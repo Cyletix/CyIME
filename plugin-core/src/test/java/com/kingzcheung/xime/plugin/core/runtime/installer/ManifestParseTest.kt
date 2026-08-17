@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.plugin.core.runtime.installer
 
+import com.kingzcheung.xime.plugin.core.model.PluginToolbarButton
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -113,5 +114,83 @@ class ManifestParseTest {
         assertTrue("含斜杠非法", !InstallerManager.isValidPluginId("a/b"))
         assertTrue("超过 64 非法", !InstallerManager.isValidPluginId("a".repeat(65)))
         assertTrue("含中文非法", !InstallerManager.isValidPluginId("插件a"))
+    }
+
+    @Test
+    fun `toolbarButtons manifest 解析为按钮列表`() {
+        val content = """
+            id: ai_reply
+            name: AI 智能回复
+            type: tool
+            toolbarButtons:
+              - id: ai_reply
+                label: AI 回复
+                icon: ai_reply.png
+              - id: ai_write
+                label: AI 帮写
+                action: custom_action
+        """.trimIndent()
+
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals("tool", config.type)
+        assertEquals(2, config.toolbarButtons.size)
+        val first = config.toolbarButtons[0]
+        assertEquals("ai_reply", first.id)
+        assertEquals("AI 回复", first.label)
+        assertEquals("ai_reply.png", first.icon)
+        assertEquals("open_panel", first.action)
+        val second = config.toolbarButtons[1]
+        assertEquals("ai_write", second.id)
+        assertEquals("AI 帮写", second.label)
+        assertEquals(null, second.icon)
+        assertEquals("custom_action", second.action)
+    }
+
+    @Test
+    fun `toolbarButtons 缺省为空列表`() {
+        val config = (InstallerManager.parseManifestContent("id: mini") as PluginParseResult.Success).config
+        assertEquals("toolbarButtons 缺省应为空", emptyList<PluginToolbarButton>(), config.toolbarButtons)
+    }
+
+    @Test
+    fun `toolbarButtons 空白 action 回落 open_panel`() {
+        val content = """
+            id: ai_reply
+            toolbarButtons:
+              - id: ai_reply
+                label: AI 回复
+                action: "   "
+        """.trimIndent()
+
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals("open_panel", config.toolbarButtons.single().action)
+    }
+
+    @Test
+    fun `toolbarButtons 非法 id 被过滤`() {
+        val content = """
+            id: ai_reply
+            toolbarButtons:
+              - id: "a,b"
+                label: 含逗号非法
+              - id: 合法_按钮
+                label: 合法
+        """.trimIndent()
+
+        val buttons = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config.toolbarButtons
+        assertEquals(1, buttons.size)
+        assertEquals("合法_按钮", buttons[0].id)
+        assertEquals("合法", buttons[0].label)
+    }
+
+    @Test
+    fun `toolbarButtons id 合法性校验`() {
+        assertTrue("反域名按钮 id 合法", InstallerManager.isValidToolbarButtonId("com.kingzcheung.xime.plugin.ai_reply"))
+        assertTrue("含冒号命名空间合法", InstallerManager.isValidToolbarButtonId("com.kingzcheung.xime.plugin:ai_reply"))
+        assertTrue("空 id 非法", !InstallerManager.isValidToolbarButtonId(""))
+        assertTrue("含逗号非法", !InstallerManager.isValidToolbarButtonId("a,b"))
+        assertTrue("含空格非法", !InstallerManager.isValidToolbarButtonId("a b"))
+        assertTrue("含尖括号非法", !InstallerManager.isValidToolbarButtonId("a<b"))
+        assertTrue("超过 64 非法", !InstallerManager.isValidToolbarButtonId("a".repeat(65)))
     }
 }

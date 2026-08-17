@@ -46,6 +46,13 @@ object PluginManager {
     @Volatile
     var httpHostApiFactory: ((pluginId: String) -> com.kingzcheung.xime.plugin.core.lua.http.HttpHostApi)? = null
 
+    /**
+     * 宿主 SSE 流式 HTTP 白名单 API 提供者（app 层注入，AI 长文本流式生成等插件使用）。
+     * 工厂参数为插件 id，宿主据此校验域名白名单与用户授权（同 httpHostApiFactory）。
+     */
+    @Volatile
+    var sseHostApiFactory: ((pluginId: String) -> com.kingzcheung.xime.plugin.core.lua.http.SseHostApi)? = null
+
     /** 宿主加密/编码原语提供者（S3 SigV4 签名等，app 层注入）。 */
     @Volatile
     var cryptoHostApiFactory: (() -> com.kingzcheung.xime.plugin.core.lua.crypto.CryptoHostApi)? = null

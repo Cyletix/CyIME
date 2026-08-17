@@ -46,7 +46,8 @@ class HttpHostApiImpl(
         method: String,
         url: String,
         headers: Map<String, String>,
-        body: ByteArray?
+        body: ByteArray?,
+        timeoutMillis: Int?
     ): HttpResponse? {
         val pluginInfo = PluginManager.getAllInstallPlugins()
             .firstOrNull { it.id == pluginId }
@@ -87,7 +88,20 @@ class HttpHostApiImpl(
                 "PROPFIND" -> requestBuilder.method("PROPFIND", null)
                 else -> requestBuilder.get()
             }
-            client.newCall(requestBuilder.build()).execute().use { response ->
+            val effectiveClient = if (timeoutMillis != null && timeoutMillis > 0) {
+                client.newBuilder()
+                    .connectTimeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
+                    .readTimeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
+                    .writeTimeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
+                    .build()
+            } else {
+                client
+            }
+            val call = effectiveClient.newCall(requestBuilder.build())
+            if (timeoutMillis != null && timeoutMillis > 0) {
+                call.timeout().timeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
+            }
+            call.execute().use { response ->
                 toHttpResponse(response)
             }
         } catch (e: Exception) {

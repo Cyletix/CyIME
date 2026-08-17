@@ -37,7 +37,8 @@ class LuaScriptRuntime(
     private val hostApi: LuaHostApi? = null,
     private val wsHostApi: com.kingzcheung.xime.plugin.core.lua.ws.WsHostApi? = null,
     private val httpHostApi: com.kingzcheung.xime.plugin.core.lua.http.HttpHostApi? = null,
-    private val cryptoHostApi: com.kingzcheung.xime.plugin.core.lua.crypto.CryptoHostApi? = null
+    private val cryptoHostApi: com.kingzcheung.xime.plugin.core.lua.crypto.CryptoHostApi? = null,
+    private val sseHostApi: com.kingzcheung.xime.plugin.core.lua.http.SseHostApi? = null
 ) {
 
     companion object {
@@ -147,6 +148,20 @@ class LuaScriptRuntime(
     /** Lua 侧注册的 WS 事件回调（host.ws.connect 的 callbacks 表）。 */
     @Volatile
     private var wsCallbacks: Map<String, LuaValue>? = null
+
+    /** SSE 会话 → Lua 回调表（host.http.stream 的 callbacks），会话 id 为宿主返回句柄。 */
+    private val sseCallbacks = ConcurrentHashMap<Int, Map<String, LuaValue>>()
+
+    /** 把 SSE 会话的流事件转发为 Lua 回调（宿主后台线程调用）。 */
+    private fun invokeSseCallback(sessionId: Int, name: String, text: String) {
+        val callbacks = sseCallbacks[sessionId] ?: return
+        val fn = callbacks[name] ?: return
+        try {
+            fn.invoke(LuaValue.valueOf(text))
+        } catch (e: Exception) {
+            api.log("host.http.stream $name 回调失败: ${e.message}")
+        }
+    }
 
     private val wsListener = object : com.kingzcheung.xime.plugin.core.lua.ws.WsHostListener {
         override fun onOpen() { wsCallbacks?.get("onOpen")?.invoke() }
@@ -385,7 +400,8 @@ class LuaScriptRuntime(
                 bodyArg.isstring() -> bodyArg.tojstring().toByteArray(Charsets.UTF_8)
                 else -> luaToBytes(bodyArg)
             }
-            val response = httpHostApi?.request(method, url, headers, body)
+            val timeoutMillis = args.arg(5).optint(0)?.takeIf { it > 0 }
+            val response = httpHostApi?.request(method, url, headers, body, timeoutMillis)
             if (response == null) {
                 CoerceJavaToLua.coerce(null)
             } else {
@@ -402,6 +418,43 @@ class LuaScriptRuntime(
         http.set("lastError", luaFunction { _ ->
             CoerceJavaToLua.coerce(httpHostApi?.lastError())
         })
+
+        // SSE 流式（异步回调模型，见 SseHostApi）。流事件经 sseCallbacks 表回调 Lua 函数。
+        if (sseHostApi != null) {
+            http.set("stream", luaFunction { args ->
+                val url = args.arg1().tojstring()
+                val headers = HashMap<String, String>()
+                LuaScriptRuntime.tableToMap(args.arg(2)).forEach { (k, v) ->
+                    headers[k] = v.tojstring()
+                }
+                val callbacks = args.arg(3)
+                val cb = HashMap<String, LuaValue>()
+                if (callbacks.istable()) {
+                    for (name in listOf("onData", "onDone", "onError")) {
+                        val fn = callbacks.get(name)
+                        if (fn.isfunction()) cb[name] = fn
+                    }
+                }
+                val timeoutMillis = args.arg(4).optint(0)?.takeIf { it > 0 }
+                var sessionId = -1
+                val listener = object : com.kingzcheung.xime.plugin.core.lua.http.SseHostListener {
+                    override fun onData(text: String) { invokeSseCallback(sessionId, "onData", text) }
+                    override fun onDone(fullText: String) { invokeSseCallback(sessionId, "onDone", fullText) }
+                    override fun onError(message: String) { invokeSseCallback(sessionId, "onError", message) }
+                }
+                sessionId = sseHostApi.connect(url, headers, listener, timeoutMillis)
+                if (sessionId >= 0) {
+                    sseCallbacks[sessionId] = cb
+                }
+                CoerceJavaToLua.coerce(sessionId)
+            })
+            http.set("closeStream", luaFunction { args ->
+                val id = args.arg1().toint()
+                sseCallbacks.remove(id)
+                sseHostApi.close(id)
+                LuaValue.NIL
+            })
+        }
         return http
     }
 

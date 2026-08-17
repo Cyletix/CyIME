@@ -71,6 +71,9 @@ class XimeApplication : Application(), ImageLoaderFactory {
         PluginManager.httpHostApiFactory = { pluginId ->
             com.kingzcheung.xime.plugin.http.HttpHostApiImpl(this, pluginId)
         }
+        PluginManager.sseHostApiFactory = { pluginId ->
+            com.kingzcheung.xime.plugin.http.SseHostApiImpl(this, pluginId)
+        }
         PluginManager.cryptoHostApiFactory = {
             com.kingzcheung.xime.plugin.crypto.CryptoHostApiImpl()
         }

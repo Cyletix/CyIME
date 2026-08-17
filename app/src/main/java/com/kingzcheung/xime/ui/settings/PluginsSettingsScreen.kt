@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Face
@@ -794,6 +795,7 @@ private fun getCategoryIcon(category: PluginCategory): ImageVector = when (categ
     PluginCategory.ASR -> Icons.Default.Mic
     PluginCategory.PREDICTION -> Icons.Default.AutoAwesome
     PluginCategory.CLIPBOARD_SYNC -> Icons.Default.Sync
+    PluginCategory.TOOL -> Icons.Default.AutoFixHigh
     PluginCategory.UNKNOWN -> Icons.Default.Extension
 }
 

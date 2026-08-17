@@ -7,6 +7,7 @@ import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.kingzcheung.xime.plugin.core.model.PluginInfo
 import com.kingzcheung.xime.plugin.core.model.PluginSource
+import com.kingzcheung.xime.plugin.core.model.PluginToolbarButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -29,7 +30,8 @@ internal data class PluginConfig(
     val maxHostVersion: String?,
     val entryScript: String?,
     val declaredHosts: List<String> = emptyList(),
-    val allowCustomHosts: Boolean = false
+    val allowCustomHosts: Boolean = false,
+    val toolbarButtons: List<PluginToolbarButton> = emptyList()
 )
 
 /** manifest.yaml 的类型化模型，与宿主一起用 kaml 解析。 */
@@ -43,13 +45,23 @@ internal data class PluginManifest(
     val description: String? = null,
     val minHostVersion: String? = null,
     val maxHostVersion: String? = null,
-    val network: NetworkConfig? = null
+    val network: NetworkConfig? = null,
+    val toolbarButtons: List<ToolbarButtonConfig> = emptyList()
 )
 
 @Serializable
 internal data class NetworkConfig(
     val hosts: List<String> = emptyList(),
     val allowCustomHosts: Boolean = false
+)
+
+/** manifest.toolbarButtons 单条（类型化）。 */
+@Serializable
+internal data class ToolbarButtonConfig(
+    val id: String,
+    val label: String = "",
+    val icon: String? = null,
+    val action: String = "open_panel"
 )
 
 /**
@@ -84,6 +96,14 @@ class InstallerManager(
         private fun isValidEntryScript(name: String): Boolean =
             ENTRY_SCRIPT_REGEX.matches(name) && !name.contains("..")
 
+        /** 工具栏按钮 id：非空；禁止逗号（偏好存储按逗号分隔）、XML 特殊字符与换行/空白控制符。
+         *  全局限定 id 建议带插件命名空间（如 `pluginId:action`）。 */
+        internal fun isValidToolbarButtonId(id: String?): Boolean {
+            if (id.isNullOrBlank()) return false
+            if (id.length > 64) return false
+            return !id.any { it in ",\u003C\u003E\"'&|\\\n\r\t " }
+        }
+
 
         private val manifestYaml: Yaml by lazy {
             Yaml(configuration = YamlConfiguration(strictMode = false))
@@ -94,6 +114,16 @@ class InstallerManager(
             val manifest = manifestYaml.decodeFromString(PluginManifest.serializer(), content)
             val declaredHosts = manifest.network?.hosts.orEmpty()
                 .filter { it.isNotBlank() }
+            val toolbarButtons = manifest.toolbarButtons
+                .filter { isValidToolbarButtonId(it.id) }
+                .map {
+                    PluginToolbarButton(
+                        id = it.id,
+                        label = it.label,
+                        icon = it.icon?.takeIf { i -> i.isNotBlank() },
+                        action = it.action.ifBlank { "open_panel" }
+                    )
+                }
 
             PluginParseResult.Success(
                 PluginConfig(
@@ -106,7 +136,8 @@ class InstallerManager(
                     maxHostVersion = manifest.maxHostVersion?.takeIf { it.isNotBlank() },
                     entryScript = manifest.entry,
                     declaredHosts = declaredHosts,
-                    allowCustomHosts = manifest.network?.allowCustomHosts ?: false
+                    allowCustomHosts = manifest.network?.allowCustomHosts ?: false,
+                    toolbarButtons = toolbarButtons
                 )
             )
         } catch (e: Exception) {
@@ -213,7 +244,8 @@ class InstallerManager(
                 trustLevel = com.kingzcheung.xime.plugin.core.util.PluginSignatureUtil.classifyLuaPlugin(source),
                 entryScript = entryScript,
                 declaredHosts = pluginConfig.declaredHosts,
-                allowCustomHosts = pluginConfig.allowCustomHosts
+                allowCustomHosts = pluginConfig.allowCustomHosts,
+                toolbarButtons = pluginConfig.toolbarButtons
             )
 
             if (existingPlugin != null) {

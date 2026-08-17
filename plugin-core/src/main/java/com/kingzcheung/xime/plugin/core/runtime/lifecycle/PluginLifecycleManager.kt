@@ -153,7 +153,8 @@ class PluginLifecycleManager(
                 configStore = PluginManager.configStoreFactory.create(application, plugin.id),
                 wsHostApi = PluginManager.wsHostApiFactory?.invoke(plugin.id),
                 httpHostApi = PluginManager.httpHostApiFactory?.invoke(plugin.id),
-                cryptoHostApi = PluginManager.cryptoHostApiFactory?.invoke()
+                cryptoHostApi = PluginManager.cryptoHostApiFactory?.invoke(),
+                sseHostApi = PluginManager.sseHostApiFactory?.invoke(plugin.id)
             )
             LoadedPluginInfo(pluginInfo = plugin, script = runtime)
         } catch (e: Exception) {

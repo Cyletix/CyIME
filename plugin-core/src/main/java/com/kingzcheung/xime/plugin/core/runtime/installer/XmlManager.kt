@@ -3,6 +3,7 @@ package com.kingzcheung.xime.plugin.core.runtime.installer
 import android.app.Application
 import com.kingzcheung.xime.plugin.core.model.PluginInfo
 import com.kingzcheung.xime.plugin.core.model.PluginSource
+import com.kingzcheung.xime.plugin.core.model.PluginToolbarButton
 import java.io.File
 
 class XmlManager(private val context: Application) {
@@ -70,6 +71,13 @@ class XmlManager(private val context: Application) {
                     if (plugin.allowCustomHosts) {
                         writer.write("    <allowCustomHosts>true</allowCustomHosts>\n")
                     }
+                    for (button in plugin.toolbarButtons) {
+                        writer.write("    <toolbarButton id=\"${escapeXml(button.id)}\" label=\"${escapeXml(button.label)}\"")
+                        if (button.icon != null) {
+                            writer.write(" icon=\"${escapeXml(button.icon)}\"")
+                        }
+                        writer.write(" action=\"${escapeXml(button.action)}\"/>\n")
+                    }
                     writer.write("  </plugin>\n")
                 }
                 writer.write("</plugins>\n")
@@ -118,6 +126,7 @@ class XmlManager(private val context: Application) {
                 ?.filter { it.isNotBlank() }
                 ?: emptyList()
             val allowCustomHosts = extractTag(pluginContent, "allowCustomHosts")?.toBoolean() ?: false
+            val toolbarButtons = parseToolbarButtons(pluginContent)
             val trustLevel = com.kingzcheung.xime.plugin.core.util.PluginSignatureUtil.classifyLuaPlugin(source)
 
             if (id != null && path != null) {
@@ -138,10 +147,32 @@ class XmlManager(private val context: Application) {
                     trustLevel = trustLevel,
                     entryScript = entryScript,
                     declaredHosts = networkHosts,
-                    allowCustomHosts = allowCustomHosts
+                    allowCustomHosts = allowCustomHosts,
+                    toolbarButtons = toolbarButtons
                 )
             }
         }
+    }
+
+    private fun parseToolbarButtons(pluginContent: String): List<PluginToolbarButton> {
+        val regex = Regex("<toolbarButton\\b([^>]*)/>")
+        return regex.findAll(pluginContent).mapNotNull { m ->
+            val tag = m.groupValues[1]
+            val id = extractAttribute(tag, "id") ?: return@mapNotNull null
+            val rawIcon = extractAttribute(tag, "icon")
+            PluginToolbarButton(
+                id = unescapeXml(id),
+                label = unescapeXml(extractAttribute(tag, "label").orEmpty()),
+                icon = rawIcon?.let { if (it.isEmpty()) null else unescapeXml(it) },
+                action = unescapeXml(extractAttribute(tag, "action").orEmpty())
+                    .ifBlank { "open_panel" }
+            )
+        }.toList()
+    }
+
+    private fun extractAttribute(tag: String, name: String): String? {
+        val regex = Regex("(?:^|\\s)$name=\"([^\"]*)\"")
+        return regex.find(tag)?.groupValues?.get(1)
     }
 
     private fun extractTag(content: String, tagName: String): String? {
@@ -156,5 +187,14 @@ class XmlManager(private val context: Application) {
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
             .replace("'", "&apos;")
+    }
+
+    private fun unescapeXml(text: String): String {
+        return text
+            .replace("&apos;", "'")
+            .replace("&quot;", "\"")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
     }
 }
