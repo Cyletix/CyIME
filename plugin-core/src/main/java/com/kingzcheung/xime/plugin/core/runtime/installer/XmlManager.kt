@@ -78,6 +78,9 @@ class XmlManager(private val context: Application) {
                         }
                         writer.write(" action=\"${escapeXml(button.action)}\"/>\n")
                     }
+                    if (plugin.manifestIcon != null) {
+                        writer.write("    <manifestIcon>${escapeXml(plugin.manifestIcon)}</manifestIcon>\n")
+                    }
                     writer.write("  </plugin>\n")
                 }
                 writer.write("</plugins>\n")
@@ -128,6 +131,7 @@ class XmlManager(private val context: Application) {
             val allowCustomHosts = extractTag(pluginContent, "allowCustomHosts")?.toBoolean() ?: false
             val toolbarButtons = parseToolbarButtons(pluginContent)
             val trustLevel = com.kingzcheung.xime.plugin.core.util.PluginSignatureUtil.classifyLuaPlugin(source)
+            val manifestIcon = extractTag(pluginContent, "manifestIcon")?.takeIf { it.isNotBlank() }
 
             if (id != null && path != null) {
                 plugins[id] = PluginInfo(
@@ -148,7 +152,8 @@ class XmlManager(private val context: Application) {
                     entryScript = entryScript,
                     declaredHosts = networkHosts,
                     allowCustomHosts = allowCustomHosts,
-                    toolbarButtons = toolbarButtons
+                    toolbarButtons = toolbarButtons,
+                    manifestIcon = manifestIcon
                 )
             }
         }

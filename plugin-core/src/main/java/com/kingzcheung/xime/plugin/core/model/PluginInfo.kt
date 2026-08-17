@@ -35,7 +35,9 @@ data class PluginInfo(
      *  插件配置中用户填写的 URL 域名自动获得联网授权（剪贴板同步等服务器地址场景）。 */
     val allowCustomHosts: Boolean = false,
     /** 插件声明的工具栏按钮（manifest.toolbarButtons）。宿主据此在工具栏渲染插件入口。 */
-    val toolbarButtons: List<PluginToolbarButton> = emptyList()
+    val toolbarButtons: List<PluginToolbarButton> = emptyList(),
+    /** manifest 顶层 icon 原文：文字（如 "译"）或 resources/ 下图片文件名。工具栏按钮无专属图标时兜底。 */
+    val manifestIcon: String? = null,
 ) {
     val version: String get() = versionName
     val category: PluginCategory get() = PluginCategory.fromId(type)

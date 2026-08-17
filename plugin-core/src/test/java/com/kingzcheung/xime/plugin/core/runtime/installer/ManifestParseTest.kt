@@ -193,4 +193,20 @@ class ManifestParseTest {
         assertTrue("含尖括号非法", !InstallerManager.isValidToolbarButtonId("a<b"))
         assertTrue("超过 64 非法", !InstallerManager.isValidToolbarButtonId("a".repeat(65)))
     }
+
+    @Test
+    fun `manifest 顶层 icon 解析透传`() {
+        val content = """
+            id: ai_translate
+            name: AI 翻译
+            type: tool
+            icon: 译
+        """.trimIndent()
+
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals("译", config.icon)
+
+        val noIcon = (InstallerManager.parseManifestContent("id: mini") as PluginParseResult.Success).config
+        assertEquals("缺省 icon 为 null", null, noIcon.icon)
+    }
 }

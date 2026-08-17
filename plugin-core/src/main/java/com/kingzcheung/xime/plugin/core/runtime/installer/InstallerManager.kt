@@ -31,7 +31,8 @@ internal data class PluginConfig(
     val entryScript: String?,
     val declaredHosts: List<String> = emptyList(),
     val allowCustomHosts: Boolean = false,
-    val toolbarButtons: List<PluginToolbarButton> = emptyList()
+    val toolbarButtons: List<PluginToolbarButton> = emptyList(),
+    val icon: String? = null
 )
 
 /** manifest.yaml 的类型化模型，与宿主一起用 kaml 解析。 */
@@ -46,7 +47,9 @@ internal data class PluginManifest(
     val minHostVersion: String? = null,
     val maxHostVersion: String? = null,
     val network: NetworkConfig? = null,
-    val toolbarButtons: List<ToolbarButtonConfig> = emptyList()
+    val toolbarButtons: List<ToolbarButtonConfig> = emptyList(),
+    /** 顶层 icon：文字（如 "译"）或 resources/ 下图片文件名。 */
+    val icon: String? = null
 )
 
 @Serializable
@@ -137,7 +140,8 @@ class InstallerManager(
                     entryScript = manifest.entry,
                     declaredHosts = declaredHosts,
                     allowCustomHosts = manifest.network?.allowCustomHosts ?: false,
-                    toolbarButtons = toolbarButtons
+                    toolbarButtons = toolbarButtons,
+                    icon = manifest.icon?.takeIf { it.isNotBlank() }
                 )
             )
         } catch (e: Exception) {
@@ -245,7 +249,8 @@ class InstallerManager(
                 entryScript = entryScript,
                 declaredHosts = pluginConfig.declaredHosts,
                 allowCustomHosts = pluginConfig.allowCustomHosts,
-                toolbarButtons = pluginConfig.toolbarButtons
+                toolbarButtons = pluginConfig.toolbarButtons,
+                manifestIcon = pluginConfig.icon
             )
 
             if (existingPlugin != null) {

@@ -8,6 +8,7 @@ import com.kingzcheung.xime.plugin.core.lua.LuaClipboardSyncPluginAdapter
 import com.kingzcheung.xime.plugin.core.lua.LuaEmojiPluginAdapter
 import com.kingzcheung.xime.plugin.core.lua.LuaPluginAdapter
 import com.kingzcheung.xime.plugin.core.lua.LuaScriptRuntime
+import com.kingzcheung.xime.plugin.core.lua.LuaToolPluginAdapter
 import com.kingzcheung.xime.plugin.core.model.PluginCategory
 import com.kingzcheung.xime.plugin.core.model.PluginContext
 import com.kingzcheung.xime.plugin.core.model.PluginInfo
@@ -185,6 +186,11 @@ class PluginLifecycleManager(
                     )
                 PluginCategory.CLIPBOARD_SYNC ->
                     LuaClipboardSyncPluginAdapter(
+                        runtime = loadedPlugin.script ?: return null,
+                        pluginContext = pluginContext
+                    )
+                PluginCategory.TOOL ->
+                    LuaToolPluginAdapter(
                         runtime = loadedPlugin.script ?: return null,
                         pluginContext = pluginContext
                     )

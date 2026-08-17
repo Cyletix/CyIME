@@ -55,6 +55,7 @@ open class LuaPluginAdapter(
     }
 
     private fun parseFieldType(type: String?): PluginFieldType = when (type) {
+        "textarea" -> PluginFieldType.TEXTAREA
         "secret" -> PluginFieldType.SECRET
         "select" -> PluginFieldType.SELECT
         "multi_select" -> PluginFieldType.MULTI_SELECT

@@ -96,6 +96,49 @@ object ExtensionManager {
         return result
     }
     
+    /**
+     * 提取插件工具栏按钮图标（manifest.toolbarButtons[].icon，resources/ 下相对路径）
+     * 到本地 plugin_icons/ 目录并返回本地文件路径；无图标或提取失败返回 null（宿主用 label 兜底）。
+     */
+    fun extractToolbarButtonIcon(context: Context, pluginId: String, pluginInfo: PluginInfo, iconName: String?): PluginIcon? {
+        if (iconName.isNullOrBlank()) return null
+        val iconDir = File(context.filesDir, "plugin_icons")
+        if (!iconDir.exists()) iconDir.mkdirs()
+        val iconFile = File(iconDir, "${pluginId}_tb_$iconName")
+
+        if (!iconFile.exists()) {
+            // Lua 插件资源在 resources/ 目录（path 指向入口脚本，其父目录为插件目录）
+            val resourceFile = pluginInfo.path
+                ?.let { File(it).parentFile }
+                ?.let { File(it, "resources/$iconName") }
+            if (resourceFile != null && resourceFile.exists()) {
+                try {
+                    resourceFile.copyTo(iconFile, overwrite = true)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to extract toolbar icon for $pluginId", e)
+                }
+            }
+        }
+
+        return if (iconFile.exists()) PluginIcon(assetName = iconFile.absolutePath) else null
+    }
+
+    /** manifest 顶层 icon 识别为图片文件名（常见图片扩展名）。 */
+    private val IMAGE_EXTENSION_REGEX = Regex("(?i)\\.(png|jpe?g|gif|webp|svg)$")
+
+    /**
+     * 解析插件 manifest 顶层 icon（[PluginInfo.manifestIcon]）：文字（如 "译"）直接作为文本图标，
+     * 图片文件名则从插件 resources/ 提取到本地 plugin_icons/。
+     * 供工具栏按钮无专属图标时兜底。
+     */
+    fun extractPluginManifestIcon(context: Context, pluginInfo: PluginInfo): PluginIcon? {
+        val manifestIcon = pluginInfo.manifestIcon ?: return null
+        if (!IMAGE_EXTENSION_REGEX.containsMatchIn(manifestIcon)) {
+            return PluginIcon(text = manifestIcon)
+        }
+        return extractToolbarButtonIcon(context, pluginInfo.id, pluginInfo, manifestIcon)
+    }
+
     suspend fun loadEmojiDataFromPlugins(context: Context) {
         val pluginCategories = mutableListOf<EmojiCategory>()
         

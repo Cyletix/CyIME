@@ -23,6 +23,47 @@ import kotlinx.coroutines.withContext
  */
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal fun handleKeyPress(key: String, isShifted: Boolean) {
+        if (service.uiState.value.toolPanelInputFocused) {
+            when (key) {
+                "enter" -> {
+                    service.triggerToolPanelGenerate()
+                    return
+                }
+                "delete" -> {
+                    ToolPanelEditTextHolder.editText?.let { et ->
+                        val start = et.selectionStart.coerceAtLeast(0)
+                        val end = et.selectionEnd.coerceAtLeast(start)
+                        if (start == end && start > 0) {
+                            et.text?.delete(start - 1, start)
+                            try { et.setSelection(start - 1) } catch (_: Exception) {}
+                        } else if (end > start) {
+                            et.text?.delete(start, end)
+                            try { et.setSelection(start) } catch (_: Exception) {}
+                        }
+                    }
+                    return
+                }
+                "space" -> {
+                    ToolPanelEditTextHolder.editText?.let { et ->
+                        val start = et.selectionStart.coerceAtLeast(0)
+                        et.text?.insert(start, " ")
+                        try { et.setSelection(start + 1) } catch (_: Exception) {}
+                    }
+                    return
+                }
+                else -> {
+                    if (key.length == 1) {
+                        val char = if (isShifted) key.uppercase() else key
+                        ToolPanelEditTextHolder.editText?.let { et ->
+                            val start = et.selectionStart.coerceAtLeast(0)
+                            et.text?.insert(start, char)
+                            try { et.setSelection(start + char.length) } catch (_: Exception) {}
+                        }
+                        return
+                    }
+                }
+            }
+        }
         if (service.uiState.value.quickSendFormFocused) {
             when (key) {
                 "enter" -> {

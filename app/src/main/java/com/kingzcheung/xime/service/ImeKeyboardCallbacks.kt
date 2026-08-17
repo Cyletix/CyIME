@@ -202,6 +202,15 @@ internal fun rememberImeKeyboardCallbacks(
                 SettingsPreferences.setToolbarButtons(service, buttons)
                 service.uiState.value = service.uiState.value.copy(toolbarButtons = buttons)
             },
+            onOpenToolPanel = { pluginId -> service.openToolPanel(pluginId) },
+            onToolPanelClose = { service.closeToolPanel() },
+            onToolPanelItemClick = { item -> service.commitToolPanelItem(item.text) },
+            onToolPanelRegenerate = { service.triggerToolPanelGenerate() },
+            onToolPanelFocusChange = { focused ->
+                service.uiState.value = service.uiState.value.copy(
+                    toolPanelInputFocused = focused,
+                )
+            },
             onKeyboardModeChange = { chineseMode ->
                 if (service.isChineseMode != chineseMode) {
                     service.isChineseMode = chineseMode
@@ -308,6 +317,7 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onShowQuickSendForm = {
+                service.closeToolPanel()
                 val current = service.uiState.value
                 service.uiState.value = current.copy(
                     showQuickSendForm = true,

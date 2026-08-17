@@ -218,6 +218,27 @@ private fun PluginSettingFieldEditor(
     }
 
     when (field.type) {
+        PluginFieldType.TEXTAREA -> {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {
+                    value = it
+                    persist()
+                },
+                label = { Text(field.label) },
+                placeholder = field.placeholder?.let { { Text(it) } },
+                minLines = 4,
+                maxLines = 8,
+                supportingText = field.helpText?.let { { Text(it) } },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                )
+            )
+        }
+
         PluginFieldType.TEXT,
         PluginFieldType.NUMBER -> {
             OutlinedTextField(
