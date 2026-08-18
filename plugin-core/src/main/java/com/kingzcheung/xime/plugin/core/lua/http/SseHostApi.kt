@@ -12,7 +12,10 @@ package com.kingzcheung.xime.plugin.core.lua.http
  * - 每个会话一个句柄：宿主返回递增会话 id，`close(id)` 可主动中断，防止旧请求继续回调
  *
  * Lua 侧注入为 `host.http.stream / host.http.closeStream`：
- *   local id = host.http.stream(url, headers, { onData=fn, onDone=fn, onError=fn })  -- 失败返回 -1（lastError 读原因）
+ *   local id = host.http.stream(url, headers, { onData=fn, onDone=fn, onError=fn }, timeoutMillis, method, body)
+ *     -- method 默认 "POST"（AI 对话接口通常为 POST 携带 JSON body），GET 可显式传
+ *     -- body 文本或二进制（null 表示无请求体）
+ *     -- 失败返回 -1（lastError 读原因）
  *   host.http.closeStream(id)
  *
  * @see com.kingzcheung.xime.plugin.core.lua.http.HttpHostApi
@@ -27,13 +30,17 @@ interface SseHostApi {
      * @param headers 请求头（如 Authorization、Content-Type、Accept: text/event-stream）
      * @param listener 流事件回调（后台线程 invoke，插件 Lua 需自行同步/去抖）
      * @param timeoutMillis 覆盖默认超时（毫秒）；null 使用宿主默认（SSE 默认读超时为无限，见实现）
+     * @param method   HTTP 方法（默认 GET；AI 对话流式接口通常为 POST）
+     * @param body     请求体（文本转 UTF-8 字节，二进制原始字节；无请求体传 null）
      * @return 会话 id（>=0）；失败返回 -1（用 [lastError] 读取原因）
      */
     fun connect(
         url: String,
         headers: Map<String, String> = emptyMap(),
         listener: SseHostListener,
-        timeoutMillis: Int? = null
+        timeoutMillis: Int? = null,
+        method: String = "GET",
+        body: ByteArray? = null
     ): Int
 
     /** 主动中断指定会话（幂等）。中断后该会话不再回调。 */

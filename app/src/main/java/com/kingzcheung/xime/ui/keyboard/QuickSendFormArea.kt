@@ -25,6 +25,7 @@ fun QuickSendFormArea(
     editingItemId: Long? = null,
     onClose: (text: String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
         MaterialTheme.colorScheme.surface,
@@ -41,6 +42,7 @@ fun QuickSendFormArea(
         closeButtonColor = accentColor,
         title = title,
         titleColor = textColor,
+        modifier = modifier,
         onCloseClick = {
             val et = QuickSendFormEditTextHolder.editText
             onClose(et?.text?.toString() ?: "")

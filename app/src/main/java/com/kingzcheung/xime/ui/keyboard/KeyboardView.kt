@@ -212,6 +212,7 @@ fun KeyboardView(
         onCardPositioned = onCardPositioned,
     ) {
     Box(modifier = contentModifier) {
+        Box {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1027,6 +1028,7 @@ fun KeyboardView(
         }
         }
     }
+}
 }
 }
 

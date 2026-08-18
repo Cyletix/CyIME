@@ -34,7 +34,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.kingzcheung.xime.keyboard.ToolPanelItem
 import com.kingzcheung.xime.service.ToolPanelEditTextHolder
 
-private val TOOL_PANEL_HEIGHT = 200
+private val TOOL_PANEL_HEIGHT = 170
 
 @Composable
 fun ToolPanel(
@@ -51,6 +51,7 @@ fun ToolPanel(
     onFocusChange: (Boolean) -> Unit,
     onItemClick: (ToolPanelItem) -> Unit,
     onRegenerate: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
         MaterialTheme.colorScheme.surface,
@@ -66,6 +67,7 @@ fun ToolPanel(
         closeButtonColor = accentColor,
         title = title,
         titleColor = textColor,
+        modifier = modifier,
         onCloseClick = onClose,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -106,6 +108,31 @@ fun ToolPanel(
                     .height(52.dp),
             )
 
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(items) { item ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onItemClick(item) }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = item.text,
+                            color = textColor,
+                            fontSize = 14.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -134,31 +161,6 @@ fun ToolPanel(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("重新生成", color = accentColor, fontSize = 12.sp)
                         }
-                    }
-                }
-            }
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items(items) { item ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onItemClick(item) }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        Text(
-                            text = item.text,
-                            color = textColor,
-                            fontSize = 14.sp,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
                     }
                 }
             }

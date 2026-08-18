@@ -1,9 +1,9 @@
--- AI 翻译插件（Lua 脚本插件）
+-- AI 翻译插件（Lua 脚本插件，SSE 流式）
 --
 -- 职责划分：
---   Lua   = prompt 模板组装（{context}/{targetLang}）+ 同步调用 LLM + 解析译文
---   宿主  = 通用工具面板 + 选区替换上屏（选中文本优先预填，结果替换原选区）
---     host.http.request  同步 HTTP（第 5 参 timeoutMillis）
+--   Lua   = prompt 模板组装（{context}/{targetLang}）+ 发起流式请求（host.http.stream）+ 累积译文
+--   宿主  = 通用工具面板 + 结果交互自适应（1 条自动上屏替换选区 / 多条候选选择）
+--     host.http.stream   SSE 流式（异步回调 onData/onDone/onError）
 --     host.json          JSON 编解码
 --     host.config        配置存储
 
@@ -23,8 +23,9 @@ local DEFAULTS = {
 }
 
 local lastContext = ""
-local cachedItems = {}
+local buffer = ""
 local generating = false
+local sessionId = -1
 
 -- ================= 配置 schema（与 manifest 一致，插件中心表单数据源） =================
 
@@ -67,10 +68,15 @@ function plugin.getSettingsSchema()
   }
 end
 
+local function buildItems()
+  if buffer == "" then return {} end
+  return { { id = "result", text = buffer } }
+end
+
 function plugin.getPanelState(inputText)
   return {
     inputText = inputText,
-    items = cachedItems,
+    items = buildItems(),
     actions = { { id = "generate", label = "翻译" } },
     loading = generating,
   }
@@ -95,8 +101,8 @@ function plugin.onPanelAction(actionId)
     return
   end
 
+  buffer = ""
   generating = true
-  cachedItems = {}
 
   local baseUrl = host.config.get(KEY_BASE_URL) or DEFAULTS.baseUrl
   baseUrl = baseUrl:gsub("/+$", "")
@@ -113,6 +119,7 @@ function plugin.onPanelAction(actionId)
       { role = "user", content = prompt },
     },
     temperature = 0.3,
+    stream = true,
   })
   local headers = {
     ["Content-Type"] = "application/json",
@@ -120,29 +127,34 @@ function plugin.onPanelAction(actionId)
   }
   local url = baseUrl .. "/chat/completions"
 
-  local resp = host.http.request("POST", url, headers, body, 60000)
-  if resp == nil then
-    host.logError("AI 请求失败: " .. (host.http.lastError() or "未知错误"))
+  sessionId = host.http.stream(url, headers, {
+    onData = function(text)
+      if text == nil or text == "" or text == "[DONE]" then return end
+      local data = host.json.decode(text)
+      if data ~= nil and data.choices ~= nil and #data.choices > 0 then
+        local delta = data.choices[1].delta
+        if delta ~= nil and delta.content ~= nil then
+          buffer = buffer .. delta.content
+        end
+      end
+    end,
+    onDone = function(fullText)
+      if fullText ~= nil and fullText ~= "" and buffer == "" then
+        buffer = fullText
+      end
+      generating = false
+      sessionId = -1
+    end,
+    onError = function(message)
+      host.logError("AI 流式请求失败: " .. (message or "未知错误"))
+      generating = false
+      sessionId = -1
+    end,
+  }, 0, "POST", body)
+  if sessionId < 0 then
     generating = false
-    return
+    host.logError("AI 流式连接被拒绝: " .. (host.http.lastError() or "未知错误"))
   end
-  if resp.status ~= 200 then
-    host.logError("AI 接口返回 " .. tostring(resp.status) .. ": " .. resp.text)
-    generating = false
-    return
-  end
-
-  local data = host.json.decode(resp.text)
-  local items = {}
-  if data ~= nil and data.choices ~= nil and #data.choices > 0 then
-    local content = data.choices[1].message.content or ""
-    local trimmed = content:gsub("^%s+", ""):gsub("%s+$", "")
-    if trimmed ~= "" then
-      items[#items + 1] = { id = "1", text = trimmed }
-    end
-  end
-  cachedItems = items
-  generating = false
 end
 
 function plugin.onPanelItemClick(itemId)

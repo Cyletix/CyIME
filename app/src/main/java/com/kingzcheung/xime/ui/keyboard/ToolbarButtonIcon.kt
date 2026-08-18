@@ -26,7 +26,7 @@ fun ToolbarButtonIcon(
     tint: Color,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
-    fontSize: TextUnit = 10.sp,
+    fontSize: TextUnit = 16.sp,
 ) {
     when (item) {
         is ToolbarButtonItem.Builtin -> Icon(

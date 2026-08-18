@@ -12,8 +12,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
@@ -62,7 +64,9 @@ class SseHostApiImpl(
         url: String,
         headers: Map<String, String>,
         listener: SseHostListener,
-        timeoutMillis: Int?
+        timeoutMillis: Int?,
+        method: String,
+        body: ByteArray?
     ): Int {
         val pluginInfo = PluginManager.getAllInstallPlugins()
             .firstOrNull { it.id == pluginId }
@@ -89,6 +93,14 @@ class SseHostApiImpl(
         return try {
             val requestBuilder = Request.Builder().url(url)
             headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
+            // 与 HttpHostApiImpl 一致：尊重调用方显式声明的 Content-Type，避免 OkHttp 用
+            // RequestBody 默认 mediaType 覆盖（阿里云 MaaS 网关对 octet-stream 请求挂起）。
+            if (body != null) {
+                val contentType = headers["Content-Type"] ?: "application/octet-stream"
+                requestBuilder.method(method.uppercase(), body.toRequestBody(contentType.toMediaType()))
+            } else {
+                requestBuilder.method(method.uppercase(), null)
+            }
             val request = requestBuilder.build()
 
             val effectiveClient = if (timeoutMillis != null && timeoutMillis > 0) {

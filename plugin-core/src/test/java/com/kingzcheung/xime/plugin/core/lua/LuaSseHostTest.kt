@@ -56,7 +56,9 @@ class LuaSseHostTest {
             url: String,
             headers: Map<String, String>,
             listener: SseHostListener,
-            timeoutMillis: Int?
+            timeoutMillis: Int?,
+            method: String,
+            body: ByteArray?
         ): Int {
             connectedUrl = url
             connectedHeaders = headers

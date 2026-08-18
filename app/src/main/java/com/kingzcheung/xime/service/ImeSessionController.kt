@@ -96,7 +96,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             }
         }
 
-        if (codeInInputBox) {
+        if (codeInInputBox && !service.uiState.value.toolPanelInputFocused) {
             val ic = service.currentInputConnection
             if (isComposing && displayText.isNotEmpty()) {
                 showInputBoxComposition(ic, displayText)

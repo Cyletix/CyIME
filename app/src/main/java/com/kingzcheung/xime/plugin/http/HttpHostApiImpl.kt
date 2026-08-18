@@ -37,6 +37,19 @@ class HttpHostApiImpl(
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val request = chain.request()
+            Log.d(TAG, "[$pluginId] >>> ${request.method} ${request.url}")
+            val start = System.currentTimeMillis()
+            try {
+                val resp = chain.proceed(request)
+                Log.d(TAG, "[$pluginId] <<< ${resp.code} in ${System.currentTimeMillis() - start}ms")
+                resp
+            } catch (e: Exception) {
+                Log.d(TAG, "[$pluginId] <<< FAIL ${e.message} in ${System.currentTimeMillis() - start}ms")
+                throw e
+            }
+        }
         .build()
 
     @Volatile
@@ -76,7 +89,10 @@ class HttpHostApiImpl(
         return try {
             val requestBuilder = Request.Builder().url(url)
             headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
-            val requestBody = (body ?: ByteArray(0)).toRequestBody(JSON_MEDIA_TYPE)
+            // 尊重调用方显式声明的 Content-Type(如 RTF/DIP 服务的 application/json);OkHttp 的
+            // post(body) 会用 RequestBody 的 mediaType 覆盖 header,这里先取 header 再建 body。
+            val contentType = headers["Content-Type"] ?: "application/octet-stream"
+            val requestBody = (body ?: ByteArray(0)).toRequestBody(contentType.toMediaType())
             when (method.uppercase()) {
                 "GET" -> requestBuilder.get()
                 "DELETE" -> requestBuilder.delete()
@@ -151,6 +167,4 @@ class HttpHostApiImpl(
             body = bytes
         )
     }
-
-    private val JSON_MEDIA_TYPE = "application/octet-stream".toMediaType()
 }

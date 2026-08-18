@@ -326,6 +326,7 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendEditingItemText = "",
                     enterKeyText = "确定",
                 )
+                service.forceInsetsRecompute()
             },
             onQuickSendEditItem = { id, text ->
                 service.uiState.value = service.uiState.value.copy(
@@ -350,6 +351,8 @@ internal fun rememberImeKeyboardCallbacks(
                 )
                 QuickSendFormEditTextHolder.editText = null
                 service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(1))
+                // 兜底：强制容器真实尺寸变化，触发 IME insets 重算恢复为纯键盘高度（防残留）。
+                service.forceInsetsRecompute()
             },
             onQuickSendFormFocusChange = { focused: Boolean ->
                 service.uiState.value = service.uiState.value.copy(

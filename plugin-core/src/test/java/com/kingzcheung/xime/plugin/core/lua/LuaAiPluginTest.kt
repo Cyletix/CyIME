@@ -48,12 +48,20 @@ class LuaAiPluginTest {
         var listener: SseHostListener? = null
         var closedIds = mutableListOf<Int>()
         var returnId = 100
+        var connectedMethod: String? = null
+        var connectedBody: ByteArray? = null
+        var connectedCount = 0
         override fun connect(
             url: String,
             headers: Map<String, String>,
             listener: SseHostListener,
-            timeoutMillis: Int?
+            timeoutMillis: Int?,
+            method: String,
+            body: ByteArray?
         ): Int {
+            connectedCount++
+            connectedMethod = method
+            connectedBody = body
             this.listener = listener
             return returnId
         }
@@ -191,27 +199,23 @@ class LuaAiPluginTest {
     }
 
     @Test
-    fun `ai-translate 同步翻译生成译文`() {
+    fun `ai-translate 流式翻译生成译文`() {
         val dir = File("../plugins/ai-translate")
         assertTrue("ai-translate 插件目录应存在: ${dir.absolutePath}", dir.exists())
         val store = InMemoryConfigStore()
         store.set("apiKey", "test-key")
         store.set("baseUrl", "https://api.example.com/v1")
         store.set("targetLang", "English")
-        val mockHttp = MockHttpHostApi(
-            HttpResponse(
-                status = 200,
-                body = "{\"choices\":[{\"message\":{\"content\":\"Hello world\"}}]}".toByteArray()
-            )
-        )
+        val sse = MockSseHostApi()
         val runtime = LuaScriptRuntime(
             "com.kingzcheung.xime.plugin.ai_translate",
             dir,
             "main.lua",
             store,
-            httpHostApi = mockHttp
+            sseHostApi = sse
         )
         assertTrue("main.lua 应能加载", runtime.load())
+
         val adapter = LuaToolPluginAdapter(runtime, com.kingzcheung.xime.plugin.core.model.PluginContext(
             application = android.app.Application(),
             pluginInfo = com.kingzcheung.xime.plugin.core.model.PluginInfo(
@@ -221,12 +225,27 @@ class LuaAiPluginTest {
             ),
             configStore = store,
         ))
-
         adapter.onPanelInput("你好世界")
         adapter.onPanelAction("generate")
 
-        val state = adapter.getPanelState("你好世界")
-        assertFalse(state.loading)
+        assertEquals("应发起 SSE 流式连接", 1, sse.connectedCount)
+        assertEquals("SSE 应使用 POST", "POST", sse.connectedMethod)
+        assertNotNull("SSE 应携带 JSON body", sse.connectedBody)
+
+        var state = adapter.getPanelState("你好世界")
+        assertTrue("生成中应 loading", state.loading)
+
+        // 流式增量累积
+        sse.listener?.onData("""{"choices":[{"delta":{"content":"Hello"}}]}""")
+        state = adapter.getPanelState("你好世界")
+        assertTrue("流式期间应 loading", state.loading)
+        assertEquals("增量累积", "Hello", state.items.single().text)
+
+        sse.listener?.onData("""{"choices":[{"delta":{"content":" world"}}]}""")
+        sse.listener?.onDone("Hello world")
+
+        state = adapter.getPanelState("你好世界")
+        assertFalse("onDone 后不再加载", state.loading)
         assertEquals("译文解析", "Hello world", state.items.single().text)
     }
 

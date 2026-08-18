@@ -325,8 +325,10 @@ class LuaScriptRuntime(
             host.set("ws", buildWsTable())
         }
 
-        // 通用 HTTP 白名单 API（协议无关，剪贴板同步等插件使用，见 HttpHostApi）
-        if (httpHostApi != null) {
+        // 通用 HTTP 白名单 API（协议无关，剪贴板同步等插件使用，见 HttpHostApi）。
+        // 同步 request 依赖 httpHostApi，流式 stream 依赖 sseHostApi，两者各自判空注册，
+        // 因此宿主任一提供时都要挂出 host.http 表（否则只配 SSE 的插件拿不到 stream）。
+        if (httpHostApi != null || sseHostApi != null) {
             host.set("http", buildHttpTable())
         }
 
@@ -436,13 +438,20 @@ class LuaScriptRuntime(
                     }
                 }
                 val timeoutMillis = args.arg(4).optint(0)?.takeIf { it > 0 }
+                val method = if (args.arg(5).isnil()) "GET" else args.arg(5).tojstring().uppercase()
+                val bodyArg = args.arg(6)
+                val body: ByteArray? = when {
+                    bodyArg.isnil() -> null
+                    bodyArg.isstring() -> bodyArg.tojstring().toByteArray(Charsets.UTF_8)
+                    else -> luaToBytes(bodyArg)
+                }
                 var sessionId = -1
                 val listener = object : com.kingzcheung.xime.plugin.core.lua.http.SseHostListener {
                     override fun onData(text: String) { invokeSseCallback(sessionId, "onData", text) }
                     override fun onDone(fullText: String) { invokeSseCallback(sessionId, "onDone", fullText) }
                     override fun onError(message: String) { invokeSseCallback(sessionId, "onError", message) }
                 }
-                sessionId = sseHostApi.connect(url, headers, listener, timeoutMillis)
+                sessionId = sseHostApi.connect(url, headers, listener, timeoutMillis, method, body)
                 if (sessionId >= 0) {
                     sseCallbacks[sessionId] = cb
                 }

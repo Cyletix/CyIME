@@ -7,7 +7,7 @@ id: com.kingzcheung.xime.plugin.ai_reply
 
 # 插件名称与描述
 name: AI 智能回复
-icon: "AI"
+icon: "应"
 description: 根据对方消息生成 3~5 条回复候选，点选上屏。支持任意 OpenAI 兼容的 chat/completions 接口。
 
 # 插件版本
