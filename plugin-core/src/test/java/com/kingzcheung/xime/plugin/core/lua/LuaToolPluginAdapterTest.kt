@@ -82,6 +82,47 @@ class LuaToolPluginAdapterTest {
     }
 
     @Test
+    fun `getPanelState 解析结果模式声明`() {
+        val dir = writeScript(
+            """
+            local plugin = {}
+            function plugin.getPanelState(inputText)
+              return {
+                items = { { id = "1", text = "候选一" }, { id = "2", text = "候选二" } },
+                resultMode = "multiple",
+              }
+            end
+            return plugin
+            """.trimIndent()
+        )
+        val adapter = createAdapter(dir)
+
+        val state = adapter.getPanelState("x")
+        assertEquals(
+            com.kingzcheung.xime.plugin.core.api.ToolResultMode.MULTIPLE,
+            state.resultMode
+        )
+    }
+
+    @Test
+    fun `getPanelState 未声明结果模式时返回 null 由宿主兜底`() {
+        val dir = writeScript(
+            """
+            local plugin = {}
+            function plugin.getPanelState(inputText)
+              return { items = { { id = "1", text = "候选一" } } }
+            end
+            return plugin
+            """.trimIndent()
+        )
+        val adapter = createAdapter(dir)
+
+        val state = adapter.getPanelState("x")
+        assertEquals(null, state.resultMode)
+        assertEquals(1, state.items.size)
+    }
+
+    @Test
     fun `getPanelState 未实现时返回空状态`() {
         val dir = writeScript(
             """

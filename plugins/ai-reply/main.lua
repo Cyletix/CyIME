@@ -23,7 +23,7 @@ local KEY_PROMPT = "prompt"
 local DEFAULTS = {
   baseUrl = "https://api.openai.com/v1",
   model = "gpt-4o-mini",
-  prompt = "你是我的智能回复助手。根据对方的消息，生成 3~5 条简洁、自然、符合我语气的中文回复候选，每条不超过 30 字，直接给出候选文本，不要编号、不要引号、不要解释。对方消息：{context}",
+  prompt = "你是我的智能回复助手。请根据对方消息生成 3~5 条简洁、自然、符合我语气的中文回复候选，每条不超过 30 字。严格按以下格式输出：只输出一个 JSON 对象，格式为 {\"candidates\": [\"好的呀\", \"马上来\", \"稍等片刻\"]}，candidates 是候选文本数组，不要编号、不要解释、不要任何其他文字。对方消息：{context}",
 }
 
 local lastContext = ""
@@ -36,7 +36,7 @@ local function trim(s)
   return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
--- 把 LLM 输出的多行文本拆成候选列表（去除编号/引号前缀）
+-- 把 LLM 输出的多行文本拆成候选列表（去除编号/引号前缀，JSON 解析失败的兜底）
 local function splitCandidates(text)
   local lines = {}
   for line in text:gmatch("[^\n]+") do
@@ -46,6 +46,45 @@ local function splitCandidates(text)
     if t ~= "" then lines[#lines + 1] = t end
   end
   return lines
+end
+
+-- 从模型输出中提取 JSON（剥离 ```json 代码块包裹，取首个 { 或 [ 到末尾对应括号的区间）
+local function extractJson(text)
+  local t = text:gsub("```[%w]*", ""):gsub("```", "")
+  t = trim(t)
+  local startIdx = t:find("[{%[]")
+  if startIdx == nil then return nil end
+  local endIdx = t:reverse():find("[}%]]")
+  if endIdx == nil then return nil end
+  local lastIdx = #t - endIdx + 1
+  if lastIdx <= startIdx then return nil end
+  return t:sub(startIdx, lastIdx)
+end
+
+-- 解析候选：优先 JSON 对象（prompt 已要求 {"candidates": [...]}），兼容直接数组，失败时按行拆分兜底
+local function parseCandidates(content)
+  local items = {}
+  local json = extractJson(content or "")
+  if json ~= nil then
+    local data = host.json.decode(json)
+    local list = data
+    if type(data) == "table" and data.candidates ~= nil then
+      list = data.candidates
+    end
+    if type(list) == "table" then
+      for _, v in ipairs(list) do
+        if type(v) == "string" then
+          local t = trim(v)
+          if t ~= "" then items[#items + 1] = { id = tostring(#items + 1), text = t } end
+        end
+      end
+    end
+    if #items > 0 then return items end
+  end
+  for _, line in ipairs(splitCandidates(content or "")) do
+    items[#items + 1] = { id = tostring(#items + 1), text = line }
+  end
+  return items
 end
 
 -- ================= 配置 schema（与 manifest 一致，插件中心表单数据源） =================
@@ -90,6 +129,7 @@ function plugin.getPanelState(inputText)
     items = cachedItems,
     actions = { { id = "generate", label = "生成" } },
     loading = generating,
+    resultMode = "multiple",
   }
 end
 
@@ -124,7 +164,7 @@ function plugin.onPanelAction(actionId)
   local body = host.json.encode({
     model = model,
     messages = {
-      { role = "system", content = "你是智能回复助手，只输出候选文本列表，每条占一行。" },
+      { role = "system", content = "你是智能回复助手。严格按格式输出：只输出一个 JSON 对象，格式为 {\"candidates\": [\"回复一\", \"回复二\"]}，不要任何其他文字。" },
       { role = "user", content = prompt },
     },
     temperature = 0.8,
@@ -152,8 +192,8 @@ function plugin.onPanelAction(actionId)
   if data ~= nil and data.choices ~= nil then
     for _, choice in ipairs(data.choices) do
       local content = choice.message and choice.message.content or ""
-      for _, line in ipairs(splitCandidates(content)) do
-        items[#items + 1] = { id = tostring(#items + 1), text = line }
+      for _, item in ipairs(parseCandidates(content)) do
+        items[#items + 1] = item
       end
     end
   end

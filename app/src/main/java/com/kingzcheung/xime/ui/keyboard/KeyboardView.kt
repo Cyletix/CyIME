@@ -285,7 +285,6 @@ fun KeyboardView(
             if (state.toolPanelVisible) {
                 ToolPanel(
                     title = state.toolPanelTitle,
-                    items = state.toolPanelItems,
                     isFocused = state.toolPanelInputFocused,
                     isLoading = state.toolPanelLoading,
                     initialText = state.toolPanelPrefillText,
@@ -295,8 +294,6 @@ fun KeyboardView(
                     cardBgColor = keyBgColor,
                     onClose = { callbacks.onToolPanelClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
-                    onItemClick = { item -> callbacks.onToolPanelItemClick?.invoke(item) },
-                    onRegenerate = { callbacks.onToolPanelRegenerate?.invoke() },
                 )
             }
 
@@ -1022,6 +1019,20 @@ fun KeyboardView(
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is OverlayRoute.ToolPanel -> {}
+                    is OverlayRoute.ToolResult -> AiResultPanel(
+                        title = state.toolPanelTitle,
+                        items = state.toolPanelItems,
+                        isLoading = state.toolPanelLoading,
+                        backgroundColor = keyboardBgColor,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        cardBgColor = keyBgColor,
+                        bottomPaddingDp = state.keyboardBottomPaddingDp,
+                        onBack = { viewModel.closeOverlay() },
+                        onItemClick = { item -> callbacks.onToolPanelItemClick?.invoke(item) },
+                        onRegenerate = { callbacks.onToolPanelRegenerate?.invoke() },
+                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                    )
                 }
                 else -> {}
             }

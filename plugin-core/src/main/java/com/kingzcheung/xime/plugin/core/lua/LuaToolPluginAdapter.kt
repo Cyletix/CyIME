@@ -23,6 +23,7 @@ class LuaToolPluginAdapter(
             items = parseItems(map["items"] ?: LuaValue.NIL),
             actions = parseActions(map["actions"] ?: LuaValue.NIL),
             loading = map["loading"]?.toboolean() ?: false,
+            resultMode = parseResultMode(map["resultMode"] ?: LuaValue.NIL),
         )
     }
 
@@ -36,6 +37,14 @@ class LuaToolPluginAdapter(
 
     override fun onPanelItemClick(itemId: String) {
         runtime.call("onPanelItemClick", LuaValue.valueOf(itemId))
+    }
+
+    private fun parseResultMode(value: LuaValue): com.kingzcheung.xime.plugin.core.api.ToolResultMode? {
+        return when (value.tojstring().lowercase()) {
+            "single" -> com.kingzcheung.xime.plugin.core.api.ToolResultMode.SINGLE
+            "multiple" -> com.kingzcheung.xime.plugin.core.api.ToolResultMode.MULTIPLE
+            else -> null
+        }
     }
 
     private fun parseItems(value: LuaValue): List<ToolPanelItem> {

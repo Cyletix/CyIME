@@ -14,13 +14,31 @@ data class ToolPanelAction(
     val label: String,
 )
 
-/** 工具面板状态（宿主渲染、插件给数据）。 */
+/**
+ * 工具面板结果展示模式：插件在 [ToolPanelState.resultMode] 中显式声明，
+ * 宿主据此决定结果交互（直接上屏 or 全屏页面候选选择）。
+ */
+enum class ToolResultMode {
+    /** 单条结果：生成结束直接上屏（如 AI 翻译）。 */
+    SINGLE,
+
+    /** 多条结果：生成结束打开全屏结果页面，用户点击候选上屏（如 AI 智能回复）。 */
+    MULTIPLE,
+}
+
+/**
+ * 工具面板状态（宿主渲染、插件给数据）。
+ *
+ * [resultMode] 为 null 时宿主回退到运行时数量判断（1 条直接上屏，多条打开页面）。
+ */
 data class ToolPanelState(
     val inputText: String = "",
     val items: List<ToolPanelItem> = emptyList(),
     val actions: List<ToolPanelAction> = emptyList(),
     /** 是否正在生成中（SSE 流式期间为 true，宿主据此展示 loading 并轮询刷新）。 */
     val loading: Boolean = false,
+    /** 结果展示模式：SINGLE 直接上屏 / MULTIPLE 全屏页面；null 由宿主按结果数量兜底。 */
+    val resultMode: ToolResultMode? = null,
 )
 
 /**

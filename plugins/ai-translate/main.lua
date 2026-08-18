@@ -79,6 +79,7 @@ function plugin.getPanelState(inputText)
     items = buildItems(),
     actions = { { id = "generate", label = "翻译" } },
     loading = generating,
+    resultMode = "single",
   }
 end
 

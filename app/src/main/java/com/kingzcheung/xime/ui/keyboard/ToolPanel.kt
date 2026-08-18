@@ -3,43 +3,34 @@ package com.kingzcheung.xime.ui.keyboard
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.kingzcheung.xime.keyboard.ToolPanelItem
 import com.kingzcheung.xime.service.ToolPanelEditTextHolder
 
 private val TOOL_PANEL_HEIGHT = 170
 
+/**
+ * AI 工具插件输入面板（候选栏上方）。
+ *
+ * 仅承载输入与生成触发：输入框（预填上下文，键盘按键路由可注入）+ 生成状态提示。
+ * 生成结果不再显示在此面板，多条结果由全屏页面（AiResultPanel）承载。
+ */
 @Composable
 fun ToolPanel(
     title: String,
-    items: List<ToolPanelItem>,
     isFocused: Boolean,
     isLoading: Boolean = false,
     initialText: String = "",
@@ -49,8 +40,6 @@ fun ToolPanel(
     cardBgColor: Color,
     onClose: () -> Unit,
     onFocusChange: (Boolean) -> Unit,
-    onItemClick: (ToolPanelItem) -> Unit,
-    onRegenerate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
@@ -108,61 +97,17 @@ fun ToolPanel(
                     .height(52.dp),
             )
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items(items) { item ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onItemClick(item) }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        Text(
-                            text = item.text,
-                            color = textColor,
-                            fontSize = 14.sp,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = when {
-                        isLoading -> "生成中..."
-                        items.isEmpty() -> "点击生成或输入后按回车"
-                        else -> "${items.size} 条候选"
-                    },
+                    text = if (isLoading) "生成中..." else "输入上下文后按回车生成",
                     color = textColor.copy(alpha = 0.5f),
                     fontSize = 11.sp,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (items.isNotEmpty() && !isLoading) {
-                        androidx.compose.material3.TextButton(onClick = onRegenerate) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "重新生成",
-                                tint = accentColor,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("重新生成", color = accentColor, fontSize = 12.sp)
-                        }
-                    }
-                }
             }
         }
     }

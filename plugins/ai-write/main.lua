@@ -80,6 +80,7 @@ function plugin.getPanelState(inputText)
       { id = "stop", label = "停止" },
     },
     loading = generating,
+    resultMode = "single",
   }
 end
 
