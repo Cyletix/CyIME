@@ -876,7 +876,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun triggerToolPanelGenerate() {
         val pluginId = uiState.value.toolPanelPluginId
         val inputText = ToolPanelEditTextHolder.editText?.text?.toString() ?: ""
-        val epoch = uiState.value.toolPanelRequestEpoch + 1
+        // 捕获当前代际号（openToolPanel 时递增）。轮询期间持续对比：
+        // 面板被重新打开（epoch 递增）即视为过期，丢弃本轮结果。
+        val epoch = uiState.value.toolPanelRequestEpoch
         toolPanelPollJob?.cancel()
         toolPanelPollJob = serviceScope.launch(Dispatchers.IO) {
             val plugin = ExtensionManager.getPluginById(pluginId) as? ToolPlugin
@@ -887,9 +889,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val items = state.items.map { ToolPanelItem(it.id, it.text) }
                 val loading = state.loading
                 withContext(Dispatchers.Main) {
-                    if (uiState.value.toolPanelRequestEpoch == epoch - 1) {
+                    if (uiState.value.toolPanelRequestEpoch == epoch) {
                         uiState.value = uiState.value.copy(
-                            toolPanelRequestEpoch = epoch,
                             toolPanelItems = items,
                             toolPanelLoading = loading,
                         )

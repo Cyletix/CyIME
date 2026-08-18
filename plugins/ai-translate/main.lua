@@ -120,6 +120,9 @@ function plugin.onPanelAction(actionId)
     },
     temperature = 0.3,
     stream = true,
+    -- qwen3 等推理模型默认把输出放进 reasoning_content（content 为空），
+    -- 关闭思考模式让译文直接走 content；非推理模型（如 gpt-4o-mini）会忽略此字段
+    enable_thinking = false,
   })
   local headers = {
     ["Content-Type"] = "application/json",

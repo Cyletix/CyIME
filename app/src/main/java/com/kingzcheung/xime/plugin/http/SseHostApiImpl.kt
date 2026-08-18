@@ -119,6 +119,7 @@ class SseHostApiImpl(
                     val s = current ?: return
                     if (s.closed) return
                     s.totalText.append(data)
+                    Log.d(TAG, "[$pluginId] SSE 会话 ${s.id} 收到事件: ${data.take(200)}")
                     listener.onData(data)
                 }
 
@@ -139,7 +140,8 @@ class SseHostApiImpl(
                         return
                     }
                     val message = if (response != null && !response.isSuccessful) {
-                        "HTTP ${response.code}"
+                        val body = runCatching { response.body?.string()?.take(300) }.getOrNull()
+                        "HTTP ${response.code}" + (if (body.isNullOrBlank()) "" else ": $body")
                     } else {
                         t?.message ?: "连接失败"
                     }

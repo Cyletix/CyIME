@@ -145,6 +145,14 @@ class LuaScriptRuntime(
     private var pluginTable: LuaValue = LuaValue.NIL
     private var loaded = false
 
+    /**
+     * Lua 状态串行锁：LuaJ 的 [Globals] 非线程安全，而 SSE/WS 回调（OkHttp/OkHttp WebSocket
+     * 后台线程）与业务调用（IO 协程轮询 getPanelState 等）会并发执行同一个 Lua 状态，
+     * 竞争可导致回调执行失败（异常被静默吞掉）、Lua 变量写入丢失。
+     * 所有 Lua 执行入口必须持此锁（Java 内置锁可重入，host API 内层再回调 Lua 不会死锁）。
+     */
+    private val luaLock = Any()
+
     /** Lua 侧注册的 WS 事件回调（host.ws.connect 的 callbacks 表）。 */
     @Volatile
     private var wsCallbacks: Map<String, LuaValue>? = null
@@ -157,18 +165,20 @@ class LuaScriptRuntime(
         val callbacks = sseCallbacks[sessionId] ?: return
         val fn = callbacks[name] ?: return
         try {
-            fn.invoke(LuaValue.valueOf(text))
+            synchronized(luaLock) {
+                fn.invoke(LuaValue.valueOf(text))
+            }
         } catch (e: Exception) {
             api.log("host.http.stream $name 回调失败: ${e.message}")
         }
     }
 
     private val wsListener = object : com.kingzcheung.xime.plugin.core.lua.ws.WsHostListener {
-        override fun onOpen() { wsCallbacks?.get("onOpen")?.invoke() }
-        override fun onMessage(text: String) { wsCallbacks?.get("onMessage")?.invoke(LuaValue.valueOf(text)) }
-        override fun onBinary(data: ByteArray) { wsCallbacks?.get("onBinary")?.invoke(LuaString.valueOf(data)) }
-        override fun onError(message: String) { wsCallbacks?.get("onError")?.invoke(LuaValue.valueOf(message)) }
-        override fun onClose() { wsCallbacks?.get("onClose")?.invoke() }
+        override fun onOpen() { synchronized(luaLock) { wsCallbacks?.get("onOpen")?.invoke() } }
+        override fun onMessage(text: String) { synchronized(luaLock) { wsCallbacks?.get("onMessage")?.invoke(LuaValue.valueOf(text)) } }
+        override fun onBinary(data: ByteArray) { synchronized(luaLock) { wsCallbacks?.get("onBinary")?.invoke(LuaString.valueOf(data)) } }
+        override fun onError(message: String) { synchronized(luaLock) { wsCallbacks?.get("onError")?.invoke(LuaValue.valueOf(message)) } }
+        override fun onClose() { synchronized(luaLock) { wsCallbacks?.get("onClose")?.invoke() } }
     }
 
     private fun buildSandbox(): Globals {
@@ -193,17 +203,19 @@ class LuaScriptRuntime(
             if (name.contains("/") || name.contains("\\") || name.contains("..")) {
                 throw LuaError("require 非法模块名: $name")
             }
-            synchronized(loadedModules) {
-                loadedModules[name]?.let { return@luaFunction it }
-                val moduleFile = File(libsDir, "$name.lua")
-                if (!moduleFile.exists()) {
-                    throw LuaError("module '$name' not found in libs/")
+            synchronized(luaLock) {
+                synchronized(loadedModules) {
+                    loadedModules[name]?.let { return@luaFunction it }
+                    val moduleFile = File(libsDir, "$name.lua")
+                    if (!moduleFile.exists()) {
+                        throw LuaError("module '$name' not found in libs/")
+                    }
+                    val chunk = g.load(moduleFile.readText(), "@$name")
+                    val result = chunk.call()
+                    val module = result.takeIf { it.istable() } ?: LuaValue.TRUE
+                    loadedModules[name] = module
+                    module
                 }
-                val chunk = g.load(moduleFile.readText(), "@$name")
-                val result = chunk.call()
-                val module = result.takeIf { it.istable() } ?: LuaValue.TRUE
-                loadedModules[name] = module
-                module
             }
         })
 
@@ -526,17 +538,20 @@ class LuaScriptRuntime(
     fun load(): Boolean {
         if (loaded) return true
         return try {
-            val entryFile = File(pluginDir, entryScript)
-            if (!entryFile.exists()) {
-                Log.e(TAG, "Entry script not found: ${entryFile.absolutePath}")
-                return false
+            synchronized(luaLock) {
+                if (loaded) return true
+                val entryFile = File(pluginDir, entryScript)
+                if (!entryFile.exists()) {
+                    Log.e(TAG, "Entry script not found: ${entryFile.absolutePath}")
+                    return false
+                }
+                val chunk = globals.load(entryFile.readText(), "@$entryScript")
+                val result = chunk.call()
+                pluginTable = result.takeIf { it.istable() } ?: LuaValue.NIL
+                loaded = true
+                Log.d(TAG, "Plugin $pluginId loaded from $entryScript")
+                true
             }
-            val chunk = globals.load(entryFile.readText(), "@$entryScript")
-            val result = chunk.call()
-            pluginTable = result.takeIf { it.istable() } ?: LuaValue.NIL
-            loaded = true
-            Log.d(TAG, "Plugin $pluginId loaded from $entryScript")
-            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load Lua plugin $pluginId", e)
             false
@@ -546,9 +561,9 @@ class LuaScriptRuntime(
     fun callOnLoad() {
         if (!loaded) return
         try {
-            val fn = pluginTable.get(LuaPluginContract.FN_ON_LOAD)
+            val fn = synchronized(luaLock) { pluginTable.get(LuaPluginContract.FN_ON_LOAD) }
             if (fn.isfunction()) {
-                fn.invoke()
+                synchronized(luaLock) { fn.invoke() }
             }
         } catch (e: Exception) {
             Log.e(TAG, "onLoad failed for $pluginId", e)
@@ -558,9 +573,9 @@ class LuaScriptRuntime(
     fun callOnUnload() {
         if (!loaded) return
         try {
-            val fn = pluginTable.get(LuaPluginContract.FN_ON_UNLOAD)
+            val fn = synchronized(luaLock) { pluginTable.get(LuaPluginContract.FN_ON_UNLOAD) }
             if (fn.isfunction()) {
-                fn.invoke()
+                synchronized(luaLock) { fn.invoke() }
             }
         } catch (e: Exception) {
             Log.e(TAG, "onUnload failed for $pluginId", e)
@@ -571,15 +586,17 @@ class LuaScriptRuntime(
     fun call(name: String, vararg args: LuaValue): LuaValue {
         if (!loaded) return LuaValue.NIL
         return try {
-            val fn = pluginTable.get(name)
-            if (!fn.isfunction()) {
-                Log.w(TAG, "Plugin $pluginId does not export '$name'")
-                return LuaValue.NIL
-            }
-            if (args.isEmpty()) {
-                fn.invoke().arg1()
-            } else {
-                fn.invoke(args).arg1()
+            synchronized(luaLock) {
+                val fn = pluginTable.get(name)
+                if (!fn.isfunction()) {
+                    Log.w(TAG, "Plugin $pluginId does not export '$name'")
+                    return LuaValue.NIL
+                }
+                if (args.isEmpty()) {
+                    fn.invoke().arg1()
+                } else {
+                    fn.invoke(args).arg1()
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Call '$name' failed for $pluginId: ${e.message}", e)
