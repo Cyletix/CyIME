@@ -50,7 +50,7 @@ class LuaToolPluginAdapterTest {
     }
 
     @Test
-    fun `getPanelState 解析输入框候选与操作按钮`() {
+    fun `getPanelState 解析输入框与候选`() {
         val dir = writeScript(
             """
             local plugin = {}
@@ -60,9 +60,6 @@ class LuaToolPluginAdapterTest {
                 items = {
                   { id = "1", text = "候选一" },
                   { id = "2", text = "候选二" },
-                },
-                actions = {
-                  { id = "generate", label = "生成" },
                 },
               }
             end
@@ -76,50 +73,6 @@ class LuaToolPluginAdapterTest {
         assertEquals(2, state.items.size)
         assertEquals("候选一", state.items[0].text)
         assertEquals("2", state.items[1].id)
-        assertEquals(1, state.actions.size)
-        assertEquals("generate", state.actions[0].id)
-        assertEquals("生成", state.actions[0].label)
-    }
-
-    @Test
-    fun `getPanelState 解析结果模式声明`() {
-        val dir = writeScript(
-            """
-            local plugin = {}
-            function plugin.getPanelState(inputText)
-              return {
-                items = { { id = "1", text = "候选一" }, { id = "2", text = "候选二" } },
-                resultMode = "multiple",
-              }
-            end
-            return plugin
-            """.trimIndent()
-        )
-        val adapter = createAdapter(dir)
-
-        val state = adapter.getPanelState("x")
-        assertEquals(
-            com.kingzcheung.xime.plugin.core.api.ToolResultMode.MULTIPLE,
-            state.resultMode
-        )
-    }
-
-    @Test
-    fun `getPanelState 未声明结果模式时返回 null 由宿主兜底`() {
-        val dir = writeScript(
-            """
-            local plugin = {}
-            function plugin.getPanelState(inputText)
-              return { items = { { id = "1", text = "候选一" } } }
-            end
-            return plugin
-            """.trimIndent()
-        )
-        val adapter = createAdapter(dir)
-
-        val state = adapter.getPanelState("x")
-        assertEquals(null, state.resultMode)
-        assertEquals(1, state.items.size)
     }
 
     @Test
@@ -135,7 +88,65 @@ class LuaToolPluginAdapterTest {
         val state = adapter.getPanelState("x")
         assertEquals("", state.inputText)
         assertTrue(state.items.isEmpty())
-        assertTrue(state.actions.isEmpty())
+    }
+
+    @Test
+    fun `getPanelState 非法 items 元素按协议丢弃`() {
+        val dir = writeScript(
+            """
+            local plugin = {}
+            function plugin.getPanelState(inputText)
+              return {
+                items = {
+                  { id = "1", text = "合规项" },
+                  { id = "", text = "空 id" },
+                  { text = "缺 id" },
+                  { id = "3", text = "" },
+                  "非 table 元素",
+                },
+              }
+            end
+            return plugin
+            """.trimIndent()
+        )
+        val adapter = createAdapter(dir)
+
+        val state = adapter.getPanelState("x")
+        assertEquals(1, state.items.size)
+        assertEquals("合规项", state.items[0].text)
+    }
+
+    @Test
+    fun `getPanelState items id 重复时丢弃重复项`() {
+        val dir = writeScript(
+            """
+            local plugin = {}
+            function plugin.getPanelState(inputText)
+              return {
+                items = {
+                  { id = "a", text = "第一" },
+                  { id = "a", text = "重复 id" },
+                  { id = "b", text = "第二" },
+                },
+              }
+            end
+            return plugin
+            """.trimIndent()
+        )
+        val adapter = createAdapter(dir)
+
+        val state = adapter.getPanelState("x")
+        assertEquals(2, state.items.size)
+        // 重复 id 不会进入宿主 UI（AiResultPanel 的 LazyColumn key 依赖 id 唯一）
+        assertEquals(listOf("a", "b"), state.items.map { it.id })
+    }
+
+    @Test
+    fun `tool 结果显示方式来自 manifest capabilities`() {
+        val config = com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ToolCapabilities(
+            display = com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT
+        )
+        assertEquals(com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT, config.display)
     }
 
     @Test

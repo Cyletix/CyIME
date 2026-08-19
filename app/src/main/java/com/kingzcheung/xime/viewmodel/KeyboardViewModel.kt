@@ -14,7 +14,7 @@ import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.PanelType
 import com.kingzcheung.xime.keyboard.ToolbarButton
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
-import com.kingzcheung.xime.keyboard.ToolPanelItem
+import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction
@@ -88,7 +88,7 @@ data class KeyboardUiState(
     val toolPanelPluginId: String = "",
     val toolPanelTitle: String = "",
     val toolPanelPrefillText: String = "",
-    val toolPanelItems: List<ToolPanelItem> = emptyList(),
+    val toolPanelItems: List<PluginResultItem> = emptyList(),
     val toolPanelLoading: Boolean = false,
     val toolPanelRequestEpoch: Long = 0,
 )

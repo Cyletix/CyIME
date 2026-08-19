@@ -75,6 +75,11 @@ class LuaHostApiImpl(
 
     override fun logError(message: String) {
         android.util.Log.e("LuaPlugin", "[$pluginId] $message")
+        com.kingzcheung.xime.plugin.core.security.PluginErrorLog.logError(
+            pluginId = pluginId,
+            operation = "插件运行错误",
+            message = message
+        )
     }
 
     override fun configGet(key: String): String? = configStore.get(key)

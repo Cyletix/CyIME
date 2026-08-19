@@ -33,8 +33,10 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -87,6 +89,7 @@ import com.kingzcheung.xime.model.ModelDownloadState
 import com.kingzcheung.xime.model.ModelInfo
 import com.kingzcheung.xime.model.ModelVersion
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
+import com.kingzcheung.xime.settings.MarketPlugin
 import com.kingzcheung.xime.settings.MarketScheme
 import com.kingzcheung.xime.settings.MarketSchemeItem
 import com.kingzcheung.xime.settings.MarketPluginItem
@@ -1797,6 +1800,8 @@ private fun pluginCategoryIcon(pluginType: String): ImageVector = when (pluginTy
     "emoji" -> Icons.Default.SentimentSatisfiedAlt
     "speech" -> Icons.Default.GraphicEq
     "prediction" -> Icons.Default.AutoAwesome
+    "clipboard_sync" -> Icons.Default.Sync
+    "tool" -> Icons.Default.AutoFixHigh
     else -> Icons.Default.Extension
 }
 
@@ -1816,6 +1821,8 @@ private fun pluginCategoryLabel(pluginType: String): String = when (pluginType) 
     "emoji" -> "表情"
     "speech" -> "语音转文本"
     "prediction" -> "智能预测"
+    "clipboard_sync" -> "剪贴板同步"
+    "tool" -> "工具"
     else -> "其他"
 }
 
@@ -1859,6 +1866,32 @@ fun PluginMarketDetailContent(
     }
 
     val item = uiState.plugins.firstOrNull { it.plugin.id == pluginId }
+    val localItem = remember(item, pluginId) {
+        if (item == null) {
+            com.kingzcheung.xime.plugin.ExtensionManager.getAllInstalledPlugins()
+                .find { it.id == pluginId }
+                ?.let { info ->
+                    MarketPluginItem(
+                        plugin = MarketPlugin(
+                            id = info.id,
+                            name = info.name,
+                            author = "",
+                            description = info.description,
+                            pluginType = info.category.id,
+                            currentVersion = info.versionName,
+                            versions = listOf(PluginVersion(version = info.versionName)),
+                        ),
+                        compatible = true,
+                        minAppVersion = info.minHostVersion.orEmpty(),
+                        installed = true,
+                        installedVersion = info.versionName,
+                    )
+                }
+        } else {
+            null
+        }
+    }
+    val displayItem = item ?: localItem
 
     Scaffold(
         topBar = {
@@ -1877,11 +1910,11 @@ fun PluginMarketDetailContent(
         },
     ) { padding ->
         when {
-            uiState.isLoading && item == null -> MarketCenterBox {
+            uiState.isLoading && displayItem == null -> MarketCenterBox {
                 CircularProgressIndicator()
             }
 
-            item == null -> MarketCenterBox {
+            displayItem == null -> MarketCenterBox {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "未找到该插件",
@@ -1894,7 +1927,7 @@ fun PluginMarketDetailContent(
             }
 
             else -> PluginDetailBody(
-                item = item,
+                item = displayItem,
                 uiState = uiState,
                 viewModel = viewModel,
                 modifier = Modifier.padding(padding),

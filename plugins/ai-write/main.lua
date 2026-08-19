@@ -75,12 +75,7 @@ function plugin.getPanelState(inputText)
   return {
     inputText = inputText,
     items = buildItems(),
-    actions = {
-      { id = "generate", label = "生成" },
-      { id = "stop", label = "停止" },
-    },
     loading = generating,
-    resultMode = "single",
   }
 end
 

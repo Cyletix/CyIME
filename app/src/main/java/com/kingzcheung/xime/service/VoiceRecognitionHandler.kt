@@ -137,9 +137,12 @@ class VoiceRecognitionHandler(
         val enabledPlugins = ExtensionManager.getEnabledAsrPlugins(context)
         if (enabledPlugins.isNotEmpty()) {
             val selectedId = SettingsPreferences.getSttOnlinePluginId(context)
-            val plugin = enabledPlugins.firstOrNull { it.first == selectedId }?.second
-                ?: enabledPlugins.firstOrNull()?.second
-            if (plugin != null) return plugin.getDisplayName()
+            val selected = enabledPlugins.firstOrNull { it.first == selectedId }
+                ?: enabledPlugins.firstOrNull()
+            if (selected != null) {
+                return ExtensionManager.getAllInstalledPlugins()
+                    .firstOrNull { it.id == selected.first }?.name ?: selected.first
+            }
         }
         return "未配置"
     }

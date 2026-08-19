@@ -1,13 +1,20 @@
 package com.kingzcheung.xime.plugin.core.lua
 
-import com.kingzcheung.xime.plugin.core.api.ToolPanelAction
-import com.kingzcheung.xime.plugin.core.api.ToolPanelItem
+import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import com.kingzcheung.xime.plugin.core.api.ToolPanelState
 import com.kingzcheung.xime.plugin.core.api.ToolPlugin
 import com.kingzcheung.xime.plugin.core.model.PluginContext
 import org.luaj.vm2.LuaValue
 
-/** tool 类型 Lua 插件的宿主侧适配器：实现 ToolPlugin 接口。 */
+/**
+ * tool 类型 Lua 插件的宿主侧适配器：实现 [ToolPlugin] 接口。
+ *
+ * 这里是宿主强制协议（见 [ToolPlugin] 契约）的校验点：
+ * 插件返回的 items 不符合协议时，非法数据被丢弃并输出协议错误日志，
+ * 不再静默忽略——宿主 UI（ToolPanel/AiResultPanel）消费的永远是协议合规数据。
+ * 单条（SINGLE）与列表（MULTIPLE）结果统一为 [PluginResultItem] 列表，
+ * 宿主不感知传输方式（HTTP/SSE）；结果呈现由元数据（manifest.capabilities.tool）声明。
+ */
 class LuaToolPluginAdapter(
     runtime: LuaScriptRuntime,
     pluginContext: PluginContext
@@ -15,15 +22,16 @@ class LuaToolPluginAdapter(
 
     override fun getPanelState(inputText: String): ToolPanelState {
         val result = runtime.call("getPanelState", LuaValue.valueOf(inputText))
-        if (!result.istable()) return ToolPanelState()
+        if (!result.istable()) {
+            protocolWarn("getPanelState 必须返回 table（当前为 ${result.typename()}），已按空状态处理")
+            return ToolPanelState()
+        }
         val map = LuaScriptRuntime.tableToMap(result)
         val input = map["inputText"]?.tojstring()?.takeIf { it.isNotBlank() } ?: inputText
         return ToolPanelState(
             inputText = input,
-            items = parseItems(map["items"] ?: LuaValue.NIL),
-            actions = parseActions(map["actions"] ?: LuaValue.NIL),
+            items = parseResultItems(map["items"] ?: LuaValue.NIL, "getPanelState.items"),
             loading = map["loading"]?.toboolean() ?: false,
-            resultMode = parseResultMode(map["resultMode"] ?: LuaValue.NIL),
         )
     }
 
@@ -37,33 +45,5 @@ class LuaToolPluginAdapter(
 
     override fun onPanelItemClick(itemId: String) {
         runtime.call("onPanelItemClick", LuaValue.valueOf(itemId))
-    }
-
-    private fun parseResultMode(value: LuaValue): com.kingzcheung.xime.plugin.core.api.ToolResultMode? {
-        return when (value.tojstring().lowercase()) {
-            "single" -> com.kingzcheung.xime.plugin.core.api.ToolResultMode.SINGLE
-            "multiple" -> com.kingzcheung.xime.plugin.core.api.ToolResultMode.MULTIPLE
-            else -> null
-        }
-    }
-
-    private fun parseItems(value: LuaValue): List<ToolPanelItem> {
-        if (!value.istable()) return emptyList()
-        return LuaScriptRuntime.tableToList(value).mapNotNull { entry ->
-            val m = LuaScriptRuntime.tableToMap(entry)
-            val id = m["id"]?.tojstring() ?: return@mapNotNull null
-            val text = m["text"]?.tojstring() ?: return@mapNotNull null
-            ToolPanelItem(id = id, text = text)
-        }
-    }
-
-    private fun parseActions(value: LuaValue): List<ToolPanelAction> {
-        if (!value.istable()) return emptyList()
-        return LuaScriptRuntime.tableToList(value).mapNotNull { entry ->
-            val m = LuaScriptRuntime.tableToMap(entry)
-            val id = m["id"]?.tojstring() ?: return@mapNotNull null
-            val label = m["label"]?.tojstring() ?: id
-            ToolPanelAction(id = id, label = label)
-        }
     }
 }

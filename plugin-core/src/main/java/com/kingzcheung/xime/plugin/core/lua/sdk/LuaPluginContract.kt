@@ -14,11 +14,17 @@ package com.kingzcheung.xime.plugin.core.lua.sdk
  * ## 分类能力（按 manifest.type 约定）
  * ### emoji 表情
  * - `getCategories()` -> string[]
- * - `getEmojis(category, searchText, topK)` -> EmojiItem[]
- *   每项: { id: string, text: string, imageUrl?: string, category: string }
- *   - text 同时作为显示文本与插入文本
+ * - `getEmojis(query)` -> EmojiItem[]
+ *   `query`: { keyword?: string, topK?: int }
+ *   每项: { id: string, text: string, insertText?: string, imageUrl?: string }
+ *   - text 同时作为显示文本与插入文本（可另给 insertText 区分上屏内容）
  *   - imageUrl 可通过 host.resource.path() 获得（图片渲染由宿主完成）
- * - `getCategoryLayoutConfig(category)`（可选）-> { columns?: int, itemHeightDp?: int }
+ *
+ * ### tool 工具
+ * - `getPanelState(inputText)` -> { inputText?, items: [], loading? }
+ * - `onPanelInput(text)` 面板输入变化通知
+ * - `onPanelAction(actionId)` 面板操作事件（宿主保留 `generate`）
+ * - `onPanelItemClick(itemId)` 点候选上屏
  *
  * ### speech 语音（规划中）
  * - `getSettingsSchema()` 配置字段声明（与 manifest.configSchema 等价）
@@ -28,11 +34,19 @@ package com.kingzcheung.xime.plugin.core.lua.sdk
  * ## 数据格式
  * Lua 返回值一律使用 Lua table（数组或 map），宿主统一做 table -> Kotlin 转换；
  * 函数不存在或抛错时，宿主返回空结果（不崩溃）。
+ *
+ * ## 与元数据的分工（v0.2.0 起）
+ * 静态能力一律由 manifest.capabilities 声明（宿主唯一来源）：
+ * - 布局（columns/itemHeightDp）→ capabilities.emoji
+ * - 结果显示（display: direct/select）→ capabilities.tool
+ * - ASR 能力（inputMode 等）→ capabilities.speech
+ * Lua 侧不再导出 getCategoryLayoutConfig / getCapabilities /
+ * getProviderId / getDisplayName / getState 等元信息函数。
  */
 object LuaPluginContract {
 
     /** SDK 版本（宿主注入的 host.sdkVersion）。插件 manifest 可声明 `sdkVersion` 声明所需 SDK 版本。 */
-    const val SDK_VERSION = "0.1.0"
+    const val SDK_VERSION = "0.2.0"
 
     // ---- 宿主注入的全局对象 ----
     const val GLOBAL_HOST = "host"
@@ -44,11 +58,16 @@ object LuaPluginContract {
     // ---- emoji ----
     const val FN_GET_CATEGORIES = "getCategories"
     const val FN_GET_EMOJIS = "getEmojis"
-    const val FN_GET_CATEGORY_LAYOUT = "getCategoryLayoutConfig"
+
+    // ---- tool ----
+    const val FN_GET_PANEL_STATE = "getPanelState"
+    const val FN_ON_PANEL_INPUT = "onPanelInput"
+    const val FN_ON_PANEL_ACTION = "onPanelAction"
+    const val FN_ON_PANEL_ITEM_CLICK = "onPanelItemClick"
 
     // ---- emoji item 字段 ----
     const val FIELD_ID = "id"
     const val FIELD_TEXT = "text"
+    const val FIELD_INSERT_TEXT = "insertText"
     const val FIELD_IMAGE_URL = "imageUrl"
-    const val FIELD_CATEGORY = "category"
 }

@@ -276,10 +276,6 @@ class SpeechRecognitionManager(private val context: Context) {
     private var isPreloading = false
     private val preloadLock = Object()
 
-    fun getState(): RecognitionState {
-        return backend?.getState() ?: RecognitionState.IDLE
-    }
-
     fun preload(): Boolean {
         synchronized(preloadLock) {
             if (backend != null) return true
@@ -339,7 +335,9 @@ class SpeechRecognitionManager(private val context: Context) {
         val (_, plugin) = selected ?: return null
 
         val backend = plugin.createBackend(context.applicationContext)
-        return PluginAsrBackendAdapter(plugin.getDisplayName(), backend)
+        val pluginName = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == selected?.first }?.name ?: selected?.first ?: "语音识别"
+        return PluginAsrBackendAdapter(pluginName, backend)
     }
 
     private fun createAudioRecord(bufferSecs: Float = 2.0f): AudioRecord? {

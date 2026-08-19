@@ -33,7 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kingzcheung.xime.keyboard.ToolPanelItem
+import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 
 /**
  * AI 插件多条结果全屏页面（与表情/符号页面同级，Overlay 全屏承载）。
@@ -45,7 +45,7 @@ import com.kingzcheung.xime.keyboard.ToolPanelItem
 @Composable
 fun AiResultPanel(
     title: String,
-    items: List<ToolPanelItem>,
+    items: List<PluginResultItem>,
     isLoading: Boolean = false,
     backgroundColor: Color,
     textColor: Color,
@@ -53,7 +53,7 @@ fun AiResultPanel(
     cardBgColor: Color,
     bottomPaddingDp: Int = 0,
     onBack: () -> Unit,
-    onItemClick: (ToolPanelItem) -> Unit,
+    onItemClick: (PluginResultItem) -> Unit,
     onRegenerate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {

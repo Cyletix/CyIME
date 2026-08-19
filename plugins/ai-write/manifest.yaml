@@ -11,7 +11,7 @@ icon: "帮"
 description: 输入草稿/指令，SSE 流式生成长文本，打字机效果上屏。支持任意 OpenAI 兼容接口。
 
 # 插件版本
-version: 0.1.0
+version: 0.2.0
 
 # 插件分类：tool 工具类（多开）
 type: tool
@@ -54,3 +54,7 @@ configSchema:
     type: textarea
     defaultValue: "你是我的写作助手。请根据以下上下文与要求写一段通顺的中文文字：\n{context}"
     helpText: 写作 prompt 模板，{context} 会被替换为面板输入内容
+# 能力声明
+capabilities:
+  tool:
+    display: direct

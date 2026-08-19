@@ -127,9 +127,7 @@ function plugin.getPanelState(inputText)
   return {
     inputText = inputText,
     items = cachedItems,
-    actions = { { id = "generate", label = "生成" } },
     loading = generating,
-    resultMode = "multiple",
   }
 end
 

@@ -164,17 +164,14 @@ object ExtensionManager {
 
                     for (subCatName in subCategoryNames) {
                         val emojiItems = plugin.getEmojis(
-                            category = subCatName,
-                            searchText = null,
-                            topK = 100
+                            com.kingzcheung.xime.plugin.core.api.EmojiQuery(
+                                category = subCatName,
+                                keyword = null,
+                                topK = 100
+                            )
                         )
                         if (emojiItems.isNotEmpty()) {
-                            val layoutConfig = try {
-                                plugin.getCategoryLayoutConfig(subCatName)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "getCategoryLayoutConfig not supported by ${pluginInfo?.name}/$subCatName")
-                                null
-                            }
+                            val emojiCap = pluginInfo?.capabilities?.emoji
                             pluginCategories.add(
                                 EmojiCategory(
                                     name = subCatName,
@@ -184,7 +181,8 @@ object ExtensionManager {
                                     isPlugin = true,
                                     pluginId = pluginId,
                                     emojiItems = emojiItems,
-                                    layoutConfig = layoutConfig
+                                    layoutColumns = emojiCap?.columns ?: 8,
+                                    layoutItemHeightDp = emojiCap?.itemHeightDp ?: 40
                                 )
                             )
                         }
@@ -267,8 +265,17 @@ object ExtensionManager {
     suspend fun getEmojis(context: Context, category: String? = null, searchText: String? = null, topK: Int = 100) =
         withContext(Dispatchers.Default) {
             getEnabledEmojiPlugins(context).flatMap { (_, plugin) ->
-                try { plugin.getEmojis(category, searchText, topK) }
-                catch (e: Exception) { Log.e(TAG, "Get emojis failed", e); emptyList() }
+                try {
+                    plugin.getEmojis(
+                        com.kingzcheung.xime.plugin.core.api.EmojiQuery(
+                            category = category,
+                            keyword = searchText,
+                            topK = topK
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Get emojis failed", e); emptyList()
+                }
             }.take(topK)
         }
     

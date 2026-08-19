@@ -34,9 +34,14 @@ class LuaScriptRuntimeTest {
         val emojis = LuaScriptRuntime.tableToList(
             runtime.call(
                 "getEmojis",
-                org.luaj.vm2.LuaValue.valueOf(""),
-                org.luaj.vm2.LuaValue.valueOf(""),
-                org.luaj.vm2.LuaValue.valueOf(5)
+                org.luaj.vm2.LuaValue.tableOf(
+                    arrayOf<org.luaj.vm2.LuaValue>(
+                        org.luaj.vm2.LuaValue.valueOf("keyword"),
+                        org.luaj.vm2.LuaValue.valueOf(""),
+                        org.luaj.vm2.LuaValue.valueOf("topK"),
+                        org.luaj.vm2.LuaValue.valueOf(5)
+                    )
+                )
             )
         )
         assertEquals("应返回 topK=5 个", 5, emojis.size)

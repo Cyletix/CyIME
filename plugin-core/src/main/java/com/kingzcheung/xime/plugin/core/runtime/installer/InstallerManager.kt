@@ -32,7 +32,8 @@ internal data class PluginConfig(
     val declaredHosts: List<String> = emptyList(),
     val allowCustomHosts: Boolean = false,
     val toolbarButtons: List<PluginToolbarButton> = emptyList(),
-    val icon: String? = null
+    val icon: String? = null,
+    val capabilities: com.kingzcheung.xime.plugin.core.model.PluginCapabilities? = null
 )
 
 /** manifest.yaml 的类型化模型，与宿主一起用 kaml 解析。 */
@@ -49,7 +50,8 @@ internal data class PluginManifest(
     val network: NetworkConfig? = null,
     val toolbarButtons: List<ToolbarButtonConfig> = emptyList(),
     /** 顶层 icon：文字（如 "译"）或 resources/ 下图片文件名。 */
-    val icon: String? = null
+    val icon: String? = null,
+    val capabilities: CapabilitiesConfig? = null
 )
 
 @Serializable
@@ -66,6 +68,73 @@ internal data class ToolbarButtonConfig(
     val icon: String? = null,
     val action: String = "open_panel"
 )
+
+/** manifest.capabilities 能力声明（类型化）。 */
+@Serializable
+internal data class CapabilitiesConfig(
+    val emoji: EmojiCapabilitiesConfig? = null,
+    val speech: SpeechCapabilitiesConfig? = null,
+    val tool: ToolCapabilitiesConfig? = null,
+    val clipboardSync: ClipboardSyncCapabilitiesConfig? = null
+)
+
+@Serializable
+internal data class EmojiCapabilitiesConfig(
+    val supportsSearch: Boolean = false,
+    val columns: Int? = null,
+    val itemHeightDp: Int? = null
+)
+
+@Serializable
+internal data class SpeechCapabilitiesConfig(
+    val inputMode: String = "streaming",
+    val supportsPartialResults: Boolean = true,
+    val requiresNetwork: Boolean = true
+)
+
+@Serializable
+internal data class ToolCapabilitiesConfig(
+    val display: String? = null
+)
+
+@Serializable
+internal data class ClipboardSyncCapabilitiesConfig(
+    val protocols: List<String> = emptyList()
+)
+
+/** manifest 能力声明 → 类型化模型（未知字段静默忽略，非法枚举值按未声明处理）。 */
+private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model.PluginCapabilities {
+    return com.kingzcheung.xime.plugin.core.model.PluginCapabilities(
+        emoji = emoji?.let {
+            com.kingzcheung.xime.plugin.core.model.PluginCapabilities.EmojiCapabilities(
+                supportsSearch = it.supportsSearch,
+                columns = it.columns?.takeIf { c -> c > 0 },
+                itemHeightDp = it.itemHeightDp?.takeIf { h -> h > 0 }
+            )
+        },
+        speech = speech?.let {
+            com.kingzcheung.xime.plugin.core.model.PluginCapabilities.SpeechCapabilities(
+                inputMode = it.inputMode,
+                supportsPartialResults = it.supportsPartialResults,
+                requiresNetwork = it.requiresNetwork
+            )
+        },
+        tool = tool?.let {
+            com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ToolCapabilities(
+                display = when (it.display?.lowercase()) {
+                    "direct" -> com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT
+                    "select" -> com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT
+                    else -> null
+                }
+            )
+        },
+        clipboardSync = clipboardSync?.let {
+            com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ClipboardSyncCapabilities(
+                protocols = it.protocols.filter { p -> p.isNotBlank() }
+            )
+        }
+    )
+}
 
 /**
  * 插件安装器（Lua 脚本插件）。
@@ -141,7 +210,8 @@ class InstallerManager(
                     declaredHosts = declaredHosts,
                     allowCustomHosts = manifest.network?.allowCustomHosts ?: false,
                     toolbarButtons = toolbarButtons,
-                    icon = manifest.icon?.takeIf { it.isNotBlank() }
+                    icon = manifest.icon?.takeIf { it.isNotBlank() },
+                    capabilities = manifest.capabilities?.toModel()
                 )
             )
         } catch (e: Exception) {
@@ -250,7 +320,8 @@ class InstallerManager(
                 declaredHosts = pluginConfig.declaredHosts,
                 allowCustomHosts = pluginConfig.allowCustomHosts,
                 toolbarButtons = pluginConfig.toolbarButtons,
-                manifestIcon = pluginConfig.icon
+                manifestIcon = pluginConfig.icon,
+                capabilities = pluginConfig.capabilities
             )
 
             if (existingPlugin != null) {

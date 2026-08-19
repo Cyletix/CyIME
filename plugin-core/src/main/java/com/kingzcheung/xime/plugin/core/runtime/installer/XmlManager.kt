@@ -81,6 +81,9 @@ class XmlManager(private val context: Application) {
                     if (plugin.manifestIcon != null) {
                         writer.write("    <manifestIcon>${escapeXml(plugin.manifestIcon)}</manifestIcon>\n")
                     }
+                    if (plugin.capabilities != null) {
+                        writer.write("    <capabilities>${escapeXml(encodeCapabilities(plugin.capabilities))}</capabilities>\n")
+                    }
                     writer.write("  </plugin>\n")
                 }
                 writer.write("</plugins>\n")
@@ -132,6 +135,9 @@ class XmlManager(private val context: Application) {
             val toolbarButtons = parseToolbarButtons(pluginContent)
             val trustLevel = com.kingzcheung.xime.plugin.core.util.PluginSignatureUtil.classifyLuaPlugin(source)
             val manifestIcon = extractTag(pluginContent, "manifestIcon")?.takeIf { it.isNotBlank() }
+            val capabilities = extractTag(pluginContent, "capabilities")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { decodeCapabilities(it) }
 
             if (id != null && path != null) {
                 plugins[id] = PluginInfo(
@@ -153,7 +159,8 @@ class XmlManager(private val context: Application) {
                     declaredHosts = networkHosts,
                     allowCustomHosts = allowCustomHosts,
                     toolbarButtons = toolbarButtons,
-                    manifestIcon = manifestIcon
+                    manifestIcon = manifestIcon,
+                    capabilities = capabilities
                 )
             }
         }
@@ -201,5 +208,68 @@ class XmlManager(private val context: Application) {
             .replace("&lt;", "<")
             .replace("&gt;", ">")
             .replace("&amp;", "&")
+    }
+
+    /** capabilities → JSON 文本（便于单个 XML 节点持久化）。 */
+    private fun encodeCapabilities(cap: com.kingzcheung.xime.plugin.core.model.PluginCapabilities): String {
+        val root = mutableMapOf<String, Any?>()
+        cap.emoji?.let {
+            root["emoji"] = mapOf(
+                "supportsSearch" to it.supportsSearch,
+                "columns" to it.columns,
+                "itemHeightDp" to it.itemHeightDp
+            )
+        }
+        cap.speech?.let {
+            root["speech"] = mapOf(
+                "inputMode" to it.inputMode,
+                "supportsPartialResults" to it.supportsPartialResults,
+                "requiresNetwork" to it.requiresNetwork
+            )
+        }
+        cap.tool?.let {
+            root["tool"] = mapOf("display" to it.display?.name)
+        }
+        cap.clipboardSync?.let {
+            root["clipboardSync"] = mapOf("protocols" to it.protocols)
+        }
+        return com.kingzcheung.xime.plugin.core.lua.sdk.SimpleJson.encode(root) ?: ""
+    }
+
+    /** capabilities JSON 文本 → 类型化模型（解析失败返回 null，不影响插件加载）。 */
+    private fun decodeCapabilities(json: String): com.kingzcheung.xime.plugin.core.model.PluginCapabilities? {
+        return runCatching {
+            val root = com.kingzcheung.xime.plugin.core.lua.sdk.SimpleJson.decode(json)
+                as? Map<*, *> ?: return null
+            com.kingzcheung.xime.plugin.core.model.PluginCapabilities(
+                emoji = (root["emoji"] as? Map<*, *>)?.let { m ->
+                    com.kingzcheung.xime.plugin.core.model.PluginCapabilities.EmojiCapabilities(
+                        supportsSearch = (m["supportsSearch"] as? Boolean) ?: false,
+                        columns = (m["columns"] as? Number)?.toInt(),
+                        itemHeightDp = (m["itemHeightDp"] as? Number)?.toInt()
+                    )
+                },
+                speech = (root["speech"] as? Map<*, *>)?.let { m ->
+                    com.kingzcheung.xime.plugin.core.model.PluginCapabilities.SpeechCapabilities(
+                        inputMode = (m["inputMode"] as? String) ?: "streaming",
+                        supportsPartialResults = (m["supportsPartialResults"] as? Boolean) ?: true,
+                        requiresNetwork = (m["requiresNetwork"] as? Boolean) ?: true
+                    )
+                },
+                tool = (root["tool"] as? Map<*, *>)?.let { m ->
+                    com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ToolCapabilities(
+                        display = (m["display"] as? String)?.let { s ->
+                            com.kingzcheung.xime.plugin.core.api.ToolResult.entries
+                                .firstOrNull { it.name.equals(s, ignoreCase = true) }
+                        }
+                    )
+                },
+                clipboardSync = (root["clipboardSync"] as? Map<*, *>)?.let { m ->
+                    com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ClipboardSyncCapabilities(
+                        protocols = (m["protocols"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                    )
+                }
+            )
+        }.getOrNull()
     }
 }

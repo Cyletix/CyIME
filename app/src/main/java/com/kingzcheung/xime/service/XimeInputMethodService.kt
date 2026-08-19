@@ -111,7 +111,7 @@ import com.kingzcheung.xime.keyboard.ActionExecutor
 import com.kingzcheung.xime.keyboard.HANDWRITING_SCHEMA_ID
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
-import com.kingzcheung.xime.keyboard.ToolPanelItem
+import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -668,6 +668,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (enabled.isEmpty()) return
             val preferredId = SettingsPreferences.getClipboardSyncPluginId(this)
             val selected = enabled.firstOrNull { it.first == preferredId } ?: enabled.first()
+            // 能力声明校验：未声明同步协议的插件不启动（manifest.capabilities.clipboard_sync.protocols）
+            val protocols = ExtensionManager.getAllInstalledPlugins()
+                .firstOrNull { it.id == selected.first }
+                ?.capabilities?.clipboardSync?.protocols
+            if (protocols.isNullOrEmpty()) {
+                Log.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
+                return
+            }
             val plugin = selected.second
             clipboardSyncBridge = ClipboardSyncBridge(
                 this,
@@ -799,7 +807,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             toolPanelPluginId = pluginId,
             toolPanelTitle = pluginName,
             toolPanelPrefillText = prefill,
-            toolPanelItems = pluginState?.items?.map { ToolPanelItem(it.id, it.text) } ?: emptyList(),
+            toolPanelItems = pluginState?.items ?: emptyList(),
             toolPanelRequestEpoch = uiState.value.toolPanelRequestEpoch + 1,
             enterKeyText = "生成",
         )
@@ -883,21 +891,24 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun triggerToolPanelGenerate() {
         val pluginId = uiState.value.toolPanelPluginId
         val inputText = ToolPanelEditTextHolder.editText?.text?.toString() ?: ""
+        // 结果显示方式：插件元数据声明（manifest.capabilities.tool.display），
+        // 未声明时按结果数量兜底（1 条直接上屏，多条打开页面）
+        val display = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == pluginId }
+            ?.capabilities?.tool?.display
         // 捕获当前代际号（openToolPanel 时递增）。轮询期间持续对比：
         // 面板被重新打开（epoch 递增）即视为过期，丢弃本轮结果。
         val epoch = uiState.value.toolPanelRequestEpoch
+        val epochStartTime = System.currentTimeMillis()
         toolPanelPollJob?.cancel()
         toolPanelPollJob = serviceScope.launch(Dispatchers.IO) {
             val plugin = ExtensionManager.getPluginById(pluginId) as? ToolPlugin
             plugin?.onPanelInput(inputText)
             plugin?.onPanelAction("generate")
-            // 插件声明的结果展示模式（SINGLE/MULTIPLE），随最后一次轮询取回
-            var resultMode: com.kingzcheung.xime.plugin.core.api.ToolResultMode? = null
             while (uiState.value.toolPanelVisible) {
                 val state = plugin?.getPanelState(inputText) ?: break
-                val items = state.items.map { ToolPanelItem(it.id, it.text) }
+                val items = state.items
                 val loading = state.loading
-                resultMode = state.resultMode
                 withContext(Dispatchers.Main) {
                     if (uiState.value.toolPanelRequestEpoch == epoch) {
                         uiState.value = uiState.value.copy(
@@ -909,23 +920,37 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (!loading) break
                 delay(200)
             }
-            // 自适应结果交互：生成结束后按结果模式决策——
-            //   resultMode=SINGLE → 直接上屏替换选区并关闭面板（AI 翻译/帮写等单结果场景，无需点击）
-            //   resultMode=MULTIPLE → 打开全屏结果页面（AiResultPanel，与表情/符号同级）供用户点击选择
-            //   resultMode=null（未声明）→ 按结果数量兜底：1 条直接上屏，多条打开页面
+            // 自适应结果交互：生成结束后按结果显示方式决策——
+            //   display=DIRECT → 直接上屏替换选区并关闭面板（AI 翻译/帮写等单结果场景，无需点击）
+            //   display=SELECT → 打开全屏结果页面（AiResultPanel，与表情/符号同级）供用户点击选择
+            //   display=null（未声明）→ 按结果数量兜底：1 条直接上屏，多条打开页面
             //   空结果 → 保持面板（用户可重新生成）
             withContext(Dispatchers.Main) {
                 if (uiState.value.toolPanelVisible) {
                     val items = uiState.value.toolPanelItems
-                    val mode = resultMode ?: when {
-                        items.size > 1 -> com.kingzcheung.xime.plugin.core.api.ToolResultMode.MULTIPLE
-                        else -> com.kingzcheung.xime.plugin.core.api.ToolResultMode.SINGLE
+                    val mode = display ?: when {
+                        items.size > 1 -> com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT
+                        else -> com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT
                     }
                     when {
-                        items.isEmpty() -> { /* 保持面板，等待重新生成 */ }
-                        mode == com.kingzcheung.xime.plugin.core.api.ToolResultMode.SINGLE ->
+                        items.isEmpty() -> {
+                            // 空结果：若非静默失败（插件刚记录了错误），Toast 告知用户原因
+                            val lastError = com.kingzcheung.xime.plugin.core.security.PluginErrorLog
+                                .getLastError(pluginId)
+                            val errorMessage = lastError?.message
+                            if (!errorMessage.isNullOrEmpty() &&
+                                lastError.timestamp >= epochStartTime
+                            ) {
+                                android.widget.Toast.makeText(
+                                    this@XimeInputMethodService,
+                                    errorMessage,
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                        mode == com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT ->
                             commitToolPanelItem(items[0].text)
-                        mode == com.kingzcheung.xime.plugin.core.api.ToolResultMode.MULTIPLE -> {
+                        mode == com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT -> {
                             if (!(keyboardViewModel.page.value is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay &&
                                     (keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Overlay)?.route == OverlayRoute.ToolResult)
                             ) {
@@ -1833,6 +1858,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     private fun clearInputState() {
         closeToolPanel()
+        // 输入会话结束：关闭残留的面板页面（表情/符号等 overlay），
+        // 避免下次键盘弹出时在候选栏上方渲染上次的面板背景
+        var page = keyboardViewModel.page.value
+        while (page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay) {
+            keyboardViewModel.closeOverlay()
+            page = keyboardViewModel.page.value
+        }
         calculatorEngine.clear()
         rimeEngine.clearComposition()
         t9PartialSegments.clear()

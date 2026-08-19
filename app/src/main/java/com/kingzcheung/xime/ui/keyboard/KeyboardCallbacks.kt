@@ -45,7 +45,7 @@ data class KeyboardCallbacks(
     /**
      * 通用工具面板候选条目点击（AI 生成结果上屏，宿主处理选区替换/追加）。
      */
-    val onToolPanelItemClick: ((com.kingzcheung.xime.keyboard.ToolPanelItem) -> Unit)? = null,
+    val onToolPanelItemClick: ((com.kingzcheung.xime.plugin.core.api.PluginResultItem) -> Unit)? = null,
     /**
      * 通用工具面板"重新生成"。
      */

@@ -38,6 +38,8 @@ data class PluginInfo(
     val toolbarButtons: List<PluginToolbarButton> = emptyList(),
     /** manifest 顶层 icon 原文：文字（如 "译"）或 resources/ 下图片文件名。工具栏按钮无专属图标时兜底。 */
     val manifestIcon: String? = null,
+    /** manifest.capabilities 能力声明（emoji/speech/tool/clipboard_sync 各类型）。宿主消费能力的唯一来源。 */
+    val capabilities: PluginCapabilities? = null,
 ) {
     val version: String get() = versionName
     val category: PluginCategory get() = PluginCategory.fromId(type)

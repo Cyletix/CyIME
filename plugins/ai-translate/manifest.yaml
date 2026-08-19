@@ -11,7 +11,7 @@ icon: "译"
 description: 翻译选中文本/输入框内容，结果替换原选区或光标处追加。支持任意 OpenAI 兼容接口。
 
 # 插件版本
-version: 0.1.0
+version: 0.2.0
 
 # 插件分类：tool 工具类（多开）
 type: tool
@@ -59,3 +59,7 @@ configSchema:
     type: textarea
     defaultValue: "你是专业翻译。请把下面的内容翻译成{targetLang}，只输出译文，不要解释、不要引号。\n{context}"
     helpText: 翻译 prompt 模板，{context} 替换为待翻译文本，{targetLang} 替换为目标语言
+# 能力声明
+capabilities:
+  tool:
+    display: direct

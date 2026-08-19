@@ -5,7 +5,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.keyboard.ToolbarButton
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
-import com.kingzcheung.xime.keyboard.ToolPanelItem
+import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 
 data class InputUIState(
@@ -63,7 +63,7 @@ data class InputUIState(
     /** 面板输入框预填内容（上下文收集结果）。 */
     val toolPanelPrefillText: String = "",
     /** 面板候选条目（AI 生成结果，点击上屏）。 */
-    val toolPanelItems: List<ToolPanelItem> = emptyList(),
+    val toolPanelItems: List<PluginResultItem> = emptyList(),
     /** 面板是否正在生成中（流式生成期间为 true，面板展示 loading）。 */
     val toolPanelLoading: Boolean = false,
     /** 面板请求代际号（防旧结果回填闪动）。 */

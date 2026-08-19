@@ -68,6 +68,7 @@ fun PluginConfigFormScreen(
     pluginId: String,
     plugin: IPluginConfigurable,
     pluginName: String,
+    schema: List<PluginSettingField> = emptyList(),
     onBack: () -> Unit,
     embedded: Boolean = false
 ) {
@@ -75,7 +76,11 @@ fun PluginConfigFormScreen(
     val configStore = remember(pluginId) {
         PluginConfigStoreImpl(context.applicationContext as android.app.Application, pluginId)
     }
-    val fields = plugin.getSettingsSchema()
+    val fields = remember(schema, plugin) {
+        if (schema.isNotEmpty()) schema else {
+            runCatching { plugin.getSettingsSchema() }.getOrElse { emptyList() }
+        }
+    }
     val groupedFields = remember(fields) { fields.groupBy { it.section.orEmpty() } }
 
     val dynamicOptions = remember(plugin) { mutableStateMapOf<String, List<String>>() }
