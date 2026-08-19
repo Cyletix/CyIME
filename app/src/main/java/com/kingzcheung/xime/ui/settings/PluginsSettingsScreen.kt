@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.PluginIcon
 import com.kingzcheung.xime.plugin.core.model.Activation
 import com.kingzcheung.xime.plugin.core.model.PluginCategory
@@ -446,11 +447,15 @@ private fun ExtensionItem(
                     )
                 }
 
-                if (extension.declaredHosts.isNotEmpty()) {
+                val networkHosts = remember(extension.id) {
+                    (extension.declaredHosts + ExtensionManager.getConfiguredNetworkHosts(context, extension.id))
+                        .distinct()
+                }
+                if (networkHosts.isNotEmpty()) {
                     NetworkAccessSection(
                         pluginId = extension.id,
                         pluginName = extension.name,
-                        hosts = extension.declaredHosts
+                        hosts = networkHosts
                     )
                 }
 

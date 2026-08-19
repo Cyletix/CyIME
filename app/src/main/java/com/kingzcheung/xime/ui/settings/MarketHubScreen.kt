@@ -88,6 +88,7 @@ import com.kingzcheung.xime.model.ModelCategory
 import com.kingzcheung.xime.model.ModelDownloadState
 import com.kingzcheung.xime.model.ModelInfo
 import com.kingzcheung.xime.model.ModelVersion
+import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import com.kingzcheung.xime.settings.MarketPlugin
 import com.kingzcheung.xime.settings.MarketScheme
@@ -1955,6 +1956,18 @@ private fun PluginDetailBody(
             null
         }
     }
+    val context = LocalContext.current
+    val declaredHosts = installedPlugin?.declaredHosts.orEmpty()
+    val networkHosts = remember(installedPlugin?.id) {
+        if (installedPlugin != null) {
+            (declaredHosts + ExtensionManager.getConfiguredNetworkHosts(
+                context,
+                installedPlugin.id
+            )).distinct()
+        } else {
+            declaredHosts
+        }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -2041,8 +2054,7 @@ private fun PluginDetailBody(
             }
         }
 
-        val declaredHosts = installedPlugin?.declaredHosts.orEmpty()
-        if (declaredHosts.isNotEmpty()) {
+        if (networkHosts.isNotEmpty()) {
             item {
                 Text(
                     "网络权限",
@@ -2060,7 +2072,7 @@ private fun PluginDetailBody(
                         NetworkAccessSection(
                             pluginId = item.plugin.id,
                             pluginName = plugin.name.ifEmpty { plugin.id },
-                            hosts = declaredHosts,
+                            hosts = networkHosts,
                         )
                     }
                 }

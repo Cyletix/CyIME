@@ -155,6 +155,13 @@ class InstallerManager(
         private const val PLUGINS_DIR = "plugins"
         private const val MANIFEST_YAML = "manifest.yaml"
 
+        /** xipk 包大小上限（10MB）：插件是脚本+资源，超过即拒绝安装。 */
+        private const val MAX_ARCHIVE_FILE_BYTES = 10 * 1024 * 1024
+
+        /** 解压条目数与解压后总体积上限（防 zip bomb）。 */
+        private const val MAX_ARCHIVE_ENTRIES = 512
+        private const val MAX_ARCHIVE_TOTAL_BYTES = 64 * 1024 * 1024
+
         /** 插件 id 白名单：字母/数字/下划线/连字符，点号仅作命名空间分段（禁止 .. / 空段 / /），最长 64，杜绝路径穿越。 */
         private val PLUGIN_ID_REGEX = Regex("^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$")
         private const val PLUGIN_ID_MAX_LENGTH = 64
@@ -162,11 +169,27 @@ class InstallerManager(
         /** 入口脚本：普通文件名，不允许路径分隔符与 ".."。 */
         private val ENTRY_SCRIPT_REGEX = Regex("^[A-Za-z0-9_.-]{1,128}$")
 
+        /** 网络声明域名：合法域名或 IPv4（禁止通配/空白/超长，授权 UI 直接展示，需可读可信）。 */
+        private val DECLARED_HOST_REGEX = Regex(
+            "^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\\.([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$"
+        )
+
         internal fun isValidPluginId(id: String): Boolean =
             id.length <= PLUGIN_ID_MAX_LENGTH && PLUGIN_ID_REGEX.matches(id)
 
         private fun isValidEntryScript(name: String): Boolean =
             ENTRY_SCRIPT_REGEX.matches(name) && !name.contains("..")
+
+        /** 网络声明域名是否合法（域名/IPv4，供 manifest 解析时过滤）。 */
+        internal fun isValidDeclaredHost(host: String): Boolean =
+            DECLARED_HOST_REGEX.matches(host)
+
+        /** 插件包内资源相对路径：允许子目录（/ 分隔），禁止 .. 穿越、绝对路径与反斜杠。 */
+        fun isValidResourcePath(name: String): Boolean {
+            if (name.isBlank() || name.length > 256) return false
+            if (name.startsWith("/") || name.contains("\\")) return false
+            return name.split('/').all { it.isNotEmpty() && it != "." && it != ".." }
+        }
 
         /** 工具栏按钮 id：非空；禁止逗号（偏好存储按逗号分隔）、XML 特殊字符与换行/空白控制符。
          *  全局限定 id 建议带插件命名空间（如 `pluginId:action`）。 */
@@ -185,7 +208,7 @@ class InstallerManager(
         internal fun parseManifestContent(content: String): PluginParseResult = try {
             val manifest = manifestYaml.decodeFromString(PluginManifest.serializer(), content)
             val declaredHosts = manifest.network?.hosts.orEmpty()
-                .filter { it.isNotBlank() }
+                .filter { it.isNotBlank() && isValidDeclaredHost(it) }
             val toolbarButtons = manifest.toolbarButtons
                 .filter { isValidToolbarButtonId(it.id) }
                 .map {
@@ -246,6 +269,11 @@ class InstallerManager(
     ): InstallResult = withContext(Dispatchers.IO) {
         if (!pluginFile.exists()) {
             return@withContext InstallResult.Failure("插件文件不存在")
+        }
+        if (pluginFile.length() > MAX_ARCHIVE_FILE_BYTES) {
+            return@withContext InstallResult.Failure(
+                "插件包超过大小上限（${MAX_ARCHIVE_FILE_BYTES / 1024 / 1024}MB），拒绝安装"
+            )
         }
 
         val pluginConfig = when (val parsed = parsePluginConfig(pluginFile)) {
@@ -376,11 +404,20 @@ class InstallerManager(
         return File(pluginsDir, pluginId)
     }
 
-    /** 解压 Lua 插件包到插件目录（防 zip-slip 路径穿越）。 */
+    /** 解压 Lua 插件包到插件目录（防 zip-slip 路径穿越与 zip bomb 解压膨胀）。 */
     private fun extractPluginArchive(archiveFile: File, pluginDir: File) {
         ZipFile(archiveFile).use { zip ->
+            var entryCount = 0
+            var totalBytes = 0L
             for (entry in zip.entries()) {
+                if (++entryCount > MAX_ARCHIVE_ENTRIES) {
+                    throw IllegalArgumentException("插件包条目数超过上限（$MAX_ARCHIVE_ENTRIES）")
+                }
                 if (entry.isDirectory) continue
+                if (entry.size > 0) totalBytes += entry.size
+                if (totalBytes > MAX_ARCHIVE_TOTAL_BYTES) {
+                    throw IllegalArgumentException("插件包解压体积超过上限（${MAX_ARCHIVE_TOTAL_BYTES / 1024 / 1024}MB）")
+                }
                 // Windows 打包工具可能产生 "\" 分隔的条目名，统一规范为 "/"
                 val name = entry.name.replace('\\', '/')
                 if (name.startsWith("lib/")) continue

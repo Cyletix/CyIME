@@ -209,4 +209,50 @@ class ManifestParseTest {
         val noIcon = (InstallerManager.parseManifestContent("id: mini") as PluginParseResult.Success).config
         assertEquals("缺省 icon 为 null", null, noIcon.icon)
     }
+
+    @Test
+    fun `非法网络域名声明被过滤`() {
+        val content = """
+            id: demo
+            network:
+              hosts:
+                - api.openai.com
+                - "*.wildcard.example.com"
+                - "http://evil.example.com/path"
+                - "169.254.169.254"
+                - ""
+        """.trimIndent()
+
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals(
+            "仅合法域名/IPv4 保留",
+            listOf("api.openai.com", "169.254.169.254"),
+            config.declaredHosts
+        )
+    }
+
+    @Test
+    fun `网络域名合法性校验`() {
+        assertTrue("普通域名合法", InstallerManager.isValidDeclaredHost("api.openai.com"))
+        assertTrue("带连字符合法", InstallerManager.isValidDeclaredHost("my-server.example.com"))
+        assertTrue("IPv4 合法", InstallerManager.isValidDeclaredHost("192.168.1.50"))
+        assertTrue("通配符非法", !InstallerManager.isValidDeclaredHost("*.example.com"))
+        assertTrue("带协议非法", !InstallerManager.isValidDeclaredHost("https://example.com"))
+        assertTrue("带端口非法", !InstallerManager.isValidDeclaredHost("example.com:8080"))
+        assertTrue("空白非法", !InstallerManager.isValidDeclaredHost(""))
+        assertTrue("含下划线非法", !InstallerManager.isValidDeclaredHost("under_score.example.com"))
+    }
+
+    @Test
+    fun `资源路径合法性校验`() {
+        assertTrue("普通文件名合法", InstallerManager.isValidResourcePath("icon.png"))
+        assertTrue("子目录合法", InstallerManager.isValidResourcePath("icons/ai.png"))
+        assertTrue("点开头文件名合法", InstallerManager.isValidResourcePath(".hidden.png"))
+        assertTrue("空路径非法", !InstallerManager.isValidResourcePath(""))
+        assertTrue("路径穿越非法", !InstallerManager.isValidResourcePath("../xime.yaml"))
+        assertTrue("嵌套穿越非法", !InstallerManager.isValidResourcePath("icons/../../xime.yaml"))
+        assertTrue("绝对路径非法", !InstallerManager.isValidResourcePath("/etc/passwd"))
+        assertTrue("反斜杠非法", !InstallerManager.isValidResourcePath("..\\xime.yaml"))
+        assertTrue("空段非法", !InstallerManager.isValidResourcePath("icons//x.png"))
+    }
 }

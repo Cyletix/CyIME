@@ -15,7 +15,11 @@ import org.luaj.vm2.lib.VarArgFunction
 import org.luaj.vm2.lib.jse.CoerceJavaToLua
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
@@ -38,11 +42,23 @@ class LuaScriptRuntime(
     private val wsHostApi: com.kingzcheung.xime.plugin.core.lua.ws.WsHostApi? = null,
     private val httpHostApi: com.kingzcheung.xime.plugin.core.lua.http.HttpHostApi? = null,
     private val cryptoHostApi: com.kingzcheung.xime.plugin.core.lua.crypto.CryptoHostApi? = null,
-    private val sseHostApi: com.kingzcheung.xime.plugin.core.lua.http.SseHostApi? = null
+    private val sseHostApi: com.kingzcheung.xime.plugin.core.lua.http.SseHostApi? = null,
+    private val callTimeoutMs: Long = CALL_TIMEOUT_MS,
+    private val callbackTimeoutMs: Long = CALLBACK_TIMEOUT_MS
 ) {
 
     companion object {
         private const val TAG = "LuaRuntime"
+
+        /** 插件业务调用（load/call/onLoad/onUnload）超时：覆盖同步 HTTP 最长 30s 与用户自定义
+         *  timeout，超时后插件被标记中毒（不再执行任何 Lua 代码，直到宿主重载插件）。 */
+        private const val CALL_TIMEOUT_MS = 180_000L
+
+        /** 网络回调（SSE/WS 事件）超时：回调应短促，恶意死循环回调会占住执行线程。 */
+        private const val CALLBACK_TIMEOUT_MS = 5_000L
+
+        /** zlib.gunzip 解压输出上限（防压缩炸弹撑爆内存）。 */
+        private const val MAX_GUNZIP_OUTPUT_BYTES = 16 * 1024 * 1024
 
         fun tableToMap(table: LuaValue): Map<String, LuaValue> {
             val result = LinkedHashMap<String, LuaValue>()
@@ -135,6 +151,42 @@ class LuaScriptRuntime(
     private val loadedModules = ConcurrentHashMap<String, LuaValue>()
     private val libsDir = File(pluginDir, "libs")
 
+    /**
+     * 插件 Lua 执行的专用线程：宿主 IO 协程线程池不被插件死循环耗尽。
+     * 超时后线程被弃用（Java 无法强杀死循环线程，但影响被隔离在该线程内），
+     * 插件标记中毒，后续调用直接失败，用户可在插件中心重载/卸载。
+     */
+    private val executor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "xime-lua-$pluginId").apply { isDaemon = true }
+    }
+
+    /** 插件是否已中毒（执行超时）：true 后所有 Lua 执行入口直接失败。 */
+    @Volatile
+    private var poisoned = false
+
+    /** 在专用线程内执行 Lua 代码并限时；超时返回 null（可选的调用方按失败处理）。 */
+    private fun <T> runGuarded(timeoutMs: Long, poisonOnTimeout: Boolean, block: () -> T): T? {
+        if (poisoned) return null
+        val future = executor.submit(Callable(block))
+        return try {
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: TimeoutException) {
+            future.cancel(true)
+            if (poisonOnTimeout) poison()
+            null
+        } catch (e: Exception) {
+            future.cancel(true)
+            throw e
+        }
+    }
+
+    private fun poison() {
+        if (poisoned) return
+        poisoned = true
+        executor.shutdownNow()
+        api.logError("插件执行超时（疑似死循环），已停止执行该插件，请重载或卸载")
+    }
+
     /** ASR 插件后端设置的宿主结果回调（Lua 的 emit* 桥接目标）。 */
     @Volatile
     var asrResultCallback: com.kingzcheung.xime.plugin.core.api.AsrPluginListener? = null
@@ -165,8 +217,10 @@ class LuaScriptRuntime(
         val callbacks = sseCallbacks[sessionId] ?: return
         val fn = callbacks[name] ?: return
         try {
-            synchronized(luaLock) {
-                fn.invoke(LuaValue.valueOf(text))
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) {
+                    fn.invoke(LuaValue.valueOf(text))
+                }
             }
         } catch (e: Exception) {
             api.log("host.http.stream $name 回调失败: ${e.message}")
@@ -174,23 +228,50 @@ class LuaScriptRuntime(
     }
 
     private val wsListener = object : com.kingzcheung.xime.plugin.core.lua.ws.WsHostListener {
-        override fun onOpen() { synchronized(luaLock) { wsCallbacks?.get("onOpen")?.invoke() } }
-        override fun onMessage(text: String) { synchronized(luaLock) { wsCallbacks?.get("onMessage")?.invoke(LuaValue.valueOf(text)) } }
-        override fun onBinary(data: ByteArray) { synchronized(luaLock) { wsCallbacks?.get("onBinary")?.invoke(LuaString.valueOf(data)) } }
-        override fun onError(message: String) { synchronized(luaLock) { wsCallbacks?.get("onError")?.invoke(LuaValue.valueOf(message)) } }
-        override fun onClose() { synchronized(luaLock) { wsCallbacks?.get("onClose")?.invoke() } }
+        override fun onOpen() {
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) { wsCallbacks?.get("onOpen")?.invoke() }
+            }
+        }
+
+        override fun onMessage(text: String) {
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) { wsCallbacks?.get("onMessage")?.invoke(LuaValue.valueOf(text)) }
+            }
+        }
+
+        override fun onBinary(data: ByteArray) {
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) { wsCallbacks?.get("onBinary")?.invoke(LuaString.valueOf(data)) }
+            }
+        }
+
+        override fun onError(message: String) {
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) { wsCallbacks?.get("onError")?.invoke(LuaValue.valueOf(message)) }
+            }
+        }
+
+        override fun onClose() {
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) { wsCallbacks?.get("onClose")?.invoke() }
+            }
+            wsCallbacks = null
+        }
     }
 
     private fun buildSandbox(): Globals {
         // JsePlatform 自动配置 compiler 与 loader；随后剥离全部危险库
         val g = org.luaj.vm2.lib.jse.JsePlatform.standardGlobals()
 
-        // 危险库剥离：io/os（文件与系统调用）、luajava（Java 反射）、loadfile/dofile（任意文件加载）
+        // 危险库剥离：io/os（文件与系统调用）、luajava（Java 反射）、loadfile/dofile（任意文件加载）、
+        // debug（getregistry/getmetatable 可篡改宿主注入表与注册表，扩大攻击面）
         g.set("os", LuaValue.NIL)
         g.set("io", LuaValue.NIL)
         g.set("luajava", LuaValue.NIL)
         g.set("loadfile", LuaValue.NIL)
         g.set("dofile", LuaValue.NIL)
+        g.set("debug", LuaValue.NIL)
 
         g.set("print", luaFunction { args ->
             api.log(args.tojstring())
@@ -324,7 +405,20 @@ class LuaScriptRuntime(
         zlib.set("gunzip", luaFunction { args ->
             val data = luaToBytes(args.arg1()) ?: return@luaFunction LuaValue.NIL
             try {
-                LuaString.valueOf(GZIPInputStream(data.inputStream()).readBytes())
+                val gzipIn = GZIPInputStream(data.inputStream())
+                val buffer = ByteArray(8192)
+                val bos = ByteArrayOutputStream()
+                var total = 0
+                while (true) {
+                    val n = gzipIn.read(buffer)
+                    if (n < 0) break
+                    total += n
+                    if (total > MAX_GUNZIP_OUTPUT_BYTES) {
+                        throw IllegalStateException("gunzip 输出超过上限（${MAX_GUNZIP_OUTPUT_BYTES / 1024 / 1024}MB）")
+                    }
+                    bos.write(buffer, 0, n)
+                }
+                LuaString.valueOf(bos.toByteArray())
             } catch (e: Exception) {
                 api.log("zlib.gunzip failed: ${e.message}")
                 LuaValue.NIL
@@ -538,20 +632,22 @@ class LuaScriptRuntime(
     fun load(): Boolean {
         if (loaded) return true
         return try {
-            synchronized(luaLock) {
-                if (loaded) return true
-                val entryFile = File(pluginDir, entryScript)
-                if (!entryFile.exists()) {
-                    Log.e(TAG, "Entry script not found: ${entryFile.absolutePath}")
-                    return false
+            runGuarded(callTimeoutMs, poisonOnTimeout = true) {
+                synchronized(luaLock) {
+                    if (loaded) return@runGuarded true
+                    val entryFile = File(pluginDir, entryScript)
+                    if (!entryFile.exists()) {
+                        Log.e(TAG, "Entry script not found: ${entryFile.absolutePath}")
+                        return@runGuarded false
+                    }
+                    val chunk = globals.load(entryFile.readText(), "@$entryScript")
+                    val result = chunk.call()
+                    pluginTable = result.takeIf { it.istable() } ?: LuaValue.NIL
+                    loaded = true
+                    Log.d(TAG, "Plugin $pluginId loaded from $entryScript")
+                    true
                 }
-                val chunk = globals.load(entryFile.readText(), "@$entryScript")
-                val result = chunk.call()
-                pluginTable = result.takeIf { it.istable() } ?: LuaValue.NIL
-                loaded = true
-                Log.d(TAG, "Plugin $pluginId loaded from $entryScript")
-                true
-            }
+            } ?: false
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load Lua plugin $pluginId", e)
             false
@@ -562,7 +658,8 @@ class LuaScriptRuntime(
         if (!loaded) return
         try {
             val fn = synchronized(luaLock) { pluginTable.get(LuaPluginContract.FN_ON_LOAD) }
-            if (fn.isfunction()) {
+            if (!fn.isfunction()) return
+            runGuarded(callTimeoutMs, poisonOnTimeout = true) {
                 synchronized(luaLock) { fn.invoke() }
             }
         } catch (e: Exception) {
@@ -574,7 +671,8 @@ class LuaScriptRuntime(
         if (!loaded) return
         try {
             val fn = synchronized(luaLock) { pluginTable.get(LuaPluginContract.FN_ON_UNLOAD) }
-            if (fn.isfunction()) {
+            if (!fn.isfunction()) return
+            runGuarded(callTimeoutMs, poisonOnTimeout = true) {
                 synchronized(luaLock) { fn.invoke() }
             }
         } catch (e: Exception) {
@@ -582,22 +680,24 @@ class LuaScriptRuntime(
         }
     }
 
-    /** 调用插件导出的函数，返回 LuaValue 结果；不存在或出错返回 NIL。 */
+    /** 调用插件导出的函数，返回 LuaValue 结果；不存在、出错或超时返回 NIL。 */
     fun call(name: String, vararg args: LuaValue): LuaValue {
         if (!loaded) return LuaValue.NIL
         return try {
-            synchronized(luaLock) {
-                val fn = pluginTable.get(name)
-                if (!fn.isfunction()) {
-                    Log.w(TAG, "Plugin $pluginId does not export '$name'")
-                    return LuaValue.NIL
+            runGuarded(callTimeoutMs, poisonOnTimeout = true) {
+                synchronized(luaLock) {
+                    val fn = pluginTable.get(name)
+                    if (!fn.isfunction()) {
+                        Log.w(TAG, "Plugin $pluginId does not export '$name'")
+                        return@runGuarded LuaValue.NIL
+                    }
+                    if (args.isEmpty()) {
+                        fn.invoke().arg1()
+                    } else {
+                        fn.invoke(args).arg1()
+                    }
                 }
-                if (args.isEmpty()) {
-                    fn.invoke().arg1()
-                } else {
-                    fn.invoke(args).arg1()
-                }
-            }
+            } ?: LuaValue.NIL
         } catch (e: Exception) {
             Log.e(TAG, "Call '$name' failed for $pluginId: ${e.message}", e)
             api.log("Call '$name' failed: ${e.message}")
@@ -609,7 +709,10 @@ class LuaScriptRuntime(
         try {
             callOnUnload()
         } finally {
+            executor.shutdownNow()
             loadedModules.clear()
+            sseCallbacks.clear()
+            wsCallbacks = null
             pluginTable = LuaValue.NIL
             loaded = false
         }

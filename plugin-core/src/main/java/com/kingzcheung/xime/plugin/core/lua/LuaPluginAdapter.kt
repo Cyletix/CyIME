@@ -76,7 +76,10 @@ open class LuaPluginAdapter(
         val map = LuaScriptRuntime.tableToMap(result)
         val text = map["text"]?.tojstring()?.takeIf { it.isNotBlank() }
         if (text != null) return PluginIcon(text = text)
-        val assetName = map["assetName"]?.tojstring()?.takeIf { it.isNotBlank() }
+        val assetName = map["assetName"]?.tojstring()
+            ?.takeIf {
+                it.isNotBlank() && com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager.isValidResourcePath(it)
+            }
         if (assetName != null) return PluginIcon(assetName = assetName)
         return null
     }

@@ -20,6 +20,16 @@ class NetworkPolicyTest {
     }
 
     @Test
+    fun `extractHttpHost extracts domain only from http urls`() {
+        assertEquals("dav.example.com", NetworkPolicy.extractHttpHost("https://dav.example.com:8080/dav/"))
+        assertEquals("api.openai.com", NetworkPolicy.extractHttpHost("https://api.openai.com/v1/chat/completions"))
+        assertEquals("192.168.1.50", NetworkPolicy.extractHttpHost("http://192.168.1.50:8080/dav/"))
+        assertNull("非 http 协议返回 null", NetworkPolicy.extractHttpHost("wss://dav.example.com/ws"))
+        assertNull("空白返回 null", NetworkPolicy.extractHttpHost("  "))
+        assertNull("无协议返回 null", NetworkPolicy.extractHttpHost("dav.example.com/path"))
+    }
+
+    @Test
     fun `trusted host passes silently`() {
         assertNull(
             NetworkPolicy.check(

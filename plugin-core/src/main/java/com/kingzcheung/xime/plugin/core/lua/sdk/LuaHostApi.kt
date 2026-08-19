@@ -95,11 +95,17 @@ class LuaHostApiImpl(
     override fun configKeys(): Set<String> = configStore.keys()
 
     override fun resourcePath(name: String): String? {
+        if (!com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager.isValidResourcePath(name)) {
+            return null
+        }
         val file = File(pluginDir, "resources/$name")
         return if (file.exists()) file.absolutePath else null
     }
 
     override fun resourceList(dir: String): List<String> {
+        if (!com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager.isValidResourcePath(dir)) {
+            return emptyList()
+        }
         val dirFile = File(pluginDir, "resources/$dir")
         if (!dirFile.isDirectory) return emptyList()
         return dirFile.listFiles()

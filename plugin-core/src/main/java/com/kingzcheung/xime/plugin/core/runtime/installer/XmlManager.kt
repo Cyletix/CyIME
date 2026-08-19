@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.plugin.core.runtime.installer
 
 import android.app.Application
+import android.util.Log
 import com.kingzcheung.xime.plugin.core.model.PluginInfo
 import com.kingzcheung.xime.plugin.core.model.PluginSource
 import com.kingzcheung.xime.plugin.core.model.PluginToolbarButton
@@ -39,7 +40,9 @@ class XmlManager(private val context: Application) {
 
     fun flushToDisk() {
         try {
-            pluginsFile.bufferedWriter().use { writer ->
+            // 原子写入：先写临时文件再 rename，避免崩溃损坏注册表（覆盖式 rename 在 Android 上可靠）
+            val tmp = File(pluginsFile.parentFile, "${pluginsFile.name}.tmp")
+            tmp.bufferedWriter().use { writer ->
                 writer.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
                 writer.write("<plugins>\n")
                 for (plugin in plugins.values) {
@@ -87,6 +90,12 @@ class XmlManager(private val context: Application) {
                     writer.write("  </plugin>\n")
                 }
                 writer.write("</plugins>\n")
+            }
+            if (pluginsFile.exists() && !pluginsFile.delete()) {
+                Log.w("XmlManager", "删除旧注册表失败，rename 将覆盖")
+            }
+            if (!tmp.renameTo(pluginsFile)) {
+                Log.e("XmlManager", "注册表写入失败：rename 失败")
             }
         } catch (e: Exception) {
             e.printStackTrace()

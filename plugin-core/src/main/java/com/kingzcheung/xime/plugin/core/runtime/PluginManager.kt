@@ -177,6 +177,10 @@ object PluginManager {
             val updatedPluginInfo = pluginInfo.copy(enabled = enabled)
             requireContext().xmlManager.updatePlugin(updatedPluginInfo)
             requireContext().xmlManager.flushToDisk()
+            if (!enabled) {
+                // 禁用时同步卸载运行中实例，避免插件继续后台运行（网络会话/剪贴板监听）
+                unloadPlugin(pluginId)
+            }
             true
         } catch (e: Exception) {
             false
@@ -214,7 +218,7 @@ object PluginManager {
             Log.d(TAG, "Found ${assetFiles.size} files in assets/$assetsDir: ${assetFiles.toList()}")
             
             for (fileName in assetFiles) {
-                if (fileName.endsWith(".xipk") || fileName.endsWith(".apk")) {
+                if (fileName.endsWith(".xipk")) {
                     val assetPath = "$assetsDir/$fileName"
                     Log.d(TAG, "Installing: $assetPath")
                     if (installPluginFromAssets(assetPath, forceOverwrite = true)) {

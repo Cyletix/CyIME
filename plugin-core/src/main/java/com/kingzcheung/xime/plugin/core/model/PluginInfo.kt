@@ -31,8 +31,8 @@ data class PluginInfo(
     val entryScript: String? = null,
     /** 插件声明需要访问的域名（manifest.network.hosts）。联网时需命中可信池或获用户授权。 */
     val declaredHosts: List<String> = emptyList(),
-    /** 是否接受用户自定义服务器地址（manifest.network.allowCustomHosts）。为 true 时，
-     *  插件配置中用户填写的 URL 域名自动获得联网授权（剪贴板同步等服务器地址场景）。 */
+    /** 是否接受用户自定义服务器地址（manifest.network.allowCustomHosts）。仅作能力声明：
+     *  自定义服务器域名一律需用户手动授权后才可联网（不再自动授权）。 */
     val allowCustomHosts: Boolean = false,
     /** 插件声明的工具栏按钮（manifest.toolbarButtons）。宿主据此在工具栏渲染插件入口。 */
     val toolbarButtons: List<PluginToolbarButton> = emptyList(),

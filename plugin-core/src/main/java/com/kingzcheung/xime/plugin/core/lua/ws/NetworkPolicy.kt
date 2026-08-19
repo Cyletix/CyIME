@@ -43,4 +43,11 @@ object NetworkPolicy {
         val host = rest.substringBefore(':')
         return host.takeIf { it.isNotBlank() }
     }
+
+    /** 从配置值文本提取 HTTP(S) URL 的域名（非 http/https 值返回 null，供 UI 展示授权候选）。 */
+    fun extractHttpHost(value: String): String? {
+        val trimmed = value.trim()
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return null
+        return extractHost(trimmed)
+    }
 }

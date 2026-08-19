@@ -2,7 +2,6 @@ package com.kingzcheung.xime.plugin.http
 
 import android.content.Context
 import android.util.Log
-import com.kingzcheung.xime.plugin.PluginConfigStoreImpl
 import com.kingzcheung.xime.plugin.core.lua.http.SseHostApi
 import com.kingzcheung.xime.plugin.core.lua.http.SseHostListener
 import com.kingzcheung.xime.plugin.core.lua.ws.NetworkPolicy
@@ -27,8 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * 宿主通用 SSE 流式 HTTP 白名单 API。
  *
- * - URL 域名须通过 [NetworkPolicy]（同 [HttpHostApiImpl]）：命中宿主可信池或插件已声明且
- *   经用户授权，否则拒绝（插件无法静默发起任意网络请求）
+ * - URL 域名须通过 [NetworkPolicy]（同 [HttpHostApiImpl]）：插件已声明且经用户授权，
+ *   否则拒绝（插件无法静默发起任意网络请求，自定义服务器域名需用户手动授权）
  * - 异步回调模型：[SseHostListener.onData] 每条 SSE 事件回调一次，onDone 收尾，onError 报错
  * - 支持任意 HTTP 方法（AI 对话接口通常为 POST）；解析由 okhttp-sse 的 [EventSourceListener] 承载
  * - 会话句柄：[close] 中断单个会话；中断后不再回调
@@ -75,18 +74,9 @@ class SseHostApiImpl(
 
         val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts)
         if (reason != null) {
-            // 插件声明了"接受用户自定义服务器地址"时：目标域名来自用户填写的配置 URL 视为用户意图连接，自动授权
-            val host = NetworkPolicy.extractHost(url)
-            if (pluginInfo?.allowCustomHosts == true && host != null && isConfiguredUrlHost(host)) {
-                if (host !in authorizedHosts) {
-                    SettingsPreferences.authorizePluginHost(context, pluginId, host)
-                    Log.d(TAG, "[$pluginId] 自动授权用户配置的服务器域名: $host")
-                }
-            } else {
-                lastErrorMsg = reason
-                Log.w(TAG, "[$pluginId] 联网被拒绝: $reason")
-                return -1
-            }
+            lastErrorMsg = reason
+            Log.w(TAG, "[$pluginId] 联网被拒绝: $reason")
+            return -1
         }
         lastErrorMsg = null
 
@@ -175,31 +165,4 @@ class SseHostApiImpl(
     }
 
     override fun lastError(): String? = lastErrorMsg
-
-    /**
-     * 判断目标域名是否来自插件配置中用户填写的 URL（同 HttpHostApiImpl，支持 allowCustomHosts 自动授权）。
-     */
-    private fun isConfiguredUrlHost(host: String): Boolean {
-        return try {
-            val configStore = PluginConfigStoreImpl(
-                context.applicationContext as android.app.Application,
-                pluginId
-            )
-            configStore.keys().any { key ->
-                val value = configStore.get(key) ?: return@any false
-                val configuredHost = extractHttpHost(value)
-                configuredHost != null && configuredHost == host
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "isConfiguredUrlHost failed", e)
-            false
-        }
-    }
-
-    private fun extractHttpHost(value: String): String? {
-        val trimmed = value.trim()
-        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return null
-        val withScheme = if (trimmed.contains("://")) trimmed else "http://$trimmed"
-        return NetworkPolicy.extractHost(withScheme)
-    }
 }

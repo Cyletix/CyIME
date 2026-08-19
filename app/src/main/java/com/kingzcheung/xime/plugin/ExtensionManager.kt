@@ -7,6 +7,7 @@ import com.kingzcheung.xime.plugin.core.api.ClipboardSyncPlugin
 import com.kingzcheung.xime.plugin.core.api.EmojiPlugin
 import com.kingzcheung.xime.plugin.core.api.IPluginEntryClass
 import com.kingzcheung.xime.plugin.core.api.PluginIcon
+import com.kingzcheung.xime.plugin.core.lua.ws.NetworkPolicy
 import com.kingzcheung.xime.plugin.core.model.PluginCategory
 import com.kingzcheung.xime.plugin.core.model.PluginInfo
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
@@ -65,13 +66,15 @@ object ExtensionManager {
         }
         
         val assetName = pluginIcon.assetName
-        if (assetName == null) {
+        if (assetName == null ||
+            !com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager.isValidResourcePath(assetName)
+        ) {
             return null
         }
-        
+
         val iconDir = File(context.filesDir, "plugin_icons")
         if (!iconDir.exists()) iconDir.mkdirs()
-        
+
         val iconFile = File(iconDir, "${pluginId}_$assetName")
 
         if (!iconFile.exists()) {
@@ -81,6 +84,7 @@ object ExtensionManager {
                 ?.let { File(it, "resources/$assetName") }
             if (resourceFile != null && resourceFile.exists()) {
                 try {
+                    iconFile.parentFile?.mkdirs()
                     resourceFile.copyTo(iconFile, overwrite = true)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to extract icon for $pluginId", e)
@@ -101,7 +105,11 @@ object ExtensionManager {
      * 到本地 plugin_icons/ 目录并返回本地文件路径；无图标或提取失败返回 null（宿主用 label 兜底）。
      */
     fun extractToolbarButtonIcon(context: Context, pluginId: String, pluginInfo: PluginInfo, iconName: String?): PluginIcon? {
-        if (iconName.isNullOrBlank()) return null
+        if (iconName.isNullOrBlank() ||
+            !com.kingzcheung.xime.plugin.core.runtime.installer.InstallerManager.isValidResourcePath(iconName)
+        ) {
+            return null
+        }
         val iconDir = File(context.filesDir, "plugin_icons")
         if (!iconDir.exists()) iconDir.mkdirs()
         val iconFile = File(iconDir, "${pluginId}_tb_$iconName")
@@ -113,6 +121,7 @@ object ExtensionManager {
                 ?.let { File(it, "resources/$iconName") }
             if (resourceFile != null && resourceFile.exists()) {
                 try {
+                    iconFile.parentFile?.mkdirs()
                     resourceFile.copyTo(iconFile, overwrite = true)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to extract toolbar icon for $pluginId", e)
@@ -280,6 +289,22 @@ object ExtensionManager {
         }
     
     fun getAllInstalledPlugins(): List<PluginInfo> = PluginManager.getAllInstallPlugins()
+
+    /** 插件配置中解析出的 HTTP(S) 域名（用户填写的自定义服务器地址），供网络授权 UI 展示。 */
+    fun getConfiguredNetworkHosts(context: Context, pluginId: String): List<String> {
+        return try {
+            val store = PluginConfigStoreImpl(
+                context.applicationContext as android.app.Application,
+                pluginId
+            )
+            store.keys()
+                .mapNotNull { key -> store.get(key)?.let { NetworkPolicy.extractHttpHost(it) } }
+                .distinct()
+        } catch (e: Exception) {
+            Log.e(TAG, "getConfiguredNetworkHosts failed for $pluginId", e)
+            emptyList()
+        }
+    }
 
     fun getPluginsByCategory(category: PluginCategory): List<PluginInfo> =
         getAllInstalledPlugins().filter { it.category == category }
