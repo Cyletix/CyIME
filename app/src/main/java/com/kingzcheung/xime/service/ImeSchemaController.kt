@@ -45,14 +45,24 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             } else {
                 val input = candState.inputText
                 if (input.isNotEmpty()) {
-                    service.commitText(input)
+                    withContext(Dispatchers.Main) {
+                        service.commitText(input)
+                    }
                     service.rimeEngine.clearComposition()
                 }
             }
         }
-        service.rimeEngine.toggleAsciiMode()
+        // 由 ImeKeyRouter 在 key-processing 线程调用：toggleAsciiMode 阻塞等待 rimeLock
+        // （部署/维护持锁时排队，完成后自动切换），不静默失败、不阻塞主线程。
+        // 仅在 session 创建失败（引擎真正不可用）时返回 false。
+        if (!service.rimeEngine.toggleAsciiMode()) {
+            Toast.makeText(service, "输入法引擎不可用，请稍后再试", Toast.LENGTH_SHORT).show()
+            return
+        }
         service.sessionController.persistSchemaOption("ascii_mode", service.rimeEngine.isAsciiMode())
-        service.updateUI()
+        withContext(Dispatchers.Main) {
+            service.updateUI()
+        }
     }
     
     internal fun reloadConfig() {
@@ -62,7 +72,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             android.widget.Toast.makeText(service, "方案部署中...", android.widget.Toast.LENGTH_SHORT).show()
         }
         
-        service.serviceScope.launch(Dispatchers.IO) {
+        // 部署投递到 key-processing 队列：与按键/切换同队列串行执行，
+        // 部署期间输入/切换操作排队等待，完成后自动恢复，
+        // 不再因 rimeLock 被部署占用而失败或静默丢弃。
+        service.keyRouter.postRimeJob {
             try {
                 KeysConfigHelper.loadConfig(service)
                 // 重新加载配色方案（用户可能在 xime.custom.yaml 中修改了 color_schemes）
@@ -95,7 +108,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     Log.w(XimeInputMethodService.TAG, "Schema $savedSchema not found in available schemas")
                 }
                 
-                // 直接在 IO 线程同步读取 name，避免嵌套协程的时序问题
+                // 直接在 key-processing 线程同步读取 name，避免嵌套协程的时序问题
                 val currentSchemaId = service.rimeEngine.getCurrentSchema()
                 val schemaName = SchemaManager.getSchemaDisplayName(
                     service, currentSchemaId
@@ -315,7 +328,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     }
     
     private fun deploy() {
-        service.serviceScope.launch(Dispatchers.IO) {
+        // 部署投递到 key-processing 队列，与输入/切换串行执行，避免持锁饿死输入
+        service.keyRouter.postRimeJob {
             // 部署前刷新手势配置和配色方案缓存
             KeysConfigHelper.loadConfig(service)
             KeyboardThemes.reload(service)

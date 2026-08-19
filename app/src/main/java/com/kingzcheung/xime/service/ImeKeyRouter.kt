@@ -395,9 +395,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 "mode_change" -> {
                 }
                 "ime_switch" -> {
-                    withContext(Dispatchers.Main) {
-                        service.schemaController.switchInputMethod()
-                    }
+                    // 在 key-processing 线程上执行切换：toggleAsciiMode 阻塞等待 rimeLock
+                    // （部署/维护持锁时排队，完成后自动切换），不在主线程阻塞避免 ANR。
+                    service.schemaController.switchInputMethod()
                 }
                 "abc" -> {
                     service.calculatorEngine.clear()

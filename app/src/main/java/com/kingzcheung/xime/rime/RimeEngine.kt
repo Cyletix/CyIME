@@ -254,6 +254,11 @@ class RimeEngine {
         return nativeIsMaintaining()
     }
 
+    /** 引擎是否繁忙（维护中或 rimeLock 被占用）：非阻塞探测，供 UI 立即反馈使用。 */
+    fun isEngineBusy(): Boolean {
+        return nativeIsMaintaining() || rimeLock.isLocked
+    }
+
     fun getCurrentSchema(): String {
         if (!nativeHasSession()) return ""
         return tryLocked("") {
@@ -394,15 +399,17 @@ class RimeEngine {
     }
 
     fun toggleAsciiMode(): Boolean {
-        return tryLocked(false) {
-            if (!nativeHasSession()) return@tryLocked false
+        // 用户显式切换操作：阻塞等待锁（部署/维护持锁时排队，完成后自动切换），
+        // 不静默失败；调用方保证不在主线程执行（ImeKeyRouter 的 key-process 线程）。
+        return locked {
+            if (!nativeHasSession() && !nativeCreateSession()) return@locked false
             nativeToggleAsciiMode()
         }
     }
 
     fun isAsciiMode(): Boolean {
         return tryLocked(false) {
-            if (!nativeHasSession()) return@tryLocked false
+            if (!nativeHasSession() && !nativeCreateSession()) return@tryLocked false
             nativeIsAsciiMode()
         }
     }
