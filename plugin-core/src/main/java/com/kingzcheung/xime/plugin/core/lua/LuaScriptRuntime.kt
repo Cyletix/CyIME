@@ -5,6 +5,7 @@ import com.kingzcheung.xime.plugin.core.config.PluginConfigStore
 import com.kingzcheung.xime.plugin.core.lua.sdk.LuaHostApi
 import com.kingzcheung.xime.plugin.core.lua.sdk.LuaHostApiImpl
 import com.kingzcheung.xime.plugin.core.lua.sdk.LuaPluginContract
+import com.kingzcheung.xime.plugin.core.lua.sdk.SimpleJson
 import org.luaj.vm2.Globals
 import org.luaj.vm2.LuaError
 import org.luaj.vm2.LuaString
@@ -129,6 +130,27 @@ class LuaScriptRuntime(
                 is String -> LuaValue.valueOf(value)
                 else -> CoerceJavaToLua.coerce(value)
             }
+        }
+    }
+
+    /** Lua 值 → 请求体字节：字符串按 UTF-8，Lua table 序列化为 JSON，ByteArray userdata 原样。 */
+    private fun bodyToBytes(value: LuaValue): ByteArray? {
+        return when {
+            value.isnil() -> null
+            value.isstring() -> value.tojstring().toByteArray(Charsets.UTF_8)
+            value.istable() -> SimpleJson.encode(tableToJava(value)).toByteArray(Charsets.UTF_8)
+            else -> luaToBytes(value)
+        }
+    }
+
+    /** 调试日志：Lua 参数类型 + 摘要值。 */
+    private fun argTypeValue(value: LuaValue): String {
+        return when {
+            value.isnil() -> "nil"
+            value.isstring() -> "str:${value.tojstring().take(40)}"
+            value.isnumber() -> "num:${value.tojstring()}"
+            value.istable() -> "table:${tableToJava(value)}"
+            else -> value.typename()
         }
     }
 
@@ -503,11 +525,10 @@ class LuaScriptRuntime(
                 headers[k] = v.tojstring()
             }
             val bodyArg = args.arg(4)
-            val body: ByteArray? = when {
-                bodyArg.isnil() -> null
-                bodyArg.isstring() -> bodyArg.tojstring().toByteArray(Charsets.UTF_8)
-                else -> luaToBytes(bodyArg)
-            }
+            val body: ByteArray? = bodyToBytes(bodyArg)
+            Log.d("LuaHttpBridge", "[$pluginId] request(method=$method url=$url nargs=${args.narg()} bodyType=" +
+                if (bodyArg.isnil()) "nil" else bodyArg.typename() +
+                " body=${body?.toString(Charsets.UTF_8)?.take(300) ?: "<空>"}")
             val timeoutMillis = args.arg(5).optint(0)?.takeIf { it > 0 }
             val response = httpHostApi?.request(method, url, headers, body, timeoutMillis)
             if (response == null) {
@@ -543,14 +564,36 @@ class LuaScriptRuntime(
                         if (fn.isfunction()) cb[name] = fn
                     }
                 }
-                val timeoutMillis = args.arg(4).optint(0)?.takeIf { it > 0 }
-                val method = if (args.arg(5).isnil()) "GET" else args.arg(5).tojstring().uppercase()
-                val bodyArg = args.arg(6)
-                val body: ByteArray? = when {
-                    bodyArg.isnil() -> null
-                    bodyArg.isstring() -> bodyArg.tojstring().toByteArray(Charsets.UTF_8)
-                    else -> luaToBytes(bodyArg)
+                val arg4 = args.arg(4)
+                val arg5 = args.arg(5)
+                val arg6 = args.arg(6)
+                // 兼容多风格调用：stream(url, headers, callbacks[, timeout][, method][, body])，
+                // 也兼容 stream(url, headers, callbacks, method) 等省略 timeout/body 的写法。
+                val timeoutMillis: Int? = when {
+                    arg4.isnumber() -> arg4.toint().takeIf { it > 0 }
+                    arg5.isnumber() -> arg5.toint().takeIf { it > 0 }
+                    arg4.isstring() && arg4.tojstring().toIntOrNull() != null ->
+                        arg4.tojstring().toInt().takeIf { it > 0 }
+                    arg5.isstring() && arg5.tojstring().toIntOrNull() != null ->
+                        arg5.tojstring().toInt().takeIf { it > 0 }
+                    else -> null
                 }
+                val method: String = when {
+                    arg4.isstring() && arg4.tojstring().toIntOrNull() == null ->
+                        arg4.tojstring().uppercase()
+                    arg5.isstring() && arg5.tojstring().toIntOrNull() == null ->
+                        arg5.tojstring().uppercase()
+                    else -> "GET"
+                }
+                val body: ByteArray? = when {
+                    !arg6.isnil() -> bodyToBytes(arg6)
+                    arg5.istable() -> bodyToBytes(arg5)
+                    arg4.istable() -> bodyToBytes(arg4)
+                    else -> null
+                }
+                Log.d("LuaHttpBridge", "[$pluginId] stream(url=$url method=$method nargs=${args.narg()} " +
+                    "arg4=${argTypeValue(arg4)} arg5=${argTypeValue(arg5)} arg6=${argTypeValue(arg6)} " +
+                    "body=${body?.toString(Charsets.UTF_8)?.take(300) ?: "<空>"}")
                 var sessionId = -1
                 val listener = object : com.kingzcheung.xime.plugin.core.lua.http.SseHostListener {
                     override fun onData(text: String) { invokeSseCallback(sessionId, "onData", text) }

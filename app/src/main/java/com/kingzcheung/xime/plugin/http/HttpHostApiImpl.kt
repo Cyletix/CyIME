@@ -3,10 +3,13 @@ package com.kingzcheung.xime.plugin.http
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.kingzcheung.xime.plugin.ExtensionManager
+import com.kingzcheung.xime.plugin.PluginNetworkAuthHelper
 import com.kingzcheung.xime.plugin.core.lua.http.HttpHostApi
 import com.kingzcheung.xime.plugin.core.lua.http.HttpResponse
 import com.kingzcheung.xime.plugin.core.lua.ws.NetworkPolicy
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
+import com.kingzcheung.xime.plugin.core.security.PluginErrorLog
 import com.kingzcheung.xime.settings.SettingsPreferences
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -65,11 +68,17 @@ class HttpHostApiImpl(
             .firstOrNull { it.id == pluginId }
         val declaredHosts = pluginInfo?.declaredHosts ?: emptyList()
         val authorizedHosts = SettingsPreferences.getPluginAuthorizedHosts(context, pluginId)
+        val customHosts = ExtensionManager.getConfiguredNetworkHosts(context, pluginId).toSet()
 
-        val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts)
+        val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts, customHosts)
         if (reason != null) {
             lastErrorMsg = reason
             Log.w(TAG, "[$pluginId] 联网被拒绝: $reason")
+            PluginErrorLog.logError(pluginId, "联网被拒绝", reason)
+            PluginNetworkAuthHelper.onNetworkDenied(
+                context, pluginId, pluginInfo?.name,
+                NetworkPolicy.extractHost(url), reason
+            )
             return null
         }
         lastErrorMsg = null
@@ -79,7 +88,10 @@ class HttpHostApiImpl(
             headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
             // 尊重调用方显式声明的 Content-Type(如 RTF/DIP 服务的 application/json);OkHttp 的
             // post(body) 会用 RequestBody 的 mediaType 覆盖 header,这里先取 header 再建 body。
-            val contentType = headers["Content-Type"] ?: "application/octet-stream"
+            // header 名大小写不敏感：Lua 插件可能传 "content-type"。
+            val contentType = headers.entries.firstOrNull {
+                it.key.equals("Content-Type", ignoreCase = true)
+            }?.value ?: "application/octet-stream"
             val requestBody = (body ?: ByteArray(0)).toRequestBody(contentType.toMediaType())
             when (method.uppercase()) {
                 "GET" -> requestBuilder.get()
@@ -111,6 +123,7 @@ class HttpHostApiImpl(
         } catch (e: Exception) {
             lastErrorMsg = e.message ?: "request failed"
             Log.e(TAG, "[$pluginId] HTTP $method $url failed", e)
+            PluginErrorLog.logError(pluginId, "HTTP 请求失败 ($method $url)", e.message ?: "request failed", e)
             null
         }
     }

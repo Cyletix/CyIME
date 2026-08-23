@@ -3,6 +3,7 @@ package com.kingzcheung.xime.plugin.ws
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.lua.ws.NetworkPolicy
 import com.kingzcheung.xime.plugin.core.lua.ws.WsHostApi
 import com.kingzcheung.xime.plugin.core.lua.ws.WsHostListener
@@ -55,15 +56,21 @@ class WsHostApiImpl(
     private var lastErrorMsg: String? = null
 
     override fun connect(url: String, headers: Map<String, String>, listener: WsHostListener): Boolean {
-        val declaredHosts = com.kingzcheung.xime.plugin.core.runtime.PluginManager.getAllInstallPlugins()
+        val pluginInfo = com.kingzcheung.xime.plugin.core.runtime.PluginManager.getAllInstallPlugins()
             .firstOrNull { it.id == pluginId }
-            ?.declaredHosts ?: emptyList()
+        val declaredHosts = pluginInfo?.declaredHosts ?: emptyList()
         val authorizedHosts = SettingsPreferences.getPluginAuthorizedHosts(context, pluginId)
+        val customHosts = ExtensionManager.getConfiguredNetworkHosts(context, pluginId).toSet()
 
-        val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts)
+        val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts, customHosts)
         if (reason != null) {
             lastErrorMsg = reason
             Log.w(TAG, "[$pluginId] 联网被拒绝: $reason")
+            com.kingzcheung.xime.plugin.core.security.PluginErrorLog.logError(pluginId, "联网被拒绝", reason)
+            com.kingzcheung.xime.plugin.PluginNetworkAuthHelper.onNetworkDenied(
+                context, pluginId, pluginInfo?.name,
+                NetworkPolicy.extractHost(url), reason
+            )
             return false
         }
         lastErrorMsg = null
@@ -142,6 +149,12 @@ class WsHostApiImpl(
                 "HTTP ${r.code}: $reason"
             } ?: ""
             Log.e(TAG, "WS failure: ${t.message} | $serverMsg")
+            com.kingzcheung.xime.plugin.core.security.PluginErrorLog.logError(
+                pluginId,
+                "WS 连接失败",
+                serverMsg.ifEmpty { t.message ?: "连接失败" },
+                t
+            )
             state = STATE_CLOSED
             listener?.onError(serverMsg.ifEmpty { t.message ?: "连接失败" })
         }

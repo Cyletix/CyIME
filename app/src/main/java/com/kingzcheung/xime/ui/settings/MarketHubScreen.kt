@@ -96,6 +96,7 @@ import com.kingzcheung.xime.settings.MarketSchemeItem
 import com.kingzcheung.xime.settings.MarketPluginItem
 import com.kingzcheung.xime.settings.PluginVersion
 import com.kingzcheung.xime.settings.SchemeVersion
+import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.viewmodel.ModelManagementUiState
 import com.kingzcheung.xime.viewmodel.ModelManagementViewModel
 import com.kingzcheung.xime.viewmodel.ModelItemState
@@ -1962,10 +1963,9 @@ private fun PluginDetailBody(
     val declaredHosts = installedPlugin?.declaredHosts.orEmpty()
     val networkHosts = remember(installedPlugin?.id) {
         if (installedPlugin != null) {
-            (declaredHosts + ExtensionManager.getConfiguredNetworkHosts(
-                context,
-                installedPlugin.id
-            )).distinct()
+            (declaredHosts +
+                ExtensionManager.getConfiguredNetworkHosts(context, installedPlugin.id) +
+                SettingsPreferences.getPluginPendingHosts(context, installedPlugin.id)).distinct()
         } else {
             declaredHosts
         }

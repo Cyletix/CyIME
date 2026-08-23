@@ -58,6 +58,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -312,6 +313,12 @@ private fun ExtensionItem(
     val errors = PluginErrorLog.getErrors(extension.id)
     val hasErrors = errors.isNotEmpty()
 
+    val pendingHosts = remember(extension.id) {
+        SettingsPreferences.getPluginPendingHosts(context, extension.id)
+    }
+    val hasPendingNetwork = pendingHosts.isNotEmpty() ||
+        (extension.declaredHosts - SettingsPreferences.getPluginAuthorizedHosts(context, extension.id)).isNotEmpty()
+
     val hostCompatible = remember(extension.id) { viewModel.isHostCompatible(extension) }
     val hostRange = remember(extension) {
         buildString {
@@ -390,6 +397,15 @@ private fun ExtensionItem(
                         )
                     }
 
+                    if (hasPendingNetwork) {
+                        Icon(
+                            Icons.Default.Wifi,
+                            contentDescription = "网络访问待授权",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
                     if (!hostCompatible) {
                         Icon(
                             Icons.Default.Warning,
@@ -448,7 +464,9 @@ private fun ExtensionItem(
                 }
 
                 val networkHosts = remember(extension.id) {
-                    (extension.declaredHosts + ExtensionManager.getConfiguredNetworkHosts(context, extension.id))
+                    (extension.declaredHosts +
+                        ExtensionManager.getConfiguredNetworkHosts(context, extension.id) +
+                        SettingsPreferences.getPluginPendingHosts(context, extension.id))
                         .distinct()
                 }
                 if (networkHosts.isNotEmpty()) {
@@ -644,7 +662,7 @@ private fun ExtensionItem(
     }
 }
 
-// 插件网络访问授权：展示声明域名，未授权可授权，已授权可撤销
+// 插件网络访问授权：展示声明/待授权域名，未授权可授权，已授权可撤销
 @Composable
 fun NetworkAccessSection(
     pluginId: String,
@@ -656,25 +674,59 @@ fun NetworkAccessSection(
     var authorized by remember(pluginId) {
         mutableStateOf(SettingsPreferences.getPluginAuthorizedHosts(context, pluginId))
     }
+    var pending by remember(pluginId) {
+        mutableStateOf(SettingsPreferences.getPluginPendingHosts(context, pluginId))
+    }
     var pendingHost by remember { mutableStateOf<String?>(null) }
 
+    val unauthorized = hosts.filter { it !in authorized }
+
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = "网络访问",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "网络访问",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (unauthorized.isNotEmpty()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text(
+                        text = "${unauthorized.size} 个域名待授权",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
         hosts.forEach { host ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = host,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = host,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (host in pending) {
+                        Text(
+                            text = "访问被拒，等待授权",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
                 if (host in authorized) {
                     Text(
                         text = "已授权",
@@ -688,6 +740,11 @@ fun NetworkAccessSection(
                         Text("撤销", style = MaterialTheme.typography.bodySmall)
                     }
                 } else {
+                    Text(
+                        text = "未授权",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                     TextButton(onClick = { pendingHost = host }) {
                         Text(
                             text = "授权",
@@ -709,6 +766,7 @@ fun NetworkAccessSection(
                 TextButton(onClick = {
                     SettingsPreferences.authorizePluginHost(context, pluginId, host)
                     authorized = authorized + host
+                    pending = pending - host
                     pendingHost = null
                 }) {
                     Text("允许", color = MaterialTheme.colorScheme.primary)

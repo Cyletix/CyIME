@@ -58,6 +58,9 @@ import com.kingzcheung.xime.plugin.core.config.IPluginConfigurable
 import com.kingzcheung.xime.plugin.core.config.PluginConfigStore
 import com.kingzcheung.xime.plugin.core.config.PluginFieldType
 import com.kingzcheung.xime.plugin.core.config.PluginSettingField
+import com.kingzcheung.xime.plugin.core.lua.ws.NetworkPolicy
+import com.kingzcheung.xime.plugin.core.runtime.PluginManager
+import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -118,6 +121,22 @@ fun PluginConfigFormScreen(
         )
     }
 
+    // 插件声明 allowCustomHosts 时，配置中填写的 HTTP(S) 服务器域名自动获得联网授权，
+    // 兑现 manifest helpText「域名将自动获得联网授权」的承诺，无需用户再手动寻找授权入口。
+    fun autoAuthorizeConfiguredHosts() {
+        val allowCustom = PluginManager.getAllInstallPlugins()
+            .firstOrNull { it.id == pluginId }
+            ?.allowCustomHosts ?: false
+        if (!allowCustom) return
+        configStore.keys().forEach { key ->
+            configStore.get(key)?.let { value ->
+                NetworkPolicy.extractHttpHost(value)?.let { host ->
+                    SettingsPreferences.authorizePluginHost(context, pluginId, host)
+                }
+            }
+        }
+    }
+
     @Composable
     fun saveButton() {
         Button(
@@ -133,6 +152,7 @@ fun PluginConfigFormScreen(
                     Toast.makeText(context, "请填写必填配置", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
+                autoAuthorizeConfiguredHosts()
                 Toast.makeText(context, "配置已保存", Toast.LENGTH_SHORT).show()
                 if (!embedded) onBack()
             },

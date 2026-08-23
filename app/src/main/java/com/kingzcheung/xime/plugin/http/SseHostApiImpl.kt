@@ -2,10 +2,13 @@ package com.kingzcheung.xime.plugin.http
 
 import android.content.Context
 import android.util.Log
+import com.kingzcheung.xime.plugin.ExtensionManager
+import com.kingzcheung.xime.plugin.PluginNetworkAuthHelper
 import com.kingzcheung.xime.plugin.core.lua.http.SseHostApi
 import com.kingzcheung.xime.plugin.core.lua.http.SseHostListener
 import com.kingzcheung.xime.plugin.core.lua.ws.NetworkPolicy
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
+import com.kingzcheung.xime.plugin.core.security.PluginErrorLog
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -71,11 +74,17 @@ class SseHostApiImpl(
             .firstOrNull { it.id == pluginId }
         val declaredHosts = pluginInfo?.declaredHosts ?: emptyList()
         val authorizedHosts = SettingsPreferences.getPluginAuthorizedHosts(context, pluginId)
+        val customHosts = ExtensionManager.getConfiguredNetworkHosts(context, pluginId).toSet()
 
-        val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts)
+        val reason = NetworkPolicy.check(url, emptySet(), declaredHosts, authorizedHosts, customHosts)
         if (reason != null) {
             lastErrorMsg = reason
             Log.w(TAG, "[$pluginId] 联网被拒绝: $reason")
+            PluginErrorLog.logError(pluginId, "联网被拒绝", reason)
+            PluginNetworkAuthHelper.onNetworkDenied(
+                context, pluginId, pluginInfo?.name,
+                NetworkPolicy.extractHost(url), reason
+            )
             return -1
         }
         lastErrorMsg = null
@@ -85,8 +94,11 @@ class SseHostApiImpl(
             headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
             // 与 HttpHostApiImpl 一致：尊重调用方显式声明的 Content-Type，避免 OkHttp 用
             // RequestBody 默认 mediaType 覆盖（阿里云 MaaS 网关对 octet-stream 请求挂起）。
+            // header 名大小写不敏感：Lua 插件可能传 "content-type"。
             if (body != null) {
-                val contentType = headers["Content-Type"] ?: "application/octet-stream"
+                val contentType = headers.entries.firstOrNull {
+                    it.key.equals("Content-Type", ignoreCase = true)
+                }?.value ?: "application/octet-stream"
                 requestBuilder.method(method.uppercase(), body.toRequestBody(contentType.toMediaType()))
             } else {
                 requestBuilder.method(method.uppercase(), null)
@@ -104,6 +116,7 @@ class SseHostApiImpl(
 
             val id = nextId.getAndIncrement()
             var current: Session? = null
+            Log.d(TAG, "[$pluginId] SSE 会话 $id 建立: $url body=${body?.toString(Charsets.UTF_8)?.take(300) ?: "<空>"}")
             val esListener = object : EventSourceListener() {
                 override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
                     val s = current ?: return
@@ -137,6 +150,7 @@ class SseHostApiImpl(
                     }
                     lastErrorMsg = message
                     Log.e(TAG, "[$pluginId] SSE 会话 ${s.id} 失败: $message", t)
+                    PluginErrorLog.logError(pluginId, "SSE 会话失败", message, t)
                     listener.onError(message)
                     sessions.remove(s.id)
                 }
@@ -147,7 +161,6 @@ class SseHostApiImpl(
             val session = Session(id, eventSource)
             current = session
             sessions[id] = session
-            Log.d(TAG, "[$pluginId] SSE 会话 ${id} 建立: $url")
             id
         } catch (e: Exception) {
             lastErrorMsg = e.message ?: "连接失败"

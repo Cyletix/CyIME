@@ -890,6 +890,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     internal fun triggerToolPanelGenerate() {
         val pluginId = uiState.value.toolPanelPluginId
+        // 使用前授权检测：插件有未授权网络域名时先引导授权，不发起请求
+        if (!com.kingzcheung.xime.plugin.PluginNetworkAuthHelper.ensureAuthorized(this, pluginId)) {
+            return
+        }
         val inputText = ToolPanelEditTextHolder.editText?.text?.toString() ?: ""
         // 结果显示方式：插件元数据声明（manifest.capabilities.tool.display），
         // 未声明时按结果数量兜底（1 条直接上屏，多条打开页面）

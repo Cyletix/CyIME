@@ -71,4 +71,42 @@ class NetworkPolicyTest {
         assertTrue("已声明但未授权应拒绝", reason != null)
         assertTrue("拒绝原因应含授权提示", reason!!.contains("授权"))
     }
+
+    @Test
+    fun `configured custom host authorized passes`() {
+        assertNull(
+            NetworkPolicy.check(
+                "https://my-llm.example.com/v1/chat/completions",
+                trusted,
+                declaredHosts = emptyList(),
+                authorizedHosts = setOf("my-llm.example.com"),
+                customHosts = setOf("my-llm.example.com")
+            )
+        )
+    }
+
+    @Test
+    fun `configured custom host not authorized rejected`() {
+        val reason = NetworkPolicy.check(
+            "https://my-llm.example.com/v1/chat/completions",
+            trusted,
+            declaredHosts = emptyList(),
+            authorizedHosts = emptySet(),
+            customHosts = setOf("my-llm.example.com")
+        )
+        assertTrue("已配置但未授权应拒绝", reason != null)
+        assertTrue("拒绝原因应含授权提示", reason!!.contains("授权"))
+    }
+
+    @Test
+    fun `neither declared nor configured host rejected`() {
+        val reason = NetworkPolicy.check(
+            "https://evil.example.com/v1",
+            trusted,
+            declaredHosts = emptyList(),
+            authorizedHosts = emptySet(),
+            customHosts = setOf("my-llm.example.com")
+        )
+        assertTrue("未声明未配置应拒绝", reason != null)
+    }
 }

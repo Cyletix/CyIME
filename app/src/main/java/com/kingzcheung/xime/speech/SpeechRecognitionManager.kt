@@ -40,6 +40,8 @@ class SpeechRecognitionManager(private val context: Context) {
     private var resultCallback: ((String) -> Unit)? = null
     private var partialResultCallback: ((String) -> Unit)? = null
     private var stateCallback: ((RecognitionState) -> Unit)? = null
+    @Volatile
+    private var currentState: RecognitionState = RecognitionState.IDLE
     private var errorCallback: ((String, Boolean) -> Unit)? = null
     private var amplitudeCallback: ((Float) -> Unit)? = null
     private var spectrumCallback: ((FloatArray) -> Unit)? = null
@@ -67,7 +69,7 @@ class SpeechRecognitionManager(private val context: Context) {
         }
 
         FileLogger.i(TAG, "Starting speech recognition")
-        stateCallback?.invoke(RecognitionState.PROCESSING)
+        setState(RecognitionState.PROCESSING)
 
         if (backend == null) {
             // 按需加载：后台线程加载 ASR 模型，完成后在主线程启动录音，避免阻塞键盘 UI
@@ -87,13 +89,13 @@ class SpeechRecognitionManager(private val context: Context) {
                     if (!ok || synchronized(preloadLock) { backend } == null) {
                         mainHandler.post {
                             errorCallback?.invoke("无法初始化语音引擎，请检查本地模型或在线语音插件配置", true)
-                            stateCallback?.invoke(RecognitionState.ERROR)
+                            setState(RecognitionState.ERROR)
                         }
                         return@Thread
                     }
                     if (loadingCancelled) {
                         mainHandler.post {
-                            stateCallback?.invoke(RecognitionState.IDLE)
+                            setState(RecognitionState.IDLE)
                         }
                         return@Thread
                     }
@@ -139,7 +141,7 @@ class SpeechRecognitionManager(private val context: Context) {
             if (loadingInProgress) {
                 loadingCancelled = true
                 mainHandler.post {
-                    stateCallback?.invoke(RecognitionState.IDLE)
+                    setState(RecognitionState.IDLE)
                 }
             }
             return
@@ -169,7 +171,7 @@ class SpeechRecognitionManager(private val context: Context) {
                 }
             }
             mainHandler.post {
-                stateCallback?.invoke(RecognitionState.IDLE)
+                setState(RecognitionState.IDLE)
             }
         }.start()
     }
@@ -182,7 +184,7 @@ class SpeechRecognitionManager(private val context: Context) {
             if (loadingInProgress) {
                 loadingCancelled = true
                 mainHandler.post {
-                    stateCallback?.invoke(RecognitionState.IDLE)
+                    setState(RecognitionState.IDLE)
                 }
             }
             return
@@ -212,9 +214,16 @@ class SpeechRecognitionManager(private val context: Context) {
                 }
             }
             mainHandler.post {
-                stateCallback?.invoke(RecognitionState.IDLE)
+                setState(RecognitionState.IDLE)
             }
         }.start()
+    }
+
+    fun getState(): RecognitionState = currentState
+
+    private fun setState(state: RecognitionState) {
+        currentState = state
+        setState(state)
     }
 
     fun setCallbacks(
@@ -294,7 +303,7 @@ class SpeechRecognitionManager(private val context: Context) {
         newBackend.setCallbacks(
             onResult = { text -> handleResult(text) },
             onPartialResult = { text -> handlePartialResult(text) },
-            onStateChange = { state -> stateCallback?.invoke(state) },
+            onStateChange = { state -> setState(state) },
             onError = { error -> handleError(error) }
         )
 
@@ -373,7 +382,7 @@ class SpeechRecognitionManager(private val context: Context) {
             val audioRecord = preStarted ?: (createAudioRecord() ?: run {
                 mainHandler.post {
                     errorCallback?.invoke("无法启动录音", false)
-                    stateCallback?.invoke(RecognitionState.ERROR)
+                    setState(RecognitionState.ERROR)
                 }
                 return
             })
@@ -383,7 +392,7 @@ class SpeechRecognitionManager(private val context: Context) {
                 audioRecord.release()
                 mainHandler.post {
                     errorCallback?.invoke("启动引擎失败", false)
-                    stateCallback?.invoke(RecognitionState.ERROR)
+                    setState(RecognitionState.ERROR)
                 }
                 return
             }
@@ -392,7 +401,7 @@ class SpeechRecognitionManager(private val context: Context) {
                 audioRecord.startRecording()
             }
             mainHandler.post {
-                stateCallback?.invoke(RecognitionState.LISTENING)
+                setState(RecognitionState.LISTENING)
             }
 
             val buffer = ShortArray((SAMPLE_RATE * BUFFER_SIZE_SECONDS).toInt())

@@ -54,6 +54,15 @@ class MainActivity : ComponentActivity() {
     
     companion object {
         private const val TAG = "MainActivity"
+
+        /** 构造跳转到指定插件网络授权页的 Intent（IME 等后台场景调用）。 */
+        fun buildPluginAuthIntent(context: android.content.Context, pluginId: String): Intent {
+            return Intent(context, MainActivity::class.java).apply {
+                putExtra("open_fragment", "plugins")
+                putExtra("open_plugin_id", pluginId)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -107,6 +116,7 @@ class MainActivity : ComponentActivity() {
         }
         
         val openFragment = intent?.getStringExtra("open_fragment")
+        val openPluginId = intent?.getStringExtra("open_plugin_id")
 
         setContent {
             val context = this
@@ -164,6 +174,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         SettingsScreen(
                             initialRoute = openFragment,
+                            initialPluginId = openPluginId,
                             onThemeChanged = {
                                 darkMode = SettingsPreferences.getDarkMode(context)
                                 keyboardTheme = SettingsPreferences.getKeyboardTheme(context)

@@ -152,7 +152,7 @@ function plugin.onPanelAction(actionId)
       generating = false
       sessionId = -1
     end,
-  }, 0)
+  }, 0, "POST", body)
   if sessionId < 0 then
     generating = false
     host.logError("AI 流式连接被拒绝: " .. (host.http.lastError() or "未知错误"))
