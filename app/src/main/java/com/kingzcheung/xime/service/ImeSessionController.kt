@@ -7,6 +7,7 @@ import com.kingzcheung.xime.rime.buildT9DisplayState
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
+import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -85,6 +86,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             hasNextPage = hasNextPage,
             hasPrevPage = hasPrevPage
         )
+        if (isAsciiMode != service.uiState.value.isAsciiMode) {
+            FileLogger.i(XimeInputMethodService.TAG, "applyComposition: ascii ${service.uiState.value.isAsciiMode}->$isAsciiMode")
+        }
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
 
         if (pendingEnglish.isNotEmpty()) {
@@ -317,6 +321,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (!RimeEngine.isInitialized()) return
         val schemaId = service.rimeEngine.getCurrentSchema()
         if (schemaId.isEmpty()) return
+        val rimeAsciiBefore = service.rimeEngine.isAsciiMode()
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
         for (def in defs) {
             if (def.name.isNotEmpty()) {
@@ -327,6 +332,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                     def.options.forEachIndexed { i, opt -> service.rimeEngine.setOption(opt, i == activeIndex) }
                 }
             }
+        }
+        val rimeAsciiAfter = service.rimeEngine.isAsciiMode()
+        if (rimeAsciiBefore != rimeAsciiAfter) {
+            FileLogger.i(XimeInputMethodService.TAG, "restorePersistedSchemaOptions: ascii $rimeAsciiBefore -> $rimeAsciiAfter (ui=${service.uiState.value.isAsciiMode})")
         }
     }
 

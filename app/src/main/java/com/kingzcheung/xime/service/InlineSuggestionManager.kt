@@ -1,7 +1,9 @@
 package com.kingzcheung.xime.service
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -16,12 +18,15 @@ import android.widget.inline.InlineContentView
 import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.RequiresApi
 import androidx.autofill.inline.UiVersions
+import androidx.autofill.inline.common.ImageViewStyle
 import androidx.autofill.inline.common.TextViewStyle
+import androidx.autofill.inline.common.ViewStyle
 import androidx.autofill.inline.v1.InlineSuggestionUi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.kingzcheung.xime.R
 import java.util.concurrent.Executor
 
 /**
@@ -65,7 +70,7 @@ internal object InlineSuggestionViews {
     }
 }
 
-class InlineSuggestionManager {
+class InlineSuggestionManager(private val context: Context) {
 
     var suggestions by mutableStateOf<List<InlineSuggestion>>(emptyList())
         private set
@@ -75,22 +80,55 @@ class InlineSuggestionManager {
 
     var candidateTextColorArgb: Int = Color.BLACK
     var labelTextColorArgb: Int = Color.GRAY
-    var backgroundColorArgb: Int = Color.WHITE
+    var isDarkTheme: Boolean = false
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
         return try {
+            val textColor = candidateTextColorArgb
+            val altTextColor = labelTextColorArgb
+            val chipDrawable = if (isDarkTheme) {
+                R.drawable.bg_inline_suggestion_dark
+            } else {
+                R.drawable.bg_inline_suggestion_light
+            }
+            val chipBg = Icon.createWithResource(context, chipDrawable).apply {
+                setTint(textColor)
+            }
+            val density = context.resources.displayMetrics.density
             val style = InlineSuggestionUi.newStyleBuilder()
+                .setSingleIconChipStyle(
+                    ViewStyle.Builder()
+                        .setBackgroundColor(Color.TRANSPARENT)
+                        .setPadding(0, 0, 0, 0)
+                        .build()
+                )
+                .setChipStyle(
+                    ViewStyle.Builder()
+                        .setBackground(chipBg)
+                        .setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
+                        .build()
+                )
                 .setTitleStyle(
                     TextViewStyle.Builder()
-                        .setTextColor(candidateTextColorArgb)
+                        .setTextColor(textColor)
                         .setTextSize(15f)
                         .build()
                 )
                 .setSubtitleStyle(
                     TextViewStyle.Builder()
-                        .setTextColor(labelTextColorArgb)
+                        .setTextColor(altTextColor)
                         .setTextSize(12f)
+                        .build()
+                )
+                .setStartIconStyle(
+                    ImageViewStyle.Builder()
+                        .setTintList(ColorStateList.valueOf(altTextColor))
+                        .build()
+                )
+                .setEndIconStyle(
+                    ImageViewStyle.Builder()
+                        .setTintList(ColorStateList.valueOf(altTextColor))
                         .build()
                 )
                 .build()

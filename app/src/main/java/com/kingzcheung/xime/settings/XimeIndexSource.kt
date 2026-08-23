@@ -307,6 +307,7 @@ object XimeIndexSource {
         context: Context,
         scheme: MarketScheme,
         resolveDepUrl: (String) -> String? = { null },
+        switchEnabled: Boolean = true,
     ): InstallResult = withContext(Dispatchers.IO) {
         if (!SchemaManager.isSchemeDownloaded(context, scheme.id)) {
             return@withContext InstallResult(false, failureReason = "压缩包不存在，请先下载")
@@ -319,6 +320,7 @@ object XimeIndexSource {
             fromMarket = true,
             dependencies = scheme.dependencies,
             resolveDepUrl = resolveDepUrl,
+            switchEnabled = switchEnabled,
         )
         if (!result.success) {
             val reason = result.failureReason ?: result.conflicts.joinToString("、") { c ->

@@ -9,6 +9,7 @@ import com.kingzcheung.xime.rime.resolveRimeCandidateIndex
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
+import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -395,9 +396,31 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 "mode_change" -> {
                 }
                 "ime_switch" -> {
+                    // 乐观更新：立即按目标模式切换 UI（主键盘布局/面板字符），不等引擎异步切换，
+                    // 消除"进入面板/切键盘后才闪变"的可见延迟（引擎切换完成后权威同步，一致则无感）。
+                    val state = service.uiState.value
+                    val optimisticTarget = !state.isAsciiMode
+                    val schemaId = service.rimeEngine.getCurrentSchema()
+                    withContext(Dispatchers.Main) {
+                        service.uiState.value = service.uiState.value.copy(isAsciiMode = optimisticTarget)
+                        service.keyboardViewModel.dispatch(
+                            com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(optimisticTarget, schemaId)
+                        )
+                    }
                     // 在 key-processing 线程上执行切换：toggleAsciiMode 阻塞等待 rimeLock
                     // （部署/维护持锁时排队，完成后自动切换），不在主线程阻塞避免 ANR。
-                    service.schemaController.switchInputMethod()
+                    val t0 = System.nanoTime()
+                    FileLogger.i(XimeInputMethodService.TAG, "ime_switch dispatched, ui ascii=${service.uiState.value.isAsciiMode}, thread=${Thread.currentThread().name}")
+                    if (!service.schemaController.switchInputMethod()) {
+                        // 引擎不可用：回滚乐观状态
+                        withContext(Dispatchers.Main) {
+                            service.uiState.value = service.uiState.value.copy(isAsciiMode = optimisticTarget)
+                            service.keyboardViewModel.dispatch(
+                                com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(optimisticTarget, schemaId)
+                            )
+                        }
+                    }
+                    FileLogger.i(XimeInputMethodService.TAG, "ime_switch handled, total ${(System.nanoTime() - t0) / 1_000_000}ms (queue+rimeLock+main)")
                 }
                 "abc" -> {
                     service.calculatorEngine.clear()
@@ -473,9 +496,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         val isLetter = key.matches(Regex("[a-zA-Z]"))
                         val isShiftedChinese = isShifted && isChinese && isLetter
 
-                        // Shifted non-letter keys: send character code to Rime (like soft keyboard does),
-                        // avoiding Rime misinterpreting physical keycodes as internal actions.
-                        if (isShifted && !isLetter) {
+                        // 非 ASCII 可打印字符（全角符号/中文标点）：直接上屏，不进入 Rime 引擎。
+                        // Rime processKey 只接受标准键码，全角键码（如 U+FF0F）无法识别会被静默
+                        // 丢弃，导致中文模式下符号面板点击全角字符无输出（与 Trime onText 行为一致）。
+                        if (char.isNotEmpty() && char.any { it.code > 0x7E }) {
+                            committedText = char
+                            needsUIUpdate = true
+                        } else if (isShifted && !isLetter) {
                             if (char.length == 1) {
                                 val charCode = char[0].code
                                 val processed = service.rimeEngine.processKey(charCode, 0)
@@ -601,6 +628,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             hasNextPage = capturedHasNext,
                             hasPrevPage = capturedHasPrev
                         )
+                        if (capturedIsAscii != service.uiState.value.isAsciiMode) {
+                            FileLogger.i(XimeInputMethodService.TAG, "keyRouter UI refresh: ascii ${service.uiState.value.isAsciiMode}->$capturedIsAscii")
+                        }
                         service.uiState.value = service.uiState.value.copy(isAsciiMode = capturedIsAscii)
                         if (pendingEnglish.isNotEmpty()) {
                             service.serviceScope.launch {

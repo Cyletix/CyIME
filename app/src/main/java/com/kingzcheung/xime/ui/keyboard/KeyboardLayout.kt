@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.keyboard.KeyboardDimensions
 import com.kingzcheung.xime.util.PermissionHelper
 import com.kingzcheung.xime.util.CharInfo
+import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.util.SubcharHelper
 import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
@@ -161,6 +162,7 @@ fun KeyboardLayout(
                 overlayRoute?.let { viewModel.showOverlay(it) }
             }
             GestureAction.TOGGLE_ASCII -> {
+                FileLogger.i("XimeKeyboard", "earth key toggle_ascii tapped, ui ascii=${uiState.isAsciiMode}")
                 viewModel.resetShift()
                 callbacks.onKeyPress("ime_switch", uiState.isAsciiMode)
             }
@@ -1219,6 +1221,7 @@ private fun LandscapeKeyboardContent(
                 overlayRoute?.let { viewModel.showOverlay(it) }
             }
             GestureAction.TOGGLE_ASCII -> {
+                FileLogger.i("XimeKeyboard", "earth key toggle_ascii tapped, ui ascii=${uiState.isAsciiMode}")
                 viewModel.resetShift()
                 callbacks.onKeyPress("ime_switch", uiState.isAsciiMode)
             }

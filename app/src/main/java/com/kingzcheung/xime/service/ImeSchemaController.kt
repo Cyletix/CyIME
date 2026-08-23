@@ -14,6 +14,7 @@ import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
+import com.kingzcheung.xime.util.FileLogger
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -28,9 +29,10 @@ import kotlinx.coroutines.withContext
  * 共享状态通过 service 引用访问。
  */
 internal class ImeSchemaController(private val service: XimeInputMethodService) {
-    internal suspend fun switchInputMethod() {
+    internal suspend fun switchInputMethod(): Boolean {
         val candState = service.candidateState.value
         val pendingEnglish = candState.pendingEnglishText
+        FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: start, pendingEnglish='${if (pendingEnglish.isEmpty()) '-' else pendingEnglish}', isComposing=${candState.isComposing}, candidates=${candState.candidates.size}")
         if (pendingEnglish.isNotEmpty()) {
             withContext(Dispatchers.Main) {
                 service.commitText(pendingEnglish)
@@ -55,14 +57,29 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         // 由 ImeKeyRouter 在 key-processing 线程调用：toggleAsciiMode 阻塞等待 rimeLock
         // （部署/维护持锁时排队，完成后自动切换），不静默失败、不阻塞主线程。
         // 仅在 session 创建失败（引擎真正不可用）时返回 false。
+        val t0 = System.nanoTime()
         if (!service.rimeEngine.toggleAsciiMode()) {
+            FileLogger.e(XimeInputMethodService.TAG, "switchInputMethod: toggleAsciiMode FAILED (engine unavailable)")
             Toast.makeText(service, "输入法引擎不可用，请稍后再试", Toast.LENGTH_SHORT).show()
-            return
+            return false
         }
+        FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: toggleAsciiMode ok, took ${(System.nanoTime() - t0) / 1_000_000}ms, rime ascii=${service.rimeEngine.isAsciiMode()}, thread=${Thread.currentThread().name}")
         service.sessionController.persistSchemaOption("ascii_mode", service.rimeEngine.isAsciiMode())
         withContext(Dispatchers.Main) {
+            // 显式同步 uiState.isAsciiMode（权威源 = rime 引擎状态），
+            // 不依赖 updateUI 链路异步回写，避免键盘 UI 与 rime 状态脱钩。
+            val ascii = service.rimeEngine.isAsciiMode()
+            FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: rime ascii=$ascii, ui before=${service.uiState.value.isAsciiMode}")
+            service.uiState.value = service.uiState.value.copy(isAsciiMode = ascii)
             service.updateUI()
+            // 主线程直接权威下发键盘布局切换（与 rime 状态一致），
+            // 不依赖 Compose LaunchedEffect 侦测 uiState 后再异步 dispatch（部分机型调度延迟导致 UI 不更新）。
+            val schemaId = service.rimeEngine.getCurrentSchema()
+            service.keyboardViewModel.dispatch(
+                com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(ascii, schemaId)
+            )
         }
+        return true
     }
     
     internal fun reloadConfig() {

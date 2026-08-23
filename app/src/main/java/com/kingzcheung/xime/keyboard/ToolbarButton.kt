@@ -34,7 +34,7 @@ enum class ToolbarButton(
     FLOAT("float", "悬浮", Icons.Default.PictureInPicture),
     SELECT_ALL("select_all", "全选", Icons.TwoTone.SelectAll),
     COPY("copy", "复制", Icons.TwoTone.ContentCopy),
-    PASTE("paste", "黏贴", Icons.TwoTone.ContentPaste),
+    PASTE("paste", "粘贴", Icons.TwoTone.ContentPaste),
     HOME("home", "段首", Icons.TwoTone.FirstPage),
     END("end", "段尾", Icons.AutoMirrored.TwoTone.LastPage),
     HANDWRITING_LOOKUP("handwriting_lookup", "手写找字", Icons.Outlined.Gesture),

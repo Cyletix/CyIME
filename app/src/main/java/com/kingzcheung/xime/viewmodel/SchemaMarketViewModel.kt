@@ -217,7 +217,76 @@ class SchemaMarketViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun clearToast() = _uiState.update { it.copy(toastMessage = null) }
+    /**
+     * 更新已下载的方案：重新下载当前版本并安装覆盖 rime/ 旧版。
+     * 更新不强制切换启用方案（保留用户现有 schema_list）。
+     */
+    fun updateScheme(item: MarketSchemeItem) {
+        if (_uiState.value.downloadingId != null) {
+            showToast("有其他方案正在操作，请稍候")
+            return
+        }
+        if (!item.compatible) {
+            showToast("需 App ≥ ${item.minAppVersion}")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(downloadingId = item.scheme.id, downloadProgress = 0f) }
+            val selectedVersion = _uiState.value.selectedVersions[item.scheme.id]
+            val download = withContext(Dispatchers.IO) {
+                XimeIndexSource.downloadScheme(
+                    context, item.scheme,
+                    version = selectedVersion,
+                    onDownloadProgress = { downloaded, total ->
+                        val progress = if (total > 0) (downloaded.toFloat() / total) else 0f
+                        _uiState.update { it.copy(downloadProgress = progress) }
+                    },
+                )
+            }
+            if (!download.success) {
+                val reason = if (download.sha256Status == false)
+                    "下载校验失败，文件可能不完整" else (download.failureReason ?: "下载失败")
+                _uiState.update { it.copy(downloadingId = null, downloadProgress = 0f) }
+                showToast(reason)
+                return@launch
+            }
 
+            val install = withContext(Dispatchers.IO) {
+                XimeIndexSource.installFromMarket(context, item.scheme, switchEnabled = false)
+            }
+
+            val newVersion = selectedVersion ?: item.scheme.resolvedVersion()?.version
+                ?: item.scheme.currentVersion
+            _uiState.update { st ->
+                st.copy(downloadingId = null, downloadProgress = 0f)
+            }
+
+            if (install.success) {
+                withContext(Dispatchers.IO) {
+                    MarketVersionStore.setSchemeVersion(context, item.scheme.id, newVersion)
+                }
+                _uiState.update { st ->
+                    st.copy(
+                        downloadedVersions = st.downloadedVersions + (item.scheme.id to newVersion),
+                        schemes = st.schemes.map { s ->
+                            if (s.scheme.id == item.scheme.id) s.copy(installedVersion = newVersion)
+                            else s
+                        },
+                    )
+                }
+                val msg = buildString {
+                    append("已更新「${item.scheme.name}」")
+                    if (install.unresolvedDeps.isNotEmpty()) {
+                        append("\n依赖未完整：${install.unresolvedDeps.joinToString("、")}")
+                    }
+                }
+                showToast(msg)
+            } else {
+                showToast(install.failureReason ?: "安装失败")
+            }
+        }
+    }
+
+    fun clearToast() = _uiState.update { it.copy(toastMessage = null) }
     private fun showToast(message: String) = _uiState.update { it.copy(toastMessage = message) }
 }

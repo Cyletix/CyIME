@@ -303,6 +303,7 @@ private fun SchemesMarketTab(
                                         item = item,
                                         uiState = uiState,
                                         onDownload = { viewModel.downloadScheme(item) },
+                                        onUpdate = { viewModel.updateScheme(item) },
                                     )
                                 },
                             )
@@ -335,6 +336,7 @@ private fun SchemeTrailingButton(
     item: MarketSchemeItem,
     uiState: SchemaMarketUiState,
     onDownload: () -> Unit,
+    onUpdate: () -> Unit = onDownload,
 ) {
     val scheme = item.scheme
     when {
@@ -353,7 +355,7 @@ private fun SchemeTrailingButton(
         }
 
         scheme.id in uiState.downloadedIds && item.hasUpdate -> Button(
-            onClick = onDownload,
+            onClick = onUpdate,
             shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,

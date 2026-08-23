@@ -2,9 +2,11 @@ package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -16,6 +18,7 @@ import com.kingzcheung.xime.service.CandidateState
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.resolveSolidColor
+import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
 
@@ -35,6 +38,11 @@ fun KeyboardLayoutScreen(
     t9Controller: T9InputController? = null,
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
 ) {
+    var lastLoggedKb by remember { mutableStateOf<KeyboardLayoutState?>(null) }
+    if (keyboardState != lastLoggedKb) {
+        lastLoggedKb = keyboardState
+        FileLogger.d("XimeKeyboard", "render keyboard: $keyboardState, ui ascii=${uiState.isAsciiMode}")
+    }
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
     val themeScheme = KeyboardThemes.getThemeById(uiState.themeId)
@@ -73,6 +81,7 @@ fun KeyboardLayoutScreen(
             }
 
             GestureAction.TOGGLE_ASCII -> {
+                FileLogger.i("XimeKeyboard", "earth key toggle_ascii tapped, ui ascii=${uiState.isAsciiMode}")
                 viewModel.resetShift()
                 callbacks.onKeyPress("ime_switch", uiState.isAsciiMode)
             }
@@ -81,12 +90,13 @@ fun KeyboardLayoutScreen(
         }
     }
 
-    // 系统手势（如三指截图）截走触摸流时，Compose 手势检测器不会被 ACTION_CANCEL 取消，
-    // 键内部的长按/按下协程会继续执行并重新上报，导致气泡/按下状态残留。
+// 系统手势（如三指截图）截走触摸流时，Compose 手势检测器不会被 ACTION_CANCEL 取消，
+    // 键内部的长按/按下协程会继续执行并继续上报，导致气泡/按下状态残留。
     // 这里用 key() 让整个活动键盘在 cancel（epoch 变化）时 remount：
     // 所有键的 remember 状态重置、所有进行中手势协程被 Compose 取消，彻底清干净。
-    key(uiState.swipeCancelEpoch) {
-        when (keyboardState) {
+    key(keyboardState) {
+        key(uiState.swipeCancelEpoch) {
+            when (keyboardState) {
             is KeyboardLayoutState.Chinese -> {
                 if (isHandwritingLookup) {
                     HandwritingLookupKeyboard(
@@ -248,6 +258,7 @@ fun KeyboardLayoutScreen(
             is KeyboardLayoutState.Symbol -> {
                 // 符号键盘已改为路由，此处不应到达
             }
+        }
         }
     }
 }

@@ -15,61 +15,64 @@ val ghMirrors = listOf(
     "https://ghproxy.net",
 )
 
-val isWindows = System.getProperty("os.name").lowercase().contains("win")
-
-// 本机 curl 直连官方 GitHub 源常因 schannel TLS 握手失败（SSL error 35），
-// 而 PowerShell 的 Invoke-WebRequest（.NET TLS）与浏览器一致、更可靠。
-// Windows 下优先用 IWR；Linux/macOS 用 curl。
-fun downloadCommand(vararg args: String): List<String> {
-    if (isWindows) {
-        // args 形如: -L --retry 5 ... -o <target> <url>
-        val url = args.last()
-        val outIdx = args.indexOf("-o")
-        val out = if (outIdx >= 0) args[outIdx + 1] else null
-        val script = StringBuilder()
-        script.append("[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;")
-        if (out != null) {
-            script.append("Invoke-WebRequest -Uri '").append(url).append("' -OutFile '").append(out)
-                .append("' -UseBasicParsing -TimeoutSec 600;")
-        } else {
-            script.append("Invoke-WebRequest -Uri '").append(url).append("' -UseBasicParsing -TimeoutSec 600 | Out-Null;")
-        }
-        return listOf("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script.toString())
-    }
-    return mutableListOf<String>().apply { add("curl"); addAll(args) }
-}
-
+// 纯 Java（HttpURLConnection）实现下载，跨平台且不依赖外部 curl/powershell：
+//  - 不依赖构建环境 PATH 中是否有 curl（F-Droid 构建服务器曾因找不到 curl 而构建失败）
+//  - 天然规避 Windows 下 curl/schannel TLS 握手失败（SSL error 35）问题
 // 单个 URL 下载，支持断点续传与自动重试
 fun downloadFile(url: String, target: File, workDir: File, desc: String): Boolean {
     println("Downloading $desc: $url")
-    val cmd = downloadCommand(
-        "-L", "--retry", "5", "--retry-delay", "3", "--retry-all-errors",
-        "-C", "-", // 断点续传
-        "-o", target.absolutePath, url
-    )
-    return try {
-        val proc = ProcessBuilder(cmd).directory(workDir).redirectErrorStream(true).start()
-        val buf = ByteArray(4096)
-        val tail = StringBuilder()
-        proc.inputStream.use { input ->
-            var n: Int
-            while (input.read(buf).also { n = it } != -1) {
-                val s = String(buf, 0, n)
-                tail.append(s)
-                if (tail.length > 2000) tail.delete(0, tail.length - 2000)
+    repeat(5) { attempt ->
+        try {
+            if (downloadOnce(url, target, desc)) {
+                if (target.exists() && target.length() == 0L) {
+                    target.delete()
+                    return false
+                }
+                println("Downloaded ${target.name} (${target.length()} bytes)")
+                return true
             }
+        } catch (e: Exception) {
+            System.err.println("Download error for $desc: ${e.message}")
         }
-        val code = proc.waitFor()
-        if (code != 0) {
-            System.err.println("Download failed for $desc (exit $code): ${tail.takeLast(500)}")
+        // 失败后清空残留半成品，避免续传污染下一源
+        target.delete()
+        if (attempt < 4) Thread.sleep(3000)
+    }
+    return false
+}
+
+// 单次下载；返回 true 表示 HTTP 成功且内容已写入，false 表示 HTTP 层失败（如 404/403）
+fun downloadOnce(url: String, target: File, desc: String): Boolean {
+    val resumeFrom = if (target.exists()) target.length() else 0L
+    val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+    try {
+        conn.instanceFollowRedirects = true
+        conn.connectTimeout = 30_000
+        conn.readTimeout = 600_000
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (X11; Linux x86_64)")
+        if (resumeFrom > 0) {
+            conn.setRequestProperty("Range", "bytes=$resumeFrom-")
+        }
+        val code = conn.responseCode
+        if (code !in 200..299 && code != 206) {
+            System.err.println("Download failed for $desc (HTTP $code)")
             return false
         }
-        if (target.exists() && target.length() == 0L) { target.delete(); return false }
-        println("Downloaded ${target.name} (${target.length()} bytes)")
-        true
-    } catch (e: Exception) {
-        System.err.println("Download error for $desc: ${e.message}")
-        false
+        // 服务端支持 Range（206）才追加续传；否则（200）从头覆盖
+        val append = code == 206 && resumeFrom > 0
+        target.parentFile.mkdirs()
+        conn.inputStream.use { input ->
+            java.io.FileOutputStream(target, append).use { out ->
+                val buf = ByteArray(64 * 1024)
+                var n: Int
+                while (input.read(buf).also { n = it } != -1) {
+                    out.write(buf, 0, n)
+                }
+            }
+        }
+        return true
+    } finally {
+        conn.disconnect()
     }
 }
 

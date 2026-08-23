@@ -6,6 +6,7 @@ import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.settings.PersonalDictManager
 import com.kingzcheung.xime.settings.SchemaConfigHelper
 import com.kingzcheung.xime.settings.SchemaManifestManager
+import com.kingzcheung.xime.settings.MarketVersionStore
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.TimeoutCancellationException
@@ -18,6 +19,11 @@ import java.io.IOException
 object RimeConfigHelper {
     private const val TAG = "RimeConfigHelper"
     private const val ASSETS_RIME_DIR = "rime"
+
+    /** 市场索引中随 app 发布的内置默认方案集条目 id（见 rimes/index.yaml 的 `builtin`）。 */
+    private const val BUILTIN_MARKET_ID = "builtin"
+    /** 内置方案集的初始占位版本：`0.0.0` 保证不等于任何真实 git tag，从而在市场提示「更新」。 */
+    private const val BUILTIN_PLACEHOLDER_VERSION = "0.0.0"
 
     /** 部署互斥：Application 预初始化与输入法服务初始化可能并发触发部署，串行化避免重复/并发全量编译。 */
     private val deploymentLock = Any()
@@ -204,13 +210,16 @@ object RimeConfigHelper {
     }
 
     private fun copyAssetsToRimeDir(context: Context, targetDir: File): Boolean {
-        // assets 编译进 APK，同一 versionCode 内不会变化。记录上次同步的版本号，
-        // 一致时跳过全量拷贝：避免每次启动都覆盖 default.yaml 等文件（assets 默认压缩，
-        // openFd 抛异常导致 size 判断失效），从而保证部署 hash 稳定、不再每次启动全量重编译。
-        // 版本匹配时必须确认关键文件确实已落地：若上次拷贝失败（如 assets 缺失/为空），
-        // 仅记版本号而未拷入文件，覆盖安装后仍会误跳过导致方案文件永远缺失。
-        val versionMatched = SettingsPreferences.getRimeAssetsVersion(context) == BuildConfig.VERSION_CODE
-        if (versionMatched && File(targetDir, "default.yaml").exists()) {
+        // 判断 rime/ 是否已部署过任何方案（存在任意 <name>.schema.yaml）。
+        // 全新安装时 rime/ 为空 → 全量复制内置默认方案与系统文件，保证开箱即用。
+        // 一旦已部署过方案（内置旧版或从市场安装的第三方方案），app 更新时
+        // 一律不再用内置 assets 覆盖，避免覆盖第三方同名文件造成污染；
+        // 需要更新的方案统一走方案市场。此判定不依赖具体方案 id/文件名，天然鲁棒。
+        val alreadyHasSchemas = targetDir.listFiles()
+            ?.any { it.isFile && it.name.endsWith(".schema.yaml") } == true
+        if (alreadyHasSchemas) {
+            // 仅兜底确保 default.yaml 存在（librime 入口必需），缺失时补一份，不覆盖已有。
+            ensureDefaultYaml(context, targetDir)
             return false
         }
         val copied = try {
@@ -219,11 +228,33 @@ object RimeConfigHelper {
             Log.e(TAG, "Failed to copy assets", e)
             false
         }
-        // 仅当真正拷贝成功才记录版本，避免失败时留下"已同步"假象
         if (copied) {
-            SettingsPreferences.setRimeAssetsVersion(context, BuildConfig.VERSION_CODE)
+            seedBuiltinPackageVersion(context)
         }
         return copied
+    }
+
+    /**
+     * 全新安装复制内置默认方案集后，为市场条目 `builtin`（type=built-in 的默认方案包，
+     * 一个压缩包里含多个 schema）写入一个初始占位版本号。
+     *
+     * 市场方案的版本号与具体 .schema.yaml 无关，是方案集所属 git 仓库的 tag（见
+     * rimes/index.yaml 中 builtin 条目）。随 app 发布的内置方案集在运行时无法自报其
+     * 对应的 git tag，因此写入一个不等于任何真实 tag 的占位值，使市场 `hasUpdate`
+     * （installedVersion != currentVersion）成立，从而向用户提示「更新」，把默认方案
+     * 从市场更新到带真实版本号的版本。仅当该条目尚无版本记录时写入。
+     */
+    private fun seedBuiltinPackageVersion(context: Context) {
+        if (MarketVersionStore.getSchemeVersion(context, BUILTIN_MARKET_ID) == null) {
+            MarketVersionStore.setSchemeVersion(context, BUILTIN_MARKET_ID, BUILTIN_PLACEHOLDER_VERSION)
+        }
+    }
+
+    /** 兜底确保 default.yaml 存在（首次复制失败/旧结构迁移时可能缺失），缺失才补且不覆盖已有内容。 */
+    private fun ensureDefaultYaml(context: Context, targetDir: File) {
+        val defaultYaml = File(targetDir, "default.yaml")
+        if (defaultYaml.exists()) return
+        copyAssetFile(context, "$ASSETS_RIME_DIR/default.yaml", defaultYaml)
     }
     
     private fun copyAssetsRecursively(context: Context, assetPath: String, targetDir: File): Boolean {

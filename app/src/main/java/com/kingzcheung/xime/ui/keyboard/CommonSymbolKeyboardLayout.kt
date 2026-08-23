@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.util.FileLogger
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,35 @@ import com.kingzcheung.xime.keyboard.KeyboardDimensions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/** 符号键：同一键在中文模式输出全角、英文模式输出半角（per-key 模型） */
+internal data class SymbolKey(val full: String, val ascii: String)
+
+private val row2Keys = listOf(
+    SymbolKey("＠", "@"),
+    SymbolKey("＃", "#"),
+    SymbolKey("＄", "$"),
+    SymbolKey("＆", "&"),
+    SymbolKey("＿", "_"),
+    SymbolKey("－", "-"),
+    SymbolKey("＋", "+"),
+    SymbolKey("（", "("),
+    SymbolKey("）", ")"),
+    SymbolKey("／", "/"),
+)
+
+private val row3Keys = listOf(
+    SymbolKey("＊", "*"),
+    SymbolKey("，", ","),
+    SymbolKey("“", "\""),
+    SymbolKey("’", "'"),
+    SymbolKey("。", "."),
+    SymbolKey("！", "!"),
+    SymbolKey("？", "?"),
+)
+
+/** 当前模式下的显示/输出字符 */
+private fun SymbolKey.resolve(asciiMode: Boolean): String = if (asciiMode) ascii else full
+
 @Composable
 fun CommonSymbolKeyboardLayout(
     onKeyPress: (String) -> Unit,
@@ -48,21 +78,10 @@ fun CommonSymbolKeyboardLayout(
     onKeyPressDown: ((String) -> Unit)? = null,
     isFloatingMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
+    /** 进入面板时的初始模式（来自 ascii 记忆状态机），为 null 时退回 [isAsciiMode]。 */
+    initialAsciiMode: Boolean? = null,
 ) {
-    var localAsciiMode by remember { mutableStateOf(isAsciiMode) }
-
-    val row2Symbols = if (localAsciiMode) {
-        listOf("@", "#", "$", "&", "_", "-", "+", "(", ")", "/")
-    } else {
-        listOf("＠", "＃", "＄", "＆", "＿", "－", "＋", "（", "）", "／")
-    }
-
-    val row3Symbols = if (localAsciiMode) {
-        listOf("*", ",", "\"", "'", ".", "!", "?")
-    } else {
-        listOf("＊", "，", "：", "；", "。", "！", "？")
-    }
-
+    var localAsciiMode by remember(initialAsciiMode) { mutableStateOf(initialAsciiMode ?: isAsciiMode) }
 
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.screenWidthDp > configuration.screenHeightDp
@@ -109,8 +128,8 @@ fun CommonSymbolKeyboardLayout(
         if (isLandscape) {
             CommonSymbolLandscapeContent(
                 onKeyPress = onKeyPress,
-                row2Symbols = row2Symbols,
-                row3Symbols = row3Symbols,
+                row2Keys = row2Keys,
+                row3Keys = row3Keys,
                 keyBackgroundColor = keyBackgroundColor,
                 keyTextColor = keyTextColor,
                 specialKeyBackgroundColor = specialKeyBackgroundColor,
@@ -121,6 +140,12 @@ fun CommonSymbolKeyboardLayout(
                 suppressCursorMove = suppressCursorMove,
                 onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                 specialKeyTextColor = specialKeyTextColor,
+                isAsciiMode = localAsciiMode,
+                onToggleAsciiMode = {
+                    FileLogger.i("XimeKeyboard", "panel En key tapped (landscape): localAsciiMode=$localAsciiMode -> ${!localAsciiMode}, uiAscii=$isAsciiMode")
+                    localAsciiMode = !localAsciiMode
+                    onKeyPress("ime_switch")
+                },
             )
         } else {
             CompositionLocalProvider(
@@ -169,14 +194,15 @@ fun CommonSymbolKeyboardLayout(
                                 .fillMaxWidth()
                                 .weight(1f),
                         ) {
-                            row2Symbols.forEach { sym ->
+                            row2Keys.forEach { sym ->
+                                val ch = sym.resolve(localAsciiMode)
                                 KeyButton(
-                                    text = sym,
-                                    onClick = { onKeyPress(sym) },
+                                    text = ch,
+                                    onClick = { onKeyPress(ch) },
                                     backgroundColor = keyBackgroundColor,
                                     textColor = keyTextColor,
                                     modifier = Modifier.weight(1f),
-                                    onPress = { onKeyPressDown?.invoke(sym) },
+                                    onPress = { onKeyPressDown?.invoke(ch) },
                                     shadowEnabled = shadowEnabled,
                                     shadowElevation = shadowElevation,
                                     shadowShapeRadius = shadowShapeRadius,
@@ -202,14 +228,15 @@ fun CommonSymbolKeyboardLayout(
                                 shadowShapeRadius = shadowShapeRadius,
                                 fontSize = 14.sp,
                             )
-                            row3Symbols.forEach { sym ->
+                            row3Keys.forEach { sym ->
+                                val ch = sym.resolve(localAsciiMode)
                                 KeyButton(
-                                    text = sym,
-                                    onClick = { onKeyPress(sym) },
+                                    text = ch,
+                                    onClick = { onKeyPress(ch) },
                                     backgroundColor = keyBackgroundColor,
                                     textColor = keyTextColor,
                                     modifier = Modifier.weight(1f),
-                                    onPress = { onKeyPressDown?.invoke(sym) },
+                                    onPress = { onKeyPressDown?.invoke(ch) },
                                     shadowEnabled = shadowEnabled,
                                     shadowElevation = shadowElevation,
                                     shadowShapeRadius = shadowShapeRadius,
@@ -285,7 +312,11 @@ fun CommonSymbolKeyboardLayout(
                             )
                             KeyButton(
                                 text = if (localAsciiMode) "中" else "En",
-                                onClick = { localAsciiMode = !localAsciiMode },
+                                onClick = {
+                                    FileLogger.i("XimeKeyboard", "panel En key tapped: localAsciiMode=$localAsciiMode -> ${!localAsciiMode}, uiAscii=$isAsciiMode")
+                                    localAsciiMode = !localAsciiMode
+                                    onKeyPress("ime_switch")
+                                },
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
                                 modifier = Modifier.weight(1f),
@@ -317,10 +348,10 @@ fun CommonSymbolKeyboardLayout(
 }
 
 @Composable
-fun CommonSymbolLandscapeContent(
+internal fun CommonSymbolLandscapeContent(
     onKeyPress: (String) -> Unit,
-    row2Symbols: List<String>,
-    row3Symbols: List<String>,
+    row2Keys: List<SymbolKey>,
+    row3Keys: List<SymbolKey>,
     keyBackgroundColor: Color,
     keyTextColor: Color,
     specialKeyBackgroundColor: Color,
@@ -369,14 +400,15 @@ fun CommonSymbolLandscapeContent(
                 Row(modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)) {
-                    row2Symbols.take(5).forEach { sym ->
+                    row2Keys.take(5).forEach { sym ->
+                        val ch = sym.resolve(isAsciiMode)
                         KeyButton(
-                            text = sym,
-                            onClick = { onKeyPress(sym) },
+                            text = ch,
+                            onClick = { onKeyPress(ch) },
                             backgroundColor = keyBackgroundColor,
                             textColor = keyTextColor,
                             modifier = Modifier.weight(1f),
-                            onPress = { onKeyPressDown?.invoke(sym) },
+                            onPress = { onKeyPressDown?.invoke(ch) },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
@@ -399,14 +431,15 @@ fun CommonSymbolLandscapeContent(
                         shadowShapeRadius = shadowShapeRadius,
                         fontSize = 12.sp,
                     )
-                    row3Symbols.take(4).forEach { sym ->
+                    row3Keys.take(4).forEach { sym ->
+                        val ch = sym.resolve(isAsciiMode)
                         KeyButton(
-                            text = sym,
-                            onClick = { onKeyPress(sym) },
+                            text = ch,
+                            onClick = { onKeyPress(ch) },
                             backgroundColor = keyBackgroundColor,
                             textColor = keyTextColor,
                             modifier = Modifier.weight(1f),
-                            onPress = { onKeyPressDown?.invoke(sym) },
+                            onPress = { onKeyPressDown?.invoke(ch) },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
@@ -499,14 +532,15 @@ fun CommonSymbolLandscapeContent(
                 Row(modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)) {
-                    row2Symbols.drop(5).forEach { sym ->
+                    row2Keys.drop(5).forEach { sym ->
+                        val ch = sym.resolve(isAsciiMode)
                         KeyButton(
-                            text = sym,
-                            onClick = { onKeyPress(sym) },
+                            text = ch,
+                            onClick = { onKeyPress(ch) },
                             backgroundColor = keyBackgroundColor,
                             textColor = keyTextColor,
                             modifier = Modifier.weight(1f),
-                            onPress = { onKeyPressDown?.invoke(sym) },
+                            onPress = { onKeyPressDown?.invoke(ch) },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
@@ -517,14 +551,15 @@ fun CommonSymbolLandscapeContent(
                 Row(modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)) {
-                    row3Symbols.drop(4).forEach { sym ->
+                    row3Keys.drop(4).forEach { sym ->
+                        val ch = sym.resolve(isAsciiMode)
                         KeyButton(
-                            text = sym,
-                            onClick = { onKeyPress(sym) },
+                            text = ch,
+                            onClick = { onKeyPress(ch) },
                             backgroundColor = keyBackgroundColor,
                             textColor = keyTextColor,
                             modifier = Modifier.weight(1f),
-                            onPress = { onKeyPressDown?.invoke(sym) },
+                            onPress = { onKeyPressDown?.invoke(ch) },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,

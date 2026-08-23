@@ -265,7 +265,7 @@ fun KeyButton(
                                 currentOnRelease?.invoke()
                             },
                             onTap = {
-                                if (!dragActivated && !hasTriggeredSwipeUp && !hasTriggeredSwipeDown) onClick()
+                                if (!dragActivated && !hasTriggeredSwipeUp && !hasTriggeredSwipeDown) currentOnClick()
                             }
                         )
                     } else {
