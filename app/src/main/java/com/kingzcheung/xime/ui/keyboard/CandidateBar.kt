@@ -307,6 +307,18 @@ fun CandidateBar(
                         .padding(horizontal = 0.dp)
                 )
             }
+        } else if (state is CandidateBarState.AssociationOnly &&
+            !showInputBoxStyle && showInputTextRow
+        ) {
+            // 联想态没有编码可显示，但需与打字态的候选行处于同一垂直位置：
+            // 补一个与上方编码行完全等高的空占位（含相同 vertical padding），
+            // 使两种形态下候选行在 50dp 栏内的布局基准一致。
+            Spacer(
+                modifier = Modifier
+                    .padding(vertical = 0.5.dp)
+                    .fillMaxWidth()
+                    .height(16.dp)
+            )
         }
 
         Row(

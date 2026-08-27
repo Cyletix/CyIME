@@ -327,7 +327,9 @@ internal fun rememberImeKeyboardCallbacks(
                             if (text.isNotEmpty()) service.commitText(text)
                         }
                     } else if (cs.preeditText.isNotEmpty()) {
-                        service.commitText(cs.preeditText)
+                        // 提交原始键入串而非 preeditText：后者现为带回显分隔符的展示串（如 ni'hao），
+                        // 直接上屏会混入分隔符。
+                        service.commitText(cs.inputText)
                         service.rimeEngine.clearComposition()
                     }
                 }

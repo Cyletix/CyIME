@@ -104,8 +104,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     if (hasInputState(candState)) {
                         // 输入态：只清输入态（等价于 clear_composition），并记录 lastClearedText 供下滑撤回。
                         // 需在 clearInputStateForKeys() 之前记录（该函数会清空 preeditText/inputText）。
-                        val codeInInputBox = SettingsPreferences.getInputTextLocation(service) ==
-                            SettingsPreferences.INPUT_TEXT_INPUT_BOX
                         val pendingEnglish = candState.pendingEnglishText
                         if (pendingEnglish.isNotEmpty()) {
                             // 直接上屏模式：英文编码已逐字落盘，"清输入态"需回删屏上对应字符；
@@ -119,10 +117,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             }
                             if (removed) service.lastClearedText = pendingEnglish
                         } else {
-                            service.lastClearedText = when {
-                                codeInInputBox -> candState.preeditText
-                                else -> candState.inputText
-                            }
+                            // 撤回重放用 inputText（原始键入串）：preeditText 现为带回显分隔符的
+                            // 展示串（如 ni'hao），上屏必须无分隔符版本。T9 时 inputText 为合成显示态，
+                            // 与 preeditText 同值，行为不变。
+                            service.lastClearedText = candState.inputText
                         }
                         clearInputStateForKeys()
                     } else {
