@@ -9,6 +9,7 @@ import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
+import com.kingzcheung.xime.util.FileLogger
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +48,7 @@ internal fun rememberImeKeyboardCallbacks(
             onAssociationSelect = { index ->
                 service.feedbackManager.performKeyPressEffect(view = view)
                 val cs = service.candidateState.value
-                val adjustedCandidates = if (cs.pendingEnglishText.isNotEmpty()) {
+                val adjustedCandidates = if (cs.pendingEnglishText.isNotEmpty() && cs.englishReplaceSupported) {
                     listOf(cs.pendingEnglishText) + cs.associationCandidates
                 } else {
                     cs.associationCandidates
@@ -56,16 +57,38 @@ internal fun rememberImeKeyboardCallbacks(
                     val text = adjustedCandidates[index]
                     val pendingEnglish = cs.pendingEnglishText
                     if (pendingEnglish.isNotEmpty()) {
+                        // 英文直接上屏模式：编码已逐字落盘，选中候选词时需回删屏上编码再提交候选词。
+                        // 第 0 项即当前已键入文本本身（上屏确认），无需替换。
                         if (index == 0 && text == pendingEnglish) {
-                            service.commitText(text)
                             service.candidateState.value = service.candidateState.value.copy(
                                 pendingEnglishText = "",
                                 associationCandidates = emptyList()
                             )
                         } else {
-                            // 键入时已用 setComposingText 建立 composing region，
-                            // commitText 自然替换 composing 文本，终端也兼容。
-                            service.commitText(text)
+                            val ic = service.currentInputConnection
+                            var replaced = false
+                            if (ic != null) {
+                                val before = runCatching {
+                                    ic.getTextBeforeCursor(pendingEnglish.length, 0)?.toString()
+                                }.getOrNull()
+                                if (before == pendingEnglish) {
+                                    ic.beginBatchEdit()
+                                    try {
+                                        replaced = ic.deleteSurroundingText(pendingEnglish.length, 0)
+                                        ic.commitText(text, 1)
+                                    } finally {
+                                        ic.endBatchEdit()
+                                    }
+                                } else {
+                                    // 光标位置与编码不对应（用户移动过光标）：放弃替换，
+                                    // 候选词降级为直接追加上屏，避免误删用户文本。
+                                    ic.commitText(text, 1)
+                                }
+                            }
+                            FileLogger.d(
+                                XimeInputMethodService.TAG,
+                                "english candidate replace: replaced=$replaced, expected=${pendingEnglish.length} chars"
+                            )
                             service.candidateState.value = service.candidateState.value.copy(
                                 pendingEnglishText = "",
                                 associationCandidates = emptyList()
@@ -290,7 +313,8 @@ internal fun rememberImeKeyboardCallbacks(
             onCommitCandidateBeforeModeChange = {
                 val cs = service.candidateState.value
                 if (cs.pendingEnglishText.isNotEmpty()) {
-                    service.commitText(cs.pendingEnglishText)
+                    // 英文直接上屏模式：编码字符已逐字落盘，切模式只需结束本轮输入（清状态），
+                    // 不可再 commitText 否则会重复输出整个词。
                     service.candidateState.value = cs.copy(
                         pendingEnglishText = "",
                         associationCandidates = emptyList()
