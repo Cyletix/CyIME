@@ -909,7 +909,7 @@ private fun CandidateItem(
                 modifier = Modifier
                     .clip(RoundedCornerShape(5.dp))
                     .background(accentColor.copy(alpha = 0.2f))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .padding(horizontal = 3.dp, vertical = 1.dp)
             ) {
                 Text(
                     text = text,
