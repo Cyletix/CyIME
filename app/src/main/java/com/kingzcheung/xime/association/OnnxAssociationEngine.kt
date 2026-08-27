@@ -59,6 +59,9 @@ object OnnxAssociationEngine {
             FileLogger.d(TAG, "Using model: ${modelFile.name} (${modelFile.length()} bytes)")
 
             val client = InferenceClient(context)
+            // 先释放旧 client 的绑定，避免每次 initialize 泄漏一个 ServiceConnection
+            // （ServiceConnectionLeaked：切换预测设置时反复 initialize 累积泄漏）
+            inferenceClient?.unbind()
             inferenceClient = client
 
             if (!client.ensureBound()) {
@@ -86,14 +89,25 @@ object OnnxAssociationEngine {
     }
 
     suspend fun predict(inputText: String, topK: Int = 20): List<AssociationCandidate> = withContext(Dispatchers.Default) {
-        if (!isInitialized) {
+        val client = inferenceClient
+        if (!isInitialized || client == null) {
             FileLogger.e(TAG, "Engine not initialized")
             return@withContext emptyList()
         }
 
+        // 服务进程崩溃后 binder 失效：这里必须重置本地"已初始化"假象，
+        // 否则联想将永远空转（无法重新 bind + loadModel）。重置后由
+        // AssociationManager.predict 的现有重试路径自动重新加载，实现自愈。
+        if (!client.isBound()) {
+            FileLogger.w(TAG, "InferenceService not bound, resetting engine state for recovery")
+            release()
+            return@withContext emptyList()
+        }
+
         try {
-            val client = inferenceClient ?: return@withContext emptyList()
-            client.predict(inputText, topK)
+            val result = client.predict(inputText, topK)
+            FileLogger.d(TAG, "Model predict '${inputText.takeLast(10)}' -> ${result.size} candidates (bound=${client.isBound()})")
+            result
         } catch (e: Exception) {
             FileLogger.e(TAG, "Prediction failed: ${e.message}", e)
             emptyList()

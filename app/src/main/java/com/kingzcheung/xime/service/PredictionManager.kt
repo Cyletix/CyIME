@@ -120,7 +120,8 @@ class PredictionManager(
                 }
                 
                 val candidates = AssociationManager.predict(contextText, MAX_ASSOCIATION_COUNT)
-                
+                FileLogger.d(TAG, "Prediction returned ${candidates.size} candidates for '$contextText' (epoch ok: ${epoch == requestEpoch})")
+
                 withContext(Dispatchers.Main) {
                     // 代际过期说明上下文已被退格/清空修改，丢弃过期结果避免候选栏闪动
                     if (epoch == requestEpoch) {
