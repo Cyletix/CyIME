@@ -1543,7 +1543,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             associationCandidates = emptyList(),
             pendingEnglishText = "",
             hasNextPage = false,
-            hasPrevPage = false
+            hasPrevPage = false,
+            englishReplaceSupported = true
         )
         endComposingInputBox()
     }
@@ -1551,15 +1552,27 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /**
      * 结束输入框中的 composing span，先清空内容再结束，避免转为 committed text。
      *
-     * 无论输入位置设置（输入框/候选栏）都执行：英文输入（pendingEnglishText）始终通过
-     * setComposingText 写入编辑器，清空时若跳过会残留英文 composing 文本。
-     * 中文候选栏模式下编辑器无 composing 文本，本方法为空操作。
+     * 无论输入位置设置（输入框/候选栏）都执行。
+     * 英文输入改为直接上屏模式后不再写入 composing 文本（本方法对英文变为空操作），
+     * 但中文输入框模式仍会产生 composing 区，需在此清理。
      */
     internal fun endComposingInputBox() {
         currentInputConnection?.let {
             it.setComposingText("", 0)
             it.finishComposingText()
         }
+    }
+
+    /**
+     * 当前宿主是否支持英文候选的"回删替换"机制。
+     *
+     * 英文直接上屏模式下，选中候选词需要 deleteSurroundingText 回删已上屏编码再提交候选词；
+     * 终端等受限宿主对该能力（含文本探测接口）通常不支持，探针返回 null。
+     * 此类宿主直接不提供英文联想候选。
+     */
+    internal fun supportsEnglishCandidateReplace(): Boolean {
+        val ic = currentInputConnection ?: return false
+        return runCatching { ic.getTextBeforeCursor(1, 0) != null }.getOrDefault(false)
     }
 
     override fun onDestroy() {
