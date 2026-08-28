@@ -103,6 +103,15 @@ private:
     static constexpr int kMaxPinyinLen = 6;
 };
 
+// ── 声调归一化工具（UTF-8 解码 + 声调字符映射）──
+// 统一入口：t9_pinyin_map.cc 实现，t9_filter.cc / t9_processor.cc 共用。
+
+// 将带声调拼音归一化为纯 ASCII 小写（保留空格）。
+// 如 "jì huà" → "ji hua"，"JĪ HUÀ" → "ji hua"。
+// 用途：PinyinToDigitCode 内部归一化、comment 匹配（容忍带调/无调差异）、
+// preedit 转换中的 comment 过滤。
+std::string NormalizePinyinComment(const std::string& comment);
+
 }  // namespace rime
 
 #endif  // T9_PINYIN_MAP_H_

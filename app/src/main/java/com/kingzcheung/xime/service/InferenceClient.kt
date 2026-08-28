@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.DeadObjectException
 import android.os.IBinder
 import com.kingzcheung.xime.association.AssociationCandidate
 import com.kingzcheung.xime.util.FileLogger
@@ -22,7 +23,9 @@ class InferenceClient(private val context: Context) {
 
     private var service: IInferenceService? = null
     private var bound = false
-    private val connectLatch = CountDownLatch(1)
+
+    @Volatile
+    private var connectLatch = CountDownLatch(1)
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -46,15 +49,24 @@ class InferenceClient(private val context: Context) {
         }
     }
 
-    suspend fun ensureBound(): Boolean = withContext(Dispatchers.IO) {
-        if (bound && service != null) return@withContext true
+    /** 服务是否处于可用绑定状态（进程存活且 binder 有效）。 */
+    fun isBound(): Boolean = bound && service != null
 
-        val intent = Intent(context, InferenceService::class.java)
-        val ok = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
-        if (!ok) return@withContext false
+    suspend fun ensureBound(): Boolean = withContext(Dispatchers.IO) {
+        if (isBound()) return@withContext true
+
+        // 服务进程可能崩溃重启：latch 是一次性的，重绑前必须重建，
+        // 否则旧 latch 已 countDown 会让 await 立即假成功（实际未连接）
+        synchronized(this@InferenceClient) {
+            if (isBound()) return@withContext true
+            connectLatch = CountDownLatch(1)
+            val intent = Intent(context, InferenceService::class.java)
+            val ok = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+            if (!ok) return@withContext false
+        }
 
         val connected = connectLatch.await(3, TimeUnit.SECONDS)
-        connected
+        connected && isBound()
     }
 
     fun unbind() {
@@ -69,9 +81,19 @@ class InferenceClient(private val context: Context) {
         return service ?: throw IllegalStateException("InferenceService not bound")
     }
 
+    /** binder 调用失败后重置绑定状态；下一次 ensureBound 会重新 bindService。 */
+    private fun invalidateBinding() {
+        service = null
+        bound = false
+    }
+
     suspend fun loadModel(modelId: String, modelPath: String, extraPath: String = ""): Boolean = withContext(Dispatchers.IO) {
         try {
             requireService().loadModel(modelId, modelPath, extraPath)
+        } catch (e: DeadObjectException) {
+            invalidateBinding()
+            FileLogger.e(TAG, "loadModel($modelId) failed: service died", e)
+            false
         } catch (e: Exception) {
             FileLogger.e(TAG, "loadModel($modelId) failed", e)
             false
@@ -102,6 +124,11 @@ class InferenceClient(private val context: Context) {
                 candidates.add(AssociationCandidate(word, score))
             }
             candidates
+        } catch (e: DeadObjectException) {
+            // 服务进程已死：重置绑定状态，让上层（OnnxAssociationEngine）感知失联并自愈
+            invalidateBinding()
+            FileLogger.e(TAG, "predict failed: service died", e)
+            emptyList()
         } catch (e: Exception) {
             FileLogger.e(TAG, "predict failed", e)
             emptyList()

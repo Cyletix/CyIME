@@ -70,6 +70,12 @@ class InferenceService : Service() {
 
         override fun predict(modelId: String, text: String, topK: Int): MutableList<String> {
             if (modelId != MODEL_PREDICTION) return mutableListOf()
+            // 模型未加载时（如进程重启后客户端状态未同步）直接返回空，
+            // 避免在未初始化的 native 引擎上推理导致进程崩溃
+            if (!NativeOnnxEngine.isInitialized()) {
+                Log.w(TAG, "predict called before model loaded, returning empty")
+                return mutableListOf()
+            }
             val candidates = NativeOnnxEngine.predict(text, topK)
             val result = mutableListOf<String>()
             for (c in candidates) {
@@ -156,6 +162,11 @@ class InferenceService : Service() {
             return false
         }
 
+        // 先释放旧 session：切换联想模型（small/base）或重复加载时，
+        // 避免 ORT 双 session 并存导致内存峰值过高、进程被系统查杀
+        if (NativeOnnxEngine.isInitialized()) {
+            NativeOnnxEngine.release()
+        }
         if (!NativeOnnxEngine.initialize(this, modelPath)) {
             Log.e(TAG, "NativeOnnxEngine.initialize failed")
             return false

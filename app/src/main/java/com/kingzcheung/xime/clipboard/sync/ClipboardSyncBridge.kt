@@ -1,8 +1,5 @@
 package com.kingzcheung.xime.clipboard.sync
 
-import android.content.Context
-import android.content.IntentFilter
-import android.os.PowerManager
 import android.util.Log
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.plugin.core.api.ClipboardProfile
@@ -12,11 +9,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -24,23 +19,22 @@ import kotlinx.coroutines.launch
  *
  * 规则（与 ximed 设计一致的三通道去重语义）：
  * - 本地剪贴板变化 → 与上次推送 hash 不同且非"自写内容" → 推送到远端
- * - 轮询远端 → 与本地 hash 及"自写 hash"比对 → 不同才写回本地剪贴板
+ * - 拉取远端（启动时 + 键盘显示时 pullOnce）→ 与本地 hash 及"自写 hash"比对 → 不同才写回本地剪贴板
  * - 自写抑制：引擎写回本地后记录 hash，监听到同一 hash 判定为回声，跳过推送
+ *
+ * 不再做后台轮询：拉取只在启动时和键盘显示（[pullOnce]）时各触发一次，
+ * 避免 IME service 生命周期内频繁请求；推送仍由本地剪贴板变化实时触发。
  *
  * 宿主只持有引擎与剪贴板桥，具体传输协议（WebDAV/S3/ximed）由 [ClipboardSyncPlugin]
  * 的 Lua 实现承载。
  */
 class ClipboardSyncBridge(
-    private val context: Context,
     private val clipboardManager: ClipboardManager,
     private val plugin: ClipboardSyncPlugin,
-    private val pullOnOpen: Boolean = false,
     val pluginId: String = ""
 ) {
     companion object {
         private const val TAG = "ClipboardSync"
-        private const val DEFAULT_POLL_MS = 3000L
-        private const val BATTERY_SAVER_POLL_MS = 60_000L
         private const val PUSH_RETRY_BACKOFF_MS = 5_000L
     }
 
@@ -61,17 +55,12 @@ class ClipboardSyncBridge(
     @Volatile
     private var retryUntil = 0L
 
-    private var pollJob: Job? = null
     private var collectJob: Job? = null
-
-    private val powerManager by lazy {
-        context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    }
 
     fun start() {
         if (running) return
         running = true
-        Log.d(TAG, if (pullOnOpen) "Sync started (pull on open)" else "Sync started")
+        Log.d(TAG, "Sync started")
 
         // 1. 订阅本地剪贴板变化 → push（回声抑制：selfWritten 命中的跳过）
         collectJob = clipboardManager.clipboardChanged
@@ -86,36 +75,15 @@ class ClipboardSyncBridge(
             }
             .launchIn(scope)
 
-        if (pullOnOpen) {
-            // 打开即拉取一次，不启动轮询（后续由键盘显示时 pullOnce() 触发）
-            scope.launch { pullRemote() }
-            return
-        }
-
-        // 2. 轮询远端 → 拉取 → 写回（hash 去重）
-        pollJob = scope.launch {
-            while (isActive) {
-                try {
-                    val interval = currentPollInterval()
-                    pullRemote()
-                    delay(interval)
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.e(TAG, "Poll error", e)
-                    delay(5000)
-                }
-            }
-        }
+        // 2. 启动即拉取一次；后续由键盘显示时 pullOnce() 触发
+        scope.launch { pullRemote() }
     }
 
     fun stop() {
         if (!running) return
         running = false
         collectJob?.cancel()
-        pollJob?.cancel()
         collectJob = null
-        pollJob = null
         Log.d(TAG, "Sync stopped")
     }
 
@@ -124,16 +92,12 @@ class ClipboardSyncBridge(
         scope.cancel()
     }
 
-    /** 键盘显示时触发一次拉取（仅 pullOnOpen 模式；轮询模式忽略）。 */
+    /** 键盘显示时触发一次拉取。 */
     fun pullOnce() {
-        if (!running || !pullOnOpen) return
+        if (!running) return
         scope.launch {
             pullRemote()
         }
-    }
-
-    private fun currentPollInterval(): Long {
-        return if (powerManager.isPowerSaveMode) BATTERY_SAVER_POLL_MS else DEFAULT_POLL_MS
     }
 
     private suspend fun pushLocal(text: String, hash: String) {

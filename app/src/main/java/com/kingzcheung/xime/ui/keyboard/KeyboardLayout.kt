@@ -1798,7 +1798,11 @@ fun SwipeableKeyButtonLandscape(
                                         if (selected != null) {
                                             currentOnLongPressSelect?.invoke(selected)
                                         }
-                                    } else if (!swipeDetected && !dragActivated) {
+                                    } else if (!dragActivated) {
+                                        // 不能用 swipeDetected 抑制点击：swipeDetected 由 5dp 位移触发，
+                                        // 而 dragActivated 由 touch slop（更大）触发。5dp~touchSlop 区间
+                                        // 若被 swipeDetected 吞掉点击且 drag 未激活，会造成快速打字漏键。
+                                        // 5dp 位移只用于取消长按（longPressJob）。
                                         currentOnClick()
                                     }
                                 }

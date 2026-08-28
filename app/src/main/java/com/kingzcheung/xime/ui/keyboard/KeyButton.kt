@@ -143,8 +143,10 @@ fun KeyButton(
     val swipeDownThreshold = with(density) { 50.dp.toPx() }
     val bubbleShowThresholdUp = swipeUpThreshold
     val bubbleShowThresholdDown = swipeDownThreshold
-    // 水平位移超过该值视为横向手势（如键盘区滑动移动光标），不再触发点击
-    val horizontalClickCancelThreshold = with(density) { 30.dp.toPx() }
+    // 水平位移超过该值视为横向手势（如键盘区滑动移动光标），不再触发点击。
+    // 与 KeyboardView 光标手势激活阈值（activationThresholdPx = 60dp）对齐，
+    // 消除 30~60dp 位移区间"点击被取消但光标手势未激活"的死区（打字吃键）。
+    val horizontalClickCancelThreshold = with(density) { 60.dp.toPx() }
 
     val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
         if (shadowEnabled) {
@@ -191,7 +193,8 @@ fun KeyButton(
                             isSwipeDown = false
                         },
                         onDragEnd = {
-                            if (!hasTriggeredSwipeUp && !hasTriggeredSwipeDown && abs(dragOffsetX) < horizontalClickCancelThreshold) {
+                            val shouldClick = !hasTriggeredSwipeUp && !hasTriggeredSwipeDown && abs(dragOffsetX) < horizontalClickCancelThreshold
+                            if (shouldClick) {
                                 currentOnClick()
                             }
                             isPressed = false
@@ -260,9 +263,14 @@ fun KeyButton(
                             onPress = {
                                 isPressed = true
                                 onPress?.invoke()
-                                tryAwaitRelease()
-                                isPressed = false
-                                currentOnRelease?.invoke()
+                                val released = tryAwaitRelease()
+                                // 位移/消费导致的取消：保留按压效果，由 onDragEnd/onDragCancel 统一清理，
+                                // 避免快速打字时按压反馈提前消失（无气泡感）。
+                                // outOfBounds 取消但拖动未激活时立即清理，防止状态泄漏。
+                                if (released || !dragActivated) {
+                                    isPressed = false
+                                    currentOnRelease?.invoke()
+                                }
                             },
                             onTap = {
                                 if (!dragActivated && !hasTriggeredSwipeUp && !hasTriggeredSwipeDown) currentOnClick()
@@ -274,9 +282,11 @@ fun KeyButton(
                                 isPressed = true
                                 longPressActivated = false
                                 onPress?.invoke()
-                                tryAwaitRelease()
-                                isPressed = false
-                                currentOnRelease?.invoke()
+                                val released = tryAwaitRelease()
+                                if (released || !dragActivated) {
+                                    isPressed = false
+                                    currentOnRelease?.invoke()
+                                }
                             },
                             onTap = {
                                 if (!dragActivated && !hasTriggeredSwipeUp && !hasTriggeredSwipeDown && !longPressActivated) {
@@ -402,8 +412,10 @@ fun SwipeableKeyButton(
     val swipeDownThreshold = with(density) { 50.dp.toPx() }
     val bubbleShowThresholdUp = swipeUpThreshold
     val bubbleShowThresholdDown = swipeDownThreshold
-    // 水平位移超过该值视为横向手势（如键盘区滑动移动光标），不再触发点击
-    val horizontalClickCancelThreshold = with(density) { 30.dp.toPx() }
+    // 水平位移超过该值视为横向手势（如键盘区滑动移动光标），不再触发点击。
+    // 与 KeyboardView 光标手势激活阈值（activationThresholdPx = 60dp）对齐，
+    // 消除 30~60dp 位移区间"点击被取消但光标手势未激活"的死区（打字吃键）。
+    val horizontalClickCancelThreshold = with(density) { 60.dp.toPx() }
 
     val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
         if (shadowEnabled) {
@@ -441,7 +453,8 @@ fun SwipeableKeyButton(
                         isSwipeDown = false
                     },
                     onDragEnd = {
-                        if (!hasTriggeredSwipeUp && !hasTriggeredSwipeDown && abs(dragOffsetX) < horizontalClickCancelThreshold) {
+                        val shouldClick = !hasTriggeredSwipeUp && !hasTriggeredSwipeDown && abs(dragOffsetX) < horizontalClickCancelThreshold
+                        if (shouldClick) {
                             currentOnClick()
                         }
                         isPressed = false
@@ -514,10 +527,12 @@ fun SwipeableKeyButton(
                             isPressed = true
                             currentOnSwipeStateChange?.invoke(SwipeState(isPressed = true, pressedText = currentText), buttonBounds)
                             currentOnPress?.invoke()
-                            tryAwaitRelease()
-                            isPressed = false
-                            currentOnRelease?.invoke()
-                            currentOnSwipeStateChange?.invoke(SwipeState(false, null, false, emptyList(), false, null), buttonBounds)
+                            val released = tryAwaitRelease()
+                            if (released || !dragActivated) {
+                                isPressed = false
+                                currentOnRelease?.invoke()
+                                currentOnSwipeStateChange?.invoke(SwipeState(false, null, false, emptyList(), false, null), buttonBounds)
+                            }
                         },
                         onTap = {
                             if (!dragActivated && !hasTriggeredSwipeUp && !hasTriggeredSwipeDown) currentOnClick()
@@ -606,7 +621,11 @@ fun SwipeableKeyButton(
                                     if (selected != null) {
                                         currentOnLongPressSelect?.invoke(selected)
                                     }
-                                } else if (!dragActivated && !swipeDetected) {
+                                } else if (!dragActivated) {
+                                    // 注意：不能再用 swipeDetected 抑制点击——swipeDetected 由 5dp 位移触发，
+                                    // 而 dragActivated 由 touch slop（更大）触发。两者之间的位移区间
+                                    // （5dp~touchSlop）若被 swipeDetected 吞掉点击，且 drag 未激活无 dragEnd
+                                    // 兜底，会造成快速打字漏键（吃键）。5dp 位移只用于取消长按（longPressJob）。
                                     currentOnClick()
                                 }
                             }
@@ -961,8 +980,10 @@ fun SwipeableIconKeyButton(
     // 上滑清空/下滑撤回需要更大的滑动距离，防止误触
     val clearActionThreshold = with(density) { (-50).dp.toPx() }
     val undoActionThreshold = with(density) { 50.dp.toPx() }
-    // 水平位移超过该值视为横向手势（如键盘区滑动移动光标），不再触发点击
-    val horizontalClickCancelThreshold = with(density) { 30.dp.toPx() }
+    // 水平位移超过该值视为横向手势（如键盘区滑动移动光标），不再触发点击。
+    // 与 KeyboardView 光标手势激活阈值（activationThresholdPx = 60dp）对齐，
+    // 消除 30~60dp 位移区间"点击被取消但光标手势未激活"的死区（打字吃键）。
+    val horizontalClickCancelThreshold = with(density) { 60.dp.toPx() }
     
     LaunchedEffect(isLongPress) {
         if (isLongPress && onLongClick != null) {
@@ -1012,10 +1033,17 @@ fun SwipeableIconKeyButton(
                     onPress = {
                         isPressed = true
                         onPress?.invoke()
-                        tryAwaitRelease()
-                        isPressed = false
-                        currentOnRelease?.invoke()
-                        isLongPress = false
+                        val released = tryAwaitRelease()
+                        if (released || !dragActivated) {
+                            isPressed = false
+                            currentOnRelease?.invoke()
+                            isLongPress = false
+                            // 长按结束后必须重置：onTap 不会在长按后触发，
+                            // 若残留 true 会吞掉下一次点击（退格键吃键）。
+                            // onDragEnd/onDragCancel 虽也重置，但仅 drag 激活时触发，
+                            // 长按无位移（drag 未激活）时走不到那里。
+                            hasTriggeredLongPress = false
+                        }
                     },
                     onTap = {
                         if (!dragActivated && !isDragging && !hasTriggeredLongPress) {
@@ -1034,7 +1062,6 @@ fun SwipeableIconKeyButton(
                         dragActivated = true
                         isDragging = true
                         isPressed = true
-                        isLongPress = false
                         dragOffsetY = 0f
                         dragOffsetX = 0f
                         hasTriggeredSwipe = false
@@ -1059,7 +1086,7 @@ fun SwipeableIconKeyButton(
                         } else if (dragOffsetY < swipeUpThreshold && !hasTriggeredSwipe && onSwipe != null) {
                             hasTriggeredSwipe = true
                             onSwipe()
-                        } else if (!hasTriggeredSwipeLeft && abs(dragOffsetX) < horizontalClickCancelThreshold) {
+                        } else if (!hasTriggeredLongPress && !hasTriggeredSwipeLeft) {
                             currentOnClick()
                         }
                         dragActivated = false
@@ -1077,6 +1104,8 @@ fun SwipeableIconKeyButton(
                         hasReachedClearThreshold = false
                         hasReachedUndoThreshold = false
                         isLongPress = false
+                        // 手势结束（含位移场景 tap 取消）必须重置，否则残留 true 会吞掉后续点击
+                        hasTriggeredLongPress = false
                         onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
                     },
                     onDragCancel = {
@@ -1095,11 +1124,18 @@ fun SwipeableIconKeyButton(
                         hasReachedClearThreshold = false
                         hasReachedUndoThreshold = false
                         isLongPress = false
+                        hasTriggeredLongPress = false
                         onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
                     },
                     onDrag = { change, dragAmount ->
                         dragOffsetY += dragAmount.y
                         dragOffsetX += dragAmount.x
+                        
+                        // 位移超过手势阈值才打断长按（轻微抖动不中断重复删除），
+                        // 阈值与各手势触发阈值一致（左滑 -50dp / 上滑 -50dp / 下滑 50dp / 右滑 60dp）
+                        if (isLongPress && (dragOffsetY < swipeUpThreshold || dragOffsetY > swipeDownThreshold || dragOffsetX < swipeLeftThreshold || dragOffsetX > horizontalClickCancelThreshold)) {
+                            isLongPress = false
+                        }
                         
                         if (dragOffsetX < swipeLeftThreshold && !hasTriggeredSwipeLeft && onSwipeLeft != null) {
                             hasTriggeredSwipeLeft = true

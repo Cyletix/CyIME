@@ -115,10 +115,12 @@ public:
     // @param candidate_text_length 候选词文字长度（汉字数）
     // @param rime_consumed_digits 方案 A：RIME 候选 end 换算的应消费数字位数，
     //                             -1 表示无法确定（fallback 到现有消费算法）
+    // @param is_t9_user_word 候选是否为 T9 用户词：是则 unassigned 全量消费
     bool HandleRightCommit(Context& ctx,
                            const std::optional<std::string>& candidate_pinyin,
                            int candidate_text_length = 0,
-                           int rime_consumed_digits = -1);
+                           int rime_consumed_digits = -1,
+                           bool is_t9_user_word = false);
 
     // ── 策略共享公共服务 ──
     // 三个 Strategy 类通过 Context 与协调器交互所需的下层辅助。
@@ -178,12 +180,14 @@ private:
     //                  CRCC 与 ApostropheStrategy 共享，消除重复 ParseSyllables 调用
     // @param rime_consumed_digits 方案 A：RIME 候选 end 换算的应消费数字位数，
     //                             -1 表示无法确定（fallback 到现有消费算法）
+    // @param is_t9_user_word 候选是否为 T9 用户词：是则 unassigned 全量消费
     std::pair<std::string, std::string> ComputeRightCommitConsumption(
         const T9Buffer& buf,
         const SyllableAlignment& alignment,
         const std::optional<std::string>& candidate_pinyin,
         RouteType route,
-        int rime_consumed_digits = -1);
+        int rime_consumed_digits = -1,
+        bool is_t9_user_word = false);
 };
 
 }  // namespace rime

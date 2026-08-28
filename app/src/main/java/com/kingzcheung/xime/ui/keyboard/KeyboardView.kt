@@ -256,7 +256,7 @@ fun KeyboardView(
                         inputText = cs.inputText,
                         preeditText = cs.preeditText,
                         isComposing = cs.isComposing,
-                        associationCandidates = if (cs.pendingEnglishText.isNotEmpty()) {
+                        associationCandidates = if (cs.pendingEnglishText.isNotEmpty() && cs.englishReplaceSupported) {
                             listOf(cs.pendingEnglishText) + cs.associationCandidates
                         } else {
                             cs.associationCandidates
@@ -649,7 +649,9 @@ fun KeyboardView(
                             is KeyboardLayoutState.T9Pinyin -> t9OnKeyPress
                             is KeyboardLayoutState.Symbol -> symbolOnKeyPress
                         }
-                        CompositionLocalProvider(LocalSuppressCursorMove provides suppressCursorMove) {
+                        CompositionLocalProvider(
+                            LocalSuppressCursorMove provides suppressCursorMove,
+                        ) {
                             KeyboardLayoutScreen(
                                 keyboardState = keyboardState,
                                 uiState = state,
@@ -947,6 +949,8 @@ fun KeyboardView(
                             viewModel.closeOverlay()
                             callbacks.onQuickSendEditItem?.invoke(id, text)
                         },
+                        onPullRemote = callbacks.onClipboardPullRemote,
+                        pullRemoteAvailable = state.clipboardSyncEnabled,
                     )
                     is OverlayRoute.ToolbarCustomize -> ToolbarCustomizeView(
                         toolbarButtons = state.toolbarButtons,

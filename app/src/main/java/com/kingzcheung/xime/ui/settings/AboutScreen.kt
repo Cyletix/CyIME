@@ -68,7 +68,6 @@ object AppInfo {
     val versionName: String = BuildConfig.VERSION_NAME
     val versionCode: Int = BuildConfig.VERSION_CODE
     val gitHash: String = BuildConfig.GIT_HASH
-    val buildTime: String = BuildConfig.BUILD_TIME
     
     val androidVersion: String = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
     val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"
@@ -201,11 +200,6 @@ fun AboutContent(
                         )
                         Text(
                             text = "构建: ${AppInfo.gitHash}",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "构建时间: ${AppInfo.buildTime}",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

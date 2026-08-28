@@ -1,9 +1,18 @@
 cmake_minimum_required(VERSION 3.18.0)
 
 # ── 调试日志与耗时埋点开关 ──
-# 对应 P12/P9 重构：release 构建零开销，debug/CI 构建可独立启用
-option(T9_ENABLE_VERBOSE_LOG "Enable verbose T9 debug logging" ON)
-option(T9_ENABLE_TIMING      "Enable T9 timing instrumentation" ON)
+# 默认 OFF；可通过环境变量按需开启：
+#   T9_ENABLE_VERBOSE_LOG=ON T9_ENABLE_TIMING=ON ./gradlew assembleDebug
+option(T9_ENABLE_VERBOSE_LOG "Enable verbose T9 debug logging" OFF)
+option(T9_ENABLE_TIMING      "Enable T9 timing instrumentation" OFF)
+
+# 环境变量覆盖（不持久化到 CMakeCache，每次构建重新评估）
+if(DEFINED ENV{T9_ENABLE_VERBOSE_LOG} AND NOT "$ENV{T9_ENABLE_VERBOSE_LOG}" STREQUAL "")
+    set(T9_ENABLE_VERBOSE_LOG "$ENV{T9_ENABLE_VERBOSE_LOG}" CACHE BOOL "" FORCE)
+endif()
+if(DEFINED ENV{T9_ENABLE_TIMING} AND NOT "$ENV{T9_ENABLE_TIMING}" STREQUAL "")
+    set(T9_ENABLE_TIMING "$ENV{T9_ENABLE_TIMING}" CACHE BOOL "" FORCE)
+endif()
 
 # 使用 file(GLOB CONFIGURE_DEPENDS) 替代 aux_source_directory，
 # 让 CMake 在源文件新增/删除时自动重新配置。
@@ -57,7 +66,7 @@ if(T9_BUILD_TESTS)
     # 排除 t9_processor.cc / t9_module.cc（依赖 RIME Context/Menu/Candidate 等）
     # t9_filter.cc 保留：通过 T9_ALGO_ONLY_BUILD 编译守卫，仅编译 converter 部分（无 RIME 依赖）
     file(GLOB T9_ALGO_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc)
-    list(FILTER T9_ALGO_SRC EXCLUDE REGEX "t9_processor\\.cc$|t9_module\\.cc$|t9_date_translator\\.cc$")
+    list(FILTER T9_ALGO_SRC EXCLUDE REGEX "t9_processor\\.cc$|t9_module\\.cc$|t9_date_translator\\.cc$|t9_user_translator\\.cc$|t9_digit_userdict\\.cc$")
     add_library(t9-algo-objs OBJECT ${T9_ALGO_SRC})
     target_include_directories(t9-algo-objs PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src

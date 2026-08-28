@@ -27,7 +27,8 @@
 // 编译选项（CMakeLists.txt）：
 //   option(T9_ENABLE_VERBOSE_LOG "Enable verbose T9 debug logging" OFF)
 //   option(T9_ENABLE_TIMING      "Enable T9 timing instrumentation" OFF)
-//   debug 构建：两者均 ON；release 构建：两者均 OFF
+//   默认两者均 OFF；通过环境变量按需开启：
+//     T9_ENABLE_VERBOSE_LOG=ON T9_ENABLE_TIMING=ON ./gradlew assembleDebug
 
 #ifndef T9_LOG_H_
 #define T9_LOG_H_

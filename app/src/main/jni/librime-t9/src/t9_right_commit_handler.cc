@@ -209,7 +209,8 @@ T9RightCommitHandler::ComputeRightCommitConsumption(
     const SyllableAlignment& alignment,
     const std::optional<std::string>& candidate_pinyin,
     RouteType route,
-    int rime_consumed_digits) {
+    int rime_consumed_digits,
+    bool is_t9_user_word) {
 
     T9_SCOPED_TIMER_TAG("T9RightCommit", "ComputeRightCommitConsumption");
     bool has_selections = !buf.selections.empty();
@@ -244,8 +245,16 @@ T9RightCommitHandler::ComputeRightCommitConsumption(
                 // S4-统一：直接使用 alignment 阶段2 的结果（unassigned_consumed 始终计算），
                 // 删除 ComputeConsumedDigitsMultiSyllable 兜底（单一算法，行为等价硬约束下
                 // 的 4 个对照场景 ZouDe/HaiHui/GuoHui/JieGouGuan 已验证一致）。
+                // T9 用户词：input_digits 即组词时的实际输入序列，与当前 unassigned
+                // 完全一致，必须全量消费（避免音节对齐不匹配导致 partial commit）。
                 int consumed_from_unassigned =
-                    align_observation.unassigned_consumed;
+                    is_t9_user_word
+                        ? static_cast<int>(unassigned.size())
+                        : align_observation.unassigned_consumed;
+                if (is_t9_user_word) {
+                    RCLOG(">>   apostrophe: t9_user word → full consume unassigned (%d)",
+                          consumed_from_unassigned);
+                }
                 RCLOG(">>   apostrophe: multi-syllable (alignment) sylCount=%zu sels=%d, unassignedConsumed=%d, unassigned='%s'",
                       syllables.size(), sel_count, consumed_from_unassigned, unassigned.c_str());
                 if (consumed_from_unassigned > 0) {
@@ -437,7 +446,8 @@ bool T9RightCommitHandler::HandleRightCommit(
     Context& ctx,
     const std::optional<std::string>& candidate_pinyin,
     int candidate_text_length,
-    int rime_consumed_digits) {
+    int rime_consumed_digits,
+    bool is_t9_user_word) {
 
     T9_SCOPED_TIMER_TAG("T9RightCommit", "HandleRightCommit");
     if (ctx.input_buffer.is_empty()) return true;
@@ -472,7 +482,8 @@ bool T9RightCommitHandler::HandleRightCommit(
     auto alignment = SyllableAlignment::FromCandidatePinyin(candidate_pinyin);
 
     auto consumption = ComputeRightCommitConsumption(
-        buf, alignment, candidate_pinyin, route, rime_consumed_digits);
+        buf, alignment, candidate_pinyin, route, rime_consumed_digits,
+        is_t9_user_word);
     const std::string& remaining_digits = consumption.second;
 
     RCLOG(">> HandleRightCommit: hasSels=%d, hasUnassigned=%d, route=%d, unassigned='%s'",

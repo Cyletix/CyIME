@@ -22,7 +22,8 @@
 
 #include "t9_log.h"
 #include "t9_right_commit_utils.h"  // ParseSyllables
-#include "t9_filter.h"              // NormalizePinyinComment（调频码声调保真）
+#include "t9_pinyin_map.h"           // NormalizePinyinComment（声调归一化，统一入口）
+#include "t9_digit_userdict.h"      // 数字序列用户词召回（方案 A）
 
 namespace rime {
 
@@ -187,9 +188,14 @@ ProcessResult T9Processor::HandleDigitKey(char ch) {
     T9_PERF_SCOPED_TIMER("[T9] HandleDigitKey");
     if (state_machine_.is_idle()) {
         state_machine_.EnterInput();
+        original_digit_sequence_.clear();
+        T9LOG(">> HandleDigitKey: idle→input, original_digit_sequence_ cleared");
     }
     undo_model_.DigitPressed(ch);  // 段模型双写
     input_buffer_ = input_buffer_.AddDigit(ch);
+    original_digit_sequence_ += ch;
+    T9LOG(">> HandleDigitKey: original_digit_sequence_='%s' (after += '%c')",
+          original_digit_sequence_.c_str(), ch);
     SendToRime();
 
     Context* ctx = engine_->context();
@@ -486,27 +492,67 @@ bool T9Processor::SelectCandidate(const std::string& candidate_pinyin,
     // 顺带捕获候选真实数据（Phrase 文本 + 音节码，含声调真相）供调频使用。
     Code captured_code;
     std::string captured_text;
+    // 识别候选是否为 T9 用户词：其 input_digits 与当前 unassigned 完全一致，
+    // 右选应全量消费（避免音节对齐不匹配导致 partial commit）。
+    bool is_t9_user = false;
     int rime_consumed =
-        QueryRimeConsumedDigits(candidate_pinyin, candidate_text, &captured_code, &captured_text);
-    T9LOG(">> SelectCandidate: rimeConsumedDigits=%d", rime_consumed);
+        QueryRimeConsumedDigits(candidate_pinyin, candidate_text, &captured_code, &captured_text,
+                                &is_t9_user);
+    // 左选场景时 RIME input 含左选拼音前缀，需加 consumed_count 得到总消费位数。
+    if (rime_consumed >= 0 && !input_buffer_.selections.empty()) {
+        rime_consumed += input_buffer_.consumed_count;
+    }
+    T9LOG(">> SelectCandidate: rimeConsumedDigits=%d (consumed=%d, isT9User=%d, hasSels=%d)",
+          rime_consumed, input_buffer_.consumed_count, is_t9_user ? 1 : 0,
+          !input_buffer_.selections.empty() ? 1 : 0);
     if (!captured_code.empty()) {
-        // 捕获随段模型同生命周期（Clear/undo 由段模型权威管理）；
-        // rime::Code → 段模型 RIME 无关表示（T9SyllableCode，同型互转）。
         undo_model_.PushCommitCapture(captured_text,
                                       T9SyllableCode(captured_code.begin(), captured_code.end()));
+        // 同步暂存调频捕获：跨异步上屏链路存活
+        pending_fullcommit_capture_ = {captured_text,
+                                       T9SyllableCode(captured_code.begin(),
+                                                      captured_code.end())};
         std::string ids;
         for (auto id : captured_code) ids += std::to_string(id) + ",";
         T9LOG(">> SelectCandidate: captured '%s' code=[%s] (%zu syl)",
               captured_text.c_str(), ids.c_str(), captured_code.size());
     }
 
+    // 构建召回索引：剩余数字序列 + 左选标记（场景 C）或纯左选（场景 D）。
+    const std::string digit_seq_before_commit = input_buffer_.digit_sequence;
+    const std::string unassigned = input_buffer_.unassigned();
+    std::string left_select_key = unassigned;
+    const bool is_first_select = last_commit_digit_sequence_.empty();
+    if (is_first_select && !input_buffer_.selections.empty()) {
+        if (!unassigned.empty())
+            left_select_key += ":";
+        for (const auto& sel : input_buffer_.selections)
+            left_select_key += sel.pinyin;
+    }
+    T9LOG(">> SelectCandidate: buf.digitSeq='%s', unassigned='%s', left_select_key='%s', selections=%zu, is_first=%d",
+          digit_seq_before_commit.c_str(),
+          unassigned.c_str(),
+          left_select_key.c_str(),
+          input_buffer_.selections.size(),
+          is_first_select ? 1 : 0);
+
     bool full_commit = right_commit_handler_.HandleRightCommit(
-        ctx, candidate_pinyin, candidate_text_length, rime_consumed);
+        ctx, candidate_pinyin, candidate_text_length, rime_consumed, is_t9_user);
 
     // 必须先把 handler 消费结果回写 input_buffer_（consumed/unassigned 更新）。
     ApplyHandlerContext(ctx);
 
-    // 调频不在此进行：由 Kotlin 在 full commit 上屏后经 MemorizeEntry 显式调用。
+    // 记录召回索引，供 MemorizeEntry 写入用户词典。
+    // partial commit 时如果 left_select_key 比已保存的短，保留之前的值不覆盖。
+    if (!last_commit_digit_sequence_.empty() &&
+        left_select_key.length() < last_commit_digit_sequence_.length()) {
+        // 被 partial commit 截断，不覆盖
+    } else {
+        last_commit_digit_sequence_ = left_select_key;
+    }
+    T9LOG(">> SelectCandidate: last_commit_digit_sequence_='%s' (left_select_key='%s', full=%d)",
+          last_commit_digit_sequence_.c_str(),
+          left_select_key.c_str(), full_commit ? 1 : 0);
 
     // ── 诊断日志：出口状态 ──
     T9LOG(">> SelectCandidate EXIT: full_commit=%d", full_commit ? 1 : 0);
@@ -686,37 +732,42 @@ bool T9Processor::UpdateDictEntry(const std::string& text,
 
 bool T9Processor::MemorizeEntry(const std::string& text,
                                 const std::string& pinyin) {
-    // 优先使用右选捕获的 (text, code)（含声调真相，见 T9UndoModel::commit_captures）：
-    // 事后无声调拼音解析会命中轻声音节（计划→ji/hua 轻声）导致调频码丢声调。
-    const auto& captures = undo_model_.commit_captures();
-    T9LOG(">> MemorizeEntry: text='%s' pinyin='%s' captures=%zu",
-          text.c_str(), pinyin.c_str(), captures.size());
-    if (!captures.empty()) {
-        auto pinyin_syllables = ParseSyllables(pinyin);
-        std::string captured_text;
-        size_t total_syllables = 0;
-        for (const auto& [seg_text, code] : captures) {
-            captured_text += seg_text;
-            total_syllables += code.size();
+    // 场景判定：full_code == input_digits → 写 RIME userdb，否则 → 写 T9 数字词典。
+    // capture 机制不再用于场景判定——多段拼接自造词的 capture 只存最后一段，文本不匹配。
+    T9LOG(">> MemorizeEntry digitSeq='%s' lastCommit='%s' consumed=%d",
+          input_buffer_.digit_sequence.c_str(),
+          last_commit_digit_sequence_.c_str(),
+          input_buffer_.consumed_count);
+    T9LOG(">> MemorizeEntry: text='%s' pinyin='%s'", text.c_str(), pinyin.c_str());
+
+    pending_fullcommit_capture_.reset();
+    undo_model_.ClearCommitCaptures();
+
+    const std::string& digits = last_commit_digit_sequence_;
+    std::string full_code_str = T9DigitUserDictCore::PinyinToFullCode(pinyin);
+
+    if (!full_code_str.empty() && !digits.empty() && full_code_str == digits) {
+        // 音节图可达 → 写 RIME userdb
+        DictEntry entry;
+        if (BuildEntryForPinyin(text, pinyin, &entry)) {
+            T9LOG(">> MemorizeEntry: full_code=='%s'==digits, write RIME userdb",
+                  full_code_str.c_str());
+            WriteDictEntry(text, entry.code, 1);
+        } else {
+            T9LOG(">> MemorizeEntry: BuildEntryForPinyin failed, fallback to T9 digit dict");
+            if (!text.empty() && !digits.empty()) {
+                T9DigitUserDict::Instance().Memorize(digits, text, pinyin);
+            }
         }
-        // 文本拼接 + 音节数双重校验：任一不符视为序列被中断的过期捕获，
-        // 作废后回退到拼音解析（避免把残留捕获误写到本次上屏文本上）。
-        if (captured_text == text && !pinyin_syllables.empty() &&
-            total_syllables == pinyin_syllables.size()) {
-            Code full_code;
-            for (const auto& [seg_text, code] : captures)
-                full_code.insert(full_code.end(), code.begin(), code.end());
-            undo_model_.ClearCommitCaptures();
-            std::string ids;
-            for (auto id : full_code) ids += std::to_string(id) + ",";
-            T9LOG(">> MemorizeEntry: USE CAPTURE code=[%s]", ids.c_str());
-            return WriteDictEntry(text, full_code, 1);
+    } else {
+        // 音节图不可达 → 写 T9 数字词典
+        if (!text.empty() && !digits.empty()) {
+            T9LOG(">> MemorizeEntry: full_code='%s' != digits='%s', write T9 digit dict",
+                  full_code_str.c_str(), digits.c_str());
+            T9DigitUserDict::Instance().Memorize(digits, text, pinyin);
         }
-        T9LOG(">> MemorizeEntry: capture mismatch (join='%s'), clear + fallback",
-              captured_text.c_str());
-        undo_model_.ClearCommitCaptures();  // 不匹配 → 作废过期捕获
     }
-    return UpdateDictEntry(text, pinyin, 1);
+    return true;
 }
 
 bool T9Processor::ForgetEntry(const std::string& text,
@@ -741,7 +792,8 @@ int T9Processor::QueryRimeConsumedDigits(
     const std::optional<std::string>& candidate_pinyin,
     const std::string& candidate_text,
     Code* captured_code,
-    std::string* captured_text) const {
+    std::string* captured_text,
+    bool* out_is_t9_user) const {
     // 方案 A：右选消费优先采用 RIME 候选的实际匹配范围。
     // RIME 已通过 schema 的 speller/algebra（含 derive/abbrev 派生规则）
     // 精确计算出候选在输入中的匹配结束位置（Candidate::end()），
@@ -775,6 +827,10 @@ int T9Processor::QueryRimeConsumedDigits(
             // 的候选（如 几股/击鼓 同注释 "ji gu"），避免捕获同注释他词的码。
             // text 为空（兼容/异常兜底）时退化为仅按注释匹配的旧行为。
             if (match_text && genuine->text() != candidate_text) continue;
+            // T9 用户词识别：候选 type=="t9_user"（T9UserTranslator 召回，
+            // SimpleCandidate，非 RIME Phrase）。其 input_digits 即组词时实际
+            // 输入序列（如 4482:j），右选时应全量消费 unassigned。
+            if (out_is_t9_user) *out_is_t9_user = (genuine->type() == "t9_user");
             // 顺带捕获 Phrase 的真实码（含声调真相），供调频保留声调。
             if (captured_code || captured_text) {
                 if (auto phrase = As<Phrase>(genuine)) {
@@ -1030,6 +1086,12 @@ void T9Processor::EnterIdle() {
     // 必须在 state_machine_ 之前清空 input_buffer_，否则 state sync 后
     // stale buffer 会导致后续 backspace 等操作在残留数据上处理。
     input_buffer_ = T9Buffer();
+    T9LOG(">> EnterIdle: clearing original_digit_sequence_='%s', last_commit='%s'",
+          original_digit_sequence_.c_str(),
+          last_commit_digit_sequence_.c_str());
+    original_digit_sequence_.clear();
+    last_commit_digit_sequence_.clear();
+    pending_fullcommit_capture_.reset();
     state_machine_.EnterIdle();
     left_column_locked_ = false;
     separator_consumed_digits_.reset();   // 修复（2026-08-06）：外部清空触发的

@@ -32,11 +32,6 @@ std::string T9ConvertCandidatePreedit(const std::string& preedit,
                                       const std::string& comment,
                                       const std::string& candidate_text);
 
-// 将拼音注释中的带声调字符归一化为纯 ASCII 小写拼音（jī huà → ji hua）。
-// 供 t9_processor 调频码声调保真复用：comment 归一化匹配、无声调音节
-// → 带声调变体选择（避免命中轻声音节）。
-std::string NormalizePinyinComment(const std::string& comment);
-
 #ifndef T9_ALGO_ONLY_BUILD
 // 包装候选，覆盖 preedit() 返回转换后的拼音，
 // 不修改原始候选对象，避免跨 .so 边界的 dynamic_cast 失效问题。
@@ -73,6 +68,9 @@ public:
     an<Candidate> Peek() override { return cand_; }
 
 private:
+    // 定位到下一个可接受的候选。
+    void Advance();
+    // 转换/缓存当前候选的 preedit（原逻辑）。
     void ConvertCurrent();
 
     an<Translation> translation_;

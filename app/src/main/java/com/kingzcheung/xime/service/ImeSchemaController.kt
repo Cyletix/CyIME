@@ -34,8 +34,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         val pendingEnglish = candState.pendingEnglishText
         FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: start, pendingEnglish='${if (pendingEnglish.isEmpty()) '-' else pendingEnglish}', isComposing=${candState.isComposing}, candidates=${candState.candidates.size}")
         if (pendingEnglish.isNotEmpty()) {
+            // 英文直接上屏模式：编码字符已逐字落盘，切模式只需结束本轮输入（清状态），
+            // 不可再 commitText 否则会重复输出整个词。
             withContext(Dispatchers.Main) {
-                service.commitText(pendingEnglish)
                 service.candidateState.value = service.candidateState.value.copy(
                     pendingEnglishText = "",
                     associationCandidates = emptyList()

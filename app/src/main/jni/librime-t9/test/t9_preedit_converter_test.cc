@@ -4,7 +4,8 @@
 // 覆盖场景：常规多音节、末尾简拼、单段多音节、中文混合、空 comment
 #include <gtest/gtest.h>
 
-#include "t9_filter.h"
+#include "t9_filter.h"            // T9ConvertPreedit / T9ConvertCandidatePreedit
+#include "t9_pinyin_map.h"        // NormalizePinyinComment
 
 using rime::T9ConvertPreedit;
 using rime::T9ConvertCandidatePreedit;
@@ -205,15 +206,16 @@ TEST(NormalizePinyinCommentTest, TonedAndTonelessEquivalent) {
 }
 
 TEST(NormalizePinyinCommentTest, Basic) {
-    EXPECT_EQ(rime::NormalizePinyinComment("jì huà"), "jihua");
-    EXPECT_EQ(rime::NormalizePinyinComment("ji hua"), "jihua");
-    EXPECT_EQ(rime::NormalizePinyinComment("jī guā"), "jigua");
+    // 保留空格（音节分隔符），声调归一化为无声调 ASCII
+    EXPECT_EQ(rime::NormalizePinyinComment("jì huà"), "ji hua");
+    EXPECT_EQ(rime::NormalizePinyinComment("ji hua"), "ji hua");
+    EXPECT_EQ(rime::NormalizePinyinComment("jī guā"), "ji gua");
 }
 
 TEST(NormalizePinyinCommentTest, NeutralTonePreserved) {
-    // 轻声音节（簸箕 ji / 笑话 hua）全 ASCII，归一化原样保留
-    EXPECT_EQ(rime::NormalizePinyinComment("bò ji"), "boji");
-    EXPECT_EQ(rime::NormalizePinyinComment("xiào hua"), "xiaohua");
+    // 轻声音节（簸箕 ji / 笑话 hua）全 ASCII，归一化原样保留（含空格）
+    EXPECT_EQ(rime::NormalizePinyinComment("bò ji"), "bo ji");
+    EXPECT_EQ(rime::NormalizePinyinComment("xiào hua"), "xiao hua");
     EXPECT_EQ(rime::NormalizePinyinComment("ji"), "ji");
     EXPECT_EQ(rime::NormalizePinyinComment("hua"), "hua");
 }
@@ -225,6 +227,6 @@ TEST(NormalizePinyinCommentTest, NonLetterCharsDropped) {
 }
 
 TEST(NormalizePinyinCommentTest, UppercaseNormalized) {
-    EXPECT_EQ(rime::NormalizePinyinComment("JĪ HUÀ"), "jihua");
-    EXPECT_EQ(rime::NormalizePinyinComment("JI HUA"), "jihua");
+    EXPECT_EQ(rime::NormalizePinyinComment("JĪ HUÀ"), "ji hua");
+    EXPECT_EQ(rime::NormalizePinyinComment("JI HUA"), "ji hua");
 }

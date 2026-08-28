@@ -181,7 +181,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     internal lateinit var clipboardManager: ClipboardManager
 
-    private var clipboardSyncBridge: ClipboardSyncBridge? = null
+    internal var clipboardSyncBridge: ClipboardSyncBridge? = null
     
     internal lateinit var keyboardContainer: VoiceKeyboardContainer
     
@@ -388,10 +388,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 SettingsPreferences.KEY_SMART_PREDICTION_ENABLED -> onPredictionSettingChanged()
                 SettingsPreferences.KEY_CLIPBOARD_SYNC_ENABLED -> updateClipboardSync()
                 SettingsPreferences.KEY_CLIPBOARD_SYNC_PLUGIN_ID -> {
-                    stopClipboardSync()
-                    updateClipboardSync()
-                }
-                SettingsPreferences.KEY_CLIPBOARD_SYNC_PULL_ON_OPEN -> {
                     stopClipboardSync()
                     updateClipboardSync()
                 }
@@ -678,13 +674,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             val plugin = selected.second
             clipboardSyncBridge = ClipboardSyncBridge(
-                this,
                 clipboardManager,
                 plugin,
-                pullOnOpen = SettingsPreferences.isClipboardSyncPullOnOpen(this),
                 pluginId = selected.first
             )
             clipboardSyncBridge?.start()
+            uiState.value = uiState.value.copy(clipboardSyncEnabled = true)
             Log.d(TAG, "Clipboard sync started: ${selected.first}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start clipboard sync", e)
@@ -694,6 +689,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun stopClipboardSync() {
         clipboardSyncBridge?.release()
         clipboardSyncBridge = null
+        uiState.value = uiState.value.copy(clipboardSyncEnabled = false)
     }
 
     /** 剪贴板同步设置或插件状态变化时调用，按条件动态启停。 */
@@ -1308,6 +1304,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     toolPanelItems = state.toolPanelItems,
                                     toolPanelLoading = state.toolPanelLoading,
                                     toolPanelRequestEpoch = state.toolPanelRequestEpoch,
+                                    clipboardSyncEnabled = state.clipboardSyncEnabled,
                                 )
                             }
                             val callbacks = rememberImeKeyboardCallbacks(this@XimeInputMethodService, floatingMinY, state, effectiveScreenH)
@@ -1332,9 +1329,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                               KeyboardResizeOverlay(
                                      initialHeightDp = state.resizePreviewHeightDp,
                                      defaultHeightDp = SettingsPreferences.getDefaultKeyboardHeightDp(this@XimeInputMethodService, isLandscape),
-                                    maxContainerHeightDp = state.resizePreviewHeightDp + state.keyboardBottomPaddingDp,
-                                   currentBottomPaddingDp = state.keyboardBottomPaddingDp,
-                                  onHeightChange = { newHeight ->
+                                     currentBottomPaddingDp = state.keyboardBottomPaddingDp,
+                                     onHeightChange = { newHeight ->
                                        uiState.value = uiState.value.copy(
                                            resizePreviewHeightDp = newHeight
                                        )
@@ -1861,6 +1857,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowShown() {
         super.onWindowShown()
+        // 键盘弹出时对比系统取色与缓存的动态主题色，壁纸取色变化则重建主题并热更新 UI。
+        // 每次弹出只做两次资源读取对比，取色未变时零成本。
+        KeyboardThemes.refreshDynamicSchemes(this)
         clipboardSyncBridge?.pullOnce()
     }
     
@@ -1908,7 +1907,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             associationCandidates = emptyList(),
             pendingEnglishText = "",
             hasNextPage = false,
-            hasPrevPage = false
+            hasPrevPage = false,
+            englishReplaceSupported = true
         )
         endComposingInputBox()
     }
@@ -1916,15 +1916,27 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /**
      * 结束输入框中的 composing span，先清空内容再结束，避免转为 committed text。
      *
-     * 无论输入位置设置（输入框/候选栏）都执行：英文输入（pendingEnglishText）始终通过
-     * setComposingText 写入编辑器，清空时若跳过会残留英文 composing 文本。
-     * 中文候选栏模式下编辑器无 composing 文本，本方法为空操作。
+     * 无论输入位置设置（输入框/候选栏）都执行。
+     * 英文输入改为直接上屏模式后不再写入 composing 文本（本方法对英文变为空操作），
+     * 但中文输入框模式仍会产生 composing 区，需在此清理。
      */
     internal fun endComposingInputBox() {
         currentInputConnection?.let {
             it.setComposingText("", 0)
             it.finishComposingText()
         }
+    }
+
+    /**
+     * 当前宿主是否支持英文候选的"回删替换"机制。
+     *
+     * 英文直接上屏模式下，选中候选词需要 deleteSurroundingText 回删已上屏编码再提交候选词；
+     * 终端等受限宿主对该能力（含文本探测接口）通常不支持，探针返回 null。
+     * 此类宿主直接不提供英文联想候选。
+     */
+    internal fun supportsEnglishCandidateReplace(): Boolean {
+        val ic = currentInputConnection ?: return false
+        return runCatching { ic.getTextBeforeCursor(1, 0) != null }.getOrDefault(false)
     }
 
     override fun onDestroy() {

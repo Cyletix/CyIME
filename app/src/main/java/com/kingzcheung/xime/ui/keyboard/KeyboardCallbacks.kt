@@ -97,6 +97,11 @@ data class KeyboardCallbacks(
      */
     var onT9RefreshComposition: ((RimeComposition) -> Unit)? = null,
     val onShowQuickSendForm: (() -> Unit)? = null,
+    /**
+     * 从剪贴板面板主动拉取远端剪贴板内容（仅剪贴板同步已启用时非空）。
+     * 由剪贴板面板导航头的「拉取」按钮触发。
+     */
+    val onClipboardPullRemote: (() -> Unit)? = null,
     val onHideQuickSendForm: (() -> Unit)? = null,
     val onQuickSendEditItem: ((Long, String) -> Unit)? = null,
     val onQuickSendFormFocusChange: ((Boolean) -> Unit)? = null,

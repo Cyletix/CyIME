@@ -4,6 +4,31 @@ project(kime VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# F-Droid 可复现构建：AGP 对 release 变体使用 RelWithDebInfo（-O2 -g -DNDEBUG），
+# 其中的 -g 会把绝对源码路径嵌入 .so 的调试信息，不同构建环境路径不同
+# 导致产物不一致。此处统一去掉 -g，使 native 产物与源码路径无关。
+string(REPLACE "-g" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+string(REPLACE "-g" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+
+# __FILE__/__BASE_FILE__ 宏会把源码绝对路径嵌入产物（异常消息、日志等），
+# 各构建环境绝对路径不同（/Users/...、/home/runner/...、/home/vagrant/...），
+# 导致 .so 不一致。用 -ffile-prefix-map 把项目根前缀映射为空，
+# 使产物中只含相对路径，与构建环境无关。对所有子项目（librime/boost/opencc 等）全局生效。
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffile-prefix-map=${CMAKE_SOURCE_DIR}=")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffile-prefix-map=${CMAKE_SOURCE_DIR}=")
+
+# CMake 构建目录（app/.cxx/...）里生成的文件也会通过 __FILE__ 嵌入路径，
+# 且该目录名含环境相关的 hash（如 59353x1w），必须一并映射掉。
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffile-prefix-map=${CMAKE_BINARY_DIR}=")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffile-prefix-map=${CMAKE_BINARY_DIR}=")
+
+# NDK 头文件路径会嵌入 RTTI 类型名（anonymous struct 等），各环境 SDK 路径不同。
+# AGP 通过缓存变量 ANDROID_NDK 提供 NDK 路径（勿用环境变量 ANDROID_NDK_HOME，构建时未必设置）。
+if(ANDROID_NDK)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffile-prefix-map=${ANDROID_NDK}=")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffile-prefix-map=${ANDROID_NDK}=")
+endif()
+
 # Debug 构建也启用优化，解决大词典查询性能问题
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g")

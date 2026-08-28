@@ -68,4 +68,5 @@ data class InputUIState(
     val toolPanelLoading: Boolean = false,
     /** 面板请求代际号（防旧结果回填闪动）。 */
     val toolPanelRequestEpoch: Long = 0,
+    val clipboardSyncEnabled: Boolean = false,
 )

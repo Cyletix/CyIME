@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.twotone.Refresh
 import androidx.compose.material.icons.twotone.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,9 +46,6 @@ fun ClipboardSyncSettingsContent(
     val scope = rememberCoroutineScope()
     var enabled by remember {
         mutableStateOf(SettingsPreferences.isClipboardSyncEnabled(context))
-    }
-    var pullOnOpen by remember {
-        mutableStateOf(SettingsPreferences.isClipboardSyncPullOnOpen(context))
     }
     val syncPlugins = remember { ExtensionManager.getEnabledClipboardSyncPlugins(context) }
     // 偏好未设置时，自动选中第一个已启用的插件（与服务端 fallback 一致）
@@ -104,21 +100,11 @@ fun ClipboardSyncSettingsContent(
                     SettingsToggleItem(
                         icon = Icons.TwoTone.Sync,
                         title = "启用剪贴板同步",
-                        subtitle = "将剪贴板文本与远端设备双向同步",
+                        subtitle = "将剪贴板文本与远端设备双向同步（拉取在启动及打开键盘/剪贴板面板时触发）",
                         checked = enabled,
                         onCheckedChange = { checked ->
                             enabled = checked
                             SettingsPreferences.setClipboardSyncEnabled(context, checked)
-                        }
-                    )
-                    SettingsToggleItem(
-                        icon = Icons.TwoTone.Refresh,
-                        title = "仅打开键盘时拉取",
-                        subtitle = "开启后不持续轮询，仅在键盘弹出时从远端拉取一次",
-                        checked = pullOnOpen,
-                        onCheckedChange = { checked ->
-                            pullOnOpen = checked
-                            SettingsPreferences.setClipboardSyncPullOnOpen(context, checked)
                         }
                     )
                 }

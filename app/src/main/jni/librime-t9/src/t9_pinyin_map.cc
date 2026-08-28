@@ -5,6 +5,89 @@
 
 namespace rime {
 
+// ── 声调归一化（内联实现，避免引入 t9_filter.cc 依赖）──
+// 与 t9_filter.cc 的 DecodeUtf8 / ToneToAscii 一致，供 PinyinToDigitCode
+// 在映射前归一化带声调拼音（如 "lì" → "li" → "54"）。
+
+static uint32_t DecodeUtf8(const char*& p, const char* end) {
+    if (p >= end) return 0;
+    unsigned char c = static_cast<unsigned char>(*p);
+    if (c < 0x80) {
+        uint32_t cp = c;
+        ++p;
+        return cp;
+    }
+    if ((c & 0xE0) == 0xC0) {
+        if (p + 1 >= end) { ++p; return 0; }
+        uint32_t cp = ((c & 0x1F) << 6) | (static_cast<unsigned char>(p[1]) & 0x3F);
+        p += 2;
+        return cp;
+    }
+    if ((c & 0xF0) == 0xE0) {
+        if (p + 2 >= end) { ++p; return 0; }
+        uint32_t cp = ((c & 0x0F) << 12)
+                    | ((static_cast<unsigned char>(p[1]) & 0x3F) << 6)
+                    | (static_cast<unsigned char>(p[2]) & 0x3F);
+        p += 3;
+        return cp;
+    }
+    if ((c & 0xF8) == 0xF0) {
+        if (p + 3 >= end) { ++p; return 0; }
+        uint32_t cp = ((c & 0x07) << 18)
+                    | ((static_cast<unsigned char>(p[1]) & 0x3F) << 12)
+                    | ((static_cast<unsigned char>(p[2]) & 0x3F) << 6)
+                    | (static_cast<unsigned char>(p[3]) & 0x3F);
+        p += 4;
+        return cp;
+    }
+    ++p;
+    return 0;
+}
+
+static char ToneToAscii(uint32_t cp) {
+    switch (cp) {
+        case 0x0101: case 0x01CE: case 0x00E1: case 0x00E0:
+        case 0x0100: case 0x01CD: case 0x00C1: case 0x00C0: return 'a';
+        case 0x0113: case 0x011B: case 0x00E9: case 0x00E8:
+        case 0x0112: case 0x011A: case 0x00C9: case 0x00C8: return 'e';
+        case 0x012B: case 0x01D0: case 0x00ED: case 0x00EC:
+        case 0x012A: case 0x01CF: case 0x00CD: case 0x00CC: return 'i';
+        case 0x014D: case 0x01D2: case 0x00F3: case 0x00F2:
+        case 0x014C: case 0x01D1: case 0x00D3: case 0x00D2: return 'o';
+        case 0x016B: case 0x01D4: case 0x00FA: case 0x00F9:
+        case 0x016A: case 0x01D3: case 0x00DA: case 0x00D9: return 'u';
+        case 0x01D6: case 0x01D8: case 0x01DA: case 0x01DC: case 0x00FC:
+        case 0x01D5: case 0x01D7: case 0x01D9: case 0x01DB: case 0x00DC: return 'v';
+        case 0x0144: case 0x0148: case 0x01F9:
+        case 0x0143: case 0x0147: case 0x01F8: return 'n';
+        case 0x1E3F: case 0x1E3E: return 'm';
+        default: return 0;
+    }
+}
+
+// 将带声调拼音归一化为纯 ASCII 小写（保留空格），供逐字符映射。
+// 统一实现：t9_filter.cc / t9_processor.cc 中的 NormalizePinyinComment 也指向此函数。
+std::string NormalizePinyinComment(const std::string& comment) {
+    std::string result;
+    const char* p = comment.c_str();
+    const char* end = p + comment.size();
+    while (p < end) {
+        uint32_t cp = DecodeUtf8(p, end);
+        if (cp == 0) continue;
+        if (cp < 0x80) {
+            if ((cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z')) {
+                result += static_cast<char>(std::tolower(static_cast<unsigned char>(cp)));
+            } else if (cp == ' ') {
+                result += ' ';
+            }
+        } else {
+            char mapped = ToneToAscii(cp);
+            if (mapped != 0) result += mapped;
+        }
+    }
+    return result;
+}
+
 // 单字母→数字映射（对应 Kotlin LETTER_TO_DIGIT）
 static const std::unordered_map<char, char>& LetterToDigitMap() {
     static const std::unordered_map<char, char> kMap = {
@@ -182,10 +265,10 @@ std::vector<std::string> T9PinyinMap::Candidates(const std::string& digits,
 
 std::optional<std::string> T9PinyinMap::PinyinToDigitCode(
     const std::string& pinyin) const {
-    // 对应 Kotlin pinyinToDigitCode（含缓存）
-    std::string key = pinyin;
-    std::transform(key.begin(), key.end(), key.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    // 先归一化带声调拼音（如 "lì hù" → "li hu"），再逐字符映射。
+    std::string key = NormalizePinyinComment(pinyin);
+    if (key.empty())
+        return std::nullopt;  // 归一化后为空（如纯符号输入）
 
     auto cache_it = pinyin_code_cache_.find(key);
     if (cache_it != pinyin_code_cache_.end()) {

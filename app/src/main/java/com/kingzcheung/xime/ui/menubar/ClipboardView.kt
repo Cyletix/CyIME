@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.twotone.Sync
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,6 +79,8 @@ fun ClipboardView(
     modifier: Modifier = Modifier,
     onQuickSendAddClick: (() -> Unit)? = null,
     onQuickSendEditItem: ((Long, String) -> Unit)? = null,
+    onPullRemote: (() -> Unit)? = null,
+    pullRemoteAvailable: Boolean = false,
 ) {
     // 卡片/格子背景：与菜单项背景一致（keyBgColor，浅色纯白、深色跟随 keyboard.colors）
     val itemBgColor = keyBgColor
@@ -200,21 +203,42 @@ fun ClipboardView(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                } else if (clipboardItems.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(iconButtonContainer)
-                            .clickable { showClearConfirm = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "清空剪贴板",
-                            tint = accentColor,
-                            modifier = Modifier.size(18.dp)
-                        )
+                } else {
+                    // 剪贴板同步已启用（配置+启用插件）时，提供主动拉取按钮
+                    if (pullRemoteAvailable && onPullRemote != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(iconButtonContainer)
+                                .clickable(onClick = onPullRemote),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.TwoTone.Sync,
+                                contentDescription = "拉取远端剪贴板",
+                                tint = accentColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    if (clipboardItems.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(iconButtonContainer)
+                                .clickable { showClearConfirm = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = "清空剪贴板",
+                                tint = accentColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

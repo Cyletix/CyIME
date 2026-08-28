@@ -624,7 +624,6 @@ object SettingsPreferences {
     }
 
     const val KEY_CLIPBOARD_SYNC_ENABLED = "clipboard_sync_enabled"
-    const val KEY_CLIPBOARD_SYNC_PULL_ON_OPEN = "clipboard_sync_pull_on_open"
     const val KEY_CLIPBOARD_SYNC_PLUGIN_ID = "clipboard_sync_plugin_id"
 
     fun isClipboardSyncEnabled(context: Context): Boolean {
@@ -633,14 +632,6 @@ object SettingsPreferences {
 
     fun setClipboardSyncEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_CLIPBOARD_SYNC_ENABLED, enabled).apply()
-    }
-
-    fun isClipboardSyncPullOnOpen(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_CLIPBOARD_SYNC_PULL_ON_OPEN, false)
-    }
-
-    fun setClipboardSyncPullOnOpen(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_CLIPBOARD_SYNC_PULL_ON_OPEN, enabled).apply()
     }
 
     fun getClipboardSyncPluginId(context: Context): String {

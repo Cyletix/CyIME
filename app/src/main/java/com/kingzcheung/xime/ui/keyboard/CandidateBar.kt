@@ -36,12 +36,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -222,10 +237,24 @@ fun CandidateBar(
         candidateListState.scrollToItem(0)
     }
 
+    // 编码气泡：候选栏内计算编码文本后回写此状态，供 Column 的 drawBehind 读取绘制。
+    // drawBehind 在下一帧读取最新值，无需同步；初始值取自当前 state 保证首帧即显示。
+    var preeditBubbleText by remember(state) {
+        mutableStateOf((state as? CandidateBarState.ChineseCandidates)?.preeditText
+            ?: (state as? CandidateBarState.ChineseCandidates)?.inputText ?: "")
+    }
+    val showPreeditBubble = showInputTextRow && preeditBubbleText.isNotEmpty() && !showInputBoxStyle
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .height(50.dp)
+            .drawPreeditBubble(
+                text = preeditBubbleText,
+                enabled = showPreeditBubble,
+                bubbleColor = visuals.backgroundColor,
+                textColor = visuals.textColor
+            )
             .background(visuals.backgroundColor)
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center
@@ -273,41 +302,9 @@ fun CandidateBar(
 
         val displayText = (state as? CandidateBarState.ChineseCandidates)?.preeditText
             ?: (state as? CandidateBarState.ChineseCandidates)?.inputText ?: ""
-        val showInputText = showInputTextRow && displayText.isNotEmpty() && !showInputBoxStyle
-
-        if (showInputText) {
-            val inputTextInteractionSource = remember { MutableInteractionSource() }
-            val isInputTextPressed by inputTextInteractionSource.collectIsPressedAsState()
-
-            Box(
-                modifier = Modifier
-                    .padding(vertical = 0.5.dp)
-                    .fillMaxWidth()
-                    .height(16.dp),
-                contentAlignment = Alignment.CenterStart,
-
-            ) {
-                Text(
-                    text = displayText,
-                    color = visuals.textColor.copy(alpha = 0.8f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    lineHeight = 16.sp,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            if (isInputTextPressed && callbacks.onInputTextClick != null)
-                                (if (visuals.isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(
-                                    alpha = 0.1f
-                                ))
-                            else
-                                Color.Transparent
-                        )
-                        .padding(horizontal = 0.dp)
-                )
-            }
-        }
+        // 编码显示已改为候选栏顶部的悬浮气泡（drawBehind 绘制，见 drawPreeditBubble），
+        // 栏内不再为编码保留布局空间——打字态与联想态的候选行共用同一垂直位置。
+        preeditBubbleText = displayText
 
         Row(
             modifier = Modifier
@@ -415,7 +412,11 @@ fun CandidateBar(
                     )
                 }
 
-                if (displayAssociation.isNotEmpty()) {
+                // 仅当左侧存在打字候选时才需要分隔线；纯联想态（无打字候选）下
+                // 该竖线会孤悬列表最左缘，属多余元素。
+                // 注意：分隔线在条件内，联想词 items 必须在条件外——纯联想态
+                // displayCandidates 为空，若一并包进条件会导致联想词整个不渲染。
+                if (displayCandidates.isNotEmpty() && displayAssociation.isNotEmpty()) {
                     item(key = "divider") {
                         Box(
                             modifier = Modifier
@@ -425,21 +426,21 @@ fun CandidateBar(
                                 .padding(horizontal = 4.dp)
                         )
                     }
+                }
 
-                    itemsIndexed(displayAssociation, key = { index, _ -> "assoc-$index" }) { index, candidate ->
-                        val assocState = state as? CandidateBarState.AssociationOnly
-                        CandidateItem(
-                            text = candidate,
-                            index = -1,
-                            onClick = { callbacks.onAssociationSelect?.invoke(index) },
-                            textColor = visuals.textColor,
-                            comment = displayComments.getOrElse(index) { "" },
-                            isSelected = assocState?.highlightIndex == index,
-                            accentColor = visuals.accentColor,
-                            selectedTextColor = visuals.selectedTextColor,
-                            fontSize = candidateTextSize.sp
-                        )
-                    }
+                itemsIndexed(displayAssociation, key = { index, _ -> "assoc-$index" }) { index, candidate ->
+                    val assocState = state as? CandidateBarState.AssociationOnly
+                    CandidateItem(
+                        text = candidate,
+                        index = -1,
+                        onClick = { callbacks.onAssociationSelect?.invoke(index) },
+                        textColor = visuals.textColor,
+                        comment = displayComments.getOrElse(index) { "" },
+                        isSelected = assocState?.highlightIndex == index,
+                        accentColor = visuals.accentColor,
+                        selectedTextColor = visuals.selectedTextColor,
+                        fontSize = candidateTextSize.sp
+                    )
                 }
             }
 
@@ -637,3 +638,90 @@ fun CandidateItem(
         }
     }
 }
+
+/**
+ * 编码悬浮气泡：在候选栏顶部之上（栏外）绘制一个圆角胶囊气泡显示当前拼音编码。
+ *
+ * 参考 SwipeBubble 的锚定方式，但为纯绘制实现：
+ * - 锚定宿主（候选栏 Column）左上角，气泡体向上悬浮于栏外空间；
+ * - drawBehind 绘制不参与布局、不拦截触摸事件——候选栏上方的快捷发送表单/
+ *   手写区等 UI 不受任何布局影响；
+ * - IME 窗口为 MATCH_PARENT 全屏（onConfigureWindow），栏外绘制不会被窗口裁剪。
+ *
+ * 视觉：浅色模式近白底/深色模式深灰底的圆角胶囊（92% 不透明），无边框无阴影；
+ * 编码文字在气泡内垂直居中；气泡与候选栏顶部之间留 2dp 间隙；宽度自适应，
+ * 超出宿主右缘时左移钳制。
+ *
+ * 注意：不能使用传入的主题背景色——CandidateBarVisuals.backgroundColor 为
+ * Color.Transparent（真实背景由外层绘制），以其合成会导致气泡无底色、
+ * 文字与 app 内容混叠不可读。此处以候选文字亮度推断深浅模式取对比底色。
+ */
+private fun Modifier.drawPreeditBubble(
+    text: String,
+    enabled: Boolean,
+    bubbleColor: Color,
+    textColor: Color
+): Modifier = composed {
+    val density = LocalDensity.current
+    val cornerRadiusPx = with(density) { 4.dp.toPx() }
+    val horizontalPaddingPx = with(density) { 8.dp.toPx() }
+    val verticalPaddingPx = with(density) { 3.dp.toPx() }
+    val bubbleBottomGapPx = with(density) { 2.dp.toPx() }
+    val screenMarginPx = with(density) { 4.dp.toPx() }
+    val textSizePx = with(density) { 12.sp.toPx() }
+
+    // 气泡基色：优先用传入的主题背景色；其为全透明（CandidateBarVisuals 传
+    // Color.Transparent，真实背景由外层绘制）时按候选文字亮度推导，
+    // 保证浅色模式近白/深色模式深灰的可读对比。
+    val isDarkTheme = textColor.luminance() > 0.5f
+    val bubbleBaseColor = if (bubbleColor.alpha > 0.01f) {
+        bubbleColor
+    } else {
+        if (isDarkTheme) Color(0xFF2D2F31) else Color(0xFFFAFAFA)
+    }
+    // 半透明：62% 不透明度
+    val bubbleBgColor = bubbleBaseColor.copy(alpha = 0.62f)
+
+    // 文本画笔：与 SwipeBubble 同款 nativeCanvas 绘制方式
+    val bubbleTextPaint = remember(textColor, textSizePx) {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = textSizePx
+            color = textColor.copy(alpha = 0.9f).toArgb()
+        }
+    }
+
+    drawBehind {
+        if (!enabled || text.isEmpty()) return@drawBehind
+
+        val fontMetrics = bubbleTextPaint.fontMetrics
+        val textWidth = bubbleTextPaint.measureText(text)
+        // 文本实际渲染高度以可见字形区间（ascent..descent）计，避免 lineHeight 参与导致偏移
+        val textHeight = fontMetrics.descent - fontMetrics.ascent
+        val bubbleWidth = textWidth + horizontalPaddingPx * 2
+        val bubbleHeight = textHeight + verticalPaddingPx * 2
+
+        // 气泡贴候选栏左缘，右向延伸；超出宿主右缘时整体左移钳制。
+        val clampedLeft = maxOf(
+            screenMarginPx,
+            minOf(0f, size.width - bubbleWidth - screenMarginPx).coerceAtLeast(screenMarginPx / 4f)
+        )
+        // 底部间隙：气泡底缘距候选栏顶缘 1dp
+        val top = -bubbleBottomGapPx - bubbleHeight
+
+        // 气泡主体
+        drawRoundRect(
+            color = bubbleBgColor,
+            topLeft = Offset(clampedLeft, top),
+            size = Size(bubbleWidth, bubbleHeight),
+            cornerRadius = CornerRadius(cornerRadiusPx)
+        )
+
+        // 文本垂直居中：基线 = 气泡顶 + (气泡高 - (ascent + descent)) / 2，
+        // ascent/descent 均为负/正相对基线的偏移，该式把字形区中点对准气泡中点。
+        drawIntoCanvas { composeCanvas ->
+            val baselineY = top + (bubbleHeight - (fontMetrics.ascent + fontMetrics.descent)) / 2f
+            composeCanvas.nativeCanvas.drawText(text, clampedLeft + horizontalPaddingPx, baselineY, bubbleTextPaint)
+        }
+    }
+}
+

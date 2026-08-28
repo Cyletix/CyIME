@@ -6,6 +6,7 @@
 #include <rime/dict/reverse_lookup_dictionary.h>
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
+#include "t9_digit_userdict.h"
 #include <jni.h>
 #include <android/log.h>
 #include <memory>
@@ -937,7 +938,18 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeInitialize(
     
     LOGI("Initializing Rime engine with user_dir=%s, shared_dir=%s", user_dir, shared_dir);
     Rime::Instance().startup(user_dir, shared_dir);
-    
+
+    // 初始化 T9 数字序列用户词典持久化路径（全局唯一，不依赖 schema 部署）。
+    // SetFilePath 内部 loaded_ 标志防重复 Open。
+    {
+        static bool t9_db_initialized = false;
+        if (!t9_db_initialized) {
+            rime::T9DigitUserDict::SetFilePath(
+                std::string(user_dir) + "/t9_digit.userdb");
+            t9_db_initialized = true;
+        }
+    }
+
     env->ReleaseStringUTFChars(user_data_dir, user_dir);
     env->ReleaseStringUTFChars(shared_data_dir, shared_dir);
 }
@@ -1355,29 +1367,6 @@ static bool T9PackTableBinMissing(const std::string& user_data_dir,
     return true;
 }
 
-// 从文本中解析布尔开关（如 "enable_abbrev_recall: false"）。
-// 找不到关键字或值无法识别时返回 default_val；支持 "true/false" 与 "1/0"。
-static bool ParseBoolSetting(const std::string& text,
-                             const std::string& key,
-                             bool default_val) {
-    auto pos = text.find(key);
-    if (pos == std::string::npos)
-        return default_val;
-    auto colon = text.find(':', pos);
-    auto nl = text.find('\n', pos);
-    if (colon == std::string::npos)
-        return default_val;
-    if (nl != std::string::npos && colon >= nl)
-        return default_val;
-    std::string val = text.substr(
-        colon + 1, (nl == std::string::npos ? text.size() : nl) - colon - 1);
-    if (val.find("false") != std::string::npos || val.find('0') != std::string::npos)
-        return false;
-    if (val.find("true") != std::string::npos || val.find('1') != std::string::npos)
-        return true;
-    return default_val;
-}
-
 // 读取文件全文到 out（文件不存在或读取失败返回 false）。
 static bool ReadFileToString(const std::string& path, std::string& out) {
     FILE* f = fopen(path.c_str(), "r");
@@ -1391,7 +1380,7 @@ static bool ReadFileToString(const std::string& path, std::string& out) {
     return true;
 }
 
-// 从文本中剔除含任一 needle 的行（用于移除已注入的 derive 简拼补丁）。
+// 从文本中剔除含任一 needle 的行。
 static std::string StripLinesContaining(const std::string& text,
                                         const std::vector<std::string>& needles) {
     std::string result;
@@ -1421,7 +1410,6 @@ static std::string StripLinesContaining(const std::string& text,
 //   - 判定 T9 方案：schema_id 含 "t9"，或 schema.yaml 的 schema_id 字段含 "t9"。
 //   - 补齐缺失组件：t9_processor / t9_filter / t9_date_translator /
 //     t9/isDisplayOriginalPreedit / t9/enable_date_translator（schema 已有则尊重）。
-//   - 拼音方案（含 script_translator）按 t9/enable_abbrev_recall 注入/移除 derive 简拼长词。
 //   - 修复畸形 translator/packs（个人词库），合法补丁尊重、缺失交由 PersonalDictManager。
 // 返回 true 表示写入后词库/补丁尚未编译，调用方可据此触发部署。
 static jboolean DoEnsureT9SchemaPatches(
@@ -1498,60 +1486,28 @@ static jboolean DoEnsureT9SchemaPatches(
         patch_lines.push_back(
             std::string("  \"t9/isDisplayOriginalPreedit\": ") + preedit_default);
     }
+    // t9_user_translator 占据 translators 首位。
+    // 旧版 t9_date_translator 注入在 @before 0，与新 user 冲突，迁移到 @after 0。
+    const bool legacy_date_before0 =
+        existing_content.find("\"engine/translators/@before 0\": t9_date_translator") != std::string::npos;
+    if (schema_content.find("t9_user_translator") == std::string::npos &&
+        existing_content.find("t9_user_translator") == std::string::npos) {
+        patch_lines.push_back("  \"engine/translators/@before 0\": t9_user_translator");
+    }
     if (schema_content.find("t9_date_translator") == std::string::npos &&
-        existing_content.find("t9_date_translator") == std::string::npos) {
-        patch_lines.push_back("  \"engine/translators/@before 0\": t9_date_translator");
+        (existing_content.find("t9_date_translator") == std::string::npos ||
+         legacy_date_before0)) {
+        patch_lines.push_back("  \"engine/translators/@after 0\": t9_date_translator");
+    }
+    if (schema_content.find("t9/enable_date_translator") == std::string::npos &&
+        existing_content.find("t9/enable_date_translator") == std::string::npos) {
         patch_lines.push_back("  \"t9/enable_date_translator\": true");
     }
 
-    // 简拼长词召回（t9/enable_abbrev_recall）：作为 t9 段一等开关，与
-    // isDisplayOriginalPreedit / enable_date_translator 对齐——schema 未声明时写入 custom。
-    // 仅拼音方案（含 script_translator）支持；英文 T9 方案剥离简拼召回。
-    //
-    // 为什么默认 true：九键输入的是数字序列，用户期望短序列命中长词（如输入 54482
-    // 打出"几乎把"）。若只靠完整拼音匹配，"几乎把"（ji hu ba = 544822）必须输完 6 位
-    // 才出现，5 位输入时在 RIME 原生 SyllableGraph 中不可达，体验差。注入 derive 简拼
-    // 让完整拼音词派生首字母（j h b）与 zh/ch/sh 双字母简拼，使 54482 即可召回这类长词。
-    //
-    // 如何工作：向 speller/algebra 注入两条 derive 规则，派生编码经方案既有的九宫格
-    // 数字映射（derive/[abc]/2/ 等）可被数字序列输入命中；Script::Merge 对同 spelling
-    // 取更优类型（normal 优先），简拼边不遮蔽正常拼写。
-    //
-    // 开启表现：54482 候选含"几乎把/几乎从/连环画"等简拼长词，右选后可调频置顶。
-    // 关闭表现：仅全拼词组与单字（输入序列 = 完整拼音数字序列）出现，且仍可正常调频；
-    // 但"几乎吧"（544822，序列长于 54482）这类简拼长词不会出现，无法右选调频——
-    // 调频仅对"输入序列完整覆盖其编码"的词生效。
-    const bool is_pinyin_schema = schema_content.find("script_translator") != std::string::npos;
-    const bool has_abbrev_schema = schema_content.find("enable_abbrev_recall") != std::string::npos;
-    const bool has_abbrev_custom = existing_content.find("enable_abbrev_recall") != std::string::npos;
+    // 清理已废弃的 enable_abbrev_recall 产物
     const bool has_derive = existing_content.find("derive/^([a-z])") != std::string::npos;
-
-    bool enable_abbrev_recall = false;
-    if (is_pinyin_schema) {
-        enable_abbrev_recall = ParseBoolSetting(schema_content, "enable_abbrev_recall", true);
-        enable_abbrev_recall =
-            ParseBoolSetting(existing_content, "enable_abbrev_recall", enable_abbrev_recall);
-        if (!has_abbrev_schema && !has_abbrev_custom) {
-            patch_lines.push_back(std::string("  \"t9/enable_abbrev_recall\": ") +
-                                  (enable_abbrev_recall ? "true" : "false"));
-        }
-    }
-
-    // derive 简拼长词补丁的注入/移除：开关 true 且未注入 → 注入；false 且已注入 → 移除。
-    bool need_remove_derive = false;
-    bool abbrev_patch_changed = false;  // derive 注入或移除，需重新编译 speller
-    if (enable_abbrev_recall) {
-        if (!has_derive) {
-            // 两条 derive 必须用不同 @before 索引（YAML map key 不能重复），
-            // 否则后者覆盖前者导致普通简拼 derive 丢失。
-            patch_lines.push_back("  \"speller/algebra/@before 0\": \"derive/^([a-z]).+$/$1/\"");
-            patch_lines.push_back("  \"speller/algebra/@before 1\": \"derive/^([zcs]h).+$/$1/\"");
-            abbrev_patch_changed = true;
-        }
-    } else if (has_derive) {
-        need_remove_derive = true;
-        abbrev_patch_changed = true;
-    }
+    const bool has_abbrev_custom = existing_content.find("enable_abbrev_recall") != std::string::npos;
+    bool need_remove_derive = has_derive || has_abbrev_custom;
 
     // translator/packs 个人词库：合法保留 / 畸形修复 / 缺失交由 PersonalDictManager。
     const std::string packs_name = "user_" + rime::t9_patch_utils::SanitizePackName(schema);
@@ -1578,10 +1534,14 @@ static jboolean DoEnsureT9SchemaPatches(
         return need_deploy ? JNI_TRUE : JNI_FALSE;
     }
 
-    // 开关关闭时移除已注入的 derive 行。
+    // 清理废弃的 enable_abbrev_recall 产物：移除 derive 简拼行和开关行。
     std::string base = existing_content;
     if (need_remove_derive) {
-        base = StripLinesContaining(base, {"derive/^([a-z])", "derive/^([zcs]h)"});
+        base = StripLinesContaining(base, {"derive/^([a-z])", "derive/^([zcs]h)", "enable_abbrev_recall"});
+    }
+    // 迁移旧版 translators/@before 0 的 date 行（与 user 冲突）
+    if (legacy_date_before0) {
+        base = StripLinesContaining(base, {"engine/translators/@before 0"});
     }
 
     // 剥离末尾 "..." 与空白，使追加的 patch 被 RIME 正常解析。
@@ -1628,12 +1588,12 @@ static jboolean DoEnsureT9SchemaPatches(
         actual_pack_name = packs_name;
     }
 
-    LOGI("T9Patches: applied '%s' (abbrev=%d, packs=%s)", schema,
-         enable_abbrev_recall ? 1 : 0, actual_pack_name.c_str());
+    LOGI("T9Patches: applied '%s' (packs=%s)", schema,
+         actual_pack_name.c_str());
 
     // 返回 true 表示词库/补丁尚未编译，调用方可据此触发部署。
     const bool need_deploy =
-        T9PackTableBinMissing(user_data_dir, actual_pack_name) || abbrev_patch_changed;
+        T9PackTableBinMissing(user_data_dir, actual_pack_name);
     return need_deploy ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -1829,6 +1789,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeDestroy(
     jobject thiz
 ) {
     LOGI("Destroying Rime engine");
+    // Compact T9 数字词典（flush WAL 为 .ldb），确保进程退出时数据持久化。
+    rime::T9DigitUserDict::CompactDb();
     Rime::Instance().destroy();
 }
 

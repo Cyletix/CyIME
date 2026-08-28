@@ -5,6 +5,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -154,9 +156,14 @@ fun XimeTheme(
         currentThemeId
     }
     val scheme = KeyboardThemes.getThemeById(effectiveThemeId)
-    val seed = if (darkTheme) scheme.primaryDark else scheme.primaryLight
-    val container = if (darkTheme) scheme.primaryContainerDark else scheme.primaryContainerLight
-    val colorScheme = generateColorScheme(seed, container, darkTheme)
+    val colorScheme = if (scheme.isDynamic && DynamicThemes.isSupported()) {
+        // Material You 动态配色：由系统壁纸调色板生成（官方实现），随壁纸自动更新
+        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else {
+        val seed = if (darkTheme) scheme.primaryDark else scheme.primaryLight
+        val container = if (darkTheme) scheme.primaryContainerDark else scheme.primaryContainerLight
+        generateColorScheme(seed, container, darkTheme)
+    }
 
     CompositionLocalProvider(
         LocalDensity provides Density(

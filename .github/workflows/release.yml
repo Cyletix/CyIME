@@ -64,26 +64,31 @@ jobs:
           restore-keys: |
             cmake-${{ runner.os }}-
 
+      - name: Setup signing keystore
+        run: |
+          cat > app/keystore.properties <<'EOF'
+          keyBase64=${{ secrets.SIGNING_KEY }}
+          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
+          keyAlias=${{ secrets.ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Release APKs (Unsigned)
+      - name: Build Release APKs (Signed)
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Build Plugin XIPKs (Unsigned)
         run: bash scripts/build-plugins.sh
 
-      - name: Sign Main App APKs
-        uses: r0adkll/sign-android-release@v1
-        id: sign_main_app
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-        env:
-          BUILD_TOOLS_VERSION: "36.0.0"
+      - name: Verify APK signatures
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          for apk in app/build/outputs/apk/release/Xime-*.apk; do
+            "$APKSIGNER" verify --print-certs "$apk" >/dev/null
+            echo "Verified: $apk"
+          done
 
       - name: Get version from tag
         id: get_version
@@ -92,7 +97,7 @@ jobs:
       - name: Find APKs and plugin XIPKs
         id: find_apks
         run: |
-          MAIN_APKS=$(find app/build/outputs/apk/release -name "*-signed.apk" -type f | sort | tr '\n' ',' | sed 's/,$//')
+          MAIN_APKS=$(find app/build/outputs/apk/release -name "Xime-*.apk" -type f | sort | tr '\n' ',' | sed 's/,$//')
           PLUGIN_XIPKS=$(find build/plugin-release -name "*.xipk" -type f | sort | tr '\n' ',' | sed 's/,$//')
 
           echo "main_apks=$MAIN_APKS" >> $GITHUB_OUTPUT
@@ -113,6 +118,7 @@ jobs:
           files: |
             ${{ steps.find_apks.outputs.main_apks }}
             ${{ steps.find_apks.outputs.plugin_xipks }}
+          overwrite: true
           draft: false
           prerelease: false
         env:

@@ -92,6 +92,7 @@ data class KeyboardUiState(
     val toolPanelItems: List<PluginResultItem> = emptyList(),
     val toolPanelLoading: Boolean = false,
     val toolPanelRequestEpoch: Long = 0,
+    val clipboardSyncEnabled: Boolean = false,
 )
 
 class KeyboardViewModel(application: Application) : AndroidViewModel(application) {

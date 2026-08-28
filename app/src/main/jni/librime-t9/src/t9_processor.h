@@ -181,14 +181,15 @@ private:
     // 换算为 T9 应消费的数字位数（RIME input[0:end) 中数字字符数，跳过分隔符）。
     // 候选按 comment 归一化匹配（容忍带调/无调差异，见 NormalizePinyinComment），
     // candidate_text 非空时再按文本双条件定位（同注释歧义防错码）。
-    // 返回 -1 表示无法确定（fallback 到现有 AlignWithBuffer 消费算法）。
-    // captured_code / captured_text（可空）：命中候选为 Phrase 时顺带捕获
-    // 其真实码（含声调真相）与文本，供 MemorizeEntry 调频保留声调。
+    // 返回 -1 表示无法确定（fallback 到现有消费算法）。
+    // captured_code / captured_text（可空）：命中候选为 Phrase 时顺带捕获其真实码。
+    // out_is_t9_user（可空）：命中候选为 T9 用户词时置 true。
     int QueryRimeConsumedDigits(
         const std::optional<std::string>& candidate_pinyin,
         const std::string& candidate_text,
         Code* captured_code = nullptr,
-        std::string* captured_text = nullptr) const;
+        std::string* captured_text = nullptr,
+        bool* out_is_t9_user = nullptr) const;
 
     // ════════════════════════════════════════
     // 状态成员（对应 Kotlin T9InputController 的私有字段）
@@ -206,6 +207,13 @@ private:
     std::string last_rime_input_;                        // 发送去重缓存
     int undone_right_commit_count_ = 0;                  // RightCommit 撤销计数（供 Kotlin 同步）
     char manual_delimiter_ = '\'';                       // 分隔符字符（从 speller.delimiter 读入）
+    std::string original_digit_sequence_;
+    std::string last_commit_digit_sequence_;
+    // 本次 FullCommit 右选的调频捕获，跨异步上屏链路存活。
+    // SelectCandidate 中同步暂存（避免 undo_model 在 EnterIdle 时被清空，
+    // 导致 MemorizeEntry 读到时为空、词典词被误判为场景 B/C）。
+    std::optional<std::pair<std::string, T9SyllableCode>>
+        pending_fullcommit_capture_;
     // 左侧候选区模式（2026-08-07，英文九键适配）：
     // 构造时按 engine/translators 是否含 script_translator 判定（auto），
     // 可被 t9/left_panel_mode: pinyin|none 显式覆盖。

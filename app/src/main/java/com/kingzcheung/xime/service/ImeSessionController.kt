@@ -62,9 +62,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             displayComments = display.displayComments
             isComposing = display.isComposing
         } else {
-            // 非 T9 方案（如双拼）使用原始输入文本显示，
-            // 避免显示 rime speller 展开后的编码（如双拼 vjv → zhan b）
-            displayText = inputText
+            // 非 T9 方案：preeditText 用引擎回显（带音节分隔符，如全拼 ni'hao）供候选栏展示；
+            // inputText 保留原始键入串（无分隔）——空格/切模式等提交路径会把它直接上屏，
+            // 不能混入回显字符。历史上曾整体用 input 规避自装双拼插件的展开编码显示，
+            // 代价是全拼丢失分隔符；现仅显示层恢复 librime 标准回显。
+            displayText = if (preeditText.isNotEmpty()) preeditText else inputText
             displayCandidates = filteredTexts
             displayComments = filteredComments
             isComposing = inputText.isNotEmpty()
@@ -76,7 +78,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
 
         service.candidateState.value = service.candidateState.value.copy(
-            inputText = displayText,
+            // T9 保持合成显示态同源；非 T9 仅显示层用 preedit 回显，inputText 保留原始键入串
+            inputText = if (isT9Schema) displayText else inputText,
             preeditText = displayText,
             candidates = displayCandidates,
             candidateComments = displayComments,
@@ -91,7 +94,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
 
-        if (pendingEnglish.isNotEmpty()) {
+        if (pendingEnglish.isNotEmpty() && service.supportsEnglishCandidateReplace()) {
             service.serviceScope.launch {
                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                 withContext(Dispatchers.Main) {
@@ -162,11 +165,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             displayComments = display.displayComments
             isComposing = display.isComposing
         } else {
-            val lowerInput = result.inputText.lowercase()
-            val hasExtraContent = result.preeditText.any { c ->
-                !c.isWhitespace() && c != '\'' && !lowerInput.contains(c.lowercaseChar())
-            }
-            displayText = if (result.preeditText.isNotEmpty() && hasExtraContent) result.preeditText else result.inputText
+            // 非 T9 方案：preeditText 用引擎回显（带音节分隔符，如全拼 ni'hao），空则回退 input；
+            // inputText 保留原始键入串供提交路径直接上屏（见 applyComposition 注释）。
+            displayText = if (result.preeditText.isNotEmpty()) result.preeditText else result.inputText
             displayCandidates = filteredTexts
             displayComments = filteredComments
             isComposing = result.inputText.isNotEmpty()
@@ -178,7 +179,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
 
         service.candidateState.value = service.candidateState.value.copy(
-            inputText = displayText,
+            inputText = if (isT9Schema) displayText else result.inputText,
             preeditText = displayText,
             candidates = displayCandidates,
             candidateComments = displayComments,
@@ -190,7 +191,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
         
-        if (pendingEnglish.isNotEmpty()) {
+        if (pendingEnglish.isNotEmpty() && service.supportsEnglishCandidateReplace()) {
             service.serviceScope.launch {
                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                 withContext(Dispatchers.Main) {
