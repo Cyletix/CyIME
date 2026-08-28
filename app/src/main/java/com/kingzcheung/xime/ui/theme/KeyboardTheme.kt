@@ -2,6 +2,9 @@ package com.kingzcheung.xime.ui.theme
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.ColorUtils
 import com.kingzcheung.xime.settings.BackgroundConfig
@@ -76,10 +79,6 @@ object KeyboardThemes {
     /** 从 xime.yaml 加载的配置覆盖项。 */
     private var configOverrides: Map<String, ColorSchemeEntry> = emptyMap()
 
-    /** 预计算后的主题缓存（避免每次访问都重新计算颜色）。 */
-    private var themesCache: List<KeyboardColorScheme> = emptyList()
-    private var themesMapCache: Map<String, KeyboardColorScheme> = emptyMap()
-
     /** 硬编码的默认主题列表（兜底，其余主题由 xime.yaml color_schemes 提供）。 */
     private val defaultThemes = listOf(
         KeyboardColorScheme(
@@ -98,10 +97,13 @@ object KeyboardThemes {
         )
     )
 
-    init {
-        themesCache = defaultThemes
-        themesMapCache = defaultThemes.associateBy { it.id }
-    }
+    /**
+     * 预计算后的主题缓存（避免每次访问都重新计算颜色）。
+     * 用 Compose 状态包装：UI getter 在组合中读取时会建立订阅，缓存重建后
+     * 所有已取色的 Composable 自动重组——动态配色随壁纸变化实时刷新依赖此机制。
+     */
+    private var themesCache by mutableStateOf(defaultThemes)
+    private var themesMapCache: Map<String, KeyboardColorScheme> = defaultThemes.associateBy { it.id }
 
     /** 从配置文件加载主题覆盖项。应在 Application.onCreate 中调用。 */
     fun initFromConfig(context: Context) {
@@ -122,6 +124,34 @@ object KeyboardThemes {
             .filterNotNull()
         themesCache = overridden + newThemes
         themesMapCache = themesCache.associateBy { it.id }
+    }
+
+    /**
+     * 刷新动态配色方案：对比缓存中动态主题的强调色与当前系统取色，
+     * 发生变化才重建（壁纸更换后下次打开键盘调用，实现生效）。
+     * 无动态主题或取色未变时直接返回 false，不触发任何重组。
+     *
+     * @return 是否发生了重建
+     */
+    fun refreshDynamicSchemes(context: Context): Boolean {
+        val dynamicScheme = themesCache.firstOrNull { it.isDynamic } ?: return false
+        val current = DynamicThemes.currentAccentColors(context) ?: return false
+        if (dynamicScheme.accentLight == current.first && dynamicScheme.accentDark == current.second) {
+            return false
+        }
+        var rebuilt = false
+        val refreshed = themesCache.map { scheme ->
+            if (scheme.isDynamic) {
+                DynamicThemes.create(context, scheme.id, scheme.name)?.also { rebuilt = true } ?: scheme
+            } else {
+                scheme
+            }
+        }
+        if (rebuilt) {
+            themesCache = refreshed
+            themesMapCache = refreshed.associateBy { it.id }
+        }
+        return rebuilt
     }
 
 
@@ -382,12 +412,14 @@ object KeyboardThemes {
         )
     }
 
-    /** 预计算后的主题列表。 */
+    /** 预计算后的主题列表（组合中读取会订阅缓存重建）。 */
     val themes: List<KeyboardColorScheme>
         get() = themesCache
 
     fun getThemeById(id: String): KeyboardColorScheme {
-        return themesMapCache[id] ?: themesCache[0]
+        // 先读一次状态化缓存建立 Compose 订阅，动态配色重建后 UI 自动重组
+        val cache = themesCache
+        return themesMapCache[id] ?: cache[0]
     }
 
     fun getSpecialKeyColor(themeId: String, isDark: Boolean): Color {
@@ -461,7 +493,8 @@ object KeyboardThemes {
 
     /** 动态配色主题不走 color_schemes 静态覆盖，直接从主题缓存取色；其他主题返回 null 走原逻辑。 */
     private inline fun dynamicThemeColor(themeId: String, selector: (KeyboardColorScheme) -> Color): Color? {
-        val theme = themesMapCache[themeId] ?: return null
+        // 从状态化缓存查找以建立 Compose 订阅：缓存整体替换后 UI 自动重组
+        val theme = themesCache.firstOrNull { it.id == themeId } ?: return null
         if (!theme.isDynamic) return null
         return selector(theme)
     }

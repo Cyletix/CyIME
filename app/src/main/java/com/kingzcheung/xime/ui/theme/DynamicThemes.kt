@@ -20,6 +20,16 @@ object DynamicThemes {
     fun isSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     /**
+     * 读取当前系统取色的主强调色（浅/深），用于与缓存中的动态主题对比，
+     * 判断壁纸取色是否发生了变化。不支持时返回 null。
+     */
+    fun currentAccentColors(context: Context): Pair<Color, Color>? {
+        if (!isSupported()) return null
+        val p = SystemPalette(context)
+        return p.accent1(600) to p.accent1(200)
+    }
+
+    /**
      * 构建动态配色键盘主题（颜色全部来自壁纸调色板）。
      * 不支持（< Android 12）或系统资源缺失时返回 null，调用方跳过该方案。
      */
