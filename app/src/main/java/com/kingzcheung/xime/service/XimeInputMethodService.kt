@@ -2121,6 +2121,61 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
         }
     }
+
+    /**
+     * 删除光标前 count 个字符。
+     * 焦点在输入法内部编辑器（快捷发送/工具面板）时作用于对应 EditText，
+     * 否则作用于宿主 InputConnection。需在主线程调用。
+     */
+    internal fun deleteBeforeCursor(count: Int) {
+        val quickSendFocused = uiState.value.quickSendFormFocused
+        if (quickSendFocused || uiState.value.toolPanelInputFocused) {
+            val et = if (quickSendFocused) QuickSendFormEditTextHolder.editText
+            else ToolPanelEditTextHolder.editText
+            et?.let { box ->
+                val end = box.selectionStart.coerceAtLeast(0)
+                val start = (end - count).coerceAtLeast(0)
+                box.text?.replace(start, end, "")
+            }
+            return
+        }
+        currentInputConnection?.deleteSurroundingText(count, 0)
+    }
+
+    /**
+     * 光标前文本与 expected 相同时替换为 replacement，返回是否替换成功。
+     * 焦点在输入法内部编辑器时作用于对应 EditText，否则宿主 InputConnection。
+     * 不匹配时不做任何操作（调用方决定降级策略）。需在主线程调用。
+     */
+    internal fun replaceBeforeCursor(expected: String, replacement: String): Boolean {
+        val quickSendFocused = uiState.value.quickSendFormFocused
+        if (quickSendFocused || uiState.value.toolPanelInputFocused) {
+            val et = (if (quickSendFocused) QuickSendFormEditTextHolder.editText
+            else ToolPanelEditTextHolder.editText) ?: return false
+            val selStart = et.selectionStart.coerceAtLeast(0)
+            val start = (selStart - expected.length).coerceAtLeast(0)
+            val before = et.text?.substring(start, selStart)
+            if (before != expected) return false
+            et.text?.replace(start, selStart, replacement)
+            try { et.setSelection(start + replacement.length) } catch (_: Exception) {}
+            return true
+        }
+        val ic = currentInputConnection ?: return false
+        val before = runCatching {
+            ic.getTextBeforeCursor(expected.length, 0)?.toString()
+        }.getOrNull()
+        if (before != expected) return false
+        var replaced = false
+        ic.beginBatchEdit()
+        try {
+            replaced = ic.deleteSurroundingText(expected.length, 0)
+            ic.commitText(replacement, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
+        return replaced
+    }
+
     
     
 }

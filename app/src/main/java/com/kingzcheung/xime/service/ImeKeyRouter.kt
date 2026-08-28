@@ -553,7 +553,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                         // 直接上屏模式：只提交 Rime 返回的增量字符（如智能引号转换结果），
                                         // 整段 pending 对应的文本已逐字上屏，不可重复提交。
                                         withContext(Dispatchers.Main) {
-                                            service.currentInputConnection?.commitText(committed, 1)
+                                            service.commitText(committed)
                                         }
                                         service.uiEventChannel.trySend {
                                             service.sessionController.updateUIWithResult(result)
@@ -579,7 +579,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                                         // 英文直接上屏模式：字符不经 composing region，即输即落盘；
                                                         // pendingEnglishText 仅作编码记录（供联想与选中候选后回删替换校验）。
                                                         withContext(Dispatchers.Main) {
-                                                            service.currentInputConnection?.commitText(charToCommit, 1)
+                                                            service.commitText(charToCommit)
                                                         }
                                                         service.candidateState.value = service.candidateState.value.copy(
                                                             pendingEnglishText = newPending,
@@ -796,7 +796,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
                                 service.endComposingInputBox()
                             } else {
-                                service.currentInputConnection?.deleteSurroundingText(len, 0)
+                                service.deleteBeforeCursor(len)
                             }
                         }
                         // undo 联动：撤销段时回滚用户词典调频。
