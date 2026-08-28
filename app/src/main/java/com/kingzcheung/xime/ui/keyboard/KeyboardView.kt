@@ -52,6 +52,8 @@ import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.PanelType
 import com.kingzcheung.xime.keyboard.ToolbarAction
 import com.kingzcheung.xime.keyboard.ToolbarButton
+import com.kingzcheung.xime.keyboard.ToolbarButtonItem
+import com.kingzcheung.xime.keyboard.resolveToolbarButtonItem
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
 import com.kingzcheung.xime.settings.KeysConfigHelper
@@ -222,6 +224,7 @@ fun KeyboardView(
         onCardPositioned = onCardPositioned,
     ) {
     Box(modifier = contentModifier) {
+        Box {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -291,6 +294,36 @@ fun KeyboardView(
                 )
             }
 
+            if (state.toolPanelVisible) {
+                if (state.toolPanelDisplay == "PASSIVE") {
+                    // 纯展示面板：声明式 ui 节点树，无输入框/生成动作（数据由插件事件驱动）
+                    InfoPanel(
+                        title = state.toolPanelTitle,
+                        nodes = state.toolPanelUiNodes ?: emptyList(),
+                        isLoading = state.toolPanelLoading,
+                        backgroundColor = Color.Transparent,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        cardBgColor = keyBgColor,
+                        onClose = { callbacks.onToolPanelClose?.invoke() },
+                        onAction = { actionId -> callbacks.onToolPanelAction?.invoke(actionId) },
+                    )
+                } else {
+                    ToolPanel(
+                        title = state.toolPanelTitle,
+                        isFocused = state.toolPanelInputFocused,
+                        isLoading = state.toolPanelLoading,
+                        initialText = state.toolPanelPrefillText,
+                        backgroundColor = Color.Transparent,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        cardBgColor = keyBgColor,
+                        onClose = { callbacks.onToolPanelClose?.invoke() },
+                        onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                    )
+                }
+            }
+
             CandidateBar(
                 state = candidateBarState,
                 page = page,
@@ -301,35 +334,42 @@ fun KeyboardView(
                 voiceRecognitionState = state.voiceRecognitionState,
                 voicePluginName = state.voicePluginName,
                 toolbarActions = state.toolbarButtons.mapNotNull { id ->
-                    val button = ToolbarButton.fromId(id) ?: return@mapNotNull null
-                    if (button == ToolbarButton.HANDWRITING_LOOKUP) {
+                    val item = resolveToolbarButtonItem(id, state.toolbarPluginButtons) ?: return@mapNotNull null
+                    if (item is ToolbarButtonItem.Builtin && item.button == ToolbarButton.HANDWRITING_LOOKUP) {
                         if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(LocalContext.current)) return@mapNotNull null
                     }
                     val toolbarContext = LocalContext.current
-                    val onClick: () -> Unit = when (button) {
-                        ToolbarButton.EMOJI -> ({ viewModel.showOverlay(OverlayRoute.Emoji) })
-                        ToolbarButton.CLIPBOARD -> ({ viewModel.showOverlay(OverlayRoute.Clipboard(0)) })
-                        ToolbarButton.SCHEMA -> ({ viewModel.showOverlay(OverlayRoute.SchemaList, listOf(OverlayRoute.Menu)) })
-                        ToolbarButton.QUICK_PHRASE -> ({ viewModel.showOverlay(OverlayRoute.Clipboard(1)) })
-                        ToolbarButton.SYMBOL -> ({ viewModel.showOverlay(OverlayRoute.Symbol) })
-                        ToolbarButton.SELECT_ALL -> ({ callbacks.onToolbarEditingAction?.invoke("select_all") })
-                        ToolbarButton.COPY -> ({ callbacks.onToolbarEditingAction?.invoke("copy") })
-                        ToolbarButton.PASTE -> ({ callbacks.onToolbarEditingAction?.invoke("paste") })
-                        ToolbarButton.HOME -> ({ callbacks.onToolbarEditingAction?.invoke("home") })
-                        ToolbarButton.END -> ({ callbacks.onToolbarEditingAction?.invoke("end") })
-                        ToolbarButton.FLOAT -> ({ callbacks.onFloatingModeChange?.invoke(!state.isFloatingMode) })
-                        ToolbarButton.HANDWRITING_LOOKUP -> ({ isHandwritingLookup = !isHandwritingLookup })
-                        ToolbarButton.EDIT -> ({ viewModel.showOverlay(OverlayRoute.Edit) })
-                        ToolbarButton.VOICE -> ({
-                            if (PermissionHelper.hasRecordAudioPermission(toolbarContext)) {
-                                callbacks.onVoiceStickyToggle?.invoke()
-                            } else {
-                                android.widget.Toast.makeText(toolbarContext, "需要麦克风权限才能使用语音输入", android.widget.Toast.LENGTH_SHORT).show()
-                                PermissionHelper.requestRecordAudioPermission(toolbarContext)
+                    val onClick: () -> Unit = when (item) {
+                        is ToolbarButtonItem.Builtin -> when (item.button) {
+                            ToolbarButton.EMOJI -> ({ viewModel.showOverlay(OverlayRoute.Emoji) })
+                            ToolbarButton.CLIPBOARD -> ({ viewModel.showOverlay(OverlayRoute.Clipboard(0)) })
+                            ToolbarButton.SCHEMA -> ({ viewModel.showOverlay(OverlayRoute.SchemaList, listOf(OverlayRoute.Menu)) })
+                            ToolbarButton.QUICK_PHRASE -> ({ viewModel.showOverlay(OverlayRoute.Clipboard(1)) })
+                            ToolbarButton.SYMBOL -> ({ viewModel.showOverlay(OverlayRoute.Symbol) })
+                            ToolbarButton.SELECT_ALL -> ({ callbacks.onToolbarEditingAction?.invoke("select_all") })
+                            ToolbarButton.COPY -> ({ callbacks.onToolbarEditingAction?.invoke("copy") })
+                            ToolbarButton.PASTE -> ({ callbacks.onToolbarEditingAction?.invoke("paste") })
+                            ToolbarButton.HOME -> ({ callbacks.onToolbarEditingAction?.invoke("home") })
+                            ToolbarButton.END -> ({ callbacks.onToolbarEditingAction?.invoke("end") })
+                            ToolbarButton.FLOAT -> ({ callbacks.onFloatingModeChange?.invoke(!state.isFloatingMode) })
+                            ToolbarButton.HANDWRITING_LOOKUP -> ({ isHandwritingLookup = !isHandwritingLookup })
+                            ToolbarButton.EDIT -> ({ viewModel.showOverlay(OverlayRoute.Edit) })
+                            ToolbarButton.VOICE -> ({
+                                if (PermissionHelper.hasRecordAudioPermission(toolbarContext)) {
+                                    callbacks.onVoiceStickyToggle?.invoke()
+                                } else {
+                                    android.widget.Toast.makeText(toolbarContext, "需要麦克风权限才能使用语音输入", android.widget.Toast.LENGTH_SHORT).show()
+                                    PermissionHelper.requestRecordAudioPermission(toolbarContext)
+                                }
+                            })
+                        }
+                        is ToolbarButtonItem.Plugin -> ({
+                            if (item.action == "open_panel") {
+                                callbacks.onOpenToolPanel?.invoke(item.pluginId)
                             }
                         })
                     }
-                    ToolbarAction(button, onClick)
+                    ToolbarAction(item, onClick)
                 },
                 visuals = CandidateBarVisuals(
                     backgroundColor = Color.Transparent,
@@ -929,6 +969,7 @@ fun KeyboardView(
                     )
                     is OverlayRoute.ToolbarCustomize -> ToolbarCustomizeView(
                         toolbarButtons = state.toolbarButtons,
+                        pluginButtons = state.toolbarPluginButtons,
                         keyTextColor = keyTextColor,
                         backgroundColor = keyboardBgColor,
                         accentColor = accentColor,
@@ -1026,12 +1067,28 @@ fun KeyboardView(
                         bottomPaddingDp = state.keyboardBottomPaddingDp,
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
+                    is OverlayRoute.ToolPanel -> {}
+                    is OverlayRoute.ToolResult -> AiResultPanel(
+                        title = state.toolPanelTitle,
+                        items = state.toolPanelItems,
+                        isLoading = state.toolPanelLoading,
+                        backgroundColor = keyboardBgColor,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        cardBgColor = keyBgColor,
+                        bottomPaddingDp = state.keyboardBottomPaddingDp,
+                        onBack = { viewModel.closeOverlay() },
+                        onItemClick = { item -> callbacks.onToolPanelItemClick?.invoke(item) },
+                        onRegenerate = { callbacks.onToolPanelRegenerate?.invoke() },
+                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                    )
                 }
                 else -> {}
             }
         }
         }
     }
+}
 }
 }
 

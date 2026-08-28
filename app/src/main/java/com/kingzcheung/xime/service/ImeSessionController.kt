@@ -92,7 +92,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (isAsciiMode != service.uiState.value.isAsciiMode) {
             FileLogger.i(XimeInputMethodService.TAG, "applyComposition: ascii ${service.uiState.value.isAsciiMode}->$isAsciiMode")
         }
-        service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
+        // composing 快照 → 插件（input_changed 事件；T9 与候选栏同源显示态）
+        service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else inputText)
 
         if (pendingEnglish.isNotEmpty() && service.supportsEnglishCandidateReplace()) {
             service.serviceScope.launch {
@@ -103,7 +104,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             }
         }
 
-        if (codeInInputBox) {
+        if (codeInInputBox && !service.uiState.value.toolPanelInputFocused) {
             val ic = service.currentInputConnection
             if (isComposing && displayText.isNotEmpty()) {
                 showInputBoxComposition(ic, displayText)
@@ -190,7 +191,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             hasPrevPage = result.hasPrevPage
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
-        
+        // composing 快照 → 插件（input_changed 事件；空编码表示本轮输入结束）
+        service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else result.inputText)
+
         if (pendingEnglish.isNotEmpty() && service.supportsEnglishCandidateReplace()) {
             service.serviceScope.launch {
                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)

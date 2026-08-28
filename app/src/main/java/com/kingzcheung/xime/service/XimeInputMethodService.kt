@@ -82,6 +82,9 @@ import com.kingzcheung.xime.association.AssociationService
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.clipboard.sync.ClipboardSyncBridge
 import com.kingzcheung.xime.plugin.ExtensionManager
+import com.kingzcheung.xime.plugin.core.api.ToolPlugin
+import com.kingzcheung.xime.plugin.core.api.ToolResult
+import com.kingzcheung.xime.plugin.core.lua.PluginEvent
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.rime.RimeConfigHelper
@@ -109,6 +112,8 @@ import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.keyboard.ActionExecutor
 import com.kingzcheung.xime.keyboard.HANDWRITING_SCHEMA_ID
 import com.kingzcheung.xime.keyboard.OverlayRoute
+import com.kingzcheung.xime.keyboard.ToolbarButtonItem
+import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -132,6 +137,11 @@ import java.io.File
 import java.io.FileInputStream
 
 object QuickSendFormEditTextHolder {
+    var editText: android.widget.EditText? = null
+}
+
+/** 通用工具面板输入框 holder（与快捷发送独立，避免互相覆盖）。 */
+object ToolPanelEditTextHolder {
     var editText: android.widget.EditText? = null
 }
 
@@ -240,6 +250,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal var previousSchemaId: String = ""
     /** 键盘内容 Box 顶部在窗口中的 y 坐标（px），由 onGloballyPositioned 实测更新 */
     private var keyboardContentTopPx: Int = -1
+    private var lastInsetsDebug: String = ""
     
     internal val calculatorEngine = com.kingzcheung.xime.calculator.CalculatorEngine()
 
@@ -634,6 +645,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             serviceScope.launch {
                 PluginManager.pluginInstancesFlow.collect {
                     updateClipboardSync()
+                    refreshToolbarPluginButtons()
+                    closeToolPanelIfPluginGone()
                 }
             }
             Log.d(TAG, "initClipboardManager: Clipboard manager initialized successfully")
@@ -653,6 +666,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (enabled.isEmpty()) return
             val preferredId = SettingsPreferences.getClipboardSyncPluginId(this)
             val selected = enabled.firstOrNull { it.first == preferredId } ?: enabled.first()
+            // 能力声明校验：未声明同步协议的插件不启动（manifest.capabilities.clipboard_sync.protocols）
+            val protocols = ExtensionManager.getAllInstalledPlugins()
+                .firstOrNull { it.id == selected.first }
+                ?.capabilities?.clipboardSync?.protocols
+            if (protocols.isNullOrEmpty()) {
+                Log.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
+                return
+            }
             val plugin = selected.second
             clipboardSyncBridge = ClipboardSyncBridge(
                 clipboardManager,
@@ -697,6 +718,337 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             stopClipboardSync()
             startClipboardSyncIfEnabled()
         }
+    }
+
+    /**
+     * 刷新已启用插件声明的工具栏按钮到 uiState（插件启用/加载/卸载变化时调用）。
+     * 两层显示控制的第一层：只有启用插件的按钮进入候选池；toolbar_buttons 偏好决定最终显示。
+     */
+    private fun refreshToolbarPluginButtons() {
+        serviceScope.launch(Dispatchers.IO) {
+            val buttons = ExtensionManager.getAllInstalledPlugins()
+                .filter { SettingsPreferences.isPluginEnabled(this@XimeInputMethodService, it.id) }
+                .flatMap { info ->
+                    info.toolbarButtons.map { btn ->
+                        ToolbarButtonItem.Plugin(
+                            id = btn.id,
+                            label = btn.label.ifBlank { btn.id },
+                            icon = ExtensionManager.extractToolbarButtonIcon(
+                                this@XimeInputMethodService, info.id, info, btn.icon
+                            ) ?: ExtensionManager.extractPluginManifestIcon(this@XimeInputMethodService, info),
+                            pluginId = info.id,
+                            action = btn.action,
+                        )
+                    }
+                }
+            withContext(Dispatchers.Main) {
+                uiState.value = uiState.value.copy(toolbarPluginButtons = buttons)
+            }
+        }
+    }
+
+    /** 面板打开时记录的输入框选区起止（上屏前恢复以替换原选区）。 */
+    private var toolPanelSelection: Pair<Int, Int>? = null
+
+    /** 面板生成轮询任务（流式生成期间持续刷新候选）。 */
+    private var toolPanelPollJob: Job? = null
+
+    /**
+     * 插件工具栏按钮 action=open_panel 的宿主入口：打开该插件的通用面板。
+     * 记录选区、按优先级收集上下文预填、向插件取初始面板状态并渲染。
+     */
+    internal fun openToolPanel(pluginId: String) {
+        if (uiState.value.isFloatingMode ||
+            resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
+        ) {
+            Toast.makeText(this, "工具面板不支持在悬浮/横屏模式下使用", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (uiState.value.showQuickSendForm) {
+            uiState.value = uiState.value.copy(
+                showQuickSendForm = false,
+                quickSendFormFocused = false,
+                quickSendEditingItemId = null,
+                quickSendEditingItemText = "",
+            )
+            QuickSendFormEditTextHolder.editText = null
+        }
+        // 打开面板前清理宿主输入框残留输入态（未上屏的拼音/英文），
+        // 避免旧组合混入面板输入、或面板关闭后覆盖宿主输入框中段文字。
+        val pending = candidateState.value
+        if (pending.isComposing || pending.inputText.isNotEmpty() || pending.pendingEnglishText.isNotEmpty()) {
+            rimeEngine.clearComposition()
+            endComposingInputBox()
+            candidateState.value = candidateState.value.copy(
+                candidates = emptyList(),
+                candidateComments = emptyList(),
+                associationCandidates = emptyList(),
+                pendingEnglishText = "",
+                inputText = "",
+                preeditText = "",
+                isComposing = false,
+                isShowingRecentClipboard = false,
+                hasNextPage = false,
+                hasPrevPage = false
+            )
+        }
+        toolPanelSelection = readCurrentSelection()
+        val contextText = collectToolPanelContext()
+        val pluginName = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == pluginId }?.name ?: pluginId
+        val display = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == pluginId }?.capabilities?.tool?.display
+        val pluginState = (ExtensionManager.getPluginById(pluginId) as? ToolPlugin)
+            ?.getPanelState(contextText)
+        val prefill = pluginState?.inputText?.takeIf { it.isNotBlank() } ?: contextText
+        uiState.value = uiState.value.copy(
+            toolPanelVisible = true,
+            toolPanelInputFocused = display != ToolResult.PASSIVE,
+            toolPanelPluginId = pluginId,
+            toolPanelTitle = pluginName,
+            toolPanelPrefillText = prefill,
+            toolPanelItems = pluginState?.items ?: emptyList(),
+            toolPanelDisplay = display?.name,
+            toolPanelUiNodes = pluginState?.ui,
+            toolPanelRequestEpoch = uiState.value.toolPanelRequestEpoch + 1,
+            enterKeyText = if (display == ToolResult.PASSIVE) "发送" else "生成",
+        )
+        if (display != ToolResult.PASSIVE) {
+            ToolPanelEditTextHolder.editText?.let { et ->
+                et.setText(prefill)
+                et.setSelection(prefill.length)
+            }
+        }
+        forceInsetsRecompute()
+    }
+
+    /**
+     * passive 纯展示面板的 action 点击：通知插件（onPanelAction）后单次重拉
+     * getPanelState 刷新 ui 节点（action 改变数据后面板立即反映）。
+     */
+    internal fun dispatchToolPanelAction(actionId: String) {
+        val pluginId = uiState.value.toolPanelPluginId
+        val epoch = uiState.value.toolPanelRequestEpoch
+        serviceScope.launch(Dispatchers.IO) {
+            val plugin = ExtensionManager.getPluginById(pluginId) as? ToolPlugin ?: return@launch
+            plugin.onPanelAction(actionId)
+            val state = plugin.getPanelState("")
+            withContext(Dispatchers.Main) {
+                if (uiState.value.toolPanelRequestEpoch == epoch && uiState.value.toolPanelVisible) {
+                    uiState.value = uiState.value.copy(toolPanelUiNodes = state.ui, toolPanelLoading = state.loading)
+                }
+            }
+        }
+    }
+
+    internal fun closeToolPanel() {        toolPanelSelection = null
+        stopToolPanelPoll()
+        // 结果页面（ToolResult）开着时联动关闭
+        val page = keyboardViewModel.page.value
+        if (page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay &&
+            page.route == OverlayRoute.ToolResult
+        ) {
+            keyboardViewModel.closeOverlay()
+        }
+        uiState.value = uiState.value.copy(
+            toolPanelVisible = false,
+            toolPanelInputFocused = false,
+            toolPanelPluginId = "",
+            toolPanelTitle = "",
+            toolPanelPrefillText = "",
+            toolPanelItems = emptyList(),
+            toolPanelDisplay = null,
+            toolPanelUiNodes = null,
+            toolPanelLoading = false,
+            enterKeyText = "发送",
+        )
+        ToolPanelEditTextHolder.editText = null
+        forceInsetsRecompute()
+    }
+
+    /**
+     * Compose 内容高度变化（面板开关）不会自动触发 IME insets 重算，
+     * 实测关闭面板后 insets 残留数秒（仅在下一次输入会话/窗口事件时才恢复）。
+     * 这里通过容器做一次真实尺寸变化（+1dp）再立即还原（同帧内完成，视觉不可见），
+     * 强制系统按 keyboardContentTopPx 重算并下发，消除残留。
+     */
+    internal fun forceInsetsRecompute() {
+        if (!::keyboardContainer.isInitialized) return
+        val density = resources.displayMetrics.density
+        val h = keyboardContainer.height
+        if (h > 0) {
+            keyboardContainer.updateHeight((h / density).toInt() + 1)
+            keyboardContainer.post { keyboardContainer.resetHeight() }
+        } else {
+            keyboardContainer.post { keyboardContainer.requestLayout() }
+        }
+    }
+
+    /**
+     * 面板候选条目上屏：有选区时先恢复选区再提交（替换原选区），无选区时光标处追加。
+     * 直接经 InputConnection 提交，不走 commitText 重定向（避免注入回面板输入框）。
+     */
+    internal fun commitToolPanelItem(text: String) {
+        val pluginId = uiState.value.toolPanelPluginId
+        val itemId = uiState.value.toolPanelItems.firstOrNull { it.text == text }?.id ?: text
+        serviceScope.launch(Dispatchers.IO) {
+            (ExtensionManager.getPluginById(pluginId) as? ToolPlugin)?.onPanelItemClick(itemId)
+        }
+        val ic = currentInputConnection ?: return
+        toolPanelSelection?.let { (start, end) ->
+            runCatching { ic.setSelection(start, end) }
+        }
+        ic.commitText(text, 1)
+        if (isChineseMode) {
+            predictionManager.appendCommittedText(text)
+            predictionManager.recordInput(text)
+        }
+        closeToolPanel()
+    }
+
+    /**
+     * 面板触发生成：通知插件输入变化并触发 generate，异步轮询取回最新面板状态。
+     * 同步生成（智能回复）阻塞返回后一次取回；流式生成（帮写）期间插件 loading=true，
+     * 宿主持续轮询刷新，直到 loading 结束或面板关闭。
+     * 代际号防旧结果回填：新请求/重开会递增 epoch，旧结果回来时检测到已过期则丢弃。
+     */
+    internal fun triggerToolPanelGenerate() {
+        val pluginId = uiState.value.toolPanelPluginId
+        // passive 纯展示面板：无生成语义，enter 不触发（数据由事件驱动 + InfoPanel 点击 action 刷新）
+        if (uiState.value.toolPanelDisplay == ToolResult.PASSIVE.name) {
+            return
+        }
+        // 使用前授权检测：插件有未授权网络域名时先引导授权，不发起请求
+        if (!com.kingzcheung.xime.plugin.PluginNetworkAuthHelper.ensureAuthorized(this, pluginId)) {
+            return
+        }
+        val inputText = ToolPanelEditTextHolder.editText?.text?.toString() ?: ""
+        // 结果显示方式：插件元数据声明（manifest.capabilities.tool.display），
+        // 未声明时按结果数量兜底（1 条直接上屏，多条打开页面）
+        val display = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == pluginId }
+            ?.capabilities?.tool?.display
+        // 捕获当前代际号（openToolPanel 时递增）。轮询期间持续对比：
+        // 面板被重新打开（epoch 递增）即视为过期，丢弃本轮结果。
+        val epoch = uiState.value.toolPanelRequestEpoch
+        val epochStartTime = System.currentTimeMillis()
+        toolPanelPollJob?.cancel()
+        toolPanelPollJob = serviceScope.launch(Dispatchers.IO) {
+            val plugin = ExtensionManager.getPluginById(pluginId) as? ToolPlugin
+            plugin?.onPanelInput(inputText)
+            plugin?.onPanelAction("generate")
+            while (uiState.value.toolPanelVisible) {
+                val state = plugin?.getPanelState(inputText) ?: break
+                val items = state.items
+                val loading = state.loading
+                withContext(Dispatchers.Main) {
+                    if (uiState.value.toolPanelRequestEpoch == epoch) {
+                        uiState.value = uiState.value.copy(
+                            toolPanelItems = items,
+                            toolPanelLoading = loading,
+                        )
+                    }
+                }
+                if (!loading) break
+                delay(200)
+            }
+            // 自适应结果交互：生成结束后按结果显示方式决策——
+            //   display=DIRECT → 直接上屏替换选区并关闭面板（AI 翻译/帮写等单结果场景，无需点击）
+            //   display=SELECT → 打开全屏结果页面（AiResultPanel，与表情/符号同级）供用户点击选择
+            //   display=null（未声明）→ 按结果数量兜底：1 条直接上屏，多条打开页面
+            //   空结果 → 保持面板（用户可重新生成）
+            withContext(Dispatchers.Main) {
+                if (uiState.value.toolPanelVisible) {
+                    val items = uiState.value.toolPanelItems
+                    val mode = display ?: when {
+                        items.size > 1 -> com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT
+                        else -> com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT
+                    }
+                    when {
+                        items.isEmpty() -> {
+                            // 空结果：若非静默失败（插件刚记录了错误），Toast 告知用户原因
+                            val lastError = com.kingzcheung.xime.plugin.core.security.PluginErrorLog
+                                .getLastError(pluginId)
+                            val errorMessage = lastError?.message
+                            if (!errorMessage.isNullOrEmpty() &&
+                                lastError.timestamp >= epochStartTime
+                            ) {
+                                android.widget.Toast.makeText(
+                                    this@XimeInputMethodService,
+                                    errorMessage,
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                        mode == com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT ->
+                            commitToolPanelItem(items[0].text)
+                        mode == com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT -> {
+                            if (!(keyboardViewModel.page.value is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay &&
+                                    (keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Overlay)?.route == OverlayRoute.ToolResult)
+                            ) {
+                                keyboardViewModel.showOverlay(OverlayRoute.ToolResult)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopToolPanelPoll() {
+        toolPanelPollJob?.cancel()
+        toolPanelPollJob = null
+    }
+
+    /**
+     * 面板所属插件被禁用/卸载时自动关闭面板（工具栏按钮候选池同步移除，
+     * toolbar_buttons 偏好中残留 id 匹配不到自然不显示，无需清理偏好）。
+     */
+    private fun closeToolPanelIfPluginGone() {
+        val state = uiState.value
+        if (!state.toolPanelVisible) return
+        val pluginId = state.toolPanelPluginId
+        if (pluginId.isBlank()) return
+        val stillEnabled = ExtensionManager.getAllInstalledPlugins().any {
+            it.id == pluginId && SettingsPreferences.isPluginEnabled(this, it.id)
+        }
+        if (!stillEnabled) {
+            closeToolPanel()
+        }
+    }
+
+    /** 读取当前输入框选区（起止不等时返回，供上屏替换原选区）。 */
+    private fun readCurrentSelection(): Pair<Int, Int>? {
+        val ic = currentInputConnection ?: return null
+        return runCatching {
+            val req = android.view.inputmethod.ExtractedTextRequest()
+            val extracted = ic.getExtractedText(req, 0)
+            if (extracted != null && extracted.selectionStart >= 0 && extracted.selectionEnd > extracted.selectionStart) {
+                Pair(extracted.selectionStart, extracted.selectionEnd)
+            } else null
+        }.getOrNull()
+    }
+
+    /** 收集面板上下文：仅选中文本；未选中时返回空串（不预填输入框全文/剪贴板，待用户自行输入）。 */
+    private fun collectToolPanelContext(): String {
+        val ic = currentInputConnection ?: return ""
+        runCatching {
+            val sel = ic.getSelectedText(0)?.toString()
+            if (!sel.isNullOrBlank()) return sel
+        }
+        runCatching {
+            val req = android.view.inputmethod.ExtractedTextRequest()
+            val extracted = ic.getExtractedText(req, 0)
+            if (extracted != null && extracted.selectionStart >= 0 && extracted.selectionEnd > extracted.selectionStart) {
+                val t = extracted.text?.toString()
+                if (t != null) {
+                    val s = extracted.selectionStart.coerceIn(0, t.length)
+                    val e = extracted.selectionEnd.coerceIn(s, t.length)
+                    if (e > s) return t.substring(s, e)
+                }
+            }
+        }
+        return ""
     }
 
     private fun ensureClipboardManagerInitialized() {
@@ -821,17 +1173,29 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val navBarDp = activeBottomDp.dp
                 val hasNavBar = navBarDp > 0.dp
 
+                // 快捷发送 / 工具面板为"键盘上方的撑高面板"：显示时键盘总高增加面板高度（面板在键盘上方，
+                // 不遮键盘按键），同时容器物理高度同步变大（updateHeight）→ IME insets 由系统确定性重算，
+                // 关闭后容器还原，彻底避免 insets 残留与白色区域。
                 val quickSendFormExtra = if (state.showQuickSendForm) 200 else 0
+                // 需与 ToolPanel.TOOL_PANEL_HEIGHT(170) 保持一致，否则容器比面板多/少一截，键盘被拉高。
+                // ToolResult 全屏结果页面打开时面板被覆盖，不再撑高键盘。
+                val isToolResultPage = (keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Overlay)
+                    ?.route == OverlayRoute.ToolResult
+                val toolPanelExtra = if (state.toolPanelVisible && !isToolResultPage) 170 else 0
+                val overlayPanelExtra = quickSendFormExtra + toolPanelExtra
 
                 XimeTheme(darkTheme = isDarkTheme, themeId = state.themeId) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         // Sync FrameLayout height with Compose content height
-                        val contentHeight = if (state.showKeyboardResize) state.resizePreviewHeightDp else floatingCardContentHeight + quickSendFormExtra
+                        val contentHeight = if (state.showKeyboardResize) state.resizePreviewHeightDp else floatingCardContentHeight + overlayPanelExtra
                         val totalDp = if (state.isCompact || state.isFloatingMode) effectiveScreenH
                             else contentHeight + state.keyboardBottomPaddingDp + activeBottomDp
                         SideEffect {
-                            // 非浮动模式（含键盘调节）容器保持 MATCH_PARENT（setInputView 已设置），
-                            // 键盘内容在 Compose 内贴底，由 onComputeInsets 报告键盘内容顶部。
+                            // 容器永远保持 MATCH_PARENT（setInputView 已设置），撑高只发生在
+                            // Compose 内部（键盘内容高度增加），与"键盘调节"完全同一路径：
+                            // 1110 Box 顶部随高度上移 → keyboardContentTopPx 上移 → insets 更新 → 应用被顶起。
+                            // 切勿在此改容器物理高度：容器脱离 MATCH_PARENT 后 IME 窗口内
+                            // 会退化为顶部对齐（FrameLayout child 默认 top-left），键盘整体跑到屏顶。
                             if (state.isCompact || state.isFloatingMode) {
                                 keyboardContainer.updateHeight(totalDp)
                             } else {
@@ -841,7 +1205,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             }
                             currentEffectiveKeyboardHeight = if (state.isFloatingMode) keyboardHeight + floatingDragBarHeight + 50 + state.keyboardBottomPaddingDp
                                 else if (state.isCompact) HARDWARE_CANDIDATE_BAR_HEIGHT
-                                else effectiveKeyboardHeight + quickSendFormExtra
+                                else effectiveKeyboardHeight + overlayPanelExtra
                         }
                         val kbColors = KeysConfigHelper.getKeyboardColors()
                         val longToColor: (Long) -> androidx.compose.ui.graphics.Color = { if (it == 0L)  { androidx.compose.ui.graphics.Color(0xE61E1E1E) } else if (it > 0xFFFFFF) { androidx.compose.ui.graphics.Color(it) } else { androidx.compose.ui.graphics.Color(0xFF000000 or it) } }
@@ -879,7 +1243,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.keyboardBottomPaddingDp + activeBottomDp).dp else (floatingCardContentHeight + state.keyboardBottomPaddingDp + quickSendFormExtra + activeBottomDp).dp)
+                                    .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.keyboardBottomPaddingDp + activeBottomDp).dp else (floatingCardContentHeight + state.keyboardBottomPaddingDp + overlayPanelExtra + activeBottomDp).dp)
                                     .align(androidx.compose.ui.Alignment.BottomCenter)
                                     .keyboardBackground(rootTheme.keyboardBackground, isDark, keyboardBgColor)
                             )
@@ -888,12 +1252,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             modifier = Modifier
 
                                 .fillMaxWidth()
-                                .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.keyboardBottomPaddingDp).dp else (floatingCardContentHeight + state.keyboardBottomPaddingDp + quickSendFormExtra).dp)
+                                .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.keyboardBottomPaddingDp).dp else (floatingCardContentHeight + state.keyboardBottomPaddingDp + overlayPanelExtra).dp)
                                 .align(androidx.compose.ui.Alignment.BottomCenter)
                                 .then(if (state.isFloatingMode) Modifier else Modifier.offset(y = (-activeBottomDp).dp))
                                 .onGloballyPositioned {
                                     if (!state.isFloatingMode && !state.isCompact) {
-                                        keyboardContentTopPx = it.positionInWindow().y.toInt()
+                                        val y = it.positionInWindow().y.toInt()
+                                        if (y != keyboardContentTopPx) {
+                                            keyboardContentTopPx = y
+                                            // Compose 内容高度/位置变化不会自动触发 IME insets
+                                            // 重算（面板关闭后实测残留数秒），这里在布局完成后
+                                            // 强制一次真实尺寸变化（+1dp 再还原，视觉不可见），
+                                            // 确保 insets 即时跟随键盘实际高度（防残留/白色区域）。
+                                            // 值无变化时不重复触发，避免循环。
+                                            mainHandler.post { forceInsetsRecompute() }
+                                        }
                                     }
                                 }
                         ) {
@@ -939,6 +1312,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     voiceRecognizedText = state.voiceRecognizedText,
                                     isSttEnabled = state.isSttEnabled,
                                     toolbarButtons = state.toolbarButtons,
+                                    toolbarPluginButtons = state.toolbarPluginButtons,
                                     isCalculatorMode = calculatorEngine.isActive(),
                                     inputSessionId = state.inputSessionId,
                                     isFloatingMode = state.isFloatingMode,
@@ -954,6 +1328,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     quickSendFormFocused = state.quickSendFormFocused,
                                     quickSendEditingItemId = state.quickSendEditingItemId,
                                     quickSendEditingItemText = state.quickSendEditingItemText,
+                                    toolPanelVisible = state.toolPanelVisible,
+                                    toolPanelInputFocused = state.toolPanelInputFocused,
+                                    toolPanelPluginId = state.toolPanelPluginId,
+                                    toolPanelTitle = state.toolPanelTitle,
+                                    toolPanelPrefillText = state.toolPanelPrefillText,
+                                    toolPanelItems = state.toolPanelItems,
+                                    toolPanelLoading = state.toolPanelLoading,
+                                    toolPanelRequestEpoch = state.toolPanelRequestEpoch,
+                                    toolPanelDisplay = state.toolPanelDisplay,
+                                    toolPanelUiNodes = state.toolPanelUiNodes,
                                     clipboardSyncEnabled = state.clipboardSyncEnabled,
                                 )
                             }
@@ -1157,6 +1541,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         super.onStartInput(attribute, restarting)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         loadDarkModePreference()
+
+        // 敏感输入框（密码等）判定 + composing 去重标志重置（详见 PluginEventDispatcher）
+        pluginEvents.onStartInput(attribute)
 
         predictionManager.clearCommittedText()
         // 新输入会话清空 partial commit 累积：外部 UI（如设置页输入框"清除"按钮仅清 Compose
@@ -1379,6 +1766,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         hasHardwareKeyboard = newConfig.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS
         super.onConfigurationChanged(newConfig)
+        if (newConfig.screenWidthDp > newConfig.screenHeightDp) {
+            closeToolPanel()
+        }
         applyCompactMode()
         loadDarkModePreference()
         applyWindowBackground()
@@ -1511,6 +1901,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private fun clearInputState() {
+        closeToolPanel()
+        // 输入会话结束：关闭残留的面板页面（表情/符号等 overlay），
+        // 避免下次键盘弹出时在候选栏上方渲染上次的面板背景
+        var page = keyboardViewModel.page.value
+        while (page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay) {
+            keyboardViewModel.closeOverlay()
+            page = keyboardViewModel.page.value
+        }
         calculatorEngine.clear()
         rimeEngine.clearComposition()
         t9PartialSegments.clear()
@@ -1710,6 +2108,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // contentTopInsets 直接使用 Compose 实测的键盘内容顶部位置（px），
             // 避免 window 全屏后 super 误判键盘占满全屏导致布局下沉。
             if (keyboardContentTopPx > 0) {
+                val dbg = "topPx=$keyboardContentTopPx qsForm=${state.showQuickSendForm} toolPanel=${state.toolPanelVisible} resize=${state.showKeyboardResize} hw=${(keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING}"
+                if (dbg != lastInsetsDebug) {
+                    lastInsetsDebug = dbg
+                    Log.d("InsetsDebug", dbg)
+                }
                 outInsets.contentTopInsets = keyboardContentTopPx
                 outInsets.visibleTopInsets = keyboardContentTopPx
                 outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
@@ -1718,6 +2121,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
         }
     }
+
+    /** 插件下行事件投递器（input_changed / text_committed，敏感输入豁免）。 */
+    internal val pluginEvents = PluginEventDispatcher(this)
 
     override fun commitText(text: String) {
         if (uiState.value.quickSendFormFocused) {
@@ -1731,7 +2137,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             return
         }
+        if (uiState.value.toolPanelInputFocused) {
+            mainHandler.post {
+                ToolPanelEditTextHolder.editText?.let { et ->
+                    val start = et.selectionStart.coerceAtLeast(0)
+                    val textLen = text.length
+                    et.text?.replace(start, et.selectionEnd.coerceAtLeast(start), text)
+                    try { et.setSelection(start + textLen) } catch (_: Exception) {}
+                }
+            }
+            return
+        }
         currentInputConnection?.commitText(text, 1)
+
+        // text_committed 事件：真实上屏才累计/投递（内部编辑器分支已在上方 return；
+        // 敏感输入框（密码）不计不投；详见 PluginEventDispatcher）
+        pluginEvents.onTextCommitted(text)
 
         if (isChineseMode) {
             predictionManager.appendCommittedText(text)
@@ -1744,6 +2165,61 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
         }
     }
+
+    /**
+     * 删除光标前 count 个字符。
+     * 焦点在输入法内部编辑器（快捷发送/工具面板）时作用于对应 EditText，
+     * 否则作用于宿主 InputConnection。需在主线程调用。
+     */
+    internal fun deleteBeforeCursor(count: Int) {
+        val quickSendFocused = uiState.value.quickSendFormFocused
+        if (quickSendFocused || uiState.value.toolPanelInputFocused) {
+            val et = if (quickSendFocused) QuickSendFormEditTextHolder.editText
+            else ToolPanelEditTextHolder.editText
+            et?.let { box ->
+                val end = box.selectionStart.coerceAtLeast(0)
+                val start = (end - count).coerceAtLeast(0)
+                box.text?.replace(start, end, "")
+            }
+            return
+        }
+        currentInputConnection?.deleteSurroundingText(count, 0)
+    }
+
+    /**
+     * 光标前文本与 expected 相同时替换为 replacement，返回是否替换成功。
+     * 焦点在输入法内部编辑器时作用于对应 EditText，否则宿主 InputConnection。
+     * 不匹配时不做任何操作（调用方决定降级策略）。需在主线程调用。
+     */
+    internal fun replaceBeforeCursor(expected: String, replacement: String): Boolean {
+        val quickSendFocused = uiState.value.quickSendFormFocused
+        if (quickSendFocused || uiState.value.toolPanelInputFocused) {
+            val et = (if (quickSendFocused) QuickSendFormEditTextHolder.editText
+            else ToolPanelEditTextHolder.editText) ?: return false
+            val selStart = et.selectionStart.coerceAtLeast(0)
+            val start = (selStart - expected.length).coerceAtLeast(0)
+            val before = et.text?.substring(start, selStart)
+            if (before != expected) return false
+            et.text?.replace(start, selStart, replacement)
+            try { et.setSelection(start + replacement.length) } catch (_: Exception) {}
+            return true
+        }
+        val ic = currentInputConnection ?: return false
+        val before = runCatching {
+            ic.getTextBeforeCursor(expected.length, 0)?.toString()
+        }.getOrNull()
+        if (before != expected) return false
+        var replaced = false
+        ic.beginBatchEdit()
+        try {
+            replaced = ic.deleteSurroundingText(expected.length, 0)
+            ic.commitText(replacement, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
+        return replaced
+    }
+
     
     
 }

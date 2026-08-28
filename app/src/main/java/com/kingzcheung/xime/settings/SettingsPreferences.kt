@@ -401,8 +401,10 @@ object SettingsPreferences {
     /** 授权插件访问指定域名。 */
     fun authorizePluginHost(context: Context, pluginId: String, host: String) {
         val hosts = getPluginAuthorizedHosts(context, pluginId) + host
+        val pending = getPluginPendingHosts(context, pluginId) - host
         getPrefs(context).edit()
             .putString("plugin_net_auth_$pluginId", hosts.joinToString(","))
+            .putString("plugin_net_pending_$pluginId", pending.joinToString(","))
             .apply()
     }
 
@@ -412,6 +414,27 @@ object SettingsPreferences {
         getPrefs(context).edit()
             .putString("plugin_net_auth_$pluginId", hosts.joinToString(","))
             .apply()
+    }
+
+    /** 插件运行中被拒绝访问、待用户授权的域名集合（供 UI 显眼展示并引导授权）。 */
+    fun getPluginPendingHosts(context: Context, pluginId: String): Set<String> {
+        val raw = getPrefs(context).getString("plugin_net_pending_$pluginId", "") ?: ""
+        return raw.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
+    }
+
+    /** 记录插件运行中被拒绝访问的域名（去重；返回 true 表示首次记录）。 */
+    fun addPluginPendingHost(context: Context, pluginId: String, host: String): Boolean {
+        val pending = getPluginPendingHosts(context, pluginId)
+        if (host in pending) return false
+        getPrefs(context).edit()
+            .putString("plugin_net_pending_$pluginId", (pending + host).joinToString(","))
+            .apply()
+        return true
+    }
+
+    /** 清除插件的全部待授权记录。 */
+    fun clearPluginPendingHosts(context: Context, pluginId: String) {
+        getPrefs(context).edit().putString("plugin_net_pending_$pluginId", "").apply()
     }
     
     fun isSwipeUpHintsEnabled(context: Context): Boolean {

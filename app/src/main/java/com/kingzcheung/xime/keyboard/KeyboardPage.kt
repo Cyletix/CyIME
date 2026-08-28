@@ -36,4 +36,7 @@ sealed interface OverlayRoute {
     data object Emoji : OverlayRoute
     data object CandidatePage : OverlayRoute
     data object Edit : OverlayRoute
+    data object ToolPanel : OverlayRoute
+    /** AI 插件多条结果展示页（与表情/符号同级），点击候选上屏。 */
+    data object ToolResult : OverlayRoute
 }

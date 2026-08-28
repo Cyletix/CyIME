@@ -65,25 +65,13 @@ internal fun rememberImeKeyboardCallbacks(
                                 associationCandidates = emptyList()
                             )
                         } else {
-                            val ic = service.currentInputConnection
-                            var replaced = false
-                            if (ic != null) {
-                                val before = runCatching {
-                                    ic.getTextBeforeCursor(pendingEnglish.length, 0)?.toString()
-                                }.getOrNull()
-                                if (before == pendingEnglish) {
-                                    ic.beginBatchEdit()
-                                    try {
-                                        replaced = ic.deleteSurroundingText(pendingEnglish.length, 0)
-                                        ic.commitText(text, 1)
-                                    } finally {
-                                        ic.endBatchEdit()
-                                    }
-                                } else {
-                                    // 光标位置与编码不对应（用户移动过光标）：放弃替换，
-                                    // 候选词降级为直接追加上屏，避免误删用户文本。
-                                    ic.commitText(text, 1)
-                                }
+                            // 内部编辑器（快捷发送/工具面板）与宿主 InputConnection 统一走
+                            // service 层重定向，避免编码回删/替换作用到错误的屏上文本。
+                            var replaced = service.replaceBeforeCursor(pendingEnglish, text)
+                            if (!replaced) {
+                                // 光标位置与编码不对应（用户移动过光标）：放弃替换，
+                                // 候选词降级为直接追加上屏，避免误删用户文本。
+                                service.commitText(text)
                             }
                             FileLogger.d(
                                 XimeInputMethodService.TAG,
@@ -226,6 +214,16 @@ internal fun rememberImeKeyboardCallbacks(
                 SettingsPreferences.setToolbarButtons(service, buttons)
                 service.uiState.value = service.uiState.value.copy(toolbarButtons = buttons)
             },
+            onOpenToolPanel = { pluginId -> service.openToolPanel(pluginId) },
+            onToolPanelClose = { service.closeToolPanel() },
+            onToolPanelItemClick = { item -> service.commitToolPanelItem(item.text) },
+            onToolPanelRegenerate = { service.triggerToolPanelGenerate() },
+            onToolPanelAction = { actionId -> service.dispatchToolPanelAction(actionId) },
+            onToolPanelFocusChange = { focused ->
+                service.uiState.value = service.uiState.value.copy(
+                    toolPanelInputFocused = focused,
+                )
+            },
             onKeyboardModeChange = { chineseMode ->
                 if (service.isChineseMode != chineseMode) {
                     service.isChineseMode = chineseMode
@@ -290,7 +288,7 @@ internal fun rememberImeKeyboardCallbacks(
                     == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
                     service.endComposingInputBox()
                 } else {
-                    service.currentInputConnection?.deleteSurroundingText(count, 0)
+                    service.deleteBeforeCursor(count)
                 }
                 // undo 联动：撤销 right commit 段时回滚用户词典调频。
                 val undone = service.t9PartialSegments.removeLastOrNull()
@@ -335,6 +333,7 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onShowQuickSendForm = {
+                service.closeToolPanel()
                 val current = service.uiState.value
                 service.uiState.value = current.copy(
                     showQuickSendForm = true,
@@ -343,6 +342,7 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendEditingItemText = "",
                     enterKeyText = "确定",
                 )
+                service.forceInsetsRecompute()
             },
             onQuickSendEditItem = { id, text ->
                 service.uiState.value = service.uiState.value.copy(
@@ -367,6 +367,8 @@ internal fun rememberImeKeyboardCallbacks(
                 )
                 QuickSendFormEditTextHolder.editText = null
                 service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(1))
+                // 兜底：强制容器真实尺寸变化，触发 IME insets 重算恢复为纯键盘高度（防残留）。
+                service.forceInsetsRecompute()
             },
             onQuickSendFormFocusChange = { focused: Boolean ->
                 service.uiState.value = service.uiState.value.copy(

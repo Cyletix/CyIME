@@ -24,6 +24,100 @@ import kotlinx.coroutines.withContext
  */
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal fun handleKeyPress(key: String, isShifted: Boolean) {
+        if (service.uiState.value.toolPanelInputFocused) {
+            val candState = service.candidateState.value
+            val hasComposing = candState.isComposing || candState.inputText.isNotEmpty()
+            when (key) {
+                "enter" -> {
+                    if (hasComposing) {
+                        // 组合态：先把拼音提交进面板输入框，再触发生成
+                        val input = candState.inputText
+                        service.mainHandler.post {
+                            ToolPanelEditTextHolder.editText?.let { et ->
+                                val start = et.selectionStart.coerceAtLeast(0)
+                                et.text?.replace(start, et.selectionEnd.coerceAtLeast(start), input)
+                                try { et.setSelection(start + input.length) } catch (_: Exception) {}
+                            }
+                            service.rimeEngine.clearComposition()
+                            service.candidateState.value = service.candidateState.value.copy(
+                                inputText = "",
+                                preeditText = "",
+                                pendingEnglishText = "",
+                                candidates = emptyList(),
+                                candidateComments = emptyList(),
+                                associationCandidates = emptyList(),
+                                isComposing = false
+                            )
+                        }
+                    }
+                    service.triggerToolPanelGenerate()
+                    return
+                }
+                "delete" -> {
+                    if (hasComposing) {
+                        // 组合态：退格走 Rime，更新候选栏
+                        service.rimeEngine.processKey(0xff08, 0)
+                        val result = service.rimeEngine.getProcessResult(true)
+                        if (result.inputText.isEmpty()) {
+                            service.rimeEngine.clearComposition()
+                        }
+                        service.uiEventChannel.trySend {
+                            service.sessionController.updateUIWithResult(result)
+                        }
+                    } else {
+                        ToolPanelEditTextHolder.editText?.let { et ->
+                            val start = et.selectionStart.coerceAtLeast(0)
+                            val end = et.selectionEnd.coerceAtLeast(start)
+                            if (start == end && start > 0) {
+                                et.text?.delete(start - 1, start)
+                                try { et.setSelection(start - 1) } catch (_: Exception) {}
+                            } else if (end > start) {
+                                et.text?.delete(start, end)
+                                try { et.setSelection(start) } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                    return
+                }
+                "space" -> {
+                    if (hasComposing && candState.candidates.isNotEmpty()) {
+                        // 组合态：空格选第一个候选（keyJobs 保序）
+                        postRimeJob { selectCandidateAsync(0) }
+                    } else {
+                        ToolPanelEditTextHolder.editText?.let { et ->
+                            val start = et.selectionStart.coerceAtLeast(0)
+                            et.text?.insert(start, " ")
+                            try { et.setSelection(start + 1) } catch (_: Exception) {}
+                        }
+                    }
+                    return
+                }
+                else -> {
+                    if (key.length == 1) {
+                        val isLetter = key.matches(Regex("[a-zA-Z]"))
+                        val isChineseMode = !service.uiState.value.isAsciiMode
+                        if (isLetter && isChineseMode) {
+                            // 中文模式：字母进 Rime 拼音组合，候选栏选词后经 commitText 重定向进面板输入框
+                            val keyCode = key.lowercase()[0].code
+                            val result = service.rimeEngine.processKeyAndGetResult(keyCode, 0)
+                            if (result.processed) {
+                                service.uiEventChannel.trySend {
+                                    service.sessionController.updateUIWithResult(result)
+                                }
+                            }
+                            return
+                        }
+                        val char = if (isShifted) key.uppercase() else key
+                        ToolPanelEditTextHolder.editText?.let { et ->
+                            val start = et.selectionStart.coerceAtLeast(0)
+                            et.text?.insert(start, char)
+                            try { et.setSelection(start + char.length) } catch (_: Exception) {}
+                        }
+                        return
+                    }
+                }
+            }
+        }
         if (service.uiState.value.quickSendFormFocused) {
             when (key) {
                 "enter" -> {
@@ -459,7 +553,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                         // 直接上屏模式：只提交 Rime 返回的增量字符（如智能引号转换结果），
                                         // 整段 pending 对应的文本已逐字上屏，不可重复提交。
                                         withContext(Dispatchers.Main) {
-                                            service.currentInputConnection?.commitText(committed, 1)
+                                            service.commitText(committed)
                                         }
                                         service.uiEventChannel.trySend {
                                             service.sessionController.updateUIWithResult(result)
@@ -485,7 +579,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                                         // 英文直接上屏模式：字符不经 composing region，即输即落盘；
                                                         // pendingEnglishText 仅作编码记录（供联想与选中候选后回删替换校验）。
                                                         withContext(Dispatchers.Main) {
-                                                            service.currentInputConnection?.commitText(charToCommit, 1)
+                                                            service.commitText(charToCommit)
                                                         }
                                                         service.candidateState.value = service.candidateState.value.copy(
                                                             pendingEnglishText = newPending,
@@ -702,7 +796,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
                                 service.endComposingInputBox()
                             } else {
-                                service.currentInputConnection?.deleteSurroundingText(len, 0)
+                                service.deleteBeforeCursor(len)
                             }
                         }
                         // undo 联动：撤销段时回滚用户词典调频。

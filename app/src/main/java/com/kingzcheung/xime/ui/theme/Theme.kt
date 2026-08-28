@@ -79,7 +79,7 @@ private fun generateColorScheme(seed: Color, seedContainer: Color, dark: Boolean
             surfaceContainer = hclColor(hue, p * 5f, 22f),
             surfaceContainerHigh = hclColor(hue, p * 5f, 26f),
             surfaceContainerHighest = hclColor(hue, p * 5f, 30f),
-            onBackground = hclColor(hue, 0f, 10f),
+            onBackground = hclColor(hue, 0f, 90f),
             onSurface = hclColor(hue, 0f, 90f),
             surfaceVariant = hclColor(hue, p * 10f, 30f),
             onSurfaceVariant = hclColor(hue, 0f, 80f),

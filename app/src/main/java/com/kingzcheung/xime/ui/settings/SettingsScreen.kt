@@ -11,13 +11,21 @@ import androidx.navigation.navArgument
 @Composable
 fun SettingsScreen(
     initialRoute: String? = null,
+    initialPluginId: String? = null,
     onThemeChanged: () -> Unit = {},
     onWizardBack: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val startDestination = if (initialRoute == "manage_dict") SettingsRoutes.Dictionary
     else if (initialRoute == "schema") SettingsRoutes.Schema
+    else if (initialRoute == "plugins") SettingsRoutes.Plugins
     else SettingsRoutes.Main
+
+    LaunchedEffect(initialPluginId) {
+        if (initialPluginId != null) {
+            navController.navigate("plugin_market_detail/$initialPluginId")
+        }
+    }
     
     NavHost(
         navController = navController,
