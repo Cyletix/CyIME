@@ -31,6 +31,17 @@ package com.kingzcheung.xime.plugin.core.lua.sdk
  * - `getOptions(key)` 动态选项（如 ASR 模型列表）
  * - `start()` / `pushPcm()` / `stop()` 音频流式识别（网络 API 由宿主白名单提供）
  *
+ * ### 事件（可选，manifest 声明 `capabilities.events` 才投递）
+ * - `onPluginEvent(eventType, payload)` 宿主下行事件回调
+ *   - 事件类型与 payload 字段名均为 snake_case
+ *   - `input_changed`: payload = { input_text: string }，用户正在输入的编码快照
+ *   - `text_committed`: payload = { committed_text: string, session_total_chars: int,
+ *     session_total_commits: int }，文本上屏；累计值为宿主进程生命周期计数，
+ *     conflated 丢中间事件不影响统计（插件用差值做增量持久化）
+ *   - 通道为"只保最新"（conflated）：消费慢时中间事件被合并丢弃
+ *   - 敏感输入框（密码类）不产生上述任何事件
+ *   - 函数未导出时事件被静默丢弃，不影响其他能力
+ *
  * ## 数据格式
  * Lua 返回值一律使用 Lua table（数组或 map），宿主统一做 table -> Kotlin 转换；
  * 函数不存在或抛错时，宿主返回空结果（不崩溃）。
@@ -54,6 +65,9 @@ object LuaPluginContract {
     // ---- 生命周期 ----
     const val FN_ON_LOAD = "onLoad"
     const val FN_ON_UNLOAD = "onUnload"
+
+    // ---- 事件（可选：manifest capabilities.events 声明后才投递） ----
+    const val FN_ON_PLUGIN_EVENT = "onPluginEvent"
 
     // ---- emoji ----
     const val FN_GET_CATEGORIES = "getCategories"

@@ -92,6 +92,8 @@ data class KeyboardUiState(
     val toolPanelItems: List<PluginResultItem> = emptyList(),
     val toolPanelLoading: Boolean = false,
     val toolPanelRequestEpoch: Long = 0,
+    val toolPanelDisplay: String? = null,
+    val toolPanelUiNodes: List<Map<*, *>>? = null,
     val clipboardSyncEnabled: Boolean = false,
 )
 

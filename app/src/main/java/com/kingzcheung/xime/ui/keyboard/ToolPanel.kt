@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kingzcheung.xime.service.ToolPanelEditTextHolder
 
-private val TOOL_PANEL_HEIGHT = 170
+internal val TOOL_PANEL_HEIGHT = 170
 
 /**
  * AI 工具插件输入面板（候选栏上方）。

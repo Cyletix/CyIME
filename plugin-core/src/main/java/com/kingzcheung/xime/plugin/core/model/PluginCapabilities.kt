@@ -14,6 +14,8 @@ data class PluginCapabilities(
     val tool: ToolCapabilities? = null,
     @kotlinx.serialization.SerialName("clipboard_sync")
     val clipboardSync: ClipboardSyncCapabilities? = null,
+    /** 下行事件订阅声明（如 "input_changed"）：未声明的事件宿主不投递，通道也不建立。 */
+    val events: List<String> = emptyList(),
 ) {
     companion object {
         val EMPTY = PluginCapabilities()

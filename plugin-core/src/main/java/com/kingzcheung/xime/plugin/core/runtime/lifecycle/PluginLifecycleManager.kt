@@ -157,6 +157,8 @@ class PluginLifecycleManager(
                 cryptoHostApi = PluginManager.cryptoHostApiFactory?.invoke(),
                 sseHostApi = PluginManager.sseHostApiFactory?.invoke(plugin.id)
             )
+            // 按能力声明启用下行事件通道：未声明 events 的插件零开销、零行为变化。
+            runtime.initEvents(plugin.capabilities?.events?.toSet() ?: emptySet())
             LoadedPluginInfo(pluginInfo = plugin, script = runtime)
         } catch (e: Exception) {
             Log.e(TAG, "loadPlugin failed for ${plugin.id}", e)

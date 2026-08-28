@@ -162,6 +162,22 @@ object PluginManager {
         return requireContext().xmlManager.getAllPlugins()
     }
 
+    /**
+     * 向所有运行实例广播下行事件。
+     * 实际投递取决于插件是否声明了对应 `capabilities.events`，未声明/未启用通道的实例静默跳过。
+     *
+     * @return 成功投递（进入通道）的实例数。
+     */
+    fun dispatchEvent(event: com.kingzcheung.xime.plugin.core.lua.PluginEvent): Int {
+        val context = frameworkContext ?: return 0
+        var delivered = 0
+        for ((_, loaded) in context.loadedPlugins) {
+            val runtime = loaded.script ?: continue
+            if (runtime.dispatchEvent(event)) delivered++
+        }
+        return delivered
+    }
+
     /** 判断插件是否兼容当前主应用版本（宿主侧读取自身版本）。 */
     fun isPluginHostCompatible(plugin: PluginInfo): Boolean {
         val hostVersion = com.kingzcheung.xime.plugin.core.util.VersionUtil.getHostVersionName(requireContext().application)

@@ -75,7 +75,9 @@ internal data class CapabilitiesConfig(
     val emoji: EmojiCapabilitiesConfig? = null,
     val speech: SpeechCapabilitiesConfig? = null,
     val tool: ToolCapabilitiesConfig? = null,
-    val clipboardSync: ClipboardSyncCapabilitiesConfig? = null
+    val clipboardSync: ClipboardSyncCapabilitiesConfig? = null,
+    /** 下行事件订阅（如 "input_changed"），小写 snake_case。 */
+    val events: List<String> = emptyList()
 )
 
 @Serializable
@@ -124,6 +126,7 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
                 display = when (it.display?.lowercase()) {
                     "direct" -> com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT
                     "select" -> com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT
+                    "passive" -> com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE
                     else -> null
                 }
             )
@@ -132,7 +135,8 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
             com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ClipboardSyncCapabilities(
                 protocols = it.protocols.filter { p -> p.isNotBlank() }
             )
-        }
+        },
+        events = events.map { it.trim().lowercase() }.filter { it.isNotBlank() }.distinct()
     )
 }
 

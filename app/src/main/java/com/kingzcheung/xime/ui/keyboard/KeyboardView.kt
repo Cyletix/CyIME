@@ -295,18 +295,33 @@ fun KeyboardView(
             }
 
             if (state.toolPanelVisible) {
-                ToolPanel(
-                    title = state.toolPanelTitle,
-                    isFocused = state.toolPanelInputFocused,
-                    isLoading = state.toolPanelLoading,
-                    initialText = state.toolPanelPrefillText,
-                    backgroundColor = Color.Transparent,
-                    textColor = keyTextColor,
-                    accentColor = accentColor,
-                    cardBgColor = keyBgColor,
-                    onClose = { callbacks.onToolPanelClose?.invoke() },
-                    onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
-                )
+                if (state.toolPanelDisplay == "PASSIVE") {
+                    // 纯展示面板：声明式 ui 节点树，无输入框/生成动作（数据由插件事件驱动）
+                    InfoPanel(
+                        title = state.toolPanelTitle,
+                        nodes = state.toolPanelUiNodes ?: emptyList(),
+                        isLoading = state.toolPanelLoading,
+                        backgroundColor = Color.Transparent,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        cardBgColor = keyBgColor,
+                        onClose = { callbacks.onToolPanelClose?.invoke() },
+                        onAction = { actionId -> callbacks.onToolPanelAction?.invoke(actionId) },
+                    )
+                } else {
+                    ToolPanel(
+                        title = state.toolPanelTitle,
+                        isFocused = state.toolPanelInputFocused,
+                        isLoading = state.toolPanelLoading,
+                        initialText = state.toolPanelPrefillText,
+                        backgroundColor = Color.Transparent,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        cardBgColor = keyBgColor,
+                        onClose = { callbacks.onToolPanelClose?.invoke() },
+                        onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                    )
+                }
             }
 
             CandidateBar(

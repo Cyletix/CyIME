@@ -51,6 +51,10 @@ data class KeyboardCallbacks(
      */
     val onToolPanelRegenerate: (() -> Unit)? = null,
     /**
+     * passive 纯展示面板的 action 节点点击（InfoPanel）：通知插件 actionId 并刷新面板数据。
+     */
+    val onToolPanelAction: ((actionId: String) -> Unit)? = null,
+    /**
      * 通用工具面板输入框焦点变化。
      */
     val onToolPanelFocusChange: ((Boolean) -> Unit)? = null,

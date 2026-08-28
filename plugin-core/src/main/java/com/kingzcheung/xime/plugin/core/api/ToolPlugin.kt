@@ -5,7 +5,7 @@ import com.kingzcheung.xime.plugin.core.config.IPluginConfigurable
 /**
  * 工具面板结果显示方式：宿主按插件元数据（manifest.capabilities.tool.display）决策
  * 结果交互（直接上屏 or 全屏页面候选选择），插件侧不再返回。
- * manifest 取值小写：`direct` | `select`（与 inputMode 风格一致）。
+ * manifest 取值小写：`direct` | `select` | `passive`（与 inputMode 风格一致）。
  */
 enum class ToolResult {
     /** 结果生成结束直接上屏（如 AI 翻译）。 */
@@ -13,6 +13,13 @@ enum class ToolResult {
 
     /** 结果生成结束打开全屏结果页面（AiResultPanel），用户点击候选上屏（如 AI 智能回复）。 */
     SELECT,
+
+    /**
+     * 纯展示面板（InfoPanel）：无输入框、无生成动作（enter 不触发 generate）、
+     * 点击节点不上屏。插件通过 [ToolPanelState.ui] 声明式描述内容
+     * （白名单节点：section/text/metric/divider/action），宿主统一渲染。
+     */
+    PASSIVE,
 }
 
 /**
@@ -23,6 +30,12 @@ data class ToolPanelState(
     val items: List<PluginResultItem> = emptyList(),
     /** 是否正在生成中（SSE 流式期间为 true，宿主据此展示 loading 并轮询刷新）。 */
     val loading: Boolean = false,
+    /**
+     * passive 纯展示节点树（声明式 UI）。每节点 = { type: String, ...字段 }，
+     * 白名单 type：section(title) / text(content, style) / metric(label, value, unit?) /
+     * divider / action(label, actionId)。未知 type 宿主降级为文本渲染，不崩溃。
+     */
+    val ui: List<Map<*, *>>? = null,
 )
 
 /**
@@ -36,6 +49,10 @@ data class ToolPanelState(
  *   多候选（MULTIPLE）时建议 id 用序号；单条（SINGLE）时可用固定值（如 `"result"`）。
  * - `loading`（布尔）：生成期间为 true，宿主据此轮询刷新直至 false。
  * - `inputText`（字符串，可选）：面板输入框内容回显，缺省回退为宿主传入的输入。
+ * - `ui`（数组，可选）：纯展示节点树，仅 `display: passive` 时由宿主渲染（InfoPanel）。
+ *   节点 = `{ type: string, ...字段 }`，白名单：
+ *   `section(title)` / `text(content, style?)` / `metric(label, value, unit?)` /
+ *   `divider` / `action(label, actionId)`；未知 type 降级为文本，不崩溃。
  *
  * 传输方式（同步 HTTP / SSE 流式）与结果呈现由插件元数据声明，宿主只消费上述结构化状态。
  *

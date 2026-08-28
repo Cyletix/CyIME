@@ -23,6 +23,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 
 /**
  * Lua 脚本插件运行时。
@@ -233,6 +239,78 @@ class LuaScriptRuntime(
 
     /** SSE 会话 → Lua 回调表（host.http.stream 的 callbacks），会话 id 为宿主返回句柄。 */
     private val sseCallbacks = ConcurrentHashMap<Int, Map<String, LuaValue>>()
+
+    // ---- 下行事件（manifest capabilities.events 声明后启用） ----
+
+    /** 订阅的事件类型（小写 snake_case）；空集合 = 未启用事件通道。 */
+    @Volatile
+    private var subscribedEvents: Set<String> = emptySet()
+
+    /** 下行事件通道：conflated，只保最新，插件消费慢不积压。 */
+    private var eventChannel: Channel<PluginEvent>? = null
+
+    /** 事件消费协程域；close 时 cancel。 */
+    private var eventScope: CoroutineScope? = null
+
+    /**
+     * 声明本插件订阅的事件类型（来自 manifest capabilities.events）。
+     * 必须在 [load] 之前调用；空集合不建立通道（未声明插件零开销）。
+     */
+    fun initEvents(subscribed: Set<String>) {
+        subscribedEvents = subscribed
+        if (subscribed.isEmpty()) return
+        if (eventChannel != null) return
+        val channel = Channel<PluginEvent>(Channel.CONFLATED)
+        eventChannel = channel
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        eventScope = scope
+        scope.launch {
+            for (event in channel) {
+                invokeEventCallback(event)
+            }
+        }
+    }
+
+    /** 向插件投递事件：未声明该类型或未启用通道时静默丢弃。返回是否已投递。 */
+    fun dispatchEvent(event: PluginEvent): Boolean {
+        val channel = eventChannel ?: return false
+        if (event.type !in subscribedEvents) return false
+        return channel.trySend(event).isSuccess
+    }
+
+    /** 事件 → Lua onPluginEvent(type, payload)（网络回调同级超时，不中毒）。 */
+    private fun invokeEventCallback(event: PluginEvent) {
+        try {
+            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+                synchronized(luaLock) {
+                    if (!loaded) return@runGuarded
+                    val fn = pluginTable.get(LuaPluginContract.FN_ON_PLUGIN_EVENT)
+                    if (!fn.isfunction()) return@runGuarded
+                    fn.invoke(LuaValue.valueOf(event.type), payloadToLuaTable(event.payload))
+                }
+            }
+        } catch (e: Exception) {
+            api.log("onPluginEvent 回调失败: ${e.message}")
+        }
+    }
+
+    /** payload 快照 → Lua table（仅基础类型，缺失字段为 nil）。
+     *  Long 转为 double：luaj number 即 double（Lua 5.1），统计类累计值远低于 2^53 无精度损失。 */
+    private fun payloadToLuaTable(payload: Map<String, Any?>): LuaValue {
+        val table = LuaValue.tableOf()
+        for ((key, value) in payload) {
+            table.set(key, when (value) {
+                null -> LuaValue.NIL
+                is String -> LuaValue.valueOf(value)
+                is Boolean -> LuaValue.valueOf(value)
+                is Int -> LuaValue.valueOf(value)
+                is Long -> LuaValue.valueOf(value.toDouble())
+                is Double -> LuaValue.valueOf(value)
+                else -> LuaValue.valueOf(value.toString())
+            })
+        }
+        return table
+    }
 
     /** 把 SSE 会话的流事件转发为 Lua 回调（宿主后台线程调用）。 */
     private fun invokeSseCallback(sessionId: Int, name: String, text: String) {
@@ -752,6 +830,11 @@ class LuaScriptRuntime(
         try {
             callOnUnload()
         } finally {
+            eventScope?.cancel()
+            eventScope = null
+            eventChannel?.close()
+            eventChannel = null
+            subscribedEvents = emptySet()
             executor.shutdownNow()
             loadedModules.clear()
             sseCallbacks.clear()

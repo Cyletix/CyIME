@@ -83,6 +83,8 @@ import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.clipboard.sync.ClipboardSyncBridge
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.ToolPlugin
+import com.kingzcheung.xime.plugin.core.api.ToolResult
+import com.kingzcheung.xime.plugin.core.lua.PluginEvent
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.rime.RimeConfigHelper
@@ -794,28 +796,52 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val contextText = collectToolPanelContext()
         val pluginName = ExtensionManager.getAllInstalledPlugins()
             .firstOrNull { it.id == pluginId }?.name ?: pluginId
+        val display = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == pluginId }?.capabilities?.tool?.display
         val pluginState = (ExtensionManager.getPluginById(pluginId) as? ToolPlugin)
             ?.getPanelState(contextText)
         val prefill = pluginState?.inputText?.takeIf { it.isNotBlank() } ?: contextText
         uiState.value = uiState.value.copy(
             toolPanelVisible = true,
-            toolPanelInputFocused = true,
+            toolPanelInputFocused = display != ToolResult.PASSIVE,
             toolPanelPluginId = pluginId,
             toolPanelTitle = pluginName,
             toolPanelPrefillText = prefill,
             toolPanelItems = pluginState?.items ?: emptyList(),
+            toolPanelDisplay = display?.name,
+            toolPanelUiNodes = pluginState?.ui,
             toolPanelRequestEpoch = uiState.value.toolPanelRequestEpoch + 1,
-            enterKeyText = "生成",
+            enterKeyText = if (display == ToolResult.PASSIVE) "发送" else "生成",
         )
-        ToolPanelEditTextHolder.editText?.let { et ->
-            et.setText(prefill)
-            et.setSelection(prefill.length)
+        if (display != ToolResult.PASSIVE) {
+            ToolPanelEditTextHolder.editText?.let { et ->
+                et.setText(prefill)
+                et.setSelection(prefill.length)
+            }
         }
         forceInsetsRecompute()
     }
 
-    internal fun closeToolPanel() {
-        toolPanelSelection = null
+    /**
+     * passive 纯展示面板的 action 点击：通知插件（onPanelAction）后单次重拉
+     * getPanelState 刷新 ui 节点（action 改变数据后面板立即反映）。
+     */
+    internal fun dispatchToolPanelAction(actionId: String) {
+        val pluginId = uiState.value.toolPanelPluginId
+        val epoch = uiState.value.toolPanelRequestEpoch
+        serviceScope.launch(Dispatchers.IO) {
+            val plugin = ExtensionManager.getPluginById(pluginId) as? ToolPlugin ?: return@launch
+            plugin.onPanelAction(actionId)
+            val state = plugin.getPanelState("")
+            withContext(Dispatchers.Main) {
+                if (uiState.value.toolPanelRequestEpoch == epoch && uiState.value.toolPanelVisible) {
+                    uiState.value = uiState.value.copy(toolPanelUiNodes = state.ui, toolPanelLoading = state.loading)
+                }
+            }
+        }
+    }
+
+    internal fun closeToolPanel() {        toolPanelSelection = null
         stopToolPanelPoll()
         // 结果页面（ToolResult）开着时联动关闭
         val page = keyboardViewModel.page.value
@@ -831,6 +857,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             toolPanelTitle = "",
             toolPanelPrefillText = "",
             toolPanelItems = emptyList(),
+            toolPanelDisplay = null,
+            toolPanelUiNodes = null,
             toolPanelLoading = false,
             enterKeyText = "发送",
         )
@@ -886,6 +914,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     internal fun triggerToolPanelGenerate() {
         val pluginId = uiState.value.toolPanelPluginId
+        // passive 纯展示面板：无生成语义，enter 不触发（数据由事件驱动 + InfoPanel 点击 action 刷新）
+        if (uiState.value.toolPanelDisplay == ToolResult.PASSIVE.name) {
+            return
+        }
         // 使用前授权检测：插件有未授权网络域名时先引导授权，不发起请求
         if (!com.kingzcheung.xime.plugin.PluginNetworkAuthHelper.ensureAuthorized(this, pluginId)) {
             return
@@ -1304,6 +1336,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     toolPanelItems = state.toolPanelItems,
                                     toolPanelLoading = state.toolPanelLoading,
                                     toolPanelRequestEpoch = state.toolPanelRequestEpoch,
+                                    toolPanelDisplay = state.toolPanelDisplay,
+                                    toolPanelUiNodes = state.toolPanelUiNodes,
                                     clipboardSyncEnabled = state.clipboardSyncEnabled,
                                 )
                             }
@@ -1507,6 +1541,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         super.onStartInput(attribute, restarting)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         loadDarkModePreference()
+
+        // 敏感输入框（密码等）判定 + composing 去重标志重置（详见 PluginEventDispatcher）
+        pluginEvents.onStartInput(attribute)
 
         predictionManager.clearCommittedText()
         // 新输入会话清空 partial commit 累积：外部 UI（如设置页输入框"清除"按钮仅清 Compose
@@ -2085,6 +2122,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /** 插件下行事件投递器（input_changed / text_committed，敏感输入豁免）。 */
+    internal val pluginEvents = PluginEventDispatcher(this)
+
     override fun commitText(text: String) {
         if (uiState.value.quickSendFormFocused) {
             mainHandler.post {
@@ -2109,6 +2149,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return
         }
         currentInputConnection?.commitText(text, 1)
+
+        // text_committed 事件：真实上屏才累计/投递（内部编辑器分支已在上方 return；
+        // 敏感输入框（密码）不计不投；详见 PluginEventDispatcher）
+        pluginEvents.onTextCommitted(text)
 
         if (isChineseMode) {
             predictionManager.appendCommittedText(text)

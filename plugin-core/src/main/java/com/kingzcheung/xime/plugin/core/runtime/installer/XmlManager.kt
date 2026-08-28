@@ -242,6 +242,9 @@ class XmlManager(private val context: Application) {
         cap.clipboardSync?.let {
             root["clipboardSync"] = mapOf("protocols" to it.protocols)
         }
+        if (cap.events.isNotEmpty()) {
+            root["events"] = cap.events
+        }
         return com.kingzcheung.xime.plugin.core.lua.sdk.SimpleJson.encode(root) ?: ""
     }
 
@@ -277,7 +280,8 @@ class XmlManager(private val context: Application) {
                     com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ClipboardSyncCapabilities(
                         protocols = (m["protocols"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
                     )
-                }
+                },
+                events = (root["events"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
             )
         }.getOrNull()
     }
