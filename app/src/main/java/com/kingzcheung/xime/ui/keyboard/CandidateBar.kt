@@ -414,6 +414,8 @@ fun CandidateBar(
 
                 // 仅当左侧存在打字候选时才需要分隔线；纯联想态（无打字候选）下
                 // 该竖线会孤悬列表最左缘，属多余元素。
+                // 注意：分隔线在条件内，联想词 items 必须在条件外——纯联想态
+                // displayCandidates 为空，若一并包进条件会导致联想词整个不渲染。
                 if (displayCandidates.isNotEmpty() && displayAssociation.isNotEmpty()) {
                     item(key = "divider") {
                         Box(
@@ -424,21 +426,21 @@ fun CandidateBar(
                                 .padding(horizontal = 4.dp)
                         )
                     }
+                }
 
-                    itemsIndexed(displayAssociation, key = { index, _ -> "assoc-$index" }) { index, candidate ->
-                        val assocState = state as? CandidateBarState.AssociationOnly
-                        CandidateItem(
-                            text = candidate,
-                            index = -1,
-                            onClick = { callbacks.onAssociationSelect?.invoke(index) },
-                            textColor = visuals.textColor,
-                            comment = displayComments.getOrElse(index) { "" },
-                            isSelected = assocState?.highlightIndex == index,
-                            accentColor = visuals.accentColor,
-                            selectedTextColor = visuals.selectedTextColor,
-                            fontSize = candidateTextSize.sp
-                        )
-                    }
+                itemsIndexed(displayAssociation, key = { index, _ -> "assoc-$index" }) { index, candidate ->
+                    val assocState = state as? CandidateBarState.AssociationOnly
+                    CandidateItem(
+                        text = candidate,
+                        index = -1,
+                        onClick = { callbacks.onAssociationSelect?.invoke(index) },
+                        textColor = visuals.textColor,
+                        comment = displayComments.getOrElse(index) { "" },
+                        isSelected = assocState?.highlightIndex == index,
+                        accentColor = visuals.accentColor,
+                        selectedTextColor = visuals.selectedTextColor,
+                        fontSize = candidateTextSize.sp
+                    )
                 }
             }
 
