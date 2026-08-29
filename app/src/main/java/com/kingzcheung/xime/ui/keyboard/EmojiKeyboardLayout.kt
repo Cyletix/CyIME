@@ -53,6 +53,7 @@ import coil.request.ImageRequest
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.data.EmojiCategory
 import com.kingzcheung.xime.data.EmojiData
+import com.kingzcheung.xime.data.RecentUsageStore
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import com.kingzcheung.xime.plugin.core.api.PluginIcon
@@ -85,6 +86,15 @@ fun EmojiKeyboardLayout(
     val pluginCategories = allCategories.filter { it.isPlugin }
     val builtinCategories = allCategories.filter { !it.isPlugin }
 
+    // 最近使用（LRU）：作为内置分区的第一个子分类页，点击 emoji 时置顶记录
+    var recentEmojis by remember {
+        mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_EMOJIS))
+    }
+    val recentCategory = EmojiCategory(name = "最近使用", icon = "🕘", emojis = recentEmojis)
+    val displayBuiltinCategories = remember(builtinCategories, recentEmojis) {
+        listOf(recentCategory) + builtinCategories
+    }
+
     // 按 pluginId 分组插件子分类（用于顶层 tab 和底部子分类 tab）
     val pluginGroupEntries = remember(pluginCategories) {
         pluginCategories.groupBy { it.pluginId ?: it.name }.entries.toList()
@@ -92,7 +102,7 @@ fun EmojiKeyboardLayout(
 
     // 当前顶层 tab 对应的子分类列表
     val currentSubCategories = if (selectedTopTabIndex == 0) {
-        builtinCategories
+        displayBuiltinCategories
     } else {
         val groupIdx = selectedTopTabIndex - 1
         if (groupIdx < pluginGroupEntries.size) pluginGroupEntries[groupIdx].value
@@ -101,14 +111,14 @@ fun EmojiKeyboardLayout(
 
     // 所有页面的扁平索引（用于动画过渡）
     val currentPageIndex = if (selectedTopTabIndex == 0) {
-        selectedSubCategoryIndex.coerceIn(0, maxOf(0, builtinCategories.lastIndex))
+        selectedSubCategoryIndex.coerceIn(0, maxOf(0, displayBuiltinCategories.lastIndex))
     } else {
         val groupIdx = selectedTopTabIndex - 1
-        val startPage = builtinCategories.size + pluginGroupEntries.take(groupIdx).sumOf { it.value.size }
+        val startPage = displayBuiltinCategories.size + pluginGroupEntries.take(groupIdx).sumOf { it.value.size }
         val groupSize = if (groupIdx < pluginGroupEntries.size) pluginGroupEntries[groupIdx].value.lastIndex else 0
         startPage + selectedSubCategoryIndex.coerceIn(0, maxOf(0, groupSize))
     }
-    val totalPages = builtinCategories.size + pluginCategories.size
+    val totalPages = displayBuiltinCategories.size + pluginCategories.size
 
     val configuration = LocalConfiguration.current
     val isLandscape =
@@ -118,7 +128,7 @@ fun EmojiKeyboardLayout(
     // 当前显示的类别
     val currentCategory =
         if (selectedTopTabIndex == 0) {
-            if (builtinCategories.isNotEmpty()) builtinCategories[selectedSubCategoryIndex.coerceIn(0, builtinCategories.lastIndex)]
+            if (displayBuiltinCategories.isNotEmpty()) displayBuiltinCategories[selectedSubCategoryIndex.coerceIn(0, displayBuiltinCategories.lastIndex)]
             else EmojiData.categories.first()
         } else {
             val groupIdx = selectedTopTabIndex - 1
@@ -256,7 +266,7 @@ fun EmojiKeyboardLayout(
         LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
             val page = pagerState.currentPage
             if (!pagerState.isScrollInProgress && page != currentPageIndex) {
-                if (page < builtinCategories.size) {
+                if (page < displayBuiltinCategories.size) {
                     selectedTopTabIndex = 0
                     selectedSubCategoryIndex = page
                 } else {
@@ -282,10 +292,10 @@ fun EmojiKeyboardLayout(
                 .padding(horizontal = if (isLandscape) 50.dp else 4.dp)
                 .padding(bottom = 4.dp)
         ) { pageIndex ->
-            val category = if (pageIndex < builtinCategories.size) {
-                builtinCategories[pageIndex]
+            val category = if (pageIndex < displayBuiltinCategories.size) {
+                displayBuiltinCategories[pageIndex]
             } else {
-                pluginCategories[pageIndex - builtinCategories.size]
+                pluginCategories[pageIndex - displayBuiltinCategories.size]
             }
 
             val emojiColumns = if (isLandscape) 15 else 8
@@ -348,6 +358,18 @@ fun EmojiKeyboardLayout(
                         }
                     }
                 }
+            } else if (category.emojis.isEmpty()) {
+                // 最近使用为空时的占位提示
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "暂无最近使用",
+                        color = textColor.copy(alpha = 0.5f),
+                        fontSize = 14.sp
+                    )
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -361,7 +383,12 @@ fun EmojiKeyboardLayout(
                             rowEmojis.forEach { emoji ->
                                 EmojiButton(
                                     emoji = emoji,
-                                    onClick = { onEmojiSelect(emoji) },
+                                    onClick = {
+                                        recentEmojis = RecentUsageStore.record(
+                                            context, RecentUsageStore.KEY_RECENT_EMOJIS, emoji
+                                        )
+                                        onEmojiSelect(emoji)
+                                    },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
