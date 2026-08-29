@@ -11,7 +11,7 @@ import org.luaj.vm2.LuaValue
  *
  * 这里是宿主强制协议（见 [ToolPlugin] 契约）的校验点：
  * 插件返回的 items 不符合协议时，非法数据被丢弃并输出协议错误日志，
- * 不再静默忽略——宿主 UI（ToolPanel/AiResultPanel）消费的永远是协议合规数据。
+ * 不再静默忽略——宿主 UI（ToolPanel/InfoPanel）消费的永远是协议合规数据。
  * 单条（SINGLE）与列表（MULTIPLE）结果统一为 [PluginResultItem] 列表，
  * 宿主不感知传输方式（HTTP/SSE）；结果呈现由元数据（manifest.capabilities.tool）声明。
  */

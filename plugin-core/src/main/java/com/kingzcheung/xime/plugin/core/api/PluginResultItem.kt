@@ -10,7 +10,7 @@ package com.kingzcheung.xime.plugin.core.api
  * - `imageUrl` 可选，图文项图片路径（emoji 通过 host.resource.path 得到）
  *
  * emoji 显示用 [text]，点击上屏 [insertText] ?: [text]；
- * tool 面板/AiResultPanel 显示与上屏均用 [text]。
+ * tool 面板（ToolPanel/InfoPanel）显示与上屏均用 [text]。
  */
 data class PluginResultItem(
     val id: String,

@@ -294,34 +294,21 @@ fun KeyboardView(
                 )
             }
 
-            if (state.toolPanelVisible) {
-                if (state.toolPanelDisplay == "PASSIVE") {
-                    // 纯展示面板：声明式 ui 节点树，无输入框/生成动作（数据由插件事件驱动）
-                    InfoPanel(
-                        title = state.toolPanelTitle,
-                        nodes = state.toolPanelUiNodes ?: emptyList(),
-                        isLoading = state.toolPanelLoading,
-                        backgroundColor = Color.Transparent,
-                        textColor = keyTextColor,
-                        accentColor = accentColor,
-                        cardBgColor = keyBgColor,
-                        onClose = { callbacks.onToolPanelClose?.invoke() },
-                        onAction = { actionId -> callbacks.onToolPanelAction?.invoke(actionId) },
-                    )
-                } else {
-                    ToolPanel(
-                        title = state.toolPanelTitle,
-                        isFocused = state.toolPanelInputFocused,
-                        isLoading = state.toolPanelLoading,
-                        initialText = state.toolPanelPrefillText,
-                        backgroundColor = Color.Transparent,
-                        textColor = keyTextColor,
-                        accentColor = accentColor,
-                        cardBgColor = keyBgColor,
-                        onClose = { callbacks.onToolPanelClose?.invoke() },
-                        onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
-                    )
-                }
+            // ACTIVE 输入面板在候选栏上方（需要 EditText 输入，保留候选栏可见）；
+            // PASSIVE 纯展示面板走 Overlay 全屏（KeyboardView 底部 Overlay 分支渲染 InfoPanel）
+            if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE") {
+                ToolPanel(
+                    title = state.toolPanelTitle,
+                    isFocused = state.toolPanelInputFocused,
+                    isLoading = state.toolPanelLoading,
+                    initialText = state.toolPanelPrefillText,
+                    backgroundColor = Color.Transparent,
+                    textColor = keyTextColor,
+                    accentColor = accentColor,
+                    cardBgColor = keyBgColor,
+                    onClose = { callbacks.onToolPanelClose?.invoke() },
+                    onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                )
             }
 
             CandidateBar(
@@ -1067,19 +1054,19 @@ fun KeyboardView(
                         bottomPaddingDp = state.keyboardBottomPaddingDp,
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
-                    is OverlayRoute.ToolPanel -> {}
-                    is OverlayRoute.ToolResult -> AiResultPanel(
+                    is OverlayRoute.ToolPanel -> InfoPanel(
                         title = state.toolPanelTitle,
+                        nodes = state.toolPanelUiNodes ?: emptyList(),
                         items = state.toolPanelItems,
                         isLoading = state.toolPanelLoading,
                         backgroundColor = keyboardBgColor,
                         textColor = keyTextColor,
                         accentColor = accentColor,
-                        cardBgColor = keyBgColor,
+                        itemBgColor = keyBgColor,
                         bottomPaddingDp = state.keyboardBottomPaddingDp,
-                        onBack = { viewModel.closeOverlay() },
+                        onClose = { callbacks.onToolPanelClose?.invoke() },
+                        onAction = { actionId -> callbacks.onToolPanelAction?.invoke(actionId) },
                         onItemClick = { item -> callbacks.onToolPanelItemClick?.invoke(item) },
-                        onRegenerate = { callbacks.onToolPanelRegenerate?.invoke() },
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                 }

@@ -217,7 +217,6 @@ internal fun rememberImeKeyboardCallbacks(
             onOpenToolPanel = { pluginId -> service.openToolPanel(pluginId) },
             onToolPanelClose = { service.closeToolPanel() },
             onToolPanelItemClick = { item -> service.commitToolPanelItem(item.text) },
-            onToolPanelRegenerate = { service.triggerToolPanelGenerate() },
             onToolPanelAction = { actionId -> service.dispatchToolPanelAction(actionId) },
             onToolPanelFocusChange = { focused ->
                 service.uiState.value = service.uiState.value.copy(

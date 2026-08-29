@@ -68,7 +68,7 @@ data class InputUIState(
     val toolPanelLoading: Boolean = false,
     /** 面板请求代际号（防旧结果回填闪动）。 */
     val toolPanelRequestEpoch: Long = 0,
-    /** 面板展示模式（manifest display.name）：PASSIVE 时渲染纯展示 InfoPanel。 */
+    /** 面板展示模式（manifest display.name）：PASSIVE 时以 Overlay 全屏渲染纯展示 InfoPanel（与表情/符号同级）。 */
     val toolPanelDisplay: String? = null,
     /** passive 纯展示节点树（getPanelState.ui，白名单节点声明式 UI）。 */
     val toolPanelUiNodes: List<Map<*, *>>? = null,
