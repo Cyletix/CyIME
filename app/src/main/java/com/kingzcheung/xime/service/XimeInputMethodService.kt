@@ -917,6 +917,26 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     private var insetsRecomputePending = false
 
+    /**
+     * onGloballyPositioned 无条件记录的键盘内容顶部最新 y。
+     * pending 期间 y 更新被跳过（防 +1dp hack 抖动循环），但跳过的 y 是真实布局
+     * 结果（如快捷发送面板撑高 200dp）——丢掉会让 onComputeInsets 按旧 topPx
+     * 算 touchable region：面板可见却整个区域不可触摸（点关闭无响应）。
+     * pending 清除后由 [applyLatestContentTop] 补应用。
+     */
+    private var latestContentTopY = Int.MIN_VALUE
+
+    private fun applyLatestContentTop() {
+        if (latestContentTopY == Int.MIN_VALUE) return
+        if (latestContentTopY != keyboardContentTopPx) {
+            keyboardContentTopPx = latestContentTopY
+            android.util.Log.d("ImeWindowInsets", "contentBox late-apply y=$latestContentTopY")
+            // 刚才那轮 hack 是按旧 topPx 算的 insets，需再跑一轮让系统按新值重算；
+            // 第二轮的 ±1dp 抖动不会改变真实 y（== topPx）→ applyLatestContentTop 不再触发，收敛
+            forceInsetsRecompute()
+        }
+    }
+
     internal fun forceInsetsRecompute() {
         if (!::keyboardContainer.isInitialized) return
         if (insetsRecomputePending) return
@@ -928,6 +948,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             keyboardContainer.post {
                 keyboardContainer.resetHeight()
                 insetsRecomputePending = false
+                applyLatestContentTop()
             }
         } else {
             keyboardContainer.post { keyboardContainer.requestLayout() }
@@ -1209,11 +1230,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 快捷发送 / 工具面板为"键盘上方的撑高面板"：显示时键盘总高增加面板高度（面板在键盘上方，
                 // 不遮键盘按键），同时容器物理高度同步变大（updateHeight）→ IME insets 由系统确定性重算，
                 // 关闭后容器还原，彻底避免 insets 残留与白色区域。
-                val quickSendFormExtra = if (state.showQuickSendForm) 200 else 0
+                // Overlay 页面（menubar/剪贴板/emoji 等）全屏覆盖键盘内容区：激活期间撑高面板
+                // 不参与计算，否则 Overlay 页面会带上表单/工具面板的额外高度（容器整体被撑高）。
+                val isOverlayPage = page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay
+                val quickSendFormExtra = if (state.showQuickSendForm && !isOverlayPage) 200 else 0
                 // 需与 ToolPanel.TOOL_PANEL_HEIGHT(170) 保持一致，否则容器比面板多/少一截，键盘被拉高。
                 // PASSIVE 纯展示面板走 Overlay 全屏覆盖（键盘窗口内容区），不撑高。
                 val toolPanelExtra = if (state.toolPanelVisible &&
-                    state.toolPanelDisplay != "PASSIVE"
+                    state.toolPanelDisplay != "PASSIVE" &&
+                    !isOverlayPage
                 ) 170 else 0
                 val overlayPanelExtra = quickSendFormExtra + toolPanelExtra
 
@@ -1292,10 +1317,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     // insetsRecomputePending 期间的高度摆动是 +1dp hack
                                     // 自身引起的，忽略之：否则 y 在 h/h+1 间交替变化，
                                     // 每次都 != keyboardContentTopPx → 无限循环触发重算。
+                                    // 但真实布局变化（面板撑高）的 y 不能丢——无条件记录到
+                                    // latestContentTopY，pending 清除后由 applyLatestContentTop 补应用。
+                                    val y = it.positionInWindow().y.toInt()
+                                    latestContentTopY = y
                                     if (!state.isFloatingMode && !state.isCompact && !insetsRecomputePending) {
-                                        val y = it.positionInWindow().y.toInt()
                                         if (y != keyboardContentTopPx) {
                                             keyboardContentTopPx = y
+                                            android.util.Log.d("ImeWindowInsets", "contentBox y=$y h=${it.size.height} qsForm=${state.showQuickSendForm}")
                                             // Compose 内容高度/位置变化不会自动触发 IME insets
                                             // 重算（面板关闭后实测残留数秒），这里在布局完成后
                                             // 强制一次真实尺寸变化（+1dp 再还原，视觉不可见），
@@ -1303,6 +1332,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             // 值无变化时不重复触发，避免循环。
                                             mainHandler.post { forceInsetsRecompute() }
                                         }
+                                    } else {
+                                        android.util.Log.d("ImeWindowInsets", "contentBox SKIP y=$y h=${it.size.height} qsForm=${state.showQuickSendForm} pending=$insetsRecomputePending float=${state.isFloatingMode} compact=${state.isCompact}")
                                     }
                                 }
                         ) {
@@ -1933,6 +1964,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         super.onWindowHidden()
         clearInputState()
         recentClipboardItemsState.value = emptyList()
+        // 键盘隐藏时重置快捷发送表单临时态：表单开启状态下直接隐藏键盘（未走 onClose）
+        // 会把 showQuickSendForm 残留到下次弹窗，候选栏上方渲染出残留表单背景造成遮挡；
+        // 回车键文案也需一并还原（打开表单时被改为"确定"）。
+        if (uiState.value.showQuickSendForm || uiState.value.quickSendFormFocused) {
+            uiState.value = uiState.value.copy(
+                showQuickSendForm = false,
+                quickSendFormFocused = false,
+                quickSendEditingItemId = null,
+                quickSendEditingItemText = "",
+                enterKeyText = "发送",
+            )
+            QuickSendFormEditTextHolder.editText = null
+        }
     }
 
     override fun onWindowShown() {

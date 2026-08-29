@@ -285,6 +285,7 @@ fun KeyboardView(
                     cardBgColor = keyBgColor,
                     editingItemId = state.quickSendEditingItemId,
                     onClose = { text: String ->
+                        android.util.Log.d("QuickSendForm", "onClose: textLen=${text.length}, editingId=${state.quickSendEditingItemId}, showForm=${state.showQuickSendForm}")
                         if (text.isNotBlank()) {
                             val editingId = state.quickSendEditingItemId
                             if (editingId != null) {
