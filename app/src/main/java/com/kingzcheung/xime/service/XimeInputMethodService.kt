@@ -562,6 +562,32 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             // 手写方案：不要调 rimeEngine.switchSchema（Rime 没有手写引擎），
                             // 也不要覆盖 savedSchema（由 onStartInput 恢复 UI）
                             Log.d(TAG, "initRimeEngine: savedSchema is handwriting, keeping current Rime schema")
+                            // UI 布局恢复：冷启动时第一次 onStartInput 先于引擎初始化完成，
+                            // RimeEngine.isInitialized()=false 会跳过 handwriting UI 恢复，
+                            // 此处必须补切，否则第一次弹出键盘停留在默认全键盘
+                            val hwDir = com.kingzcheung.xime.model.ModelStorage.getModelDir(
+                                this@XimeInputMethodService, "ochwpro"
+                            )
+                            com.kingzcheung.xime.model.ModelStorage.migrateLegacyForModel(
+                                this@XimeInputMethodService, "ochwpro"
+                            )
+                            val modelOk = java.io.File(hwDir, "ochwpro.onnx").exists() &&
+                                java.io.File(hwDir, "char_index.json").exists()
+                            if (modelOk) {
+                                val page = keyboardViewModel.page.value
+                                val alreadyHandwriting = page is com.kingzcheung.xime.keyboard.KeyboardPage.Main &&
+                                    page.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
+                                if (!alreadyHandwriting) {
+                                    keyboardViewModel.switchMain(com.kingzcheung.xime.keyboard.MainType.HANDWRITING)
+                                }
+                            } else {
+                                Log.w(TAG, "initRimeEngine: handwriting model missing, keep full keyboard")
+                                android.widget.Toast.makeText(
+                                    this@XimeInputMethodService,
+                                    "请先下载手写模型",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
                         }
                         savedSchema in availableSchemas -> {
                             // 即使 savedSchema == currentSchema 也要调用 switchSchema，
@@ -2161,6 +2187,23 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal val pluginEvents = PluginEventDispatcher(this)
 
     override fun commitText(text: String) {
+        commitTextSilently(text)
+        if (isChineseMode) {
+            mainHandler.post {
+                if (!uiState.value.isAsciiMode) {
+                    getPredictionFromPlugin(predictionManager.lastCommittedText)
+                }
+            }
+        }
+    }
+
+    /**
+     * 静默上屏：与 [commitText] 相同的落盘路径（内部编辑器重定向、InputConnection、
+     * text_committed 事件、联想上下文/输入统计），但不触发联想推理。
+     * 手写叠写自动上屏/替换使用——笔画替换频率高，逐次推理既浪费又会闪烁候选栏。
+     * 需在主线程调用。
+     */
+    internal fun commitTextSilently(text: String) {
         if (uiState.value.quickSendFormFocused) {
             mainHandler.post {
                 QuickSendFormEditTextHolder.editText?.let { et ->
@@ -2192,11 +2235,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (isChineseMode) {
             predictionManager.appendCommittedText(text)
             predictionManager.recordInput(text)
+        }
+    }
 
-            mainHandler.post {
-                if (!uiState.value.isAsciiMode) {
-                    getPredictionFromPlugin(predictionManager.lastCommittedText)
-                }
+    /**
+     * 手写活动区固化后触发一轮联想推理（基于已上屏文本）。
+     * 空格/标点上屏走全量 commitText 自带推理，无需调用此方法。
+     */
+    internal fun finalizeHandwritingPrediction() {
+        if (!isChineseMode) return
+        mainHandler.post {
+            if (!uiState.value.isAsciiMode) {
+                getPredictionFromPlugin(predictionManager.lastCommittedText)
             }
         }
     }
