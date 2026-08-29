@@ -156,7 +156,7 @@ fun rememberSwipeBubbleDrawData(
 
     val textPaint = remember {
         Paint().apply {
-            textSize = with(density) { 14.sp.toPx() }
+            textSize = with(density) { 16.sp.toPx() }
             isAntiAlias = true
         }
     }
@@ -171,9 +171,9 @@ fun rememberSwipeBubbleDrawData(
         maxOf(textPaint.measureText(displayText!!) + with(density) { 20.dp.toPx() }, minBodyWidthPx)
     }
 
-    val textSizePx = with(density) { 14.sp.toPx() }
-    val selectedFontSizePx = with(density) { 18.sp.toPx() }
-    val normalFontSizePx = with(density) { 14.sp.toPx() }
+    val textSizePx = with(density) { 16.sp.toPx() }
+    val selectedFontSizePx = with(density) { 20.sp.toPx() }
+    val normalFontSizePx = with(density) { 16.sp.toPx() }
     val selectedBgRadiusPx = with(density) { 6.dp.toPx() }
 
     val pointerCenterX = keyBounds.left + keyBounds.width / 2f
@@ -349,6 +349,7 @@ fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
                     bubbleLabelPaint.color = if (index == data.selectedLongPressIndex) accentColor else data.textColor
                     bubbleLabelPaint.textSize = fontSize
                     bubbleLabelPaint.textAlign = Paint.Align.CENTER
+                    bubbleLabelPaint.isFakeBoldText = true
                     val textY = data.bodyHeightPx / 2f - (bubbleLabelPaint.fontMetrics.ascent + bubbleLabelPaint.fontMetrics.descent) / 2f
                     canvas.drawText(item, itemLeft + cellWidth / 2f, textY, bubbleLabelPaint)
                 }
@@ -361,6 +362,7 @@ fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
             bubbleTextPaint.textSize = data.textSizePx
             bubbleTextPaint.textAlign = Paint.Align.CENTER
             bubbleTextPaint.typeface = data.chaiTypeface
+            bubbleTextPaint.isFakeBoldText = true
             val textCenterX = data.pathBodyLeft + data.pathBodyWidth / 2f
             val textY = data.bodyHeightPx / 2f - (bubbleTextPaint.fontMetrics.ascent + bubbleTextPaint.fontMetrics.descent) / 2f
             canvas.drawText(data.displayText, textCenterX, textY, bubbleTextPaint)
