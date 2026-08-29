@@ -5,7 +5,11 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Typeface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -18,6 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.keyboard.KeyboardDimensions
 import com.kingzcheung.xime.settings.SettingsPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val BubbleBodyHeight = KeyboardDimensions.BubbleHeightDown
 private val BubblePointerHeight = KeyboardDimensions.BubblePointerHeight
@@ -60,6 +68,52 @@ data class BubbleDrawData(
     val longPressIconBitmaps: List<Bitmap> = emptyList(),
     val accentArgb: Int = 0xFF8F73E2.toInt(),
 )
+
+/** 按压气泡抬起后的滞留时长：随抬起瞬间消失看不清键位提示（主流输入法约 50~80ms），取中值。 */
+private const val PRESS_BUBBLE_RELEASE_DELAY_MS = 60L
+
+/**
+ * 各布局共享的气泡状态持有器。
+ *
+ * 封装"按压气泡抬起后短暂滞留"逻辑：抬起瞬间不清空状态，而是保留气泡内容与位置
+ * [PRESS_BUBBLE_RELEASE_DELAY_MS] 毫秒再消失；期间任意新手势（新键按压/滑动/长按）
+ * 会立即取消滞留并切换为新气泡，快速连打无延迟感。
+ * 仅对按压气泡滞留——滑动选择与长按选择的气泡在松手时语义上已结束（候选已提交），立即消失。
+ */
+class SwipeBubbleController(private val scope: CoroutineScope) {
+    var state by mutableStateOf(SwipeState())
+        private set
+    var keyBounds by mutableStateOf(Rect(0f, 0f, 0f, 0f))
+        private set
+    private var releaseJob: Job? = null
+
+    fun update(newState: SwipeState, bounds: Rect) {
+        releaseJob?.cancel()
+        releaseJob = null
+        val prev = state
+        val gestureActive = newState.isSwiping || newState.isPressed || newState.isLongPress
+        if (!gestureActive &&
+            prev.isPressed && prev.pressedText != null &&
+            !prev.isSwiping && !prev.isLongPress
+        ) {
+            state = prev
+            keyBounds = bounds
+            releaseJob = scope.launch {
+                delay(PRESS_BUBBLE_RELEASE_DELAY_MS)
+                state = SwipeState()
+            }
+            return
+        }
+        state = newState
+        keyBounds = bounds
+    }
+}
+
+@Composable
+fun rememberSwipeBubbleController(): SwipeBubbleController {
+    val scope = rememberCoroutineScope()
+    return remember { SwipeBubbleController(scope) }
+}
 
 @Composable
 fun rememberSwipeBubbleDrawData(
