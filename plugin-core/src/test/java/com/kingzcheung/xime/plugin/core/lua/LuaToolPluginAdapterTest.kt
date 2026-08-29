@@ -137,16 +137,16 @@ class LuaToolPluginAdapterTest {
 
         val state = adapter.getPanelState("x")
         assertEquals(2, state.items.size)
-        // 重复 id 不会进入宿主 UI（AiResultPanel 的 LazyColumn key 依赖 id 唯一）
+        // 重复 id 不会进入宿主 UI（InfoPanel 候选条目依赖 id 唯一）
         assertEquals(listOf("a", "b"), state.items.map { it.id })
     }
 
     @Test
     fun `tool 结果显示方式来自 manifest capabilities`() {
         val config = com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ToolCapabilities(
-            display = com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT
+            display = com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE
         )
-        assertEquals(com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT, config.display)
+        assertEquals(com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE, config.display)
     }
 
     @Test

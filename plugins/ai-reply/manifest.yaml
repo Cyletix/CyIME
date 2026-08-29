@@ -11,7 +11,7 @@ icon: "应"
 description: 根据对方消息生成 3~5 条回复候选，点选上屏。支持任意 OpenAI 兼容的 chat/completions 接口。
 
 # 插件版本
-version: 0.2.0
+version: 0.3.0
 
 # 插件分类：tool 工具类（多开）
 type: tool
@@ -57,4 +57,6 @@ configSchema:
 # 能力声明
 capabilities:
   tool:
-    display: select
+    # passive：宿主渲染全屏纯展示面板（InfoPanel，与表情/符号同级），
+    # ui 节点树承载"生成"入口，items 候选在面板内点选上屏（原 select 全屏结果页已并入）
+    display: passive

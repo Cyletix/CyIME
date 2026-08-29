@@ -271,7 +271,9 @@ class XmlManager(private val context: Application) {
                 tool = (root["tool"] as? Map<*, *>)?.let { m ->
                     com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ToolCapabilities(
                         display = (m["display"] as? String)?.let { s ->
-                            com.kingzcheung.xime.plugin.core.api.ToolResult.entries
+                            // 旧契约 "select"（全屏结果页）已并入 passive（InfoPanel 内 items 点选上屏）
+                            if (s.equals("select", ignoreCase = true)) com.kingzcheung.xime.plugin.core.api.ToolResult.PASSIVE
+                            else com.kingzcheung.xime.plugin.core.api.ToolResult.entries
                                 .firstOrNull { it.name.equals(s, ignoreCase = true) }
                         }
                     )

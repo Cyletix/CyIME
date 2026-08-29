@@ -47,10 +47,6 @@ data class KeyboardCallbacks(
      */
     val onToolPanelItemClick: ((com.kingzcheung.xime.plugin.core.api.PluginResultItem) -> Unit)? = null,
     /**
-     * 通用工具面板"重新生成"。
-     */
-    val onToolPanelRegenerate: (() -> Unit)? = null,
-    /**
      * passive 纯展示面板的 action 节点点击（InfoPanel）：通知插件 actionId 并刷新面板数据。
      */
     val onToolPanelAction: ((actionId: String) -> Unit)? = null,

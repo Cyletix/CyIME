@@ -1,6 +1,9 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,41 +11,55 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 
 private const val MAX_UI_NODES = 64
 
 /**
- * passive 纯展示面板（候选栏上方，替代 ToolPanel 的输入区）。
+ * passive 纯展示面板（全屏 Overlay 页面，与表情/符号同级，覆盖键盘）。
  *
  * 渲染插件通过 getPanelState.ui 声明的白名单节点树（声明式 UI）：
  *   section(title) / text(content, style) / metric(label, value, unit?) /
  *   divider / action(label, actionId)
+ * 以及 items 候选条目（点击 → onItemClick → 宿主上屏，替代原 SELECT 全屏结果页）。
  * 未知 type 降级为文本渲染；节点数截断 [MAX_UI_NODES]；不做嵌套渲染。
  */
 @Composable
 fun InfoPanel(
     title: String,
     nodes: List<Map<*, *>>,
+    items: List<PluginResultItem> = emptyList(),
     isLoading: Boolean = false,
     backgroundColor: Color,
     textColor: Color,
     accentColor: Color,
-    cardBgColor: Color,
+    itemBgColor: Color,
+    bottomPaddingDp: Int = 0,
     onClose: () -> Unit,
     onAction: (String) -> Unit,
+    onItemClick: (PluginResultItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
@@ -51,21 +68,54 @@ fun InfoPanel(
         0.35f
     )
 
-    CandidateBarOverlayPanel(
-        heightDp = TOOL_PANEL_HEIGHT,
-        backgroundColor = backgroundColor,
-        cardBgColor = cardBgColor,
-        closeButtonBg = closeButtonBg,
-        closeButtonColor = accentColor,
-        title = title,
-        titleColor = textColor,
-        modifier = modifier,
-        onCloseClick = onClose,
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxSize()
+            .background(backgroundColor)
+            .padding(bottom = bottomPaddingDp.dp)
     ) {
+        // 导航区：关闭按钮 + 标题
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(closeButtonBg)
+                    .clickable(onClick = onClose),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "关闭",
+                    tint = accentColor,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = title,
+                color = textColor,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp, vertical = 4.dp),
         ) {
             if (nodes.isEmpty()) {
                 Text(
@@ -93,6 +143,29 @@ fun InfoPanel(
                         fontSize = 13.sp,
                         modifier = Modifier.padding(vertical = 2.dp),
                     )
+                }
+            }
+            // 候选条目（插件 getPanelState.items，点击上屏；替代原 SELECT 全屏结果页）
+            if (items.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                items.forEach { item ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(itemBgColor)
+                            .clickable { onItemClick(item) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = item.text,
+                            color = textColor,
+                            fontSize = 15.sp,
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
                 }
             }
         }

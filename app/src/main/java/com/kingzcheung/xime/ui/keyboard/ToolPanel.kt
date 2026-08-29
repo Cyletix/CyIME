@@ -26,7 +26,7 @@ internal val TOOL_PANEL_HEIGHT = 170
  * AI 工具插件输入面板（候选栏上方）。
  *
  * 仅承载输入与生成触发：输入框（预填上下文，键盘按键路由可注入）+ 生成状态提示。
- * 生成结果不再显示在此面板，多条结果由全屏页面（AiResultPanel）承载。
+ * 生成结果不再显示在此面板，多条结果由 passive 面板（InfoPanel 内 items 点选上屏）承载。
  */
 @Composable
 fun ToolPanel(

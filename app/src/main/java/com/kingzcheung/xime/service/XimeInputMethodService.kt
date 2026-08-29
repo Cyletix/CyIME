@@ -813,7 +813,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             toolPanelRequestEpoch = uiState.value.toolPanelRequestEpoch + 1,
             enterKeyText = if (display == ToolResult.PASSIVE) "发送" else "生成",
         )
-        if (display != ToolResult.PASSIVE) {
+        if (display == ToolResult.PASSIVE) {
+            // 纯展示面板与表情/符号同级：Overlay 全屏覆盖键盘，不撑高候选栏上方区域
+            keyboardViewModel.showOverlay(OverlayRoute.ToolPanel)
+        } else {
             ToolPanelEditTextHolder.editText?.let { et ->
                 et.setText(prefill)
                 et.setSelection(prefill.length)
@@ -825,17 +828,26 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /**
      * passive 纯展示面板的 action 点击：通知插件（onPanelAction）后单次重拉
      * getPanelState 刷新 ui 节点（action 改变数据后面板立即反映）。
+     * 先置 loading 再执行：同步生成（插件 onPanelAction 阻塞返回）期间面板显示加载态。
      */
     internal fun dispatchToolPanelAction(actionId: String) {
         val pluginId = uiState.value.toolPanelPluginId
         val epoch = uiState.value.toolPanelRequestEpoch
+        uiState.value = uiState.value.copy(toolPanelLoading = true)
         serviceScope.launch(Dispatchers.IO) {
             val plugin = ExtensionManager.getPluginById(pluginId) as? ToolPlugin ?: return@launch
-            plugin.onPanelAction(actionId)
-            val state = plugin.getPanelState("")
+            // runCatching：插件异常（Lua 超时/中毒）时不卡 loading，面板恢复可交互
+            val state = runCatching {
+                plugin.onPanelAction(actionId)
+                plugin.getPanelState("")
+            }.getOrNull()
             withContext(Dispatchers.Main) {
                 if (uiState.value.toolPanelRequestEpoch == epoch && uiState.value.toolPanelVisible) {
-                    uiState.value = uiState.value.copy(toolPanelUiNodes = state.ui, toolPanelLoading = state.loading)
+                    uiState.value = uiState.value.copy(
+                        toolPanelUiNodes = state?.ui,
+                        toolPanelItems = state?.items ?: uiState.value.toolPanelItems,
+                        toolPanelLoading = state?.loading ?: false,
+                    )
                 }
             }
         }
@@ -843,10 +855,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     internal fun closeToolPanel() {        toolPanelSelection = null
         stopToolPanelPoll()
-        // 结果页面（ToolResult）开着时联动关闭
+        // 面板相关 Overlay 页面（ToolPanel 纯展示页）开着时联动关闭
         val page = keyboardViewModel.page.value
         if (page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay &&
-            page.route == OverlayRoute.ToolResult
+            page.route == OverlayRoute.ToolPanel
         ) {
             keyboardViewModel.closeOverlay()
         }
@@ -923,11 +935,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return
         }
         val inputText = ToolPanelEditTextHolder.editText?.text?.toString() ?: ""
-        // 结果显示方式：插件元数据声明（manifest.capabilities.tool.display），
-        // 未声明时按结果数量兜底（1 条直接上屏，多条打开页面）
-        val display = ExtensionManager.getAllInstalledPlugins()
-            .firstOrNull { it.id == pluginId }
-            ?.capabilities?.tool?.display
         // 捕获当前代际号（openToolPanel 时递增）。轮询期间持续对比：
         // 面板被重新打开（epoch 递增）即视为过期，丢弃本轮结果。
         val epoch = uiState.value.toolPanelRequestEpoch
@@ -952,18 +959,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (!loading) break
                 delay(200)
             }
-            // 自适应结果交互：生成结束后按结果显示方式决策——
+            // 结果交互：生成结束后按结果显示方式决策——
             //   display=DIRECT → 直接上屏替换选区并关闭面板（AI 翻译/帮写等单结果场景，无需点击）
-            //   display=SELECT → 打开全屏结果页面（AiResultPanel，与表情/符号同级）供用户点击选择
-            //   display=null（未声明）→ 按结果数量兜底：1 条直接上屏，多条打开页面
+            //   display=PASSIVE → 面板本身全屏展示 items（InfoPanel 点选上屏），无需分派
+            //   display=null（未声明）→ 直接上屏（旧行为为按数量兜底开页面，页面已并入 passive 面板）
             //   空结果 → 保持面板（用户可重新生成）
             withContext(Dispatchers.Main) {
                 if (uiState.value.toolPanelVisible) {
                     val items = uiState.value.toolPanelItems
-                    val mode = display ?: when {
-                        items.size > 1 -> com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT
-                        else -> com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT
-                    }
                     when {
                         items.isEmpty() -> {
                             // 空结果：若非静默失败（插件刚记录了错误），Toast 告知用户原因
@@ -980,15 +983,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 ).show()
                             }
                         }
-                        mode == com.kingzcheung.xime.plugin.core.api.ToolResult.DIRECT ->
-                            commitToolPanelItem(items[0].text)
-                        mode == com.kingzcheung.xime.plugin.core.api.ToolResult.SELECT -> {
-                            if (!(keyboardViewModel.page.value is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay &&
-                                    (keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Overlay)?.route == OverlayRoute.ToolResult)
-                            ) {
-                                keyboardViewModel.showOverlay(OverlayRoute.ToolResult)
-                            }
-                        }
+                        else -> commitToolPanelItem(items[0].text)
                     }
                 }
             }
@@ -1178,10 +1173,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 关闭后容器还原，彻底避免 insets 残留与白色区域。
                 val quickSendFormExtra = if (state.showQuickSendForm) 200 else 0
                 // 需与 ToolPanel.TOOL_PANEL_HEIGHT(170) 保持一致，否则容器比面板多/少一截，键盘被拉高。
-                // ToolResult 全屏结果页面打开时面板被覆盖，不再撑高键盘。
-                val isToolResultPage = (keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Overlay)
-                    ?.route == OverlayRoute.ToolResult
-                val toolPanelExtra = if (state.toolPanelVisible && !isToolResultPage) 170 else 0
+                // PASSIVE 纯展示面板走 Overlay 全屏覆盖（键盘窗口内容区），不撑高。
+                val toolPanelExtra = if (state.toolPanelVisible &&
+                    state.toolPanelDisplay != "PASSIVE"
+                ) 170 else 0
                 val overlayPanelExtra = quickSendFormExtra + toolPanelExtra
 
                 XimeTheme(darkTheme = isDarkTheme, themeId = state.themeId) {

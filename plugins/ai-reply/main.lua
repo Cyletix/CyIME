@@ -2,15 +2,15 @@
 --
 -- 职责划分：
 --   Lua   = prompt 模板组装 + 调用 LLM（host.http.request）+ 解析候选列表
---   宿主  = 通用工具面板（输入框/候选渲染/选区替换上屏）+ 通用原语：
+--   宿主  = 全屏纯展示面板（InfoPanel：ui 节点树 + items 候选点选上屏）+ 通用原语：
 --     host.http.request  同步 HTTP（第 5 参 timeoutMillis 覆盖长生成超时）
 --     host.json          JSON 编解码
 --     host.config        配置存储
 --
--- 工具面板契约（host 调用）：
---   getPanelState(inputText)  返回面板状态 { inputText, items, actions, loading }
---   onPanelInput(text)        输入变化
---   onPanelAction(actionId)   按钮点击（generate = 调用 LLM）
+-- 工具面板契约（host 调用，display: passive）：
+--   getPanelState(inputText)  返回面板状态 { items, ui, loading }（入参为宿主收集的上下文）
+--   onPanelInput(text)        输入变化（passive 无输入框，保留兼容）
+--   onPanelAction(actionId)   ui 节点 action 点击（generate = 调用 LLM）
 --   onPanelItemClick(itemId)  点候选（上屏由宿主完成）
 
 local plugin = {}
@@ -27,6 +27,7 @@ local DEFAULTS = {
 }
 
 local lastContext = ""
+local lastError = ""
 local cachedItems = {}
 local generating = false
 
@@ -123,11 +124,41 @@ end
 
 -- ================= 工具面板契约 =================
 
+-- ui 节点树（白名单 type：section/text/metric/divider/action）：
+--   未生成 → 对方消息预览 + "生成回复"按钮；失败 → 错误提示 + 重试按钮；
+--   生成中 → 空 ui（loading 字段驱动宿主显示加载态）；有候选 → 提示文字（items 由宿主渲染）
+local function buildUi()
+  local ui = {}
+  if #cachedItems > 0 then
+    ui[#ui + 1] = { type = "section", title = "回复候选" }
+    ui[#ui + 1] = { type = "text", content = "点击候选直接上屏", style = "caption" }
+  elseif generating then
+    -- loading 态：宿主显示"加载中..."
+  else
+    ui[#ui + 1] = { type = "section", title = "对方消息" }
+    if lastContext ~= "" then
+      ui[#ui + 1] = { type = "text", content = lastContext }
+    else
+      ui[#ui + 1] = { type = "text", content = "暂无上下文：先复制对方消息，再从工具栏打开本面板", style = "caption" }
+    end
+    if lastError ~= "" then
+      ui[#ui + 1] = { type = "text", content = lastError, style = "caption" }
+    end
+    ui[#ui + 1] = { type = "action", label = lastError ~= "" and "重新生成" or "生成回复", actionId = "generate" }
+  end
+  return ui
+end
+
 function plugin.getPanelState(inputText)
+  -- openToolPanel 时宿主传入收集的上下文（选区 > 输入框 > 剪贴板）；
+  -- action 点击后的单次重拉传空串，不覆盖已有上下文
+  if inputText ~= nil and trim(inputText) ~= "" then
+    lastContext = trim(inputText)
+  end
   return {
-    inputText = inputText,
     items = cachedItems,
     loading = generating,
+    ui = buildUi(),
   }
 end
 
@@ -139,18 +170,19 @@ function plugin.onPanelAction(actionId)
   if actionId ~= "generate" then return end
   local context = trim(lastContext)
   if context == "" then
-    host.logError("请先输入对方消息")
+    lastError = "请先复制对方消息再打开本面板"
     return
   end
   if generating then return end
 
   local apiKey = host.config.get(KEY_API_KEY) or ""
   if apiKey == "" then
-    host.logError("AI 智能回复未配置 API Key")
+    lastError = "未配置 API Key，请到插件中心配置"
     return
   end
 
   generating = true
+  lastError = ""
   cachedItems = {}
 
   local baseUrl = host.config.get(KEY_BASE_URL) or DEFAULTS.baseUrl
@@ -175,12 +207,14 @@ function plugin.onPanelAction(actionId)
 
   local resp = host.http.request("POST", url, headers, body, 60000)
   if resp == nil then
-    host.logError("AI 请求失败: " .. (host.http.lastError() or "未知错误"))
+    lastError = "AI 请求失败: " .. (host.http.lastError() or "未知错误")
+    host.logError(lastError)
     generating = false
     return
   end
   if resp.status ~= 200 then
-    host.logError("AI 接口返回 " .. tostring(resp.status) .. ": " .. resp.text)
+    lastError = "AI 接口返回 " .. tostring(resp.status)
+    host.logError(lastError .. ": " .. resp.text)
     generating = false
     return
   end
@@ -194,6 +228,9 @@ function plugin.onPanelAction(actionId)
         items[#items + 1] = item
       end
     end
+  end
+  if #items == 0 then
+    lastError = "未解析到候选，请重试"
   end
   cachedItems = items
   generating = false
