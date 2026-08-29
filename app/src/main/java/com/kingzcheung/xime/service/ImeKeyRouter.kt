@@ -118,7 +118,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
             }
         }
-        if (service.uiState.value.quickSendFormFocused) {
+        // 表单显示期间（无论 EditText 是否持有焦点）都拦截：
+        // 焦点可能因点击表单外区域丢失，此时回车仍应提交并关闭表单、
+        // 退格仍应作用于表单输入框，否则按键落入普通输入语义造成"关闭无效"。
+        if (service.uiState.value.showQuickSendForm) {
             when (key) {
                 "enter" -> {
                     val editText = QuickSendFormEditTextHolder.editText

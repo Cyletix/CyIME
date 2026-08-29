@@ -352,6 +352,11 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onShowQuickSendForm = {
                 service.closeToolPanel()
+                // 从 Overlay 页面（剪贴板面板）打开表单时必须退出 Overlay：
+                // Overlay 渲染为全屏 clickable Box（吞点击），若不退出，表单会被
+                // 盖在其下——可见但关闭按钮等点击全部失效（时灵时不灵的根源：
+                // 从主键盘打开则无叠加）。
+                service.keyboardViewModel.closeOverlay()
                 val current = service.uiState.value
                 service.uiState.value = current.copy(
                     showQuickSendForm = true,
@@ -360,9 +365,13 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendEditingItemText = "",
                     enterKeyText = "确定",
                 )
-                service.forceInsetsRecompute()
+                // 不在此处 forceInsetsRecompute：此刻 Compose 尚未布局，hack 会用旧高度
+                // 白跑一轮且 pending=true 挡掉撑高后的第一次 y 更新（曾导致表单可见
+                // 却不可触摸）。布局撑高完成后 onGloballyPositioned 会以新 y 触发重算。
             },
             onQuickSendEditItem = { id, text ->
+                // 同 onShowQuickSendForm：编辑入口在剪贴板面板内，先退出 Overlay 防表单被盖
+                service.keyboardViewModel.closeOverlay()
                 service.uiState.value = service.uiState.value.copy(
                     showQuickSendForm = true,
                     quickSendFormFocused = true,
@@ -376,6 +385,7 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onHideQuickSendForm = {
+                android.util.Log.d("QuickSendForm", "onHideQuickSendForm invoked")
                 service.uiState.value = service.uiState.value.copy(
                     showQuickSendForm = false,
                     quickSendFormFocused = false,
@@ -389,10 +399,15 @@ internal fun rememberImeKeyboardCallbacks(
                 service.forceInsetsRecompute()
             },
             onQuickSendFormFocusChange = { focused: Boolean ->
-                service.uiState.value = service.uiState.value.copy(
-                    quickSendFormFocused = focused,
-                    enterKeyText = if (focused) "确定" else "发送",
-                )
+                // 聚焦时回车键为"确定"；失焦不改文案——表单仍显示，回车保持"确定"
+                // 语义（提交并关闭，由 handleKeyPress 的 showQuickSendForm 分支保证）。
+                // 关闭表单时由 onHideQuickSendForm / onWindowHidden 统一还原"发送"。
+                val s = service.uiState.value
+                service.uiState.value = if (focused) {
+                    s.copy(quickSendFormFocused = true, enterKeyText = "确定")
+                } else {
+                    s.copy(quickSendFormFocused = false)
+                }
             },
         )
     }
