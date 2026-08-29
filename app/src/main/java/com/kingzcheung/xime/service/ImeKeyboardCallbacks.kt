@@ -83,6 +83,14 @@ internal fun rememberImeKeyboardCallbacks(
                             )
                         }
                     } else {
+                        // 单次联想模式（仅中文模式——英文 commitText 不触发推理，
+                        // 否则抑制标志会悬挂并吞掉下次切回中文后的首轮推理）：
+                        // 联想候选上屏前先置抑制标志——commitText 触发的下一轮自动推理
+                        // 被跳过并清空联想候选（只推理一次）。
+                        // 连续联想模式：不抑制，commitText 自动推理新联想（一直上屏一直推理）。
+                        if (!service.uiState.value.isAsciiMode && SettingsPreferences.isSingleAssociationMode(service)) {
+                            service.predictionManager.suppressNextPredictionOnce()
+                        }
                         service.commitText(text)
                         service.updateUI()
                     }
