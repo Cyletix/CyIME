@@ -233,6 +233,13 @@ fun KeyboardView(
             var handwritingComments by remember { mutableStateOf<List<String>>(emptyList()) }
             var handwritingClearSignal by remember { mutableIntStateOf(0) }
             var isHandwritingLookup by remember { mutableStateOf(false) }
+            // 手写叠写状态真源：tailText=屏上手写会话尾部文本（含固化+活动字）；
+            // activeLen=其中活动部分长度（可被识别结果替换/固化/撤销）；
+            // lastSegLen=最后一次识别的段长（停顿定型不清零）——点选替换据此定位
+            // "最后上屏的字"（停顿后再点候选仍可替换，而非追加）
+            var handwritingTail by remember { mutableStateOf("") }
+            var handwritingActiveLen by remember { mutableStateOf(0) }
+            var handwritingLastSegLen by remember { mutableStateOf(0) }
 
             val isHandwritingPage = page is KeyboardPage.Main && (page as KeyboardPage.Main).type == MainType.HANDWRITING
             val showHandwritingCandidates = (isHandwritingPage || isHandwritingLookup) && handwritingCandidates.isNotEmpty()
@@ -369,11 +376,27 @@ fun KeyboardView(
                 callbacks = CandidateBarCallbacks(
                     onCandidateSelect = { index ->
                         if (showHandwritingCandidates && index in handwritingCandidates.indices) {
-                            val ch = handwritingCandidates[index]
-                            callbacks.onCommitText?.invoke(ch)
-                            handwritingCandidates = emptyList()
-                            handwritingComments = emptyList()
-                            handwritingClearSignal++
+                            if (isHandwritingLookup) {
+                                // 手写查词：直接上屏（原有行为）
+                                val ch = handwritingCandidates[index]
+                                callbacks.onCommitText?.invoke(ch)
+                                handwritingCandidates = emptyList()
+                                handwritingComments = emptyList()
+                                handwritingClearSignal++
+                            } else {
+                                // 兜底路径（AssociationOnly 正常走 onAssociationSelect）：
+                                // 与点选替换同语义；候选栏保留供继续改选
+                                val ch = handwritingCandidates[index]
+                                if (index > 0 && handwritingLastSegLen > 0) {
+                                    val newTail = handwritingTail.dropLast(handwritingLastSegLen) + ch
+                                    val ok = callbacks.onHandwritingAutoCommit?.invoke(newTail, handwritingTail) ?: false
+                                    if (ok || handwritingTail.isEmpty()) handwritingTail = newTail
+                                    handwritingLastSegLen = ch.length
+                                }
+                                handwritingActiveLen = 0
+                                callbacks.onHandwritingFinalize?.invoke()
+                                handwritingClearSignal++
+                            }
                         } else {
                             callbacks.onCandidateSelect(index)
                         }
@@ -417,11 +440,31 @@ fun KeyboardView(
                     },
                     onAssociationSelect = { index ->
                         if (showHandwritingCandidates && index in handwritingCandidates.indices) {
-                            val ch = handwritingCandidates[index]
-                            callbacks.onCommitText?.invoke(ch)
-                            handwritingCandidates = emptyList()
-                            handwritingComments = emptyList()
-                            handwritingClearSignal++
+                            if (isHandwritingLookup) {
+                                // 手写查词：查词结果直接上屏（原有行为，与叠写状态无关）
+                                val ch = handwritingCandidates[index]
+                                callbacks.onCommitText?.invoke(ch)
+                                handwritingCandidates = emptyList()
+                                handwritingComments = emptyList()
+                                handwritingClearSignal++
+                            } else if (index == 0) {
+                                // 首选已自动上屏：点选仅固化当前字并触发联想。
+                                // 候选栏保留——用户可继续改点其他候选，直到下一次书写
+                                handwritingActiveLen = 0
+                                callbacks.onHandwritingFinalize?.invoke()
+                                handwritingClearSignal++
+                            } else {
+                                // 替换最后上屏的字为点选候选（停顿定型后仍可替换）。
+                                // 候选栏保留供继续改选，笔画清空
+                                val ch = handwritingCandidates[index]
+                                val newTail = handwritingTail.dropLast(handwritingLastSegLen) + ch
+                                val ok = callbacks.onHandwritingAutoCommit?.invoke(newTail, handwritingTail) ?: false
+                                if (ok || handwritingTail.isEmpty()) handwritingTail = newTail
+                                handwritingActiveLen = 0
+                                handwritingLastSegLen = ch.length
+                                callbacks.onHandwritingFinalize?.invoke()
+                                handwritingClearSignal++
+                            }
                         } else {
                             callbacks.onAssociationSelect?.invoke(index)
                         }
@@ -684,12 +727,27 @@ fun KeyboardView(
                             onKeyPress = { key ->
                                 when (key) {
                                     "delete" -> {
-                                        if (handwritingCandidates.isNotEmpty()) {
-                                            handwritingCandidates = emptyList()
-                                            handwritingComments = emptyList()
-                                            handwritingClearSignal++
-                                        } else {
-                                            callbacks.onKeyPress("delete", false)
+                                        when {
+                                            handwritingActiveLen > 0 -> {
+                                                // 撤销当前字：删屏上活动区文本，清笔画重写
+                                                callbacks.onDeleteText?.invoke(handwritingActiveLen)
+                                                handwritingTail = handwritingTail.dropLast(handwritingActiveLen)
+                                                handwritingActiveLen = 0
+                                                handwritingLastSegLen = 0
+                                                handwritingCandidates = emptyList()
+                                                handwritingComments = emptyList()
+                                                handwritingClearSignal++
+                                            }
+                                            handwritingTail.isNotEmpty() -> {
+                                                // 无活动字：退格删固化尾字，tail 乐观修剪（下次替换校验兜底）。
+                                                // 候选栏同步失效（tail 已变，点选替换无意义）
+                                                callbacks.onDeleteText?.invoke(1)
+                                                handwritingTail = handwritingTail.dropLast(1)
+                                                handwritingLastSegLen = 0
+                                                handwritingCandidates = emptyList()
+                                                handwritingComments = emptyList()
+                                            }
+                                            else -> callbacks.onKeyPress("delete", false)
                                         }
                                     }
                                     "symbol" -> viewModel.enterPanel(PanelType.COMMON_SYMBOL)
@@ -699,23 +757,61 @@ fun KeyboardView(
                                         callbacks.onKeyPress("ime_switch", false)
                                     }
                                     "space" -> {
-                                        if (handwritingCandidates.isNotEmpty()) {
-                                            val ch = handwritingCandidates[0]
-                                            callbacks.onCommitText?.invoke(ch)
-                                            handwritingCandidates = emptyList()
-                                            handwritingComments = emptyList()
-                                            handwritingClearSignal++
-                                        } else {
-                                            callbacks.onKeyPress("space", false)
-                                        }
+                                        // 当前字已自动上屏：空格=固化 + 上屏空格（全量 commitText 触发联想）。
+                                        // 选择期结束：清候选栏
+                                        handwritingActiveLen = 0
+                                        handwritingLastSegLen = 0
+                                        handwritingCandidates = emptyList()
+                                        handwritingComments = emptyList()
+                                        callbacks.onCommitText?.invoke(" ")
                                     }
-                                    "enter" -> callbacks.onKeyPress("enter", false)
-                                    else -> callbacks.onCommitText?.invoke(key)
+                                    "enter" -> {
+                                        // 换行定稿：选择期结束
+                                        handwritingActiveLen = 0
+                                        handwritingLastSegLen = 0
+                                        handwritingCandidates = emptyList()
+                                        handwritingComments = emptyList()
+                                        callbacks.onKeyPress("enter", false)
+                                    }
+                                    else -> {
+                                        // 标点等直接上屏：固化活动字 + 选择期结束
+                                        handwritingActiveLen = 0
+                                        handwritingLastSegLen = 0
+                                        handwritingCandidates = emptyList()
+                                        handwritingComments = emptyList()
+                                        callbacks.onCommitText?.invoke(key)
+                                    }
                                 }
                             },
-                            onCandidates = { candidates ->
-                                handwritingCandidates = candidates.map { it.char }
-                                handwritingComments = emptyList()
+                            onRecognition = { segments ->
+                                val segText = segments.mapNotNull { seg ->
+                                    seg.candidates.firstOrNull()?.char
+                                }.joinToString("")
+                                if (segText.isNotEmpty()) {
+                                    // 替换式上屏：活动区整体重写为最新识别结果（微信式边写边上屏）。
+                                    // 校验失败（光标漂移）时重置尾部状态，后续识别以追加模式重建
+                                    val newTail = handwritingTail.dropLast(handwritingActiveLen) + segText
+                                    val ok = callbacks.onHandwritingAutoCommit?.invoke(newTail, handwritingTail) ?: false
+                                    handwritingTail = if (ok || handwritingTail.isEmpty()) newTail else ""
+                                    handwritingActiveLen = segText.length
+                                    handwritingLastSegLen = segText.length
+                                    handwritingCandidates = segments.last().candidates.map { it.char }
+                                    handwritingComments = emptyList()
+                                }
+                            },
+                            onSegmentSettled = { ch ->
+                                // 叠写满上限：最早段固化（屏上不动，退出活动区）
+                                handwritingActiveLen = (handwritingActiveLen - ch.length).coerceAtLeast(0)
+                            },
+                            onUndoActive = {
+                                if (handwritingActiveLen > 0) {
+                                    callbacks.onDeleteText?.invoke(handwritingActiveLen)
+                                    handwritingTail = handwritingTail.dropLast(handwritingActiveLen)
+                                    handwritingActiveLen = 0
+                                    handwritingCandidates = emptyList()
+                                    handwritingComments = emptyList()
+                                    handwritingClearSignal++
+                                }
                             },
                             onButtonFeedback = { key ->
                                 callbacks.onKeyPressDown?.invoke(key)

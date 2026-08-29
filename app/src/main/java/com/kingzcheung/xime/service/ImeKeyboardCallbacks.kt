@@ -105,6 +105,17 @@ internal fun rememberImeKeyboardCallbacks(
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             onCommitText = { text -> service.textCommit.commitClipboardText(text) },
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
+            onHandwritingAutoCommit = { newTail, expectedTail ->
+                if (expectedTail.isEmpty()) {
+                    service.commitTextSilently(newTail)
+                    true
+                } else {
+                    // 光标前文本与手写尾部不对应（用户移动过光标/退格过）时不上屏，
+                    // 调用方重置手写尾部状态后以追加模式重建，避免误删/重复上屏
+                    service.replaceBeforeCursor(expectedTail, newTail)
+                }
+            },
+            onHandwritingFinalize = { service.finalizeHandwritingPrediction() },
             onQuickSend = {},
             onKeyboardResize = {
                 val config = service.resources.configuration

@@ -110,4 +110,15 @@ data class KeyboardCallbacks(
      * 服务层负责上屏首位候选词或待确认英文，再由键盘层切换布局。
      */
     val onCommitCandidateBeforeModeChange: (() -> Unit)? = null,
+    /**
+     * 手写叠写自动上屏：把屏上手写尾部 [expectedTail] 替换为 [newTail]
+     * （静默上屏——不触发联想推理）。返回是否成功：
+     * 期望校验失败（用户移动过光标/退格过）返回 false 且不上屏，
+     * 调用方应重置手写尾部状态（后续识别以追加模式重建）。需在主线程调用。
+     */
+    val onHandwritingAutoCommit: ((newTail: String, expectedTail: String) -> Boolean)? = null,
+    /**
+     * 手写活动区固化（停顿/点选确认）后触发联想推理（基于已上屏文本）。
+     */
+    val onHandwritingFinalize: (() -> Unit)? = null,
 )
