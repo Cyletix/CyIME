@@ -118,6 +118,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     private fun showInputBoxComposition(ic: android.view.inputmethod.InputConnection, displayText: String) {
         // 第二参数为 1：光标相对编码起始偏移 1 个字符，使光标落在编码末尾，
         // 避免传 displayText.length 时被 AOSP 钳制到整段文本末尾（光标跑到最右边）。
+        // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
+        // 否则该调用会在光标处插入空串，光标处有选中文字时等于删除选区。
+        service.markInputBoxComposing()
         ic.beginBatchEdit()
         try {
             ic.setComposingText(displayText, 1)

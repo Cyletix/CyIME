@@ -20,7 +20,9 @@ class VoiceRecognitionHandler(
     private val getInputConnection: () -> InputConnection?,
     private val onVoiceComplete: () -> Unit = {},
     private val onAmplitudeChanged: (Float) -> Unit = {},
-    private val onSpectrumChanged: (FloatArray) -> Unit = {}
+    private val onSpectrumChanged: (FloatArray) -> Unit = {},
+    /** 语音向输入框写入 composing 文本时回调（标记 composing 区域存在，供 endComposingInputBox 判断）。 */
+    private val onComposingWritten: () -> Unit = {}
 ) {
     companion object {
         private const val TAG = "VoiceRecognition"
@@ -255,6 +257,7 @@ class VoiceRecognitionHandler(
         
         val ic = getInputConnection()
         if (ic != null) {
+            onComposingWritten()
             ic.setComposingText(cleanText, 1)
         }
         onStateChanged(getState().copy(voiceRecognizedText = cleanText))

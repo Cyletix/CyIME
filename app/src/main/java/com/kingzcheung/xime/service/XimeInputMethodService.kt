@@ -291,7 +291,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         },
         onSpectrumChanged = { spectrum ->
             voiceSpectrumState.value = spectrum
-        }
+        },
+        onComposingWritten = { markInputBoxComposing() }
     )
 
     /**
@@ -1540,6 +1541,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 敏感输入框（密码等）判定 + composing 去重标志重置（详见 PluginEventDispatcher）
         pluginEvents.onStartInput(attribute)
 
+        // 输入 target 变化：旧编辑框的 composing 区域不再可达，复位标记。
+        // 防御 stale 标记导致 endComposingInputBox 对新编辑框执行 setComposingText("")
+        // （无 composing 时会在光标处插入空串，选中文字时等于删除选区）。
+        if (!restarting) {
+            inputBoxComposingActive = false
+        }
+
         predictionManager.clearCommittedText()
         // 新输入会话清空 partial commit 累积：外部 UI（如设置页输入框"清除"按钮仅清 Compose
         // state）会触发 restartInput → 此处重建 T9，若残留累积会被 buildT9DisplayState 拼进
@@ -1946,17 +1954,35 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /**
-     * 结束输入框中的 composing span，先清空内容再结束，避免转为 committed text。
+     * 输入框是否存在 IME 写入的 composing 区域（拼音编码回显 / 语音识别临时文本）。
+     * Android 无法查询宿主编辑器的 composing 状态，由写入点主动标记。
+     */
+    private var inputBoxComposingActive = false
+
+    /** 标记刚向输入框写入了 composing 文本（showInputBoxComposition / 语音 partial）。 */
+    internal fun markInputBoxComposing() {
+        inputBoxComposingActive = true
+    }
+
+    /**
+     * 清理输入框中的 composing 区域（未上屏的拼音编码 / 语音临时文本）。
      *
      * 无论输入位置设置（输入框/候选栏）都执行。
-     * 英文输入改为直接上屏模式后不再写入 composing 文本（本方法对英文变为空操作），
-     * 但中文输入框模式仍会产生 composing 区，需在此清理。
+     * 注意：composing 区域不存在时 [InputConnection.setComposingText] 并非空操作——
+     * 它会在光标处"插入"空串，光标处有选中文字时等于删除整个选区
+     * （收起键盘/焦点切换误删选中文字的根因）。因此仅在标记过 composing 时才清空，
+     * 否则只调用 finishComposingText（无 composing 时是无害空操作，仅兜底清理残留 span）。
      */
     internal fun endComposingInputBox() {
         currentInputConnection?.let {
-            it.setComposingText("", 0)
-            it.finishComposingText()
+            if (inputBoxComposingActive) {
+                it.setComposingText("", 0)
+                it.finishComposingText()
+            } else {
+                it.finishComposingText()
+            }
         }
+        inputBoxComposingActive = false
     }
 
     /**
