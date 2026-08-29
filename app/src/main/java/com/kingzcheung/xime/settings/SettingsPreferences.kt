@@ -25,6 +25,8 @@ object SettingsPreferences {
     const val KEY_SMART_PREDICTION_ENABLED = "smart_prediction_enabled"
     private const val KEY_PREDICTION_MODEL_REPO = "prediction_model_repo"
     private const val KEY_PREDICTION_SELECTED_MODEL = "prediction_selected_model"
+    private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
+    private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
     
     const val KEY_STT_ENABLED = "stt_enabled"
     const val KEY_STT_ONLINE_PLUGIN_ID = "stt_online_plugin_id"
@@ -354,6 +356,27 @@ object SettingsPreferences {
     
     fun setPredictionSelectedModel(context: Context, modelId: String) {
         getPrefs(context).edit().putString(KEY_PREDICTION_SELECTED_MODEL, modelId).apply()
+    }
+
+    /** 空格上屏联想候选：有联想候选时按空格键直接上屏第一个联想词（而非空格字符） */
+    fun isSpaceCommitAssociationEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SPACE_COMMIT_ASSOCIATION, false)
+    }
+
+    fun setSpaceCommitAssociationEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SPACE_COMMIT_ASSOCIATION, enabled).apply()
+    }
+
+    /**
+     * 联想模式：false = 连续联想（联想上屏后继续推理，可连续上屏），true = 单次联想（只推理一次）。
+     * 默认连续（保持历史行为）。
+     */
+    fun isSingleAssociationMode(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_ASSOCIATION_SINGLE_MODE, false)
+    }
+
+    fun setAssociationSingleMode(context: Context, single: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_ASSOCIATION_SINGLE_MODE, single).apply()
     }
     
     fun isSttEnabled(context: Context): Boolean {

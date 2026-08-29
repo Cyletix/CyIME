@@ -384,6 +384,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 needsUIUpdate = true
                             }
                         }
+                    } else if (!state.isAsciiMode &&
+                        SettingsPreferences.isSpaceCommitAssociationEnabled(service) &&
+                        candState.associationCandidates.isNotEmpty()
+                    ) {
+                        // 空格上屏联想候选（中文模式 + 开关开启 + 联想候选存在）：上屏第一个联想词。
+                        // 仅中文联想——英文模式此分支不生效，空格保持上屏空格字符；
+                        // 连续联想模式：commitText 会自动触发下一轮推理（一直上屏一直推理）；
+                        // 单次联想模式：先置抑制标志，上屏引发的那轮推理被跳过并清空联想候选。
+                        val association = candState.associationCandidates.first()
+                        withContext(Dispatchers.Main) {
+                            if (SettingsPreferences.isSingleAssociationMode(service)) {
+                                service.predictionManager.suppressNextPredictionOnce()
+                            }
+                            service.commitText(association)
+                        }
                     } else {
                         withContext(Dispatchers.Main) {
                             service.commitText(" ")
