@@ -28,7 +28,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val BubbleBodyHeight = KeyboardDimensions.BubbleHeightDown
-private val BubblePointerHeight = KeyboardDimensions.BubblePointerHeight
 private val BubbleCornerRadius = KeyboardDimensions.BubbleCornerRadius
 private val BubbleScreenMargin = 4.dp
 
@@ -137,12 +136,14 @@ fun rememberSwipeBubbleDrawData(
 
     val density = LocalDensity.current
     val bodyHeightPx = with(density) { BubbleBodyHeight.toPx() }
-    val pointerHeightPx = with(density) { (BubblePointerHeight + 5.dp).toPx() }
+    // 尖端完整覆盖按下的按键（与按键同高），宽体锚定按键顶部悬在上方（见 boxTop）。
+    // 全部基于真实按键 bounds 计算，不再用 KeyHeight 估算值——
+    // 键盘高度被调大时估算失准，宽体会下沉进按键被手指挡住。
+    val pointerHeightPx = keyBounds.height
     val cornerRadiusPx = with(density) { BubbleCornerRadius.toPx() }
     val screenMarginPx = with(density) { BubbleScreenMargin.toPx() }
     val keyWidthPx = keyWidth
     val minBodyWidthPx = keyWidthPx * 1.8f
-    val totalHeightPx = bodyHeightPx + pointerHeightPx
     val shadowRadiusPx = with(density) { 4.dp.toPx() }
 
     val accentArgb = accentColor.toArgb()
@@ -185,7 +186,9 @@ fun rememberSwipeBubbleDrawData(
     val pointerLeft = pointerCenterX - keyWidthPx / 2f
     val pointerRight = pointerLeft + keyWidthPx
     val boxLeft = minOf(bodyLeft, pointerLeft)
-    val boxTop = keyBounds.top + keyBounds.height - totalHeightPx
+    // 宽体（显示文字的主体）底部对齐按键顶部，悬在按键正上方不被手指遮挡；
+    // 尖端从宽体底部向下延伸 pointerHeightPx（≈按键上半部）指示归属键。
+    val boxTop = keyBounds.top - bodyHeightPx
     val boxRight = maxOf(bodyRight, pointerRight)
 
     val rightRoom = bodyRight - pointerRight
