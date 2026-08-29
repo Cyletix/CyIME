@@ -884,14 +884,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 实测关闭面板后 insets 残留数秒（仅在下一次输入会话/窗口事件时才恢复）。
      * 这里通过容器做一次真实尺寸变化（+1dp）再立即还原（同帧内完成，视觉不可见），
      * 强制系统按 keyboardContentTopPx 重算并下发，消除残留。
+     *
+     * [insetsRecomputePending] 防重入：+1dp 到 resetHeight 还原之间为"飞行中"，
+     * 期间再次调用会读到 +1dp 后的当前高度再叠加 +1——某些 ROM 上 onApplyWindowInsets
+     * 回调时机不同导致 reset 滞后，+1dp 反复叠加/循环 → 键盘底部被持续垫高（2.7.0 用户反馈）。
      */
+    private var insetsRecomputePending = false
+
     internal fun forceInsetsRecompute() {
         if (!::keyboardContainer.isInitialized) return
+        if (insetsRecomputePending) return
         val density = resources.displayMetrics.density
         val h = keyboardContainer.height
         if (h > 0) {
+            insetsRecomputePending = true
             keyboardContainer.updateHeight((h / density).toInt() + 1)
-            keyboardContainer.post { keyboardContainer.resetHeight() }
+            keyboardContainer.post {
+                keyboardContainer.resetHeight()
+                insetsRecomputePending = false
+            }
         } else {
             keyboardContainer.post { keyboardContainer.requestLayout() }
         }
@@ -1252,7 +1263,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 .align(androidx.compose.ui.Alignment.BottomCenter)
                                 .then(if (state.isFloatingMode) Modifier else Modifier.offset(y = (-activeBottomDp).dp))
                                 .onGloballyPositioned {
-                                    if (!state.isFloatingMode && !state.isCompact) {
+                                    // insetsRecomputePending 期间的高度摆动是 +1dp hack
+                                    // 自身引起的，忽略之：否则 y 在 h/h+1 间交替变化，
+                                    // 每次都 != keyboardContentTopPx → 无限循环触发重算。
+                                    if (!state.isFloatingMode && !state.isCompact && !insetsRecomputePending) {
                                         val y = it.positionInWindow().y.toInt()
                                         if (y != keyboardContentTopPx) {
                                             keyboardContentTopPx = y
