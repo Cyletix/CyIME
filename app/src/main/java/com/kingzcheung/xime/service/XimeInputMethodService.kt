@@ -100,12 +100,9 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardView
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
-import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.theme.XimeTheme
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.util.PreeditMergeHelper
 import com.kingzcheung.xime.BuildConfig
@@ -248,9 +245,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal var currentEffectiveKeyboardHeight: Int = 0
     internal var currentFloatingCardHeightDp: Int = 0
     internal var previousSchemaId: String = ""
-    /** 键盘内容 Box 顶部在窗口中的 y 坐标（px），由 onGloballyPositioned 实测更新 */
-    private var keyboardContentTopPx: Int = -1
-    private var lastInsetsDebug: String = ""
     
     internal val calculatorEngine = com.kingzcheung.xime.calculator.CalculatorEngine()
 
@@ -849,7 +843,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 et.setSelection(prefill.length)
             }
         }
-        forceInsetsRecompute()
     }
 
     /**
@@ -902,57 +895,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             enterKeyText = "发送",
         )
         ToolPanelEditTextHolder.editText = null
-        forceInsetsRecompute()
-    }
-
-    /**
-     * Compose 内容高度变化（面板开关）不会自动触发 IME insets 重算，
-     * 实测关闭面板后 insets 残留数秒（仅在下一次输入会话/窗口事件时才恢复）。
-     * 这里通过容器做一次真实尺寸变化（+1dp）再立即还原（同帧内完成，视觉不可见），
-     * 强制系统按 keyboardContentTopPx 重算并下发，消除残留。
-     *
-     * [insetsRecomputePending] 防重入：+1dp 到 resetHeight 还原之间为"飞行中"，
-     * 期间再次调用会读到 +1dp 后的当前高度再叠加 +1——某些 ROM 上 onApplyWindowInsets
-     * 回调时机不同导致 reset 滞后，+1dp 反复叠加/循环 → 键盘底部被持续垫高（2.7.0 用户反馈）。
-     */
-    private var insetsRecomputePending = false
-
-    /**
-     * onGloballyPositioned 无条件记录的键盘内容顶部最新 y。
-     * pending 期间 y 更新被跳过（防 +1dp hack 抖动循环），但跳过的 y 是真实布局
-     * 结果（如快捷发送面板撑高 200dp）——丢掉会让 onComputeInsets 按旧 topPx
-     * 算 touchable region：面板可见却整个区域不可触摸（点关闭无响应）。
-     * pending 清除后由 [applyLatestContentTop] 补应用。
-     */
-    private var latestContentTopY = Int.MIN_VALUE
-
-    private fun applyLatestContentTop() {
-        if (latestContentTopY == Int.MIN_VALUE) return
-        if (latestContentTopY != keyboardContentTopPx) {
-            keyboardContentTopPx = latestContentTopY
-            android.util.Log.d("ImeWindowInsets", "contentBox late-apply y=$latestContentTopY")
-            // 刚才那轮 hack 是按旧 topPx 算的 insets，需再跑一轮让系统按新值重算；
-            // 第二轮的 ±1dp 抖动不会改变真实 y（== topPx）→ applyLatestContentTop 不再触发，收敛
-            forceInsetsRecompute()
-        }
-    }
-
-    internal fun forceInsetsRecompute() {
-        if (!::keyboardContainer.isInitialized) return
-        if (insetsRecomputePending) return
-        val density = resources.displayMetrics.density
-        val h = keyboardContainer.height
-        if (h > 0) {
-            insetsRecomputePending = true
-            keyboardContainer.updateHeight((h / density).toInt() + 1)
-            keyboardContainer.post {
-                keyboardContainer.resetHeight()
-                insetsRecomputePending = false
-                applyLatestContentTop()
-            }
-        } else {
-            keyboardContainer.post { keyboardContainer.requestLayout() }
-        }
     }
 
     /**
@@ -1249,18 +1191,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         val totalDp = if (state.isCompact || state.isFloatingMode) effectiveScreenH
                             else contentHeight + state.keyboardBottomPaddingDp + activeBottomDp
                         SideEffect {
-                            // 容器永远保持 MATCH_PARENT（setInputView 已设置），撑高只发生在
-                            // Compose 内部（键盘内容高度增加），与"键盘调节"完全同一路径：
-                            // 1110 Box 顶部随高度上移 → keyboardContentTopPx 上移 → insets 更新 → 应用被顶起。
-                            // 切勿在此改容器物理高度：容器脱离 MATCH_PARENT 后 IME 窗口内
-                            // 会退化为顶部对齐（FrameLayout child 默认 top-left），键盘整体跑到屏顶。
-                            if (state.isCompact || state.isFloatingMode) {
-                                keyboardContainer.updateHeight(totalDp)
-                            } else {
-                                // 从悬浮/紧凑模式切回时恢复容器为 MATCH_PARENT，
-                                // 否则容器高度残留悬浮时的固定值导致布局异常。
-                                keyboardContainer.resetHeight()
-                            }
+                            // 容器物理高度 = Compose 内容总高（含底部留白），全模式统一。
+                            // 容器高度变化 → View 层 relayout → traversal → onComputeInsets
+                            // 自动以新高度重算并上报（ViewRootImpl 每次 traversal 都 dispatch
+                            // OnComputeInternalInsetsListener，值变化即 setInsets），
+                            // 无需 +1dp hack 强制造型变化。
+                            keyboardContainer.updateHeight(totalDp)
                             currentEffectiveKeyboardHeight = if (state.isFloatingMode) keyboardHeight + floatingDragBarHeight + 50 + state.keyboardBottomPaddingDp
                                 else if (state.isCompact) HARDWARE_CANDIDATE_BAR_HEIGHT
                                 else effectiveKeyboardHeight + overlayPanelExtra
@@ -1313,29 +1249,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.keyboardBottomPaddingDp).dp else (floatingCardContentHeight + state.keyboardBottomPaddingDp + overlayPanelExtra).dp)
                                 .align(androidx.compose.ui.Alignment.BottomCenter)
                                 .then(if (state.isFloatingMode) Modifier else Modifier.offset(y = (-activeBottomDp).dp))
-                                .onGloballyPositioned {
-                                    // insetsRecomputePending 期间的高度摆动是 +1dp hack
-                                    // 自身引起的，忽略之：否则 y 在 h/h+1 间交替变化，
-                                    // 每次都 != keyboardContentTopPx → 无限循环触发重算。
-                                    // 但真实布局变化（面板撑高）的 y 不能丢——无条件记录到
-                                    // latestContentTopY，pending 清除后由 applyLatestContentTop 补应用。
-                                    val y = it.positionInWindow().y.toInt()
-                                    latestContentTopY = y
-                                    if (!state.isFloatingMode && !state.isCompact && !insetsRecomputePending) {
-                                        if (y != keyboardContentTopPx) {
-                                            keyboardContentTopPx = y
-                                            android.util.Log.d("ImeWindowInsets", "contentBox y=$y h=${it.size.height} qsForm=${state.showQuickSendForm}")
-                                            // Compose 内容高度/位置变化不会自动触发 IME insets
-                                            // 重算（面板关闭后实测残留数秒），这里在布局完成后
-                                            // 强制一次真实尺寸变化（+1dp 再还原，视觉不可见），
-                                            // 确保 insets 即时跟随键盘实际高度（防残留/白色区域）。
-                                            // 值无变化时不重复触发，避免循环。
-                                            mainHandler.post { forceInsetsRecompute() }
-                                        }
-                                    } else {
-                                        android.util.Log.d("ImeWindowInsets", "contentBox SKIP y=$y h=${it.size.height} qsForm=${state.showQuickSendForm} pending=$insetsRecomputePending float=${state.isFloatingMode} compact=${state.isCompact}")
-                                    }
-                                }
                         ) {
                         CompositionLocalProvider(LocalStretchFactor provides state.stretchFactor) {
                             // 注意：kbState 只承载键盘按键/布局状态，不承载候选数据。
@@ -1499,8 +1412,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 ?.updateLayoutParams<android.view.ViewGroup.LayoutParams> {
                     height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
                 }
-            view.updateLayoutParams<android.view.ViewGroup.LayoutParams> {
+            // 容器在 inputArea 内底部对齐（gravity BOTTOM）：
+            // 容器物理高度 = Compose 内容总高，小于全屏窗口时若默认 top-left
+            // 对齐会让键盘跑到屏顶。高度由 SideEffect 的 updateHeight 动态设置。
+            view.updateLayoutParams<android.widget.FrameLayout.LayoutParams> {
                 height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                gravity = android.view.Gravity.BOTTOM
             }
         } catch (_: Exception) {}
     }
@@ -2209,17 +2126,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 )
             }
         } else {
-            // 非浮动模式：窗口全屏，键盘内容贴底。
-            // contentTopInsets 直接使用 Compose 实测的键盘内容顶部位置（px），
-            // 避免 window 全屏后 super 误判键盘占满全屏导致布局下沉。
-            if (keyboardContentTopPx > 0) {
-                val dbg = "topPx=$keyboardContentTopPx qsForm=${state.showQuickSendForm} toolPanel=${state.toolPanelVisible} resize=${state.showKeyboardResize} hw=${(keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING}"
-                if (dbg != lastInsetsDebug) {
-                    lastInsetsDebug = dbg
-                    Log.d("InsetsDebug", dbg)
-                }
-                outInsets.contentTopInsets = keyboardContentTopPx
-                outInsets.visibleTopInsets = keyboardContentTopPx
+            // 非浮动模式：窗口全屏，容器物理高度 = Compose 内容总高（含底部留白），
+            // 容器在窗口内底部对齐（gravity BOTTOM）。
+            // contentTopInsets 直接用容器顶部在窗口中的 y 同步计算：
+            // 容器高度变化（面板撑高/收起）→ View relayout → traversal → 本方法
+            // 自动以新几何重算并上报，无需 hack；窗口全屏时 super 会误判键盘占满
+            // 全屏导致布局下沉，故必须显式报告容器顶部。
+            if (::keyboardContainer.isInitialized && keyboardContainer.height > 0) {
+                val loc = IntArray(2)
+                keyboardContainer.getLocationInWindow(loc)
+                val topPx = loc[1].coerceAtLeast(0)
+                outInsets.contentTopInsets = topPx
+                outInsets.visibleTopInsets = topPx
                 outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
             } else {
                 super.onComputeInsets(outInsets)
