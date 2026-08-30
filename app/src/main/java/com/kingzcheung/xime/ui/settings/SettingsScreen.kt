@@ -208,7 +208,8 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToPrivacy = { navController.navigate(SettingsRoutes.Privacy) },
                 onNavigateToLicenses = { navController.navigate(SettingsRoutes.Licenses) },
-                onNavigateToLogViewer = { navController.navigate(SettingsRoutes.LogViewer) }
+                onNavigateToLogViewer = { navController.navigate(SettingsRoutes.LogViewer) },
+                onNavigateToHandwritingCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) }
             )
         }
         composable(SettingsRoutes.MarketModel) {
@@ -230,6 +231,11 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.LogViewer) {
             LogViewerScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(SettingsRoutes.HandwritingCapture) {
+            HandwritingCaptureScreen(
                 onBack = { navController.popBackStack() }
             )
         }

@@ -365,9 +365,8 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendEditingItemText = "",
                     enterKeyText = "确定",
                 )
-                // 不在此处 forceInsetsRecompute：此刻 Compose 尚未布局，hack 会用旧高度
-                // 白跑一轮且 pending=true 挡掉撑高后的第一次 y 更新（曾导致表单可见
-                // 却不可触摸）。布局撑高完成后 onGloballyPositioned 会以新 y 触发重算。
+                // 撑高由 SideEffect 驱动：uiState 变化 → Compose 内容高度变化 →
+                // updateHeight 改容器物理高度 → relayout → onComputeInsets 自动重算。
             },
             onQuickSendEditItem = { id, text ->
                 // 同 onShowQuickSendForm：编辑入口在剪贴板面板内，先退出 Overlay 防表单被盖
@@ -395,8 +394,8 @@ internal fun rememberImeKeyboardCallbacks(
                 )
                 QuickSendFormEditTextHolder.editText = null
                 service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(1))
-                // 兜底：强制容器真实尺寸变化，触发 IME insets 重算恢复为纯键盘高度（防残留）。
-                service.forceInsetsRecompute()
+                // insets 恢复由 SideEffect 驱动：表单收起 → 容器物理高度还原 →
+                // relayout → onComputeInsets 自动重算，无需强制触发。
             },
             onQuickSendFormFocusChange = { focused: Boolean ->
                 // 聚焦时回车键为"确定"；失焦不改文案——表单仍显示，回车保持"确定"
