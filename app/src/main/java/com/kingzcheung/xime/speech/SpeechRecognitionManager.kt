@@ -147,11 +147,15 @@ class SpeechRecognitionManager(private val context: Context) {
             return
         }
         recordingThread = null
+        thread.stopRequested = true
         val session = synchronized(preloadLock) { sessionId }
         thread.interrupt()
+        thread.forceStopAudio()
         Thread {
             try {
-                thread.join()
+                // join 超时兜底：录音线程若卡在 Lua 调用中（最坏 CALL_TIMEOUT_MS=180s），
+                // 不能让后端释放无限期阻塞（否则 WebSocket 与麦克风一直占着）
+                thread.join(3000)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             }
@@ -190,11 +194,13 @@ class SpeechRecognitionManager(private val context: Context) {
             return
         }
         recordingThread = null
+        thread.stopRequested = true
         val session = synchronized(preloadLock) { sessionId }
         thread.interrupt()
+        thread.forceStopAudio()
         Thread {
             try {
-                thread.join()
+                thread.join(3000)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             }
@@ -378,6 +384,21 @@ class SpeechRecognitionManager(private val context: Context) {
 
         private val spectrumAnalyzer = SpectrumAnalyzer()
 
+        /**
+         * 停止请求标志：不能只依赖线程中断标志停止循环。
+         *
+         * processAudioChunk 会经 LuaScriptRuntime.runGuarded 的 FutureTask.get 执行，
+         * FutureTask.awaitDone 内部用 Thread.interrupted() 检查中断状态并**清除中断标志**，
+         * 随后 LuaScriptRuntime.call 吞掉 InterruptedException 正常返回 NIL——
+         * 于是中断标志被消费后 while (!interrupted()) 永远为真，录音线程无法停止，
+         * stopRecognition 的 join() 永不返回，后端（WebSocket）与麦克风一直后台占用。
+         */
+        @Volatile
+        var stopRequested = false
+
+        @Volatile
+        private var audioRecord: AudioRecord? = null
+
         override fun run() {
             val audioRecord = preStarted ?: (createAudioRecord() ?: run {
                 mainHandler.post {
@@ -386,6 +407,7 @@ class SpeechRecognitionManager(private val context: Context) {
                 }
                 return
             })
+            this.audioRecord = audioRecord
 
             if (!currentBackend.start()) {
                 audioRecord.stop()
@@ -413,7 +435,7 @@ class SpeechRecognitionManager(private val context: Context) {
             val maxPreSpeechChunks = 4  // 0.4s 语音前缓冲
 
             try {
-                while (!interrupted()) {
+                while (!interrupted() && !stopRequested) {
                     val nread = audioRecord.read(buffer, 0, buffer.size)
                     if (nread > 0) {
                         var peak = 0
@@ -457,12 +479,21 @@ class SpeechRecognitionManager(private val context: Context) {
                 }
             } catch (_: Exception) {
             } finally {
-                audioRecord.stop()
-                audioRecord.release()
+                // forceStopAudio 可能已从外部 stop/release，这里需容错（重复释放不抛异常中断后续流程）
+                try { audioRecord.stop() } catch (_: Exception) { }
+                try { audioRecord.release() } catch (_: Exception) { }
             }
 
             currentBackend.stop()
             Log.d(TAG, "Recognition thread ended")
+        }
+
+        /** 从外部强制停止录音：录音线程阻塞在 read() 等不可中断调用时，释放 AudioRecord 使其立即返回错误并退出。 */
+        fun forceStopAudio() {
+            audioRecord?.let { record ->
+                try { record.stop() } catch (_: Exception) { }
+                try { record.release() } catch (_: Exception) { }
+            }
         }
 
         private fun isSpeech(chunk: ByteArray): Boolean {
