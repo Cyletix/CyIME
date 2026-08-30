@@ -248,7 +248,7 @@ fun CandidateBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(50.dp)
+            .height(44.dp)
             .drawPreeditBubble(
                 text = preeditBubbleText,
                 enabled = showPreeditBubble,

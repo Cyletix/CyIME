@@ -1087,7 +1087,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 )
             }
         )
-        
+        // 编码气泡绘制在候选栏上方（栏外，drawBehind 负坐标）：insets 重构后容器
+        // 物理高度 = Compose 内容总高（gravity BOTTOM），候选栏紧贴容器顶边，
+        // 气泡落在容器顶边之外——关闭容器裁剪，气泡才能画进 inputArea 的空白区。
+        // 仅影响越界绘制裁剪，不触碰容器高度/insets 计算路径。
+        keyboardContainer.clipChildren = false
+
         bottomInsetPxState.value = getActiveBottomInsetPx(window.window)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             keyboardContainer.setOnApplyWindowInsetsListener { v, insets ->
@@ -1409,8 +1414,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         try {
             window.window?.decorView
                 ?.findViewById<FrameLayout>(android.R.id.inputArea)
-                ?.updateLayoutParams<android.view.ViewGroup.LayoutParams> {
-                    height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                ?.let { area ->
+                    area.updateLayoutParams<android.view.ViewGroup.LayoutParams> {
+                        height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    }
+                    // 栏外编码气泡越出容器顶边后进入 inputArea 空白区，
+                    // inputArea 默认 clipChildren=true 会把越界部分裁掉。
+                    area.clipChildren = false
                 }
             // 容器在 inputArea 内底部对齐（gravity BOTTOM）：
             // 容器物理高度 = Compose 内容总高，小于全屏窗口时若默认 top-left
