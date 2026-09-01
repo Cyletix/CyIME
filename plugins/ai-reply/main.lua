@@ -151,9 +151,16 @@ end
 
 function plugin.getPanelState(inputText)
   -- openToolPanel 时宿主传入收集的上下文（选区 > 输入框 > 剪贴板）；
-  -- action 点击后的单次重拉传空串，不覆盖已有上下文
+  -- action 点击后的单次重拉传空串，不覆盖已有上下文。
+  -- 上下文变化（用户复制了新消息）→ 旧候选/错误状态失效，回到初始态
   if inputText ~= nil and trim(inputText) ~= "" then
-    lastContext = trim(inputText)
+    local ctx = trim(inputText)
+    if ctx ~= lastContext then
+      cachedItems = {}
+      lastError = ""
+      generating = false
+    end
+    lastContext = ctx
   end
   return {
     items = cachedItems,
@@ -237,7 +244,11 @@ function plugin.onPanelAction(actionId)
 end
 
 function plugin.onPanelItemClick(itemId)
-  -- 上屏由宿主完成，插件无需处理
+  -- 点选上屏即本次任务完成：重置面板状态，下次打开回到初始态
+  -- （否则旧候选残留，新复制的消息看起来"没效果"）
+  cachedItems = {}
+  lastError = ""
+  generating = false
 end
 
 return plugin

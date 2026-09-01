@@ -11,7 +11,7 @@ icon: "应"
 description: 根据对方消息生成 3~5 条回复候选，点选上屏。支持任意 OpenAI 兼容的 chat/completions 接口。
 
 # 插件版本
-version: 0.4.0
+version: 0.5.0
 
 # 插件分类：tool 工具类（多开）
 type: tool
