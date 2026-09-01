@@ -300,6 +300,9 @@ fun KeyboardView(
                     onFocusChange = { focused: Boolean ->
                         callbacks.onQuickSendFormFocusChange?.invoke(focused)
                     },
+                    onCodeFocusChange = { focused: Boolean ->
+                        callbacks.onQuickSendCodeFocusChange?.invoke(focused)
+                    },
                 )
             }
 

@@ -50,6 +50,8 @@ data class InputUIState(
     val cursorVisible: Boolean = false,
     val showQuickSendForm: Boolean = false,
     val quickSendFormFocused: Boolean = false,
+    /** 快捷发送表单内焦点是否在"触发编码"输入框（false=在文本输入框）；决定按键输入路由目标。 */
+    val quickSendCodeFocused: Boolean = false,
     val quickSendEditingItemId: Long? = null,
     val quickSendEditingItemText: String = "",
     val quickSendEditingItemCode: String = "",

@@ -105,6 +105,8 @@ data class KeyboardCallbacks(
     val onHideQuickSendForm: (() -> Unit)? = null,
     val onQuickSendEditItem: ((Long, String, String) -> Unit)? = null,
     val onQuickSendFormFocusChange: ((Boolean) -> Unit)? = null,
+    /** 快捷发送表单"触发编码"输入框焦点变化（决定按键输入路由到编码框）。 */
+    val onQuickSendCodeFocusChange: ((Boolean) -> Unit)? = null,
     /**
      * 全键盘（中文/英文）切离至其他键盘（数字/符号）时调用。
      * 服务层负责上屏首位候选词或待确认英文，再由键盘层切换布局。

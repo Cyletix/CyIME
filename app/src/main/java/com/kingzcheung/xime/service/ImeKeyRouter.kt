@@ -157,6 +157,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     service.uiState.value = s.copy(
                         showQuickSendForm = false,
                         quickSendFormFocused = false,
+                        quickSendCodeFocused = false,
                         quickSendEditingItemId = null,
                         quickSendEditingItemText = "",
                         quickSendEditingItemCode = ""
@@ -178,18 +179,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                         sendTransformedResult(result)
                     } else {
-                        // 无组合态 → 直接操作 EditText 删除已上屏文字
-                        QuickSendFormEditTextHolder.editText?.let { et ->
-                            val start = et.selectionStart.coerceAtLeast(0)
-                            val end = et.selectionEnd.coerceAtLeast(start)
-                            if (start == end && start > 0) {
-                                et.text?.delete(start - 1, start)
-                                try { et.setSelection(start - 1) } catch (_: Exception) {}
-                            } else if (end > start) {
-                                et.text?.delete(start, end)
-                                try { et.setSelection(start) } catch (_: Exception) {}
-                            }
-                        }
+                        // 无组合态 → 按焦点路由删除表单内（文本框/触发编码框）已上屏文字
+                        service.deleteInQuickSendForm()
                     }
                     return
                 }
@@ -788,6 +779,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
 
     /** 单次退格处理（service.keyProcessingDispatcher 上执行）。 */
     internal suspend fun processDeleteKey() {
+        // 快捷发送表单显示：退格按焦点路由到表单内 EditText（与单击退格同一路径），不进入 Rime
+        if (service.uiState.value.showQuickSendForm) {
+            withContext(Dispatchers.Main) { service.deleteInQuickSendForm() }
+            return
+        }
         val candState = service.candidateState.value
         // 退格改变输入上下文：使在途的联想预测结果失效，防止过期结果迟到回填
         // associationCandidates，导致长按退格删除时候选栏在"联想词↔空"之间闪动。

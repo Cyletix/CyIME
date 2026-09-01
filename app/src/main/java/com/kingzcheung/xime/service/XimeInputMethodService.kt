@@ -802,6 +802,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             uiState.value = uiState.value.copy(
                 showQuickSendForm = false,
                 quickSendFormFocused = false,
+                quickSendCodeFocused = false,
                 quickSendEditingItemId = null,
                 quickSendEditingItemText = "",
                 quickSendEditingItemCode = "",
@@ -1929,6 +1930,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             uiState.value = uiState.value.copy(
                 showQuickSendForm = false,
                 quickSendFormFocused = false,
+                quickSendCodeFocused = false,
                 quickSendEditingItemId = null,
                 quickSendEditingItemText = "",
                 quickSendEditingItemCode = "",
@@ -2230,6 +2232,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /**
+     * 快捷发送表单内退格：按焦点路由到文本框/触发编码框，删除光标前字符或选区。
+     * 与原行为对齐：表单显示即处理（未聚焦时删文本框），焦点在编码框时删编码框。
+     * 需在主线程调用；返回 false 表示表单未显示（调用方继续常规退格流程）。
+     */
+    internal fun deleteInQuickSendForm(): Boolean {
+        if (!uiState.value.showQuickSendForm) return false
+        val et = if (uiState.value.quickSendFormFocused && uiState.value.quickSendCodeFocused)
+            QuickSendFormCodeEditTextHolder.editText
+        else QuickSendFormEditTextHolder.editText
+        et?.let { box ->
+            val start = box.selectionStart.coerceAtLeast(0)
+            val end = box.selectionEnd.coerceAtLeast(start)
+            if (end > start) {
+                box.text?.delete(start, end)
+                try { box.setSelection(start) } catch (_: Exception) {}
+            } else if (start > 0) {
+                box.text?.delete(start - 1, start)
+                try { box.setSelection(start - 1) } catch (_: Exception) {}
+            }
+        }
+        return true
+    }
+
+    /**
      * 静默上屏：与 [commitText] 相同的落盘路径（内部编辑器重定向、InputConnection、
      * text_committed 事件、联想上下文/输入统计），但不触发联想推理。
      * 手写叠写自动上屏/替换使用——笔画替换频率高，逐次推理既浪费又会闪烁候选栏。
@@ -2237,12 +2263,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     internal fun commitTextSilently(text: String) {
         if (uiState.value.quickSendFormFocused) {
+            // 焦点在触发编码输入框时路由到编码框，否则路由到快捷发送文本框
+            val codeFocused = uiState.value.quickSendCodeFocused
             mainHandler.post {
-                QuickSendFormEditTextHolder.editText?.let { et ->
-                    val start = et.selectionStart.coerceAtLeast(0)
+                val et = if (codeFocused) QuickSendFormCodeEditTextHolder.editText
+                else QuickSendFormEditTextHolder.editText
+                et?.let { box ->
+                    val start = box.selectionStart.coerceAtLeast(0)
                     val textLen = text.length
-                    et.text?.replace(start, et.selectionEnd.coerceAtLeast(start), text)
-                    try { et.setSelection(start + textLen) } catch (_: Exception) {}
+                    box.text?.replace(start, box.selectionEnd.coerceAtLeast(start), text)
+                    try { box.setSelection(start + textLen) } catch (_: Exception) {}
                 }
             }
             return
@@ -2291,8 +2321,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun deleteBeforeCursor(count: Int) {
         val quickSendFocused = uiState.value.quickSendFormFocused
         if (quickSendFocused || uiState.value.toolPanelInputFocused) {
-            val et = if (quickSendFocused) QuickSendFormEditTextHolder.editText
-            else ToolPanelEditTextHolder.editText
+            val et = when {
+                quickSendFocused && uiState.value.quickSendCodeFocused ->
+                    QuickSendFormCodeEditTextHolder.editText
+                quickSendFocused -> QuickSendFormEditTextHolder.editText
+                else -> ToolPanelEditTextHolder.editText
+            }
             et?.let { box ->
                 val end = box.selectionStart.coerceAtLeast(0)
                 val start = (end - count).coerceAtLeast(0)
@@ -2311,8 +2345,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun replaceBeforeCursor(expected: String, replacement: String): Boolean {
         val quickSendFocused = uiState.value.quickSendFormFocused
         if (quickSendFocused || uiState.value.toolPanelInputFocused) {
-            val et = (if (quickSendFocused) QuickSendFormEditTextHolder.editText
-            else ToolPanelEditTextHolder.editText) ?: return false
+            val et = when {
+                quickSendFocused && uiState.value.quickSendCodeFocused ->
+                    QuickSendFormCodeEditTextHolder.editText
+                quickSendFocused -> QuickSendFormEditTextHolder.editText
+                else -> ToolPanelEditTextHolder.editText
+            } ?: return false
             val selStart = et.selectionStart.coerceAtLeast(0)
             val start = (selStart - expected.length).coerceAtLeast(0)
             val before = et.text?.substring(start, selStart)
