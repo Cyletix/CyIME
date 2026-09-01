@@ -166,6 +166,27 @@ class LuaWebdavClipboardSyncPluginTest {
     }
 
     @Test
+    fun `push creates missing directories via MKCOL on 404 then retries`() {
+        val store = InMemoryConfigStore()
+        store.set("davUrl", "https://192.168.1.50:8080/dav/")
+        store.set("remotePath", "xime")
+        val http = MockHttpHostApi()
+        // 部分服务器（Alist/Nextcloud 等）对 PUT 缺失父目录返回 404 而非 409，
+        // 同样应触发 MKCOL 逐级创建后重试
+        http.responseQueue.addLast(HttpResponse(404))
+        http.responseQueue.addLast(HttpResponse(405))
+        http.responseQueue.addLast(HttpResponse(201))
+        http.responseQueue.addLast(HttpResponse(201))
+        val runtime = newRuntime(store, http)
+
+        val ok = runtime.call("push", profileTable("hello", "abc")).toboolean()
+
+        assertTrue("push 应成功", ok)
+        val methods = http.requests.map { it.first }
+        assertEquals(listOf("PUT", "MKCOL", "MKCOL", "PUT"), methods)
+    }
+
+    @Test
     fun `push honors remotePath in url`() {
         val store = InMemoryConfigStore()
         store.set("davUrl", "https://192.168.1.50:8080/dav/")

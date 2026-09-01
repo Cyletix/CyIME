@@ -124,27 +124,27 @@ end
 
 -- ================= 工具面板契约 =================
 
--- ui 节点树（白名单 type：section/text/metric/divider/action）：
+-- ui 节点树（统一 UiNode 白名单 type：section/text/metric/divider/button）：
 --   未生成 → 对方消息预览 + "生成回复"按钮；失败 → 错误提示 + 重试按钮；
 --   生成中 → 空 ui（loading 字段驱动宿主显示加载态）；有候选 → 提示文字（items 由宿主渲染）
 local function buildUi()
   local ui = {}
   if #cachedItems > 0 then
-    ui[#ui + 1] = { type = "section", title = "回复候选" }
-    ui[#ui + 1] = { type = "text", content = "点击候选直接上屏", style = "caption" }
+    ui[#ui + 1] = { type = "section", label = "回复候选" }
+    ui[#ui + 1] = { type = "text", value = "点击候选直接上屏", style = "caption" }
   elseif generating then
     -- loading 态：宿主显示"加载中..."
   else
-    ui[#ui + 1] = { type = "section", title = "对方消息" }
+    ui[#ui + 1] = { type = "section", label = "对方消息" }
     if lastContext ~= "" then
-      ui[#ui + 1] = { type = "text", content = lastContext }
+      ui[#ui + 1] = { type = "text", value = lastContext }
     else
-      ui[#ui + 1] = { type = "text", content = "暂无上下文：先复制对方消息，再从工具栏打开本面板", style = "caption" }
+      ui[#ui + 1] = { type = "text", value = "暂无上下文：先复制对方消息，再从工具栏打开本面板", style = "caption" }
     end
     if lastError ~= "" then
-      ui[#ui + 1] = { type = "text", content = lastError, style = "caption" }
+      ui[#ui + 1] = { type = "text", value = lastError, style = "caption" }
     end
-    ui[#ui + 1] = { type = "action", label = lastError ~= "" and "重新生成" or "生成回复", actionId = "generate" }
+    ui[#ui + 1] = { type = "button", label = lastError ~= "" and "重新生成" or "生成回复", key = "generate" }
   end
   return ui
 end

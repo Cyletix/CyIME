@@ -363,12 +363,13 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendFormFocused = true,
                     quickSendEditingItemId = null,
                     quickSendEditingItemText = "",
+                    quickSendEditingItemCode = "",
                     enterKeyText = "确定",
                 )
                 // 撑高由 SideEffect 驱动：uiState 变化 → Compose 内容高度变化 →
                 // updateHeight 改容器物理高度 → relayout → onComputeInsets 自动重算。
             },
-            onQuickSendEditItem = { id, text ->
+            onQuickSendEditItem = { id, text, code ->
                 // 同 onShowQuickSendForm：编辑入口在剪贴板面板内，先退出 Overlay 防表单被盖
                 service.keyboardViewModel.closeOverlay()
                 service.uiState.value = service.uiState.value.copy(
@@ -376,6 +377,7 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendFormFocused = true,
                     quickSendEditingItemId = id,
                     quickSendEditingItemText = text,
+                    quickSendEditingItemCode = code,
                     enterKeyText = "确定",
                 )
                 QuickSendFormEditTextHolder.editText?.let { et ->
@@ -390,9 +392,11 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendFormFocused = false,
                     quickSendEditingItemId = null,
                     quickSendEditingItemText = "",
+                    quickSendEditingItemCode = "",
                     enterKeyText = "发送",
                 )
                 QuickSendFormEditTextHolder.editText = null
+                QuickSendFormCodeEditTextHolder.editText = null
                 service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(1))
                 // insets 恢复由 SideEffect 驱动：表单收起 → 容器物理高度还原 →
                 // relayout → onComputeInsets 自动重算，无需强制触发。

@@ -19,7 +19,10 @@ import kotlinx.coroutines.withContext
  * 方案名称/开关刷新与切换、T9 切离提交等逻辑。共享状态通过 service 引用访问。
  */
 internal class ImeSessionController(private val service: XimeInputMethodService) {
-    internal fun applyComposition(composition: com.kingzcheung.xime.rime.RimeComposition) {
+    internal fun applyComposition(
+        composition: com.kingzcheung.xime.rime.RimeComposition,
+        pluginActions: List<CandidateAction> = emptyList(),
+    ) {
         val inputText = composition.input
         val codeInInputBox = SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX
         val preeditText = composition.preedit
@@ -87,7 +90,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,
             hasNextPage = hasNextPage,
-            hasPrevPage = hasPrevPage
+            hasPrevPage = hasPrevPage,
+            // 候选词变换映射（T9 不接入变换，防御清空）
+            candidateActions = if (isT9Schema) emptyList() else pluginActions
         )
         if (isAsciiMode != service.uiState.value.isAsciiMode) {
             FileLogger.i(XimeInputMethodService.TAG, "applyComposition: ascii ${service.uiState.value.isAsciiMode}->$isAsciiMode")
@@ -129,7 +134,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
     }
 
-    internal fun updateUIWithResult(result: com.kingzcheung.xime.rime.RimeProcessResult) {
+    internal fun updateUIWithResult(
+        result: com.kingzcheung.xime.rime.RimeProcessResult,
+        pluginActions: List<CandidateAction> = emptyList(),
+    ) {
         val isAsciiMode = result.isAsciiMode
         val candidatesWithComments = result.candidates
 
@@ -191,7 +199,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,
             hasNextPage = result.hasNextPage,
-            hasPrevPage = result.hasPrevPage
+            hasPrevPage = result.hasPrevPage,
+            // 候选词变换映射（T9 不接入变换，防御清空；ascii 时调用方不产生 actions）
+            candidateActions = if (isT9Schema) emptyList() else pluginActions
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
         // composing 快照 → 插件（input_changed 事件；空编码表示本轮输入结束）
@@ -386,7 +396,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 isComposing = false,
                 associationCandidates = emptyList(),
                 hasNextPage = false,
-                hasPrevPage = false
+                hasPrevPage = false,
+                candidateActions = emptyList()
             )
         }
     }

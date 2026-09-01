@@ -276,7 +276,7 @@ class LuaAiPluginTest {
             assertNotNull("$name 应包含 prompt", prompt)
             assertEquals(
                 "$name prompt 应为 textarea 长文本编辑",
-                com.kingzcheung.xime.plugin.core.config.PluginFieldType.TEXTAREA,
+                com.kingzcheung.xime.plugin.core.config.UiNodeType.TEXTAREA,
                 prompt!!.type
             )
         }

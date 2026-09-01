@@ -23,6 +23,26 @@ import kotlinx.coroutines.withContext
  * 所有共享状态通过 service 引用访问（同模块 internal 成员）。
  */
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
+
+    /**
+     * 候选词变换（hotPath 插件能力）+ 发送 UI 更新。
+     * 必须在 key-processing 线程调用：同步等插件至多 15ms；
+     * 超时/失败/插件不干预（null）均回退原始候选（actions 为空 = 纯引擎语义）。
+     */
+    private fun sendTransformedResult(
+        result: com.kingzcheung.xime.rime.RimeProcessResult,
+        afterUpdate: (suspend () -> Unit)? = null,
+    ) {
+        val transformed = service.candidateTransform.transformFor(result)
+        service.uiEventChannel.trySend {
+            service.sessionController.updateUIWithResult(
+                transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
+                transformed?.actions ?: emptyList()
+            )
+            if (afterUpdate != null) afterUpdate()
+        }
+    }
+
     internal fun handleKeyPress(key: String, isShifted: Boolean) {
         if (service.uiState.value.toolPanelInputFocused) {
             val candState = service.candidateState.value
@@ -46,7 +66,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 candidates = emptyList(),
                                 candidateComments = emptyList(),
                                 associationCandidates = emptyList(),
-                                isComposing = false
+                                isComposing = false,
+                                candidateActions = emptyList()
                             )
                         }
                     }
@@ -61,9 +82,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         if (result.inputText.isEmpty()) {
                             service.rimeEngine.clearComposition()
                         }
-                        service.uiEventChannel.trySend {
-                            service.sessionController.updateUIWithResult(result)
-                        }
+                        sendTransformedResult(result)
                     } else {
                         ToolPanelEditTextHolder.editText?.let { et ->
                             val start = et.selectionStart.coerceAtLeast(0)
@@ -101,9 +120,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             val keyCode = key.lowercase()[0].code
                             val result = service.rimeEngine.processKeyAndGetResult(keyCode, 0)
                             if (result.processed) {
-                                service.uiEventChannel.trySend {
-                                    service.sessionController.updateUIWithResult(result)
-                                }
+                                sendTransformedResult(result)
                             }
                             return
                         }
@@ -125,18 +142,27 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             when (key) {
                 "enter" -> {
                     val editText = QuickSendFormEditTextHolder.editText
+                    val codeEditText = QuickSendFormCodeEditTextHolder.editText
                     val text = editText?.text?.toString() ?: ""
+                    val code = codeEditText?.text?.toString()?.trim() ?: ""
                     val s = service.uiState.value
                     val editingId = s.quickSendEditingItemId
                     if (text.isNotBlank()) {
                         if (editingId != null) {
-                            service.keyboardViewModel.updateQuickSendItem(editingId, text)
+                            service.keyboardViewModel.updateQuickSendItem(editingId, text, code)
                         } else {
-                            service.keyboardViewModel.addQuickSendText(text)
+                            service.keyboardViewModel.addQuickSendText(text, code)
                         }
                     }
-                    service.uiState.value = s.copy(showQuickSendForm = false, quickSendFormFocused = false, quickSendEditingItemId = null, quickSendEditingItemText = "")
+                    service.uiState.value = s.copy(
+                        showQuickSendForm = false,
+                        quickSendFormFocused = false,
+                        quickSendEditingItemId = null,
+                        quickSendEditingItemText = "",
+                        quickSendEditingItemCode = ""
+                    )
                     QuickSendFormEditTextHolder.editText = null
+                    QuickSendFormCodeEditTextHolder.editText = null
                     service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(1))
                     return
                 }
@@ -150,9 +176,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         if (result.inputText.isEmpty()) {
                             service.rimeEngine.clearComposition()
                         }
-                        service.uiEventChannel.trySend {
-                            service.sessionController.updateUIWithResult(result)
-                        }
+                        sendTransformedResult(result)
                     } else {
                         // 无组合态 → 直接操作 EditText 删除已上屏文字
                         QuickSendFormEditTextHolder.editText?.let { et ->
@@ -246,7 +270,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             pendingEnglishText = "",
                             inputText = "",
                             isComposing = false,
-                            isShowingRecentClipboard = false
+                            isShowingRecentClipboard = false,
+                            candidateActions = emptyList()
                         )
                         withContext(Dispatchers.Main) {
                             service.currentInputConnection?.let {
@@ -368,7 +393,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                         pendingEnglishText = "",
                                         candidates = emptyList(),
                                         candidateComments = emptyList(),
-                                        associationCandidates = emptyList()
+                                        associationCandidates = emptyList(),
+                                        candidateActions = emptyList()
                                     )
                                 }
                                 service.rimeEngine.clearComposition()
@@ -412,9 +438,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     if (candState.isComposing || candState.inputText.isNotEmpty()) {
                         val result = service.rimeEngine.processKeyAndGetResult(0x27, 0)
                         if (result.processed) {
-                            service.uiEventChannel.trySend {
-                                service.sessionController.updateUIWithResult(result)
-                            }
+                            sendTransformedResult(result)
                         } else {
                             needsUIUpdate = true
                         }
@@ -502,6 +526,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         updateCalculatorCandidates()
                     }
                     
+                    // 数字选词拦截（插件候选变换存在时）：数字键不进入引擎——rime 会自行选
+                    // 引擎候选并返回 committedText，绕过插件候选；映射为对应位置显示候选的
+                    // 点击（selectCandidateAsync 按 candidateActions 分流上屏）。
+                    // actions 为空（无变换）时保持原生数字选词行为不变。
+                    if (!state.isAsciiMode && candState.isComposing &&
+                        key.length == 1 && key[0] in '1'..'9'
+                    ) {
+                        val actions = service.candidateState.value.candidateActions
+                        val digitIndex = key[0] - '1'
+                        if (actions.isNotEmpty() && digitIndex < service.candidateState.value.candidates.size) {
+                            selectCandidateAsync(digitIndex)
+                            return@launch
+                        }
+                    }
+
                     // 所有按键统一经过 Rime 引擎
                     // 字母键不进入此分支（即使 pendingEnglish 非空），需要继续积累编码
                     // 英文模式（isAsciiMode）下非字母键（QWERTY 上滑的数字/符号、数字/符号面板）
@@ -541,10 +580,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     if (result.committedText.isNotEmpty()) {
                                         withContext(Dispatchers.Main) { service.commitText(result.committedText) }
                                     }
-                                    service.uiEventChannel.trySend {
-                                        service.sessionController.updateUIWithResult(result)
-                                        if (service.calculatorEngine.isActive()) updateCalculatorCandidates()
-                                    }
+                                    sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                                 } else {
                                     committedText = char
                                     needsUIUpdate = true
@@ -573,18 +609,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                         withContext(Dispatchers.Main) {
                                             service.commitText(committed)
                                         }
-                                        service.uiEventChannel.trySend {
-                                            service.sessionController.updateUIWithResult(result)
-                                            if (service.calculatorEngine.isActive()) updateCalculatorCandidates()
-                                        }
+                                        sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                                     } else {
                                         if (committed.isNotEmpty()) {
                                             withContext(Dispatchers.Main) { service.commitText(committed) }
                                         }
-                                        service.uiEventChannel.trySend {
-                                            service.sessionController.updateUIWithResult(result)
-                                            if (service.calculatorEngine.isActive()) updateCalculatorCandidates()
-                                        }
+                                        sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                                     }
                                 }
                             } else {
@@ -631,8 +661,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     if (textToCommit != null) {
                         withContext(Dispatchers.Main) { service.commitText(textToCommit) }
                     }
-                    service.uiEventChannel.trySend {
-                        service.sessionController.updateUIWithResult(result)
+                    sendTransformedResult(result) {
                         if (service.calculatorEngine.isActive()) {
                             updateCalculatorCandidates()
                         }
@@ -643,6 +672,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val capturedIsAscii = service.rimeEngine.isAsciiMode()
                     val capturedHasNext = service.rimeEngine.hasNextPage()
                     val capturedHasPrev = service.rimeEngine.hasPrevPage()
+                    // 候选词变换（hotPath 插件能力）：内联刷新路径（无 RimeProcessResult），
+                    // key-processing 线程同步调用；ascii 场景不变换（调用点语义与 transformFor 一致）
+                    val transformed = if (capturedInputText.isNotEmpty() && !capturedIsAscii) {
+                        service.candidateTransform.transform(
+                            capturedInputText, "", capturedCandidates.toList(), capturedIsAscii
+                        )
+                    } else {
+                        null
+                    }
+                    val displayCandidates: List<com.kingzcheung.xime.rime.RimeCandidate> =
+                        transformed?.candidates ?: capturedCandidates.toList()
                     if (textToCommit != null) {
                         withContext(Dispatchers.Main) { service.commitText(textToCommit) }
                     }
@@ -654,7 +694,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             }
                             filtered.map { it.text } to filtered.map { it.comment }
                         } else {
-                            capturedCandidates.map { it.text } to capturedCandidates.map { it.comment }
+                            displayCandidates.map { it.text } to displayCandidates.map { it.comment }
                         }
                         service.candidateState.value = service.candidateState.value.copy(
                             inputText = capturedInputText,
@@ -664,7 +704,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             associationCandidates = if ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
                             isShowingRecentClipboard = false,
                             hasNextPage = capturedHasNext,
-                            hasPrevPage = capturedHasPrev
+                            hasPrevPage = capturedHasPrev,
+                            candidateActions = transformed?.actions ?: emptyList()
                         )
                         if (capturedIsAscii != service.uiState.value.isAsciiMode) {
                             FileLogger.i(XimeInputMethodService.TAG, "keyRouter UI refresh: ascii ${service.uiState.value.isAsciiMode}->$capturedIsAscii")
@@ -773,7 +814,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             pendingEnglishText = newPending,
                             candidates = emptyList(),
                             candidateComments = emptyList(),
-                            associationCandidates = emptyList()
+                            associationCandidates = emptyList(),
+                            candidateActions = emptyList()
                         )
                     }
                     if (service.supportsEnglishCandidateReplace()) {
@@ -792,7 +834,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             candidates = emptyList(),
                             candidateComments = emptyList(),
                             associationCandidates = emptyList(),
-                            isShowingRecentClipboard = false
+                            isShowingRecentClipboard = false,
+                            candidateActions = emptyList()
                         )
                     }
                 }
@@ -824,10 +867,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                     }
                 }
-                service.uiEventChannel.trySend {
-                    service.sessionController.updateUIWithResult(result)
-                    if (service.calculatorEngine.isActive()) updateCalculatorCandidates()
-                }
+                sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
             }
 
             // 3. 联想词或剪贴板：仅清空候选栏，不回删已上屏字符
@@ -870,6 +910,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     suspend fun selectCandidateAsync(index: Int) {
+        // 插件候选（candidate_transform 变换）：直接上屏插件文本（所见即所得），不走引擎选词。
+        // 引擎引用项继续走下方引擎路径，用映射记录的引擎索引（显示 index 因插件候选插入而错位）。
+        val pendingAction = service.candidateState.value.candidateActions.getOrNull(index)
+        if (pendingAction != null && pendingAction.isPluginCandidate) {
+            // 防御：中英/方案切换后引擎组合已清空但 candidateState 残留旧候选+actions，
+            // 此时点选必须回落原生路径（引擎侧 selectCandidate 失败自动防呆，与旧行为一致），
+            // 否则残留插件候选会绕过引擎校验直接上屏。
+            val engineHasComposition = service.rimeEngine.getInput().isNotEmpty() ||
+                service.rimeEngine.getCandidates().isNotEmpty()
+            if (engineHasComposition) {
+                commitPluginCandidate(pendingAction.commitText)
+                return
+            }
+        }
+
         val selectedCandidate = if (index < service.candidateState.value.candidates.size) {
             service.candidateState.value.candidates[index]
         } else null
@@ -897,7 +952,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val selectRimeOk = if (isT9) {
             true
         } else {
-            val rimeIndex = if (selectedCandidate != null) {
+            val rimeIndex = if (pendingAction != null && pendingAction.engineIndex >= 0) {
+                // 变换映射记录的引擎候选索引（比按显示文本回查更准）
+                pendingAction.engineIndex
+            } else if (selectedCandidate != null) {
                 resolveRimeCandidateIndex(index, selectedCandidate, service.rimeEngine.getCandidates().toList())
             } else {
                 index
@@ -1006,6 +1064,30 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
             }
         }
+    }
+
+    /**
+     * 插件候选直接上屏（所见即所得）：不经引擎 select/commit。
+     * 先上屏并清空候选状态（与 enter 提交分支同序），再清引擎组合态。
+     */
+    private suspend fun commitPluginCandidate(text: String) {
+        withContext(Dispatchers.Main) {
+            service.commitText(text)
+            service.candidateState.value = service.candidateState.value.copy(
+                inputText = "",
+                preeditText = "",
+                candidates = emptyList(),
+                candidateComments = emptyList(),
+                associationCandidates = emptyList(),
+                pendingEnglishText = "",
+                isComposing = false,
+                isShowingRecentClipboard = false,
+                hasNextPage = false,
+                hasPrevPage = false,
+                candidateActions = emptyList()
+            )
+        }
+        service.rimeEngine.clearComposition()
     }
     
     /**

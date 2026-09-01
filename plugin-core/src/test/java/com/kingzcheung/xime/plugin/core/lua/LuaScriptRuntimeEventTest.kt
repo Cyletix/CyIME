@@ -85,11 +85,12 @@ class LuaScriptRuntimeEventTest {
                 PluginEvent(PluginEvent.TYPE_INPUT_CHANGED, mapOf(PluginEvent.FIELD_INPUT_TEXT to "k$i"))
             )
         }
-        awaitUntil { runtime.call("eventCount").toint() >= 1 }
-        assertEquals("最终必须是最后一个事件", "input_changed|k20", runtime.call("lastEvent").tojstring())
-        // 消费远慢于同步连发，收到的次数应远小于 20（允许并发穿插）
+        // conflated 只保最新：消费串行处理时存在"已处理 k1、k20 尚未消费"的窗口，
+        // 必须等待最终值（k20）而不是等到任意一条后再断言
+        awaitUntil { runtime.call("lastEvent").tojstring() == "input_changed|k20" }
+        // 消费远慢于同步连发，收到的次数应远小于 20（允许并发穿插；k1 + k20 至少 2 条）
         assertTrue("conflated 应合并中间事件: count=${runtime.call("eventCount").toint()}",
-            runtime.call("eventCount").toint() <= 6)
+            runtime.call("eventCount").toint() in 2..6)
         runtime.close()
     }
 

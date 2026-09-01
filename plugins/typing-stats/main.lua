@@ -203,34 +203,34 @@ function plugin.getPanelState(inputText)
   local hint = nextTitleHint()
   local now = nowSec()
   local ui = {
-    { type = "section", title = "🏆 称号" },
+    { type = "section", label = "🏆 称号" },
     { type = "metric",  label = "当前称号", value = (badge or "") .. " " .. title },
   }
   if hint ~= nil then
-    table.insert(ui, { type = "text", content = hint, style = "caption" })
+    table.insert(ui, { type = "text", value = hint, style = "caption" })
   else
-    table.insert(ui, { type = "text", content = "👑 已是最高称号", style = "caption" })
+    table.insert(ui, { type = "text", value = "👑 已是最高称号", style = "caption" })
   end
 
-  table.insert(ui, { type = "section", title = "⚡ 速度" })
+  table.insert(ui, { type = "section", label = "⚡ 速度" })
   table.insert(ui, { type = "metric", label = "💨 最近 1 分钟", value = tostring(currentKpm(now)), unit = "字/分" })
 
   local t = todayStr()
-  table.insert(ui, { type = "section", title = "📅 今日" })
+  table.insert(ui, { type = "section", label = "📅 今日" })
   table.insert(ui, { type = "metric", label = "✍️ 输入字数", value = tostring(daily[t] or 0), unit = "字" })
   table.insert(ui, { type = "metric", label = "🔢 提交次数", value = tostring(totalCommits) })
 
-  table.insert(ui, { type = "section", title = "🗓 近 7 天" })
+  table.insert(ui, { type = "section", label = "🗓 近 7 天" })
   table.insert(ui, { type = "metric", label = "✍️ 输入字数", value = tostring(sumRecentDays(7)), unit = "字" })
 
-  table.insert(ui, { type = "section", title = "📆 本月" })
+  table.insert(ui, { type = "section", label = "📆 本月" })
   table.insert(ui, { type = "metric", label = "✍️ 输入字数", value = tostring(sumMonth(t:sub(1, 6))), unit = "字" })
 
   if currentInput ~= "" then
-    table.insert(ui, { type = "text", content = "⌨️ 正在输入: " .. currentInput, style = "caption" })
+    table.insert(ui, { type = "text", value = "⌨️ 正在输入: " .. currentInput, style = "caption" })
   end
   table.insert(ui, { type = "divider" })
-  table.insert(ui, { type = "action", label = "🗑️ 清零统计", actionId = "reset" })
+  table.insert(ui, { type = "button", label = "🗑️ 清零统计", key = "reset" })
 
   return { inputText = inputText or "", items = {}, ui = ui, loading = false }
 end

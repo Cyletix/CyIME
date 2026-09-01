@@ -25,7 +25,14 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
     /** 进程生命周期累计上屏提交次数。 */
     private var sessionCommits: Long = 0L
 
+    /** 当前输入会话是否敏感输入框（密码类 / 不学习标记）。
+     *  主线程写（onStartInput）、key-processing 线程读（候选词变换短路），volatile 保证可见性。 */
+    @Volatile
     private var sensitiveInput: Boolean = false
+
+    /** 当前输入会话是否敏感输入框（密码类 / 不学习标记）。
+     *  供 hotPath 插件能力（候选词变换）在发起请求前短路。 */
+    val isCurrentEditorSensitive: Boolean get() = sensitiveInput
 
     /** 新输入会话：刷新敏感标记并重置 composing 去重。 */
     fun onStartInput(attribute: EditorInfo?) {

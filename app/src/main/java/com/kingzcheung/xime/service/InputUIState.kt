@@ -52,6 +52,7 @@ data class InputUIState(
     val quickSendFormFocused: Boolean = false,
     val quickSendEditingItemId: Long? = null,
     val quickSendEditingItemText: String = "",
+    val quickSendEditingItemCode: String = "",
     /** 通用工具面板是否显示（候选栏上方，与快捷发送同位置）。 */
     val toolPanelVisible: Boolean = false,
     /** 面板输入框是否聚焦（聚焦时按键路由注入面板 EditText）。 */
@@ -70,7 +71,7 @@ data class InputUIState(
     val toolPanelRequestEpoch: Long = 0,
     /** 面板展示模式（manifest display.name）：PASSIVE 时以 Overlay 全屏渲染纯展示 InfoPanel（与表情/符号同级）。 */
     val toolPanelDisplay: String? = null,
-    /** passive 纯展示节点树（getPanelState.ui，白名单节点声明式 UI）。 */
-    val toolPanelUiNodes: List<Map<*, *>>? = null,
+    /** passive 纯展示节点树（getPanelState.ui，统一 UiNode 声明式模型）。 */
+    val toolPanelUiNodes: List<com.kingzcheung.xime.plugin.core.config.UiNode>? = null,
     val clipboardSyncEnabled: Boolean = false,
 )
