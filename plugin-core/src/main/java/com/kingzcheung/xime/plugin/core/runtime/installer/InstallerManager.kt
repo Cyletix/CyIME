@@ -75,6 +75,7 @@ internal data class CapabilitiesConfig(
     val emoji: EmojiCapabilitiesConfig? = null,
     val speech: SpeechCapabilitiesConfig? = null,
     val tool: ToolCapabilitiesConfig? = null,
+    @kotlinx.serialization.SerialName("clipboard_sync")
     val clipboardSync: ClipboardSyncCapabilitiesConfig? = null,
     /** 下行事件订阅（如 "input_changed"），小写 snake_case。 */
     val events: List<String> = emptyList(),
