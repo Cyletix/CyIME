@@ -1042,22 +1042,35 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /** 收集面板上下文：仅选中文本；未选中时返回空串（不预填输入框全文/剪贴板，待用户自行输入）。 */
+    /**
+     * 工具面板上下文收集（选区 > 输入框选区 > 剪贴板）：
+     * 对方消息通常来自聊天 App 复制而非输入框选区，剪贴板兜底是 AI 回复等
+     * 插件拿到上下文的关键路径（插件契约见 plugins/ai-reply/main.lua）。
+     */
     private fun collectToolPanelContext(): String {
-        val ic = currentInputConnection ?: return ""
-        runCatching {
-            val sel = ic.getSelectedText(0)?.toString()
-            if (!sel.isNullOrBlank()) return sel
-        }
-        runCatching {
-            val req = android.view.inputmethod.ExtractedTextRequest()
-            val extracted = ic.getExtractedText(req, 0)
-            if (extracted != null && extracted.selectionStart >= 0 && extracted.selectionEnd > extracted.selectionStart) {
-                val t = extracted.text?.toString()
-                if (t != null) {
-                    val s = extracted.selectionStart.coerceIn(0, t.length)
-                    val e = extracted.selectionEnd.coerceIn(s, t.length)
-                    if (e > s) return t.substring(s, e)
+        val ic = currentInputConnection
+        if (ic != null) {
+            runCatching {
+                val sel = ic.getSelectedText(0)?.toString()
+                if (!sel.isNullOrBlank()) return sel
+            }
+            runCatching {
+                val req = android.view.inputmethod.ExtractedTextRequest()
+                val extracted = ic.getExtractedText(req, 0)
+                if (extracted != null && extracted.selectionStart >= 0 && extracted.selectionEnd > extracted.selectionStart) {
+                    val t = extracted.text?.toString()
+                    if (t != null) {
+                        val s = extracted.selectionStart.coerceIn(0, t.length)
+                        val e = extracted.selectionEnd.coerceIn(s, t.length)
+                        if (e > s) return t.substring(s, e)
+                    }
                 }
+            }
+        }
+        // 剪贴板兜底：无选区/无输入连接时取系统剪贴板
+        runCatching {
+            if (::clipboardManager.isInitialized) {
+                clipboardManager.getCurrentClipboardText()?.takeIf { it.isNotBlank() }?.let { return it }
             }
         }
         return ""
