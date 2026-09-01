@@ -137,6 +137,11 @@ object QuickSendFormEditTextHolder {
     var editText: android.widget.EditText? = null
 }
 
+/** 快捷发送表单的触发编码输入框 holder（与内容输入框独立）。 */
+object QuickSendFormCodeEditTextHolder {
+    var editText: android.widget.EditText? = null
+}
+
 /** 通用工具面板输入框 holder（与快捷发送独立，避免互相覆盖）。 */
 object ToolPanelEditTextHolder {
     var editText: android.widget.EditText? = null
@@ -660,6 +665,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             serviceScope.launch {
                 clipboardManager.quickSendItems.collect { items ->
                     quickSendItemsState.value = items
+                    // 快捷发送列表变更 → 插件事件（仅投递给 manifest 声明
+                    // capabilities.events 含 quick_send_changed 的插件）
+                    PluginManager.dispatchEvent(
+                        com.kingzcheung.xime.plugin.core.lua.PluginEvent(
+                            com.kingzcheung.xime.plugin.core.lua.PluginEvent.TYPE_QUICK_SEND_CHANGED,
+                            mapOf(com.kingzcheung.xime.plugin.core.lua.PluginEvent.FIELD_COUNT to items.size)
+                        )
+                    )
                 }
             }
             startClipboardSyncIfEnabled()
@@ -791,8 +804,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 quickSendFormFocused = false,
                 quickSendEditingItemId = null,
                 quickSendEditingItemText = "",
+                quickSendEditingItemCode = "",
             )
             QuickSendFormEditTextHolder.editText = null
+            QuickSendFormCodeEditTextHolder.editText = null
         }
         // 打开面板前清理宿主输入框残留输入态（未上屏的拼音/英文），
         // 避免旧组合混入面板输入、或面板关闭后覆盖宿主输入框中段文字。
@@ -806,6 +821,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 associationCandidates = emptyList(),
                 pendingEnglishText = "",
                 inputText = "",
+                candidateActions = emptyList(),
                 preeditText = "",
                 isComposing = false,
                 isShowingRecentClipboard = false,
@@ -1313,6 +1329,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     quickSendFormFocused = state.quickSendFormFocused,
                                     quickSendEditingItemId = state.quickSendEditingItemId,
                                     quickSendEditingItemText = state.quickSendEditingItemText,
+                                    quickSendEditingItemCode = state.quickSendEditingItemCode,
                                     toolPanelVisible = state.toolPanelVisible,
                                     toolPanelInputFocused = state.toolPanelInputFocused,
                                     toolPanelPluginId = state.toolPanelPluginId,
@@ -1697,7 +1714,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     candidateState.value = candidateState.value.copy(
                         candidates = emptyList(),
                         candidateComments = emptyList(),
-                        isShowingRecentClipboard = false
+                        isShowingRecentClipboard = false,
+                        candidateActions = emptyList()
                     )
                 }
             }
@@ -1900,9 +1918,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 quickSendFormFocused = false,
                 quickSendEditingItemId = null,
                 quickSendEditingItemText = "",
+                quickSendEditingItemCode = "",
                 enterKeyText = "发送",
             )
             QuickSendFormEditTextHolder.editText = null
+            QuickSendFormCodeEditTextHolder.editText = null
         }
     }
 
@@ -1959,7 +1979,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             pendingEnglishText = "",
             hasNextPage = false,
             hasPrevPage = false,
-            englishReplaceSupported = true
+            englishReplaceSupported = true,
+            candidateActions = emptyList()
         )
         endComposingInputBox()
     }
@@ -2038,7 +2059,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     internal fun updateUI() {
-        sessionController.applyComposition(rimeEngine.getComposition())
+        val composition = rimeEngine.getComposition()
+        // 候选词变换（hotPath 插件能力）：仅 key-processing 线程同步等插件（至多 15ms），
+        // 主线程调用点（联想上屏/光标移动/剪贴板点选后的刷新）一律跳过——主线程永不等待插件；
+        // 这些调用点组合态已清空（input 为空），正常不触发，Looper 判定仅为防御
+        val transformed = if (composition.input.isNotEmpty() &&
+            android.os.Looper.myLooper() != android.os.Looper.getMainLooper()
+        ) {
+            candidateTransform.transform(
+                inputText = composition.input,
+                preedit = composition.preedit,
+                engineCandidates = composition.candidates.toList(),
+                asciiMode = composition.isAsciiMode,
+            )
+        } else {
+            null
+        }
+        if (transformed != null) {
+            sessionController.applyComposition(
+                composition.copy(candidates = transformed.candidates.toTypedArray()),
+                transformed.actions
+            )
+        } else {
+            sessionController.applyComposition(composition)
+        }
     }
 
     /**
@@ -2157,6 +2201,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 插件下行事件投递器（input_changed / text_committed，敏感输入豁免）。 */
     internal val pluginEvents = PluginEventDispatcher(this)
+
+    /** 候选词变换协调器（插件 candidate_transform 能力，hotPath：key-processing 线程同步调用）。 */
+    internal val candidateTransform = CandidateTransformCoordinator(this)
 
     override fun commitText(text: String) {
         commitTextSilently(text)

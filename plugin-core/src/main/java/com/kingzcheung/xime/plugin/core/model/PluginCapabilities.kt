@@ -16,6 +16,19 @@ data class PluginCapabilities(
     val clipboardSync: ClipboardSyncCapabilities? = null,
     /** 下行事件订阅声明（如 "input_changed"）：未声明的事件宿主不投递，通道也不建立。 */
     val events: List<String> = emptyList(),
+    /** 候选词变换能力（manifest 声明 `candidate_transform: true`）：rime 返回候选后、
+     *  候选栏渲染前，宿主同步调用插件 transformCandidates 修改候选；首个接入输入
+     *  主流程（hotPath）的能力，硬超时 15ms + 敏感输入短路 + 连续超时熔断。 */
+    @kotlinx.serialization.SerialName("candidate_transform")
+    val candidateTransform: Boolean = false,
+    /** 快捷发送只读能力（manifest 声明 `quick_send_read: true`）：声明后宿主注入
+     *  `host.quickSend`（list()），并允许订阅 `quick_send_changed` 事件。 */
+    @kotlinx.serialization.SerialName("quick_send_read")
+    val quickSendRead: Boolean = false,
+    /** 剪贴板只读能力（manifest 声明 `clipboard_read: true`）：声明后宿主注入
+     *  `host.clipboard`（getText()）。 */
+    @kotlinx.serialization.SerialName("clipboard_read")
+    val clipboardRead: Boolean = false,
 ) {
     companion object {
         val EMPTY = PluginCapabilities()

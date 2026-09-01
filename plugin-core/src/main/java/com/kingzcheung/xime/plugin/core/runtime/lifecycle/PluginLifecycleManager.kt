@@ -155,7 +155,14 @@ class PluginLifecycleManager(
                 wsHostApi = PluginManager.wsHostApiFactory?.invoke(plugin.id),
                 httpHostApi = PluginManager.httpHostApiFactory?.invoke(plugin.id),
                 cryptoHostApi = PluginManager.cryptoHostApiFactory?.invoke(),
-                sseHostApi = PluginManager.sseHostApiFactory?.invoke(plugin.id)
+                sseHostApi = PluginManager.sseHostApiFactory?.invoke(plugin.id),
+                // 数据类 API 按 manifest 能力声明门禁注入：未声明连实例都不创建（host 表不挂）
+                quickSendHostApi = if (plugin.capabilities?.quickSendRead == true) {
+                    PluginManager.quickSendHostApiFactory?.invoke(plugin.id)
+                } else null,
+                clipboardHostApi = if (plugin.capabilities?.clipboardRead == true) {
+                    PluginManager.clipboardHostApiFactory?.invoke(plugin.id)
+                } else null
             )
             // 按能力声明启用下行事件通道：未声明 events 的插件零开销、零行为变化。
             runtime.initEvents(plugin.capabilities?.events?.toSet() ?: emptySet())

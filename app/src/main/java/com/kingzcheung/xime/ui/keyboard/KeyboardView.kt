@@ -282,16 +282,17 @@ fun KeyboardView(
                     accentColor = accentColor,
                     isFocused = state.quickSendFormFocused,
                     initialText = state.quickSendEditingItemText,
+                    initialCode = state.quickSendEditingItemCode,
                     cardBgColor = keyBgColor,
                     editingItemId = state.quickSendEditingItemId,
-                    onClose = { text: String ->
+                    onClose = { text: String, code: String ->
                         android.util.Log.d("QuickSendForm", "onClose: textLen=${text.length}, editingId=${state.quickSendEditingItemId}, showForm=${state.showQuickSendForm}")
                         if (text.isNotBlank()) {
                             val editingId = state.quickSendEditingItemId
                             if (editingId != null) {
-                                viewModel.updateQuickSendItem(editingId, text)
+                                viewModel.updateQuickSendItem(editingId, text, code)
                             } else {
-                                viewModel.addQuickSendText(text)
+                                viewModel.addQuickSendText(text, code)
                             }
                         }
                         callbacks.onHideQuickSendForm?.invoke()
@@ -1044,9 +1045,9 @@ fun KeyboardView(
                             viewModel.closeOverlay()
                             callbacks.onShowQuickSendForm?.invoke()
                         },
-                        onQuickSendEditItem = { id, text ->
+                        onQuickSendEditItem = { id, text, code ->
                             viewModel.closeOverlay()
-                            callbacks.onQuickSendEditItem?.invoke(id, text)
+                            callbacks.onQuickSendEditItem?.invoke(id, text, code)
                         },
                         onPullRemote = callbacks.onClipboardPullRemote,
                         pullRemoteAvailable = state.clipboardSyncEnabled,

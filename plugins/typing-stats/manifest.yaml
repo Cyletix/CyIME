@@ -8,7 +8,7 @@ name: 输入统计
 icon: "统"
 description: 统计打字量（今日/累计字数、提交次数）。基于宿主下行事件，无网络访问。
 
-version: 0.1.0
+version: 0.2.0
 
 type: tool
 activation: multi

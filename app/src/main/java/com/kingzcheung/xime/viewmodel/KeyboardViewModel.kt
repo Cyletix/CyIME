@@ -84,6 +84,7 @@ data class KeyboardUiState(
     val quickSendFormFocused: Boolean = false,
     val quickSendEditingItemId: Long? = null,
     val quickSendEditingItemText: String = "",
+    val quickSendEditingItemCode: String = "",
     val toolPanelVisible: Boolean = false,
     val toolPanelInputFocused: Boolean = false,
     val toolPanelPluginId: String = "",
@@ -93,7 +94,7 @@ data class KeyboardUiState(
     val toolPanelLoading: Boolean = false,
     val toolPanelRequestEpoch: Long = 0,
     val toolPanelDisplay: String? = null,
-    val toolPanelUiNodes: List<Map<*, *>>? = null,
+    val toolPanelUiNodes: List<com.kingzcheung.xime.plugin.core.config.UiNode>? = null,
     val clipboardSyncEnabled: Boolean = false,
 )
 
@@ -532,12 +533,12 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         clipboardManager.addToQuickSend(id)
     }
 
-    fun addQuickSendText(text: String) {
-        clipboardManager.addQuickSendItem(text)
+    fun addQuickSendText(text: String, code: String = "") {
+        clipboardManager.addQuickSendItem(text, code)
     }
 
-    fun updateQuickSendItem(id: Long, text: String) {
-        clipboardManager.updateQuickSendItem(id, text)
+    fun updateQuickSendItem(id: Long, text: String, code: String = "") {
+        clipboardManager.updateQuickSendItem(id, text, code)
     }
 
     fun removeQuickSendItem(id: Long) {

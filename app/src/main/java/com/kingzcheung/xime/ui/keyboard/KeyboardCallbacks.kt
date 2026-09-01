@@ -103,7 +103,7 @@ data class KeyboardCallbacks(
      */
     val onClipboardPullRemote: (() -> Unit)? = null,
     val onHideQuickSendForm: (() -> Unit)? = null,
-    val onQuickSendEditItem: ((Long, String) -> Unit)? = null,
+    val onQuickSendEditItem: ((Long, String, String) -> Unit)? = null,
     val onQuickSendFormFocusChange: ((Boolean) -> Unit)? = null,
     /**
      * 全键盘（中文/英文）切离至其他键盘（数字/符号）时调用。

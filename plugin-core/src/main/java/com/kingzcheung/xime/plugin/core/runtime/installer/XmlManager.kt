@@ -245,6 +245,15 @@ class XmlManager(private val context: Application) {
         if (cap.events.isNotEmpty()) {
             root["events"] = cap.events
         }
+        if (cap.candidateTransform) {
+            root["candidateTransform"] = true
+        }
+        if (cap.quickSendRead) {
+            root["quickSendRead"] = true
+        }
+        if (cap.clipboardRead) {
+            root["clipboardRead"] = true
+        }
         return com.kingzcheung.xime.plugin.core.lua.sdk.SimpleJson.encode(root) ?: ""
     }
 
@@ -283,7 +292,10 @@ class XmlManager(private val context: Application) {
                         protocols = (m["protocols"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
                     )
                 },
-                events = (root["events"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                events = (root["events"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
+                candidateTransform = (root["candidateTransform"] as? Boolean) ?: false,
+                quickSendRead = (root["quickSendRead"] as? Boolean) ?: false,
+                clipboardRead = (root["clipboardRead"] as? Boolean) ?: false
             )
         }.getOrNull()
     }

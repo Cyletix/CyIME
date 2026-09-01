@@ -35,5 +35,14 @@ data class PluginEvent(
 
         /** FIELD_SESSION_TOTAL_COMMITS：宿主进程累计上屏提交次数。 */
         const val FIELD_SESSION_TOTAL_COMMITS = "session_total_commits"
+
+        /**
+         * 快捷发送列表变更：payload = { count: Int }。
+         * 只通知变更（conflated 只保最新），插件收到后调 host.quickSend.list() 重新拉取。
+         */
+        const val TYPE_QUICK_SEND_CHANGED = "quick_send_changed"
+
+        /** FIELD_COUNT：变更后的快捷发送条目数。 */
+        const val FIELD_COUNT = "count"
     }
 }

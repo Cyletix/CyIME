@@ -50,6 +50,8 @@ class LuaScriptRuntime(
     private val httpHostApi: com.kingzcheung.xime.plugin.core.lua.http.HttpHostApi? = null,
     private val cryptoHostApi: com.kingzcheung.xime.plugin.core.lua.crypto.CryptoHostApi? = null,
     private val sseHostApi: com.kingzcheung.xime.plugin.core.lua.http.SseHostApi? = null,
+    private val quickSendHostApi: QuickSendHostApi? = null,
+    private val clipboardHostApi: ClipboardHostApi? = null,
     private val callTimeoutMs: Long = CALL_TIMEOUT_MS,
     private val callbackTimeoutMs: Long = CALLBACK_TIMEOUT_MS
 ) {
@@ -63,6 +65,13 @@ class LuaScriptRuntime(
 
         /** 网络回调（SSE/WS 事件）超时：回调应短促，恶意死循环回调会占住执行线程。 */
         private const val CALLBACK_TIMEOUT_MS = 5_000L
+
+        /** 候选词变换（hotPath 能力）超时：调用发生在按键路径，超时即回退原始候选
+         *  （不中毒——由调用方按连续失败次数熔断；15ms 足够纯内存计算的插件完成）。 */
+        const val TRANSFORM_TIMEOUT_MS = 15L
+
+        /** 候选词变换响应候选总数上限（超限截断，防插件撑爆候选栏）。 */
+        const val TRANSFORM_MAX_CANDIDATES = 20
 
         /** zlib.gunzip 解压输出上限（防压缩炸弹撑爆内存）。 */
         private const val MAX_GUNZIP_OUTPUT_BYTES = 16 * 1024 * 1024
@@ -312,6 +321,76 @@ class LuaScriptRuntime(
         return table
     }
 
+    // ---- 候选词变换（manifest capabilities.candidate_transform 声明后宿主按需同步调用） ----
+
+    /**
+     * 同步调用插件 transformCandidates(request)。
+     *
+     * 线程契约：调用方为 key-processing 线程（hotPath），本方法阻塞等待至多
+     * [TRANSFORM_TIMEOUT_MS]（luaLock 竞争可能额外等待，由调用方熔断兜底）。
+     * 超时/报错不中毒（插件可能只是偶发慢），由调用方按连续失败熔断。
+     */
+    fun transformCandidates(request: CandidateTransformRequest): CandidateTransformOutcome {
+        if (!loaded) return CandidateTransformOutcome.NoResponse
+        val reqTable = LuaValue.tableOf()
+        reqTable.set("input_text", LuaValue.valueOf(request.inputText))
+        reqTable.set("preedit", LuaValue.valueOf(request.preedit))
+        reqTable.set("ascii_mode", LuaValue.valueOf(request.asciiMode))
+        val cands = LuaValue.tableOf()
+        request.candidates.forEachIndexed { i, c ->
+            val t = LuaValue.tableOf()
+            t.set("text", LuaValue.valueOf(c.text))
+            t.set("comment", LuaValue.valueOf(c.comment))
+            cands.set(i + 1, t)
+        }
+        reqTable.set("candidates", cands)
+        return try {
+            // 函数不存在 / 插件返回 nil → block 返回 NIL；runGuarded 返回 null 仅表示超时
+            val result = runGuarded(TRANSFORM_TIMEOUT_MS, poisonOnTimeout = false) {
+                synchronized(luaLock) {
+                    if (!loaded) return@runGuarded LuaValue.NIL
+                    val fn = pluginTable.get(LuaPluginContract.FN_TRANSFORM_CANDIDATES)
+                    if (!fn.isfunction()) return@runGuarded LuaValue.NIL
+                    fn.invoke(reqTable).arg1()
+                }
+            }
+            when {
+                result == null -> CandidateTransformOutcome.Failed
+                result.isnil() -> CandidateTransformOutcome.NoResponse
+                result.istable() -> parseTransformResponse(result)
+                else -> CandidateTransformOutcome.Failed
+            }
+        } catch (e: Exception) {
+            api.log("transformCandidates 调用失败: ${e.message}")
+            CandidateTransformOutcome.Failed
+        }
+    }
+
+    /** 解析 { candidates = { {engine_index=..} | {text=.., comment=..} } }。
+     *  candidates 字段缺失/非 table = 格式错误（Failed）；
+     *  空列表或全部项非法 = 不干预（NoResponse）。 */
+    private fun parseTransformResponse(result: LuaValue): CandidateTransformOutcome {
+        val listTable = result.get("candidates")
+        if (!listTable.istable()) return CandidateTransformOutcome.Failed
+        val items = mutableListOf<CandidateTransformItem>()
+        for (v in tableToList(listTable)) {
+            if (!v.istable()) continue
+            val comment = v.get("comment").takeIf { it.isstring() }?.tojstring()
+            val engineIdx = v.get("engine_index")
+            val text = v.get("text")
+            when {
+                engineIdx.isnumber() ->
+                    items.add(CandidateTransformItem(engineIndex = engineIdx.toint(), text = null, comment = comment))
+                text.isstring() && text.tojstring().isNotEmpty() ->
+                    items.add(CandidateTransformItem(engineIndex = null, text = text.tojstring(), comment = comment))
+                else -> continue // 非法项丢弃（既非引擎引用也非文本候选）
+            }
+            if (items.size >= TRANSFORM_MAX_CANDIDATES) break
+        }
+        if (items.isEmpty()) return CandidateTransformOutcome.NoResponse
+        return CandidateTransformOutcome.Success(items)
+    }
+
     /** 把 SSE 会话的流事件转发为 Lua 回调（宿主后台线程调用）。 */
     private fun invokeSseCallback(sessionId: Int, name: String, text: String) {
         val callbacks = sseCallbacks[sessionId] ?: return
@@ -546,7 +625,45 @@ class LuaScriptRuntime(
         // ASR 结果回传桥：插件 Lua 解析结果后通知宿主后端（协议无关的接口桥）
         host.set("asr", buildAsrEmitTable())
 
+        // 快捷发送只读 API（manifest quick_send_read 声明后注入，未声明 host.quickSend 不存在）
+        if (quickSendHostApi != null) {
+            host.set("quickSend", buildQuickSendTable())
+        }
+
+        // 剪贴板只读 API（manifest clipboard_read 声明后注入，未声明 host.clipboard 不存在）
+        if (clipboardHostApi != null) {
+            host.set("clipboard", buildClipboardTable())
+        }
+
         return host
+    }
+
+    private fun buildQuickSendTable(): LuaTable {
+        val quickSend = LuaTable()
+        quickSend.set("list", luaFunction { _ ->
+            val arr = LuaTable()
+            quickSendHostApi?.list()?.forEachIndexed { i, item ->
+                val m = LuaTable()
+                // Long → double：luaj number 即 double（Lua 5.1 语义），毫秒时间戳远低于 2^53
+                m.set("id", LuaValue.valueOf(item.id.toDouble()))
+                m.set("text", LuaValue.valueOf(item.text))
+                m.set("code", LuaValue.valueOf(item.code))
+                m.set("timestamp", LuaValue.valueOf(item.timestamp.toDouble()))
+                m.set("isPinned", LuaValue.valueOf(item.isPinned))
+                arr.set(i + 1, m)
+            }
+            arr
+        })
+        return quickSend
+    }
+
+    private fun buildClipboardTable(): LuaTable {
+        val clipboard = LuaTable()
+        clipboard.set("get", luaFunction { _ ->
+            val text = clipboardHostApi?.getText()
+            if (text.isNullOrEmpty()) LuaValue.NIL else LuaValue.valueOf(text)
+        })
+        return clipboard
     }
 
     private fun buildWsTable(): LuaTable {

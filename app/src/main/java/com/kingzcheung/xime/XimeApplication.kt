@@ -77,6 +77,12 @@ class XimeApplication : Application(), ImageLoaderFactory {
         PluginManager.cryptoHostApiFactory = {
             com.kingzcheung.xime.plugin.crypto.CryptoHostApiImpl()
         }
+        PluginManager.quickSendHostApiFactory = { _ ->
+            com.kingzcheung.xime.plugin.QuickSendHostApiImpl(this)
+        }
+        PluginManager.clipboardHostApiFactory = { _ ->
+            com.kingzcheung.xime.plugin.ClipboardHostApiImpl(this)
+        }
         PluginManager.initialize(this) {
             if (isDebug) {
                 PluginManager.installPluginsFromAssetsForDebug("plugins")

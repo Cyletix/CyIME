@@ -150,7 +150,6 @@ function plugin.getSettingsSchema()
             key = "testConnection",
             label = "测试连接",
             type = "button",
-            action = "testConnection",
             required = false,
         },
     }
