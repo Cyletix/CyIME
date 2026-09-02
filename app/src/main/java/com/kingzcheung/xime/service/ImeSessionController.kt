@@ -22,6 +22,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     internal fun applyComposition(
         composition: com.kingzcheung.xime.rime.RimeComposition,
         pluginActions: List<CandidateAction> = emptyList(),
+        t9PluginInjections: List<T9CandidateInjection> = emptyList(),
     ) {
         val inputText = composition.input
         val codeInInputBox = SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX
@@ -54,6 +55,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         val displayCandidates: List<String>
         val displayComments: List<String>
         val isComposing: Boolean
+        var t9CandidateActions: List<CandidateAction> = emptyList()
         if (isT9Schema) {
             val rawPreedit = if (preeditText.isNotEmpty()) preeditText else inputText
             // preedit 转换由 C++ t9_filter 完成，Kotlin 侧直接使用引擎输出的 preedit
@@ -61,9 +63,35 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 service.t9PartialSegments.map { it.text }, rawPreedit, inputText, t9FilteredTexts, t9FilteredComments
             )
             displayText = display.displayText
-            displayCandidates = display.displayCandidates
-            displayComments = display.displayComments
+            // T9 插件候选按引擎锚点插入（transformForT9 已把插件输出顺序折叠为
+            // anchorEngineIndex；编码命中→锚 0→第二候选位，内容命中→跟随对应候选；
+            // 无锚点追加末尾）。引擎段 actions 用平行 index 引用（T9 点击走引擎分支，
+            // 不实际消费 engineIndex，仅用于插件候选分流）
+            val baseCands = display.displayCandidates
+            val baseComments = display.displayComments
+            val byAnchor = t9PluginInjections.groupBy { it.anchorEngineIndex }
+            val mergedCands = ArrayList<String>(baseCands.size + t9PluginInjections.size)
+            val mergedComments = ArrayList<String>(mergedCands.size)
+            val mergedActions = ArrayList<CandidateAction>(mergedCands.size)
+            for ((idx, cand) in baseCands.withIndex()) {
+                byAnchor[idx]?.forEach { inj ->
+                    mergedCands.add(inj.snapshot.text)
+                    mergedComments.add(inj.snapshot.comment)
+                    mergedActions.add(CandidateAction.plugin(inj.snapshot.text))
+                }
+                mergedCands.add(cand)
+                mergedComments.add(baseComments.getOrElse(idx) { "" })
+                mergedActions.add(CandidateAction.engine(idx))
+            }
+            byAnchor[null]?.forEach { inj ->
+                mergedCands.add(inj.snapshot.text)
+                mergedComments.add(inj.snapshot.comment)
+                mergedActions.add(CandidateAction.plugin(inj.snapshot.text))
+            }
+            displayCandidates = mergedCands
+            displayComments = mergedComments
             isComposing = display.isComposing
+            t9CandidateActions = mergedActions
         } else {
             // 非 T9 方案：preeditText 用引擎回显（带音节分隔符，如全拼 ni'hao）供候选栏展示；
             // inputText 保留原始键入串（无分隔）——空格/切模式等提交路径会把它直接上屏，
@@ -91,8 +119,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             isShowingRecentClipboard = false,
             hasNextPage = hasNextPage,
             hasPrevPage = hasPrevPage,
-            // 候选词变换映射（T9 不接入变换，防御清空）
-            candidateActions = if (isT9Schema) emptyList() else pluginActions
+            // 候选词变换映射（全键盘 pluginActions / T9 平行 actions；防御空）
+            candidateActions = if (isT9Schema) t9CandidateActions else pluginActions
         )
         if (isAsciiMode != service.uiState.value.isAsciiMode) {
             FileLogger.i(XimeInputMethodService.TAG, "applyComposition: ascii ${service.uiState.value.isAsciiMode}->$isAsciiMode")
@@ -104,7 +132,12 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             service.serviceScope.launch {
                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                 withContext(Dispatchers.Main) {
-                    service.candidateState.value = service.candidateState.value.copy(associationCandidates = candidates)
+                    val current = service.candidateState.value
+                    // 在途联想过期校验：pendingEnglish 已变/已清（如点击候选栏"清空"）→
+                    // 丢弃迟到回填，防止"清了又冒出来"与旧联想覆盖新联想的竞态
+                    if (current.pendingEnglishText == pendingEnglish) {
+                        service.candidateState.value = current.copy(associationCandidates = candidates)
+                    }
                 }
             }
         }
@@ -211,7 +244,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             service.serviceScope.launch {
                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                 withContext(Dispatchers.Main) {
-                    service.candidateState.value = service.candidateState.value.copy(associationCandidates = candidates)
+                    val current = service.candidateState.value
+                    // 在途联想过期校验：pendingEnglish 已变/已清 → 丢弃迟到回填
+                    if (current.pendingEnglishText == pendingEnglish) {
+                        service.candidateState.value = current.copy(associationCandidates = candidates)
+                    }
                 }
             }
         }

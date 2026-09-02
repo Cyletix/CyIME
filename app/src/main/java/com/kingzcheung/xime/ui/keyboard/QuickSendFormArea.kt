@@ -34,6 +34,7 @@ fun QuickSendFormArea(
     editingItemId: Long? = null,
     onClose: (text: String, code: String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
+    onCodeFocusChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
@@ -123,8 +124,13 @@ fun QuickSendFormArea(
                         imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION or
                             EditorInfo.IME_ACTION_DONE
 
+                        // 焦点回调 + 点击抢焦点：宿主按键输入按焦点路由（文本框 vs 编码框）
+                        onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+                            if (hasFocus) onCodeFocusChange(true) else onCodeFocusChange(false)
+                        }
                         setOnClickListener {
-                            onFocusChange(true)
+                            requestFocus()
+                            onCodeFocusChange(true)
                         }
                         QuickSendFormCodeEditTextHolder.editText = this
                     }

@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.rime.T9InputController
+import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
@@ -97,7 +98,13 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onClearAssociation = {
-                service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList())
+                // 清空英文联想候选，并结束英文输入态：pendingEnglish 清空后，
+                // 后续刷新不再触发联想异步回填（否则"清了又冒出来"，见
+                // ImeSessionController/updateUIWithResult 的在途回填校验）。
+                service.candidateState.value = service.candidateState.value.copy(
+                    associationCandidates = emptyList(),
+                    pendingEnglishText = ""
+                )
             },
             onToggleDarkMode = { service.toggleDarkMode() },
             onClipboard = {},
@@ -316,10 +323,16 @@ internal fun rememberImeKeyboardCallbacks(
                     }
                 }
             },
-            onT9RefreshComposition = { composition ->
+            onT9RefreshComposition = { composition, injections ->
                 // composition 由 T9 控制器在 flush 后一次取回并传入，
                 // 避免在此再次 getComposition 造成重复 JNI 往返。
-                service.mainHandler.post { service.sessionController.applyComposition(composition) }
+                service.mainHandler.post {
+                    service.sessionController.applyComposition(composition, emptyList(), injections)
+                }
+            },
+            onTCandidateTransform = { result ->
+                // T9 后台线程（t9Dispatcher）调用：同步等插件至多 15ms，主线程零等待
+                service.candidateTransform.transformForT9(result)
             },
             onT9SwitchAway = {
                 service.keyRouter.postRimeJob {
@@ -361,6 +374,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.uiState.value = current.copy(
                     showQuickSendForm = true,
                     quickSendFormFocused = true,
+                    quickSendCodeFocused = false,
                     quickSendEditingItemId = null,
                     quickSendEditingItemText = "",
                     quickSendEditingItemCode = "",
@@ -375,6 +389,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.uiState.value = service.uiState.value.copy(
                     showQuickSendForm = true,
                     quickSendFormFocused = true,
+                    quickSendCodeFocused = false,
                     quickSendEditingItemId = id,
                     quickSendEditingItemText = text,
                     quickSendEditingItemCode = code,
@@ -390,6 +405,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.uiState.value = service.uiState.value.copy(
                     showQuickSendForm = false,
                     quickSendFormFocused = false,
+                    quickSendCodeFocused = false,
                     quickSendEditingItemId = null,
                     quickSendEditingItemText = "",
                     quickSendEditingItemCode = "",
@@ -407,9 +423,19 @@ internal fun rememberImeKeyboardCallbacks(
                 // 关闭表单时由 onHideQuickSendForm / onWindowHidden 统一还原"发送"。
                 val s = service.uiState.value
                 service.uiState.value = if (focused) {
-                    s.copy(quickSendFormFocused = true, enterKeyText = "确定")
+                    // 文本框抢回焦点：编码焦点清除，按键输入回到文本框
+                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = false, enterKeyText = "确定")
                 } else {
-                    s.copy(quickSendFormFocused = false)
+                    s.copy(quickSendFormFocused = false, quickSendCodeFocused = false)
+                }
+            },
+            onQuickSendCodeFocusChange = { focused: Boolean ->
+                val s = service.uiState.value
+                service.uiState.value = if (focused) {
+                    // 编码框获得焦点：同样视为表单聚焦（回车"确定"/按键路由生效）
+                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = true, enterKeyText = "确定")
+                } else {
+                    s.copy(quickSendCodeFocused = false)
                 }
             },
         )
