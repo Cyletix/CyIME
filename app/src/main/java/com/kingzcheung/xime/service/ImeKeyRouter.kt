@@ -706,7 +706,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             service.serviceScope.launch {
                                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                                 withContext(Dispatchers.Main) {
-                                    service.candidateState.value = service.candidateState.value.copy(associationCandidates = candidates)
+                                    val current = service.candidateState.value
+                                    // 在途联想过期校验：pendingEnglish 已变/已清 → 丢弃迟到回填
+                                    if (current.pendingEnglishText == pendingEnglish) {
+                                        service.candidateState.value = current.copy(associationCandidates = candidates)
+                                    }
                                 }
                             }
                         }
@@ -1081,6 +1085,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 hasNextPage = false,
                 hasPrevPage = false,
                 candidateActions = emptyList()
+            )
+            // T9：清 partial 累积与左栏状态（与引擎候选 full commit 同款清理，
+            // 防残留 partial 混入下一轮 preedit / 左侧面板残留）
+            service.t9PartialSegments.clear()
+            service.uiState.value = service.uiState.value.copy(
+                t9ResetSignal = service.uiState.value.t9ResetSignal + 1,
+                t9RightCandidateSelectedCount = 0,
+                t9SelectedCandidatePinyin = ""
             )
         }
         service.rimeEngine.clearComposition()

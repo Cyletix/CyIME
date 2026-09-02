@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.rime.T9InputController
+import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
@@ -97,7 +98,13 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onClearAssociation = {
-                service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList())
+                // 清空英文联想候选，并结束英文输入态：pendingEnglish 清空后，
+                // 后续刷新不再触发联想异步回填（否则"清了又冒出来"，见
+                // ImeSessionController/updateUIWithResult 的在途回填校验）。
+                service.candidateState.value = service.candidateState.value.copy(
+                    associationCandidates = emptyList(),
+                    pendingEnglishText = ""
+                )
             },
             onToggleDarkMode = { service.toggleDarkMode() },
             onClipboard = {},
@@ -316,10 +323,16 @@ internal fun rememberImeKeyboardCallbacks(
                     }
                 }
             },
-            onT9RefreshComposition = { composition ->
+            onT9RefreshComposition = { composition, injections ->
                 // composition 由 T9 控制器在 flush 后一次取回并传入，
                 // 避免在此再次 getComposition 造成重复 JNI 往返。
-                service.mainHandler.post { service.sessionController.applyComposition(composition) }
+                service.mainHandler.post {
+                    service.sessionController.applyComposition(composition, emptyList(), injections)
+                }
+            },
+            onTCandidateTransform = { result ->
+                // T9 后台线程（t9Dispatcher）调用：同步等插件至多 15ms，主线程零等待
+                service.candidateTransform.transformForT9(result)
             },
             onT9SwitchAway = {
                 service.keyRouter.postRimeJob {

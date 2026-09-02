@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.service
 
+import android.util.Log
 import com.kingzcheung.xime.plugin.core.lua.CandidateTransformCandidate
 import com.kingzcheung.xime.plugin.core.lua.CandidateTransformItem
 import com.kingzcheung.xime.plugin.core.lua.CandidateTransformOutcome
@@ -15,6 +16,24 @@ import com.kingzcheung.xime.util.FileLogger
 internal data class CandidateTransformResult(
     val candidates: List<RimeCandidate>,
     val actions: List<CandidateAction>,
+)
+
+/** T9 场景插件候选快照（text + comment）：引擎候选原样保留，插件候选追加右栏。 */
+data class PluginCandidateSnapshot(
+    val text: String,
+    val comment: String,
+)
+
+/**
+ * T9 插件候选注入：锚定在某个引擎候选之后。
+ * [anchorEngineIndex] = 该条目在插件响应 items 中前一个引擎引用项（engine_index）；
+ * null = 无引擎锚点（追加末尾）。两条命中规则在插件 Lua 侧已表达为输出顺序
+ * （编码命中紧跟引擎第一候选 → anchor=0 即第二候选位；内容命中紧跟对应候选 → anchor=k），
+ * 本模型把该顺序语义无损带过 T9 索引不可信的问题。
+ */
+data class T9CandidateInjection(
+    val anchorEngineIndex: Int?,
+    val snapshot: PluginCandidateSnapshot,
 )
 
 /**
@@ -98,7 +117,7 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
         if (asciiMode) return null
         if (isT9Schema(service.uiState.value.currentSchemaId)) return null
         if (service.pluginEvents.isCurrentEditorSensitive) return null
-        val runtime = findRuntime() ?: return null
+        val (pluginId, runtime) = findRuntime() ?: return null
         val outcome = runtime.transformCandidates(
             CandidateTransformRequest(
                 inputText = inputText,
@@ -110,10 +129,12 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
         return when (outcome) {
             is CandidateTransformOutcome.NoResponse -> {
                 consecutiveFailures = 0
+                logTransform("QWERTY", pluginId, inputText, "no-intervention", 0)
                 null
             }
             is CandidateTransformOutcome.Failed -> {
                 consecutiveFailures++
+                logTransform("QWERTY", pluginId, inputText, "failed", 0)
                 if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                     disabledThisSession = true
                     FileLogger.w(
@@ -125,17 +146,88 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
             }
             is CandidateTransformOutcome.Success -> {
                 consecutiveFailures = 0
-                buildDisplay(outcome.items, engineCandidates)
+                val transformed = buildDisplay(outcome.items, engineCandidates)
+                logTransform("QWERTY", pluginId, inputText, "inject", transformed?.candidates?.size ?: 0)
+                transformed
             }
         }
     }
 
-    /** 第一个声明 candidate_transform 且已加载的插件运行时（v1 单插件；链式变换为后续增强）。 */
-    private fun findRuntime(): LuaScriptRuntime? {
-        for ((_, loaded) in PluginManager.loadedPluginsFlow.value) {
+    /**
+     * T9 场景变换入口（t9Dispatcher/key-processing 线程，阻塞至多 15ms）。
+     * 与 [transform] 的区别：T9 候选索引可能被引擎 partial 展示态替换，engine_index
+     * 引用不可信 → 响应只取 text 追加项（引擎引用丢弃），但记录每条 text 项的
+     * 引擎锚点（其前最近一次引擎引用的 index），供 applyComposition T9 分支按锚点
+     * 插入（插件 Lua 的输出顺序已表达"编码命中→第二候选位、内容命中→跟随候选"）。
+     * 短路条件同 [transform]；T9 本身不作短路（本方法即 T9 路径）。
+     */
+    fun transformForT9(result: RimeProcessResult): List<T9CandidateInjection>? {
+        if (disabledThisSession) return null
+        if (result.isAsciiMode) return null
+        if (result.inputText.isEmpty() && result.candidates.isEmpty()) return null
+        if (service.pluginEvents.isCurrentEditorSensitive) return null
+        val (pluginId, runtime) = findRuntime() ?: return null
+        val outcome = runtime.transformCandidates(
+            CandidateTransformRequest(
+                inputText = result.inputText,
+                preedit = result.preeditText,
+                candidates = result.candidates.map { CandidateTransformCandidate(it.text, it.comment) },
+                asciiMode = result.isAsciiMode,
+            )
+        )
+        return when (outcome) {
+            is CandidateTransformOutcome.NoResponse -> {
+                consecutiveFailures = 0
+                logTransform("T9", pluginId, result.inputText, "no-intervention", 0)
+                null
+            }
+            is CandidateTransformOutcome.Failed -> {
+                consecutiveFailures++
+                logTransform("T9", pluginId, result.inputText, "failed", 0)
+                if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                    disabledThisSession = true
+                    FileLogger.w(
+                        XimeInputMethodService.TAG,
+                        "candidate_transform(T9) 连续失败 $consecutiveFailures 次，本会话禁用该插件变换"
+                    )
+                }
+                null
+            }
+            is CandidateTransformOutcome.Success -> {
+                consecutiveFailures = 0
+                val injections = mutableListOf<T9CandidateInjection>()
+                var lastEngineAnchor: Int? = null
+                for (item in outcome.items) {
+                    if (item.engineIndex != null) {
+                        lastEngineAnchor = item.engineIndex
+                        continue
+                    }
+                    val text = item.text?.takeIf { it.isNotEmpty() } ?: continue
+                    injections.add(
+                        T9CandidateInjection(lastEngineAnchor, PluginCandidateSnapshot(text, item.comment ?: ""))
+                    )
+                }
+                logTransform("T9", pluginId, result.inputText, "inject", injections.size)
+                injections.takeIf { it.isNotEmpty() }
+            }
+        }
+    }
+
+    /** 第一个声明 candidate_transform 且已加载的插件运行时（v1 单插件；链式变换为后续增强）。
+     *  返回 (插件 id, 运行时)；无可用插件返回 null。 */
+    private fun findRuntime(): Pair<String, LuaScriptRuntime>? {
+        for ((pluginId, loaded) in PluginManager.loadedPluginsFlow.value) {
             if (loaded.pluginInfo.capabilities?.candidateTransform != true) continue
-            return loaded.script ?: continue
+            val script = loaded.script ?: continue
+            return pluginId to script
         }
         return null
+    }
+
+    /** 诊断日志：hotPath 每键调用。调用点只传原始值（零字符串操作），
+     *  isLoggable 未开启时立即返回（唯一开销是一次 int 读+比较，~1ns）。 */
+    private fun logTransform(mode: String, pluginId: String?, input: String, state: String, count: Int) {
+        if (!Log.isLoggable(XimeInputMethodService.TAG, Log.DEBUG)) return
+        Log.d(XimeInputMethodService.TAG, "candidate_transform[$mode] plugin=$pluginId input='$input' $state=$count")
     }
 }

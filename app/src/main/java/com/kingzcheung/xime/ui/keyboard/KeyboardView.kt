@@ -103,10 +103,11 @@ fun KeyboardView(
 
     val t9Controller = remember {
         T9InputController(
-            onCompositionRefresh = { composition ->
-                callbacks.onT9RefreshComposition?.invoke(composition)
+            onCompositionRefresh = { composition, snapshots ->
+                callbacks.onT9RefreshComposition?.invoke(composition, snapshots)
             },
             onRightCommitUndone = callbacks.onT9RightCommitUndone,
+            candidateTransform = callbacks.onTCandidateTransform,
         )
     }
 
