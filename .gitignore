@@ -38,7 +38,7 @@ app/release
 /.agents
 # Association model weights (large files, manually placed)
 app/src/main/assets/association_model
-
+/.sisyphus
 /.kilo
 /.kotlin
 
