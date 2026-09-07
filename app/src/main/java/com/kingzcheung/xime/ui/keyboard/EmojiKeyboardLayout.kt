@@ -2,7 +2,6 @@ package com.kingzcheung.xime.ui.keyboard
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -163,7 +162,7 @@ fun EmojiKeyboardLayout(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(iconButtonContainer)
-                        .clickable { onBack() },
+                        .tolerantClick { onBack() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -197,7 +196,7 @@ fun EmojiKeyboardLayout(
                                     if (selectedTopTabIndex == 0) accentColor.copy(0.4f)
                                     else Color.Transparent
                                 )
-                                .clickable {
+                                .tolerantClick {
                                     onHapticFeedback?.invoke()
                                     selectedTopTabIndex = 0
                                     selectedSubCategoryIndex = 0
@@ -223,7 +222,7 @@ fun EmojiKeyboardLayout(
                                         if (selectedTopTabIndex == index + 1) accentColor.copy(0.4f)
                                         else Color.Transparent
                                     )
-                                    .clickable {
+                                    .tolerantClick {
                                         onHapticFeedback?.invoke()
                                         selectedTopTabIndex = index + 1
                                         selectedSubCategoryIndex = 0
@@ -509,7 +508,7 @@ fun EmojiCategoryTab(
                 else backgroundColor
             )
             .padding(horizontal = 5.dp)
-            .clickable(onClick = onClick),
+            .tolerantClick(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         if (pluginIcon?.assetName != null) {
@@ -544,7 +543,7 @@ fun EmojiButton(
         modifier = modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(4.dp))
-            .clickable(onClick = onClick),
+            .tolerantClick(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -580,7 +579,7 @@ fun PluginEmojiButton(
             )
             .clip(RoundedCornerShape(4.dp))
             .background(buttonBackgroundColor)
-            .clickable(onClick = onClick)
+            .tolerantClick(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {

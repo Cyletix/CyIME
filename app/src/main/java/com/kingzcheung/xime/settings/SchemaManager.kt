@@ -751,12 +751,27 @@ object SchemaManager {
         return result.joinToString("\n")
     }
 
+    /** 内置方案（保持默认启用顺序）。 */
+    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
+
+    /**
+     * 内置方案补齐（纯函数）：用户启用列表尾部按 [BUILTIN_SCHEMAS] 顺序追加缺失项，
+     * 用户已有顺序与选择保持不变；无缺失时原样返回。
+     *
+     * 背景：老版本升级用户的 custom.yaml 早于新内置方案（如 t9_pinyin）创建，
+     * 列表里没有它 → 方案永不部署 → 切九键引擎侧静默失败（按键无候选）。
+     */
+    internal fun mergeBuiltinSchemas(enabled: List<String>): List<String> {
+        val missing = BUILTIN_SCHEMAS.filter { it !in enabled }
+        return if (missing.isEmpty()) enabled else enabled + missing
+    }
+
     fun getEnabledSchemas(context: Context): List<String> {
         val customFile = getCustomYamlFile(context)
         if (!customFile.exists()) {
-            val defaultBuiltIn = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
-            setEnabledSchemas(context, defaultBuiltIn)
-            return defaultBuiltIn
+            setEnabledSchemas(context, BUILTIN_SCHEMAS)
+            SettingsPreferences.setBuiltinSchemasMerged(context, true)
+            return BUILTIN_SCHEMAS
         }
 
         try {
@@ -778,12 +793,29 @@ object SchemaManager {
                     }
                 }
             }
-            if (schemas.isNotEmpty()) return schemas
+            if (schemas.isNotEmpty()) {
+                // 内置方案补齐只执行一次（新版本首次运行，治老版本升级残留：
+                // 列表无 t9_pinyin → 方案永不部署 → 切九键静默失败）。之后用户
+                // 在方案管理中移除内置方案是有效选择，不得每次读取强行补回。
+                // 补齐写回后 schema_list 计入部署 hash、build 产物按方案校验，
+                // 缺失的方案会自动触发重部署。
+                val merged = if (SettingsPreferences.isBuiltinSchemasMerged(context)) {
+                    schemas
+                } else {
+                    val m = mergeBuiltinSchemas(schemas)
+                    if (m != schemas) {
+                        setEnabledSchemas(context, m)
+                    }
+                    SettingsPreferences.setBuiltinSchemasMerged(context, true)
+                    m
+                }
+                return merged
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to read custom.yaml", e)
         }
 
-        return listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
+        return BUILTIN_SCHEMAS
     }
 
     fun setEnabledSchemas(context: Context, schemaIds: List<String>) {

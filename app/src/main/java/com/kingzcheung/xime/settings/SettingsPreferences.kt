@@ -10,6 +10,7 @@ object SettingsPreferences {
     /** 双写标记：仅新版本双写后置 true，本地值才可信（旧版本只写 rime，本地是过时迁移值） */
     private const val KEY_CURRENT_SCHEMA_DUAL = "current_schema_dual"
     private const val KEY_DEPLOYMENT_DONE = "deployment_done"
+    private const val KEY_BUILTIN_SCHEMAS_MERGED = "builtin_schemas_merged"
     private const val KEY_DEPLOYMENT_HASH = "deployment_hash"
     private const val KEY_RIME_ASSETS_VERSION = "rime_assets_version"
     private const val KEY_SETUP_COMPLETED = "setup_completed"
@@ -167,9 +168,22 @@ object SettingsPreferences {
     fun isDeploymentDone(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_DEPLOYMENT_DONE, false)
     }
-    
+
     fun setDeploymentDone(context: Context, done: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_DEPLOYMENT_DONE, done).apply()
+    }
+
+    /**
+     * 内置方案补齐已执行标记：新版本首次运行时把缺失的内置方案（如 t9_pinyin，
+     * 老版本升级用户列表里没有）补进 schema_list 一次；之后用户在方案管理里
+     * 移除内置方案是有效选择，getEnabledSchemas 不得再强行补回。
+     */
+    fun isBuiltinSchemasMerged(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_BUILTIN_SCHEMAS_MERGED, false)
+    }
+
+    fun setBuiltinSchemasMerged(context: Context, merged: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_BUILTIN_SCHEMAS_MERGED, merged).apply()
     }
 
     fun getDeploymentHash(context: Context): String {

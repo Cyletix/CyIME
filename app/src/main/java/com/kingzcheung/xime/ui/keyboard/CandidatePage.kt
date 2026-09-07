@@ -1,7 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -128,7 +127,7 @@ fun CandidatePage(
                             if (state.hasPrevPage && callbacks.onPageUp != null) state.textColor.copy(alpha = 0.5f)
                             else state.textColor.copy(alpha = 0.1f)
                         )
-                        .clickable(
+                        .tolerantClick(
                             enabled = state.hasPrevPage && state.candidates.isNotEmpty() && callbacks.onPageUp != null,
                             onClick = { callbacks.onPageUp?.invoke() }
                         ),
@@ -150,7 +149,7 @@ fun CandidatePage(
                             if (state.hasNextPage && callbacks.onPageDown != null) state.textColor.copy(alpha = 0.25f)
                             else state.textColor.copy(alpha = 0.1f)
                         )
-                        .clickable(
+                        .tolerantClick(
                             enabled = state.hasNextPage && state.candidates.isNotEmpty() && callbacks.onPageDown != null,
                             onClick = { callbacks.onPageDown?.invoke() }
                         ),
@@ -170,7 +169,7 @@ fun CandidatePage(
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(iconButtonContainer)
-                    .clickable { callbacks.onBack?.invoke() },
+                    .tolerantClick { callbacks.onBack?.invoke() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -193,7 +192,8 @@ fun CandidatePage(
                 // 候选条目点击与外层 verticalScroll 存在手势竞争：按下后轻微位移超过
                 // touch slop 即被判定为滚动，点击被静默取消（无任何反馈）。部分 ROM
                 // （如鸿蒙）的 slop/触摸采样更敏感，表现为"偶尔点击候选无反应"。
-                // 内容不超高时彻底禁用滚动容器，保证点击稳定命中；超高时仍可滚动。
+                // 内容不超高时彻底禁用滚动容器，保证点击稳定命中；超高时仍可滚动，
+                // 由候选条目的 tolerantClick（宽容位移判定）兜底。
                 var viewportHeight by remember { mutableStateOf(0) }
                 var contentHeight by remember { mutableStateOf(0) }
                 val scrollState = rememberScrollState()
@@ -287,9 +287,9 @@ fun CandidatePageItem(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(if (isPressed) textColor.copy(alpha = 0.12f) else Color.Transparent)
-            .clickable(
+            .tolerantClick(
+                showRipple = false,
                 interactionSource = interactionSource,
-                indication = null,
                 onClick = onClick
             )
             .padding(horizontal = 4.dp, vertical = 8.dp),

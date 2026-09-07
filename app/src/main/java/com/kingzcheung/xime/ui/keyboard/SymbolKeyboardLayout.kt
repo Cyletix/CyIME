@@ -1,7 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -103,7 +102,7 @@ fun SymbolKeyboardLayout(
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(iconButtonContainer)
-                    .clickable {
+                    .tolerantClick {
                         onHapticFeedback?.invoke()
                         onBack()
                     },
@@ -242,9 +241,9 @@ private fun SymbolButton(
                 if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)
                 else backgroundColor
             )
-            .clickable(
+            .tolerantClick(
+                showRipple = false,
                 interactionSource = interactionSource,
-                indication = null,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -277,7 +276,7 @@ private fun SymbolCategoryTab(
                 if (isSelected) selectedBackgroundColor
                 else backgroundColor
             )
-            .clickable(onClick = onClick)
+            .tolerantClick(onClick = onClick)
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center
     ) {

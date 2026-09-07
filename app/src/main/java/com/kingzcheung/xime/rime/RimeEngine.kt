@@ -446,14 +446,26 @@ class RimeEngine {
         // 部署/全量编译进行中（30s+）不阻塞等待：直接返回 false，避免主线程
         // onStartInput/selectSchema 等路径 ANR。部署完成后的 initRimeEngine
         // 流程会重新切换方案。非部署场景保持阻塞锁语义，保证切换可靠。
-        if (isMaintaining()) return false
+        if (isMaintaining()) {
+            Log.w(TAG, "switchSchema($schemaId) skipped: deployment in progress")
+            return false
+        }
         locked {
-            if (!nativeHasSession()) return false
+            if (!nativeHasSession()) {
+                Log.w(TAG, "switchSchema($schemaId) failed: no rime session")
+                return false
+            }
             // 在切换方案前，确保 T9 方案的 schema 补丁已注入
             // 这会在 user_data_dir 中创建 {schemaId}.custom.yaml 文件，
             // RIME 引擎加载方案时会自动应用 custom.yaml 中的 patch 补丁
             nativeEnsureT9SchemaPatches(schemaId)
-            return nativeSwitchSchema(schemaId)
+            val switched = nativeSwitchSchema(schemaId)
+            if (!switched) {
+                // 常见于方案未部署（不在 schema_list，如老版本升级残留）：
+                // 留证便于反馈日志定位（用户症状：键盘已切换但按键无候选）
+                Log.w(TAG, "switchSchema($schemaId) failed: schema not available, current=${getCurrentSchema()}")
+            }
+            return switched
         }
     }
 
