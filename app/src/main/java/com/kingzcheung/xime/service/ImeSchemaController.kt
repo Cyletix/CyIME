@@ -303,8 +303,22 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             // 部署/编译进行中 switchSchema 返回 false（不阻塞等待），
             // 此时不应继续触发其他 native 调用进入编译中的引擎
             if (!service.rimeEngine.switchSchema(schemaId)) {
-                Log.w(XimeInputMethodService.TAG, "switchSchema skipped: deployment in progress")
-                Toast.makeText(service, "词库部署中，请稍后再切换方案", Toast.LENGTH_SHORT).show()
+                if (service.rimeEngine.isMaintaining()) {
+                    Log.w(XimeInputMethodService.TAG, "switchSchema skipped: deployment in progress")
+                    Toast.makeText(service, "词库部署中，请稍后再切换方案", Toast.LENGTH_SHORT).show()
+                    return
+                }
+                // 引擎切换失败（常见：方案未部署/不在 schema_list，老版本升级残留）。
+                // 必须回滚偏好到引擎实际方案：偏好留着目标值会让 UI 状态与引擎
+                // 永久脱节（键盘已显示九键但数字键无人处理，候选栏始终 IDLE）。
+                // getCurrentSchema 无会话时返回空串——此时不动偏好，保留原值由
+                // IME 重启的恢复逻辑兜底，避免把空串写进偏好与 user.yaml
+                val actual = service.rimeEngine.getCurrentSchema()
+                if (actual.isNotEmpty()) {
+                    SettingsPreferences.setCurrentSchema(service, actual)
+                }
+                Log.w(XimeInputMethodService.TAG, "switchSchema failed: target=$schemaId actual=$actual")
+                Toast.makeText(service, "方案未部署，请在方案管理中部署后再试", Toast.LENGTH_SHORT).show()
                 return
             }
             if (!service.rimeEngine.isAsciiMode()) {

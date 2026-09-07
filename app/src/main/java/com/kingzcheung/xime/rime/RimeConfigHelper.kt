@@ -19,6 +19,7 @@ import java.io.IOException
 object RimeConfigHelper {
     private const val TAG = "RimeConfigHelper"
     private const val ASSETS_RIME_DIR = "rime"
+    private const val BUFFER_SIZE = 8192
 
     /** 市场索引中随 app 发布的内置默认方案集条目 id（见 rimes/index.yaml 的 `builtin`）。 */
     private const val BUILTIN_MARKET_ID = "builtin"
@@ -125,6 +126,39 @@ object RimeConfigHelper {
         }
     }
 
+    /**
+     * 部署产物完整性检查（半成品检测）：librime 的 table/prism 产物文件头是固定
+     * magic（"Rime::Table/" / "Rime::Prism/"，Metadata.format 位于文件偏移 0）。
+     * 部署进行中进程被杀会留下空文件或截断的半成品——其 mtime 比源文件新，
+     * librime 增量维护会视为"已是最新"而跳过重编，导致该方案查询永远零命中
+     * （症状：九键方案切换正常、按键进 buffer，但候选恒空、候选栏恒 IDLE）。
+     */
+    internal fun isBrokenBuildArtifact(file: File): Boolean {
+        val expectedMagic = when {
+            file.name.endsWith(".prism.bin") -> "Rime::Prism/"
+            file.name.endsWith(".table.bin") -> "Rime::Table/"
+            // 未知类型（如 reverse.bin、日志）不判损坏，避免误删触发部署循环
+            else -> return false
+        }
+        if (!file.isFile || file.length() == 0L) return true
+        if (file.length() < expectedMagic.length) return true
+        return try {
+            java.io.FileInputStream(file).use { input ->
+                val head = ByteArray(expectedMagic.length)
+                var read = 0
+                while (read < head.size) {
+                    val n = input.read(head, read, head.size - read)
+                    if (n < 0) return true
+                    read += n
+                }
+                !String(head, Charsets.US_ASCII).startsWith(expectedMagic)
+            }
+        } catch (_: IOException) {
+            // 读不了不臆断损坏，交由 librime 运行时自检兜底
+            false
+        }
+    }
+
     fun isDeploymentComplete(context: Context): Boolean {
         val rimeDir = File(context.filesDir, "rime")
         val buildDir = File(rimeDir, "build")
@@ -132,6 +166,20 @@ object RimeConfigHelper {
 
         val enabledSchemas = SchemaManager.getEnabledSchemas(context)
         if (enabledSchemas.isEmpty()) return false
+
+        // 损坏产物统一扫描：*.prism.bin / *.table.bin 存在但 magic 不对（部署中断
+        // 半成品）→ 删除并判定未完成。产物被删除后 librime 增量维护才会重建它；
+        // 同时清 stored hash，避免 ensureDeployment 因 hash 一致而短路跳过重建。
+        // 词典产物按 dictionary 名生成，可能与 schemaId 不同名（如 t9_pinyin 用
+        // pinyin_simp 词典），故扫描整个 build 目录而非按方案枚举。
+        buildDir.listFiles()?.forEach { artifact ->
+            if (artifact.isFile && isBrokenBuildArtifact(artifact)) {
+                artifact.delete()
+                SettingsPreferences.setDeploymentHash(context, "")
+                Log.w(TAG, "Broken build artifact removed: ${artifact.name}")
+                return false
+            }
+        }
 
         for (schemaId in enabledSchemas) {
             if (!File(buildDir, "$schemaId.prism.bin").exists() &&
@@ -220,6 +268,16 @@ object RimeConfigHelper {
         if (alreadyHasSchemas) {
             // 仅兜底确保 default.yaml 存在（librime 入口必需），缺失时补一份，不覆盖已有。
             ensureDefaultYaml(context, targetDir)
+            // 默认方案强制更新（维护者决策）：默认方案随 app 发布、由维护者统一
+            // 维护，升级时以 assets 为准覆盖用户目录残留（治老版本升级残留废弃
+            // 配置——如引用已废弃 t9_translator 的旧 t9_pinyin 方案导致九键零候选）。
+            // 仅覆盖 assets 清单内的文件（内容比对，不同才写），清单外的第三方
+            // 方案一律跳过不处理。覆盖后文件内容变化使部署 hash 失配，后续
+            // ensureDeployment 按增量优先策略只重编受影响方案。
+            val updated = updateBuiltinAssets(context, targetDir)
+            if (updated > 0) {
+                Log.i(TAG, "Updated $updated builtin asset file(s)")
+            }
             return false
         }
         val copied = try {
@@ -257,6 +315,68 @@ object RimeConfigHelper {
         copyAssetFile(context, "$ASSETS_RIME_DIR/default.yaml", defaultYaml)
     }
     
+    /**
+     * 默认方案强制更新：递归遍历 assets 内置清单，对 .yaml/.lua 文件做内容比对，
+     * 缺失或内容不同才覆盖。assets 清单之外的第三方文件不受影响。
+     *
+     * 覆盖 default.yaml 会重置 schema_list，由调用方
+     * [SchemaManager.applyEnabledSchemasToDefaultYaml] 紧随其后恢复用户启用列表。
+     *
+     * @return 覆盖（含新增）的文件数。
+     */
+    private fun updateBuiltinAssets(context: Context, targetDir: File): Int {
+        var updated = 0
+        fun sync(assetSub: String, targetSub: File) {
+            val assetPath = if (assetSub.isEmpty()) ASSETS_RIME_DIR else "$ASSETS_RIME_DIR/$assetSub"
+            for (fileName in context.assets.list(assetPath) ?: return) {
+                val childAsset = if (assetSub.isEmpty()) fileName else "$assetSub/$fileName"
+                val childTarget = File(targetSub, fileName)
+                val subFiles = context.assets.list("$ASSETS_RIME_DIR/$childAsset")
+                if (!subFiles.isNullOrEmpty()) {
+                    childTarget.mkdirs()
+                    sync(childAsset, childTarget)
+                } else if (fileName.endsWith(".yaml") || fileName.endsWith(".lua")) {
+                    // *.custom.yaml 是补丁层文件（用户定制 + app 运行时写入：
+                    // setEnabledSchemas 的启用列表、DoEnsureT9SchemaPatches 的
+                    // T9 注入与个人词库 packs），覆盖会抹掉用户配置与第三方方案——
+                    // 一律排除出默认覆盖范围
+                    if (fileName.endsWith(".custom.yaml")) continue
+                    if (!childTarget.exists() || !assetContentEquals(context, "$ASSETS_RIME_DIR/$childAsset", childTarget)) {
+                        copyAssetFile(context, "$ASSETS_RIME_DIR/$childAsset", childTarget)
+                        updated++
+                    }
+                }
+            }
+        }
+        sync("", targetDir)
+        return updated
+    }
+
+    /** assets 文件与本地文件内容逐块比对（流式，避免大词典整读进内存）。 */
+    private fun assetContentEquals(context: Context, assetPath: String, target: File): Boolean {
+        return try {
+            context.assets.open(assetPath).use { assetStream ->
+                java.io.FileInputStream(target).use { fileStream ->
+                    val assetBuf = ByteArray(BUFFER_SIZE)
+                    val fileBuf = ByteArray(BUFFER_SIZE)
+                    while (true) {
+                        val nAsset = assetStream.read(assetBuf)
+                        val nFile = fileStream.read(fileBuf)
+                        if (nAsset != nFile) return false
+                        if (nAsset < 0) return true
+                        for (i in 0 until nAsset) {
+                            if (assetBuf[i] != fileBuf[i]) return false
+                        }
+                    }
+                    @Suppress("UNREACHABLE_CODE")
+                    true
+                }
+            }
+        } catch (_: IOException) {
+            false
+        }
+    }
+
     private fun copyAssetsRecursively(context: Context, assetPath: String, targetDir: File): Boolean {
         val files = context.assets.list(assetPath)
         
