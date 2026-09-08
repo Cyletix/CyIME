@@ -19,6 +19,8 @@ import java.io.IOException
 object RimeConfigHelper {
     private const val TAG = "RimeConfigHelper"
     private const val ASSETS_RIME_DIR = "rime"
+    /** app 固定的 default.custom.yaml 模板（assets 根，与 xime.yaml 并列，不随 submodule 分发）。 */
+    private const val ASSETS_DEFAULT_CUSTOM = "default.custom.yaml"
     private const val BUFFER_SIZE = 8192
 
     /** 市场索引中随 app 发布的内置默认方案集条目 id（见 rimes/index.yaml 的 `builtin`）。 */
@@ -49,7 +51,7 @@ object RimeConfigHelper {
         PersonalDictManager.ensureSchemaPacks(context)
         // 不再在初始化阶段删 build：build 是否重建统一由 ensureDeployment()
         // 按增量优先策略决定，避免配置变化即全量重编译（60MB 词库持锁 30s+）。
-        
+
         return Pair(rimeDir.absolutePath, rimeDir.absolutePath)
     }
 
@@ -254,6 +256,16 @@ object RimeConfigHelper {
             fileUpdateDigest(digest, defaultYaml)
         }
 
+        // default.custom.yaml 变化（patch 基线修补/方案列表启停）也要触发重部署：
+        // librime 编译各方案时经 DefaultConfigPlugin include default 的 menu 等节，
+        // 且其 __build_info/timestamps 记录了 default.custom.yaml 的 mtime，
+        // hash 失配 → 增量维护 → 各方案配置重编 → 新 page_size 编入产物全局生效。
+        val defaultCustomYaml = File(rimeDir, "default.custom.yaml")
+        if (defaultCustomYaml.exists()) {
+            digest.update("default.custom".toByteArray())
+            fileUpdateDigest(digest, defaultCustomYaml)
+        }
+
         return digest.digest().joinToString("") { String.format("%02x", it) }
     }
 
@@ -278,6 +290,7 @@ object RimeConfigHelper {
             if (updated > 0) {
                 Log.i(TAG, "Updated $updated builtin asset file(s)")
             }
+            syncBuiltinDefaultCustom(context, targetDir)
             return false
         }
         val copied = try {
@@ -289,7 +302,71 @@ object RimeConfigHelper {
         if (copied) {
             seedBuiltinPackageVersion(context)
         }
+        syncBuiltinDefaultCustom(context, targetDir)
         return copied
+    }
+
+    /**
+     * 把 app 固定的 assets/default.custom.yaml 同步/修补到用户 rime 目录。
+     *
+     * 背景：menu/page_size 等全局默认经 default.custom.yaml patch 进 default.yaml，
+     * 再由 librime DefaultConfigPlugin 编入每个方案的编译产物。submodule 里的同名
+     * 文件只在全新安装复制一次（*.custom.yaml 被排除出强制更新），且旧版
+     * setEnabledSchemas 启停方案时会把整文件重写成只剩 schema_list 的空壳——
+     * page_size patch 就此丢失，候选数在 5（引擎兜底）与 20（运行时内存覆盖，
+     * 重启/部署后失效）之间漂移。
+     *
+     * 规则：文件缺失 → 复制模板；已存在 → 内容对齐 app 设置值
+     * （[patchDefaultCustomContent]，.custom.yaml 可以被覆盖，不保留 PC 遗留值）。
+     * 文件变化使部署 hash 失配，由 ensureDeployment 增量重编后全局生效。
+     */
+    private fun syncBuiltinDefaultCustom(context: Context, targetDir: File) {
+        val target = File(targetDir, ASSETS_DEFAULT_CUSTOM)
+        val pageSize = SettingsPreferences.getPageSize(context).coerceAtLeast(1)
+        try {
+            if (!target.exists()) {
+                copyAssetFile(context, ASSETS_DEFAULT_CUSTOM, target)
+                // 模板基线（20）与用户设置不一致时（如 slider 调过）以设置为准
+                val aligned = patchDefaultCustomContent(target.readText(), pageSize)
+                if (aligned != null) {
+                    target.writeText(aligned)
+                }
+                return
+            }
+            val patched = patchDefaultCustomContent(target.readText(), pageSize) ?: return
+            target.writeText(patched)
+            Log.i(TAG, "Aligned ${target.name} menu/page_size=$pageSize")
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to sync $ASSETS_DEFAULT_CUSTOM", e)
+        }
+    }
+
+    /**
+     * default.custom.yaml 的基线对齐（纯函数）：把 page_size 强制对齐为 app 当前
+     * 设置值。注意这只是磁盘配置基线——方案自带的 menu/page_size（内置与第三方
+     * 方案多为 PC 遗留默认 5，不适配手机）经 librime MergeTree 语义压过 default
+     * 层，运行时的实际生效靠 JNI 层 setPageSize 直接注入（rime_jni.cc）。
+     * 无需变化时返回 null。
+     */
+    internal fun patchDefaultCustomContent(text: String, pageSize: Int): String? {
+        val sep = if (text.contains("\r\n")) "\r\n" else "\n"
+        val lines = text.lines()
+        val pageSizeIdx = lines.indexOfFirst { it.trimStart().startsWith("page_size:") }
+        if (pageSizeIdx >= 0) {
+            val raw = lines[pageSizeIdx].trimStart().removePrefix("page_size:")
+                .substringBefore('#').trim()
+            if (raw.toIntOrNull() == pageSize) return null
+            val indent = lines[pageSizeIdx].takeWhile { it == ' ' || it == '\t' }
+            val updated = lines.toMutableList()
+            updated[pageSizeIdx] = "${indent}page_size: $pageSize"
+            return updated.joinToString(sep)
+        }
+        val patchIdx = lines.indexOfFirst { it.trim() == "patch:" }
+        if (patchIdx < 0) return null
+        val updated = lines.toMutableList()
+        updated.add(patchIdx + 1, "  menu:")
+        updated.add(patchIdx + 2, "    page_size: $pageSize")
+        return updated.joinToString(sep)
     }
 
     /**

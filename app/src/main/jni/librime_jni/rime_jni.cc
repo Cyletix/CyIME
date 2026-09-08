@@ -4,6 +4,8 @@
 #include <rime_api.h>
 #include <rime/setup.h>
 #include <rime/dict/reverse_lookup_dictionary.h>
+#include <rime/service.h>
+#include <rime/schema.h>
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
 #include "t9_digit_userdict.h"
@@ -144,6 +146,9 @@ public:
         session_id_ = rime->create_session();
         if (session_id_ != 0) {
             LOGI("Session created: %lu", (unsigned long)session_id_);
+            // 会话重建后的初始 Schema 可能读到部署产物里的旧 page_size
+            //（方案自带/第三方为 PC 默认 5），重新对齐到 app 覆盖值
+            reapplyPageSizeIfNeeded();
         } else {
             LOGD("Session creation failed (engine may be maintaining)");
         }
@@ -660,7 +665,8 @@ public:
             return false;
         }
         LOGI("New session created: %lu", (unsigned long)session_id_);
-        
+        reapplyPageSizeIfNeeded();
+
         LOGI("Deployment completed successfully");
         return true;
     }
@@ -714,6 +720,7 @@ public:
         
         // 重新创建session
         session_id_ = rime->create_session();
+        reapplyPageSizeIfNeeded();
         LOGI("Deploy schema completed: %s", schemaId);
         return true;
     }
@@ -729,20 +736,54 @@ public:
         }
     }
 
+    // 把记住的每页候选数覆盖值注入引擎（值来自 app 设置页，非 cpp 写死）：
+    // 1) 修改方案配置缓存：schema_open 打开的 ConfigData 由组件按 id 弱引用共享，
+    //    此处写入后，之后构造的所有 Schema 都会读到覆盖值；
+    // 2) 当前会话正在使用该方案时，幂等重构造 Schema 立即生效——Schema 仅在
+    //    构造时读取 menu/page_size（FetchUsefulConfigItems），只改配置对已构造的
+    //    Schema 无效。旧实现只有第 1 步，部署/会话重建后无人再调 setPageSize 时
+    //    候选数漂移回方案自带值（内置/第三方方案多为 PC 默认 5，不适配手机）。
+    void applyPageSizeOverride(const char* schema_id) {
+        if (!rime || page_size_override_ <= 0) return;
+        RimeConfig config;
+        if (rime->schema_open(schema_id, &config)) {
+            rime->config_set_int(&config, "menu/page_size", page_size_override_);
+            rime->config_close(&config);
+        } else {
+            LOGE("applyPageSizeOverride: schema_open failed for '%s'", schema_id);
+        }
+        if (!session_id_) return;
+        auto session = rime::Service::instance().GetSession(
+            static_cast<rime::SessionId>(session_id_));
+        if (!session) return;
+        auto schema = session->schema();
+        // 仅当会话正用该方案时幂等刷新（重构造 Schema 读到覆盖值）；
+        // 目标方案与当前不同时只写缓存，随后的 switchSchema 自然生效
+        if (!schema || schema->schema_id() != schema_id) return;
+        session->ApplySchema(new rime::Schema(schema->schema_id()));
+        LOGI("applyPageSizeOverride: re-applied schema '%s' (menu/page_size=%d)",
+             schema_id, page_size_override_);
+    }
+
+    // 会话重建（创建/部署）后重新对齐覆盖值；无覆盖值时为空操作
+    void reapplyPageSizeIfNeeded() {
+        if (page_size_override_ <= 0 || !session_id_ || !rime) return;
+        auto session = rime::Service::instance().GetSession(
+            static_cast<rime::SessionId>(session_id_));
+        if (!session) return;
+        auto schema = session->schema();
+        if (!schema) return;
+        applyPageSizeOverride(schema->schema_id().c_str());
+    }
+
     void setPageSize(const char* schema_id, int page_size) {
         if (!rime) {
             LOGE("setPageSize: rime not available");
             return;
         }
-        // schema_open 直接打开方案的配置对象，修改内存中的 menu/page_size
-        RimeConfig config;
-        if (rime->schema_open(schema_id, &config)) {
-            rime->config_set_int(&config, "menu/page_size", page_size);
-            rime->config_close(&config);
-            LOGI("Set schema '%s' menu/page_size=%d via schema_open", schema_id, page_size);
-        } else {
-            LOGE("setPageSize: schema_open failed for '%s'", schema_id);
-        }
+        if (page_size <= 0) return;
+        page_size_override_ = page_size;
+        applyPageSizeOverride(schema_id);
     }
 
     void setOption(const char* option, Bool value) {
@@ -882,6 +923,9 @@ private:
     std::string user_data_dir_;
     std::string shared_data_dir_;
     bool initialized_ = false;
+    // app 设置的每页候选数覆盖值（<=0 表示未设置）；会话重建后由
+    // reapplyPageSizeIfNeeded 重新对齐，保证不被方案自带值（PC 默认 5）漂移
+    int page_size_override_ = 0;
 };
 
 extern "C" {

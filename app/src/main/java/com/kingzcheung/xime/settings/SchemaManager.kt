@@ -819,19 +819,54 @@ object SchemaManager {
     }
 
     fun setEnabledSchemas(context: Context, schemaIds: List<String>) {
+        val customFile = getCustomYamlFile(context)
+        if (!customFile.exists()) {
+            // 首次写入以 app 固定模板为基底（含 menu/page_size 等默认 patch），
+            // 不再把整文件重写成只剩 schema_list 的空壳——那会丢掉 default.custom.yaml
+            // 的全部补丁（menu/page_size 丢失后每页候选数漂移回引擎兜底值 5）
+            if (!copyBuiltinDefaultCustom(context, customFile)) {
+                // 模板复制失败兜底：保留旧行为，至少保证文件存在（getEnabledSchemas
+                // 以文件存在为前提）且 schema_list 有效
+                writeSchemaListOnlyCustom(customFile, schemaIds)
+                applyEnabledSchemasToDefaultYaml(context, schemaIds)
+                return
+            }
+        }
+        // 只替换 schema_list 块，保留 menu/switcher/key_binder 等其余 patch
+        try {
+            val text = customFile.readText()
+            val updated = replaceSchemaListBlock(text, schemaIds)
+            if (updated != text) {
+                customFile.writeText(updated)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to write custom.yaml schema_list", e)
+        }
+        // F1: 同步写进 default.yaml，确保 librime 真正编译启用的方案
+        applyEnabledSchemasToDefaultYaml(context, schemaIds)
+    }
+
+    private fun writeSchemaListOnlyCustom(customFile: File, schemaIds: List<String>) {
         val sb = StringBuilder()
         sb.appendLine("patch:")
         sb.appendLine("  schema_list:")
         for (id in schemaIds) {
             sb.appendLine("    - schema: $id")
         }
-        try {
-            getCustomYamlFile(context).writeText(sb.toString())
+        customFile.writeText(sb.toString())
+    }
+
+    /** 复制 app 固定的 assets/default.custom.yaml 模板（assets 根与 rime 目录同名，与 RimeConfigHelper 同步的是同一份）。 */
+    private fun copyBuiltinDefaultCustom(context: Context, target: File): Boolean {
+        return try {
+            context.assets.open(CUSTOM_YAML).use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to write custom.yaml", e)
+            Log.e(TAG, "Failed to copy builtin $CUSTOM_YAML", e)
+            false
         }
-        // F1: 同步写进 default.yaml，确保 librime 真正编译启用的方案
-        applyEnabledSchemasToDefaultYaml(context, schemaIds)
     }
 
     fun toggleSchema(context: Context, schemaId: String) {
