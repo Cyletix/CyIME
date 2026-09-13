@@ -62,6 +62,28 @@ data class GestureDef(
     val display: DisplayMode = DisplayMode.BOTH,
 )
 
+/**
+ * 把滑动手势定义转换为布局层回调（九键/笔画布局共用，26 键在 KeyboardLayout 内联处理）。
+ *
+ * - COMMIT 走 [onCommitText]：落点由布局决定（九键直接上屏数字——T9 模式 onKeyPress(数字)
+ *   会进拼音数字码组合，笔画则沿用按键路由保持原语义）；
+ * - NONE 视为未绑定；
+ * - 其余动作（复制/粘贴/光标移动/面板切换等）走 [onGestureAction]（UI 拦截层 → GestureAction.execute）。
+ */
+internal fun swipeHandlerFor(
+    def: GestureDef?,
+    onCommitText: (String) -> Unit,
+    onGestureAction: ((GestureAction, String) -> Unit)?,
+): (() -> Unit)? {
+    val action = def?.action ?: return null
+    if (action == GestureAction.NONE) return null
+    val value = def.value.ifEmpty { def.label }
+    return {
+        if (action == GestureAction.COMMIT) onCommitText(value)
+        else onGestureAction?.invoke(action, value)
+    }
+}
+
 data class LongPressConfig(
     val display: String = "key", // "key"（默认）显示在按键上, "bubble" 气泡弹出
     val values: List<GestureDef> = emptyList(),
@@ -584,6 +606,11 @@ object KeysConfigHelper {
     private var _activeMergedSection: String? = null
     private var _activeSchemaId: String = ""
 
+    // 九键/笔画手势配置缓存（keyboard.t9.keys / keyboard.stroke.keys，custom 键级覆盖）。
+    // 键 id 不做大小写归一：九键为数字字符串 "1"~"9"，笔画为键面标签（一/丨/丿/丶/乛 等）。
+    private var _t9GestureConfigs: Map<String, KeyGestureConfig> = emptyMap()
+    private var _strokeGestureConfigs: Map<String, KeyGestureConfig> = emptyMap()
+
     /** 合并键方案（pinyin_14jian 等）对应的 xime.yaml 键盘 section，非合并键方案返回 null。 */
     internal fun mergedSectionForSchema(schemaId: String): String? = when {
         schemaId.contains("14jian") -> "qwerty_14"
@@ -666,6 +693,9 @@ object KeysConfigHelper {
             }
             _mergedRows = mergedRowsMap
             _mergedGestureConfigs = mergedGesturesMap
+            // 九键/笔画手势（keyboard.t9.keys / keyboard.stroke.keys，custom 键级覆盖）
+            _t9GestureConfigs = parseGesturesSection(context, "t9")
+            _strokeGestureConfigs = parseGesturesSection(context, "stroke")
             // 重新应用当前方案对应的合并键布局（上面重置了基线缓存）
             _activeMergedSection = null
             setActiveKeyboardSchema(_activeSchemaId)
@@ -1399,6 +1429,14 @@ object KeysConfigHelper {
     /** 获取九键左侧快捷符号栏配置（xime.custom.yaml → xime.yaml → 内置默认值）。 */
     fun getT9SideSymbols(): List<String> =
         keyboardT9Config.sideSymbols ?: DEFAULT_T9_SIDE_SYMBOLS
+
+    /** 获取九键数字键手势配置（xime.yaml keyboard.t9.keys，custom 键级覆盖）。
+     *  键 id 为数字字符串 "1"~"9"；无配置返回 null（布局不启用滑动）。 */
+    fun getT9KeyGesture(key: String): KeyGestureConfig? = _t9GestureConfigs[key]
+
+    /** 获取笔画键手势配置（xime.yaml keyboard.stroke.keys，custom 键级覆盖）。
+     *  键 id 为键面标签：一/丨/丿/丶/乛、*、分词、，、英。 */
+    fun getStrokeKeyGesture(key: String): KeyGestureConfig? = _strokeGestureConfigs[key]
 
     /** 获取某个按键的手势配置。 */
     fun getKeyGesture(key: String): KeyGestureConfig? = keyGestureConfig[key.lowercase()]

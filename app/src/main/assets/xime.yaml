@@ -614,3 +614,36 @@ keyboard:
       - "。"
       - "？"
       - "！"
+    # ── 数字键手势（可自定义：在 xime.custom.yaml 的 keyboard.t9.keys 同路径覆盖）──
+    # 键 id 为数字字符串 "1"~"9"；tap/长按（选字母）为九键核心交互，不在配置范围。
+    # 内置默认：上滑直接输入键面数字（无需切数字键盘），下滑绑定快捷编辑动作
+    # （参照主流九键方案：段首/全选/段尾/复制/剪切/粘贴/剪贴板；8 下滑留空供自定义）。
+    # 动作可选值见 GestureAction：commit/select_all/copy/cut/paste/line_start/line_end/
+    # undo/repeat/command/switch_route（value: emoji|symbol|clipboard 打开对应面板）等；
+    # display: key（印在键面）/ bubble（仅滑动气泡）/ both。
+    keys:
+      "1": { swipe_up: "1" }
+      "2": { swipe_up: "2", swipe_down: { label: "段首", action: "line_start" } }
+      "3": { swipe_up: "3", swipe_down: { label: "全选", action: "select_all" } }
+      "4": { swipe_up: "4", swipe_down: { label: "段尾", action: "line_end" } }
+      "5": { swipe_up: "5", swipe_down: { label: "复制", action: "copy" } }
+      "6": { swipe_up: "6", swipe_down: { label: "剪切", action: "cut" } }
+      "7": { swipe_up: "7", swipe_down: { label: "粘贴", action: "paste" } }
+      "8": { swipe_up: "8" }
+      "9": { swipe_up: "9", swipe_down: { label: "剪贴板", action: "switch_route", value: "clipboard" } }
+
+  # 笔画键盘配置
+  stroke:
+    # ── 笔画键手势（可自定义：在 xime.custom.yaml 的 keyboard.stroke.keys 同路径覆盖）──
+    # 键 id 为键面标签；内置默认：上滑输入对应数字（与历史行为一致，此前版本该手势
+    # 因缺少滑动提示文本实际不触发，现修复生效），下滑可按需绑定编辑动作。
+    keys:
+      "一": { swipe_up: "1" }
+      "丨": { swipe_up: "2" }
+      "丿": { swipe_up: "3" }
+      "丶": { swipe_up: "4" }
+      "乛": { swipe_up: "5" }
+      "*": { swipe_up: "6" }
+      "分词": { swipe_up: "7" }
+      "，": { swipe_up: "8" }
+      "英": { swipe_up: "9" }

@@ -205,3 +205,21 @@ keyboard:
       "'": { tap: { label: ",", value: "," }, swipe_up: { label: ".", value: "." } }
       # 中/英切换键，英文键盘下显示"中"
       earth: { tap: { label: "中", action: "toggle_ascii" } }
+
+  # ── 九键（T9）键盘手势 ──
+  # 键 id 为数字字符串 "1"~"9"；tap/长按选字母为九键核心交互，不在配置范围。
+  # 内置默认已含：上滑直接输入键面数字（无需切数字键盘）、下滑绑定快捷编辑动作
+  # （段首/全选/段尾/复制/剪切/粘贴/剪贴板，8 下滑留空）。覆盖时只需写要改的键：
+  t9:
+    keys:
+      # 示例：8 下滑内置留空，此处自定义绑定"撤销"
+      "8": { swipe_up: "8", swipe_down: { label: "撤销", action: "undo" } }
+      # 示例：9 下滑内置为打开剪贴板面板（switch_route: clipboard），改为重复上一次输入
+      "9": { swipe_up: "9", swipe_down: { label: "重复", action: "repeat" } }
+
+  # ── 笔画键盘手势 ──
+  # 键 id 为键面标签（一/丨/丿/丶/乛、*、分词、，、英）。
+  # 内置默认：上滑输入对应数字；下滑可按需绑定编辑动作：
+  stroke:
+    keys:
+      "一": { swipe_up: "1", swipe_down: { label: "全选", action: "select_all" } }
