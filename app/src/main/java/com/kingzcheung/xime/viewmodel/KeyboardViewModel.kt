@@ -15,6 +15,7 @@ import com.kingzcheung.xime.keyboard.PanelType
 import com.kingzcheung.xime.keyboard.ToolbarButton
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
 import com.kingzcheung.xime.plugin.core.api.PluginResultItem
+import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction
@@ -136,11 +137,32 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     /**
      * 单⼀状态转移入口 — 替代所有散落的 LaunchedEffect、setKeyboardState、switchMain 等。
      */
+    /**
+     * 按 action 携带（或显式传入）的 schemaId 同步键布局缓存。
+     * dispatch 的各分支都会经由 initialKeyboardLayoutState 依据 schemaId 推导布局，
+     * 合并键布局（pinyin_14jian 等）的行数据/手势缓存需在此之前切换到位。
+     */
+    private fun applySchemaLayout(action: KeyboardDispatchAction, schemaId: String) {
+        val sid = schemaId.ifEmpty {
+            when (action) {
+                is KeyboardDispatchAction.AsciiModeChanged -> action.schemaId
+                is KeyboardDispatchAction.InputSessionStarted -> action.schemaId
+                else -> ""
+            }
+        }
+        if (sid.isNotEmpty()) {
+            KeysConfigHelper.setActiveKeyboardSchema(sid)
+        }
+    }
+
     fun dispatch(
         action: KeyboardDispatchAction,
         isAsciiMode: Boolean = false,
         schemaId: String = "",
     ) {
+        // 布局随方案切换：合并键方案（pinyin_14jian 等）切换行布局与手势缓存，
+        // 必须在状态更新前同步执行，保证重组时读到新布局
+        applySchemaLayout(action, schemaId)
         val current = _viewState.value
         val (newState, newPage, newKbState) = when (action) {
             is KeyboardDispatchAction.ToggleChineseEnglish -> {
@@ -519,6 +541,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     fun resetKeyboard(isAsciiMode: Boolean, schemaId: String = "") {
         _isShifted.value = false
         _shiftMode.value = ShiftMode.OFF
+        KeysConfigHelper.setActiveKeyboardSchema(schemaId)
         _keyboardState.value = initialKeyboardLayoutState(isAsciiMode, schemaId)
         if (_page.value !is KeyboardPage.Main) {
             _page.value = KeyboardPage.Main(MainType.FULL)

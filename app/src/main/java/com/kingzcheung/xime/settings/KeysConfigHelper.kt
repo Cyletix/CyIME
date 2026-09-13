@@ -574,7 +574,45 @@ object KeysConfigHelper {
     private var _zhRows: List<List<String>> = DEFAULT_ZH_ROWS
     private var _enRows: List<List<String>> = DEFAULT_EN_ROWS
 
-    /** 获取键盘行布局，每个子 List 为一行的按键 ID 列表，索引 0=第一行 */
+    // 标准 26 键的基线缓存（合并键布局切换退出时恢复）
+    private var _zhRowsBase: List<List<String>> = DEFAULT_ZH_ROWS
+    private var _keyGestureConfigZhBase: Map<String, KeyGestureConfig> = emptyMap()
+
+    // 合并键布局缓存：section（qwerty_14/17/18）→ 行布局 / 手势配置
+    private var _mergedRows: Map<String, List<List<String>>> = emptyMap()
+    private var _mergedGestureConfigs: Map<String, Map<String, KeyGestureConfig>> = emptyMap()
+    private var _activeMergedSection: String? = null
+    private var _activeSchemaId: String = ""
+
+    /** 合并键方案（pinyin_14jian 等）对应的 xime.yaml 键盘 section，非合并键方案返回 null。 */
+    internal fun mergedSectionForSchema(schemaId: String): String? = when {
+        schemaId.contains("14jian") -> "qwerty_14"
+        schemaId.contains("17jian") -> "qwerty_17"
+        schemaId.contains("18jian") -> "qwerty_18"
+        else -> null
+    }
+
+    /**
+     * 按当前方案切换中文行布局与手势缓存（合并键布局 ↔ 标准 26 键）。
+     * 在 KeyboardViewModel.dispatch/resetKeyboard 收到 schemaId 时调用；
+     * 英文键盘不受影响（合并键布局仅中文拼音方案使用）。
+     */
+    fun setActiveKeyboardSchema(schemaId: String) {
+        _activeSchemaId = schemaId
+        val section = mergedSectionForSchema(schemaId)
+        if (section == _activeMergedSection) return
+        _activeMergedSection = section
+        if (section != null) {
+            _zhRows = _mergedRows[section] ?: DEFAULT_ZH_ROWS
+            _keyGestureConfig.value = _mergedGestureConfigs[section] ?: emptyMap()
+        } else {
+            _zhRows = _zhRowsBase
+            _keyGestureConfig.value = _keyGestureConfigZhBase
+        }
+    }
+
+    /** 获取键盘行布局，每个子 List 为一行的按键 ID 列表，索引 0=第一行。
+     *  合并键布局中合并键的 ID 为组内字母拼接（如 "qw"），渲染层按 ID 长度分配键宽。 */
     fun getKeyRows(isAsciiMode: Boolean): List<List<String>> =
         if (isAsciiMode) _enRows else _zhRows
     
@@ -598,7 +636,7 @@ object KeysConfigHelper {
         try {
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
-            _keyGestureConfig.value = parsed?.first ?: emptyMap()
+            _keyGestureConfigZhBase = parsed?.first ?: emptyMap()
             _keyGestureConfigEn.value = parsed?.second ?: emptyMap()
             // 键盘颜色（从原始 YAML 手动解析）
             keyboardColorsConfig = parseKeyboardColorsFromAssets(context)
@@ -617,8 +655,20 @@ object KeysConfigHelper {
             _buttonLayoutEn = parsedLayouts.second
             // 键盘行布局
             val parsedRows = parseKeyboardLayoutFromAssets(context)
-            _zhRows = parsedRows.first
+            _zhRowsBase = parsedRows.first
             _enRows = parsedRows.second
+            // 合并键布局 sections（qwerty_14 / qwerty_17 / qwerty_18）
+            val mergedRowsMap = mutableMapOf<String, List<List<String>>>()
+            val mergedGesturesMap = mutableMapOf<String, Map<String, KeyGestureConfig>>()
+            for (section in MERGED_LAYOUT_SECTIONS) {
+                parseLayoutSection(context, section)?.let { mergedRowsMap[section] = it }
+                mergedGesturesMap[section] = parseGesturesSection(context, section)
+            }
+            _mergedRows = mergedRowsMap
+            _mergedGestureConfigs = mergedGesturesMap
+            // 重新应用当前方案对应的合并键布局（上面重置了基线缓存）
+            _activeMergedSection = null
+            setActiveKeyboardSchema(_activeSchemaId)
             // 校验配置版本兼容性
             val merged = try { loadMergedConfig(context) } catch (_: YamlException) { null }
             val meta = merged?.metadata
@@ -1030,8 +1080,35 @@ object KeysConfigHelper {
         )
     }
 
-    /** 从 YAML 文本中提取 keyboard.<section>.layout.rows。 */
-    private fun parseKeyboardLayoutYamlText(yamlText: String, section: String): List<List<String>>? {
+    /** 合并键布局的 xime.yaml section 名。 */
+    private val MERGED_LAYOUT_SECTIONS = listOf("qwerty_14", "qwerty_17", "qwerty_18")
+
+    /** 从 xime.yaml + xime.custom.yaml 合并解析指定 section 的键盘行布局（custom 整段覆盖 built-in）。 */
+    private fun parseLayoutSection(context: Context, section: String): List<List<String>>? {
+        val defaultText = readAssetText(context, XIME_CONFIG_FILE)
+        val default = defaultText?.let { parseKeyboardLayoutYamlText(it, section) }
+        val customText = readUserDataText(context, XIME_CUSTOM_CONFIG_FILE)
+            ?: readAssetText(context, XIME_CUSTOM_CONFIG_FILE)
+        val custom = customText?.let { parseKeyboardLayoutYamlText(it, section) }
+        return custom ?: default
+    }
+
+    /** 从 xime.yaml + xime.custom.yaml 合并解析指定 section 的手势配置（custom 键级覆盖 built-in）。 */
+    private fun parseGesturesSection(context: Context, section: String): Map<String, KeyGestureConfig> {
+        val defaultText = readAssetText(context, XIME_CONFIG_FILE)
+        val default = defaultText?.let { parseKeyboardYamlSection(it, section) } ?: emptyMap()
+        val userData = readUserDataText(context, XIME_CUSTOM_CONFIG_FILE)
+        val custom = (userData ?: readAssetText(context, XIME_CUSTOM_CONFIG_FILE))
+            ?.let { parseKeyboardYamlSection(it, section) }
+        return if (custom != null) default + custom else default
+    }
+
+    /**
+     * 从 YAML 文本中提取 keyboard.<section>.layout.rows。
+     * 行元素支持嵌套子数组表示合并键：[[q, w], [e, r], t] → ["qw", "er", "t"]，
+     * 合并键 ID 为组内字母拼接，渲染层按 ID 长度分配键宽。
+     */
+    internal fun parseKeyboardLayoutYamlText(yamlText: String, section: String): List<List<String>>? {
         return try {
             val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
@@ -1040,8 +1117,11 @@ object KeysConfigHelper {
             val rowsNode = layoutNode.opt<YamlList>("rows") ?: return null
             val rows = mutableListOf<List<String>>()
             for (rowNode in rowsNode.items) {
-                val rowList = rowNode as? YamlList ?: continue
-                val row = rowList.items.mapNotNull { (it as? YamlScalar)?.content }
+                val row = when (rowNode) {
+                    is YamlList -> rowListToKeyIds(rowNode)
+                    is YamlScalar -> scalarRowToKeyIds(rowNode.content)
+                    else -> emptyList()
+                }
                 if (row.isNotEmpty()) {
                     rows.add(row)
                 }
@@ -1051,6 +1131,59 @@ object KeysConfigHelper {
             Log.w(TAG, "Failed to parse keyboard layout config", e)
             null
         }
+    }
+
+    /** 行节点 → 按键 ID 列表：子数组为合并键（组内字母拼接为 ID），标量为单字母键。 */
+    private fun rowListToKeyIds(rowList: YamlList): List<String> =
+        rowList.items.mapNotNull { item ->
+            when (item) {
+                is YamlScalar -> item.content.takeIf { it.isNotBlank() }
+                is YamlList -> item.items
+                    .mapNotNull { (it as? YamlScalar)?.content }
+                    .filter { it.isNotBlank() }
+                    .joinToString("")
+                    .takeIf { it.isNotEmpty() }
+                else -> null
+            }
+        }
+
+    /**
+     * 标量行兜底：YAML 中以普通字母开头的行（如 "- z, [x, c], v"）不会成为 flow 序列，
+     * 而是整行解析为单个标量。此处手动拆分：逗号为键分隔，方括号内为合并键组。
+     */
+    private fun scalarRowToKeyIds(content: String): List<String> {
+        val text = content.trim()
+        if (text.isEmpty()) return emptyList()
+        if (!text.contains(',') && !text.contains('[')) return listOf(text)
+        val items = mutableListOf<String>()
+        val sb = StringBuilder()
+        var depth = 0
+        fun flushItem() {
+            val t = sb.toString().trim()
+            if (t.isNotEmpty()) items.add(t)
+            sb.clear()
+        }
+        for (ch in text) {
+            when {
+                ch == '[' -> { depth++; if (depth == 1) sb.clear() else sb.append(ch) }
+                ch == ']' -> {
+                    depth--
+                    if (depth == 0) {
+                        flushItem()
+                    } else if (depth < 0) {
+                        depth = 0
+                    } else {
+                        sb.append(ch)
+                    }
+                }
+                ch == ',' && depth == 0 -> flushItem()
+                ch == ',' && depth > 0 -> {} // 组内逗号仅分隔字母，拼接时丢弃
+                ch == ' ' && depth > 0 -> {} // 组内空格一并丢弃（[x, c] → xc）
+                else -> sb.append(ch)
+            }
+        }
+        flushItem()
+        return items
     }
 
     /** 从 YAML 文本中提取 keyboard.<section>.button_layout。 */
@@ -1068,7 +1201,7 @@ object KeysConfigHelper {
     }
 
     /** 从 YAML 文本中提取 keyboard.<section>.keys 段。 */
-    private fun parseKeyboardYamlSection(yamlText: String, section: String): Map<String, KeyGestureConfig>? {
+    internal fun parseKeyboardYamlSection(yamlText: String, section: String): Map<String, KeyGestureConfig>? {
         return try {
             val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
@@ -1286,7 +1419,10 @@ object KeysConfigHelper {
     fun getKeyCommitValue(key: String, isAsciiMode: Boolean = false): String {
         val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
         val value = config[key.lowercase()]?.tap?.value
-        return value?.takeIf { it.isNotEmpty() } ?: key
+        return value?.takeIf { it.isNotEmpty() }
+            // 合并键 ID（如 "qw"）无手势配置时回退为代表字母（组内第一个字母）
+            ?: key.takeIf { it.length > 1 }?.first()?.toString()
+            ?: key
     }
 
     /** 获取某个按键指定手势的显示标签。 */

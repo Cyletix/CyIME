@@ -510,6 +510,101 @@ keyboard:
       # 中/英切换键，label 为按键显示文字
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
+  # ── 合并键布局（14/17/18 键）──
+  # rows 支持子数组：[[q, w], [e, r], ...] 表示 q/w 合并在同一个键，每行键数变少键自然更宽（行内等宽）。
+  # 合并键在 keys 里的 id 为组内字母拼接（qw、er...），tap 的 value 固定为组内第一个字母（代表字母），
+  # Rime 侧由 pinyin_14jian / pinyin_17jian / pinyin_18jian 方案的拼写运算靠词库消歧。
+  # swipe_up：前 10 个键按行序输出数字 1-0，其余键沿用 26 键同字母的符号习惯；
+  # long_press 气泡保留组内字母的精确输入作为辅助。
+  #
+  # 拼音 14 键：qw/er/ty/ui/op、as/df/gh/jk/l、zx/cv/bn/m（对应方案 pinyin_14jian）
+  qwerty_14:
+    button_layout: standard
+    layout:
+      rows:
+        - [[q, w], [e, r], [t, y], [u, i], [o, p]]
+        - [[a, s], [d, f], [g, h], [j, k], [l]]
+        - [[z, x], [c, v], [b, n], [m]]
+    keys:
+      # swipe_up 数字按行序排布：上排 1-5、中排 6-0
+      qw: { tap: { label: "qw", value: "q" }, swipe_up: "1", long_press: { display: "bubble", values: ["q", "w", "Q", "W"] } }
+      er: { tap: { label: "er", value: "e" }, swipe_up: "2", long_press: { display: "bubble", values: ["e", "r", "E", "R"] } }
+      ty: { tap: { label: "ty", value: "t" }, swipe_up: "3", long_press: { display: "bubble", values: ["t", "y", "T", "Y"] } }
+      ui: { tap: { label: "ui", value: "u" }, swipe_up: "4", long_press: { display: "bubble", values: ["u", "i", "U", "I"] } }
+      op: { tap: { label: "op", value: "o" }, swipe_up: "5", long_press: { display: "bubble", values: ["o", "p", "O", "P"] } }
+      as: { tap: { label: "as", value: "a" }, swipe_up: "6", long_press: { display: "bubble", values: ["a", "s", "A", "S"] } }
+      df: { tap: { label: "df", value: "d" }, swipe_up: "7", long_press: { display: "bubble", values: ["d", "f", "D", "F"] } }
+      gh: { tap: { label: "gh", value: "g" }, swipe_up: "8", long_press: { display: "bubble", values: ["g", "h", "G", "H"] } }
+      jk: { tap: { label: "jk", value: "j" }, swipe_up: "9", long_press: { display: "bubble", values: ["j", "k", "J", "K"] } }
+      l:  { tap: { label: "l", value: "l" }, swipe_up: "0", long_press: { display: "bubble", values: ["l", "L"] } }
+      zx: { tap: { label: "zx", value: "z" }, swipe_up: "*", long_press: { display: "bubble", values: ["z", "x", "Z", "X"] } }
+      cv: { tap: { label: "cv", value: "c" }, swipe_up: "、", long_press: { display: "bubble", values: ["c", "v", "C", "V"] } }
+      bn: { tap: { label: "bn", value: "b" }, swipe_up: "!", long_press: { display: "bubble", values: ["b", "n", "B", "N"] } }
+      m:  { tap: { label: "m", value: "m" }, swipe_up: "#", long_press: { display: "bubble", values: ["m", "M"] } }
+      "'": { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [ ",","."] }}
+      earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
+
+  # 拼音 17 键：we/rt/yu/op、sd/fg/jk、xc/bn（对应方案 pinyin_17jian）
+  qwerty_17:
+    button_layout: standard
+    layout:
+      rows:
+        - [q, [w, e], [r, t], [y, u], i, [o, p]]
+        - [a, [s, d], [f, g], h, [j, k], l]
+        - [z, [x, c], v, [b, n], m]
+    keys:
+      # swipe_up 数字按行序排布：上排 1-6、中排 7-0
+      q:  { tap: { label: "q", value: "q" }, swipe_up: "1", long_press: { display: "bubble", values: ["q", "Q"] } }
+      we: { tap: { label: "we", value: "w" }, swipe_up: "2", long_press: { display: "bubble", values: ["w", "e", "W", "E"] } }
+      rt: { tap: { label: "rt", value: "r" }, swipe_up: "3", long_press: { display: "bubble", values: ["r", "t", "R", "T"] } }
+      yu: { tap: { label: "yu", value: "y" }, swipe_up: "4", long_press: { display: "bubble", values: ["y", "u", "Y", "U"] } }
+      i:  { tap: { label: "i", value: "i" }, swipe_up: "5", long_press: { display: "bubble", values: ["i", "I"] } }
+      op: { tap: { label: "op", value: "o" }, swipe_up: "6", long_press: { display: "bubble", values: ["o", "p", "O", "P"] } }
+      a:  { tap: { label: "a", value: "a" }, swipe_up: "7", long_press: { display: "bubble", values: ["a", "A"] } }
+      sd: { tap: { label: "sd", value: "s" }, swipe_up: "8", long_press: { display: "bubble", values: ["s", "d", "S", "D"] } }
+      fg: { tap: { label: "fg", value: "f" }, swipe_up: "9", long_press: { display: "bubble", values: ["f", "g", "F", "G"] } }
+      h:  { tap: { label: "h", value: "h" }, swipe_up: "0", long_press: { display: "bubble", values: ["h", "H"] } }
+      jk: { tap: { label: "jk", value: "j" }, swipe_up: "-", long_press: { display: "bubble", values: ["j", "k", "J", "K"] } }
+      l:  { tap: { label: "l", value: "l" }, swipe_up: ")", long_press: { display: "bubble", values: ["l", "L"] } }
+      z:  { tap: { label: "z", value: "z" }, swipe_up: "*", long_press: { display: "bubble", values: ["z", "Z"] } }
+      xc: { tap: { label: "xc", value: "x" }, swipe_up: "@", long_press: { display: "bubble", values: ["x", "c", "X", "C"] } }
+      v:  { tap: { label: "v", value: "v" }, swipe_up: "?", long_press: { display: "bubble", values: ["v", "V"] } }
+      bn: { tap: { label: "bn", value: "b" }, swipe_up: "!", long_press: { display: "bubble", values: ["b", "n", "B", "N"] } }
+      m:  { tap: { label: "m", value: "m" }, swipe_up: "#", long_press: { display: "bubble", values: ["m", "M"] } }
+      "'": { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [ ",","."] }}
+      earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
+
+  # 拼音 18 键：we/rt/io、sd/fg/jk、xc/bn（对应方案 pinyin_18jian）
+  qwerty_18:
+    button_layout: standard
+    layout:
+      rows:
+        - [q, [w, e], [r, t], y, u, [i, o], p]
+        - [a, [s, d], [f, g], h, [j, k], l]
+        - [z, [x, c], v, [b, n], m]
+    keys:
+      # swipe_up 数字按行序排布：上排 1-7、中排 8-0
+      q:  { tap: { label: "q", value: "q" }, swipe_up: "1", long_press: { display: "bubble", values: ["q", "Q"] } }
+      we: { tap: { label: "we", value: "w" }, swipe_up: "2", long_press: { display: "bubble", values: ["w", "e", "W", "E"] } }
+      rt: { tap: { label: "rt", value: "r" }, swipe_up: "3", long_press: { display: "bubble", values: ["r", "t", "R", "T"] } }
+      y:  { tap: { label: "y", value: "y" }, swipe_up: "4", long_press: { display: "bubble", values: ["y", "Y"] } }
+      u:  { tap: { label: "u", value: "u" }, swipe_up: "5", long_press: { display: "bubble", values: ["u", "U"] } }
+      io: { tap: { label: "io", value: "i" }, swipe_up: "6", long_press: { display: "bubble", values: ["i", "o", "I", "O"] } }
+      p:  { tap: { label: "p", value: "p" }, swipe_up: "7", long_press: { display: "bubble", values: ["p", "P"] } }
+      a:  { tap: { label: "a", value: "a" }, swipe_up: "8", long_press: { display: "bubble", values: ["a", "A"] } }
+      sd: { tap: { label: "sd", value: "s" }, swipe_up: "9", long_press: { display: "bubble", values: ["s", "d", "S", "D"] } }
+      fg: { tap: { label: "fg", value: "f" }, swipe_up: "0", long_press: { display: "bubble", values: ["f", "g", "F", "G"] } }
+      h:  { tap: { label: "h", value: "h" }, swipe_up: "”", long_press: { display: "bubble", values: ["h", "H"] } }
+      jk: { tap: { label: "jk", value: "j" }, swipe_up: "-", long_press: { display: "bubble", values: ["j", "k", "J", "K"] } }
+      l:  { tap: { label: "l", value: "l" }, swipe_up: ")", long_press: { display: "bubble", values: ["l", "L"] } }
+      z:  { tap: { label: "z", value: "z" }, swipe_up: "*", long_press: { display: "bubble", values: ["z", "Z"] } }
+      xc: { tap: { label: "xc", value: "x" }, swipe_up: "@", long_press: { display: "bubble", values: ["x", "c", "X", "C"] } }
+      v:  { tap: { label: "v", value: "v" }, swipe_up: "?", long_press: { display: "bubble", values: ["v", "V"] } }
+      bn: { tap: { label: "bn", value: "b" }, swipe_up: "!", long_press: { display: "bubble", values: ["b", "n", "B", "N"] } }
+      m:  { tap: { label: "m", value: "m" }, swipe_up: "#", long_press: { display: "bubble", values: ["m", "M"] } }
+      "'": { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [ ",","."] }}
+      earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
+
   # 九键（T9）键盘配置
   t9:
     # ── 左侧快捷符号栏（空闲态显示；列表长度不限，超过 4 个时可上下滑动）──

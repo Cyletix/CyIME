@@ -752,7 +752,13 @@ object SchemaManager {
     }
 
     /** 内置方案（保持默认启用顺序）。 */
-    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
+    internal val BUILTIN_SCHEMAS = listOf(
+        "wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin",
+        "pinyin_14jian", "pinyin_17jian", "pinyin_18jian",
+    )
+
+    /** 内置方案清单指纹：清单变化（新版本新增内置方案）时重新执行一次补齐。 */
+    private fun builtinSchemasStamp(): String = BUILTIN_SCHEMAS.joinToString(",")
 
     /**
      * 内置方案补齐（纯函数）：用户启用列表尾部按 [BUILTIN_SCHEMAS] 顺序追加缺失项，
@@ -770,7 +776,7 @@ object SchemaManager {
         val customFile = getCustomYamlFile(context)
         if (!customFile.exists()) {
             setEnabledSchemas(context, BUILTIN_SCHEMAS)
-            SettingsPreferences.setBuiltinSchemasMerged(context, true)
+            SettingsPreferences.setBuiltinSchemasStamp(context, builtinSchemasStamp())
             return BUILTIN_SCHEMAS
         }
 
@@ -794,20 +800,20 @@ object SchemaManager {
                 }
             }
             if (schemas.isNotEmpty()) {
-                // 内置方案补齐只执行一次（新版本首次运行，治老版本升级残留：
-                // 列表无 t9_pinyin → 方案永不部署 → 切九键静默失败）。之后用户
+                // 内置方案补齐在清单指纹变化时执行一次（新版本新增内置方案时，
+                // 老用户列表里没有 → 方案永不部署 → 切换静默失败）。之后用户
                 // 在方案管理中移除内置方案是有效选择，不得每次读取强行补回。
                 // 补齐写回后 schema_list 计入部署 hash、build 产物按方案校验，
                 // 缺失的方案会自动触发重部署。
-                val merged = if (SettingsPreferences.isBuiltinSchemasMerged(context)) {
+                val merged = if (SettingsPreferences.getBuiltinSchemasStamp(context) == builtinSchemasStamp()) {
                     schemas
                 } else {
                     val m = mergeBuiltinSchemas(schemas)
-                    if (m != schemas) {
-                        setEnabledSchemas(context, m)
-                    }
-                    SettingsPreferences.setBuiltinSchemasMerged(context, true)
+                    SettingsPreferences.setBuiltinSchemasStamp(context, builtinSchemasStamp())
                     m
+                }
+                if (merged != schemas) {
+                    setEnabledSchemas(context, merged)
                 }
                 return merged
             }
