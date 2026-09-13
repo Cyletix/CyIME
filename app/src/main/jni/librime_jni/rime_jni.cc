@@ -18,6 +18,10 @@
 #include <cstring>   // for strcmp
 #include <utility>   // for std::pair
 #include <ctime>     // for time
+#include <signal.h>  // native crash 捕获
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unwind.h>  // 信号安全的 native 调用栈采集
 
 #define LOG_TAG "XimeRime"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
@@ -2159,6 +2163,128 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9GetFirstSyllableOptions(
         result += options[i];
     }
     return env->NewStringUTF(result.c_str());
+}
+
+// ===== Native 崩溃捕获 =====
+// librime 部署/编译发生在 native 层，SIGSEGV 等信号崩溃不经过 Java 的
+// UncaughtExceptionHandler，日志文件里不会留下任何痕迹。这里在进程内注册
+// 信号处理器，把信号号、出错地址和 native 调用栈写入预打开的文件描述符。
+// 信号处理函数内只使用异步信号安全的调用（write / _Unwind_Backtrace /
+// 手工格式化），不触碰 Java（JNI/ART 均非信号安全）、不调用 malloc。
+// 写入后恢复默认处理器并 re-raise，保证系统 tombstone 照常生成。
+
+static int g_native_crash_fd = -1;
+static bool g_signal_handler_installed = false;
+
+static void xime_safe_write(const char* s) {
+    if (g_native_crash_fd < 0 || !s) return;
+    size_t len = strlen(s);
+    size_t off = 0;
+    while (off < len) {
+        ssize_t n = write(g_native_crash_fd, s + off, len - off);
+        if (n <= 0) return;
+        off += (size_t)n;
+    }
+}
+
+static void xime_safe_write_hex(uintptr_t v) {
+    char buf[2 + sizeof(uintptr_t) * 2 + 1];
+    size_t n = 0;
+    buf[n++] = '0';
+    buf[n++] = 'x';
+    if (v == 0) buf[n++] = '0';
+    char tmp[sizeof(uintptr_t) * 2];
+    int t = 0;
+    while (v) {
+        int d = v & 0xf;
+        tmp[t++] = d < 10 ? ('0' + d) : ('a' + d - 10);
+        v >>= 4;
+    }
+    while (t) buf[n++] = tmp[--t];
+    buf[n] = '\0';
+    xime_safe_write(buf);
+}
+
+struct XimeBacktraceState {
+    uintptr_t frames[32];
+    int count;
+};
+
+static _Unwind_Reason_Code xime_trace_fn(struct _Unwind_Context* ctx, void* data) {
+    XimeBacktraceState* state = (XimeBacktraceState*)data;
+    if (state->count >= 32) return _URC_END_OF_STACK;
+    uintptr_t pc = _Unwind_GetIP(ctx);
+    if (pc) state->frames[state->count++] = pc;
+    return _URC_NO_REASON;
+}
+
+static void xime_native_crash_handler(int sig, siginfo_t* info, void* /*uctx*/) {
+    if (g_native_crash_fd >= 0) {
+        xime_safe_write("\n==== NATIVE CRASH ====\nsignal=");
+        xime_safe_write_hex((uintptr_t)sig);
+        xime_safe_write(" fault_addr=");
+        xime_safe_write_hex((uintptr_t)info->si_addr);
+        xime_safe_write("\nbacktrace:\n");
+        XimeBacktraceState bt;
+        bt.count = 0;
+        _Unwind_Backtrace(xime_trace_fn, &bt);
+        for (int i = 0; i < bt.count; i++) {
+            xime_safe_write("  #");
+            xime_safe_write_hex((uintptr_t)i);
+            xime_safe_write(" ");
+            xime_safe_write_hex(bt.frames[i]);
+            xime_safe_write("\n");
+        }
+        xime_safe_write("==== END ====\n");
+        fsync(g_native_crash_fd);
+    }
+    // 恢复默认处理器后重发信号，交还系统生成 tombstone
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+// 预打开崩溃日志文件并注册信号处理器。fd 在初始化期打开（而非 handler 内），
+// 避免 signal-unsafe 的 open 调用。
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeInstallSignalHandler(
+    JNIEnv* env,
+    jobject thiz,
+    jstring user_data_dir
+) {
+    if (g_signal_handler_installed) return;
+    const char* user_dir = env->GetStringUTFChars(user_data_dir, nullptr);
+    if (!user_dir) return;
+
+    // 崩溃日志与 FileLogger 同放 {filesDir}/logs/（rime 目录的上一级）
+    std::string logs_dir = std::string(user_dir) + "/../logs";
+    mkdir(logs_dir.c_str(), 0755);
+    std::string log_path = logs_dir + "/native_crash.log";
+    struct stat st;
+    if (stat(log_path.c_str(), &st) == 0 && st.st_size > 1024 * 1024) {
+        unlink(log_path.c_str());
+    }
+    g_native_crash_fd = open(log_path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+
+    // 预热 unwinder，避免信号处理函数内首次执行触发惰性初始化分配内存
+    {
+        XimeBacktraceState warmup;
+        warmup.count = 0;
+        _Unwind_Backtrace(xime_trace_fn, &warmup);
+    }
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = xime_native_crash_handler;
+    sa.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, nullptr);
+    sigaction(SIGABRT, &sa, nullptr);
+    sigaction(SIGBUS, &sa, nullptr);
+    sigaction(SIGFPE, &sa, nullptr);
+    sigaction(SIGILL, &sa, nullptr);
+
+    g_signal_handler_installed = true;
+    LOGI("native crash signal handler installed, log: %s", log_path.c_str());
+    env->ReleaseStringUTFChars(user_data_dir, user_dir);
 }
 
 } // extern "C"
