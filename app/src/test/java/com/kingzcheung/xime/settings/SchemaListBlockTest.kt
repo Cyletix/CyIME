@@ -110,18 +110,18 @@ class SchemaListBlockTest {
 
     @Test
     fun `老列表缺新内置方案时补到尾部`() {
-        // 老版本只有三个方案：升级后 t9_pinyin / 合并键方案从未部署，切换静默失败
+        // 老版本只有三个方案：升级后 t9_pinyin 从未部署，切九键静默失败
         val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp")
         val merged = SchemaManager.mergeBuiltinSchemas(enabled)
         assertEquals(
-            listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "pinyin_14jian", "pinyin_17jian", "pinyin_18jian"),
+            listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin"),
             merged,
         )
     }
 
     @Test
     fun `内置方案齐全时原样返回`() {
-        val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "pinyin_14jian", "pinyin_17jian", "pinyin_18jian")
+        val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
         assertEquals(enabled, SchemaManager.mergeBuiltinSchemas(enabled))
     }
 
@@ -130,7 +130,7 @@ class SchemaListBlockTest {
         val enabled = listOf("my_custom_schema", "pinyin_simp", "wubi86")
         val merged = SchemaManager.mergeBuiltinSchemas(enabled)
         assertEquals(
-            listOf("my_custom_schema", "pinyin_simp", "wubi86", "wubi86_pinyin", "t9_pinyin", "pinyin_14jian", "pinyin_17jian", "pinyin_18jian"),
+            listOf("my_custom_schema", "pinyin_simp", "wubi86", "wubi86_pinyin", "t9_pinyin"),
             merged,
         )
     }

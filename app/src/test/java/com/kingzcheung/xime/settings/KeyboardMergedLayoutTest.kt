@@ -10,6 +10,9 @@ import java.io.File
  * 合并键布局（14/17/18 键）测试：
  * 1. xime.yaml 嵌套 rows 解析（子数组 → 拼接 ID）
  * 2. 前端键位分组与 Rime 方案 xlit 映射串的一致性
+ *
+ * 三个合并键方案不作为内置方案随包提供，schema 示例文件放在 docs/schemas_examples/
+ * （供市场分发/用户导入），此处一致性校验守护示例文件与前端分组不脱节。
  */
 class KeyboardMergedLayoutTest {
 
@@ -103,13 +106,22 @@ class KeyboardMergedLayoutTest {
 
     // ── 前端分组 ↔ Rime xlit 映射一致性 ──
 
-    /** 定位模块内 assets 文件（单测 workingDir 通常为模块目录，兜底仓库根目录）。 */
-    private fun assetFile(rel: String): File =
-        listOf(File(rel), File("app/$rel")).firstOrNull { it.exists() }
-            ?: error("asset file not found: $rel")
+    /** 定位仓库内文件（单测 workingDir 可能是模块目录或仓库根目录，逐级向上查找）。 */
+    private fun repoFile(rel: String): File {
+        var dir: File? = File(System.getProperty("user.dir")).absoluteFile
+        while (dir != null) {
+            File(dir, rel).takeIf { it.exists() }?.let { return it }
+            File(dir, "app/$rel").takeIf { it.exists() }?.let { return it }
+            dir = dir.parentFile
+        }
+        error("file not found: $rel")
+    }
 
     private fun ximeYamlText(): String =
-        assetFile("src/main/assets/xime.yaml").readText()
+        repoFile("src/main/assets/xime.yaml").readText()
+
+    private fun schemaExampleText(schemaId: String): String =
+        repoFile("docs/schemas_examples/$schemaId.schema.yaml").readText()
 
     /** 从合并键方案 schema 提取 xlit 映射：字母 → 代表字母。 */
     private fun xlitMap(schemaText: String): Map<Char, Char> {
@@ -130,8 +142,7 @@ class KeyboardMergedLayoutTest {
         val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_14")
             ?: error("xime.yaml 缺少 qwerty_14 rows")
         assertEquals(14, rows.flatten().size)
-        val schemaText = assetFile("src/main/assets/rime/pinyin_14jian.schema.yaml").readText()
-        assertEquals(representativeMap(rows), xlitMap(schemaText))
+        assertEquals(representativeMap(rows), xlitMap(schemaExampleText("pinyin_14jian")))
     }
 
     @Test
@@ -139,8 +150,7 @@ class KeyboardMergedLayoutTest {
         val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_17")
             ?: error("xime.yaml 缺少 qwerty_17 rows")
         assertEquals(17, rows.flatten().size)
-        val schemaText = assetFile("src/main/assets/rime/pinyin_17jian.schema.yaml").readText()
-        assertEquals(representativeMap(rows), xlitMap(schemaText))
+        assertEquals(representativeMap(rows), xlitMap(schemaExampleText("pinyin_17jian")))
     }
 
     @Test
@@ -148,22 +158,21 @@ class KeyboardMergedLayoutTest {
         val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_18")
             ?: error("xime.yaml 缺少 qwerty_18 rows")
         assertEquals(18, rows.flatten().size)
-        val schemaText = assetFile("src/main/assets/rime/pinyin_18jian.schema.yaml").readText()
-        assertEquals(representativeMap(rows), xlitMap(schemaText))
+        assertEquals(representativeMap(rows), xlitMap(schemaExampleText("pinyin_18jian")))
     }
 
     @Test
     fun `三个方案的 xlit 映射串与万象参考一致`() {
         assertTrue(
-            assetFile("src/main/assets/rime/pinyin_14jian.schema.yaml").readText()
+            schemaExampleText("pinyin_14jian")
                 .contains("xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qqeettuuooaaddggjjlzzccbbm"),
         )
         assertTrue(
-            assetFile("src/main/assets/rime/pinyin_17jian.schema.yaml").readText()
+            schemaExampleText("pinyin_17jian")
                 .contains("xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qwwrryyiooassffhjjlzxxvbbm"),
         )
         assertTrue(
-            assetFile("src/main/assets/rime/pinyin_18jian.schema.yaml").readText()
+            schemaExampleText("pinyin_18jian")
                 .contains("xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qwwrryuiipassffhjjlzxxvbbm"),
         )
     }
