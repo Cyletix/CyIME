@@ -757,7 +757,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             try {
                 processDeleteKey()
             } catch (t: Throwable) {
-                Log.e(XimeInputMethodService.TAG, "processDeleteKey failed", t)
+                FileLogger.e(XimeInputMethodService.TAG, "processDeleteKey failed", t)
             } finally {
                 maybeScheduleFollowUp()
             }

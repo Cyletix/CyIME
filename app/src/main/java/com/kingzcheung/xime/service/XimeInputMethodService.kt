@@ -545,7 +545,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     if (RimeConfigHelper.ensureDeployment(this@XimeInputMethodService)) {
                         rimeEngine.updateLastBuildTime()
                     } else {
-                        Log.e(TAG, "initRimeEngine: ensureDeployment failed, deployment may not have completed")
+                        FileLogger.e(TAG, "initRimeEngine: ensureDeployment failed, deployment may not have completed")
                     }
                 } else {
                     Log.d(TAG, "initRimeEngine: Already deployed, creating session directly")
@@ -561,7 +561,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         RimeConfigHelper.storeDeploymentHash(this@XimeInputMethodService)
                     }
                 } else {
-                    Log.w(TAG, "initRimeEngine: Session not ready after 60s, continuing in background")
+                    FileLogger.w(TAG, "initRimeEngine: Session not ready after 60s, continuing in background")
                 }
                 notifyDeploymentStatus(false, "")
 
@@ -597,7 +597,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 // 手写模型按"用键盘时加载"管理：不在此预载，
                                 // HandwritingKeyboardLayout 创建时（LaunchedEffect）负责加载
                             } else {
-                                Log.w(TAG, "initRimeEngine: handwriting model missing, keep full keyboard")
+                                FileLogger.w(TAG, "initRimeEngine: handwriting model missing, keep full keyboard")
                                 android.widget.Toast.makeText(
                                     this@XimeInputMethodService,
                                     "请先下载手写模型",
@@ -636,7 +636,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     Log.d(TAG, "initRimeEngine: Rime engine initialized successfully")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "initRimeEngine: Failed to initialize Rime engine", e)
+                FileLogger.e(TAG, "initRimeEngine: Failed to initialize Rime engine", e)
                 notifyDeploymentStatus(false, "初始化失败")
             }
         }
@@ -649,7 +649,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         serviceScope.launch(Dispatchers.Main) {
             delay(190_000L)
             if (uiState.value.isDeploying) {
-                Log.w(TAG, "initRimeEngine: Watchdog triggered - native init appears stuck, forcing loading state cleared")
+                FileLogger.w(TAG, "initRimeEngine: Watchdog triggered - native init appears stuck, forcing loading state cleared")
                 uiState.value = uiState.value.copy(
                     isDeploying = false,
                     deploymentMessage = "初始化超时，请重启输入法"
@@ -702,7 +702,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             Log.d(TAG, "initClipboardManager: Clipboard manager initialized successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "initClipboardManager: Failed to initialize clipboard manager", e)
+            FileLogger.e(TAG, "initClipboardManager: Failed to initialize clipboard manager", e)
         }
     }
 
@@ -722,7 +722,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 .firstOrNull { it.id == selected.first }
                 ?.capabilities?.clipboardSync?.protocols
             if (protocols.isNullOrEmpty()) {
-                Log.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
+                FileLogger.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
                 return
             }
             val plugin = selected.second
@@ -735,7 +735,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             uiState.value = uiState.value.copy(clipboardSyncEnabled = true)
             Log.d(TAG, "Clipboard sync started: ${selected.first}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start clipboard sync", e)
+            FileLogger.e(TAG, "Failed to start clipboard sync", e)
         }
     }
 
@@ -1103,7 +1103,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 quickSendItemsState.value = clipboardManager.quickSendItems.value
                 Log.d(TAG, "ensureClipboardManagerInitialized: Clipboard manager initialized")
             } catch (e: Exception) {
-                Log.e(TAG, "ensureClipboardManagerInitialized: Failed to initialize clipboard manager", e)
+                FileLogger.e(TAG, "ensureClipboardManagerInitialized: Failed to initialize clipboard manager", e)
             }
         }
     }
@@ -1592,7 +1592,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 @Suppress("DEPRECATION")
                 imm.showInputMethodPicker()
             }
-            else -> Log.w(TAG, "Unknown command: $name")
+            else -> FileLogger.w(TAG, "Unknown command: $name")
         }
     }
 
@@ -1652,7 +1652,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         val modelFile = java.io.File(hwDir, "ochwpro.onnx")
                         val charIndexFile = java.io.File(hwDir, "char_index.json")
                         if (!modelFile.exists() || !charIndexFile.exists()) {
-                            Log.w(TAG, "Handwriting model not found, falling back to first available schema")
+                            FileLogger.w(TAG, "Handwriting model not found, falling back to first available schema")
                             android.widget.Toast.makeText(
                                 this, "请先下载手写模型", android.widget.Toast.LENGTH_LONG
                             ).show()
@@ -1749,7 +1749,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 isShowingRecentClipboard = true
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get recent clipboard items", e)
+            FileLogger.e(TAG, "Failed to get recent clipboard items", e)
         }
 
         // 监听clipboardItems变化，更新候选栏
@@ -1826,7 +1826,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 cursorVisible = true,
             )
         } catch (e: Exception) {
-            Log.e(TAG, "onUpdateCursorAnchorInfo failed", e)
+            FileLogger.e(TAG, "onUpdateCursorAnchorInfo failed", e)
         }
     }
 
@@ -1914,7 +1914,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 win.decorView?.requestApplyInsets()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "applyWindowBackground failed", e)
+            FileLogger.e(TAG, "applyWindowBackground failed", e)
         }
     }
 
