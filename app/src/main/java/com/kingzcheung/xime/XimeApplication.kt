@@ -54,7 +54,7 @@ class XimeApplication : Application(), ImageLoaderFactory {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
                 FileLogger.e("CrashHandler", "Uncaught exception on thread: ${thread.name}", throwable)
-                FileLogger.flush()
+                FileLogger.flushNow()
             } catch (_: Exception) {
             }
             defaultHandler?.uncaughtException(thread, throwable)

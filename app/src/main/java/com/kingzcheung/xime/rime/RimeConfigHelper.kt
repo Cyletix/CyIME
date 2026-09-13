@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.rime
 
+import com.kingzcheung.xime.util.FileLogger
 import android.content.Context
 import android.util.Log
 import com.kingzcheung.xime.BuildConfig
@@ -84,7 +85,7 @@ object RimeConfigHelper {
                 if (engine.deployIncremental()) {
                     deployed = true
                 } else {
-                    Log.w(TAG, "Incremental maintenance failed, falling back to full deploy")
+                    FileLogger.w(TAG, "Incremental maintenance failed, falling back to full deploy")
                     buildDir.deleteRecursively()
                     buildDir.mkdirs()
                     deployed = engine.deploy()
@@ -178,7 +179,7 @@ object RimeConfigHelper {
             if (artifact.isFile && isBrokenBuildArtifact(artifact)) {
                 artifact.delete()
                 SettingsPreferences.setDeploymentHash(context, "")
-                Log.w(TAG, "Broken build artifact removed: ${artifact.name}")
+                FileLogger.w(TAG, "Broken build artifact removed: ${artifact.name}")
                 return false
             }
         }
@@ -296,7 +297,7 @@ object RimeConfigHelper {
         val copied = try {
             copyAssetsRecursively(context, ASSETS_RIME_DIR, targetDir)
         } catch (e: IOException) {
-            Log.e(TAG, "Failed to copy assets", e)
+            FileLogger.e(TAG, "Failed to copy assets", e)
             false
         }
         if (copied) {
@@ -337,7 +338,7 @@ object RimeConfigHelper {
             target.writeText(patched)
             Log.i(TAG, "Aligned ${target.name} menu/page_size=$pageSize")
         } catch (e: IOException) {
-            Log.e(TAG, "Failed to sync $ASSETS_DEFAULT_CUSTOM", e)
+            FileLogger.e(TAG, "Failed to sync $ASSETS_DEFAULT_CUSTOM", e)
         }
     }
 
@@ -493,7 +494,7 @@ object RimeConfigHelper {
                     }
                 }
             } catch (e: IOException) {
-                Log.e(TAG, "Failed to process: $fullAssetPath", e)
+                FileLogger.e(TAG, "Failed to process: $fullAssetPath", e)
             }
         }
         
@@ -513,7 +514,7 @@ object RimeConfigHelper {
                 }
             }
         } catch (e: IOException) {
-            Log.e(TAG, "Failed to copy: $assetPath", e)
+            FileLogger.e(TAG, "Failed to copy: $assetPath", e)
         }
     }
 
@@ -565,7 +566,7 @@ object RimeConfigHelper {
             if (oldMarket.renameTo(newMarket)) {
                 Log.i(TAG, "Migrated rime/market/ -> market/")
             } else {
-                Log.w(TAG, "Failed to rename rime/market/ to market/")
+                FileLogger.w(TAG, "Failed to rename rime/market/ to market/")
             }
         } else {
             // 新位置已存在，逐项合并
