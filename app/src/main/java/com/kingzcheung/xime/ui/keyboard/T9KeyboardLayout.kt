@@ -497,8 +497,8 @@ private fun T9KeyboardContent(
 
     // 数字键滑动手势（keyboard.t9.keys，热重载经 configVersion 感知）：
     // 上滑默认直接上屏数字（T9 模式 onKeyPress(数字) 会进拼音数字码组合，须走 onCommitText），
-    // 下滑默认绑定快捷编辑动作。上滑提示开关同时控制上滑动作（与 26 键行为一致：
-    // 组件内上滑触发依赖提示文本）；横屏紧凑模式不显示提示。
+    // 下滑默认绑定快捷编辑动作。提示开关只控制提示显示；组件内上滑触发只看回调绑定，
+    // 提示关闭/横屏紧凑时手势仍可用。上滑键面提示尊重 display: bubble（仅气泡不印键面）。
     val configVersion by KeysConfigHelper.configVersion.collectAsState()
     val swipeHints = rememberSwipeHintsEnabled()
     val hintsActive = !compactMode
@@ -509,11 +509,23 @@ private fun T9KeyboardContent(
         val gesture = KeysConfigHelper.getT9KeyGesture(id) ?: return T9KeySwipes()
         val upHint = gesture.swipeUp?.let { it.label.ifEmpty { it.value } }
         val downHint = gesture.swipeDown?.let { it.label.ifEmpty { it.value } }
+        // display 三态：key=仅键面提示（无气泡）、bubble=仅滑动气泡、both=键面+气泡。
+        // 内置默认全为 key（无气泡）：上滑对象格式 { value: "N" } 默认 key，下滑对象格式同。
+        // SwipeableKeyButton 键面提示取 swipeUpKeyLabel ?: swipeText（null 回退气泡文本），
+        // bubble 模式传空串显式压制键面显示。手势回调独立于提示与 display。
+        val swipeUpKeyLabel = when {
+            !swipeHints.up || !hintsActive -> null
+            gesture.swipeUp?.display == DisplayMode.BUBBLE -> ""
+            else -> upHint
+        }
         return T9KeySwipes(
             onSwipeUp = swipeHandlerFor(gesture.swipeUp, commitDirect, onGestureAction),
             onSwipeDown = swipeHandlerFor(gesture.swipeDown, commitDirect, onGestureAction),
-            swipeUpText = if (swipeHints.up && hintsActive) upHint else null,
-            swipeDownText = if (swipeHints.down && hintsActive) downHint else null,
+            swipeUpText = if (swipeHints.up && hintsActive &&
+                gesture.swipeUp?.display != DisplayMode.KEY) upHint else null,
+            swipeDownText = if (swipeHints.down && hintsActive &&
+                gesture.swipeDown?.display != DisplayMode.KEY) downHint else null,
+            swipeUpKeyLabel = swipeUpKeyLabel,
             swipeDownKeyLabel = if (swipeHints.down && hintsActive &&
                 gesture.swipeDown?.display != DisplayMode.BUBBLE) downHint else null,
         )
@@ -912,8 +924,12 @@ private fun T9KeyboardContent(
 private data class T9KeySwipes(
     val onSwipeUp: (() -> Unit)? = null,
     val onSwipeDown: (() -> Unit)? = null,
+    /** 上滑滑动气泡文本（display: key 时不传） */
     val swipeUpText: String? = null,
+    /** 下滑滑动气泡文本（display: key 时不传） */
     val swipeDownText: String? = null,
+    /** 上滑键面提示（空串 = 显式不印键面，bubble 模式用；null = 不显示） */
+    val swipeUpKeyLabel: String? = null,
     val swipeDownKeyLabel: String? = null,
 )
 
@@ -959,6 +975,7 @@ private fun T9DigitKey(
         badgeText = digit,
         swipeText = currentSwipes.swipeUpText,
         swipeDownText = currentSwipes.swipeDownText,
+        swipeUpKeyLabel = currentSwipes.swipeUpKeyLabel,
         swipeDownKeyLabel = currentSwipes.swipeDownKeyLabel,
         onSwipe = currentSwipes.onSwipeUp?.let { handler -> { _: String -> handler() } },
         onSwipeDown = currentSwipes.onSwipeDown?.let { handler -> { _: String -> handler() } },
@@ -1056,6 +1073,7 @@ private fun NineKeyButton(
         badgeText = digit,
         swipeText = swipes.swipeUpText,
         swipeDownText = swipes.swipeDownText,
+        swipeUpKeyLabel = swipes.swipeUpKeyLabel,
         swipeDownKeyLabel = swipes.swipeDownKeyLabel,
         onSwipe = swipes.onSwipeUp?.let { handler -> { _: String -> handler() } },
         onSwipeDown = swipes.onSwipeDown?.let { handler -> { _: String -> handler() } },

@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -350,6 +351,8 @@ private data class StrokeKeySwipes(
     val onSwipeDown: (() -> Unit)? = null,
     val swipeUpText: String? = null,
     val swipeDownText: String? = null,
+    /** 上滑键面提示（空串 = 显式不印键面，bubble 模式用；null = 回退 swipeText） */
+    val swipeUpKeyLabel: String? = null,
     val swipeDownKeyLabel: String? = null,
 )
 
@@ -382,32 +385,46 @@ private fun StrokeKeyboardContent(
         else (if (keyTextColor == Color(0xFFE8EAED)) Color.White
               else Color(0xFF1A73E8))
 
-    val symbols = listOf("。", "？", "！", "~")
     val suppressCursorMove = LocalSuppressCursorMove.current
 
     // 笔画键滑动手势（keyboard.stroke.keys，热重载经 configVersion 感知）：
-    // 有配置走配置（可覆盖上滑/新增下滑动作），无配置回退内置默认（上滑提交对应数字，
-    // 且补传提示文本——组件内上滑触发依赖提示文本非空，此前缺省导致上滑数字静默失效）。
-    // COMMIT 沿用 onKeyPress（保持笔画模式数字的按键路由语义）；提示受设置开关与横屏紧凑控制。
+    // 有配置走配置（可覆盖上滑/新增下滑动作），无配置回退内置默认（上滑提交对应数字）。
+    // COMMIT 沿用 onKeyPress（保持笔画模式数字的按键路由语义）。
+    // 提示开关只控制提示显示；组件内上滑触发只看回调绑定，提示关闭/横屏紧凑时手势仍可用。
+    // 上滑键面提示尊重 display: bubble（仅气泡不印键面）。
     val configVersion by KeysConfigHelper.configVersion.collectAsState()
     val swipeHints = rememberSwipeHintsEnabled()
     val hintsActive = !compactMode
+    // 左侧快捷符号列来自 xime.yaml keyboard.stroke.side_symbols（可自定义，>3 滚动显示）
+    val strokeSideSymbols = remember(configVersion) { KeysConfigHelper.getStrokeSideSymbols() }
 
     fun swipesFor(id: String, fallbackDigit: String): StrokeKeySwipes {
         val gesture = KeysConfigHelper.getStrokeKeyGesture(id)
         if (gesture == null || (gesture.swipeUp == null && gesture.swipeDown == null)) {
+            // 回退行为与内置默认（display: "key"）一致：仅键面提示，无滑动气泡
             return StrokeKeySwipes(
                 onSwipeUp = { onKeyPress(fallbackDigit) },
-                swipeUpText = if (swipeHints.up && hintsActive) fallbackDigit else null,
+                swipeUpKeyLabel = if (swipeHints.up && hintsActive) fallbackDigit else null,
             )
         }
         fun hint(def: GestureDef?): String? =
             def?.let { it.label.ifEmpty { it.value } }
+        // display 三态：key=仅键面提示（无气泡）、bubble=仅滑动气泡、both=键面+气泡。
+        // SwipeableKeyButton 键面提示取 swipeUpKeyLabel ?: swipeText（null 回退气泡文本），
+        // bubble 模式传空串显式压制键面显示；气泡仅 bubble/both 时传（key 关闭气泡）。
+        val swipeUpKeyLabel = when {
+            !swipeHints.up || !hintsActive -> null
+            gesture.swipeUp?.display == DisplayMode.BUBBLE -> ""
+            else -> hint(gesture.swipeUp)
+        }
         return StrokeKeySwipes(
             onSwipeUp = swipeHandlerFor(gesture.swipeUp, onKeyPress, onGestureAction),
             onSwipeDown = swipeHandlerFor(gesture.swipeDown, onKeyPress, onGestureAction),
-            swipeUpText = if (swipeHints.up && hintsActive) hint(gesture.swipeUp) else null,
-            swipeDownText = if (swipeHints.down && hintsActive) hint(gesture.swipeDown) else null,
+            swipeUpText = if (swipeHints.up && hintsActive &&
+                gesture.swipeUp?.display != DisplayMode.KEY) hint(gesture.swipeUp) else null,
+            swipeDownText = if (swipeHints.down && hintsActive &&
+                gesture.swipeDown?.display != DisplayMode.KEY) hint(gesture.swipeDown) else null,
+            swipeUpKeyLabel = swipeUpKeyLabel,
             swipeDownKeyLabel = gesture.swipeDown?.let { def ->
                 if (swipeHints.down && hintsActive && def.display != DisplayMode.BUBBLE)
                     def.label.ifEmpty { def.value } else null
@@ -428,17 +445,41 @@ private fun StrokeKeyboardContent(
                 modifier = Modifier.fillMaxWidth().weight(3f),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                symbols.forEachIndexed { index, symbol ->
-                    StrokeSymbolItem(
-                        text = symbol,
-                        isFirst = index == 0,
-                        isLast = index == symbols.lastIndex,
-                        onClick = { onKeyPress(symbol) },
-                        onPress = { onKeyPressDown?.invoke(symbol) },
-                        backgroundColor = keyBackgroundColor,
-                        textColor = keyTextColor,
-                        modifier = Modifier.fillMaxWidth().weight(1f)
-                    )
+                if (strokeSideSymbols.size <= 3) {
+                    strokeSideSymbols.forEachIndexed { index, symbol ->
+                        StrokeSymbolItem(
+                            text = symbol,
+                            isFirst = index == 0,
+                            isLast = index == strokeSideSymbols.lastIndex,
+                            onClick = { onKeyPress(symbol) },
+                            onPress = { onKeyPressDown?.invoke(symbol) },
+                            backgroundColor = keyBackgroundColor,
+                            textColor = keyTextColor,
+                            modifier = Modifier.fillMaxWidth().weight(1f)
+                        )
+                    }
+                } else {
+                    // 超过 3 个滚动显示（对齐九键 side_symbols 体验），每项约可见 3.5 行高
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val itemHeight = maxHeight / 3.5f
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
+                            itemsIndexed(strokeSideSymbols) { index, symbol ->
+                                StrokeSymbolItem(
+                                    text = symbol,
+                                    isFirst = index == 0,
+                                    isLast = index == strokeSideSymbols.lastIndex,
+                                    onClick = { onKeyPress(symbol) },
+                                    onPress = { onKeyPressDown?.invoke(symbol) },
+                                    backgroundColor = keyBackgroundColor,
+                                    textColor = keyTextColor,
+                                    modifier = Modifier.fillMaxWidth().height(itemHeight)
+                                )
+                            }
+                        }
+                    }
                 }
             }
             StrokeSymbolButton(
@@ -735,6 +776,7 @@ private fun StrokeKeyItem(
         badgeText = swipeDigit,
         swipeText = swipes.swipeUpText,
         swipeDownText = swipes.swipeDownText,
+        swipeUpKeyLabel = swipes.swipeUpKeyLabel,
         swipeDownKeyLabel = swipes.swipeDownKeyLabel,
         shadowEnabled = shadowEnabled,
         shadowElevation = shadowElevation,
@@ -772,6 +814,7 @@ private fun StrokeDigitKey(
         badgeText = swipeDigit,
         swipeText = swipes.swipeUpText,
         swipeDownText = swipes.swipeDownText,
+        swipeUpKeyLabel = swipes.swipeUpKeyLabel,
         swipeDownKeyLabel = swipes.swipeDownKeyLabel,
         shadowEnabled = shadowEnabled,
         shadowElevation = shadowElevation,

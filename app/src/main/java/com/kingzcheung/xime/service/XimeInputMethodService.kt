@@ -470,6 +470,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         
         FileLogger.init(this)
         FileLogger.i(TAG, "XimeInputMethodService created")
+        FileLogger.i(
+            TAG,
+            "Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), " +
+                "screen=${resources.displayMetrics.widthPixels}x${resources.displayMetrics.heightPixels}@${resources.displayMetrics.density}"
+        )
         
         feedbackManager.initialize()
         
@@ -1921,12 +1926,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun applyCompactMode() {
         val current = uiState.value
         val isCompact = hasHardwareKeyboard
+        FileLogger.i(
+            TAG,
+            "applyCompactMode: keyboardCfg=${keyboardConfigName(resources.configuration.keyboard)}, " +
+                "hasHardwareKeyboard=$hasHardwareKeyboard, isCompact=$isCompact (was ${current.isCompact})"
+        )
         if (current.isCompact != isCompact) {
             uiState.value = current.copy(isCompact = isCompact)
             if (isCompact) {
                 window.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
             }
         }
+    }
+
+    private fun keyboardConfigName(value: Int): String = when (value) {
+        android.content.res.Configuration.KEYBOARD_UNDEFINED -> "UNDEFINED"
+        android.content.res.Configuration.KEYBOARD_NOKEYS -> "NOKEYS"
+        android.content.res.Configuration.KEYBOARD_QWERTY -> "QWERTY"
+        android.content.res.Configuration.KEYBOARD_12KEY -> "12KEY"
+        else -> "UNKNOWN($value)"
     }
 
     private fun moveFloatingWindow(dx: Int, dy: Int) {

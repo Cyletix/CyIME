@@ -263,7 +263,14 @@ private fun parseGestureNode(node: com.charleskorn.kaml.YamlNode): GestureDef {
                 }
                 "action" -> {
                     val vStr = (v as? YamlScalar)?.content ?: continue
-                    action = if (vStr == "null") null else GestureAction.fromValue(vStr)
+                    if (vStr == "null") {
+                        action = null
+                    } else {
+                        action = GestureAction.fromValue(vStr)
+                        if (action == null) {
+                            Log.w("KeysConfigHelper", "手势配置包含未知 action: \"$vStr\"，该 tap/滑动将不生效")
+                        }
+                    }
                 }
                 "value" -> {
                     val vStr = (v as? YamlScalar)?.content ?: continue
@@ -438,6 +445,14 @@ data class KeyboardT9Config(
 )
 
 /**
+ * 笔画键盘配置，从 xime.yaml keyboard.stroke 加载。
+ */
+data class KeyboardStrokeConfig(
+    /** 左侧快捷符号列，列表长度不限，超过 3 个时键盘侧滚动显示。 */
+    val sideSymbols: List<String>? = null,
+)
+
+/**
  * 部分配置：仅包含 YAML 中显式配置的字段，null = 未配置。
  * 用于 custom → builtIn → 代码默认值的字段级一路 fallback 合并。
  */
@@ -473,6 +488,10 @@ internal data class KeyboardKeyPartial(
 )
 
 internal data class KeyboardT9Partial(
+    val sideSymbols: List<String>? = null,
+)
+
+internal data class KeyboardStrokePartial(
     val sideSymbols: List<String>? = null,
 )
 
@@ -541,6 +560,9 @@ object KeysConfigHelper {
 
     /** 九键左侧快捷符号栏内置默认值（T9KeyboardLayout 硬编码的历史行为）。 */
     val DEFAULT_T9_SIDE_SYMBOLS: List<String> = listOf("，", "。", "？", "！")
+
+    /** 笔画键盘左侧符号列内置默认（与历史硬编码一致）。 */
+    val DEFAULT_STROKE_SIDE_SYMBOLS: List<String> = listOf("。", "？", "！", "~")
     
     private val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))
     
@@ -569,6 +591,7 @@ object KeysConfigHelper {
 
     // 九键（T9）键盘配置缓存
     private var keyboardT9Config: KeyboardT9Config = KeyboardT9Config(sideSymbols = DEFAULT_T9_SIDE_SYMBOLS)
+    private var keyboardStrokeConfig: KeyboardStrokeConfig = KeyboardStrokeConfig(sideSymbols = DEFAULT_STROKE_SIDE_SYMBOLS)
 
     // 字体配置缓存
     private var keyboardFontConfig: KeyboardFontConfig = KeyboardFontConfig()
@@ -673,6 +696,8 @@ object KeysConfigHelper {
             keyboardKeyConfig = parseKeyboardKeyFromAssets(context)
             // 九键键盘配置（从原始 YAML 手动解析）
             keyboardT9Config = parseKeyboardT9FromAssets(context)
+            // 笔画键盘配置（从原始 YAML 手动解析）
+            keyboardStrokeConfig = parseKeyboardStrokeFromAssets(context)
             // 字体配置（从原始 YAML 手动解析）
             keyboardFontConfig = parseKeyboardFontsFromAssets(context)
             com.kingzcheung.xime.ui.keyboard.AppFonts.loadCustomFonts(keyboardFontConfig)
@@ -1022,6 +1047,36 @@ object KeysConfigHelper {
             KeyboardT9Partial(sideSymbols = sideSymbols?.ifEmpty { null })
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse keyboard t9 config", e)
+            null
+        }
+    }
+
+    /** 从 xime.yaml + xime.custom.yaml 合并解析笔画键盘配置。 */
+    private fun parseKeyboardStrokeFromAssets(context: Context): KeyboardStrokeConfig {
+        val builtIn = readAssetText(context, XIME_CONFIG_FILE)
+            ?.let { parseKeyboardStrokeYamlPartial(it) }
+        val custom = readCustomText(context)?.let { parseKeyboardStrokeYamlPartial(it) }
+        return mergeStrokeConfigs(custom, builtIn)
+    }
+
+    /** 字段级一路 fallback 合并笔画配置：custom → builtIn → 代码默认值。 */
+    internal fun mergeStrokeConfigs(custom: KeyboardStrokePartial?, builtIn: KeyboardStrokePartial?): KeyboardStrokeConfig =
+        KeyboardStrokeConfig(
+            sideSymbols = tiered(custom?.sideSymbols?.takeIf { it.isNotEmpty() },
+                builtIn?.sideSymbols?.takeIf { it.isNotEmpty() }, DEFAULT_STROKE_SIDE_SYMBOLS),
+        )
+
+    /** 从 YAML 文本中提取 keyboard.stroke 段（仅显式字段非 null）。 */
+    internal fun parseKeyboardStrokeYamlPartial(yamlText: String): KeyboardStrokePartial? {
+        return try {
+            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
+            val strokeNode = keyboardNode.opt<YamlMap>("stroke") ?: return null
+            val sideSymbols = strokeNode.opt<YamlList>("side_symbols")
+                ?.items?.mapNotNull { (it as? YamlScalar)?.content }
+            KeyboardStrokePartial(sideSymbols = sideSymbols?.ifEmpty { null })
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse keyboard stroke config", e)
             null
         }
     }
@@ -1433,6 +1488,10 @@ object KeysConfigHelper {
     /** 获取九键数字键手势配置（xime.yaml keyboard.t9.keys，custom 键级覆盖）。
      *  键 id 为数字字符串 "1"~"9"；无配置返回 null（布局不启用滑动）。 */
     fun getT9KeyGesture(key: String): KeyGestureConfig? = _t9GestureConfigs[key]
+
+    /** 获取笔画左侧快捷符号列（keyboard.stroke.side_symbols，可自定义）。 */
+    fun getStrokeSideSymbols(): List<String> =
+        keyboardStrokeConfig.sideSymbols ?: DEFAULT_STROKE_SIDE_SYMBOLS
 
     /** 获取笔画键手势配置（xime.yaml keyboard.stroke.keys，custom 键级覆盖）。
      *  键 id 为键面标签：一/丨/丿/丶/乛、*、分词、，、英。 */

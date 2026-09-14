@@ -169,29 +169,18 @@ class KeyboardT9StrokeGestureTest {
             val swipe = keys[id]?.swipeUp ?: error("t9.keys 缺少 $id 的上滑绑定")
             assertEquals(GestureAction.COMMIT, swipe.action)
             assertEquals(id, swipe.value)
+            // 内置默认对象格式不写 display → KEY：仅键面提示，无滑动气泡
+            assertEquals("t9.keys $id 上滑 display", DisplayMode.KEY, swipe.display)
         }
     }
 
     @Test
-    fun `内置 t9 keys 下滑编辑动作绑定符合默认方案`() {
+    fun `内置 t9 keys 默认不绑定下滑动作`() {
         val keys = loadAssetSection("t9")
-        val expected = mapOf(
-            "2" to GestureAction.LINE_START,
-            "3" to GestureAction.SELECT_ALL,
-            "4" to GestureAction.LINE_END,
-            "5" to GestureAction.COPY,
-            "6" to GestureAction.CUT,
-            "7" to GestureAction.PASTE,
-            "9" to GestureAction.SWITCH_ROUTE,
-        )
-        expected.forEach { (id, action) ->
-            assertEquals("t9.keys $id 下滑动作", action, keys[id]?.swipeDown?.action)
+        // 内置默认仅上滑输数字；下滑全部留空，由用户在 xime.custom.yaml 按键级配置
+        for (d in '1'..'9') {
+            assertNull("t9.keys $d 下滑应留空供自定义", keys[d.toString()]?.swipeDown)
         }
-        // 8 下滑留空供用户自定义；9 下滑打开剪贴板面板
-        assertNull(keys["8"]?.swipeDown)
-        assertEquals("clipboard", keys["9"]?.swipeDown?.value)
-        assertEquals("段首", keys["2"]?.swipeDown?.label)
-        assertEquals("剪贴板", keys["9"]?.swipeDown?.label)
     }
 
     @Test
@@ -205,6 +194,31 @@ class KeyboardT9StrokeGestureTest {
             val swipe = keys[id]?.swipeUp ?: error("stroke.keys 缺少 $id 的上滑绑定")
             assertEquals(GestureAction.COMMIT, swipe.action)
             assertEquals(digit, swipe.value)
+            // 内置默认显式 display: "key"：仅键面提示，无滑动气泡
+            assertEquals("stroke.keys $id 上滑 display", DisplayMode.KEY, swipe.display)
         }
+    }
+
+    @Test
+    fun `内置 stroke side_symbols 与历史硬编码一致`() {
+        val text = repoFile("src/main/assets/xime.yaml").readText()
+        val partial = KeysConfigHelper.parseKeyboardStrokeYamlPartial(text)
+        assertEquals(listOf("。", "？", "！", "~"), partial?.sideSymbols)
+    }
+
+    @Test
+    fun `stroke side_symbols 支持同路径覆盖解析`() {
+        val yaml = """
+            keyboard:
+              stroke:
+                side_symbols:
+                  - "，"
+                  - "。"
+        """.trimIndent()
+        val partial = KeysConfigHelper.parseKeyboardStrokeYamlPartial(yaml)
+        assertEquals(listOf("，", "。"), partial?.sideSymbols)
+        // 合并语义：custom → builtIn → 代码默认值
+        val merged = KeysConfigHelper.mergeStrokeConfigs(partial, null)
+        assertEquals(listOf("，", "。"), merged.sideSymbols)
     }
 }
