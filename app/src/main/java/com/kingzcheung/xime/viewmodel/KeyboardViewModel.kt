@@ -538,13 +538,21 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun resetKeyboard(isAsciiMode: Boolean, schemaId: String = "") {
+    fun resetKeyboard(isAsciiMode: Boolean, schemaId: String = "", forceNumberPanel: Boolean = false) {
         _isShifted.value = false
         _shiftMode.value = ShiftMode.OFF
         KeysConfigHelper.setActiveKeyboardSchema(schemaId)
-        _keyboardState.value = initialKeyboardLayoutState(isAsciiMode, schemaId)
-        if (_page.value !is KeyboardPage.Main) {
-            _page.value = KeyboardPage.Main(MainType.FULL)
+        if (forceNumberPanel) {
+            // 数字输入框自动进入数字面板：记录默认主布局，供面板"abc"返回键恢复
+            // （exitPanel 对 FULL returnTo 优先用 _savedKbStateBeforePanel）
+            _keyboardState.value = KeyboardLayoutState.Number
+            _savedKbStateBeforePanel = initialKeyboardLayoutState(isAsciiMode, schemaId)
+            _page.value = KeyboardPage.Panel(PanelType.NUMBER, MainType.FULL)
+        } else {
+            _keyboardState.value = initialKeyboardLayoutState(isAsciiMode, schemaId)
+            if (_page.value !is KeyboardPage.Main) {
+                _page.value = KeyboardPage.Main(MainType.FULL)
+            }
         }
         // 必须重新推导 viewState：否则 _viewState 停留在旧的面板/覆盖值，
         // 与 UI 实际渲染的 keyboardState 脱节，后续 AsciiModeChanged 会被误判为 panel/overlay 而跳过。

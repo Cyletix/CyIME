@@ -173,6 +173,9 @@ fun KeyboardLayout(
             GestureAction.TOGGLE_SYMBOLS -> {
                 callbacks.onKeyPress("mode_change", false)
             }
+            GestureAction.TOGGLE_SHIFT -> {
+                viewModel.toggleShift()
+            }
             else -> callbacks.onGestureAction?.invoke(action, value) ?: Unit
         }
     }
@@ -717,15 +720,19 @@ fun KeyboardLayout(
                             // earth — 从配置读取
                             val k4KeyGesture = KeysConfigHelper.getKeyGesture("earth", isAsciiMode)
                             val k4TapAction = k4KeyGesture?.tap?.action
-                            val k4TapValue = k4KeyGesture?.tap?.value?.takeIf { it.isNotEmpty() } ?: ""
-                            val k4TapLabel = k4KeyGesture?.tap?.label?.takeIf { it.isNotEmpty() } ?: ""
+                            // 无 tap 手势配置时回退地球键默认语义：地球图标 + 中英切换。
+                            // 否则键面空白（label=""/icon=null）且点击发出空键值——空键值在
+                            // 中文模式会触发 ImeKeyRouter lowercase()[0] 越界崩溃（2026-09-14 实证）。
+                            val isEarthDefaultTap = k4KeyGesture?.tap == null
+                            val k4TapValue = k4KeyGesture?.tap?.value?.takeIf { it.isNotEmpty() } ?: "ime_switch"
+                            val k4TapLabel = k4KeyGesture?.tap?.label?.takeIf { it.isNotEmpty() } ?: "中"
                             val k4Icon: Painter? = k4KeyGesture?.tap?.icon?.takeIf { it.isNotEmpty() }?.let { iconName ->
                                 val iv = when (iconName) {
                                     "language", "globe" -> Icons.Default.Language
                                     else -> null
                                 }
                                 iv?.let { rememberVectorPainter(it) }
-                            }
+                            } ?: if (isEarthDefaultTap) rememberVectorPainter(Icons.Default.Language) else null
                             val k4SwipeUpRaw = k4KeyGesture?.swipeUp
                             val k4SwipeUpLabel = if (isAsciiMode)
                                 (k4SwipeUpRaw?.value?.takeIf { it.isNotEmpty() } ?: "")
@@ -784,9 +791,9 @@ fun KeyboardLayout(
                                     Unit
                                 }
                             }
-                            if (k4TapAction == GestureAction.TOGGLE_ASCII && k4LongPressLabels == null && k4Icon != null) {
+                            if ((k4TapAction == GestureAction.TOGGLE_ASCII && k4Icon != null || isEarthDefaultTap) && k4LongPressLabels == null) {
                                 IconKeyButton(
-                                    icon = k4Icon,
+                                    icon = k4Icon ?: rememberVectorPainter(Icons.Default.Language),
                                     onClick = k4OnClick,
                                     backgroundColor = keyBackgroundColor,
                                     iconColor = keyTextColor,
@@ -1236,6 +1243,9 @@ private fun LandscapeKeyboardContent(
             }
             GestureAction.TOGGLE_SYMBOLS -> {
                 callbacks.onKeyPress("mode_change", false)
+            }
+            GestureAction.TOGGLE_SHIFT -> {
+                viewModel.toggleShift()
             }
             else -> callbacks.onGestureAction?.invoke(action, value) ?: Unit
         }
