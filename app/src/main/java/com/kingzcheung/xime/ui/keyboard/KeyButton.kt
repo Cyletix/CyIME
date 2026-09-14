@@ -521,11 +521,12 @@ fun SwipeableKeyButton(
                                     currentOnSwipeStateChange?.invoke(SwipeState(shouldShowBubble, currentSwipeText, false, emptyList(), false, null), buttonBounds)
                                 }
                                 
-                                val swipeTextValue = currentSwipeText
+                                // 上滑触发只看回调绑定，不依赖提示文本（swipeText 仅控制气泡/键面提示）：
+                                // 提示开关关闭或横屏紧凑不印提示时手势仍可用，与下滑触发语义一致。
                                 val onSwipeValue = currentOnSwipe
-                                if (dragOffsetY < swipeUpThreshold && !hasTriggeredSwipeUp && swipeTextValue != null && onSwipeValue != null) {
+                                if (dragOffsetY < swipeUpThreshold && !hasTriggeredSwipeUp && onSwipeValue != null) {
                                     hasTriggeredSwipeUp = true
-                                    onSwipeValue(swipeTextValue)
+                                    onSwipeValue(currentSwipeText ?: "")
                                 }
                             }
                         } else if (dragOffsetY > 0) {
@@ -778,7 +779,9 @@ fun SwipeableKeyButton(
                 )
             }
 
-            if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty()) {
+            // 上滑提示与角标文字相同（如九键/笔画上滑输入键面数字）时不再重复渲染提示，
+            // 角标已表达该信息；swipeText 状态保持非空，上滑触发与气泡不受影响。
+            if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && (swipeUpKeyLabel ?: swipeText) != badgeText) {
                 val keyLabel = (swipeUpKeyLabel ?: swipeText)!!
                 val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
                 Text(

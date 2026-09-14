@@ -413,7 +413,7 @@ keyboard:
     comment_font: ""
 
   qwerty:
-    # ── 按键布局模式 ──
+    # ── 按键布局模式（仅 26 键键盘支持；九键/笔画等其余键盘固定 standard，配置不生效）──
     # standard: 默认布局（主文字居中，下滑提示在底部）
     # compact: 紧凑布局（主文字在左上，下滑提示占满键帽中部）
     button_layout: standard
@@ -606,6 +606,8 @@ keyboard:
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
   # 九键（T9）键盘配置
+  # 注意：本键盘不支持 button_layout（按键布局模式），固定 standard 键面布局；
+  # 此处配置 button_layout: compact 不生效（compact 仅 26 键 qwerty/qwerty_en 支持）。
   t9:
     # ── 左侧快捷符号栏（空闲态显示；列表长度不限，超过 4 个时可上下滑动）──
     # 用户在 xime.custom.yaml 的同路径覆盖整个列表，未配置时使用内置默认值
@@ -614,3 +616,52 @@ keyboard:
       - "。"
       - "？"
       - "！"
+    # ── 数字键手势（可自定义：在 xime.custom.yaml 的 keyboard.t9.keys 同路径覆盖）──
+    # 键 id 为数字字符串 "1"~"9"；tap/长按（选字母）为九键核心交互，不在配置范围。
+    # 内置默认：上滑直接输入键面数字（无需切数字键盘）；下滑内置不绑定动作，
+    # 可按键级自行配置（如 swipe_down: { label: "复制", action: "copy" }，
+    # 或 switch_route: clipboard 打开剪贴板面板）。
+    # 动作可选值见 GestureAction：commit/select_all/copy/cut/paste/line_start/line_end/
+    # undo/repeat/command/switch_route（value: emoji|symbol|clipboard 打开对应面板）等；
+    # display 控制提示显示位置：key（仅键面提示，无滑动气泡）/ bubble（仅滑动气泡，
+    # 不印键面）/ both（键面+气泡）。内置默认全部显式配 display: "key"（不显示滑动
+    # 气泡）；想要气泡自行改为 display: "both"。手势功能与提示相互独立，
+    # 提示开关/display 关闭提示后手势仍生效。
+    keys:
+      "1": { swipe_up: { value: "1", display: "key" } }
+      "2": { swipe_up: { value: "2", display: "key" } }
+      "3": { swipe_up: { value: "3", display: "key" } }
+      "4": { swipe_up: { value: "4", display: "key" } }
+      "5": { swipe_up: { value: "5", display: "key" } }
+      "6": { swipe_up: { value: "6", display: "key" } }
+      "7": { swipe_up: { value: "7", display: "key" } }
+      "8": { swipe_up: { value: "8", display: "key" } }
+      "9": { swipe_up: { value: "9", display: "key" } }
+
+  # 笔画键盘配置
+  # 注意：本键盘不支持 button_layout（按键布局模式），固定 standard 键面布局；
+  # 此处配置 button_layout: compact 不生效（compact 仅 26 键 qwerty/qwerty_en 支持）。
+  stroke:
+    # ── 左侧快捷符号列（常显；列表长度不限，超过 3 个时滚动显示）──
+    # 用户在 xime.custom.yaml 的同路径覆盖整个列表，未配置时使用内置默认值
+    side_symbols:
+      - "。"
+      - "？"
+      - "！"
+      - "~"
+    # ── 笔画键手势（可自定义：在 xime.custom.yaml 的 keyboard.stroke.keys 同路径覆盖）──
+    # 键 id 为键面标签；内置默认：上滑输入对应数字（与历史行为一致，此前版本该手势
+    # 因缺少滑动提示文本实际不触发，现修复生效），下滑可按需绑定编辑动作。
+    # display：key（仅键面提示，无滑动气泡）/ bubble（仅滑动气泡）/ both（键面+气泡）。
+    # 内置上滑全部显式配 display: "key"（不显示滑动气泡，数字提示由键面右上角角标
+    # 承担）；想要拖动气泡自行改为 display: "both"。手势功能与提示相互独立。
+    keys:
+      "一": { swipe_up: { value: "1", display: "key" } }
+      "丨": { swipe_up: { value: "2", display: "key" } }
+      "丿": { swipe_up: { value: "3", display: "key" } }
+      "丶": { swipe_up: { value: "4", display: "key" } }
+      "乛": { swipe_up: { value: "5", display: "key" } }
+      "*": { swipe_up: { value: "6", display: "key" } }
+      "分词": { swipe_up: { value: "7", display: "key" } }
+      "，": { swipe_up: { value: "8", display: "key" } }
+      "英": { swipe_up: { value: "9", display: "key" } }

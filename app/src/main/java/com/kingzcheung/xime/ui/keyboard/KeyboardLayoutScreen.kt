@@ -76,6 +76,7 @@ fun KeyboardLayoutScreen(
                 val overlayRoute = when (value) {
                     "emoji" -> OverlayRoute.Emoji
                     "symbol" -> OverlayRoute.Symbol
+                    "clipboard" -> OverlayRoute.Clipboard(0)
                     else -> null
                 }
                 overlayRoute?.let { viewModel.showOverlay(it) }
@@ -222,6 +223,7 @@ fun KeyboardLayoutScreen(
                     onKeyPressDown = callbacks.onKeyPressDown,
                     isFloatingMode = uiState.isFloatingMode,
                     specialKeyTextColor = specialKeyTextColor,
+                    onGestureAction = onGestureAction,
                 )
             }
 
@@ -265,6 +267,7 @@ fun KeyboardLayoutScreen(
                         onKeyPressDown = callbacks.onKeyPressDown,
                         isFloatingMode = uiState.isFloatingMode,
                         specialKeyTextColor = specialKeyTextColor,
+                        onGestureAction = onGestureAction,
                     )
                 }
             }
