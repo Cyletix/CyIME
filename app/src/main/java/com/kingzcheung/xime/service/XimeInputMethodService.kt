@@ -1216,7 +1216,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 } else 0
                 // 底部留白整体缩减量（dp）：让键盘比系统导航栏实际高度再低一点，
                 // 键盘背景已 edge-to-edge 延伸到系统栏后，留白可小于系统栏高度。
-                val bottomInsetShrinkDp = 8
+                // 横屏手势区 inset 更大（约 32dp vs 竖屏 16dp），固定减 8 会留下过厚的
+                // 底条（24dp，为竖屏 3 倍）；横屏多减一档到 16dp，仍足以盖住手势条。
+                val bottomInsetShrinkDp = if (isLandscape) 16 else 8
                 // 标准（三键）导航栏 inset 明显大于手势条，额外多减一点，
                 // 让标准模式高度更接近抬高模式，但保留可辨识的差异。
                 val extraShrinkDp = if (rawDp >= 120) 8 else 0

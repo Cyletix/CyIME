@@ -1254,7 +1254,9 @@ private fun LandscapeKeyboardContent(
     CompositionLocalProvider(
         LocalKeyVisualPadding provides PaddingValues(
             horizontal = kbKey.spacingFor("qwerty").first?.dp ?: 2.dp,
-            vertical = kbKey.spacingFor("qwerty").second?.dp ?: 2.dp,
+            // 竖向只认 qwerty 专属覆盖（keyboard.key.qwerty.spacing_y），不回退全局 spacing_y
+            // ——全局值是竖屏行距（4.25dp），横屏行盒被它撑开后按键只剩 ~23dp 高
+            vertical = kbKey.spacingOverrides["qwerty"]?.spacingY?.dp ?: 2.dp,
         )
     ) {
         Row(

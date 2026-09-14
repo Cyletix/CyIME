@@ -73,7 +73,8 @@ object SettingsPreferences {
     private const val KEY_KEYBOARD_HEIGHT_DP = "keyboard_height_dp"
     private const val KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE = "keyboard_height_dp_landscape"
     const val DEFAULT_KEYBOARD_HEIGHT_PERCENT = 35
-    const val DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE = 49
+    /** 横屏默认高度 = 竖屏高度（长边）× 此百分比。约等于旧值（横屏短边 × 49%），但基数稳定、与竖屏语义统一 */
+    const val DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE = 25
 
     private const val KEY_TOOLBAR_BUTTONS = "toolbar_buttons"
     private val DEFAULT_TOOLBAR_BUTTONS = com.kingzcheung.xime.keyboard.ToolbarButton.DEFAULT_VISIBLE.joinToString(",") { it.id }
@@ -551,8 +552,12 @@ object SettingsPreferences {
     }
 
     fun getDefaultKeyboardHeightDp(context: Context, isLandscape: Boolean = false): Int {
-        val percent = if (isLandscape) DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE else DEFAULT_KEYBOARD_HEIGHT_PERCENT
-        return context.resources.configuration.screenHeightDp * percent / 100
+        val config = context.resources.configuration
+        if (!isLandscape) return config.screenHeightDp * DEFAULT_KEYBOARD_HEIGHT_PERCENT / 100
+        // 横屏以竖屏高度（长边）为基数：横屏短边随宽高比/系统栏波动大，
+        // 长边是设备稳定值，且与悬浮模式 fallback（portraitScreenHeightDp × 百分比）语义一致
+        val portraitHeightDp = maxOf(config.screenWidthDp, config.screenHeightDp)
+        return portraitHeightDp * DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE / 100
     }
 
     private const val KEY_KEYBOARD_BOTTOM_PADDING_DP = "keyboard_bottom_padding_dp"
