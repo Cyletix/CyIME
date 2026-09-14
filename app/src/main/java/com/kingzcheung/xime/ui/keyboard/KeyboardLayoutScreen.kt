@@ -88,6 +88,10 @@ fun KeyboardLayoutScreen(
                 callbacks.onKeyPress("ime_switch", uiState.isAsciiMode)
             }
 
+            GestureAction.TOGGLE_SHIFT -> {
+                viewModel.toggleShift()
+            }
+
             else -> callbacks.onGestureAction?.invoke(action, value) ?: Unit
         }
     }

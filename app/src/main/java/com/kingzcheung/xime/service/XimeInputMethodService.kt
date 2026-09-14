@@ -235,6 +235,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     private val bottomInsetPxState = mutableStateOf(0)
     private var hasHardwareKeyboard = false
+    /** 当前输入框是否受限（密码/终端/NO_SUGGESTIONS，见 EditorInfoClassifier）。
+     *  主线程写（onStartInput）、key-processing 线程读（英文联想短路），volatile 保证可见性。 */
+    @Volatile
+    private var editorRestricted: Boolean = false
     private var floatingWinX = 100
     private var floatingWinY = 300
     
@@ -1608,6 +1612,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    override fun dispatchKey(key: String) {
+        // 与物理键盘 onKeyDown 同一入口：handleKeyPress 内部自行调度到 key-processing 线程
+        keyRouter.handleKeyPress(key, false)
+    }
+
     // ── 原有方法 ──
 
     
@@ -1618,6 +1627,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
         // 敏感输入框（密码等）判定 + composing 去重标志重置（详见 PluginEventDispatcher）
         pluginEvents.onStartInput(attribute)
+
+        // 受限输入框判定（密码/终端/NO_SUGGESTIONS）：供英文联想等补全功能短路
+        editorRestricted = EditorInfoClassifier.isRestrictedEditor(attribute)
 
         // 输入 target 变化：旧编辑框的 composing 区域不再可达，复位标记。
         // 防御 stale 标记导致 endComposingInputBox 对新编辑框执行 setComposingText("")
@@ -1734,7 +1746,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // 用持久化方案兜底，避免布局退化为 26 键全键盘
             val schemaId = uiState.value.currentSchemaId
                 .ifBlank { SettingsPreferences.getCurrentSchema(this) }
-            keyboardViewModel.resetKeyboard(rimeAscii, schemaId)
+            // 纯数字输入框（号码/验证码等）自动进入数字面板，可由设置关闭
+            val forceNumberPanel = EditorInfoClassifier.isNumberEditor(attribute) &&
+                SettingsPreferences.isAutoNumberKeyboardEnabled(this)
+            debugLog(
+                "onStartInput: editor inputType=0x${Integer.toHexString(attribute?.inputType ?: 0)}, " +
+                    "restricted=$editorRestricted, forceNumberPanel=$forceNumberPanel"
+            )
+            keyboardViewModel.resetKeyboard(rimeAscii, schemaId, forceNumberPanel)
         } else {
             val rimeAscii = if (RimeEngine.isInitialized()) rimeEngine.isAsciiMode() else "n/a"
             FileLogger.i(TAG, "onStartInput: skip keyboard reset, restarting=$restarting, rimeAscii=$rimeAscii, ui=${uiState.value.isAsciiMode}")
@@ -2103,6 +2122,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         inputBoxComposingActive = false
     }
+
+    /**
+     * 当前输入框是否受限（密码/终端/NO_SUGGESTIONS，见 EditorInfoClassifier）：
+     * 英文联想等补全类功能应短路。
+     */
+    internal fun isEditorRestricted(): Boolean = editorRestricted
 
     /**
      * 当前宿主是否支持英文候选的"回删替换"机制。

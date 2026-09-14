@@ -44,6 +44,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     internal fun handleKeyPress(key: String, isShifted: Boolean) {
+        // 空键无任何按键语义，且下游 Rime 路由按 key[0] 取码（key.lowercase()[0]），
+        // 空串会越界崩溃（2026-09-14 真机实证：滑动手势 commit 值为空时触发）。
+        if (key.isEmpty()) return
         if (service.uiState.value.toolPanelInputFocused) {
             val candState = service.candidateState.value
             val hasComposing = candState.isComposing || candState.inputText.isNotEmpty()
@@ -687,12 +690,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         } else {
                             displayCandidates.map { it.text } to displayCandidates.map { it.comment }
                         }
+                        val restricted = service.isEditorRestricted()
                         service.candidateState.value = service.candidateState.value.copy(
                             inputText = capturedInputText,
                             candidates = filteredTexts,
                             candidateComments = filteredComments,
                             isComposing = capturedInputText.isNotEmpty(),
-                            associationCandidates = if ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
+                            associationCandidates = if (restricted || ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty())) emptyList() else service.candidateState.value.associationCandidates,
                             isShowingRecentClipboard = false,
                             hasNextPage = capturedHasNext,
                             hasPrevPage = capturedHasPrev,
@@ -702,7 +706,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             FileLogger.i(XimeInputMethodService.TAG, "keyRouter UI refresh: ascii ${service.uiState.value.isAsciiMode}->$capturedIsAscii")
                         }
                         service.uiState.value = service.uiState.value.copy(isAsciiMode = capturedIsAscii)
-                        if (pendingEnglish.isNotEmpty() && service.supportsEnglishCandidateReplace()) {
+                        // 受限输入框（密码/终端/NO_SUGGESTIONS）不拉取英文联想：
+                        // 联想会泄漏输入前缀，回删替换机制也会破坏受限宿主的输入
+                        if (pendingEnglish.isNotEmpty() && !restricted && service.supportsEnglishCandidateReplace()) {
                             service.serviceScope.launch {
                                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                                 withContext(Dispatchers.Main) {
