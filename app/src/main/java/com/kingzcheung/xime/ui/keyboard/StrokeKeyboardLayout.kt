@@ -1,17 +1,13 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,9 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Refresh
@@ -189,47 +183,33 @@ onKeyPressDown: ((String) -> Unit)?,
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
         if (isLandscape) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(vertical = 2.dp, horizontal = 50.dp),
+            // 横屏：去除原左侧符号面板（符号走符号键盘），
+            // 笔画布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
+            CompositionLocalProvider(
+                LocalKeyVisualPadding provides PaddingValues(
+                    horizontal = keySpacingX ?: 2.dp,
+                    vertical = keySpacingY ?: 2.dp,
+                )
             ) {
-                Column(
-                    modifier = Modifier.weight(0.42f).fillMaxHeight(),
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 2.dp, horizontal = 50.dp),
                 ) {
-                    StrokeLandscapeSymbolPanel(
+                    StrokeKeyboardContent(
                         onKeyPress = onKeyPress,
                         keyBackgroundColor = keyBackgroundColor,
                         keyTextColor = keyTextColor,
+                        specialKeyBackgroundColor = specialKeyBackgroundColor,
                         shadowEnabled = shadowEnabled,
                         shadowElevation = shadowElevation,
                         shadowShapeRadius = shadowShapeRadius,
                         onKeyPressDown = onKeyPressDown,
+                        onSwipeStateChange = ::processSwipeState,
+                        specialKeyTextColor = specialKeyTextColor,
+                        compactMode = true,
+                        onGestureAction = onGestureAction,
                     )
-                }
-                Spacer(modifier = Modifier.weight(0.16f))
-                Box(
-                    modifier = Modifier.weight(0.42f).fillMaxHeight(),
-                ) {
-                    CompositionLocalProvider(
-                        LocalKeyVisualPadding provides PaddingValues(
-                            horizontal = keySpacingX ?: 2.dp,
-                            vertical = keySpacingY ?: 2.dp,
-                        )
-                    ) {
-                        StrokeKeyboardContent(
-                            onKeyPress = onKeyPress,
-                            keyBackgroundColor = keyBackgroundColor,
-                            keyTextColor = keyTextColor,
-                            specialKeyBackgroundColor = specialKeyBackgroundColor,
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                            onKeyPressDown = onKeyPressDown,
-                            onSwipeStateChange = ::processSwipeState,
-                            specialKeyTextColor = specialKeyTextColor,
-                            compactMode = true,
-                            onGestureAction = onGestureAction,
-                        )
-                    }
                 }
             }
         } else {
@@ -263,77 +243,6 @@ onKeyPressDown: ((String) -> Unit)?,
             }
         }
     }
-    }
-}
-
-// ─── 横屏符号面板 ──────────────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun StrokeLandscapeSymbolPanel(
-    onKeyPress: (String) -> Unit,
-    keyBackgroundColor: Color,
-    keyTextColor: Color,
-    shadowEnabled: Boolean,
-    shadowElevation: Dp,
-    shadowShapeRadius: Dp,
-    onKeyPressDown: ((String) -> Unit)?,
-) {
-    val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
-            val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
-            val color = crispShadowColor(keyBackgroundColor)
-            Modifier.drawBehind {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(0f, offsetPx),
-                    size = size,
-                    cornerRadius = CornerRadius(cornerPx)
-                )
-            }
-        } else Modifier
-    }
-
-    val commonSymbols = listOf(
-        "~", "!", "#", "$", "%", "^", "&", "*",
-        "(", ")", "_", "=", "[", "]", "{", "}",
-        "\\", "|", ";", ":", "'", "\"", "<", ">"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(shadowModifier)
-            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(keyBackgroundColor)
-    ) {
-        val scrollState = rememberScrollState()
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
-        ) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                commonSymbols.forEach { sym ->
-                    Box(
-                        modifier = Modifier
-                            .clickable { onKeyPress(sym) }
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = sym,
-                            color = keyTextColor,
-                            fontSize = 14.sp,
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -381,6 +290,7 @@ private fun StrokeKeyboardContent(
 ) {
     val ctrlFontSize = if (compactMode) 11.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val strokeFontSize = if (compactMode) 13.sp else 16.sp
+    val symbolFontSize = if (compactMode) 11.sp else 13.sp
     val specialCtxTextColor = if (compactMode) specialKeyTextColor
         else (if (keyTextColor == Color(0xFFE8EAED)) Color.White
               else Color(0xFF1A73E8))
@@ -395,8 +305,26 @@ private fun StrokeKeyboardContent(
     val configVersion by KeysConfigHelper.configVersion.collectAsState()
     val swipeHints = rememberSwipeHintsEnabled()
     val hintsActive = !compactMode
-    // 左侧快捷符号列来自 xime.yaml keyboard.stroke.side_symbols（可自定义，>3 滚动显示）
+    // 左侧快捷符号列来自 xime.yaml keyboard.stroke.side_symbols（可自定义，>4 滚动显示）
     val strokeSideSymbols = remember(configVersion) { KeysConfigHelper.getStrokeSideSymbols() }
+
+    // 符号面板统一阴影（与九键左栏候选面板同款样式）
+    val density = LocalDensity.current
+    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
+        if (shadowEnabled) {
+            val offsetPx = with(density) { shadowElevation.toPx() }
+            val cornerPx = with(density) { shadowShapeRadius.toPx() }
+            val color = crispShadowColor(keyBackgroundColor)
+            Modifier.drawBehind {
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(0f, offsetPx),
+                    size = size,
+                    cornerRadius = CornerRadius(cornerPx)
+                )
+            }
+        } else Modifier
+    }
 
     fun swipesFor(id: String, fallbackDigit: String): StrokeKeySwipes {
         val gesture = KeysConfigHelper.getStrokeKeyGesture(id)
@@ -436,48 +364,53 @@ private fun StrokeKeyboardContent(
         modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
     ) {
-        // ── 第1列：左侧符号区（3 行符号 + 1 行符号按钮） ──
+        // ── 第1列：左侧符号区（面板样式与九键左栏对齐：统一圆角/阴影/内边距） ──
         Column(
-            modifier = Modifier.fillMaxHeight().weight(0.9f),
+            modifier = Modifier.fillMaxHeight().weight(0.8f),
             verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().weight(3f),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(3f)
+                    .padding(LocalKeyVisualPadding.current)
+                    .then(symbolPanelShadowModifier)
+                    .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+                    .background(keyBackgroundColor)
             ) {
-                if (strokeSideSymbols.size <= 3) {
-                    strokeSideSymbols.forEachIndexed { index, symbol ->
-                        StrokeSymbolItem(
-                            text = symbol,
-                            isFirst = index == 0,
-                            isLast = index == strokeSideSymbols.lastIndex,
-                            onClick = { onKeyPress(symbol) },
-                            onPress = { onKeyPressDown?.invoke(symbol) },
-                            backgroundColor = keyBackgroundColor,
-                            textColor = keyTextColor,
-                            modifier = Modifier.fillMaxWidth().weight(1f)
-                        )
+                if (strokeSideSymbols.size <= 4) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        strokeSideSymbols.forEach { symbol ->
+                            StrokeSymbolItem(
+                                text = symbol,
+                                onClick = { onKeyPress(symbol) },
+                                onPress = { onKeyPressDown?.invoke(symbol) },
+                                backgroundColor = keyBackgroundColor,
+                                textColor = keyTextColor,
+                                fontSize = symbolFontSize,
+                                modifier = Modifier.fillMaxWidth().weight(1f)
+                            )
+                        }
                     }
                 } else {
-                    // 超过 3 个滚动显示（对齐九键 side_symbols 体验），每项约可见 3.5 行高
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        val itemHeight = maxHeight / 3.5f
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
-                        ) {
-                            itemsIndexed(strokeSideSymbols) { index, symbol ->
-                                StrokeSymbolItem(
-                                    text = symbol,
-                                    isFirst = index == 0,
-                                    isLast = index == strokeSideSymbols.lastIndex,
-                                    onClick = { onKeyPress(symbol) },
-                                    onPress = { onKeyPressDown?.invoke(symbol) },
-                                    backgroundColor = keyBackgroundColor,
-                                    textColor = keyTextColor,
-                                    modifier = Modifier.fillMaxWidth().height(itemHeight)
-                                )
-                            }
+                    // 超过 4 个滚动显示（对齐九键 side_symbols 体验），条目定高、由面板圆角统一裁切
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        itemsIndexed(strokeSideSymbols) { _, symbol ->
+                            StrokeSymbolItem(
+                                text = symbol,
+                                onClick = { onKeyPress(symbol) },
+                                onPress = { onKeyPressDown?.invoke(symbol) },
+                                backgroundColor = keyBackgroundColor,
+                                textColor = keyTextColor,
+                                fontSize = symbolFontSize,
+                                modifier = Modifier.fillMaxWidth().height(if (compactMode) 26.dp else 32.dp)
+                            )
                         }
                     }
                 }
@@ -703,29 +636,22 @@ private fun StrokeKeyboardContent(
 @Composable
 private fun StrokeSymbolItem(
     text: String,
-    isFirst: Boolean,
-    isLast: Boolean,
     onClick: () -> Unit,
     onPress: (() -> Unit)?,
     backgroundColor: Color,
     textColor: Color,
     modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnPress by rememberUpdatedState(onPress)
-    val cornerRadius = LocalKeyCornerRadius.current
-    val shape = RoundedCornerShape(
-        topStart = if (isFirst) cornerRadius else 0.dp,
-        topEnd = if (isFirst) cornerRadius else 0.dp,
-        bottomStart = if (isLast) cornerRadius else 0.dp,
-        bottomEnd = if (isLast) cornerRadius else 0.dp
-    )
+    // 面板样式与九键左栏（CandidateItem）一致：条目自身透明、按压时垫底层加深，
+    // 圆角/阴影由外层面板统一负责
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else Color.Transparent)
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -739,8 +665,11 @@ private fun StrokeSymbolItem(
         Text(
             text = text,
             color = textColor,
-            fontSize = 18.sp,
+            fontSize = fontSize,
             fontWeight = FontWeight.Normal,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            fontFamily = AppFonts.candidateFontFamily
         )
     }
 }

@@ -11,10 +11,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,9 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Language
@@ -242,42 +237,20 @@ private fun T9KeyboardSwipeOverlay(
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp)) {
         if (isLandscape) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(vertical = 2.dp, horizontal = 50.dp),
+            // 横屏：去除原左侧候选大面板（候选已在顶部候选栏展示），
+            // 九键布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
+            CompositionLocalProvider(
+                LocalKeyVisualPadding provides PaddingValues(
+                    horizontal = keySpacingX ?: 2.dp,
+                    vertical = keySpacingY ?: 2.dp,
+                )
             ) {
-                Column(
-                    modifier = Modifier
-                        .weight(0.42f)
-                        .fillMaxHeight(),
-                ) {
-                    T9LandscapeCandidatePanel(
-                        uiState = uiState,
-                        callbacks = callbacks,
-                        keyTextColor = keyTextColor,
-                        keyBackgroundColor = keyBackgroundColor,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                        candidateState = candidateState,
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(0.16f))
-
                 Box(
                     modifier = Modifier
-                        .weight(0.42f)
-                        .fillMaxHeight()
+                        .fillMaxSize()
+                        .padding(vertical = 2.dp, horizontal = 50.dp),
                 ) {
-                    CompositionLocalProvider(
-                        LocalKeyVisualPadding provides PaddingValues(
-                            horizontal = keySpacingX ?: 2.dp,
-                            vertical = keySpacingY ?: 2.dp,
-                        )
-                    ) {
-                        T9KeyboardContent(
+                    T9KeyboardContent(
                         onKeyPress = onKeyPress,
                         callbacks = callbacks,
                         uiState = uiState,
@@ -296,7 +269,6 @@ private fun T9KeyboardSwipeOverlay(
                         candidateState = candidateState,
                         onGestureAction = onGestureAction,
                     )
-                    }
                 }
             }
         } else {
@@ -335,134 +307,6 @@ private fun T9KeyboardSwipeOverlay(
             }
         }
     }
-    }
-}
-
-// ─── 横屏候选面板 — 包装组件 ────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun T9LandscapeCandidatePanel(
-    uiState: KeyboardUiState,
-    callbacks: KeyboardCallbacks,
-    keyTextColor: Color,
-    keyBackgroundColor: Color,
-    shadowEnabled: Boolean,
-    shadowElevation: Dp,
-    shadowShapeRadius: Dp,
-    candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
-) {
-    val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
-            val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
-            val color = crispShadowColor(keyBackgroundColor)
-            Modifier.drawBehind {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(0f, offsetPx),
-                    size = size,
-                    cornerRadius = CornerRadius(cornerPx)
-                )
-            }
-        } else Modifier
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(shadowModifier)
-            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(keyBackgroundColor)
-    ) {
-        val rimeCandidates = candidateState.value.candidates
-        val rimeComments = candidateState.value.candidateComments
-        if (rimeCandidates.isNotEmpty()) {
-            val scrollState = rememberScrollState()
-            Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(scrollState),
-            ) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth().padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    rimeCandidates.forEachIndexed { index, candidate ->
-                        LandscapeCandidateItem(
-                            index = index + 1,
-                            text = candidate,
-                            comment = rimeComments.getOrElse(index) { "" },
-                            onClick = { callbacks.onCandidateSelect(index) },
-                            textColor = keyTextColor,
-                        )
-                    }
-                }
-            }
-        } else {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (candidateState.value.isComposing) "..." else "",
-                    color = keyTextColor.copy(alpha = 0.3f),
-                    fontSize = 14.sp
-                )
-            }
-        }
-    }
-}
-
-// ─── 横屏候选面板 — 子项组件 ──────────────────────────────────────────
-
-@Composable
-private fun LandscapeCandidateItem(
-    index: Int,
-    text: String,
-    comment: String,
-    onClick: () -> Unit,
-    textColor: Color,
-) {
-    val currentOnClick by rememberUpdatedState(onClick)
-    Box(
-        modifier = Modifier
-            .clickable { currentOnClick() }
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "$index",
-                color = textColor.copy(alpha = 0.4f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Normal,
-                modifier = Modifier.padding(end = 2.dp)
-            )
-            Text(
-                text = text,
-                color = textColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontFamily = AppFonts.candidateFontFamily
-            )
-            if (comment.isNotEmpty()) {
-                Text(
-                    text = comment,
-                    color = textColor.copy(alpha = 0.5f),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 2.dp),
-                    fontFamily = AppFonts.commentFontFamily
-                )
-            }
-        }
     }
 }
 
