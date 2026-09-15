@@ -84,15 +84,19 @@ object ExpandedCandidatePager {
      * @param singleCharOnly true 时只保留单字候选（筛选单字功能）
      * @param fromIndex 起始偏移：跳过候选栏已显示的前若干个候选，避免展开页重复
      */
+    /**
+     * 生成展开页的数据索引列表：先按 [singleCharOnly] 口径过滤（false=全量、
+     * true=仅单字，与候选栏筛选口径一致），再从 [fromIndex] 起跳过候选栏已
+     * 显示的条目数（候选栏与展开页同口径衔接，不重复展示）。
+     */
     fun filterIndices(
         all: List<RimeCandidate>,
         singleCharOnly: Boolean,
         fromIndex: Int = 0,
     ): List<Int> {
-        val start = fromIndex.coerceIn(0, all.size)
-        return (start until all.size).toList().let { range ->
-            if (!singleCharOnly) range else range.filter { all[it].text.length == 1 }
-        }
+        val filtered = if (!singleCharOnly) all.indices.toList()
+        else all.indices.filter { all[it].text.length == 1 }
+        return filtered.drop(fromIndex.coerceIn(0, filtered.size))
     }
 
     /**

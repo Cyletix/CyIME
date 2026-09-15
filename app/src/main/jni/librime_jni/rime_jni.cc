@@ -449,6 +449,18 @@ public:
         if (!rime || !session_id_) return false;
         return rime->delete_candidate_on_current_page(session_id_, index);
     }
+
+    // 按候选列表全局索引删除（跨页，与 candidate_list 遍历顺序一致），
+    // 供候选展开页本地分页长按删除自造词。
+    bool deleteCandidateByGlobalIndex(int index) {
+        if (!rime || !session_id_ || index < 0) {
+            LOGD("deleteCandidateByGlobalIndex: invalid state, index=%d", index);
+            return false;
+        }
+        bool result = rime->delete_candidate(session_id_, static_cast<size_t>(index));
+        LOGD("deleteCandidateByGlobalIndex: index=%d -> %d", index, result ? 1 : 0);
+        return result;
+    }
     
     bool pageDown() {
         if (!rime || !session_id_) return false;
@@ -1372,6 +1384,16 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeDeleteCandidateOnCurrentPage(
     jint index
 ) {
     return Rime::Instance().deleteCandidateOnCurrentPage(index) ? JNI_TRUE : JNI_FALSE;
+}
+
+// 按候选列表全局索引删除（跨页，供候选展开页长按删除自造词）
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeDeleteCandidateByGlobalIndex(
+    JNIEnv* env,
+    jobject thiz,
+    jint index
+) {
+    return Rime::Instance().deleteCandidateByGlobalIndex(index) ? JNI_TRUE : JNI_FALSE;
 }
 
 // 翻页 - 下一页

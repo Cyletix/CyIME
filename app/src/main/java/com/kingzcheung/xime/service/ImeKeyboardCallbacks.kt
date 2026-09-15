@@ -203,6 +203,9 @@ internal fun rememberImeKeyboardCallbacks(
             onGlobalCandidateSelect = { globalIndex ->
                 service.keyRouter.selectCandidateGlobal(globalIndex)
             },
+            onGlobalCandidateDelete = { globalIndex ->
+                service.keyRouter.deleteCandidateGlobal(globalIndex)
+            },
             onRequestExpandedCandidates = { service.refreshExpandedCandidates() },
             onCursorMove = { direction ->
                 val ic = service.currentInputConnection

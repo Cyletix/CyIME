@@ -1344,4 +1344,28 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /**
+     * 候选展开页长按删除自造词：按跨页全局索引删除（delete_candidate）。
+     * 删除后重拉全量候选并恢复当前页码（用户应停留在删除发生的页，
+     * 被删词消失、后续候选自然前移）。
+     */
+    internal fun deleteCandidateGlobal(globalIndex: Int) {
+        postRimeJob {
+            val text = service.candidateState.value.expandedCandidates.getOrNull(globalIndex)?.text
+            if (text.isNullOrEmpty()) return@postRimeJob
+            val ok = service.rimeEngine.deleteCandidateByGlobalIndex(globalIndex)
+            FileLogger.i(
+                "ImeKeyRouter",
+                "deleteCandidateGlobal: text='$text' index=$globalIndex ok=$ok"
+            )
+            if (!ok) return@postRimeJob
+            withContext(Dispatchers.Main) {
+                // updateUI 内部会重拉全量并重置页码，这里记录并恢复删除时的页
+                val keepStart = service.keyboardViewModel.expandedPageStart
+                service.updateUI()
+                service.keyboardViewModel.restoreExpandedPage(keepStart)
+            }
+        }
+    }
+
 }

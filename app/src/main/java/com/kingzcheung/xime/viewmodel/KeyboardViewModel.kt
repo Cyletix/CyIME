@@ -127,7 +127,12 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     /** 打开/收起候选展开页。 */
     fun setCandidatePageExpanded(expanded: Boolean) {
         _candidatePageExpanded.value = expanded
-        if (expanded) resetExpandedPaging()
+        if (expanded) {
+            resetExpandedPaging()
+        } else {
+            // 筛选开关只在展开页左栏：收起后候选栏若仍被过滤将无处可关，自动复位
+            _singleCharFilter.value = false
+        }
     }
 
     // ── 展开页本地分页 ──
@@ -165,6 +170,11 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     /** 编码刷新 / 切过滤 / 重新展开时重置到第一页 */
     fun resetExpandedPaging() {
         _expandedPageStarts.value = listOf(0)
+    }
+
+    /** 恢复到指定页起点（如展开页删除自造词后停留在删除发生的页；第一页不产生回退项） */
+    fun restoreExpandedPage(start: Int) {
+        _expandedPageStarts.value = if (start > 0) listOf(0, start) else listOf(0)
     }
 
     /** 翻到下一页：调用方先用 pager 切页，确认 hasNext 后传入下一页起点 */

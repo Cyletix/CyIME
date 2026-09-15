@@ -382,6 +382,17 @@ class RimeEngine {
         }
     }
 
+    /**
+     * 按候选列表全局索引删除（跨页，与 getAllCandidates 遍历顺序一致），
+     * 供候选展开页本地分页长按删除自造词。
+     */
+    fun deleteCandidateByGlobalIndex(index: Int): Boolean {
+        return tryLocked(false) {
+            if (!nativeHasSession()) return@tryLocked false
+            nativeDeleteCandidateByGlobalIndex(index)
+        }
+    }
+
     fun pageDown(): Boolean {
         return tryLocked(false) {
             if (!nativeHasSession()) return@tryLocked false
@@ -691,6 +702,7 @@ class RimeEngine {
     private external fun nativeSelectCandidate(index: Int): Boolean
     private external fun nativeSelectCandidateByGlobalIndex(index: Int): Boolean
     private external fun nativeDeleteCandidateOnCurrentPage(index: Int): Boolean
+    private external fun nativeDeleteCandidateByGlobalIndex(index: Int): Boolean
     private external fun nativePageDown(): Boolean
     private external fun nativePageUp(): Boolean
     private external fun nativeHasNextPage(): Boolean

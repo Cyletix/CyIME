@@ -108,11 +108,28 @@ class ExpandedCandidatePagerTest {
         // 候选栏已显示前 2 个，展开页从索引 2 开始
         val filtered = ExpandedCandidatePager.filterIndices(all, singleCharOnly = false, fromIndex = 2)
         assertEquals(listOf(2, 3), filtered)
-        // 偏移叠加单字过滤：跳过 1 个后只剩单字"世"
+        // 偏移作用于过滤后列表：跳过 1 个单字"你"后接"世"
         val single = ExpandedCandidatePager.filterIndices(all, singleCharOnly = true, fromIndex = 1)
         assertEquals(listOf(2), single)
         // 偏移越界安全
         assertEquals(emptyList<Int>(), ExpandedCandidatePager.filterIndices(all, false, fromIndex = 9))
+    }
+
+    @Test
+    fun `单字筛选时偏移作用于过滤后列表与候选栏单字口径衔接`() {
+        // 候选栏（单字口径）显示"你""好"2 个单字后，展开页应无更多单字——
+        // 旧语义（先偏移后过滤）会返回 [2]，把候选栏已显示的"好"再展示一遍
+        val all = listOf(candidate("你"), candidate("你好"), candidate("好"), candidate("好的"))
+        assertEquals(
+            emptyList<Int>(),
+            ExpandedCandidatePager.filterIndices(all, singleCharOnly = true, fromIndex = 2)
+        )
+        // 正向衔接：候选栏显示 2 个单字后，展开页从下一个单字接续
+        val all2 = listOf(candidate("你"), candidate("你好"), candidate("好"), candidate("好人"), candidate("们"))
+        assertEquals(
+            listOf(4),
+            ExpandedCandidatePager.filterIndices(all2, singleCharOnly = true, fromIndex = 2)
+        )
     }
 
     @Test

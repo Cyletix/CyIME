@@ -3,6 +3,8 @@ package com.kingzcheung.xime.ui.keyboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,7 +29,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +42,7 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -66,6 +72,20 @@ data class CandidatePageState(
     val bottomPaddingDp: Int = 0,
     /** "只看单字"过滤开启中（左栏底部切换按钮的选中态） */
     val singleCharFilter: Boolean = false,
+    /** 左栏符号列表（九键/笔画复刻各自键盘左栏的 side_symbols）；空=通用快捷符号 */
+    val railSymbols: List<String> = emptyList(),
+    /** 左栏宽度 dp（九键对齐其键盘左栏：(屏宽-4)×0.8/5，与其 weight 分配同公式）；
+     *  0=默认固定宽度 */
+    val leftRailWidthDp: Int = 0,
+    /** 左栏垂直缩进 dp（九键对齐其左栏面板 keySpacingY，默认 6=原 Row 垂直边距，
+     *  保证展开/收起切换时左栏顶部位置不跳跃） */
+    val leftRailInsetDp: Int = 6,
+    /** 左栏音节拼音候选（九键输入/选择态复刻，与键盘左栏同源）；非空时优先于 railSymbols */
+    val railPinyinOptions: List<String> = emptyList(),
+    /** 拼音候选项选中索引（九键 SELECTION 态），-1 无选中 */
+    val railSelectedPinyinIndex: Int = -1,
+    /** 拼音选中胶囊强调色（对齐九键 CandidateItem）；Unspecified 时用 textColor 兜底 */
+    val railAccentColor: Color = Color.Unspecified,
 )
 
 /**
@@ -84,6 +104,10 @@ data class CandidatePageCallbacks(
     val onAssociationSelect: ((Int) -> Unit)? = null,
     val onToggleSingleCharFilter: (() -> Unit)? = null,
     val onContentHeightChanged: ((Int) -> Unit)? = null,
+    /** 长按候选删除自造词（index 为本地页内索引，KeyboardView 换算全局索引） */
+    val onCandidateLongPress: ((Int) -> Unit)? = null,
+    /** 左栏拼音候选点选（九键音节切换，index 对应 railPinyinOptions） */
+    val onRailPinyinSelect: ((Int) -> Unit)? = null,
     val onPageDown: (() -> Unit)? = null,
     val onPageUp: (() -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
@@ -121,6 +145,14 @@ fun CandidatePage(
     val keyBg = if (state.keyBackgroundColor == Color.Unspecified)
         state.textColor.copy(alpha = 0.12f) else state.keyBackgroundColor
     val dividerColor = state.textColor.copy(alpha = 0.12f)
+    val railSymbols = state.railSymbols.ifEmpty { QUICK_SYMBOLS }
+    // 九键输入/选择态：左栏显示音节拼音候选（与键盘左栏同源同点击）；空闲态回落符号列表
+    val railItems = state.railPinyinOptions.ifEmpty { railSymbols }
+    val isPinyinRail = state.railPinyinOptions.isNotEmpty()
+    // 左栏宽度：九键对齐其键盘左栏（宿主按同公式给的 dp 值），其余布局用固定宽度
+    val railWidthModifier = if (state.leftRailWidthDp > 0)
+        Modifier.fillMaxHeight().width(state.leftRailWidthDp.dp)
+    else Modifier.fillMaxHeight().width(leftRailWidth)
 
     Column(
         modifier = modifier
@@ -131,31 +163,67 @@ fun CandidatePage(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                // 垂直边距下放各栏：左栏用 leftRailInsetDp（九键对其键盘左栏面板的
+                // keySpacingY 缩进，切换展开/收起时左栏不跳位），中/右栏保持 6dp 原视觉
+                .padding(horizontal = 8.dp)
         ) {
-            // ── 左栏：快捷符号（上，连体键——首尾圆角、中间直角，对齐数字键盘左栏）
-            // + 候选/单字切换（下，独立键） ──
+            // ── 左栏：九键为音节拼音候选（输入/选择态）或 side_symbols（空闲态，
+            // 连体键——首尾圆角、中间直角，对齐数字键盘左栏）+ 候选/单字切换（下）。
+            // 条目 ≤4 均分填满；>4 最多显示 4 条、LazyColumn 滚动（对齐九键左栏）──
             Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(leftRailWidth),
+                modifier = railWidthModifier
+                    .padding(vertical = state.leftRailInsetDp.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                var railListHeightPx by remember { mutableIntStateOf(0) }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(3f)
+                        .onSizeChanged { railListHeightPx = it.height }
                 ) {
-                    QUICK_SYMBOLS.forEachIndexed { index, symbol ->
-                        CandidateRailSymbolKey(
-                            text = symbol,
-                            onClick = { callbacks.onCommitText?.invoke(symbol) },
-                            keyBg = keyBg,
-                            textColor = state.textColor,
-                            modifier = Modifier.weight(1f),
-                            isFirst = index == 0,
-                            isLast = index == QUICK_SYMBOLS.lastIndex
-                        )
+                    if (railItems.size <= 4) {
+                        railItems.forEachIndexed { index, item ->
+                            CandidateRailSymbolKey(
+                                text = item,
+                                onClick = {
+                                    if (isPinyinRail) callbacks.onRailPinyinSelect?.invoke(index)
+                                    else callbacks.onCommitText?.invoke(item)
+                                },
+                                keyBg = keyBg,
+                                textColor = state.textColor,
+                                modifier = Modifier.weight(1f),
+                                isFirst = index == 0,
+                                isLast = index == railItems.lastIndex,
+                                isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
+                                accentColor = state.railAccentColor,
+                                isPinyin = isPinyinRail
+                            )
+                        }
+                    } else {
+                        // 每条高 = 列表区高/4（视口恰好显示 4 条），超出滚动查看
+                        val itemHeightDp = with(LocalDensity.current) {
+                            (railListHeightPx / 4).coerceAtLeast(1).toDp()
+                        }
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            itemsIndexed(railItems) { index, item ->
+                                CandidateRailSymbolKey(
+                                    text = item,
+                                    onClick = {
+                                        if (isPinyinRail) callbacks.onRailPinyinSelect?.invoke(index)
+                                        else callbacks.onCommitText?.invoke(item)
+                                    },
+                                    keyBg = keyBg,
+                                    textColor = state.textColor,
+                                    modifier = Modifier.height(itemHeightDp),
+                                    isFirst = index == 0,
+                                    isLast = index == railItems.lastIndex,
+                                    isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
+                                    accentColor = state.railAccentColor,
+                                    isPinyin = isPinyinRail
+                                )
+                            }
+                        }
                     }
                 }
                 RailKey(
@@ -185,10 +253,13 @@ fun CandidatePage(
 
             // ── 中间：候选流式排列（条目按内容宽度自适应、放不下自动换行）。
             // 数据源是本地分页切片（无需滚动容器）；高度随内容自适应并把实测
-            // 内容高度上报给宿主，供其闭环调整每页行数以精确撑满。 ──
+            // 内容高度上报给宿主，供其闭环调整每页行数以精确撑满。
+            // padding 在 onSizeChanged 外侧，上报值不含垂直边距（与 Row 承担
+            // padding 时同口径）──
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    .padding(vertical = 6.dp)
                     .onSizeChanged { callbacks.onContentHeightChanged?.invoke(it.height) }
             ) {
                 if (state.candidates.isNotEmpty()) {
@@ -203,6 +274,7 @@ fun CandidatePage(
                                 text = candidate,
                                 comment = state.candidateComments.getOrElse(index) { "" },
                                 onClick = { callbacks.onCandidateSelect(index) },
+                                onLongClick = { callbacks.onCandidateLongPress?.invoke(index) },
                                 textColor = state.textColor
                             )
                         }
@@ -245,7 +317,8 @@ fun CandidatePage(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(rightRailWidth),
+                    .width(rightRailWidth)
+                    .padding(vertical = 6.dp),
                 verticalArrangement = if (isLandscape) Arrangement.spacedBy(4.dp)
                 else Arrangement.spacedBy(10.dp, Alignment.CenterVertically)
             ) {
@@ -324,6 +397,7 @@ private fun CandidatePageItem(
     comment: String,
     onClick: () -> Unit,
     textColor: Color,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val displayComment = comment.replace("~", "")
     val annotated = remember(text, displayComment, textColor) {
@@ -362,6 +436,7 @@ private fun CandidatePageItem(
             .tolerantClick(
                 showRipple = false,
                 interactionSource = interactionSource,
+                onLongClick = onLongClick,
                 onClick = onClick
             )
             .padding(horizontal = 4.dp, vertical = 8.dp),
@@ -523,6 +598,8 @@ private fun FlexRowDivider(color: Color) {
 /**
  * 左栏连体符号键（样式对齐数字键盘 NumberSymbolKey）：同一列内首条目上圆角、
  * 末条目下圆角、中间直角——整列背景连成一体；按压背景加深（0.7 透明度）。
+ * [isSelected] 时渲染选中胶囊（对齐九键 CandidateItem 的 accentColor 高亮），
+ * [isPinyin] 用拼音字号（13sp，对齐九键左栏），否则符号字号 16sp。
  */
 @Composable
 private fun CandidateRailSymbolKey(
@@ -533,6 +610,9 @@ private fun CandidateRailSymbolKey(
     modifier: Modifier = Modifier,
     isFirst: Boolean = false,
     isLast: Boolean = false,
+    isSelected: Boolean = false,
+    accentColor: Color = Color.Unspecified,
+    isPinyin: Boolean = false,
 ) {
     val cornerRadius = LocalKeyCornerRadius.current
     val shape = RoundedCornerShape(
@@ -543,6 +623,7 @@ private fun CandidateRailSymbolKey(
     )
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val pillColor = if (accentColor == Color.Unspecified) textColor else accentColor
 
     Box(
         modifier = modifier
@@ -556,14 +637,32 @@ private fun CandidateRailSymbolKey(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Normal,
-            maxLines = 1,
-            fontFamily = AppFonts.candidateFontFamily
-        )
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(pillColor.copy(alpha = 0.2f))
+                    .padding(horizontal = 3.dp, vertical = 1.dp)
+            ) {
+                Text(
+                    text = text,
+                    color = pillColor,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    fontFamily = AppFonts.candidateFontFamily
+                )
+            }
+        } else {
+            Text(
+                text = text,
+                color = textColor,
+                fontSize = if (isPinyin) 13.sp else 16.sp,
+                fontWeight = FontWeight.Normal,
+                maxLines = 1,
+                fontFamily = AppFonts.candidateFontFamily
+            )
+        }
     }
 }
 
