@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +66,7 @@ import com.kingzcheung.xime.keyboard.ToolbarButtonItem
 import com.kingzcheung.xime.keyboard.resolveToolbarButtonItem
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
+import com.kingzcheung.xime.service.ExpandedCandidatePager
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.menubar.ClipboardView
@@ -103,6 +106,8 @@ fun KeyboardView(
     val keyboardState by viewModel.keyboardState.collectAsStateWithLifecycle()
     val page by viewModel.page.collectAsStateWithLifecycle()
     val candidatePageExpanded by viewModel.candidatePageExpanded.collectAsStateWithLifecycle()
+    val expandedPageStarts by viewModel.expandedPageStarts.collectAsStateWithLifecycle()
+    val singleCharFilter by viewModel.singleCharFilter.collectAsStateWithLifecycle()
 
     // 候选展开页自动收起：编码删空（无候选也无联想）时不留空页。
     // 展开态是候选栏的在位扩展（非 Overlay），删除实时更新页内候选，删空即回到键盘。
@@ -274,6 +279,9 @@ fun KeyboardView(
             var handwritingTail by remember { mutableStateOf("") }
             var handwritingActiveLen by remember { mutableStateOf(0) }
             var handwritingLastSegLen by remember { mutableStateOf(0) }
+
+            // 候选栏实际显示的打字候选数（不滑动只显示放得下的；展开页以此为偏移跳过）
+            var barVisibleCount by remember { mutableStateOf(0) }
 
             val isHandwritingPage = page is KeyboardPage.Main && (page as KeyboardPage.Main).type == MainType.HANDWRITING
             val showHandwritingCandidates = (isHandwritingPage || isHandwritingLookup) && handwritingCandidates.isNotEmpty()
@@ -489,7 +497,10 @@ fun KeyboardView(
                     onShowMoreCandidates = {
                         onHapticFeedback?.invoke()
                         viewModel.setCandidatePageExpanded(true)
+                        // 拉取跨页全量候选（本地分页数据源，含首次展开）
+                        callbacks.onRequestExpandedCandidates?.invoke()
                     },
+                    onVisibleCandidateCountChanged = { barVisibleCount = it },
                     onInputTextClick = {
                         if (candidateState.value.inputText.isNotEmpty()) {
                             callbacks.onClipboardSelect?.invoke(candidateState.value.inputText)
@@ -539,45 +550,112 @@ fun KeyboardView(
 
             if (candidatePageExpanded) {
                 // 候选展开页：候选栏的在位展开态（顶部即真实候选栏，实时跟随编码/删除变化）。
-                // 不再走 Overlay 全屏页——Overlay 会在部分状态刷新时整页关闭，产生闪动。
-                CandidatePage(
-                    state = CandidatePageState(
-                        candidates = candidateState.value.candidates.toList(),
-                        candidateComments = candidateState.value.candidateComments.toList(),
-                        associationCandidates = candidateState.value.associationCandidates.toList(),
-                        backgroundColor = keyboardBgColor,
-                        textColor = candidateTextColor,
-                        keyBackgroundColor = keyBgColor,
-                        hasNextPage = candidateState.value.hasNextPage,
-                        hasPrevPage = candidateState.value.hasPrevPage,
-                        bottomPaddingDp = state.keyboardBottomPaddingDp,
-                    ),
-                    callbacks = CandidatePageCallbacks(
-                        onCandidateSelect = { index ->
-                            callbacks.onCandidateSelect(index)
-                            viewModel.setCandidatePageExpanded(false)
-                        },
-                        onAssociationSelect = { index ->
-                            callbacks.onAssociationSelect?.invoke(index)
-                            viewModel.setCandidatePageExpanded(false)
-                        },
-                        onPageDown = { onHapticFeedback?.invoke(); callbacks.onPageDown?.invoke() },
-                        onPageUp = { onHapticFeedback?.invoke(); callbacks.onPageUp?.invoke() },
-                        onCommitText = { text ->
-                            onHapticFeedback?.invoke()
-                            callbacks.onCommitText?.invoke(text)
-                        },
-                        onDelete = {
-                            onHapticFeedback?.invoke()
-                            callbacks.onKeyPress("delete", false)
-                        },
-                        onEnter = {
-                            onHapticFeedback?.invoke()
-                            callbacks.onKeyPress("enter", false)
-                        },
-                    ),
-                    modifier = Modifier.weight(1f).fillMaxWidth()
+                // 数据源为服务层的跨页全量候选（expandedCandidates），翻页是纯本地切页
+                // （按行贪心分行，与布局层 FlexRow 同算法），不再驱动 rime session 翻页。
+                val allExpanded = candidateState.value.expandedCandidates
+                // 从候选栏已显示数量之后开始（候选栏不滑动只显示放得下的前若干个），
+                // 避免展开页重复展示候选栏出现过的候选
+                val filteredIndices = ExpandedCandidatePager.filterIndices(
+                    allExpanded, singleCharFilter, fromIndex = barVisibleCount
                 )
+                // 行容量（字符当量）估算，UI 层与服务层（硬件翻页键）统一换算
+                val rowWidthUnits = with(LocalDensity.current) {
+                    ExpandedCandidatePager.rowWidthUnits(
+                        screenWidthPx = LocalConfiguration.current.screenWidthDp.dp.toPx(),
+                        density = density,
+                        scaledDensity = density * fontScale
+                    )
+                }
+                // 每页行数闭环校准：先按区域高度估算初值，再以 CandidatePage 上报的
+                // 实测内容高度迭代调整——还能再放一行则 +1、溢出则 -1，精确撑满；
+                // 联想区占用的空间在实测中自动扣减，无需预估。
+                BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    val density = LocalDensity.current
+                    val areaHeightPx = with(density) { maxHeight.toPx() }
+                    val bottomPaddingPx = with(density) { state.keyboardBottomPaddingDp.dp.toPx() }
+                    val bodyVerticalPaddingPx = with(density) { 12.dp.toPx() }
+                    var rowsPerPage by remember {
+                        mutableStateOf(
+                            ExpandedCandidatePager.rowsForArea(
+                                areaHeightPx, density.density, density.density * density.fontScale,
+                                bottomPaddingPx
+                            )
+                        )
+                    }
+                    var contentHeightPx by remember { mutableStateOf(0) }
+                    val expandedPage = ExpandedCandidatePager.pageSlice(
+                        filteredIndices,
+                        expandedPageStarts.lastOrNull() ?: 0,
+                        rowsPerPage,
+                        rowWidthUnits,
+                        allExpanded
+                    )
+                    LaunchedEffect(contentHeightPx, areaHeightPx, expandedPage.hasNext) {
+                        if (contentHeightPx <= 0 || areaHeightPx <= 0) return@LaunchedEffect
+                        val available = areaHeightPx - bottomPaddingPx - bodyVerticalPaddingPx
+                        val rowHeight = contentHeightPx / rowsPerPage.coerceAtLeast(1)
+                        when {
+                            expandedPage.hasNext && contentHeightPx + rowHeight <= available ->
+                                if (rowsPerPage < 12) rowsPerPage++
+                            contentHeightPx > available && rowsPerPage > 1 -> rowsPerPage--
+                        }
+                    }
+                    SideEffect { viewModel.expandedRowsPerPage = rowsPerPage }
+                    CandidatePage(
+                        state = CandidatePageState(
+                            candidates = expandedPage.globalIndices.map { allExpanded[it].text },
+                            candidateComments = expandedPage.globalIndices.map { allExpanded[it].comment },
+                            associationCandidates = candidateState.value.associationCandidates.toList(),
+                            backgroundColor = keyboardBgColor,
+                            textColor = candidateTextColor,
+                            keyBackgroundColor = keyBgColor,
+                            hasNextPage = expandedPage.hasNext,
+                            hasPrevPage = viewModel.hasPrevExpandedPage(),
+                            bottomPaddingDp = state.keyboardBottomPaddingDp,
+                            singleCharFilter = singleCharFilter,
+                        ),
+                        callbacks = CandidatePageCallbacks(
+                            onCandidateSelect = { index ->
+                                // 本地页内索引 → 跨页全局索引（引擎侧 select_candidate）
+                                val globalIndex = expandedPage.globalIndices.getOrNull(index)
+                                if (globalIndex != null) {
+                                    callbacks.onGlobalCandidateSelect?.invoke(globalIndex)
+                                    viewModel.setCandidatePageExpanded(false)
+                                }
+                            },
+                            onToggleSingleCharFilter = {
+                                onHapticFeedback?.invoke()
+                                viewModel.toggleSingleCharFilter()
+                            },
+                            onContentHeightChanged = { contentHeightPx = it },
+                            onAssociationSelect = { index ->
+                                callbacks.onAssociationSelect?.invoke(index)
+                                viewModel.setCandidatePageExpanded(false)
+                            },
+                            onPageDown = {
+                                onHapticFeedback?.invoke()
+                                if (expandedPage.hasNext) viewModel.pushExpandedPage(expandedPage.nextStart)
+                            },
+                            onPageUp = {
+                                onHapticFeedback?.invoke()
+                                viewModel.popExpandedPage()
+                            },
+                            onCommitText = { text ->
+                                onHapticFeedback?.invoke()
+                                callbacks.onCommitText?.invoke(text)
+                            },
+                            onDelete = {
+                                onHapticFeedback?.invoke()
+                                callbacks.onKeyPress("delete", false)
+                            },
+                            onEnter = {
+                                onHapticFeedback?.invoke()
+                                callbacks.onKeyPress("enter", false)
+                            },
+                        ),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             } else {
             val isMainKeyboard = page is KeyboardPage.Main
             if (isMainKeyboard) {

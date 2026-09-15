@@ -200,6 +200,10 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onPageDown = { service.keyRouter.pageDown() },
             onPageUp = { service.keyRouter.pageUp() },
+            onGlobalCandidateSelect = { globalIndex ->
+                service.keyRouter.selectCandidateGlobal(globalIndex)
+            },
+            onRequestExpandedCandidates = { service.refreshExpandedCandidates() },
             onCursorMove = { direction ->
                 val ic = service.currentInputConnection
                 if (ic != null && direction != 0) {

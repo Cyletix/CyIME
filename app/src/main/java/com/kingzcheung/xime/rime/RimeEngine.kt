@@ -316,6 +316,23 @@ class RimeEngine {
         }
     }
 
+    /**
+     * 跨页获取整个候选列表（与引擎分页无关），供候选展开页本地分页使用。
+     * @param maxCount 收集上限，防御超大列表
+     */
+    fun getAllCandidates(maxCount: Int = 500): Array<RimeCandidate> {
+        return tryLocked(emptyArray()) {
+            if (!nativeHasSession()) return@tryLocked emptyArray()
+            val rawCandidates = nativeGetAllCandidates(maxCount) ?: emptyArray()
+            rawCandidates.map { pair ->
+                RimeCandidate(
+                    text = pair.getOrElse(0) { "" },
+                    comment = pair.getOrElse(1) { "" }
+                )
+            }.toTypedArray()
+        }
+    }
+
     fun getInput(): String {
         return tryLocked("") {
             nativeGetInput() ?: ""
@@ -338,6 +355,17 @@ class RimeEngine {
         return tryLocked(false) {
             if (!nativeHasSession()) return@tryLocked false
             nativeSelectCandidate(index)
+        }
+    }
+
+    /**
+     * 按候选列表全局索引选词（跨页，与 getAllCandidates 遍历顺序一致）。
+     * 候选展开页本地分页点选走此接口：本地页内索引 + 页偏移 = 全局索引。
+     */
+    fun selectCandidateByGlobalIndex(index: Int): Boolean {
+        return tryLocked(false) {
+            if (!nativeHasSession()) return@tryLocked false
+            nativeSelectCandidateByGlobalIndex(index)
         }
     }
 
@@ -657,9 +685,11 @@ class RimeEngine {
     private external fun nativeGetProcessResult(processed: Boolean): RimeProcessResult
     private external fun nativeGetCandidates(): Array<String>?
     private external fun nativeGetCandidatesWithComments(): Array<Array<String>>?
+    private external fun nativeGetAllCandidates(maxCount: Int): Array<Array<String>>?
     private external fun nativeGetInput(): String?
     private external fun nativeGetComposition(): RimeComposition
     private external fun nativeSelectCandidate(index: Int): Boolean
+    private external fun nativeSelectCandidateByGlobalIndex(index: Int): Boolean
     private external fun nativeDeleteCandidateOnCurrentPage(index: Int): Boolean
     private external fun nativePageDown(): Boolean
     private external fun nativePageUp(): Boolean

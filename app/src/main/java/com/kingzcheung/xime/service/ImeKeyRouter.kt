@@ -1286,4 +1286,62 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /**
+     * 候选展开页点选：按跨页全局索引选词（select_candidate，区别于候选栏的
+     * 当前页内索引 select_candidate_on_current_page）。
+     *
+     * 关键：rime 的 select 只是把候选放进内部 commit 缓冲，宿主必须再调
+     * [RimeEngine.commit]（get_commit）拉取文本并自行上屏——只刷新 composition
+     * 拿不到上屏内容（编码已消费、字却丢失，即此前"展开页点选无法上屏"的根因）。
+     */
+    internal fun selectCandidateGlobal(globalIndex: Int) {
+        // 点选震动反馈与候选栏同源（performKeyPressEffect），保证手感一致
+        service.composeViewRef?.let { service.feedbackManager.performKeyPressEffect(view = it) }
+        postRimeJob {
+            // T9 方案的选词消费由 t9_processor 独立完成，直接调引擎 select 会
+            // 遗留 [confirmed, phony] 残留组合态（见 selectCandidateAsync 注释），
+            // 降级走候选栏同款路径（全局索引近似页内索引，T9 候选页浅）。
+            if (isT9Schema(service.uiState.value.currentSchemaId)) {
+                selectCandidateAsync(globalIndex)
+                return@postRimeJob
+            }
+            val ok = service.rimeEngine.selectCandidateByGlobalIndex(globalIndex)
+            FileLogger.i(
+                "ImeKeyRouter",
+                "selectCandidateGlobal: index=$globalIndex ok=$ok"
+            )
+            if (!ok) return@postRimeJob
+
+            val committedText = service.rimeEngine.commit()
+            if (committedText.isNotEmpty()) {
+                // 智能联想记录（对齐候选栏点选路径，以引擎实际返回文本为准）
+                if (SettingsPreferences.isSmartPredictionEnabled(service) && AssociationManager.isInitialized()) {
+                    if (service.predictionManager.lastCommittedText.isNotEmpty()) {
+                        val lastChar = service.predictionManager.lastCommittedText.last().toString()
+                        service.predictionManager.recordInputPair(lastChar, committedText)
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    service.commitText(committedText)
+                    service.candidateState.value = service.candidateState.value.copy(
+                        inputText = "",
+                        preeditText = "",
+                        candidates = emptyList(),
+                        candidateComments = emptyList(),
+                        isComposing = false,
+                        hasNextPage = false,
+                        hasPrevPage = false,
+                        isShowingRecentClipboard = false,
+                        expandedCandidates = emptyList()
+                    )
+                }
+            } else {
+                // 引擎未产生 commit（选中后继续组句的多段场景）：刷新组合态
+                withContext(Dispatchers.Main) {
+                    service.updateUI()
+                }
+            }
+        }
+    }
+
 }
