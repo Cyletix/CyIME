@@ -136,6 +136,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (isAsciiMode != service.uiState.value.isAsciiMode) {
             FileLogger.i(XimeInputMethodService.TAG, "applyComposition: ascii ${service.uiState.value.isAsciiMode}->$isAsciiMode")
         }
+        // 展开态时刷新跨页全量候选并重置页码（编码已变化）
+        service.refreshExpandedCandidates()
         // composing 快照 → 插件（input_changed 事件；T9 与候选栏同源显示态）
         service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else inputText)
 
@@ -253,6 +255,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             candidateActions = if (isT9Schema) emptyList() else pluginActions
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
+        // 展开态时刷新跨页全量候选并重置页码（编码已变化）
+        service.refreshExpandedCandidates()
+        // 候选展开页：编码删空（候选与联想均空）时自动收起，不留空页
+        service.maybeCollapseCandidatePage()
         // composing 快照 → 插件（input_changed 事件；空编码表示本轮输入结束）
         service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else result.inputText)
 

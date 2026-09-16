@@ -97,6 +97,11 @@ data class CandidateBarCallbacks(
     val onClearAssociation: (() -> Unit)? = null,
     val onInputTextClick: (() -> Unit)? = null,
     val onAssociationSelect: ((Int) -> Unit)? = null,
+    /**
+     * 候选栏实际显示的打字候选数量变化（候选栏不滑动，只显示放得下的前若干个；
+     * 候选展开页以此数为偏移跳过已显示部分，避免重复）。
+     */
+    val onVisibleCandidateCountChanged: ((Int) -> Unit)? = null,
     // 长按候选：抛事件给宿主（键盘视图内弹确认覆盖层，不弹独立窗口——
     // 焦点型弹窗会抢焦点导致 IME 被系统收起）。
     val onCandidateLongPress: ((Int) -> Unit)? = null
@@ -106,6 +111,7 @@ data class CandidateBarCallbacks(
 fun CandidateBar(
     state: CandidateBarState,
     page: KeyboardPage = KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL),
+    candidatePageExpanded: Boolean = false,
     toolbarActions: List<ToolbarAction> = emptyList(),
     visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks,
@@ -158,6 +164,8 @@ fun CandidateBar(
     val hasAnyMore: Boolean
     val showInputTextRow: Boolean
     val showLeftIcon: Boolean
+    /** 候选栏实际显示的打字候选数（不滑动，只显示放得下的；其余候选进展开页） */
+    var visibleCandidateCount = 0
 
     when (val s = state) {
         is CandidateBarState.Idle -> {
@@ -169,6 +177,23 @@ fun CandidateBar(
         }
         is CandidateBarState.ChineseCandidates -> {
             val taken = s.candidates.take(20)
+            // 候选栏不滑动：只显示放得下的前若干个（测量贪心装填），剩余的进
+            // 候选展开页（KeyboardView 以 visibleCandidateCount 为偏移跳过已显示部分）
+            val leftSidePx = with(density) { rowPaddingPx + 32.dp.toPx() }
+            val lazyRowWidthPx = screenWidthPx - leftSidePx - rightSidePx
+            var usedPx = 0f
+            var visibleCount = 0
+            for (c in taken) {
+                val w = textMeasurer.measure(
+                    text = AnnotatedString(c),
+                    style = TextStyle(fontSize = candidateTextSize.sp)
+                ).size.width + itemPaddingPx + (if (visibleCount == 0) 0f else spacingPx)
+                if (usedPx + w <= lazyRowWidthPx) {
+                    usedPx += w
+                    visibleCount++
+                } else break
+            }
+            visibleCandidateCount = visibleCount
             displayCandidates = taken
             displayComments = s.comments
             hasAnyMore = s.hasMore
@@ -183,21 +208,21 @@ fun CandidateBar(
                             style = TextStyle(fontSize = candidateTextSize.sp)
                         ).size.width.toFloat()
                     }
-                    val leftSidePx = with(density) { rowPaddingPx + 32.dp.toPx() }
-                    val lazyRowWidthPx = screenWidthPx - leftSidePx - rightSidePx
+                    val leftPx = with(density) { rowPaddingPx + 32.dp.toPx() }
+                    val rowWidthPx = screenWidthPx - leftPx - rightSidePx
                     val regularWidthPx = taken.sumOf { c ->
                         measureText(c).toDouble() + itemPaddingPx
                     }.toFloat()
                     val dividerWidthPx = with(density) { 9.dp.toPx() }
-                    val availablePx = lazyRowWidthPx - regularWidthPx - dividerWidthPx
+                    val availablePx = rowWidthPx - regularWidthPx - dividerWidthPx
 
-                    var usedPx = 0f
+                    var used = 0f
                     val result = mutableListOf<String>()
                     for (c in s.associationCandidates) {
                         val w =
                             measureText(c) + itemPaddingPx + (if (result.isEmpty()) 0f else spacingPx)
-                        if (usedPx + w <= availablePx) {
-                            usedPx += w
+                        if (used + w <= availablePx) {
+                            used += w
                             result.add(c)
                         } else break
                     }
@@ -242,6 +267,11 @@ fun CandidateBar(
     val candidateListState = rememberLazyListState()
     LaunchedEffect(displayCandidates) {
         candidateListState.scrollToItem(0)
+    }
+
+    // 候选栏可见打字候选数变化通知宿主（展开页据此偏移，避免重复展示）
+    LaunchedEffect(visibleCandidateCount) {
+        callbacks.onVisibleCandidateCountChanged?.invoke(visibleCandidateCount)
     }
 
     // 编码气泡：候选栏内计算编码文本后回写此状态，供 Column 的 drawBehind 读取绘制。
@@ -397,6 +427,10 @@ fun CandidateBar(
             LazyRow(
                 modifier = if (state is CandidateBarState.Idle) Modifier else Modifier.weight(1f),
                 state = candidateListState,
+                // 候选栏不提供左右滑动：打字候选只显示放得下的前若干个，剩余的进
+                // 候选展开页（消除候选栏/展开页重复展示）；纯联想态仍可滑动
+                // （联想词无展开页承接）。
+                userScrollEnabled = state is CandidateBarState.AssociationOnly,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 itemsIndexed(displayCandidates, key = { index, _ -> index }) { index, candidate ->
@@ -519,7 +553,7 @@ fun CandidateBar(
                         }
                     }
                 }
-                page is KeyboardPage.Overlay && page.route is OverlayRoute.CandidatePage -> {
+                candidatePageExpanded -> {
                     if (callbacks.onBack != null) {
                         Box(
                             modifier = Modifier
