@@ -295,11 +295,19 @@ fun KeyboardView(
             val showHandwritingCandidates = (isHandwritingPage || isHandwritingLookup) && handwritingCandidates.isNotEmpty()
 
             val cs = candidateState.value
-            // 展开态候选栏数据源：全量列表（筛选态取单字子列表，仍是同源关系）
+            // 展开态候选栏数据源：全量列表（筛选态取单字子列表，仍是同源关系）。
+            // 每项携带全量原索引：筛选态过滤掉词组后位置索引 ≠ 全局索引，
+            // 点选/长按必须经 first 换算回全局索引，与展开页 globalIndices 同口径
             val railExpanded = if (expandedDataMode) {
-                if (singleCharFilter) cs.expandedCandidates.filter { it.text.length == 1 }
-                else cs.expandedCandidates.toList()
-            } else emptyList()
+                if (singleCharFilter) {
+                    cs.expandedCandidates.withIndex()
+                        .mapNotNull { (i, c) -> if (c.text.length == 1) i to c else null }
+                } else {
+                    cs.expandedCandidates.withIndex().map { it.index to it.value }
+                }
+            } else {
+                emptyList()
+            }
             val candidateBarState = remember(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
@@ -314,8 +322,8 @@ fun KeyboardView(
                     )
                 } else {
                     CandidateBarState.from(
-                        candidates = if (railExpanded.isNotEmpty()) railExpanded.map { it.text } else cs.candidates,
-                        candidateComments = if (railExpanded.isNotEmpty()) railExpanded.map { it.comment } else cs.candidateComments,
+                        candidates = if (railExpanded.isNotEmpty()) railExpanded.map { it.second.text } else cs.candidates,
+                        candidateComments = if (railExpanded.isNotEmpty()) railExpanded.map { it.second.comment } else cs.candidateComments,
                         inputText = cs.inputText,
                         preeditText = cs.preeditText,
                         isComposing = cs.isComposing,
@@ -468,24 +476,25 @@ fun KeyboardView(
                                 handwritingClearSignal++
                             }
                         } else if (expandedDataMode) {
-                            // 展开态候选栏数据源=全量列表：index 即全局索引
-                            callbacks.onGlobalCandidateSelect?.invoke(index)
-                            viewModel.setCandidatePageExpanded(false)
+                            // 展开态候选栏数据源=全量列表（筛选态为其单字子列表）：
+                            // 位置索引经 railExpanded 换算全局索引再走全局链路
+                            val globalIndex = railExpanded.getOrNull(index)?.first
+                            if (globalIndex != null) {
+                                callbacks.onGlobalCandidateSelect?.invoke(globalIndex)
+                                viewModel.setCandidatePageExpanded(false)
+                            }
                         } else {
                             callbacks.onCandidateSelect(index)
                         }
                     },
                     onCandidateLongPress = { index ->
-                        val word = if (expandedDataMode) {
-                            // 展开态数据源=全量列表：删除走全局索引链路
-                            candidateState.value.expandedCandidates.getOrNull(index)?.text
-                        } else {
-                            candidateState.value.candidates.getOrNull(index)
-                        }
+                        val railEntry = if (expandedDataMode) railExpanded.getOrNull(index) else null
+                        val word = railEntry?.second?.text
+                            ?: candidateState.value.candidates.getOrNull(index)
                         if (!word.isNullOrEmpty()) {
                             deletePending = DeletePendingWord(word) {
-                                if (expandedDataMode) {
-                                    callbacks.onGlobalCandidateDelete?.invoke(index)
+                                if (railEntry != null) {
+                                    callbacks.onGlobalCandidateDelete?.invoke(railEntry.first)
                                 } else {
                                     callbacks.onCandidateDelete?.invoke(index)
                                 }

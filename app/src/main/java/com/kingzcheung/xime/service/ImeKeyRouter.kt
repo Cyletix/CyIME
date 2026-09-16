@@ -5,6 +5,7 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import com.kingzcheung.xime.association.AssociationManager
 import com.kingzcheung.xime.keyboard.OverlayRoute
+import com.kingzcheung.xime.rime.RimeCandidate
 import com.kingzcheung.xime.rime.resolveRimeCandidateIndex
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState
@@ -921,10 +922,17 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.keyJobs.trySend(job)
     }
 
-    suspend fun selectCandidateAsync(index: Int) {
-        // 插件候选（candidate_transform 变换）：直接上屏插件文本（所见即所得），不走引擎选词。
-        // 引擎引用项继续走下方引擎路径，用映射记录的引擎索引（显示 index 因插件候选插入而错位）。
-        val pendingAction = service.candidateState.value.candidateActions.getOrNull(index)
+    suspend fun selectCandidateAsync(index: Int, expandedCandidate: RimeCandidate? = null) {
+        // 展开页点选（expandedCandidate 非空）：取词/注释以展开页显示的同一份
+        // 全量列表为准（所见即所得）。index 是全量索引，不得用于索引引擎当前页的
+        // candidates/candidateComments——部分选拼音（SELECTION 态）或候选超页时
+        // 两列表错位，全局索引套在当前页上会取错词（如点长词只上屏另一短词）。
+        // 插件候选 actions 按页内索引记录，展开页索引同样不适用，直接跳过检测。
+        val pendingAction = if (expandedCandidate == null) {
+            service.candidateState.value.candidateActions.getOrNull(index)
+        } else {
+            null
+        }
         if (pendingAction != null && pendingAction.isPluginCandidate) {
             // 防御：中英/方案切换后引擎组合已清空但 candidateState 残留旧候选+actions，
             // 此时点选必须回落原生路径（引擎侧 selectCandidate 失败自动防呆，与旧行为一致），
@@ -937,14 +945,22 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             }
         }
 
-        val selectedCandidate = if (index < service.candidateState.value.candidates.size) {
-            service.candidateState.value.candidates[index]
-        } else null
+        val selectedCandidate = expandedCandidate?.text
+            ?: if (index < service.candidateState.value.candidates.size) {
+                service.candidateState.value.candidates[index]
+            } else null
 
         val isT9 = isT9Schema(service.uiState.value.currentSchemaId)
-        val candidatePinyin = if (isT9 && index < service.candidateState.value.candidateComments.size) {
-            service.candidateState.value.candidateComments[index]
-        } else null
+        val candidatePinyin = if (isT9) {
+            expandedCandidate?.comment?.takeIf { it.isNotEmpty() }
+                ?: if (index < service.candidateState.value.candidateComments.size) {
+                    service.candidateState.value.candidateComments[index]
+                } else {
+                    null
+                }
+        } else {
+            null
+        }
 
         // 在 RIME 真正 select/commit 之前，先同步通知 T9 控制器消费数字。
         // 控制器返回 true 表示输入序列已被该候选词完整消费，服务层应视为 full commit。
@@ -1297,12 +1313,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     internal fun selectCandidateGlobal(globalIndex: Int) {
         // 点选震动反馈与候选栏同源（performKeyPressEffect），保证手感一致
         service.composeViewRef?.let { service.feedbackManager.performKeyPressEffect(view = it) }
+        // 入队前先按全局索引取全量候选：调用线程读到的 expandedCandidates 正是
+        // UI 渲染的同一份列表；入队后再取可能被编码刷新清空/重建而扑空
+        val expandedCandidate = service.candidateState.value.expandedCandidates.getOrNull(globalIndex)
         postRimeJob {
             // T9 方案的选词消费由 t9_processor 独立完成，直接调引擎 select 会
             // 遗留 [confirmed, phony] 残留组合态（见 selectCandidateAsync 注释），
-            // 降级走候选栏同款路径（全局索引近似页内索引，T9 候选页浅）。
+            // 降级走候选栏同款路径；取词/注释必须用展开页同一份全量候选——
+            // 全局索引与引擎当前页列表错位时会取错词/丢字
             if (isT9Schema(service.uiState.value.currentSchemaId)) {
-                selectCandidateAsync(globalIndex)
+                selectCandidateAsync(globalIndex, expandedCandidate)
                 return@postRimeJob
             }
             val ok = service.rimeEngine.selectCandidateByGlobalIndex(globalIndex)
