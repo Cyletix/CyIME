@@ -279,10 +279,9 @@ fun KeyboardView(
             var handwritingActiveLen by remember { mutableStateOf(0) }
             var handwritingLastSegLen by remember { mutableStateOf(0) }
 
-            // 数据源统一（展开与否即切换点）：展开态下候选栏与展开页吃同一份
-            // 全量列表（expandedCandidates，展开时服务层重新拉取）——候选栏展示
-            // 列表开头、展开页从全量第一条开始展示；非展开态候选栏保持引擎
-            // 当前页（"每页候选词数"），不全量
+            // 数据源（展开与否即切换点）：展开态下候选栏与展开页同吃全量列表
+            // （expandedCandidates，展开时服务层重新拉取）；非展开态候选栏保持
+            // 引擎当前页（"每页候选词数"）
             val expandedDataMode = candidatePageExpanded &&
                 candidateState.value.expandedCandidates.isNotEmpty()
 
@@ -621,12 +620,7 @@ fun KeyboardView(
                     if (isT9Layout && t9Controller.leftPanelState ==
                         T9InputController.LeftPanelState.SELECTION
                     ) t9Controller.firstOptions.indexOf(t9Controller.selectedOption) else -1
-                // 行分组仅作展示分组：按字符当量估算把候选贪心分行，配合 CandidatePage
-                // 的 LazyColumn 只渲染可见行。真机打点：FlexRow 全量非懒测量 356 条
-                // 耗时 348ms（展开卡顿根因），而全量拉取仅 13ms；估算偏差只改变每行
-                // 词数，行内条目 weight 均分宽度自适应拉伸，不会溢出。
-                // 展开页展示全量候选（从第一条开始，候选栏恢复按设置页大小显示 +
-                // 左右滑动，不再做"跳过候选栏已显示"的去重衔接）
+                // 展开页展示全量候选；行分组按字符当量估算，仅作展示分组
                 val rowWidthUnits = with(LocalDensity.current) {
                     ExpandedCandidatePager.rowWidthUnits(
                         screenWidthPx = LocalConfiguration.current.screenWidthDp.dp.toPx(),
@@ -1057,7 +1051,7 @@ fun KeyboardView(
                                     seg.candidates.firstOrNull()?.char
                                 }.joinToString("")
                                 if (segText.isNotEmpty()) {
-                                    // 替换式上屏：活动区整体重写为最新识别结果（微信式边写边上屏）。
+                                    // 替换式上屏：活动区整体重写为最新识别结果（边写边上屏）。
                                     // 校验失败（光标漂移）时重置尾部状态，后续识别以追加模式重建
                                     val newTail = handwritingTail.dropLast(handwritingActiveLen) + segText
                                     val ok = callbacks.onHandwritingAutoCommit?.invoke(newTail, handwritingTail) ?: false

@@ -1364,11 +1364,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
-    /**
-     * 候选展开页长按删除自造词：按跨页全局索引删除（delete_candidate）。
-     * 删除后重拉全量候选；展开页为可滚动列表，滚动位置自然保持
-     * （被删词消失、后续候选自然前移）。
-     */
+    /** 候选展开页长按删除自造词：按跨页全局索引删除，删除后重拉全量候选 */
     internal fun deleteCandidateGlobal(globalIndex: Int) {
         postRimeJob {
             val text = service.candidateState.value.expandedCandidates.getOrNull(globalIndex)?.text

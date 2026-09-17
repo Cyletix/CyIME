@@ -278,11 +278,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
-    /**
-     * 刷新展开页的跨页全量候选（可滚动列表数据源）：展开态时经 candidate_list
-     * 迭代器一次拉全量（含 comment）；非展开态清空以省内存。编码变化
-     * （applyComposition/updateUIWithResult）与用户展开动作时调用。
-     */
+    /** 刷新展开页的跨页全量候选；非展开态清空以省内存。编码变化与展开动作时调用 */
     internal fun refreshExpandedCandidates() {
         if (!keyboardViewModel.candidatePageExpanded.value) {
             if (candidateState.value.expandedCandidates.isNotEmpty()) {

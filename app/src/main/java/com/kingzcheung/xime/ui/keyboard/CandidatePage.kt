@@ -63,8 +63,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 /**
- * 候选展开页条目：候选文本 + 拼音注释 + 跨页全局索引（点选/长按直接据此路由，
- * KeyboardView 不再二次换算）。
+ * 候选展开页条目：候选文本 + 拼音注释 + 跨页全局索引。
  */
 data class CandidateEntry(
     val text: String,
@@ -75,8 +74,7 @@ data class CandidateEntry(
 /**
  * 候选展开页数据。
  *
- * @param candidateRows 行分组的候选（行分组由宿主按字符当量估算，仅作展示分组；
- *                     配合 LazyColumn 只渲染可见行——全量非懒测量是真机卡顿根因）
+ * @param candidateRows 行分组的候选（行分组仅作展示分组）
  * @param keyBackgroundColor 左右两栏按键底色（键盘按键色）；[Color.Unspecified] 时
  *                          用 textColor 半透明兜底，保证单独预览时也不失形。
  */
@@ -130,7 +128,7 @@ data class CandidatePageCallbacks(
 /** 左栏快捷符号（对齐主流输入法候选展开页的符号栏）。 */
 private val QUICK_SYMBOLS = listOf("？", "！", "……", "~")
 
-/** 性能打点开关（真机排查候选卡顿用，结论确认后移除打点代码） */
+/** 性能打点开关 */
 private const val debugPerfLogging = true
 
 /**
@@ -143,11 +141,9 @@ private const val debugPerfLogging = true
  * │ 候选/单字│                          │ │       │
  * └────────┴────────────────────────────┴───────┘
  * 左栏样式对齐数字键盘左栏：上部快捷符号键、底部"候选/单字"切换。
- * 数据源为跨页全量候选（参考 fcitx5 的 Bulk 列表模型：不做本地分页，
- * LazyColumn 惰性渲染）。
- * 收起按钮在上方候选栏右侧；编码删空时由宿主自动收起本页。
- * 翻页键 = 视口滚动一屏（上下到头自动置灰）；[pageScrollEvents] 供硬件键盘
- * DPAD 上/下联动同样的滚动。
+ * 数据源为跨页全量候选，不做本地分页；收起按钮在上方候选栏右侧；
+ * 编码删空时由宿主自动收起本页；翻页键 = 视口滚动一屏（上下到头自动置灰），
+ * [pageScrollEvents] 供硬件键盘 DPAD 上/下联动同样的滚动。
  */
 @Composable
 fun CandidatePage(
@@ -174,8 +170,7 @@ fun CandidatePage(
         Modifier.fillMaxHeight().width(state.leftRailWidthDp.dp)
     else Modifier.fillMaxHeight().width(leftRailWidth)
 
-    // 中间候选区（LazyColumn 惰性渲染，只组合可见行——真机打点全量非懒测量
-    // 356 条耗时 348ms，是展开卡顿根因）的滚动；翻页 = 滚动一屏
+    // 中间候选区滚动；翻页 = 滚动一屏
     val listState = rememberLazyListState()
     var viewportHeightPx by remember { mutableIntStateOf(0) }
     val scrollScope = rememberCoroutineScope()
@@ -291,10 +286,8 @@ fun CandidatePage(
             )
             Spacer(modifier = Modifier.width(8.dp))
 
-            // ── 中间：候选行分组列表（LazyColumn 惰性渲染，只组合可见行）。
-            // 行分组由宿主按字符当量估算（仅作展示分组，行内条目 weight 均分宽度
-            // 自适应拉伸，估算偏差只改变每行词数、不会溢出）；联想词在候选之后
-            // 随内容一并滚动。参考 fcitx5 的 Bulk 列表模型：全量数据、视口外不渲染 ──
+            // ── 中间：候选行分组列表（LazyColumn 只渲染可见行），联想词在末尾
+            // 随内容一并滚动 ──
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -446,8 +439,8 @@ fun CandidatePage(
 }
 
 /**
- * 流式候选条目：候选词与拼音注释拼进同一文本（注释用次级色 + 注释字体，对齐
- * fcitx5 的 SpannableString 方案），字号固定不缩放，超宽时省略号截断。
+ * 候选条目：候选词与拼音注释拼进同一文本（注释用次级色 + 注释字体），
+ * 字号固定不缩放，超宽时省略号截断。
  * 行内条目间竖分隔线：主候选区由行 Row 摆放（条目 weight 均分宽度），
  * 联想区仍由 FlexRow 摆放。
  */
@@ -512,9 +505,8 @@ private fun CandidatePageItem(
 }
 
 /**
- * 简化 flexbox 行布局（对齐 fcitx5 展开候选的 FlexboxLayoutManager 方案）：
- * 条目先按内容宽度贪心分行（放不下自动换行），再把每行剩余宽度均分给该行
- * 所有条目拉宽（flexGrow=1 语义），保证每行两端饱满、行尾不留空白。
+ * 简化 flexbox 行布局：条目先按内容宽度贪心分行（放不下自动换行），再把每行
+ * 剩余宽度均分给该行所有条目拉宽，保证每行两端饱满、行尾不留空白。
  * content 中的 [FlexRowDivider] 子项被摆放在其前条目与下一条目的间隙正中，
  * 行尾条目后的分隔线不绘制。
  */
