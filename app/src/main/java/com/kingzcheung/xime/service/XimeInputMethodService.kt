@@ -78,7 +78,6 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState
 import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
-import com.kingzcheung.xime.service.ExpandedCandidatePager
 import com.kingzcheung.xime.association.AssociationService
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.clipboard.sync.ClipboardSyncBridge
@@ -280,10 +279,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /**
-     * 刷新展开页的跨页全量候选（本地分页数据源）：展开态时经 candidate_list
-     * 迭代器一次拉全量（含 comment），并重置页码到第一页（编码已变化）；
-     * 非展开态清空以省内存。编码变化（applyComposition/updateUIWithResult）
-     * 与用户展开动作时调用。
+     * 刷新展开页的跨页全量候选（可滚动列表数据源）：展开态时经 candidate_list
+     * 迭代器一次拉全量（含 comment）；非展开态清空以省内存。编码变化
+     * （applyComposition/updateUIWithResult）与用户展开动作时调用。
      */
     internal fun refreshExpandedCandidates() {
         if (!keyboardViewModel.candidatePageExpanded.value) {
@@ -292,25 +290,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }
             return
         }
+        val perfT0 = android.os.SystemClock.elapsedRealtime()
         val all = rimeEngine.getAllCandidates().toList()
-        keyboardViewModel.resetExpandedPaging()
         candidateState.value = candidateState.value.copy(expandedCandidates = all)
+        android.util.Log.d(
+            "CandidatePerf",
+            "refreshExpandedCandidates: count=${all.size} cost=${android.os.SystemClock.elapsedRealtime() - perfT0}ms"
+        )
     }
 
-    /** 硬件键盘在展开态按 DPAD_DOWN：本地 pager 切下一页（行数与 UI 层同源） */
-    private fun expandedPageDown() {
-        val all = candidateState.value.expandedCandidates
-        if (all.isEmpty()) return
-        val filtered = ExpandedCandidatePager.filterIndices(all, keyboardViewModel.singleCharFilter.value)
-        val dm = resources.displayMetrics
-        val page = ExpandedCandidatePager.pageSlice(
-            filtered,
-            keyboardViewModel.expandedPageStart,
-            keyboardViewModel.expandedRowsPerPage,
-            ExpandedCandidatePager.rowWidthUnits(dm.widthPixels.toFloat(), dm.density, dm.scaledDensity),
-            all
-        )
-        if (page.hasNext) keyboardViewModel.pushExpandedPage(page.nextStart)
+    /** 硬件键盘在展开态按 DPAD_DOWN/UP：展开页滚动一屏（经事件流驱动 UI） */
+    private fun expandedPageScroll(direction: Int) {
+        keyboardViewModel.requestExpandedPageScroll(direction)
     }
     
     internal val predictionManager = PredictionManager(
@@ -1587,14 +1578,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (keyboardViewModel.candidatePageExpanded.value) {
-                        expandedPageDown(); highlightIndex.intValue = 0; return true
+                        expandedPageScroll(1); highlightIndex.intValue = 0; return true
                     }
                     if (candidateState.value.hasNextPage) { keyRouter.pageDown(); highlightIndex.intValue = 0; return true }
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     if (keyboardViewModel.candidatePageExpanded.value) {
-                        if (keyboardViewModel.popExpandedPage()) highlightIndex.intValue = 0
-                        return true
+                        expandedPageScroll(-1); highlightIndex.intValue = 0; return true
                     }
                     if (candidateState.value.hasPrevPage) { keyRouter.pageUp(); highlightIndex.intValue = 0; return true }
                 }
