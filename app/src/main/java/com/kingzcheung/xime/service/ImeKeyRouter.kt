@@ -691,13 +691,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         } else {
                             displayCandidates.map { it.text } to displayCandidates.map { it.comment }
                         }
-                        val restricted = service.isEditorRestricted()
+                        // 秘密输入框（密码/终端）禁英文联想：联想会泄漏输入前缀，
+                        // 回删替换也会破坏受限宿主的输入。NO_SUGGESTIONS 只是宿主
+                        // 不要内联补全，候选栏联想仍提供（与退格/applyComposition 路径同口径）。
+                        val secret = service.isSecretEditor()
                         service.candidateState.value = service.candidateState.value.copy(
                             inputText = capturedInputText,
                             candidates = filteredTexts,
                             candidateComments = filteredComments,
                             isComposing = capturedInputText.isNotEmpty(),
-                            associationCandidates = if (restricted || ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty())) emptyList() else service.candidateState.value.associationCandidates,
+                            associationCandidates = if (secret || ((capturedIsAscii || !service.isChineseMode) && pendingEnglish.isEmpty())) emptyList() else service.candidateState.value.associationCandidates,
                             isShowingRecentClipboard = false,
                             hasNextPage = capturedHasNext,
                             hasPrevPage = capturedHasPrev,
@@ -707,9 +710,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             FileLogger.i(XimeInputMethodService.TAG, "keyRouter UI refresh: ascii ${service.uiState.value.isAsciiMode}->$capturedIsAscii")
                         }
                         service.uiState.value = service.uiState.value.copy(isAsciiMode = capturedIsAscii)
-                        // 受限输入框（密码/终端/NO_SUGGESTIONS）不拉取英文联想：
-                        // 联想会泄漏输入前缀，回删替换机制也会破坏受限宿主的输入
-                        if (pendingEnglish.isNotEmpty() && !restricted && service.supportsEnglishCandidateReplace()) {
+                        if (pendingEnglish.isNotEmpty() && !secret && service.supportsEnglishCandidateReplace()) {
                             service.serviceScope.launch {
                                 val candidates = service.predictionManager.getEnglishAssociations(pendingEnglish, PredictionManager.MAX_ASSOCIATION_COUNT)
                                 withContext(Dispatchers.Main) {
@@ -825,7 +826,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             candidateActions = emptyList()
                         )
                     }
-                    if (service.supportsEnglishCandidateReplace()) {
+                    if (!service.isSecretEditor() && service.supportsEnglishCandidateReplace()) {
                         service.serviceScope.launch {
                             val candidates = service.predictionManager.getEnglishAssociations(newPending, PredictionManager.MAX_ASSOCIATION_COUNT)
                             withContext(Dispatchers.Main) {

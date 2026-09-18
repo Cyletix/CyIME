@@ -239,6 +239,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      *  主线程写（onStartInput）、key-processing 线程读（英文联想短路），volatile 保证可见性。 */
     @Volatile
     private var editorRestricted: Boolean = false
+    /** 秘密输入框（密码/TYPE_NULL）：英文联想与回删替换的统一禁用线 */
+    private var editorSecret: Boolean = false
     private var floatingWinX = 100
     private var floatingWinY = 300
     
@@ -1670,6 +1672,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
         // 受限输入框判定（密码/终端/NO_SUGGESTIONS）：供英文联想等补全功能短路
         editorRestricted = EditorInfoClassifier.isRestrictedEditor(attribute)
+        // 秘密输入框判定（密码/终端，不含 NO_SUGGESTIONS）：英文联想/回删替换的禁用线
+        editorSecret = EditorInfoClassifier.isSecretEditor(attribute)
 
         // 输入 target 变化：旧编辑框的 composing 区域不再可达，复位标记。
         // 防御 stale 标记导致 endComposingInputBox 对新编辑框执行 setComposingText("")
@@ -2168,6 +2172,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 英文联想等补全类功能应短路。
      */
     internal fun isEditorRestricted(): Boolean = editorRestricted
+
+    internal fun isSecretEditor(): Boolean = editorSecret
 
     /**
      * 当前宿主是否支持英文候选的"回删替换"机制。
