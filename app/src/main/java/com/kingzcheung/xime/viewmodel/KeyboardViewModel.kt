@@ -137,8 +137,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     }
 
     // ── 展开页翻页联动 ──
-    // 展开页为可滚动列表（参考 fcitx5 的 Bulk 列表模型）：全量候选铺开渲染、
-    // 超出视口即滚动，无本地分页；硬件键盘 DPAD 上/下经此事件流驱动 UI 滚动一屏。
+    // 硬件键盘 DPAD 上/下经此事件流驱动展开页滚动一屏
 
     /** 硬件键盘翻页事件：+1 向下滚一屏、-1 向上滚一屏 */
     private val _expandedPageScrollEvents = MutableSharedFlow<Int>(extraBufferCapacity = 4)
