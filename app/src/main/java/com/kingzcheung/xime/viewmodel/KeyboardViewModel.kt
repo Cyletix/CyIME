@@ -315,7 +315,11 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 // 面板（数字/符号）不应被新会话事件重置，否则输入一个数字后键盘会切回全键盘
                 if (current is KeyboardViewState.NumberPanel || current is KeyboardViewState.CommonSymbolPanel) {
                     Triple(current, _page.value, _keyboardState.value)
-                } else if (currentPage is KeyboardPage.Main && currentPage.type == MainType.HANDWRITING) {
+                } else if (currentPage is KeyboardPage.Main && currentPage.type == MainType.HANDWRITING
+                    && (action.schemaId.isEmpty() || action.schemaId == "handwriting")
+                ) {
+                    // 仅在当前确为手写方案（或方案未知）时保持手写页；事件携带其他
+                    // schemaId 说明引擎已切换，手写页是残留状态，需走下方重置切回
                     Triple(_viewState.value, currentPage, _keyboardState.value)
                 } else {
                     val kb = initialKeyboardLayoutState(action.isAsciiMode, action.schemaId)

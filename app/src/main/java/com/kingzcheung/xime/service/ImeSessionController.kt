@@ -293,12 +293,14 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             val engineSchemaId = service.rimeEngine.getCurrentSchema()
             // session 未就绪时 getCurrentSchema() 返回空串：用持久化方案兜底，
             // 避免空值覆盖已正确的 currentSchemaId/schemaName 导致键盘退化为全键盘
-            val currentSchemaId = if (isHandwritingMode) {
-                HANDWRITING_SCHEMA_ID
-            } else if (engineSchemaId.isNotEmpty()) {
-                engineSchemaId
-            } else {
-                SettingsPreferences.getCurrentSchema(context)
+            val currentSchemaId = when {
+                // 引擎已切到非手写方案时以引擎为准：键盘若仍停留手写页（部署期间
+                // fallback 的残留），钉死 handwriting 会让 UI 与引擎永久脱节，
+                // 表现为选完方案后键盘卡在手写页
+                engineSchemaId.isNotEmpty() && engineSchemaId != HANDWRITING_SCHEMA_ID -> engineSchemaId
+                isHandwritingMode -> HANDWRITING_SCHEMA_ID
+                engineSchemaId.isNotEmpty() -> engineSchemaId
+                else -> SettingsPreferences.getCurrentSchema(context)
             }
             val name = SchemaManager.getSchemaDisplayName(context, currentSchemaId)
 
