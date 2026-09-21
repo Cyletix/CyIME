@@ -99,6 +99,7 @@ import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardView
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
+import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
 import kotlin.math.roundToInt
@@ -108,7 +109,6 @@ import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.util.PreeditMergeHelper
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.keyboard.ActionExecutor
-import com.kingzcheung.xime.keyboard.HANDWRITING_SCHEMA_ID
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
 import com.kingzcheung.xime.plugin.core.api.PluginResultItem
@@ -616,7 +616,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     Log.d(TAG, "initRimeEngine: currentSchema=$currentSchema, savedSchema=$savedSchema, availableSchemas=${availableSchemas.joinToString()}")
                     
                     when {
-                        savedSchema == HANDWRITING_SCHEMA_ID -> {
+                        isHandwritingSchema(savedSchema) -> {
                             // 手写方案：不要调 rimeEngine.switchSchema（Rime 没有手写引擎），
                             // 也不要覆盖 savedSchema（由 onStartInput 恢复 UI）
                             Log.d(TAG, "initRimeEngine: savedSchema is handwriting, keeping current Rime schema")
@@ -1707,7 +1707,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 
                 val actualSchema: String
                 when {
-                    savedSchema == HANDWRITING_SCHEMA_ID -> {
+                    isHandwritingSchema(savedSchema) -> {
                         debugLog("onStartInput: saved schema is handwriting, checking model files")
                         val hwDir = com.kingzcheung.xime.model.ModelStorage.getModelDir(this, "ochwpro")
                         com.kingzcheung.xime.model.ModelStorage.migrateLegacyForModel(this, "ochwpro")
