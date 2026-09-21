@@ -7,6 +7,7 @@ import com.kingzcheung.xime.rime.buildT9DisplayState
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
+import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -297,8 +298,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 // 引擎已切到非手写方案时以引擎为准：键盘若仍停留手写页（部署期间
                 // fallback 的残留），钉死 handwriting 会让 UI 与引擎永久脱节，
                 // 表现为选完方案后键盘卡在手写页
-                engineSchemaId.isNotEmpty() && engineSchemaId != HANDWRITING_SCHEMA_ID -> engineSchemaId
-                isHandwritingMode -> HANDWRITING_SCHEMA_ID
+                engineSchemaId.isNotEmpty() && !isHandwritingSchema(engineSchemaId) -> engineSchemaId
+                // 手写页在态时报告当前持久化的手写方案 id（内置为 handwriting，
+                // 第三方手写方案报告其自身 id，方案名/图标显示才正确）
+                isHandwritingMode -> SettingsPreferences.getCurrentSchema(context)
+                    .takeIf { isHandwritingSchema(it) } ?: HANDWRITING_SCHEMA_ID
                 engineSchemaId.isNotEmpty() -> engineSchemaId
                 else -> SettingsPreferences.getCurrentSchema(context)
             }
