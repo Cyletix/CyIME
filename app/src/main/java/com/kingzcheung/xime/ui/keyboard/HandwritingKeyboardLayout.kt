@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.filled.SpaceBar
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -143,18 +144,19 @@ fun HandwritingKeyboardLayout(
 private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, background: Color, foreground: Color, modifier: Modifier) {
     val label = when (action) {
         "delete" -> "删除"; "enter" -> "回车"; "space" -> "空格"
-        "symbol" -> "符号"; "number" -> "123"; "ime_switch" -> "ABC"; else -> action
+        "symbol" -> "符号"; "number" -> "123"; "ime_switch" -> "语言切换"; else -> action
     }
-    Box(modifier.padding(2.dp).clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(background)
+    Box(modifier.padding(2.dp).clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(background).keyGlow()
         .clickable(onClick = onClick).semantics { contentDescription = label }
         .testTag("handwriting-key:$action"), contentAlignment = Alignment.Center) {
         val icon = when (action) {
             "delete" -> Icons.AutoMirrored.Filled.Backspace
             "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn
             "space" -> Icons.Default.SpaceBar
+            "ime_switch" -> Icons.Default.Language
             else -> null
         }
-        if (icon != null) Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(24.dp))
+        if (icon != null) Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
         else Text(label, color = foreground, fontSize = 18.sp, fontFamily = AppFonts.keyFontFamily)
     }
 }

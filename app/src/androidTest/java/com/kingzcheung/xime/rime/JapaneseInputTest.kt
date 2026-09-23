@@ -64,7 +64,20 @@ class JapaneseInputTest {
             val processed = result!!.get(5, java.util.concurrent.TimeUnit.SECONDS)
             assertTrue("解锁后按键正常进入方案", processed.processed)
             assertEquals("K", processed.inputText)
-            engine.clearComposition()
+            val cleared = RimeEngine.rimeLock.run {
+                lock()
+                try {
+                    executor.submit { engine.clearQueuedComposition() }.also { pending ->
+                        try {
+                            pending.get(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+                            fail("取消输入必须等待引擎锁，不能丢失清空操作")
+                        } catch (_: java.util.concurrent.TimeoutException) { }
+                    }
+                } finally { unlock() }
+            }
+            cleared.get(5, java.util.concurrent.TimeUnit.SECONDS)
+            assertEquals("解锁后取消所有编码", "", engine.getInput())
+            assertEquals("取消不应提交原始编码", "", engine.commit())
         } finally { executor.shutdownNow() }
     }
 

@@ -26,6 +26,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.CompositionLocalProvider
+import com.kingzcheung.xime.ui.keyboard.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -71,6 +73,32 @@ fun KeyEffectSettingsContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                SettingsSection(title = "按键光效", content = {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("键内炫光", style = MaterialTheme.typography.bodyLarge)
+                                Text("渐变光晕与圆角方块，半秒内淡出", style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(checked = uiState.keyGlowEnabled, onCheckedChange = viewModel::setKeyGlowEnabled)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text("点按下方按键预览", style = MaterialTheme.typography.labelMedium)
+                        CompositionLocalProvider(LocalKeyboardInputPreferences provides rememberKeyboardInputPreferences()) {
+                            Row(Modifier.fillMaxWidth().height(56.dp)) {
+                                listOf("A", "あ", "123").forEach { label ->
+                                    KeyButton(label, {}, MaterialTheme.colorScheme.secondaryContainer,
+                                        MaterialTheme.colorScheme.onSecondaryContainer, Modifier.weight(1f))
+                                }
+                                ActionKeyButton("删除", {}, MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
+                            }
+                        }
+                    }
+                })
+            }
             item {
                 SettingsSection(title = "按键音效", content = {
                     Row(

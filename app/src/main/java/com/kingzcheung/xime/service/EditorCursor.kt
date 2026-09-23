@@ -71,8 +71,16 @@ internal class EditorCursor {
         }
     }
 
-    fun move(ic: InputConnection, steps: Int, selecting: Boolean = false) {
-        if (steps == 0) return
+    /** 每一个成功的字符步长独立通知，边界和失败不产生额外触觉。 */
+    fun moveWithFeedback(ic: InputConnection, steps: Int, onStep: () -> Unit) {
+        repeat(abs(steps)) {
+            if (!move(ic, steps.compareTo(0))) return
+            onStep()
+        }
+    }
+
+    fun move(ic: InputConnection, steps: Int, selecting: Boolean = false): Boolean {
+        if (steps == 0) return false
         bind(ic)
         if (!selecting) resetSelection()
         val extracted = snapshot(ic)
@@ -92,9 +100,11 @@ internal class EditorCursor {
             // 在真实文首/文末截停，不能继续发 DPAD 让宿主把焦点移出输入框。
             val target = if (moved == abs(remaining)) extracted.startOffset + next
                 else extendedHorizontalTarget(ic, extracted, from, remaining)
-            if (target != null && setSelection(ic, target, selecting)) return
+            if (target != null && setSelection(ic, target, selecting))
+                return target != extracted.startOffset + from || collapsed
         }
         val key = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+        var moved = false
         repeat(abs(steps)) {
             val current = snapshot(ic)
             val hasSelection = current?.let { it.selectionStart != it.selectionEnd }
@@ -102,9 +112,10 @@ internal class EditorCursor {
             val adjacent = runCatching {
                 if (steps < 0) ic.getTextBeforeCursor(1, 0) else ic.getTextAfterCursor(1, 0)
             }.getOrNull()
-            if (!hasSelection && adjacent?.isEmpty() == true) return
-            sendDirection(ic, key, selecting)
+            if (!hasSelection && adjacent?.isEmpty() == true) return moved
+            moved = sendDirection(ic, key, selecting) || moved
         }
+        return moved
     }
 
     private fun extendedHorizontalTarget(ic: InputConnection, extracted: ExtractedText, from: Int, steps: Int): Int? {
@@ -181,7 +192,7 @@ internal class EditorCursor {
         }
     }
 
-    fun sendDirection(ic: InputConnection, key: Int, selecting: Boolean = false, additionalMeta: Int = 0) {
+    fun sendDirection(ic: InputConnection, key: Int, selecting: Boolean = false, additionalMeta: Int = 0): Boolean {
         bind(ic)
         if (!selecting) resetSelection()
         else snapshot(ic)?.let {
@@ -190,8 +201,9 @@ internal class EditorCursor {
             runCatching { ic.setSelection(anchor!!, active!!) }
         }
         val meta = additionalMeta or if (selecting) KeyEvent.META_SHIFT_ON else 0
-        ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, key, 0, meta))
-        ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, key, 0, meta))
+        val downAccepted = ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, key, 0, meta))
+        val upAccepted = ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, key, 0, meta))
+        return downAccepted || upAccepted
     }
 }
 

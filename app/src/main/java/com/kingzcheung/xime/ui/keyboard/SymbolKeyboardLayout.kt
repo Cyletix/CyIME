@@ -215,7 +215,7 @@ private fun SymbolButton(
             .background(
                 if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)
                 else backgroundColor
-            )
+            ).keyGlow()
             .tolerantClick(
                 showRipple = false,
                 interactionSource = interactionSource,
@@ -250,7 +250,7 @@ private fun SymbolCategoryTab(
             .background(
                 if (isSelected) selectedBackgroundColor
                 else backgroundColor
-            )
+            ).keyGlow()
             .tolerantClick(onClick = onClick)
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center

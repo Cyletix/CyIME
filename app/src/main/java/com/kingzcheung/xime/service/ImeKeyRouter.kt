@@ -1166,7 +1166,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.calculatorEngine.clear()
         updateCalculatorCandidates()
         service.t9PartialSegments.clear()
-        service.rimeEngine.clearComposition()
+        service.rimeEngine.clearQueuedComposition()
         service.candidateState.value = service.candidateState.value.copy(
             candidates = emptyList(),
             candidateComments = emptyList(),

@@ -135,7 +135,7 @@ fun SpaceKeyButton(
             .padding(LocalKeyVisualPadding.current)
             .then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor),
+            .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor).keyGlow(),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -144,7 +144,7 @@ fun SpaceKeyButton(
                 fontSize = (10f * settings.keyTextScale).sp, maxLines = 1,
                 fontFamily = AppFonts.keyFontFamily)
             Icon(Icons.Default.SpaceBar, contentDescription = "空格", tint = textColor,
-                modifier = Modifier.size(22.dp))
+                modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
         }
     }
 }

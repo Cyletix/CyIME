@@ -128,6 +128,7 @@ class VoiceRecognitionHandler(
         inputSession = getState().inputSessionId
         toolbarSession = getState().voiceSticky
         toolbarText.reset()
+        toolbarSentencePrefix = null
         lastToolbarFinal = ""
         lastPartialText = ""
 
@@ -194,6 +195,7 @@ class VoiceRecognitionHandler(
     private var toolbarSession = false
     private val toolbarText = StreamingVoiceText()
     private var lastToolbarFinal = ""
+    private var toolbarSentencePrefix: String? = null
     private var lastPartialText = ""
     private var lastAmplitudeUpdate = 0L
     private var smoothedAmplitude = 0f
@@ -215,6 +217,7 @@ class VoiceRecognitionHandler(
     fun abandonSession() {
         sessionAbandoned = true
         toolbarText.reset()
+        toolbarSentencePrefix = null
         finishing = false
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         lastPartialText = ""
@@ -226,9 +229,10 @@ class VoiceRecognitionHandler(
         if (sessionAbandoned || suppressDuplicateFinal) return
         if (toolbarSession) {
             if (lastPartialText.isNotBlank()) {
-                getInputConnection()?.let { toolbarText.update(it, addPunctuation(lastPartialText)) }
+                getInputConnection()?.let { updateToolbarText(it, normalizeVoiceText(lastPartialText)) }
             }
             toolbarText.reset()
+            toolbarSentencePrefix = null
             lastPartialText = ""
             suppressDuplicateFinal = true
             return
@@ -238,8 +242,8 @@ class VoiceRecognitionHandler(
         Log.d(TAG, "commitPendingOnRelease: ic=${ic != null}, partial='$partial', suppress=$suppressDuplicateFinal")
         if (ic == null) return
         if (partial.isEmpty()) return
-        val punctuatedText = addPunctuation(partial)
-        commitFinal(ic, punctuatedText, partial)
+        val finalText = normalizeVoiceText(partial)
+        commitFinal(ic, finalText, partial)
         suppressDuplicateFinal = true
         lastPartialText = ""
     }
@@ -311,17 +315,18 @@ class VoiceRecognitionHandler(
             return
         }
 
-        val cleanText = text.replace(" ", "")
+        val cleanText = normalizeVoiceText(text)
         if (toolbarSession) {
             // 部分引擎 stop 时重发上一句 final；没有新 partial 时只保留一次。
-            if (cleanText.isNotEmpty() && !cleanText.startsWith("错误:") &&
+            if (cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：") &&
                 !(wasFinishing && lastPartialText.isEmpty() && cleanText == lastToolbarFinal)) {
-                getInputConnection()?.let { toolbarText.update(it, addPunctuation(cleanText)) }
+                getInputConnection()?.let { updateToolbarText(it, cleanText) }
                 lastToolbarFinal = cleanText
             } else if (cleanText.isEmpty() && lastPartialText.isNotEmpty()) {
-                getInputConnection()?.let { toolbarText.update(it, addPunctuation(lastPartialText)) }
+                getInputConnection()?.let { updateToolbarText(it, normalizeVoiceText(lastPartialText)) }
             }
             toolbarText.reset()
+            toolbarSentencePrefix = null
             lastPartialText = ""
             if (wasFinishing) {
                 suppressDuplicateFinal = true
@@ -330,9 +335,8 @@ class VoiceRecognitionHandler(
             return
         }
         val ic = getInputConnection()
-        if (ic != null && cleanText.isNotEmpty() && !cleanText.startsWith("错误:")) {
-            val punctuatedText = addPunctuation(cleanText)
-            commitFinal(ic, punctuatedText, lastPartialText)
+        if (ic != null && cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：")) {
+            commitFinal(ic, cleanText, lastPartialText)
         }
         lastPartialText = ""
 
@@ -366,28 +370,20 @@ class VoiceRecognitionHandler(
         Log.d(TAG, "commitFinal: final='$finalText', partial='$partial'")
     }
     
-    private fun addPunctuation(text: String): String {
-        val cleanText = text.trim().replace(" ", "")
-        if (cleanText.isEmpty()) return text
-
-        // 若文本末尾已带句末标点（如 funasr/volc 等自带标点的后端），不再追加，避免"。。"
-        if (cleanText.last() in "。！？；：，、；：,.!?;:，") return cleanText
-
-        return "$cleanText${heuristicPunctuation(cleanText)}"
-    }
-
-    private fun heuristicPunctuation(text: String): String {
-        return when {
-            text.any { it in "吗呢么吧" } || text.contains("什么") || text.contains("怎么") || text.contains("为什么") || text.contains("如何") || text.contains("哪") -> "？"
-            text.length < 4 -> "，"
-            else -> "。"
+    // 引擎逐句返回时，只在下一句真正开始后插入一个分隔空格；句尾不留空格。
+    private fun updateToolbarText(ic: InputConnection, text: String) {
+        if (toolbarSentencePrefix == null) {
+            val preceding = if (lastToolbarFinal.isNotEmpty())
+                ic.getTextBeforeCursor(lastToolbarFinal.length, 0)?.toString() else null
+            toolbarSentencePrefix = if (preceding == lastToolbarFinal && !preceding.isNullOrEmpty()) " " else ""
         }
+        toolbarText.update(ic, toolbarSentencePrefix.orEmpty() + text)
     }
 
     private fun handlePartialResult(text: String) {
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
-        val cleanText = text.replace(" ", "")
+        val cleanText = normalizeVoiceText(text)
         if (cleanText.isEmpty() || cleanText == lastPartialText) return
         lastPartialText = cleanText
         Log.d(TAG, "Speech result (partial): $cleanText")
@@ -395,7 +391,7 @@ class VoiceRecognitionHandler(
         val ic = getInputConnection()
         if (ic != null) {
             if (toolbarSession) {
-                toolbarText.update(ic, cleanText)
+                updateToolbarText(ic, cleanText)
             } else {
                 onComposingWritten()
                 ic.setComposingText(cleanText, 1)

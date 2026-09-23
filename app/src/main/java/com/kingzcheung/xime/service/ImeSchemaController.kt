@@ -265,7 +265,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
 
     internal fun moveEditorCursorVertical(steps: Int) = editCursor { editorCursor.moveVertical(it, steps) }
 
-    internal fun moveEditorCursor(steps: Int) = editCursor { editorCursor.move(it, steps) }
+    internal fun moveEditorCursor(steps: Int, onStep: () -> Unit = {}) =
+        editCursor { editorCursor.moveWithFeedback(it, steps, onStep) }
 
     /** 已在按键队列中，不能再次排队，否则长按方向键会积压到后续操作之后。 */
     internal suspend fun moveJapaneseCursorFromKeyQueue(steps: Int) {

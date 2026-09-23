@@ -121,16 +121,16 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals(RecognitionState.PROCESSING, stateChanges.last().voiceRecognitionState)
         assertEquals(1, posted.size)
 
-        // 引擎吐出最终结果：提交增量部分（partial 已通过 composing 上屏，句号由启发式补齐）
+        // 引擎吐出最终结果：提交增量部分（partial 已通过 composing 上屏，不追加句读）
         onResult.invoke("你好世界再见")
 
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("世界再见。"), eq(1))
+        verify(mockInputConnection).commitText(eq("世界再见"), eq(1))
         assertEquals(1, voiceCompleteCount)
         // 超时兜底已被取消，手动推进不再重复提交
         assertTrue(posted.isEmpty())
         runTimeouts()
-        verify(mockInputConnection, never()).commitText(eq("你好，"), eq(1))
+        verify(mockInputConnection, never()).commitText(eq("你好"), eq(1))
         assertEquals(1, voiceCompleteCount)
     }
 
@@ -140,14 +140,14 @@ class VoiceRecognitionHandlerFinishTest {
         handler.finishRecognition()
         runTimeouts()
 
-        // 部分结果"你好"已通过 composing 上屏，兜底只补上启发式句号"，"
+        // 部分结果已实时上屏，兜底只结束 composing
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("，"), eq(1))
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         assertEquals(1, voiceCompleteCount)
 
         // 迟到的最终结果被抑制：不再写入输入框（避免重复/错乱）
         onResult.invoke("你好世界再见")
-        verify(mockInputConnection, times(1)).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         assertEquals(2, voiceCompleteCount)
     }
 
@@ -215,10 +215,10 @@ class VoiceRecognitionHandlerFinishTest {
         // 用户尚未松手，流式插件按句回调 final：该句上屏，会话必须继续
         onResult.invoke("你好")
 
-        // 提交了增量（composing 收尾 + 补句读），但不结束会话、不停止录音——
+        // 结束 composing，但不结束会话、不停止录音——
         // 若此时触发 onVoiceComplete，松手停止链即失效，录音会一直在后台运行
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("，"), eq(1))
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         verify(mockManager, never()).stopRecognition()
         assertEquals(0, voiceCompleteCount)
 
@@ -268,7 +268,7 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals(1, recordingStoppedCount)
         assertEquals(0, voiceCompleteCount)
         onResult("你好世界")
-        assertEquals("你好世界。", editor.toString())
+        assertEquals("你好世界", editor.toString())
         assertEquals(1, voiceCompleteCount)
     }
 
@@ -276,7 +276,7 @@ class VoiceRecognitionHandlerFinishTest {
         startToolbar(); onResult("完整一句")
         handler.finishRecognition(); onState(RecognitionState.IDLE)
         assertEquals(1, voiceCompleteCount)
-        assertEquals("完整一句。", editor.toString())
+        assertEquals("完整一句", editor.toString())
         assertTrue(posted.isEmpty())
     }
 
@@ -293,16 +293,16 @@ class VoiceRecognitionHandlerFinishTest {
         onPartial("你好")
         assertEquals("你好", editor.toString())
         onResult("你好世界")
-        assertEquals("你好世界。", editor.toString())
+        assertEquals("你好世界", editor.toString())
         assertEquals(0, voiceCompleteCount)
         onPartial("继续")
-        assertEquals("你好世界。继续", editor.toString())
+        assertEquals("你好世界 继续", editor.toString())
         handler.finishRecognition()
         onResult("继续说话")
-        assertEquals("你好世界。继续说话。", editor.toString())
+        assertEquals("你好世界 继续说话", editor.toString())
         assertEquals(1, voiceCompleteCount)
         repeat(2) { onResult("继续说话") }
-        assertEquals("你好世界。继续说话。", editor.toString())
+        assertEquals("你好世界 继续说话", editor.toString())
     }
 
     @Test fun `toolbar partial revisions replace only its own visible tail`() {
@@ -312,7 +312,7 @@ class VoiceRecognitionHandlerFinishTest {
         onPartial("你好世界")
         assertEquals("你好世界", editor.toString())
         handler.finishRecognition(); onResult("你好世界")
-        assertEquals("你好世界。", editor.toString())
+        assertEquals("你好世界", editor.toString())
     }
 
     @Test fun `toolbar speech preserves intervening manual text`() {
@@ -322,7 +322,7 @@ class VoiceRecognitionHandlerFinishTest {
         onPartial("你好世界")
         assertEquals("你好手动文字世界", editor.toString())
         handler.finishRecognition(); onResult("你好世界")
-        assertEquals("你好手动文字世界。", editor.toString())
+        assertEquals("你好手动文字世界", editor.toString())
         verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
     }
 
@@ -341,7 +341,7 @@ class VoiceRecognitionHandlerFinishTest {
         handler.finishRecognition()
         assertEquals(0, voiceCompleteCount)
         onResult("最终识别结果")
-        verify(mockInputConnection).commitText(eq("最终识别结果。"), eq(1))
+        verify(mockInputConnection).commitText(eq("最终识别结果"), eq(1))
         assertEquals(1, voiceCompleteCount)
     }
 
@@ -349,11 +349,11 @@ class VoiceRecognitionHandlerFinishTest {
         startToolbar()
         onResult("第一句话")
         onPartial("第二句")
-        assertEquals("第一句话。第二句", editor.toString())
+        assertEquals("第一句话 第二句", editor.toString())
         handler.finishRecognition(); runTimeouts()
-        assertEquals("第一句话。第二句，", editor.toString())
+        assertEquals("第一句话 第二句", editor.toString())
         repeat(2) { onResult("第二句话") }
-        assertEquals("第一句话。第二句，", editor.toString())
+        assertEquals("第一句话 第二句", editor.toString())
     }
 
     @Test fun `toolbar abandoning session rejects all late results`() {
@@ -372,7 +372,7 @@ class VoiceRecognitionHandlerFinishTest {
         onResult("完整的一句")
         handler.finishRecognition()
         onResult("完整的一句")
-        verify(mockInputConnection).commitText(eq("完整的一句。"), eq(1))
+        verify(mockInputConnection).commitText(eq("完整的一句"), eq(1))
     }
     @Test fun `输入会话变化后迟到语音不能写入新输入框`() {
         currentState = currentState.copy(inputSessionId = 1)
@@ -384,6 +384,29 @@ class VoiceRecognitionHandlerFinishTest {
         onResult("第一句残留最终结果")
         verify(mockInputConnection, never()).commitText(any(), anyInt())
         verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+    }
+
+    @Test fun `partial final and sequential sentences use spaces without terminal punctuation`() {
+        startToolbar()
+        onPartial("你好，world！")
+        assertEquals("你好 world", editor.toString())
+        onResult("你好，world。")
+        assertEquals("你好 world", editor.toString())
+        onPartial("How are")
+        assertEquals("你好 world How are", editor.toString())
+        handler.finishRecognition()
+        onResult("How are you？")
+        assertEquals("你好 world How are you", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `final revisions remove punctuation already present in partial without deleting words`() {
+        startToolbar()
+        onPartial("Hello, wor")
+        onPartial("Hello, world!")
+        handler.finishRecognition()
+        onResult("Hello world.")
+        assertEquals("Hello world", editor.toString())
     }
 
 }

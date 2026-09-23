@@ -31,10 +31,14 @@ class JapaneseLayoutActionsTest {
             val aa = a.fetchSemanticsNode().boundsInRoot
             val bb = b.fetchSemanticsNode().boundsInRoot
             assertEquals(aa.center.y, bb.center.y, 1f)
+            assertEquals(aa.width, bb.width, 1f)
+            assertEquals(aa.height, bb.height, 1f)
         }
         val punct = rule.onNodeWithTag("kana-punctuation").fetchSemanticsNode().boundsInRoot
         val wa = rule.onNodeWithTag("kana-key:wa").fetchSemanticsNode().boundsInRoot
         assertEquals(wa.height, punct.height, 1f)
+        assertEquals(wa.width, punct.width, 1f)
+        assertEquals(wa.width, left.first().fetchSemanticsNode().boundsInRoot.width, 1f)
         assertTrue(punct.right <= wa.left)
         rule.onNodeWithTag("kana-convert").performClick()
         assertEquals("japanese_convert", actions.last())
