@@ -33,3 +33,5 @@
 -dontwarn java.lang.management.RuntimeMXBean
 
 -processkotlinnullchecks remove
+# Kotlin configuration fields are read by sherpa-onnx JNI.
+-keep class com.k2fsa.sherpa.onnx.** { *; }

@@ -9,9 +9,9 @@ import java.io.File
 /**
  * ASR 模型管理与选择。
  *
- * 模型推理由自研的 streaming zipformer2 实现（libasr_jni.so）负责。
+ * 使用官方 sherpa-onnx；保留原市场 Zipformer，补充 ASRInput 模型和双模型选择。
  * 模型清单与描述来自「扩展商店」远程索引（[ModelManager]，category=asr），
- * 索引未加载时回退到内置默认模型（zipformer-zh-int8）。
+ * 新语音模型也有本地固定索引；索引离线时保留 Zipformer 兼容入口。
  */
 class AsrModelManager(private val context: Context) {
 
@@ -45,13 +45,13 @@ class AsrModelManager(private val context: Context) {
                 id = info.id,
                 name = info.name,
                 description = info.description,
-                language = "zh",
+                language = when (info.id) { SpeechModelCatalog.SENSEVOICE -> "auto"; SpeechModelCatalog.PARAFORMER -> "zh-en"; else -> "zh" },
                 size = version?.size ?: info.size,
                 downloadUrl = info.archiveUrl ?: "",
-                modelType = "transducer",
+                modelType = when (info.id) { SpeechModelCatalog.PARAFORMER -> "paraformer"; SpeechModelCatalog.SENSEVOICE -> "sensevoice"; else -> "transducer" },
                 files = fileNames,
                 encoderFile = "encoder.int8.onnx",
-                decoderFile = "decoder.onnx",
+                decoderFile = if (info.id == SpeechModelCatalog.PARAFORMER) "decoder.int8.onnx" else "decoder.onnx",
                 joinerFile = "joiner.int8.onnx"
             )
         }
@@ -76,17 +76,36 @@ class AsrModelManager(private val context: Context) {
     fun getAsrModels(): List<AsrModelInfo> {
         val fromIndex = ModelManager.getModelsByCategory(ModelCategory.ASR)
             .map { toAsrModelInfo(it) }
-        return if (fromIndex.isNotEmpty()) fromIndex else listOf(DEFAULT_MODEL)
+        return (fromIndex + DEFAULT_MODEL).distinctBy { it.id }
     }
 
     /** 所有 ASR 模型 id，用于判断某个 id 是否为已知 ASR 模型。 */
     fun getAsrModelIds(): Set<String> = getAsrModels().map { it.id }.toSet()
 
-    fun isModelReady(): Boolean {
-        val modelDir = getSelectedModelDir()
-        if (!modelDir.exists()) return false
-        val files = modelDir.listFiles()
-        return files != null && files.isNotEmpty()
+    fun isModelReady(): Boolean = try { selection().ready } catch (_: Exception) { false }
+
+    data class Selection(
+        val mode: String,
+        val first: AsrModelInfo?, val firstDir: File?, val secondDir: File?,
+    ) {
+        val ready: Boolean get() = (first == null || firstDir != null && first.files.isNotEmpty() && first.files.all { File(firstDir, it).let { f -> f.isFile && f.length() > 0 } }) &&
+            (secondDir == null || listOf("model.int8.onnx", "tokens.txt").all { File(secondDir, it).let { f -> f.isFile && f.length() > 0 } })
+        val key: String get() = listOfNotNull(firstDir, secondDir).joinToString(prefix = "$mode:") { dir ->
+            dir.absolutePath + ":" + dir.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }
+                .joinToString { "${it.name}:${it.length()}:${it.lastModified()}" }
+        }
+    }
+
+    fun selection(mode: String = getSelectedModelId()): Selection {
+        fun dir(id: String): File {
+            ModelStorage.migrateLegacyForModel(context, id)
+            return ModelStorage.getModelDir(context, id)
+        }
+        if (mode == SpeechModelCatalog.TWO_PASS) return Selection(mode,
+            getAsrModels().first { it.id == SpeechModelCatalog.PARAFORMER }, dir(SpeechModelCatalog.PARAFORMER), dir(SpeechModelCatalog.SENSEVOICE))
+        val info = getAsrModels().firstOrNull { it.id == mode } ?: error("不支持的语音模型：$mode")
+        return if (info.modelType == "sensevoice") Selection(mode, null, null, dir(mode))
+        else Selection(mode, info, dir(mode), null)
     }
 
     fun getSelectedModelDir(): File {
@@ -105,7 +124,7 @@ class AsrModelManager(private val context: Context) {
     /** 当前选中模型的完整信息（索引优先，兜底内置默认）。 */
     fun getSelectedModelInfo(): AsrModelInfo? {
         val modelId = getSelectedModelId()
-        return getAsrModels().find { it.id == modelId } ?: DEFAULT_MODEL
+        return getAsrModels().find { it.id == modelId }
     }
 
     fun setModel(modelId: String) {

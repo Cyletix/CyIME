@@ -34,23 +34,12 @@ class AsrInferenceClient(private val context: Context) {
     @Volatile
     private var connectLatch = CountDownLatch(1)
 
-    private val asrCallbackStub = object : IInferenceAsrCallback.Stub() {
-        private var callback: AsrCallback? = null
+    private val callbackGeneration = java.util.concurrent.atomic.AtomicLong()
 
-        fun attach(cb: AsrCallback) { callback = cb }
-        fun detach() { callback = null }
-
-        override fun onPartialResult(text: String) {
-            callback?.onPartialResult(text)
-        }
-
-        override fun onFinalResult(text: String) {
-            callback?.onFinalResult(text)
-        }
-
-        override fun onError(message: String) {
-            callback?.onError(message)
-        }
+    private fun callbackStub(callback: AsrCallback, token: Long) = object : IInferenceAsrCallback.Stub() {
+        override fun onPartialResult(text: String) { if (token == callbackGeneration.get()) callback.onPartialResult(text) }
+        override fun onFinalResult(text: String) { if (token == callbackGeneration.get()) callback.onFinalResult(text) }
+        override fun onError(message: String) { if (token == callbackGeneration.get()) callback.onError(message) }
     }
 
     private val connection = object : ServiceConnection {
@@ -112,13 +101,13 @@ class AsrInferenceClient(private val context: Context) {
         return service ?: throw IllegalStateException("AsrInferenceService not bound")
     }
 
-    suspend fun startAsr(modelDir: String, callback: AsrCallback): Boolean = withContext(Dispatchers.IO) {
+    suspend fun startAsr(modelId: String, callback: AsrCallback): Boolean = withContext(Dispatchers.IO) {
         try {
-            asrCallbackStub.attach(callback)
-            requireService().startAsr(modelDir, asrCallbackStub)
+            val token = callbackGeneration.incrementAndGet()
+            requireService().startAsr(modelId, callbackStub(callback, token))
         } catch (e: Exception) {
             FileLogger.e(TAG, "startAsr failed", e)
-            asrCallbackStub.detach()
+            callbackGeneration.incrementAndGet()
             false
         }
     }
@@ -130,12 +119,13 @@ class AsrInferenceClient(private val context: Context) {
     }
 
     suspend fun stopAsr(): String = withContext(Dispatchers.IO) {
+        val token = callbackGeneration.get()
         try {
             requireService().stopAsr()
         } catch (_: Exception) {
             ""
         } finally {
-            asrCallbackStub.detach()
+            callbackGeneration.compareAndSet(token, token + 1)
         }
     }
 
@@ -143,7 +133,7 @@ class AsrInferenceClient(private val context: Context) {
         try {
             requireService().cancelAsr()
         } catch (_: Exception) {}
-        asrCallbackStub.detach()
+        callbackGeneration.incrementAndGet()
     }
 
     suspend fun releaseAsr() {

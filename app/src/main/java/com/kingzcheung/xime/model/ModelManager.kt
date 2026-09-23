@@ -17,7 +17,8 @@ object ModelManager {
     private const val TAG = "ModelManager"
 
     private var initialized = false
-    private val _modelsFlow = kotlinx.coroutines.flow.MutableStateFlow<List<ModelInfo>>(emptyList())
+    private var remoteIndexLoaded = false
+    private val _modelsFlow = kotlinx.coroutines.flow.MutableStateFlow<List<ModelInfo>>(com.kingzcheung.xime.speech.SpeechModelCatalog.models)
     private val downloadLocks = ConcurrentHashMap<String, Mutex>()
     private val installGuards = ConcurrentHashMap<String, ModelInstallGuard>()
     private val _downloadStates = MutableStateFlow<Map<String, ModelDownloadState>>(emptyMap())
@@ -32,7 +33,7 @@ object ModelManager {
         FileLogger.i(TAG, "ModelManager initialized")
     }
 
-    /** 模型清单完全来自远程 index（xime_index.base_urls 指向的 models/index.yaml）。
+    /** 模型清单合并 CyIME 固定版本语音模型与远程 index（models/index.yaml）。
      *  以 StateFlow 内的不可变列表为唯一状态源：读方拿到的是发布时的快照，
      *  与后续刷新互不干扰（历史上共享可变列表曾被遍历方并发 clear/addAll，
      *  连点刷新触发 ConcurrentModificationException 闪退）。 */
@@ -50,12 +51,15 @@ object ModelManager {
         if (remote.isNotEmpty()) {
             FileLogger.i(TAG, "Loaded ${remote.size} models from remote index")
         } else {
-            FileLogger.w(TAG, "Remote index returned empty, no models available")
+            FileLogger.w(TAG, "Remote index returned empty, retaining the bundled speech catalog")
         }
-        if (remote.isNotEmpty()) _modelsFlow.value = remote
+        if (remote.isNotEmpty()) {
+            remoteIndexLoaded = true
+            _modelsFlow.value = (com.kingzcheung.xime.speech.SpeechModelCatalog.models + remote).distinctBy { it.id }
+        }
     }
 
-    fun isUsingRemoteIndex(): Boolean = _modelsFlow.value.isNotEmpty()
+    fun isUsingRemoteIndex(): Boolean = remoteIndexLoaded
 
     fun isModelDownloaded(context: Context, id: String): Boolean {
         val model = getModel(id) ?: return false

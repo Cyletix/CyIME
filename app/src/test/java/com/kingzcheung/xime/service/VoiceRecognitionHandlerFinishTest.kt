@@ -272,9 +272,9 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals(1, voiceCompleteCount)
     }
 
-    @Test fun `local idle after a completed sentence does not wait for timeout`() {
+    @Test fun `local empty final after a completed sentence does not wait for timeout`() {
         startToolbar(); onResult("完整一句")
-        handler.finishRecognition(); onState(RecognitionState.IDLE)
+        handler.finishRecognition(); onResult(""); onState(RecognitionState.IDLE)
         assertEquals(1, voiceCompleteCount)
         assertEquals("完整一句", editor.toString())
         assertTrue(posted.isEmpty())
@@ -409,4 +409,20 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals("Hello world", editor.toString())
     }
 
+
+    @Test fun `local idle cannot commit a preview before the final callback`() {
+        startToolbar(); onPartial("未校正预览")
+        handler.finishRecognition(); onState(RecognitionState.IDLE)
+        assertEquals(0, voiceCompleteCount)
+        onResult("已校正文本")
+        assertEquals("已校正文本", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `empty multilingual final removes its unsupported preview`() {
+        startToolbar(); onPartial("不应上屏的预览")
+        handler.finishRecognition(); onResult("")
+        assertEquals("", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
 }

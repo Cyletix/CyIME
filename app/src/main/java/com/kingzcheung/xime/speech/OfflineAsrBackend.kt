@@ -17,10 +17,11 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
         private const val TAG = "OfflineAsrBackend"
     }
 
-    override val name: String = "本地 Zipformer（离线）"
+    override val name: String get() = "本地离线语音"
 
     private val client = AsrInferenceClient(context)
-    private var initialized = false
+    @Volatile private var initialized = false
+    private val sessionGeneration = java.util.concurrent.atomic.AtomicLong()
 
     private var resultCallback: ((String) -> Unit)? = null
     private var partialResultCallback: ((String) -> Unit)? = null
@@ -67,8 +68,8 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
             try {
                 val modelManager = AsrModelManager(context)
                 if (modelManager.isModelReady()) {
-                    val modelDir = modelManager.getSelectedModelDir().absolutePath
-                    runBlocking { client.startAsr(modelDir, asrCallback) }
+                    val modelId = modelManager.getSelectedModelId()
+                    runBlocking { client.startAsr(modelId, asrCallback) }
                     runBlocking { client.stopAsr() }
                 }
             } catch (e: Exception) {
@@ -84,6 +85,7 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
 
     override fun start(): Boolean {
         if (!initialized) return false
+        sessionGeneration.incrementAndGet()
         return try {
             val modelManager = AsrModelManager(context)
             if (!modelManager.isModelReady()) {
@@ -91,11 +93,11 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
                 errorCallback?.invoke("离线语音模型未下载，请在设置中先下载")
                 return false
             }
-            // 每次会话开始都重新 startAsr：服务端会 nativeReset 并重设回调，
+            // 每次会话开始都重新 startAsr：服务端会重置语音会话并重设回调，
             // 否则 preload 预热时 stop() 清空的 callback 会导致 partial 结果丢失
             syncKeepAlive()
-            val modelDir = modelManager.getSelectedModelDir().absolutePath
-            runBlocking { client.startAsr(modelDir, asrCallback) }
+            val modelId = modelManager.getSelectedModelId()
+            runBlocking { client.startAsr(modelId, asrCallback) }
         } catch (e: InterruptedException) {
             // 快速取消竞态：stopRecognition/cancelRecognition 会 interrupt 录音线程，
             // 中断正好落在等待 :asr 绑定/模型加载的 runBlocking 上——属正常取消，不算错误，
@@ -116,6 +118,7 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
 
     override fun stop() {
         if (!initialized) return
+        val token = sessionGeneration.get()
         val text = try {
             runBlocking { client.stopAsr() }
         } catch (e: InterruptedException) {
@@ -127,19 +130,21 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
             FileLogger.e(TAG, "stop failed", e)
             ""
         }
-        if (text.isNotEmpty()) {
+        if (token == sessionGeneration.get()) {
             resultCallback?.invoke(text)
+            stateCallback?.invoke(RecognitionState.IDLE)
         }
-        stateCallback?.invoke(RecognitionState.IDLE)
     }
 
     override fun cancel() {
+        sessionGeneration.incrementAndGet()
         if (initialized) {
             client.cancelAsr()
         }
     }
 
     override fun release() {
+        sessionGeneration.incrementAndGet()
         // 语音会话结束：重置识别状态，但保持 :asr 服务绑定与模型常驻，
         // 由 AsrSupport 统一管理（关闭开关时才真正卸载）
         initialized = false

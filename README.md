@@ -1,6 +1,6 @@
 > **Cyletix fork — modified 2026-09-24.** This is [CyIME](https://github.com/Cyletix/CyIME), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/CyIME/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [identity and migration decisions](docs/cyime-identity.md).
 
-[CyIME 0.1.3 changes](docs/cyime-0.1.3.md)
+[CyIME 0.1.4 speech changes](docs/cyime-0.1.4-speech.md) · [0.1.3 keyboard changes](docs/cyime-0.1.3.md)
 
 
 <h1 align="center">CyIME</h1>
@@ -13,7 +13,7 @@
 
 CyIME is Cyletix’s independently named Android input method, developed from [Xime](https://github.com/ximeiorg/Xime) and Rime. It retains upstream attribution and GPL-3.0 licensing. The 2024 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) project is its keyboard-layout research predecessor, not the Android application.
 
-The repository is now `Cyletix/CyIME`; former `Cyletix/Xime` URLs redirect to it. Existing releases may still carry the former name. New builds use `CyIME-0.1.3-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
+The repository is now `Cyletix/CyIME`; former `Cyletix/Xime` URLs redirect to it. Existing releases may still carry the former name. New builds use `CyIME-0.1.4-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
 
 [Research findings and experimental layout](docs/cyime-keyboard-research.md) · [Naming and migration decisions](docs/cyime-identity.md)
 
@@ -63,7 +63,7 @@ An Android input method built on the [Rime](https://rime.im/) engine, designed f
 - **Rime Engine** - Powered by the mature and reliable Rime input method engine for accurate Chinese input
 - **Rich Keyboard Layouts** - QWERTY full keyboard, T9 Pinyin, Stroke 9-key, Handwriting, Numpad (with calculator)
 - **Floating Keyboard** - Floating card style with drag support, semi-transparent rounded design
-- **Voice-to-Text** - Local offline ASR (built-in streaming zipformer2 engine) plus online ASR plugins (FunAsr, Volc, etc.)
+- **Voice-to-Text** - Local offline ASR (sherpa-onnx: Zipformer, Paraformer, SenseVoice, or two-pass Paraformer + SenseVoice) plus online ASR plugins (FunAsr, Volc, etc.)
 - **AI Enhancement** - Transformer-based predictive text for faster input
 - **Clean UI** - Material Design 3, light/dark themes with multiple color schemes
 - **Keyboard Adjustment** - Adjustable keyboard height and position

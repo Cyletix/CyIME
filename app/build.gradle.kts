@@ -11,6 +11,7 @@ plugins {
 }
 
 apply(from = "build-logic/tasks-native.gradle.kts")
+apply(from = "build-logic/tasks-speech.gradle.kts")
 apply(from = "build-logic/tasks-plugin-dev.gradle.kts")
 apply(from = "build-logic/tasks-japanese.gradle.kts")
 apply(from = "build-logic/tasks-chinese.gradle.kts")
@@ -41,6 +42,7 @@ android {
     namespace = "com.kingzcheung.xime"
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/chinese-assets").get().asFile)
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/speech-assets").get().asFile)
     compileSdk = 36
 
     // JVM 单测中未 mock 的 Android 框架方法（如 android.util.Log）返回默认值而非抛异常，
@@ -53,8 +55,8 @@ android {
         applicationId = "com.kingzcheung.xime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 20261001
-        versionName = "0.1.3"
+        versionCode = 20261002
+        versionName = "0.1.4"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
