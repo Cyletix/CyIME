@@ -127,6 +127,10 @@ class VoiceRecognitionHandler(
         sessionAbandoned = false
         inputSession = getState().inputSessionId
         toolbarSession = getState().voiceSticky
+        requiresLocalFinal = SettingsPreferences.isSttUseLocal(context) &&
+            com.kingzcheung.xime.speech.AsrModelManager(context).getSelectedModelId() in setOf(
+                com.kingzcheung.xime.speech.SpeechModelCatalog.SENSEVOICE,
+                com.kingzcheung.xime.speech.SpeechModelCatalog.TWO_PASS)
         toolbarText.reset()
         toolbarSentencePrefix = null
         lastToolbarFinal = ""
@@ -193,6 +197,7 @@ class VoiceRecognitionHandler(
     }
 
     private var toolbarSession = false
+    private var requiresLocalFinal = false
     private val toolbarText = StreamingVoiceText()
     private var lastToolbarFinal = ""
     private var toolbarSentencePrefix: String? = null
@@ -273,7 +278,8 @@ class VoiceRecognitionHandler(
         // handleSpeechStateChange 过滤，直到最终结果/超时才结束
         onStateChanged(getState().copy(voiceRecognitionState = RecognitionState.PROCESSING))
         mainHandler.removeCallbacks(finishTimeoutRunnable)
-        mainHandler.postDelayed(finishTimeoutRunnable, FINISH_TIMEOUT_MS)
+        mainHandler.postDelayed(finishTimeoutRunnable,
+            if (SettingsPreferences.isSttUseLocal(context)) 8500L else FINISH_TIMEOUT_MS)
         speechRecognitionManager.stopRecognition()
         if (toolbarSession) onRecordingStopped()
     }
@@ -284,7 +290,16 @@ class VoiceRecognitionHandler(
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         Log.d(TAG, "finish timeout: committing partial result as fallback")
         // 超时未收到最终结果：提交已收到的部分结果兜底（会话已丢弃时内部直接跳过）
-        commitPendingOnRelease()
+        if (requiresLocalFinal) {
+            // Transport watchdog only: normal local stop returns a confirmed snapshot before this.
+            // Never turn Paraformer's bilingual Japanese preview into an accepted final.
+            getInputConnection()?.let { ic ->
+                if (toolbarSession) toolbarText.update(ic, "")
+                else { ic.setComposingText("", 1); ic.finishComposingText() }
+            }
+            lastPartialText = ""
+            suppressDuplicateFinal = true
+        } else commitPendingOnRelease()
         onVoiceComplete()
     }
 
@@ -322,8 +337,11 @@ class VoiceRecognitionHandler(
                 !(wasFinishing && lastPartialText.isEmpty() && cleanText == lastToolbarFinal)) {
                 getInputConnection()?.let { updateToolbarText(it, cleanText) }
                 lastToolbarFinal = cleanText
-            } else if (cleanText.isEmpty() && lastPartialText.isNotEmpty()) {
+            } else if (cleanText.isEmpty() && lastPartialText.isNotEmpty() && !SettingsPreferences.isSttUseLocal(context)) {
                 getInputConnection()?.let { updateToolbarText(it, normalizeVoiceText(lastPartialText)) }
+            }
+            if (cleanText.isEmpty() && SettingsPreferences.isSttUseLocal(context)) {
+                getInputConnection()?.let { toolbarText.update(it, "") }
             }
             toolbarText.reset()
             toolbarSentencePrefix = null
@@ -335,6 +353,9 @@ class VoiceRecognitionHandler(
             return
         }
         val ic = getInputConnection()
+        if (ic != null && cleanText.isEmpty() && SettingsPreferences.isSttUseLocal(context)) {
+            ic.setComposingText("", 1); ic.finishComposingText()
+        }
         if (ic != null && cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：")) {
             commitFinal(ic, cleanText, lastPartialText)
         }
@@ -384,7 +405,7 @@ class VoiceRecognitionHandler(
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
         val cleanText = normalizeVoiceText(text)
-        if (cleanText.isEmpty() || cleanText == lastPartialText) return
+        if (cleanText == lastPartialText) return
         lastPartialText = cleanText
         Log.d(TAG, "Speech result (partial): $cleanText")
 
@@ -411,9 +432,7 @@ class VoiceRecognitionHandler(
         }
         // 收尾等待最终结果期间，引擎 stop 产生的 IDLE 不覆盖"正在识别..."显示
         if (finishing && state == RecognitionState.IDLE) {
-            // 本地 stop() 已完成，空尾句不会再发 final；立即兜底，避免固定等满3秒。
-            // 在线插件的 IDLE 可能先于 WebSocket final，不据此丢弃尾句。
-            if (toolbarSession && SettingsPreferences.isSttUseLocal(context)) onFinishTimeout()
+            // 本地（包括空结果）都会发 final；在线 IDLE 可能先于 WebSocket final。
             return
         }
         onStateChanged(getState().copy(voiceRecognitionState = state))

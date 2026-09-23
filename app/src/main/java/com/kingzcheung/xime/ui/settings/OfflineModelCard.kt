@@ -1,147 +1,77 @@
 package com.kingzcheung.xime.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.kingzcheung.xime.model.ModelManager
+import com.kingzcheung.xime.model.*
 import com.kingzcheung.xime.speech.AsrModelManager
+import com.kingzcheung.xime.speech.SpeechModelCatalog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * 集成在语音转文本设置页内的离线模型状态卡片。
- * 模型由"模型中心"下载（filesDir/models/zipformer-zh-int8/），
- * 本卡片仅展示安装状态。
- */
+/** Download and select in the existing speech settings; selection applies to the next recording. */
 @Composable
 internal fun OfflineModelCard() {
     val context = LocalContext.current
-    val modelManager = remember { AsrModelManager(context) }
-
-    var selectedModelId by remember {
-        mutableStateOf(modelManager.getSelectedModelId())
-    }
-
-    // 模型信息来自"模型中心"远程索引；进入本页时确保索引已加载
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            ModelManager.loadFromRemote(context)
-        }
-    }
-
-    val model = modelManager.getSelectedModelInfo()
-        ?: AsrModelManager.DEFAULT_MODEL
-    val downloaded = modelManager.isModelReady()
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (downloaded)
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Icon(
-                        Icons.Default.Memory,
-                        contentDescription = null,
-                        tint = if (downloaded)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(12.dp).size(24.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "离线语音识别",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "${model.name} · ${model.size}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (downloaded) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = "已安装",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+    val manager = remember { AsrModelManager(context) }
+    val scope = rememberCoroutineScope()
+    val models by ModelManager.modelsFlow.collectAsState()
+    val downloads by ModelManager.downloadStates.collectAsState()
+    var selected by remember { mutableStateOf(manager.getSelectedModelId()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { ModelManager.loadFromRemote(context) } }
+    val choices = remember(models) { manager.getAsrModels().map { it.id } + SpeechModelCatalog.TWO_PASS }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("离线语音模型", style = MaterialTheme.typography.titleMedium)
+            Text("按停顿分段，标点转为空格。切换对下一次录音生效。", style = MaterialTheme.typography.bodyMedium)
+            choices.forEach { id ->
+                val info = manager.getAsrModels().firstOrNull { it.id == id }
+                val ids = if (id == SpeechModelCatalog.TWO_PASS)
+                    listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE) else listOf(id)
+                val state = ids.mapNotNull { downloads[it] }.filterIsInstance<ModelDownloadState.Downloading>().firstOrNull()
+                val ready = remember(id, downloads, models) { runCatching { manager.selection(id).ready }.getOrDefault(false) }
+                val title = info?.name ?: "Paraformer + SenseVoice 双模型"
+                val detail = info?.description ?: "中英流式预览，多语第二遍校正；约 455 MB，日语需等定稿，内存与耗电高于单模型。"
+                HorizontalDivider()
+                Row(Modifier.fillMaxWidth().selectable(selected = selected == id, enabled = ready, role = Role.RadioButton,
+                    onClick = { manager.setModel(id); selected = id }), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = selected == id, enabled = ready, onClick = null)
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = MaterialTheme.typography.titleSmall)
+                        Text(detail, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    if (!ready && state == null) TextButton(onClick = {
+                        error = null
+                        scope.launch {
+                            for (required in ids) {
+                                if (manager.selection(required).ready) continue
+                                val fallback = AsrModelManager.DEFAULT_MODEL
+                                val model = ModelManager.getModel(required) ?: ModelInfo(fallback.id, fallback.name,
+                                    fallback.description, ModelCategory.ASR, versions = listOf(ModelVersion(
+                                        version = "2025-06-30", size = fallback.size, archiveUrl = fallback.downloadUrl,
+                                        files = fallback.files.map { ModelFile(it, "") })))
+                                var failed = false
+                                ModelManager.downloadModel(context, model, { result ->
+                                    if (result is ModelDownloadState.Error) { error = result.message; failed = true }
+                                })
+                                if (failed) break
+                            }
+                        }
+                    }) { Text("下载") }
                 }
+                if (state != null) LinearProgressIndicator(progress = { state.progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth())
             }
-
-            Text(
-                text = if (downloaded)
-                    "本地 Zipformer 流式识别，无网络也能用，识别在独立进程运行。"
-                else
-                    "尚未安装模型，请前往「扩展商店」下载「${model.name}」。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
         }
     }
 }

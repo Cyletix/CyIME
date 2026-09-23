@@ -4,11 +4,11 @@ import android.content.Context
 import com.kingzcheung.xime.util.FileLogger
 
 /**
- * 本地 zipformer2 离线识别后端支持。
+ * 本地 sherpa-onnx 离线识别后端支持。
  *
  * 模型生命周期：
  * - 打开"使用本地模型"开关时 [warmup] 加载模型并常驻 :asr 服务；
- * - 语音时 [create] 复用该常驻后端，绝不现场加载模型；
+ * - 语音时 [create] 复用后端，切换模型后在工作线程重新加载；
  * - 关闭开关时 [releaseModel] 卸载并解绑服务。
  */
 internal object AsrSupport {
@@ -27,7 +27,7 @@ internal object AsrSupport {
         return OfflineAsrBackend(context)
     }
 
-    fun getLocalName(): String? = "本地 Zipformer"
+    fun getLocalName(): String? = "本地离线语音"
 
     /** 加载本地模型并保持 :asr 服务常驻，直到 [releaseModel]。 */
     fun warmup(context: Context) {

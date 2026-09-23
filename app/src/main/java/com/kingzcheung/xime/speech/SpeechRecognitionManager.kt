@@ -25,7 +25,7 @@ class SpeechRecognitionManager(private val context: Context) {
         private const val SPEECH_THRESHOLD = 25
 
         /** 停止时等待录音线程退出的超时：覆盖 backend.stop() 同步等待最终结果的耗时。 */
-        private const val JOIN_TIMEOUT_MS = 5000L
+        private const val JOIN_TIMEOUT_MS = 8000L
 
         /**
          * 停止后延迟释放后端的窗口：在线插件 stop() 只发送结束信号，最终结果由
@@ -40,7 +40,7 @@ class SpeechRecognitionManager(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // 会话序号：用于区分连续语音会话，防止旧会话的回收线程误释放新会话的后端
-    private var sessionId = 0
+    @Volatile private var sessionId = 0
     // 待执行的延迟释放所对应的会话序号（-1 表示无待释放）
     @Volatile
     private var pendingReleaseSession = -1
@@ -214,7 +214,7 @@ class SpeechRecognitionManager(private val context: Context) {
             }
             scheduleBackendRelease(session)
             mainHandler.post {
-                setState(RecognitionState.IDLE)
+                if (session == sessionId) setState(RecognitionState.IDLE)
             }
         }.start()
     }
@@ -248,7 +248,7 @@ class SpeechRecognitionManager(private val context: Context) {
             }
             scheduleBackendRelease(session)
             mainHandler.post {
-                setState(RecognitionState.IDLE)
+                if (session == sessionId) setState(RecognitionState.IDLE)
             }
         }.start()
     }
@@ -339,7 +339,11 @@ class SpeechRecognitionManager(private val context: Context) {
         newBackend.setCallbacks(
             onResult = { text -> handleResult(text) },
             onPartialResult = { text -> handlePartialResult(text) },
-            onStateChange = { state -> setState(state) },
+            onStateChange = { state ->
+                val token = sessionId
+                // Final text is posted first. IDLE must not overtake it on a Binder/recording thread.
+                mainHandler.post { if (token == sessionId) setState(state) }
+            },
             onError = { error -> handleError(error) }
         )
 
@@ -540,16 +544,16 @@ class SpeechRecognitionManager(private val context: Context) {
     }
 
     private fun handleResult(text: String) {
+        val token = sessionId
         mainHandler.post {
-            resultCallback?.invoke(text)
+            if (token == sessionId) resultCallback?.invoke(text)
         }
     }
 
     private fun handlePartialResult(text: String) {
+        val token = sessionId
         mainHandler.post {
-            if (text.isNotEmpty()) {
-                partialResultCallback?.invoke(text)
-            }
+            if (token == sessionId) partialResultCallback?.invoke(text)
         }
     }
 
