@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 data class ThemeUiState(
-    val darkMode: Int = 0,
-    val colorTheme: String = "lavender_purple",
+    val darkMode: Int = 1,
+    val colorTheme: String = "dynamic",
     val colorThemes: List<KeyboardColorScheme> = KeyboardThemes.themes,
 )
 

@@ -29,12 +29,24 @@ object DynamicThemes {
         return p.accent1(600) to p.accent1(200)
     }
 
+    internal fun fallback(id: String = THEME_ID, name: String = "动态配色") = KeyboardColorScheme(
+        id = id, name = name,
+        specialKeyLight = Color(0xFFD8E2FF), specialKeyDark = Color(0xFF405F91),
+        accentLight = Color(0xFF315DA8), accentDark = Color(0xFFA8C7FA),
+        primaryLight = Color(0xFF315DA8), primaryDark = Color(0xFFA8C7FA),
+        primaryContainerLight = Color(0xFFD8E2FF), primaryContainerDark = Color(0xFF284777),
+        surfaceLight = Color(0xFFF7F9FC), surfaceDark = Color(0xFF191C20),
+        keyboardBgLight = Color(0xFFF7F9FC), keyboardBgDark = Color(0xFF191C20),
+        keyBgLight = Color.White, keyBgDark = Color(0xFF2C3036),
+        candidateBarBgLight = Color(0xFFF7F9FC), candidateBarBgDark = Color(0xFF191C20),
+    )
+
     /**
      * 构建动态配色键盘主题（颜色全部来自壁纸调色板）。
-     * 不支持（< Android 12）或系统资源缺失时返回 null，调用方跳过该方案。
+     * Android 12 以下使用中性深灰/蓝色兼容配色，保留同一主题入口。
      */
     fun create(context: Context, id: String = THEME_ID, name: String = "动态配色"): KeyboardColorScheme? {
-        if (!isSupported()) return null
+        if (!isSupported()) return fallback(id, name)
         val p = SystemPalette(context)
         val accentLight = p.accent1(600)
         val accentDark = p.accent1(200)
@@ -75,7 +87,7 @@ private class SystemPalette(context: Context) {
     private val appContext = context.applicationContext
     private val cache = HashMap<String, Color>()
 
-    /** 资源缺失时的兜底色（薰衣草紫系），保证动态主题在任何设备上不崩溃。 */
+    /** 资源缺失时的兜底色（中性深灰/蓝色），保证动态主题在任何设备上不崩溃。 */
     private fun resolve(resource: String, fallback: Color): Color {
         cache[resource]?.let { return it }
         val color = try {
@@ -93,10 +105,10 @@ private class SystemPalette(context: Context) {
     }
 
     fun accent1(resource: Int): Color =
-        resolve("system_accent1_$resource", Color(0xFF8F73E2))
+        resolve("system_accent1_$resource", if (resource >= 500) Color(0xFF405F91) else Color(0xFFA8C7FA))
 
     fun neutral1(resource: Int): Color =
-        resolve("system_neutral1_$resource", Color(0xFF1C1B1F))
+        resolve("system_neutral1_$resource", Color(0xFF191C20))
 
     fun neutral2(resource: Int): Color =
         resolve("system_neutral2_$resource", Color(0xFF3C4043))

@@ -15,8 +15,7 @@ import java.io.File
  * 1. xime.yaml 嵌套 rows 解析（子数组 → 拼接 ID）
  * 2. 前端键位分组与 Rime 方案 xlit 映射串的一致性
  *
- * 三个合并键方案不作为内置方案随包提供，schema 示例文件放在 docs/schemas_examples/
- * （供市场分发/用户导入），此处一致性校验守护示例文件与前端分组不脱节。
+ * 14 键随包提供，17/18 键示例供市场分发；一致性校验守护实际方案与前端分组。
  */
 class KeyboardMergedLayoutTest {
 
@@ -226,7 +225,8 @@ class KeyboardMergedLayoutTest {
         repoFile("src/main/assets/xime.yaml").readText()
 
     private fun schemaExampleText(schemaId: String): String =
-        repoFile("docs/schemas_examples/$schemaId.schema.yaml").readText()
+        repoFile(if (schemaId == "pinyin_14jian") "src/main/assets/rime_chinese/$schemaId.schema.yaml"
+            else "docs/schemas_examples/$schemaId.schema.yaml").readText()
 
     /** 从合并键方案 schema 提取 xlit 映射：字母 → 代表字母。 */
     private fun xlitMap(schemaText: String): Map<Char, Char> {
