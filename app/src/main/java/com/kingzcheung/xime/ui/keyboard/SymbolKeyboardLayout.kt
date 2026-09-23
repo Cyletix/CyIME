@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.CompositionLocalProvider
+import com.kingzcheung.xime.keyboard.commonSymbolsFor
+import com.kingzcheung.xime.keyboard.KeyboardInputPage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.data.RecentUsageStore
@@ -57,44 +63,52 @@ fun SymbolKeyboardLayout(
     modifier: Modifier = Modifier,
     /** 分类 tab 切换与返回按钮的振动钩子（符号点击/删除经 onSelect 由调用方统一振动）。 */
     onHapticFeedback: (() -> Unit)? = null,
+    onNumber: () -> Unit,
+    shadowEnabled: Boolean = true,
+    shadowElevation: Dp = 1.dp,
+    shadowShapeRadius: Dp = 8.dp,
+    specialKeyBackgroundColor: Color = accentColor,
+    specialKeyTextColor: Color = textColor,
 ) {
     val context = LocalContext.current
-    // 最近使用（LRU）：作为第一个分类页，点击符号时置顶记录
+    // 常用在首屏；最近使用（LRU）作为紧邻分类，点击符号时置顶记录
     var recentSymbols by remember {
         mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_SYMBOLS))
     }
-    val displayCategories = remember(recentSymbols) {
-        listOf(SymbolCategory(name = "最近使用", id = "recentSymbols", symbols = recentSymbols)) +
+    val textLabel = LocalTextModeLabel.current
+    val displayCategories = remember(recentSymbols, textLabel) {
+        listOf(SymbolCategory(name = "常用", id = "common", symbols = commonSymbolsFor(textLabel)),
+            SymbolCategory(name = "最近使用", id = "recentSymbols", symbols = recentSymbols)) +
             SymbolData.categories
     }
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scope = rememberCoroutineScope()
 
     val pagerState = rememberPagerState(
-        initialPage = 0,
+        initialPage = 0, // Common symbols are always the first page, including on a fresh install.
         pageCount = { displayCategories.size }
     )
 
+    KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp)) { bodyModifier ->
+    CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(4.dp)) {
     Column(
-        modifier = modifier
+        modifier = bodyModifier
             .fillMaxWidth()
             .background(backgroundColor)
+            .padding(start = 4.dp, end = 4.dp, bottom = 8.dp)
     ) {
         // 内容区：符号网格 + HorizontalPager
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = if (isLandscape) 50.dp else 4.dp)
+                .weight(3f)
                 .padding(bottom = 4.dp)
         ) {
+            val columns = (maxWidth.value / 48f).toInt().coerceIn(6, 15)
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val category = displayCategories[page]
-                val columns = if (isLandscape) 15 else 8
 
                 if (category.symbols.isEmpty()) {
                     // 最近使用为空时的占位提示
@@ -142,29 +156,28 @@ fun SymbolKeyboardLayout(
             }
         }
 
-        // 返回固定在左下角，最近使用及其余分类从右侧依次排列。
+        // 左侧双槽位与文本/数字键盘同位；右侧仍是分类和删除。
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(44.dp)
-                .padding(horizontal = if (isLandscape) 50.dp else 4.dp, vertical = 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                .weight(1f),
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                Modifier.width(48.dp).height(40.dp).clip(RoundedCornerShape(8.dp))
-                    .background(keyBgColor).tolerantClick {
-                        onHapticFeedback?.invoke()
-                        onBack()
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "返回键盘",
-                    tint = textColor, modifier = Modifier.size(24.dp))
+            for (slot in 1..2) {
+                KeyboardModeKey(
+                    slot = slot, page = KeyboardInputPage.SYMBOLS,
+                    onKeyPress = { action -> if (action == "abc") onBack() else onNumber() },
+                    onKeyPressDown = { onHapticFeedback?.invoke() },
+                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                    modifier = Modifier.weight(0.8f),
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                    shadowShapeRadius = shadowShapeRadius,
+                )
             }
             Row(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(2.6f)
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
@@ -186,15 +199,15 @@ fun SymbolKeyboardLayout(
             ActionKeyButton(
                 text = "删除",
                 onClick = { onSelect("delete") },
-                backgroundColor = backgroundColor,
-                textColor = textColor,
-                modifier = Modifier.width(48.dp),
+                backgroundColor = specialKeyBackgroundColor,
+                textColor = specialKeyTextColor,
+                modifier = Modifier.weight(0.8f),
                 fontSize = 12.sp
             )
         }
 
-        // 底部留空（至少覆盖导航栏 inset 与键盘底部内边距）
-        Spacer(modifier = Modifier.height(bottomPaddingDp.dp))
+    }
+    }
     }
 }
 

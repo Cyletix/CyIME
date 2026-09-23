@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material3.Text
@@ -44,19 +43,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kingzcheung.xime.keyboard.KeyboardInputPage
 import com.kingzcheung.xime.util.SubcharHelper
 
-/**
- * 九宫格数字键盘布局
- * 第1行：+ | 1 | 2 | 3 | 退格
- * 第2行：- | 4 | 5 | 6 | 符号切换
- * 第3行：* | 7 | 8 | 9 | 表情
- * 第4行：ABC | / | 0 | . | 确定
- *
- * [backKeyOnLeft] 为 true 时，左下角的「符号」键与数字区底行的「返回(ABC)」键互换位置：
- * 从全键盘 ?123（位于左下角）进入数字键盘时，返回键保持在用户的进入位置；
- * 默认 false 保持九键布局习惯（符号键在最左下角）。
- */
+/** Numeric keypad; slot one opens symbols, slot two returns to the original text mode. */
 @Composable
 fun NumberKeyboardLayout(
     onKeyPress: (String) -> Unit,
@@ -75,17 +65,8 @@ fun NumberKeyboardLayout(
     onKeyPressDown: ((String) -> Unit)? = null,
     isFloatingMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
-    backKeyOnLeft: Boolean = false,
 ) {
     KeyboardKeySpacingScope(modifier) { bodyModifier ->
-
-    val configuration = LocalConfiguration.current
-    val isLandscape = !isFloatingMode && configuration.screenWidthDp > configuration.screenHeightDp
-    val commonSymbols = listOf(
-        "~", "!", "#", "$", "%", "^", "&", "?",
-        "(", ")", "_", "=", "[", "]", "{", "}",
-        "\\", "|", ";", ":", "'", "\"", "<", ">"
-    )
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
@@ -127,86 +108,8 @@ fun NumberKeyboardLayout(
                 drawContent()
                 bubbleData?.let { drawSwipeBubble(it) }
             }
-            .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp)) {
-        if (isLandscape) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(vertical = 2.dp, horizontal = 50.dp),
-            ) {
-                // 左侧：常用符号区（6列 × 4行）
-                Column(
-                    modifier = Modifier
-                        .weight(0.42f)
-                        .fillMaxHeight(),
-                ) {
-                    CompositionLocalProvider(
-                        LocalKeyVisualPadding provides PaddingValues(
-                            horizontal = keySpacingX ?: 4.dp,
-                            vertical = keySpacingY ?: 4.dp,
-                        )
-                    ) {
-                    commonSymbols.chunked(6).forEach { rowSymbols ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                        ) {
-                            rowSymbols.forEach { sym ->
-                                KeyButton(
-                                    text = sym,
-                                    onClick = { onKeyPress(sym) },
-                                    backgroundColor = keyBackgroundColor,
-                                    textColor = keyTextColor,
-                                    modifier = Modifier.weight(1f),
-                                    onPress = { onKeyPressDown?.invoke(sym) },
-                                    shadowEnabled = shadowEnabled,
-                                    shadowElevation = shadowElevation,
-                                    shadowShapeRadius = shadowShapeRadius,
-                                    fontSize = 14.sp,
-                                )
-                            }
-                            repeat(6 - rowSymbols.size) {
-                                Box(modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(0.16f))
-
-                // 右侧：数字键盘（与竖屏完全一致）
-                Box(
-                    modifier = Modifier
-                        .weight(0.42f)
-                        .fillMaxHeight()
-                ) {
-                    CompositionLocalProvider(
-                        LocalKeyVisualPadding provides PaddingValues(
-                            horizontal = keySpacingX ?: 4.dp,
-                            vertical = keySpacingY ?: 4.dp,
-                        )
-                    ) {
-                    NumberRows(
-                        onKeyPress = onKeyPress,
-                        keyBackgroundColor = keyBackgroundColor,
-                        keyTextColor = keyTextColor,
-                        specialKeyBackgroundColor = specialKeyBackgroundColor,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                        onKeyPressDown = onKeyPressDown,
-                        compactMode = true,
-                        specialKeyTextColor = specialKeyTextColor,
-                        backKeyOnLeft = backKeyOnLeft,
-                        onSwipeStateChange = ::processSwipeState
-                    )
-                    }
-                }
-            }
-        } else {
-            // 竖屏：原有布局
+    ) {
+        run {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
                     horizontal = keySpacingX ?: 4.dp,
@@ -229,7 +132,6 @@ fun NumberKeyboardLayout(
                     shadowShapeRadius = shadowShapeRadius,
                     onKeyPressDown = onKeyPressDown,
                     specialKeyTextColor = specialKeyTextColor,
-                    backKeyOnLeft = backKeyOnLeft,
                     onSwipeStateChange = ::processSwipeState
                 )
             }
@@ -254,7 +156,6 @@ private fun NumberRows(
     onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
     compactMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
-    backKeyOnLeft: Boolean = false,
 ) {
     val symFontSize = if (compactMode) 14.sp else 18.sp
     val keyFontSize = if (compactMode) 16.sp else androidx.compose.ui.unit.TextUnit.Unspecified
@@ -264,28 +165,28 @@ private fun NumberRows(
     Row(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(2.dp))
+        horizontalArrangement = Arrangement.Start
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
                 .weight(0.8f),
-            verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(if (compactMode) 2.dp else 4.dp))
+            verticalArrangement = Arrangement.Top
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
                     .weight(3f),
-                horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(2.dp))
+                horizontalArrangement = Arrangement.Start
             ) {
                 Column(
                     modifier = Modifier
 //                        .padding(vertical = 2.dp)
                         .fillMaxHeight()
                         .weight(0.8f),
-                    verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(4.dp))
+                    verticalArrangement = Arrangement.Top
                 ) {
                     Column(
                         modifier = Modifier
@@ -315,32 +216,13 @@ private fun NumberRows(
                             .fillMaxHeight()
                             .weight(1f),
                     ) {
-                        if (backKeyOnLeft) {
-                            LanguageKeyButton(
-                                icon = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowBack),
-                                onClick = { onKeyPress("abc") },
-                                backgroundColor = specialKeyBackgroundColor,
-                                iconColor = specialKeyTextColor,
-                                modifier = Modifier.weight(1f),
-                                onPress = { onKeyPressDown?.invoke("abc") },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                            )
-                        } else {
-                            KeyButton(
-                                text = "符号",
-                                onClick = { onKeyPress("symbol") },
-                                backgroundColor = specialKeyBackgroundColor,
-                                textColor = specialKeyTextColor,
-                                modifier = Modifier.weight(1f),
-                                onPress = { onKeyPressDown?.invoke("symbol") },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                                fontSize = ctrlFontSize,
-                            )
-                        }
+                        KeyboardModeKey(
+                            slot = 1, page = KeyboardInputPage.NUMBERS, onKeyPress = onKeyPress,
+                            backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                            modifier = Modifier.weight(1f), onKeyPressDown = onKeyPressDown,
+                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                            shadowShapeRadius = shadowShapeRadius,
+                        )
                     }
 
                 }
@@ -427,38 +309,19 @@ private fun NumberRows(
                     ) {
 
 
-                        if (backKeyOnLeft) {
-                            KeyButton(
-                                text = "符号",
-                                onClick = { onKeyPress("symbol") },
-                                backgroundColor = specialKeyBackgroundColor,
-                                textColor = specialKeyTextColor,
-                                modifier = Modifier.weight(1f),
-                                onPress = { onKeyPressDown?.invoke("symbol") },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                                fontSize = ctrlFontSize,
-                            )
-                        } else {
-                            LanguageKeyButton(
-                                icon = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowBack),
-                                onClick = { onKeyPress("abc") },
-                                backgroundColor = specialKeyBackgroundColor,
-                                iconColor = specialKeyTextColor,
-                                modifier = Modifier.weight(1f),
-                                onPress = { onKeyPressDown?.invoke("abc") },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                            )
-                        }
+                        KeyboardModeKey(
+                            slot = 2, page = KeyboardInputPage.NUMBERS, onKeyPress = onKeyPress,
+                            backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                            modifier = Modifier.weight(0.8f), onKeyPressDown = onKeyPressDown,
+                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                            shadowShapeRadius = shadowShapeRadius,
+                        )
                         KeyButton(
                             text = "0",
                             onClick = { onKeyPress("0") },
                             backgroundColor = keyBackgroundColor,
                             textColor = keyTextColor,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1.8f),
                             onPress = { onKeyPressDown?.invoke("0") },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
@@ -470,7 +333,7 @@ private fun NumberRows(
                             onClick = { onKeyPress(".") },
                             backgroundColor = keyBackgroundColor,
                             textColor = keyTextColor,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(0.8f),
                             onPress = { onKeyPressDown?.invoke(".") },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,

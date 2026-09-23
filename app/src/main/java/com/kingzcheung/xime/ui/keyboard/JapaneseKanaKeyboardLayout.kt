@@ -79,7 +79,7 @@ fun JapaneseKanaKeyboardLayout(
                     onPress = { onKeyPressDown?.invoke("japanese_left") }, shadowEnabled = shadowEnabled)
                 KeyButton("123", { onKeyPress("mode_change_number") }, specialKeyBackgroundColor, specialKeyTextColor,
                     Modifier.weight(1f).testTag("kana-number"), onPress = { onKeyPressDown?.invoke("number") }, fontSize = KeyboardKeyMetrics.LabelSize, shadowEnabled = shadowEnabled)
-                KeyButton("記号", { onKeyPress("mode_change_common_symbol") }, specialKeyBackgroundColor, specialKeyTextColor,
+                KeyButton("記号", { onKeyPress("symbol") }, specialKeyBackgroundColor, specialKeyTextColor,
                     Modifier.weight(1f).testTag("kana-symbol"), fontSize = KeyboardKeyMetrics.LabelSize, onPress = { onKeyPressDown?.invoke("symbol") }, shadowEnabled = shadowEnabled)
             }
             Column(Modifier.weight(3f).fillMaxHeight()) {

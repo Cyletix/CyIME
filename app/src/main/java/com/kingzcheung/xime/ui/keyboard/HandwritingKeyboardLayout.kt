@@ -93,9 +93,9 @@ fun HandwritingKeyboardLayout(
     }
 
     // 实际布局就是触摸边界：左侧书写区与底部按键、右侧按键互不覆盖。
-    Row(bodyModifier.fillMaxSize().testTag("handwriting-panel").padding(bottom = bottomPaddingDp.dp)) {
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            Canvas(Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("handwriting-canvas")
+    Row(bodyModifier.fillMaxSize().testTag("handwriting-panel").padding(start = 4.dp, end = 4.dp, bottom = (8 + bottomPaddingDp).dp)) {
+        Column(Modifier.weight(4.2f).fillMaxHeight()) {
+            Canvas(Modifier.weight(3f).fillMaxWidth().clipToBounds().testTag("handwriting-canvas")
                 .semantics { contentDescription = "手写区域"; stateDescription = session.phase.description }
                 .pointerInput(session) {
                     awaitEachGesture {
@@ -120,8 +120,8 @@ fun HandwritingKeyboardLayout(
                 }) {
                 renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), keyTextColor)
             }
-            Row(Modifier.fillMaxWidth().height(48.dp)) {
-                listOf("symbol" to 1f, "number" to 0.7f, "space" to 1.8f, "ime_switch" to 0.7f).forEach { (action, weight) ->
+            Row(Modifier.fillMaxWidth().weight(1f)) {
+                listOf("symbol" to 0.8f, "number" to 0.8f, "space" to 1.8f, "ime_switch" to 0.8f).forEach { (action, weight) ->
                     HandwritingFunctionKey(action, { press(action) },
                         if (action == "space") keyBackgroundColor else specialKeyBackgroundColor,
                         if (action == "space") keyTextColor else specialKeyTextColor,
@@ -129,7 +129,7 @@ fun HandwritingKeyboardLayout(
                 }
             }
         }
-        Column(Modifier.width(56.dp).fillMaxHeight()) {
+        Column(Modifier.weight(0.8f).fillMaxHeight()) {
             listOf("delete", "，", "。", "enter").forEach { action ->
                 val special = action == "delete" || action == "enter"
                 HandwritingFunctionKey(action, { press(action) },
@@ -146,7 +146,7 @@ fun HandwritingKeyboardLayout(
 private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, background: Color, foreground: Color, modifier: Modifier) {
     val label = when (action) {
         "delete" -> "删除"; "enter" -> "回车"; "space" -> "空格"
-        "symbol" -> "符号"; "number" -> "123"; "ime_switch" -> "语言切换"; else -> action
+        "symbol" -> "!@#"; "number" -> "123"; "ime_switch" -> "语言切换"; else -> action
     }
     val enter = LocalEnterKeyColors.current.takeIf { action == "enter" }
     val keyBackground = enter?.background ?: background

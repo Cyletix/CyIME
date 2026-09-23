@@ -257,7 +257,7 @@ private fun T9KeyboardSwipeOverlay(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = 2.dp, horizontal = 50.dp),
+                        .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
                 ) {
                     T9KeyboardContent(
                         onKeyPress = onKeyPress,
@@ -518,17 +518,11 @@ private fun T9KeyboardContent(
                 }
             }
 
-            KeyButton(
-                text = "符号",
-                onClick = { onKeyPress("symbol") },
-                backgroundColor = specialKeyBackgroundColor,
-                textColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f).testTag("t9-symbol-key"),
-                onPress = { onKeyPressDown?.invoke("symbol") },
-                shadowEnabled = shadowEnabled,
-                shadowElevation = shadowElevation,
-                shadowShapeRadius = shadowShapeRadius,
-                fontSize = ctrlFontSize,
+            KeyboardModeKey(
+                slot = 1, onKeyPress = onKeyPress,
+                backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                modifier = Modifier.fillMaxWidth().weight(1f), onKeyPressDown = onKeyPressDown,
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
             )
         }
 
@@ -683,11 +677,10 @@ private fun T9KeyboardContent(
                 )
             }
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                KeyButton(
-                    text = "123", onClick = { onKeyPress("number") },
+                KeyboardModeKey(
+                    slot = 2, onKeyPress = onKeyPress,
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("mode_change") },
+                    modifier = Modifier.weight(0.8f), onKeyPressDown = onKeyPressDown,
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
                 T9SpaceKey(
@@ -703,7 +696,7 @@ private fun T9KeyboardContent(
                     icon = rememberVectorPainter(Icons.Default.Language),
                     onClick = { onKeyPress("ime_switch") },
                     backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(0.8f),
                     onPress = { onKeyPressDown?.invoke("ime_switch") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )

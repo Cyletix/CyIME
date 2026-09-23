@@ -561,33 +561,24 @@ fun KeyboardLayout(
                         if (isVoiceMode && !isVoiceSticky) {
                             DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(1.2f)
+                                modifier = Modifier.weight(2.24f)
                             )
                             DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
                                 modifier = Modifier.weight(0.8f)
                             )
                         } else {
-                            // ?123 — 硬编码（长按弹出 t9/t26 图标）
-                            SwipeableKeyButton(
-                                text = "?123",
-                                onClick = { onKeyPress("mode_change") },
-                                backgroundColor = specialKeyBackgroundColor,
-                                textColor = specialKeyTextColor,
-                                modifier = Modifier.weight(1.2f),
-                                onPress = { onKeyPressDown?.invoke("mode_change") },
-                                onRelease = { onKeyRelease?.invoke("mode_change") },
-                                onLongPressSelect = { label -> onKeyPress(if (label == "number") "mode_change_number" else "mode_change_common_symbol") },
-                                longPressItems = listOf("number", "common_symbol"),
-                                longPressDrawableIds = listOf(
-                                    com.kingzcheung.xime.R.drawable.t9,
-                                    com.kingzcheung.xime.R.drawable.t26
-                                ),
-                                onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                            )
+                            for (slot in 1..2) {
+                                KeyboardModeKey(
+                                    slot = slot, onKeyPress = onKeyPress,
+                                    backgroundColor = specialKeyBackgroundColor,
+                                    textColor = specialKeyTextColor,
+                                    modifier = Modifier.weight(1.12f),
+                                    onKeyPressDown = onKeyPressDown,
+                                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                                    shadowShapeRadius = shadowShapeRadius,
+                                )
+                            }
 
                             // 逗号 — 从配置读取 "'"
                             val k2KeyGesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
@@ -709,7 +700,7 @@ fun KeyboardLayout(
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
-                            modifier = Modifier.weight(3f),
+                            modifier = Modifier.weight(1.96f),
                             onKeyPress = onKeyPress,
                             onKeyPressDown = onKeyPressDown,
                             onKeyRelease = onKeyRelease,
@@ -1290,15 +1281,14 @@ private fun SplitKeyboardContent(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(vertical = 2.dp, horizontal = 4.dp)
+                .padding(start = 4.dp, end = 4.dp, bottom = 8.dp)
                 .testTag("split-keyboard")
         ) {
         // ========== 左面板 ==========
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .weight(0.45f)
-                .padding(start = 4.dp),
+                .weight(0.45f),
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 KeyboardRowWithConfig(
@@ -1356,41 +1346,10 @@ private fun SplitKeyboardContent(
                     onSwipeStateChange = onSwipeStateChange,
                 )
             }
-            Box(
+            Row(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = staggerStep * 2)
-            ) {
-                KeyboardRowWithConfig(
-                    keys = row2Left,
-                    onKeyPress = onKeyPress,
-                    config = KeyboardRowConfig(
-                        keyBackgroundColor = keyBackgroundColor,
-                        keyTextColor = keyTextColor,
-                        keyboardBackgroundColor = keyboardBackgroundColor,
-                        fontSize = landscapeFontSize,
-                        swipeFontSize = landscapeSwipeFontSize,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    ),
-                    isShifted = isShifted,
-                    isAsciiMode = isAsciiMode,
-                    configVersion = configVersion,
-                    onKeyPressDown = onKeyPressDown,
-                    onKeyRelease = onKeyRelease,
-                    swipeDownHintsEnabled = swipeDownHintsEnabled,
-                    swipeUpHintsEnabled = swipeUpHintsEnabled,
-                    onCommitText = onCommitText,
-                    onGestureAction = onGestureAction,
-                    onSwipeStateChange = onSwipeStateChange,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(4.dp)),
             ) {
                 ShiftCapsKeyButton(
                     shiftMode = shiftMode,
@@ -1399,66 +1358,55 @@ private fun SplitKeyboardContent(
                     backgroundColor = specialKeyBackgroundColor,
                     iconColor = specialKeyTextColor,
                     modifier = Modifier.weight(1.2f),
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    )
-                    val k2Gesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
-                    val k2Action = k2Gesture?.tap?.action
-                    val k2Tap = k2Gesture?.tap?.value?.takeIf { it.isNotEmpty() }
-                        ?: k2Gesture?.tap?.label?.takeIf { it.isNotEmpty() }
-                        ?: "，"
-                    val k2SwipeValue = k2Gesture?.swipeUp?.value?.takeIf { it.isNotEmpty() } ?: "。"
-                    val k2SwipeLabel = if (isAsciiMode) k2SwipeValue
-                        else (k2Gesture?.swipeUp?.label?.takeIf { it.isNotEmpty() } ?: k2SwipeValue)
-                    val k2Swipe = k2SwipeValue
-                    if (k2Action == GestureAction.TOGGLE_ASCII) {
-                        LanguageKeyButton(
-                            icon = rememberVectorPainter(Icons.Default.Language),
-                            onClick = {
-                                onGestureAction.invoke(k2Action, k2Tap)
-                            },
-                            backgroundColor = specialKeyBackgroundColor,
-                            iconColor = specialKeyTextColor,
-                            modifier = Modifier.weight(0.8f),
-                            onPress = { onKeyPressDown?.invoke(k2Swipe) },
-                            swipeText = k2SwipeLabel,
-                            swipeDownText = k2Gesture?.swipeDown?.let { it.label.ifEmpty { it.value } },
-                            onSwipe = swipeHandlerFor(k2Gesture?.swipeUp, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                            onSwipeDown = swipeHandlerFor(k2Gesture?.swipeDown, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                            onSwipeStateChange = onSwipeStateChange,
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                        )
-                    } else {
-                        SwipeableKeyButtonLandscape(
-                            text = k2Tap,
-                            onClick = {
-                                if (k2Action != null && k2Action != GestureAction.COMMIT) {
-                                    onGestureAction?.invoke(k2Action, k2Tap)
-                                } else {
-                                    onKeyPress(k2Tap)
-                                }
-                            },
-                            backgroundColor = keyBackgroundColor,
-                            textColor = keyTextColor,
-                            modifier = Modifier.weight(0.8f),
-                            swipeText = k2Swipe,
+                    shadowEnabled = shadowEnabled,
+                    shadowElevation = shadowElevation,
+                    shadowShapeRadius = shadowShapeRadius,
+                )
+                Box(Modifier.weight(4f)) {
+                    KeyboardRowWithConfig(
+                        keys = row2Left,
+                        onKeyPress = onKeyPress,
+                        config = KeyboardRowConfig(
+                            keyBackgroundColor = keyBackgroundColor,
+                            keyTextColor = keyTextColor,
+                            keyboardBackgroundColor = keyboardBackgroundColor,
+                            fontSize = landscapeFontSize,
                             swipeFontSize = landscapeSwipeFontSize,
-                            onSwipe = { onKeyPress(it) },
-                            onPress = { onKeyPressDown?.invoke(k2Swipe) },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
-                        )
-                    }
+                        ),
+                        isShifted = isShifted,
+                        isAsciiMode = isAsciiMode,
+                        configVersion = configVersion,
+                        onKeyPressDown = onKeyPressDown,
+                        onKeyRelease = onKeyRelease,
+                        swipeDownHintsEnabled = swipeDownHintsEnabled,
+                        swipeUpHintsEnabled = swipeUpHintsEnabled,
+                        onCommitText = onCommitText,
+                        onGestureAction = onGestureAction,
+                        onSwipeStateChange = onSwipeStateChange,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
+                for (slot in 1..2) {
+                    KeyboardModeKey(slot = slot, onKeyPress = onKeyPress,
+                        backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                        modifier = Modifier.weight(16f), onKeyPressDown = onKeyPressDown,
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                        shadowShapeRadius = shadowShapeRadius)
+                }
                 SplitSpaceKey(
                     onClick = { onKeyPress("space") },
                     backgroundColor = keyBackgroundColor,
                     textColor = keyTextColor,
                     schemaName = if (isAsciiMode) "英文" else schemaName,
-                    modifier = Modifier.weight(3f),
+                    modifier = Modifier.weight(13f),
                     onPress = { onKeyPressDown?.invoke("space") },
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
@@ -1474,8 +1422,7 @@ private fun SplitKeyboardContent(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .weight(0.45f)
-                .padding(end = 4.dp),
+                .weight(0.45f),
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 KeyboardRowWithConfig(
@@ -1598,25 +1545,56 @@ private fun SplitKeyboardContent(
                     shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius,
                 )
-                SwipeableKeyButton(
-                    text = "?123",
-                    onClick = { onKeyPress("mode_change") },
-                    backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor,
-                    modifier = Modifier.weight(1.2f),
-                    onPress = { onKeyPressDown?.invoke("mode_change") },
-                    onRelease = { onKeyRelease?.invoke("mode_change") },
-                    onLongPressSelect = { label -> onKeyPress(if (label == "number") "mode_change_number" else "mode_change_common_symbol") },
-                    longPressItems = listOf("number", "common_symbol"),
-                    longPressDrawableIds = listOf(
-                        com.kingzcheung.xime.R.drawable.t9,
-                        com.kingzcheung.xime.R.drawable.t26
-                    ),
-                    onSwipeStateChange = onSwipeStateChange,
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                )
+                    val k2Gesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
+                    val k2Action = k2Gesture?.tap?.action
+                    val k2Tap = k2Gesture?.tap?.value?.takeIf { it.isNotEmpty() }
+                        ?: k2Gesture?.tap?.label?.takeIf { it.isNotEmpty() }
+                        ?: "，"
+                    val k2SwipeValue = k2Gesture?.swipeUp?.value?.takeIf { it.isNotEmpty() } ?: "。"
+                    val k2SwipeLabel = if (isAsciiMode) k2SwipeValue
+                        else (k2Gesture?.swipeUp?.label?.takeIf { it.isNotEmpty() } ?: k2SwipeValue)
+                    val k2Swipe = k2SwipeValue
+                    if (k2Action == GestureAction.TOGGLE_ASCII) {
+                        LanguageKeyButton(
+                            icon = rememberVectorPainter(Icons.Default.Language),
+                            onClick = {
+                                onGestureAction.invoke(k2Action, k2Tap)
+                            },
+                            backgroundColor = specialKeyBackgroundColor,
+                            iconColor = specialKeyTextColor,
+                            modifier = Modifier.weight(1.2f),
+                            onPress = { onKeyPressDown?.invoke(k2Swipe) },
+                            swipeText = k2SwipeLabel,
+                            swipeDownText = k2Gesture?.swipeDown?.let { it.label.ifEmpty { it.value } },
+                            onSwipe = swipeHandlerFor(k2Gesture?.swipeUp, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
+                            onSwipeDown = swipeHandlerFor(k2Gesture?.swipeDown, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
+                            onSwipeStateChange = onSwipeStateChange,
+                            shadowEnabled = shadowEnabled,
+                            shadowElevation = shadowElevation,
+                            shadowShapeRadius = shadowShapeRadius,
+                        )
+                    } else {
+                        SwipeableKeyButtonLandscape(
+                            text = k2Tap,
+                            onClick = {
+                                if (k2Action != null && k2Action != GestureAction.COMMIT) {
+                                    onGestureAction?.invoke(k2Action, k2Tap)
+                                } else {
+                                    onKeyPress(k2Tap)
+                                }
+                            },
+                            backgroundColor = keyBackgroundColor,
+                            textColor = keyTextColor,
+                            modifier = Modifier.weight(1.2f),
+                            swipeText = k2Swipe,
+                            swipeFontSize = landscapeSwipeFontSize,
+                            onSwipe = { onKeyPress(it) },
+                            onPress = { onKeyPressDown?.invoke(k2Swipe) },
+                            shadowEnabled = shadowEnabled,
+                            shadowElevation = shadowElevation,
+                            shadowShapeRadius = shadowShapeRadius,
+                        )
+                    }
                 val k4Gesture = KeysConfigHelper.getKeyGesture("earth", isAsciiMode)
                 val k4Action = k4Gesture?.tap?.action
                 val k4Value = k4Gesture?.tap?.value?.takeIf { it.isNotEmpty() } ?: k4Gesture?.tap?.label?.takeIf { it.isNotEmpty() } ?: "ime_switch"
