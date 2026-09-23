@@ -134,6 +134,8 @@ class FeedbackManager(private val context: Context) {
     }
 
     fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false, type: KeyFeedbackType = KeyFeedbackType.CHARACTER) {
+        // 未开启松手反馈时，不必读取系统触觉设置。
+        if (keyUp && !hapticOnKeyUp) return
         when (hapticMode) {
             HapticMode.Enabled -> {}
             HapticMode.Disabled -> return
@@ -150,7 +152,6 @@ class FeedbackManager(private val context: Context) {
                 if (!systemEnabled) return
             }
         }
-        if (keyUp && !hapticOnKeyUp) return
 
         val duration = if (longPress) longPressDuration else pressDuration
         val amplitude = if (longPress) longPressAmplitude else pressAmplitude

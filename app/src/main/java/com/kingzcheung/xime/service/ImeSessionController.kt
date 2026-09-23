@@ -66,10 +66,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 inputText.isEmpty() -> ""
                 else -> service.candidateState.value.preeditText
             }
-            FileLogger.i(
-                XimeInputMethodService.TAG,
+            FileLogger.i(XimeInputMethodService.TAG) {
                 "T9 display: enginePreedit='$preeditText' rawPreedit='$rawPreedit' input='$inputText' partials=${service.t9PartialSegments.size}"
-            )
+            }
             // preedit 转换由 C++ t9_filter 完成，Kotlin 侧直接使用引擎输出的 preedit
             val display = buildT9DisplayState(
                 service.t9PartialSegments.map { it.text }, rawPreedit, inputText, t9FilteredTexts, t9FilteredComments

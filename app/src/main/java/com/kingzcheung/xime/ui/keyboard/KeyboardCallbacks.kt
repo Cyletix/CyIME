@@ -10,6 +10,11 @@ data class KeyboardCallbacks(
     val onKeyPressDown: ((String) -> Unit)? = null,
     val onKeyRelease: ((String) -> Unit)? = null,
     val onCandidateSelect: (Int) -> Unit,
+    val onOpenPreeditEditor: (((com.kingzcheung.xime.rime.PinyinEditSession?) -> Unit) -> Unit)? = null,
+    val onApplyPreeditEdit: ((com.kingzcheung.xime.rime.PinyinEditSession, String, Int, (Boolean) -> Unit) -> Unit)? = null,
+    var onT9RefreshAfterPreeditEdit: (() -> Unit)? = null,
+    /** Installed by the visible editor; the IME service consumes Back before hiding. */
+    var onDismissPreeditEditor: (() -> Unit)? = null,
     // 长按候选删除自造词：index 为候选栏显示索引（候选栏→服务层透传）
     val onCandidateDelete: ((Int) -> Unit)? = null,
     /**

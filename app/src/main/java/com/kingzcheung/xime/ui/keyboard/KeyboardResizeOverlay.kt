@@ -23,6 +23,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.VerticalAlignBottom
+import androidx.compose.material.icons.filled.HorizontalSplit
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
@@ -77,6 +81,10 @@ fun KeyboardResizeOverlay(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     onFloatingModeChange: ((Boolean) -> Unit)? = null,
+    isSplitKeyboard: Boolean = false,
+    onSplitKeyboardChange: ((Boolean) -> Unit)? = null,
+    onPositionDrag: ((Float, Float) -> Unit)? = null,
+    onPositionDragEnd: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -94,6 +102,7 @@ fun KeyboardResizeOverlay(
     var currentHeightDp by remember { mutableFloatStateOf(safeInitialHeightDp.toFloat()) }
     var currentBottomPaddingDpState by remember { mutableFloatStateOf(currentBottomPaddingDp.toFloat()) }
     var floatingMode by remember(isFloatingMode) { mutableStateOf(isFloatingMode) }
+    var splitMode by remember(isSplitKeyboard) { mutableStateOf(isSplitKeyboard) }
     var opacity by remember { mutableFloatStateOf(initialOpacity.coerceIn(0.3f, 1f)) }
     if (LocalOnBackPressedDispatcherOwner.current != null) {
         BackHandler(onBack = onCancel)
@@ -102,6 +111,8 @@ fun KeyboardResizeOverlay(
     val currentOnHeightChange by rememberUpdatedState(onHeightChange)
     val currentOnBottomPaddingChange by rememberUpdatedState(onBottomPaddingChange)
     val currentOnReset by rememberUpdatedState(onReset)
+    val currentPositionDrag by rememberUpdatedState(onPositionDrag)
+    val currentPositionDragEnd by rememberUpdatedState(onPositionDragEnd)
 
     BoxWithConstraints(
         modifier = modifier
@@ -114,12 +125,18 @@ fun KeyboardResizeOverlay(
             )
     ) {
         val compact = maxHeight < 190.dp
-        val singleLineControls = maxHeight < 160.dp
+        val stackedModeButtons = onSplitKeyboardChange != null && maxWidth < 420.dp
+        val singleLineControls = maxHeight < 160.dp || (stackedModeButtons && compact)
         val controlScale = minOf(maxWidth.value / 360f, maxHeight.value / 260f).coerceIn(1f, 1.25f)
         val textSize = (16f * controlScale).sp
+        // Convert the actual font size before multiplying ems: Android nonlinear scaling
+        // maps 16sp to 20.2dp at 1.3x, but (16sp * 2.25) to only 36dp, clipping two glyphs.
+        val modeLabelWidth = with(density) { textSize.toDp() } * 2.25f
         val actionSize = if (controlScale > 1.15f) 56.dp else 48.dp
         val iconSize = (24f * controlScale).dp
-        val handleHeight = if (compact) 24.dp else 32.dp
+        val handleHeight = if (compact) 40.dp else 48.dp
+        val modeStackGap = if (compact) 2.dp else 4.dp
+        val bottomInset = if (compact && stackedModeButtons) 2.dp else if (compact) 4.dp else 8.dp
         val surfaceColor = Color(0xFF10141A)
         val outlineColor = Color(0xFF99A4B3)
         val accentColor = MaterialTheme.colorScheme.primary.let { color ->
@@ -153,56 +170,54 @@ fun KeyboardResizeOverlay(
                 .fillMaxSize()
                 .fillMaxWidth()
                 .background(Color.Black.copy(alpha = 0.72f))
-                .pointerInput(floatingMode) {
-                    detectDragGestures(
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val paddingChangeDp = with(density) { -dragAmount.y.toDp().value }
-                            if (!floatingMode) {
-                                currentBottomPaddingDpState = (currentBottomPaddingDpState + paddingChangeDp)
-                                    .coerceIn(0f, maxBottomPaddingDp.toFloat())
-                            }
-                        },
-                        onDragEnd = {
-                            currentOnBottomPaddingChange(currentBottomPaddingDpState.roundToInt())
-                        }
-                    )
-                }
         ) {
-            // Height drag handle at top
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(handleHeight)
+            // 明确触区：高度只拉伸，底距/移动只改变位置；中央背景不再接管拖动。
+            Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(handleHeight)
+                .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(12.dp))
+                    .background(surfaceColor).border(1.dp, outlineColor, RoundedCornerShape(12.dp))
+                    .testTag("keyboard-resize-height-handle")
                     .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                val heightChangeDp = with(density) { -dragAmount.y.toDp().value }
-                                currentHeightDp = (currentHeightDp + heightChangeDp)
-                                    .coerceIn(minKeyboardHeightDp.toFloat(), maxKeyboardHeightDp.toFloat())
-                                currentOnHeightChange(currentHeightDp.roundToInt())
-                            },
-                            onDragEnd = {
-                                currentOnHeightChange(currentHeightDp.roundToInt())
+                        detectDragGestures(onDrag = { change, amount ->
+                            change.consume()
+                            currentHeightDp = (currentHeightDp - amount.y / density.density)
+                                .coerceIn(minKeyboardHeightDp.toFloat(), maxKeyboardHeightDp.toFloat())
+                            currentOnHeightChange(currentHeightDp.roundToInt())
+                        })
+                    }, verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.UnfoldMore, "调整高度", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Text("高度", color = Color.White, fontSize = 14.sp, maxLines = 1)
+                }
+                Row(Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(12.dp))
+                    .background(surfaceColor).border(1.dp, outlineColor, RoundedCornerShape(12.dp))
+                    .testTag("keyboard-resize-position-handle")
+                    .pointerInput(floatingMode) {
+                        detectDragGestures(onDrag = { change, amount ->
+                            change.consume()
+                            val dx = amount.x / density.density
+                            val dy = -amount.y / density.density
+                            if (floatingMode) currentPositionDrag?.invoke(dx, dy)
+                            else {
+                                currentBottomPaddingDpState = (currentBottomPaddingDpState + dy)
+                                    .coerceIn(0f, maxBottomPaddingDp.toFloat())
+                                currentOnBottomPaddingChange(currentBottomPaddingDpState.roundToInt())
                             }
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(72.dp)
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(Color.White)
-                )
+                        }, onDragEnd = { if (floatingMode) currentPositionDragEnd?.invoke() },
+                            onDragCancel = { if (floatingMode) currentPositionDragEnd?.invoke() })
+                    }, verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center) {
+                    Icon(if (floatingMode) Icons.Default.OpenWith else Icons.Default.VerticalAlignBottom,
+                        if (floatingMode) "移动键盘" else "调整底部间距", tint = Color.White, modifier = Modifier.size(20.dp))
+                    Text(if (floatingMode) "移动" else "底距 ${currentBottomPaddingDpState.roundToInt()}",
+                        color = Color.White, fontSize = 14.sp, maxLines = 1, softWrap = false)
+                }
             }
 
             Column(
                 modifier = Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp,
-                    top = handleHeight, bottom = if (compact) 4.dp else 8.dp),
+                    top = handleHeight, bottom = bottomInset),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -210,7 +225,7 @@ fun KeyboardResizeOverlay(
                         modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp)).background(surfaceColor)
                             .border(1.dp, outlineColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 12.dp, vertical = if (compact) 2.dp else 12.dp)
+                            .padding(horizontal = 12.dp, vertical = if (compact && stackedModeButtons) 0.dp else if (compact) 2.dp else 12.dp)
                             .testTag("keyboard-resize-opacity-panel"),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
@@ -226,8 +241,48 @@ fun KeyboardResizeOverlay(
                         }
                     }
                 }
+                val modeButtons: @Composable () -> Unit = {
+                    OutlinedButton(onClick = {
+                        floatingMode = !floatingMode
+                        onFloatingModeChange?.invoke(floatingMode)
+                    }, modifier = Modifier.height(actionSize).widthIn(min = 104.dp)
+                        .semantics {
+                            contentDescription = "悬浮键盘"
+                            stateDescription = if (floatingMode) "当前悬浮" else "当前固定"
+                        }.testTag("keyboard-resize-floating-button"),
+                        shape = RoundedCornerShape(24.dp), border = BorderStroke(1.5.dp, outlineColor),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = surfaceColor, contentColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    ) {
+                        Icon(if (floatingMode) Icons.Default.Keyboard else Icons.Default.OpenInNew,
+                            contentDescription = null, modifier = Modifier.size(iconSize))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (floatingMode) "固定" else "悬浮", fontSize = textSize,
+                            modifier = Modifier.width(modeLabelWidth), textAlign = TextAlign.Center,
+                            lineHeight = textSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                    }
+                    if (onSplitKeyboardChange != null) OutlinedButton(onClick = {
+                        splitMode = !splitMode
+                        onSplitKeyboardChange(splitMode)
+                    }, modifier = Modifier.height(actionSize).widthIn(min = 104.dp)
+                        .semantics {
+                            contentDescription = "分体键盘"
+                            stateDescription = if (splitMode) "当前分体" else "当前完整"
+                        }.testTag("keyboard-resize-split-button"),
+                        shape = RoundedCornerShape(24.dp), border = BorderStroke(1.5.dp, outlineColor),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = surfaceColor, contentColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    ) {
+                        Icon(if (splitMode) Icons.Default.Keyboard else Icons.Default.HorizontalSplit,
+                            contentDescription = null, modifier = Modifier.size(iconSize))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (splitMode) "完整" else "分体", fontSize = textSize,
+                            modifier = Modifier.width(modeLabelWidth), textAlign = TextAlign.Center,
+                            lineHeight = textSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                    }
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(actionSize),
+                    modifier = Modifier.fillMaxWidth().height(if (stackedModeButtons) actionSize * 2 + modeStackGap else actionSize),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -245,24 +300,9 @@ fun KeyboardResizeOverlay(
                         Icon(Icons.Default.RestartAlt, contentDescription = "重置", tint = Color.White,
                             modifier = Modifier.size(iconSize))
                     }
-                    OutlinedButton(onClick = {
-                        floatingMode = !floatingMode
-                        onFloatingModeChange?.invoke(floatingMode)
-                    }, modifier = Modifier.height(actionSize).widthIn(min = 104.dp)
-                        .semantics {
-                            contentDescription = "悬浮键盘"
-                            stateDescription = if (floatingMode) "当前悬浮" else "当前固定"
-                        }.testTag("keyboard-resize-floating-button"),
-                        shape = RoundedCornerShape(24.dp), border = BorderStroke(1.5.dp, outlineColor),
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = surfaceColor, contentColor = Color.White),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    ) {
-                        Icon(if (floatingMode) Icons.Default.Keyboard else Icons.Default.OpenInNew,
-                            contentDescription = null, modifier = Modifier.size(iconSize))
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (floatingMode) "固定" else "悬浮", fontSize = textSize,
-                            lineHeight = textSize * 1.2f, fontWeight = FontWeight.Medium, maxLines = 1)
-                    }
+                    if (stackedModeButtons) Column(verticalArrangement = Arrangement.spacedBy(modeStackGap),
+                        horizontalAlignment = Alignment.CenterHorizontally) { modeButtons() }
+                    else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { modeButtons() }
                     IconButton(
                         onClick = { onConfirm(currentHeightDp.roundToInt(), currentBottomPaddingDpState.roundToInt(), floatingMode, opacity) },
                         modifier = Modifier.size(actionSize).background(surfaceColor, CircleShape)

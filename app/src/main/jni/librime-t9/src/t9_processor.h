@@ -107,6 +107,10 @@ public:
     // 批量替换 RIME 输入为完整拼音（对应 Kotlin onT9ReplaceFullPinyin）
     void ReplaceFullPinyin(const std::string& pinyin);
 
+    // Edit only the uncommitted T9 suffix. The caller holds the engine lock and
+    // validates its snapshot first, then calls FlushRimeInput on success.
+    bool ReplaceEditableSuffix(const std::string& pinyin);
+
     // 两种清理模式：mode=0 (CLEAR_COMPOSITION_ONLY), mode=1 (CLEAR_ALL)
     void ClearComposition(int mode);
 
@@ -209,6 +213,10 @@ private:
     char manual_delimiter_ = '\'';                       // 分隔符字符（从 speller.delimiter 读入）
     std::string original_digit_sequence_;
     std::string last_commit_digit_sequence_;
+    // A manually edited suffix no longer has a trustworthy whole-word digit
+    // recall key. Keep normal pinyin learning, but suppress that fallback until
+    // the next input session instead of teaching the new word under the old key.
+    bool digit_recall_key_valid_ = true;
     // 本次 FullCommit 右选的调频捕获，跨异步上屏链路存活。
     // SelectCandidate 中同步暂存（避免 undo_model 在 EnterIdle 时被清空，
     // 导致 MemorizeEntry 读到时为空、词典词被误判为场景 B/C）。

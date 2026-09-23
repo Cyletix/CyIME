@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.keyboard
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.kingzcheung.xime.settings.SettingsPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -24,12 +25,19 @@ class KeyboardInputPreferencesTest {
         whenever(prefs.getString(any(), anyOrNull())).thenAnswer {
             values[it.getArgument<String>(0)] as? String ?: it.getArgument<String?>(1)
         }
+        whenever(prefs.getBoolean(any(), any())).thenAnswer {
+            values[it.getArgument<String>(0)] as? Boolean ?: it.getArgument<Boolean>(1)
+        }
         whenever(prefs.getFloat(any(), any())).thenAnswer {
             values[it.getArgument<String>(0)] as? Float ?: it.getArgument<Float>(1)
         }
         whenever(editor.putString(any(), anyOrNull())).thenAnswer {
             val value = it.getArgument<String?>(1)
             if (value != null) values[it.getArgument(0)] = value
+            editor
+        }
+        whenever(editor.putBoolean(any(), any())).thenAnswer {
+            values[it.getArgument(0)] = it.getArgument<Boolean>(1)
             editor
         }
         whenever(editor.putFloat(any(), any())).thenAnswer {
@@ -46,6 +54,15 @@ class KeyboardInputPreferencesTest {
         assertEquals(1.15f, settings.keyTextScale, 0f)
         assertEquals(0.5f, settings.handwritingPauseSeconds, 0f)
         assertNull(settings.symbols())
+    }
+
+    @Test fun `visual effects are opt in and explicit choices are respected`() {
+        assertEquals(false, KeyboardInputPreferences.read(context).keyGlowEnabled)
+        assertEquals(false, KeyboardInputPreferences.read(context).showPressBubble)
+        values["key_glow_enabled"] = true
+        values[SettingsPreferences.KEY_SHOW_PRESS_BUBBLE] = true
+        assertEquals(true, KeyboardInputPreferences.read(context).keyGlowEnabled)
+        assertEquals(true, KeyboardInputPreferences.read(context).showPressBubble)
     }
 
     @Test
@@ -104,6 +121,16 @@ class KeyboardInputPreferencesTest {
         }
         KeyboardInputPreferences(handwritingPauseSeconds = 0.56f).save(context)
         assertEquals(0.6f, KeyboardInputPreferences.read(context).handwritingPauseSeconds, 0f)
+    }
+
+    @Test fun `split keyboard is opt in and persists independently of input settings`() {
+        assertEquals(false, KeyboardInputPreferences.read(context).splitKeyboardEnabled)
+        SettingsPreferences.setSplitKeyboardEnabled(context, true)
+        assertEquals(true, KeyboardInputPreferences.read(context).splitKeyboardEnabled)
+        KeyboardInputPreferences().save(context)
+        assertEquals(true, SettingsPreferences.isSplitKeyboardEnabled(context))
+        SettingsPreferences.setSplitKeyboardEnabled(context, false)
+        assertEquals(false, KeyboardInputPreferences.read(context).splitKeyboardEnabled)
     }
 
 }

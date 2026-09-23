@@ -22,6 +22,8 @@ class ForkThemeDefaultsTest {
         assertEquals("soft_blue", SettingsPreferences.getKeyboardTheme(context))
         assertEquals(1, SettingsPreferences.getDarkMode(context))
         assertFalse(SettingsPreferences.shouldShowPressBubble(context))
+        assertFalse(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.read(context).keyGlowEnabled)
+        assertFalse(SettingsPreferences.isVerboseLoggingEnabled(context))
         assertTrue(KeyboardThemes.getThemeById("dynamic").isDynamic)
     }
     @Test fun legacyPurpleMovesOnceThenLaterUserChoicesPersist() {

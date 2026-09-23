@@ -71,9 +71,35 @@ color_schemes:
     primary_color: 0x8F73E2
     keyboard_background:
       type: solid
-      color: 0xE3E4E8
-      color_dark: 0x1E1838
+      color: 0xF7F4FA
+      color_dark: 0x211E28
+    key_background:
+      type: solid
+      color: 0xFFFBFF
+      color_dark: 0x38333F
   
+  858AdvanceColor:
+    name: "858AdvanceColor"
+    primary_color: 0xC3CDDF
+    special_key_bg_color: 0x6D717C
+    special_key_bg_color_dark: 0x6D717C
+    enter_key_bg_color: 0x3F4E68
+    enter_key_bg_color_dark: 0x3F4E68
+    key_text_color: 0xFFFFFF
+    key_text_color_dark: 0xFFFFFF
+    special_key_text_color: 0xFFFFFF
+    special_key_text_color_dark: 0xFFFFFF
+    candidate_text_color: 0xE0E0E0
+    candidate_text_color_dark: 0xE0E0E0
+    keyboard_background:
+      type: solid
+      color: 0x292929
+      color_dark: 0x292929
+    key_background:
+      type: solid
+      color: 0x525252
+      color_dark: 0x525252
+
   ocean_blue:
     name: "海洋蔚蓝"
     primary_color: 0x1A73E8

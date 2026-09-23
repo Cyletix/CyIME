@@ -162,6 +162,12 @@ class T9InputController(
         enqueue { block() }
     }
 
+    /** Refresh is enqueued behind the editor replacement, ahead of the user's next key. */
+    internal fun refreshAfterPreeditEdit() {
+        uiGeneration++
+        enqueue { refreshOnBackground() }
+    }
+
     /** 引擎已在 T9 队列清空时只重置 UI，不能另排一个 clear 误删后续按键。 */
     internal fun resetLocalState() {
         // 丢弃旧会话尚未执行的刷新 post，避免复位后被旧状态覆盖

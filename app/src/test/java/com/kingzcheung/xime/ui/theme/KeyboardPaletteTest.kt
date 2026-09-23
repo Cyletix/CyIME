@@ -51,4 +51,43 @@ class KeyboardPaletteTest {
             assertTrue("dark keys should be softly tinted", spread < 0.2f)
         }
     }
+    @Test fun completePalettesIgnoreLegacyGlobalFunctionKeyColors() {
+        val full = SoftLavenderTheme.create()
+        assertEquals(full.specialKeyDark, resolvedSpecialKeyColor(full, true, Color.Red))
+        assertEquals(full.specialKeyLight, resolvedSpecialKeyColor(full, false, Color.Red))
+        val legacy = full.copy(useThemeColors = false)
+        assertEquals(Color.Red, resolvedSpecialKeyColor(legacy, true, Color.Red))
+        assertEquals(legacy.specialKeyDark, resolvedSpecialKeyColor(legacy, true, null))
+    }
+
+    @Test fun lavenderHasOpaqueReadableKeycapsAndASubtleBackground() {
+        val lavender = SoftLavenderTheme.create()
+        assertEquals(1f, lavender.keyBgDark.alpha, 0f)
+        assertEquals(1f, lavender.keyBgLight.alpha, 0f)
+        assertTrue(contrast(lavender.keyTextColorDark, lavender.keyBgDark) >= 4.5f)
+        assertTrue(contrast(lavender.keyTextColorLight, lavender.keyBgLight) >= 4.5f)
+        assertTrue(contrast(Color.White, lavender.specialKeyDark) >= 4.5f)
+        val background = lavender.keyboardBgDark
+        assertTrue(maxOf(background.red, background.green, background.blue) -
+            minOf(background.red, background.green, background.blue) < 0.06f)
+    }
+
+    @Test fun advance858UsesRequestedRolesInBothLightAndDarkModes() {
+        val theme = Advance858Theme.create()
+        assertEquals("858AdvanceColor", theme.id)
+        assertEquals(theme.id, theme.name)
+        assertEquals(Color(0xFF292929), theme.keyboardBgLight)
+        assertEquals(theme.keyboardBgLight, theme.keyboardBgDark)
+        assertEquals(Color(0xFF525252), theme.keyBgLight)
+        assertEquals(theme.keyBgLight, theme.keyBgDark)
+        assertEquals(Color(0xFF6D717C), theme.specialKeyLight)
+        assertEquals(theme.specialKeyLight, theme.specialKeyDark)
+        assertEquals(Color(0xFF3F4E68), theme.enterKeyLight)
+        assertEquals(theme.enterKeyLight, theme.enterKeyDark)
+        assertEquals(Color.White, theme.keyTextColorLight)
+        assertEquals(Color.White, theme.specialKeyTextColorLight)
+        assertTrue(contrast(Color.White, theme.keyBgDark) >= 4.5f)
+        assertTrue(contrast(Color.White, theme.enterKeyDark!!) >= 4.5f)
+    }
+
 }

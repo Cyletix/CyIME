@@ -54,6 +54,7 @@ fun EditKeyboardLayout(
     shadowShapeRadius: Dp = 8.dp,
     modifier: Modifier = Modifier,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     var selecting by remember { mutableStateOf(false) }
     val latestAction by rememberUpdatedState(onAction)
     // 离开面板只清本地锚点，复制等操作后仍可保留宿主中的选区。
@@ -62,7 +63,7 @@ fun EditKeyboardLayout(
         LocalKeyCornerRadius provides keyCornerRadius,
         LocalEditorKeyShadow provides EditorKeyShadow(shadowEnabled, shadowElevation, shadowShapeRadius),
     ) {
-        Column(modifier.fillMaxSize().background(backgroundColor).padding(horizontal = 2.dp)) {
+        Column(bodyModifier.fillMaxSize().background(backgroundColor).padding(horizontal = 2.dp)) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 // 中央九宫格保持方形；两侧操作独立贴边，不跟随九宫格缩进。
                 val keySide = minOf(maxWidth / 5, maxHeight / 3)
@@ -118,14 +119,16 @@ fun EditKeyboardLayout(
                     Column(Modifier.align(Alignment.CenterEnd).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
                         listOf(Triple(Icons.AutoMirrored.Filled.Backspace, "删除", "delete"),
                             Triple(Icons.AutoMirrored.Filled.KeyboardReturn, "回车", "enter")).forEach { (icon, label, action) ->
-                            EditorActionKey(icon, label, { onAction(action) }, keyBgColor, textColor,
-                                Modifier.size(keySide), repeatable = true)
+                            val colors = if (action == "enter") LocalEnterKeyColors.current else LocalFunctionKeyColors.current
+                            EditorActionKey(icon, label, { onAction(action) }, colors?.background ?: keyBgColor,
+                                colors?.foreground ?: textColor, Modifier.size(keySide), repeatable = true)
                         }
                     }
                 }
             }
             Spacer(Modifier.height(bottomPaddingDp.dp))
         }
+    }
     }
 }
 
@@ -160,10 +163,7 @@ internal fun EditorActionKey(
             }
         } else Modifier
     }
-    Box(modifier.fillMaxSize().padding(2.dp)
-        .then(shadowModifier)
-        .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-        .background(if (pressed) foreground.copy(alpha = 0.18f) else background).keyGlow()
+    Box(modifier.fillMaxSize()
         // 独立合并每个按键，避免被面板的点击屏障合并成一个无障碍节点。
         .semantics(mergeDescendants = true) { contentDescription = label; role = Role.Button; onClick { action(); true } }
         .pointerInput(repeatable) {
@@ -184,7 +184,11 @@ internal fun EditorActionKey(
                     pressed = false
                 }
             })
-        }, contentAlignment = Alignment.Center) {
+        }
+        .padding(scaledKeyVisualPadding(PaddingValues(2.dp)))
+        .then(shadowModifier)
+        .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+        .background(if (pressed) foreground.copy(alpha = 0.18f) else background).keyGlow(), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
     }
 }

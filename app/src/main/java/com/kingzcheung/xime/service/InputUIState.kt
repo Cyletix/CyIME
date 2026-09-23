@@ -24,6 +24,7 @@ data class InputUIState(
     val showKeyboardResize: Boolean = false,
     val resizePreviewHeightDp: Int = 0,
     val resizeInitialFloating: Boolean = false,
+    val resizeInitialSplit: Boolean = false,
     val resizeInitialX: Int = 0,
     val resizeInitialY: Int = 0,
     val associationEnabled: Boolean = false,

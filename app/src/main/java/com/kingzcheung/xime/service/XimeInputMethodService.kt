@@ -1439,6 +1439,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                      isFloatingMode = state.isFloatingMode,
                                      initialOpacity = state.keyboardOpacity,
                                      onFloatingModeChange = { enabled -> schemaController.toggleFloatingMode(enabled, floatingMinY, persist = false) },
+                                     isSplitKeyboard = SettingsPreferences.isSplitKeyboardEnabled(this@XimeInputMethodService),
+                                     onSplitKeyboardChange = if (com.kingzcheung.xime.ui.keyboard.supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode)) {
+                                         { enabled -> SettingsPreferences.setSplitKeyboardEnabled(this@XimeInputMethodService, enabled) }
+                                     } else null,
+                                     onPositionDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
+                                     onPositionDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
                                      onOpacityChange = { opacity ->
                                          uiState.value = uiState.value.copy(keyboardOpacity = opacity)
                                      },
@@ -1601,6 +1607,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     internal fun cancelKeyboardResize() {
         if (!uiState.value.showKeyboardResize) return
+        SettingsPreferences.setSplitKeyboardEnabled(this, uiState.value.resizeInitialSplit)
         val isLandscape = resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
         uiState.value = uiState.value.copy(
             showKeyboardResize = false,
@@ -1638,7 +1645,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.showKeyboardResize) {
+        if (keyCode == KeyEvent.KEYCODE_BACK &&
+            (keyboardCallbacks?.onDismissPreeditEditor != null || uiState.value.showKeyboardResize)) {
             event?.startTracking()
             return true
         }
@@ -1695,6 +1703,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK && keyboardCallbacks?.onDismissPreeditEditor != null) {
+            if (event?.isCanceled != true) keyboardCallbacks?.onDismissPreeditEditor?.invoke()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.showKeyboardResize) {
             if (event?.isCanceled != true) cancelKeyboardResize()
             return true

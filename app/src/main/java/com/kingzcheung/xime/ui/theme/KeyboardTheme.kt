@@ -96,6 +96,10 @@ data class KeyboardColorScheme(
     val isDynamic: Boolean = false,
     /** 内置完整调色板优先于旧全局颜色；固定主题与动态色兼容回退同样适用。 */
     val useThemeColors: Boolean = false,
+    val enterKeyLight: Color? = null,
+    val enterKeyDark: Color? = null,
+    val specialKeyTextColorLight: Color? = null,
+    val specialKeyTextColorDark: Color? = null,
 )
 
 object KeyboardThemes {
@@ -105,20 +109,8 @@ object KeyboardThemes {
     /** 硬编码的默认主题列表（兜底，其余主题由 xime.yaml color_schemes 提供）。 */
     private val defaultThemes = listOf(
         SoftBlueTheme.create(),
-        KeyboardColorScheme(
-            id = "lavender_purple",
-            name = "薰衣草紫",
-            specialKeyLight = Color(0xFFE8DEF8),
-            specialKeyDark = softDarkKeyContainer(Color(0xFFD0BCFF)),
-            accentLight = Color(0xFF8F73E2),
-            accentDark = Color(0xFFD0BCFF),
-            primaryLight = Color(0xFF8F73E2),
-            primaryDark = Color(0xFFD0BCFF),
-            primaryContainerLight = Color(0xFFEADDFF),
-            primaryContainerDark = softDarkKeyContainer(Color(0xFFD0BCFF)),
-            surfaceLight = Color(0xFFFAF8FC),
-            surfaceDark = Color(0xFF2B2930)
-        )
+        SoftLavenderTheme.create(),
+        Advance858Theme.create()
     )
 
     /**
@@ -209,8 +201,12 @@ object KeyboardThemes {
         return KeyboardColorScheme(
             id = id,
             name = entry.name.ifEmpty { id },
-            specialKeyLight = veryLight,
-            specialKeyDark = softDarkKeyContainer(lightened),
+            specialKeyLight = entry.specialKeyBgColor?.let(::longToColor) ?: veryLight,
+            specialKeyDark = entry.specialKeyBgColorDark?.let(::longToColor) ?: softDarkKeyContainer(lightened),
+            enterKeyLight = entry.enterKeyBgColor?.let(::longToColor),
+            enterKeyDark = entry.enterKeyBgColorDark?.let(::longToColor),
+            specialKeyTextColorLight = entry.specialKeyTextColor?.let(::longToColor),
+            specialKeyTextColorDark = entry.specialKeyTextColorDark?.let(::longToColor),
             accentLight = cfgColor,
             accentDark = lightened,
             primaryLight = cfgColor,
@@ -409,8 +405,12 @@ object KeyboardThemes {
         val global = KeysConfigHelper.getKeyboardColors()
         return scheme.copy(
             name = entry.name.ifEmpty { scheme.name },
-            specialKeyLight = lightenColor(cfgColor, 0.8f),
-            specialKeyDark = softDarkKeyContainer(lightened),
+            specialKeyLight = entry.specialKeyBgColor?.let(::longToColor) ?: lightenColor(cfgColor, 0.8f),
+            specialKeyDark = entry.specialKeyBgColorDark?.let(::longToColor) ?: softDarkKeyContainer(lightened),
+            enterKeyLight = entry.enterKeyBgColor?.let(::longToColor) ?: scheme.enterKeyLight,
+            enterKeyDark = entry.enterKeyBgColorDark?.let(::longToColor) ?: scheme.enterKeyDark,
+            specialKeyTextColorLight = entry.specialKeyTextColor?.let(::longToColor) ?: scheme.specialKeyTextColorLight,
+            specialKeyTextColorDark = entry.specialKeyTextColorDark?.let(::longToColor) ?: scheme.specialKeyTextColorDark,
             primaryContainerLight = lightenColor(cfgColor, 0.8f),
             primaryContainerDark = softDarkKeyContainer(lightened),
             accentLight = cfgColor,
@@ -419,17 +419,17 @@ object KeyboardThemes {
             primaryDark = lightened,
             keyboardBgLight = resolveBgColor(entry, isDark = false) ?: scheme.keyboardBgLight,
             keyboardBgDark = resolveBgColor(entry, isDark = true) ?: scheme.keyboardBgDark,
-            keyBgLight = resolveKeyBgColor(entry, isDark = false) ?: longToColor(global.keyBgColor),
-            keyBgDark = resolveKeyBgColor(entry, isDark = true) ?: longToColor(global.keyBgColorDark),
+            keyBgLight = resolveKeyBgColor(entry, isDark = false) ?: if (scheme.useThemeColors) scheme.keyBgLight else longToColor(global.keyBgColor),
+            keyBgDark = resolveKeyBgColor(entry, isDark = true) ?: if (scheme.useThemeColors) scheme.keyBgDark else longToColor(global.keyBgColorDark),
             candidateBarBgLight = resolveBgColor(entry, isDark = false) ?: scheme.candidateBarBgLight,
             candidateBarBgDark = resolveBgColor(entry, isDark = true) ?: scheme.candidateBarBgDark,
-            keyTextColorLight = entry.keyTextColor?.let { longToColor(it) } ?: longToColor(global.keyTextColor),
+            keyTextColorLight = entry.keyTextColor?.let { longToColor(it) } ?: if (scheme.useThemeColors) scheme.keyTextColorLight else longToColor(global.keyTextColor),
             keyTextColorDark = entry.keyTextColorDark?.let { longToColor(it) }
-                ?: longToColor(global.keyTextColorDark),
+                ?: if (scheme.useThemeColors) scheme.keyTextColorDark else longToColor(global.keyTextColorDark),
             candidateTextColorLight = entry.candidateTextColor?.let { longToColor(it) }
-                ?: longToColor(global.candidateTextColor),
+                ?: if (scheme.useThemeColors) scheme.candidateTextColorLight else longToColor(global.candidateTextColor),
             candidateTextColorDark = entry.candidateTextColorDark?.let { longToColor(it) }
-                ?: longToColor(global.candidateTextColorDark),
+                ?: if (scheme.useThemeColors) scheme.candidateTextColorDark else longToColor(global.candidateTextColorDark),
             candidateSelectedTextColorLight = entry.candidateSelectedTextColor?.let { longToColor(it) }
                 ?: cfgColor,
             candidateSelectedTextColorDark = entry.candidateSelectedTextColorDark?.let { longToColor(it) }
@@ -461,7 +461,15 @@ object KeyboardThemes {
     }
 
     /** 特殊键文字颜色：暗色用强调色，亮色用更深的版本以提高对比度。 */
+    fun getEnterKeyColor(themeId: String, isDark: Boolean): Color {
+        val theme = getThemeById(themeId)
+        return if (isDark) theme.enterKeyDark ?: theme.specialKeyDark
+        else theme.enterKeyLight ?: theme.specialKeyLight
+    }
+
     fun getSpecialKeyTextColor(themeId: String, isDark: Boolean): Color {
+        val theme = getThemeById(themeId)
+        (if (isDark) theme.specialKeyTextColorDark else theme.specialKeyTextColorLight)?.let { return it }
         val accent = getAccentColor(themeId, isDark)
         return if (isDark) accent else Color(
             red = accent.red * 0.6f, green = accent.green * 0.6f, blue = accent.blue * 0.6f

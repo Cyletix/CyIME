@@ -20,8 +20,10 @@ data class KeyboardInputPreferences(
     val cursorStepDp: Float = 10f,
     val keyTextScale: Float = 1.15f,
     val fixedSymbols: String = "",
-    val keyGlowEnabled: Boolean = true,
+    val keyGlowEnabled: Boolean = false,
     val handwritingPauseSeconds: Float = 0.5f,
+    val showPressBubble: Boolean = false,
+    val splitKeyboardEnabled: Boolean = false,
 ) {
     companion object {
         fun read(context: Context): KeyboardInputPreferences {
@@ -30,7 +32,9 @@ data class KeyboardInputPreferences(
             // 本轮将旧的一秒默认值迁移为半秒；其他已设时长保留。
             val pause = prefs.getFloat("handwriting_pause_seconds_v2", if (legacyPause == 1f) 0.5f else legacyPause)
             return KeyboardInputPreferences(
-                keyGlowEnabled = prefs.getBoolean("key_glow_enabled", true),
+                keyGlowEnabled = prefs.getBoolean("key_glow_enabled", false),
+                showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
+                splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
                 spaceHold = SpaceHoldAction.entries.firstOrNull { it.name == prefs.getString("space_hold_action", "CURSOR") }
                     ?: SpaceHoldAction.CURSOR,
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,
@@ -78,8 +82,12 @@ fun rememberKeyboardInputPreferences(): KeyboardInputPreferences {
     var settings by remember(context) { mutableStateOf(KeyboardInputPreferences.read(context)) }
     DisposableEffect(context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            settings = KeyboardInputPreferences.read(context)
+        val relevantKeys = setOf("key_glow_enabled", SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
+            SettingsPreferences.KEY_SPLIT_KEYBOARD,
+            "space_hold_action", "cursor_step_dp", "key_text_scale", "fixed_symbols",
+            "handwriting_pause_seconds", "handwriting_pause_seconds_v2")
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key in relevantKeys) settings = KeyboardInputPreferences.read(context)
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }

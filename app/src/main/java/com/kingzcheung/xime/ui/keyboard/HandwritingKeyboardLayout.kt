@@ -57,6 +57,7 @@ fun HandwritingKeyboardLayout(
     sessionKey: Long = 0,
     specialKeyTextColor: Color = Color.White,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val keyAction by rememberUpdatedState(onKeyPress)
@@ -92,7 +93,7 @@ fun HandwritingKeyboardLayout(
     }
 
     // 实际布局就是触摸边界：左侧书写区与底部按键、右侧按键互不覆盖。
-    Row(modifier.fillMaxSize().testTag("handwriting-panel").padding(bottom = bottomPaddingDp.dp)) {
+    Row(bodyModifier.fillMaxSize().testTag("handwriting-panel").padding(bottom = bottomPaddingDp.dp)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
             Canvas(Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("handwriting-canvas")
                 .semantics { contentDescription = "手写区域"; stateDescription = session.phase.description }
@@ -122,8 +123,8 @@ fun HandwritingKeyboardLayout(
             Row(Modifier.fillMaxWidth().height(48.dp)) {
                 listOf("symbol" to 1f, "number" to 0.7f, "space" to 1.8f, "ime_switch" to 0.7f).forEach { (action, weight) ->
                     HandwritingFunctionKey(action, { press(action) },
-                        specialKeyBackgroundColor,
-                        specialKeyTextColor,
+                        if (action == "space") keyBackgroundColor else specialKeyBackgroundColor,
+                        if (action == "space") keyTextColor else specialKeyTextColor,
                         Modifier.weight(weight).fillMaxHeight())
                 }
             }
@@ -138,6 +139,7 @@ fun HandwritingKeyboardLayout(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -146,9 +148,12 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
         "delete" -> "删除"; "enter" -> "回车"; "space" -> "空格"
         "symbol" -> "符号"; "number" -> "123"; "ime_switch" -> "语言切换"; else -> action
     }
-    Box(modifier.padding(2.dp).clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(background).keyGlow()
-        .clickable(onClick = onClick).semantics { contentDescription = label }
-        .testTag("handwriting-key:$action"), contentAlignment = Alignment.Center) {
+    val enter = LocalEnterKeyColors.current.takeIf { action == "enter" }
+    val keyBackground = enter?.background ?: background
+    val keyForeground = enter?.foreground ?: foreground
+    Box(modifier.clickable(onClick = onClick).semantics { contentDescription = label }
+        .testTag("handwriting-key:$action")
+        .padding(scaledKeyVisualPadding(PaddingValues(2.dp))).clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(keyBackground).keyGlow(), contentAlignment = Alignment.Center) {
         val icon = when (action) {
             "delete" -> Icons.AutoMirrored.Filled.Backspace
             "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn
@@ -156,7 +161,7 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
             "ime_switch" -> Icons.Default.Language
             else -> null
         }
-        if (icon != null) Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
-        else Text(label, color = foreground, fontSize = 18.sp, fontFamily = AppFonts.keyFontFamily)
+        if (icon != null) Icon(icon, contentDescription = null, tint = keyForeground, modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
+        else Text(label, color = keyForeground, fontSize = 18.sp, fontFamily = AppFonts.keyFontFamily)
     }
 }

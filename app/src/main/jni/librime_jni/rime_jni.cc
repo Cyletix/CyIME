@@ -6,6 +6,8 @@
 #include <rime/dict/reverse_lookup_dictionary.h>
 #include <rime/service.h>
 #include <rime/schema.h>
+#include <rime/context.h>
+#include <rime/candidate.h>
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
 #include "t9_digit_userdict.h"
@@ -37,7 +39,7 @@
 #define RIME_JNI_VERBOSE_LOGGING 0
 #endif
 #if RIME_JNI_VERBOSE_LOGGING == 1
-static volatile bool g_rime_jni_verbose_logging = true;
+static volatile bool g_rime_jni_verbose_logging = false;
 #define LOGI(...) do { if (g_rime_jni_verbose_logging) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__); } while (0)
 #define LOGD(...) do { if (g_rime_jni_verbose_logging) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__); } while (0)
 #else
@@ -308,6 +310,25 @@ public:
 
     bool highlightCandidate(int index) {
         return rime && session_id_ && index >= 0 && rime->highlight_candidate(session_id_, index);
+    }
+
+    // Editable suffix only: confirmed segments stay owned by Rime and are never replayed.
+    std::vector<std::string> pinyinEditSnapshot() {
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->context()) return {};
+        auto ctx = session->context();
+        auto confirmed = ctx->composition().GetConfirmedPosition();
+        std::string confirmed_text;
+        for (const auto& segment : ctx->composition()) {
+            if (segment.end > confirmed || segment.status < rime::Segment::kSelected) break;
+            if (auto candidate = segment.GetSelectedCandidate()) confirmed_text += candidate->text();
+        }
+        return {ctx->input(), std::to_string(ctx->caret_pos()), std::to_string(confirmed),
+                confirmed_text, ctx->GetPreedit().text};
+    }
+
+    void setCaret(int caret) {
+        if (rime && session_id_) rime->set_caret_pos(session_id_, static_cast<size_t>(std::max(0, caret)));
     }
 
     bool setInput(const char* input) {
@@ -1224,6 +1245,36 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeConversionPreview(JNIEnv* env, j
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeHighlightCandidate(JNIEnv*, jobject, jint index) {
     return Rime::Instance().highlightCandidate(index) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativePinyinEditSnapshot(JNIEnv* env, jobject) {
+    auto values = Rime::Instance().pinyinEditSnapshot();
+    jclass stringClass = env->FindClass("java/lang/String");
+    auto result = env->NewObjectArray(values.size(), stringClass, nullptr);
+    for (size_t i = 0; i < values.size(); ++i) {
+        auto value = env->NewStringUTF(values[i].c_str());
+        env->SetObjectArrayElement(result, i, value);
+        env->DeleteLocalRef(value);
+    }
+    env->DeleteLocalRef(stringClass);
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetCaret(JNIEnv*, jobject, jint caret) {
+    Rime::Instance().setCaret(caret);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9ReplaceEditableSuffix(JNIEnv* env, jobject, jstring input) {
+    auto processor = rime::T9ProcessorRequire();
+    if (!processor || !input) return JNI_FALSE;
+    const char* value = env->GetStringUTFChars(input, nullptr);
+    if (!value) return JNI_FALSE;
+    const bool replaced = processor->ReplaceEditableSuffix(value);
+    env->ReleaseStringUTFChars(input, value);
+    return replaced ? JNI_TRUE : JNI_FALSE;
 }
 
 // 设置输入字符串（替代逐字符 processKey，减少 JNI 调用次数）

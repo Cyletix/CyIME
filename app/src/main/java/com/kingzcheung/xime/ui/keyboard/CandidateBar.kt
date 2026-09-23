@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.keyboard
 
 import com.kingzcheung.xime.service.PredictionManager
 import android.annotation.SuppressLint
+import android.content.SharedPreferences
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -50,6 +51,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,25 +61,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -89,6 +81,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
@@ -163,10 +162,12 @@ fun CandidateBar(
     voiceSpectrum: FloatArray = FloatArray(16),
     voiceRecognitionState: RecognitionState = RecognitionState.IDLE,
     voicePluginName: String = "",
+    onEditPreedit: (() -> Unit)? = null,
+    showPreeditPreview: Boolean = true,
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val horizontalPadding = if (isLandscape) 50.dp else 8.dp
+    val horizontalPadding = if (isLandscape && state is CandidateBarState.Idle) 50.dp else 8.dp
     val context = LocalContext.current
 
     // M3 角色色：图标按钮背景用 surface 与 primary 的混合色调（带种子色但不过于强烈），
@@ -177,6 +178,20 @@ fun CandidateBar(
         0.15f
     )
     val iconButtonTint = MaterialTheme.colorScheme.onSurfaceVariant
+    val preferences = remember(context) { SettingsPreferences.getPrefsPublic(context) }
+    var showCancelButton by remember(preferences) {
+        mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
+    }
+    DisposableEffect(preferences) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON || key == null) {
+                showCancelButton = SettingsPreferences.shouldShowCandidateCancelButton(context)
+            }
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
     val showComments = SettingsPreferences.showCandidateComments(context)
     val inputTextLocation = SettingsPreferences.getInputTextLocation(context)
     val showInputBoxStyle = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX
@@ -225,8 +240,11 @@ fun CandidateBar(
 
             hasAnyMore = s.hasMore || candidateListState.canScrollForward
             showLeftIcon = false
-            displayAssociation = remember(s.associationCandidates, taken, s.inputText, textMeasurer) {
-                if (taken.isEmpty()) {
+            displayAssociation = remember(s.associationCandidates, taken, s.inputText, textMeasurer, candidateTextSize, showCompositionCancel, screenWidthPx, density) {
+                if (s.associationCandidates.isEmpty()) {
+                    // 常规输入没有追加联想时，避免每次按键测量整页候选文字。
+                    emptyList()
+                } else if (taken.isEmpty()) {
                     s.associationCandidates.take(PredictionManager.MAX_ASSOCIATION_COUNT)
                 } else {
                     val measureText = { text: String ->
@@ -235,7 +253,7 @@ fun CandidateBar(
                             style = TextStyle(fontSize = candidateTextSize.sp)
                         ).size.width.toFloat()
                     }
-                    val leftPx = with(density) { rowPaddingPx + 32.dp.toPx() }
+                    val leftPx = with(density) { rowPaddingPx + if (showCompositionCancel) 44.dp.toPx() else 0f }
                     val rowWidthPx = screenWidthPx - leftPx - rightSidePx
                     val regularWidthPx = taken.sumOf { c ->
                         measureText(c).toDouble() + itemPaddingPx
@@ -295,33 +313,23 @@ fun CandidateBar(
         candidateListState.scrollToItem(0)
     }
 
-    // 编码气泡：候选栏内计算编码文本后回写此状态，供 Column 的 drawBehind 读取绘制。
-    // drawBehind 在下一帧读取最新值，无需同步；初始值取自当前 state 保证首帧即显示。
-    var preeditBubbleText by remember(state) {
-        mutableStateOf((state as? CandidateBarState.ChineseCandidates)?.preeditText
-            ?: (state as? CandidateBarState.ChineseCandidates)?.inputText ?: "")
-    }
-    val showPreeditBubble = showInputTextRow && preeditBubbleText.isNotEmpty() && !showInputBoxStyle
+    val preeditText = (state as? CandidateBarState.ChineseCandidates)?.let {
+        it.preeditText.ifEmpty { it.inputText }
+    }.orEmpty()
+    val showPreedit = showPreeditPreview && showInputTextRow && preeditText.isNotEmpty() &&
+        (!showInputBoxStyle || onEditPreedit != null)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .height(44.dp)
-            .drawPreeditBubble(
-                text = preeditBubbleText,
-                enabled = showPreeditBubble,
-                bubbleColor = visuals.backgroundColor,
-                textColor = visuals.textColor
-            )
             .background(visuals.backgroundColor)
             .padding(horizontal = horizontalPadding),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
-        val displayText = (state as? CandidateBarState.ChineseCandidates)?.preeditText
-            ?: (state as? CandidateBarState.ChineseCandidates)?.inputText ?: ""
-        // 编码显示已改为候选栏顶部的悬浮气泡（drawBehind 绘制，见 drawPreeditBubble），
-        // 栏内不再为编码保留布局空间——打字态与联想态的候选行共用同一垂直位置。
-        preeditBubbleText = displayText
+        if (showPreedit) {
+            PreeditPreview(preeditText, visuals, onEditPreedit)
+        }
 
         if (state is CandidateBarState.ClipboardDisplay) {
             ClipboardPreviewBar(state.candidates, visuals, callbacks)
@@ -333,8 +341,8 @@ fun CandidateBar(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (state !is CandidateBarState.Idle && callbacks.onCancelInput != null) {
-                KeyboardBackButton(callbacks.onCancelInput, iconButtonContainer, visuals.textColor, label = "取消输入")
+            if (showCompositionCancel) {
+                KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, visuals.textColor, label = "取消输入")
                 Spacer(Modifier.width(4.dp))
             }
             if (showLeftIcon) {
@@ -487,22 +495,8 @@ fun CandidateBar(
                     }
                 }
                 candidatePageExpanded -> {
-                    if (callbacks.onBack != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(iconButtonContainer)
-                                .clickable { callbacks.onBack() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = "返回键盘",
-                                tint = visuals.accentColor,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                    callbacks.onBack?.let {
+                        CandidateExpansionButton(it, iconButtonContainer, visuals.accentColor, expanded = true)
                     }
                 }
                 displayAssociation.isNotEmpty() && callbacks.onClearAssociation != null && callbacks.onCancelInput == null -> {
@@ -542,34 +536,8 @@ fun CandidateBar(
                     }
                 }
                 hasAnyMore && callbacks.onShowMoreCandidates != null -> {
-                    val moreInteractionSource = remember { MutableInteractionSource() }
-                    val isMorePressed by moreInteractionSource.collectIsPressedAsState()
-
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(30.dp)
-                            .height(24.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                if (isMorePressed) (if (visuals.isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(
-                                    alpha = 0.1f
-                                ))
-                                else Color.Transparent
-                            )
-                            .clickable(
-                                interactionSource = moreInteractionSource,
-                                indication = null,
-                                onClick = { callbacks.onShowMoreCandidates() }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "更多",
-                            color = if (isMorePressed) visuals.textColor.copy(alpha = 0.6f) else visuals.textColor,
-                            fontSize = 11.sp
-                        )
-                    }
+                    CandidateExpansionButton(callbacks.onShowMoreCandidates,
+                        iconButtonContainer, visuals.accentColor, expanded = false)
                 }
             }
             if (state !is CandidateBarState.Idle) {
@@ -726,88 +694,58 @@ fun CandidateItem(
     }
 }
 
-/**
- * 编码悬浮气泡：在候选栏顶部之上（栏外）绘制一个圆角胶囊气泡显示当前拼音编码。
- *
- * 参考 SwipeBubble 的锚定方式，但为纯绘制实现：
- * - 锚定宿主（候选栏 Column）左上角，气泡体向上悬浮于栏外空间；
- * - drawBehind 绘制不参与布局、不拦截触摸事件——候选栏上方的快捷发送表单/
- *   手写区等 UI 不受任何布局影响；
- * - IME 窗口为 MATCH_PARENT 全屏（onConfigureWindow），栏外绘制不会被窗口裁剪。
- *
- * 视觉：浅色模式近白底/深色模式深灰底的圆角胶囊（92% 不透明），无边框无阴影；
- * 编码文字在气泡内垂直居中；气泡与候选栏顶部之间留 2dp 间隙；宽度自适应，
- * 超出宿主右缘时左移钳制。
- *
- * 注意：不能使用传入的主题背景色——CandidateBarVisuals.backgroundColor 为
- * Color.Transparent（真实背景由外层绘制），以其合成会导致气泡无底色、
- * 文字与 app 内容混叠不可读。此处以候选文字亮度推断深浅模式取对比底色。
- */
-private fun Modifier.drawPreeditBubble(
-    text: String,
-    enabled: Boolean,
-    bubbleColor: Color,
-    textColor: Color
-): Modifier = composed {
-    val density = LocalDensity.current
-    val cornerRadiusPx = with(density) { 4.dp.toPx() }
-    val horizontalPaddingPx = with(density) { 8.dp.toPx() }
-    val verticalPaddingPx = with(density) { 3.dp.toPx() }
-    val bubbleBottomGapPx = with(density) { 2.dp.toPx() }
-    val screenMarginPx = with(density) { 4.dp.toPx() }
-    val textSizePx = with(density) { 12.sp.toPx() }
-
-    // 气泡基色：优先用传入的主题背景色；其为全透明（CandidateBarVisuals 传
-    // Color.Transparent，真实背景由外层绘制）时按候选文字亮度推导，
-    // 保证浅色模式近白/深色模式深灰的可读对比。
-    val isDarkTheme = textColor.luminance() > 0.5f
-    val bubbleBaseColor = if (bubbleColor.alpha > 0.01f) {
-        bubbleColor
-    } else {
-        if (isDarkTheme) Color(0xFF2D2F31) else Color(0xFFFAFAFA)
+/** 同一按钮尺寸、背景与上箭头；无障碍名称区分展开和收起动作。 */
+@Composable
+private fun CandidateExpansionButton(
+    onClick: () -> Unit,
+    background: Color,
+    foreground: Color,
+    expanded: Boolean,
+) {
+    KeyboardToolbarButton(onClick, background,
+        modifier = Modifier.testTag("candidate-expansion")) {
+        Icon(Icons.Default.KeyboardArrowUp,
+            contentDescription = if (expanded) "返回键盘" else "展开候选词",
+            tint = foreground, modifier = Modifier.size(24.dp))
     }
-    // 半透明：62% 不透明度
-    val bubbleBgColor = bubbleBaseColor.copy(alpha = 0.62f)
+}
 
-    // 文本画笔：与 SwipeBubble 同款 nativeCanvas 绘制方式
-    val bubbleTextPaint = remember(textColor, textSizePx) {
-        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = textSizePx
-            color = textColor.copy(alpha = 0.9f).toArgb()
+/** 非聚焦窗口提供真实触控区域，点击编码不会抢走宿主编辑框焦点。 */
+@Composable
+private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?) {
+    val density = LocalDensity.current
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val margin = with(density) { 4.dp.roundToPx() }
+    val gap = with(density) { 2.dp.roundToPx() }
+    val positionProvider = remember(margin, gap) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
+                layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+                return IntOffset(
+                    anchorBounds.left.coerceIn(margin,
+                        (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)),
+                    (anchorBounds.top - popupContentSize.height - gap).coerceIn(0,
+                        (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
+                )
+            }
         }
     }
-
-    drawBehind {
-        if (!enabled || text.isEmpty()) return@drawBehind
-
-        val fontMetrics = bubbleTextPaint.fontMetrics
-        val textWidth = bubbleTextPaint.measureText(text)
-        // 文本实际渲染高度以可见字形区间（ascent..descent）计，避免 lineHeight 参与导致偏移
-        val textHeight = fontMetrics.descent - fontMetrics.ascent
-        val bubbleWidth = textWidth + horizontalPaddingPx * 2
-        val bubbleHeight = textHeight + verticalPaddingPx * 2
-
-        // 气泡贴候选栏左缘，右向延伸；超出宿主右缘时整体左移钳制。
-        val clampedLeft = maxOf(
-            screenMarginPx,
-            minOf(0f, size.width - bubbleWidth - screenMarginPx).coerceAtLeast(screenMarginPx / 4f)
-        )
-        // 底部间隙：气泡底缘距候选栏顶缘 1dp
-        val top = -bubbleBottomGapPx - bubbleHeight
-
-        // 气泡主体
-        drawRoundRect(
-            color = bubbleBgColor,
-            topLeft = Offset(clampedLeft, top),
-            size = Size(bubbleWidth, bubbleHeight),
-            cornerRadius = CornerRadius(cornerRadiusPx)
-        )
-
-        // 文本垂直居中：基线 = 气泡顶 + (气泡高 - (ascent + descent)) / 2，
-        // ascent/descent 均为负/正相对基线的偏移，该式把字形区中点对准气泡中点。
-        drawIntoCanvas { composeCanvas ->
-            val baselineY = top + (bubbleHeight - (fontMetrics.ascent + fontMetrics.descent)) / 2f
-            composeCanvas.nativeCanvas.drawText(text, clampedLeft + horizontalPaddingPx, baselineY, bubbleTextPaint)
+    val background = if (visuals.textColor.luminance() > 0.5f) Color(0xFF292D35) else Color(0xFFF3F5F9)
+    Popup(popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, dismissOnBackPress = false,
+            dismissOnClickOutside = false, clippingEnabled = true)) {
+        Box(Modifier.widthIn(max = screenWidth - 16.dp)
+            .height(40.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(background)
+            .border(1.dp, visuals.textColor.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
+            .testTag("candidate-preedit")
+            .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
+                onClickLabel = "编辑拼音", onClick = onEdit) else Modifier)
+            .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart) {
+            Text(text, color = visuals.textColor, fontSize = 18.sp, maxLines = 1,
+                softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
         }
     }
 }

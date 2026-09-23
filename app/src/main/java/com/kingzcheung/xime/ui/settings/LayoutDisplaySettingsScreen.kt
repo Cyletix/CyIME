@@ -33,6 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.SettingsPreferences
@@ -108,6 +111,40 @@ fun LayoutDisplaySettingsContent(
                         modifier = Modifier.padding(start = 16.dp),
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
+                    var showCandidateCancel by remember {
+                        mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("candidate-cancel-setting")
+                            .toggleable(
+                                value = showCandidateCancel,
+                                role = Role.Switch,
+                                onValueChange = {
+                                    showCandidateCancel = it
+                                    SettingsPreferences.setShowCandidateCancelButton(context, it)
+                                },
+                            )
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("候选栏取消按钮", style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium)
+                            Text("默认关闭，候选词从左侧开始；开启后可点左箭头取消当前输入",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = showCandidateCancel, onCheckedChange = null)
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     )
 
                     var showComments by remember {
@@ -350,7 +387,7 @@ fun LayoutDisplaySettingsContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "默认关闭，避免遮挡按键光效；开启后点按会显示字符气泡",
+                                text = "默认关闭以减少动画开销；开启后点按会显示字符气泡",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

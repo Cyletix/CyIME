@@ -162,6 +162,10 @@ std::string T9Buffer::ToPreeditString(char manual_delimiter) const {
         if (!selections.empty()) sb += "'";
         sb += unassigned();
     }
+    if (is_fully_consumed() && !separator_positions.empty() &&
+        separator_positions.back() == static_cast<int>(digit_sequence.size())) {
+        sb.push_back(manual_delimiter);
+    }
     BUFLOG(">> ToPreeditString: digitSeq='%s', consumedCount=%d, selCount=%zu, selPinyin='%s', fullyConsumed=%d → '%s'",
           digit_sequence.c_str(), consumed_count, selections.size(),
           selected_pinyin().c_str(), is_fully_consumed() ? 1 : 0, sb.c_str());
@@ -176,7 +180,13 @@ std::string T9Buffer::ToRimeInputString(char manual_delimiter) const {
     if (!unassigned().empty()) {
         return BuildRimeInputWithUnassigned();
     }
-    return BuildRimeInputFullyConsumed();
+    std::string result = BuildRimeInputFullyConsumed();
+    if (!separator_positions.empty() &&
+        separator_positions.back() == static_cast<int>(digit_sequence.size()) &&
+        !result.empty() && result.back() != manual_delimiter) {
+        result.push_back(manual_delimiter);
+    }
+    return result;
 }
 
 std::string T9Buffer::BuildRimeInputForEmptySelections(char manual_delimiter) const {

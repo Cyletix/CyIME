@@ -32,7 +32,7 @@ class HandwritingWorkflowAuditTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        val keys = listOf("floating_mode", "floating_offset_x", "floating_offset_y",
+        val keys = listOf(SettingsPreferences.KEY_SHOW_CANDIDATE_CANCEL_BUTTON, "floating_mode", "floating_offset_x", "floating_offset_y",
             "keyboard_height_dp", "keyboard_bottom_padding_dp", "keyboard_opacity",
             "current_schema", "current_schema_dual")
         val saved = keys.associateWith { prefs.all[it] }
@@ -45,6 +45,7 @@ class HandwritingWorkflowAuditTest {
         var previousSavedAscii = false
         lateinit var editor: EditText
         try {
+            SettingsPreferences.setShowCandidateCancelButton(context, true)
             val (userDir, sharedDir) = RimeConfigHelper.initializeRimeDataAsync(context)
             engine.initialize(userDir, sharedDir)
             assertTrue(RimeConfigHelper.ensureDeployment(context))

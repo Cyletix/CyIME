@@ -1,5 +1,11 @@
 package com.kingzcheung.xime.ui
 
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalContext
+import androidx.test.platform.app.InstrumentationRegistry
+import com.kingzcheung.xime.settings.SettingsPreferences
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -261,13 +267,19 @@ class ToolbarUiTest {
         rule.runOnIdle { assertEquals(1, clicks) }
     }
     @Test fun compositionCancelArrowPrecedesCandidatesAndDoesNotSelectOne() {
+        val context = object : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
+            override fun getSharedPreferences(name: String, mode: Int) = super.getSharedPreferences("toolbar_test_$name", mode)
+        }
+        SettingsPreferences.setShowCandidateCancelButton(context, true)
         val events = mutableListOf<String>()
         rule.setContent {
-            MaterialTheme {
-                CandidateBar(state = CandidateBarState.ChineseCandidates(listOf("你好", "你"), inputText = "nihao"),
-                    visuals = CandidateBarVisuals(Color.Black, Color.White, Color.Gray),
-                    callbacks = CandidateBarCallbacks(onCandidateSelect = { events += "select" }, onCancelInput = { events += "cancel" }),
-                    modifier = Modifier.width(320.dp))
+            CompositionLocalProvider(LocalContext provides context) {
+                MaterialTheme {
+                    CandidateBar(state = CandidateBarState.ChineseCandidates(listOf("你好", "你"), inputText = "nihao"),
+                        visuals = CandidateBarVisuals(Color.Black, Color.White, Color.Gray),
+                        callbacks = CandidateBarCallbacks(onCandidateSelect = { events += "select" }, onCancelInput = { events += "cancel" }),
+                        modifier = Modifier.width(320.dp))
+                }
             }
         }
         val back = rule.onNodeWithContentDescription("取消输入")

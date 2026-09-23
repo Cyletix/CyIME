@@ -59,11 +59,12 @@ fun JapaneseKanaKeyboardLayout(
     bottomPaddingDp: Int = 0,
     hasKanaInput: Boolean = false,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     CompositionLocalProvider(
         LocalKeyCornerRadius provides keyCornerRadius,
         LocalKeyVisualPadding provides PaddingValues(horizontal = (keySpacingX ?: 4.dp) / 2, vertical = (keySpacingY ?: 4.dp) / 2),
     ) {
-        Row(modifier.fillMaxSize().background(keyboardBackgroundColor)
+        Row(bodyModifier.fillMaxSize().background(keyboardBackgroundColor)
             .padding(start = 4.dp, end = 4.dp, bottom = bottomPaddingDp.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 val convert = KanaChoice("変換", "japanese_convert")
@@ -117,14 +118,15 @@ fun JapaneseKanaKeyboardLayout(
                     onClick = { onKeyPress("japanese_right") }, onLongClick = { onKeyPressDown?.invoke("japanese_right"); onKeyPress("japanese_right") },
                     backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor, modifier = Modifier.weight(1f).testTag("kana-right"),
                     onPress = { onKeyPressDown?.invoke("japanese_right") }, shadowEnabled = shadowEnabled)
-                SpaceKeyButton(onClick = { onKeyPress("space") }, backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor, schemaName = "日本語", modifier = Modifier.weight(1f).testTag("kana-space"), onPress = { onKeyPressDown?.invoke("space") },
+                SpaceKeyButton(onClick = { onKeyPress("space") }, backgroundColor = keyBackgroundColor,
+                    textColor = keyTextColor, schemaName = "日本語", modifier = Modifier.weight(1f).testTag("kana-space"), onPress = { onKeyPressDown?.invoke("space") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
                 ActionKeyButton(text = "回车", onClick = { onKeyPress("enter") }, backgroundColor = specialKeyBackgroundColor,
                     textColor = specialKeyTextColor, modifier = Modifier.weight(1f).testTag("kana-enter"), onPress = { onKeyPressDown?.invoke("enter") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
             }
         }
+    }
     }
 }
 
@@ -195,7 +197,7 @@ internal fun KanaFlickButton(
                     choice?.let { currentAction(JapaneseKanaAction.Input(it.romaji)) }
                 }
             }
-            .padding(LocalKeyVisualPadding.current)
+            .padding(scaledKeyVisualPadding())
             .then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
             .background(if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background).keyGlow(),
