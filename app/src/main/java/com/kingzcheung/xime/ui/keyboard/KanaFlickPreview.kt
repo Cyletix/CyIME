@@ -27,7 +27,8 @@ import androidx.compose.ui.window.PopupProperties
 
 /** 按住显示五个候选方向，滑动后用浮动气泡显示最终待输入字符。浮层不获取输入焦点。 */
 @Composable
-internal fun KanaFlickPreview(key: KanaFlickKey, direction: KanaFlickDirection, background: Color, foreground: Color) {
+internal fun KanaFlickPreview(key: KanaFlickKey, direction: KanaFlickDirection, background: Color, foreground: Color, contentScale: Float = 1f) {
+    val scale = contentScale.coerceIn(1f, 1.5f)
     val density = LocalDensity.current
     val margin = with(density) { 6.dp.roundToPx() }
     val position = remember(margin) {
@@ -45,17 +46,17 @@ internal fun KanaFlickPreview(key: KanaFlickKey, direction: KanaFlickDirection, 
     LaunchedEffect(Unit) { shown = true }
     val appear by animateFloatAsState(if (shown) 1f else 0f, tween(100), label = "kana-preview-appear")
     val x by animateDpAsState(when (direction) {
-        KanaFlickDirection.LEFT -> (-20).dp; KanaFlickDirection.RIGHT -> 20.dp; else -> 0.dp
+        KanaFlickDirection.LEFT -> (-20f * scale).dp; KanaFlickDirection.RIGHT -> (20f * scale).dp; else -> 0.dp
     }, tween(90), label = "kana-preview-x")
     val y by animateDpAsState(when (direction) {
-        KanaFlickDirection.UP -> (-20).dp; KanaFlickDirection.DOWN -> 20.dp; else -> 0.dp
+        KanaFlickDirection.UP -> (-20f * scale).dp; KanaFlickDirection.DOWN -> (20f * scale).dp; else -> 0.dp
     }, tween(90), label = "kana-preview-y")
-    val diameter by animateDpAsState(if (direction == KanaFlickDirection.TAP) 100.dp else 56.dp,
+    val diameter by animateDpAsState(if (direction == KanaFlickDirection.TAP) (100f * scale).dp else (56f * scale).dp,
         tween(90), label = "kana-preview-size")
     Popup(popupPositionProvider = position,
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
             dismissOnClickOutside = false, clippingEnabled = false)) {
-        Box(Modifier.size(112.dp).testTag("kana-flick-preview")
+        Box(Modifier.size((112f * scale).dp).testTag("kana-flick-preview")
             .semantics { stateDescription = key.choice(direction)?.label ?: "无字符" }, contentAlignment = Alignment.Center) {
             Box(Modifier.offset(x, y).size(diameter).testTag("kana-preview-bubble").graphicsLayer {
                 alpha = appear; scaleX = 0.9f + appear * 0.1f; scaleY = scaleX
@@ -63,10 +64,10 @@ internal fun KanaFlickPreview(key: KanaFlickKey, direction: KanaFlickDirection, 
                 Crossfade(direction, animationSpec = tween(90), label = "kana-preview-direction") { selected ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         if (selected == KanaFlickDirection.TAP) {
-                            KanaDirectionLabels(key, foreground, 28f, 17f)
+                            KanaDirectionLabels(key, foreground, 28f * scale, 17f * scale)
                         } else {
-                            Text(key.choice(selected)?.label ?: "—", color = foreground, fontSize = 30.sp,
-                                lineHeight = 34.sp, maxLines = 1, fontFamily = AppFonts.keyLabelFontFamily)
+                            Text(key.choice(selected)?.label ?: "—", color = foreground, fontSize = (30f * scale).sp,
+                                lineHeight = (34f * scale).sp, maxLines = 1, fontFamily = AppFonts.keyFontFamily)
                         }
                     }
                 }
@@ -90,7 +91,7 @@ internal fun KanaDirectionLabels(key: KanaFlickKey, color: Color, centerSize: Fl
             }
             val fontSize = if (direction == KanaFlickDirection.TAP) centerSize else hintSize
             Text(choice.label, color = color, fontSize = fontSize.sp, lineHeight = (fontSize * 1.15f).sp,
-                maxLines = 1, softWrap = false, fontFamily = AppFonts.keyLabelFontFamily, modifier = Modifier.align(alignment))
+                maxLines = 1, softWrap = false, fontFamily = AppFonts.keyFontFamily, modifier = Modifier.align(alignment))
         }
     }
 }

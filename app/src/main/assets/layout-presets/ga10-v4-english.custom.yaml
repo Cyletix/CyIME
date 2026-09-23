@@ -1,0 +1,40 @@
+# CyIME optional GA_10 v4 English experiment; see docs/cyime-keyboard-research.md.
+# Merge into rime/xime.custom.yaml after backing it up. Not enabled by default.
+keyboard:
+  qwerty_en:
+    layout:
+      rows:
+        - ["q", "w", "y", "r", "d", ";", "l", "k", "u", "p"]
+        - ["a", "s", "e", "f", "g", "h", "j", "i", "o", "t"]
+        - ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"]
+    keys:
+      "q": {"tap": "q", "swipe_up": "1", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["q", "Q"]}}
+      "w": {"tap": "w", "swipe_up": "2", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["w", "W"]}}
+      "y": {"tap": "y", "swipe_up": "3", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["y", "Y"]}}
+      "r": {"tap": "r", "swipe_up": "4", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["r", "R"]}}
+      "d": {"tap": "d", "swipe_up": "5", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["d", "D"]}}
+      ";": {"tap": ";", "swipe_up": "6", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": [";", ":"]}}
+      "l": {"tap": "l", "swipe_up": "7", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["l", "L"]}}
+      "k": {"tap": "k", "swipe_up": "8", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["k", "K"]}}
+      "u": {"tap": "u", "swipe_up": "9", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["u", "U"]}}
+      "p": {"tap": "p", "swipe_up": "0", "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["p", "P"]}}
+      "a": {"tap": "a", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["a", "A"]}}
+      "s": {"tap": "s", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["s", "S"]}}
+      "e": {"tap": "e", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["e", "E"]}}
+      "f": {"tap": "f", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["f", "F"]}}
+      "g": {"tap": "g", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["g", "G"]}}
+      "h": {"tap": "h", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["h", "H"]}}
+      "j": {"tap": "j", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["j", "J"]}}
+      "i": {"tap": "i", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["i", "I"]}}
+      "o": {"tap": "o", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["o", "O"]}}
+      "t": {"tap": "t", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["t", "T"]}}
+      "z": {"tap": "z", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["z", "Z"]}}
+      "x": {"tap": "x", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["x", "X"]}}
+      "c": {"tap": "c", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["c", "C"]}}
+      "v": {"tap": "v", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["v", "V"]}}
+      "b": {"tap": "b", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["b", "B"]}}
+      "n": {"tap": "n", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["n", "N"]}}
+      "m": {"tap": "m", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["m", "M"]}}
+      ",": {"tap": ",", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": [",", "<"]}}
+      ".": {"tap": ".", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": [".", ">"]}}
+      "/": {"tap": "/", "swipe_up": {"action": "none"}, "swipe_down": {"action": "none"}, "long_press": {"display": "bubble", "values": ["/", "?"]}}

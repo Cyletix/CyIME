@@ -94,6 +94,8 @@ data class KeyboardColorScheme(
     val candidateBarBackground: BackgroundConfig? = null,
     /** Material You 动态配色：颜色来自壁纸调色板，随壁纸变化。 */
     val isDynamic: Boolean = false,
+    /** 内置完整调色板优先于旧全局颜色；固定主题与动态色兼容回退同样适用。 */
+    val useThemeColors: Boolean = false,
 )
 
 object KeyboardThemes {
@@ -102,17 +104,18 @@ object KeyboardThemes {
 
     /** 硬编码的默认主题列表（兜底，其余主题由 xime.yaml color_schemes 提供）。 */
     private val defaultThemes = listOf(
+        SoftBlueTheme.create(),
         KeyboardColorScheme(
             id = "lavender_purple",
             name = "薰衣草紫",
             specialKeyLight = Color(0xFFE8DEF8),
-            specialKeyDark = Color(0xFF6750A4),
+            specialKeyDark = softDarkKeyContainer(Color(0xFFD0BCFF)),
             accentLight = Color(0xFF8F73E2),
             accentDark = Color(0xFFD0BCFF),
             primaryLight = Color(0xFF8F73E2),
             primaryDark = Color(0xFFD0BCFF),
             primaryContainerLight = Color(0xFFEADDFF),
-            primaryContainerDark = Color(0xFF4F378B),
+            primaryContainerDark = softDarkKeyContainer(Color(0xFFD0BCFF)),
             surfaceLight = Color(0xFFFAF8FC),
             surfaceDark = Color(0xFF2B2930)
         )
@@ -177,7 +180,7 @@ object KeyboardThemes {
 
 
 
-    /** 根据配置项创建全新的 KeyboardColorScheme；动态配色条目构建失败（不支持）返回 null。 */
+    /** 根据配置项创建 KeyboardColorScheme；动态主题在旧系统使用完整固定调色板回退。 */
     private fun buildSchemeFromConfig(context: Context, id: String, entry: ColorSchemeEntry): KeyboardColorScheme? {
         if (entry.dynamicColor) {
             return DynamicThemes.create(context, id, entry.name.ifEmpty { id })
@@ -207,13 +210,13 @@ object KeyboardThemes {
             id = id,
             name = entry.name.ifEmpty { id },
             specialKeyLight = veryLight,
-            specialKeyDark = cfgColor,
+            specialKeyDark = softDarkKeyContainer(lightened),
             accentLight = cfgColor,
             accentDark = lightened,
             primaryLight = cfgColor,
             primaryDark = lightened,
             primaryContainerLight = veryLight,
-            primaryContainerDark = cfgColor,
+            primaryContainerDark = softDarkKeyContainer(lightened),
             surfaceLight = Color.White,
             surfaceDark = Color(0xFF1C1B1F),
             keyboardBgLight = kbdBg,
@@ -406,6 +409,10 @@ object KeyboardThemes {
         val global = KeysConfigHelper.getKeyboardColors()
         return scheme.copy(
             name = entry.name.ifEmpty { scheme.name },
+            specialKeyLight = lightenColor(cfgColor, 0.8f),
+            specialKeyDark = softDarkKeyContainer(lightened),
+            primaryContainerLight = lightenColor(cfgColor, 0.8f),
+            primaryContainerDark = softDarkKeyContainer(lightened),
             accentLight = cfgColor,
             accentDark = lightened,
             primaryLight = cfgColor,
@@ -512,11 +519,11 @@ object KeyboardThemes {
         return if (isDark) theme.dividerColorDark else theme.dividerColorLight
     }
 
-    /** 动态配色主题不走 color_schemes 静态覆盖，直接从主题缓存取色；其他主题返回 null 走原逻辑。 */
+    /** 完整调色板直接从主题缓存取色，避免固定蓝和低版本回退又混入旧全局颜色。 */
     private inline fun dynamicThemeColor(themeId: String, selector: (KeyboardColorScheme) -> Color): Color? {
         // 从状态化缓存查找以建立 Compose 订阅：缓存整体替换后 UI 自动重组
         val theme = themesCache.firstOrNull { it.id == themeId } ?: return null
-        if (!theme.isDynamic) return null
+        if (!theme.isDynamic && !theme.useThemeColors) return null
         return selector(theme)
     }
 

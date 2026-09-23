@@ -201,7 +201,7 @@ fun AboutContent(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Xime-CyletixFork",
+                            text = "CyIME",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -561,7 +561,7 @@ fun PrivacyPolicyContent(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Xime-CyletixFork隐私策略",
+                            text = "CyIME隐私策略",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -569,12 +569,12 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "数据收集",
-                            content = "Xime-CyletixFork 默认使用本地输入与识别。主动启用在线语音或其他联网服务时，相应音频或文本会发送给您选择的服务商。"
+                            content = "CyIME 默认使用本地输入与识别。主动启用在线语音或其他联网服务时，相应音频或文本会发送给您选择的服务商。"
                         )
                         
                         PrivacySection(
                             title = "本地存储",
-                            content = "Xime-CyletixFork 默认在本地存储设置、词库和剪贴板历史。主动启用云备份或剪贴板同步插件时，所选数据会按插件配置传输。您可以随时清除本地数据。"
+                            content = "CyIME 默认在本地存储设置、词库和剪贴板历史。主动启用云备份或剪贴板同步插件时，所选数据会按插件配置传输。您可以随时清除本地数据。"
                         )
                         
                         PrivacySection(
@@ -594,7 +594,7 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "开源",
-                            content = "Xime-CyletixFork是开源软件，源代码公开可审计。您可以在 GitHub 上查看完整源代码。"
+                            content = "CyIME是开源软件，源代码公开可审计。您可以在 GitHub 上查看完整源代码。"
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))

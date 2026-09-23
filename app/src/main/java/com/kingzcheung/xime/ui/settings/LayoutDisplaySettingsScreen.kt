@@ -350,7 +350,7 @@ fun LayoutDisplaySettingsContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "在按键上显示当前按键字符气泡（关闭可减少快速打字卡顿）",
+                                text = "默认关闭，避免遮挡按键光效；开启后点按会显示字符气泡",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

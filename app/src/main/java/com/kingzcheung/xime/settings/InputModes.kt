@@ -9,9 +9,15 @@ object InputModes {
     val english = SchemaInfo(ENGLISH, "英文", "", "", "内置英文模式，始终启用", isDownloaded = true)
 
     fun available(schemas: List<SchemaInfo>, order: List<String> = emptyList()): List<SchemaInfo> {
-        val unique = (schemas + english).distinctBy { it.schemaId }
+        val available = schemas.map { it.schemaId }.toSet()
+        val visible = schemas.filter { CyimeInputDefaults.visibleSchema(it.schemaId, available) }
+            .map { it.copy(name = ChineseSchemas.displayName(it.schemaId, it.name)) }
+        val unique = (visible + english).distinctBy { it.schemaId }
         val byId = unique.associateBy { it.schemaId }
-        val ordered = order.distinct().mapNotNull { byId[it] }
+        val canonicalOrder = order.flatMap { id ->
+            if (id == ENGLISH) listOf(id) else CyimeInputDefaults.canonicalIds(listOf(id), available)
+        }
+        val ordered = canonicalOrder.distinct().mapNotNull { byId[it] }
         val used = ordered.mapTo(mutableSetOf()) { it.schemaId }
         return ordered + unique.filterNot { it.schemaId in used }
     }

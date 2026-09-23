@@ -42,6 +42,7 @@ data class SchemaLocalUiState(
     val toastMessage: String? = null,
     val conflictPackageId: String? = null,
     val conflictingSchemeIds: List<String> = emptyList(),
+    val conflictingFiles: List<FileConflictInfo> = emptyList(),
 )
 
 class SchemaLocalViewModel(application: Application) : AndroidViewModel(application) {
@@ -74,7 +75,7 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
                 val info = installedMap[id]
                 LocalPackageItem(
                     packageId = id,
-                    displayName = info?.displayName ?: id,
+                    displayName = if (id == "builtin") "CyIME 内置资源" else info?.displayName ?: id,
                     version = info?.version ?: "",
                     downloaded = id in downloadedIds,
                     installed = info != null,
@@ -86,149 +87,46 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun installPackage(item: LocalPackageItem) {
+    fun installPackage(item: LocalPackageItem) = install(item, replaceConflictingFiles = false)
+
+    private fun install(item: LocalPackageItem, replaceConflictingFiles: Boolean) {
         if (_uiState.value.installingId != null) return
         viewModelScope.launch {
-            _uiState.update { it.copy(installingId = item.packageId) }
-
-            // 检查 rime/ 下是否已有其他方案（无论是否被清单追踪）
-            val hasSchemas = withContext(Dispatchers.IO) {
-                SchemaManager.discoverSchemas(context).isNotEmpty()
-            }
-            if (hasSchemas) {
-                _uiState.update { it.copy(installingId = null) }
-                val otherInstalled = withContext(Dispatchers.IO) {
-                    SchemaManifestManager.getInstalledPackages(context)
-                        .map { it.packageId }
-                        .filter { it != item.packageId }
-                }
-                val targetIds = if (otherInstalled.isNotEmpty()) otherInstalled else listOf("builtin")
-                _uiState.update {
-                    it.copy(
-                        conflictPackageId = item.packageId,
-                        conflictingSchemeIds = targetIds,
-                    )
-                }
-                return@launch
-            }
-
-            // 直接安装（后续由 UI 提示用户部署）
+            _uiState.update { it.copy(installingId = item.packageId, conflictPackageId = null) }
             val result = try {
-                withContext(Dispatchers.IO) {
-                    SchemaManager.installPackageFromMarketDir(
-                        context = context,
-                        packageId = item.packageId,
-                        displayName = item.displayName,
-                        version = item.version,
-                        fromMarket = !item.isImport,
-                    )
-                }
+                SchemaManager.installPackageFromMarketDir(
+                    context = context, packageId = item.packageId,
+                    displayName = item.displayName, version = item.version,
+                    fromMarket = !item.isImport, replaceConflictingFiles = replaceConflictingFiles,
+                )
             } catch (e: Exception) {
                 android.util.Log.e("SchemaLocalViewModel", "installPackage exception", e)
-                InstallFromDirResult(success = false, failureReason = "安装异常: ${e.message}")
+                InstallFromDirResult(false, failureReason = "安装异常: ${e.message}")
             }
-            _uiState.update { st -> st.copy(installingId = null) }
-            if (result.success) {
-                val msg = buildString {
+            _uiState.update { it.copy(installingId = null, conflictingFiles = emptyList(), conflictingSchemeIds = emptyList()) }
+            when {
+                result.success -> showToast(buildString {
                     append("已安装「${item.displayName}」，点「部署」生效")
-                    if (result.parseFailures.isNotEmpty()) {
-                        append("\n以下方案解析失败：")
-                        result.parseFailures.forEach { append("\n  · $it") }
-                    }
+                    if (result.parseFailures.isNotEmpty()) append("\n" + result.parseFailures.joinToString("\n"))
+                })
+                result.conflicts.isNotEmpty() -> _uiState.update {
+                    it.copy(conflictPackageId = item.packageId, conflictingFiles = result.conflicts,
+                        conflictingSchemeIds = result.conflicts.flatMap { conflict -> conflict.claimedBy }.distinct())
                 }
-                showToast(msg)
-            } else if (result.conflicts.isNotEmpty()) {
-                // 注册表冲突 → 进入冲突解决流程
-                val otherInstalled = withContext(Dispatchers.IO) {
-                    SchemaManifestManager.getInstalledPackages(context)
-                        .map { it.packageId }
-                        .filter { it != item.packageId }
-                }
-                val targetIds = result.conflicts
-                    .flatMap { it.claimedBy }
-                    .distinct()
-                    .filter { it != item.packageId }
-                    .ifEmpty { otherInstalled }
-                    .ifEmpty { listOf("builtin") }
-                _uiState.update {
-                    it.copy(
-                        conflictPackageId = item.packageId,
-                        conflictingSchemeIds = targetIds,
-                    )
-                }
-            } else {
-                showToast(result.failureReason ?: "安装失败")
+                else -> showToast(result.failureReason ?: "安装失败")
             }
             loadLocalPackages()
         }
     }
 
-    fun confirmInstallWithUninstall() {
-        if (_uiState.value.installingId != null) return
-        val pkgId = _uiState.value.conflictPackageId ?: return
-        val item = _uiState.value.packages.firstOrNull { it.packageId == pkgId } ?: return
-        viewModelScope.launch {
-            _uiState.update { it.copy(conflictPackageId = null, installingId = pkgId) }
-            for (sid in _uiState.value.conflictingSchemeIds) {
-                val uninstallOk = withContext(Dispatchers.IO) {
-                    try {
-                        // 先刷新 builtin 清单：APP 更新后可能新增了未被清单追踪的文件
-                        SchemaManifestManager.refreshBuiltinManifest(context)
-                        SchemaManifestManager.uninstallWithManifest(context, sid).success
-                    } catch (e: Exception) {
-                        android.util.Log.e("SchemaLocalViewModel", "uninstall $sid failed", e)
-                        false
-                    }
-                }
-                if (!uninstallOk) {
-                    _uiState.update {
-                        it.copy(installingId = null, conflictPackageId = null, conflictingSchemeIds = emptyList())
-                    }
-                    showToast("卸载冲突方案「$sid」失败，安装已取消")
-                    loadLocalPackages()
-                    return@launch
-                }
-            }
-            val result = try {
-                withContext(Dispatchers.IO) {
-                    SchemaManager.installPackageFromMarketDir(
-                        context = context,
-                        packageId = pkgId,
-                        displayName = item.displayName,
-                        version = item.version,
-                        fromMarket = !item.isImport,
-                    )
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("SchemaLocalViewModel", "confirmInstallWithUninstall exception", e)
-                InstallFromDirResult(success = false, failureReason = "安装异常: ${e.message}")
-            }
-            _uiState.update { st -> st.copy(installingId = null, conflictingSchemeIds = emptyList()) }
-            if (result.success) {
-                val msg = buildString {
-                    append("已安装「${item.displayName}」，点「部署」生效")
-                    if (result.parseFailures.isNotEmpty()) {
-                        append("\n以下方案解析失败：")
-                        result.parseFailures.forEach { append("\n  · $it") }
-                    }
-                }
-                showToast(msg)
-            } else {
-                val reason = if (result.failureReason != null) {
-                    result.failureReason
-                } else if (result.conflicts.isNotEmpty()) {
-                    result.conflicts.joinToString("、") { "${it.fileName}（已被 ${it.claimedBy.joinToString("、")} 使用）" }
-                } else {
-                    "安装失败"
-                }
-                showToast(reason)
-            }
-            loadLocalPackages()
-        }
+    fun confirmInstallWithReplace() {
+        val packageId = _uiState.value.conflictPackageId ?: return
+        val item = _uiState.value.packages.firstOrNull { it.packageId == packageId } ?: return
+        install(item, replaceConflictingFiles = true)
     }
 
     fun cancelConflictInstall() {
-        _uiState.update { it.copy(conflictPackageId = null, conflictingSchemeIds = emptyList()) }
+        _uiState.update { it.copy(conflictPackageId = null, conflictingSchemeIds = emptyList(), conflictingFiles = emptyList()) }
     }
 
     fun deleteDownloaded(item: LocalPackageItem) {
@@ -244,21 +142,10 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun uninstall(item: LocalPackageItem) {
+        if (item.packageId == "builtin") { showToast("内置方案不可卸载"); return }
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                SchemaManager.deleteSchemaFiles(context, item.packageId)
-                SchemaManager.deleteSchemeArchive(context, item.packageId)
-            }
-            // 若卸载后没有已安装的方案了，全量清理 rime/ 残留
-            val remaining = withContext(Dispatchers.IO) {
-                SchemaManifestManager.getInstalledPackages(context)
-            }
-            if (remaining.isEmpty()) {
-                withContext(Dispatchers.IO) {
-                    SchemaManager.cleanRimeDir(context)
-                }
-            }
-            showToast("已卸载")
+            val result = SchemaManager.uninstallPackage(context, item.packageId)
+            showToast(result.message)
             loadLocalPackages()
         }
     }

@@ -1,14 +1,23 @@
-> **Cyletix fork — modified 2026-09-23.** This is [Xime-CyletixFork](https://github.com/Cyletix/Xime), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/Xime/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [fork changes and validation](docs/fork-landscape-japanese-and-branding.md).
+> **Cyletix fork — modified 2026-09-23.** This is [CyIME](https://github.com/Cyletix/Xime), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/Xime/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [identity and migration decisions](docs/cyime-identity.md).
 
-<p align="center">
-  <img src="docs/logo.jpg" alt="Xime Logo" width="600">
-</p>
+[CyIME 0.1.0 changes](docs/cyime-0.1.0.md)
 
-<h1 align="center">Xime-CyletixFork</h1>
+
+<h1 align="center">CyIME</h1>
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a>
 </p>
+
+## CyIME project identity
+
+CyIME is Cyletix’s independently named Android input method, developed from [Xime](https://github.com/ximeiorg/Xime) and Rime. It retains upstream attribution and GPL-3.0 licensing. The 2024 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) project is its keyboard-layout research predecessor, not the Android application.
+
+The current repository is `Cyletix/Xime`; `Cyletix/CyIME` is the proposed repository name, not an existing download URL. Existing releases may still carry the former name. New builds use `CyIME-0.1.0-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
+
+[Research findings and experimental layout](docs/cyime-keyboard-research.md) · [Naming and migration decisions](docs/cyime-identity.md)
+
+The optional GA_10 v4 English preset preserves the historical 30-key ordering. It is not enabled by default and has no validated mobile speed advantage. The sections below include inherited Xime feature documentation; linked Windows/Linux applications and upstream services are separate projects.
 
 [Upstream Xime on F-Droid](https://f-droid.org/packages/com.kingzcheung.xime)
 
@@ -85,10 +94,10 @@ Choose the APK matching your device architecture:
 
 ### From Releases
 
-1. Download the latest APK from [Releases](https://github.com/ximeiorg/Xime/releases)
+1. Download the latest APK from [Releases](https://github.com/Cyletix/Xime/releases)
 2. Install the application
-3. Enable Xime in system input method settings
-4. Set Xime as the current input method
+3. Enable CyIME in system input method settings
+4. Set CyIME as the current input method
 
 ### Plugins (Optional)
 
@@ -107,8 +116,8 @@ For the full plugin list, see the [Plugin Center](https://ime.ximei.me/plugin-li
 
 1. Clone the project and build the APK
 2. Install the application
-3. Enable Xime in system input method settings
-4. Set Xime as the current input method
+3. Enable CyIME in system input method settings
+4. Set CyIME as the current input method
 
 ## Documentation
 
@@ -123,7 +132,7 @@ For detailed documentation, visit [https://ime.ximei.me](https://ime.ximei.me).
 
 ```bash
 # Clone with submodules
-git clone --recursive https://github.com/ximeiorg/Xime.git
+git clone --recursive https://github.com/Cyletix/Xime.git
 
 # Or initialize submodules in an existing clone
 git submodule update --init --recursive

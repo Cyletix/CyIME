@@ -82,8 +82,8 @@ class MenuLayoutRegressionTest {
         } }
         val initial = rule.onNodeWithTag("toolbar-leading").fetchSemanticsNode().boundsInRoot
         val tools = rule.onNodeWithTag("toolbar-order-row").fetchSemanticsNode().boundsInRoot
-        rule.onNodeWithContentDescription("Xime-CyletixFork Logo").performTouchInput { down(center); up() }
-        rule.onNodeWithContentDescription("Xime-CyletixFork Logo").assertDoesNotExist()
+        rule.onNodeWithContentDescription("CyIME Logo").performTouchInput { down(center); up() }
+        rule.onNodeWithContentDescription("CyIME Logo").assertDoesNotExist()
         rule.onNodeWithContentDescription("关闭菜单").assertDoesNotExist()
         rule.onAllNodesWithContentDescription("返回").assertCountEquals(1)
         assertEquals(initial, rule.onNodeWithTag("toolbar-leading").fetchSemanticsNode().boundsInRoot)
@@ -93,7 +93,7 @@ class MenuLayoutRegressionTest {
         rule.onNodeWithContentDescription("返回").performClick()
         rule.onNodeWithTag("menu-item:输入方案").assertIsDisplayed()
         rule.onNodeWithContentDescription("返回").performClick()
-        rule.onNodeWithContentDescription("Xime-CyletixFork Logo").assertIsDisplayed()
+        rule.onNodeWithContentDescription("CyIME Logo").assertIsDisplayed()
         rule.onNodeWithTag("keyboard-overlay").assertDoesNotExist()
         rule.runOnIdle { assertTrue("菜单与返回需走统一按键反馈", feedback.size >= 3) }
     }

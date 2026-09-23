@@ -21,6 +21,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Xime"
+rootProject.name = "CyIME"
 include(":app")
 include(":plugin-core")

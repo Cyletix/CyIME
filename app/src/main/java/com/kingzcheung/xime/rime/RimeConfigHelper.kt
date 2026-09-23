@@ -285,12 +285,7 @@ object RimeConfigHelper {
         if (alreadyHasSchemas) {
             // 仅兜底确保 default.yaml 存在（librime 入口必需），缺失时补一份，不覆盖已有。
             ensureDefaultYaml(context, targetDir)
-            // 默认方案强制更新（维护者决策）：默认方案随 app 发布、由维护者统一
-            // 维护，升级时以 assets 为准覆盖用户目录残留（治老版本升级残留废弃
-            // 配置——如引用已废弃 t9_translator 的旧 t9_pinyin 方案导致九键零候选）。
-            // 仅覆盖 assets 清单内的文件（内容比对，不同才写），清单外的第三方
-            // 方案一律跳过不处理。覆盖后文件内容变化使部署 hash 失配，后续
-            // ensureDeployment 按增量优先策略只重编受影响方案。
+            // 只更新确实由内置包管理且未经修改的文件，市场同名版本及个人修改保留。
             val updated = updateBuiltinAssets(context, targetDir)
             if (updated > 0) {
                 Log.i(TAG, "Updated $updated builtin asset file(s)")
@@ -429,8 +424,8 @@ object RimeConfigHelper {
     }
     
     /**
-     * 默认方案强制更新：递归遍历 assets 内置清单，对 .yaml/.lua 文件做内容比对，
-     * 缺失或内容不同才覆盖。assets 清单之外的第三方文件不受影响。
+     * 内置方案更新：只替换仍由内置包独占且未修改的旧版本。
+     * 市场同名文件、个人修改和新版中文资源由各自安装流程管理。
      *
      * 覆盖 default.yaml 会重置 schema_list，由调用方
      * [SchemaManager.applyEnabledSchemasToDefaultYaml] 紧随其后恢复用户启用列表。
@@ -439,6 +434,15 @@ object RimeConfigHelper {
      */
     private fun updateBuiltinAssets(context: Context, targetDir: File): Int {
         var updated = 0
+        val registryFile = SchemaManifestManager.getRegistryFile(context)
+        val manifestFile = SchemaManifestManager.getManifestFile(context, "builtin")
+        val registry = runCatching { org.json.JSONObject(registryFile.readText()) }.getOrNull()
+        val entries = registry?.optJSONObject("files")
+        val manifest = runCatching { org.json.JSONObject(manifestFile.readText()) }.getOrNull()
+        val manifestEntries = manifest?.optJSONObject("files")
+        fun suppliedByNewBundle(path: String): Boolean = listOf("rime_ice", "rime_chinese").any { root ->
+            runCatching { context.assets.open("$root/$path").use { } }.isSuccess
+        }
         fun sync(assetSub: String, targetSub: File) {
             val assetPath = if (assetSub.isEmpty()) ASSETS_RIME_DIR else "$ASSETS_RIME_DIR/$assetSub"
             for (fileName in context.assets.list(assetPath) ?: return) {
@@ -449,19 +453,27 @@ object RimeConfigHelper {
                     childTarget.mkdirs()
                     sync(childAsset, childTarget)
                 } else if (fileName.endsWith(".yaml") || fileName.endsWith(".lua")) {
-                    // *.custom.yaml 是补丁层文件（用户定制 + app 运行时写入：
-                    // setEnabledSchemas 的启用列表、DoEnsureT9SchemaPatches 的
-                    // T9 注入与个人词库 packs），覆盖会抹掉用户配置与第三方方案——
-                    // 一律排除出默认覆盖范围
-                    if (fileName.endsWith(".custom.yaml")) continue
-                    if (!childTarget.exists() || !assetContentEquals(context, "$ASSETS_RIME_DIR/$childAsset", childTarget)) {
-                        copyAssetFile(context, "$ASSETS_RIME_DIR/$childAsset", childTarget)
-                        updated++
+                    if (fileName.endsWith(".custom.yaml") || suppliedByNewBundle(childAsset)) continue
+                    if (childTarget.exists()) {
+                        if (assetContentEquals(context, "$ASSETS_RIME_DIR/$childAsset", childTarget)) continue
+                        if (!SchemaManifestManager.canUpdateBuiltinFile(entries?.optJSONObject(childAsset),
+                                SchemaManifestManager.fileSha256(childTarget))) continue
                     }
+                    copyAssetFile(context, "$ASSETS_RIME_DIR/$childAsset", childTarget)
+                    val hash = SchemaManifestManager.fileSha256(childTarget) ?: continue
+                    entries?.optJSONObject(childAsset)?.apply { put("sha256", hash); put("size", childTarget.length()) }
+                    manifestEntries?.optJSONObject(childAsset)?.apply { put("sha256", hash); put("size", childTarget.length()) }
+                    SchemaManifestManager.copyToBuiltinBackup(childTarget,
+                        SchemaManager.getMarketDir(context, "builtin"), childAsset)
+                    updated++
                 }
             }
         }
         sync("", targetDir)
+        if (updated > 0) {
+            if (registry != null) registryFile.writeText(registry.toString(2))
+            if (manifest != null) manifestFile.writeText(manifest.toString(2))
+        }
         return updated
     }
 

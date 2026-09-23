@@ -15,6 +15,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -238,7 +239,10 @@ object SchemaManager {
         dependencies: List<String> = emptyList(),
         resolveDepUrl: (String) -> String? = { null },
         switchEnabled: Boolean = true,
+        replaceConflictingFiles: Boolean = false,
     ): InstallFromDirResult = withContext(Dispatchers.IO) {
+      SchemaManifestManager.packageMutex.withLock {
+        val staged = File(context.cacheDir, "schema-install-${java.util.UUID.randomUUID()}")
         try {
             val dir = getMarketDir(context, packageId)
             if (!dir.exists() || dir.listFiles()?.none { it.isFile } != false) {
@@ -257,7 +261,7 @@ object SchemaManager {
             FileLogger.i(TAG, "installPackageFromMarketDir: computed sha256 for ${sha256Map.size} files")
 
             val conflicts = SchemaManifestManager.detectConflicts(context, packageId, targetFiles, sha256Map)
-            if (conflicts.isNotEmpty()) {
+            if (conflicts.isNotEmpty() && !replaceConflictingFiles) {
                 FileLogger.w(TAG, "installPackageFromMarketDir: conflicts detected: ${conflicts.map { "${it.fileName} (${it.claimedBy})" }}")
                 return@withContext InstallFromDirResult(success = false, conflicts = conflicts)
             }
@@ -265,11 +269,15 @@ object SchemaManager {
             val before = discoverSchemas(context).map { it.schemaId }.toSet()
             FileLogger.i(TAG, "installPackageFromMarketDir: schemas before install: $before")
 
-            val ok = installFromMarketToRime(context, packageId)
+            val ok = installFromMarketToRime(context, packageId, staged)
             if (!ok) {
                 FileLogger.e(TAG, "installPackageFromMarketDir: installFromMarketToRime returned false")
                 return@withContext InstallFromDirResult(success = false, failureReason = "安装失败")
             }
+
+            SchemaManifestManager.installStagedFiles(
+                context, packageId, displayName, version, fromMarket, staged, targetFiles,
+            )
 
             val after = discoverSchemas(context).map { it.schemaId }.toSet()
             val newIds = (after - before).toList()
@@ -300,15 +308,7 @@ object SchemaManager {
                 dependencyIds = completion.downloaded
             }
 
-            SchemaManifestManager.createManifest(
-                context = context,
-                schemeId = packageId,
-                displayName = displayName,
-                version = version,
-                fromMarket = fromMarket,
-                extractedFiles = targetFiles,
-                dependencyIds = dependencyIds,
-            )
+            SchemaManifestManager.appendDependencies(context, packageId, dependencyIds)
 
             if (fromMarket) {
                 SettingsPreferences.addInstalledMarketId(context, packageId)
@@ -320,7 +320,7 @@ object SchemaManager {
                 ?: targetFiles.firstOrNull { it.endsWith(".schema.yaml") }
                     ?.removeSuffix(".schema.yaml")
             if (firstSchema != null && switchEnabled) {
-                setEnabledSchemas(context, listOf(firstSchema))
+                setEnabledSchemas(context, (getEnabledSchemas(context) + firstSchema).distinct())
             }
 
             FileLogger.i(TAG, "installPackageFromMarketDir: success for $packageId, firstSchema=$firstSchema")
@@ -328,7 +328,10 @@ object SchemaManager {
         } catch (e: Exception) {
             FileLogger.e(TAG, "installPackageFromMarketDir: UNCAUGHT exception for $packageId", e)
             return@withContext InstallFromDirResult(success = false, failureReason = "安装异常: ${e.message}")
+        } finally {
+            staged.deleteRecursively()
         }
+      }
     }
 
     /** 解析单个归档（或普通文件）将被释放到 rime/ 的目标文件名列表。 */
@@ -379,12 +382,12 @@ object SchemaManager {
      * - .zip / .tar.gz / .tgz → 解压
      * - 其他文件 → 直接复制
      */
-    fun installFromMarketToRime(context: Context, schemeId: String): Boolean {
+    fun installFromMarketToRime(context: Context, schemeId: String, destination: File = getRimeDir(context)): Boolean {
         val dir = getMarketDir(context, schemeId)
         if (!dir.exists()) return false
         val files = dir.listFiles()?.filter { it.isFile } ?: return false
         if (files.isEmpty()) return false
-        val rimeDir = getRimeDir(context)
+        val rimeDir = destination
         if (!rimeDir.exists()) rimeDir.mkdirs()
         var allOk = true
         for (file in files) {
@@ -442,9 +445,27 @@ object SchemaManager {
         // 保留原文件换行风格（CRLF/LF），避免把整文件换行符规范化
         val sep = if (defaultYamlText.contains("\r\n")) "\r\n" else "\n"
         val lines = defaultYamlText.lines()
-        val headerIdx = lines.indexOfFirst { it.trim() == "schema_list:" }
+        val headerIdx = lines.indexOfFirst {
+            it.trim().substringBefore(':').trim().trim('\"', '\'') == "schema_list" && it.contains(':')
+        }
 
         if (headerIdx < 0) {
+            // 同时支持单行 flow-map 的个人补丁。
+            val flowPatchIdx = lines.indexOfFirst { it.trim().startsWith("patch:") && it.substringAfter(':').trim().startsWith("{") }
+            if (flowPatchIdx >= 0) {
+                val value = enabled.joinToString(", ", "[", "]") { "{schema: $it}" }
+                val line = lines[flowPatchIdx]
+                val existingList = Regex("schema_list\\s*:\\s*\\[[^]]*]")
+                val changed = if (existingList.containsMatchIn(line)) existingList.replace(line, "schema_list: $value")
+                    else line.replaceFirst("{", "{schema_list: $value, ")
+                return lines.toMutableList().apply { this[flowPatchIdx] = changed }.joinToString(sep)
+            }
+            // default.custom.yaml 的列表必须放在 patch 下，保留原有其它个人补丁。
+            val patchIdx = lines.indexOfFirst { it.trim() == "patch:" }
+            if (patchIdx >= 0) {
+                val inserted = listOf("  schema_list:") + enabled.map { "    - schema: $it" }
+                return (lines.take(patchIdx + 1) + inserted + lines.drop(patchIdx + 1)).joinToString(sep)
+            }
             // 没有 schema_list 块：在文末追加一个
             val sb = StringBuilder(defaultYamlText)
             if (!defaultYamlText.endsWith("\n")) sb.append(sep)
@@ -455,7 +476,7 @@ object SchemaManager {
 
         // 吃掉紧跟其后的列表项行；保留缩进风格（默认两空格）
         var j = headerIdx + 1
-        var indent = "  "
+        var indent = lines[headerIdx].takeWhile { it == ' ' || it == '\t' } + "  "
         var first = true
         while (j < lines.size && lines[j].trimStart().startsWith("-")) {
             if (first) {
@@ -466,7 +487,7 @@ object SchemaManager {
         }
 
         val rebuilt = buildList {
-            add(lines[headerIdx])                    // 保留原 header 行（含其缩进）
+            add(lines[headerIdx].takeWhile { it == ' ' || it == '\t' } + "schema_list:")
             enabled.forEach { add("$indent- schema: $it") }
         }
         return (lines.subList(0, headerIdx) + rebuilt + lines.subList(j, lines.size))
@@ -752,7 +773,7 @@ object SchemaManager {
     }
 
     /** 内置方案（保持默认启用顺序）。 */
-    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "pinyin_14jian") + JapaneseSchemas.ids
+    internal val BUILTIN_SCHEMAS = CyimeInputDefaults.recommended
 
     /**
      * 内置方案补齐（纯函数）：用户启用列表尾部按 [BUILTIN_SCHEMAS] 顺序追加缺失项，
@@ -766,6 +787,25 @@ object SchemaManager {
         return if (missing.isEmpty()) enabled else enabled + missing
     }
 
+    /** null 表示没有设置列表；空集合表示用户明确写了 [] / 空列表。 */
+    internal fun readEnabledSchemaList(text: String): List<String>? {
+        val root = yaml.parseToYamlNode(text) as? YamlMap ?: return null
+        val patch = root.entries.entries.firstOrNull { it.key.content == "patch" }?.value as? YamlMap
+        val holder = patch ?: root
+        val node = holder.entries.entries.firstOrNull { it.key.content == "schema_list" }?.value ?: return null
+        return (node as? YamlList)?.items.orEmpty().mapNotNull { item ->
+            val map = item as? YamlMap ?: return@mapNotNull null
+            (map.entries.entries.firstOrNull { it.key.content == "schema" }?.value as? YamlScalar)
+                ?.content?.takeIf { it.isNotBlank() }
+        }
+    }
+
+    internal fun fallbackNativeSchema(available: Set<String>): List<String> = listOfNotNull(
+        CyimeInputDefaults.recommended.firstOrNull { it in available }
+            ?: available.firstOrNull { it !in CyimeInputDefaults.dependencies && it != InputModes.ENGLISH }
+            ?: available.firstOrNull()
+    )
+
     fun getEnabledSchemas(context: Context): List<String> {
         val customFile = getCustomYamlFile(context)
         if (!customFile.exists()) {
@@ -775,23 +815,23 @@ object SchemaManager {
         }
 
         try {
-            val content = customFile.readText()
-            val schemas = mutableListOf<String>()
-            var inSchemaList = false
-            for (line in content.lines()) {
-                val trimmed = line.trim()
-                if (trimmed == "schema_list:") {
-                    inSchemaList = true
-                    continue
-                }
-                if (inSchemaList) {
-                    if (trimmed.startsWith("- schema:")) {
-                        val id = trimmed.removePrefix("- schema:").trim()
-                        if (id.isNotEmpty()) schemas.add(id)
-                    } else if (!trimmed.startsWith("- ")) {
-                        inSchemaList = false
-                    }
-                }
+            val schemas = readEnabledSchemaList(customFile.readText())
+            if (schemas != null && schemas.isEmpty()) {
+                val available = getRimeDir(context).listFiles().orEmpty().filter { it.name.endsWith(".schema.yaml") }
+                    .map { it.name.removeSuffix(".schema.yaml") }.toSet()
+                val fallback = fallbackNativeSchema(available)
+                setEnabledSchemas(context, fallback)
+                // 明确空列表不是旧版本遗漏；不得在下一次读取时又补回全部模式。
+                SettingsPreferences.setBuiltinSchemasMerged(context, true)
+                SettingsPreferences.getPrefsPublic(context).edit()
+                    .putBoolean("japanese_schemas_added_v1", true)
+                    .putBoolean("cyime_chinese_defaults_v1", true).apply()
+                return fallback
+            }
+            if (schemas == null) {
+                setEnabledSchemas(context, BUILTIN_SCHEMAS)
+                SettingsPreferences.setBuiltinSchemasMerged(context, true)
+                return ChineseSchemas.addOnFirstUpgrade(context, JapaneseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS))
             }
             if (schemas.isNotEmpty()) {
                 // 内置方案补齐只执行一次（新版本首次运行，治老版本升级残留：
@@ -818,7 +858,12 @@ object SchemaManager {
         return BUILTIN_SCHEMAS
     }
 
-    fun setEnabledSchemas(context: Context, schemaIds: List<String>) {
+    fun setEnabledSchemas(context: Context, requestedIds: List<String>) {
+        val available = getRimeDir(context).listFiles().orEmpty().filter { it.name.endsWith(".schema.yaml") }
+            .map { it.name.removeSuffix(".schema.yaml") }.toSet()
+        // Rime 始终需要一个底层方案支撑固定英文模式；依赖方案不成为独立入口。
+        val normalized = CyimeInputDefaults.canonicalIds(requestedIds, available)
+        val schemaIds = normalized.ifEmpty { fallbackNativeSchema(available) }
         val customFile = getCustomYamlFile(context)
         if (!customFile.exists()) {
             // 首次写入以 app 固定模板为基底（含 menu/page_size 等默认 patch），
@@ -883,34 +928,25 @@ object SchemaManager {
         return schemaId in getEnabledSchemas(context)
     }
 
-    suspend fun deleteSchemaFiles(context: Context, schemaId: String): Boolean {
-        // 优先使用清单系统精准卸载
-        val result = SchemaManifestManager.uninstallWithManifest(context, schemaId)
-        if (result.manifestExisted) {
-            if (result.success) {
-                Log.i(TAG, "Manifest-based uninstall for $schemaId: ${result.message}")
-            } else {
-                Log.w(TAG, "Manifest-based uninstall for $schemaId failed: ${result.message}")
-            }
-        } else {
-            // 降级到传统逻辑（无清单的旧方案）
-            val rimeDir = getRimeDir(context)
-            // 先读 dictName 再删 schema.yaml，否则 getReferencedDictName 永远返回 null
-            val dictName = getReferencedDictName(context, schemaId) ?: schemaId
-            val schemaFile = File(rimeDir, "$schemaId.schema.yaml")
-            if (schemaFile.exists()) schemaFile.delete()
-            val dictFile = File(rimeDir, "$dictName.dict.yaml")
-            if (dictFile.exists()) dictFile.delete()
-            Log.i(TAG, "Legacy uninstall for $schemaId (dict=$dictName)")
+    /** 两个卸载入口使用同一个结果，失败时不改启用列表、下载文件或市场标记。 */
+    suspend fun uninstallPackage(context: Context, packageId: String): UninstallResult {
+        val result = SchemaManifestManager.uninstallWithManifest(context, packageId)
+        if (!result.success) return result
+        SettingsPreferences.removeInstalledMarketId(context, packageId)
+        val available = discoverSchemas(context).map { it.schemaId }.toSet()
+        val previous = getEnabledSchemas(context)
+        val remaining = previous.filter { it in available }
+        if (remaining != previous) setEnabledSchemas(context, remaining)
+        val current = SettingsPreferences.getCurrentSchema(context)
+        if (current !in available) {
+            val fallback = remaining.firstOrNull() ?: fallbackNativeSchema(available).firstOrNull()
+            if (fallback != null) SettingsPreferences.setCurrentSchema(context, fallback)
         }
-
-        // 从已安装市场列表和启用列表中移除
-        SettingsPreferences.removeInstalledMarketId(context, schemaId)
-        val enabled = getEnabledSchemas(context).toMutableList()
-        enabled.remove(schemaId)
-        setEnabledSchemas(context, enabled)
-        return true
+        return result
     }
+
+    suspend fun deleteSchemaFiles(context: Context, schemaId: String): Boolean =
+        uninstallPackage(context, schemaId).success
 
     data class ImportResult(val success: Boolean, val installedDirect: Boolean = false)
 

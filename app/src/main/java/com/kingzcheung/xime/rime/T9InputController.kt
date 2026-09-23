@@ -67,7 +67,8 @@ class T9InputController(
     // ── 异步执行模型 ──
     private val t9Dispatcher = Dispatchers.Default.limitedParallelism(1)
     private val t9Scope = CoroutineScope(t9Dispatcher)
-    private var lastT9Job: Job? = null
+    @Volatile private var lastT9Job: Job? = null
+    private val enqueueLock = Any()
 
     /** UI 更新投递目标（后台任务通过 post 派发，不阻塞任务完成）。 */
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -93,8 +94,15 @@ class T9InputController(
 
     /** 将 T9 处理任务排入单线程后台队列（FIFO 保序）。 */
     private fun enqueue(block: suspend CoroutineScope.() -> Unit) {
-        val job = t9Scope.launch { block() }
-        lastT9Job = job
+        synchronized(enqueueLock) {
+            val previous = lastT9Job
+            // limitedParallelism(1) 只限制同时运行；等待 Main 时仍可换到下一任务。
+            // 等前驱整段完成，才能保证上滑提交后的下一键不越过候选/清空/上屏。
+            lastT9Job = t9Scope.launch {
+                previous?.join()
+                block()
+            }
+        }
     }
 
     /**
@@ -145,6 +153,17 @@ class T9InputController(
      * 主线程零等待（方案 B）。
      */
     fun reset() {
+        resetLocalState()
+        enqueue { rimeEngine.t9ClearComposition(1) }
+    }
+
+    /** 字面输入和普通九键触摸共用 FIFO，随后输入不能越过数字提交。 */
+    internal fun enqueueLiteralInput(block: suspend () -> Unit) {
+        enqueue { block() }
+    }
+
+    /** 引擎已在 T9 队列清空时只重置 UI，不能另排一个 clear 误删后续按键。 */
+    internal fun resetLocalState() {
         // 丢弃旧会话尚未执行的刷新 post，避免复位后被旧状态覆盖
         uiGeneration++
         _selectionHistory = emptyList()
@@ -155,7 +174,6 @@ class T9InputController(
         leftColumnLocked = false
         _committedText = null
         cachedInput = ""
-        enqueue { rimeEngine.t9ClearComposition(1) }
     }
 
     /**

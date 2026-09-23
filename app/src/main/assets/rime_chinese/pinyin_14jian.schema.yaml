@@ -69,7 +69,7 @@ speller:
     - xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qqeettuuooaaddggjjlzzccbbm/
 
 translator:
-  dictionary: pinyin_simp
+  dictionary: rime_ice
   prism: pinyin_14jian
   packs:
     - user_simp

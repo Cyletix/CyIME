@@ -621,7 +621,7 @@ fun CodeDisplayCard(
                             if (showCodeInInputBox) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "Xime-CyletixFork shu ru fa",
+                                        text = "CyIME shu ru fa",
                                         fontSize = 12.sp,
                                         color = onSurface,
                                         maxLines = 1
@@ -711,7 +711,7 @@ fun CodeDisplayCard(
 fun CodeDisplayCardPreview_SelectedWithCode() {
     XimeTheme {
         CodeDisplayCard(
-            title = "Xime-CyletixFork",
+            title = "CyIME",
             isSelected = true,
             showCodeInInputBox = true,
             onClick = {},
@@ -727,7 +727,7 @@ fun CodeDisplayCardPreview_SelectedWithCode() {
 fun CodeDisplayCardPreview_NotSelectedNoCode() {
     XimeTheme {
         CodeDisplayCard(
-            title = "Xime-CyletixFork",
+            title = "CyIME",
             isSelected = true,
             showCodeInInputBox = false,
             onClick = {},
@@ -889,6 +889,7 @@ fun KeyboardThemeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     title: String? = null,
+    previewDark: Boolean? = null,
 ) {
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
@@ -925,7 +926,7 @@ fun KeyboardThemeCard(
                     .padding(6.dp)
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    ThemeHalfPreview(
+                    if (previewDark != true) ThemeHalfPreview(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
@@ -935,10 +936,11 @@ fun KeyboardThemeCard(
                         candidateBarColor = theme.candidateBarBgLight,
                         accentColor = theme.accentLight,
                         keyColor = globalKeyBgLight,
-                        specialKeyColor = theme.specialKeyLight,
+                        specialKeyColor = kbColors.specialKeyBgColor?.let(longToColor) ?: theme.specialKeyLight,
                         isLeft = true,
+                        single = previewDark != null,
                     )
-                    ThemeHalfPreview(
+                    if (previewDark != false) ThemeHalfPreview(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
@@ -948,8 +950,9 @@ fun KeyboardThemeCard(
                         candidateBarColor = theme.candidateBarBgDark,
                         accentColor = theme.accentDark,
                         keyColor = globalKeyBgDark,
-                        specialKeyColor = theme.specialKeyDark,
+                        specialKeyColor = kbColors.specialKeyBgColorDark?.let(longToColor) ?: theme.specialKeyDark,
                         isLeft = false,
+                        single = previewDark != null,
                     )
                 }
             }

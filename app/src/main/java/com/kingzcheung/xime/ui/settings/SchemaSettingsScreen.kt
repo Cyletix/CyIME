@@ -98,6 +98,7 @@ fun SchemaSettingsContent(
     val localViewModel: SchemaLocalViewModel = viewModel()
     val localUiState by localViewModel.uiState.collectAsStateWithLifecycle()
     var tabIndex by remember { mutableStateOf(0) }
+    var showExtraSchemas by remember { mutableStateOf(false) }
     // F6: 从方案市场/导入返回时自动重扫描，新装方案立即出现
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh(); localViewModel.loadLocalPackages() }
     // 切 tab 时刷新对应列表，保持数据一致
@@ -299,7 +300,7 @@ fun SchemaSettingsContent(
     }
 
     if (uiState.showUninstallDialog) {
-        val packages = uiState.marketPackages
+        val packages = uiState.marketPackages.filterNot { it.packageId == "builtin" }
         val selectedIds = remember { mutableStateListOf<String>() }
         AlertDialog(
             onDismissRequest = { viewModel.dismissUninstallDialog() },
@@ -357,7 +358,7 @@ fun SchemaSettingsContent(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        selectedIds.forEach { viewModel.uninstallPackage(it) }
+                        viewModel.uninstallPackages(selectedIds.toList())
                     },
                     enabled = selectedIds.isNotEmpty(),
                 ) {
@@ -402,13 +403,13 @@ fun SchemaSettingsContent(
     if (localUiState.conflictPackageId != null) {
         AlertDialog(
             onDismissRequest = { localViewModel.cancelConflictInstall() },
-            title = { Text("文件冲突") },
+            title = { Text("更新共用文件") },
             text = {
-                Text("需要先卸载冲突方案：${localUiState.conflictingSchemeIds.joinToString("、")}，是否继续？")
+                Text("以下 ${localUiState.conflictingFiles.size} 个同名文件将备份并更新：\n${localUiState.conflictingFiles.joinToString("、") { it.fileName }}\n不会卸载其他输入模式；卸载新方案时可恢复原文件。")
             },
             confirmButton = {
-                TextButton(onClick = { localViewModel.confirmInstallWithUninstall() }) {
-                    Text("确认卸载并安装")
+                TextButton(onClick = { localViewModel.confirmInstallWithReplace() }) {
+                    Text("备份并更新")
                 }
             },
             dismissButton = {
@@ -545,7 +546,7 @@ fun SchemaSettingsContent(
                     ) {
                         item {
                             Text(
-                                text = "已启用",
+                                text = "已启用的输入布局",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
@@ -559,7 +560,9 @@ fun SchemaSettingsContent(
                                 onToggle = {}, onSelect = {}, isBuiltIn = true,
                             )
                         }
-                        val enabledSchemas = uiState.allSchemas.filter { it.schemaId in uiState.enabledSchemas }
+                        val installedIds = uiState.allSchemas.map { it.schemaId }.toSet()
+                        val visibleSchemas = uiState.allSchemas.filter { com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds) }
+                        val enabledSchemas = visibleSchemas.filter { it.schemaId in uiState.enabledSchemas }
 
                         if (enabledSchemas.isEmpty()) {
                             item {
@@ -586,14 +589,20 @@ fun SchemaSettingsContent(
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "添加输入方案后，需要点击一次「部署方案」进行部署",
+                                text = "九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「部署方案」生效。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                         }
 
-                        val disabledSchemas = uiState.allSchemas.filter { it.schemaId !in uiState.enabledSchemas }
+                        val disabledSchemas = visibleSchemas.filter { it.schemaId !in uiState.enabledSchemas &&
+                            (showExtraSchemas || it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.recommended) }
+                        item {
+                            TextButton(onClick = { showExtraSchemas = !showExtraSchemas }) {
+                                Text(if (showExtraSchemas) "收起其他已安装方案" else "其他已安装方案（高级）")
+                            }
+                        }
 
                         if (disabledSchemas.isEmpty()) {
                             item {
@@ -725,6 +734,9 @@ internal fun SchemaToggleItem(
                         )
                     }
                 }
+                com.kingzcheung.xime.settings.CyimeInputDefaults.description(schema.schemaId)?.let { description ->
+                    Text(description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (isBuiltIn) {
                     Text("内置输入模式 · 始终启用", style = MaterialTheme.typography.labelSmall,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.outline)
@@ -836,6 +848,7 @@ private fun LocalPackageItemCard(
                             Text("安装中…", style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                    item.packageId == "builtin" -> Text("随应用提供", style = MaterialTheme.typography.labelMedium)
                     item.installed -> {
                         OutlinedButton(onClick = onUninstall) { Text("卸载") }
                     }

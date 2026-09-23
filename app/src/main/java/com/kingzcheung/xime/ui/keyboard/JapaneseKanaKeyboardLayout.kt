@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -200,19 +201,22 @@ internal fun KanaFlickButton(
             .background(if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background).keyGlow(),
         contentAlignment = Alignment.Center,
     ) {
-        val fontSp = minOf(KeyboardKeyMetrics.LabelSize.value * textScale, maxHeight.value / (density.fontScale * 1.4f), maxWidth.value / (key.center.label.length * density.fontScale * 1.1f)).coerceAtLeast(12f)
+        val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
+        val fontSp = KeyboardKeyMetrics.labelSizeSp(key.center.label, KeyboardKeyMetrics.LabelSize.value,
+            maxWidth.value, maxHeight.value, density.fontScale, textScale)
         if (pressed) KanaDirectionIndicator(direction, MaterialTheme.colorScheme.primary)
         if (key.center.romaji == ",") {
             val availableHeight = (maxHeight.value - 4f).coerceAtLeast(1f) / density.fontScale
-            val hintSize = minOf(14f, maxWidth.value / (density.fontScale * 4.8f), availableHeight * 0.17f)
-            val centerSize = minOf(fontSp, 22f, maxWidth.value / (density.fontScale * 2.7f), availableHeight * 0.30f)
+            val hintSize = minOf(14f * contentScale, maxWidth.value / (density.fontScale * 4.8f), availableHeight * 0.17f)
+            val centerSize = minOf(fontSp, 22f * contentScale, maxWidth.value / (density.fontScale * 2.7f), availableHeight * 0.30f)
             Box(Modifier.fillMaxWidth().height(minOf(maxHeight, maxWidth * 1.5f))) {
                 KanaDirectionLabels(key, foreground, centerSize, hintSize)
             }
         } else {
-            Text(key.center.label, color = foreground, fontSize = fontSp.sp, lineHeight = (fontSp * 1.1f).sp,
-                maxLines = 1, fontFamily = AppFonts.keyLabelFontFamily)
+            Text(key.center.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+                color = foreground, fontSize = fontSp.sp, lineHeight = (fontSp * 1.2f).sp,
+                maxLines = 1, softWrap = false, fontFamily = AppFonts.keyFontFamily)
         }
-        if (pressed) KanaFlickPreview(key, direction, background, foreground)
+        if (pressed) KanaFlickPreview(key, direction, background, foreground, contentScale)
     }
 }

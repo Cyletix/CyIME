@@ -218,7 +218,7 @@ private fun EnableImeStep(onNext: () -> Unit) {
         Spacer(Modifier.weight(1f))
 
         Text(
-            text = "Xime-CyletixFork",
+            text = "CyIME",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
@@ -238,7 +238,7 @@ private fun EnableImeStep(onNext: () -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "请在系统设置中启用「Xime-CyletixFork」",
+            text = "请在系统设置中启用「CyIME」",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -257,7 +257,7 @@ private fun EnableImeStep(onNext: () -> Unit) {
         if (isEnabled) {
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "✓ Xime-CyletixFork已启用",
+                text = "✓ CyIME已启用",
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
@@ -271,7 +271,7 @@ private fun EnableImeStep(onNext: () -> Unit) {
         } else {
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "请先在系统设置中启用Xime-CyletixFork",
+                text = "请先在系统设置中启用CyIME",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.error
             )
@@ -425,7 +425,7 @@ private fun SwitchToImeStep(onCompleted: () -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "一切准备就绪！请切换到Xime-CyletixFork开始使用",
+            text = "一切准备就绪！请切换到CyIME开始使用",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center

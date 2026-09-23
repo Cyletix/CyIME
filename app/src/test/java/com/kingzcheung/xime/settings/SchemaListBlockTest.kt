@@ -114,14 +114,14 @@ class SchemaListBlockTest {
         val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp")
         val merged = SchemaManager.mergeBuiltinSchemas(enabled)
         assertEquals(
-            listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "pinyin_14jian", "japanese", "japanese_kana"),
+            listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "japanese", "japanese_kana"),
             merged,
         )
     }
 
     @Test
     fun `内置方案齐全时原样返回`() {
-        val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "pinyin_14jian", "japanese", "japanese_kana")
+        val enabled = SchemaManager.BUILTIN_SCHEMAS
         assertEquals(enabled, SchemaManager.mergeBuiltinSchemas(enabled))
     }
 
@@ -130,7 +130,7 @@ class SchemaListBlockTest {
         val enabled = listOf("my_custom_schema", "pinyin_simp", "wubi86")
         val merged = SchemaManager.mergeBuiltinSchemas(enabled)
         assertEquals(
-            listOf("my_custom_schema", "pinyin_simp", "wubi86", "wubi86_pinyin", "t9_pinyin", "pinyin_14jian", "japanese", "japanese_kana"),
+            listOf("my_custom_schema", "pinyin_simp", "wubi86", "t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "japanese", "japanese_kana"),
             merged,
         )
     }
@@ -142,4 +142,37 @@ class SchemaListBlockTest {
             SchemaManager.mergeBuiltinSchemas(emptyList()),
         )
     }
+    @Test fun `explicit empty list is distinct from omitted configuration`() {
+        assertEquals(emptyList<String>(), SchemaManager.readEnabledSchemaList("patch:\n  schema_list: []\n  menu/page_size: 11\n"))
+        assertEquals(emptyList<String>(), SchemaManager.readEnabledSchemaList("patch:\n  schema_list:\n  menu/page_size: 11\n"))
+        assertEquals(null, SchemaManager.readEnabledSchemaList("patch:\n  menu/page_size: 11\n"))
+    }
+
+    @Test fun `repair inline empty list within patch and preserve sibling settings`() {
+        val repaired = SchemaManager.replaceSchemaListBlock("patch:\n  schema_list: []\n  menu/page_size: 11\n", listOf("japanese"))
+        assertEquals(listOf("japanese"), SchemaManager.readEnabledSchemaList(repaired))
+        assertTrue(repaired.contains("  menu/page_size: 11"))
+        assertTrue(repaired.contains("    - schema: japanese"))
+    }
+
+    @Test fun `missing schema list is inserted into existing patch without replacing it`() {
+        val repaired = SchemaManager.replaceSchemaListBlock("patch:\n  menu/page_size: 11\n", listOf("t9_pinyin"))
+        assertEquals(listOf("t9_pinyin"), SchemaManager.readEnabledSchemaList(repaired))
+        assertTrue(repaired.contains("  menu/page_size: 11"))
+    }
+
+    @Test fun `flow style patch retains options when adding or repairing schema list`() {
+        for (original in listOf("patch: {menu/page_size: 11}", "patch: {schema_list: [], menu/page_size: 11}")) {
+            val repaired = SchemaManager.replaceSchemaListBlock(original, listOf("japanese"))
+            assertEquals(listOf("japanese"), SchemaManager.readEnabledSchemaList(repaired))
+            assertTrue(repaired.contains("menu/page_size: 11"))
+        }
+    }
+
+    @Test fun `native fallback chooses one available mode and never invents unavailable ids`() {
+        assertEquals(listOf("japanese"), SchemaManager.fallbackNativeSchema(setOf("japanese", "japanese_kana")))
+        assertEquals(listOf("my_schema"), SchemaManager.fallbackNativeSchema(setOf("my_schema", "melt_eng")))
+        assertEquals(emptyList<String>(), SchemaManager.fallbackNativeSchema(emptySet()))
+    }
+
 }

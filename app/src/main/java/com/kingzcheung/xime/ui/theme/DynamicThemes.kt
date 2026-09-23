@@ -29,38 +29,29 @@ object DynamicThemes {
         return p.accent1(600) to p.accent1(200)
     }
 
-    internal fun fallback(id: String = THEME_ID, name: String = "动态配色") = KeyboardColorScheme(
-        id = id, name = name,
-        specialKeyLight = Color(0xFFD8E2FF), specialKeyDark = Color(0xFF405F91),
-        accentLight = Color(0xFF315DA8), accentDark = Color(0xFFA8C7FA),
-        primaryLight = Color(0xFF315DA8), primaryDark = Color(0xFFA8C7FA),
-        primaryContainerLight = Color(0xFFD8E2FF), primaryContainerDark = Color(0xFF284777),
-        surfaceLight = Color(0xFFF7F9FC), surfaceDark = Color(0xFF191C20),
-        keyboardBgLight = Color(0xFFF7F9FC), keyboardBgDark = Color(0xFF191C20),
-        keyBgLight = Color.White, keyBgDark = Color(0xFF2C3036),
-        candidateBarBgLight = Color(0xFFF7F9FC), candidateBarBgDark = Color(0xFF191C20),
-    )
+    internal fun fallback(id: String = THEME_ID, name: String = "跟随系统动态配色") =
+        SoftBlueTheme.create(id, if (id == THEME_ID) "跟随系统动态配色" else name)
 
     /**
-     * 构建动态配色键盘主题（颜色全部来自壁纸调色板）。
+     * 构建动态配色键盘主题：强调色来自壁纸，深色功能键使用柔和中性容器。
      * Android 12 以下使用中性深灰/蓝色兼容配色，保留同一主题入口。
      */
-    fun create(context: Context, id: String = THEME_ID, name: String = "动态配色"): KeyboardColorScheme? {
+    fun create(context: Context, id: String = THEME_ID, name: String = "跟随系统动态配色"): KeyboardColorScheme? {
         if (!isSupported()) return fallback(id, name)
         val p = SystemPalette(context)
         val accentLight = p.accent1(600)
         val accentDark = p.accent1(200)
         return KeyboardColorScheme(
             id = id,
-            name = name,
+            name = if (id == THEME_ID) "跟随系统动态配色" else name,
             specialKeyLight = p.accent1(100),
-            specialKeyDark = p.accent1(600),
+            specialKeyDark = softDarkKeyContainer(accentDark),
             accentLight = accentLight,
             accentDark = accentDark,
             primaryLight = accentLight,
             primaryDark = accentDark,
             primaryContainerLight = p.accent1(100),
-            primaryContainerDark = p.accent1(700),
+            primaryContainerDark = softDarkKeyContainer(accentDark),
             surfaceLight = p.neutral1(10),
             surfaceDark = p.neutral1(900),
             keyboardBgLight = p.neutral1(10),

@@ -1491,7 +1491,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 callbacks = callbacks,
                                 inlineSuggestions = inlineSuggestionManager?.suggestions.orEmpty(),
                                 modifier = Modifier.graphicsLayer {
-                                    alpha = if (state.isFloatingMode) 1f else state.keyboardOpacity
+                                    alpha = if (state.isFloatingMode || state.showKeyboardResize) 1f else state.keyboardOpacity
                                     compositingStrategy = CompositingStrategy.ModulateAlpha
                                 },
                                 // 非按键交互（符号/表情面板、菜单栏、候选栏按钮）的振动，
