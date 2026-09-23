@@ -335,7 +335,7 @@ class RoundThreeImeTest {
             rule.onNodeWithText("123").performTouchInput { down(center); up() }
             chooseMode(com.kingzcheung.xime.settings.InputModes.ENGLISH)
             rule.waitUntil(10_000) { engine.isAsciiMode() && rule.onAllNodesWithText("英文").fetchSemanticsNodes().isNotEmpty() }
-            rule.onNodeWithText("?123").performTouchInput { down(center); up() }
+            rule.onNodeWithTag("mode-slot-2", useUnmergedTree = true).performTouchInput { down(center); up() }
             rule.onNodeWithText("0").assertIsDisplayed()
             rule.onAllNodesWithTag("language-key-control", useUnmergedTree = true).onLast().performTouchInput { down(center); up() }
             rule.onNodeWithText("英文").assertIsDisplayed()

@@ -289,12 +289,11 @@ fun CommonSymbolKeyboardLayout(
                                 .fillMaxWidth()
                                 .weight(1f),
                         ) {
-                            IconKeyButton(
-                                icon = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft),
-                                contentDescription = "返回键盘",
+                            KeyButton(
+                                text = LocalTextModeLabel.current,
                                 onClick = { onKeyPress("abc") },
                                 backgroundColor = specialKeyBackgroundColor,
-                                iconColor = specialKeyTextColor,
+                                textColor = specialKeyTextColor,
                                 modifier = Modifier.weight(1.2f),
                                 onPress = { onKeyPressDown?.invoke("abc") },
                                 shadowEnabled = shadowEnabled,
@@ -473,12 +472,11 @@ internal fun CommonSymbolLandscapeContent(
                 Row(modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)) {
-                    IconKeyButton(
-                        icon = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft),
-                        contentDescription = "返回键盘",
+                    KeyButton(
+                        text = LocalTextModeLabel.current,
                         onClick = { onKeyPress("abc") },
                         backgroundColor = specialKeyBackgroundColor,
-                        iconColor = specialKeyTextColor,
+                        textColor = specialKeyTextColor,
                         modifier = Modifier.weight(1.2f),
                         onPress = { onKeyPressDown?.invoke("abc") },
                         shadowEnabled = shadowEnabled,

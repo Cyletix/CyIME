@@ -27,23 +27,26 @@ class SymbolNavigationTest {
 
     @Test fun returnStaysAtBottomLeftBeforeTheRecentCategoryStrip() {
         var returns = 0
+        var numbers = 0
         rule.setContent {
             MaterialTheme {
-                SymbolKeyboardLayout(onSelect = {}, onBack = { returns++ },
+                SymbolKeyboardLayout(onSelect = {}, onBack = { returns++ }, onNumber = { numbers++ },
                     backgroundColor = Color.White, textColor = Color.Black,
                     accentColor = Color.Blue, keyBgColor = Color.LightGray,
                     modifier = Modifier.size(360.dp, 240.dp).testTag("symbols"))
             }
         }
         val panel = rule.onNodeWithTag("symbols").fetchSemanticsNode().boundsInRoot
-        val backNode = rule.onNodeWithContentDescription("返回键盘")
+        val backNode = rule.onNodeWithText("中文")
         val back = backNode.fetchSemanticsNode().boundsInRoot
         val recent = rule.onNodeWithText("最近使用").fetchSemanticsNode().boundsInRoot
         assertTrue(back.center.x < panel.left + panel.width * 0.2f)
         assertTrue(back.center.y > panel.top + panel.height * 0.8f)
         assertTrue(recent.left > back.right)
-        backNode.performClick()
+        backNode.performTouchInput { down(center); up() }
         rule.runOnIdle { assertEquals(1, returns) }
+        rule.onNodeWithTag("mode-slot-2", useUnmergedTree = true).performTouchInput { down(center); up() }
+        rule.runOnIdle { assertEquals(1, numbers) }
     }
 
     @Test fun commonSymbolPortraitKeepsReturnLeftAndEnterRight() = assertCommonSymbolNavigation(false)
@@ -68,7 +71,7 @@ class SymbolNavigationTest {
             }
         }
         val panel = rule.onNodeWithTag("common-symbols").fetchSemanticsNode().boundsInRoot
-        val backNode = rule.onNodeWithContentDescription("返回键盘")
+        val backNode = rule.onNodeWithText("中文")
         val enterNode = rule.onNodeWithContentDescription("回车")
         val back = backNode.fetchSemanticsNode().boundsInRoot
         val enter = enterNode.fetchSemanticsNode().boundsInRoot

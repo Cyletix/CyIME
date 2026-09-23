@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.clipboard.ClipboardManager
+import com.kingzcheung.xime.keyboard.textMainType
 import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.MainType
 import com.kingzcheung.xime.keyboard.OverlayRoute
@@ -506,17 +507,12 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     /** Level 2: 进入面板（编号/符号等），可从任意页面进入 */
     fun enterPanel(type: PanelType) {
         val current = _page.value
-        val mainType = when (current) {
-            is KeyboardPage.Main -> current.type
-            is KeyboardPage.Panel -> current.returnTo
-            is KeyboardPage.Overlay -> {
-                val behind = current.behind
-                if (behind is KeyboardPage.Main) behind.type
-                else MainType.FULL
-            }
-        }
+        val mainType = current.textMainType()
         if (_savedKbStateBeforePanel == null) {
-            _savedKbStateBeforePanel = _keyboardState.value
+            _savedKbStateBeforePanel = when (_keyboardState.value) {
+                KeyboardLayoutState.Number, KeyboardLayoutState.CommonSymbol, KeyboardLayoutState.Symbol -> _lastMainLayout.value
+                else -> _keyboardState.value
+            }
         }
         _page.value = KeyboardPage.Panel(type, mainType)
         _keyboardState.value = when (type) {
@@ -526,23 +522,21 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         _syncViewState()
     }
 
-    /** Level 2: 退出面板，回到主键盘 */
-    fun exitPanel() {
-        val current = _page.value
-        if (current is KeyboardPage.Panel) {
-            _page.value = KeyboardPage.Main(current.returnTo)
-            val saved = _savedKbStateBeforePanel
-            _savedKbStateBeforePanel = null
-            _keyboardState.value = when (current.returnTo) {
-                com.kingzcheung.xime.keyboard.MainType.FULL -> saved ?: KeyboardLayoutState.Chinese
-                else -> KeyboardLayoutState.Chinese
-            }
-            _syncViewState()
-        }
+    /** Both secondary modes return directly to the original text keyboard. */
+    fun returnToTextKeyboard() {
+        val mainType = _page.value.textMainType()
+        _keyboardState.value = _savedKbStateBeforePanel ?: _lastMainLayout.value
+        _savedKbStateBeforePanel = null
+        _page.value = KeyboardPage.Main(mainType)
+        _syncViewState()
     }
+
+    fun exitPanel() = returnToTextKeyboard()
 
     /** Level 3: 打开覆盖页面，可从任意页面进入 */
     fun showOverlay(route: OverlayRoute, initialBackStack: List<OverlayRoute> = emptyList()) {
+        // Symbols and numbers are peers, not a back stack. Keep the text destination.
+        if (route == OverlayRoute.Symbol) returnToTextKeyboard()
         val current = _page.value
         val behind = if (current is KeyboardPage.Overlay) current.behind else current
         _page.value = KeyboardPage.Overlay(route, initialBackStack, behind)

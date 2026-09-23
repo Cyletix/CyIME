@@ -196,7 +196,7 @@ onKeyPressDown: ((String) -> Unit)?,
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = 2.dp, horizontal = 50.dp),
+                        .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
                 ) {
                     StrokeKeyboardContent(
                         onKeyPress = onKeyPress,
@@ -366,12 +366,12 @@ private fun StrokeKeyboardContent(
 
     Row(
         modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(if (compactMode) 2.dp else 4.dp))
+        horizontalArrangement = Arrangement.Start
     ) {
         // ── 第1列：左侧符号区（面板样式与九键左栏对齐：统一圆角/阴影/内边距） ──
         Column(
             modifier = Modifier.fillMaxHeight().weight(0.8f),
-            verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(if (compactMode) 2.dp else 4.dp))
+            verticalArrangement = Arrangement.Top
         ) {
             Box(
                 modifier = Modifier
@@ -419,23 +419,17 @@ private fun StrokeKeyboardContent(
                     }
                 }
             }
-            StrokeSymbolButton(
-                text = "符号",
-                onClick = { onKeyPress("symbol") },
-                backgroundColor = specialKeyBackgroundColor,
-                textColor = specialKeyTextColor,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                onPress = { onKeyPressDown?.invoke("symbol") },
-                shadowEnabled = shadowEnabled,
-                shadowElevation = shadowElevation,
-                shadowShapeRadius = shadowShapeRadius,
-                fontSize = ctrlFontSize,
+            KeyboardModeKey(
+                slot = 1, onKeyPress = onKeyPress,
+                backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                modifier = Modifier.fillMaxWidth().weight(1f), onKeyPressDown = onKeyPressDown,
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
             )
         }
 
         // ── 第2列：笔画键区 ──
         Column(
-            modifier = Modifier.fillMaxHeight().weight(3.2f),
+            modifier = Modifier.fillMaxHeight().weight(3.4f),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -550,17 +544,11 @@ private fun StrokeKeyboardContent(
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
             ) {
-                StrokeSymbolButton(
-                    text = "123",
-                    onClick = { onKeyPress("number") },
-                    backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("number") },
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                    fontSize = ctrlFontSize,
+                KeyboardModeKey(
+                    slot = 2, onKeyPress = onKeyPress,
+                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                    modifier = Modifier.weight(0.8f), onKeyPressDown = onKeyPressDown,
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
                 StrokeSpaceButton(
                     onKeyPress = onKeyPress,
@@ -577,7 +565,7 @@ private fun StrokeKeyboardContent(
                     onClick = { onKeyPress(".") },
                     backgroundColor = keyBackgroundColor,
                     textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(0.8f),
                     onPress = { onKeyPressDown?.invoke(".") },
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
@@ -589,7 +577,7 @@ private fun StrokeKeyboardContent(
 
         // ── 第3列：功能键区 ──
         Column(
-            modifier = Modifier.fillMaxHeight().weight(0.9f),
+            modifier = Modifier.fillMaxHeight().weight(0.8f),
         ) {
             SwipeableIconKeyButton(
                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),

@@ -69,7 +69,7 @@ class LanguageKeyButtonTest {
     }
 
     @Test
-    fun numberPanelReturnKeyCanOpenTheSameLanguageMenu() {
+    fun numberPanelReturnIsTextOnlyAndCannotOpenTheLanguageMenu() {
         rule.setContent {
             CompositionLocalProvider(LocalKeyboardInputActions provides KeyboardInputActions(
                 schemas = listOf(SchemaInfo("second", "中文九键", "", "", "")),
@@ -83,12 +83,15 @@ class LanguageKeyButtonTest {
             }
         }
         rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag("language-key-control").performTouchInput { down(center) }
+        rule.onNodeWithTag("mode-slot-2", useUnmergedTree = true).performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(350L)
-        rule.onNodeWithTag("language-schema:second").assertIsDisplayed()
-        rule.onNodeWithTag("language-schema:__xime_english").assertIsDisplayed()
-        rule.onNodeWithTag("language-key-control").performTouchInput { cancel() }
+        rule.onNodeWithTag("language-schema:second").assertDoesNotExist()
+        rule.onNodeWithTag("language-schema:__xime_english").assertDoesNotExist()
+        rule.onNodeWithTag("mode-slot-2", useUnmergedTree = true).performTouchInput { cancel() }
         rule.runOnIdle { assertTrue(events.isEmpty()) }
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag("mode-slot-2", useUnmergedTree = true).performTouchInput { down(center); up() }
+        rule.runOnIdle { assertEquals(listOf("abc"), events) }
     }
 
     @Test fun currentModeIsHighlightedBeforeDragging() {
