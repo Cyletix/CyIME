@@ -125,6 +125,7 @@ fun T9KeyboardLayout(
     val isLandscape = !isFloatingMode && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     fun handleDelete() {
+        if (callbacks.onPreeditKeyInput?.invoke("delete") == true) return
         // onDeleted 在后台队列中处理（flush 不阻塞 UI），结果通过回调返回（Main 线程）。
         controller.onDeleted { result ->
             when (result) {
@@ -249,8 +250,8 @@ private fun T9KeyboardSwipeOverlay(
             // 九键布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 2.dp,
-                    vertical = keySpacingY ?: 2.dp,
+                    horizontal = keySpacingX ?: 4.dp,
+                    vertical = keySpacingY ?: 4.dp,
                 )
             ) {
                 Box(
@@ -282,8 +283,8 @@ private fun T9KeyboardSwipeOverlay(
         } else {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 2.dp,
-                    vertical = keySpacingY ?: 2.dp,
+                    horizontal = keySpacingX ?: 4.dp,
+                    vertical = keySpacingY ?: 4.dp,
                 )
             ) {
                 Column(
@@ -403,14 +404,14 @@ private fun T9KeyboardContent(
     Row(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(2.dp))
+        horizontalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         // ── 第1列：左侧候选区（拼音候选项） ──
         Column(
             modifier = Modifier
                 .fillMaxHeight()
                 .weight(0.8f),
-            verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(if (compactMode) 2.dp else 4.dp))
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -445,7 +446,7 @@ private fun T9KeyboardContent(
                                     controller.isSelectedOptionInCurrentCandidates()
                                     CandidateItem(
                                         text = option.pinyin,
-                                        onClick = { controller.onChoiceSelected(option) },
+                                        onClick = { callbacks.onDismissPreeditEditor?.invoke(); controller.onChoiceSelected(option) },
                                         onPress = { onKeyPressDown?.invoke(option.pinyin) },
                                         textColor = keyTextColor,
                                         backgroundColor = keyBackgroundColor,
@@ -486,7 +487,7 @@ private fun T9KeyboardContent(
                                         controller.isSelectedOptionInCurrentCandidates()
                                 CandidateItem(
                                     text = option.pinyin,
-                                    onClick = { controller.onChoiceSelected(option) },
+                                    onClick = { callbacks.onDismissPreeditEditor?.invoke(); controller.onChoiceSelected(option) },
                                     onPress = { onKeyPressDown?.invoke(option.pinyin) },
                                     textColor = keyTextColor,
                                     backgroundColor = keyBackgroundColor,
@@ -545,7 +546,7 @@ private fun T9KeyboardContent(
 
                     digit = "1", letters = "分词",
                     onSwipeStateChange = onSwipeStateChange,
-                    onClick = { controller.onDigitPressed("1") },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("1") != true) controller.onDigitPressed("1") },
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("1") },
@@ -555,8 +556,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("2"),
                     digit = "2", letters = "ABC", longPressItems = listOf("A", "B", "C"),
-                    onClick = { controller.onDigitPressed("2") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("2") != true) controller.onDigitPressed("2") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)
@@ -570,8 +571,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("3"),
                     digit = "3", letters = "DEF", longPressItems = listOf("D", "E", "F"),
-                    onClick = { controller.onDigitPressed("3") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("3") != true) controller.onDigitPressed("3") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)
@@ -589,8 +590,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("4"),
                     digit = "4", letters = "GHI", longPressItems = listOf("G", "H", "I"),
-                    onClick = { controller.onDigitPressed("4") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("4") != true) controller.onDigitPressed("4") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)
@@ -604,8 +605,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("5"),
                     digit = "5", letters = "JKL", longPressItems = listOf("J", "K", "L"),
-                    onClick = { controller.onDigitPressed("5") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("5") != true) controller.onDigitPressed("5") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)
@@ -619,8 +620,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("6"),
                     digit = "6", letters = "MNO", longPressItems = listOf("M", "N", "O"),
-                    onClick = { controller.onDigitPressed("6") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("6") != true) controller.onDigitPressed("6") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)
@@ -638,8 +639,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("7"),
                     digit = "7", letters = "PQRS", longPressItems = listOf("P", "Q", "R", "S"),
-                    onClick = { controller.onDigitPressed("7") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("7") != true) controller.onDigitPressed("7") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)
@@ -653,8 +654,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("8"),
                     digit = "8", letters = "TUV", longPressItems = listOf("T", "U", "V"),
-                    onClick = { controller.onDigitPressed("8") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("8") != true) controller.onDigitPressed("8") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)
@@ -668,8 +669,8 @@ private fun T9KeyboardContent(
                 T9DigitKey(
                     swipes = swipesFor("9"),
                     digit = "9", letters = "WXYZ", longPressItems = listOf("W", "X", "Y", "Z"),
-                    onClick = { controller.onDigitPressed("9") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                    onClick = { if (callbacks.onPreeditKeyInput?.invoke("9") != true) controller.onDigitPressed("9") },
+                    onLongPressSelect = { letter -> if (callbacks.onPreeditKeyInput?.invoke(letter) != true) { controller.clearAll(); onKeyPress(letter) } },
                     onSwipeStateChange = { state, bounds ->
                         if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
                             onSwipeStateChange?.invoke(state, bounds)

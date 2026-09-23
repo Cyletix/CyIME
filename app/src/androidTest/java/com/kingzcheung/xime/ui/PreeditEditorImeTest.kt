@@ -33,7 +33,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
-/** Real IME: draft edits must never replace already committed host text. */
+/** Real IME: live code edits retain the original keyboard and committed host text. */
 class PreeditEditorImeTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -124,8 +124,25 @@ class PreeditEditorImeTest {
 
     private fun chooseMode(id: String) {
         val globe = rule.onAllNodesWithTag("language-key-control", useUnmergedTree = true).onLast()
-        globe.performTouchInput { down(center) }
-        rule.waitUntil(3000) { rule.onAllNodesWithTag("language-schema:$id").fetchSemanticsNodes().isNotEmpty() }
+        // The key can be composed before the async schema list reaches the service UI.
+        // A change in hasMenu cancels a held pointerInput, so retry that cancelled hold.
+        var menuReady = false
+        repeat(2) {
+            if (!menuReady) {
+                globe.performTouchInput { down(center) }
+                try {
+                    rule.waitUntil(10_000) { rule.onAllNodesWithTag("language-schema:$id").fetchSemanticsNodes().isNotEmpty() }
+                    menuReady = true
+                } catch (_: androidx.compose.ui.test.ComposeTimeoutException) {
+                    screenshot("mode-$id-menu-not-ready")
+                    val tags = rule.onAllNodes(SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.TestTag), useUnmergedTree = true)
+                        .fetchSemanticsNodes().map { it.config[androidx.compose.ui.semantics.SemanticsProperties.TestTag] }
+                    File(context.getExternalFilesDir(null), "mode-menu-tags.txt").writeText(tags.joinToString("\n"))
+                    globe.performTouchInput { cancel() }
+                }
+            }
+        }
+        assertTrue("language menu did not expose $id", menuReady)
         val choice = rule.onNodeWithTag("language-schema:$id").performScrollTo().fetchSemanticsNode()
         val key = globe.fetchSemanticsNode()
         globe.performTouchInput {
@@ -178,7 +195,7 @@ class PreeditEditorImeTest {
         rule.onNodeWithTag("preedit-editor-code").performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(caret, caret, false)) }
     }
     private fun applyDraft() {
-        rule.onNodeWithTag("preedit-apply").performScrollTo().performClick()
+        rule.onNodeWithTag("preedit-editor-close").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("preedit-editor").fetchSemanticsNodes().isEmpty() }
     }
     private fun selectExpandedCandidate(value: String) {
@@ -211,29 +228,39 @@ class PreeditEditorImeTest {
         }
     }
 
-    @Test fun pinyinDraftCancelsWithoutCommitAndDoneReturnsToRealInsertionCaret() {
+    @Test fun liveEditorStaysAboveCandidatesAndUsesOriginalKeysWithoutChangingHostText() {
         chooseMode("rime_ice"); setPrefix()
         "nihao".forEach { tap(it.toString()) }
         rule.waitUntil(5000) { engine.getInput() == "nihao" }
-        openEditor(); draft("womf")
-        assertEquals("编辑草稿不能改引擎", "nihao", engine.getInput())
-        assertEquals("前文", text())
-        rule.onNodeWithTag("preedit-editor-close").performClick()
+        // Editor restarts reapply this setting. Idempotent updates must retain composition.
+        repeat(12) { engine.setPageSize("rime_ice", SettingsPreferences.getPageSize(context)) }
         assertEquals("nihao", engine.getInput())
-        openEditor(); draft("changed")
+        val qBefore = rule.onNodeWithText("q", ignoreCase = true).fetchSemanticsNode()
+        val qPosition = qBefore.positionOnScreen
+        val qSize = qBefore.size
+        openEditor()
+        rule.onNodeWithText("ni'hao", useUnmergedTree = true).assertExists()
+        rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
+        val bar = rule.onNodeWithTag("preedit-editor").fetchSemanticsNode()
+        val candidate = rule.onNodeWithTag("candidate-expansion").fetchSemanticsNode()
+        assertTrue("editor must be above the candidate row", bar.positionOnScreen.y + bar.size.height <= candidate.positionOnScreen.y + 2)
+        val qAfter = rule.onNodeWithText("q", ignoreCase = true).fetchSemanticsNode()
+        assertEquals(qPosition, qAfter.positionOnScreen); assertEquals(qSize, qAfter.size)
+        rule.onNodeWithTag("preedit-apply").assertDoesNotExist()
+        draft("nihao", 2)
+        tap("m")
+        rule.waitUntil(5000) { engine.getInput() == "nimhao" }
+        assertEquals("前文", text())
+        screenshot("pinyin-editor-above-original-keyboard")
+        applyDraft()
+        assertEquals("nimhao", engine.getInput())
+        openEditor(); draft("womf")
+        rule.waitUntil(5000) { engine.getInput() == "womf" }
         shell("input keyevent 4")
         rule.waitUntil(5000) { rule.onAllNodesWithTag("preedit-editor").fetchSemanticsNodes().isEmpty() }
         rule.onNodeWithTag("language-key-control", useUnmergedTree = true).assertExists()
-        assertEquals("系统返回只关闭草稿", "nihao", engine.getInput())
-        assertEquals("前文", text())
+        assertEquals("womf", engine.getInput()); assertEquals("前文", text())
         rule.runOnUiThread { assertTrue(editor.hasFocus()) }
-        openEditor(); draft("nihao", 2)
-        screenshot("pinyin-editor")
-        applyDraft()
-        assertEquals("前文", text())
-        tap("m")
-        rule.waitUntil(5000) { engine.getInput() == "nimhao" }
-        assertEquals("原输入框的已上屏文字不变", "前文", text())
         engine.clearQueuedComposition()
     }
 
@@ -242,6 +269,7 @@ class PreeditEditorImeTest {
         listOf("bn", "ui", "gh", "as", "op").forEach(::tap)
         rule.waitUntil(5000) { engine.getInput() == "bugao" }
         openEditor(); draft("nihao"); applyDraft()
+        rule.waitUntil(5000) { engine.getInput() == "nihao" }
         assertEquals("nihao", engine.getInput()); assertEquals("前文", text())
         rule.onNodeWithText("bn", ignoreCase = true).assertExists()
         rule.onNodeWithText("你好").performClick()
@@ -251,6 +279,7 @@ class PreeditEditorImeTest {
         rule.waitUntil(5000) { engine.getInput() == "nihk" }
         openEditor(); draft("womf"); applyDraft()
         assertEquals("double_pinyin_flypy", engine.getCurrentSchema())
+        rule.waitUntil(5000) { engine.getInput() == "womf" }
         assertEquals("womf", engine.getInput()); assertEquals("前文你好", text())
         engine.clearQueuedComposition()
     }
@@ -259,14 +288,22 @@ class PreeditEditorImeTest {
         chooseMode("t9_pinyin"); setPrefix()
         listOf("MNO", "GHI", "GHI", "ABC", "MNO").forEach(::tap)
         rule.waitUntil(5000) { engine.getInput().isNotEmpty() && engine.getCandidates().contains("你好") }
-        openEditor(); draft("ni'hao"); applyDraft()
+        openEditor(); draft("ni'hao", 3)
+        tap("MNO")
+        rule.waitUntil(5000) { engine.getInput().contains("6") }
+        rule.onNodeWithTag("t9-delete-key").performTouchInput { down(center); up() }
+        rule.waitUntil(5000) { engine.getInput().contains("hao") && !engine.getInput().contains("6") }
+        rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "ni'hao" }
+        rule.waitForIdle()
+        screenshot("t9-live-editor-original-keys")
+        applyDraft()
+        rule.waitUntil(5000) { engine.getInput().contains("hao") }
         val edited = engine.getInput()
         assertTrue(edited.contains("ni")); assertTrue(edited.contains("hao")); assertEquals("前文", text())
         // Select only the first word, leaving a protected nine-key partial commit.
         selectExpandedCandidate("你")
         rule.waitUntil(5000) { engine.getInput().isNotEmpty() && engine.getCandidates().isNotEmpty() }
         openEditor()
-        rule.onNodeWithText("已选：你").assertExists()
         draft("hao"); applyDraft()
         assertEquals("前文", text())
         screenshot("t9-edited-partial")

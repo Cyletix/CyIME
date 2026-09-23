@@ -825,7 +825,10 @@ public:
     //    Schema 无效。旧实现只有第 1 步，部署/会话重建后无人再调 setPageSize 时
     //    候选数漂移回方案自带值（内置/第三方方案多为 PC 默认 5，不适配手机）。
     void applyPageSizeOverride(const char* schema_id) {
-        if (!rime || page_size_override_ <= 0) return;
+        if (!rime || page_size_override_ <= 0 || !schema_id) return;
+        // The caller may pass a pointer owned by the schema that ApplySchema replaces.
+        const std::string target_schema_id(schema_id);
+        schema_id = target_schema_id.c_str();
         RimeConfig config;
         if (rime->schema_open(schema_id, &config)) {
             rime->config_set_int(&config, "menu/page_size", page_size_override_);
@@ -841,7 +844,10 @@ public:
         // 仅当会话正用该方案时幂等刷新（重构造 Schema 读到覆盖值）；
         // 目标方案与当前不同时只写缓存，随后的 switchSchema 自然生效
         if (!schema || schema->schema_id() != schema_id) return;
-        session->ApplySchema(new rime::Schema(schema->schema_id()));
+        // Restarting an editor must not rebuild the same schema, clear its composition,
+        // or reload all dictionaries when the effective page size already matches.
+        if (schema->page_size() == page_size_override_) return;
+        session->ApplySchema(new rime::Schema(target_schema_id));
         LOGI("applyPageSizeOverride: re-applied schema '%s' (menu/page_size=%d)",
              schema_id, page_size_override_);
     }

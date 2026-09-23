@@ -56,9 +56,10 @@ internal fun rememberImeKeyboardCallbacks(
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
             onOpenPreeditEditor = preeditEditor::open,
-            onApplyPreeditEdit = preeditEditor::apply,
+            onLivePreeditEdit = preeditEditor::edit,
             onKeyPress = { key, isShifted ->
-                service.keyRouter.handleKeyPress(key, isShifted)
+                if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke(key) != true)
+                    service.keyRouter.handleKeyPress(key, isShifted)
             },
             onJapaneseKanaAction = { action -> service.schemaController.handleJapaneseKanaAction(action) },
             onKeyPressDown = { key ->

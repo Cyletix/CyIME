@@ -62,7 +62,7 @@ fun JapaneseKanaKeyboardLayout(
     KeyboardKeySpacingScope(modifier) { bodyModifier ->
     CompositionLocalProvider(
         LocalKeyCornerRadius provides keyCornerRadius,
-        LocalKeyVisualPadding provides PaddingValues(horizontal = (keySpacingX ?: 4.dp) / 2, vertical = (keySpacingY ?: 4.dp) / 2),
+        LocalKeyVisualPadding provides PaddingValues(horizontal = (keySpacingX ?: 4.dp), vertical = (keySpacingY ?: 4.dp)),
     ) {
         Row(bodyModifier.fillMaxSize().background(keyboardBackgroundColor)
             .padding(start = 4.dp, end = 4.dp, bottom = bottomPaddingDp.dp)) {

@@ -193,8 +193,8 @@ bool T9UndoModel::ReplaceEditableSuffix(const std::string& pinyin) {
         if (end == start) return false;
         std::string syllable = pinyin.substr(start, end - start);
         for (char c : syllable) {
-            if (c < 'a' || c > 'z') return false;
-            digits.push_back(T9PinyinMap::LetterToDigit(c));
+            if ((c < 'a' || c > 'z') && (c < '2' || c > '9')) return false;
+            digits.push_back(c >= '2' && c <= '9' ? c : T9PinyinMap::LetterToDigit(c));
         }
         choices.emplace_back(syllable, static_cast<int>(syllable.size()));
         start = end + 1;

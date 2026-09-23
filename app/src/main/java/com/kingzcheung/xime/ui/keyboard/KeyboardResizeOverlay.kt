@@ -4,7 +4,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,8 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.filled.HorizontalSplit
 import androidx.compose.material.icons.filled.Keyboard
@@ -53,6 +55,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -134,7 +141,8 @@ fun KeyboardResizeOverlay(
         val modeLabelWidth = with(density) { textSize.toDp() } * 2.25f
         val actionSize = if (controlScale > 1.15f) 56.dp else 48.dp
         val iconSize = (24f * controlScale).dp
-        val handleHeight = if (compact) 40.dp else 48.dp
+        val handleHeight = 24.dp
+        var dragEdge by remember { mutableStateOf(0) }
         val modeStackGap = if (compact) 2.dp else 4.dp
         val bottomInset = if (compact && stackedModeButtons) 2.dp else if (compact) 4.dp else 8.dp
         val surfaceColor = Color(0xFF10141A)
@@ -170,54 +178,75 @@ fun KeyboardResizeOverlay(
                 .fillMaxSize()
                 .fillMaxWidth()
                 .background(Color.Black.copy(alpha = 0.72f))
-        ) {
-            // 明确触区：高度只拉伸，底距/移动只改变位置；中央背景不再接管拖动。
-            Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(handleHeight)
-                .padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(12.dp))
-                    .background(surfaceColor).border(1.dp, outlineColor, RoundedCornerShape(12.dp))
-                    .testTag("keyboard-resize-height-handle")
-                    .pointerInput(Unit) {
-                        detectDragGestures(onDrag = { change, amount ->
-                            change.consume()
-                            currentHeightDp = (currentHeightDp - amount.y / density.density)
-                                .coerceIn(minKeyboardHeightDp.toFloat(), maxKeyboardHeightDp.toFloat())
-                            currentOnHeightChange(currentHeightDp.roundToInt())
-                        })
-                    }, verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center) {
-                    Icon(Icons.Default.UnfoldMore, "调整高度", tint = Color.White, modifier = Modifier.size(20.dp))
-                    Text("高度", color = Color.White, fontSize = 14.sp, maxLines = 1)
+                .testTag("keyboard-resize-frame")
+                .semantics { contentDescription = "拖动边框调整大小，拖动空白处移动键盘" }
+                .drawBehind {
+                    val edge = accentColor
+                    drawRect(edge, style = Stroke(2.dp.toPx()))
+                    val tab = 7.dp.toPx()
+                    val length = 42.dp.toPx().coerceAtMost(size.width / 5)
+                    drawRoundRect(edge, Offset((size.width - length) / 2, 0f), Size(length, tab), CornerRadius(tab))
+                    drawRoundRect(edge, Offset((size.width - length) / 2, size.height - tab), Size(length, tab), CornerRadius(tab))
+                    if (floatingMode) {
+                        drawRoundRect(edge, Offset(0f, (size.height - length) / 2), Size(tab, length), CornerRadius(tab))
+                        drawRoundRect(edge, Offset(size.width - tab, (size.height - length) / 2), Size(tab, length), CornerRadius(tab))
+                    }
+                    val corner = 22.dp.toPx()
+                    for (right in listOf(false, true)) {
+                        val x = if (right) size.width else 0f
+                        val inward = if (right) -corner else corner
+                        drawLine(edge, Offset(x, 0f), Offset(x + inward, 0f), 8.dp.toPx())
+                        drawLine(edge, Offset(x, 0f), Offset(x, corner), 8.dp.toPx())
+                    }
                 }
-                Row(Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(12.dp))
-                    .background(surfaceColor).border(1.dp, outlineColor, RoundedCornerShape(12.dp))
-                    .testTag("keyboard-resize-position-handle")
-                    .pointerInput(floatingMode) {
-                        detectDragGestures(onDrag = { change, amount ->
-                            change.consume()
+                .pointerInput(floatingMode) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        val point = down.position
+                        run {
+                            val hit = 28.dp.toPx()
+                            dragEdge = when {
+                                point.y < hit -> 1
+                                point.y > size.height - hit -> 4
+                                floatingMode && point.x < hit -> 2
+                                floatingMode && point.x > size.width - hit -> 3
+                                else -> 0
+                            }
+                        }
+                        fun applyDelta(amount: Offset) {
                             val dx = amount.x / density.density
-                            val dy = -amount.y / density.density
-                            if (floatingMode) currentPositionDrag?.invoke(dx, dy)
+                            val dy = amount.y / density.density
+                            if (dragEdge != 0) {
+                                val delta = when (dragEdge) {
+                                    1 -> -dy
+                                    4 -> dy
+                                    2 -> -dx * currentHeightDp / maxWidth.value
+                                    else -> dx * currentHeightDp / maxWidth.value
+                                }
+                                currentHeightDp = (currentHeightDp + delta)
+                                    .coerceIn(minKeyboardHeightDp.toFloat(), maxKeyboardHeightDp.toFloat())
+                                currentOnHeightChange(currentHeightDp.roundToInt())
+                            } else if (floatingMode) currentPositionDrag?.invoke(dx, -dy)
                             else {
-                                currentBottomPaddingDpState = (currentBottomPaddingDpState + dy)
+                                currentBottomPaddingDpState = (currentBottomPaddingDpState - dy)
                                     .coerceIn(0f, maxBottomPaddingDp.toFloat())
                                 currentOnBottomPaddingChange(currentBottomPaddingDpState.roundToInt())
                             }
-                        }, onDragEnd = { if (floatingMode) currentPositionDragEnd?.invoke() },
-                            onDragCancel = { if (floatingMode) currentPositionDragEnd?.invoke() })
-                    }, verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center) {
-                    Icon(if (floatingMode) Icons.Default.OpenWith else Icons.Default.VerticalAlignBottom,
-                        if (floatingMode) "移动键盘" else "调整底部间距", tint = Color.White, modifier = Modifier.size(20.dp))
-                    Text(if (floatingMode) "移动" else "底距 ${currentBottomPaddingDpState.roundToInt()}",
-                        color = Color.White, fontSize = 14.sp, maxLines = 1, softWrap = false)
+                        }
+                        val start = awaitTouchSlopOrCancellation(down.id) { change, over ->
+                            change.consume(); applyDelta(over)
+                        }
+                        if (start != null) {
+                            drag(start.id) { change -> applyDelta(change.positionChange()); change.consume() }
+                            if (dragEdge == 0 && floatingMode) currentPositionDragEnd?.invoke()
+                        }
+                    }
                 }
-            }
+        ) {
 
             Column(
                 modifier = Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp,
-                    top = handleHeight, bottom = bottomInset),
+                    top = handleHeight, bottom = bottomInset + 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {

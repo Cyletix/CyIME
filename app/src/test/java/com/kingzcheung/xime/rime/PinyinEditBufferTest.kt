@@ -12,4 +12,20 @@ class PinyinEditBufferTest {
         assertEquals("nv'er", PinyinEditBuffer.normalized("Nü er"))
         assertEquals("ni'hao", PinyinEditBuffer.normalized("ni hao"))
     }
+    @Test fun engineBoundariesAreVisibleButDoNotChangeTheEditableCode() {
+        val display = PinyinEditDisplay("xiugaishuru", "xiu'gai'shu'ru")
+        assertEquals("xiu'gai'shu'ru", display.text)
+        assertEquals(3, display.rawOffset(3))
+        assertEquals(3, display.rawOffset(4))
+        assertEquals(4, display.displayOffset(3))
+        assertEquals(11, display.rawOffset(display.text.length))
+        val explicit = PinyinEditDisplay("ni''hao", "ni'hao")
+        assertEquals("ni''hao", explicit.text)
+        assertEquals(4, explicit.rawOffset(4))
+    }
+    @Test fun incompatibleOrOldPreeditNeverRewritesRawKeys() {
+        assertEquals("nih", PinyinEditDisplay("nih", "ni'hao").text)
+        assertEquals("nihk", PinyinEditDisplay("nihk", "ni'hao").text)
+        assertEquals("ni'426", PinyinEditBuffer.normalizedT9("ni 426"))
+    }
 }

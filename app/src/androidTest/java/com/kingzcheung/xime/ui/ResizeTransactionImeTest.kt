@@ -146,7 +146,7 @@ class ResizeTransactionImeTest {
 
     private fun chooseMode(id: String) {
         val globe = rule.onAllNodesWithTag("language-key-control", useUnmergedTree = true).onLast()
-        globe.performTouchInput { down(center) }
+        globe.performTouchInput { down(Offset(width / 2f, 4f)) }
         rule.waitUntil(3000) { rule.onAllNodesWithTag("language-schema:$id").fetchSemanticsNodes().isNotEmpty() }
         val choice = rule.onNodeWithTag("language-schema:$id", useUnmergedTree = true).performScrollTo().fetchSemanticsNode()
         val key = globe.fetchSemanticsNode()
@@ -167,8 +167,8 @@ class ResizeTransactionImeTest {
         rule.onNodeWithTag("keyboard-resize-split-button", useUnmergedTree = true).performClick()
         rule.waitUntil(3000) { SettingsPreferences.isSplitKeyboardEnabled(context) }
         rule.onNodeWithTag("split-keyboard-gap", useUnmergedTree = true).assertExists()
-        rule.onNodeWithTag("keyboard-resize-height-handle", useUnmergedTree = true).performTouchInput {
-            down(center); moveBy(Offset(0f, -35f), 80); up()
+        rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true).performTouchInput {
+            down(Offset(width / 2f, 4f)); moveBy(Offset(0f, -35f), 80); up()
         }
         rule.onNodeWithTag("keyboard-opacity-slider", useUnmergedTree = true).performSemanticsAction(SemanticsActions.SetProgress) { it(0.6f) }
         rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()

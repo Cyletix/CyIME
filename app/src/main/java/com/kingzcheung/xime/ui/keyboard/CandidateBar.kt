@@ -8,6 +8,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.draw.rotate
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -313,6 +316,12 @@ fun CandidateBar(
         candidateListState.scrollToItem(0)
     }
 
+    // Keep this animation outside the conditional button branches so changing pages
+    // does not discard the previous angle and jump directly to the destination.
+    val expansionRotation by animateFloatAsState(
+        targetValue = if (candidatePageExpanded) 180f else 0f,
+        animationSpec = tween(200, easing = FastOutSlowInEasing), label = "candidateExpansion",
+    )
     val preeditText = (state as? CandidateBarState.ChineseCandidates)?.let {
         it.preeditText.ifEmpty { it.inputText }
     }.orEmpty()
@@ -496,7 +505,7 @@ fun CandidateBar(
                 }
                 candidatePageExpanded -> {
                     callbacks.onBack?.let {
-                        CandidateExpansionButton(it, iconButtonContainer, visuals.accentColor, expanded = true)
+                        CandidateExpansionButton(it, iconButtonContainer, visuals.accentColor, expanded = true, rotation = expansionRotation)
                     }
                 }
                 displayAssociation.isNotEmpty() && callbacks.onClearAssociation != null && callbacks.onCancelInput == null -> {
@@ -537,7 +546,7 @@ fun CandidateBar(
                 }
                 hasAnyMore && callbacks.onShowMoreCandidates != null -> {
                     CandidateExpansionButton(callbacks.onShowMoreCandidates,
-                        iconButtonContainer, visuals.accentColor, expanded = false)
+                        iconButtonContainer, visuals.accentColor, expanded = false, rotation = expansionRotation)
                 }
             }
             if (state !is CandidateBarState.Idle) {
@@ -694,19 +703,20 @@ fun CandidateItem(
     }
 }
 
-/** 同一按钮尺寸、背景与上箭头；无障碍名称区分展开和收起动作。 */
+/** 收起时向上、展开时向下；沿用工具栏的同一按钮与图标。 */
 @Composable
 private fun CandidateExpansionButton(
     onClick: () -> Unit,
     background: Color,
     foreground: Color,
     expanded: Boolean,
+    rotation: Float,
 ) {
     KeyboardToolbarButton(onClick, background,
-        modifier = Modifier.testTag("candidate-expansion")) {
+        modifier = Modifier.testTag("candidate-expansion").semantics { stateDescription = if (expanded) "已展开" else "已收起" }) {
         Icon(Icons.Default.KeyboardArrowUp,
             contentDescription = if (expanded) "返回键盘" else "展开候选词",
-            tint = foreground, modifier = Modifier.size(24.dp))
+            tint = foreground, modifier = Modifier.size(24.dp).rotate(rotation))
     }
 }
 
@@ -735,16 +745,15 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
             dismissOnClickOutside = false, clippingEnabled = true)) {
         Box(Modifier.widthIn(max = screenWidth - 16.dp)
-            .height(40.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .height(28.dp)
+            .clip(RoundedCornerShape(4.dp))
             .background(background)
-            .border(1.dp, visuals.textColor.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
             .testTag("candidate-preedit")
             .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
                 onClickLabel = "编辑拼音", onClick = onEdit) else Modifier)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 8.dp),
             contentAlignment = Alignment.CenterStart) {
-            Text(text, color = visuals.textColor, fontSize = 18.sp, maxLines = 1,
+            Text(text, color = visuals.textColor, fontSize = 16.sp, maxLines = 1,
                 softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
         }
     }

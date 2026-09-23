@@ -415,9 +415,10 @@ keyboard:
     corner_radius: 8
     spacing_x: 2
     spacing_y: 4.25
-    t9: { spacing_x: 2, spacing_y: 2 }
-    number: { spacing_x: 2, spacing_y: 2 }
-    stroke: { spacing_x: 2, spacing_y: 2 }
+    t9: { spacing_x: 4, spacing_y: 4 }
+    japanese_kana: { spacing_x: 4, spacing_y: 4 }
+    number: { spacing_x: 4, spacing_y: 4 }
+    stroke: { spacing_x: 4, spacing_y: 4 }
     symbol: { spacing_x: 2, spacing_y: 4.25 }
 
   # ── 按键阴影（可选，不设置则使用默认值）──
