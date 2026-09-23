@@ -58,9 +58,8 @@ object HandwritingNativeEngine {
 
     fun initialize(context: Context, modelPath: String): Boolean {
         try {
-            nativeInitialize(modelPath)
-            nativeReady = true
-            return true
+            nativeReady = nativeInitialize(modelPath)
+            return nativeReady
         } catch (e: UnsatisfiedLinkError) {
         }
         if (!loadNativeLibrary(context)) {

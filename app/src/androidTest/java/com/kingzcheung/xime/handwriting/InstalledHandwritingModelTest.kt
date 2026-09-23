@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +33,13 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class InstalledHandwritingModelTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test fun loadedNativeLibraryMustStillRejectAMissingModel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        assertTrue(HandwritingNativeEngine.loadNativeLibrary(context))
+        assertFalse(HandwritingNativeEngine.initialize(context, File(context.cacheDir, "missing-handwriting-model.onnx").absolutePath))
+        HandwritingNativeEngine.release()
+    }
 
     @Test fun installedModelRunsRealInferenceAndRendersTheHandwritingPage() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

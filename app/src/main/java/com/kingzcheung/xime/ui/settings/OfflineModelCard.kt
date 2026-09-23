@@ -2,6 +2,9 @@ package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,28 +30,40 @@ internal fun OfflineModelCard() {
     var selected by remember { mutableStateOf(manager.getSelectedModelId()) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { ModelManager.loadFromRemote(context) } }
-    val choices = remember(models) { manager.getAsrModels().map { it.id } + SpeechModelCatalog.TWO_PASS }
+    val choices = listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
+    val firstPass = when (selected) {
+        SpeechModelCatalog.TWO_PASS -> SpeechModelCatalog.PARAFORMER
+        SpeechModelCatalog.ZIPFORMER_TWO_PASS -> SpeechModelCatalog.ZIPFORMER
+        else -> selected
+    }
+    val refine = selected == SpeechModelCatalog.TWO_PASS || selected == SpeechModelCatalog.ZIPFORMER_TWO_PASS
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(16.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("离线语音模型", style = MaterialTheme.typography.titleMedium)
             Text("按停顿分段，标点转为空格。切换对下一次录音生效。", style = MaterialTheme.typography.bodyMedium)
             choices.forEach { id ->
                 val info = manager.getAsrModels().firstOrNull { it.id == id }
-                val ids = if (id == SpeechModelCatalog.TWO_PASS)
-                    listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE) else listOf(id)
-                val state = ids.mapNotNull { downloads[it] }.filterIsInstance<ModelDownloadState.Downloading>().firstOrNull()
+                val isCorrection = id == SpeechModelCatalog.SENSEVOICE
+                val ids = listOf(id)
+                val state = downloads[id] as? ModelDownloadState.Downloading
                 val ready = remember(id, downloads, models) { runCatching { manager.selection(id).ready }.getOrDefault(false) }
-                val title = info?.name ?: "Paraformer + SenseVoice 双模型"
-                val detail = info?.description ?: "中英流式预览，多语第二遍校正；约 455 MB，日语需等定稿，内存与耗电高于单模型。"
+                val checked = if (isCorrection) refine else firstPass == id
+                val title = if (isCorrection) "SenseVoice 二次校正" else info?.name.orEmpty()
+                val detail = if (isCorrection) "对所选模型逐段复核，支持中英日粤韩；额外约 229 MB，较慢的设备可关闭。"
+                    else info?.description.orEmpty()
                 HorizontalDivider()
-                Row(Modifier.fillMaxWidth().selectable(selected = selected == id, enabled = ready, role = Role.RadioButton,
-                    onClick = { manager.setModel(id); selected = id }), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = selected == id, enabled = ready, onClick = null)
+                val selectionModifier = if (isCorrection) Modifier.toggleable(value = checked, enabled = ready || checked,
+                    role = Role.Switch, onValueChange = { manager.setRefinementEnabled(it); selected = manager.getSelectedModelId() })
+                    else Modifier.selectable(selected = checked, enabled = ready, role = Role.RadioButton,
+                        onClick = { manager.setFirstPassModel(id); selected = manager.getSelectedModelId() })
+                Row(Modifier.fillMaxWidth().testTag("speech-choice:$id").then(selectionModifier), verticalAlignment = Alignment.CenterVertically) {
+                    if (!isCorrection) RadioButton(selected = checked, enabled = ready, onClick = null)
                     Column(Modifier.weight(1f)) {
                         Text(title, style = MaterialTheme.typography.titleSmall)
                         Text(detail, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    if (isCorrection) Switch(checked = checked, enabled = ready || checked, onCheckedChange = null)
                     if (!ready && state == null) TextButton(onClick = {
                         error = null
                         scope.launch {

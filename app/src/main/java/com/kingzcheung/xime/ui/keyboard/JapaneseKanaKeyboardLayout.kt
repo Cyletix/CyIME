@@ -207,18 +207,9 @@ internal fun KanaFlickButton(
         val fontSp = KeyboardKeyMetrics.labelSizeSp(key.center.label, KeyboardKeyMetrics.LabelSize.value,
             maxWidth.value, maxHeight.value, density.fontScale, textScale)
         if (pressed) KanaDirectionIndicator(direction, MaterialTheme.colorScheme.primary)
-        if (key.center.romaji == ",") {
-            val availableHeight = (maxHeight.value - 4f).coerceAtLeast(1f) / density.fontScale
-            val hintSize = minOf(14f * contentScale, maxWidth.value / (density.fontScale * 4.8f), availableHeight * 0.17f)
-            val centerSize = minOf(fontSp, 22f * contentScale, maxWidth.value / (density.fontScale * 2.7f), availableHeight * 0.30f)
-            Box(Modifier.fillMaxWidth().height(minOf(maxHeight, maxWidth * 1.5f))) {
-                KanaDirectionLabels(key, foreground, centerSize, hintSize)
-            }
-        } else {
-            Text(key.center.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
-                color = foreground, fontSize = fontSp.sp, lineHeight = (fontSp * 1.2f).sp,
-                maxLines = 1, softWrap = false, fontFamily = AppFonts.keyFontFamily)
-        }
+        Text(key.center.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+            color = foreground, fontSize = fontSp.sp, lineHeight = (fontSp * 1.2f).sp,
+            maxLines = 1, softWrap = false, fontFamily = AppFonts.keyFontFamily)
         if (pressed) KanaFlickPreview(key, direction, background, foreground, contentScale)
     }
 }

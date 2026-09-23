@@ -92,7 +92,7 @@ internal class LocalSpeechSession(
                 }
             } catch (_: java.util.concurrent.RejectedExecutionException) {
                 synchronized(outputLock) { pending.remove(id); publish(id, "", boundary) }
-                fail("第二遍识别队列已满，请改用 Paraformer 或 SenseVoice 单模型")
+                fail("第二遍识别队列已满，请关闭 SenseVoice 二次校正后重试")
             }
         }
     }

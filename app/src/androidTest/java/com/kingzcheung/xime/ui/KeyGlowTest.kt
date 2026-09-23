@@ -30,7 +30,7 @@ class KeyGlowTest {
         File(dir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test fun quickTapGlowsInsideKeyAndFullyDisappearsWithinHalfSecond() {
+    @Test fun quickTapGlowsPastHalfSecondAndFullyDisappearsAtOneSecond() {
         var taps = 0
         rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
             Box(Modifier.size(160.dp, 110.dp).background(Color.White).testTag("frame").padding(24.dp)) {
@@ -48,8 +48,10 @@ class KeyGlowTest {
             if (before.getPixel(x, y) == android.graphics.Color.WHITE) assertEquals(before.getPixel(x, y), glow.getPixel(x, y))
         }
         save("key-glow-active.png", glow)
-        rule.mainClock.advanceTimeBy(400)
-        assertTrue("animation must finish within 500 ms", before.sameAs(snapshot("frame")))
+        rule.mainClock.advanceTimeBy(512)
+        assertFalse("glow must still be visible after half a second", before.sameAs(snapshot("frame")))
+        rule.mainClock.advanceTimeBy(432)
+        assertTrue("animation must finish at one second (plus frame scheduling)", before.sameAs(snapshot("frame")))
         rule.runOnIdle { assertEquals(1, taps) }
     }
 
@@ -92,7 +94,7 @@ class KeyGlowTest {
             rule.onNodeWithTag(tag).performTouchInput { down(center); up() }
             rule.mainClock.advanceTimeBy(96)
             assertFalse("$tag missing glow", before.sameAs(snapshot(tag)))
-            rule.mainClock.advanceTimeBy(416)
+            rule.mainClock.advanceTimeBy(944)
             assertTrue("$tag did not fade", before.sameAs(snapshot(tag)))
         }
         rule.runOnIdle { assertEquals(6, taps) }
@@ -124,6 +126,12 @@ class KeyGlowTest {
             layouts.single().layoutInput.style.fontSize.value
         }
         fontSizes.forEach { assertEquals(fontSizes[0], it, 0.1f) }
+        rule.onNodeWithText("、").assertExists()
+        rule.onNodeWithText("。").assertDoesNotExist()
+        rule.onNodeWithText("？").assertDoesNotExist()
+        val cap = snapshot("kana-punctuation")
+        assertEquals("punctuation is an ordinary gray key", Color(0xFF2C2D32).value,
+            Color(cap.getPixel(cap.width / 4, cap.height / 4)).value)
         save("japanese-key-proportions.png", snapshot("japanese"))
     }
 }

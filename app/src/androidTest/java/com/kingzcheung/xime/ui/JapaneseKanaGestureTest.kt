@@ -76,9 +76,10 @@ class JapaneseKanaGestureTest {
         rule.runOnIdle { assertEquals(listOf(JapaneseKanaAction.Input("ta")), actions) }
     }
 
-    @Test fun punctuationShowsItsChoicesAndOnlyCommitsTheFinalDirection() {
+    @Test fun punctuationOnlyShowsCenterAtRestAndCommitsTheFinalFlick() {
         setKey(",")
-        for (label in listOf("、", "。", "？", "！", "・")) rule.onNodeWithText(label).assertIsDisplayed()
+        rule.onNodeWithText("、").assertIsDisplayed()
+        for (label in listOf("。", "？", "！", "・")) rule.onNodeWithText(label).assertDoesNotExist()
         val key = rule.onNodeWithTag("kana")
         key.performTouchInput { down(center); moveTo(center + Offset(0f, -40f * density)) }
         assertEquals("？", rule.onNodeWithTag("kana-flick-preview").fetchSemanticsNode().config[SemanticsProperties.StateDescription])

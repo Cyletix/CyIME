@@ -21,7 +21,7 @@ class LocalSpeechModelsTest {
         val args = InstrumentationRegistry.getArguments()
         val manager = AsrModelManager(context)
         val results = JSONArray()
-        for (mode in listOf("zipformer-zh-int8", SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.TWO_PASS)) {
+        for (mode in listOf("zipformer-zh-int8", SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.ZIPFORMER_TWO_PASS, SpeechModelCatalog.TWO_PASS)) {
             if (args.getString("mode") != null && args.getString("mode") != mode) continue
             val base = manager.selection(mode)
             val selection = base.copy(
@@ -30,6 +30,7 @@ class LocalSpeechModelsTest {
             if (!selection.ready) continue
             val loadedAt = System.nanoTime()
             val engine = SherpaSpeechEngine(context, selection)
+            assertEquals(selection.first != null && selection.secondDir != null, engine.hasRefinement)
             val loadMs = (System.nanoTime() - loadedAt) / 1e6
             try {
                 val clips = if (mode == "zipformer-zh-int8" || mode == SpeechModelCatalog.PARAFORMER)

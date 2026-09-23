@@ -18,7 +18,7 @@ class LocalSpeechServiceTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val root = File(context.getExternalFilesDir(null), "speech-eval")
         assumeTrue(File(root, "zh.wav").isFile)
-        for (id in listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)) {
+        for (id in listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)) {
             val info = AsrModelManager(context).getAsrModels().first { it.id == id }
             val destination = File(context.filesDir, "models/$id").apply { mkdirs() }
             for (name in info.files) {
@@ -39,7 +39,7 @@ class LocalSpeechServiceTest {
         }
         try {
             assertTrue(client.ensureBound())
-            for (id in listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.TWO_PASS, SpeechModelCatalog.SENSEVOICE)) {
+            for (id in listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.TWO_PASS, SpeechModelCatalog.ZIPFORMER_TWO_PASS, SpeechModelCatalog.ZIPFORMER)) {
                 assertTrue("$id: $errors", client.startAsr(id, cb))
                 for (start in pcm.indices step 3200) {
                     client.pushAsrAudio(pcm.copyOfRange(start, (start + 3200).coerceAtMost(pcm.size)))
@@ -49,7 +49,7 @@ class LocalSpeechServiceTest {
                 assertTrue("$id: $text / $errors", text.contains("时间") && text.contains("下午"))
                 assertTrue(errors.toString(), errors.isEmpty())
             }
-            assertTrue(client.startAsr(SpeechModelCatalog.SENSEVOICE, cb))
+            assertTrue(client.startAsr(SpeechModelCatalog.ZIPFORMER_TWO_PASS, cb))
             client.pushAsrAudio(pcm)
             client.cancelAsr()
             val afterCancel = snapshots.size
