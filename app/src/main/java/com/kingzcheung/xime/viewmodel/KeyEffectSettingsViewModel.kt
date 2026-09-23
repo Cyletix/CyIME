@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 
 data class KeyEffectUiState(
     val soundEnabled: Boolean = true,
+    val keyGlowEnabled: Boolean = true,
     val soundVolume: Int = 50,
     val hapticMode: String = "following_system",
     val hapticOnKeyUp: Boolean = false,
@@ -27,6 +28,7 @@ class KeyEffectSettingsViewModel(application: Application) : AndroidViewModel(ap
 
     private val _uiState = MutableStateFlow(KeyEffectUiState(
         soundEnabled = SettingsPreferences.isSoundEnabled(context),
+        keyGlowEnabled = SettingsPreferences.getPrefsPublic(context).getBoolean("key_glow_enabled", true),
         soundVolume = SettingsPreferences.getSoundVolume(context),
         hapticMode = SettingsPreferences.getHapticMode(context),
         hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context),
@@ -53,6 +55,11 @@ class KeyEffectSettingsViewModel(application: Application) : AndroidViewModel(ap
         }
         val hasAmp = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && vibrator.hasAmplitudeControl()
         _uiState.update { it.copy(hasAmplitudeControl = hasAmp) }
+    }
+
+    fun setKeyGlowEnabled(enabled: Boolean) {
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean("key_glow_enabled", enabled).apply()
+        _uiState.update { it.copy(keyGlowEnabled = enabled) }
     }
 
     fun setSoundEnabled(enabled: Boolean) {

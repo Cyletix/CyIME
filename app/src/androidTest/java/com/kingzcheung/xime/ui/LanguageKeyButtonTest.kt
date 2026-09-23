@@ -56,7 +56,11 @@ class LanguageKeyButtonTest {
                         modifier = Modifier.size(100.dp).testTag("language-key"),
                         backgroundColor = Color.White, textColor = Color.Black,
                         onClick = { events += "tap" },
-                        swipeText = "1", onSwipe = { events += "up:$it" },
+                        swipeText = "中", onSwipe = { events += "up:$it" },
+                        swipeDownText = "中", onSwipeDown = { events += "down:$it" },
+                        longPressItems = listOf("中", "英"),
+                        onLongPressSelect = { events += "legacy:$it" },
+                        onSwipeStateChange = { _, _ -> events += "legacy-preview" },
                         shadowEnabled = false,
                     )
                 }

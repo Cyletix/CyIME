@@ -974,6 +974,7 @@ private fun ResetKey(
             .then(shadowModifier)
             .clip(shape)
             .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .keyGlow()
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true

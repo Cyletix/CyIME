@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,7 +81,7 @@ internal fun languageMenuSelection(
     return schemas.getOrNull(index)?.schemaId
 }
 
-/** 点按及下滑沿用原配置，取消上滑；长按后移入菜单，松手按 schemaId 切换方案。 */
+/** 统一语言键：点按切换、长按选方案；不接受方案定义的文字预览和滑动菜单。 */
 @Composable
 fun LanguageKeyButton(
     onClick: () -> Unit,
@@ -204,18 +207,18 @@ fun LanguageKeyButton(
             }
     ) {
         SwipeableKeyButton(
-            text = text, icon = icon, onClick = onClick,
+            text = "语言切换", icon = rememberVectorPainter(Icons.Default.Language), onClick = onClick,
             backgroundColor = backgroundColor,
             textColor = if (icon != null) iconColor else textColor,
-            modifier = Modifier.fillMaxSize().testTag("language-key-control"), layoutMode = layoutMode,
+            modifier = Modifier.fillMaxSize().testTag("language-key-control"), layoutMode = ButtonLayout.STANDARD,
             fontSize = fontSize, swipeFontSize = swipeFontSize,
-            swipeText = null, swipeDownText = swipeDownText,
-            swipeUpKeyLabel = null, swipeDownKeyLabel = swipeDownKeyLabel,
-            badgeText = badgeText, onSwipe = null, onSwipeDown = onSwipeDown,
-            onSwipeStateChange = onSwipeStateChange,
+            swipeText = null, swipeDownText = null,
+            swipeUpKeyLabel = null, swipeDownKeyLabel = null,
+            badgeText = null, onSwipe = null, onSwipeDown = null,
+            onSwipeStateChange = null,
             onPress = onPress, onRelease = onRelease,
-            longPressItems = if (hasMenu) null else longPressItems,
-            onLongPressSelect = if (hasMenu) null else onLongPressSelect,
+            longPressItems = null,
+            onLongPressSelect = null,
             shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
             shadowShapeRadius = shadowShapeRadius,
         )

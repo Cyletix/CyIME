@@ -294,7 +294,7 @@ class RoundThreeImeTest {
             rule.onNodeWithTag("kana-key:a").assertIsDisplayed()
 
             rule.onNodeWithContentDescription("手写").performClick()
-            rule.onNodeWithText("ABC").performTouchInput { down(center); up() }
+            rule.onNodeWithTag("handwriting-key:ime_switch").performTouchInput { down(center); up() }
             rule.waitUntil(10_000) { engine.isAsciiMode() && rule.onAllNodesWithText("英文").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithText("英文").assertIsDisplayed()
             chooseMode("t9_pinyin")
@@ -307,7 +307,7 @@ class RoundThreeImeTest {
             screenshot("round3-handwriting-english-t9")
             // 从九键再进入手写：英文与九键共用同一个 Rime schema 时也必须正确退出 ASCII。
             rule.onNodeWithContentDescription("手写").performClick()
-            rule.onNodeWithText("ABC").performTouchInput { down(center); up() }
+            rule.onNodeWithTag("handwriting-key:ime_switch").performTouchInput { down(center); up() }
             rule.waitUntil(10_000) { engine.isAsciiMode() && rule.onAllNodesWithText("英文").fetchSemanticsNodes().isNotEmpty() }
             chooseMode("t9_pinyin")
             rule.waitUntil(10_000) {

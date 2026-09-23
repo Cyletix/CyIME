@@ -105,7 +105,7 @@ fun KeyboardView(
     onHapticFeedback: (() -> Unit)? = null,
 ) {
     // 状态栏按钮走一次完整按键反馈，声音和振动均由用户设置控制。
-    val toolbarFeedback = { callbacks.onKeyPressDown?.invoke("standard"); Unit }
+    val toolbarFeedback = { callbacks.onKeyPressDown?.invoke("toolbar"); Unit }
     val keyboardState by viewModel.keyboardState.collectAsStateWithLifecycle()
     val page by viewModel.page.collectAsStateWithLifecycle()
     val candidatePageExpanded by viewModel.candidatePageExpanded.collectAsStateWithLifecycle()

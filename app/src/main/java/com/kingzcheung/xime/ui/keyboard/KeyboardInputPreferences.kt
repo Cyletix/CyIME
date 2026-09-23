@@ -20,6 +20,7 @@ data class KeyboardInputPreferences(
     val cursorStepDp: Float = 10f,
     val keyTextScale: Float = 1.15f,
     val fixedSymbols: String = "",
+    val keyGlowEnabled: Boolean = true,
     val handwritingPauseSeconds: Float = 0.5f,
 ) {
     companion object {
@@ -29,6 +30,7 @@ data class KeyboardInputPreferences(
             // 本轮将旧的一秒默认值迁移为半秒；其他已设时长保留。
             val pause = prefs.getFloat("handwriting_pause_seconds_v2", if (legacyPause == 1f) 0.5f else legacyPause)
             return KeyboardInputPreferences(
+                keyGlowEnabled = prefs.getBoolean("key_glow_enabled", true),
                 spaceHold = SpaceHoldAction.entries.firstOrNull { it.name == prefs.getString("space_hold_action", "CURSOR") }
                     ?: SpaceHoldAction.CURSOR,
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,

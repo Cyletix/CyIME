@@ -60,7 +60,7 @@ class InferenceClient(private val context: Context) {
     /** 服务是否处于可用绑定状态（进程存活且 binder 有效）。 */
     fun isBound(): Boolean = bound && service != null
 
-    suspend fun ensureBound(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun ensureBound(timeoutMs: Long = 3_000L): Boolean = withContext(Dispatchers.IO) {
         if (isBound()) return@withContext true
 
         // 服务进程可能崩溃重启：latch 是一次性的，重绑前必须重建，
@@ -73,7 +73,7 @@ class InferenceClient(private val context: Context) {
             if (!ok) return@withContext false
         }
 
-        val connected = connectLatch.await(3, TimeUnit.SECONDS)
+        val connected = connectLatch.await(timeoutMs, TimeUnit.MILLISECONDS)
         connected && isBound()
     }
 

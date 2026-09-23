@@ -133,7 +133,7 @@ class FeedbackManager(private val context: Context) {
         pool.play(soundId, volume, volume, 1, 0, 1.0f)
     }
 
-    fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false) {
+    fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false, type: KeyFeedbackType = KeyFeedbackType.CHARACTER) {
         when (hapticMode) {
             HapticMode.Enabled -> {}
             HapticMode.Disabled -> return
@@ -158,6 +158,8 @@ class FeedbackManager(private val context: Context) {
             HapticFeedbackConstants.LONG_PRESS
         } else if (keyUp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             HapticFeedbackConstants.KEYBOARD_RELEASE
+        } else if (type == KeyFeedbackType.CURSOR_STEP) {
+            HapticFeedbackConstants.TEXT_HANDLE_MOVE
         } else {
             HapticFeedbackConstants.KEYBOARD_TAP
         }
@@ -181,21 +183,18 @@ class FeedbackManager(private val context: Context) {
         }
     }
 
-    fun performKeyPressEffect(keyType: String = "standard", view: View) {
-        playKeySound(keyType)
-        hapticFeedback(view)
+    fun performKeyPressEffect(keyType: String = "toolbar", view: View) {
+        val type = KeyFeedbackType.fromKey(keyType)
+        playKeySound(type.sound)
+        hapticFeedback(view, type = type)
     }
 
     fun performKeyPressDownEffect(key: String, view: View) {
-        val keyType = when (key) {
-            "delete", "clear_composition" -> "delete"
-            "enter" -> "enter"
-            "space" -> "space"
-            else -> "standard"
-        }
-        playKeySound(keyType)
-        hapticFeedback(view)
+        val type = KeyFeedbackType.fromKey(key)
+        playKeySound(type.sound)
+        hapticFeedback(view, type = type)
     }
+
 
     fun performVibration() {
         if (hapticMode == HapticMode.Disabled) return

@@ -524,7 +524,7 @@ fun EmojiButton(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(4.dp)).keyGlow()
             .tolerantClick(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

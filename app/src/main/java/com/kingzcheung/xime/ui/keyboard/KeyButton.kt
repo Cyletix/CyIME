@@ -334,7 +334,7 @@ fun KeyButton(
                 if (isPressed) darkenColor(backgroundColor, 0.2f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
-            ),
+            ).keyGlow(),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -558,7 +558,7 @@ fun SwipeableKeyButton(
                 if (isPressed) backgroundColor.copy(alpha = 0.7f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
-            ),
+            ).keyGlow(),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
         val contentScale = adaptiveKeyContentScale(maxHeight.value)
@@ -649,7 +649,7 @@ fun SwipeableKeyButton(
                     painter = icon,
                     contentDescription = text,
                     tint = textColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize)
                 )
             } else {
                 Text(
@@ -763,7 +763,7 @@ fun IconKeyButton(
     iconColor: Color,
     modifier: Modifier = Modifier,
     isHighlighted: Boolean = false,
-    iconSize: androidx.compose.ui.unit.Dp = 20.dp,
+    iconSize: androidx.compose.ui.unit.Dp = KeyboardKeyMetrics.FunctionIconSize,
     onPress: (() -> Unit)? = null,
     onRelease: (() -> Unit)? = null,
     shadowEnabled: Boolean = true,
@@ -830,7 +830,7 @@ fun IconKeyButton(
                 if (isPressed) darkenColor(backgroundColor, 0.1f)
                 else if (isHighlighted) darkenColor(backgroundColor, 0.2f)
                 else backgroundColor
-            ),
+            ).keyGlow(),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -862,7 +862,7 @@ fun SwipeableIconKeyButton(
     iconColor: Color,
     modifier: Modifier = Modifier,
     isHighlighted: Boolean = false,
-    iconSize: androidx.compose.ui.unit.Dp = 20.dp,
+    iconSize: androidx.compose.ui.unit.Dp = KeyboardKeyMetrics.FunctionIconSize,
     swipeText: String? = null,
     onSwipe: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -1129,7 +1129,7 @@ fun SwipeableIconKeyButton(
                 if (isPressed) darkenColor(backgroundColor, 0.2f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
-            ),
+            ).keyGlow(),
         contentAlignment = Alignment.Center
     ) {
         Icon(

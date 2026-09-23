@@ -163,7 +163,7 @@ internal fun EditorActionKey(
     Box(modifier.fillMaxSize().padding(2.dp)
         .then(shadowModifier)
         .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-        .background(if (pressed) foreground.copy(alpha = 0.18f) else background)
+        .background(if (pressed) foreground.copy(alpha = 0.18f) else background).keyGlow()
         // 独立合并每个按键，避免被面板的点击屏障合并成一个无障碍节点。
         .semantics(mergeDescendants = true) { contentDescription = label; role = Role.Button; onClick { action(); true } }
         .pointerInput(repeatable) {
@@ -185,6 +185,6 @@ internal fun EditorActionKey(
                 }
             })
         }, contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
     }
 }

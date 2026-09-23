@@ -45,6 +45,27 @@ class EditorCursorTest {
         }
     }
 
+    @Test fun `cursor feedback fires for each unicode character but stops at boundaries`() {
+        val ic = editor(0, text = "a😀b")
+        val cursor = EditorCursor()
+        var ticks = 0
+        cursor.moveWithFeedback(ic, 8) { ticks++ }
+        assertEquals(3, ticks)
+        cursor.moveWithFeedback(ic, 2) { ticks++ }
+        assertEquals(3, ticks)
+        cursor.moveWithFeedback(ic, -8) { ticks++ }
+        assertEquals(6, ticks)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `rejected editor operations do not report cursor feedback`() {
+        val ic = editor(1)
+        doReturn(false).whenever(ic).setSelection(any(), any())
+        var ticks = 0
+        EditorCursor().moveWithFeedback(ic, 3) { ticks++ }
+        assertEquals(0, ticks)
+    }
+
     @Test fun `vertical arrows delegate visual wrapping to the editor`() {
         val up = editor(4, text = "abcdefghijklmnop")
         assertCancelKeyPair(up, KeyEvent.KEYCODE_DPAD_UP) { EditorCursor().moveVertical(up, -1) }

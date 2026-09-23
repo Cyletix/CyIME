@@ -43,7 +43,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },
             onKeyRelease = { key ->
-                service.feedbackManager.hapticFeedback(view, keyUp = true)
+                service.feedbackManager.hapticFeedback(view, keyUp = true, type = KeyFeedbackType.fromKey(key))
             },
             onCandidateSelect = { index ->
                 service.keyRouter.selectCandidate(index)
@@ -236,7 +236,9 @@ internal fun rememberImeKeyboardCallbacks(
                 service.keyRouter.deleteCandidateGlobal(globalIndex)
             },
             onRequestExpandedCandidates = { service.refreshExpandedCandidates() },
-            onCursorMove = { direction -> service.schemaController.moveEditorCursor(direction) },
+            onCursorMove = { direction -> service.schemaController.moveEditorCursor(direction) {
+                service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
+            } },
             onCursorMoveVertical = { steps -> service.schemaController.moveEditorCursorVertical(steps) },
             onGestureAction = { action, value ->
                 action.execute(service, value)

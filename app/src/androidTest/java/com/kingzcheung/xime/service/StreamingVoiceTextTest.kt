@@ -13,6 +13,32 @@ import org.junit.Test
 class StreamingVoiceTextTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
+    @Test fun realEditorReceivesSpaceSeparatedSpeechPartialsAndFinals() {
+        lateinit var editor: EditText
+        rule.setContent { AndroidView(factory = { EditText(it).also { view -> editor = view } }) }
+        rule.runOnUiThread {
+            editor.requestFocus()
+            val ic = editor.onCreateInputConnection(EditorInfo())!!
+            var state = InputUIState(voiceSticky = true)
+            val handler = VoiceRecognitionHandler(rule.activity, { state = it }, { state }, { ic })
+            VoiceRecognitionHandler::class.java.getDeclaredField("toolbarSession").apply { isAccessible = true }.setBoolean(handler, true)
+            fun emit(method: String, text: String) {
+                VoiceRecognitionHandler::class.java.getDeclaredMethod(method, String::class.java).apply { isAccessible = true }.invoke(handler, text)
+            }
+            emit("handlePartialResult", "你好，wor")
+            assertEquals("你好 wor", editor.text.toString())
+            emit("handleSpeechResult", "你好，world。")
+            assertEquals("你好 world", editor.text.toString())
+            emit("handlePartialResult", "How are")
+            assertEquals("你好 world How are", editor.text.toString())
+            emit("handleSpeechResult", "How are you？")
+            assertEquals("你好 world How are you", editor.text.toString())
+            handler.abandonSession()
+            emit("handlePartialResult", "late result")
+            assertEquals("你好 world How are you", editor.text.toString())
+        }
+    }
+
     @Test fun partialsAreVisibleImmediatelyAndOnlyOwnedTextCanBeRevised() {
         lateinit var editor: EditText
         rule.setContent { AndroidView(factory = { EditText(it).also { view -> editor = view } }) }

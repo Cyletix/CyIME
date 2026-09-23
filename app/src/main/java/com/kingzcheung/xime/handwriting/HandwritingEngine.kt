@@ -62,7 +62,8 @@ object HandwritingEngine {
             }
 
             // 调用方均在后台线程（键盘 LaunchedEffect(IO)/切方案 Thread），runBlocking 桥接 IPC
-            val bound = runBlocking { client.ensureBound() }
+            // 更新后的首次进程启动可能超过 3 秒；后台等待真实连接，连接完成立即返回。
+            val bound = runBlocking { client.ensureBound(timeoutMs = 10_000L) }
             if (!bound) {
                 Log.e(TAG, "Failed to bind InferenceService for handwriting")
                 return false

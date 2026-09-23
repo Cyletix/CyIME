@@ -438,6 +438,11 @@ class RimeEngine {
         }
     }
 
+    /** 用户取消输入从后台按键队列调用：等待引擎锁，不能把清空操作静默丢掉。 */
+    internal fun clearQueuedComposition() = locked {
+        if (nativeHasSession()) nativeClearComposition()
+    }
+
     fun clearComposition() {
         if (!nativeHasSession()) return
         tryLocked(Unit) {
