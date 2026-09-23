@@ -46,13 +46,12 @@ internal fun PreeditEditorBar(
     onCaret: (Int) -> Unit,
     onReplace: (String) -> Unit,
     preedit: String = session.text,
-    backgroundColor: Color = keyColor,
 ) {
     if (LocalOnBackPressedDispatcherOwner.current != null) BackHandler(onBack = onClose)
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val scroll = rememberScrollState()
     val currentCaret by rememberUpdatedState(onCaret)
-    val display = remember(session.text, preedit) { PinyinEditDisplay(session.text, preedit.removePrefix(session.protectedText).trim()) }
+    val display = remember(session.text, session.isT9, session.protectedText, preedit) { PinyinEditDisplay(session.text, preedit.removePrefix(session.protectedText).trim(), session.isT9) }
     val code = display.text.ifEmpty { " " }
     val displayCaret = display.displayOffset(session.caret)
     LaunchedEffect(session.caret, code, layout) {
@@ -62,7 +61,7 @@ internal fun PreeditEditorBar(
                 scroll.scrollTo((it.right - scroll.viewportSize + 16).toInt().coerceAtLeast(0))
         }
     }
-    val gap = 0
+    val gap = with(LocalDensity.current) { 2.dp.roundToPx() }
     val position = remember(gap) { object : PopupPositionProvider {
         override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
             layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset = IntOffset(
@@ -73,13 +72,13 @@ internal fun PreeditEditorBar(
         val width = maxWidth
         Popup(popupPositionProvider = position,
             properties = PopupProperties(focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
-            Row(Modifier.width(width).height(68.dp).background(backgroundColor.copy(alpha = 1f))
-                .padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp).testTag("preedit-editor"),
+            Row(Modifier.width(width).height(44.dp).testTag("preedit-editor")
+                .padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(28.dp))
-                    .background(keyColor.copy(alpha = 1f)).padding(horizontal = 16.dp),
+                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp))
+                    .background(keyColor.copy(alpha = 0.62f)).padding(horizontal = 8.dp),
                     contentAlignment = Alignment.CenterStart) {
-                    Text(code, color = textColor, fontSize = 24.sp, maxLines = 1, softWrap = false,
+                    Text(code, color = textColor, fontSize = 18.sp, maxLines = 1, softWrap = false,
                         onTextLayout = { layout = it }, modifier = Modifier.fillMaxWidth().horizontalScroll(scroll)
                             .padding(vertical = 4.dp).testTag("preedit-editor-code")
                             .semantics {
@@ -105,8 +104,9 @@ internal fun PreeditEditorBar(
                                 }
                             })
                 }
-                Box(Modifier.size(48.dp).clickable(onClick = onClose).testTag("preedit-editor-close"), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Close, "关闭拼音编辑", tint = textColor, modifier = Modifier.size(28.dp))
+                Box(Modifier.padding(start = 4.dp).size(32.dp).clip(RoundedCornerShape(4.dp))
+                    .background(keyColor.copy(alpha = 0.62f)).clickable(onClick = onClose).testTag("preedit-editor-close"), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Close, "关闭拼音编辑", tint = textColor, modifier = Modifier.size(24.dp))
                 }
             }
         }

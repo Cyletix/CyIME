@@ -28,4 +28,12 @@ class PinyinEditBufferTest {
         assertEquals("nihk", PinyinEditDisplay("nihk", "ni'hao").text)
         assertEquals("ni'426", PinyinEditBuffer.normalizedT9("ni 426"))
     }
+    @Test fun nineKeyDigitsShowEngineReadingWithReversibleCaretOffsets() {
+        val display = PinyinEditDisplay("ni'426", "ni'hao", true)
+        assertEquals("ni'hao", display.text)
+        for (i in 0..6) assertEquals(i, display.rawOffset(display.displayOffset(i)))
+        assertEquals("ni'hen", PinyinEditDisplay("ni436", "ni'hen", true).text)
+        // A stale reading cannot replace literal letters the user explicitly entered.
+        assertEquals("ni'426", PinyinEditDisplay("ni'426", "mi'hao", true).text)
+    }
 }

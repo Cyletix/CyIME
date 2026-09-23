@@ -314,12 +314,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         keyboardViewModel.requestExpandedPageScroll(direction)
     }
     
-    internal val predictionManager = PredictionManager(
+    internal val predictionManager: PredictionManager = PredictionManager(
         context = this,
         serviceScope = serviceScope,
         onPredictionResult = { candidates ->
             candidateState.value = candidateState.value.copy(
-                associationCandidates = if (isChineseMode) candidates else emptyList()
+                associationCandidates = if (isChineseMode && canPredictAfter(predictionManager.lastCommittedText)) candidates else emptyList()
             )
         },
     )
@@ -563,7 +563,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     
     private fun getPredictionFromPlugin(contextText: String) {
-        if (!isChineseMode) return
+        if (!isChineseMode || !canPredictAfter(contextText)) return
         predictionManager.getPrediction(contextText)
     }
     
@@ -1339,7 +1339,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + contentBottomPaddingDp + activeBottomDp).dp else (floatingCardContentHeight + contentBottomPaddingDp + overlayPanelExtra + activeBottomDp).dp)
+                                    .height(activeBottomDp.dp)
                                     .align(androidx.compose.ui.Alignment.BottomCenter)
                                     .graphicsLayer { alpha = state.keyboardOpacity }
                                     .keyboardBackground(rootTheme.keyboardBackground, isDark, keyboardBgColor)
@@ -1498,7 +1498,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 inlineSuggestions = inlineSuggestionManager?.suggestions.orEmpty(),
                                 modifier = Modifier.graphicsLayer {
                                     alpha = if (state.isFloatingMode || state.showKeyboardResize) 1f else state.keyboardOpacity
-                                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                                    compositingStrategy = CompositingStrategy.Offscreen
                                 },
                                 // 非按键交互（符号/表情面板、菜单栏、候选栏按钮）的振动，
                                 // 语义与按键按下反馈完全一致（模式/时长/振幅走同一配置）
@@ -2488,6 +2488,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     private fun commitTextAndPredict(text: String, isPaste: Boolean) {
         commitTextSilently(text, isPaste)
+        if (!canPredictAfter(text)) {
+            predictionManager.invalidatePendingPredictions()
+            candidateState.value = candidateState.value.copy(associationCandidates = emptyList(), pendingEnglishText = "")
+            return
+        }
         if (isChineseMode) {
             mainHandler.post {
                 if (!uiState.value.isAsciiMode) {

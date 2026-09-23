@@ -110,4 +110,49 @@ class PinyinEditEngineTest {
         engine.clearQueuedComposition()
     }
 
+    @Test fun schemaSwitchReappliesPageSizeToTheLiveSchema() {
+        mode("rime_ice")
+        for ((schema, code) in listOf("double_pinyin_flypy" to "ui", "rime_ice" to "shi", "pinyin_14jian" to "shi")) {
+            engine.setPageSize(schema, 12) // Deliberately set BEFORE switching, as the service does.
+            mode(schema); engine.setInput(code)
+            assertEquals("$schema lost mobile page size", 12, engine.getCandidates().size)
+            engine.setPageSize(schema, 12)
+            assertEquals(code, engine.getInput())
+            engine.clearQueuedComposition()
+        }
+        engine.setPageSize("rime_ice", 20)
+    }
+    @Test fun englishRejectsRestoredFullWidthButChineseRetainsItsOption() {
+        mode("rime_ice"); engine.setOption("full_shape", true)
+        assertTrue(engine.getOption("full_shape"))
+        engine.setOption("ascii_mode", true)
+        val result = engine.processKeyAndGetResult('s'.code, 0)
+        assertTrue("ASCII passes through or commits half-width: $result", result.committedText in listOf("", "s"))
+        assertEquals("", engine.getInput())
+        assertFalse(engine.getOption("full_shape"))
+        engine.setOption("full_shape", true)
+        engine.processKey('d'.code, 0)
+        assertTrue(engine.commit() in listOf("", "d"))
+        assertFalse(engine.getOption("full_shape"))
+        engine.setOption("ascii_mode", false)
+    }
+    @Test fun queuedNineKeyWaitsForContendedLockAndFlushesBeforeReturning() {
+        mode("t9_pinyin")
+        val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            for (key in listOf('6'.code, 0xff08)) {
+                val entered = java.util.concurrent.CountDownLatch(1)
+                RimeEngine.rimeLock.lock()
+                val result = try {
+                    val future = worker.submit<Boolean> { entered.countDown(); engine.processQueuedT9Key(key) }
+                    assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                    Thread.sleep(80)
+                    assertFalse("a key must wait instead of reporting not-consumed", future.isDone)
+                    future
+                } finally { RimeEngine.rimeLock.unlock() }
+                assertTrue(result.get(5, java.util.concurrent.TimeUnit.SECONDS))
+                if (key == '6'.code) assertTrue(engine.getInput().isNotEmpty()) else assertEquals("", engine.getInput())
+            }
+        } finally { worker.shutdownNow() }
+    }
 }

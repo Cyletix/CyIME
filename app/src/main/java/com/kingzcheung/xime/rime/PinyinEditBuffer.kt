@@ -33,13 +33,25 @@ internal object PinyinEditBuffer {
 }
 
 /** Render engine syllable boundaries without inserting them into the editable Rime input. */
-internal class PinyinEditDisplay(raw: String, preedit: String) {
+internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = false) {
     val text: String
     private val offsets: List<Int>
     init {
         val visible = PinyinEditBuffer.normalized(preedit)
         val boundaries = mutableSetOf<Int>()
-        if (visible.replace("'", "") == raw.replace("'", "")) {
+        val reading = visible.replace("'", "")
+        val input = raw.replace("'", "")
+        fun digit(c: Char): Char = when (c) {
+            in 'a'..'c' -> '2'; in 'd'..'f' -> '3'; in 'g'..'i' -> '4'
+            in 'j'..'l' -> '5'; in 'm'..'o' -> '6'; in 'p'..'s' -> '7'
+            in 't'..'v' -> '8'; in 'w'..'z' -> '9'; else -> c
+        }
+        // Numeric keys remain ambiguous in the engine, but display its actual reading.
+        // Literal letters and caret offsets retain their original identity.
+        val matches = input.length == reading.length && input.indices.all {
+            input[it] == reading[it] || isT9 && input[it] in '2'..'9' && input[it] == digit(reading[it])
+        }
+        if (matches) {
             var letters = 0
             visible.forEach { if (it == '\'') boundaries.add(letters) else letters++ }
         }
@@ -50,7 +62,7 @@ internal class PinyinEditDisplay(raw: String, preedit: String) {
                 if (character != '\'' && letters in boundaries && isNotEmpty() && last() != '\'') {
                     append('\''); mapping.add(index)
                 }
-                append(character); mapping.add(index + 1)
+                append(if (matches && character in '2'..'9') reading[letters] else character); mapping.add(index + 1)
                 if (character != '\'') letters++
             }
         }

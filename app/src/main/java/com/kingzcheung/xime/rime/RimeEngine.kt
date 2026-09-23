@@ -272,6 +272,7 @@ class RimeEngine {
         if (!isInitialized) return false
         return tryLocked(false) {
             if (!nativeHasSession() && !nativeCreateSession()) return@tryLocked false
+            enforceAsciiWidth()
             nativeProcessKey(keycode, mask)
         }
     }
@@ -281,6 +282,7 @@ class RimeEngine {
         return tryLocked(RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)) {
             if (!nativeHasSession() && !nativeCreateSession())
                 return@tryLocked RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)
+            enforceAsciiWidth()
             nativeProcessKeyAndGetResult(keycode, mask)
         }
     }
@@ -519,12 +521,18 @@ class RimeEngine {
     private external fun nativePinyinEditSnapshot(): Array<String>
     private external fun nativeSetCaret(caret: Int)
 
+    // English stays half-width even after restoring full_shape from a Chinese schema.
+    // Called under the engine lock; deliberate Chinese full-width input is unchanged.
+    private fun enforceAsciiWidth() {
+        if (nativeIsAsciiMode() && nativeGetOption("full_shape")) nativeSetOption("full_shape", false)
+    }
+
     fun toggleAsciiMode(): Boolean {
         // 用户显式切换操作：阻塞等待锁（部署/维护持锁时排队，完成后自动切换），
         // 不静默失败；调用方保证不在主线程执行（ImeKeyRouter 的 key-process 线程）。
         return locked {
             if (!nativeHasSession() && !nativeCreateSession()) return@locked false
-            nativeToggleAsciiMode()
+            nativeToggleAsciiMode().also { enforceAsciiWidth() }
         }
     }
 
@@ -910,6 +918,14 @@ class RimeEngine {
         tryLocked(Unit) {
             nativeT9ClearComposition(mode)
         }
+    }
+
+    /** A queued T9 key must wait for readers and flush as one transaction, never drop a key on tryLock. */
+    @androidx.annotation.WorkerThread
+    internal fun processQueuedT9Key(keycode: Int): Boolean = locked {
+        val processed = processKey(keycode, 0)
+        if (isInitialized && nativeHasSession()) nativeT9FlushRimeInput()
+        processed
     }
 
     /**

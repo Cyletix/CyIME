@@ -170,14 +170,14 @@ fun SymbolKeyboardLayout(
                     onKeyPress = { action -> if (action == "abc") onBack() else onNumber() },
                     onKeyPressDown = { onHapticFeedback?.invoke() },
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
-                    modifier = Modifier.weight(0.8f),
+                    modifier = Modifier.weight(LocalModeSlotWeight.current),
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius,
                 )
             }
             Row(
                 modifier = Modifier
-                    .weight(2.6f)
+                    .weight(4.2f - 2 * LocalModeSlotWeight.current)
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {

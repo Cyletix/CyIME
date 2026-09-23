@@ -68,6 +68,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             return false
         }
         FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: toggleAsciiMode ok, took ${(System.nanoTime() - t0) / 1_000_000}ms, rime ascii=${service.rimeEngine.isAsciiMode()}, thread=${Thread.currentThread().name}")
+        if (!service.rimeEngine.isAsciiMode()) {
+            // The English width guard must not erase the user's explicit Chinese-width choice.
+            service.rimeEngine.setOption("full_shape", service.rimeEngine.getUserConfigBool("var/option/full_shape"))
+        }
         service.sessionController.persistSchemaOption("ascii_mode", service.rimeEngine.isAsciiMode())
         withContext(Dispatchers.Main) {
             // 显式同步 uiState.isAsciiMode（权威源 = rime 引擎状态），

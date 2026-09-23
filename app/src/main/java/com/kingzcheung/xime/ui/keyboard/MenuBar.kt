@@ -3,10 +3,7 @@ package com.kingzcheung.xime.ui.keyboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,14 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.twotone.Assignment
 import androidx.compose.material.icons.twotone.DarkMode
-import androidx.compose.material.icons.twotone.EmojiEmotions
 import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material.icons.twotone.LightMode
 import androidx.compose.material.icons.twotone.Padding
@@ -31,7 +23,12 @@ import androidx.compose.material.icons.twotone.Settings
 import androidx.compose.material.icons.twotone.SettingsOverscan
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,7 +36,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -95,10 +91,8 @@ fun MenuBar(
     val configuration = LocalConfiguration.current
     val isLandscape = !state.isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
-    val clipboardIcon = rememberVectorPainter(Icons.AutoMirrored.TwoTone.Assignment)
     val quickSendIcon = rememberVectorPainter(Icons.TwoTone.Quickreply)
     val keyboardResizeIcon = rememberVectorPainter(Icons.TwoTone.SettingsOverscan)
-    val emojiIcon = rememberVectorPainter(Icons.TwoTone.EmojiEmotions)
     val darkModeIcon = when (state.darkMode) {
         0 -> rememberVectorPainter(Icons.TwoTone.DarkMode)
         1 -> rememberVectorPainter(Icons.TwoTone.LightMode)
@@ -115,26 +109,44 @@ fun MenuBar(
         else -> "跟随系统"
     }
 
-    // 动态方案开关：图标取第一个状态的首字；标题若有 abbrev 则用 abbrev（多个用 🔁 连接），否则用所有状态 🔁 连接
-    val switchItems = state.schemaSwitches.map { sw ->
-        val textIcon = sw.states.firstOrNull()?.firstOrNull()?.toString() ?: ""
-        val label = if (sw.abbrev.isNotEmpty()) sw.abbrev.joinToString("🔁")
-            else sw.states.joinToString("🔁")
-        MenuItem(icon = null, label = label, action = { callbacks.onToggleSchemaSwitch?.invoke(sw) }, textIcon = textIcon)
+    var showOptions by remember { mutableStateOf(false) }
+    val options = state.schemaSwitches.filter { it.name != "ascii_mode" }
+    if (showOptions) {
+        Column(modifier.fillMaxSize().background(state.backgroundColor)
+            .padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
+            Row(Modifier.fillMaxWidth().height(44.dp).clickable { showOptions = false },
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回菜单", tint = textColor, modifier = Modifier.size(22.dp))
+                Text("输入选项", color = textColor, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp))
+            }
+            options.forEach { sw ->
+                val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
+                val title = when (sw.name) {
+                    "full_shape" -> "中文字符宽度"
+                    "ascii_punct" -> "标点样式"
+                    "simplification" -> "简繁转换"
+                    else -> sw.states.joinToString(" / ")
+                }
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp))
+                    .background(itemBgColor).semantics { stateDescription = current }
+                    .clickable { callbacks.onToggleSchemaSwitch?.invoke(sw) }
+                    .padding(horizontal = 16.dp, vertical = 12.dp).testTag("input-option:${sw.name}"),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, color = textColor, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Text("$current  ›", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+        return
     }
-
     val menuItems = listOf(
-            MenuItem(clipboardIcon, "剪贴板", callbacks.onClipboard),
-            MenuItem(quickSendIcon, "快捷发送", callbacks.onQuickSend),
-            MenuItem(schemaIcon, "输入方案", callbacks.onSchemaList),
-            MenuItem(emojiIcon, "表情", callbacks.onEmoji),
-        ) + switchItems + listOf(
-            MenuItem(customizeIcon, "定制工具栏", callbacks.onToolbarCustomize),
-            MenuItem(keyboardResizeIcon, "键盘调节", callbacks.onKeyboardResize),
-            MenuItem(darkModeIcon, darkModeLabel, callbacks.onToggleDarkMode),
-            MenuItem(deployIcon, "部署方案", callbacks.onReloadConfig),
-            MenuItem(settingsIcon, "设置", callbacks.onSettings),
-        )
+        MenuItem(keyboardResizeIcon, "键盘调节", callbacks.onKeyboardResize),
+        MenuItem(settingsIcon, "设置", callbacks.onSettings),
+        MenuItem(quickSendIcon, "快捷发送", callbacks.onQuickSend),
+        MenuItem(customizeIcon, "定制工具栏", callbacks.onToolbarCustomize),
+        MenuItem(darkModeIcon, darkModeLabel, callbacks.onToggleDarkMode),
+    ) + (if (options.isNotEmpty()) listOf(MenuItem(schemaIcon, "输入选项", { showOptions = true })) else emptyList()) +
+        listOf(MenuItem(deployIcon, "部署方案", callbacks.onReloadConfig))
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
         modifier.fillMaxWidth().background(state.backgroundColor)) { item, cellModifier ->
         MenuItemButton(item, itemBgColor, textColor,

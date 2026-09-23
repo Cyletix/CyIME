@@ -145,7 +145,7 @@ class CandidateBarOptionsTest {
         rule.runOnIdle { assertFalse(SettingsPreferences.shouldShowCandidateCancelButton(context)) }
     }
 
-    @Test fun preeditIsLargerClickableInInputBoxStyleAndCanBeHiddenForEditor() {
+    @Test fun preeditRestoresOriginalCompactFontAndRemainsClickable() {
         SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
         val showPreview = mutableStateOf(true)
         var edits = 0
@@ -162,7 +162,7 @@ class CandidateBarOptionsTest {
         }
         val layouts = mutableListOf<TextLayoutResult>()
         rule.onNodeWithText("ni'hao", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertEquals(16.sp, layouts.single().layoutInput.style.fontSize)
+        assertEquals(12.sp, layouts.single().layoutInput.style.fontSize)
         rule.onNodeWithTag("candidate-preedit").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(1, edits); showPreview.value = false }
         rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()

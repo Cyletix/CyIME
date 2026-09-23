@@ -324,11 +324,7 @@ class T9InputController(
     fun onDigitPressed(digit: String) {
         val code = digit[0].code
         enqueue {
-            rimeEngine.processKey(code, 0)
-            // C++ T9Processor 采用异步 flush 模型：processKey 只标记 pending 动作，
-            // 必须调用 FlushRimeInput 才能真正触发 set_input → compose。
-            // 全程在后台线程执行，引擎 compose（2-23ms）不阻塞 UI 线程。
-            rimeEngine.t9FlushRimeInput()
+            rimeEngine.processQueuedT9Key(code)
             refreshOnBackground()
         }
     }
@@ -400,8 +396,7 @@ class T9InputController(
 
     /** 单次退格：processKey → flush → 撤销计数 → 取全量结果 → Main 刷新 + 回调。 */
     private suspend fun processDelete(callback: (DeleteResult) -> Unit) {
-        val result = rimeEngine.processKey(0xff08, 0)
-        rimeEngine.t9FlushRimeInput()
+        val result = rimeEngine.processQueuedT9Key(0xff08)
         val undoneCount = rimeEngine.t9GetAndConsumeUndoneRightCommitCount()
         val data = fetchAll()
         val (finalResult, injections) = transformInjections(data.result)

@@ -261,15 +261,17 @@ fun KeyboardView(
         alpha = state.keyboardOpacity
         compositingStrategy = CompositingStrategy.Offscreen
     } else Modifier
-    val contentModifier = if (state.isFloatingMode) {
-        previewModifier.keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
-    } else {
-        // 固定模式的渐变背景仍由服务单独按相同透明度绘制，避免重复叠色。
-        previewModifier
-    }
+    // Compose background and keys into the same layer before applying opacity.
+    val contentModifier = previewModifier.keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
     val inputPreferences = rememberKeyboardInputPreferences()
     var cursorControlActive by remember { mutableStateOf(false) }
     CompositionLocalProvider(
+        LocalModeSlotWeight provides if (
+            page.textMainType() != MainType.HANDWRITING &&
+            (textLayout is KeyboardLayoutState.Chinese || textLayout is KeyboardLayoutState.English) &&
+            (state.isAsciiMode || KeysConfigHelper.codeLayoutForSchema(state.currentSchemaId) != "japanese_kana") &&
+            !(inputPreferences.splitKeyboardEnabled && supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode))
+        ) 0.5f else 0.8f,
         LocalModeKeyPadding provides androidx.compose.foundation.layout.PaddingValues(
             horizontal = kbKey.spacingX?.dp ?: 4.dp, vertical = kbKey.spacingY?.dp ?: 4.dp),
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
@@ -329,7 +331,7 @@ fun KeyboardView(
             callbacks.onLivePreeditEdit?.invoke(owner, key, caret, text) { next ->
                 if (owner.isActive() && preeditEditSession === owner) {
                     preeditFrame = next
-                    if (next == null) { preeditEditSession = null; preeditRequest++ }
+                    if (next == null || next.text.isEmpty()) { preeditEditSession = null; preeditFrame = null; preeditRequest++ }
                 }
             }
         }
@@ -344,7 +346,9 @@ fun KeyboardView(
             callbacks.onDismissPreeditEditor = if (preeditEditSession != null) ({ closePreeditEditor() }) else null
             callbacks.onPreeditKeyInput = if (preeditEditSession != null) ({ key ->
                 val t9 = preeditEditSession?.isT9 == true
-                if (key == "delete" || key == "'" || key.length == 1 &&
+                if (key.startsWith("preedit_cursor:")) {
+                    editPreedit(key = key); true
+                } else if (key == "delete" || key == "'" || key.length == 1 &&
                     (key[0].lowercaseChar() in 'a'..'z' || t9 && key[0] in '1'..'9')) {
                     editPreedit(key = key); true
                 } else { closePreeditEditor(); false }
@@ -354,6 +358,9 @@ fun KeyboardView(
             onDispose { callbacks.onDismissPreeditEditor = null; callbacks.onPreeditKeyInput = null; preeditEditSession?.invalidate() }
         }
         LaunchedEffect(page, resizeOverlay != null) { closePreeditEditor() }
+        LaunchedEffect(candidateState.value.isComposing, candidateState.value.inputText) {
+            if (!candidateState.value.isComposing && candidateState.value.inputText.isEmpty()) closePreeditEditor()
+        }
 
         Column(
             modifier = Modifier
@@ -488,7 +495,7 @@ fun KeyboardView(
                     onClose = { closePreeditEditor() },
                     onCaret = { editPreedit(caret = it) },
                     onReplace = { editPreedit(text = it) },
-                    preedit = candidateState.value.preeditText, backgroundColor = keyboardBgColor)
+                    preedit = candidateState.value.preeditText)
             }
 
             CandidateBar(
@@ -568,7 +575,8 @@ fun KeyboardView(
                     dividerColor = dividerColor,
                     accentColor = accentColor,
                     selectedTextColor = candidateSelectedTextColor,
-                    isDarkTheme = state.isDarkTheme
+                    isDarkTheme = state.isDarkTheme,
+                    preeditBackgroundColor = keyBgColor,
                 ),
                 callbacks = CandidateBarCallbacks(
                     onReorderToolbar = callbacks.onUpdateToolbarButtons,
@@ -1437,7 +1445,7 @@ fun KeyboardView(
                             onToggleDarkMode = { onHapticFeedback?.invoke(); callbacks.onToggleDarkMode?.invoke() },
                             onToolbarCustomize = { onHapticFeedback?.invoke(); viewModel.showOverlay(OverlayRoute.ToolbarCustomize) },
                             onFloatingModeToggle = { onHapticFeedback?.invoke(); callbacks.onFloatingModeChange?.invoke(!state.isFloatingMode); viewModel.closeOverlay() },
-                            onToggleSchemaSwitch = { sw -> onHapticFeedback?.invoke(); callbacks.onToggleSchemaSwitch?.invoke(sw); viewModel.closeOverlay() },
+                            onToggleSchemaSwitch = { sw -> onHapticFeedback?.invoke(); callbacks.onToggleSchemaSwitch?.invoke(sw) },
                         ),
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )

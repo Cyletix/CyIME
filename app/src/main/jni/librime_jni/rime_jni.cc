@@ -609,6 +609,9 @@ public:
         LOGI("select_schema result: %s", result ? "true" : "false");
         
         if (result) {
+            // Non-current schema configs are weakly cached. Apply to the new live schema
+            // after select_schema, otherwise its bundled menu/page_size (often 5) wins.
+            reapplyPageSizeIfNeeded();
             // 验证切换是否成功
             char current_schema[256];
             if (rime->get_current_schema(session_id_, current_schema, sizeof(current_schema))) {
