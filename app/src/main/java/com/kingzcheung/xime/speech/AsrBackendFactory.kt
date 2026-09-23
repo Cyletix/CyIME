@@ -3,7 +3,7 @@ package com.kingzcheung.xime.speech
 import android.content.Context
 
 /**
- * ASR 后端工厂。优先使用本地 zipformer2 离线后端（[AsrSupport]），
+ * ASR 后端工厂。优先使用本地 sherpa-onnx 离线后端（[AsrSupport]），
  * 不可用时由调用方回退到在线插件。
  */
 object AsrBackendFactory {

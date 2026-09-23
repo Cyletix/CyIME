@@ -128,9 +128,7 @@ class VoiceRecognitionHandler(
         inputSession = getState().inputSessionId
         toolbarSession = getState().voiceSticky
         requiresLocalFinal = SettingsPreferences.isSttUseLocal(context) &&
-            com.kingzcheung.xime.speech.AsrModelManager(context).getSelectedModelId() in setOf(
-                com.kingzcheung.xime.speech.SpeechModelCatalog.SENSEVOICE,
-                com.kingzcheung.xime.speech.SpeechModelCatalog.TWO_PASS)
+            com.kingzcheung.xime.speech.AsrModelManager(context).isRefinementEnabled()
         toolbarText.reset()
         toolbarSentencePrefix = null
         lastToolbarFinal = ""

@@ -188,13 +188,14 @@ object HandwritingInference {
         strokes: List<List<Pair<Float, Float>>>,
         topK: Int
     ): List<HandwritingCandidate> {
+        if (topK <= 0 || chars.isEmpty()) return emptyList()
         val simplified = simplifyStrokes(strokes)
         if (simplified.isEmpty()) return emptyList()
 
         val seqData = strokesToSequence(simplified)
         val mask = buildMask(seqData.originalLen)
 
-        val rawResults = HandwritingNativeEngine.predict(seqData.data, mask, topK)
+        val rawResults = HandwritingNativeEngine.predict(seqData.data, mask, min(chars.size, topK.coerceAtMost(64) * 5))
         if (rawResults.isEmpty()) return emptyList()
 
         val results = mutableListOf<HandwritingCandidate>()
@@ -209,6 +210,8 @@ object HandwritingInference {
             results.add(HandwritingCandidate(ch, score))
         }
 
-        return results.take(topK)
+        // The upstream demo prioritizes Han candidates too. Never refill with symbols here:
+        // those would participate in DP as high-confidence fragments of an unfinished character.
+        return HandwritingCandidatePolicy.select(results, topK)
     }
 }

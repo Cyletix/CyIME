@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -30,7 +31,13 @@ internal fun Modifier.keyGlow(): Modifier = composed {
     if (!LocalKeyboardInputPreferences.current.keyGlowEnabled) return@composed this
     val scheme = MaterialTheme.colorScheme
     val colors = remember(scheme.primary, scheme.tertiary, scheme.secondary) {
-        listOf(scheme.primary, scheme.tertiary, scheme.secondary)
+        listOf(scheme.primary, scheme.tertiary, scheme.secondary).map { color ->
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+            hsv[1] = hsv[1].coerceAtLeast(0.75f)
+            hsv[2] = hsv[2].coerceAtLeast(0.95f)
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }
     }
     val progress = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
@@ -47,13 +54,13 @@ internal fun Modifier.keyGlow(): Modifier = composed {
             }
             animation = scope.launch {
                 progress.snapTo(0f)
-                progress.animateTo(1f, tween(480, easing = LinearEasing))
+                progress.animateTo(1f, tween(1000, easing = LinearEasing))
             }
         }
     }.drawWithCache {
         // 颜色和大小不变时复用渐变着色器；每帧只更新位移/透明度。
         val glowBrush = Brush.radialGradient(
-            listOf(colors[0].copy(alpha = 0.48f), colors[1].copy(alpha = 0.18f), Color.Transparent),
+            listOf(colors[0].copy(alpha = 0.72f), colors[1].copy(alpha = 0.32f), Color.Transparent),
             center = Offset.Zero, radius = size.maxDimension.coerceAtLeast(1f) * 0.85f,
         )
         onDrawWithContent {
@@ -68,7 +75,7 @@ internal fun Modifier.keyGlow(): Modifier = composed {
                     val side = size.minDimension * square.side * (0.6f + 0.4f * t)
                     val center = Offset(size.width * square.x, size.height * square.y - size.height * t * 0.12f)
                     rotate(square.angle + square.spin * t, center) {
-                        drawRoundRect(colors[i % colors.size].copy(alpha = fade * 0.42f),
+                        drawRoundRect(colors[i % colors.size].copy(alpha = fade * 0.65f),
                             topLeft = center - Offset(side / 2, side / 2), size = Size(side, side),
                             cornerRadius = CornerRadius(side * 0.25f))
                     }

@@ -19,6 +19,14 @@ class OverlappedHandwritingRecognizerTest {
 
     private fun cand(ch: String, score: Float) = listOf(HandwritingCandidate(ch, score))
 
+    @Test fun `弱候选且没有换字停顿时不把单字拆成多个字`() {
+        val result = OverlappedHandwritingRecognizer().recognize(strokesOf(4), listOf(0, 180, 180, 180)) { segment, _ ->
+            if (segment.size == 4) cand("中", .08f) else cand("一", .22f)
+        }
+        assertEquals(1, result.segments.size)
+        assertEquals("中", result.segments.single().candidates.first().char)
+    }
+
     @Test
     fun `单字未分裂时切为一段`() {
         // 假模型：任意段都识别为"张"（单段分数最高，无更优切分）

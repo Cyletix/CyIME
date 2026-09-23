@@ -31,12 +31,6 @@ class AsrModelManager(private val context: Context) {
             joinerFile = "joiner.int8.onnx"
         )
 
-        /** 兼容旧引用。 */
-        @Deprecated("使用 getAsrModels()/getSelectedModelInfo() 从索引读取")
-        val AVAILABLE_MODELS: List<AsrModelInfo> = listOf(DEFAULT_MODEL)
-
-        private const val DEFAULT_ID = "zipformer-zh-int8"
-
         /** 把索引里的 ModelInfo 转换为 ASR 专用模型信息。 */
         private fun toAsrModelInfo(info: com.kingzcheung.xime.model.ModelInfo): AsrModelInfo {
             val version = info.resolvedVersion()
@@ -68,19 +62,16 @@ class AsrModelManager(private val context: Context) {
         val files: List<String>,
         val encoderFile: String = "",
         val decoderFile: String = "",
-        val joinerFile: String = "",
-        val needsAutoPunctuation: Boolean = true
+        val joinerFile: String = ""
     )
 
     /** ASR 分类的模型清单（索引优先，索引未加载时用内置默认）。 */
     fun getAsrModels(): List<AsrModelInfo> {
         val fromIndex = ModelManager.getModelsByCategory(ModelCategory.ASR)
             .map { toAsrModelInfo(it) }
-        return (fromIndex + DEFAULT_MODEL).distinctBy { it.id }
+        return (fromIndex + SpeechModelCatalog.models.map(::toAsrModelInfo) + DEFAULT_MODEL)
+            .distinctBy { it.id }.sortedBy { listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE).indexOf(it.id).let { order -> if (order < 0) Int.MAX_VALUE else order } }
     }
-
-    /** 所有 ASR 模型 id，用于判断某个 id 是否为已知 ASR 模型。 */
-    fun getAsrModelIds(): Set<String> = getAsrModels().map { it.id }.toSet()
 
     fun isModelReady(): Boolean = try { selection().ready } catch (_: Exception) { false }
 
@@ -101,47 +92,51 @@ class AsrModelManager(private val context: Context) {
             ModelStorage.migrateLegacyForModel(context, id)
             return ModelStorage.getModelDir(context, id)
         }
-        if (mode == SpeechModelCatalog.TWO_PASS) return Selection(mode,
-            getAsrModels().first { it.id == SpeechModelCatalog.PARAFORMER }, dir(SpeechModelCatalog.PARAFORMER), dir(SpeechModelCatalog.SENSEVOICE))
+        val firstId = when (mode) {
+            SpeechModelCatalog.TWO_PASS -> SpeechModelCatalog.PARAFORMER
+            SpeechModelCatalog.ZIPFORMER_TWO_PASS -> SpeechModelCatalog.ZIPFORMER
+            else -> null
+        }
+        if (firstId != null) return Selection(mode,
+            getAsrModels().first { it.id == firstId }, dir(firstId), dir(SpeechModelCatalog.SENSEVOICE))
         val info = getAsrModels().firstOrNull { it.id == mode } ?: error("不支持的语音模型：$mode")
         return if (info.modelType == "sensevoice") Selection(mode, null, null, dir(mode))
         else Selection(mode, info, dir(mode), null)
     }
 
-    fun getSelectedModelDir(): File {
-        val modelId = getSelectedModelId()
-        val dir = ModelStorage.getModelDir(context, modelId)
-        // 兼容旧版：自动迁移 asr_models/<id>/ 下的模型文件
-        ModelStorage.migrateLegacyForModel(context, modelId)
-        return dir
-    }
+    private val preferences get() = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
 
+    /** Persist the complete selection as one value, also passed explicitly to the :asr process. */
     fun getSelectedModelId(): String {
-        val sharedPrefs = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
-        return sharedPrefs.getString("selected_model", DEFAULT_ID) ?: DEFAULT_ID
+        val stored = preferences.getString("selected_model", SpeechModelCatalog.ZIPFORMER) ?: SpeechModelCatalog.ZIPFORMER
+        if (stored != SpeechModelCatalog.SENSEVOICE) return stored
+        // Migrate the retired standalone choice without downloading or pretending missing weights are ready.
+        val base = if (selection(SpeechModelCatalog.PARAFORMER).ready) SpeechModelCatalog.PARAFORMER else SpeechModelCatalog.ZIPFORMER
+        val migrated = combinedMode(base, true)
+        setModel(migrated)
+        return migrated
     }
 
-    /** 当前选中模型的完整信息（索引优先，兜底内置默认）。 */
-    fun getSelectedModelInfo(): AsrModelInfo? {
-        val modelId = getSelectedModelId()
-        return getAsrModels().find { it.id == modelId }
+    fun getFirstPassModelId(): String = when (val mode = getSelectedModelId()) {
+        SpeechModelCatalog.TWO_PASS -> SpeechModelCatalog.PARAFORMER
+        SpeechModelCatalog.ZIPFORMER_TWO_PASS -> SpeechModelCatalog.ZIPFORMER
+        else -> mode
     }
+
+    fun isRefinementEnabled(): Boolean = getSelectedModelId() in setOf(
+        SpeechModelCatalog.TWO_PASS, SpeechModelCatalog.ZIPFORMER_TWO_PASS)
+
+    fun setFirstPassModel(modelId: String) {
+        require(modelId in listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.PARAFORMER))
+        setModel(combinedMode(modelId, isRefinementEnabled()))
+    }
+
+    fun setRefinementEnabled(enabled: Boolean) = setModel(combinedMode(getFirstPassModelId(), enabled))
+
+    private fun combinedMode(base: String, refine: Boolean): String = if (!refine) base
+        else if (base == SpeechModelCatalog.PARAFORMER) SpeechModelCatalog.TWO_PASS else SpeechModelCatalog.ZIPFORMER_TWO_PASS
 
     fun setModel(modelId: String) {
-        val sharedPrefs = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
-        sharedPrefs.edit().putString("selected_model", modelId).apply()
-    }
-
-    fun findFile(dir: File, fileName: String): File? {
-        val direct = File(dir, fileName)
-        if (direct.exists()) return direct
-        dir.listFiles()?.forEach { child ->
-            if (child.isDirectory) {
-                val found = findFile(child, fileName)
-                if (found != null) return found
-            }
-        }
-        return null
+        preferences.edit().putString("selected_model", modelId).apply()
     }
 }
-

@@ -10,7 +10,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     private var offline: OfflineRecognizer? = null
     private var stream: OnlineStream? = null
     private var vad: Vad? = null
-    override val hasRefinement get() = selection.mode == SpeechModelCatalog.TWO_PASS
+    override val hasRefinement get() = selection.first != null && selection.secondDir != null
     override val isStreaming get() = online != null
     init {
         try {

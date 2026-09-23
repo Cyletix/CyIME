@@ -124,7 +124,19 @@ class OverlappedHandwritingRecognizer(
         if (bestK >= 2 && !hasPauseBoundary(gaps)) {
             val merged = segmentCandidates(0, n, bounded, predictFn)
             val mergedScore = merged.firstOrNull()?.score ?: 0f
-            if (mergedScore >= MERGED_CHAR_MIN_SCORE) {
+            var end = n
+            var confidentFragments = true
+            for (k in bestK downTo 1) {
+                val start = back[k][end]
+                if ((segmentCandidates(start, end, bounded, predictFn).firstOrNull()?.score ?: 0f) < MERGED_CHAR_MIN_SCORE) {
+                    confidentFragments = false
+                }
+                end = start
+            }
+            // Weak Han fragments must not multiply an uncertain single character into several.
+            // Keep clear multi-character results and explicit inter-character pauses intact.
+            if (merged.isNotEmpty() && (mergedScore >= MERGED_CHAR_MIN_SCORE ||
+                    n <= maxStrokesPerSegment && !confidentFragments)) {
                 return Result(listOf(Segment(0, n, merged)), mergedScore, mergedScore)
             }
         }
