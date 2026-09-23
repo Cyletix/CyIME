@@ -306,7 +306,9 @@ private fun StrokeKeyboardContent(
     val swipeHints = rememberSwipeHintsEnabled()
     val hintsActive = !compactMode
     // 左侧快捷符号列来自 xime.yaml keyboard.stroke.side_symbols（可自定义，>4 滚动显示）
-    val strokeSideSymbols = remember(configVersion) { KeysConfigHelper.getStrokeSideSymbols() }
+    val commitSymbol = LocalKeyboardInputActions.current.onCommitText ?: onKeyPress
+    val strokeSideSymbols = LocalKeyboardInputPreferences.current.symbols()
+        ?: remember(configVersion) { KeysConfigHelper.getStrokeSideSymbols() }
 
     // 符号面板统一阴影（与九键左栏候选面板同款样式）
     val density = LocalDensity.current
@@ -386,7 +388,7 @@ private fun StrokeKeyboardContent(
                         strokeSideSymbols.forEach { symbol ->
                             StrokeSymbolItem(
                                 text = symbol,
-                                onClick = { onKeyPress(symbol) },
+                                onClick = { commitSymbol(symbol) },
                                 onPress = { onKeyPressDown?.invoke(symbol) },
                                 backgroundColor = keyBackgroundColor,
                                 textColor = keyTextColor,
@@ -404,7 +406,7 @@ private fun StrokeKeyboardContent(
                         itemsIndexed(strokeSideSymbols) { _, symbol ->
                             StrokeSymbolItem(
                                 text = symbol,
-                                onClick = { onKeyPress(symbol) },
+                                onClick = { commitSymbol(symbol) },
                                 onPress = { onKeyPressDown?.invoke(symbol) },
                                 backgroundColor = keyBackgroundColor,
                                 textColor = keyTextColor,
@@ -522,19 +524,25 @@ private fun StrokeKeyboardContent(
                     onSwipeStateChange = onSwipeStateChange,
                     swipes = swipesFor("，", "8"),
                 )
-                StrokeDigitKey(
-                    digit = "英", swipeDigit = "9",
+                val languageSwipes = swipesFor("英", "9")
+                LanguageKeyButton(
+                    text = "英", badgeText = "9",
                     onClick = { onKeyPress("ime_switch") },
                     onPress = { onKeyPressDown?.invoke("ime_switch") },
-                    backgroundColor = keyBackgroundColor,
-                    textColor = keyTextColor,
+                    backgroundColor = specialKeyBackgroundColor,
+                    textColor = specialKeyTextColor,
                     modifier = Modifier.weight(1f),
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius,
                     fontSize = strokeFontSize,
                     onSwipeStateChange = onSwipeStateChange,
-                    swipes = swipesFor("英", "9"),
+                    swipeText = languageSwipes.swipeUpText,
+                    swipeDownText = languageSwipes.swipeDownText,
+                    swipeUpKeyLabel = languageSwipes.swipeUpKeyLabel,
+                    swipeDownKeyLabel = languageSwipes.swipeDownKeyLabel,
+                    onSwipe = languageSwipes.onSwipeUp?.let { handler -> { _: String -> handler() } },
+                    onSwipeDown = languageSwipes.onSwipeDown?.let { handler -> { _: String -> handler() } },
                 )
             }
             Row(
@@ -543,8 +551,8 @@ private fun StrokeKeyboardContent(
                 StrokeSymbolButton(
                     text = "123",
                     onClick = { onKeyPress("number") },
-                    backgroundColor = keyBackgroundColor,
-                    textColor = keyTextColor,
+                    backgroundColor = specialKeyBackgroundColor,
+                    textColor = specialKeyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("number") },
                     shadowEnabled = shadowEnabled,
@@ -555,8 +563,8 @@ private fun StrokeKeyboardContent(
                 StrokeSpaceButton(
                     onKeyPress = onKeyPress,
                     onKeyPressDown = onKeyPressDown,
-                    backgroundColor = keyBackgroundColor,
-                    textColor = keyTextColor,
+                    backgroundColor = specialKeyBackgroundColor,
+                    textColor = specialKeyTextColor,
                     modifier = Modifier.weight(1.8f),
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
@@ -615,7 +623,7 @@ private fun StrokeKeyboardContent(
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
-            StrokeSymbolButton(
+            ActionKeyButton(
                 text = "确定",
                 onClick = { onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
@@ -860,53 +868,9 @@ private fun StrokeSpaceButton(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
 ) {
-    val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
-            val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
-            val color = crispShadowColor(backgroundColor)
-            Modifier.drawBehind {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(0f, offsetPx),
-                    size = size,
-                    cornerRadius = CornerRadius(cornerPx)
-                )
-            }
-        } else Modifier
-    }
 
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .padding(horizontal = 2.dp, vertical = 2.dp)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        onKeyPressDown?.invoke("space")
-                        tryAwaitRelease()
-                    },
-                    onTap = { onKeyPress("space") },
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(shadowModifier)
-                .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                .background(backgroundColor)
-        )
-        Text(
-            text = "空格",
-            color = textColor.copy(alpha = 0.3f),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Normal,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            fontFamily = AppFonts.keyFontFamily
-        )
-    }
+    SpaceKeyButton(onClick = { onKeyPress("space") }, backgroundColor = backgroundColor,
+        textColor = textColor, schemaName = "空格", modifier = modifier,
+        onPress = { onKeyPressDown?.invoke("space") }, shadowEnabled = shadowEnabled,
+        shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
 }

@@ -114,14 +114,14 @@ class SchemaListBlockTest {
         val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp")
         val merged = SchemaManager.mergeBuiltinSchemas(enabled)
         assertEquals(
-            listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin"),
+            listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "japanese", "japanese_kana"),
             merged,
         )
     }
 
     @Test
     fun `内置方案齐全时原样返回`() {
-        val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
+        val enabled = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "japanese", "japanese_kana")
         assertEquals(enabled, SchemaManager.mergeBuiltinSchemas(enabled))
     }
 
@@ -130,7 +130,7 @@ class SchemaListBlockTest {
         val enabled = listOf("my_custom_schema", "pinyin_simp", "wubi86")
         val merged = SchemaManager.mergeBuiltinSchemas(enabled)
         assertEquals(
-            listOf("my_custom_schema", "pinyin_simp", "wubi86", "wubi86_pinyin", "t9_pinyin"),
+            listOf("my_custom_schema", "pinyin_simp", "wubi86", "wubi86_pinyin", "t9_pinyin", "japanese", "japanese_kana"),
             merged,
         )
     }

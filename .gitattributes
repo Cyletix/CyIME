@@ -1,0 +1,5 @@
+
+# Preserve the exact upstream Japanese dictionaries and notices.
+app/src/main/assets/rime_japanese/jaroomaji.* -whitespace
+app/src/main/assets/rime_japanese/README.md -whitespace
+app/src/main/assets/rime_japanese/LICENSE -whitespace

@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -57,6 +59,24 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
 
     init {
         viewModelScope.launch {
+            ModelManager.modelsFlow.drop(1).collectLatest { loadModels() }
+        }
+        viewModelScope.launch {
+            var completed = emptySet<String>()
+            ModelManager.downloadStates.collectLatest { states ->
+                _uiState.update { current ->
+                    current.copy(models = current.models.map { item ->
+                        val state = states[item.model.id]
+                        if (state == null) item else item.copy(downloadState =
+                            if (state is ModelDownloadState.Complete) ModelDownloadState.Idle else state)
+                    })
+                }
+                val nowCompleted = states.filterValues { it is ModelDownloadState.Complete }.keys
+                if ((nowCompleted - completed).isNotEmpty()) loadModels()
+                completed = nowCompleted
+            }
+        }
+        viewModelScope.launch {
             loadModels()
             refreshFromRemote()
         }
@@ -81,6 +101,8 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
                 isDownloaded = downloaded,
                 diskSize = size,
                 installedVersion = if (downloaded) versions[model.id] else null,
+                downloadState = ModelManager.downloadStates.value[model.id]
+                    ?.takeUnless { it is ModelDownloadState.Complete } ?: ModelDownloadState.Idle,
             )
         }
         _uiState.update { it.copy(models = items, isLoading = false) }
@@ -154,14 +176,9 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
                         ModelManager.getModelSizeOnDisk(context, modelId)
                     }
                 } else 0L
-                // 记录本地下载版本（用于更新检测）；下载成功但版本未知时留空
-                val actualVersion = if (downloaded) {
-                    (selectedVersion?.version ?: _uiState.value.models[index].model.resolvedVersion()?.version)
-                        ?.also {
-                            withContext(Dispatchers.IO) {
-                                MarketVersionStore.setModelVersion(context, modelId, it)
-                            }
-                        }
+                // 版本由 ModelManager 与最终安装一起记录，UI 不在删除后补写旧下载版本。
+                val actualVersion = if (downloaded) withContext(Dispatchers.IO) {
+                    MarketVersionStore.getModelVersion(context, modelId)
                 } else null
                 updateModelState(index) {
                     it.copy(

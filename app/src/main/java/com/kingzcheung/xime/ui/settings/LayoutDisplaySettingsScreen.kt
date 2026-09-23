@@ -71,6 +71,7 @@ fun LayoutDisplaySettingsContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item { InputExperienceSettings() }
             item {
                 SettingsSection(title = "候选词", content = {
                     val candidateTextSizePref = SettingsPreferences.getCandidateTextSize(context)

@@ -100,7 +100,8 @@ object ModelIndexLoader {
         val date = (versionNode["date"] as? YamlScalar)?.content ?: ""
         val changelog = (versionNode["changelog"] as? YamlScalar)?.content ?: ""
         val size = (versionNode["size"] as? YamlScalar)?.content ?: ""
-        val sha256 = (versionNode["sha256"] as? YamlScalar)?.content ?: ""
+        val sha256 = (versionNode["sha256"] as? YamlScalar)?.content
+            ?: ((versionNode["archive"] as? YamlMap)?.get("sha256") as? YamlScalar)?.content ?: ""
         val archiveUrl = (versionNode["archive"] as? YamlMap)
             ?.let { (it["url"] as? YamlScalar)?.content }
 
@@ -121,7 +122,9 @@ object ModelIndexLoader {
             val fileEntry = node as? YamlMap ?: return@mapNotNull null
             val name = (fileEntry["name"] as? YamlScalar)?.content ?: return@mapNotNull null
             val url = (fileEntry["url"] as? YamlScalar)?.content ?: ""
-            ModelFile(name = name, downloadUrl = url)
+            ModelFile(name = name, downloadUrl = url,
+                sha256 = (fileEntry["sha256"] as? YamlScalar)?.content.orEmpty(),
+                sizeBytes = (fileEntry["sizeBytes"] as? YamlScalar)?.content?.toLongOrNull() ?: 0)
         }
     }
 

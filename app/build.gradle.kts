@@ -12,6 +12,7 @@ plugins {
 
 apply(from = "build-logic/tasks-native.gradle.kts")
 apply(from = "build-logic/tasks-plugin-dev.gradle.kts")
+apply(from = "build-logic/tasks-japanese.gradle.kts")
 
 // 获取 Git 提交哈希
 fun getGitHash(): String {
@@ -37,6 +38,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.kingzcheung.xime"
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-assets").get().asFile)
     compileSdk = 36
 
     // JVM 单测中未 mock 的 Android 框架方法（如 android.util.Log）返回默认值而非抛异常，
@@ -49,8 +51,8 @@ android {
         applicationId = "com.kingzcheung.xime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 20260921
-        versionName = "2.8.6"
+        versionCode = 20260924
+        versionName = "2.8.7"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -165,7 +167,7 @@ android {
 }
 
 android.applicationVariants.all {
-    val appName = "Xime"
+    val appName = "Xime-CyletixFork"
     outputs.all {
         val abi = filters.find { it.filterType.toString() == "ABI" }?.identifier ?: "universal"
         (this as BaseVariantOutputImpl).outputFileName = "$appName-$versionName-$abi.apk"
@@ -257,6 +259,8 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // Compose 仪器测试需要一个独立宿主 Activity，仅加入 debug 变体。
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)

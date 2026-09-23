@@ -126,7 +126,7 @@ object BackupManager {
                     val target = File(rimeDir, name)
                     // 显式拒绝绝对路径（File(parent, "/abs") 在 Unix 下会被拼接为 parent/abs，
                     // canonical 检查拦不住；此处按契约直接拒绝）
-                    if (File(name).isAbsolute) {
+                    if (name.startsWith("/") || File(name).isAbsolute) {
                         return Result.failure(Exception("备份包包含非法路径: $name"))
                     }
                     val canonicalRoot = rimeDir.canonicalPath + File.separator

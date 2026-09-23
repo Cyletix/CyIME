@@ -35,7 +35,7 @@ class SettingsPreferencesTest {
 
     @Test
     fun darkModePersistsIntegerSetting() {
-        assertEquals(2, SettingsPreferences.getDarkMode(context))
+        assertEquals(SettingsPreferences.defaultDarkMode, SettingsPreferences.getDarkMode(context))
 
         SettingsPreferences.setDarkMode(context, 0)
 
@@ -57,9 +57,9 @@ class SettingsPreferencesTest {
     @Test
     fun soundAndVibrationDefaultsAndUpdatesWork() {
         assertTrue(SettingsPreferences.isSoundEnabled(context))
-        assertEquals(50, SettingsPreferences.getSoundVolume(context))
+        assertEquals(20, SettingsPreferences.getSoundVolume(context))
         assertTrue(SettingsPreferences.isVibrationEnabled(context))
-        assertEquals(50, SettingsPreferences.getVibrationIntensity(context))
+        assertEquals(30, SettingsPreferences.getVibrationIntensity(context))
 
         SettingsPreferences.setSoundEnabled(context, false)
         SettingsPreferences.setSoundVolume(context, 72)
@@ -137,8 +137,11 @@ class SettingsPreferencesTest {
 
     @Test
     fun keyboardThemeAndToolbarButtonsPersist() {
-        assertEquals("lavender_purple", SettingsPreferences.getKeyboardTheme(context))
-        assertTrue(SettingsPreferences.getToolbarButtons(context).isEmpty())
+        assertEquals(SettingsPreferences.defaultKeyboardTheme, SettingsPreferences.getKeyboardTheme(context))
+        assertEquals(
+            listOf("schema", "emoji", "edit", "clipboard", "handwriting_lookup", "voice"),
+            SettingsPreferences.getToolbarButtons(context),
+        )
 
         SettingsPreferences.setKeyboardTheme(context, "sunset")
         SettingsPreferences.setToolbarButtons(context, listOf("symbols", "clipboard"))
@@ -161,8 +164,13 @@ class SettingsPreferencesTest {
 
     @Test
     fun pluginEnabledStateIsIsolatedByPluginId() {
-        val predictionPlugin = "prediction-onnx"
-        val emojiPlugin = "meme-bunny"
+        val predictionPlugin = "settings-test-first"
+        val emojiPlugin = "settings-test-second"
+
+        // 未保存偏好时会读取插件注册表，未知插件默认启用。
+        // 本用例只验证按 id 隔离的显式覆盖，不依赖设备上安装的插件状态。
+        SettingsPreferences.setPluginEnabled(context, predictionPlugin, false)
+        SettingsPreferences.setPluginEnabled(context, emojiPlugin, false)
 
         assertFalse(SettingsPreferences.isPluginEnabled(context, predictionPlugin))
         assertFalse(SettingsPreferences.isPluginEnabled(context, emojiPlugin))
@@ -262,7 +270,8 @@ class SettingsPreferencesTest {
     
     @Test
     fun clearingPreferencesResetsToDefaults() {
-        SettingsPreferences.setDarkMode(context, 2)
+        val defaultDarkMode = SettingsPreferences.defaultDarkMode
+        SettingsPreferences.setDarkMode(context, if (defaultDarkMode == 2) 0 else 2)
         SettingsPreferences.setSoundEnabled(context, false)
         
         context.getSharedPreferences("kime_settings", Context.MODE_PRIVATE)
@@ -271,7 +280,7 @@ class SettingsPreferencesTest {
             .commit()
         
         assertEquals("wubi86", SettingsPreferences.getCurrentSchema(context))
-        assertEquals(0, SettingsPreferences.getDarkMode(context))
+        assertEquals(defaultDarkMode, SettingsPreferences.getDarkMode(context))
         assertTrue(SettingsPreferences.isSoundEnabled(context))
     }
 }

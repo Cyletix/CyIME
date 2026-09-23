@@ -129,7 +129,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         service.clipboardManager.markConsumed(text)
         // 粘贴不计打字统计（不投 text_committed），联想照常
         service.commitPastedText(text)
-        service.clipboardManager.copyToSystemClipboard(text)
+        // 已通过 InputConnection 完成粘贴，不再回写系统剪贴板触发一次新的复制通知。
     }
 
     internal fun commitClipboardText(text: String) {

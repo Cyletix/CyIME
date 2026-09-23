@@ -1,4 +1,4 @@
-﻿name: Nightly Build
+﻿name: Xime-CyletixFork Nightly Build
 
 on:
   schedule:
@@ -171,7 +171,7 @@ jobs:
           fi
 
           gh release create nightly \
-            --title "Nightly Build (${{ steps.info.outputs.DATE }})" \
+            --title "Xime-CyletixFork Nightly Build (${{ steps.info.outputs.DATE }})" \
             --notes "## Nightly Build
 
           - 日期: ${{ steps.info.outputs.DATE }}

@@ -34,6 +34,11 @@ interface ClipboardDao {
     @Query("UPDATE clipboard_entries SET timestamp = :timestamp WHERE id = :id")
     suspend fun updateTimestamp(id: Long, timestamp: Long)
 
+    // 再次复制是新的用户动作，同一条历史记录也应重新出现在预览栏。
+    @Query("UPDATE clipboard_entries SET timestamp = :timestamp, consumed = 0 WHERE id = :id AND isQuickSend = 0")
+    suspend fun refreshCopiedItem(id: Long, timestamp: Long)
+
+
     @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND id = :id")
     suspend fun deleteClipboardById(id: Long)
 
@@ -74,7 +79,7 @@ interface ClipboardDao {
     suspend fun upsertAndTrim(text: String, now: Long, maxItems: Int) {
         val existing = findByText(text)
         if (existing != null) {
-            updateTimestamp(existing.id, now)
+            refreshCopiedItem(existing.id, now)
         } else {
             insert(ClipboardEntry(text = text, timestamp = now))
             val unpinned = countUnpinned()

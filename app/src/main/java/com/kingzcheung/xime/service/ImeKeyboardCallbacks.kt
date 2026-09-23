@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
  *
  * 所有回调直接操作服务层状态与方法；service 内部成员对同模块可见（internal）。
  * 与原始实现在 onCreateInputView 内联构建的行为完全一致：
- * 仅当 [floatingMinY] 变化时重建（remember key 与原实现相同）。
+ * 浮动模式或屏幕几何变化时重建，拖动边界不能使用切换前的窗口高度。
  */
 @Composable
 internal fun rememberImeKeyboardCallbacks(
@@ -32,11 +32,13 @@ internal fun rememberImeKeyboardCallbacks(
     effectiveScreenH: Int,
 ): KeyboardCallbacks {
     val view = LocalView.current
-    return remember(floatingMinY) {
+    val handwritingCursor = remember(state.inputSessionId) { androidx.compose.runtime.mutableStateOf<Int?>(null) }
+    return remember(floatingMinY, state.isFloatingMode, effectiveScreenH, state.inputSessionId) {
         KeyboardCallbacks(
             onKeyPress = { key, isShifted ->
                 service.keyRouter.handleKeyPress(key, isShifted)
             },
+            onJapaneseKanaAction = { action -> service.schemaController.handleJapaneseKanaAction(action) },
             onKeyPressDown = { key ->
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },
@@ -111,34 +113,60 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onToggleDarkMode = { service.toggleDarkMode() },
             onClipboard = {},
+            onDismissClipboardPreview = {
+                if (service.candidateState.value.isShowingRecentClipboard) {
+                    service.candidateState.value = service.candidateState.value.copy(
+                        candidates = emptyList(),
+                        candidateComments = emptyList(),
+                        isShowingRecentClipboard = false,
+                    )
+                }
+            },
             onClipboardSelect = { text -> service.textCommit.selectClipboardItem(text) },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             onCommitText = { text -> service.textCommit.commitClipboardText(text) },
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
             onHandwritingAutoCommit = { newTail, expectedTail ->
-                if (expectedTail.isEmpty()) {
+                val cursor = service.currentEditorCursorPosition()
+                if (service.uiState.value.inputSessionId != state.inputSessionId || service.currentInputConnection == null) {
+                    false
+                } else if (expectedTail.isEmpty()) {
                     service.commitTextSilently(newTail)
+                    handwritingCursor.value = cursor?.plus(newTail.length)
                     true
+                } else if (handwritingCursor.value != null && cursor != null && handwritingCursor.value != cursor) {
+                    // 同样的字可能出现在多处；仅文本匹配不代表仍属于本轮手写。
+                    false
                 } else {
-                    // 光标前文本与手写尾部不对应（用户移动过光标/退格过）时不上屏，
-                    // 调用方重置手写尾部状态后以追加模式重建，避免误删/重复上屏
-                    service.replaceBeforeCursor(expectedTail, newTail)
+                    val replaced = service.replaceBeforeCursor(expectedTail, newTail)
+                    if (replaced) handwritingCursor.value = cursor?.let { it + newTail.length - expectedTail.length }
+                    replaced
                 }
             },
             onHandwritingFinalize = { service.finalizeHandwritingPrediction() },
             onQuickSend = {},
             onKeyboardResize = {
+                service.keyboardViewModel.closeOverlay()
                 val config = service.resources.configuration
                 val isLandscape = config.screenWidthDp > config.screenHeightDp
                 val currentHeight = SettingsPreferences.getKeyboardHeightDp(service, isLandscape)
                 service.uiState.value = service.uiState.value.copy(
                     showKeyboardResize = true,
                     resizePreviewHeightDp = currentHeight,
+                    resizeInitialFloating = service.uiState.value.isFloatingMode,
+                    resizeInitialX = service.uiState.value.floatingOffsetX,
+                    resizeInitialY = service.uiState.value.floatingOffsetY,
                 )
             },
             onReloadConfig = { service.schemaController.reloadConfig() },
             onSettings = { service.schemaController.openSettings() },
             onSwitchSchema = { schemaId -> service.schemaController.switchSchema(schemaId) },
+            onReorderSchemas = { ids ->
+                com.kingzcheung.xime.settings.InputModes.saveOrder(service, ids)
+                service.uiState.value = service.uiState.value.copy(
+                    schemas = com.kingzcheung.xime.settings.InputModes.available(service.uiState.value.schemas, ids))
+            },
+            onHandwritingToggle = { service.schemaController.toggleHandwriting() },
             onToggleSchemaSwitch = { sw -> service.sessionController.toggleSchemaSwitch(sw) },
             onHideKeyboard = { service.hideKeyboard() },
             onSwitchKeyboard = {
@@ -183,10 +211,11 @@ internal fun rememberImeKeyboardCallbacks(
             onVoiceStickyToggle = {
                 val state = service.uiState.value
                 if (state.isVoiceMode && state.voiceSticky) {
-                    // 常驻语音中：点按空格/再次点击工具栏即结束
+                    // 再次点击麦克风：停止录音并提交转录。
                     service.endVoiceSession()
                 } else if (!state.isVoiceMode) {
-                    // 进入常驻语音：保持正常键盘布局，候选栏显示频谱，空格键轻触结束
+                    // 工具栏独立语音组件，不占用空格或改变键盘页面。
+                    service.feedbackManager.playKeySound("voice_start")
                     service.uiState.value = service.uiState.value.copy(
                         isVoiceMode = true,
                         voiceSticky = true,
@@ -207,42 +236,8 @@ internal fun rememberImeKeyboardCallbacks(
                 service.keyRouter.deleteCandidateGlobal(globalIndex)
             },
             onRequestExpandedCandidates = { service.refreshExpandedCandidates() },
-            onCursorMove = { direction ->
-                val ic = service.currentInputConnection
-                if (ic != null && direction != 0) {
-                    if (SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX &&
-                        service.candidateState.value.isComposing
-                    ) {
-                        // 输入框模式：移动光标前先结束 composing 并清空 RIME 组成，
-                        // 避免再次输入时 composing 区域与光标位置错乱
-                        ic.finishComposingText()
-                        service.keyRouter.postRimeJob {
-                            service.rimeEngine.clearComposition()
-                            withContext(Dispatchers.Main) {
-                                service.mainHandler.post { service.updateUI() }
-                            }
-                        }
-                    }
-                    var movedBySelection = false
-                    try {
-                        val req = android.view.inputmethod.ExtractedTextRequest()
-                        val extracted = ic.getExtractedText(req, 0)
-                        if (extracted != null && extracted.selectionStart >= 0) {
-                            val newPos = (extracted.selectionStart + direction)
-                                .coerceIn(0, extracted.text?.length ?: 0)
-                            ic.setSelection(newPos, newPos)
-                            movedBySelection = true
-                        }
-                    } catch (_: Exception) {}
-                    if (!movedBySelection) {
-                        val keyCode = if (direction < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
-                        repeat(abs(direction)) {
-                            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-                            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
-                        }
-                    }
-                }
-            },
+            onCursorMove = { direction -> service.schemaController.moveEditorCursor(direction) },
+            onCursorMoveVertical = { steps -> service.schemaController.moveEditorCursorVertical(steps) },
             onGestureAction = { action, value ->
                 action.execute(service, value)
             },
@@ -268,19 +263,19 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onDismissDeploying = { service.notifyDeploymentStatus(false, "") },
-            onFloatingModeChange = { enabled -> service.schemaController.toggleFloatingMode(enabled, floatingMinY) },
+            onFloatingModeChange = { enabled -> service.schemaController.toggleFloatingMode(enabled, floatingMinY, persist = !service.uiState.value.showKeyboardResize) },
             onFloatingKeyboardDrag = { dx, dy ->
                 val s = service.uiState.value
                 val screenW = service.resources.configuration.screenWidthDp
                 val screenH = if (state.isFloatingMode) effectiveScreenH else service.resources.configuration.screenHeightDp
-                val portraitWidth = minOf(screenW, screenH)
-                val cardWidth = (portraitWidth * 0.85f).roundToInt()
+                val portraitWidth = minOf(screenW, service.resources.configuration.screenHeightDp)
+                val cardWidth = service.currentFloatingCardWidthDp.takeIf { it > 0 } ?: (portraitWidth * 0.85f).roundToInt()
                 val halfMargin = ((screenW - cardWidth) / 2f).roundToInt()
                 val newX = (s.floatingOffsetX + dx).roundToInt().coerceIn(-halfMargin, halfMargin)
-                val newY_raw = (s.floatingOffsetY + dy).roundToInt()
+                val newY_raw = (s.floatingOffsetY.coerceAtLeast(floatingMinY) + dy).roundToInt()
                 val actualCardH = if (service.currentFloatingCardHeightDp > 0) service.currentFloatingCardHeightDp else service.currentEffectiveKeyboardHeight
                 val maxOffsetY = (screenH - actualCardH).coerceAtLeast(floatingMinY)
-                val newY = newY_raw.coerceIn(0, maxOffsetY)
+                val newY = newY_raw.coerceIn(floatingMinY, maxOffsetY)
                 service.uiState.value = s.copy(
                     floatingOffsetX = newX,
                     floatingOffsetY = newY,
@@ -289,8 +284,10 @@ internal fun rememberImeKeyboardCallbacks(
             onFloatingKeyboardDragEnd = {
                 val s = service.uiState.value
                 val isLandscape = service.resources.configuration.screenWidthDp > service.resources.configuration.screenHeightDp
-                SettingsPreferences.setFloatingOffsetX(service, s.floatingOffsetX, isLandscape)
-                SettingsPreferences.setFloatingOffsetY(service, s.floatingOffsetY, isLandscape)
+                if (!s.showKeyboardResize) {
+                    SettingsPreferences.setFloatingOffsetX(service, s.floatingOffsetX, isLandscape)
+                    SettingsPreferences.setFloatingOffsetY(service, s.floatingOffsetY, isLandscape)
+                }
             },
             onT9ReplaceFullPinyin = { pinyin ->
                 service.serviceScope.launch(service.keyProcessingDispatcher) {

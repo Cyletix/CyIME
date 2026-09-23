@@ -25,6 +25,7 @@ data class KeyboardCallbacks(
     val onClearAssociation: (() -> Unit)? = null,
     val onToggleDarkMode: (() -> Unit)? = null,
     val onClipboard: (() -> Unit)? = null,
+    val onDismissClipboardPreview: (() -> Unit)? = null,
     val onClipboardSelect: ((String) -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
     val onDeleteText: ((Int) -> Unit)? = null,
@@ -33,6 +34,8 @@ data class KeyboardCallbacks(
     val onReloadConfig: (() -> Unit)? = null,
     val onSettings: (() -> Unit)? = null,
     val onSwitchSchema: ((String) -> Unit)? = null,
+    val onReorderSchemas: ((List<String>) -> Unit)? = null,
+    val onHandwritingToggle: (() -> Unit)? = null,
     val onToggleSchemaSwitch: ((SchemaSwitchUiState) -> Unit)? = null,
     val onHideKeyboard: (() -> Unit)? = null,
     val onSwitchKeyboard: (() -> Unit)? = null,
@@ -43,6 +46,7 @@ data class KeyboardCallbacks(
     val onPageDown: (() -> Unit)? = null,
     val onPageUp: (() -> Unit)? = null,
     val onCursorMove: ((Int) -> Unit)? = null,
+    val onCursorMoveVertical: ((Int) -> Unit)? = null,
     val onGestureAction: ((GestureAction, String) -> Unit)? = null,
     val onUpdateToolbarButtons: ((List<String>) -> Unit)? = null,
     /**
@@ -138,4 +142,6 @@ data class KeyboardCallbacks(
      * 手写活动区固化（停顿/点选确认）后触发联想推理（基于已上屏文本）。
      */
     val onHandwritingFinalize: (() -> Unit)? = null,
+    /** 假名按序进入 Rime；变音仅修改仍在组合中的末尾编码。 */
+    val onJapaneseKanaAction: ((JapaneseKanaAction) -> Unit)? = null,
 )

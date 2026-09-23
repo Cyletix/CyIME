@@ -7,10 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,7 +24,8 @@ import androidx.compose.material.icons.twotone.KeyboardAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +33,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import com.kingzcheung.xime.R
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
+import com.kingzcheung.xime.ui.keyboard.KeyboardPanelGrid
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,18 +52,14 @@ fun SchemaListView(
     keyBgColor: Color,
     onSelectSchema: (String) -> Unit,
     onBack: (() -> Unit)? = null,
+    onReorderSchemas: ((List<String>) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var editingOrder by remember { mutableStateOf(false) }
     // 功能 item 背景：与键盘按键背景一致（keyBgColor，浅色纯白、深色跟随 keyboard.colors）
     val itemBgColor = keyBgColor
     val textColor = keyTextColor
     val subTextColor = keyTextColor.copy(alpha = 0.65f)
-    // 图标按钮容器色：surface 与 primary 的混合色调（带种子色但不过于强烈）
-    val iconButtonContainer = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.primary,
-        0.35f
-    )
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     Column(
@@ -70,130 +68,31 @@ fun SchemaListView(
             .background(backgroundColor),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-                .padding(horizontal = if (isLandscape) 50.dp else 8.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(iconButtonContainer)
-                    .clickable { onBack?.invoke() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "返回",
-                    tint = textColor,
-                    modifier = Modifier.size(24.dp)
-                )
+        if (onReorderSchemas != null) {
+            Row(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(if (editingOrder) "长按拖动调整顺序" else "输入模式", color = textColor, fontSize = 13.sp)
+                TextButton(onClick = { editingOrder = !editingOrder }) {
+                    Text(if (editingOrder) "完成" else "调整顺序", color = accentColor)
+                }
             }
         }
+        if (editingOrder && onReorderSchemas != null) {
+            InputModeOrderEditor(schemas, onReorderSchemas, keyBgColor, textColor, accentColor,
+                Modifier.fillMaxWidth().weight(1f))
+            return@Column
+        }
 
-        if (isLandscape) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 50.dp)
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                schemas.forEach { schema ->
-                    SchemaGridItem(
-                        schema = schema,
-                        isSelected = schema.schemaId == currentSchemaId,
-                        bgColor = itemBgColor,
-                        textColor = textColor,
-                        accentColor = accentColor,
-                        onSelect = { onSelectSchema(schema.schemaId) },
-                        modifier = Modifier.weight(1f),
-                        isLandscape = true
-                    )
-                }
-                if (schemas.isEmpty()) {
-                    Text(
-                        text = "没有可用的输入方案",
-                        color = subTextColor,
-                        fontSize = 13.sp
-                    )
-                }
+        if (schemas.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                Text("没有可用的输入方案", color = subTextColor, fontSize = 13.sp)
             }
         } else {
-            val itemsPerPage = 8
-            val pages = schemas.chunked(itemsPerPage).map { page ->
-                page + List(itemsPerPage - page.size) { null }
-            }
-            val pagerState = rememberPagerState(pageCount = { pages.size })
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceAround
-            ) {
-                if (schemas.isEmpty()) {
-                    Text(
-                        text = "没有可用的输入方案",
-                        color = subTextColor,
-                        fontSize = 13.sp
-                    )
-                } else {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxWidth()
-                    ) { page ->
-                        FlowRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            maxItemsInEachRow = 4
-                        ) {
-                            pages[page].forEach { schema ->
-                                if (schema != null) {
-                                    SchemaGridItem(
-                                        schema = schema,
-                                        isSelected = schema.schemaId == currentSchemaId,
-                                        bgColor = itemBgColor,
-                                        textColor = textColor,
-                                        accentColor = accentColor,
-                                        onSelect = { onSelectSchema(schema.schemaId) },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                } else {
-                                    Box(modifier = Modifier.weight(1f).aspectRatio(1f))
-                                }
-                            }
-                        }
-                    }
-
-                    if (pages.size > 1) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            repeat(pages.size) { index ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(if (index == pagerState.currentPage) 8.dp else 6.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (index == pagerState.currentPage) textColor
-                                            else textColor.copy(alpha = 0.3f)
-                                        )
-                                )
-                            }
-                        }
-                    }
-                }
+            KeyboardPanelGrid(schemas, isLandscape, textColor, "schema-pages", Modifier.fillMaxWidth().weight(1f)) { schema, cellModifier ->
+                SchemaGridItem(schema, schema.schemaId == currentSchemaId, itemBgColor, textColor,
+                    accentColor = accentColor, onSelect = { onSelectSchema(schema.schemaId) },
+                    modifier = cellModifier.testTag("schema-tile:${schema.schemaId}"), isLandscape = isLandscape)
             }
         }
     }
@@ -214,11 +113,10 @@ private fun SchemaGridItem(
 ) {
     Column(
         modifier = modifier
-            .then(if (isLandscape) Modifier.height(72.dp) else Modifier.aspectRatio(1f))
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
             .clickable { onSelect() }
-            .padding(if (isLandscape) 4.dp else 8.dp),
+            .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -249,10 +147,12 @@ private fun SchemaGridItem(
         Text(
             text = schema.name,
             color = if (isSelected) accentColor else textColor,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
+            lineHeight = 14.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
-            maxLines = 1
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
         if (layoutHint != null) {
             Text(

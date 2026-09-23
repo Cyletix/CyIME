@@ -297,6 +297,19 @@ public:
         }
     }
 
+    std::string conversionPreview() {
+        if (!rime || !session_id_) return "";
+        RIME_STRUCT(RimeContext, context);
+        if (!rime->get_context(session_id_, &context)) return "";
+        std::string text = context.commit_text_preview ? context.commit_text_preview : "";
+        rime->free_context(&context);
+        return text;
+    }
+
+    bool highlightCandidate(int index) {
+        return rime && session_id_ && index >= 0 && rime->highlight_candidate(session_id_, index);
+    }
+
     bool setInput(const char* input) {
         if (!rime || !session_id_) {
             LOGE("setInput: rime or session not available");
@@ -1202,6 +1215,15 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetProcessResult(
     env->DeleteLocalRef(candidateArray);
 
     return jResult;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeConversionPreview(JNIEnv* env, jobject) {
+    return env->NewStringUTF(Rime::Instance().conversionPreview().c_str());
+}
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeHighlightCandidate(JNIEnv*, jobject, jint index) {
+    return Rime::Instance().highlightCandidate(index) ? JNI_TRUE : JNI_FALSE;
 }
 
 // 设置输入字符串（替代逐字符 processKey，减少 JNI 调用次数）

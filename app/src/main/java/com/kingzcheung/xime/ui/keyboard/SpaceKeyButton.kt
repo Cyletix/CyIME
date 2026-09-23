@@ -3,22 +3,13 @@ package com.kingzcheung.xime.ui.keyboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,15 +18,18 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
+/** 全键盘、九键、笔画和分栏布局共用的空格交互。 */
 @Composable
 fun SpaceKeyButton(
     onClick: () -> Unit,
@@ -44,102 +38,113 @@ fun SpaceKeyButton(
     schemaName: String = "",
     modifier: Modifier = Modifier,
     onPress: (() -> Unit)? = null,
-    isVoiceMode: Boolean = false,
-    onVoiceModeChange: ((Boolean) -> Unit)? = null,
+    onRelease: (() -> Unit)? = null,
+    isVoiceMode: Boolean = LocalKeyboardInputActions.current.isVoiceMode,
+    voiceSticky: Boolean = LocalKeyboardInputActions.current.voiceSticky,
+    isSttEnabled: Boolean = LocalKeyboardInputActions.current.isSttEnabled,
+    onVoiceModeChange: ((Boolean) -> Unit)? = LocalKeyboardInputActions.current.onVoiceModeChange,
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    fontSize: TextUnit = 14.sp,
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val longPressTimeout = 400L
+    val settings = LocalKeyboardInputPreferences.current
+    val actions = LocalKeyboardInputActions.current
+    val onMove by rememberUpdatedState(actions.onCursorMove)
+    val onMoveVertical by rememberUpdatedState(actions.onCursorMoveVertical)
+    val onCursorMode by rememberUpdatedState(actions.onCursorModeChange)
+    DisposableEffect(Unit) { onDispose { onCursorMode?.invoke(false) } }
+    val currentClick by rememberUpdatedState(onClick)
+    val currentPress by rememberUpdatedState(onPress)
+    val currentRelease by rememberUpdatedState(onRelease)
     val scope = rememberCoroutineScope()
+    val view = LocalView.current
     val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
-            val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
-            val color = crispShadowColor(backgroundColor)
-            Modifier.drawBehind {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(0f, offsetPx),
-                    size = size,
-                    cornerRadius = CornerRadius(cornerPx)
-                )
-            }
+    var pressed by remember { mutableStateOf(false) }
+    var cursorActive by remember { mutableStateOf(false) }
+    val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (shadowEnabled) Modifier.drawBehind {
+            drawRoundRect(crispShadowColor(backgroundColor), topLeft = Offset(0f, shadowElevation.toPx()),
+                size = size, cornerRadius = CornerRadius(shadowShapeRadius.toPx()))
         } else Modifier
     }
-    
     Box(
-        modifier = modifier
-            .height((44 * LocalStretchFactor.current).dp)
-            .then(shadowModifier)
-            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(
-                if (isPressed) backgroundColor.copy(alpha = 0.7f)
-                else backgroundColor
-            )
-            .pointerInput(Unit) {
+        modifier.fillMaxSize()
+            .pointerInput(settings.spaceHold, settings.cursorStepDp) {
+                val step = settings.cursorStepDp.dp.toPx()
                 awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    isPressed = true
-                    onPress?.invoke()
-                    
-                    var longPressTriggered = false
-                    val longPressJob = scope.launch {
-                        delay(longPressTimeout)
-                        longPressTriggered = true
-                        onVoiceModeChange?.invoke(true)
-                    }
-                    
-                    try {
-                        waitForUpOrCancellation()
-                    } finally {
-                        longPressJob.cancel()
-                        
-                        if (longPressTriggered) {
-                            onVoiceModeChange?.invoke(false)
-                        } else {
-                            onClick()
+                    val down = awaitFirstDown()
+                    down.consume()
+                    pressed = true
+                    currentPress?.invoke()
+                    var held = false
+                    var movedBeforeHold = false
+                    var lastX = down.position.x
+                    var lastY = down.position.y
+                    val cursorSteps = CursorStepAccumulator(step)
+                    val verticalSteps = CursorStepAccumulator(step * 2f)
+                    val timer = scope.launch {
+                        delay(300L)
+                        held = true
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        when (settings.spaceHold) {
+                            SpaceHoldAction.CURSOR -> { cursorActive = true; onCursorMode?.invoke(true) }
+                            SpaceHoldAction.REPEAT -> while (true) { currentClick(); delay(70L) }
                         }
-                        
-                        isPressed = false
+                    }
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.isConsumed) break
+                            if (held && settings.spaceHold == SpaceHoldAction.REPEAT &&
+                                (change.position.x < 0f || change.position.x > size.width ||
+                                    change.position.y < 0f || change.position.y > size.height)) break
+                            val dx = change.position.x - lastX
+                            lastX = change.position.x
+                            val dy = change.position.y - lastY
+                            lastY = change.position.y
+                            if (!held && (abs(change.position.x - down.position.x) > viewConfiguration.touchSlop ||
+                                abs(change.position.y - down.position.y) > viewConfiguration.touchSlop)) {
+                                movedBeforeHold = true
+                                timer.cancel()
+                            }
+                            if (cursorActive) {
+                                val steps = cursorSteps.move(dx)
+                                if (steps != 0) onMove?.invoke(steps)
+                                val rows = verticalSteps.move(dy)
+                                if (rows != 0) onMoveVertical?.invoke(rows)
+                            }
+                            change.consume()
+                            if (!change.pressed) {
+                                if (!held && !movedBeforeHold) {
+                                    currentClick()
+                                }
+                                break
+                            }
+                        }
+                    } finally {
+                        timer.cancel()
+                        pressed = false
+                        cursorActive = false
+                        onCursorMode?.invoke(false)
+                        currentRelease?.invoke()
                     }
                 }
-            },
+            }
+            .padding(LocalKeyVisualPadding.current)
+            .then(shadow)
+            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+            .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor),
         contentAlignment = Alignment.Center
     ) {
-        // UI 显示由外部 isVoiceMode 控制
-        if (isVoiceMode) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "语音输入",
-                tint = textColor,
-                modifier = Modifier.size(24.dp)
-            )
-        } else {
-            Text(
-                text = schemaName,
-                color = textColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Normal,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                fontFamily = AppFonts.keyFontFamily
-            )
-            
-            Text(
-                text = "空格",
-                color = textColor.copy(alpha = 0.3f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Normal,
-                textAlign = TextAlign.Start,
-                maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 6.dp, bottom = 2.dp),
-                fontFamily = AppFonts.keyFontFamily
-            )
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            if (schemaName.isNotBlank() && schemaName != "空格") Text(
+                schemaName.replace("拼音九键", "拼音"), color = textColor,
+                fontSize = (10f * settings.keyTextScale).sp, maxLines = 1,
+                fontFamily = AppFonts.keyFontFamily)
+            Icon(Icons.Default.SpaceBar, contentDescription = "空格", tint = textColor,
+                modifier = Modifier.size(22.dp))
         }
     }
 }

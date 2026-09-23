@@ -15,9 +15,9 @@ import androidx.compose.material.icons.twotone.SelectAll
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.PictureInPicture
+import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.outlined.Gesture
-import androidx.compose.material.icons.twotone.Edit
+import androidx.compose.material.icons.twotone.OpenWith
 import androidx.compose.material.icons.twotone.Mic
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -31,18 +31,20 @@ enum class ToolbarButton(
     SCHEMA("schema", "方案选择", Icons.TwoTone.KeyboardAlt),
     QUICK_PHRASE("quick_phrase", "快捷发送", Icons.TwoTone.Quickreply),
     SYMBOL("symbol", "符号", Icons.TwoTone.Paid),
-    FLOAT("float", "悬浮", Icons.Default.PictureInPicture),
+    // 保留已保存的旧 ID，悬浮模式统一在键盘调节中设置。
+    FLOAT("float", "键盘调节", Icons.TwoTone.Tune),
     SELECT_ALL("select_all", "全选", Icons.TwoTone.SelectAll),
     COPY("copy", "复制", Icons.TwoTone.ContentCopy),
     PASTE("paste", "粘贴", Icons.TwoTone.ContentPaste),
     HOME("home", "段首", Icons.TwoTone.FirstPage),
     END("end", "段尾", Icons.AutoMirrored.TwoTone.LastPage),
-    HANDWRITING_LOOKUP("handwriting_lookup", "手写找字", Icons.Outlined.Gesture),
-    EDIT("edit", "编辑", Icons.TwoTone.Edit),
+    HANDWRITING_LOOKUP("handwriting_lookup", "手写", Icons.Outlined.Gesture),
+    EDIT("edit", "编辑", Icons.TwoTone.OpenWith),
     VOICE("voice", "语音", Icons.TwoTone.Mic);
 
     companion object {
-        val DEFAULT_VISIBLE = emptySet<ToolbarButton>()
+        // 仅在用户还没有保存工具栏偏好时使用，保留已有选择及顺序。
+        val DEFAULT_VISIBLE = linkedSetOf(SCHEMA, EMOJI, EDIT, CLIPBOARD, HANDWRITING_LOOKUP, VOICE)
 
         fun fromId(id: String): ToolbarButton? =
             entries.find { it.id == id }
@@ -51,5 +53,6 @@ enum class ToolbarButton(
 
 data class ToolbarAction(
     val item: ToolbarButtonItem,
+    val active: Boolean = false,
     val onClick: () -> Unit
 )

@@ -346,7 +346,7 @@ private fun CandidateBarPreview(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PreviewCandidate(
-                text = "曦码",
+                text = "Xime-CyletixFork",
                 isSelected = true,
                 accent = accent,
                 textColor = textColor,

@@ -90,6 +90,8 @@ class FeedbackManager(private val context: Context) {
             soundIds["delete"] = pool.load(context, R.raw.kb_key_delete, 1)
             soundIds["space"] = pool.load(context, R.raw.kb_key_space, 1)
             soundIds["enter"] = pool.load(context, R.raw.kb_key_enter, 1)
+            soundIds["voice_start"] = pool.load(context, R.raw.kb_voice_start, 1)
+            soundIds["voice_end"] = pool.load(context, R.raw.kb_voice_end, 1)
         }
     }
 

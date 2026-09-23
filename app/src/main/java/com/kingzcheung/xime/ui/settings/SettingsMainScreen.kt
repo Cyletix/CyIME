@@ -90,7 +90,7 @@ fun SettingsMainContent(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             MediumTopAppBar(
-                title = { Text("曦码输入法设置") },
+                title = { Text("Xime-CyletixFork 设置") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surface,
@@ -117,7 +117,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.Keyboard,
                         title = "启用输入法",
-                        subtitle = "在系统设置中启用曦码输入法",
+                        subtitle = "在系统设置中启用 Xime-CyletixFork",
                         onClick = {
                             val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)
                             context.startActivity(intent)
@@ -131,7 +131,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.ToggleOn,
                         title = "选择输入法",
-                        subtitle = "将曦码设为当前输入法",
+                        subtitle = "将 Xime-CyletixFork 设为当前输入法",
                         onClick = {
                             val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) 
                                 as InputMethodManager
@@ -369,7 +369,7 @@ fun SettingsMainContent(
                     )
                     SettingsItem(
                         icon = Icons.TwoTone.Info,
-                        title = "关于曦码",
+                        title = "关于 Xime-CyletixFork",
                         subtitle = "版本信息、开发者、联系方式",
                         onClick = onNavigateToAbout,
                         showArrow = true

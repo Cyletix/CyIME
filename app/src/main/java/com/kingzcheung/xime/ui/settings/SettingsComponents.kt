@@ -621,7 +621,7 @@ fun CodeDisplayCard(
                             if (showCodeInInputBox) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "曦码 shu ru fa",
+                                        text = "Xime-CyletixFork shu ru fa",
                                         fontSize = 12.sp,
                                         color = onSurface,
                                         maxLines = 1
@@ -711,7 +711,7 @@ fun CodeDisplayCard(
 fun CodeDisplayCardPreview_SelectedWithCode() {
     XimeTheme {
         CodeDisplayCard(
-            title = "曦码",
+            title = "Xime-CyletixFork",
             isSelected = true,
             showCodeInInputBox = true,
             onClick = {},
@@ -727,7 +727,7 @@ fun CodeDisplayCardPreview_SelectedWithCode() {
 fun CodeDisplayCardPreview_NotSelectedNoCode() {
     XimeTheme {
         CodeDisplayCard(
-            title = "曦码",
+            title = "Xime-CyletixFork",
             isSelected = true,
             showCodeInInputBox = false,
             onClick = {},

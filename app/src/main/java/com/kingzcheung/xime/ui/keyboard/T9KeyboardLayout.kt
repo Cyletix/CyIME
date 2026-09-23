@@ -44,6 +44,7 @@ import com.kingzcheung.xime.settings.DisplayMode
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.swipeHandlerFor
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -354,20 +355,20 @@ private fun T9KeyboardContent(
         val upHint = gesture.swipeUp?.let { it.label.ifEmpty { it.value } }
         val downHint = gesture.swipeDown?.let { it.label.ifEmpty { it.value } }
         // display 三态：key=仅键面提示（无气泡）、bubble=仅滑动气泡、both=键面+气泡。
-        // 内置默认全为 key（无气泡）：上滑对象格式 { value: "N" } 默认 key，下滑对象格式同。
+        // 内置数字上滑默认 both：滑动显示预览，松手输入数字。
         // SwipeableKeyButton 键面提示取 swipeUpKeyLabel ?: swipeText（null 回退气泡文本），
         // bubble 模式传空串显式压制键面显示。手势回调独立于提示与 display。
         val swipeUpKeyLabel = when {
-            !swipeHints.up || !hintsActive -> null
+            !swipeHints.up || !hintsActive -> ""
             gesture.swipeUp?.display == DisplayMode.BUBBLE -> ""
             else -> upHint
         }
         return T9KeySwipes(
             onSwipeUp = swipeHandlerFor(gesture.swipeUp, commitDirect, onGestureAction),
             onSwipeDown = swipeHandlerFor(gesture.swipeDown, commitDirect, onGestureAction),
-            swipeUpText = if (swipeHints.up && hintsActive &&
+            swipeUpText = if (swipeHints.up &&
                 gesture.swipeUp?.display != DisplayMode.KEY) upHint else null,
-            swipeDownText = if (swipeHints.down && hintsActive &&
+            swipeDownText = if (swipeHints.down &&
                 gesture.swipeDown?.display != DisplayMode.KEY) downHint else null,
             swipeUpKeyLabel = swipeUpKeyLabel,
             swipeDownKeyLabel = if (swipeHints.down && hintsActive &&
@@ -417,7 +418,8 @@ private fun T9KeyboardContent(
                 val currentFirstOptions = controller.firstOptions
                 // 空闲态符号列表来自 xime.yaml keyboard.t9.side_symbols（可自定义，>4 滚动）
                 val configVersion by KeysConfigHelper.configVersion.collectAsState()
-                val t9SideSymbols = remember(configVersion) { KeysConfigHelper.getT9SideSymbols() }
+                val t9SideSymbols = LocalKeyboardInputPreferences.current.symbols()
+                    ?: remember(configVersion) { KeysConfigHelper.getT9SideSymbols() }
                 val displayItems: List<String> = if (showCandidates) {
                     currentFirstOptions.map { it.pinyin }
                 } else {
@@ -450,7 +452,7 @@ private fun T9KeyboardContent(
                             } else {
                                 CandidateItem(
                                     text = item,
-                                    onClick = { onKeyPress(item) },
+                                    onClick = { commitDirect(item) },
                                     onPress = { onKeyPressDown?.invoke(item) },
                                     textColor = keyTextColor,
                                     backgroundColor = keyBackgroundColor,
@@ -491,7 +493,7 @@ private fun T9KeyboardContent(
                             } else {
                                 CandidateItem(
                                     text = item,
-                                    onClick = { onKeyPress(item) },
+                                    onClick = { commitDirect(item) },
                                     onPress = { onKeyPressDown?.invoke(item) },
                                     textColor = keyTextColor,
                                     backgroundColor = keyBackgroundColor,
@@ -513,7 +515,7 @@ private fun T9KeyboardContent(
                 onClick = { onKeyPress("symbol") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("t9-symbol-key"),
                 onPress = { onKeyPressDown?.invoke("symbol") },
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
@@ -535,6 +537,7 @@ private fun T9KeyboardContent(
                     swipes = swipesFor("1"),
 
                     digit = "1", letters = "分词",
+                    onSwipeStateChange = onSwipeStateChange,
                     onClick = { controller.onDigitPressed("1") },
                     backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1f),
@@ -674,24 +677,24 @@ private fun T9KeyboardContent(
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 KeyButton(
                     text = "123", onClick = { onKeyPress("number") },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("mode_change") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
                 T9SpaceKey(
-                    schemaName = uiState.schemaName, isSttEnabled = uiState.isSttEnabled,
+                    schemaName = "拼音", isSttEnabled = uiState.isSttEnabled,
                     voiceSticky = uiState.voiceSticky,
                     onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
                     onVoiceModeChange = callbacks.onVoiceModeChange,
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                     modifier = Modifier.weight(1.8f),
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
-                IconKeyButton(
+                LanguageKeyButton(
                     icon = rememberVectorPainter(Icons.Default.Language),
                     onClick = { onKeyPress("ime_switch") },
-                    backgroundColor = keyBackgroundColor, iconColor = keyTextColor,
+                    backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor,
                     modifier = Modifier.weight(1f),
                     onPress = { onKeyPressDown?.invoke("ime_switch") },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
@@ -747,7 +750,7 @@ private fun T9KeyboardContent(
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
-            KeyButton(
+            ActionKeyButton(
                 text = uiState.enterKeyText,
                 onClick = { onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
@@ -901,6 +904,7 @@ private fun NineKeyButton(
     textColor: Color,
     modifier: Modifier = Modifier,
     onPress: (() -> Unit)? = null,
+    onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
@@ -914,6 +918,7 @@ private fun NineKeyButton(
         textColor = textColor,
         modifier = modifier,
         onPress = onPress,
+        onSwipeStateChange = onSwipeStateChange,
         badgeText = digit,
         swipeText = swipes.swipeUpText,
         swipeDownText = swipes.swipeDownText,
@@ -1015,118 +1020,10 @@ private fun T9SpaceKey(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
 ) {
-    val context = LocalContext.current
-    val view = LocalView.current
-    val currentOnKeyPress by rememberUpdatedState(onKeyPress)
-    val currentOnVoiceModeChange by rememberUpdatedState(onVoiceModeChange)
-    val density = LocalDensity.current
-    val spaceShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
-            val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
-            val color = crispShadowColor(backgroundColor)
-            Modifier.drawBehind {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(0f, offsetPx),
-                    size = size,
-                    cornerRadius = CornerRadius(cornerPx)
-                )
-            }
-        } else Modifier
-    }
 
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .padding(horizontal = 2.dp, vertical = 2.dp)
-            .pointerInput(voiceSticky) {
-                detectTapGestures(
-                    onPress = {
-                        if (voiceSticky) {
-                            tryAwaitRelease()
-                        } else {
-                            onKeyPressDown?.invoke("space")
-                            tryAwaitRelease()
-                        }
-                    },
-                    onTap = {
-                        if (voiceSticky) {
-                            currentOnVoiceModeChange?.invoke(false)
-                        } else {
-                            currentOnKeyPress("space")
-                        }
-                    },
-                    onLongPress = {
-                        if (voiceSticky) return@detectTapGestures
-                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                        if (isSttEnabled) {
-                            if (!PermissionHelper.hasRecordAudioPermission(context)) {
-                                Toast.makeText(context, "需要麦克风权限才能使用语音输入", Toast.LENGTH_SHORT).show()
-                                PermissionHelper.requestRecordAudioPermission(context)
-                            } else {
-                                currentOnVoiceModeChange?.invoke(true)
-                            }
-                        } else {
-                            // 连续空格：在主线程上快速发送多个 space
-                            repeat(5) { currentOnKeyPress("space") }
-                        }
-                    }
-                )
-            }, contentAlignment = Alignment.Center
-    ) {
-        // 背景层
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(spaceShadowModifier)
-                .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                .background(backgroundColor)
-        )
-        if (voiceSticky) {
-            Text(
-                text = "轻触结束语音",
-                color = textColor,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-        } else {
-            Text(
-                text = schemaName,
-                color = textColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Normal,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-            if (isSttEnabled) {
-                Icon(
-                    painter = painterResource(R.drawable.voice),
-                    contentDescription = "语音输入",
-                    tint = textColor.copy(alpha = 0.3f),
-                    modifier = Modifier
-                        .size(18.dp)
-                        .align(Alignment.BottomStart)
-                        .padding(start = 6.dp, bottom = 2.dp)
-                )
-            } else {
-                Text(
-                    text = "空格",
-                    color = textColor.copy(alpha = 0.3f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Normal,
-                    textAlign = TextAlign.Start,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 6.dp, bottom = 2.dp)
-                )
-            }
-        }
-    }
+    SpaceKeyButton(onClick = { onKeyPress("space") }, backgroundColor = backgroundColor,
+        textColor = textColor, schemaName = schemaName, modifier = modifier,
+        onPress = { onKeyPressDown?.invoke("space") }, voiceSticky = voiceSticky,
+        isSttEnabled = isSttEnabled, onVoiceModeChange = onVoiceModeChange,
+        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
 }
