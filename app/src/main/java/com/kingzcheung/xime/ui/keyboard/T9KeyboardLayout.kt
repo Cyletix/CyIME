@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -338,7 +339,7 @@ private fun T9KeyboardContent(
     val ctrlFontSize = if (compactMode) 11.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val candidateFontSize = if (compactMode) 11.sp else 13.sp
     val specialKeyTextColor = if (uiState.isDarkTheme) Color.White
-        else KeyboardThemes.getAccentColor(uiState.themeId, false)
+        else KeyboardThemes.getSpecialKeyTextColor(uiState.themeId, false)
 
     // 数字键滑动手势（keyboard.t9.keys，热重载经 configVersion 感知）：
     // 上滑默认直接上屏数字（T9 模式 onKeyPress(数字) 会进拼音数字码组合，须走 onCommitText），
@@ -967,7 +968,7 @@ private fun ResetKey(
         } else Modifier
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 2.dp, vertical = 4.dp)
@@ -984,22 +985,25 @@ private fun ResetKey(
                 }, onTap = { currentOnClick() })
             }, contentAlignment = Alignment.Center
     ) {
+        val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
+        val hintSize = 9f * adaptiveHintScale(contentScale)
         Icon(
             imageVector = Icons.Default.Refresh,
             contentDescription = "重输",
             tint = textColor,
-            modifier = Modifier.size(if (compactMode) 16.dp else 20.dp)
+            modifier = Modifier.size(KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value, if (compactMode) 16f else 20f).dp)
         )
 
         if (!compactMode) {
             Text(
                 text = "重输",
                 color = textColor.copy(alpha = 0.5f),
-                fontSize = 9.sp,
+                fontSize = hintSize.sp,
+                lineHeight = (hintSize * 1.2f).sp,
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.offset(y = (-14).dp)
+                modifier = Modifier.offset(y = -KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale).dp)
             )
         }
     }

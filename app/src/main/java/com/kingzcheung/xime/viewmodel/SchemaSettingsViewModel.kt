@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 data class SchemaUiState(
     val allSchemas: List<SchemaMeta> = emptyList(),
     val enabledSchemas: List<String> = emptyList(),
-    val currentSchema: String = "wubi86",
+    val currentSchema: String = "t9_pinyin",
     val isDeploying: Boolean = false,
     val isDownloading: Boolean = false,
     val toastMessage: String? = null,
@@ -165,16 +165,18 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
         _uiState.update { it.copy(showUninstallDialog = false) }
     }
 
-    fun uninstallPackage(packageId: String) {
+    fun uninstallPackage(packageId: String) = uninstallPackages(listOf(packageId))
+
+    fun uninstallPackages(packageIds: List<String>) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                SchemaManager.deleteSchemaFiles(context, packageId)
-                SchemaManager.deleteSchemeArchive(context, packageId)
+            // 批量操作串行进行，避免启用列表的读改写互相覆盖或失败提示被后一个成功吞掉。
+            val results = withContext(Dispatchers.IO) {
+                packageIds.distinct().map { id -> id to SchemaManager.uninstallPackage(context, id) }
             }
-            _uiState.update { it.copy(showUninstallDialog = false) }
+            if (results.all { it.second.success }) _uiState.update { it.copy(showUninstallDialog = false) }
             refresh()
             loadMarketPackages()
-            showToast("已卸载")
+            showToast(results.joinToString("\n") { (id, result) -> "$id：${result.message}" })
         }
     }
 

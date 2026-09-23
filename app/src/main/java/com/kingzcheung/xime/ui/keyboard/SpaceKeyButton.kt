@@ -68,7 +68,7 @@ fun SpaceKeyButton(
                 size = size, cornerRadius = CornerRadius(shadowShapeRadius.toPx()))
         } else Modifier
     }
-    Box(
+    BoxWithConstraints(
         modifier.fillMaxSize()
             .pointerInput(settings.spaceHold, settings.cursorStepDp) {
                 val step = settings.cursorStepDp.dp.toPx()
@@ -138,13 +138,18 @@ fun SpaceKeyButton(
             .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor).keyGlow(),
         contentAlignment = Alignment.Center
     ) {
+        val iconSize = KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value)
+        val labelHeight = (maxHeight.value - iconSize).coerceAtLeast(1f)
+        val labelSize = minOf(KeyboardKeyMetrics.labelSizeSp(schemaName, 10f,
+            maxWidth.value, maxHeight.value, density.fontScale, settings.keyTextScale),
+            labelHeight / (density.fontScale * 1.4f)).coerceAtLeast(1f)
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             if (schemaName.isNotBlank() && schemaName != "空格") Text(
                 schemaName.replace("拼音九键", "拼音"), color = textColor,
-                fontSize = (10f * settings.keyTextScale).sp, maxLines = 1,
+                fontSize = labelSize.sp, lineHeight = (labelSize * 1.2f).sp, maxLines = 1, softWrap = false,
                 fontFamily = AppFonts.keyFontFamily)
             Icon(Icons.Default.SpaceBar, contentDescription = "空格", tint = textColor,
-                modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
+                modifier = Modifier.size(iconSize.dp))
         }
     }
 }

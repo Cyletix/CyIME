@@ -46,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -193,6 +195,12 @@ fun KeyboardView(
         callbacks.onT9ForceSendToRime = {
             t9Controller.forceSendToRime()
         }
+        callbacks.onT9RunLiteralInput = { block ->
+            t9Controller.enqueueLiteralInput(block)
+        }
+        callbacks.onT9ResetAfterLiteralCommit = {
+            t9Controller.resetLocalState()
+        }
         callbacks.onFilterT9Candidates = { candidates, comments ->
             Pair(candidates, comments)  // no-op: t9_processor handles filtering
         }
@@ -244,12 +252,17 @@ fun KeyboardView(
     val floatScaleFactor = if (state.isFloatingMode) cardWidthDp.toFloat() / screenW.toFloat() else 0.85f
     val floatFontScale = if (state.isFloatingMode) cardWidthDp.toFloat() / portraitScreenWidth.toFloat() else 1f
 
+    // 调节控件与键盘预览是兄弟层：透明度只作用于键盘，操作面板始终清晰。
+    val resizeControlDensity = LocalDensity.current
+    val previewModifier = if (resizeOverlay != null) Modifier.graphicsLayer {
+        alpha = state.keyboardOpacity
+        compositingStrategy = CompositingStrategy.Offscreen
+    } else Modifier
     val contentModifier = if (state.isFloatingMode) {
-        modifier.keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
+        previewModifier.keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
     } else {
-        // 非浮动模式：渐变背景由 XimeInputMethodService 外层 Box 统一绘制（含导航栏区，
-        // 保证延伸到屏幕底部时渐变连续），此处不再叠加第二层背景。
-        modifier
+        // 固定模式的渐变背景仍由服务单独按相同透明度绘制，避免重复叠色。
+        previewModifier
     }
     val inputPreferences = rememberKeyboardInputPreferences()
     var cursorControlActive by remember { mutableStateOf(false) }
@@ -271,7 +284,7 @@ fun KeyboardView(
     ) {
     FloatingKeyboardContainer(
         isFloatingMode = state.isFloatingMode,
-        opacity = state.keyboardOpacity,
+        opacity = if (resizeOverlay != null) 1f else state.keyboardOpacity,
         scaleFactor = floatScaleFactor,
         fontScaleFactor = floatFontScale,
         offsetX = state.floatingOffsetX,
@@ -284,8 +297,8 @@ fun KeyboardView(
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
         onCardPositioned = onCardPositioned,
     ) {
-    Box(modifier = contentModifier) {
-        Box {
+    Box(modifier = modifier) {
+        Box(modifier = contentModifier) {
         // 长按候选删除自造词：确认覆盖层状态（键盘视图内渲染，不弹独立
         // 窗口——焦点型弹窗会抢焦点导致 IME 被系统收起）
         // 长按删除待确认项：词文本 + 确认后执行（候选栏/展开页共用同一确认覆盖层）
@@ -1566,7 +1579,11 @@ fun KeyboardView(
         }
         }
     }
-    resizeOverlay?.let { Box(Modifier.matchParentSize()) { it() } }
+    resizeOverlay?.let { controls ->
+        CompositionLocalProvider(LocalDensity provides resizeControlDensity) {
+            Box(Modifier.matchParentSize()) { controls() }
+        }
+    }
 }
 }
 }

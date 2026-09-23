@@ -6,11 +6,12 @@
 
 patch:
   schema_list:
-    - schema: wubi86_pinyin
-    - schema: wubi86
-    - schema: wubi86_trad
-    - schema: wubi86_trad_pinyin
-    - schema: pinyin_simp
+    - schema: t9_pinyin
+    - schema: rime_ice
+    - schema: pinyin_14jian
+    - schema: double_pinyin_flypy
+    - schema: japanese
+    - schema: japanese_kana
 
   # Menu
   menu:

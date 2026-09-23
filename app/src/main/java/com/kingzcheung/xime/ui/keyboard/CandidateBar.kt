@@ -350,7 +350,7 @@ fun CandidateBar(
                             KeyboardToolbarButton({ callbacks.onLogoClick?.invoke() }, iconButtonContainer,
                                 modifier = Modifier.testTag("toolbar-leading")) {
                                 Icon(painterResource(id = if (visuals.isDarkTheme) R.drawable.logo_dark else R.drawable.logo),
-                                    contentDescription = "Xime-CyletixFork Logo", tint = Color.Unspecified, modifier = Modifier.size(20.dp))
+                                    contentDescription = "CyIME Logo", tint = Color.Unspecified, modifier = Modifier.size(20.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(4.dp))

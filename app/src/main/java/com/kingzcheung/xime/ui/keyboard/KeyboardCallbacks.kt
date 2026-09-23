@@ -99,6 +99,10 @@ data class KeyboardCallbacks(
      * 用于右侧候选 partial commit 后，RIME composition 被清除需要重新构建。
      */
     var onT9ForceSendToRime: (() -> Unit)? = null,
+    /** 与普通九键触摸共用 FIFO，字面提交也等待之前的输入。 */
+    var onT9RunLiteralInput: ((suspend () -> Unit) -> Unit)? = null,
+    /** 引擎已在队列中清空，仅同步复位 T9 控制器显示状态。 */
+    var onT9ResetAfterLiteralCommit: (() -> Unit)? = null,
     /**
      * T9 候选词过滤器。服务层在获取 RIME 候选词后调用，由键盘层根据
      * [com.kingzcheung.xime.rime.T9InputController.selectionHistory] 过滤不匹配的候选词。

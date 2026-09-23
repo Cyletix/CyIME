@@ -95,24 +95,22 @@ fun ThemeSettingsContent(
                         modifier = Modifier.weight(1f),
                         title = "跟随系统"
                     )
-                    ThemeCard(
+                    KeyboardThemeCard(
+                        theme = currentTheme,
                         title = "浅色",
                         isSelected = uiState.darkMode == 0,
-                        isDark = false,
-                        accentColor = currentTheme.accentLight,
-                        keyBgColor = currentTheme.keyBgLight,
+                        previewDark = false,
                         onClick = {
                             viewModel.setDarkMode(0)
                             onThemeChanged()
                         },
                         modifier = Modifier.weight(1f)
                     )
-                    ThemeCard(
+                    KeyboardThemeCard(
+                        theme = currentTheme,
                         title = "深色",
                         isSelected = uiState.darkMode == 1,
-                        isDark = true,
-                        accentColor = currentTheme.accentDark,
-                        keyBgColor = currentTheme.keyBgDark,
+                        previewDark = true,
                         onClick = {
                             viewModel.setDarkMode(1)
                             onThemeChanged()
@@ -134,7 +132,7 @@ fun ThemeSettingsContent(
             
             item {
                 Text(
-                    text = "点击配色预览完整键盘效果",
+                    text = "柔和蓝在各设备使用相同配色；跟随系统动态配色会随壁纸和系统改变。点击可预览。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)

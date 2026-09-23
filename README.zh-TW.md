@@ -1,14 +1,23 @@
-> **Cyletix 分支 · 修改日期 2026-09-23。** [Xime-CyletixFork](https://github.com/Cyletix/Xime) 基于 Kor1（kingzcheung）及贡献者开发的 [Xime](https://github.com/ximeiorg/Xime)。应用继续遵循 [GNU GPL v3](LICENSE)，保留原作者及第三方版权声明。请从 [本分支 Releases](https://github.com/Cyletix/Xime/releases) 下载，F-Droid 链接指向上游原版。对应源代码在本仓库公开，改动和验证见 [本轮记录](docs/fork-landscape-japanese-and-branding.md)。
+> **Cyletix 分支 · 修改日期 2026-09-23。** [CyIME](https://github.com/Cyletix/Xime) 基于 Kor1（kingzcheung）及贡献者开发的 [Xime](https://github.com/ximeiorg/Xime)。应用继续遵循 [GNU GPL v3](LICENSE)，保留原作者及第三方版权声明。请从 [本分支 Releases](https://github.com/Cyletix/Xime/releases) 下载，F-Droid 链接指向上游原版。对应源代码在本仓库公开，改动和验证见 [命名与整理记录](docs/cyime-identity.md)。
 
-<p align="center">
-  <img src="docs/logo.jpg" alt="Xime Logo" width="600">
-</p>
+[CyIME 0.1.0 變更與驗證](docs/cyime-0.1.0.md)
 
-<h1 align="center">Xime-CyletixFork</h1>
+
+<h1 align="center">CyIME</h1>
 
 <p align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
+
+## CyIME 项目定位
+
+**CyIME** 是 Cyletix 独立命名和维护的 Android 输入法，基于 [Xime](https://github.com/ximeiorg/Xime) 与 Rime 开发，保留上游署名及 GPL-3.0 许可。2024 年的 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) 是键盘布局研究前身，与 Android 应用分别保留历史。
+
+当前仓库仍为 `Cyletix/Xime`；`Cyletix/CyIME` 是建议迁移名称，尚未作为下载地址启用。既有 Releases 可能仍使用旧名称；新构建命名为 `CyIME-0.1.0-<abi>.apk`，包标识与签名配置保持升级兼容。
+
+[旧项目结论与可选实验配置](docs/cyime-keyboard-research.md) · [命名及目录迁移决策](docs/cyime-identity.md)
+
+已提供 GA_10 v4 英文实验配置，保留历史 30 键顺序，默认不启用；尚无手机速度提升的验证结果。下文包含继承的 Xime 功能说明；链接中的 Windows/Linux 应用与上游服务属于各自项目。
 
 [Upstream Xime on F-Droid](https://f-droid.org/packages/com.kingzcheung.xime)
 
@@ -101,10 +110,10 @@
 
 ### 從 Release 下載
 
-1. 在 [Releases](https://github.com/ximeiorg/Xime/releases) 頁面下載最新版本的 APK
+1. 在 [Releases](https://github.com/Cyletix/Xime/releases) 頁面下載最新版本的 APK
 2. 安裝應用程式
-3. 在系統設定中啟用 Xime 輸入法
-4. 將 Xime 設為目前輸入法
+3. 在系統設定中啟用 CyIME 輸入法
+4. 將 CyIME 設為目前輸入法
 
 ### 國內下載
 
@@ -114,8 +123,8 @@
 
 1. 克隆專案並構建 APK
 2. 安裝應用程式
-3. 在系統設定中啟用 Xime 輸入法
-4. 將 Xime 設為目前輸入法
+3. 在系統設定中啟用 CyIME 輸入法
+4. 將 CyIME 設為目前輸入法
 
 ## 使用文件
 
@@ -130,7 +139,7 @@
 
 ```bash
 # 克隆專案（包含子模組）
-git clone --recursive https://github.com/ximeiorg/Xime.git
+git clone --recursive https://github.com/Cyletix/Xime.git
 
 # 或者在已克隆的專案中初始化子模組
 git submodule update --init --recursive

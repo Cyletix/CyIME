@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -42,6 +44,8 @@ object SchemaManifestManager {
     private const val REGISTRY_FILE = ".registry.json"
     private const val MANIFESTS_DIR = ".manifests"
     private const val REGISTRY_VERSION = 1
+    internal val packageMutex = Mutex()
+    private const val LOCAL_OWNER = "__local__"
 
     fun getRegistryFile(context: Context): File =
         File(context.filesDir, REGISTRY_FILE)
@@ -111,7 +115,7 @@ object SchemaManifestManager {
 
     // ── SHA256 helper ──
 
-    private fun fileSha256(file: File): String? {
+    internal fun fileSha256(file: File): String? {
         return try {
             val digest = MessageDigest.getInstance("SHA-256")
             FileInputStream(file).use { input ->
@@ -143,27 +147,108 @@ object SchemaManifestManager {
         newFileSha256: Map<String, String> = emptyMap(),
     ): List<FileConflictInfo> = withContext(Dispatchers.IO) {
         val registry = loadRegistry(context)
-        val files = registry.optJSONObject("files") ?: return@withContext emptyList()
+        val files = registry.optJSONObject("files") ?: JSONObject()
         val conflicts = mutableListOf<FileConflictInfo>()
-
         for (fileName in targetFiles) {
-            val entry = files.optJSONObject(fileName) ?: continue
-            val claimants = entry.optJSONArray("claimedBy") ?: continue
-            // 同一方案重新安装/升级：不视为冲突
-            if (jsonArrayToList(claimants).any { it == schemeId }) continue
-
-            val existingSha256 = entry.optString("sha256", "")
-            val newSha256 = newFileSha256[fileName] ?: continue
-            if (existingSha256 != newSha256) {
-                conflicts.add(FileConflictInfo(
-                    fileName = fileName,
-                    existingSha256 = existingSha256,
-                    newSha256 = newSha256,
-                    claimedBy = jsonArrayToList(claimants),
-                ))
+            val target = safeTarget(SchemaManager.getRimeDir(context), fileName)
+            if (!target.isFile || isUserDataFile(fileName)) continue
+            val existingHash = fileSha256(target) ?: error("无法校验 $fileName")
+            val newHash = newFileSha256[fileName] ?: continue
+            val entry = files.optJSONObject(fileName)
+            val owners = entry?.optJSONArray("claimedBy")?.let(::jsonArrayToList).orEmpty()
+            // 单包升级可以替换自身未修改的文件；共有或用户改写文件必须单独确认。
+            val ownUnmodified = owners == listOf(schemeId) && existingHash == entry?.optString("sha256")
+            if (existingHash != newHash && !ownUnmodified) {
+                conflicts.add(FileConflictInfo(fileName, existingHash, newHash,
+                    owners.filter { it != LOCAL_OWNER }.ifEmpty { listOf("本地文件") }))
             }
         }
         conflicts
+    }
+
+    internal fun safeTarget(root: File, relative: String): File {
+        require(relative.isNotBlank() && !relative.contains('\\')) { "无效路径: $relative" }
+        val target = File(root, relative).canonicalFile
+        require(target.toPath().startsWith(root.canonicalFile.toPath()) && target != root.canonicalFile) {
+            "文件超出方案目录: $relative"
+        }
+        return target
+    }
+
+    private fun versionFile(context: Context, hash: String): File {
+        require(hash.matches(Regex("[0-9a-f]{64}")))
+        return File(context.filesDir, ".schema-file-versions/$hash")
+    }
+
+    private fun keepVersion(context: Context, source: File): String {
+        val hash = fileSha256(source) ?: error("无法备份 ${source.name}")
+        val backup = versionFile(context, hash)
+        if (!backup.isFile) {
+            backup.parentFile!!.mkdirs()
+            source.copyTo(backup, overwrite = true)
+        }
+        check(fileSha256(backup) == hash) { "备份校验失败: ${source.name}" }
+        return hash
+    }
+
+    /** 仅发布已验证的暂存文件。失败时恢复原文件、清单和注册表。调用方持有 packageMutex。 */
+    internal suspend fun installStagedFiles(
+        context: Context, schemeId: String, displayName: String, version: String,
+        fromMarket: Boolean, staged: File, targets: List<String>,
+    ): List<String> {
+        val rimeDir = SchemaManager.getRimeDir(context)
+        val registryBefore = loadRegistry(context).toString()
+        val manifestBefore = loadManifest(context, schemeId)?.toString()
+        val priorFiles = linkedMapOf<String, String?>()
+        val installed = mutableListOf<String>()
+        val registry = JSONObject(registryBefore)
+        val entries = registry.optJSONObject("files") ?: JSONObject()
+        try {
+            for (name in targets.distinct()) {
+                if (isProtectedSystemFile(name)) continue
+                val source = safeTarget(staged, name)
+                val dest = safeTarget(rimeDir, name)
+                if (!source.isFile || (isUserDataFile(name) && dest.exists())) continue
+                val previousHash = if (dest.isFile) keepVersion(context, dest) else null
+                priorFiles[name] = previousHash
+                if (previousHash != null) {
+                    val entry = entries.optJSONObject(name) ?: JSONObject().apply {
+                        put("claimedBy", JSONArray(listOf(LOCAL_OWNER)))
+                    }
+                    // 用户修改过当前文件：另存为本地层，卸载市场版本时可还原这些修改。
+                    if (entry.has("sha256") && entry.optString("sha256") != previousHash) {
+                        val history = entry.optJSONArray("previous") ?: JSONArray()
+                        history.put(JSONObject(entry.toString()).apply { remove("previous") })
+                        entry.put("previous", history)
+                        entry.put("claimedBy", JSONArray(listOf(LOCAL_OWNER)))
+                    }
+                    entry.put("sha256", previousHash)
+                    entry.put("size", dest.length())
+                    entries.put(name, entry)
+                }
+                if (previousHash != fileSha256(source)) {
+                    dest.parentFile!!.mkdirs()
+                    source.copyTo(dest, overwrite = true)
+                }
+                installed.add(name)
+            }
+            registry.put("files", entries)
+            saveRegistry(context, registry)
+            check(createManifest(context, schemeId, displayName, version, fromMarket, installed)) {
+                "无法保存安装清单"
+            }
+            return installed
+        } catch (failure: Exception) {
+            for ((name, hash) in priorFiles) {
+                val dest = safeTarget(rimeDir, name)
+                if (hash == null) dest.delete()
+                else versionFile(context, hash).copyTo(dest, overwrite = true)
+            }
+            saveRegistry(context, JSONObject(registryBefore))
+            if (manifestBefore == null) deleteManifest(context, schemeId)
+            else saveManifest(context, schemeId, JSONObject(manifestBefore))
+            throw failure
+        }
     }
 
     // ── Create Manifest After Installation ──
@@ -183,7 +268,7 @@ object SchemaManifestManager {
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             val rimeDir = SchemaManager.getRimeDir(context)
-            val fileEntries = JSONObject()
+            val fileEntries = loadManifest(context, schemeId)?.optJSONObject("files") ?: JSONObject()
 
             for (fileName in extractedFiles) {
                 val file = File(rimeDir, fileName)
@@ -217,20 +302,31 @@ object SchemaManifestManager {
                 val fn = keysIt.next() as String
                 val fe = fileEntries.getJSONObject(fn)
                 val existing = allFiles.optJSONObject(fn)
-                if (existing != null) {
-                    val claimants = existing.optJSONArray("claimedBy") ?: JSONArray()
-                    if (!jsonArrayToList(claimants).contains(schemeId)) {
-                        claimants.put(schemeId)
-                    }
-                    existing.put("claimedBy", claimants)
-                } else {
-                    allFiles.put(fn, JSONObject().apply {
-                        put("sha256", fe.getString("sha256"))
-                        put("size", fe.getLong("size"))
-                        put("claimedBy", JSONArray(listOf(schemeId)))
+                if (fn !in extractedFiles) continue
+                val history = existing?.optJSONArray("previous") ?: JSONArray()
+                // 重装同一个包不会产生卸载后复活的旧包层。
+                val keptHistory = JSONArray()
+                for (i in 0 until history.length()) {
+                    val layer = history.getJSONObject(i)
+                    val owners = jsonArrayToList(layer.optJSONArray("claimedBy") ?: JSONArray()) - schemeId
+                    if (owners.isNotEmpty()) keptHistory.put(JSONObject(layer.toString()).put("claimedBy", JSONArray(owners)))
+                }
+                val previousOwners = existing?.optJSONArray("claimedBy")?.let(::jsonArrayToList).orEmpty() - schemeId
+                val sameContent = existing?.optString("sha256") == fe.getString("sha256")
+                if (!sameContent && previousOwners.isNotEmpty()) {
+                    keptHistory.put(JSONObject(existing!!.toString()).apply {
+                        remove("previous")
+                        put("claimedBy", JSONArray(previousOwners))
                     })
                 }
+                allFiles.put(fn, JSONObject().apply {
+                    put("sha256", fe.getString("sha256"))
+                    put("size", fe.getLong("size"))
+                    put("claimedBy", JSONArray((if (sameContent) previousOwners else emptyList()) + schemeId))
+                    put("previous", keptHistory)
+                })
             }
+
             registry.put("files", allFiles)
             saveRegistry(context, registry)
 
@@ -270,111 +366,80 @@ object SchemaManifestManager {
 
     // ── Uninstall Using Manifest ──
 
-    /**
-     * 基于清单卸载方案，整体删除方案所属的所有文件（不保留共享文件）。
-     */
-    suspend fun uninstallWithManifest(
-        context: Context,
-        schemeId: String,
-    ): UninstallResult = withContext(Dispatchers.IO) {
-        val manifest = loadManifest(context, schemeId)
-        if (manifest == null) {
-            return@withContext UninstallResult(
-                success = false,
-                manifestExisted = false,
-                message = "清单不存在，请使用传统方式删除",
-            )
-        }
-
-        try {
-            val files = manifest.optJSONObject("files") ?: JSONObject()
-            val rimeDir = SchemaManager.getRimeDir(context)
-            val registry = loadRegistry(context)
-            val allFiles = registry.optJSONObject("files") ?: JSONObject()
-
-            // 收集清单中所有方案 ID，用于后续清理衍生文件
-            val schemaIds = mutableSetOf<String>()
-            val keysIt = files.keys()
-            while (keysIt.hasNext()) {
-                val fn = keysIt.next() as String
-                if (fn.endsWith(".schema.yaml")) {
-                    schemaIds.add(fn.removeSuffix(".schema.yaml"))
-                }
-            }
-
-            // 在删除 .custom.yaml 之前，先读取每个方案的 custom_phrase dict 名
-            val customPhraseNames = schemaIds.associateWith { sid ->
-                PersonalDictManager.getCustomPhraseDictName(rimeDir, sid)
-            }
-
-            var deletedCount = 0
-
-            // 删除清单记录的文件（检查 registry claimedBy，多包共享时不删除）
-            val keysIt2 = files.keys()
-            while (keysIt2.hasNext()) {
-                val fn = keysIt2.next() as String
-                val claimEntry = allFiles.optJSONObject(fn)
-                val claimants = if (claimEntry != null) {
-                    val arr = claimEntry.optJSONArray("claimedBy")
-                    if (arr != null) jsonArrayToList(arr) else emptyList()
-                } else emptyList()
-
-                if (claimants.size <= 1 || (claimants.size == 1 && claimants[0] == schemeId)) {
-                    val file = File(rimeDir, fn)
-                    if (file.exists()) { file.delete(); deletedCount++ }
-                    allFiles.remove(fn)
-                } else {
-                    // 还有其他包声明该文件：仅移除当前包，保留文件
-                    val updated = claimants.filter { it != schemeId }
-                    claimEntry!!.put("claimedBy", JSONArray(updated))
-                }
-            }
-
-            // 清理每个方案由于 ensureSchemaPack 等生成的衍生文件
-            val buildDir = SchemaManager.getBuildDir(context)
-            for (sid in schemaIds) {
-                val customYaml = File(rimeDir, "$sid.custom.yaml")
-                if (customYaml.exists()) { customYaml.delete(); deletedCount++ }
-
-                val mergedDict = File(rimeDir, "${sid}_merged.dict.yaml")
-                if (mergedDict.exists()) { mergedDict.delete(); deletedCount++ }
-
-                val dictName = customPhraseNames[sid] ?: "custom_phrase"
-                val phraseFile = File(rimeDir, "$dictName.txt")
-                if (phraseFile.exists()) {
-                    // 检查 registry 确认没有其他包声明这个短语文件
-                    val pfEntry = allFiles.optJSONObject("$dictName.txt")
-                    val pfClaimants = if (pfEntry != null) {
-                        val arr = pfEntry.optJSONArray("claimedBy")
-                        if (arr != null) jsonArrayToList(arr) else emptyList()
-                    } else emptyList()
-                    val otherClaimants = pfClaimants.filter { it != schemeId }
-                    if (otherClaimants.isEmpty()) {
-                        phraseFile.delete(); deletedCount++
+    /** 逐文件移除所有权；恢复被覆盖版本，保留共有文件与个人配置。 */
+    suspend fun uninstallWithManifest(context: Context, schemeId: String): UninstallResult =
+        packageMutex.withLock {
+            withContext(Dispatchers.IO) {
+                if (schemeId == BUILTIN_PACKAGE_ID) return@withContext UninstallResult(false, message = "内置方案不可卸载")
+                val manifest = loadManifest(context, schemeId)
+                    ?: return@withContext UninstallResult(false, manifestExisted = false, message = "方案清单不存在")
+                try {
+                    val registry = loadRegistry(context)
+                    val registryBefore = registry.toString()
+                    val entries = registry.optJSONObject("files") ?: JSONObject()
+                    val files = manifest.optJSONObject("files") ?: JSONObject()
+                    var deleted = 0
+                    val changes = linkedMapOf<String, String?>()
+                    val backups = linkedMapOf<String, String?>()
+                    for (name in files.keys()) {
+                        val entry = entries.optJSONObject(name) ?: continue
+                        val target = safeTarget(SchemaManager.getRimeDir(context), name)
+                        val owners = jsonArrayToList(entry.optJSONArray("claimedBy") ?: JSONArray()) - schemeId
+                        val history = entry.optJSONArray("previous") ?: JSONArray()
+                        val kept = mutableListOf<JSONObject>()
+                        for (i in 0 until history.length()) {
+                            val layer = history.getJSONObject(i)
+                            val layerOwners = jsonArrayToList(layer.optJSONArray("claimedBy") ?: JSONArray()) - schemeId
+                            if (layerOwners.isNotEmpty()) kept.add(JSONObject(layer.toString()).put("claimedBy", JSONArray(layerOwners)))
+                        }
+                        val modified = target.isFile && fileSha256(target) != entry.optString("sha256")
+                        if (isUserDataFile(name) || modified) {
+                            entry.put("claimedBy", JSONArray(owners + LOCAL_OWNER))
+                            entry.put("previous", JSONArray(kept))
+                            if (target.isFile) entry.put("sha256", fileSha256(target))
+                        } else if (owners.isNotEmpty()) {
+                            entry.put("claimedBy", JSONArray(owners))
+                            entry.put("previous", JSONArray(kept))
+                        } else if (kept.isNotEmpty()) {
+                            val restored = kept.removeAt(kept.lastIndex)
+                            val hash = restored.getString("sha256")
+                            val backup = versionFile(context, hash)
+                            check(backup.isFile && fileSha256(backup) == hash) { "恢复文件缺失: $name" }
+                            changes[name] = hash
+                            restored.put("previous", JSONArray(kept))
+                            entries.put(name, restored)
+                        } else {
+                            changes[name] = null
+                            entries.remove(name)
+                        }
                     }
-                }
-
-                if (buildDir.exists()) {
-                    buildDir.listFiles { f -> f.name.startsWith("$sid.") }
-                        ?.forEach { it.delete(); deletedCount++ }
+                    // 所有恢复来源先校验，再写入；失败不留下半卸载状态。
+                    try {
+                        for ((name, hash) in changes) {
+                            val target = safeTarget(SchemaManager.getRimeDir(context), name)
+                            backups[name] = if (target.isFile) keepVersion(context, target) else null
+                            if (hash == null) { if (target.exists() && target.delete()) deleted++ }
+                            else { target.parentFile!!.mkdirs(); versionFile(context, hash).copyTo(target, overwrite = true) }
+                        }
+                        registry.put("files", entries)
+                        saveRegistry(context, registry)
+                        deleteManifest(context, schemeId)
+                    } catch (failure: Exception) {
+                        for ((name, hash) in backups) {
+                            val target = safeTarget(SchemaManager.getRimeDir(context), name)
+                            if (hash == null) target.delete() else versionFile(context, hash).copyTo(target, overwrite = true)
+                        }
+                        saveRegistry(context, JSONObject(registryBefore))
+                        saveManifest(context, schemeId, manifest)
+                        throw failure
+                    }
+                    UninstallResult(true, deletedFiles = deleted, message = "已卸载，其他模式与个人配置已保留")
+                } catch (e: Exception) {
+                    Log.e(TAG, "uninstall failed for $schemeId", e)
+                    UninstallResult(false, message = "卸载失败: ${e.message}")
                 }
             }
-
-            registry.put("files", allFiles)
-            saveRegistry(context, registry)
-            getManifestFile(context, schemeId).delete()
-
-            Log.i(TAG, "uninstalled $schemeId: $deletedCount files removed")
-            UninstallResult(
-                success = true,
-                deletedFiles = deletedCount,
-                message = "已删除 $deletedCount 个文件",
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "uninstall failed for $schemeId", e)
-            UninstallResult(success = false, message = "卸载失败: ${e.message}")
         }
-    }
 
     /** 检查一个文件是否列入受保护列表（不被方案覆盖和追踪）。 */
     fun isProtectedSystemFile(name: String): Boolean {
@@ -494,6 +559,7 @@ object SchemaManifestManager {
                     val relPath = f.toRelativeString(rimeDir).replace('\\', '/')
                     if (isProtectedSystemFile(relPath)) return@forEach
                     if (isUserDataFile(relPath)) return@forEach
+                    if (!matchesBundledAsset(context, relPath, f)) return@forEach
                     allFilesInRime.add(relPath)
                 }
                 if (allFilesInRime.isNotEmpty()) {
@@ -568,6 +634,40 @@ object SchemaManifestManager {
         return false
     }
 
+    internal val bundledAssetRoots = listOf("rime", "rime_chinese", "rime_japanese", "rime_ice")
+
+    internal fun matchesBundledAsset(context: Context, path: String, file: File): Boolean {
+        val currentHash = fileSha256(file) ?: return false
+        return bundledAssetRoots.any { root ->
+            runCatching {
+                context.assets.open("$root/$path").use { SchemaManager.streamSha256(it) } == currentHash
+            }.getOrDefault(false)
+        }
+    }
+
+    /** 受控内置迁移完成后同步所有权与恢复源，避免新内容被误判为个人修改。 */
+    internal fun recordBuiltinReplacement(context: Context, relative: String, destination: File) {
+        val registryFile = getRegistryFile(context)
+        val registry = runCatching { JSONObject(registryFile.readText()) }.getOrNull() ?: return
+        val entries = registry.optJSONObject("files") ?: return
+        val entry = entries.optJSONObject(relative) ?: return
+        if (jsonArrayToList(entry.optJSONArray("claimedBy") ?: JSONArray()) != listOf(BUILTIN_PACKAGE_ID)) return
+        val hash = fileSha256(destination) ?: return
+        val manifestFile = getManifestFile(context, BUILTIN_PACKAGE_ID)
+        val manifest = runCatching { JSONObject(manifestFile.readText()) }.getOrNull() ?: return
+        val manifestFiles = manifest.optJSONObject("files") ?: return
+        entry.put("sha256", hash).put("size", destination.length())
+        manifestFiles.put(relative, JSONObject().put("sha256", hash).put("size", destination.length()))
+        copyToBuiltinBackup(destination, SchemaManager.getMarketDir(context, BUILTIN_PACKAGE_ID), relative)
+        manifestFile.writeText(manifest.toString(2))
+        registryFile.writeText(registry.toString(2))
+    }
+
+    /** 启动升级只允许更新仍由 builtin 单独管理且未被用户修改的旧文件。 */
+    internal fun canUpdateBuiltinFile(entry: JSONObject?, currentHash: String?): Boolean =
+        entry != null && currentHash != null && entry.optString("sha256") == currentHash &&
+            jsonArrayToList(entry.optJSONArray("claimedBy") ?: JSONArray()) == listOf(BUILTIN_PACKAGE_ID)
+
     /** 备份文件到 market/builtin/，确保嵌套路径的父目录存在（如 lua/t9_preedit.lua）。 */
     internal fun copyToBuiltinBackup(src: File, builtinDir: File, relPath: String) {
         if (!src.exists()) return
@@ -612,6 +712,7 @@ object SchemaManifestManager {
             if (isProtectedSystemFile(relPath)) return@forEach
             if (isUserDataFile(relPath)) return@forEach
             if (allFiles.has(relPath)) return@forEach
+            if (!matchesBundledAsset(context, relPath, f)) return@forEach
             untracked[relPath] = f
         }
 
@@ -723,7 +824,7 @@ object SchemaManifestManager {
 
     // ── Utilities ──
 
-    private fun jsonArrayToList(arr: JSONArray): List<String> {
+    internal fun jsonArrayToList(arr: JSONArray): List<String> {
         val result = mutableListOf<String>()
         for (i in 0 until arr.length()) {
             result.add(arr.getString(i))

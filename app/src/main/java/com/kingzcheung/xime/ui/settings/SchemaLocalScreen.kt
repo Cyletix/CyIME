@@ -69,13 +69,13 @@ fun SchemaLocalContent(
     if (uiState.conflictPackageId != null) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelConflictInstall() },
-            title = { Text("文件冲突") },
+            title = { Text("更新共用文件") },
             text = {
-                Text("需要先卸载冲突方案：${uiState.conflictingSchemeIds.joinToString("、")}，是否继续？")
+                Text("${uiState.conflictingFiles.size} 个同名文件内容不同，将备份后更新。卸载此包时可恢复原文件，不会卸载其他输入模式。\n\n" + uiState.conflictingFiles.take(8).joinToString("\n") { it.fileName })
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.confirmInstallWithUninstall() }) {
-                    Text("确认卸载并安装")
+                TextButton(onClick = { viewModel.confirmInstallWithReplace() }) {
+                    Text("备份并更新")
                 }
             },
             dismissButton = {
@@ -226,6 +226,7 @@ private fun LocalPackageCard(
                             Text("安装中…", style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                    item.packageId == "builtin" -> Text("随应用提供", style = MaterialTheme.typography.labelMedium)
                     item.installed -> {
                         OutlinedButton(onClick = onUninstall) { Text("卸载") }
                     }

@@ -17,16 +17,17 @@ class ForkThemeDefaultsTest {
     @Before fun before() { SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
     @After fun after() { SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
 
-    @Test fun freshInstallUsesDynamicDarkWithoutPersonalConfiguration() {
+    @Test fun freshInstallUsesFixedBlueDarkWithoutPersonalConfiguration() {
         SettingsPreferences.applyForkThemeDefaults(context)
-        assertEquals("dynamic", SettingsPreferences.getKeyboardTheme(context))
+        assertEquals("soft_blue", SettingsPreferences.getKeyboardTheme(context))
         assertEquals(1, SettingsPreferences.getDarkMode(context))
+        assertFalse(SettingsPreferences.shouldShowPressBubble(context))
         assertTrue(KeyboardThemes.getThemeById("dynamic").isDynamic)
     }
     @Test fun legacyPurpleMovesOnceThenLaterUserChoicesPersist() {
         SettingsPreferences.setKeyboardTheme(context, "lavender_purple")
         SettingsPreferences.applyForkThemeDefaults(context)
-        assertEquals("dynamic", SettingsPreferences.getKeyboardTheme(context))
+        assertEquals("soft_blue", SettingsPreferences.getKeyboardTheme(context))
         SettingsPreferences.setKeyboardTheme(context, "lavender_purple")
         SettingsPreferences.applyForkThemeDefaults(context)
         assertEquals("lavender_purple", SettingsPreferences.getKeyboardTheme(context))
@@ -42,7 +43,16 @@ class ForkThemeDefaultsTest {
         val fallback = DynamicThemes.fallback()
         assertEquals("dynamic", fallback.id)
         assertFalse(fallback.isDynamic)
-        assertEquals(androidx.compose.ui.graphics.Color(0xFF191C20), fallback.keyboardBgDark)
-        assertEquals(androidx.compose.ui.graphics.Color(0xFF405F91), fallback.specialKeyDark)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF191C22), fallback.keyboardBgDark)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF495A7D), fallback.specialKeyDark)
     }
+    @Test fun oldDynamicMigratesOnceButUserCanChooseSystemColorsAgain() {
+        SettingsPreferences.setKeyboardTheme(context, "dynamic")
+        SettingsPreferences.applyForkThemeDefaults(context)
+        assertEquals("soft_blue", SettingsPreferences.getKeyboardTheme(context))
+        SettingsPreferences.setKeyboardTheme(context, "dynamic")
+        SettingsPreferences.applyForkThemeDefaults(context)
+        assertEquals("dynamic", SettingsPreferences.getKeyboardTheme(context))
+    }
+
 }

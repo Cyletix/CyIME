@@ -124,7 +124,7 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onClipboardSelect = { text -> service.textCommit.selectClipboardItem(text) },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
-            onCommitText = { text -> service.textCommit.commitClipboardText(text) },
+            onCommitText = { text -> service.textCommit.commitLiteralText(text) },
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
             onHandwritingAutoCommit = { newTail, expectedTail ->
                 val cursor = service.currentEditorCursorPosition()
@@ -335,9 +335,8 @@ internal fun rememberImeKeyboardCallbacks(
             onT9RefreshComposition = { composition, injections ->
                 // composition 由 T9 控制器在 flush 后一次取回并传入，
                 // 避免在此再次 getComposition 造成重复 JNI 往返。
-                service.mainHandler.post {
-                    service.sessionController.applyComposition(composition, emptyList(), injections)
-                }
+                // 控制器已在 Main 执行并校验刷新代际；二次 post 会让旧快照越过 literal 复位。
+                service.sessionController.applyComposition(composition, emptyList(), injections)
             },
             onTCandidateTransform = { result ->
                 // T9 后台线程（t9Dispatcher）调用：同步等插件至多 15ms，主线程零等待

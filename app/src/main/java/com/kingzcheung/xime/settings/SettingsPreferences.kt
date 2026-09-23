@@ -37,7 +37,7 @@ object SettingsPreferences {
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
     @JvmStatic
-    var defaultKeyboardTheme: String = "dynamic"
+    var defaultKeyboardTheme: String = "soft_blue"
 
     /** 默认显示模式，可从 xime.yaml 的 style.dark_mode 初始化。 */
     @JvmStatic
@@ -159,7 +159,7 @@ object SettingsPreferences {
         }
         val legacy = prefs.getString(KEY_CURRENT_SCHEMA, null)
         if (!legacy.isNullOrBlank()) return legacy
-        return "wubi86"
+        return "t9_pinyin"
     }
 
     fun setCurrentSchema(context: Context, schemaId: String) {
@@ -330,15 +330,15 @@ object SettingsPreferences {
         getPrefs(context).edit().putInt(KEY_VIBRATION_LONG_PRESS_AMPLITUDE, amplitude).apply()
     }
 
-    /** 首次使用本 fork 的默认配色；只迁移旧默认紫色，不重置其它个人设置。 */
+    /** CyIME 默认固定柔和蓝；一次迁移旧默认紫色/动态色，后续用户重新选择仍有效。 */
     fun applyForkThemeDefaults(context: Context) {
         val prefs = getPrefs(context)
-        if (prefs.getBoolean("fork_dynamic_theme_v1", false)) return
+        if (prefs.getBoolean("cyime_soft_blue_v1", false)) return
         val theme = prefs.getString(KEY_KEYBOARD_THEME, null)
         prefs.edit().apply {
-            if (theme.isNullOrBlank() || theme == "lavender_purple") putString(KEY_KEYBOARD_THEME, "dynamic")
+            if (theme.isNullOrBlank() || theme in setOf("lavender_purple", "dynamic")) putString(KEY_KEYBOARD_THEME, "soft_blue")
             if (!prefs.contains(KEY_DARK_MODE)) putInt(KEY_DARK_MODE, 1)
-            putBoolean("fork_dynamic_theme_v1", true)
+            putBoolean("cyime_soft_blue_v1", true)
         }.apply()
     }
 
@@ -527,7 +527,7 @@ object SettingsPreferences {
     }
 
     fun shouldShowPressBubble(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_SHOW_PRESS_BUBBLE, true)
+        return getPrefs(context).getBoolean(KEY_SHOW_PRESS_BUBBLE, false)
     }
 
     fun setShowPressBubble(context: Context, show: Boolean) {

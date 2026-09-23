@@ -846,6 +846,11 @@ class RimeEngine {
      * 清空 T9Processor 全部状态（buffer + undo + state machine）+ RIME composition。
      * @param mode 0=仅清 composition（保留 local state），1=全清（clearAll 场景）
      */
+    /** T9 FIFO 内提交字面数字后的全清，不允许锁竞争时丢弃清空。 */
+    internal fun clearQueuedT9Composition() = locked {
+        if (isInitialized && nativeHasSession()) nativeT9ClearComposition(1)
+    }
+
     fun t9ClearComposition(mode: Int) {
         if (!isInitialized) return
         tryLocked(Unit) {

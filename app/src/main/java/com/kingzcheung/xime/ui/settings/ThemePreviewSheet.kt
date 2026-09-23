@@ -197,11 +197,14 @@ private fun ThemeKeyboardPreview(
 ) {
     val bgColor = if (isDark) theme.keyboardBgDark else theme.keyboardBgLight
     val accent = if (isDark) theme.accentDark else theme.accentLight
-    val specialKeyColor = if (isDark) theme.specialKeyDark else theme.specialKeyLight
-    val textColor = if (isDark) theme.keyTextColorDark else theme.keyTextColorLight
 
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
+    val specialKeyColor = (if (isDark) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)
+        ?.let(longToColor) ?: if (isDark) theme.specialKeyDark else theme.specialKeyLight
+    val specialTextColor = if (isDark) Color.White else KeyboardThemes.getSpecialKeyTextColor(theme.id, false)
+    val textColor = KeyboardThemes.getKeyTextColorOverride(theme.id, isDark)
+        ?: if (isDark) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
     val keyColor = KeyboardThemes.getKeyBgColorOverride(theme.id, isDark)
         ?: if (isDark) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
     val candidateTextColor = KeyboardThemes.getCandidateTextColorOverride(theme.id, isDark)
@@ -279,7 +282,7 @@ private fun ThemeKeyboardPreview(
                         PreviewKey(
                             label = "",
                             icon = rememberVectorPainter(Icons.TwoTone.KeyboardControlKey),
-                            color = specialKeyColor, textColor = textColor, weight = 1.4f,
+                            color = specialKeyColor, textColor = specialTextColor, weight = 1.4f,
                             extraModifier = Modifier.padding(0.5.dp, 2.dp)
                         )
 
@@ -303,7 +306,7 @@ private fun ThemeKeyboardPreview(
                         PreviewKey(
                             label = "",
                             icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                            color = specialKeyColor, textColor = textColor, weight = 1.4f,
+                            color = specialKeyColor, textColor = specialTextColor, weight = 1.4f,
                             extraModifier = Modifier.padding(0.5.dp, 2.dp)
                         )
                     }
@@ -315,11 +318,11 @@ private fun ThemeKeyboardPreview(
                             .weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        PreviewKey("?123", specialKeyColor, textColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
+                        PreviewKey("?123", specialKeyColor, specialTextColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
                         PreviewKey("，", keyColor, textColor, 0.8f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("空格", keyColor, textColor, 3f, fontSize = 9.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("中/En", specialKeyColor, textColor, 0.8f, fontSize = 8.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("确定", specialKeyColor, textColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
+                        PreviewKey("空格", specialKeyColor, specialTextColor, 3f, fontSize = 9.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
+                        PreviewKey("中/En", specialKeyColor, specialTextColor, 0.8f, fontSize = 8.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
+                        PreviewKey("确定", specialKeyColor, specialTextColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
                     }
                 }
             }
@@ -346,7 +349,7 @@ private fun CandidateBarPreview(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PreviewCandidate(
-                text = "Xime-CyletixFork",
+                text = "CyIME",
                 isSelected = true,
                 accent = accent,
                 textColor = textColor,

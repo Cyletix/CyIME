@@ -1,7 +1,7 @@
 <resources>
-<string name="app_name">Xime-CyletixFork</string>
-    <string name="subtype_label_wubi">Xime-CyletixFork</string>
+<string name="app_name">CyIME</string>
+    <string name="subtype_label_wubi">CyIME</string>
     <string name="subtype_label_pinyin">拼音</string>
-    <string name="keyboard_name">Xime-CyletixFork</string>
-    <string name="ime_service_label">Xime-CyletixFork</string>
+    <string name="keyboard_name">CyIME</string>
+    <string name="ime_service_label">CyIME</string>
 </resources>
