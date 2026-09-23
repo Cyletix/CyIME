@@ -330,6 +330,18 @@ object SettingsPreferences {
         getPrefs(context).edit().putInt(KEY_VIBRATION_LONG_PRESS_AMPLITUDE, amplitude).apply()
     }
 
+    /** 首次使用本 fork 的默认配色；只迁移旧默认紫色，不重置其它个人设置。 */
+    fun applyForkThemeDefaults(context: Context) {
+        val prefs = getPrefs(context)
+        if (prefs.getBoolean("fork_dynamic_theme_v1", false)) return
+        val theme = prefs.getString(KEY_KEYBOARD_THEME, null)
+        prefs.edit().apply {
+            if (theme.isNullOrBlank() || theme == "lavender_purple") putString(KEY_KEYBOARD_THEME, "dynamic")
+            if (!prefs.contains(KEY_DARK_MODE)) putInt(KEY_DARK_MODE, 1)
+            putBoolean("fork_dynamic_theme_v1", true)
+        }.apply()
+    }
+
     fun getKeyboardTheme(context: Context): String {
         return getPrefs(context).getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
     }

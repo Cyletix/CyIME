@@ -47,6 +47,7 @@ object RimeConfigHelper {
         
         copyAssetsToRimeDir(context, rimeDir)
         com.kingzcheung.xime.settings.JapaneseSchemas.installAssets(context, rimeDir)
+        com.kingzcheung.xime.settings.ChineseSchemas.installAssets(context, rimeDir)
         // F1: assets 会用内置 default.yaml 覆盖，这里把启用方案重新写回 schema_list
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         // 为所有启用方案打个人词库补丁
@@ -116,6 +117,7 @@ object RimeConfigHelper {
         
         copyAssetsToRimeDir(context, rimeDir)
         com.kingzcheung.xime.settings.JapaneseSchemas.installAssets(context, rimeDir)
+        com.kingzcheung.xime.settings.ChineseSchemas.installAssets(context, rimeDir)
         // F1: 同步初始化路径也写回 default.yaml 的 schema_list
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         runBlocking { PersonalDictManager.ensureSchemaPacks(context) }

@@ -610,7 +610,7 @@ object SchemaManager {
 
             SchemaMeta(
                 schemaId = entry.schemaId,
-                name = entry.name.ifEmpty { entry.schemaId },
+                name = ChineseSchemas.displayName(entry.schemaId, entry.name.ifEmpty { entry.schemaId }),
                 version = entry.version,
                 author = author,
                 description = entry.description ?: ""
@@ -673,7 +673,7 @@ object SchemaManager {
         if (!file.exists()) return null
         return try {
             val entry = yaml.decodeFromString(SchemaYaml.serializer(), file.readText().trimStart('\uFEFF')).schema
-            entry.name.ifEmpty { null }
+            ChineseSchemas.displayName(schemaId, entry.name).ifEmpty { null }
         } catch (e: Exception) {
             try { Log.e(TAG, "Failed to parse schema name for $schemaId", e) } catch (_: Exception) {}
             null
@@ -752,7 +752,7 @@ object SchemaManager {
     }
 
     /** 内置方案（保持默认启用顺序）。 */
-    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin") + JapaneseSchemas.ids
+    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "pinyin_14jian") + JapaneseSchemas.ids
 
     /**
      * 内置方案补齐（纯函数）：用户启用列表尾部按 [BUILTIN_SCHEMAS] 顺序追加缺失项，
@@ -771,7 +771,7 @@ object SchemaManager {
         if (!customFile.exists()) {
             setEnabledSchemas(context, BUILTIN_SCHEMAS)
             SettingsPreferences.setBuiltinSchemasMerged(context, true)
-            return JapaneseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS)
+            return ChineseSchemas.addOnFirstUpgrade(context, JapaneseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS))
         }
 
         try {
@@ -809,7 +809,7 @@ object SchemaManager {
                     SettingsPreferences.setBuiltinSchemasMerged(context, true)
                     m
                 }
-                return JapaneseSchemas.addOnFirstUpgrade(context, merged)
+                return ChineseSchemas.addOnFirstUpgrade(context, JapaneseSchemas.addOnFirstUpgrade(context, merged))
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to read custom.yaml", e)
