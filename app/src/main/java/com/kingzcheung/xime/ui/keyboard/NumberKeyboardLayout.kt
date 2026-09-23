@@ -77,6 +77,7 @@ fun NumberKeyboardLayout(
     specialKeyTextColor: Color = Color.White,
     backKeyOnLeft: Boolean = false,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
 
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.screenWidthDp > configuration.screenHeightDp
@@ -118,7 +119,7 @@ fun NumberKeyboardLayout(
 
     CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius) {
     Box(
-        modifier = modifier
+        modifier = bodyModifier
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
             }
@@ -237,6 +238,7 @@ fun NumberKeyboardLayout(
 
     }
     }
+    }
 }
 
 @Composable
@@ -262,34 +264,34 @@ private fun NumberRows(
     Row(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(2.dp))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
                 .weight(0.8f),
-            verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
+            verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(if (compactMode) 2.dp else 4.dp))
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
                     .weight(3f),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(2.dp))
             ) {
                 Column(
                     modifier = Modifier
 //                        .padding(vertical = 2.dp)
                         .fillMaxHeight()
                         .weight(0.8f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(4.dp))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxHeight()
                             .weight(3f)
-                            .padding(LocalKeyVisualPadding.current),
+                            .padding(scaledKeyVisualPadding()),
                     ) {
                         symbols.forEach { symbol ->
                             NumberSymbolKey(
@@ -512,8 +514,8 @@ private fun NumberRows(
                     SpaceKeyButton(
                         schemaName = "空格",
                         onClick = { onKeyPress("space") },
-                        backgroundColor = specialKeyBackgroundColor,
-                        textColor = specialKeyTextColor,
+                        backgroundColor = keyBackgroundColor,
+                        textColor = keyTextColor,
                         modifier = Modifier.weight(1f),
                         onPress = { onKeyPressDown?.invoke("space") },
                         shadowEnabled = shadowEnabled,

@@ -92,8 +92,9 @@ fun StrokeKeyboardLayout(
     specialKeyTextColor: Color = Color.White,
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     StrokeKeyboardSwipeOverlay(
-        modifier = modifier,
+        modifier = bodyModifier,
         keyboardBackgroundColor = keyboardBackgroundColor,
         keyCornerRadius = keyCornerRadius,
         keyTextColor = keyTextColor,
@@ -111,6 +112,7 @@ fun StrokeKeyboardLayout(
         keySpacingY = keySpacingY,
         onGestureAction = onGestureAction,
     )
+    }
 }
 
 // ─── 滑动气泡覆盖层 ────────────────────────────────────────────────
@@ -223,7 +225,7 @@ onKeyPressDown: ((String) -> Unit)?,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(4.dp))
                 ) {
                     StrokeKeyboardContent(
                         onKeyPress = onKeyPress,
@@ -364,18 +366,18 @@ private fun StrokeKeyboardContent(
 
     Row(
         modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
+        horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(if (compactMode) 2.dp else 4.dp))
     ) {
         // ── 第1列：左侧符号区（面板样式与九键左栏对齐：统一圆角/阴影/内边距） ──
         Column(
             modifier = Modifier.fillMaxHeight().weight(0.8f),
-            verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
+            verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(if (compactMode) 2.dp else 4.dp))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(3f)
-                    .padding(LocalKeyVisualPadding.current)
+                    .padding(scaledKeyVisualPadding())
                     .then(symbolPanelShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
                     .background(keyBackgroundColor)
@@ -563,8 +565,8 @@ private fun StrokeKeyboardContent(
                 StrokeSpaceButton(
                     onKeyPress = onKeyPress,
                     onKeyPressDown = onKeyPressDown,
-                    backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor,
+                    backgroundColor = keyBackgroundColor,
+                    textColor = keyTextColor,
                     modifier = Modifier.weight(1.8f),
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
@@ -822,11 +824,6 @@ private fun ResetKey(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 2.dp, vertical = 4.dp)
-            .then(shadowModifier)
-            .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
-            .keyGlow()
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -834,7 +831,12 @@ private fun ResetKey(
                     tryAwaitRelease()
                     isPressed = false
                 }, onTap = { currentOnClick() })
-            },
+            }
+            .padding(scaledKeyVisualPadding())
+            .then(shadowModifier)
+            .clip(shape)
+            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .keyGlow(),
         contentAlignment = Alignment.Center
     ) {
         Icon(

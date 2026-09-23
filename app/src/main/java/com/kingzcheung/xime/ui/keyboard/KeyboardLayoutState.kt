@@ -9,15 +9,15 @@ import com.kingzcheung.xime.settings.KeysConfigHelper
  *
  * 状态转移由 [KeyboardLayoutAction] 驱动，参见 [KeyboardLayoutState.transition]。
  *
- * 横竖屏（分体/正常）是渲染层根据 [isLandscape] 自动选择的，
+ * 分体/完整由用户偏好选择，与屏幕方向无关，
  * 不编码在状态机中，故仅有 5 种核心状态。
  */
 sealed class KeyboardLayoutState {
 
-    /** 中文全键盘（默认模式，带 Rime 手势配置；横屏自动切换为分体键盘） */
+    /** 中文全键盘（默认模式，带 Rime 手势配置；可手动切换为分体键盘） */
     data object Chinese : KeyboardLayoutState()
 
-    /** 英文全键盘（纯 QWERTY，无手势配置；横屏自动切换为分体键盘） */
+    /** 英文全键盘（纯 QWERTY，无手势配置；可手动切换为分体键盘） */
     data object English : KeyboardLayoutState()
 
     /** 数字键盘 */
@@ -120,3 +120,10 @@ fun isStrokeSchema(schemaId: String): Boolean =
  */
 fun isHandwritingSchema(schemaId: String): Boolean =
     KeysConfigHelper.boundSectionForSchema(schemaId) == "handwriting"
+
+/** 分体只适用于26键，不能把14键、九键、手写或日语九键拆开。 */
+internal fun supportsSplitKeyboard(schemaId: String, asciiMode: Boolean): Boolean = asciiMode || (
+    !isT9Schema(schemaId) && !isStrokeSchema(schemaId) && !isHandwritingSchema(schemaId) &&
+        KeysConfigHelper.mergedSectionForSchema(schemaId) == null &&
+        KeysConfigHelper.codeLayoutForSchema(schemaId) != "japanese_kana"
+    )

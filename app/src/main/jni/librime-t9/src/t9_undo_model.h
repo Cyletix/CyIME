@@ -49,7 +49,7 @@ struct T9Segment {
 // 命令模式的经验表明文档回退顺序【故,b,2,gu,8,4,里,4,5】是
 // "操作 LIFO + partial-commit RC 延后"的产物，不是纯段反向。
 struct T9SegmentOp {
-    enum Kind { kLC, kRC, kTailConsume, kSeparator } kind;
+    enum Kind { kLC, kRC, kTailConsume, kSeparator, kEditBoundary } kind;
     int segment_index = -1;            // kLC：关联段（-1 = tail）
     std::vector<int> commit_indices;   // kRC：一次 commit 涉及的段
     // kRC/kTailConsume：执行后 digit_sequence 长度（P1 判定"digitSeq 未变"）。
@@ -134,6 +134,10 @@ public:
     // 替换最后 selected 段（SELECTION 态筛选层替换，对应 ReplaceLastSelection）。
     // 仅替换 option（同位数替换），段 digits 不变。
     void ReplaceLastSelection(const SyllableOption& option);
+
+    // Replace only unconfirmed input, retaining committed segments, captures and
+    // their undo operations. Invalid pinyin leaves the model unchanged.
+    bool ReplaceEditableSuffix(const std::string& pinyin);
 
     // 清空全部状态（对应 EnterIdle / ClearComposition 的 undo_model 同步）
     void Clear();

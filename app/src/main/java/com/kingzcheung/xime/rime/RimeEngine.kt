@@ -468,6 +468,57 @@ class RimeEngine {
         }
     }
 
+    /** Snapshot/apply run on the existing input FIFO, under one engine lock. */
+    internal fun readPinyinEditSnapshot(): Array<String> = locked {
+        if (nativeHasSession()) nativePinyinEditSnapshot() else emptyArray()
+    }
+
+    internal fun applyPinyinEdit(expectedInput: String, newInput: String, caret: Int,
+        protectedLength: Int = 0, protectedText: String = "", expectedSchema: String? = null,
+        isStillCurrent: () -> Boolean = { true },
+    ): Boolean = locked {
+        if (!nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode() ||
+            (expectedSchema != null && nativeGetCurrentSchema() != expectedSchema) ||
+            nativeGetInput().orEmpty() != expectedInput) return@locked false
+        val snapshot = nativePinyinEditSnapshot()
+        if (snapshot.getOrNull(2)?.toIntOrNull() != protectedLength || snapshot.getOrNull(3).orEmpty() != protectedText) return@locked false
+        if (!nativeSetInput(newInput)) return@locked false
+        nativeSetCaret(caret.coerceIn(0, newInput.length))
+        true
+    }
+
+    /** The editor changes composition only: snapshot it in the same lock, never consume a commit. */
+    internal fun editPinyinAndReadState(apply: () -> Boolean): RimeProcessResult? = locked {
+        if (!apply()) return@locked null
+        val snapshot = nativePinyinEditSnapshot()
+        val candidates = nativeGetCandidatesWithComments().orEmpty().map { pair ->
+            RimeCandidate(pair.getOrElse(0) { "" }, pair.getOrElse(1) { "" })
+        }.toTypedArray()
+        RimeProcessResult(
+            processed = true, committedText = "", inputText = snapshot.getOrNull(0).orEmpty(),
+            preeditText = snapshot.getOrNull(4).orEmpty(), candidates = candidates,
+            isAsciiMode = nativeIsAsciiMode(), hasNextPage = nativeHasNextPage(), hasPrevPage = nativeHasPrevPage(),
+        )
+    }
+
+    /** Rebuild both the nine-key buffer and undo model; setInput alone leaves stale digits. */
+    internal fun applyT9PinyinEdit(expectedInput: String, input: String, expectedRemainingDigits: String? = null,
+        expectedSchema: String? = null, isStillCurrent: () -> Boolean = { true },
+    ): Boolean = locked {
+        if (!nativeHasSession() || !isStillCurrent() || nativeIsAsciiMode() ||
+            (expectedSchema != null && nativeGetCurrentSchema() != expectedSchema) ||
+            nativeGetInput().orEmpty() != expectedInput) return@locked false
+        if (expectedRemainingDigits != null && nativeT9GetRemainingDigits().orEmpty() != expectedRemainingDigits) return@locked false
+        if (!nativeT9ReplaceEditableSuffix(input)) return@locked false
+        nativeT9FlushRimeInput()
+        true
+    }
+
+    private external fun nativeT9ReplaceEditableSuffix(input: String): Boolean
+
+    private external fun nativePinyinEditSnapshot(): Array<String>
+    private external fun nativeSetCaret(caret: Int)
+
     fun toggleAsciiMode(): Boolean {
         // 用户显式切换操作：阻塞等待锁（部署/维护持锁时排队，完成后自动切换），
         // 不静默失败；调用方保证不在主线程执行（ImeKeyRouter 的 key-process 线程）。

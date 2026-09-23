@@ -84,6 +84,7 @@ fun CommonSymbolKeyboardLayout(
     /** 进入面板时的初始模式（来自 ascii 记忆状态机），为 null 时退回 [isAsciiMode]。 */
     initialAsciiMode: Boolean? = null,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     var localAsciiMode by remember(initialAsciiMode) { mutableStateOf(initialAsciiMode ?: isAsciiMode) }
 
     val configuration = LocalConfiguration.current
@@ -117,7 +118,7 @@ fun CommonSymbolKeyboardLayout(
 
     CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius) {
     Box(
-        modifier = modifier
+        modifier = bodyModifier
             .fillMaxWidth()
             .fillMaxHeight()
             .onGloballyPositioned { coordinates ->
@@ -315,8 +316,8 @@ fun CommonSymbolKeyboardLayout(
                             SpaceKeyButton(
                                 schemaName = "空格",
                                 onClick = { onKeyPress("space") },
-                                backgroundColor = specialKeyBackgroundColor,
-                                textColor = specialKeyTextColor,
+                                backgroundColor = keyBackgroundColor,
+                                textColor = keyTextColor,
                                 modifier = Modifier.weight(2.5f),
                                 onPress = { onKeyPressDown?.invoke("space") },
                                 shadowEnabled = shadowEnabled,
@@ -356,6 +357,7 @@ fun CommonSymbolKeyboardLayout(
                 }
             }
         }
+    }
     }
     }
     }
@@ -498,8 +500,8 @@ internal fun CommonSymbolLandscapeContent(
                     SpaceKeyButton(
                         schemaName = "空格",
                         onClick = { onKeyPress("space") },
-                        backgroundColor = specialKeyBackgroundColor,
-                        textColor = specialKeyTextColor,
+                        backgroundColor = keyBackgroundColor,
+                        textColor = keyTextColor,
                         modifier = Modifier.weight(1.25f),
                         onPress = { onKeyPressDown?.invoke("space") },
                         shadowEnabled = shadowEnabled,
@@ -616,8 +618,8 @@ internal fun CommonSymbolLandscapeContent(
                     SpaceKeyButton(
                         schemaName = "空格",
                         onClick = { onKeyPress("space") },
-                        backgroundColor = specialKeyBackgroundColor,
-                        textColor = specialKeyTextColor,
+                        backgroundColor = keyBackgroundColor,
+                        textColor = keyTextColor,
                         modifier = Modifier.weight(1.25f),
                         onPress = { onKeyPressDown?.invoke("space") },
                         shadowEnabled = shadowEnabled,

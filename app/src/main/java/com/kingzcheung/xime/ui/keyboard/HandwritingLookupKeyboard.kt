@@ -55,6 +55,7 @@ fun HandwritingLookupKeyboard(
     clearSignal: Int,
     modifier: Modifier = Modifier,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     val strokes = remember { mutableStateListOf<List<StrokePoint>>() }
     // 与主手写键盘一致的叠写视觉状态（三段前缀渲染 + 识别窗口），见 HandwritingStrokeFx
     var settledCount by remember { mutableIntStateOf(0) }
@@ -138,7 +139,7 @@ fun HandwritingLookupKeyboard(
     }
 
     Box(
-        modifier = modifier
+        modifier = bodyModifier
             .fillMaxSize()
             .padding(
                 bottom = if (uiState.isFloatingMode) {
@@ -217,8 +218,9 @@ fun HandwritingLookupKeyboard(
             ) {
                 KeyButton("返回", { onExit() }, specialKeyBgColor, keyTextColor, Modifier.weight(1f), onPress = { onButtonFeedback?.invoke("exit") }, shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
                 Spacer(Modifier.weight(4f))
-                KeyButton("回车", { onKeyPress("enter") }, specialKeyBgColor, keyTextColor, Modifier.weight(1f), onPress = { onButtonFeedback?.invoke("enter") }, shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                ActionKeyButton("回车", { onKeyPress("enter") }, specialKeyBgColor, keyTextColor, Modifier.weight(1f), onPress = { onButtonFeedback?.invoke("enter") }, shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
             }
         }
+    }
     }
 }

@@ -59,10 +59,10 @@ fun KeyboardLayoutScreen(
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
     val keyTextColor = KeyboardThemes.getKeyTextColorOverride(uiState.themeId, uiState.isDarkTheme)
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
-    val specialKeyBgColor =
-        if (uiState.isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) }
-            ?: themeSpecialKeyColor else kbColors.specialKeyBgColor?.let { longToColor(it) }
-            ?: themeSpecialKeyColor
+    val specialKeyBgColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(
+        themeScheme, uiState.isDarkTheme,
+        (if (uiState.isDarkTheme) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor)
+    )
     val specialKeyTextColor = if (uiState.isDarkTheme) Color.White
     else KeyboardThemes.getSpecialKeyTextColor(uiState.themeId, false)
     val kbShadow = KeysConfigHelper.getKeyboardShadow()

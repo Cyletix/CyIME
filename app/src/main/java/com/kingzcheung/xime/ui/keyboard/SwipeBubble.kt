@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -23,7 +24,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.keyboard.KeyboardDimensions
-import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -81,14 +81,29 @@ private const val PRESS_BUBBLE_RELEASE_DELAY_MS = 60L
  * 会立即取消滞留并切换为新气泡，快速连打无延迟感。
  * 仅对按压气泡滞留——滑动选择与长按选择的气泡在松手时语义上已结束（候选已提交），立即消失。
  */
-class SwipeBubbleController(private val scope: CoroutineScope) {
+class SwipeBubbleController(
+    private val scope: CoroutineScope,
+    private val showPressBubble: Boolean = false,
+) {
     var state by mutableStateOf(SwipeState())
         private set
     var keyBounds by mutableStateOf(Rect(0f, 0f, 0f, 0f))
         private set
     private var releaseJob: Job? = null
 
+    fun dispose() {
+        releaseJob?.cancel()
+        releaseJob = null
+    }
+
     fun update(newState: SwipeState, bounds: Rect) {
+        // 默认关闭时，普通按下/抬起不能让整个键盘重组或启动延迟协程。
+        // 拂动/长按是选择反馈，仍需显示；退出这些反馈时只清一次状态。
+        if (!showPressBubble && !newState.isSwiping && !newState.isLongPress) {
+            dispose()
+            if (state.isSwiping || state.isLongPress || state.isPressed) state = SwipeState()
+            return
+        }
         releaseJob?.cancel()
         releaseJob = null
         val prev = state
@@ -113,7 +128,10 @@ class SwipeBubbleController(private val scope: CoroutineScope) {
 @Composable
 fun rememberSwipeBubbleController(): SwipeBubbleController {
     val scope = rememberCoroutineScope()
-    return remember { SwipeBubbleController(scope) }
+    val showPressBubble = LocalKeyboardInputPreferences.current.showPressBubble
+    val controller = remember(scope, showPressBubble) { SwipeBubbleController(scope, showPressBubble) }
+    DisposableEffect(controller) { onDispose { controller.dispose() } }
+    return controller
 }
 
 @Composable
@@ -127,7 +145,7 @@ fun rememberSwipeBubbleDrawData(
     keyboardWidth: Float,
 ): BubbleDrawData? {
     val context = LocalContext.current
-    val showPressBubble = SettingsPreferences.shouldShowPressBubble(context)
+    val showPressBubble = LocalKeyboardInputPreferences.current.showPressBubble
     if (!swipeState.isSwiping && !(showPressBubble && swipeState.isPressed) && !swipeState.isLongPress) return null
 
     val isLongPressMode = swipeState.isLongPress && swipeState.longPressItems.isNotEmpty()

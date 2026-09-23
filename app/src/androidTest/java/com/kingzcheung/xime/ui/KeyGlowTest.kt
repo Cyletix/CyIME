@@ -32,11 +32,11 @@ class KeyGlowTest {
 
     @Test fun quickTapGlowsInsideKeyAndFullyDisappearsWithinHalfSecond() {
         var taps = 0
-        rule.setContent { MaterialTheme {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
             Box(Modifier.size(160.dp, 110.dp).background(Color.White).testTag("frame").padding(24.dp)) {
                 KeyButton("A", { taps++ }, Color.DarkGray, Color.White, Modifier.testTag("key"), shadowEnabled = false)
             }
-        } }
+        } } }
         rule.mainClock.autoAdvance = false
         val before = snapshot("frame")
         rule.onNodeWithTag("key").performTouchInput { down(center); up() }
@@ -77,7 +77,7 @@ class KeyGlowTest {
 
     @Test fun textIconSwipeKanaAndSpaceKeysAllUseTheSameDecoration() {
         var taps = 0
-        rule.setContent { MaterialTheme { Column(Modifier.width(160.dp)) {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) { Column(Modifier.width(160.dp)) {
             val color = Color.DarkGray
             KeyButton("A", { taps++ }, color, Color.White, Modifier.height(55.dp).testTag("plain"), shadowEnabled = false)
             SwipeableKeyButton("Q", { taps++ }, color, Color.White, Modifier.height(55.dp).testTag("swipe"), shadowEnabled = false)
@@ -85,7 +85,7 @@ class KeyGlowTest {
             SwipeableIconKeyButton(rememberVectorPainter(Icons.Default.Language), { taps++ }, color, Color.White, Modifier.height(55.dp).testTag("swipe-icon"), shadowEnabled = false)
             KanaFlickButton(japaneseKanaKeys.first(), { taps++ }, color, Color.White, Modifier.height(55.dp).testTag("kana"), shadowEnabled = false)
             SpaceKeyButton({ taps++ }, color, Color.White, modifier = Modifier.height(55.dp).testTag("space"), shadowEnabled = false)
-        } } }
+        } } } }
         rule.mainClock.autoAdvance = false
         listOf("plain", "swipe", "icon", "swipe-icon", "kana", "space").forEach { tag ->
             val before = snapshot(tag)
@@ -96,6 +96,20 @@ class KeyGlowTest {
             assertTrue("$tag did not fade", before.sameAs(snapshot(tag)))
         }
         rule.runOnIdle { assertEquals(6, taps) }
+    }
+
+    @Test fun defaultKeyboardHasNoDecorationAfterRapidTaps() {
+        var taps = 0
+        rule.setContent { MaterialTheme {
+            KeyButton("A", { taps++ }, Color.DarkGray, Color.White,
+                Modifier.size(100.dp, 60.dp).testTag("key"), shadowEnabled = false)
+        } }
+        rule.mainClock.autoAdvance = false
+        val before = snapshot("key")
+        repeat(20) { rule.onNodeWithTag("key").performTouchInput { down(center); up() } }
+        rule.mainClock.advanceTimeBy(112)
+        assertTrue(before.sameAs(snapshot("key")))
+        rule.runOnIdle { assertEquals(20, taps) }
     }
 
     @Test fun japaneseRowsShareCellSizesAndReadableLabelScale() {

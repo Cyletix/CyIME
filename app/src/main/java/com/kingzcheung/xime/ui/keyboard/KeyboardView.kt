@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -183,6 +184,7 @@ fun KeyboardView(
     }
 
     SideEffect {
+        callbacks.onT9RefreshAfterPreeditEdit = { t9Controller.refreshAfterPreeditEdit() }
         callbacks.onT9RightCandidateWillBeSelected = { pinyin, text, textLength ->
             // 返回 C++ T9RightCommitHandler 的 full_commit 权威标志，
             // 不依赖 RIME 引擎 input（full_commit 后引擎 input 可能残留，判断会失真）
@@ -228,9 +230,10 @@ fun KeyboardView(
     val accentColor = KeyboardThemes.getAccentColor(state.themeId, state.isDarkTheme)
     val themeScheme = KeyboardThemes.getThemeById(state.themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(state.themeId, state.isDarkTheme)
-    val specialKeyBgColor = if (state.isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) }
-        ?: themeSpecialKeyColor
-        else kbColors.specialKeyBgColor?.let { longToColor(it) } ?: themeSpecialKeyColor
+    val specialKeyBgColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(
+        themeScheme, state.isDarkTheme,
+        (if (state.isDarkTheme) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor)
+    )
     val specialKeyTextColor = if (state.isDarkTheme) androidx.compose.ui.graphics.Color.White
         else KeyboardThemes.getSpecialKeyTextColor(state.themeId, false)
     val candidateTextColor = KeyboardThemes.getCandidateTextColorOverride(state.themeId, state.isDarkTheme)
@@ -245,12 +248,10 @@ fun KeyboardView(
     } ?: 0
     val screenW = LocalConfiguration.current.screenWidthDp
     val screenH = LocalConfiguration.current.screenHeightDp
-    val portraitScreenWidth = minOf(screenW, screenH)
     val wideFloating = !isT9Schema(state.currentSchemaId) && state.currentSchemaId != "japanese_kana" && keyboardState !is KeyboardLayoutState.Stroke
     val portraitHeight = SettingsPreferences.getKeyboardHeightDp(androidx.compose.ui.platform.LocalContext.current, false)
     val cardWidthDp = floatingKeyboardWidth(screenW, screenH, state.keyboardHeightDp, portraitHeight, wideFloating)
     val floatScaleFactor = if (state.isFloatingMode) cardWidthDp.toFloat() / screenW.toFloat() else 0.85f
-    val floatFontScale = if (state.isFloatingMode) cardWidthDp.toFloat() / portraitScreenWidth.toFloat() else 1f
 
     // 调节控件与键盘预览是兄弟层：透明度只作用于键盘，操作面板始终清晰。
     val resizeControlDensity = LocalDensity.current
@@ -268,6 +269,8 @@ fun KeyboardView(
     var cursorControlActive by remember { mutableStateOf(false) }
     CompositionLocalProvider(
         LocalKeyboardInputPreferences provides inputPreferences,
+        LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(state.themeId, state.isDarkTheme), specialKeyTextColor),
+        LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBgColor, specialKeyTextColor),
         LocalKeyboardInputActions provides KeyboardInputActions(
             onCursorMove = callbacks.onCursorMove,
             onCursorMoveVertical = callbacks.onCursorMoveVertical,
@@ -286,7 +289,8 @@ fun KeyboardView(
         isFloatingMode = state.isFloatingMode,
         opacity = if (resizeOverlay != null) 1f else state.keyboardOpacity,
         scaleFactor = floatScaleFactor,
-        fontScaleFactor = floatFontScale,
+        // KeyButton already fits text to the actual key bounds; do not shrink it again against the tablet screen.
+        fontScaleFactor = 1f,
         offsetX = state.floatingOffsetX,
         offsetY = state.floatingOffsetY,
         minOffsetY = state.floatingMinOffsetY,
@@ -303,6 +307,23 @@ fun KeyboardView(
         // 窗口——焦点型弹窗会抢焦点导致 IME 被系统收起）
         // 长按删除待确认项：词文本 + 确认后执行（候选栏/展开页共用同一确认覆盖层）
         var deletePending by remember { mutableStateOf<DeletePendingWord?>(null) }
+        var preeditEditSession by remember(state.inputSessionId, state.currentSchemaId, state.isAsciiMode) {
+            mutableStateOf<com.kingzcheung.xime.rime.PinyinEditSession?>(null)
+        }
+        var preeditRequest by remember(state.inputSessionId, state.currentSchemaId) { mutableIntStateOf(0) }
+        fun closePreeditEditor() {
+            preeditEditSession?.invalidate()
+            preeditEditSession = null
+            preeditRequest++
+        }
+        SideEffect {
+            callbacks.onDismissPreeditEditor = if (preeditEditSession != null) ({ closePreeditEditor() }) else null
+        }
+        DisposableEffect(callbacks) {
+            onDispose { callbacks.onDismissPreeditEditor = null }
+        }
+        LaunchedEffect(page, resizeOverlay != null) { closePreeditEditor() }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -513,6 +534,7 @@ fun KeyboardView(
                 callbacks = CandidateBarCallbacks(
                     onReorderToolbar = callbacks.onUpdateToolbarButtons,
                     onCancelInput = {
+                        closePreeditEditor()
                         toolbarFeedback()
                         viewModel.setCandidatePageExpanded(false)
                         if (showHandwritingCandidates) {
@@ -541,6 +563,7 @@ fun KeyboardView(
                         viewModel.showOverlay(OverlayRoute.Clipboard(0))
                     },
                     onCandidateSelect = { index ->
+                        closePreeditEditor()
                         if (showHandwritingCandidates && index in handwritingCandidates.indices) {
                             // 手写候选点选绕过了服务层 selectCandidate（其入口统一有按键反馈），
                             // 这里补齐同款反馈，保证各键盘点选手感一致
@@ -684,9 +707,30 @@ fun KeyboardView(
                     },
                 ),
                 inlineSuggestions = inlineSuggestions,
+                showPreeditPreview = preeditEditSession == null,
+                onEditPreedit = if (!state.isAsciiMode && !isHandwritingPage &&
+                    com.kingzcheung.xime.rime.PinyinEditBuffer.supports(state.currentSchemaId) &&
+                    callbacks.onOpenPreeditEditor != null) ({
+                    val request = ++preeditRequest
+                    callbacks.onOpenPreeditEditor?.invoke { session ->
+                        if (request == preeditRequest) { preeditEditSession = session; viewModel.setCandidatePageExpanded(false) }
+                    }
+                }) else null,
             )
 
-            if (candidatePageExpanded) {
+            if (preeditEditSession != null) {
+                val editSession = preeditEditSession!!
+                val editRequest = preeditRequest
+                PreeditEditorPanel(editSession, keyboardBgColor, keyBgColor, keyTextColor, accentColor,
+                    onClose = { if (editRequest == preeditRequest) closePreeditEditor() },
+                    onApply = { text, caret, reply ->
+                        callbacks.onApplyPreeditEdit?.invoke(editSession, text, caret) { success ->
+                            if (editRequest == preeditRequest && editSession.isActive()) reply(success)
+                        } ?: reply(false)
+                    },
+                    onFeedback = { onHapticFeedback?.invoke() },
+                    modifier = Modifier.weight(1f).fillMaxWidth())
+            } else if (candidatePageExpanded) {
                 // 候选展开页：候选栏的在位展开态（顶部即真实候选栏，实时跟随编码/删除变化）。
                 // 数据源为服务层的跨页全量候选（expandedCandidates），行分组惰性渲染
                 // （LazyColumn 只画可见行），可上下滑动 + 翻页键滚动一屏，不驱动 rime 翻页。

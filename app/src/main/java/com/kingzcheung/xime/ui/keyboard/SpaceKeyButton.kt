@@ -132,7 +132,7 @@ fun SpaceKeyButton(
                     }
                 }
             }
-            .padding(LocalKeyVisualPadding.current)
+            .padding(scaledKeyVisualPadding())
             .then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
             .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor).keyGlow(),

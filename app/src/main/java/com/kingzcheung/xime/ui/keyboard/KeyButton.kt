@@ -199,7 +199,7 @@ fun KeyButton(
                 .fillMaxHeight()
                 .fillMaxWidth()
                 .pointerInput(Unit) { detectExclusiveKeyGestures { currentActions } }
-            .padding(LocalKeyVisualPadding.current)
+            .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
@@ -345,7 +345,7 @@ fun SwipeableKeyButton(
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
             }
-            .padding(LocalKeyVisualPadding.current)
+            .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
@@ -456,6 +456,7 @@ fun SwipeableKeyButton(
             } else {
                 Text(
                     text = text,
+                    modifier = Modifier.fillMaxWidth(),
                     color = textColor,
                     fontSize = labelSize.sp,
                     lineHeight = (labelSize * 1.2f).sp,
@@ -628,7 +629,7 @@ fun IconKeyButton(
                     }
                 )
             }
-            .padding(LocalKeyVisualPadding.current)
+            .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
@@ -927,7 +928,7 @@ fun SwipeableIconKeyButton(
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
             }
-            .padding(LocalKeyVisualPadding.current)
+            .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(

@@ -355,6 +355,16 @@ data class ColorSchemeEntry(
     val keyBgColorDark: Long? = null,
     @SerialName("special_key_bg_color")
     val specialKeyBgColor: Long? = null,
+    @SerialName("special_key_bg_color_dark")
+    val specialKeyBgColorDark: Long? = null,
+    @SerialName("enter_key_bg_color")
+    val enterKeyBgColor: Long? = null,
+    @SerialName("enter_key_bg_color_dark")
+    val enterKeyBgColorDark: Long? = null,
+    @SerialName("special_key_text_color")
+    val specialKeyTextColor: Long? = null,
+    @SerialName("special_key_text_color_dark")
+    val specialKeyTextColorDark: Long? = null,
     @SerialName("candidate_bar_bg_color")
     val candidateBarBgColor: Long? = null,
     @SerialName("key_text_color")
@@ -1448,6 +1458,11 @@ object KeysConfigHelper {
                 keyBgColor = customEntry.keyBgColor ?: base.keyBgColor,
                 keyBgColorDark = customEntry.keyBgColorDark ?: base.keyBgColorDark,
                 specialKeyBgColor = customEntry.specialKeyBgColor ?: base.specialKeyBgColor,
+                specialKeyBgColorDark = customEntry.specialKeyBgColorDark ?: base.specialKeyBgColorDark,
+                enterKeyBgColor = customEntry.enterKeyBgColor ?: base.enterKeyBgColor,
+                enterKeyBgColorDark = customEntry.enterKeyBgColorDark ?: base.enterKeyBgColorDark,
+                specialKeyTextColor = customEntry.specialKeyTextColor ?: base.specialKeyTextColor,
+                specialKeyTextColorDark = customEntry.specialKeyTextColorDark ?: base.specialKeyTextColorDark,
                 candidateBarBgColor = customEntry.candidateBarBgColor ?: base.candidateBarBgColor,
                 keyTextColor = customEntry.keyTextColor ?: base.keyTextColor,
                 keyTextColorDark = customEntry.keyTextColorDark ?: base.keyTextColorDark,

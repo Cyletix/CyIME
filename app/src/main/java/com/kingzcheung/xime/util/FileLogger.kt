@@ -23,10 +23,10 @@ object FileLogger {
     private var logsDir: File? = null
     private var isInitialized = false
 
-    /** 调试日志总开关：控制 v/d/i 级写文件（日志查看器）。
-     * 仅 Debug 构建生效；Release 构建 v/d/i 级完全不写文件，省磁盘 I/O。 */
+    /** 调试日志总开关：同时控制 v/d/i 级 logcat 和文件日志。
+     * 默认关闭；仅 Debug 构建可启用，警告/错误始终保留。 */
     @Volatile
-    private var verboseLoggingEnabled = true
+    private var verboseLoggingEnabled = false
     
     private val logQueue = LinkedBlockingQueue<String>(QUEUE_CAPACITY)
     private var writer: BufferedWriter? = null
@@ -102,24 +102,34 @@ object FileLogger {
     
     fun isInitialized(): Boolean = isInitialized
 
-    /** 运行时切换 verbose 文件日志（跨进程通过设置项/onStartInput 同步）。 */
+    /** 运行时切换 verbose 日志（跨进程通过设置项/onStartInput 同步）。 */
     fun setVerboseLoggingEnabled(enabled: Boolean) {
         verboseLoggingEnabled = enabled
     }
     
+    fun isVerboseLoggingEnabled(): Boolean = BuildConfig.DEBUG && verboseLoggingEnabled
+
     fun v(tag: String, message: String) {
-        if (BuildConfig.DEBUG) Log.v(tag, message)
-        if (BuildConfig.DEBUG && verboseLoggingEnabled) writeToFile("V", tag, message)
+        if (!isVerboseLoggingEnabled()) return
+        Log.v(tag, message)
+        writeToFile("V", tag, message)
     }
     
     fun d(tag: String, message: String) {
-        if (BuildConfig.DEBUG) Log.d(tag, message)
-        if (BuildConfig.DEBUG && verboseLoggingEnabled) writeToFile("D", tag, message)
+        if (!isVerboseLoggingEnabled()) return
+        Log.d(tag, message)
+        writeToFile("D", tag, message)
     }
     
     fun i(tag: String, message: String) {
-        if (BuildConfig.DEBUG) Log.i(tag, message)
-        if (BuildConfig.DEBUG && verboseLoggingEnabled) writeToFile("I", tag, message)
+        if (!isVerboseLoggingEnabled()) return
+        Log.i(tag, message)
+        writeToFile("I", tag, message)
+    }
+
+    /** 高频路径先检查开关，关闭时连字符串插值也不执行。 */
+    inline fun i(tag: String, message: () -> String) {
+        if (isVerboseLoggingEnabled()) i(tag, message())
     }
     
     fun w(tag: String, message: String, throwable: Throwable? = null) {

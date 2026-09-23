@@ -1,6 +1,6 @@
 > **Cyletix 分支 · 修改日期 2026-09-23。** [CyIME](https://github.com/Cyletix/Xime) 基于 Kor1（kingzcheung）及贡献者开发的 [Xime](https://github.com/ximeiorg/Xime)。应用继续遵循 [GNU GPL v3](LICENSE)，保留原作者及第三方版权声明。请从 [本分支 Releases](https://github.com/Cyletix/Xime/releases) 下载，F-Droid 链接指向上游原版。对应源代码在本仓库公开，改动和验证见 [命名与整理记录](docs/cyime-identity.md)。
 
-[CyIME 0.1.0 改动与验证](docs/cyime-0.1.0.md)
+[CyIME 0.1.1 改动与验证](docs/cyime-0.1.1.md)
 
 
 <h1 align="center">CyIME</h1>
@@ -13,7 +13,7 @@
 
 **CyIME** 是 Cyletix 独立命名和维护的 Android 输入法，基于 [Xime](https://github.com/ximeiorg/Xime) 与 Rime 开发，保留上游署名及 GPL-3.0 许可。2024 年的 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) 是键盘布局研究前身，与 Android 应用分别保留历史。
 
-当前仓库仍为 `Cyletix/Xime`；`Cyletix/CyIME` 是建议迁移名称，尚未作为下载地址启用。既有 Releases 可能仍使用旧名称；新构建命名为 `CyIME-0.1.0-<abi>.apk`，包标识与签名配置保持升级兼容。
+当前仓库仍为 `Cyletix/Xime`；`Cyletix/CyIME` 是建议迁移名称，尚未作为下载地址启用。既有 Releases 可能仍使用旧名称；新构建命名为 `CyIME-0.1.1-<abi>.apk`，包标识与签名配置保持升级兼容。
 
 [旧项目结论与可选实验配置](docs/cyime-keyboard-research.md) · [命名及目录迁移决策](docs/cyime-identity.md)
 
@@ -30,8 +30,7 @@
 
 ---
 
-> 本输入法支持五笔/拼音输入，只是本人以五笔为主，拼音为辅，因此资源会倾向于五笔为主。
-如果你是拼音用户，默认的拼音不是很强大，你可以到扩展市场里下载如`凇雾拼音` 之类的方案。
+> 本分支默认内置雾凇拼音词库，提供中文九键、26键、14键与小鹤双拼。其他方案仍可从扩展市场安装。
 
 <table align="center">
   <tr>

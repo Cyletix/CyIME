@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
 import androidx.compose.ui.platform.LocalContext
@@ -160,9 +161,19 @@ fun XimeTheme(
         // Material You 动态配色：由系统壁纸调色板生成（官方实现），随壁纸自动更新
         if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else {
-        val seed = if (darkTheme) scheme.primaryDark else scheme.primaryLight
-        val container = if (darkTheme) scheme.primaryContainerDark else scheme.primaryContainerLight
-        generateColorScheme(seed, container, darkTheme)
+        val surface = if (darkTheme) scheme.surfaceDark else scheme.surfaceLight
+        // A complete palette may intentionally stay dark in a light system (858AdvanceColor).
+        // Derive Material contrast from that actual surface, not the system appearance flag.
+        val materialDark = if (scheme.useThemeColors) surface.luminance() < 0.5f else darkTheme
+        val seed = if (materialDark) scheme.primaryDark else scheme.primaryLight
+        val container = if (materialDark) scheme.primaryContainerDark else scheme.primaryContainerLight
+        val generated = generateColorScheme(seed, container, materialDark)
+        if (scheme.useThemeColors) {
+            val foreground = if (darkTheme) scheme.keyTextColorDark else scheme.keyTextColorLight
+            val mutedForeground = if (darkTheme) scheme.candidateTextColorDark else scheme.candidateTextColorLight
+            generated.copy(background = surface, surface = surface,
+                onBackground = foreground, onSurface = foreground, onSurfaceVariant = mutedForeground)
+        } else generated
     }
 
     CompositionLocalProvider(

@@ -55,7 +55,7 @@ import kotlin.math.roundToInt
 fun FloatingKeyboardContainer(
     isFloatingMode: Boolean,
     scaleFactor: Float,
-    fontScaleFactor: Float = scaleFactor,
+    fontScaleFactor: Float = 1f,
     opacity: Float = 1f,
     offsetX: Int,
     offsetY: Int,
@@ -179,9 +179,10 @@ fun FloatingKeyboardContainer(
                         change.consume()
                         val dxDp = with(density) { dragAmount.x.toDp().value }
                         val dyDp = with(density) { dragAmount.y.toDp().value }
-                        dragX = (dragX + dxDp).roundToInt().toFloat().coerceIn(-horizontalTravel, horizontalTravel)
-                        dragY = (dragY - dyDp).roundToInt().toFloat().coerceIn(minimumY, maxOffsetY)
-                        val nextEdge = floatingDockEdge(dragX, dragY, horizontalTravel, maxOffsetY, minOffsetY.toFloat())
+                        dragX = (dragX + dxDp).coerceIn(-horizontalTravel, horizontalTravel)
+                        dragY = (dragY - dyDp).coerceIn(minimumY, maxOffsetY)
+                        val nextEdge = floatingDockEdge(dragX.roundToInt().toFloat(), dragY.roundToInt().toFloat(),
+                            horizontalTravel, maxOffsetY, minOffsetY.toFloat())
                         if (nextEdge != dragEdge) {
                             // MOVE 与 UP 可能早于下一帧重组；必须在触摸回调中立即撤销准备态。
                             dragEdge = nextEdge
@@ -205,6 +206,7 @@ fun FloatingKeyboardContainer(
                         dockEpoch++
                         isDragging = false
                         dockReady = false
+                        onDragEnd()
                     },
                 )
             }

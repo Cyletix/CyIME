@@ -200,8 +200,9 @@ private fun ThemeKeyboardPreview(
 
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
-    val specialKeyColor = (if (isDark) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)
-        ?.let(longToColor) ?: if (isDark) theme.specialKeyDark else theme.specialKeyLight
+    val specialKeyColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(theme, isDark,
+        (if (isDark) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor))
+    val enterKeyColor = KeyboardThemes.getEnterKeyColor(theme.id, isDark)
     val specialTextColor = if (isDark) Color.White else KeyboardThemes.getSpecialKeyTextColor(theme.id, false)
     val textColor = KeyboardThemes.getKeyTextColorOverride(theme.id, isDark)
         ?: if (isDark) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
@@ -320,9 +321,9 @@ private fun ThemeKeyboardPreview(
                     ) {
                         PreviewKey("?123", specialKeyColor, specialTextColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
                         PreviewKey("，", keyColor, textColor, 0.8f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("空格", specialKeyColor, specialTextColor, 3f, fontSize = 9.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
+                        PreviewKey("空格", keyColor, textColor, 3f, fontSize = 9.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
                         PreviewKey("中/En", specialKeyColor, specialTextColor, 0.8f, fontSize = 8.sp,extraModifier = Modifier.padding(0.5.dp, 2.dp))
-                        PreviewKey("确定", specialKeyColor, specialTextColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
+                        PreviewKey("确定", enterKeyColor, specialTextColor, 1.2f,extraModifier = Modifier.padding(0.5.dp, 2.dp))
                     }
                 }
             }

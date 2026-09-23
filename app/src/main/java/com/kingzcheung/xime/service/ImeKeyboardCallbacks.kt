@@ -17,6 +17,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Keeps sub-dp motion until the next whole offset, without accumulating debt at an edge. */
+internal class FloatingDragAxis {
+    private var remainder = 0f
+    private var lastPosition: Int? = null
+
+    fun move(current: Int, delta: Float, minimum: Int, maximum: Int): Int {
+        if (lastPosition != current) remainder = 0f  // external reset / cancel / geometry change
+        val position = (current + remainder + delta).coerceIn(minimum.toFloat(), maximum.toFloat())
+        val next = position.roundToInt()
+        remainder = position - next
+        lastPosition = next
+        return next
+    }
+
+    fun reset() { remainder = 0f; lastPosition = null }
+}
+
 /**
  * 构建键盘回调集合（KeyboardCallbacks）。
  *
@@ -32,9 +49,14 @@ internal fun rememberImeKeyboardCallbacks(
     effectiveScreenH: Int,
 ): KeyboardCallbacks {
     val view = LocalView.current
+    val preeditEditor = remember(service) { ImePreeditEditor(service) }
     val handwritingCursor = remember(state.inputSessionId) { androidx.compose.runtime.mutableStateOf<Int?>(null) }
-    return remember(floatingMinY, state.isFloatingMode, effectiveScreenH, state.inputSessionId) {
+    return remember(floatingMinY, state.isFloatingMode, effectiveScreenH, state.inputSessionId, state.showKeyboardResize) {
+        val floatingDragX = FloatingDragAxis()
+        val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
+            onOpenPreeditEditor = preeditEditor::open,
+            onApplyPreeditEdit = preeditEditor::apply,
             onKeyPress = { key, isShifted ->
                 service.keyRouter.handleKeyPress(key, isShifted)
             },
@@ -154,6 +176,7 @@ internal fun rememberImeKeyboardCallbacks(
                     showKeyboardResize = true,
                     resizePreviewHeightDp = currentHeight,
                     resizeInitialFloating = service.uiState.value.isFloatingMode,
+                    resizeInitialSplit = SettingsPreferences.isSplitKeyboardEnabled(service),
                     resizeInitialX = service.uiState.value.floatingOffsetX,
                     resizeInitialY = service.uiState.value.floatingOffsetY,
                 )
@@ -273,17 +296,18 @@ internal fun rememberImeKeyboardCallbacks(
                 val portraitWidth = minOf(screenW, service.resources.configuration.screenHeightDp)
                 val cardWidth = service.currentFloatingCardWidthDp.takeIf { it > 0 } ?: (portraitWidth * 0.85f).roundToInt()
                 val halfMargin = ((screenW - cardWidth) / 2f).roundToInt()
-                val newX = (s.floatingOffsetX + dx).roundToInt().coerceIn(-halfMargin, halfMargin)
-                val newY_raw = (s.floatingOffsetY.coerceAtLeast(floatingMinY) + dy).roundToInt()
+                val newX = floatingDragX.move(s.floatingOffsetX, dx, -halfMargin, halfMargin)
                 val actualCardH = if (service.currentFloatingCardHeightDp > 0) service.currentFloatingCardHeightDp else service.currentEffectiveKeyboardHeight
                 val maxOffsetY = (screenH - actualCardH).coerceAtLeast(floatingMinY)
-                val newY = newY_raw.coerceIn(floatingMinY, maxOffsetY)
+                val newY = floatingDragY.move(s.floatingOffsetY.coerceAtLeast(floatingMinY), dy, floatingMinY, maxOffsetY)
                 service.uiState.value = s.copy(
                     floatingOffsetX = newX,
                     floatingOffsetY = newY,
                 )
             },
             onFloatingKeyboardDragEnd = {
+                floatingDragX.reset()
+                floatingDragY.reset()
                 val s = service.uiState.value
                 val isLandscape = service.resources.configuration.screenWidthDp > service.resources.configuration.screenHeightDp
                 if (!s.showKeyboardResize) {

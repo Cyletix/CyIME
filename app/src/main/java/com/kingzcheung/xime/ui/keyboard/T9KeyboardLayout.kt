@@ -1,5 +1,9 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.widget.Toast
@@ -115,6 +119,7 @@ fun T9KeyboardLayout(
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     val controller = t9Controller
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -138,7 +143,7 @@ fun T9KeyboardLayout(
     }
 
     T9KeyboardSwipeOverlay(
-        modifier = modifier,
+        modifier = bodyModifier,
         keyboardBackgroundColor = keyboardBackgroundColor,
         keyCornerRadius = keyCornerRadius,
         keyTextColor = keyTextColor,
@@ -163,6 +168,7 @@ fun T9KeyboardLayout(
         keySpacingY = keySpacingY,
         onGestureAction = onGestureAction,
     )
+    }
 }
 
 
@@ -397,20 +403,20 @@ private fun T9KeyboardContent(
     Row(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(2.dp))
     ) {
         // ── 第1列：左侧候选区（拼音候选项） ──
         Column(
             modifier = Modifier
                 .fillMaxHeight()
                 .weight(0.8f),
-            verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
+            verticalArrangement = Arrangement.spacedBy(keyboardKeyGapY(if (compactMode) 2.dp else 4.dp))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(3f)
-                    .padding(LocalKeyVisualPadding.current)
+                    .padding(scaledKeyVisualPadding())
                     .then(candidateShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
                     .background(keyBackgroundColor)
@@ -688,7 +694,7 @@ private fun T9KeyboardContent(
                     voiceSticky = uiState.voiceSticky,
                     onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
                     onVoiceModeChange = callbacks.onVoiceModeChange,
-                    backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                     modifier = Modifier.weight(1.8f),
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
                 )
@@ -715,7 +721,7 @@ private fun T9KeyboardContent(
                 onLongClick = { onDelete() },
                 backgroundColor = specialKeyBackgroundColor,
                 iconColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("t9-delete-key").semantics { contentDescription = "删除" },
                 swipeText = if (compactMode) null else "清空",
                 onSwipe = { onKeyPress("clear_composition") },
                 onPress = { onKeyPressDown?.invoke("delete") },
@@ -971,11 +977,6 @@ private fun ResetKey(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 2.dp, vertical = 4.dp)
-            .then(shadowModifier)
-            .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
-            .keyGlow()
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -983,7 +984,12 @@ private fun ResetKey(
                     tryAwaitRelease()
                     isPressed = false
                 }, onTap = { currentOnClick() })
-            }, contentAlignment = Alignment.Center
+            }
+            .padding(scaledKeyVisualPadding())
+            .then(shadowModifier)
+            .clip(shape)
+            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .keyGlow(), contentAlignment = Alignment.Center
     ) {
         val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
         val hintSize = 9f * adaptiveHintScale(contentScale)

@@ -15,6 +15,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 
+data class KeyboardKeyColors(val background: Color, val foreground: Color)
+val LocalEnterKeyColors = androidx.compose.runtime.staticCompositionLocalOf<KeyboardKeyColors?> { null }
+val LocalFunctionKeyColors = androidx.compose.runtime.staticCompositionLocalOf<KeyboardKeyColors?> { null }
+
 /** 主键盘与编辑页使用同一组动作图标，文字保留为无障碍说明。 */
 @Composable
 fun ActionKeyButton(
@@ -38,8 +42,9 @@ fun ActionKeyButton(
         "确定", "完成", "前往" -> Icons.Default.Check
         else -> Icons.AutoMirrored.Filled.KeyboardReturn
     }
+    val enter = if (text == "删除") LocalFunctionKeyColors.current else LocalEnterKeyColors.current
     IconKeyButton(icon = rememberVectorPainter(icon), onClick = onClick,
-        backgroundColor = backgroundColor, iconColor = textColor, modifier = modifier,
+        backgroundColor = enter?.background ?: backgroundColor, iconColor = enter?.foreground ?: textColor, modifier = modifier,
         onPress = onPress, onRelease = onRelease, contentDescription = text,
         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius)

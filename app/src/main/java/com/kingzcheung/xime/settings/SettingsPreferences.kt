@@ -68,6 +68,15 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_AUTO_NUMBER_KEYBOARD, enabled).apply()
     }
     
+    const val KEY_SPLIT_KEYBOARD = "split_keyboard_enabled"
+
+    /** 完整键盘为默认；仅用户在调节界面选择后启用26键分体。 */
+    fun isSplitKeyboardEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_SPLIT_KEYBOARD, false)
+
+    fun setSplitKeyboardEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SPLIT_KEYBOARD, enabled).apply()
+    }
+
     private const val KEY_LAYOUT_PREFIX = "layout_pref_"
     
     private const val KEY_KEYBOARD_HEIGHT_DP = "keyboard_height_dp"
@@ -94,6 +103,7 @@ object SettingsPreferences {
     private const val KEY_INSTALLED_MARKET_IDS = "installed_market_ids"
     private const val KEY_COMPACT_MODE = "compact_mode"
     private const val KEY_SHOW_CANDIDATE_COMMENTS = "show_candidate_comments"
+    const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
     private const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     private const val KEY_PAGE_SIZE = "page_size"
     private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
@@ -115,6 +125,15 @@ object SettingsPreferences {
 
     fun setShowCandidateComments(context: Context, show: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_SHOW_CANDIDATE_COMMENTS, show).apply()
+    }
+
+    /** 候选词默认靠左；需要一键取消编码时可自行启用。 */
+    fun shouldShowCandidateCancelButton(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SHOW_CANDIDATE_CANCEL_BUTTON, false)
+    }
+
+    fun setShowCandidateCancelButton(context: Context, show: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SHOW_CANDIDATE_CANCEL_BUTTON, show).apply()
     }
 
     fun getInputTextLocation(context: Context): String {
@@ -218,7 +237,7 @@ object SettingsPreferences {
 
     /** 调试 verbose 日志总开关（仅 Debug 构建生效，Release 恒关闭）。 */
     fun isVerboseLoggingEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_VERBOSE_LOGGING, true)
+        return getPrefs(context).getBoolean(KEY_VERBOSE_LOGGING, false)
     }
 
     fun setVerboseLoggingEnabled(context: Context, enabled: Boolean) {

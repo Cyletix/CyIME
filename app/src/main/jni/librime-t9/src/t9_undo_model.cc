@@ -1,5 +1,6 @@
 #include "t9_undo_model.h"
 
+#include <algorithm>
 #include <map>
 #include <sstream>
 
@@ -181,6 +182,63 @@ void T9UndoModel::ReplaceLastSelection(const SyllableOption& option) {
     }
 }
 
+bool T9UndoModel::ReplaceEditableSuffix(const std::string& pinyin) {
+    // Validate the entire draft before changing either input or undo history.
+    std::vector<SyllableOption> choices;
+    std::string digits;
+    size_t start = 0;
+    while (start < pinyin.size()) {
+        size_t end = pinyin.find('\'', start);
+        if (end == std::string::npos) end = pinyin.size();
+        if (end == start) return false;
+        std::string syllable = pinyin.substr(start, end - start);
+        for (char c : syllable) {
+            if (c < 'a' || c > 'z') return false;
+            digits.push_back(T9PinyinMap::LetterToDigit(c));
+        }
+        choices.emplace_back(syllable, static_cast<int>(syllable.size()));
+        start = end + 1;
+    }
+
+    // Keep indices stable: outstanding RC/LC operations refer to these slots.
+    // Removing an unconfirmed suffix must never clear a captured committed word.
+    int protected_digits = 0;
+    for (auto& seg : segments_) {
+        if (seg.phase == T9Segment::kCommitted) {
+            protected_digits += static_cast<int>(seg.digits.size());
+        } else {
+            seg = T9Segment{};
+        }
+    }
+    tail_digits_.clear();
+    separator_positions_.erase(std::remove_if(separator_positions_.begin(),
+        separator_positions_.end(), [protected_digits](int pos) {
+            return pos >= protected_digits;
+        }), separator_positions_.end());
+    ops_.erase(std::remove_if(ops_.begin(), ops_.end(), [&](const T9SegmentOp& op) {
+        if (op.kind == T9SegmentOp::kLC) {
+            return op.segment_index < 0 ||
+                segments_[op.segment_index].phase != T9Segment::kCommitted;
+        }
+        if (op.kind == T9SegmentOp::kSeparator) return op.pos >= protected_digits;
+        return op.kind == T9SegmentOp::kEditBoundary;
+    }), ops_.end());
+    while (!segments_.empty() && !segments_.back().IsActive()) segments_.pop_back();
+
+    // The new suffix must be removed before crossing into the old commit chain.
+    // In particular, linked RC+TailConsume must not preempt deletion of the new
+    // letters, or reclaim them as digits released by an earlier partial commit.
+    T9SegmentOp boundary{};
+    boundary.kind = T9SegmentOp::kEditBoundary;
+    boundary.pos = FullPos(protected_digits);
+    ops_.push_back(boundary);
+    for (char d : digits) DigitPressed(d);
+    for (const auto& choice : choices) LeftChoice(choice);
+    if (!pinyin.empty() && pinyin.back() == '\'') SeparatorPressed(TotalDigitLength());
+    ResetDeletePhase();
+    return true;
+}
+
 void T9UndoModel::Clear() {
     segments_.clear();
     tail_digits_.clear();
@@ -223,6 +281,24 @@ bool T9UndoModel::HasPendingCommit() const {
 //   （unassigned 数字 + 分词键，位置从后往前），删空后回阶段 A。
 // 分词键（kSeparator）不通过阶段 A undo，仅作为位置元素在阶段 B 删除。
 bool T9UndoModel::Backspace() {
+    // Letters typed after applying an edit are newer than its left selections.
+    // Remove those unselected digits first, rather than undoing the last edited
+    // syllable and turning e.g. ni'hao + 6 into ni'4266 on the first backspace.
+    const bool edited_suffix = std::any_of(ops_.begin(), ops_.end(),
+        [](const T9SegmentOp& op) { return op.kind == T9SegmentOp::kEditBoundary; });
+    if (edited_suffix && !tail_digits_.empty() && !ops_.empty() &&
+        ops_.back().kind != T9SegmentOp::kRC &&
+        ops_.back().kind != T9SegmentOp::kTailConsume) {
+        delete_min_pos_ = -1;
+        return DeleteLastActiveElement();
+    }
+    if (!ops_.empty() && ops_.back().kind == T9SegmentOp::kEditBoundary) {
+        delete_mode_ = true;
+        delete_min_pos_ = ops_.back().pos;
+        if (DeleteLastActiveElement()) return true;
+        ops_.pop_back();
+        ResetDeletePhase();
+    }
     // 一次右选（SyncRightCommit）产生 kRC + linked kTailConsume → 整体撤销
     // （场景16/17/18：undo"价格/结婚后"一次 backspace 完成 j 回 selected + tail 恢复）。
     if (TryUndoLinkedCommit()) return true;
@@ -575,6 +651,9 @@ bool T9UndoModel::UndoOp(const T9SegmentOp& op) {
             undone_commit_count_++;  // 撤销一个 commit 操作（供 Kotlin 同步）
             return true;
         }
+        case T9SegmentOp::kEditBoundary:
+            // Backspace consumes this marker only after the new suffix is empty.
+            return false;
         case T9SegmentOp::kSeparator: {
             // 移除分隔符位置（分词键字符从完整输入序列消失）。
             // 注：阶段 B 删除分词键时已移除，此处防御（阶段 A 不应 undo kSeparator）。

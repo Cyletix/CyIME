@@ -41,3 +41,46 @@ object SoftBlueTheme {
         useThemeColors = true,
     )
 }
+
+/** 完整主题的功能键与预览同源；兼容旧式自定义主题的全局覆盖。 */
+fun resolvedSpecialKeyColor(theme: KeyboardColorScheme, isDark: Boolean, legacyOverride: Color?): Color {
+    val themed = if (isDark) theme.specialKeyDark else theme.specialKeyLight
+    return if (theme.isDynamic || theme.useThemeColors) themed else legacyOverride ?: themed
+}
+
+/** 薰衣草使用不透明的中性紫灰键帽，避免半透明白叠深紫导致泛灰。 */
+object SoftLavenderTheme {
+    fun create() = KeyboardColorScheme(
+        id = "lavender_purple", name = "薰衣草紫",
+        specialKeyLight = Color(0xFFE8DEF8), specialKeyDark = softDarkKeyContainer(Color(0xFFD0BCFF)),
+        accentLight = Color(0xFF8F73E2), accentDark = Color(0xFFD0BCFF),
+        surfaceLight = Color(0xFFF7F4FA), surfaceDark = Color(0xFF211E28),
+        keyboardBgLight = Color(0xFFF7F4FA), keyboardBgDark = Color(0xFF211E28),
+        candidateBarBgLight = Color(0xFFF7F4FA), candidateBarBgDark = Color(0xFF211E28),
+        keyBgLight = Color(0xFFFFFBFF), keyBgDark = Color(0xFF38333F),
+        keyTextColorLight = Color(0xFF25212C), keyTextColorDark = Color(0xFFF0EAF5),
+        candidateTextColorLight = Color(0xFF685191), candidateTextColorDark = Color(0xFFD0BCFF),
+        candidateSelectedTextColorLight = Color(0xFF59417F), candidateSelectedTextColorDark = Color(0xFFE9DDFF),
+        useThemeColors = true,
+    )
+}
+
+/** 用户指定的固定深色主题；跟随系统亮暗时也保留相同的键盘配色。 */
+object Advance858Theme {
+    const val ID = "858AdvanceColor"
+    fun create() = KeyboardColorScheme(
+        id = ID, name = ID,
+        specialKeyLight = Color(0xFF6D717C), specialKeyDark = Color(0xFF6D717C),
+        enterKeyLight = Color(0xFF3F4E68), enterKeyDark = Color(0xFF3F4E68),
+        accentLight = Color(0xFFC3CDDF), accentDark = Color(0xFFC3CDDF),
+        surfaceLight = Color(0xFF292929), surfaceDark = Color(0xFF292929),
+        keyboardBgLight = Color(0xFF292929), keyboardBgDark = Color(0xFF292929),
+        candidateBarBgLight = Color(0xFF292929), candidateBarBgDark = Color(0xFF292929),
+        keyBgLight = Color(0xFF525252), keyBgDark = Color(0xFF525252),
+        keyTextColorLight = Color.White, keyTextColorDark = Color.White,
+        specialKeyTextColorLight = Color.White, specialKeyTextColorDark = Color.White,
+        candidateTextColorLight = Color(0xFFE0E0E0), candidateTextColorDark = Color(0xFFE0E0E0),
+        candidateSelectedTextColorLight = Color.White, candidateSelectedTextColorDark = Color.White,
+        useThemeColors = true,
+    )
+}

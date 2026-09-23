@@ -936,7 +936,8 @@ fun KeyboardThemeCard(
                         candidateBarColor = theme.candidateBarBgLight,
                         accentColor = theme.accentLight,
                         keyColor = globalKeyBgLight,
-                        specialKeyColor = kbColors.specialKeyBgColor?.let(longToColor) ?: theme.specialKeyLight,
+                        specialKeyColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(theme, false, kbColors.specialKeyBgColor?.let(longToColor)),
+                        enterKeyColor = KeyboardThemes.getEnterKeyColor(theme.id, false),
                         isLeft = true,
                         single = previewDark != null,
                     )
@@ -950,7 +951,8 @@ fun KeyboardThemeCard(
                         candidateBarColor = theme.candidateBarBgDark,
                         accentColor = theme.accentDark,
                         keyColor = globalKeyBgDark,
-                        specialKeyColor = kbColors.specialKeyBgColorDark?.let(longToColor) ?: theme.specialKeyDark,
+                        specialKeyColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(theme, true, kbColors.specialKeyBgColorDark?.let(longToColor)),
+                        enterKeyColor = KeyboardThemes.getEnterKeyColor(theme.id, true),
                         isLeft = false,
                         single = previewDark != null,
                     )
@@ -991,6 +993,7 @@ private fun ThemeHalfPreview(
     accentColor: Color,
     keyColor: Color,
     specialKeyColor: Color,
+    enterKeyColor: Color,
     isLeft: Boolean,
     single: Boolean = false,
 ) {
@@ -1042,7 +1045,11 @@ private fun ThemeHalfPreview(
                                 .weight(if (isSpace) 3f else 1f)
                                 .fillMaxHeight()
                                 .clip(RoundedCornerShape(1.5.dp))
-                                .background(if (isSpecial) specialKeyColor else keyColor)
+                                .background(when {
+                                    !isLeft && rowIndex == 2 && keyIndex == 1 -> enterKeyColor
+                                    isSpecial -> specialKeyColor
+                                    else -> keyColor
+                                })
                         )
                     }
                 }

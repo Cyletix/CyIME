@@ -759,7 +759,7 @@ bool T9Processor::MemorizeEntry(const std::string& text,
     const bool resolvable = BuildEntryForPinyin(text, pinyin, &entry);
     if (resolvable) {
         userdb_ok = WriteDictEntry(text, entry.code, 1);
-    } else if (!text.empty() && !digits.empty()) {
+    } else if (digit_recall_key_valid_ && !text.empty() && !digits.empty()) {
         T9DigitUserDict::Instance().Memorize(digits, text, pinyin);
     }
     // 地面真相诊断：T9LOG 发布包被 T9_ENABLE_VERBOSE_LOG 门控，用
@@ -1092,6 +1092,7 @@ void T9Processor::EnterIdle() {
           last_commit_digit_sequence_.c_str());
     original_digit_sequence_.clear();
     last_commit_digit_sequence_.clear();
+    digit_recall_key_valid_ = true;
     pending_fullcommit_capture_.reset();
     state_machine_.EnterIdle();
     left_column_locked_ = false;
@@ -1223,6 +1224,24 @@ void T9Processor::ReplaceFullPinyin(const std::string& pinyin) {
     engine_->context()->Clear();
     SyncRimeInput(pinyin);
     T9LOG("ReplaceFullPinyin: '%s'", pinyin.c_str());
+}
+
+bool T9Processor::ReplaceEditableSuffix(const std::string& pinyin) {
+    if (left_panel_mode_ == t9_panel_state::LeftPanelMode::kNone ||
+        !undo_model_.ReplaceEditableSuffix(pinyin)) return false;
+    input_buffer_ = undo_model_.ToBuffer();
+    original_digit_sequence_ = input_buffer_.digit_sequence;
+    last_commit_digit_sequence_.clear();
+    digit_recall_key_valid_ = false;
+    left_column_locked_ = false;
+    separator_consumed_digits_.reset();
+    last_choice_consumed_digits_.reset();
+    DeriveStateMachineFromUndoModel();
+    last_rime_input_.clear();
+    pending_action_ = RimePendingAction::kNone;
+    pending_input_.clear();
+    SendToRime();
+    return true;
 }
 
 void T9Processor::ClearComposition(int mode) {

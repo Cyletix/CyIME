@@ -110,6 +110,7 @@ fun KeyboardLayout(
     isAsciiMode: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    KeyboardKeySpacingScope(modifier) { bodyModifier ->
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     val isShifted = shiftMode.isShifted
 
@@ -123,8 +124,10 @@ fun KeyboardLayout(
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
     val keyTextColor = KeyboardThemes.getKeyTextColorOverride(uiState.themeId, uiState.isDarkTheme)
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
-    val specialKeyBackgroundColor = if (uiState.isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) }
-        ?: themeSpecialKeyColor else kbColors.specialKeyBgColor?.let { longToColor(it) } ?: themeSpecialKeyColor
+    val specialKeyBackgroundColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(
+        themeScheme, uiState.isDarkTheme,
+        (if (uiState.isDarkTheme) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor)
+    )
     val specialKeyTextColor = if (uiState.isDarkTheme) Color.White
         else KeyboardThemes.getSpecialKeyTextColor(uiState.themeId, false)
     val bubbleBgColor = if (uiState.isDarkTheme) themeScheme.specialKeyDark
@@ -243,17 +246,20 @@ fun KeyboardLayout(
         keyboardWidth = keyboardBounds.width
     )
 
-    val isLandscape = !uiState.isFloatingMode && LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
+    val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
+        supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
 
     CompositionLocalProvider(
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
+        LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(uiState.themeId, uiState.isDarkTheme), specialKeyTextColor),
+        LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBackgroundColor, specialKeyTextColor),
         LocalKeyVisualPadding provides PaddingValues(
             horizontal = kbKey.spacingFor("qwerty").first?.dp ?: 2.dp,
             vertical = kbKey.spacingFor("qwerty").second?.dp ?: 4.25.dp,
         ),
     ) {
     Box(
-        modifier = modifier
+        modifier = bodyModifier
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
             }
@@ -261,10 +267,10 @@ fun KeyboardLayout(
                 drawContent()
                 bubbleData?.let { drawSwipeBubble(it) }
             }
-            .padding(bottom = if (uiState.isFloatingMode || isLandscape) {0.dp} else {0.dp})
+
     ) {
-            if (isLandscape) {
-            LandscapeKeyboardContent(
+            if (splitKeyboard) {
+            SplitKeyboardContent(
                 onKeyPress = onKeyPress,
                 viewModel = viewModel,
                 callbacks = callbacks,
@@ -698,8 +704,8 @@ fun KeyboardLayout(
                             isSttEnabled = isSttEnabled,
                             isVoiceMode = isVoiceMode,
                             voiceSticky = isVoiceSticky,
-                            keyBackgroundColor = specialKeyBackgroundColor,
-                            keyTextColor = specialKeyTextColor,
+                            keyBackgroundColor = keyBackgroundColor,
+                            keyTextColor = keyTextColor,
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
@@ -877,6 +883,7 @@ fun KeyboardLayout(
         }
     }
 
+    }
     }
 }
 
@@ -1135,7 +1142,7 @@ private fun ShiftCapsKeyButton(
                     isPressed = false
                 }
             }
-            .padding(LocalKeyVisualPadding.current)
+            .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
@@ -1182,11 +1189,11 @@ internal fun splitRowForLandscape(row: List<String>): Pair<List<String>, List<St
 }
 
 /**
- * 横屏分体键盘内容 — 当 [KeyboardLayout.isLandscape] 为 true 时渲染。
+ * 用户手动开启的分体键盘内容；尺寸始终取实际键盘窗口。
  * 将键盘拆分为左右两个面板，紧贴屏幕左右边缘，中间留空方便双手持机拇指操作。
  */
 @Composable
-private fun LandscapeKeyboardContent(
+private fun SplitKeyboardContent(
     onKeyPress: (String) -> Unit,
     viewModel: KeyboardViewModel,
     callbacks: KeyboardCallbacks,
@@ -1202,9 +1209,9 @@ private fun LandscapeKeyboardContent(
     val isShifted = shiftMode.isShifted
 
     val suppressCursorMove = LocalSuppressCursorMove.current
-    val staggerStep = 10.dp
-    val landscapeFontSize = 12.sp
-    val landscapeSwipeFontSize = 7.sp
+    val staggerStep = 6.dp
+    val landscapeFontSize = 18.sp
+    val landscapeSwipeFontSize = 9.sp
 
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
@@ -1215,8 +1222,10 @@ private fun LandscapeKeyboardContent(
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
     val keyTextColor = KeyboardThemes.getKeyTextColorOverride(uiState.themeId, uiState.isDarkTheme)
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
-    val specialKeyBackgroundColor = if (uiState.isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) }
-        ?: themeSpecialKeyColor else kbColors.specialKeyBgColor?.let { longToColor(it) } ?: themeSpecialKeyColor
+    val specialKeyBackgroundColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(
+        themeScheme, uiState.isDarkTheme,
+        (if (uiState.isDarkTheme) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor)
+    )
     val specialKeyTextColor = if (uiState.isDarkTheme) Color.White
         else KeyboardThemes.getSpecialKeyTextColor(uiState.themeId, false)
     val bubbleBgColor = if (uiState.isDarkTheme) themeScheme.specialKeyDark
@@ -1281,17 +1290,18 @@ private fun LandscapeKeyboardContent(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(vertical = 2.dp, horizontal = 50.dp)
+                .padding(vertical = 2.dp, horizontal = 4.dp)
+                .testTag("split-keyboard")
         ) {
         // ========== 左面板 ==========
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .weight(0.42f)
+                .weight(0.45f)
                 .padding(start = 4.dp),
         ) {
             Box(modifier = Modifier.weight(1f)) {
-                CompactKeyboardRowWithConfig(
+                KeyboardRowWithConfig(
                     keys = row0Left,
                     onKeyPress = onKeyPress,
                     config = KeyboardRowConfig(
@@ -1321,7 +1331,7 @@ private fun LandscapeKeyboardContent(
                     .weight(1f)
                     .padding(start = staggerStep)
             ) {
-                CompactKeyboardRowWithConfig(
+                KeyboardRowWithConfig(
                     keys = row1Left,
                     onKeyPress = onKeyPress,
                     config = KeyboardRowConfig(
@@ -1351,7 +1361,7 @@ private fun LandscapeKeyboardContent(
                     .weight(1f)
                     .padding(start = staggerStep * 2)
             ) {
-                CompactKeyboardRowWithConfig(
+                KeyboardRowWithConfig(
                     keys = row2Left,
                     onKeyPress = onKeyPress,
                     config = KeyboardRowConfig(
@@ -1380,7 +1390,7 @@ private fun LandscapeKeyboardContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(4.dp)),
             ) {
                 ShiftCapsKeyButton(
                     shiftMode = shiftMode,
@@ -1445,8 +1455,8 @@ private fun LandscapeKeyboardContent(
                     }
                 SplitSpaceKey(
                     onClick = { onKeyPress("space") },
-                    backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor,
+                    backgroundColor = keyBackgroundColor,
+                    textColor = keyTextColor,
                     schemaName = if (isAsciiMode) "英文" else schemaName,
                     modifier = Modifier.weight(3f),
                     onPress = { onKeyPressDown?.invoke("space") },
@@ -1458,17 +1468,17 @@ private fun LandscapeKeyboardContent(
         }
 
         // 中间留空
-        Spacer(modifier = Modifier.weight(0.16f))
+        Spacer(modifier = Modifier.weight(0.10f).fillMaxHeight().testTag("split-keyboard-gap"))
 
         // ========== 右面板 ==========
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .weight(0.42f)
+                .weight(0.45f)
                 .padding(end = 4.dp),
         ) {
             Box(modifier = Modifier.weight(1f)) {
-                CompactKeyboardRowWithConfig(
+                KeyboardRowWithConfig(
                     keys = row0Right,
                     onKeyPress = onKeyPress,
                     config = KeyboardRowConfig(
@@ -1498,7 +1508,7 @@ private fun LandscapeKeyboardContent(
                     .weight(1f)
                     .padding(end = staggerStep)
             ) {
-                CompactKeyboardRowWithConfig(
+                KeyboardRowWithConfig(
                     keys = row1Right,
                     onKeyPress = onKeyPress,
                     config = KeyboardRowConfig(
@@ -1527,7 +1537,7 @@ private fun LandscapeKeyboardContent(
                     .padding(end = staggerStep * 2),
             ) {
                 Box(modifier = Modifier.weight(4f)) {
-                    CompactKeyboardRowWithConfig(
+                    KeyboardRowWithConfig(
                         keys = row2Right,
                         onKeyPress = onKeyPress,
                         config = KeyboardRowConfig(
@@ -1575,12 +1585,12 @@ private fun LandscapeKeyboardContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(4.dp)),
             ) {
                 SplitSpaceKey(
                     onClick = { onKeyPress("space") },
-                    backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor,
+                    backgroundColor = keyBackgroundColor,
+                    textColor = keyTextColor,
                     schemaName = if (isAsciiMode) "英文" else "",
                     modifier = Modifier.weight(2f),
                     onPress = { onKeyPressDown?.invoke("space") },
