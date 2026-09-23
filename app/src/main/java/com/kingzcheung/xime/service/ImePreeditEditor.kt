@@ -63,6 +63,13 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             if (replacement != null) {
                 text = if (session.isT9) PinyinEditBuffer.normalizedT9(replacement) else PinyinEditBuffer.normalized(replacement)
                 caret = text.length
+            } else if (key?.startsWith("preedit_cursor:") == true) {
+                val movement = key.substringAfter(":")
+                caret = when (movement) {
+                    "start" -> 0
+                    "end" -> text.length
+                    else -> (caret + (movement.toIntOrNull() ?: 0)).coerceIn(0, text.length)
+                }
             } else if (key == "delete") {
                 if (caret > 0) { text = text.removeRange(caret - 1, caret); caret-- }
             } else if (key != null) {

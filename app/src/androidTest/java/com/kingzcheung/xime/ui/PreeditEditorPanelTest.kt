@@ -33,6 +33,7 @@ class PreeditEditorPanelTest {
         val before = rule.onNodeWithTag("original-nine-key").fetchSemanticsNode().boundsInRoot
         rule.runOnIdle { show = true }
         assertEquals(before, rule.onNodeWithTag("original-nine-key").fetchSemanticsNode().boundsInRoot)
+        rule.onNodeWithTag("preedit-editor").assertHeightIsEqualTo(44.dp)
         rule.onNodeWithTag("preedit-apply").assertDoesNotExist()
         rule.onNodeWithTag("preedit-letter:q").assertDoesNotExist()
         rule.onNodeWithTag("preedit-editor-code").performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString("zenm")) }

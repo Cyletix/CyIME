@@ -37,6 +37,37 @@ class ResizeControlsContrastTest {
     @Test fun tabletControlsHaveLargerTextAndClearButtonBorders() = checkControls(760, 420, false, 1f)
     @Test fun narrowLowControlsDoNotOverlapWithLargeFont() = checkControls(280, 180, false, 1.3f)
 
+    @Test fun opacityCompositesToolbarKeysAndBackgroundTogether() {
+        val vm = KeyboardViewModel(app)
+        var opacity by mutableFloatStateOf(1f)
+        rule.setContent {
+            MaterialTheme {
+                Box(Modifier.size(360.dp, 300.dp).background(Color.White).testTag("opacity-root")) {
+                    KeyboardView(vm, KeyboardUiState(isDarkTheme = true, keyboardOpacity = opacity,
+                        keyboardHeightDp = 300),
+                        KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
+                        modifier = Modifier.fillMaxSize(), resizeOverlay = {})
+                }
+            }
+        }
+        val before = rule.onNodeWithTag("opacity-root").captureToImage().asAndroidBitmap()
+        rule.runOnIdle { opacity = 0.25f }
+        val after = rule.onNodeWithTag("opacity-root").captureToImage().asAndroidBitmap()
+        var darkPixels = 0
+        var incorrect = 0
+        for (y in 0 until before.height) for (x in 0 until before.width) {
+            val old = before.getPixel(x, y)
+            val now = after.getPixel(x, y)
+            if (android.graphics.Color.red(old) < 180) darkPixels++
+            for (shift in listOf(0, 8, 16)) {
+                val expected = 255 * 0.75f + ((old shr shift) and 255) * 0.25f
+                if (kotlin.math.abs(((now shr shift) and 255) - expected) > 3) incorrect++
+            }
+        }
+        assertTrue("test must include actual dark keyboard pixels", darkPixels > 10000)
+        assertEquals("keys and toolbar must receive one shared opacity", 0, incorrect)
+    }
+
     private fun checkControls(width: Int, height: Int, floating: Boolean, font: Float) {
         val vm = KeyboardViewModel(app)
         val opacity = mutableFloatStateOf(1f)

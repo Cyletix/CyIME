@@ -264,6 +264,36 @@ class PreeditEditorImeTest {
         engine.clearQueuedComposition()
     }
 
+    @Test fun spaceDragEditsPinyinAndDeletingAllClosesEditorWithoutMovingHostCaret() {
+        chooseMode("rime_ice"); setPrefix()
+        "nihao".forEach { tap(it.toString()) }
+        rule.waitUntil(5000) { engine.getInput() == "nihao" }
+        openEditor()
+        rule.onNodeWithTag("preedit-editor").assertHeightIsEqualTo(44.dp)
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("space-key", true).performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(400)
+        rule.onNodeWithTag("space-key", true).performTouchInput { moveTo(center - Offset(50f, 0f)); up() }
+        rule.mainClock.autoAdvance = true
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot()[1].toInt() < 5 }
+        assertEquals("前文", text())
+        rule.runOnUiThread { assertEquals(2, editor.selectionStart) }
+        draft("a")
+        rule.waitUntil(5000) { engine.getInput() == "a" }
+        rule.onNodeWithContentDescription("删除", true).performTouchInput { click() }
+        rule.waitUntil(5000) { engine.getInput().isEmpty() && rule.onAllNodesWithTag("preedit-editor").fetchSemanticsNodes().isEmpty() }
+        assertEquals("前文", text())
+    }
+    @Test fun punctuationCommitsImmediatelyAndNeverLeavesCandidates() {
+        chooseMode("rime_ice"); setPrefix()
+        "nihao".forEach { tap(it.toString()) }
+        rule.waitUntil(5000) { engine.getCandidates().contains("你好") }
+        tap("，")
+        assertSettled("前文你好，")
+        rule.onNodeWithTag("candidate-expansion").assertDoesNotExist()
+        rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
+    }
+
     @Test fun mergedAndDoublePinyinEditsReturnToTheirOwnLayout() {
         chooseMode("pinyin_14jian"); setPrefix()
         listOf("bn", "ui", "gh", "as", "op").forEach(::tap)
@@ -291,6 +321,9 @@ class PreeditEditorImeTest {
         openEditor(); draft("ni'hao", 3)
         tap("MNO")
         rule.waitUntil(5000) { engine.getInput().contains("6") }
+        rule.waitForIdle()
+        val shown = rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+        assertFalse("T9 editor must show its reading, not raw key digits: $shown", shown.any { it.isDigit() })
         rule.onNodeWithTag("t9-delete-key").performTouchInput { down(center); up() }
         rule.waitUntil(5000) { engine.getInput().contains("hao") && !engine.getInput().contains("6") }
         rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "ni'hao" }
@@ -304,6 +337,10 @@ class PreeditEditorImeTest {
         selectExpandedCandidate("你")
         rule.waitUntil(5000) { engine.getInput().isNotEmpty() && engine.getCandidates().isNotEmpty() }
         openEditor()
+        // Actually edit the suffix. Merely reopening and assigning the same code is
+        // a caret-only operation and must preserve the original T9 undo history.
+        draft("ha")
+        rule.waitUntil(5000) { engine.getInput() == "ha" }
         draft("hao"); applyDraft()
         assertEquals("前文", text())
         screenshot("t9-edited-partial")
@@ -311,7 +348,12 @@ class PreeditEditorImeTest {
         rule.waitUntil(5000) { engine.getInput().contains("hao") && engine.getInput().endsWith("6") }
         // Delete the new key through the original nine-key control.
         rule.onNodeWithTag("t9-delete-key").performTouchInput { down(center); up() }
-        rule.waitUntil(5000) { engine.getInput().contains("hao") && !engine.getInput().endsWith("6") }
+        try {
+            rule.waitUntil(5000) { engine.getInput().contains("hao") && !engine.getInput().endsWith("6") }
+        } catch (failure: Throwable) {
+            screenshot("t9-partial-delete-failed")
+            throw AssertionError("input=${engine.getInput()} remaining=${engine.t9GetRemainingDigits()} panel=${engine.t9GetLeftPanelState()} candidates=${engine.getCandidates().take(8)}", failure)
+        }
         selectExpandedCandidate("好")
         rule.waitUntil(5000) { text() == "前文你好" }
         assertEquals("", engine.getInput())

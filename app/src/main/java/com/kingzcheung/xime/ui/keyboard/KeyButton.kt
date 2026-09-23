@@ -220,7 +220,7 @@ fun KeyButton(
             LocalKeyboardInputPreferences.current.keyTextScale)
         Text(
             text = text,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().offset(y = if (!swipeText.isNullOrEmpty()) 2.dp else 0.dp),
             color = textColor,
             fontSize = labelSize.sp,
             lineHeight = (labelSize * 1.2f).sp,
@@ -230,7 +230,7 @@ fun KeyButton(
             fontFamily = keyFontFamily
         )
         
-        if (!swipeText.isNullOrEmpty()) {
+        if (!swipeText.isNullOrEmpty() && swipeText != badgeText) {
             val displayText = if (swipeText.length <= 4) swipeText else swipeText.take(4)
             Text(
                 text = displayText,
@@ -240,7 +240,7 @@ fun KeyButton(
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.offset(y = -hintOffset),
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 5.dp),
                 fontFamily = keyLabelFontFamily
             )
         }
@@ -456,7 +456,7 @@ fun SwipeableKeyButton(
             } else {
                 Text(
                     text = text,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty()) 2.dp else 0.dp),
                     color = textColor,
                     fontSize = labelSize.sp,
                     lineHeight = (labelSize * 1.2f).sp,
@@ -480,7 +480,7 @@ fun SwipeableKeyButton(
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
-                    modifier = Modifier.offset(y = -hintOffset),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 5.dp),
                     fontFamily = keyLabelFontFamily
                 )
             }
@@ -685,6 +685,18 @@ fun SwipeableIconKeyButton(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
 ) {
+    // Gesture coroutines survive recomposition; route to the current editor/input callbacks.
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnRelease by rememberUpdatedState(onRelease)
+    val currentOnPress by rememberUpdatedState(onPress)
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+    val currentOnSwipe by rememberUpdatedState(onSwipe)
+    val currentOnSwipeUp by rememberUpdatedState(onSwipeUp)
+    val currentOnSwipeDown by rememberUpdatedState(onSwipeDown)
+    val currentOnSwipeLeft by rememberUpdatedState(onSwipeLeft)
+    val currentOnSwipeStateChange by rememberUpdatedState(onSwipeStateChange)
+    val currentSwipeUpLabel by rememberUpdatedState(swipeUpLabel)
+    val currentSwipeDownLabel by rememberUpdatedState(swipeDownLabel)
     var isPressed by remember { mutableStateOf(false) }
     var dragOffsetY by remember { mutableStateOf(0f) }
     var dragOffsetX by remember { mutableStateOf(0f) }
@@ -701,8 +713,6 @@ fun SwipeableIconKeyButton(
     var hasTriggeredLongPress by remember { mutableStateOf(false) }
     var buttonBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
     var dragActivated by remember { mutableStateOf(false) }
-    val currentOnClick by rememberUpdatedState(onClick)
-    val currentOnRelease by rememberUpdatedState(onRelease)
     val keyLabelFontFamily = AppFonts.keyLabelFontFamily
     
     val density = LocalDensity.current
@@ -721,10 +731,10 @@ fun SwipeableIconKeyButton(
     val horizontalClickCancelThreshold = with(density) { 60.dp.toPx() }
     
     LaunchedEffect(isLongPress) {
-        if (isLongPress && onLongClick != null) {
+        if (isLongPress && currentOnLongClick != null) {
             hasTriggeredLongPress = true
             while (isLongPress) {
-                onLongClick()
+                currentOnLongClick?.invoke()
                 // 长按重复间隔 30ms：80ms 时退格删除以 12.5Hz 离散更新
                 // 候选栏，低于视觉融合阈值，看起来像"一闪一闪"；30ms 时更新更密集更顺滑。
                 delay(30)
@@ -767,7 +777,7 @@ fun SwipeableIconKeyButton(
                 detectTapGestures(
                     onPress = {
                         isPressed = true
-                        onPress?.invoke()
+                        currentOnPress?.invoke()
                         val released = tryAwaitRelease()
                         if (released || !dragActivated) {
                             isPressed = false
@@ -782,7 +792,7 @@ fun SwipeableIconKeyButton(
                     },
                     onTap = {
                         if (!dragActivated && !isDragging && !hasTriggeredLongPress) {
-                            onClick()
+                            currentOnClick()
                         }
                         hasTriggeredLongPress = false
                     },
@@ -807,20 +817,20 @@ fun SwipeableIconKeyButton(
                         isDangerZone = false
                         hasReachedClearThreshold = false
                         hasReachedUndoThreshold = false
-                        onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
-                        onPress?.invoke()
+                        currentOnSwipeStateChange?.invoke(SwipeState(), buttonBounds)
+                        currentOnPress?.invoke()
                     },
                     onDragEnd = {
-                        if (hasReachedClearThreshold && onSwipeUp != null) {
-                            onSwipeUp()
-                        } else if (hasReachedUndoThreshold && onSwipeDown != null) {
-                            onSwipeDown()
-                        } else if (isSwipingUp && !hasTriggeredSwipe && onSwipe != null) {
+                        if (hasReachedClearThreshold && currentOnSwipeUp != null) {
+                            currentOnSwipeUp?.invoke()
+                        } else if (hasReachedUndoThreshold && currentOnSwipeDown != null) {
+                            currentOnSwipeDown?.invoke()
+                        } else if (isSwipingUp && !hasTriggeredSwipe && currentOnSwipe != null) {
                             hasTriggeredSwipe = true
-                            onSwipe()
-                        } else if (dragOffsetY < swipeUpThreshold && !hasTriggeredSwipe && onSwipe != null) {
+                            currentOnSwipe?.invoke()
+                        } else if (dragOffsetY < swipeUpThreshold && !hasTriggeredSwipe && currentOnSwipe != null) {
                             hasTriggeredSwipe = true
-                            onSwipe()
+                            currentOnSwipe?.invoke()
                         } else if (!hasTriggeredLongPress && !hasTriggeredSwipeLeft) {
                             currentOnClick()
                         }
@@ -841,7 +851,7 @@ fun SwipeableIconKeyButton(
                         isLongPress = false
                         // 手势结束（含位移场景 tap 取消）必须重置，否则残留 true 会吞掉后续点击
                         hasTriggeredLongPress = false
-                        onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
+                        currentOnSwipeStateChange?.invoke(SwipeState(), buttonBounds)
                     },
                     onDragCancel = {
                         dragActivated = false
@@ -860,7 +870,7 @@ fun SwipeableIconKeyButton(
                         hasReachedUndoThreshold = false
                         isLongPress = false
                         hasTriggeredLongPress = false
-                        onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
+                        currentOnSwipeStateChange?.invoke(SwipeState(), buttonBounds)
                     },
                     onDrag = { change, dragAmount ->
                         dragOffsetY += dragAmount.y
@@ -872,18 +882,18 @@ fun SwipeableIconKeyButton(
                             isLongPress = false
                         }
                         
-                        if (dragOffsetX < swipeLeftThreshold && !hasTriggeredSwipeLeft && onSwipeLeft != null) {
+                        if (dragOffsetX < swipeLeftThreshold && !hasTriggeredSwipeLeft && currentOnSwipeLeft != null) {
                             hasTriggeredSwipeLeft = true
-                            onSwipeLeft()
+                            currentOnSwipeLeft?.invoke()
                         }
                         
                         if (dragOffsetY < 0 && dragOffsetX >= swipeLeftThreshold) {
-                            val showUp = dragOffsetY < bubbleShowThresholdUp && swipeUpLabel != null
+                            val showUp = dragOffsetY < bubbleShowThresholdUp && currentSwipeUpLabel != null
                             if (showUp != isSwipingUp) {
                                 isSwipingUp = showUp
                                 isSwipingDown = false
-                                onSwipeStateChange?.invoke(
-                                    SwipeState(isSwiping = showUp, swipeText = swipeUpLabel, isSwipeDown = false),
+                                currentOnSwipeStateChange?.invoke(
+                                    SwipeState(isSwiping = showUp, swipeText = currentSwipeUpLabel, isSwipeDown = false),
                                     buttonBounds
                                 )
                             }
@@ -891,8 +901,8 @@ fun SwipeableIconKeyButton(
                             val inDanger = dragOffsetY < clearActionThreshold
                             if (inDanger != isDangerZone) {
                                 isDangerZone = inDanger
-                                onSwipeStateChange?.invoke(
-                                    SwipeState(isSwiping = true, swipeText = swipeUpLabel, isSwipeDown = false, isDanger = inDanger),
+                                currentOnSwipeStateChange?.invoke(
+                                    SwipeState(isSwiping = true, swipeText = currentSwipeUpLabel, isSwipeDown = false, isDanger = inDanger),
                                     buttonBounds
                                 )
                             }
@@ -901,12 +911,12 @@ fun SwipeableIconKeyButton(
                         }
                         
                         if (dragOffsetY > 0 && dragOffsetX >= swipeLeftThreshold) {
-                            val showDown = dragOffsetY > bubbleShowThresholdDown && swipeDownLabel != null
+                            val showDown = dragOffsetY > bubbleShowThresholdDown && currentSwipeDownLabel != null
                             if (showDown != isSwipingDown) {
                                 isSwipingDown = showDown
                                 isSwipingUp = false
-                                onSwipeStateChange?.invoke(
-                                    SwipeState(isSwiping = showDown, swipeText = swipeDownLabel, isSwipeDown = true),
+                                currentOnSwipeStateChange?.invoke(
+                                    SwipeState(isSwiping = showDown, swipeText = currentSwipeDownLabel, isSwipeDown = true),
                                     buttonBounds
                                 )
                             }
@@ -914,8 +924,8 @@ fun SwipeableIconKeyButton(
                             val inDanger = dragOffsetY > undoActionThreshold
                             if (inDanger != isDangerZone) {
                                 isDangerZone = inDanger
-                                onSwipeStateChange?.invoke(
-                                    SwipeState(isSwiping = true, swipeText = swipeDownLabel, isSwipeDown = true, isDanger = inDanger),
+                                currentOnSwipeStateChange?.invoke(
+                                    SwipeState(isSwiping = true, swipeText = currentSwipeDownLabel, isSwipeDown = true, isDanger = inDanger),
                                     buttonBounds
                                 )
                             }

@@ -111,6 +111,7 @@ data class CandidateBarVisuals(
     val accentColor: Color = Color(0xFF1A73E8),
     val selectedTextColor: Color = Color(0xFF1A73E8),
     val isDarkTheme: Boolean = false,
+    val preeditBackgroundColor: Color = Color.Unspecified,
 )
 
 data class CandidateBarCallbacks(
@@ -319,7 +320,7 @@ fun CandidateBar(
     // Keep this animation outside the conditional button branches so changing pages
     // does not discard the previous angle and jump directly to the destination.
     val expansionRotation by animateFloatAsState(
-        targetValue = if (candidatePageExpanded) 180f else 0f,
+        targetValue = if (candidatePageExpanded) -180f else 0f,
         animationSpec = tween(200, easing = FastOutSlowInEasing), label = "candidateExpansion",
     )
     val preeditText = (state as? CandidateBarState.ChineseCandidates)?.let {
@@ -740,20 +741,20 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
             }
         }
     }
-    val background = if (visuals.textColor.luminance() > 0.5f) Color(0xFF292D35) else Color(0xFFF3F5F9)
+    val background = if (visuals.preeditBackgroundColor != Color.Unspecified) visuals.preeditBackgroundColor
+        else if (visuals.textColor.luminance() > 0.5f) Color(0xFF2D2F31) else Color(0xFFFAFAFA)
     Popup(popupPositionProvider = positionProvider,
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
             dismissOnClickOutside = false, clippingEnabled = true)) {
         Box(Modifier.widthIn(max = screenWidth - 16.dp)
-            .height(28.dp)
             .clip(RoundedCornerShape(4.dp))
-            .background(background)
+            .background(background.copy(alpha = 0.62f))
             .testTag("candidate-preedit")
             .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
                 onClickLabel = "编辑拼音", onClick = onEdit) else Modifier)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
             contentAlignment = Alignment.CenterStart) {
-            Text(text, color = visuals.textColor, fontSize = 16.sp, maxLines = 1,
+            Text(text, color = visuals.textColor.copy(alpha = 0.9f), fontSize = 12.sp, maxLines = 1,
                 softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
         }
     }

@@ -107,7 +107,7 @@ class PredictionManager(
             return
         }
 
-        if (contextText.isEmpty()) {
+        if (!canPredictAfter(contextText)) {
             onPredictionResult(emptyList())
             return
         }

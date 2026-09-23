@@ -157,6 +157,7 @@ private fun NumberRows(
     compactMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
 ) {
+    val modeWeight = LocalModeSlotWeight.current
     val symFontSize = if (compactMode) 14.sp else 18.sp
     val keyFontSize = if (compactMode) 16.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val ctrlFontSize = if (compactMode) 12.sp else androidx.compose.ui.unit.TextUnit.Unspecified
@@ -185,7 +186,7 @@ private fun NumberRows(
                     modifier = Modifier
 //                        .padding(vertical = 2.dp)
                         .fillMaxHeight()
-                        .weight(0.8f),
+                        .weight(modeWeight),
                     verticalArrangement = Arrangement.Top
                 ) {
                     Column(
@@ -230,7 +231,7 @@ private fun NumberRows(
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .weight(3.4f),
+                        .weight(4.2f - modeWeight),
                 ) {
                     Row(
                         modifier = Modifier
@@ -312,7 +313,7 @@ private fun NumberRows(
                         KeyboardModeKey(
                             slot = 2, page = KeyboardInputPage.NUMBERS, onKeyPress = onKeyPress,
                             backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
-                            modifier = Modifier.weight(0.8f), onKeyPressDown = onKeyPressDown,
+                            modifier = Modifier.weight(modeWeight), onKeyPressDown = onKeyPressDown,
                             shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
                         )
@@ -321,7 +322,7 @@ private fun NumberRows(
                             onClick = { onKeyPress("0") },
                             backgroundColor = keyBackgroundColor,
                             textColor = keyTextColor,
-                            modifier = Modifier.weight(1.8f),
+                            modifier = Modifier.weight(3.4f - 2 * modeWeight),
                             onPress = { onKeyPressDown?.invoke("0") },
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,

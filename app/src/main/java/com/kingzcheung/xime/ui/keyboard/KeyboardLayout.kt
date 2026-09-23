@@ -54,6 +54,8 @@ import com.kingzcheung.xime.keyboard.GestureAction
 
 /** 半角 → 全角标点映射，中文模式下键帽显示用。提交仍走半角由 Rime 处理。 */
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -528,7 +530,7 @@ fun KeyboardLayout(
                                 iconColor = specialKeyTextColor,
                                 modifier = Modifier
                                     .weight(1.4f)
-                                    .fillMaxHeight(),
+                                    .fillMaxHeight().semantics { contentDescription = "删除" },
                                 swipeText = "清空",
                                 onSwipe = { onKeyPress("clear_composition") },
                                 onLongClick = { onKeyPress("delete") },
@@ -561,11 +563,11 @@ fun KeyboardLayout(
                         if (isVoiceMode && !isVoiceSticky) {
                             DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(2.24f)
+                                modifier = Modifier.weight(1.4f)
                             )
                             DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(0.8f)
+                                modifier = Modifier.weight(0.6f)
                             )
                         } else {
                             for (slot in 1..2) {
@@ -573,7 +575,7 @@ fun KeyboardLayout(
                                     slot = slot, onKeyPress = onKeyPress,
                                     backgroundColor = specialKeyBackgroundColor,
                                     textColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(1.12f),
+                                    modifier = Modifier.weight(0.7f),
                                     onKeyPressDown = onKeyPressDown,
                                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                                     shadowShapeRadius = shadowShapeRadius,
@@ -649,7 +651,7 @@ fun KeyboardLayout(
                                     onClick = k2OnClick,
                                     backgroundColor = specialKeyBackgroundColor,
                                     iconColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(0.8f),
+                                    modifier = Modifier.weight(0.6f),
                                     onPress = { onKeyPressDown?.invoke(k2TapValue) },
                                     onRelease = { onKeyRelease?.invoke(k2TapValue) },
                                     swipeText = k2SwipeUpLabel,
@@ -669,7 +671,7 @@ fun KeyboardLayout(
                                     onClick = k2OnClick,
                                     backgroundColor = keyBackgroundColor,
                                     textColor = keyTextColor,
-                                    modifier = Modifier.weight(0.8f),
+                                    modifier = Modifier.weight(0.6f),
                                     swipeText = k2SwipeUpLabel,
                                     swipeDownText = k2SwipeDownBubbleText,
                                     swipeDownKeyLabel = if ((k2SwipeDownDisplay == DisplayMode.KEY || k2SwipeDownDisplay == DisplayMode.BOTH)) k2SwipeDownLabel else null,
@@ -700,7 +702,7 @@ fun KeyboardLayout(
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
-                            modifier = Modifier.weight(1.96f),
+                            modifier = Modifier.weight(3f),
                             onKeyPress = onKeyPress,
                             onKeyPressDown = onKeyPressDown,
                             onKeyRelease = onKeyRelease,
@@ -1513,7 +1515,7 @@ private fun SplitKeyboardContent(
                     iconColor = specialKeyTextColor,
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight(),
+                        .fillMaxHeight().semantics { contentDescription = "删除" },
                     onLongClick = { onKeyPress("delete") },
                     onPress = { onKeyPressDown?.invoke("delete") },
                     onRelease = { onKeyRelease?.invoke("delete") },

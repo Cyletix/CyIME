@@ -58,8 +58,16 @@ internal fun rememberImeKeyboardCallbacks(
             onOpenPreeditEditor = preeditEditor::open,
             onLivePreeditEdit = preeditEditor::edit,
             onKeyPress = { key, isShifted ->
-                if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke(key) != true)
-                    service.keyRouter.handleKeyPress(key, isShifted)
+                if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke(key) != true) {
+                    val numberPanel = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number
+                    val separator = key == "'" && service.candidateState.value.isComposing && !service.uiState.value.isAsciiMode
+                    if (!numberPanel && !separator && isLiteralPunctuation(key)) {
+                        val text = if (service.isChineseMode && !service.rimeEngine.getOption("ascii_punct"))
+                            when (key) { "," -> "，"; "." -> "。"; "?" -> "？"; "!" -> "！"; ";" -> "；"; ":" -> "："; else -> key }
+                            else key
+                        service.textCommit.commitLiteralText(text)
+                    } else service.keyRouter.handleKeyPress(key, isShifted)
+                }
             },
             onJapaneseKanaAction = { action -> service.schemaController.handleJapaneseKanaAction(action) },
             onKeyPressDown = { key ->
@@ -260,10 +268,18 @@ internal fun rememberImeKeyboardCallbacks(
                 service.keyRouter.deleteCandidateGlobal(globalIndex)
             },
             onRequestExpandedCandidates = { service.refreshExpandedCandidates() },
-            onCursorMove = { direction -> service.schemaController.moveEditorCursor(direction) {
-                service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
-            } },
-            onCursorMoveVertical = { steps -> service.schemaController.moveEditorCursorVertical(steps) },
+            onCursorMove = { direction ->
+                if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke("preedit_cursor:$direction") == true) {
+                    service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
+                } else service.schemaController.moveEditorCursor(direction) {
+                    service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
+                }
+            },
+            onCursorMoveVertical = { steps ->
+                val edge = if (steps < 0) "start" else "end"
+                if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke("preedit_cursor:$edge") != true)
+                    service.schemaController.moveEditorCursorVertical(steps)
+            },
             onGestureAction = { action, value ->
                 action.execute(service, value)
             },

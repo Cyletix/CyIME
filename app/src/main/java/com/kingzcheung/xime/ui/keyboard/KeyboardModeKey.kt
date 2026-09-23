@@ -14,6 +14,7 @@ import com.kingzcheung.xime.keyboard.KeyboardInputPage
 import com.kingzcheung.xime.keyboard.modeSlotTarget
 
 val LocalModeKeyPadding = staticCompositionLocalOf { PaddingValues(4.dp) }
+val LocalModeSlotWeight = staticCompositionLocalOf { 0.8f }
 val LocalTextModeLabel = staticCompositionLocalOf { "中文" }
 
 /** A mode key is deliberately a text key, never a language/globe key. */

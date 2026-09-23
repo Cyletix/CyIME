@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -69,7 +70,7 @@ fun SpaceKeyButton(
         } else Modifier
     }
     BoxWithConstraints(
-        modifier.fillMaxSize()
+        modifier.fillMaxSize().testTag("space-key")
             .pointerInput(settings.spaceHold, settings.cursorStepDp) {
                 val step = settings.cursorStepDp.dp.toPx()
                 awaitEachGesture {
