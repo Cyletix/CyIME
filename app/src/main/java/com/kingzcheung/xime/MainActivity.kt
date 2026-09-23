@@ -118,6 +118,8 @@ class MainActivity : ComponentActivity() {
         val openFragment = intent?.getStringExtra("open_fragment")
         val openPluginId = intent?.getStringExtra("open_plugin_id")
 
+        com.kingzcheung.xime.model.DefaultModelInstaller.start(applicationContext)
+
         setContent {
             val context = this
             val setupCompleted = SettingsPreferences.isSetupCompleted(context)

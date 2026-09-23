@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -128,6 +129,11 @@ fun CommonSymbolKeyboardLayout(
             }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
+        Column(Modifier.fillMaxSize()) {
+        LocalKeyboardInputPreferences.current.symbols()?.let { symbols ->
+            FixedSymbolStrip(symbols, LocalKeyboardInputActions.current.onCommitText ?: onKeyPress)
+        }
+        Box(Modifier.weight(1f)) {
         if (isLandscape) {
             CommonSymbolLandscapeContent(
                 onKeyPress = onKeyPress,
@@ -282,17 +288,17 @@ fun CommonSymbolKeyboardLayout(
                                 .fillMaxWidth()
                                 .weight(1f),
                         ) {
-                            KeyButton(
-                                text = "返回",
+                            IconKeyButton(
+                                icon = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft),
+                                contentDescription = "返回键盘",
                                 onClick = { onKeyPress("abc") },
                                 backgroundColor = specialKeyBackgroundColor,
-                                textColor = specialKeyTextColor,
+                                iconColor = specialKeyTextColor,
                                 modifier = Modifier.weight(1.2f),
                                 onPress = { onKeyPressDown?.invoke("abc") },
                                 shadowEnabled = shadowEnabled,
                                 shadowElevation = shadowElevation,
                                 shadowShapeRadius = shadowShapeRadius,
-                                fontSize = 14.sp,
                             )
                             KeyButton(
                                 text = "123",
@@ -306,11 +312,11 @@ fun CommonSymbolKeyboardLayout(
                                 shadowShapeRadius = shadowShapeRadius,
                                 fontSize = 14.sp,
                             )
-                            KeyButton(
-                                text = "空格",
+                            SpaceKeyButton(
+                                schemaName = "空格",
                                 onClick = { onKeyPress("space") },
-                                backgroundColor = keyBackgroundColor,
-                                textColor = keyTextColor,
+                                backgroundColor = specialKeyBackgroundColor,
+                                textColor = specialKeyTextColor,
                                 modifier = Modifier.weight(2.5f),
                                 onPress = { onKeyPressDown?.invoke("space") },
                                 shadowEnabled = shadowEnabled,
@@ -318,7 +324,7 @@ fun CommonSymbolKeyboardLayout(
                                 shadowShapeRadius = shadowShapeRadius,
                                 fontSize = 14.sp,
                             )
-                            KeyButton(
+                            LanguageKeyButton(
                                 text = if (localAsciiMode) "中" else "En",
                                 onClick = {
                                     FileLogger.i("XimeKeyboard", "panel En key tapped: localAsciiMode=$localAsciiMode -> ${!localAsciiMode}, uiAscii=$isAsciiMode")
@@ -333,8 +339,8 @@ fun CommonSymbolKeyboardLayout(
                                 shadowShapeRadius = shadowShapeRadius,
                                 fontSize = 12.sp,
                             )
-                            KeyButton(
-                                text = "确定",
+                            ActionKeyButton(
+                                text = "回车",
                                 onClick = { onKeyPress("enter") },
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
@@ -350,6 +356,8 @@ fun CommonSymbolKeyboardLayout(
                 }
             }
         }
+    }
+    }
     }
     }
     }
@@ -463,17 +471,17 @@ internal fun CommonSymbolLandscapeContent(
                 Row(modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)) {
-                    KeyButton(
-                        text = "返回",
+                    IconKeyButton(
+                        icon = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft),
+                        contentDescription = "返回键盘",
                         onClick = { onKeyPress("abc") },
                         backgroundColor = specialKeyBackgroundColor,
-                        textColor = specialKeyTextColor,
+                        iconColor = specialKeyTextColor,
                         modifier = Modifier.weight(1.2f),
                         onPress = { onKeyPressDown?.invoke("abc") },
                         shadowEnabled = shadowEnabled,
                         shadowElevation = shadowElevation,
                         shadowShapeRadius = shadowShapeRadius,
-                        fontSize = 12.sp,
                     )
                     KeyButton(
                         text = "123",
@@ -487,11 +495,11 @@ internal fun CommonSymbolLandscapeContent(
                         shadowShapeRadius = shadowShapeRadius,
                         fontSize = 12.sp,
                     )
-                    KeyButton(
-                        text = "空格",
+                    SpaceKeyButton(
+                        schemaName = "空格",
                         onClick = { onKeyPress("space") },
-                        backgroundColor = keyBackgroundColor,
-                        textColor = keyTextColor,
+                        backgroundColor = specialKeyBackgroundColor,
+                        textColor = specialKeyTextColor,
                         modifier = Modifier.weight(1.25f),
                         onPress = { onKeyPressDown?.invoke("space") },
                         shadowEnabled = shadowEnabled,
@@ -605,11 +613,11 @@ internal fun CommonSymbolLandscapeContent(
                 Row(modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)) {
-                    KeyButton(
-                        text = "空格",
+                    SpaceKeyButton(
+                        schemaName = "空格",
                         onClick = { onKeyPress("space") },
-                        backgroundColor = keyBackgroundColor,
-                        textColor = keyTextColor,
+                        backgroundColor = specialKeyBackgroundColor,
+                        textColor = specialKeyTextColor,
                         modifier = Modifier.weight(1.25f),
                         onPress = { onKeyPressDown?.invoke("space") },
                         shadowEnabled = shadowEnabled,
@@ -617,7 +625,7 @@ internal fun CommonSymbolLandscapeContent(
                         shadowShapeRadius = shadowShapeRadius,
                         fontSize = 12.sp,
                     )
-                    KeyButton(
+                    LanguageKeyButton(
                         text = if (isAsciiMode) "中" else "En",
                         onClick = { onToggleAsciiMode?.invoke() },
                         backgroundColor = specialKeyBackgroundColor,
@@ -628,8 +636,8 @@ internal fun CommonSymbolLandscapeContent(
                         shadowShapeRadius = shadowShapeRadius,
                         fontSize = 12.sp,
                     )
-                    KeyButton(
-                        text = "确定",
+                    ActionKeyButton(
+                        text = "回车",
                         onClick = { onKeyPress("enter") },
                         backgroundColor = specialKeyBackgroundColor,
                         textColor = specialKeyTextColor,

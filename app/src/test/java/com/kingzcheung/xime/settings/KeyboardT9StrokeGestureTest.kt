@@ -169,8 +169,8 @@ class KeyboardT9StrokeGestureTest {
             val swipe = keys[id]?.swipeUp ?: error("t9.keys 缺少 $id 的上滑绑定")
             assertEquals(GestureAction.COMMIT, swipe.action)
             assertEquals(id, swipe.value)
-            // 内置默认对象格式不写 display → KEY：仅键面提示，无滑动气泡
-            assertEquals("t9.keys $id 上滑 display", DisplayMode.KEY, swipe.display)
+            // 默认数字键同时显示键面提示和上滑预览。
+            assertEquals("t9.keys $id 上滑 display", DisplayMode.BOTH, swipe.display)
         }
     }
 

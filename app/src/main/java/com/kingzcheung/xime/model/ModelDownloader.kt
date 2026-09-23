@@ -15,6 +15,10 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 object ModelDownloader {
 
@@ -33,7 +37,8 @@ object ModelDownloader {
         context: Context,
         modelInfo: ModelInfo,
         onProgress: (ModelDownloadState) -> Unit,
-        version: ModelVersion? = null
+        version: ModelVersion? = null,
+        install: (File, File) -> Boolean = { staging, destination -> installDownloadedModel(staging, destination); true },
     ) = withContext(Dispatchers.IO) {
         FileLogger.i(TAG, "Starting download: ${modelInfo.id}")
 
@@ -44,19 +49,29 @@ object ModelDownloader {
         }
 
         val storageDir = getStorageDir(context, modelInfo)
-        storageDir.mkdirs()
+        val staging = File(context.cacheDir, "model-download-${UUID.randomUUID()}").apply { mkdirs() }
 
         try {
             if (target.archiveUrl != null) {
-                downloadAndExtractArchive(context, target.archiveUrl, storageDir, onProgress)
+                downloadAndExtractArchive(context, target.archiveUrl, staging, onProgress, target.sha256)
             } else {
-                downloadFiles(target.files, storageDir, onProgress)
+                downloadFiles(target.files, staging, onProgress)
+            }
+            validateDownloadedModel(staging, target)
+            currentCoroutineContext().ensureActive()
+            if (!install(staging, storageDir)) {
+                onProgress(ModelDownloadState.Idle)
+                return@withContext
             }
             FileLogger.i(TAG, "Download complete: ${modelInfo.id}")
             onProgress(ModelDownloadState.Complete)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             FileLogger.e(TAG, "Download failed: ${modelInfo.id}: ${e.message}", e)
             onProgress(ModelDownloadState.Error("下载失败: ${e.message}"))
+        } finally {
+            staging.deleteRecursively()
         }
     }
 
@@ -74,7 +89,7 @@ object ModelDownloader {
 
         files.forEachIndexed { index, file ->
             FileLogger.i(TAG, "Downloading ${file.name} (${index + 1}/$totalFiles)")
-            downloadSingleFile(file.downloadUrl, File(targetDir, file.name)) { fileProgress ->
+            downloadSingleFile(file.downloadUrl, modelDownloadFile(targetDir, file.name)) { fileProgress ->
                 val overall = (index.toFloat() + fileProgress) / totalFiles
                 onProgress(ModelDownloadState.Downloading(overall, 0, -1))
             }
@@ -166,7 +181,8 @@ object ModelDownloader {
         context: Context,
         archiveUrl: String,
         targetDir: File,
-        onProgress: (ModelDownloadState) -> Unit
+        onProgress: (ModelDownloadState) -> Unit,
+        sha256: String = "",
     ) {
         val tmpFile = File(context.cacheDir, "${archiveUrl.hashCode()}.tar.bz2")
 
@@ -178,9 +194,13 @@ object ModelDownloader {
                 }
 
                 downloadArchive(archiveUrl, tmpFile, onProgress)
+                verifyModelDigest(tmpFile, sha256)
                 extractTarBz2(tmpFile, targetDir)
                 tmpFile.delete()
                 return
+            } catch (e: CancellationException) {
+                tmpFile.delete()
+                throw e
             } catch (e: Exception) {
                 FileLogger.e(TAG, "Attempt $attempt/$MAX_RETRIES failed: ${e.message}")
                 tmpFile.delete()
@@ -206,7 +226,8 @@ object ModelDownloader {
                             val entryName = if (parts.size > 1) parts[1] else rawName
 
                             if (entryName.isNotEmpty() && !entry.isDirectory) {
-                                val outputFile = File(targetDir, entryName)
+                                if (!entry.isFile) throw IOException("不支持的模型归档条目")
+                                val outputFile = modelDownloadFile(targetDir, entryName)
                                 outputFile.parentFile?.mkdirs()
                                 FileOutputStream(outputFile).use { out ->
                                     val buffer = ByteArray(8192)

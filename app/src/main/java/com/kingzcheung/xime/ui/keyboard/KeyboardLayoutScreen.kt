@@ -104,7 +104,26 @@ fun KeyboardLayoutScreen(
         key(uiState.swipeCancelEpoch) {
             when (keyboardState) {
             is KeyboardLayoutState.Chinese -> {
-                if (isHandwritingLookup) {
+                if (!uiState.isAsciiMode && KeysConfigHelper.codeLayoutForSchema(uiState.currentSchemaId) == "japanese_kana") {
+                    JapaneseKanaKeyboardLayout(
+                        hasKanaInput = candidateState.value.inputText.isNotEmpty(),
+                        onKanaAction = { callbacks.onJapaneseKanaAction?.invoke(it) },
+                        onKeyPress = onKeyPress,
+                        keyBackgroundColor = keyBgColor,
+                        keyTextColor = keyTextColor,
+                        specialKeyBackgroundColor = specialKeyBgColor,
+                        specialKeyTextColor = specialKeyTextColor,
+                        keyboardBackgroundColor = keyboardBgColor,
+                        onKeyPressDown = callbacks.onKeyPressDown,
+                        shadowEnabled = kbShadow.enabled,
+                        shadowElevation = kbShadow.elevation.dp,
+                        shadowShapeRadius = kbShadow.shapeRadius.dp,
+                        keyCornerRadius = kbKey.cornerRadius.dp,
+                        keySpacingX = kbKey.spacingFor("japanese_kana").first?.dp,
+                        keySpacingY = kbKey.spacingFor("japanese_kana").second?.dp,
+                        modifier = modifier,
+                    )
+                } else if (isHandwritingLookup) {
                     HandwritingLookupKeyboard(
                         keyTextColor = keyTextColor,
                         specialKeyBgColor = specialKeyBgColor,

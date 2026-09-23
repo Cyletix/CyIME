@@ -2,18 +2,29 @@ package com.kingzcheung.xime.ui.keyboard
 
 import com.kingzcheung.xime.service.PredictionManager
 import android.annotation.SuppressLint
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,13 +33,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -42,6 +57,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -51,6 +68,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.StrokeCap
@@ -63,8 +81,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -72,12 +92,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
+import com.kingzcheung.xime.keyboard.MainType
 import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.PanelType
 import com.kingzcheung.xime.keyboard.ToolbarAction
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.speech.RecognitionState
+import kotlinx.coroutines.flow.collectLatest
 
 @Immutable
 data class CandidateBarVisuals(
@@ -98,10 +120,32 @@ data class CandidateBarCallbacks(
     val onClearAssociation: (() -> Unit)? = null,
     val onInputTextClick: (() -> Unit)? = null,
     val onAssociationSelect: ((Int) -> Unit)? = null,
+    val onDismissClipboardPreview: (() -> Unit)? = null,
+    val onOpenClipboard: (() -> Unit)? = null,
+    val onCancelInput: (() -> Unit)? = null,
+    val onReorderToolbar: ((List<String>) -> Unit)? = null,
     // 长按候选：抛事件给宿主（键盘视图内弹确认覆盖层，不弹独立窗口——
     // 焦点型弹窗会抢焦点导致 IME 被系统收起）。
     val onCandidateLongPress: ((Int) -> Unit)? = null
 )
+
+/** 空间充足时均匀排布，项目溢出时保留完整触控尺寸并允许滚动。 */
+@Composable
+internal fun ToolbarItemsRow(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    BoxWithConstraints(modifier) {
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .widthIn(min = maxWidth),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            content = content,
+        )
+    }
+}
 
 @Composable
 fun CandidateBar(
@@ -273,92 +317,40 @@ fun CandidateBar(
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center
     ) {
-        if (isVoiceSticky) {
-            // 常驻语音模式：候选栏显示语音引擎名 + 频谱
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (voicePluginName.isNotEmpty()) {
-                    Text(
-                        text = voicePluginName,
-                        color = visuals.textColor.copy(alpha = 0.7f),
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        textAlign = TextAlign.Center
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    AudioSpectrumAnimation(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp, vertical = 2.dp),
-                        isActive = voiceRecognitionState == RecognitionState.LISTENING ||
-                            voiceRecognitionState == RecognitionState.PROCESSING,
-                        amplitude = voiceAmplitude,
-                        spectrum = voiceSpectrum,
-                        barWidthFactor = 4f,
-                        barCount = 16,
-                        spacingRatio = 1.6f,
-                        heightScale = 0.6f
-                    )
-                }
-            }
-            return@Column
-        }
-
         val displayText = (state as? CandidateBarState.ChineseCandidates)?.preeditText
             ?: (state as? CandidateBarState.ChineseCandidates)?.inputText ?: ""
         // 编码显示已改为候选栏顶部的悬浮气泡（drawBehind 绘制，见 drawPreeditBubble），
         // 栏内不再为编码保留布局空间——打字态与联想态的候选行共用同一垂直位置。
         preeditBubbleText = displayText
 
+        if (state is CandidateBarState.ClipboardDisplay) {
+            ClipboardPreviewBar(state.candidates, visuals, callbacks)
+            return@Column
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (state !is CandidateBarState.Idle && callbacks.onCancelInput != null) {
+                KeyboardBackButton(callbacks.onCancelInput, iconButtonContainer, visuals.textColor, label = "取消输入")
+                Spacer(Modifier.width(4.dp))
+            }
             if (showLeftIcon) {
                 when (state) {
                     is CandidateBarState.Idle -> {
-                        if (page is KeyboardPage.Overlay && page.route is OverlayRoute.SchemaList && callbacks.onBack != null) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(iconButtonContainer)
-                                    .clickable { callbacks.onBack() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                    contentDescription = "返回菜单",
-                                    tint = visuals.accentColor,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                        val panelHasToolbarBack = page is KeyboardPage.Overlay &&
+                            (page.route is OverlayRoute.Menu || page.route is OverlayRoute.SchemaList || page.route is OverlayRoute.Edit ||
+                                page.route is OverlayRoute.Emoji || page.route is OverlayRoute.Clipboard)
+                        if ((page is KeyboardPage.Main && page.type == MainType.HANDWRITING || panelHasToolbarBack) && callbacks.onBack != null) {
+                            KeyboardBackButton(callbacks.onBack, iconButtonContainer, visuals.textColor,
+                                modifier = Modifier.testTag("toolbar-leading"))
                         } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(iconButtonContainer)
-                                    .clickable { callbacks.onLogoClick?.invoke() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = if (visuals.isDarkTheme) R.drawable.logo_dark else R.drawable.logo),
-                                    contentDescription = "曦码 Logo",
-                                    tint = Color.Unspecified,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            KeyboardToolbarButton({ callbacks.onLogoClick?.invoke() }, iconButtonContainer,
+                                modifier = Modifier.testTag("toolbar-leading")) {
+                                Icon(painterResource(id = if (visuals.isDarkTheme) R.drawable.logo_dark else R.drawable.logo),
+                                    contentDescription = "Xime-CyletixFork Logo", tint = Color.Unspecified, modifier = Modifier.size(20.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(4.dp))
@@ -479,61 +471,18 @@ fun CandidateBar(
                     // 显示内联建议时隐藏工具栏按钮区，把宽度让给建议；logo 与
                     // 收起按钮保留，退格回到 idle 时的状态感知不变
                     if (inlineSuggestions.isEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f, fill = true)
-                                .horizontalScroll(rememberScrollState()),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            if (toolbarActions.isNotEmpty()) {
-                                toolbarActions.forEach { action ->
-                                    val interactionSource = remember { MutableInteractionSource() }
-                                    val isPressed by interactionSource.collectIsPressedAsState()
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(horizontal = 5.dp)
-                                            .size(32.dp)
-                                            .clickable(
-                                                interactionSource = interactionSource,
-                                                indication = null,
-                                                onClick = action.onClick
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        ToolbarButtonIcon(
-                                            item = action.item,
-                                            tint = if (isPressed) iconButtonTint.copy(alpha = 0.6f) else iconButtonTint,
-                                            modifier = Modifier.size(22.dp),
-                                        )
-                                    }
-                                }
-                            }
+                        ReorderableToolbar(toolbarActions, visuals.accentColor, callbacks.onReorderToolbar,
+                            modifier = Modifier.weight(1f)) { action ->
+                            ToolbarActionButton(action, visuals, iconButtonTint, voiceAmplitude, voiceRecognitionState)
                         }
                     }
 
                     if (callbacks.onHideKeyboard != null) {
-                        val hideKeyboardInteractionSource = remember { MutableInteractionSource() }
-                        val isHideKeyboardPressed by hideKeyboardInteractionSource.collectIsPressedAsState()
-
                         Spacer(modifier = Modifier.width(4.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clickable(
-                                    interactionSource = hideKeyboardInteractionSource,
-                                    indication = null,
-                                    onClick = { callbacks.onHideKeyboard() }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "收起键盘",
-                                tint = if (isHideKeyboardPressed) iconButtonTint.copy(alpha = 0.6f) else iconButtonTint,
-                                modifier = Modifier.size(22.dp)
-                            )
+                        KeyboardToolbarButton(callbacks.onHideKeyboard, iconButtonContainer,
+                            modifier = Modifier.testTag("toolbar-hide")) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "收起键盘",
+                                tint = visuals.textColor, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
@@ -556,7 +505,7 @@ fun CandidateBar(
                         }
                     }
                 }
-                displayAssociation.isNotEmpty() && callbacks.onClearAssociation != null -> {
+                displayAssociation.isNotEmpty() && callbacks.onClearAssociation != null && callbacks.onCancelInput == null -> {
                     val clearInteractionSource = remember { MutableInteractionSource() }
                     val isClearPressed by clearInteractionSource.collectIsPressedAsState()
 
@@ -621,6 +570,103 @@ fun CandidateBar(
                             fontSize = 11.sp
                         )
                     }
+                }
+            }
+            if (state !is CandidateBarState.Idle) {
+                toolbarActions.filter { it.active }.forEach { action ->
+                    ToolbarActionButton(action, visuals, iconButtonTint, voiceAmplitude, voiceRecognitionState)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolbarActionButton(
+    action: ToolbarAction, visuals: CandidateBarVisuals, tint: Color,
+    amplitude: Float, voiceState: RecognitionState,
+) {
+    val voiceActive = action.active && action.item.id == "voice"
+    val pulse = if (voiceActive) {
+        val transition = rememberInfiniteTransition(label = "microphone")
+        val value by transition.animateFloat(0.35f, 1f,
+            infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "microphoneGlow")
+        value
+    } else 0f
+    val source = remember { MutableInteractionSource() }
+    val pressAlpha = remember { Animatable(0f) }
+    LaunchedEffect(source) {
+        source.interactions.collectLatest { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> pressAlpha.snapTo(1f)
+                is PressInteraction.Release, is PressInteraction.Cancel -> pressAlpha.animateTo(0f, tween(300))
+                else -> Unit
+            }
+        }
+    }
+    Box(
+        Modifier.padding(horizontal = 2.dp).size(40.dp).clip(CircleShape)
+            .background(if (action.active) visuals.accentColor.copy(alpha = 0.28f)
+                else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha.value)
+                else Color(0xFFE0E0E0).copy(alpha = pressAlpha.value))
+            .drawBehind {
+                if (voiceActive) {
+                    drawCircle(Brush.radialGradient(listOf(visuals.accentColor.copy(alpha = 0.55f), Color.Transparent)),
+                        radius = size.minDimension * (0.36f + 0.14f * maxOf(pulse, amplitude.coerceIn(0f, 1f))))
+                }
+            }
+            .semantics {
+                selected = action.active
+                if (voiceActive) stateDescription = if (voiceState == RecognitionState.PROCESSING) "正在转录" else "正在聆听，点击结束"
+            }
+            .clickable(interactionSource = source, indication = null, onClick = action.onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (voiceActive && voiceState == RecognitionState.PROCESSING) {
+            androidx.compose.material3.CircularProgressIndicator(Modifier.size(36.dp), color = visuals.accentColor, strokeWidth = 2.dp)
+        }
+        ToolbarButtonIcon(action.item, tint = if (action.active) visuals.accentColor else tint, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun ClipboardPreviewBar(
+    candidates: List<String>,
+    visuals: CandidateBarVisuals,
+    callbacks: CandidateBarCallbacks,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        KeyboardBackButton({ callbacks.onDismissClipboardPreview?.invoke() },
+            visuals.textColor.copy(alpha = 0.12f), visuals.textColor, label = "返回工具栏")
+        Box(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+            Row(
+                Modifier.fillMaxWidth().height(36.dp).clip(CircleShape)
+                    .background(if (visuals.isDarkTheme) Color(0xFF242832) else Color(0xFFF3F5FA))
+                    .border(1.dp, Brush.horizontalGradient(listOf(
+                        Color(0xFF8D8DEF).copy(alpha = 0.5f),
+                        Color(0xFF668ECC).copy(alpha = 0.3f),
+                        Color(0xFF69BCAF).copy(alpha = 0.5f),
+                    )), CircleShape)
+                    .padding(start = 12.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.ContentPaste, contentDescription = null,
+                    tint = visuals.textColor, modifier = Modifier.size(18.dp))
+                LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll")) {
+                    itemsIndexed(candidates) { index, text ->
+                        // 预览可横向滚动全部内容；换行仅在显示时折成空格，粘贴仍使用原文。
+                        val preview = remember(text) { text.replace(Regex("[\\r\\n]+"), " ") }
+                        Text(preview, color = visuals.textColor, fontSize = 15.sp, maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.testTag("clipboard-preview-text:$index")
+                                .clickable { callbacks.onCandidateSelect(index) }
+                                .padding(vertical = 7.dp, horizontal = if (index == 0) 0.dp else 8.dp))
+                    }
+                }
+                Box(Modifier.size(30.dp).clip(CircleShape).clickable { callbacks.onOpenClipboard?.invoke() },
+                    contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "打开剪贴板",
+                        tint = Color(0xFF75A7FF), modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -765,4 +811,3 @@ private fun Modifier.drawPreeditBubble(
         }
     }
 }
-

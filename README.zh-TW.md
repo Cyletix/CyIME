@@ -1,16 +1,16 @@
+> **Cyletix 分支 · 修改日期 2026-09-23。** [Xime-CyletixFork](https://github.com/Cyletix/Xime) 基于 Kor1（kingzcheung）及贡献者开发的 [Xime](https://github.com/ximeiorg/Xime)。应用继续遵循 [GNU GPL v3](LICENSE)，保留原作者及第三方版权声明。请从 [本分支 Releases](https://github.com/Cyletix/Xime/releases) 下载，F-Droid 链接指向上游原版。对应源代码在本仓库公开，改动和验证见 [本轮记录](docs/fork-landscape-japanese-and-branding.md)。
+
 <p align="center">
   <img src="docs/logo.jpg" alt="Xime Logo" width="600">
 </p>
 
-<h1 align="center">Xime（曦碼） - 五筆/拼音輸入法</h1>
+<h1 align="center">Xime-CyletixFork</h1>
 
 <p align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="80">](https://f-droid.org/packages/com.kingzcheung.xime)
+[Upstream Xime on F-Droid](https://f-droid.org/packages/com.kingzcheung.xime)
 
 
 [Xime 輸入法 (Windows 版)](https://github.com/ximeiorg/winxime) | [Xime 輸入法 (Linux 版)](https://github.com/ximeiorg/xime-wayland) | [聯想詞預測模型](https://github.com/ximeiorg/predictive-text) | [手寫輸入法模型](https://github.com/ximeiorg/ochwpro)

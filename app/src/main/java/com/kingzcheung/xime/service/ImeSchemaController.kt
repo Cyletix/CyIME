@@ -8,6 +8,9 @@ import android.view.inputmethod.InputConnection
 import android.widget.Toast
 import com.kingzcheung.xime.MainActivity
 import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
+import com.kingzcheung.xime.ui.keyboard.JapaneseKanaAction
+import com.kingzcheung.xime.ui.keyboard.japaneseKanaRomaji
+import com.kingzcheung.xime.rime.RimeProcessResult
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SchemaConfigHelper
 import com.kingzcheung.xime.settings.SchemaManager
@@ -176,7 +179,104 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
     
-    private var editSelAnchor = -1
+    private val editorCursor = EditorCursor()
+    private val japaneseKanaComposer = JapaneseKanaComposer()
+    private var japaneseKanaSession = Long.MIN_VALUE
+
+    internal fun resetEditorSelection() = editorCursor.resetSelection()
+
+    internal fun handleJapaneseKanaAction(action: JapaneseKanaAction) {
+        val original = service.currentInputConnection ?: return
+        val inputSession = service.uiState.value.inputSessionId
+        service.keyRouter.postRimeJob {
+            if (service.currentInputConnection !== original || service.uiState.value.inputSessionId != inputSession ||
+                service.rimeEngine.getCurrentSchema() != "japanese_kana" || service.rimeEngine.isAsciiMode()) return@postRimeJob
+            if (japaneseKanaSession != inputSession) {
+                japaneseKanaComposer.reset()
+                japaneseKanaSession = inputSession
+            }
+            service.japaneseInputController.prepareKana(action == JapaneseKanaAction.Modify)
+            val before = service.rimeEngine.getInput()
+            var result: RimeProcessResult? = null
+            val committed = StringBuilder()
+            when (action) {
+                is JapaneseKanaAction.Input -> {
+                    if (action.romaji !in japaneseKanaRomaji) return@postRimeJob
+                    var allProcessed = true
+                    for (char in action.romaji) {
+                        val next = service.rimeEngine.processQueuedKeyAndGetResult(char.code, 0)
+                        result = next
+                        committed.append(next.committedText)
+                        if (!next.processed) { allProcessed = false; break }
+                    }
+                    if (allProcessed) japaneseKanaComposer.recordInput(before, action.romaji, result?.inputText.orEmpty(), committed.isNotEmpty())
+                    else japaneseKanaComposer.reset()
+                }
+                JapaneseKanaAction.Modify -> {
+                    if (japaneseKanaComposer.replacement(before) == null && before.isNotEmpty()) {
+                        val boundary = service.rimeEngine.previousJapaneseBoundary(before)
+                        japaneseKanaComposer.recordInput(before.take(boundary), before.drop(boundary), before, false)
+                    }
+                    val replacement = japaneseKanaComposer.replacement(before) ?: return@postRimeJob
+                    // 整体改写引擎中的未提交编码，不发送退格，绝不删除宿主里已经上屏的字。
+                    if (!service.rimeEngine.setInput(replacement.input)) return@postRimeJob
+                    result = service.rimeEngine.getProcessResult(true)
+                    committed.append(result.committedText)
+                    if (committed.isEmpty()) japaneseKanaComposer.recordReplacement(replacement, result.inputText)
+                    else japaneseKanaComposer.reset()
+                }
+            }
+            val finalResult = result ?: return@postRimeJob
+            val transformed = service.candidateTransform.transformFor(finalResult)
+            withContext(Dispatchers.Main) {
+                if (service.currentInputConnection !== original || service.uiState.value.inputSessionId != inputSession ||
+                    service.uiState.value.currentSchemaId != "japanese_kana") return@withContext
+                if (committed.isNotEmpty()) service.commitText(committed.toString())
+                service.sessionController.updateUIWithResult(
+                    transformed?.let { finalResult.copy(candidates = it.candidates.toTypedArray()) } ?: finalResult,
+                    transformed?.actions ?: emptyList(),
+                )
+            }
+        }
+    }
+
+    private fun editCursor(finishComposition: Boolean = true, action: (InputConnection) -> Unit) {
+        val original = service.currentInputConnection ?: return
+        val inputSession = service.uiState.value.inputSessionId
+        service.keyRouter.postRimeJob {
+            withContext(Dispatchers.Main) {
+                // 焦点/会话检查与清理必须在同一个主线程任务内，中间不可挂起，
+                // 否则队列里旧输入框的编辑操作可能清掉新输入框的组合串。
+                if (service.currentInputConnection !== original || service.uiState.value.inputSessionId != inputSession) {
+                    return@withContext
+                }
+                val preserveComposition = finishComposition &&
+                    SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX &&
+                    service.candidateState.value.isComposing
+                if (preserveComposition) {
+                    service.finishComposingInputBoxKeepingText()
+                    service.rimeEngine.clearComposition()
+                }
+                action(original)
+                if (preserveComposition) service.updateUI()
+            }
+        }
+    }
+
+    internal fun moveEditorCursorVertical(steps: Int) = editCursor { editorCursor.moveVertical(it, steps) }
+
+    internal fun moveEditorCursor(steps: Int) = editCursor { editorCursor.move(it, steps) }
+
+    /** 已在按键队列中，不能再次排队，否则长按方向键会积压到后续操作之后。 */
+    internal suspend fun moveJapaneseCursorFromKeyQueue(steps: Int) {
+        val original = service.currentInputConnection ?: return
+        val owner = service.uiState.value.inputSessionId
+        withContext(Dispatchers.Main) {
+            if (service.currentInputConnection === original && service.uiState.value.inputSessionId == owner) {
+                editorCursor.move(original, steps)
+            }
+        }
+    }
 
     internal fun handleToolbarEditingAction(action: String) {
         val ic = service.currentInputConnection ?: return
@@ -185,78 +285,19 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             "copy" -> ic.performContextMenuAction(android.R.id.copy)
             "cut" -> ic.performContextMenuAction(android.R.id.cut)
             "paste" -> ic.performContextMenuAction(android.R.id.paste)
-            "home" -> ic.setSelection(0, 0)
-            "end" -> {
-                val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val after = ic.getTextAfterCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                ic.setSelection(before.length + after.length, before.length + after.length)
+            "select_begin" -> editCursor { editorCursor.beginSelection(it) }
+            "select_end" -> editCursor(finishComposition = false) { editorCursor.endSelection(it) }
+            "select_reset" -> editorCursor.resetSelection()
+            "home", "end", "select_paragraph_start", "select_paragraph_end" -> editCursor {
+                editorCursor.moveToParagraphBoundary(it, toEnd = action.endsWith("end"), selecting = action.startsWith("select_"))
             }
-            "arrow_up" -> {
-                val t = SystemClock.uptimeMillis()
-                ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 0))
-                ic.sendKeyEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP, 0))
+            "arrow_left", "arrow_right", "select_arrow_left", "select_arrow_right" -> editCursor {
+                editorCursor.move(it, if (action.endsWith("left")) -1 else 1, action.startsWith("select_"))
             }
-            "arrow_down" -> {
-                val t = SystemClock.uptimeMillis()
-                ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 0))
-                ic.sendKeyEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN, 0))
+            "arrow_up", "arrow_down", "select_arrow_up", "select_arrow_down" -> editCursor {
+                editorCursor.sendDirection(it, if (action.endsWith("up")) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN,
+                    action.startsWith("select_"))
             }
-            "arrow_left" -> {
-                val t = SystemClock.uptimeMillis()
-                ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, 0))
-                ic.sendKeyEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT, 0))
-            }
-            "arrow_right" -> {
-                val t = SystemClock.uptimeMillis()
-                ic.sendKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 0))
-                ic.sendKeyEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT, 0))
-            }
-
-            "select_begin" -> {
-                editSelAnchor = (ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: "").length
-            }
-            "select_end" -> {
-                editSelAnchor = -1
-            }
-            "select_arrow_left" -> extendSelection(ic, -1)
-            "select_arrow_right" -> extendSelection(ic, 1)
-            "select_arrow_up" -> {
-                val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val pos = before.length
-                if (pos > 0) {
-                    val prevNewline = before.lastIndexOf('\n', pos - 2)
-                    val lineStart = if (prevNewline >= 0) prevNewline + 1 else 0
-                    ic.beginBatchEdit()
-                    ic.setSelection(editSelAnchor, lineStart)
-                    ic.endBatchEdit()
-                }
-            }
-            "select_arrow_down" -> {
-                val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val after = ic.getTextAfterCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val pos = before.length
-                val total = before.length + after.length
-                if (pos < total) {
-                    val nextNewline = after.indexOf('\n')
-                    val lineEnd = if (nextNewline >= 0) pos + nextNewline else total
-                    ic.beginBatchEdit()
-                    ic.setSelection(editSelAnchor, lineEnd)
-                    ic.endBatchEdit()
-                }
-            }
-        }
-    }
-
-    private fun extendSelection(ic: InputConnection, direction: Int) {
-        val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-        val after = ic.getTextAfterCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-        val pos = before.length
-        val total = before.length + after.length
-        val next = (pos + direction).coerceIn(0, total)
-        if (next != pos) {
-            ic.beginBatchEdit()
-            ic.setSelection(editSelAnchor, next)
-            ic.endBatchEdit()
         }
     }
 
@@ -267,7 +308,46 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
 
+    internal fun toggleHandwriting() {
+        val model = service.keyboardViewModel
+        if (model.exitTemporaryHandwriting()) {
+            com.kingzcheung.xime.handwriting.HandwritingEngine.release()
+            return
+        }
+        if (model.page.value == com.kingzcheung.xime.keyboard.KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.HANDWRITING)) {
+            switchSchema(service.previousSchemaId.ifEmpty { service.rimeEngine.getCurrentSchema() }.ifEmpty { "pinyin_simp" })
+            return
+        }
+        if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service)) {
+            Toast.makeText(service, "请先下载手写模型", Toast.LENGTH_SHORT).show()
+            service.startActivity(android.content.Intent(service, com.kingzcheung.xime.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra("open_fragment", "model_management")
+            })
+            return
+        }
+        model.enterTemporaryHandwriting()
+    }
+
     internal fun switchSchema(schemaId: String) {
+        if (schemaId == com.kingzcheung.xime.settings.InputModes.ENGLISH) {
+            service.keyRouter.postRimeJob {
+                if (!service.rimeEngine.isAsciiMode() && !switchInputMethod()) return@postRimeJob
+                val engineSchema = service.rimeEngine.getCurrentSchema()
+                service.sessionController.persistSchemaOption("ascii_mode", true)
+                withContext(Dispatchers.Main) {
+                    com.kingzcheung.xime.handwriting.HandwritingEngine.release()
+                    service.keyboardViewModel.discardTemporaryHandwriting()
+                    service.keyboardViewModel.asciiStateMachine.reset()
+                    service.keyboardViewModel.switchMain(com.kingzcheung.xime.keyboard.MainType.FULL)
+                    service.keyboardViewModel.dispatch(com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(true, engineSchema))
+                    if (engineSchema.isNotEmpty()) SettingsPreferences.setCurrentSchema(service, engineSchema)
+                    service.uiState.value = service.uiState.value.copy(isAsciiMode = true)
+                    service.sessionController.updateSchemaName()
+                }
+            }
+            return
+        }
         if (isHandwritingSchema(schemaId)) {
             // 检查手写模型文件是否已下载
             if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service)) {
@@ -284,6 +364,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 service.startActivity(intent)
                 return
             }
+            service.keyboardViewModel.discardTemporaryHandwriting()
             service.previousSchemaId = service.rimeEngine.getCurrentSchema()
             SettingsPreferences.setCurrentSchema(service, schemaId)
             service.keyboardViewModel.switchMain(com.kingzcheung.xime.keyboard.MainType.HANDWRITING)
@@ -293,48 +374,37 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             service.sessionController.updateSchemaName()
             return
         }
-        // 切离手写方案时释放手写引擎
-        com.kingzcheung.xime.handwriting.HandwritingEngine.release()
-        service.keyboardViewModel.switchMain(com.kingzcheung.xime.keyboard.MainType.FULL)
-        try {
-            SettingsPreferences.setCurrentSchema(service, schemaId)
-            // 用户自定义候选词数：先写 custom.yaml 再切方案，Rime 会自动加载
-            applyPageSizeSetting(schemaId)
-            // 部署/编译进行中 switchSchema 返回 false（不阻塞等待），
-            // 此时不应继续触发其他 native 调用进入编译中的引擎
-            if (!service.rimeEngine.switchSchema(schemaId)) {
-                if (service.rimeEngine.isMaintaining()) {
-                    FileLogger.w(XimeInputMethodService.TAG, "switchSchema skipped: deployment in progress")
-                    Toast.makeText(service, "词库部署中，请稍后再切换方案", Toast.LENGTH_SHORT).show()
-                    return
+        // 显式选择语言方案与普通按键串行，成功后一次性更新引擎、页面和模式记忆。
+        service.keyRouter.postRimeJob {
+            try {
+                applyPageSizeSetting(schemaId)
+                if (!service.rimeEngine.switchSchema(schemaId)) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(service, if (service.rimeEngine.isMaintaining())
+                            "词库部署中，请稍后再切换方案" else "方案未部署，请在方案管理中部署后再试", Toast.LENGTH_SHORT).show()
+                    }
+                    return@postRimeJob
                 }
-                // 引擎切换失败（常见：方案未部署/不在 schema_list，老版本升级残留）。
-                // 必须回滚偏好到引擎实际方案：偏好留着目标值会让 UI 状态与引擎
-                // 永久脱节（键盘已显示九键但数字键无人处理，候选栏始终 IDLE）。
-                // getCurrentSchema 无会话时返回空串——此时不动偏好，保留原值由
-                // IME 重启的恢复逻辑兜底，避免把空串写进偏好与 user.yaml
-                val actual = service.rimeEngine.getCurrentSchema()
-                if (actual.isNotEmpty()) {
-                    SettingsPreferences.setCurrentSchema(service, actual)
-                }
-                FileLogger.w(XimeInputMethodService.TAG, "switchSchema failed: target=$schemaId actual=$actual")
-                Toast.makeText(service, "方案未部署，请在方案管理中部署后再试", Toast.LENGTH_SHORT).show()
-                return
-            }
-            if (!service.rimeEngine.isAsciiMode()) {
+                // 英文是独立入口；选中中文/日语方案必须退出此前遗留的 ASCII 模式。
+                service.rimeEngine.setOption("ascii_mode", false)
                 service.rimeEngine.setOption("ascii_punct", false)
+                service.sessionController.persistSchemaOption("ascii_mode", false)
+                withContext(Dispatchers.Main) {
+                    com.kingzcheung.xime.handwriting.HandwritingEngine.release()
+                    val model = service.keyboardViewModel
+                    model.discardTemporaryHandwriting()
+                    model.asciiStateMachine.reset()
+                    SettingsPreferences.setCurrentSchema(service, schemaId)
+                    service.uiState.value = service.uiState.value.copy(isAsciiMode = false, currentSchemaId = schemaId)
+                    model.switchMain(com.kingzcheung.xime.keyboard.MainType.FULL)
+                    model.dispatch(com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(false, schemaId))
+                    service.sessionController.updateSchemaName()
+                    service.updateUI()
+                    Toast.makeText(service, "已切换输入方案", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                FileLogger.e(XimeInputMethodService.TAG, "Failed to switch schema", e)
             }
-            service.sessionController.updateSchemaName()
-            service.updateUI()
-            // 确保键盘布局与方案匹配（如 T9 九键不应被 switchMain 重置为全键盘）
-            service.keyboardViewModel.dispatch(
-                com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
-                    service.rimeEngine.isAsciiMode(), schemaId
-                )
-            )
-            Toast.makeText(service, "已切换输入方案", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            FileLogger.e(XimeInputMethodService.TAG, "Failed to switch schema", e)
         }
     }
     
@@ -389,9 +459,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         Toast.makeText(service, "键盘高度已调整", Toast.LENGTH_SHORT).show()
     }
 
-    internal fun toggleFloatingMode(enabled: Boolean, navBarDp: Int = 0) {
+    internal fun toggleFloatingMode(enabled: Boolean, navBarDp: Int = 0, persist: Boolean = true) {
         val isLandscape = service.resources.configuration.screenWidthDp > service.resources.configuration.screenHeightDp
-        SettingsPreferences.setFloatingMode(service, enabled, isLandscape)
+        if (persist) SettingsPreferences.setFloatingMode(service, enabled, isLandscape)
         val loadedX = SettingsPreferences.getFloatingOffsetX(service, isLandscape)
         val loadedY = SettingsPreferences.getFloatingOffsetY(service, isLandscape)
         val screenW = service.resources.configuration.screenWidthDp
@@ -399,7 +469,6 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         val portraitWidth = minOf(screenW, screenH)
         val cardWidth = (portraitWidth * 0.85f).roundToInt()
         val halfMargin = maxOf(0, (screenW - cardWidth) / 2)
-        val cappedKbH = SettingsPreferences.getKeyboardHeightDp(service, isLandscape).coerceAtMost((screenH * 8) / 10)
         val clampedX = loadedX.coerceIn(-halfMargin, halfMargin)
         service.uiState.value = service.uiState.value.copy(
             isFloatingMode = enabled,
@@ -408,8 +477,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         )
         if (enabled) {
             service.closeToolPanel()
-            service.currentEffectiveKeyboardHeight = cappedKbH + 18 + 50 + service.uiState.value.keyboardBottomPaddingDp
         }
+        service.refreshKeyboardGeometry()
         service.applyWindowBackground()
     }
 

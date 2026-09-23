@@ -286,7 +286,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
     }
 
+    private val schemaRefreshRevision = java.util.concurrent.atomic.AtomicLong()
+
     internal fun updateSchemaName() {
+        val revision = schemaRefreshRevision.incrementAndGet()
         val context = service
         service.serviceScope.launch(Dispatchers.IO) {
             val page = service.keyboardViewModel.page.value
@@ -324,10 +327,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 }
 
             withContext(Dispatchers.Main) {
+                if (revision != schemaRefreshRevision.get()) return@withContext
                 service.uiState.value = service.uiState.value.copy(
                     schemaName = name ?: currentSchemaId,
                     currentSchemaId = currentSchemaId,
-                    schemas = schemas
+                    schemas = com.kingzcheung.xime.settings.InputModes.ordered(service, schemas)
                 )
                 refreshSchemaSwitches()
             }

@@ -168,7 +168,7 @@ class HandwritingCaptureViewModel(app: android.app.Application) : AndroidViewMod
                     "${getApplication<android.app.Application>().packageName}.fileprovider",
                     file,
                 )
-                _events.emit(CaptureEvent.Share(uri, "Xime 手写采集数据"))
+                _events.emit(CaptureEvent.Share(uri, "Xime-CyletixFork 手写采集数据"))
             } catch (e: Exception) {
                 Log.e(TAG, "exportShare failed", e)
                 FileLogger.e(TAG, "exportShare failed", e)

@@ -285,6 +285,12 @@ class RimeEngine {
         }
     }
 
+    /** 后台按键队列必须等待引擎锁，不能把短暂繁忙伪装成未处理并直接上屏字母。 */
+    @androidx.annotation.WorkerThread
+    fun processQueuedKeyAndGetResult(keycode: Int, mask: Int): RimeProcessResult = locked {
+        processKeyAndGetResult(keycode, mask)
+    }
+
     fun getProcessResult(processed: Boolean): RimeProcessResult {
         if (!isInitialized) return RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)
         // 必须持 rimeLock：nativeGetProcessResult 内部 RimeGetContext → Menu::Prepare
@@ -332,6 +338,11 @@ class RimeEngine {
             }.toTypedArray()
         }
     }
+
+    internal fun conversionPreview(): String = locked { nativeConversionPreview() }
+    internal fun highlightCandidate(index: Int): Boolean = locked { nativeHighlightCandidate(index) }
+    private external fun nativeConversionPreview(): String
+    private external fun nativeHighlightCandidate(index: Int): Boolean
 
     fun getInput(): String {
         return tryLocked("") {

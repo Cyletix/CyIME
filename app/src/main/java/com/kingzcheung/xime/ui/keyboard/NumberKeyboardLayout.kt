@@ -314,7 +314,7 @@ private fun NumberRows(
                             .weight(1f),
                     ) {
                         if (backKeyOnLeft) {
-                            IconKeyButton(
+                            LanguageKeyButton(
                                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowBack),
                                 onClick = { onKeyPress("abc") },
                                 backgroundColor = specialKeyBackgroundColor,
@@ -439,7 +439,7 @@ private fun NumberRows(
                                 fontSize = ctrlFontSize,
                             )
                         } else {
-                            IconKeyButton(
+                            LanguageKeyButton(
                                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.ArrowBack),
                                 onClick = { onKeyPress("abc") },
                                 backgroundColor = specialKeyBackgroundColor,
@@ -509,8 +509,8 @@ private fun NumberRows(
                         shadowShapeRadius = shadowShapeRadius,
                     )
 
-                    KeyButton(
-                        text = "空格",
+                    SpaceKeyButton(
+                        schemaName = "空格",
                         onClick = { onKeyPress("space") },
                         backgroundColor = specialKeyBackgroundColor,
                         textColor = specialKeyTextColor,
@@ -532,7 +532,7 @@ private fun NumberRows(
                         shadowElevation = shadowElevation,
                         shadowShapeRadius = shadowShapeRadius,
                     )
-                    KeyButton(
+                    ActionKeyButton(
                         text = "确定",
                         onClick = { onKeyPress("enter") },
                         backgroundColor = specialKeyBackgroundColor,

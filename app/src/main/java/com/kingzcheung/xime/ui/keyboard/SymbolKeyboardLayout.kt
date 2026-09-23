@@ -19,13 +19,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,12 +67,6 @@ fun SymbolKeyboardLayout(
         listOf(SymbolCategory(name = "最近使用", id = "recentSymbols", symbols = recentSymbols)) +
             SymbolData.categories
     }
-    // 图标按钮容器色：surface 与 primary 的混合色调（带种子色但不过于强烈）
-    val iconButtonContainer = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.primary,
-        0.15f
-    )
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scope = rememberCoroutineScope()
@@ -89,34 +81,6 @@ fun SymbolKeyboardLayout(
             .fillMaxWidth()
             .background(backgroundColor)
     ) {
-        // 导航区：返回按钮
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-                .padding(start = if (isLandscape) 50.dp else 8.dp, end = if (isLandscape) 50.dp else 8.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(iconButtonContainer)
-                    .tolerantClick {
-                        onHapticFeedback?.invoke()
-                        onBack()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowLeft,
-                    contentDescription = "返回",
-                    tint = textColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
         // 内容区：符号网格 + HorizontalPager
         Box(
             modifier = Modifier
@@ -178,7 +142,7 @@ fun SymbolKeyboardLayout(
             }
         }
 
-        // 底部：分类 Tab + 删除按钮
+        // 返回固定在左下角，最近使用及其余分类从右侧依次排列。
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -187,6 +151,17 @@ fun SymbolKeyboardLayout(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                Modifier.width(48.dp).height(40.dp).clip(RoundedCornerShape(8.dp))
+                    .background(keyBgColor).tolerantClick {
+                        onHapticFeedback?.invoke()
+                        onBack()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "返回键盘",
+                    tint = textColor, modifier = Modifier.size(24.dp))
+            }
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -208,7 +183,7 @@ fun SymbolKeyboardLayout(
                 }
             }
 
-            KeyButton(
+            ActionKeyButton(
                 text = "删除",
                 onClick = { onSelect("delete") },
                 backgroundColor = backgroundColor,
@@ -270,8 +245,8 @@ private fun SymbolCategoryTab(
 ) {
     Box(
         modifier = modifier
-            .height(30.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .height(40.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(
                 if (isSelected) selectedBackgroundColor
                 else backgroundColor

@@ -87,7 +87,7 @@ jobs:
       - name: Verify APK signatures
         run: |
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
-          for apk in app/build/outputs/apk/release/Xime-*.apk; do
+          for apk in app/build/outputs/apk/release/Xime-CyletixFork-*.apk; do
             "$APKSIGNER" verify --print-certs "$apk" >/dev/null
             echo "Verified: $apk"
           done
@@ -99,7 +99,7 @@ jobs:
       - name: Find APKs and plugin XIPKs
         id: find_apks
         run: |
-          MAIN_APKS=$(find app/build/outputs/apk/release -name "Xime-*.apk" -type f | sort | tr '\n' ',' | sed 's/,$//')
+          MAIN_APKS=$(find app/build/outputs/apk/release -name "Xime-CyletixFork-*.apk" -type f | sort | tr '\n' ',' | sed 's/,$//')
           PLUGIN_XIPKS=$(find build/plugin-release -name "*.xipk" -type f | sort | tr '\n' ',' | sed 's/,$//')
 
           echo "main_apks=$MAIN_APKS" >> $GITHUB_OUTPUT
@@ -115,7 +115,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          name: Xime ${{ steps.get_version.outputs.VERSION }}
+          name: Xime-CyletixFork ${{ steps.get_version.outputs.VERSION }}
           generate_release_notes: false
           files: |
             ${{ steps.find_apks.outputs.main_apks }}

@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -156,25 +157,6 @@ fun EmojiKeyboardLayout(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 返回按钮
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(iconButtonContainer)
-                        .tolerantClick { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowLeft,
-                        contentDescription = "返回",
-                        tint = textColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 // 顶层 Tab（ClipboardView 样式）
                 Box(
                     modifier = Modifier
@@ -184,7 +166,7 @@ fun EmojiKeyboardLayout(
                         .padding(2.dp)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxHeight(),
+                        modifier = Modifier.fillMaxHeight().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         // Emoji 主 Tab
@@ -274,7 +256,7 @@ fun EmojiKeyboardLayout(
                     selectedSubCategoryIndex = page
                 } else {
                     // 找到该 page 属于哪个插件组的哪个子分类
-                    var remaining = page - builtinCategories.size
+                    var remaining = page - displayBuiltinCategories.size
                     for ((groupIdx, entry) in pluginGroupEntries.withIndex()) {
                         if (remaining < entry.value.size) {
                             selectedTopTabIndex = groupIdx + 1
@@ -289,7 +271,7 @@ fun EmojiKeyboardLayout(
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier
+            modifier = Modifier.testTag("emoji-pages")
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(horizontal = if (isLandscape) 50.dp else 4.dp)
@@ -470,7 +452,7 @@ fun EmojiKeyboardLayout(
                 Spacer(modifier = Modifier.weight(1f))
             }
 
-            KeyButton(
+            ActionKeyButton(
                 text = "删除",
                 onClick = { onEmojiSelect("delete") },
                 backgroundColor = backgroundColor,

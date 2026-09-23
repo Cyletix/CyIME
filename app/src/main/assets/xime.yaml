@@ -20,10 +20,10 @@ style:
   # 浅色/深色模式的配色，deep 为降级后备
   # 可选值：内置主题 id、color_schemes 中定义的 id、或 dynamic（Material You 动态配色，随壁纸取色，仅 Android 12+ 生效）
   color_scheme:
-    light: lavender_purple
-    dark: slate_gray
-  # 显示模式：0=浅色, 1=深色, 2=跟随系统（默认）
-  dark_mode: 2
+    light: dynamic
+    dark: dynamic
+  # 显示模式：0=浅色, 1=深色（默认）, 2=跟随系统
+  dark_mode: 1
 
 # 配色方案可配置背景类型（纯色/渐变/图片），默认均为纯色。
 # 如需渐变/图片背景，在 xime.custom.yaml 的对应主题下覆盖 keyboard_background 即可：
@@ -612,6 +612,47 @@ keyboard:
       "'": { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [ ",","."] }}
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
+  # 日语：26 键用成熟 jaroomaji 罗马音转换，九宫格将假名读音交给同一引擎。
+  japanese_kana:
+    schemas: [japanese_kana]
+  qwerty_japanese:
+    schemas: [japanese, jaroomaji]
+    button_layout: standard
+    layout:
+      rows:
+        - [q, w, e, r, t, y, u, i, o, p]
+        - [a, s, d, f, g, h, j, k, l]
+        - [z, x, c, v, b, n, m]
+    keys:
+      q: { tap: { label: "q", value: "q" }, swipe_up: { label: "1", value: "1" } }
+      w: { tap: { label: "w", value: "w" }, swipe_up: { label: "2", value: "2" } }
+      e: { tap: { label: "e", value: "e" }, swipe_up: { label: "3", value: "3" } }
+      r: { tap: { label: "r", value: "r" }, swipe_up: { label: "4", value: "4" } }
+      t: { tap: { label: "t", value: "t" }, swipe_up: { label: "5", value: "5" } }
+      y: { tap: { label: "y", value: "y" }, swipe_up: { label: "6", value: "6" } }
+      u: { tap: { label: "u", value: "u" }, swipe_up: { label: "7", value: "7" } }
+      i: { tap: { label: "i", value: "i" }, swipe_up: { label: "8", value: "8" } }
+      o: { tap: { label: "o", value: "o" }, swipe_up: { label: "9", value: "9" } }
+      p: { tap: { label: "p", value: "p" }, swipe_up: { label: "0", value: "0" } }
+      a: { tap: { label: "a", value: "a" }, swipe_up: { label: "@", value: "@" } }
+      s: { tap: { label: "s", value: "s" }, swipe_up: { label: "#", value: "#" } }
+      d: { tap: { label: "d", value: "d" }, swipe_up: { label: "$", value: "$" } }
+      f: { tap: { label: "f", value: "f" }, swipe_up: { label: "%", value: "%" } }
+      g: { tap: { label: "g", value: "g" }, swipe_up: { label: "&", value: "&" } }
+      h: { tap: { label: "h", value: "h" }, swipe_up: { label: "*", value: "*" } }
+      j: { tap: { label: "j", value: "j" }, swipe_up: { label: "(", value: "(" } }
+      k: { tap: { label: "k", value: "k" }, swipe_up: { label: ")", value: ")" } }
+      l: { tap: { label: "l", value: "l" }, swipe_up: { label: "-", value: "-" } }
+      z: { tap: { label: "z", value: "z" }, swipe_up: { label: "「", value: "「" } }
+      x: { tap: { label: "x", value: "x" }, swipe_up: { label: "」", value: "」" } }
+      c: { tap: { label: "c", value: "c" }, swipe_up: { label: "、", value: "、" } }
+      v: { tap: { label: "v", value: "v" }, swipe_up: { label: "。", value: "。" } }
+      b: { tap: { label: "b", value: "b" }, swipe_up: { label: "？", value: "？" } }
+      n: { tap: { label: "n", value: "n" }, swipe_up: { label: "！", value: "！" } }
+      m: { tap: { label: "m", value: "m" }, swipe_up: { label: "ー", value: "ー" } }
+      "'": { tap: { label: "、", value: "," }, swipe_up: { label: "。", value: "." } }
+      earth: { tap: { label: "@language", action: "toggle_ascii" } }
+
   # 九键（T9）键盘配置
   # 注意：本键盘不支持 button_layout（按键布局模式），固定 standard 键面布局；
   # 此处配置 button_layout: compact 不生效（compact 仅 26 键 qwerty/qwerty_en 支持）。
@@ -634,19 +675,19 @@ keyboard:
     # 动作可选值见 GestureAction：commit/select_all/copy/cut/paste/line_start/line_end/
     # undo/repeat/command/switch_route（value: emoji|symbol|clipboard 打开对应面板）等；
     # display 控制提示显示位置：key（仅键面提示，无滑动气泡）/ bubble（仅滑动气泡，
-    # 不印键面）/ both（键面+气泡）。内置默认全部显式配 display: "key"（不显示滑动
-    # 气泡）；想要气泡自行改为 display: "both"。手势功能与提示相互独立，
+    # 不印键面）/ both（键面+气泡）。内置默认全部显式配 display: "both"（显示滑动
+    # 气泡），松手提交。手势功能与提示相互独立，
     # 提示开关/display 关闭提示后手势仍生效。
     keys:
-      "1": { swipe_up: { value: "1", display: "key" } }
-      "2": { swipe_up: { value: "2", display: "key" } }
-      "3": { swipe_up: { value: "3", display: "key" } }
-      "4": { swipe_up: { value: "4", display: "key" } }
-      "5": { swipe_up: { value: "5", display: "key" } }
-      "6": { swipe_up: { value: "6", display: "key" } }
-      "7": { swipe_up: { value: "7", display: "key" } }
-      "8": { swipe_up: { value: "8", display: "key" } }
-      "9": { swipe_up: { value: "9", display: "key" } }
+      "1": { swipe_up: { value: "1", display: "both" } }
+      "2": { swipe_up: { value: "2", display: "both" } }
+      "3": { swipe_up: { value: "3", display: "both" } }
+      "4": { swipe_up: { value: "4", display: "both" } }
+      "5": { swipe_up: { value: "5", display: "both" } }
+      "6": { swipe_up: { value: "6", display: "both" } }
+      "7": { swipe_up: { value: "7", display: "both" } }
+      "8": { swipe_up: { value: "8", display: "both" } }
+      "9": { swipe_up: { value: "9", display: "both" } }
 
   # 笔画键盘配置
   # 注意：本键盘不支持 button_layout（按键布局模式），固定 standard 键面布局；

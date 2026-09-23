@@ -77,7 +77,7 @@ object AppInfo {
     
     val dependencies = listOf(
         LicenseItem(
-            name = "曦码",
+            name = "Xime（上游，原名曦码）",
             license = "GPL-3.0",
             url = "https://github.com/ximeiorg/Xime"
         ),
@@ -201,14 +201,14 @@ fun AboutContent(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "曦码（Xime）",
+                            text = "Xime-CyletixFork",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "基于Rime 构建，支持五笔/拼音/自定义方案。",
+                            text = "由 Cyletix 维护，基于 Xime / Rime 的 Android 输入法。遵循 GPL v3，保留上游及第三方版权声明。",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -228,7 +228,7 @@ fun AboutContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { uriHandler.openUri("https://github.com/ximeiorg/Xime/releases") },
+                                .clickable { uriHandler.openUri("https://github.com/Cyletix/Xime/releases") },
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -262,9 +262,16 @@ fun AboutContent(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "作者",
+                            text = "维护者与上游作者",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Cyletix · Fork 维护者",
+                            modifier = Modifier.clickable { uriHandler.openUri("https://github.com/Cyletix") },
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 14.sp,
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
@@ -281,7 +288,7 @@ fun AboutContent(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Kor1 (kingzcheung)",
+                                    text = "Kor1 (kingzcheung) · 上游作者",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -308,7 +315,7 @@ fun AboutContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            uriHandler.openUri("https://github.com/ximeiorg/Xime")
+                            uriHandler.openUri("https://github.com/Cyletix/Xime")
                         },
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
@@ -331,7 +338,7 @@ fun AboutContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "github.com/ximeiorg/Xime",
+                                text = "github.com/Cyletix/Xime",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -554,7 +561,7 @@ fun PrivacyPolicyContent(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "曦码隐私策略",
+                            text = "Xime-CyletixFork隐私策略",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -562,37 +569,37 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "数据收集",
-                            content = "曦码不收集任何个人身份信息。您的输入内容仅用于提供输入法功能，不会被上传到服务器或分享给第三方。"
+                            content = "Xime-CyletixFork 默认使用本地输入与识别。主动启用在线语音或其他联网服务时，相应音频或文本会发送给您选择的服务商。"
                         )
                         
                         PrivacySection(
                             title = "本地存储",
-                            content = "曦码将用户设置、用户词库和剪贴板历史存储在您的设备本地，不会上传到云端。您可以随时清除这些数据。"
+                            content = "Xime-CyletixFork 默认在本地存储设置、词库和剪贴板历史。主动启用云备份或剪贴板同步插件时，所选数据会按插件配置传输。您可以随时清除本地数据。"
                         )
                         
                         PrivacySection(
                             title = "网络权限",
-                            content = "曦码需要网络权限用于下载联想模型。下载完成后，模型将在本地运行，您的输入内容不会被上传。"
+                            content = "网络权限用于下载输入方案和模型，以及您主动启用的在线服务。本地 Rime、手写和离线语音模型在设备上运行。"
                         )
                         
                         PrivacySection(
                             title = "输入内容",
-                            content = "您的所有输入内容仅保存在本地设备上。曦码使用开源的 Rime 输入引擎，所有处理均在本地完成。"
+                            content = "本地输入由开源 Rime 引擎处理。在线语音等可选服务的数据处理规则取决于所选服务商，请查看其隐私政策。"
                         )
                         
                         PrivacySection(
                             title = "剪贴板",
-                            content = "剪贴板功能仅在您的设备本地运行。您可以随时查看、删除或清除剪贴板历史记录。"
+                            content = "剪贴板历史默认保存在本地；同步功能由您启用的插件提供。您可以随时查看、删除或清除本地记录。"
                         )
                         
                         PrivacySection(
                             title = "开源",
-                            content = "曦码是开源软件，源代码公开可审计。您可以在 GitHub 上查看完整源代码。"
+                            content = "Xime-CyletixFork是开源软件，源代码公开可审计。您可以在 GitHub 上查看完整源代码。"
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "更新日期：2026年4月",
+                            text = "更新日期：2026年9月23日",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

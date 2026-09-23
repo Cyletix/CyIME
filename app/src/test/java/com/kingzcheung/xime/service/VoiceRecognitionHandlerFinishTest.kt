@@ -51,7 +51,9 @@ class VoiceRecognitionHandlerFinishTest {
     private lateinit var handler: VoiceRecognitionHandler
 
     private val stateChanges = mutableListOf<InputUIState>()
+    private var recordingStoppedCount = 0
     private var voiceCompleteCount = 0
+    private var currentState = InputUIState()
 
     /** mock mainHandler 的 postDelayed 队列，可手动推进超时。 */
     private val posted = mutableListOf<Runnable>()
@@ -79,8 +81,9 @@ class VoiceRecognitionHandlerFinishTest {
 
         handler = VoiceRecognitionHandler(
             context = mockContext,
-            onStateChanged = { stateChanges.add(it) },
-            getState = { InputUIState() },
+            onRecordingStopped = { recordingStoppedCount++ },
+            onStateChanged = { stateChanges.add(it); currentState = it },
+            getState = { currentState },
             getInputConnection = { mockInputConnection },
             onVoiceComplete = { voiceCompleteCount++ },
             managerFactory = { mockManager },
@@ -241,4 +244,146 @@ class VoiceRecognitionHandlerFinishTest {
         verify(mockInputConnection, never()).setComposingText(any(), anyInt())
         verify(mockInputConnection, never()).commitText(any(), anyInt())
     }
+
+    private val editor = StringBuilder()
+
+    private fun startToolbar() {
+        whenever(mockInputConnection.getTextBeforeCursor(anyInt(), anyInt())).thenAnswer {
+            editor.takeLast(it.getArgument<Int>(0)).toString()
+        }
+        whenever(mockInputConnection.commitText(any(), anyInt())).thenAnswer {
+            editor.append(it.getArgument<CharSequence>(0)); true
+        }
+        whenever(mockInputConnection.deleteSurroundingText(anyInt(), anyInt())).thenAnswer {
+            editor.delete((editor.length - it.getArgument<Int>(0)).coerceAtLeast(0), editor.length); true
+        }
+        currentState = currentState.copy(voiceSticky = true, isVoiceMode = true)
+        handler.startRecognition()
+        onState(RecognitionState.LISTENING)
+    }
+
+    @Test fun `toolbar stop immediately releases button while late final remains accepted`() {
+        startToolbar(); onPartial("你好")
+        handler.finishRecognition()
+        assertEquals(1, recordingStoppedCount)
+        assertEquals(0, voiceCompleteCount)
+        onResult("你好世界")
+        assertEquals("你好世界。", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `local idle after a completed sentence does not wait for timeout`() {
+        startToolbar(); onResult("完整一句")
+        handler.finishRecognition(); onState(RecognitionState.IDLE)
+        assertEquals(1, voiceCompleteCount)
+        assertEquals("完整一句。", editor.toString())
+        assertTrue(posted.isEmpty())
+    }
+
+    @Test fun `typing after stop rejects stale correction`() {
+        startToolbar(); onPartial("你好")
+        handler.finishRecognition(); handler.abandonPendingOnManualInput()
+        mockInputConnection.commitText("手动", 1)
+        onResult("你好世界")
+        assertEquals("你好手动", editor.toString())
+    }
+
+    @Test fun `toolbar streams partial and sentence results before stop without duplicates`() {
+        startToolbar()
+        onPartial("你好")
+        assertEquals("你好", editor.toString())
+        onResult("你好世界")
+        assertEquals("你好世界。", editor.toString())
+        assertEquals(0, voiceCompleteCount)
+        onPartial("继续")
+        assertEquals("你好世界。继续", editor.toString())
+        handler.finishRecognition()
+        onResult("继续说话")
+        assertEquals("你好世界。继续说话。", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+        repeat(2) { onResult("继续说话") }
+        assertEquals("你好世界。继续说话。", editor.toString())
+    }
+
+    @Test fun `toolbar partial revisions replace only its own visible tail`() {
+        startToolbar()
+        onPartial("泥好世界")
+        assertEquals("泥好世界", editor.toString())
+        onPartial("你好世界")
+        assertEquals("你好世界", editor.toString())
+        handler.finishRecognition(); onResult("你好世界")
+        assertEquals("你好世界。", editor.toString())
+    }
+
+    @Test fun `toolbar speech preserves intervening manual text`() {
+        startToolbar()
+        onPartial("你好")
+        mockInputConnection.commitText("手动文字", 1)
+        onPartial("你好世界")
+        assertEquals("你好手动文字世界", editor.toString())
+        handler.finishRecognition(); onResult("你好世界")
+        assertEquals("你好手动文字世界。", editor.toString())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+    }
+
+    @Test fun `toolbar speech does not overwrite a manual selection`() {
+        startToolbar()
+        onPartial("你好")
+        whenever(mockInputConnection.getSelectedText(0)).thenReturn("用户选中的文字")
+        onPartial("你好世界")
+        handler.finishRecognition(); onResult("你好世界")
+        assertEquals("你好", editor.toString())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+    }
+
+    @Test fun `toolbar accepts final only engines after stop`() {
+        startToolbar()
+        handler.finishRecognition()
+        assertEquals(0, voiceCompleteCount)
+        onResult("最终识别结果")
+        verify(mockInputConnection).commitText(eq("最终识别结果。"), eq(1))
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `toolbar timeout finishes the visible partial once and rejects late results`() {
+        startToolbar()
+        onResult("第一句话")
+        onPartial("第二句")
+        assertEquals("第一句话。第二句", editor.toString())
+        handler.finishRecognition(); runTimeouts()
+        assertEquals("第一句话。第二句，", editor.toString())
+        repeat(2) { onResult("第二句话") }
+        assertEquals("第一句话。第二句，", editor.toString())
+    }
+
+    @Test fun `toolbar abandoning session rejects all late results`() {
+        startToolbar()
+        onPartial("不要提交")
+        handler.abandonSession()
+        repeat(2) { onResult("不要提交") }
+        onPartial("不要提交")
+        assertEquals("不要提交", editor.toString())
+        verify(mockInputConnection, times(1)).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).setComposingText(any(), anyInt())
+    }
+
+    @Test fun `toolbar stop replay does not duplicate the previous final`() {
+        startToolbar()
+        onResult("完整的一句")
+        handler.finishRecognition()
+        onResult("完整的一句")
+        verify(mockInputConnection).commitText(eq("完整的一句。"), eq(1))
+    }
+    @Test fun `输入会话变化后迟到语音不能写入新输入框`() {
+        currentState = currentState.copy(inputSessionId = 1)
+        startToolbar()
+        onPartial("第一句")
+        org.mockito.Mockito.clearInvocations(mockInputConnection)
+        currentState = currentState.copy(inputSessionId = 2)
+        onPartial("第一句残留")
+        onResult("第一句残留最终结果")
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+    }
+
 }

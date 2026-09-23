@@ -69,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -551,6 +552,13 @@ fun SchemaSettingsContent(
                             )
                         }
 
+                        item(key = "builtin-english-mode") {
+                            SchemaToggleItem(
+                                schema = SchemaMeta(com.kingzcheung.xime.settings.InputModes.ENGLISH, "英文"),
+                                enabled = true, isCompiled = true, isCurrent = false,
+                                onToggle = {}, onSelect = {}, isBuiltIn = true,
+                            )
+                        }
                         val enabledSchemas = uiState.allSchemas.filter { it.schemaId in uiState.enabledSchemas }
 
                         if (enabledSchemas.isEmpty()) {
@@ -669,18 +677,20 @@ fun SchemaSettingsContent(
 }
 
 @Composable
-private fun SchemaToggleItem(
+internal fun SchemaToggleItem(
     schema: SchemaMeta,
     enabled: Boolean,
     isCompiled: Boolean,
     isCurrent: Boolean,
     onToggle: () -> Unit,
     onSelect: () -> Unit,
+    isBuiltIn: Boolean = false,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { if (enabled && isCompiled) onSelect() },
+            .testTag("schema-card:${schema.schemaId}")
+            .then(if (isBuiltIn) Modifier else Modifier.clickable { if (enabled && isCompiled) onSelect() }),
         colors = CardDefaults.cardColors(
             containerColor = if (isCurrent)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
@@ -715,7 +725,10 @@ private fun SchemaToggleItem(
                         )
                     }
                 }
-                Row(
+                if (isBuiltIn) {
+                    Text("内置输入模式 · 始终启用", style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.outline)
+                } else Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (schema.version.isNotEmpty()) {
@@ -749,7 +762,9 @@ private fun SchemaToggleItem(
 
             Switch(
                 checked = enabled,
-                onCheckedChange = { onToggle() }
+                enabled = !isBuiltIn,
+                onCheckedChange = { if (!isBuiltIn) onToggle() },
+                modifier = Modifier.testTag("schema-toggle:${schema.schemaId}")
             )
         }
     }

@@ -118,21 +118,6 @@ fun ClipboardView(
                 .padding(horizontal = if (isLandscape) 50.dp else 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(iconButtonContainer)
-                    .clickable { onBack?.invoke() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = "关闭面板",
-                    tint = accentColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
 
             Spacer(modifier = Modifier.width(8.dp))
 

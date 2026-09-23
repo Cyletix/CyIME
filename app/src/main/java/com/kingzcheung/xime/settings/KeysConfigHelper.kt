@@ -638,7 +638,7 @@ object KeysConfigHelper {
      * 走 [codeLayoutForSchema] 查询，不进入合并键行布局缓存
      * （[mergedSectionForSchema] 对其返回 null）。
      */
-    internal val CODE_LAYOUT_SECTIONS = setOf("t9", "stroke", "handwriting")
+    internal val CODE_LAYOUT_SECTIONS = setOf("t9", "stroke", "handwriting", "japanese_kana")
 
     // 九键/笔画手势配置缓存（keyboard.t9.keys / keyboard.stroke.keys，custom 键级覆盖）。
     // 键 id 不做大小写归一：九键为数字字符串 "1"~"9"，笔画为键面标签（一/丨/丿/丶/乛 等）。
@@ -1509,21 +1509,21 @@ object KeysConfigHelper {
     /** 从 xime.yaml 加载默认主题 ID（style.color_scheme 的 light 字段）。 */
     fun loadDefaultThemeId(context: Context): String {
         val merged = loadMergedConfig(context)
-        return merged.style?.colorScheme?.light ?: "lavender_purple"
+        return merged.style?.colorScheme?.light ?: "dynamic"
     }
 
     /** 根据显示模式加载对应的默认主题 ID。 */
     fun loadThemeIdForMode(context: Context, isDark: Boolean): String {
         val merged = loadMergedConfig(context)
-        val cs = merged.style?.colorScheme ?: return "lavender_purple"
-        return if (isDark) (cs.dark ?: cs.light ?: "lavender_purple")
-               else cs.light ?: "lavender_purple"
+        val cs = merged.style?.colorScheme ?: return "dynamic"
+        return if (isDark) (cs.dark ?: cs.light ?: "dynamic")
+               else cs.light ?: "dynamic"
     }
 
     /** 从 xime.yaml 加载默认显示模式（style.dark_mode）。 */
     fun loadDefaultDarkMode(context: Context): Int {
         val merged = loadMergedConfig(context)
-        return merged.style?.darkMode ?: 2
+        return merged.style?.darkMode ?: 1
     }
 
     // ── 新公开 API ──
@@ -1562,11 +1562,10 @@ object KeysConfigHelper {
         return config[key.lowercase()]
     }
 
-    fun getKeyDisplayLabel(key: String, isAsciiMode: Boolean = false): String {
+    fun getKeyDisplayLabel(key: String, isAsciiMode: Boolean = false, isShifted: Boolean = false): String {
         val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
         val label = config[key.lowercase()]?.tap?.label
-        if (label.isNullOrEmpty()) return key.uppercase()
-        return if (label.any { it in 'a'..'z' || it in 'A'..'Z' }) label.uppercase() else label
+        return keyLabelWithCase(label?.takeIf { it.isNotEmpty() } ?: key, isShifted)
     }
 
     fun getKeyCommitValue(key: String, isAsciiMode: Boolean = false): String {

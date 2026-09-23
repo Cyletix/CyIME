@@ -37,11 +37,11 @@ object SettingsPreferences {
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
     @JvmStatic
-    var defaultKeyboardTheme: String = "lavender_purple"
+    var defaultKeyboardTheme: String = "dynamic"
 
     /** 默认显示模式，可从 xime.yaml 的 style.dark_mode 初始化。 */
     @JvmStatic
-    var defaultDarkMode: Int = 2
+    var defaultDarkMode: Int = 1
     
     const val KEY_SWIPE_UP_HINTS_ENABLED = "swipe_up_hints_enabled"
     const val KEY_SWIPE_DOWN_HINTS_ENABLED = "swipe_down_hints_enabled"
@@ -537,12 +537,13 @@ object SettingsPreferences {
     }
 
     fun getKeyboardHeightDp(context: Context, isLandscape: Boolean): Int {
+        if (isLandscape) ensureLandscapeDefaults(context)
         val key = if (isLandscape) KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE else KEY_KEYBOARD_HEIGHT_DP
         val alt = if (isLandscape) KEY_KEYBOARD_HEIGHT_DP else KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE
         val stored = getPrefs(context).getInt(key, -1)
-        if (stored > 0) return stored
+        if (stored > 0) return if (isLandscape) stored.coerceIn(com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds(context.resources.configuration.screenHeightDp, true)) else stored
         val altStored = getPrefs(context).getInt(alt, -1)
-        if (altStored > 0) return altStored
+        if (isLandscape && altStored > 0) return if (isLandscape) altStored.coerceIn(com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds(context.resources.configuration.screenHeightDp, true)) else altStored
         return getDefaultKeyboardHeightDp(context, isLandscape)
     }
 
@@ -553,11 +554,11 @@ object SettingsPreferences {
 
     fun getDefaultKeyboardHeightDp(context: Context, isLandscape: Boolean = false): Int {
         val config = context.resources.configuration
-        if (!isLandscape) return config.screenHeightDp * DEFAULT_KEYBOARD_HEIGHT_PERCENT / 100
+        if (!isLandscape) return maxOf(config.screenWidthDp, config.screenHeightDp) * DEFAULT_KEYBOARD_HEIGHT_PERCENT / 100
         // 横屏以竖屏高度（长边）为基数：横屏短边随宽高比/系统栏波动大，
         // 长边是设备稳定值，且与悬浮模式 fallback（portraitScreenHeightDp × 百分比）语义一致
         val portraitHeightDp = maxOf(config.screenWidthDp, config.screenHeightDp)
-        return portraitHeightDp * DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE / 100
+        return (portraitHeightDp * DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE / 100).coerceIn(com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds(config.screenHeightDp, true))
     }
 
     private const val KEY_KEYBOARD_BOTTOM_PADDING_DP = "keyboard_bottom_padding_dp"
@@ -587,8 +588,28 @@ object SettingsPreferences {
     private const val KEY_FLOATING_OFFSET_X_LANDSCAPE = "floating_offset_x_landscape"
     private const val KEY_FLOATING_OFFSET_Y = "floating_offset_y"
     private const val KEY_FLOATING_OFFSET_Y_LANDSCAPE = "floating_offset_y_landscape"
+    private const val KEY_KEYBOARD_OPACITY = "keyboard_opacity"
+
+    private fun ensureLandscapeDefaults(context: Context) {
+        val prefs = getPrefs(context)
+        if (!prefs.getBoolean("landscape_layout_v2", false)) prefs.edit()
+            .putBoolean("landscape_layout_v2", true).putBoolean(KEY_FLOATING_MODE_LANDSCAPE, true)
+            .putFloat("keyboard_opacity_landscape", 0.5f).apply()
+    }
+
+    fun getKeyboardOpacity(context: Context): Float {
+        val landscape = context.resources.configuration.screenWidthDp > context.resources.configuration.screenHeightDp
+        if (landscape) ensureLandscapeDefaults(context)
+        return getPrefs(context).getFloat(if (landscape) "keyboard_opacity_landscape" else KEY_KEYBOARD_OPACITY, if (landscape) 0.5f else 1f).coerceIn(0.3f, 1f)
+    }
+
+    fun setKeyboardOpacity(context: Context, opacity: Float) {
+        val landscape = context.resources.configuration.screenWidthDp > context.resources.configuration.screenHeightDp
+        getPrefs(context).edit().putFloat(if (landscape) "keyboard_opacity_landscape" else KEY_KEYBOARD_OPACITY, opacity.coerceIn(0.3f, 1f)).apply()
+    }
 
     fun isFloatingMode(context: Context, isLandscape: Boolean = false): Boolean {
+        if (isLandscape) ensureLandscapeDefaults(context)
         val key = if (isLandscape) KEY_FLOATING_MODE_LANDSCAPE else KEY_FLOATING_MODE
         return getPrefs(context).getBoolean(key, false)
     }

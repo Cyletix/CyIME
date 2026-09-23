@@ -1,16 +1,16 @@
+> **Cyletix fork — modified 2026-09-23.** This is [Xime-CyletixFork](https://github.com/Cyletix/Xime), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/Xime/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [fork changes and validation](docs/fork-landscape-japanese-and-branding.md).
+
 <p align="center">
   <img src="docs/logo.jpg" alt="Xime Logo" width="600">
 </p>
 
-<h1 align="center">Xime - Wubi / Pinyin Input Method for Android</h1>
+<h1 align="center">Xime-CyletixFork</h1>
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a>
 </p>
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-    alt="Get it on F-Droid"
-    height="80">](https://f-droid.org/packages/com.kingzcheung.xime)
+[Upstream Xime on F-Droid](https://f-droid.org/packages/com.kingzcheung.xime)
 
 
 [Windows Version](https://github.com/ximeiorg/winxime) | [Linux Version](https://github.com/ximeiorg/xime-wayland) | [Predictive Text Model](https://github.com/ximeiorg/predictive-text) | [Handwriting Model](https://github.com/ximeiorg/ochwpro)

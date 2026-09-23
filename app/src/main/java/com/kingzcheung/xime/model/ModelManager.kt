@@ -3,6 +3,14 @@ package com.kingzcheung.xime.model
 import android.content.Context
 import com.kingzcheung.xime.util.FileLogger
 import java.io.File
+import com.kingzcheung.xime.settings.MarketVersionStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 
 object ModelManager {
 
@@ -10,6 +18,10 @@ object ModelManager {
 
     private var initialized = false
     private val _modelsFlow = kotlinx.coroutines.flow.MutableStateFlow<List<ModelInfo>>(emptyList())
+    private val downloadLocks = ConcurrentHashMap<String, Mutex>()
+    private val installGuards = ConcurrentHashMap<String, ModelInstallGuard>()
+    private val _downloadStates = MutableStateFlow<Map<String, ModelDownloadState>>(emptyMap())
+    val downloadStates: StateFlow<Map<String, ModelDownloadState>> = _downloadStates
 
     /** 可观察的模型清单（远程 index 加载后自动更新） */
     val modelsFlow: kotlinx.coroutines.flow.StateFlow<List<ModelInfo>> = _modelsFlow
@@ -40,7 +52,7 @@ object ModelManager {
         } else {
             FileLogger.w(TAG, "Remote index returned empty, no models available")
         }
-        _modelsFlow.value = remote
+        if (remote.isNotEmpty()) _modelsFlow.value = remote
     }
 
     fun isUsingRemoteIndex(): Boolean = _modelsFlow.value.isNotEmpty()
@@ -56,14 +68,7 @@ object ModelManager {
         val dir = getModelStorageDir(context, model) ?: return false
         if (!dir.exists()) return false
 
-        return model.files.all { fileInfo ->
-            val file = if (model.archiveUrl != null) {
-                findFileInDir(dir, fileInfo.name)
-            } else {
-                File(dir, fileInfo.name)
-            }
-            file.exists() && file.length() > 0
-        }
+        return installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id)) != null
     }
 
     fun getModelStorageDir(context: Context, model: ModelInfo): File? {
@@ -81,12 +86,9 @@ object ModelManager {
         val dir = getModelStorageDir(context, model) ?: return 0
         if (!dir.exists()) return 0
 
-        return model.files.sumOf { fileInfo ->
-            val file = if (model.archiveUrl != null) {
-                findFileInDir(dir, fileInfo.name)
-            } else {
-                File(dir, fileInfo.name)
-            }
+        val version = installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id)) ?: return 0
+        return version.files.sumOf { fileInfo ->
+            val file = findModelFile(dir, version, fileInfo.name)
             if (file.exists()) file.length() else 0
         }
     }
@@ -112,9 +114,47 @@ object ModelManager {
         context: Context,
         model: ModelInfo,
         onProgress: (ModelDownloadState) -> Unit,
-        version: ModelVersion? = null
+        version: ModelVersion? = null,
+        onlyIfDefaultPending: Boolean = false,
     ) {
-        ModelDownloader.downloadModel(context, model, onProgress, version)
+        val guard = installGuards.getOrPut(model.id) { ModelInstallGuard() }
+        val generation = guard.currentGeneration()
+        val completionBeforeRequest = guard.completionRevision
+        // 自动准备与市场点击同一模型时串行；仅合并排队期间已完成的同版本下载。
+        downloadLocks.getOrPut(model.id) { Mutex() }.withLock {
+            if (onlyIfDefaultPending && DefaultModelInstaller.isHandled(context, model.id)) {
+                onProgress(ModelDownloadState.Idle)
+                return@withLock
+            }
+            val target = version ?: model.resolvedVersion()
+            val installed = MarketVersionStore.getModelVersion(context, model.id)
+            if (guard.completionRevision != completionBeforeRequest && target != null &&
+                installed == target.version && hasDownloadedModelFiles(ModelStorage.getModelDir(context, model.id), target)) {
+                _downloadStates.update { it + (model.id to ModelDownloadState.Complete) }
+                onProgress(ModelDownloadState.Complete)
+                return@withLock
+            }
+            val starting = ModelDownloadState.Downloading(0f, 0, -1)
+            _downloadStates.update { it + (model.id to starting) }
+            onProgress(starting)
+            try {
+                ModelDownloader.downloadModel(context, model, { state ->
+                    _downloadStates.update { it + (model.id to state) }
+                    onProgress(state)
+                }, version, install = { staging, destination ->
+                    guard.install(generation, staging, destination,
+                        isStillRequested = { !onlyIfDefaultPending || !DefaultModelInstaller.isHandled(context, model.id) }) {
+                        if (target != null) MarketVersionStore.setModelVersion(context, model.id, target.version)
+                    }
+                })
+            } catch (cancelled: CancellationException) {
+                _downloadStates.update { states ->
+                    if (states[model.id] is ModelDownloadState.Downloading)
+                        states + (model.id to ModelDownloadState.Idle) else states
+                }
+                throw cancelled
+            }
+        }
     }
 
     fun deleteModel(context: Context, id: String): Boolean {
@@ -123,38 +163,22 @@ object ModelManager {
     }
 
     fun deleteModel(context: Context, model: ModelInfo): Boolean {
-        val dir = getModelStorageDir(context, model) ?: return false
-        if (!dir.exists()) return false
-
-        var success = true
-        for (fileInfo in model.files) {
-            val file = if (model.archiveUrl != null) {
-                findFileInDir(dir, fileInfo.name)
-            } else {
-                File(dir, fileInfo.name)
+        val guard = installGuards.getOrPut(model.id) { ModelInstallGuard() }
+        return guard.delete {
+            val dir = getModelStorageDir(context, model) ?: return@delete false
+            val version = installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id))
+                ?: model.resolvedVersion()
+            var success = true
+            for (fileInfo in version?.files.orEmpty()) {
+                val file = findModelFile(dir, version!!, fileInfo.name)
+                if (file.exists() && !file.delete()) success = false
             }
-            if (file.exists() && !file.delete()) {
-                success = false
+            if (success) {
+                MarketVersionStore.removeModelVersion(context, model.id)
+                DefaultModelInstaller.markHandled(context, model.id)
+                _downloadStates.update { it + (model.id to ModelDownloadState.Idle) }
             }
+            success
         }
-        if (success) {
-            com.kingzcheung.xime.settings.MarketVersionStore.removeModelVersion(context, model.id)
-        }
-
-        return success
-    }
-
-    private fun findFileInDir(dir: File, fileName: String): File {
-        val direct = File(dir, fileName)
-        if (direct.exists()) return direct
-
-        dir.listFiles()?.forEach { child ->
-            if (child.isDirectory) {
-                val found = findFileInDir(child, fileName)
-                if (found.exists()) return found
-            }
-        }
-
-        return direct
     }
 }

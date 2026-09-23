@@ -30,8 +30,6 @@ import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
 import com.kingzcheung.xime.ui.keyboard.initialKeyboardLayoutState
 import com.kingzcheung.xime.util.FileLogger
 
-enum class ShiftMode { OFF, SINGLE, CAPS }
-
 /**
  * 菜单栏中动态展示的一个方案开关（来自 schema 的 `switches`）。
  * [name] 非空为布尔开关，[options] 非空为多选一开关；[currentIndex] 为当前状态在 [states] 中的下标。
@@ -57,6 +55,7 @@ data class KeyboardUiState(
     val themeId: String = "ocean_blue",
     val keyboardHeightDp: Int = 0,
     val keyboardBottomPaddingDp: Int = 0,
+    val keyboardOpacity: Float = 1f,
     val isDeploying: Boolean = false,
     val deploymentMessage: String = "",
     val clipboardItems: List<ClipboardItem> = emptyList(),
@@ -81,6 +80,7 @@ data class KeyboardUiState(
     val floatingOffsetX: Int = 0,
     val floatingOffsetY: Int = 0,
     val floatingMinOffsetY: Int = 0,
+    val floatingScreenHeightDp: Int = 0,
     val t9ResetSignal: Long = 0L,
     val swipeCancelEpoch: Long = 0L,
     val t9RightCandidateSelectedCount: Long = 0L,
@@ -107,11 +107,8 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     val clipboardManager = ClipboardManager.getInstance(application)
 
-    private val _isShifted = MutableStateFlow(false)
-    val isShifted: StateFlow<Boolean> = _isShifted.asStateFlow()
-
-    private val _shiftMode = MutableStateFlow(ShiftMode.OFF)
-    val shiftMode: StateFlow<ShiftMode> = _shiftMode.asStateFlow()
+    private val shiftState = KeyboardShiftState()
+    val shiftMode: StateFlow<ShiftMode> = shiftState.mode
 
     private val _keyboardState = MutableStateFlow<KeyboardLayoutState>(KeyboardLayoutState.Chinese)
     val keyboardState: StateFlow<KeyboardLayoutState> = _keyboardState.asStateFlow()
@@ -163,6 +160,34 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     /** 进入面板前保存的 keyboardState，用于 exitPanel 恢复 */
     private var _savedKbStateBeforePanel: KeyboardLayoutState? = null
+
+    private data class HandwritingReturn(
+        val page: KeyboardPage,
+        val layout: KeyboardLayoutState,
+        val panelLayout: KeyboardLayoutState?,
+    )
+    private var handwritingReturn: HandwritingReturn? = null
+    val hasTemporaryHandwriting: Boolean get() = handwritingReturn != null
+
+    fun enterTemporaryHandwriting() {
+        if (handwritingReturn != null) return
+        handwritingReturn = HandwritingReturn(_page.value, _keyboardState.value, _savedKbStateBeforePanel)
+        _savedKbStateBeforePanel = null
+        _page.value = KeyboardPage.Main(MainType.HANDWRITING)
+        _syncViewState()
+    }
+
+    fun exitTemporaryHandwriting(): Boolean {
+        val saved = handwritingReturn ?: return false
+        handwritingReturn = null
+        _page.value = saved.page
+        _keyboardState.value = saved.layout
+        _savedKbStateBeforePanel = saved.panelLayout
+        _syncViewState()
+        return true
+    }
+
+    fun discardTemporaryHandwriting() { handwritingReturn = null }
 
     /** 键盘 ascii 状态机（顶层统一管理各键盘上下文的 ascii 记忆） */
     val asciiStateMachine = KeyboardAsciiStateMachine()
@@ -290,7 +315,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 Triple(KeyboardViewState.Handwriting, KeyboardPage.Main(MainType.HANDWRITING), KeyboardLayoutState.Chinese)
             }
             is KeyboardDispatchAction.AsciiModeChanged -> {
-                if (current is KeyboardViewState.Overlay) {
+                if (hasTemporaryHandwriting || current is KeyboardViewState.Overlay) {
                     FileLogger.i("XimeKeyboard", "AsciiModeChanged skipped: current=$current (overlay)")
                     Triple(current, _page.value, _keyboardState.value)
                 } else if (current is KeyboardViewState.NumberPanel || current is KeyboardViewState.CommonSymbolPanel) {
@@ -317,7 +342,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 if (current is KeyboardViewState.NumberPanel || current is KeyboardViewState.CommonSymbolPanel) {
                     Triple(current, _page.value, _keyboardState.value)
                 } else if (currentPage is KeyboardPage.Main && currentPage.type == MainType.HANDWRITING
-                    && (action.schemaId.isEmpty() || isHandwritingSchema(action.schemaId))
+                    && (hasTemporaryHandwriting || action.schemaId.isEmpty() || isHandwritingSchema(action.schemaId))
                 ) {
                     // 仅在当前确为手写方案（或方案未知）时保持手写页；事件携带其他
                     // schemaId 说明引擎已切换，手写页是残留状态，需走下方重置切回
@@ -363,62 +388,40 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 )
             }
         }
+        if (newPage is KeyboardPage.Main) _savedKbStateBeforePanel = null
         _viewState.value = newState
         _page.value = newPage
         if (newKbState is KeyboardLayoutState.English) {
-            _isShifted.value = false
-            _shiftMode.value = ShiftMode.OFF
+            resetShift()
         }
         _keyboardState.value = newKbState
         _syncViewState()
     }
 
     fun toggleShift() {
-        _isShifted.update { !it }
+        shiftState.singleTap()
     }
 
     fun setShifted(shifted: Boolean) {
-        _isShifted.value = shifted
+        shiftState.setShifted(shifted)
     }
 
     fun singleTapShift() {
-        when (_shiftMode.value) {
-            ShiftMode.OFF -> {
-                _isShifted.value = true
-                _shiftMode.value = ShiftMode.SINGLE
-            }
-            ShiftMode.SINGLE, ShiftMode.CAPS -> {
-                _isShifted.value = false
-                _shiftMode.value = ShiftMode.OFF
-            }
-        }
+        shiftState.singleTap()
     }
 
     fun doubleTapShift() {
-        when (_shiftMode.value) {
-            ShiftMode.CAPS -> {
-                _isShifted.value = false
-                _shiftMode.value = ShiftMode.OFF
-            }
-            else -> {
-                _isShifted.value = true
-                _shiftMode.value = ShiftMode.CAPS
-            }
-        }
+        shiftState.doubleTap()
     }
 
     fun onCharacterTyped() {
-        if (_shiftMode.value == ShiftMode.SINGLE) {
-            _isShifted.value = false
-            _shiftMode.value = ShiftMode.OFF
-        }
+        shiftState.onCharacterTyped()
     }
 
     fun setKeyboardState(state: KeyboardLayoutState) {
         val prevKb = _keyboardState.value
         if (state is KeyboardLayoutState.English) {
-            _isShifted.value = false
-            _shiftMode.value = ShiftMode.OFF
+            resetShift()
         } else {
             handwritingShouldReturn = false
         }
@@ -468,14 +471,15 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun resetShift() {
-        _isShifted.value = false
-        _shiftMode.value = ShiftMode.OFF
+        shiftState.reset()
     }
 
     // ── Page Navigation ──
 
     /** Level 1: 切换主键盘类型 */
     fun switchMain(type: MainType) {
+        // 显式模式选择结束旧面板，其返回布局不能泄漏到下一次打开的面板。
+        _savedKbStateBeforePanel = null
         _page.value = KeyboardPage.Main(type)
         if (type == MainType.FULL) {
             _keyboardState.value = KeyboardLayoutState.Chinese
@@ -545,6 +549,12 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         _syncViewState()
     }
 
+    /** 同一工具栏图标再次点击，回到打开工具前的页面。 */
+    fun toggleOverlay(route: OverlayRoute, initialBackStack: List<OverlayRoute> = emptyList()) {
+        if ((_page.value as? KeyboardPage.Overlay)?.route == route) closeOverlay()
+        else showOverlay(route, initialBackStack)
+    }
+
     /** Level 3: 在覆盖页面内推入子页 */
     fun pushOverlay(route: OverlayRoute) {
         val current = _page.value
@@ -580,8 +590,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun resetKeyboard(isAsciiMode: Boolean, schemaId: String = "", forceNumberPanel: Boolean = false) {
-        _isShifted.value = false
-        _shiftMode.value = ShiftMode.OFF
+        resetShift()
         _candidatePageExpanded.value = false
         KeysConfigHelper.setActiveKeyboardSchema(schemaId)
         if (forceNumberPanel) {
@@ -591,6 +600,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
             _savedKbStateBeforePanel = initialKeyboardLayoutState(isAsciiMode, schemaId)
             _page.value = KeyboardPage.Panel(PanelType.NUMBER, MainType.FULL)
         } else {
+            _savedKbStateBeforePanel = null
             _keyboardState.value = initialKeyboardLayoutState(isAsciiMode, schemaId)
             if (_page.value !is KeyboardPage.Main) {
                 _page.value = KeyboardPage.Main(MainType.FULL)

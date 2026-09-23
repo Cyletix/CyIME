@@ -19,6 +19,8 @@ class VoiceRecognitionHandler(
     private val getState: () -> InputUIState,
     private val getInputConnection: () -> InputConnection?,
     private val onVoiceComplete: () -> Unit = {},
+    /** 录音停止即恢复工具栏；最终文本仍允许后台收尾。 */
+    private val onRecordingStopped: () -> Unit = {},
     private val onAmplitudeChanged: (Float) -> Unit = {},
     private val onSpectrumChanged: (FloatArray) -> Unit = {},
     /** 语音向输入框写入 composing 文本时回调（标记 composing 区域存在，供 endComposingInputBox 判断）。 */
@@ -122,6 +124,12 @@ class VoiceRecognitionHandler(
         finishing = false
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         suppressDuplicateFinal = false
+        sessionAbandoned = false
+        inputSession = getState().inputSessionId
+        toolbarSession = getState().voiceSticky
+        toolbarText.reset()
+        lastToolbarFinal = ""
+        lastPartialText = ""
 
         textBeforeVoiceInput = getInputConnection()?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
         textLengthBeforeVoiceInput = textBeforeVoiceInput.length
@@ -141,6 +149,8 @@ class VoiceRecognitionHandler(
     }
 
     fun release() {
+        abandonSession()
+        cancelPreStart()
         if (::speechRecognitionManager.isInitialized) {
             speechRecognitionManager.release()
         }
@@ -167,6 +177,23 @@ class VoiceRecognitionHandler(
         return "未配置"
     }
 
+    private var inputSession: Long? = null
+
+    private fun acceptsInputSession(): Boolean {
+        if (inputSession == null || inputSession == getState().inputSessionId) return true
+        // restartInput 也可能不经 onFinishInput；不允许旧录音继续作用于新会话。
+        if (!sessionAbandoned) {
+            abandonSession()
+            cancelPreStart()
+            stopRecognition()
+            onVoiceComplete()
+        }
+        return false
+    }
+
+    private var toolbarSession = false
+    private val toolbarText = StreamingVoiceText()
+    private var lastToolbarFinal = ""
     private var lastPartialText = ""
     private var lastAmplitudeUpdate = 0L
     private var smoothedAmplitude = 0f
@@ -183,8 +210,11 @@ class VoiceRecognitionHandler(
     private val finishTimeoutRunnable = Runnable { onFinishTimeout() }
 
     /** 输入法隐藏/切换输入框时调用：丢弃当前会话的未识别文本，忽略迟到的最终结果 */
+    fun abandonPendingOnManualInput() { if (finishing) abandonSession() }
+
     fun abandonSession() {
         sessionAbandoned = true
+        toolbarText.reset()
         finishing = false
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         lastPartialText = ""
@@ -192,7 +222,17 @@ class VoiceRecognitionHandler(
 
     // 语音按钮长按抬起时调用：立即提交当前已识别的文本（不依赖可能被断连竞态吞掉的异步最终结果）
     fun commitPendingOnRelease() {
-        if (sessionAbandoned) return
+        if (!acceptsInputSession()) return
+        if (sessionAbandoned || suppressDuplicateFinal) return
+        if (toolbarSession) {
+            if (lastPartialText.isNotBlank()) {
+                getInputConnection()?.let { toolbarText.update(it, addPunctuation(lastPartialText)) }
+            }
+            toolbarText.reset()
+            lastPartialText = ""
+            suppressDuplicateFinal = true
+            return
+        }
         val ic = getInputConnection()
         val partial = lastPartialText
         Log.d(TAG, "commitPendingOnRelease: ic=${ic != null}, partial='$partial', suppress=$suppressDuplicateFinal")
@@ -217,7 +257,7 @@ class VoiceRecognitionHandler(
             speechRecognitionManager.stopRecognition()
             return
         }
-        if (lastPartialText.isEmpty()) {
+        if (!toolbarSession && lastPartialText.isEmpty()) {
             // 无已识别文本（没说话/极短语音）：无内容可等，直接结束；
             // 迟到的最终结果仍走正常提交路径（说了话就该上屏）
             speechRecognitionManager.stopRecognition()
@@ -231,11 +271,13 @@ class VoiceRecognitionHandler(
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         mainHandler.postDelayed(finishTimeoutRunnable, FINISH_TIMEOUT_MS)
         speechRecognitionManager.stopRecognition()
+        if (toolbarSession) onRecordingStopped()
     }
 
     private fun onFinishTimeout() {
         if (!finishing) return
         finishing = false
+        mainHandler.removeCallbacks(finishTimeoutRunnable)
         Log.d(TAG, "finish timeout: committing partial result as fallback")
         // 超时未收到最终结果：提交已收到的部分结果兜底（会话已丢弃时内部直接跳过）
         commitPendingOnRelease()
@@ -243,8 +285,10 @@ class VoiceRecognitionHandler(
     }
 
     private fun handleSpeechResult(text: String) {
+        if (!acceptsInputSession()) return
         Log.d(TAG, "Speech result (final): $text")
 
+        if (toolbarSession && (sessionAbandoned || suppressDuplicateFinal)) return
         val wasFinishing = finishing
         if (finishing) {
             // 收尾中收到最终结果：取消超时兜底，正常提交完整结果
@@ -268,6 +312,23 @@ class VoiceRecognitionHandler(
         }
 
         val cleanText = text.replace(" ", "")
+        if (toolbarSession) {
+            // 部分引擎 stop 时重发上一句 final；没有新 partial 时只保留一次。
+            if (cleanText.isNotEmpty() && !cleanText.startsWith("错误:") &&
+                !(wasFinishing && lastPartialText.isEmpty() && cleanText == lastToolbarFinal)) {
+                getInputConnection()?.let { toolbarText.update(it, addPunctuation(cleanText)) }
+                lastToolbarFinal = cleanText
+            } else if (cleanText.isEmpty() && lastPartialText.isNotEmpty()) {
+                getInputConnection()?.let { toolbarText.update(it, addPunctuation(lastPartialText)) }
+            }
+            toolbarText.reset()
+            lastPartialText = ""
+            if (wasFinishing) {
+                suppressDuplicateFinal = true
+                onVoiceComplete()
+            }
+            return
+        }
         val ic = getInputConnection()
         if (ic != null && cleanText.isNotEmpty() && !cleanText.startsWith("错误:")) {
             val punctuatedText = addPunctuation(cleanText)
@@ -324,39 +385,50 @@ class VoiceRecognitionHandler(
     }
 
     private fun handlePartialResult(text: String) {
+        if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
-        if (text == lastPartialText) return
-        lastPartialText = text
-        Log.d(TAG, "Speech result (partial): $text")
-        
-        // 过滤掉空格，避免显示空白
         val cleanText = text.replace(" ", "")
-        if (cleanText.isEmpty()) return
-        
+        if (cleanText.isEmpty() || cleanText == lastPartialText) return
+        lastPartialText = cleanText
+        Log.d(TAG, "Speech result (partial): $cleanText")
+
         val ic = getInputConnection()
         if (ic != null) {
-            onComposingWritten()
-            ic.setComposingText(cleanText, 1)
+            if (toolbarSession) {
+                toolbarText.update(ic, cleanText)
+            } else {
+                onComposingWritten()
+                ic.setComposingText(cleanText, 1)
+            }
         }
         onStateChanged(getState().copy(voiceRecognizedText = cleanText))
     }
 
     private fun handleSpeechStateChange(state: RecognitionState) {
+        if (!acceptsInputSession()) return
         Log.d(TAG, "Speech state changed: $state")
-        if (state == RecognitionState.LISTENING) {
+        if (toolbarSession && (sessionAbandoned || suppressDuplicateFinal)) return
+        if (state == RecognitionState.LISTENING && !toolbarSession) {
             lastPartialText = ""
             suppressDuplicateFinal = false
             sessionAbandoned = false
         }
         // 收尾等待最终结果期间，引擎 stop 产生的 IDLE 不覆盖"正在识别..."显示
-        if (finishing && state == RecognitionState.IDLE) return
+        if (finishing && state == RecognitionState.IDLE) {
+            // 本地 stop() 已完成，空尾句不会再发 final；立即兜底，避免固定等满3秒。
+            // 在线插件的 IDLE 可能先于 WebSocket final，不据此丢弃尾句。
+            if (toolbarSession && SettingsPreferences.isSttUseLocal(context)) onFinishTimeout()
+            return
+        }
         onStateChanged(getState().copy(voiceRecognitionState = state))
     }
 
     private fun handleSpeechError(error: String, userVisible: Boolean) {
+        if (!acceptsInputSession()) return
         Log.e(TAG, "Speech error: $error")
         FileLogger.e(TAG, "Speech error: $error")
         val wasFinishing = finishing
+        if (toolbarSession) commitPendingOnRelease()
         finishing = false
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         lastPartialText = ""

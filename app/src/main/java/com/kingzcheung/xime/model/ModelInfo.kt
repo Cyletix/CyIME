@@ -9,7 +9,9 @@ enum class ModelCategory {
 
 data class ModelFile(
     val name: String,
-    val downloadUrl: String
+    val downloadUrl: String,
+    val sha256: String = "",
+    val sizeBytes: Long = 0,
 )
 
 /** 单个模型版本：文件清单 + 归档 + 元信息。 */

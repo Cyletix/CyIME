@@ -752,7 +752,7 @@ object SchemaManager {
     }
 
     /** 内置方案（保持默认启用顺序）。 */
-    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
+    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin") + JapaneseSchemas.ids
 
     /**
      * 内置方案补齐（纯函数）：用户启用列表尾部按 [BUILTIN_SCHEMAS] 顺序追加缺失项，
@@ -771,7 +771,7 @@ object SchemaManager {
         if (!customFile.exists()) {
             setEnabledSchemas(context, BUILTIN_SCHEMAS)
             SettingsPreferences.setBuiltinSchemasMerged(context, true)
-            return BUILTIN_SCHEMAS
+            return JapaneseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS)
         }
 
         try {
@@ -809,7 +809,7 @@ object SchemaManager {
                     SettingsPreferences.setBuiltinSchemasMerged(context, true)
                     m
                 }
-                return merged
+                return JapaneseSchemas.addOnFirstUpgrade(context, merged)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to read custom.yaml", e)
