@@ -1,6 +1,6 @@
-> **Cyletix fork — modified 2026-09-23.** This is [CyIME](https://github.com/Cyletix/Xime), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/Xime/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [identity and migration decisions](docs/cyime-identity.md).
+> **Cyletix fork — modified 2026-09-24.** This is [CyIME](https://github.com/Cyletix/CyIME), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/CyIME/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [identity and migration decisions](docs/cyime-identity.md).
 
-[CyIME 0.1.1 changes](docs/cyime-0.1.1.md)
+[CyIME 0.1.2 changes](docs/cyime-0.1.2.md)
 
 
 <h1 align="center">CyIME</h1>
@@ -13,7 +13,7 @@
 
 CyIME is Cyletix’s independently named Android input method, developed from [Xime](https://github.com/ximeiorg/Xime) and Rime. It retains upstream attribution and GPL-3.0 licensing. The 2024 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) project is its keyboard-layout research predecessor, not the Android application.
 
-The current repository is `Cyletix/Xime`; `Cyletix/CyIME` is the proposed repository name, not an existing download URL. Existing releases may still carry the former name. New builds use `CyIME-0.1.1-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
+The repository is now `Cyletix/CyIME`; former `Cyletix/Xime` URLs redirect to it. Existing releases may still carry the former name. New builds use `CyIME-0.1.2-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
 
 [Research findings and experimental layout](docs/cyime-keyboard-research.md) · [Naming and migration decisions](docs/cyime-identity.md)
 
@@ -94,7 +94,7 @@ Choose the APK matching your device architecture:
 
 ### From Releases
 
-1. Download the latest APK from [Releases](https://github.com/Cyletix/Xime/releases)
+1. Download the latest APK from [Releases](https://github.com/Cyletix/CyIME/releases)
 2. Install the application
 3. Enable CyIME in system input method settings
 4. Set CyIME as the current input method
@@ -132,7 +132,7 @@ For detailed documentation, visit [https://ime.ximei.me](https://ime.ximei.me).
 
 ```bash
 # Clone with submodules
-git clone --recursive https://github.com/Cyletix/Xime.git
+git clone --recursive https://github.com/Cyletix/CyIME.git
 
 # Or initialize submodules in an existing clone
 git submodule update --init --recursive

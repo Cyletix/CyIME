@@ -228,7 +228,7 @@ fun AboutContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { uriHandler.openUri("https://github.com/Cyletix/Xime/releases") },
+                                .clickable { uriHandler.openUri("https://github.com/Cyletix/CyIME/releases") },
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -315,7 +315,7 @@ fun AboutContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            uriHandler.openUri("https://github.com/Cyletix/Xime")
+                            uriHandler.openUri("https://github.com/Cyletix/CyIME")
                         },
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
@@ -338,7 +338,7 @@ fun AboutContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "github.com/Cyletix/Xime",
+                                text = "github.com/Cyletix/CyIME",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

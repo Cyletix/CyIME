@@ -142,8 +142,8 @@ fun NumberKeyboardLayout(
                 ) {
                     CompositionLocalProvider(
                         LocalKeyVisualPadding provides PaddingValues(
-                            horizontal = keySpacingX ?: 2.dp,
-                            vertical = keySpacingY ?: 2.dp,
+                            horizontal = keySpacingX ?: 4.dp,
+                            vertical = keySpacingY ?: 4.dp,
                         )
                     ) {
                     commonSymbols.chunked(6).forEach { rowSymbols ->
@@ -184,8 +184,8 @@ fun NumberKeyboardLayout(
                 ) {
                     CompositionLocalProvider(
                         LocalKeyVisualPadding provides PaddingValues(
-                            horizontal = keySpacingX ?: 2.dp,
-                            vertical = keySpacingY ?: 2.dp,
+                            horizontal = keySpacingX ?: 4.dp,
+                            vertical = keySpacingY ?: 4.dp,
                         )
                     ) {
                     NumberRows(
@@ -209,8 +209,8 @@ fun NumberKeyboardLayout(
             // 竖屏：原有布局
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 2.dp,
-                    vertical = keySpacingY ?: 2.dp,
+                    horizontal = keySpacingX ?: 4.dp,
+                    vertical = keySpacingY ?: 4.dp,
                 )
             ) {
             Column(

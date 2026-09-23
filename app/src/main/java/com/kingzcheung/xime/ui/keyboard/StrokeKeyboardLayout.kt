@@ -189,8 +189,8 @@ onKeyPressDown: ((String) -> Unit)?,
             // 笔画布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 2.dp,
-                    vertical = keySpacingY ?: 2.dp,
+                    horizontal = keySpacingX ?: 4.dp,
+                    vertical = keySpacingY ?: 4.dp,
                 )
             ) {
                 Box(
@@ -217,8 +217,8 @@ onKeyPressDown: ((String) -> Unit)?,
         } else {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 2.dp,
-                    vertical = keySpacingY ?: 2.dp,
+                    horizontal = keySpacingX ?: 4.dp,
+                    vertical = keySpacingY ?: 4.dp,
                 )
             ) {
                 Row(

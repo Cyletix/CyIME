@@ -149,11 +149,9 @@ class TabletSplitResizeTest {
         val floating = rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val split = rule.onNodeWithTag("keyboard-resize-split-button", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val panel = rule.onNodeWithTag("keyboard-resize-opacity-panel", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val heightHandle = rule.onNodeWithTag("keyboard-resize-height-handle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val positionHandle = rule.onNodeWithTag("keyboard-resize-position-handle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("compact height handle must remain touchable", heightHandle.height >= 40f)
-        assertTrue("compact position handle must remain touchable", positionHandle.height >= 40f)
-        assertTrue("opacity must not overlap height handles", panel.top >= heightHandle.bottom)
+        rule.onNodeWithTag("keyboard-resize-height-handle").assertDoesNotExist()
+        rule.onNodeWithTag("keyboard-resize-position-handle").assertDoesNotExist()
+        assertTrue(panel.top >= root.top + 24f)
         assertTrue(panel.bottom <= floating.top)
         assertTrue(floating.bottom < split.top)
         assertTrue(split.bottom <= root.bottom)
@@ -179,22 +177,16 @@ class TabletSplitResizeTest {
         val heights = mutableListOf<Int>()
         val gaps = mutableListOf<Int>()
         setResize(heights = heights, gaps = gaps)
-        assertTrue(rule.onNodeWithTag("keyboard-resize-height-handle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.height >= 48f)
-        assertTrue(rule.onNodeWithTag("keyboard-resize-position-handle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.height >= 48f)
-        rule.onNodeWithTag("resize-test-root", useUnmergedTree = true).performTouchInput {
-            down(Offset(5f, 190f)); moveBy(Offset(0f, -50f), 80); up()
-        }
-        rule.runOnIdle { assertTrue(gaps.isEmpty()); assertTrue(heights.isEmpty()) }
-        rule.onNodeWithTag("keyboard-resize-position-handle", useUnmergedTree = true).performTouchInput {
-            down(center); moveBy(Offset(0f, -40f), 80)
+        rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true).performTouchInput {
+            down(Offset(40f, 45f)); moveBy(Offset(0f, -40f), 80)
         }
         rule.runOnIdle { assertTrue("bottom gap must preview before pointer up", gaps.last() > 0) }
-        rule.onNodeWithTag("keyboard-resize-position-handle", useUnmergedTree = true).performTouchInput { up() }
-        rule.onNodeWithTag("keyboard-resize-height-handle", useUnmergedTree = true).performTouchInput {
-            down(center); moveBy(Offset(0f, -40f), 80)
+        rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true).performTouchInput { up() }
+        rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true).performTouchInput {
+            down(Offset(width / 2f, 4f)); moveBy(Offset(0f, -40f), 80)
         }
         rule.runOnIdle { assertTrue("height must preview before pointer up", heights.last() > 240) }
-        rule.onNodeWithTag("keyboard-resize-height-handle", useUnmergedTree = true).performTouchInput { up() }
+        rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true).performTouchInput { up() }
     }
 
     @Test fun floatingPositionHandleMovesContinuouslyWithoutChangingHeight() {
@@ -203,14 +195,14 @@ class TabletSplitResizeTest {
         val positions = mutableListOf<Offset>()
         var ends = 0
         setResize(true, heights, gaps, { x, y -> positions.add(Offset(x, y)) }, { ends++ })
-        rule.onNodeWithTag("keyboard-resize-position-handle", useUnmergedTree = true).performTouchInput {
-            down(center); moveBy(Offset(40f, -30f), 80)
+        rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true).performTouchInput {
+            down(Offset(40f, 45f)); moveBy(Offset(40f, -30f), 80)
         }
         rule.runOnIdle {
             assertTrue(positions.isNotEmpty()); assertTrue(positions.last().x > 0); assertTrue(positions.last().y > 0)
             assertEquals(0, ends); assertTrue(gaps.isEmpty()); assertTrue(heights.isEmpty())
         }
-        rule.onNodeWithTag("keyboard-resize-position-handle", useUnmergedTree = true).performTouchInput { up() }
+        rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true).performTouchInput { up() }
         rule.runOnIdle { assertEquals(1, ends) }
     }
 
@@ -231,11 +223,11 @@ class TabletSplitResizeTest {
                 }
             }
         }
-        val handle = rule.onNodeWithTag("keyboard-resize-position-handle", useUnmergedTree = true)
+        val handle = rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true)
         val initial = handle.fetchSemanticsNode().boundsInRoot
         val root = rule.onNodeWithTag("moving-resize-root", useUnmergedTree = true)
         val origin = root.fetchSemanticsNode().boundsInRoot.topLeft
-        root.performTouchInput { down(initial.center - origin); moveBy(Offset(0f, -35f), 80) }
+        root.performTouchInput { down(initial.topLeft + Offset(40f, 40f) - origin); moveBy(Offset(0f, -35f), 80) }
         rule.waitForIdle()
         val first = handle.fetchSemanticsNode().boundsInRoot
         assertTrue("position must change during the drag", first.top < initial.top)
@@ -248,9 +240,9 @@ class TabletSplitResizeTest {
         val third = handle.fetchSemanticsNode().boundsInRoot
         assertEquals(10f, second.top - third.top, 2f)
         root.performTouchInput { up() }
-        val heightHandle = rule.onNodeWithTag("keyboard-resize-height-handle", useUnmergedTree = true)
+        val heightHandle = rule.onNodeWithTag("keyboard-resize-frame", useUnmergedTree = true)
         val beforeResize = heightHandle.fetchSemanticsNode().boundsInRoot
-        root.performTouchInput { down(beforeResize.center - origin); moveBy(Offset(0f, -35f), 80) }
+        root.performTouchInput { down(beforeResize.topLeft + Offset(beforeResize.width / 2, 4f) - origin); moveBy(Offset(0f, -35f), 80) }
         rule.waitForIdle()
         val resized = heightHandle.fetchSemanticsNode().boundsInRoot
         assertTrue(resized.top < beforeResize.top)

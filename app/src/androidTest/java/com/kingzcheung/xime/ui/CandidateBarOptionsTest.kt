@@ -89,7 +89,7 @@ class CandidateBarOptionsTest {
         rule.runOnIdle { assertEquals(1, dismissed) }
     }
 
-    @Test fun expansionAndCollapseUseIdenticalArrowStyleAndDistinctActions() {
+    @Test fun expansionArrowRotatesDownAndBackUpWithoutMovingTheButton() {
         val expanded = mutableStateOf(false)
         var opens = 0
         var closes = 0
@@ -106,16 +106,27 @@ class CandidateBarOptionsTest {
         rule.onNodeWithText("更多").assertDoesNotExist()
         val before = rule.onNodeWithTag("candidate-expansion").captureToImage()
         val originalBounds = rule.onNodeWithTag("candidate-expansion").fetchSemanticsNode().boundsInRoot
+        rule.mainClock.autoAdvance = false
         rule.onNodeWithContentDescription("展开候选词").performClick()
-        rule.mainClock.advanceTimeBy(500)
+        rule.mainClock.advanceTimeBy(96)
+        val opening = rule.onNodeWithTag("candidate-expansion").captureToImage()
+        rule.mainClock.advanceTimeBy(250)
         val after = rule.onNodeWithTag("candidate-expansion").captureToImage()
         assertEquals(originalBounds, rule.onNodeWithTag("candidate-expansion").fetchSemanticsNode().boundsInRoot)
-        assertEquals(before.width, after.width); assertEquals(before.height, after.height)
-        val pixelsBefore = before.toPixelMap(); val pixelsAfter = after.toPixelMap()
-        for (y in 0 until before.height step 3) for (x in 0 until before.width step 3) {
-            assertEquals("展开/收起箭头应使用相同绘制", pixelsBefore[x, y], pixelsAfter[x, y])
+        fun differs(a: androidx.compose.ui.graphics.ImageBitmap, b: androidx.compose.ui.graphics.ImageBitmap): Boolean {
+            val first = a.toPixelMap(); val second = b.toPixelMap()
+            return (0 until a.height).any { y -> (0 until a.width).any { x -> first[x,y] != second[x,y] } }
         }
+        assertTrue("展开后的箭头须朝下", differs(before, after))
+        assertTrue("展开过程要有中间帧", differs(before, opening) && differs(after, opening))
         rule.onNodeWithContentDescription("返回键盘").performClick()
+        rule.mainClock.advanceTimeBy(96)
+        val closing = rule.onNodeWithTag("candidate-expansion").captureToImage()
+        assertTrue("收起过程要有中间帧", differs(before, closing) && differs(after, closing))
+        rule.mainClock.advanceTimeBy(250)
+        val restored = rule.onNodeWithTag("candidate-expansion").captureToImage()
+        assertFalse("收起后恢复朝上", differs(before, restored))
+        rule.mainClock.autoAdvance = true
         rule.onNodeWithContentDescription("展开候选词").assertIsDisplayed()
         rule.runOnIdle { assertEquals(1, opens); assertEquals(1, closes) }
     }
@@ -151,7 +162,7 @@ class CandidateBarOptionsTest {
         }
         val layouts = mutableListOf<TextLayoutResult>()
         rule.onNodeWithText("ni'hao", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertEquals(18.sp, layouts.single().layoutInput.style.fontSize)
+        assertEquals(16.sp, layouts.single().layoutInput.style.fontSize)
         rule.onNodeWithTag("candidate-preedit").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(1, edits); showPreview.value = false }
         rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()

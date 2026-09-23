@@ -546,8 +546,11 @@ class RimeEngine {
     }
 
     fun setPageSize(schemaId: String, pageSize: Int) {
-        if (!isInitialized) return
-        nativeSetPageSize(schemaId, pageSize)
+        // onStartInput may run while the worker is switching/deploying a schema.
+        // Do not mutate shared native configuration concurrently or block the UI on deployment.
+        tryLocked(Unit) {
+            if (isInitialized && !nativeIsMaintaining()) nativeSetPageSize(schemaId, pageSize)
+        }
     }
 
     fun switchSchema(schemaId: String): Boolean {

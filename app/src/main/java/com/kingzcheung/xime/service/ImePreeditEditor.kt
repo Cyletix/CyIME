@@ -8,6 +8,9 @@ import kotlinx.coroutines.withContext
 
 /** No InputConnection writes: only the unconfirmed Rime code can be edited. */
 internal class ImePreeditEditor(private val service: XimeInputMethodService) {
+    private var liveOwner: PinyinEditSession? = null
+    private var liveSession: PinyinEditSession? = null
+
     private fun enqueue(schema: String, block: suspend () -> Unit) {
         val t9Queue = if (isT9Schema(schema)) service.keyboardCallbacks?.onT9RunLiteralInput else null
         if (t9Queue != null) t9Queue(block) else service.keyRouter.postRimeJob { block() }
@@ -40,45 +43,65 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 if (service.uiState.value.inputSessionId == state.inputSessionId &&
                     service.uiState.value.currentSchemaId == state.currentSchemaId) {
                     if (unsupportedCode) android.widget.Toast.makeText(service, "请先选择左侧拼音，再编辑编码", android.widget.Toast.LENGTH_SHORT).show()
+                    liveOwner = session
+                    liveSession = session
                     reply(session)
                 }
             }
         }
     }
 
-    private fun isCurrent(session: PinyinEditSession): Boolean = session.isActive() && isOwnerCurrent(session)
+    /** Reuse the real keyboard. All edits share its FIFO and update composition immediately. */
+    fun edit(owner: PinyinEditSession, key: String?, selection: Int?, replacement: String?, reply: (PinyinEditSession?) -> Unit) {
+        enqueue(owner.schemaId) {
+            val session = liveSession
+            if (liveOwner !== owner || !owner.isActive() || session == null || !isOwnerCurrent(session)) {
+                withContext(Dispatchers.Main) { reply(null) }; return@enqueue
+            }
+            var text = session.text
+            var caret = (selection ?: session.caret).coerceIn(0, text.length)
+            if (replacement != null) {
+                text = if (session.isT9) PinyinEditBuffer.normalizedT9(replacement) else PinyinEditBuffer.normalized(replacement)
+                caret = text.length
+            } else if (key == "delete") {
+                if (caret > 0) { text = text.removeRange(caret - 1, caret); caret-- }
+            } else if (key != null) {
+                val insertion = if (session.isT9 && key == "1") "'" else key.lowercase()
+                text = text.take(caret) + insertion + text.drop(caret)
+                caret += insertion.length
+            }
+            val engine = service.rimeEngine
+            val changed = text != session.text
+            if (!changed && session.isT9) {
+                // Merely moving the caret must not lock an ambiguous nine-key reading.
+                liveSession = session.copy(caret = caret)
+                withContext(Dispatchers.Main) { if (owner.isActive()) reply(liveSession) }
+                return@enqueue
+            }
+            val result = engine.editPinyinAndReadState {
+                if (session.isT9) engine.applyT9PinyinEdit(session.expectedInput, text,
+                    session.t9RemainingDigits, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
+                else engine.applyPinyinEdit(session.expectedInput, session.protectedInput + text,
+                    session.protectedInput.length + caret, session.protectedInput.length,
+                    session.protectedText, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
+            }
+            if (result == null) { withContext(Dispatchers.Main) { reply(null) }; return@enqueue }
+            val next = session.copy(expectedInput = result.inputText, text = text, caret = caret,
+                t9RemainingDigits = if (session.isT9) engine.t9GetRemainingDigits() else "")
+            liveSession = next
+            withContext(Dispatchers.Main) {
+                if (!owner.isActive() || !isOwnerCurrent(session)) return@withContext
+                if (session.isT9) service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
+                service.sessionController.updateUIWithResult(result)
+                reply(next)
+            }
+        }
+    }
 
     private fun isOwnerCurrent(session: PinyinEditSession): Boolean = service.uiState.value.let {
         it.inputSessionId == session.inputSessionId && it.currentSchemaId == session.schemaId && !it.isAsciiMode &&
-            (!session.isT9 || it.t9RightCandidateSelectedCount == session.t9SelectionCount)
+            (!session.isT9 || (it.t9RightCandidateSelectedCount == session.t9SelectionCount &&
+                service.t9PartialSegments.joinToString("") { part -> part.text } == session.protectedText))
     }
 
-    fun apply(session: PinyinEditSession, text: String, caret: Int, reply: (Boolean) -> Unit) {
-        enqueue(session.schemaId) {
-            val state = service.uiState.value
-            if (!session.isActive() || state.inputSessionId != session.inputSessionId || state.currentSchemaId != session.schemaId || state.isAsciiMode) {
-                withContext(Dispatchers.Main) { reply(false) }; return@enqueue
-            }
-            if (session.isT9 && service.t9PartialSegments.joinToString("") { it.text } != session.protectedText) {
-                withContext(Dispatchers.Main) { reply(false) }; return@enqueue
-            }
-            val normalized = PinyinEditBuffer.normalized(text)
-            val engine = service.rimeEngine
-            val result = engine.editPinyinAndReadState {
-                if (session.isT9) engine.applyT9PinyinEdit(session.expectedInput, normalized,
-                    session.t9RemainingDigits, session.schemaId) { isCurrent(session) }
-                else engine.applyPinyinEdit(session.expectedInput, session.protectedInput + normalized,
-                    session.protectedInput.length + caret.coerceIn(0, normalized.length), session.protectedInput.length,
-                    session.protectedText, session.schemaId) { isCurrent(session) }
-            }
-            if (result != null) {
-                withContext(Dispatchers.Main) {
-                    if (!isOwnerCurrent(session)) { reply(false); return@withContext }
-                    if (session.isT9) service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
-                    service.sessionController.updateUIWithResult(result)
-                    reply(true)
-                }
-            } else withContext(Dispatchers.Main) { reply(false) }
-        }
-    }
 }

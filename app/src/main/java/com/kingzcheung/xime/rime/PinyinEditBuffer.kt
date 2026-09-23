@@ -1,6 +1,6 @@
 package com.kingzcheung.xime.rime
 
-/** Editing is a draft until Done: closing cannot commit or rewrite the host text. */
+/** Owns an uncommitted composition; editing never rewrites host text. */
 data class PinyinEditSession(
     val inputSessionId: Long,
     val schemaId: String,
@@ -24,7 +24,38 @@ internal object PinyinEditBuffer {
         "luna_pinyin", "luna_pinyin_simp", "pinyin_simp",
     ) || schema.startsWith("double_pinyin")
 
+    fun normalizedT9(text: String): String = text.lowercase().replace('ü', 'v')
+        .replace(' ', '\'').filter { it in 'a'..'z' || it in '2'..'9' || it == '\'' }
+
     fun normalized(text: String): String = text.lowercase().replace('ü', 'v')
         .replace(' ', '\'').filter { it in 'a'..'z' || it == '\'' }
 
+}
+
+/** Render engine syllable boundaries without inserting them into the editable Rime input. */
+internal class PinyinEditDisplay(raw: String, preedit: String) {
+    val text: String
+    private val offsets: List<Int>
+    init {
+        val visible = PinyinEditBuffer.normalized(preedit)
+        val boundaries = mutableSetOf<Int>()
+        if (visible.replace("'", "") == raw.replace("'", "")) {
+            var letters = 0
+            visible.forEach { if (it == '\'') boundaries.add(letters) else letters++ }
+        }
+        val mapping = mutableListOf(0)
+        text = buildString {
+            var letters = 0
+            raw.forEachIndexed { index, character ->
+                if (character != '\'' && letters in boundaries && isNotEmpty() && last() != '\'') {
+                    append('\''); mapping.add(index)
+                }
+                append(character); mapping.add(index + 1)
+                if (character != '\'') letters++
+            }
+        }
+        offsets = mapping
+    }
+    fun rawOffset(display: Int): Int = offsets[display.coerceIn(0, offsets.lastIndex)]
+    fun displayOffset(raw: Int): Int = offsets.indexOfLast { it <= raw }.coerceAtLeast(0)
 }

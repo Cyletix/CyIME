@@ -39,7 +39,7 @@ TEST(T9EditSuffixTest, InvalidDraftIsAtomicIncludingCaptureAndUndo) {
     auto model = Selected("64426", {{"ni", 2}, {"hao", 3}});
     model.RightCommit(0);
     model.PushCommitCapture("你", {123});
-    for (const auto& invalid : {"ni2", "ni''hao", "'hao", "Ni", "你好"}) {
+    for (const auto& invalid : {"ni1", "ni''hao", "'hao", "Ni", "你好"}) {
         EXPECT_FALSE(model.ReplaceEditableSuffix(invalid));
         EXPECT_EQ("64426", model.ToBuffer().digit_sequence);
         EXPECT_EQ("hao", model.ToBuffer().ToRimeInputString());
@@ -194,4 +194,19 @@ TEST(T9EditSuffixTest, AppendedDigitsDoNotUndoPreviouslyCommittedPrefix) {
     EXPECT_EQ(T9Segment::kCommitted, model.segments()[0].phase);
     EXPECT_EQ(0, model.ConsumeUndoneCommitCount());
     EXPECT_EQ(1u, model.commit_captures().size());
+}
+
+TEST(T9EditSuffixTest, LiveCaretEditPreservesAmbiguousDigitsAndUndoPrefix) {
+    auto model = Selected("64426", {{"ni", 2}, {"hao", 3}});
+    model.RightCommit(0);
+    model.PushCommitCapture("你", {123});
+    ASSERT_TRUE(model.ReplaceEditableSuffix("ha6"));
+    EXPECT_EQ("ha6", model.ToBuffer().ToRimeInputString());
+    EXPECT_EQ("64426", model.ToBuffer().digit_sequence);
+    ASSERT_TRUE(model.ReplaceEditableSuffix("hao'6"));
+    EXPECT_EQ("hao'6", model.ToBuffer().ToRimeInputString());
+    ASSERT_TRUE(model.ReplaceEditableSuffix("hao"));
+    EXPECT_EQ("hao", model.ToBuffer().ToRimeInputString());
+    ASSERT_EQ(1u, model.commit_captures().size());
+    EXPECT_EQ("你", model.commit_captures()[0].first);
 }

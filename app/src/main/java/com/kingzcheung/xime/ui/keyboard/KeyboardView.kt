@@ -311,16 +311,35 @@ fun KeyboardView(
             mutableStateOf<com.kingzcheung.xime.rime.PinyinEditSession?>(null)
         }
         var preeditRequest by remember(state.inputSessionId, state.currentSchemaId) { mutableIntStateOf(0) }
+        var preeditFrame by remember { mutableStateOf<com.kingzcheung.xime.rime.PinyinEditSession?>(null) }
+        fun editPreedit(key: String? = null, caret: Int? = null, text: String? = null) {
+            val owner = preeditEditSession ?: return
+            callbacks.onLivePreeditEdit?.invoke(owner, key, caret, text) { next ->
+                if (owner.isActive() && preeditEditSession === owner) {
+                    preeditFrame = next
+                    if (next == null) { preeditEditSession = null; preeditRequest++ }
+                }
+            }
+        }
         fun closePreeditEditor() {
-            preeditEditSession?.invalidate()
+            // Queued keystrokes must finish before a following commit/candidate event.
+            // Ownership checks still reject work after a host or schema change.
             preeditEditSession = null
+            preeditFrame = null
             preeditRequest++
         }
         SideEffect {
             callbacks.onDismissPreeditEditor = if (preeditEditSession != null) ({ closePreeditEditor() }) else null
+            callbacks.onPreeditKeyInput = if (preeditEditSession != null) ({ key ->
+                val t9 = preeditEditSession?.isT9 == true
+                if (key == "delete" || key == "'" || key.length == 1 &&
+                    (key[0].lowercaseChar() in 'a'..'z' || t9 && key[0] in '1'..'9')) {
+                    editPreedit(key = key); true
+                } else { closePreeditEditor(); false }
+            }) else null
         }
         DisposableEffect(callbacks) {
-            onDispose { callbacks.onDismissPreeditEditor = null }
+            onDispose { callbacks.onDismissPreeditEditor = null; callbacks.onPreeditKeyInput = null; preeditEditSession?.invalidate() }
         }
         LaunchedEffect(page, resizeOverlay != null) { closePreeditEditor() }
 
@@ -450,6 +469,14 @@ fun KeyboardView(
                     onClose = { callbacks.onToolPanelClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
                 )
+            }
+
+            if (preeditEditSession != null && preeditFrame != null) {
+                PreeditEditorBar(preeditFrame!!, keyBgColor, keyTextColor, accentColor,
+                    onClose = { closePreeditEditor() },
+                    onCaret = { editPreedit(caret = it) },
+                    onReplace = { editPreedit(text = it) },
+                    preedit = candidateState.value.preeditText, backgroundColor = keyboardBgColor)
             }
 
             CandidateBar(
@@ -713,24 +740,12 @@ fun KeyboardView(
                     callbacks.onOpenPreeditEditor != null) ({
                     val request = ++preeditRequest
                     callbacks.onOpenPreeditEditor?.invoke { session ->
-                        if (request == preeditRequest) { preeditEditSession = session; viewModel.setCandidatePageExpanded(false) }
+                        if (request == preeditRequest) { preeditEditSession = session; preeditFrame = session; viewModel.setCandidatePageExpanded(false) }
                     }
                 }) else null,
             )
 
-            if (preeditEditSession != null) {
-                val editSession = preeditEditSession!!
-                val editRequest = preeditRequest
-                PreeditEditorPanel(editSession, keyboardBgColor, keyBgColor, keyTextColor, accentColor,
-                    onClose = { if (editRequest == preeditRequest) closePreeditEditor() },
-                    onApply = { text, caret, reply ->
-                        callbacks.onApplyPreeditEdit?.invoke(editSession, text, caret) { success ->
-                            if (editRequest == preeditRequest && editSession.isActive()) reply(success)
-                        } ?: reply(false)
-                    },
-                    onFeedback = { onHapticFeedback?.invoke() },
-                    modifier = Modifier.weight(1f).fillMaxWidth())
-            } else if (candidatePageExpanded) {
+            if (candidatePageExpanded) {
                 // 候选展开页：候选栏的在位展开态（顶部即真实候选栏，实时跟随编码/删除变化）。
                 // 数据源为服务层的跨页全量候选（expandedCandidates），行分组惰性渲染
                 // （LazyColumn 只画可见行），可上下滑动 + 翻页键滚动一屏，不驱动 rime 翻页。
