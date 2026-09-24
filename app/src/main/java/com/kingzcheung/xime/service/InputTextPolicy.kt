@@ -10,3 +10,30 @@ internal fun isLiteralPunctuation(key: String): Boolean = key.length == 1 && whe
     CharCategory.CURRENCY_SYMBOL, CharCategory.MODIFIER_SYMBOL, CharCategory.OTHER_SYMBOL -> true
     else -> false
 }
+
+/** Keyboard punctuation only: never rewrite pasted prose, digits, emoji or speech results. */
+internal fun punctuationWidth(text: String, full: Boolean, japanese: Boolean = false): String {
+    if (text.isEmpty() || !text.all { isLiteralPunctuation(it.toString()) }) return text
+    return buildString {
+        for (c in text) {
+            if (full) {
+                append(when (c) {
+                    ',' -> if (japanese) '、' else '，'; '.' -> '。'; '｡' -> '。'; '､' -> '、'
+                    '｢' -> '「'; '｣' -> '」'; '･' -> '・'
+                    in '!'..'~' -> (c.code + 0xFEE0).toChar()
+                    else -> c
+                })
+            } else {
+                append(when (c) {
+                    '。', '｡' -> '.'; '、', '､' -> ','; '・' -> '･'
+                    '“', '”', '「', '」', '『', '』', '｢', '｣' -> '"'
+                    '‘', '’' -> '\''
+                    '【', '〔' -> '['; '】', '〕' -> ']'
+                    '《', '〈' -> '<'; '》', '〉' -> '>'
+                    in '！'..'～' -> (c.code - 0xFEE0).toChar()
+                    else -> c
+                })
+            }
+        }
+    }
+}

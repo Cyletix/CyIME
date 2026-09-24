@@ -10,4 +10,14 @@ class InputTextPolicyTest {
         listOf(",", "。", "！", "/", "@", "(").forEach { assertTrue(it, isLiteralPunctuation(it)) }
         listOf("delete", "space", "abc", "s", "4", "").forEach { assertFalse(it, isLiteralPunctuation(it)) }
     }
+
+    @org.junit.Test fun widthNormalizesBothAsciiAndPresetChinesePunctuation() {
+        assertEquals("、。", punctuationWidth(",.", true, japanese = true))
+        org.junit.Assert.assertEquals(",.?!;:()[]+-*/", punctuationWidth("，。？！；：（）［］＋－＊／", false))
+        org.junit.Assert.assertEquals("，。？！；：（）［］＋－＊／", punctuationWidth(",.?!;:()[]+-*/", true))
+        for (full in listOf(false, true)) for (value in listOf("你好，世界", "1.05", "hi!", "😀", "→", "×")) {
+            org.junit.Assert.assertEquals(value, punctuationWidth(value, full))
+        }
+        org.junit.Assert.assertEquals("\"\"''", punctuationWidth("“”‘’", false))
+    }
 }

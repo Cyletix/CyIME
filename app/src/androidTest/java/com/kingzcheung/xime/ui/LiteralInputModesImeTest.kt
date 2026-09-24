@@ -20,6 +20,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.rime.RimeEngine
+import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.InputModes
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -39,12 +40,18 @@ class LiteralInputModesImeTest {
     private val imeComponent get() = ComponentName(context, "${context.packageName}.service.XimeInputMethodService")
     private val imeId get() = imeComponent.flattenToShortString()
     private val inputMethodManager get() = context.getSystemService(InputMethodManager::class.java)
+    private var previousPunctuationWidth: Boolean? = null
+    private var previousAsciiPunct = false
+    private var previousFullShape = false
     private var previousIme: String? = null
     private var previouslyEnabled = false
     private var previousSubtype = -1
     private var savedSystemImeState = false
 
     @Before fun startKeyboard(): Unit = runBlocking {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        previousPunctuationWidth = if (prefs.contains(SettingsPreferences.KEY_PUNCTUATION_FULL_WIDTH))
+            prefs.getBoolean(SettingsPreferences.KEY_PUNCTUATION_FULL_WIDTH, false) else null
         previousIme = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         previousSubtype = Settings.Secure.getInt(context.contentResolver, Settings.Secure.SELECTED_INPUT_METHOD_SUBTYPE, -1)
         previouslyEnabled = inputMethodManager.enabledInputMethodList.any { it.id == imeId }
@@ -56,6 +63,8 @@ class LiteralInputModesImeTest {
         engine.initialize(user, shared)
         assertTrue(RimeConfigHelper.ensureDeployment(context))
         assertTrue(engine.ensureSession())
+        previousAsciiPunct = engine.getUserConfigBool("var/option/ascii_punct")
+        previousFullShape = engine.getUserConfigBool("var/option/full_shape")
         engine.clearQueuedComposition()
         shell("ime enable $imeId")
         shell("ime set $imeId")
@@ -84,6 +93,13 @@ class LiteralInputModesImeTest {
     @After fun stopKeyboardAndRestoreSystemIme() {
         if (!savedSystemImeState) return
         try {
+            SettingsPreferences.getPrefsPublic(context).edit().apply {
+                val previous = previousPunctuationWidth
+                if (previous == null) remove(SettingsPreferences.KEY_PUNCTUATION_FULL_WIDTH)
+                else putBoolean(SettingsPreferences.KEY_PUNCTUATION_FULL_WIDTH, previous)
+            }.commit()
+            engine.setUserConfigBool("var/option/ascii_punct", previousAsciiPunct)
+            engine.setUserConfigBool("var/option/full_shape", previousFullShape)
             if (::editor.isInitialized) {
                 rule.runOnUiThread {
                     inputMethodManager.hideSoftInputFromWindow(editor.windowToken, 0)
@@ -157,7 +173,55 @@ class LiteralInputModesImeTest {
         assertEquals("字面上屏后不能留旧编码", "", engine.getInput())
     }
 
+    @Test fun punctuationWidthWorksFromMenuIn26Keys() = verifyPunctuationWidth("rime_ice", "，")
+    @Test fun punctuationWidthWorksFromMenuIn14Keys() = verifyPunctuationWidth("pinyin_14jian", "，")
+    @Test fun punctuationWidthWorksFromMenuInNineKeys() = verifyPunctuationWidth("t9_pinyin", "，")
+    @Test fun punctuationWidthWorksInEnglishWithoutFullWidthLetters() {
+        verifyPunctuationWidth(InputModes.ENGLISH, ",")
+        setWidthFromMenu(true)
+        tap("a")
+        rule.waitUntil(5000) { text().endsWith("a", ignoreCase = true) }
+        assertFalse(text().contains('ａ'))
+    }
+    @Test fun punctuationWidthWorksInJapaneseFlick() = verifyPunctuationWidth("japanese_kana", "、")
+    @Test fun punctuationWidthWorksInJapanese26() = verifyPunctuationWidth("japanese", "、")
+
+    private fun setWidthFromMenu(full: Boolean) {
+        rule.onNodeWithTag("toolbar-leading").performClick()
+        val tag = "menu-item:全角／半角"
+        rule.waitUntil(5000) { rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+        val desired = if (full) "全角" else "半角"
+        fun shown() = rule.onNodeWithTag(tag).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.StateDescription]
+        if (shown() != desired) rule.onNodeWithTag(tag).performClick()
+        rule.waitUntil(5000) { shown() == desired }
+        rule.onNodeWithTag("toolbar-leading").performClick()
+        rule.waitForIdle()
+    }
+
+    private fun verifyPunctuationWidth(schema: String, commaLabel: String) {
+        chooseMode(schema)
+        setWidthFromMenu(false)
+        rule.onAllNodesWithText(commaLabel).onLast().performTouchInput { click() }
+        assertSettled(",")
+        setWidthFromMenu(true)
+        rule.onAllNodesWithText(commaLabel).onLast().performTouchInput { click() }
+        val fullComma = if (schema.startsWith("japanese")) "、" else "，"
+        assertSettled("," + fullComma)
+        setWidthFromMenu(false)
+        rule.onAllNodesWithText(commaLabel).onLast().performTouchInput { click() }
+        assertSettled("," + fullComma + ",")
+        rule.onNodeWithTag("candidate-expansion").assertDoesNotExist()
+        // A separate symbol-page path uses onCommitText and must obey the same switch.
+        if (schema != "japanese_kana") {
+            rule.onNodeWithTag("mode-slot-1", true).performTouchInput { click() }
+            rule.onNodeWithText(if (schema == InputModes.ENGLISH) "?" else "？", useUnmergedTree = true).performTouchInput { click() }
+            assertSettled("," + fullComma + ",?")
+            rule.onNodeWithTag("mode-slot-1", true).performTouchInput { click() }
+        }
+    }
+
     @Test fun mergedKeySwipeDigitsAndSymbolsNeverStartPredictionsOrTypeLetters() {
+        SettingsPreferences.setPunctuationFullWidth(context, false)
         chooseMode("pinyin_14jian")
         listOf("qw" to "1", "zx" to "1*", "er" to "1*2", "ty" to "1*23").forEach { (key, output) ->
             swipeUp(key)
