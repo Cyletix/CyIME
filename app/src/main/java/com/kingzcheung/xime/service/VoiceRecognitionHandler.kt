@@ -232,7 +232,7 @@ class VoiceRecognitionHandler(
         if (sessionAbandoned || suppressDuplicateFinal) return
         if (toolbarSession) {
             if (lastPartialText.isNotBlank()) {
-                getInputConnection()?.let { updateToolbarText(it, normalizeVoiceText(lastPartialText)) }
+                getInputConnection()?.let { updateToolbarText(it, lastPartialText) }
             }
             toolbarText.reset()
             toolbarSentencePrefix = null
@@ -245,7 +245,7 @@ class VoiceRecognitionHandler(
         Log.d(TAG, "commitPendingOnRelease: ic=${ic != null}, partial='$partial', suppress=$suppressDuplicateFinal")
         if (ic == null) return
         if (partial.isEmpty()) return
-        val finalText = normalizeVoiceText(partial)
+        val finalText = partial
         commitFinal(ic, finalText, partial)
         suppressDuplicateFinal = true
         lastPartialText = ""
@@ -336,7 +336,7 @@ class VoiceRecognitionHandler(
                 getInputConnection()?.let { updateToolbarText(it, cleanText) }
                 lastToolbarFinal = cleanText
             } else if (cleanText.isEmpty() && lastPartialText.isNotEmpty() && !SettingsPreferences.isSttUseLocal(context)) {
-                getInputConnection()?.let { updateToolbarText(it, normalizeVoiceText(lastPartialText)) }
+                getInputConnection()?.let { updateToolbarText(it, lastPartialText) }
             }
             if (cleanText.isEmpty() && SettingsPreferences.isSttUseLocal(context)) {
                 getInputConnection()?.let { toolbarText.update(it, "") }

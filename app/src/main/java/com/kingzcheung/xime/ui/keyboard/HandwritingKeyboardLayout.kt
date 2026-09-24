@@ -153,7 +153,7 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
     val keyForeground = enter?.foreground ?: foreground
     Box(modifier.clickable(onClick = onClick).semantics { contentDescription = label }
         .testTag("handwriting-key:$action")
-        .padding(scaledKeyVisualPadding(PaddingValues(2.dp))).clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(keyBackground).keyGlow(), contentAlignment = Alignment.Center) {
+        .padding(scaledKeyVisualPadding(PaddingValues(2.dp))).keyGlow(Modifier.clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(keyBackground)), contentAlignment = Alignment.Center) {
         val icon = when (action) {
             "delete" -> Icons.AutoMirrored.Filled.Backspace
             "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn

@@ -1,6 +1,6 @@
 > **Cyletix fork — modified 2026-09-24.** This is [CyIME](https://github.com/Cyletix/CyIME), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/CyIME/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [identity and migration decisions](docs/cyime-identity.md).
 
-[CyIME 0.1.6 语音、手写与按键效果](docs/cyime-0.1.6.md) · [0.1.5 键盘交互修复](docs/cyime-0.1.5.md)
+[CyIME 0.1.7 拼音、语音标点与动画修复](docs/cyime-0.1.7.md) · [CyIME 0.1.6 语音、手写与按键效果](docs/cyime-0.1.6.md) · [0.1.5 键盘交互修复](docs/cyime-0.1.5.md)
 
 [CyIME 0.1.4 speech changes](docs/cyime-0.1.4-speech.md) · [0.1.3 keyboard changes](docs/cyime-0.1.3.md)
 
@@ -15,7 +15,7 @@
 
 CyIME is Cyletix’s independently named Android input method, developed from [Xime](https://github.com/ximeiorg/Xime) and Rime. It retains upstream attribution and GPL-3.0 licensing. The 2024 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) project is its keyboard-layout research predecessor, not the Android application.
 
-The repository is now `Cyletix/CyIME`; former `Cyletix/Xime` URLs redirect to it. Existing releases may still carry the former name. New builds use `CyIME-0.1.6-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
+The repository is now `Cyletix/CyIME`; former `Cyletix/Xime` URLs redirect to it. Existing releases may still carry the former name. New builds use `CyIME-0.1.7-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
 
 [Research findings and experimental layout](docs/cyime-keyboard-research.md) · [Naming and migration decisions](docs/cyime-identity.md)
 

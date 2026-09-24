@@ -747,14 +747,14 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
             dismissOnClickOutside = false, clippingEnabled = true)) {
         Box(Modifier.widthIn(max = screenWidth - 16.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(background.copy(alpha = 0.62f))
+            .height(44.dp).padding(vertical = 6.dp)
+            .preeditSurface(background)
             .testTag("candidate-preedit")
             .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
-                onClickLabel = "编辑拼音", onClick = onEdit) else Modifier)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+                onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
             contentAlignment = Alignment.CenterStart) {
-            Text(text, color = visuals.textColor.copy(alpha = 0.9f), fontSize = 12.sp, maxLines = 1,
+            Text(if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text,
+                color = visuals.textColor.copy(alpha = 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
                 softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
         }
     }

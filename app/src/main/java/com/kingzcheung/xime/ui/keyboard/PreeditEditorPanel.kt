@@ -51,7 +51,7 @@ internal fun PreeditEditorBar(
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val scroll = rememberScrollState()
     val currentCaret by rememberUpdatedState(onCaret)
-    val display = remember(session.text, session.isT9, session.protectedText, preedit) { PinyinEditDisplay(session.text, preedit.removePrefix(session.protectedText).trim(), session.isT9) }
+    val display = remember(session.text, session.isT9, session.protectedText, preedit) { PinyinEditDisplay(session.text, preedit.removePrefix(session.protectedText).trim(), session.isT9, includeAutomaticBoundaries = false) }
     val code = display.text.ifEmpty { " " }
     val displayCaret = display.displayOffset(session.caret)
     LaunchedEffect(session.caret, code, layout) {
@@ -75,12 +75,11 @@ internal fun PreeditEditorBar(
             Row(Modifier.width(width).height(44.dp).testTag("preedit-editor")
                 .padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp))
-                    .background(keyColor.copy(alpha = 0.62f)).padding(horizontal = 8.dp),
+                Box(Modifier.weight(1f).preeditSurface(keyColor).testTag("preedit-editor-surface"),
                     contentAlignment = Alignment.CenterStart) {
-                    Text(code, color = textColor, fontSize = 18.sp, maxLines = 1, softWrap = false,
+                    Text(code, color = textColor.copy(alpha = 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1, softWrap = false,
                         onTextLayout = { layout = it }, modifier = Modifier.fillMaxWidth().horizontalScroll(scroll)
-                            .padding(vertical = 4.dp).testTag("preedit-editor-code")
+                            .testTag("preedit-editor-code")
                             .semantics {
                                 editableText = AnnotatedString(session.text)
                                 textSelectionRange = TextRange(session.caret)
@@ -112,3 +111,11 @@ internal fun PreeditEditorBar(
         }
     }
 }
+
+internal object PreeditStyle {
+    val FontSize = 18.sp
+    val SurfaceHeight = 32.dp
+}
+
+internal fun Modifier.preeditSurface(color: Color): Modifier = height(PreeditStyle.SurfaceHeight)
+    .clip(RoundedCornerShape(4.dp)).background(color.copy(alpha = 0.62f)).padding(horizontal = 8.dp)

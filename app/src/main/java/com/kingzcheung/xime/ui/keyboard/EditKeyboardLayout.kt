@@ -186,9 +186,9 @@ internal fun EditorActionKey(
             })
         }
         .padding(scaledKeyVisualPadding(PaddingValues(2.dp)))
-        .then(shadowModifier)
+        .keyGlow(Modifier.then(shadowModifier)
         .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-        .background(if (pressed) foreground.copy(alpha = 0.18f) else background).keyGlow(), contentAlignment = Alignment.Center) {
+        .background(if (pressed) foreground.copy(alpha = 0.18f) else background)), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
     }
 }

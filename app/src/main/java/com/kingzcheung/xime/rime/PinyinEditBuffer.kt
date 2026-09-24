@@ -32,8 +32,9 @@ internal object PinyinEditBuffer {
 
 }
 
-/** Render engine syllable boundaries without inserting them into the editable Rime input. */
-internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = false) {
+/** Maps engine syllables to code. Editor sessions retain these boundaries as editable text. */
+internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = false,
+    includeAutomaticBoundaries: Boolean = true) {
     val text: String
     private val offsets: List<Int>
     init {
@@ -59,7 +60,7 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
         text = buildString {
             var letters = 0
             raw.forEachIndexed { index, character ->
-                if (character != '\'' && letters in boundaries && isNotEmpty() && last() != '\'') {
+                if (includeAutomaticBoundaries && character != '\'' && letters in boundaries && isNotEmpty() && last() != '\'') {
                     append('\''); mapping.add(index)
                 }
                 append(if (matches && character in '2'..'9') reading[letters] else character); mapping.add(index + 1)
@@ -71,3 +72,7 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
     fun rawOffset(display: Int): Int = offsets[display.coerceIn(0, offsets.lastIndex)]
     fun displayOffset(raw: Int): Int = offsets.indexOfLast { it <= raw }.coerceAtLeast(0)
 }
+
+/** Preserve confirmed Chinese text and real codes; make Latin syllable spaces visible. */
+internal fun pinyinPreviewText(preedit: String): String = preedit.trim()
+    .replace(Regex("(?<=[a-zA-ZüÜ'])\\s+(?=[a-zA-ZüÜ'])"), "'")

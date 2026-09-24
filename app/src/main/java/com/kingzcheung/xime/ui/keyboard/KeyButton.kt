@@ -200,13 +200,13 @@ fun KeyButton(
                 .fillMaxWidth()
                 .pointerInput(Unit) { detectExclusiveKeyGestures { currentActions } }
             .padding(scaledKeyVisualPadding())
-            .then(shadowModifier)
+            .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(
                 if (isPressed) darkenColor(backgroundColor, 0.2f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
-            ).keyGlow(),
+            )),
         contentAlignment = Alignment.Center
     ) {
         val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
@@ -346,13 +346,13 @@ fun SwipeableKeyButton(
                 buttonBounds = coordinates.boundsInRoot()
             }
             .padding(scaledKeyVisualPadding())
-            .then(shadowModifier)
+            .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(
                 if (isPressed) backgroundColor.copy(alpha = 0.7f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
-            ).keyGlow(),
+            )),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
         val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
@@ -630,13 +630,13 @@ fun IconKeyButton(
                 )
             }
             .padding(scaledKeyVisualPadding())
-            .then(shadowModifier)
+            .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(
                 if (isPressed) darkenColor(backgroundColor, 0.1f)
                 else if (isHighlighted) darkenColor(backgroundColor, 0.2f)
                 else backgroundColor
-            ).keyGlow(),
+            )),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -939,13 +939,13 @@ fun SwipeableIconKeyButton(
                 buttonBounds = coordinates.boundsInRoot()
             }
             .padding(scaledKeyVisualPadding())
-            .then(shadowModifier)
+            .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(
                 if (isPressed) darkenColor(backgroundColor, 0.2f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
-            ).keyGlow(),
+            )),
         contentAlignment = Alignment.Center
     ) {
         Icon(

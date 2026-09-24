@@ -134,9 +134,9 @@ fun SpaceKeyButton(
                 }
             }
             .padding(scaledKeyVisualPadding())
-            .then(shadow)
+            .keyGlow(Modifier.then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor).keyGlow(),
+            .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)),
         contentAlignment = Alignment.Center
     ) {
         val iconSize = KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value)

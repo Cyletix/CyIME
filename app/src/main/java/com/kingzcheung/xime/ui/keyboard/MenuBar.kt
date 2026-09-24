@@ -49,6 +49,7 @@ data class MenuItem(
     val label: String,
     val action: () -> Unit,
     val textIcon: String? = null,
+    val currentState: String? = null,
 )
 
 data class MenuBarState(
@@ -110,7 +111,8 @@ fun MenuBar(
     }
 
     var showOptions by remember { mutableStateOf(false) }
-    val options = state.schemaSwitches.filter { it.name != "ascii_mode" }
+    val widthSwitch = state.schemaSwitches.firstOrNull { it.name == "full_shape" }
+    val options = state.schemaSwitches.filter { it.name != "ascii_mode" && it.name != "full_shape" }
     if (showOptions) {
         Column(modifier.fillMaxSize().background(state.backgroundColor)
             .padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
@@ -122,7 +124,6 @@ fun MenuBar(
             options.forEach { sw ->
                 val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
                 val title = when (sw.name) {
-                    "full_shape" -> "中文字符宽度"
                     "ascii_punct" -> "标点样式"
                     "simplification" -> "简繁转换"
                     else -> sw.states.joinToString(" / ")
@@ -142,6 +143,11 @@ fun MenuBar(
     val menuItems = listOf(
         MenuItem(keyboardResizeIcon, "键盘调节", callbacks.onKeyboardResize),
         MenuItem(settingsIcon, "设置", callbacks.onSettings),
+    ) + listOfNotNull(widthSwitch?.let { sw ->
+        val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
+        MenuItem(label = "全角／半角", action = { callbacks.onToggleSchemaSwitch?.invoke(sw) },
+            textIcon = current, currentState = current)
+    }) + listOf(
         MenuItem(quickSendIcon, "快捷发送", callbacks.onQuickSend),
         MenuItem(customizeIcon, "定制工具栏", callbacks.onToolbarCustomize),
         MenuItem(darkModeIcon, darkModeLabel, callbacks.onToggleDarkMode),
@@ -167,6 +173,7 @@ fun MenuItemButton(
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
             .clickable { item.action() }
+            .semantics { item.currentState?.let { stateDescription = it } }
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

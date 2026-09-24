@@ -23,6 +23,7 @@ class KeyboardMenuTest {
             MenuBar(MenuBarState(true, true, backgroundColor = Color(0xFF292929),
                 keyBgColor = Color(0xFF525252), keyTextColor = Color.White,
                 schemaSwitches = listOf(SchemaSwitchUiState("full_shape", states = listOf("半角", "全角"), currentIndex = index),
+                    SchemaSwitchUiState("ascii_punct", states = listOf("中文标点", "西文标点")),
                     SchemaSwitchUiState("ascii_mode", states = listOf("中文", "西文")))),
                 MenuBarCallbacks(onDismiss = {}, onClipboard = {}, onQuickSend = {},
                     onKeyboardResize = { resized++ }, onEmoji = {}, onReloadConfig = {},
@@ -37,10 +38,15 @@ class KeyboardMenuTest {
         rule.onNodeWithTag("menu-item:设置").performClick()
         assertEquals(1, resized); assertEquals(1, settings)
         listOf("剪贴板", "表情", "输入方案").forEach { rule.onNodeWithText(it).assertDoesNotExist() }
+        rule.onNodeWithTag("menu-item:全角／半角").assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "半角"))
+            .performClick()
+            .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "全角"))
+        rule.onNodeWithTag("menu-item:全角／半角").performClick()
+            .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "半角"))
         rule.onNodeWithTag("menu-item:输入选项").performClick()
-        rule.onNodeWithTag("input-option:full_shape").assertIsDisplayed().assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "半角"))
-        rule.onNodeWithTag("input-option:full_shape").performClick().assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "全角"))
-        rule.onNodeWithText("中文字符宽度").assertIsDisplayed()
+        rule.onNodeWithTag("input-option:full_shape").assertDoesNotExist()
+        rule.onNodeWithTag("input-option:ascii_punct").assertIsDisplayed()
         rule.onNodeWithTag("input-option:ascii_mode").assertDoesNotExist()
     }
 }
