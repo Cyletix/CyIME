@@ -145,7 +145,7 @@ class CandidateBarOptionsTest {
         rule.runOnIdle { assertFalse(SettingsPreferences.shouldShowCandidateCancelButton(context)) }
     }
 
-    @Test fun preeditRestoresOriginalCompactFontAndRemainsClickable() {
+    @Test fun preeditShowsSyllableSeparatorsAtEditorFontSizeAndRemainsClickable() {
         SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
         val showPreview = mutableStateOf(true)
         var edits = 0
@@ -153,7 +153,7 @@ class CandidateBarOptionsTest {
             CompositionLocalProvider(LocalContext provides context) {
                 MaterialTheme {
                     Box(Modifier.fillMaxSize().padding(top = 100.dp)) {
-                        CandidateBar(composing.copy(inputText = "nihao", preeditText = "ni'hao"), visuals = visuals,
+                        CandidateBar(composing.copy(inputText = "nihao", preeditText = "ni hao"), visuals = visuals,
                             callbacks = CandidateBarCallbacks(onCandidateSelect = {}), modifier = Modifier.width(300.dp),
                             onEditPreedit = { edits++ }, showPreeditPreview = showPreview.value)
                     }
@@ -162,7 +162,7 @@ class CandidateBarOptionsTest {
         }
         val layouts = mutableListOf<TextLayoutResult>()
         rule.onNodeWithText("ni'hao", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertEquals(12.sp, layouts.single().layoutInput.style.fontSize)
+        assertEquals(18.sp, layouts.single().layoutInput.style.fontSize)
         rule.onNodeWithTag("candidate-preedit").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(1, edits); showPreview.value = false }
         rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()

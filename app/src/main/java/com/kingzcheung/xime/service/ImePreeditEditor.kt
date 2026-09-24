@@ -2,6 +2,7 @@ package com.kingzcheung.xime.service
 
 import com.kingzcheung.xime.rime.PinyinEditBuffer
 import com.kingzcheung.xime.rime.PinyinEditSession
+import com.kingzcheung.xime.rime.PinyinEditDisplay
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,15 +31,18 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0
             val t9 = isT9Schema(state.currentSchemaId)
             val rawText = if (t9) snapshot.getOrNull(4).orEmpty() else input.drop(confirmed)
-            val text = PinyinEditBuffer.normalized(rawText)
+            val normalized = PinyinEditBuffer.normalized(rawText)
             val unsupportedCode = rawText.any { it !in 'a'..'z' && it !in 'A'..'Z' && it != '\'' && !it.isWhitespace() && it != 'ü' }
             val prefix = if (t9) service.t9PartialSegments.joinToString("") { it.text }
                 else snapshot.getOrNull(3).orEmpty()
-            // Never invent letters for a numeric-only failed T9 translation.
+            val display = PinyinEditDisplay(normalized, snapshot.getOrNull(4).orEmpty().removePrefix(prefix).trim(), t9)
+            val text = display.text
+            // Keep the visible separators in the editor buffer. Merely opening/moving
+            // does not rewrite Rime or lock a nine-key translation; a real edit does.
             val session = if (input.isEmpty() || text.isEmpty() || unsupportedCode) null
             else PinyinEditSession(state.inputSessionId, state.currentSchemaId, input,
                 if (t9) "" else input.take(confirmed), prefix, text,
-                if (t9) text.length else ((snapshot.getOrNull(1)?.toIntOrNull() ?: input.length) - confirmed).coerceIn(0, text.length), t9, if (t9) engine.t9GetRemainingDigits() else "", service.uiState.value.t9RightCandidateSelectedCount)
+                if (t9) text.length else display.displayOffset(((snapshot.getOrNull(1)?.toIntOrNull() ?: input.length) - confirmed).coerceIn(0, normalized.length)), t9, if (t9) engine.t9GetRemainingDigits() else "", service.uiState.value.t9RightCandidateSelectedCount)
             withContext(Dispatchers.Main) {
                 if (service.uiState.value.inputSessionId == state.inputSessionId &&
                     service.uiState.value.currentSchemaId == state.currentSchemaId) {
@@ -88,9 +92,14 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             val result = engine.editPinyinAndReadState {
                 if (session.isT9) engine.applyT9PinyinEdit(session.expectedInput, text,
                     session.t9RemainingDigits, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
-                else engine.applyPinyinEdit(session.expectedInput, session.protectedInput + text,
-                    session.protectedInput.length + caret, session.protectedInput.length,
-                    session.protectedText, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
+                else {
+                    val engineText = if (changed) session.protectedInput + text else session.expectedInput
+                    val engineCaret = if (changed) caret else PinyinEditDisplay(
+                        session.expectedInput.drop(session.protectedInput.length), session.text).rawOffset(caret)
+                    engine.applyPinyinEdit(session.expectedInput, engineText,
+                        session.protectedInput.length + engineCaret, session.protectedInput.length,
+                        session.protectedText, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }
+                }
             }
             if (result == null) { withContext(Dispatchers.Main) { reply(null) }; return@enqueue }
             val next = session.copy(expectedInput = result.inputText, text = text, caret = caret,

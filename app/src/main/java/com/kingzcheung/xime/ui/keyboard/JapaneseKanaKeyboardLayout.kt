@@ -198,9 +198,9 @@ internal fun KanaFlickButton(
                 }
             }
             .padding(scaledKeyVisualPadding())
-            .then(shadow)
+            .keyGlow(Modifier.then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background).keyGlow(),
+            .background(if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background)),
         contentAlignment = Alignment.Center,
     ) {
         val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)

@@ -30,7 +30,7 @@ class KeyGlowTest {
         File(dir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test fun quickTapGlowsPastHalfSecondAndFullyDisappearsAtOneSecond() {
+    @Test fun quickTapShrinksWholeCapThenRecoversAndDisappearsAtHalfSecond() {
         var taps = 0
         rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
             Box(Modifier.size(160.dp, 110.dp).background(Color.White).testTag("frame").padding(24.dp)) {
@@ -44,14 +44,25 @@ class KeyGlowTest {
         val glow = snapshot("frame")
         assertFalse(before.sameAs(glow))
         // Outer margin and rounded corners stay unchanged: no particles may escape the cap.
+        val occupied = (0 until before.width).filter { x -> (0 until before.height).any { y ->
+            before.getPixel(x, y) != android.graphics.Color.WHITE
+        } }
         for (x in 0 until before.width) for (y in 0 until before.height) {
-            if (before.getPixel(x, y) == android.graphics.Color.WHITE) assertEquals(before.getPixel(x, y), glow.getPixel(x, y))
+            if (x < occupied.first() || x > occupied.last()) assertEquals(before.getPixel(x, y), glow.getPixel(x, y))
         }
         save("key-glow-active.png", glow)
-        rule.mainClock.advanceTimeBy(512)
-        assertFalse("glow must still be visible after half a second", before.sameAs(snapshot("frame")))
-        rule.mainClock.advanceTimeBy(432)
-        assertTrue("animation must finish at one second (plus frame scheduling)", before.sameAs(snapshot("frame")))
+        fun coloredWidth(bitmap: Bitmap): Int {
+            val cap = (0 until bitmap.width).filter { bitmap.getPixel(it, bitmap.height / 2) != android.graphics.Color.WHITE }
+            return cap.last() - cap.first() + 1
+        }
+        assertTrue("the background must shrink with the letters", coloredWidth(glow) < coloredWidth(before))
+        rule.mainClock.advanceTimeBy(96)
+        val recovered = snapshot("frame")
+        assertEquals("cap must recover by 150 ms", coloredWidth(before), coloredWidth(recovered))
+        assertFalse(before.sameAs(recovered))
+        save("key-glow-recovered.png", recovered)
+        rule.mainClock.advanceTimeBy(352)
+        assertTrue("animation must finish at half a second (plus frame scheduling)", before.sameAs(snapshot("frame")))
         rule.runOnIdle { assertEquals(1, taps) }
     }
 
@@ -94,7 +105,7 @@ class KeyGlowTest {
             rule.onNodeWithTag(tag).performTouchInput { down(center); up() }
             rule.mainClock.advanceTimeBy(96)
             assertFalse("$tag missing glow", before.sameAs(snapshot(tag)))
-            rule.mainClock.advanceTimeBy(944)
+            rule.mainClock.advanceTimeBy(448)
             assertTrue("$tag did not fade", before.sameAs(snapshot(tag)))
         }
         rule.runOnIdle { assertEquals(6, taps) }
@@ -112,6 +123,19 @@ class KeyGlowTest {
         rule.mainClock.advanceTimeBy(112)
         assertTrue(before.sameAs(snapshot("key")))
         rule.runOnIdle { assertEquals(20, taps) }
+    }
+
+    @Test fun animationNeverShrinksEmojiHitTargetsDuringRapidEdgeTaps() {
+        var taps = 0
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
+            EmojiButton("🙂", { taps++ }, Modifier.size(100.dp).testTag("emoji"))
+        } } }
+        rule.mainClock.autoAdvance = false
+        repeat(3) {
+            rule.onNodeWithTag("emoji").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .02f, height * .5f)) }
+            rule.mainClock.advanceTimeBy(80)
+        }
+        rule.runOnIdle { assertEquals(3, taps) }
     }
 
     @Test fun japaneseRowsShareCellSizesAndReadableLabelScale() {

@@ -821,10 +821,9 @@ private fun ResetKey(
                 }, onTap = { currentOnClick() })
             }
             .padding(scaledKeyVisualPadding())
-            .then(shadowModifier)
+            .keyGlow(Modifier.then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
-            .keyGlow(),
+            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)),
         contentAlignment = Alignment.Center
     ) {
         Icon(

@@ -118,9 +118,59 @@ internal class SpeechSegmenter(
 }
 
 private val richTags = Regex("<\\|[^|]*\\|>")
-private val speechSeparators = Regex("[\\p{P}\\p{Z}\\s]+")
-internal fun cleanSpeechText(text: String): String =
-    speechSeparators.replace(richTags.replace(text, ""), " ").trim()
+private val speechPunctuation = Regex("[\\p{P}]")
+private val speechWhitespace = Regex("[\\p{Z}\\s]+")
+
+/** Model-added sentence punctuation becomes spacing; numeric notation keeps its meaning.
+ * Spoken punctuation names stay as words until the final UI boundary, so repeated local
+ * cleanup (SenseVoice -> transcript -> UI) cannot erase an explicitly dictated symbol.
+ */
+internal fun cleanSpeechText(text: String): String {
+    val plain = richTags.replace(text, "")
+    fun neighbor(from: Int, step: Int): Char? {
+        var index = from
+        while (index in plain.indices) {
+            if (!plain[index].isWhitespace()) return plain[index]
+            index += step
+        }
+        return null
+    }
+    fun startsNumber(from: Int): Boolean {
+        var index = from
+        while (index in plain.indices && plain[index].isWhitespace()) index++
+        if (plain.getOrNull(index) in listOf('+', '-', '−', '－')) index++
+        while (index in plain.indices && plain[index].isWhitespace()) index++
+        val first = plain.getOrNull(index)
+        return first?.isDigit() == true || first == '(' || first == '（' ||
+            (first == '.' && plain.getOrNull(index + 1)?.isDigit() == true)
+    }
+    return speechWhitespace.replace(buildString {
+        plain.forEachIndexed { i, c ->
+            if (!speechPunctuation.matches(c.toString())) {
+                append(c)
+                return@forEachIndexed
+            }
+            val before = plain.getOrNull(i - 1)
+            val after = plain.getOrNull(i + 1)
+            val left = neighbor(i - 1, -1)
+            val right = neighbor(i + 1, 1)
+            val numeric = when (c) {
+                '.', '．' -> after?.isDigit() == true && (before?.isDigit() == true ||
+                    before == null || before.isWhitespace() || before in "+-−×÷/*=(（")
+                ',' -> before?.isDigit() == true && after?.isDigit() == true
+                '-', '－' -> startsNumber(i + 1)
+                '/', '／', '*', '＊' -> (left?.isDigit() == true || left == ')' || left == '）') &&
+                    startsNumber(i + 1)
+                ':', '：' -> left?.isDigit() == true && right?.isDigit() == true
+                '%', '％' -> left?.isDigit() == true
+                '(', '（' -> startsNumber(i + 1)
+                ')', '）' -> left?.isDigit() == true || left == '%' || left == '％' || left == ')' || left == '）'
+                else -> false
+            }
+            append(if (numeric) c else ' ')
+        }
+    }, " ").trim()
+}
 
 // Remove SenseVoice's CJK token-spacing before punctuation normalization so acoustic
 // and punctuation boundaries survive. Latin word spacing is never removed.

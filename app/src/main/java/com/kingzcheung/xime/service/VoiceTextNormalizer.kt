@@ -1,6 +1,16 @@
 package com.kingzcheung.xime.service
 
-private val voiceSeparators = Regex("""[\p{P}\p{Z}\s]+""")
+import com.kingzcheung.xime.speech.cleanSpeechText
 
-/** 各语音引擎、实时/最终结果共用：保留词间空格，标点只形成间隔，不补句读。 */
-internal fun normalizeVoiceText(text: String): String = voiceSeparators.replace(text, " ").trim()
+private val dictatedPunctuation = Regex(" *(逗号|句号|问号|感叹号|叹号) *")
+
+/** Call once on incoming ASR text, never on already rendered partial text. */
+internal fun normalizeVoiceText(text: String): String =
+    dictatedPunctuation.replace(cleanSpeechText(text)) {
+        when (it.groupValues[1]) {
+            "逗号" -> "，"
+            "句号" -> "。"
+            "问号" -> "？"
+            else -> "！"
+        }
+    }

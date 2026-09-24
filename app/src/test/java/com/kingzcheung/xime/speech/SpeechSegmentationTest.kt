@@ -69,6 +69,18 @@ class SpeechSegmentationTest {
         assertEquals("hello world 你好 世界", cleanSenseVoiceText("hello world，你 好，世界。"))
     }
 
+
+    @Test fun `second pass and region assembly preserve decimals and dictated names until UI`() {
+        val t = SpeechTranscript()
+        t.update(1, "零点零五")
+        val corrected = cleanSenseVoiceText("<|zh|>0.05 句 号。")
+        assertEquals("0.05句号", corrected)
+        assertEquals("0.05句号", t.update(1, corrected, SpeechBoundary.PAUSE))
+        val result = t.update(2, "5-2=3，问号。", SpeechBoundary.STOP)
+        assertEquals("0.05。5-2=3？", com.kingzcheung.xime.service.normalizeVoiceText(result))
+        assertEquals(result, cleanSpeechText(result))
+    }
+
     private open class FakeEngine(override val hasRefinement: Boolean = false) : LocalSpeechEngine {
         override val isStreaming = true
         var streamSamples = 0

@@ -491,7 +491,7 @@ fun KeyboardView(
             }
 
             if (preeditEditSession != null && preeditFrame != null) {
-                PreeditEditorBar(preeditFrame!!, keyBgColor, keyTextColor, accentColor,
+                PreeditEditorBar(preeditFrame!!, keyBgColor, candidateTextColor, accentColor,
                     onClose = { closePreeditEditor() },
                     onCaret = { editPreedit(caret = it) },
                     onReplace = { editPreedit(text = it) },

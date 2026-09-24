@@ -36,4 +36,11 @@ class PinyinEditBufferTest {
         // A stale reading cannot replace literal letters the user explicitly entered.
         assertEquals("ni'426", PinyinEditDisplay("ni'426", "mi'hao", true).text)
     }
+
+    @Test fun editorKeepsItsEditableSeparatorsWhenEngineCaretChangesSegmentation() {
+        assertEquals("ni'hao", PinyinEditDisplay("ni'hao", "ni h ao", includeAutomaticBoundaries = false).text)
+        assertEquals("nihao", PinyinEditDisplay("nihao", "ni hao", includeAutomaticBoundaries = false).text)
+        assertEquals("你ni'hao", pinyinPreviewText("你ni hao"))
+        assertEquals("xiu'gai'shu'ru", pinyinPreviewText("xiu gai shu ru"))
+    }
 }

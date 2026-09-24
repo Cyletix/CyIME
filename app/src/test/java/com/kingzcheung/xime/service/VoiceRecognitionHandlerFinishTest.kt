@@ -425,4 +425,25 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals("", editor.toString())
         assertEquals(1, voiceCompleteCount)
     }
+
+    @Test fun `ITN final replaces Chinese decimal preview without losing point or dictated punctuation`() {
+        startToolbar(); onPartial("零点零五")
+        onPartial("0.05句号")
+        assertEquals("0.05。", editor.toString())
+        handler.finishRecognition(); onResult("0.05句号。")
+        assertEquals("0.05。", editor.toString())
+    }
+
+    @Test fun `release and timeout never normalize already converted punctuation twice`() {
+        startToolbar(); onPartial("结果逗号0.05句号")
+        handler.commitPendingOnRelease()
+        assertEquals("结果，0.05。", editor.toString())
+    }
+
+    @Test fun `composing release retains explicit terminal punctuation`() {
+        onPartial("0.05句号")
+        handler.commitPendingOnRelease()
+        verify(mockInputConnection).setComposingText(eq("0.05。"), eq(1))
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+    }
 }

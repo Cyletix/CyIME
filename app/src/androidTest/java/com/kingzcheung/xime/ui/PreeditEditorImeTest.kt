@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
@@ -238,7 +239,22 @@ class PreeditEditorImeTest {
         val qBefore = rule.onNodeWithText("q", ignoreCase = true).fetchSemanticsNode()
         val qPosition = qBefore.positionOnScreen
         val qSize = qBefore.size
+        val preview = rule.onNodeWithTag("candidate-preedit").fetchSemanticsNode()
+        val previewHeight = preview.size.height
+        rule.onNodeWithText("ni'hao", useUnmergedTree = true).assertExists()
+        val previewLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        rule.onNodeWithText("ni'hao", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(previewLayouts) }
+        screenshot("pinyin-preview-segmented")
         openEditor()
+        val editLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        rule.onNodeWithTag("preedit-editor-code").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(editLayouts) }
+        assertEquals(previewLayouts.single().layoutInput.style.fontSize, editLayouts.single().layoutInput.style.fontSize)
+        assertEquals(previewLayouts.single().layoutInput.style.color, editLayouts.single().layoutInput.style.color)
+        screenshot("pinyin-editor-segmented")
+        val strip = rule.onNodeWithTag("preedit-editor").captureToImage().asAndroidBitmap()
+        File(context.getExternalFilesDir(null), "preedit-editor/pinyin-editor-surface.png").outputStream().use {
+            strip.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
         rule.onNodeWithText("ni'hao", useUnmergedTree = true).assertExists()
         rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
         val bar = rule.onNodeWithTag("preedit-editor").fetchSemanticsNode()
@@ -247,6 +263,18 @@ class PreeditEditorImeTest {
         val qAfter = rule.onNodeWithText("q", ignoreCase = true).fetchSemanticsNode()
         assertEquals(qPosition, qAfter.positionOnScreen); assertEquals(qSize, qAfter.size)
         rule.onNodeWithTag("preedit-apply").assertDoesNotExist()
+        assertEquals(previewHeight, rule.onNodeWithTag("preedit-editor-surface").fetchSemanticsNode().size.height)
+        // Both sides of a separator remain distinct cursor positions, and the normal
+        // delete key removes the separator itself without deleting the preceding letter.
+        for (caret in listOf(2, 3, 2, 3)) {
+            rule.onNodeWithTag("preedit-editor-code").performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(caret, caret, false)) }
+            rule.onNodeWithText("ni'hao", useUnmergedTree = true).assertExists()
+        }
+        assertEquals("opening and moving must not rewrite code", "nihao", engine.getInput())
+        rule.onNodeWithContentDescription("删除", true).performTouchInput { click() }
+        rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "nihao" }
+        rule.onNodeWithTag("preedit-editor-code").assertTextEquals("nihao")
+        assertEquals("nihao", engine.getInput())
         draft("nihao", 2)
         tap("m")
         rule.waitUntil(5000) { engine.getInput() == "nimhao" }

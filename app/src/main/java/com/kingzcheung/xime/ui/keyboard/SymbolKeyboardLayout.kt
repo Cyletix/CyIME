@@ -224,16 +224,16 @@ private fun SymbolButton(
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)
-                else backgroundColor
-            ).keyGlow()
             .tolerantClick(
                 showRipple = false,
                 interactionSource = interactionSource,
                 onClick = onClick
-            ),
+            )
+            .keyGlow(Modifier.clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)
+                    else backgroundColor
+                )),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -260,11 +260,12 @@ private fun SymbolCategoryTab(
         modifier = modifier
             .height(40.dp)
             .clip(RoundedCornerShape(8.dp))
+            .tolerantClick(onClick = onClick)
+            .keyGlow(Modifier.clip(RoundedCornerShape(8.dp))
             .background(
                 if (isSelected) selectedBackgroundColor
                 else backgroundColor
-            ).keyGlow()
-            .tolerantClick(onClick = onClick)
+            ))
             .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center
     ) {
