@@ -348,18 +348,50 @@ class PreeditEditorImeTest {
         engine.clearQueuedComposition()
     }
 
+    @Test fun mergedReadingAndMultiTapEditorKeepLettersAndCaretStable() {
+        chooseMode("pinyin_14jian"); setPrefix()
+        listOf("qw", "er", "bn").forEach(::tap)
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().firstOrNull() == "qeb" }
+        rule.onNode(hasText("wen") and hasAnyAncestor(hasTestTag("candidate-preedit")), useUnmergedTree = true).assertExists()
+        screenshot("merged-reading-wen")
+        openEditor()
+        rule.onNodeWithTag("preedit-editor-code").assertTextEquals("wen")
+        draft("we")
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().firstOrNull() == "we" }
+        tap("bn"); tap("bn")
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().firstOrNull() == "wen" }
+        rule.onNodeWithTag("preedit-editor-code").assertTextEquals("wen")
+        draft("ni'hao", 3)
+        for (caret in listOf(2, 3, 2, 3)) {
+            rule.onNodeWithTag("preedit-editor-code").performSemanticsAction(SemanticsActions.SetSelection) { it(caret, caret, false) }
+            rule.onNodeWithTag("preedit-editor-code").assertTextEquals("ni'hao")
+        }
+        rule.onNodeWithContentDescription("删除", true).performTouchInput { click() }
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().firstOrNull() == "nihao" }
+        rule.onNodeWithTag("preedit-editor-code").assertTextEquals("nihao")
+        rule.onNodeWithContentDescription("删除", true).performTouchInput { click() }
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().firstOrNull() == "nhao" }
+        assertEquals("前文", text())
+        engine.clearQueuedComposition()
+    }
+
     @Test fun t9EditsRebuildTheBufferAndKeepPreviouslySelectedText() {
         chooseMode("t9_pinyin"); setPrefix()
         listOf("MNO", "GHI", "GHI", "ABC", "MNO").forEach(::tap)
         rule.waitUntil(5000) { engine.getInput().isNotEmpty() && engine.getCandidates().contains("你好") }
+        rule.onNodeWithText("ni'hao", useUnmergedTree = true).assertExists()
         openEditor(); draft("ni'hao", 3)
-        tap("MNO")
-        rule.waitUntil(5000) { engine.getInput().contains("6") }
+        rule.onNodeWithTag("t9-delete-key").performTouchInput { click() }
+        rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "nihao" }
+        rule.onNodeWithTag("t9-delete-key").performTouchInput { click() }
+        rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "nhao" }
+        draft("ni'hao", 3)
+        tap("MNO"); tap("MNO"); tap("MNO")
+        rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "ni'ohao" }
         rule.waitForIdle()
         val shown = rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
         assertFalse("T9 editor must show its reading, not raw key digits: $shown", shown.any { it.isDigit() })
         rule.onNodeWithTag("t9-delete-key").performTouchInput { down(center); up() }
-        rule.waitUntil(5000) { engine.getInput().contains("hao") && !engine.getInput().contains("6") }
         rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "ni'hao" }
         rule.waitForIdle()
         screenshot("t9-live-editor-original-keys")

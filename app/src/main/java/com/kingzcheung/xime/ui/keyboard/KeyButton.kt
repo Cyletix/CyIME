@@ -317,6 +317,20 @@ fun SwipeableKeyButton(
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
     ))
 
+    val shiftTargets = LocalShiftSlideTargets.current
+    val shiftToken = remember { Any() }
+    val shiftLetter = text.lowercase().takeIf { it.length == 1 && it[0] in 'a'..'z' }
+    androidx.compose.runtime.DisposableEffect(shiftTargets, shiftToken) {
+        onDispose { shiftTargets?.remove(shiftToken) }
+    }
+    androidx.compose.runtime.SideEffect {
+        if (shiftLetter != null) shiftTargets?.put(shiftToken, shiftLetter, buttonBounds) {
+            currentActions.onPress()
+            try { currentActions.onTap() } finally { currentActions.onRelease() }
+        } else shiftTargets?.remove(shiftToken)
+    }
+    val shiftHovered = shiftLetter != null && shiftTargets?.hovered == shiftLetter
+
     val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
         if (shadowEnabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
@@ -349,7 +363,7 @@ fun SwipeableKeyButton(
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(
-                if (isPressed) backgroundColor.copy(alpha = 0.7f)
+                if (isPressed || shiftHovered) backgroundColor.copy(alpha = 0.7f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
             )),
@@ -734,6 +748,9 @@ fun SwipeableIconKeyButton(
         if (isLongPress && currentOnLongClick != null) {
             hasTriggeredLongPress = true
             while (isLongPress) {
+                // Each repeat is a new delete action, with the same configured feedback
+                // as a physical press. Holding must not become silent after the first tick.
+                currentOnPress?.invoke()
                 currentOnLongClick?.invoke()
                 // 长按重复间隔 30ms：80ms 时退格删除以 12.5Hz 离散更新
                 // 候选栏，低于视觉融合阈值，看起来像"一闪一闪"；30ms 时更新更密集更顺滑。

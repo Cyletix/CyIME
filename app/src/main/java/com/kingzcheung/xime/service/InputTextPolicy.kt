@@ -1,6 +1,6 @@
 package com.kingzcheung.xime.service
 
-internal fun canPredictAfter(text: String): Boolean = text.lastOrNull()?.isLetterOrDigit() == true
+internal fun canPredictAfter(text: String): Boolean = text.lastOrNull()?.isLetter() == true
 
 internal fun isLiteralPunctuation(key: String): Boolean = key.length == 1 && when (key[0].category) {
     CharCategory.CONNECTOR_PUNCTUATION, CharCategory.DASH_PUNCTUATION,

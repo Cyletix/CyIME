@@ -157,6 +157,70 @@ class LiteralInputModesImeTest {
         assertEquals("字面上屏后不能留旧编码", "", engine.getInput())
     }
 
+    @Test fun mergedKeySwipeDigitsAndSymbolsNeverStartPredictionsOrTypeLetters() {
+        chooseMode("pinyin_14jian")
+        listOf("qw" to "1", "zx" to "1*", "er" to "1*2", "ty" to "1*23").forEach { (key, output) ->
+            swipeUp(key)
+            assertSettled(output)
+            rule.onNodeWithTag("candidate-expansion").assertDoesNotExist()
+            rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
+        }
+        tap("qw")
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().firstOrNull() == "q" }
+        swipeUp("qw")
+        rule.waitUntil(5000) { text().endsWith("1") && engine.readPinyinEditSnapshot().firstOrNull().isNullOrEmpty() }
+        android.os.SystemClock.sleep(600)
+        rule.onNodeWithTag("candidate-expansion").assertDoesNotExist()
+        rule.onNodeWithTag("candidate-preedit").assertDoesNotExist()
+    }
+
+    @Test fun shiftHoldAndSlideCommitUppercaseThenRestoreLowercaseInEnglish() {
+        chooseMode(InputModes.ENGLISH)
+        holdShiftAndType("a", "a", "b")
+        assertSettled("AAB")
+        tap("c")
+        rule.waitUntil(5000) { text() == "AABc" }
+        slideShiftTo("p")
+        rule.waitUntil(5000) { text() == "AABcP" }
+        tap("q")
+        assertSettled("AABcPq")
+    }
+
+    @Test fun shiftHoldAndSlideInChineseReturnToPinyinAfterRelease() {
+        chooseMode("rime_ice")
+        holdShiftAndType("a", "b")
+        assertSettled("AB")
+        slideShiftTo("p")
+        assertSettled("ABP")
+        tap("n"); tap("i")
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot().firstOrNull() == "ni" }
+        assertEquals("松开 Shift 后小写必须继续中文组词", "ABP", text())
+        assertTrue(engine.getCandidates().contains("你"))
+        engine.clearQueuedComposition()
+    }
+
+    private fun holdShiftAndType(vararg letters: String) {
+        val shift = rule.onNodeWithTag("shift-key")
+        val origin = shift.fetchSemanticsNode().positionOnScreen
+        val positions = letters.map { letter ->
+            val key = rule.onNodeWithText(letter, ignoreCase = true).fetchSemanticsNode()
+            key.positionOnScreen + Offset(key.size.width / 2f, key.size.height / 2f) - origin
+        }
+        shift.performTouchInput {
+            down(0, center)
+            positions.forEach { position -> down(1, position); up(1); advanceEventTime(50) }
+            up(0)
+        }
+    }
+
+    private fun slideShiftTo(letter: String) {
+        val shift = rule.onNodeWithTag("shift-key")
+        val origin = shift.fetchSemanticsNode().positionOnScreen
+        val key = rule.onNodeWithText(letter, ignoreCase = true).fetchSemanticsNode()
+        val target = key.positionOnScreen + Offset(key.size.width / 2f, key.size.height / 2f) - origin
+        shift.performTouchInput { down(center); moveTo(target, delayMillis = 150); up() }
+    }
+
     @Test fun englishTypedWordThenSwipeDigitDoesNotRepeatTheWord() {
         chooseMode(InputModes.ENGLISH)
         listOf("h", "i").forEach(::tap)

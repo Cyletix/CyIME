@@ -8,7 +8,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -96,7 +95,6 @@ import androidx.compose.material.icons.twotone.KeyboardControlKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.TextUnit
@@ -254,6 +252,7 @@ fun KeyboardLayout(
 
 
     CompositionLocalProvider(
+        LocalShiftSlideTargets provides remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() },
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
         LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(uiState.themeId, uiState.isDarkTheme), specialKeyTextColor),
         LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBackgroundColor, specialKeyTextColor),
@@ -407,6 +406,7 @@ fun KeyboardLayout(
                                 .fillMaxHeight(),
                         ) {
                             ShiftCapsKeyButton(
+                                viewModel = viewModel,
                                 shiftMode = shiftMode,
                                 onKeyPress = onKeyPress,
                                 onKeyPressDown = onKeyPressDown,
@@ -1072,6 +1072,7 @@ fun KeyboardRowWithConfig(
 
 @Composable
 private fun ShiftCapsKeyButton(
+    viewModel: KeyboardViewModel,
     shiftMode: ShiftMode,
     onKeyPress: (String) -> Unit,
     onKeyPressDown: ((String) -> Unit)?,
@@ -1084,6 +1085,11 @@ private fun ShiftCapsKeyButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val targets = LocalShiftSlideTargets.current
+    val suppressCursorMove = LocalSuppressCursorMove.current
+    val currentPress by rememberUpdatedState(onKeyPressDown)
+    val currentKey by rememberUpdatedState(onKeyPress)
+    var bounds by remember { mutableStateOf(Rect.Zero) }
 
     val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
         if (shadowEnabled) {
@@ -1115,26 +1121,52 @@ private fun ShiftCapsKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .testTag("shift-key")
-            .pointerInput(Unit) {
+            .onGloballyPositioned { bounds = it.boundsInRoot() }
+            .pointerInput(viewModel, targets) {
+                var lastTap = Long.MIN_VALUE
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
+                    val down = awaitFirstDown()
+                    down.consume()
                     isPressed = true
-                    onKeyPressDown?.invoke("shift")
-                    onKeyPress("shift_single")
-
-                    val firstUp = waitForUpOrCancellation()
-                    if (firstUp != null) {
-                        val secondDown = withTimeoutOrNull(
-                            viewConfiguration.doubleTapTimeoutMillis
-                        ) {
-                            awaitFirstDown(requireUnconsumed = false)
+                    suppressCursorMove.value = true
+                    currentPress?.invoke("shift")
+                    // Typing consumed the previous one-shot Shift; it cannot start a double tap.
+                    if (viewModel.shiftMode.value != ShiftMode.SINGLE) lastTap = Long.MIN_VALUE
+                    viewModel.beginShiftHold()
+                    var released = false
+                    var dragged = false
+                    var upTime = down.uptimeMillis
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.isConsumed) break
+                            dragged = dragged || (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+                            val target = if (dragged) targets?.at(bounds.topLeft + change.position) else null
+                            targets?.hovered = target?.key
+                            change.consume()
+                            if (!change.pressed) {
+                                released = true
+                                upTime = change.uptimeMillis
+                                if (dragged) target?.commit?.invoke()
+                                break
+                            }
                         }
-                        if (secondDown != null) {
-                            onKeyPress("shift_caps")
-                            waitForUpOrCancellation()
-                        }
+                    } finally {
+                        val used = viewModel.endShiftHold()
+                        targets?.hovered = null
+                        isPressed = false
+                        suppressCursorMove.value = false
+                        if (released && !dragged && !used && upTime - down.uptimeMillis < 350L) {
+                            if (lastTap != Long.MIN_VALUE && down.uptimeMillis - lastTap in 0..viewConfiguration.doubleTapTimeoutMillis) {
+                                currentKey("shift_caps")
+                                lastTap = Long.MIN_VALUE
+                            } else {
+                                currentKey("shift_single")
+                                lastTap = upTime
+                            }
+                        } else lastTap = Long.MIN_VALUE
                     }
-                    isPressed = false
                 }
             }
             .padding(scaledKeyVisualPadding())
@@ -1354,6 +1386,7 @@ private fun SplitKeyboardContent(
                     .padding(start = staggerStep * 2)
             ) {
                 ShiftCapsKeyButton(
+                    viewModel = viewModel,
                     shiftMode = shiftMode,
                     onKeyPress = onKeyPress,
                     onKeyPressDown = onKeyPressDown,

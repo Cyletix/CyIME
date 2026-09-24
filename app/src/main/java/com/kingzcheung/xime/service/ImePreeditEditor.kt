@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 
 /** No InputConnection writes: only the unconfirmed Rime code can be edited. */
 internal class ImePreeditEditor(private val service: XimeInputMethodService) {
+    private val multiTap = com.kingzcheung.xime.rime.PinyinMultiTap()
     private var liveOwner: PinyinEditSession? = null
     private var liveSession: PinyinEditSession? = null
 
@@ -35,7 +36,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             val unsupportedCode = rawText.any { it !in 'a'..'z' && it !in 'A'..'Z' && it != '\'' && !it.isWhitespace() && it != 'ü' }
             val prefix = if (t9) service.t9PartialSegments.joinToString("") { it.text }
                 else snapshot.getOrNull(3).orEmpty()
-            val display = PinyinEditDisplay(normalized, snapshot.getOrNull(4).orEmpty().removePrefix(prefix).trim(), t9)
+            val display = PinyinEditDisplay(normalized, snapshot.getOrNull(4).orEmpty().removePrefix(prefix).trim(), t9, isMerged14 = state.currentSchemaId == "pinyin_14jian")
             val text = display.text
             // Keep the visible separators in the editor buffer. Merely opening/moving
             // does not rewrite Rime or lock a nine-key translation; a real edit does.
@@ -47,6 +48,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 if (service.uiState.value.inputSessionId == state.inputSessionId &&
                     service.uiState.value.currentSchemaId == state.currentSchemaId) {
                     if (unsupportedCode) android.widget.Toast.makeText(service, "请先选择左侧拼音，再编辑编码", android.widget.Toast.LENGTH_SHORT).show()
+                    multiTap.reset()
                     liveOwner = session
                     liveSession = session
                     reply(session)
@@ -57,6 +59,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
 
     /** Reuse the real keyboard. All edits share its FIFO and update composition immediately. */
     fun edit(owner: PinyinEditSession, key: String?, selection: Int?, replacement: String?, reply: (PinyinEditSession?) -> Unit) {
+        val eventTime = android.os.SystemClock.uptimeMillis()
         enqueue(owner.schemaId) {
             val session = liveSession
             if (liveOwner !== owner || !owner.isActive() || session == null || !isOwnerCurrent(session)) {
@@ -64,7 +67,17 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             }
             var text = session.text
             var caret = (selection ?: session.caret).coerceIn(0, text.length)
-            if (replacement != null) {
+            val letters = when {
+                session.isT9 -> when (key) { "2" -> "abc"; "3" -> "def"; "4" -> "ghi"; "5" -> "jkl"; "6" -> "mno"; "7" -> "pqrs"; "8" -> "tuv"; "9" -> "wxyz"; else -> null }
+                session.schemaId == "pinyin_14jian" && key?.length == 1 ->
+                    com.kingzcheung.xime.rime.merged14Groups.firstOrNull { it.first().toString() == key }
+                else -> null
+            }
+            if (letters == null || replacement != null || selection != null) multiTap.reset()
+            if (letters != null && replacement == null && selection == null) {
+                val edited = multiTap.press(text, caret, letters, eventTime)
+                text = edited.first; caret = edited.second
+            } else if (replacement != null) {
                 text = if (session.isT9) PinyinEditBuffer.normalizedT9(replacement) else PinyinEditBuffer.normalized(replacement)
                 caret = text.length
             } else if (key?.startsWith("preedit_cursor:") == true) {
@@ -95,7 +108,7 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 else {
                     val engineText = if (changed) session.protectedInput + text else session.expectedInput
                     val engineCaret = if (changed) caret else PinyinEditDisplay(
-                        session.expectedInput.drop(session.protectedInput.length), session.text).rawOffset(caret)
+                        session.expectedInput.drop(session.protectedInput.length), session.text, isMerged14 = session.schemaId == "pinyin_14jian").rawOffset(caret)
                     engine.applyPinyinEdit(session.expectedInput, engineText,
                         session.protectedInput.length + engineCaret, session.protectedInput.length,
                         session.protectedText, session.schemaId) { owner.isActive() && isOwnerCurrent(session) }

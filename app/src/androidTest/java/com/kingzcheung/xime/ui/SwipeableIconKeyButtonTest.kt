@@ -43,10 +43,11 @@ class SwipeableIconKeyButtonTest {
     }
     @Test fun repeatedDeleteStopsOnReleaseAndTheNextTapStillWorks() {
         var deletes = 0
+        var feedback = 0
         rule.setContent {
             Box(Modifier.size(64.dp)) {
                 SwipeableIconKeyButton(ColorPainter(Color.Black),
-                    onClick = { deletes++ }, onLongClick = { deletes++ },
+                    onClick = { deletes++ }, onLongClick = { deletes++ }, onPress = { feedback++ },
                     backgroundColor = Color.White, iconColor = Color.Black,
                     modifier = Modifier.testTag("delete"), shadowEnabled = false)
             }
@@ -56,12 +57,18 @@ class SwipeableIconKeyButtonTest {
         rule.mainClock.advanceTimeBy(700)
         rule.onNodeWithTag("delete").performTouchInput { up() }
         val afterRelease = deletes
+        val feedbackAfterRelease = feedback
+        assertEquals("initial press plus every repeated deletion", deletes + 1, feedback)
         org.junit.Assert.assertTrue(afterRelease > 1)
         rule.mainClock.advanceTimeBy(150)
         assertEquals(afterRelease, deletes)
+        assertEquals(feedbackAfterRelease, feedback)
         rule.mainClock.autoAdvance = true
         rule.onNodeWithTag("delete").performTouchInput { click() }
-        rule.runOnIdle { assertEquals(afterRelease + 1, deletes) }
+        rule.runOnIdle {
+            assertEquals(afterRelease + 1, deletes)
+            assertEquals(feedbackAfterRelease + 1, feedback)
+        }
     }
 
 }

@@ -38,6 +38,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -157,261 +158,85 @@ private fun NumberRows(
     compactMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
 ) {
-    val modeWeight = LocalModeSlotWeight.current
+    val modeWeight = 0.8f
     val symFontSize = if (compactMode) 14.sp else 18.sp
     val keyFontSize = if (compactMode) 16.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val ctrlFontSize = if (compactMode) 12.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val suppressCursorMove = LocalSuppressCursorMove.current
     val symbols = listOf("+", "-", "*", "/")
-    Row(
-        modifier = Modifier
-            .fillMaxSize(),
-        horizontalArrangement = Arrangement.Start
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .weight(0.8f),
-            verticalArrangement = Arrangement.Top
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .weight(3f),
-                horizontalArrangement = Arrangement.Start
-            ) {
-                Column(
-                    modifier = Modifier
-//                        .padding(vertical = 2.dp)
-                        .fillMaxHeight()
-                        .weight(modeWeight),
-                    verticalArrangement = Arrangement.Top
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(3f)
-                            .padding(scaledKeyVisualPadding()),
-                    ) {
-                        symbols.forEach { symbol ->
-                            NumberSymbolKey(
-                                text = symbol,
-                                onClick = { onKeyPress(symbol) },
-                                backgroundColor = keyBackgroundColor,
-                                textColor = keyTextColor,
-                                modifier = Modifier.weight(1f),
-                                onPress = { onKeyPressDown?.invoke(symbol) },
-                                isFirst = symbol == "+",
-                                isLast = symbol == "/",
-                                fontSize = symFontSize,
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                            )
-                        }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(1f),
-                    ) {
-                        KeyboardModeKey(
-                            slot = 1, page = KeyboardInputPage.NUMBERS, onKeyPress = onKeyPress,
-                            backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
-                            modifier = Modifier.weight(1f), onKeyPressDown = onKeyPressDown,
-                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                        )
-                    }
-
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .weight(4.2f - modeWeight),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-                        listOf("1", "2", "3").forEach { key ->
-                            KeyButton(
-                                text = key,
-                                onClick = { onKeyPress(key) },
-                                backgroundColor = keyBackgroundColor,
-                                textColor = keyTextColor,
-                                onPress = { onKeyPressDown?.invoke(key) },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                                modifier = Modifier
-                                    .weight(1f),
-                                fontSize = keyFontSize,
-                            )
-                        }
-
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-
-                        listOf("4", "5", "6").forEach { key ->
-                            KeyButton(
-                                text = key,
-                                onClick = { onKeyPress(key) },
-                                backgroundColor = keyBackgroundColor,
-                                textColor = keyTextColor,
-                                onPress = { onKeyPressDown?.invoke(key) },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                                modifier = Modifier
-                                    .weight(1f),
-                                fontSize = keyFontSize,
-                            )
-                        }
-
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-
-                        listOf("7", "8", "9").forEach { key ->
-                            KeyButton(
-                                text = key,
-                                onClick = { onKeyPress(key) },
-                                backgroundColor = keyBackgroundColor,
-                                textColor = keyTextColor,
-                                modifier = Modifier
-                                    .weight(1f),
-                                onPress = { onKeyPressDown?.invoke(key) },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                                fontSize = keyFontSize,
-                            )
-                        }
-
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-
-
-                        KeyboardModeKey(
-                            slot = 2, page = KeyboardInputPage.NUMBERS, onKeyPress = onKeyPress,
-                            backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
-                            modifier = Modifier.weight(modeWeight), onKeyPressDown = onKeyPressDown,
-                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                        )
-                        KeyButton(
-                            text = "0",
-                            onClick = { onKeyPress("0") },
-                            backgroundColor = keyBackgroundColor,
-                            textColor = keyTextColor,
-                            modifier = Modifier.weight(3.4f - 2 * modeWeight),
-                            onPress = { onKeyPressDown?.invoke("0") },
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                            fontSize = keyFontSize,
-                        )
-                        KeyButton(
-                            text = ".",
-                            onClick = { onKeyPress(".") },
-                            backgroundColor = keyBackgroundColor,
-                            textColor = keyTextColor,
-                            modifier = Modifier.weight(0.8f),
-                            onPress = { onKeyPressDown?.invoke(".") },
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                            fontSize = keyFontSize,
-                        )
-
-                    }
-
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight()
-                        .weight(0.8f),
-                ) {
-                    SwipeableIconKeyButton(
-                        icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                        onClick = { onKeyPress("delete") },
-                        backgroundColor = specialKeyBackgroundColor,
-                        iconColor = specialKeyTextColor,
-                        modifier = Modifier.weight(1f),
-                        swipeText = "清空",
-                        onSwipe = { onKeyPress("clear_composition") },
-                        onLongClick = { onKeyPress("delete") },
-                        onPress = { onKeyPressDown?.invoke("delete") },
-                        swipeUpLabel = "上滑清空",
-                        swipeDownLabel = "下滑撤回",
-                        onSwipeUp = { onKeyPress("clear_all") },
-                        onSwipeDown = { onKeyPress("undo_clear") },
-                        onSwipeLeft = {
-                            suppressCursorMove.value = true
-                            onKeyPress("clear_composition")
-                        },
-                        onSwipeStateChange = onSwipeStateChange,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    )
-
-                    SpaceKeyButton(
-                        schemaName = "空格",
-                        onClick = { onKeyPress("space") },
-                        backgroundColor = keyBackgroundColor,
-                        textColor = keyTextColor,
-                        modifier = Modifier.weight(1f),
-                        onPress = { onKeyPressDown?.invoke("space") },
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                        fontSize = ctrlFontSize,
-                    )
-                    IconKeyButton(
-                        icon = rememberVectorPainter(Icons.Default.EmojiEmotions),
-                        onClick = { onKeyPress("emoji") },
-                        backgroundColor = specialKeyBackgroundColor,
-                        iconColor = specialKeyTextColor,
-                        modifier = Modifier.weight(1f),
-                        onPress = { onKeyPressDown?.invoke("emoji") },
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    )
-                    ActionKeyButton(
-                        text = "确定",
-                        onClick = { onKeyPress("enter") },
-                        backgroundColor = specialKeyBackgroundColor,
-                        textColor = specialKeyTextColor,
-                        modifier = Modifier.weight(1f),
-                        onPress = { onKeyPressDown?.invoke("enter") },
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                        fontSize = ctrlFontSize,
-                    )
+    Column(Modifier.fillMaxSize()) {
+        // Numeric navigation uses the operator-column width, independent of the text row.
+        Row(Modifier.fillMaxWidth().weight(3f)) {
+            Column(Modifier.weight(0.8f).fillMaxHeight().testTag("number-operators")
+                .padding(scaledKeyVisualPadding())) {
+                symbols.forEach { symbol ->
+                    NumberSymbolKey(text = symbol, onClick = { onKeyPress(symbol) },
+                        backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                        modifier = Modifier.weight(1f), onPress = { onKeyPressDown?.invoke(symbol) },
+                        isFirst = symbol == "+", isLast = symbol == "/", fontSize = symFontSize,
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                        shadowShapeRadius = shadowShapeRadius)
                 }
             }
+            Column(Modifier.weight(3.4f).fillMaxHeight()) {
+                listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
+                    Row(Modifier.fillMaxWidth().weight(1f)) {
+                        row.forEach { key ->
+                            KeyButton(text = key, onClick = { onKeyPress(key) },
+                                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                                onPress = { onKeyPressDown?.invoke(key) }, modifier = Modifier.weight(1f),
+                                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                                shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
+                        }
+                    }
+                }
+            }
+            Column(Modifier.weight(0.8f).fillMaxHeight().testTag("number-actions")) {
+                SwipeableIconKeyButton(
+                    icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
+                    onClick = { onKeyPress("delete") }, backgroundColor = specialKeyBackgroundColor,
+                    iconColor = specialKeyTextColor, modifier = Modifier.weight(1f),
+                    swipeText = "清空", onSwipe = { onKeyPress("clear_composition") },
+                    onLongClick = { onKeyPress("delete") }, onPress = { onKeyPressDown?.invoke("delete") },
+                    swipeUpLabel = "上滑清空", swipeDownLabel = "下滑撤回",
+                    onSwipeUp = { onKeyPress("clear_all") }, onSwipeDown = { onKeyPress("undo_clear") },
+                    onSwipeLeft = { suppressCursorMove.value = true; onKeyPress("clear_composition") },
+                    onSwipeStateChange = onSwipeStateChange,
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                    shadowShapeRadius = shadowShapeRadius)
+                SpaceKeyButton(schemaName = "空格", onClick = { onKeyPress("space") },
+                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                    modifier = Modifier.weight(1f), onPress = { onKeyPressDown?.invoke("space") },
+                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                    shadowShapeRadius = shadowShapeRadius, fontSize = ctrlFontSize)
+                IconKeyButton(icon = rememberVectorPainter(Icons.Default.EmojiEmotions),
+                    onClick = { onKeyPress("emoji") }, backgroundColor = specialKeyBackgroundColor,
+                    iconColor = specialKeyTextColor, modifier = Modifier.weight(1f),
+                    onPress = { onKeyPressDown?.invoke("emoji") }, shadowEnabled = shadowEnabled,
+                    shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+            }
+        }
+        Row(Modifier.fillMaxWidth().weight(1f)) {
+            for (slot in 1..2) KeyboardModeKey(slot = slot, page = KeyboardInputPage.NUMBERS,
+                onKeyPress = onKeyPress, backgroundColor = specialKeyBackgroundColor,
+                textColor = specialKeyTextColor, modifier = Modifier.weight(modeWeight),
+                onKeyPressDown = onKeyPressDown, shadowEnabled = shadowEnabled,
+                shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+            KeyButton(text = "0", onClick = { onKeyPress("0") },
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                modifier = Modifier.weight(3.4f - 2 * modeWeight).testTag("number-zero"), onPress = { onKeyPressDown?.invoke("0") },
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
+            KeyButton(text = ".", onClick = { onKeyPress(".") },
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                modifier = Modifier.weight(0.8f), onPress = { onKeyPressDown?.invoke(".") },
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius, fontSize = keyFontSize)
+            ActionKeyButton(text = "确定", onClick = { onKeyPress("enter") },
+                backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                modifier = Modifier.weight(0.8f), onPress = { onKeyPressDown?.invoke("enter") },
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius, fontSize = ctrlFontSize)
         }
     }
 }
