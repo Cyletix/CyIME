@@ -341,8 +341,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     private fun loadSchemaSwitches(schemaId: String): List<com.kingzcheung.xime.viewmodel.SchemaSwitchUiState> {
         if (schemaId.isEmpty()) return emptyList()
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
-        return defs.map { def ->
+        val fullPunctuation = service.textCommit.isFullWidthPunctuation()
+        val switches = defs.filter { it.name != "full_shape" }.map { def ->
             val index = when {
+                def.name == "ascii_punct" -> if (fullPunctuation) 0 else 1
                 def.name.isNotEmpty() && def.states.isNotEmpty() ->
                     if (service.rimeEngine.getOption(def.name)) minOf(1, def.states.size - 1) else 0
                 def.options.isNotEmpty() -> {
@@ -359,6 +361,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 currentIndex = index
             )
         }
+        // All layouts, including schemas without a native full_shape switch, share this control.
+        return switches + com.kingzcheung.xime.viewmodel.SchemaSwitchUiState(
+            name = "full_shape", states = listOf("半角", "全角"), currentIndex = if (fullPunctuation) 1 else 0)
     }
 
     /** 在引擎线程上刷新菜单栏方案开关状态。 */
@@ -377,6 +382,15 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         service.serviceScope.launch(service.keyProcessingDispatcher) {
             if (sw.name == "ascii_mode") {
                 service.schemaController.switchInputMethod()
+            } else if (sw.name == "full_shape" || sw.name == "ascii_punct") {
+                val full = !service.textCommit.isFullWidthPunctuation()
+                SettingsPreferences.setPunctuationFullWidth(service, full)
+                service.rimeEngine.setOption("ascii_punct", !full)
+                persistSchemaOption("ascii_punct", !full)
+                // Retain native width semantics in Chinese; English letters remain ASCII.
+                service.rimeEngine.setOption("full_shape", full && !service.uiState.value.isAsciiMode)
+                persistSchemaOption("full_shape", full)
+                service.updateUI()
             } else if (sw.name.isNotEmpty()) {
                 val newValue = !service.rimeEngine.getOption(sw.name)
                 service.rimeEngine.setOption(sw.name, newValue)

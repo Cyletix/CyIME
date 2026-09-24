@@ -6,6 +6,13 @@ import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 
 object SettingsPreferences {
     private const val PREFS_NAME = "kime_settings"
+    const val KEY_PUNCTUATION_FULL_WIDTH = "punctuation_full_width"
+    fun punctuationFullWidth(context: Context, default: Boolean): Boolean =
+        getPrefs(context).getBoolean(KEY_PUNCTUATION_FULL_WIDTH, default)
+    fun setPunctuationFullWidth(context: Context, full: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_PUNCTUATION_FULL_WIDTH, full).apply()
+    }
+
     private const val KEY_CURRENT_SCHEMA = "current_schema"
     /** 双写标记：仅新版本双写后置 true，本地值才可信（旧版本只写 rime，本地是过时迁移值） */
     private const val KEY_CURRENT_SCHEMA_DUAL = "current_schema_dual"

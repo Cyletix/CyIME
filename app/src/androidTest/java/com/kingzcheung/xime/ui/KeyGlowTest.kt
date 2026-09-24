@@ -66,6 +66,24 @@ class KeyGlowTest {
         rule.runOnIdle { assertEquals(1, taps) }
     }
 
+    @Test fun exportActualSoftGlowFrames() {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
+            Box(Modifier.size(180.dp, 130.dp).background(Color(0xFF191C22)).testTag("soft-frame").padding(24.dp)) {
+                KeyButton("ABC", {}, Color(0xFF525252), Color.White, Modifier.testTag("soft-key"), shadowEnabled = false)
+            }
+        } } }
+        rule.mainClock.autoAdvance = false
+        val before = snapshot("soft-frame")
+        save("soft-glow-000.png", before)
+        rule.onNodeWithTag("soft-key").performTouchInput { down(center); up() }
+        for (frame in 1..34) {
+            rule.mainClock.advanceTimeByFrame()
+            val image = snapshot("soft-frame")
+            save("soft-glow-${(frame * 16).toString().padStart(3, '0')}.png", image)
+            if (frame == 34) assertTrue("finished glow restores original pixels", before.sameAs(image))
+        }
+    }
+
     @Test fun repeatedPressesRestartDecorationAndDisableRemovesItImmediately() {
         var enabled by mutableStateOf(true)
         var taps = 0

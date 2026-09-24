@@ -61,14 +61,17 @@ internal fun rememberImeKeyboardCallbacks(
                     val numberPanel = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number
                     val separator = key == "'" && service.candidateState.value.isComposing && !service.uiState.value.isAsciiMode
                     if (!numberPanel && !separator && isLiteralPunctuation(key)) {
-                        val text = if (service.isChineseMode && !service.rimeEngine.getOption("ascii_punct"))
-                            when (key) { "," -> "，"; "." -> "。"; "?" -> "？"; "!" -> "！"; ";" -> "；"; ":" -> "："; else -> key }
-                            else key
-                        service.textCommit.commitLiteralText(text)
+                        service.textCommit.commitLiteralText(key)
                     } else service.keyRouter.handleKeyPress(key, isShifted)
                 }
             },
-            onJapaneseKanaAction = { action -> service.schemaController.handleJapaneseKanaAction(action) },
+            onJapaneseKanaAction = { action ->
+                val input = (action as? com.kingzcheung.xime.ui.keyboard.JapaneseKanaAction.Input)?.romaji
+                if (input in listOf(",", ".", "?", "!", "/", "(", ")")) {
+                    val punctuation = when (input) { "," -> "、"; "." -> "。"; "/" -> "・"; else -> input!! }
+                    service.textCommit.commitLiteralText(punctuation)
+                } else service.schemaController.handleJapaneseKanaAction(action)
+            },
             onKeyPressDown = { key ->
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },

@@ -143,8 +143,15 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
      * 直接借用粘贴会只替换宿主 composing 区，却留下 Rime 编码；下一键会把旧字母再写回来。
      * 先结束当前候选，再提交字面内容；手势预览不走此入口。
      */
+    internal fun isFullWidthPunctuation(): Boolean =
+        com.kingzcheung.xime.settings.SettingsPreferences.punctuationFullWidth(service,
+            !service.uiState.value.isAsciiMode && !service.rimeEngine.getOption("ascii_punct"))
+
     internal fun commitLiteralText(text: String) {
         if (text.isEmpty()) return
+        val literal = punctuationWidth(text, isFullWidthPunctuation(),
+            service.uiState.value.currentSchemaId in com.kingzcheung.xime.settings.JapaneseSchemas.ids ||
+                service.uiState.value.currentSchemaId == "jaroomaji")
         service.voiceRecognitionHandler.abandonPendingOnManualInput()
         val owner = service.uiState.value.inputSessionId
         val submit: suspend () -> Unit = literal@ {
@@ -222,7 +229,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                     expandedCandidates = emptyList(), isComposing = false,
                     isShowingRecentClipboard = false, hasNextPage = false, hasPrevPage = false,
                 )
-                service.commitText(text)
+                service.commitText(literal)
                 service.updateUI()
                 service.maybeCollapseCandidatePage()
                 // 覆盖尚未送达的旧预编辑快照；取执行时引擎状态，不冻结空态覆盖下一键。
