@@ -407,6 +407,9 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         shiftState.setShifted(shifted)
     }
 
+    fun beginShiftHold() = shiftState.beginHold()
+    fun endShiftHold(): Boolean = shiftState.endHold()
+
     fun singleTapShift() {
         shiftState.singleTap()
     }

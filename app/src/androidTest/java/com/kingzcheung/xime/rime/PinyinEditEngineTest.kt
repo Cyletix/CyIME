@@ -19,6 +19,18 @@ class PinyinEditEngineTest {
     }
     private fun mode(id: String) { assertTrue(engine.switchSchema(id)); engine.setOption("ascii_mode", false) }
 
+    @Test fun fourteenKeyRepresentativeCodeDisplaysCandidateReading() {
+        mode("pinyin_14jian"); engine.setInput("qeb")
+        val snapshot = engine.readPinyinEditSnapshot()
+        assertEquals("qeb", snapshot[0])
+        assertEquals("wen; candidates=${engine.getCandidatesWithComments().toList()}", "wen", snapshot[4])
+        assertEquals("wen", engine.getComposition().preedit)
+        assertEquals("wen", engine.getProcessResult(true).preeditText)
+        assertTrue(engine.getCandidates().any { it in listOf("问", "文", "温") })
+        assertEquals("", engine.commit())
+        engine.clearQueuedComposition()
+    }
+
     @Test fun fullPinyinEditPreservesHostCommitAndSetsRealCaret() {
         mode("rime_ice")
         assertTrue(engine.setInput("nihao"))

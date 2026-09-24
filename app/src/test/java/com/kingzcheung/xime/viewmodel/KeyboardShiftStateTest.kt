@@ -90,4 +90,25 @@ class KeyboardShiftStateTest {
             assertEquals(key, ShiftMode.CAPS.applyToKey(key))
         }
     }
+    @Test fun `holding shift persists across letters and release restores lowercase`() {
+        val shift = KeyboardShiftState()
+        shift.beginHold()
+        repeat(3) {
+            assertEquals("A", shift.mode.value.applyToKey("a"))
+            shift.onCharacterTyped()
+        }
+        assertTrue(shift.endHold())
+        assertEquals(ShiftMode.OFF, shift.mode.value)
+    }
+    @Test fun `unused hold can cancel or become a single tap and caps survives temporary hold`() {
+        val shift = KeyboardShiftState()
+        shift.beginHold(); assertFalse(shift.endHold())
+        assertEquals(ShiftMode.OFF, shift.mode.value)
+        shift.singleTap(); shift.beginHold(); shift.onCharacterTyped(); shift.endHold()
+        assertEquals(ShiftMode.OFF, shift.mode.value)
+        shift.doubleTap(); shift.beginHold(); shift.onCharacterTyped(); shift.endHold()
+        assertEquals(ShiftMode.CAPS, shift.mode.value)
+        shift.reset(); shift.endHold(); assertEquals(ShiftMode.OFF, shift.mode.value)
+    }
+
 }

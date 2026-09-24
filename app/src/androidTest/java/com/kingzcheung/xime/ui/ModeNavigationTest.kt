@@ -85,6 +85,81 @@ class ModeNavigationTest {
         rule.runOnIdle { assertEquals(listOf(",", "."), keys) }
     }
 
+    @Test fun numericOperatorColumnIsBalancedFrom14Key() = verifyNumericColumns(400)
+    @Test fun numericOperatorColumnIsBalancedOnTablet() = verifyNumericColumns(1000)
+    private fun verifyNumericColumns(width: Int) {
+        mount("pinyin_14jian", width = width)
+        val first = bounds(1); val second = bounds(2)
+        tapAt(second)
+        val operators = rule.onNodeWithTag("number-operators").fetchSemanticsNode().boundsInRoot
+        val actions = rule.onNodeWithTag("number-actions").fetchSemanticsNode().boundsInRoot
+        assertEquals("operator/action widths", actions.width, operators.width, 1.5f)
+        assertNumericNavigationColumns()
+        assertEquals("bottom row stays at the same height", first.top, bounds(1).top, 1.5f)
+        rule.onNodeWithText("+").performTouchInput { click() }
+        rule.onNodeWithText("7").performTouchInput { click() }
+        rule.runOnIdle { assertEquals(listOf("+", "7"), keys) }
+        save("balanced-number-$width")
+        tapAt(bounds(2))
+        rule.onNodeWithText("qw").assertExists()
+    }
+
+    @Test fun heldShiftSupportsTwoFingersAndRepeatedLetters() {
+        mount("rime_ice", english = true)
+        val root = rule.onNodeWithTag("navigation-keyboard", true)
+        val origin = root.fetchSemanticsNode().boundsInRoot.topLeft
+        val shift = rule.onNodeWithTag("shift-key").fetchSemanticsNode().boundsInRoot.center - origin
+        val a = rule.onNodeWithText("a").fetchSemanticsNode().boundsInRoot.center - origin
+        val b = rule.onNodeWithText("b").fetchSemanticsNode().boundsInRoot.center - origin
+        root.performTouchInput {
+            down(0, shift)
+            down(1, a); up(1)
+            advanceEventTime(50)
+            down(1, a); up(1)
+            down(1, b); up(1)
+            up(0)
+        }
+        rule.onNodeWithText("c").performTouchInput { click() }
+        rule.runOnIdle { assertEquals(listOf("A", "A", "B", "c"), keys); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+    }
+    @Test fun shiftSlideTypesOneUppercaseAndReleases() = verifyShiftSlide(false)
+    @Test fun splitShiftSlideCrossesTheGapAndReleases() = verifyShiftSlide(true)
+    private fun verifyShiftSlide(split: Boolean) {
+        mount("rime_ice", english = true, split = split, width = if (split) 1000 else 400)
+        val key = rule.onNodeWithTag("shift-key")
+        val node = key.fetchSemanticsNode()
+        val target = rule.onNodeWithText("p").fetchSemanticsNode().positionOnScreen
+        key.performTouchInput { down(center); moveTo(target - node.positionOnScreen + androidx.compose.ui.geometry.Offset(5f, 5f)); up() }
+        rule.onNodeWithText("q").performTouchInput { click() }
+        rule.runOnIdle { assertEquals(listOf("P", "q"), keys); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+    }
+    @Test fun shiftTapDoubleTapAndCancelledSlideRetainTheirMeanings() {
+        mount("rime_ice", english = true)
+        val shift = rule.onNodeWithTag("shift-key")
+        shift.performTouchInput { click() }
+        rule.onNodeWithText("A").performTouchInput { click() }
+        rule.onNodeWithText("b").performTouchInput { click() }
+        shift.performTouchInput { doubleClick() }
+        rule.onNodeWithText("C").performTouchInput { click() }
+        rule.onNodeWithText("D").performTouchInput { click() }
+        rule.runOnIdle { assertEquals(listOf("A", "b", "C", "D"), keys); vm.resetShift() }
+        shift.performTouchInput { down(center); moveTo(center - androidx.compose.ui.geometry.Offset(200f, 200f)); cancel() }
+        rule.onNodeWithText("e").performTouchInput { click() }
+        rule.runOnIdle { assertEquals(listOf("A", "b", "C", "D", "e"), keys); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+    }
+
+    private fun assertNumericNavigationColumns() {
+        val operators = rule.onNodeWithTag("number-operators").fetchSemanticsNode().boundsInRoot
+        val first = bounds(1); val second = bounds(2)
+        assertEquals("first mode key aligns with operators", operators.left, first.left, 1.5f)
+        assertEquals("first mode key spans operator width", operators.width, first.width, 1.5f)
+        assertEquals("both mode keys have equal widths", first.width, second.width, 1.5f)
+        assertEquals("second mode key sits immediately to the right", first.right, second.left, 1.5f)
+        val zero = rule.onNodeWithTag("number-zero", true).fetchSemanticsNode().boundsInRoot
+        assertEquals("zero starts after both mode keys", second.right, zero.left, 1.5f)
+        assertTrue("zero must no longer take most of the bottom row", zero.width < first.width * 2.5f)
+    }
+
     private fun bounds(slot: Int): Rect = rule.onNodeWithTag("mode-slot-$slot", true).fetchSemanticsNode().boundsInRoot
     private fun same(expected: Rect, actual: Rect) {
         assertEquals("slot left", expected.left, actual.left, 1.5f)
@@ -113,10 +188,10 @@ class ModeNavigationTest {
         rule.runOnIdle { assertEquals(original, vm.keyboardState.value); assertTrue(vm.page.value is KeyboardPage.Main) }
         tapAt(second) // text -> numbers
         label(1, "!@#"); label(2, label)
-        same(first, bounds(1)); same(second, bounds(2))
+        assertNumericNavigationColumns()
         rule.onNodeWithText("1").performTouchInput { click() }
         save("$screenshot-numbers")
-        tapAt(second) // same physical coordinate -> text
+        tapAt(bounds(2)) // numeric return shares the operator-column width
         rule.runOnIdle { assertEquals(original, vm.keyboardState.value); assertTrue(vm.page.value is KeyboardPage.Main) }
         tapAt(first); tapAt(second) // text -> symbols -> numbers
         label(1, "!@#"); label(2, label)
@@ -176,8 +251,8 @@ class ModeNavigationTest {
         tapAt(first)
         rule.onNodeWithTag("handwriting-canvas", true).assertIsDisplayed()
         tapAt(second)
-        same(first, bounds(1)); same(second, bounds(2))
-        tapAt(second)
+        assertNumericNavigationColumns()
+        tapAt(bounds(2))
         rule.onNodeWithTag("handwriting-canvas", true).assertIsDisplayed()
     }
 

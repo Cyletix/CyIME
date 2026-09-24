@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 enum class ShiftMode {
-    OFF, SINGLE, CAPS;
+    OFF, SINGLE, CAPS, HELD;
 
     val isShifted: Boolean get() = this != OFF
 
@@ -20,6 +20,26 @@ internal class KeyboardShiftState {
     private val _mode = MutableStateFlow(ShiftMode.OFF)
     val mode = _mode.asStateFlow()
 
+    private var beforeHold = ShiftMode.OFF
+    private var usedWhileHeld = false
+
+    fun beginHold() {
+        if (_mode.value == ShiftMode.HELD) return
+        beforeHold = _mode.value
+        usedWhileHeld = false
+        _mode.value = ShiftMode.HELD
+    }
+
+    /** Returns whether another key used the held modifier; the button then suppresses its tap. */
+    fun endHold(): Boolean {
+        val used = usedWhileHeld
+        if (_mode.value == ShiftMode.HELD) {
+            _mode.value = if (used && beforeHold == ShiftMode.SINGLE) ShiftMode.OFF else beforeHold
+        }
+        usedWhileHeld = false
+        return used
+    }
+
     fun singleTap() {
         _mode.value = if (_mode.value == ShiftMode.OFF) ShiftMode.SINGLE else ShiftMode.OFF
     }
@@ -34,10 +54,13 @@ internal class KeyboardShiftState {
     }
 
     fun onCharacterTyped() {
-        if (_mode.value == ShiftMode.SINGLE) reset()
+        if (_mode.value == ShiftMode.HELD) usedWhileHeld = true
+        else if (_mode.value == ShiftMode.SINGLE) reset()
     }
 
     fun reset() {
+        beforeHold = ShiftMode.OFF
+        usedWhileHeld = false
         _mode.value = ShiftMode.OFF
     }
 }

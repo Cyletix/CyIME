@@ -283,7 +283,7 @@ class RimeEngine {
             if (!nativeHasSession() && !nativeCreateSession())
                 return@tryLocked RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)
             enforceAsciiWidth()
-            nativeProcessKeyAndGetResult(keycode, mask)
+            withDisplayPreedit(nativeProcessKeyAndGetResult(keycode, mask))
         }
     }
 
@@ -300,7 +300,7 @@ class RimeEngine {
         // 释放旧 translations）并发会导致悬空 → ScriptTranslation::Peek 空指针崩溃。
         // 部署/编译持锁期间拿不到锁直接返回空结果（不进 native），避免阻塞调用线程。
         return tryLocked(RimeProcessResult(false, "", "", "", emptyArray(), false, false, false)) {
-            nativeGetProcessResult(processed)
+            withDisplayPreedit(nativeGetProcessResult(processed))
         }
     }
 
@@ -346,6 +346,17 @@ class RimeEngine {
     private external fun nativeConversionPreview(): String
     private external fun nativeHighlightCandidate(index: Int): Boolean
 
+    private fun displayPreedit(input: String, preedit: String, spelling: String): String {
+        if (nativeGetCurrentSchema() != "pinyin_14jian" || nativeIsAsciiMode()) return preedit
+        val snapshot = nativePinyinEditSnapshot()
+        val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0
+        val prefix = snapshot.getOrNull(3).orEmpty()
+        return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), spelling)
+    }
+
+    private fun withDisplayPreedit(result: RimeProcessResult): RimeProcessResult = result.copy(
+        preeditText = displayPreedit(result.inputText, result.preeditText, result.candidates.firstOrNull()?.comment.orEmpty()))
+
     fun getInput(): String {
         return tryLocked("") {
             nativeGetInput() ?: ""
@@ -360,7 +371,8 @@ class RimeEngine {
      */
     fun getComposition(): RimeComposition {
         return tryLocked(RimeComposition("", "", "", emptyArray(), false, false, false)) {
-            nativeGetComposition()
+            nativeGetComposition().let { result -> result.copy(preedit = displayPreedit(
+                result.input, result.preedit, result.candidates.firstOrNull()?.comment.orEmpty())) }
         }
     }
 
@@ -472,7 +484,10 @@ class RimeEngine {
 
     /** Snapshot/apply run on the existing input FIFO, under one engine lock. */
     internal fun readPinyinEditSnapshot(): Array<String> = locked {
-        if (nativeHasSession()) nativePinyinEditSnapshot() else emptyArray()
+        if (nativeHasSession()) nativePinyinEditSnapshot().also { snapshot ->
+            if (snapshot.size > 4) snapshot[4] = displayPreedit(snapshot[0], snapshot[4],
+                nativeGetCandidatesWithComments()?.firstOrNull()?.getOrNull(1).orEmpty())
+        } else emptyArray()
     }
 
     internal fun applyPinyinEdit(expectedInput: String, newInput: String, caret: Int,
@@ -498,7 +513,7 @@ class RimeEngine {
         }.toTypedArray()
         RimeProcessResult(
             processed = true, committedText = "", inputText = snapshot.getOrNull(0).orEmpty(),
-            preeditText = snapshot.getOrNull(4).orEmpty(), candidates = candidates,
+            preeditText = displayPreedit(snapshot.getOrNull(0).orEmpty(), snapshot.getOrNull(4).orEmpty(), candidates.firstOrNull()?.comment.orEmpty()), candidates = candidates,
             isAsciiMode = nativeIsAsciiMode(), hasNextPage = nativeHasNextPage(), hasPrevPage = nativeHasPrevPage(),
         )
     }

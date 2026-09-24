@@ -939,7 +939,8 @@ fun KeyboardView(
                                     // 连续触摸可能早于下一次重组，提交时读取真实 Shift 状态。
                                     val shift = viewModel.shiftMode.value
                                     callbacks.onKeyPress(shift.applyToKey(key), shift.isShifted)
-                                    if (!com.kingzcheung.xime.service.JapaneseTyping.usesKanaCase(state.currentSchemaId, state.isAsciiMode)) {
+                                    if (shift == com.kingzcheung.xime.viewmodel.ShiftMode.HELD ||
+                                        !com.kingzcheung.xime.service.JapaneseTyping.usesKanaCase(state.currentSchemaId, state.isAsciiMode)) {
                                         viewModel.onCharacterTyped()
                                     }
                                 }

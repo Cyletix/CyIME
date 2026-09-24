@@ -34,7 +34,7 @@ internal object PinyinEditBuffer {
 
 /** Maps engine syllables to code. Editor sessions retain these boundaries as editable text. */
 internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = false,
-    includeAutomaticBoundaries: Boolean = true) {
+    includeAutomaticBoundaries: Boolean = true, isMerged14: Boolean = false) {
     val text: String
     private val offsets: List<Int>
     init {
@@ -50,7 +50,8 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
         // Numeric keys remain ambiguous in the engine, but display its actual reading.
         // Literal letters and caret offsets retain their original identity.
         val matches = input.length == reading.length && input.indices.all {
-            input[it] == reading[it] || isT9 && input[it] in '2'..'9' && input[it] == digit(reading[it])
+            input[it] == reading[it] || isT9 && input[it] in '2'..'9' && input[it] == digit(reading[it]) ||
+                isMerged14 && merged14Representative(input[it]) == merged14Representative(reading[it])
         }
         if (matches) {
             var letters = 0
@@ -63,7 +64,7 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
                 if (includeAutomaticBoundaries && character != '\'' && letters in boundaries && isNotEmpty() && last() != '\'') {
                     append('\''); mapping.add(index)
                 }
-                append(if (matches && character in '2'..'9') reading[letters] else character); mapping.add(index + 1)
+                append(if (matches && (character in '2'..'9' || isMerged14 && character != '\'')) reading[letters] else character); mapping.add(index + 1)
                 if (character != '\'') letters++
             }
         }
@@ -76,3 +77,36 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
 /** Preserve confirmed Chinese text and real codes; make Latin syllable spaces visible. */
 internal fun pinyinPreviewText(preedit: String): String = preedit.trim()
     .replace(Regex("(?<=[a-zA-ZüÜ'])\\s+(?=[a-zA-ZüÜ'])"), "'")
+
+internal val merged14Groups = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
+internal fun merged14Representative(c: Char): Char = merged14Groups.firstOrNull { c in it }?.first() ?: c
+
+/** Only substitute a dictionary reading when every entered key is accounted for. */
+internal fun merged14Preedit(raw: String, preedit: String, spelling: String): String {
+    val reading = spelling.trim()
+    if (reading.isEmpty() || reading.any { it !in 'a'..'z' && it != '\'' && !it.isWhitespace() && it != 'ü' }) return preedit
+    val input = PinyinEditBuffer.normalized(raw).replace("'", "")
+    val letters = PinyinEditBuffer.normalized(reading).replace("'", "")
+    if (input.isEmpty() || input.length != letters.length || input.indices.any {
+            merged14Representative(input[it]) != merged14Representative(letters[it]) }) return preedit
+    return PinyinEditDisplay(raw, reading, isMerged14 = true).text
+}
+
+/** Multi-tap exists only in the explicit pinyin editor, never in ordinary composition. */
+internal class PinyinMultiTap {
+    private var group = ""
+    private var previousText = ""
+    private var previousCaret = -1
+    private var previousTime = Long.MIN_VALUE
+    private var index = 0
+    fun reset() { group = ""; previousCaret = -1 }
+    fun press(text: String, caret: Int, letters: String, timeMs: Long): Pair<String, Int> {
+        val cycling = group == letters && text == previousText && caret == previousCaret &&
+            caret > 0 && timeMs - previousTime in 0..650
+        index = if (cycling) (index + 1) % letters.length else 0
+        val position = if (cycling) caret - 1 else caret
+        val next = text.take(position) + letters[index] + text.drop(caret)
+        group = letters; previousText = next; previousCaret = position + 1; previousTime = timeMs
+        return next to previousCaret
+    }
+}
