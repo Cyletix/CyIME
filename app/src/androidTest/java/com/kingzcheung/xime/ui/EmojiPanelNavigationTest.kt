@@ -2,6 +2,8 @@ package com.kingzcheung.xime.ui
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.*
@@ -26,9 +28,24 @@ class EmojiPanelNavigationTest {
     private fun show(items: List<EmojiCategory>) {
         categories.value = items
         rule.setContent { MaterialTheme {
-            EmojiKeyboardLayout(onEmojiSelect = {}, onBack = {}, backgroundColor = Color.Black,
-                textColor = Color.White, accentColor = Color.Blue, modifier = Modifier.size(280.dp, 180.dp))
+            EmojiKeyboardLayout(onEmojiSelect = {}, onBack = {}, backgroundColor = Color(0xFF211E29),
+                textColor = Color.White, accentColor = Color(0xFFCEB7F7), modifier = Modifier.size(400.dp, 184.dp).testTag("emoji-panel"))
         } }
+    }
+
+    @Test fun builtinEmojiStartsAtTheTopWithoutASingleGroupTab() {
+        show(com.kingzcheung.xime.data.EmojiData.categories)
+        rule.onNodeWithTag("emoji-groups").assertDoesNotExist()
+        val panel = rule.onNodeWithTag("emoji-panel").fetchSemanticsNode().boundsInRoot
+        val pages = rule.onNodeWithTag("emoji-pages").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertEquals(panel.top, pages.top, 1f)
+        rule.onNodeWithText("😀").performClick()
+        rule.waitForIdle()
+        val bitmap = rule.onNodeWithTag("emoji-panel").captureToImage().asAndroidBitmap()
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        java.io.File(context.getExternalFilesDir(null), "emoji-preview.png").outputStream().use {
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
     }
 
     @Test fun swipingFromBuiltinsEntersTheFirstPluginCategoryWithoutSkippingIt() {

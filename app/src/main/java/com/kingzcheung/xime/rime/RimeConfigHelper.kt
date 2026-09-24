@@ -13,6 +13,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -31,8 +32,9 @@ object RimeConfigHelper {
 
     /** 部署互斥：Application 预初始化与输入法服务初始化可能并发触发部署，串行化避免重复/并发全量编译。 */
     private val deploymentLock = Any()
+    private val assetInitializationMutex = kotlinx.coroutines.sync.Mutex()
     
-    suspend fun initializeRimeDataAsync(context: Context): Pair<String, String> {
+    suspend fun initializeRimeDataAsync(context: Context): Pair<String, String> = assetInitializationMutex.withLock {
         val rimeDir = File(context.filesDir, "rime")
         
         // 迁移旧目录结构 (rime/shared/ + rime/user/) → 单一 rime/ 目录
@@ -55,7 +57,7 @@ object RimeConfigHelper {
         // 不再在初始化阶段删 build：build 是否重建统一由 ensureDeployment()
         // 按增量优先策略决定，避免配置变化即全量重编译（60MB 词库持锁 30s+）。
 
-        return Pair(rimeDir.absolutePath, rimeDir.absolutePath)
+        Pair(rimeDir.absolutePath, rimeDir.absolutePath)
     }
 
     /**
@@ -71,7 +73,7 @@ object RimeConfigHelper {
     fun ensureDeployment(context: Context): Boolean {
         synchronized(deploymentLock) {
             val currentHash = computeDeploymentHash(context)
-            if (currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context)) {
+            if (currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && hasRequiredBuildArtifacts(context)) {
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
             }
@@ -97,7 +99,7 @@ object RimeConfigHelper {
                 buildDir.mkdirs()
                 deployed = engine.deploy()
             }
-            if (deployed) {
+            if (deployed && hasRequiredBuildArtifacts(context)) {
                 storeDeploymentHash(context)
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
@@ -106,26 +108,10 @@ object RimeConfigHelper {
         }
     }
     
-    fun initializeRimeData(context: Context): Pair<String, String> {
-        val rimeDir = File(context.filesDir, "rime")
-        
-        migrateOldStructure(context, rimeDir)
-        
-        if (!rimeDir.exists()) {
-            rimeDir.mkdirs()
-        }
-        
-        copyAssetsToRimeDir(context, rimeDir)
-        com.kingzcheung.xime.settings.JapaneseSchemas.installAssets(context, rimeDir)
-        com.kingzcheung.xime.settings.ChineseSchemas.installAssets(context, rimeDir)
-        // F1: 同步初始化路径也写回 default.yaml 的 schema_list
-        SchemaManager.applyEnabledSchemasToDefaultYaml(context)
-        runBlocking { PersonalDictManager.ensureSchemaPacks(context) }
-        // build 重建统一由 ensureDeployment() 增量优先决策，此处不删 build
-        
-        return Pair(rimeDir.absolutePath, rimeDir.absolutePath)
+    fun initializeRimeData(context: Context): Pair<String, String> = runBlocking {
+        initializeRimeDataAsync(context)
     }
-    
+
     fun storeDeploymentHash(context: Context) {
         val hash = computeDeploymentHash(context)
         if (hash.isNotEmpty()) {
@@ -166,7 +152,7 @@ object RimeConfigHelper {
         }
     }
 
-    fun isDeploymentComplete(context: Context): Boolean {
+    fun isDeploymentComplete(context: Context): Boolean = synchronized(deploymentLock) {
         val rimeDir = File(context.filesDir, "rime")
         val buildDir = File(rimeDir, "build")
         if (!buildDir.exists()) return false
@@ -195,6 +181,7 @@ object RimeConfigHelper {
             }
         }
 
+        if (!hasRequiredBuildArtifacts(context)) return false
         val currentHash = computeDeploymentHash(context)
         if (currentHash.isEmpty()) return false
 
@@ -209,6 +196,23 @@ object RimeConfigHelper {
         }
 
         return true
+    }
+
+    /** A compiled YAML alone is not a usable dictionary. Never cache that as ready. */
+    internal fun hasRequiredBuildArtifacts(context: Context): Boolean {
+        val build = File(context.filesDir, "rime/build")
+        return SchemaManager.getEnabledSchemas(context).all { id ->
+            val schema = File(build, "$id.schema.yaml")
+            if (!schema.isFile) return@all false
+            val translator = Regex("""(?ms)^translator:\s*\n(.*?)(?=^\S|\z)""")
+                .find(schema.readText())?.groupValues?.get(1) ?: return@all id !in com.kingzcheung.xime.settings.ChineseSchemas.ids
+            fun value(key: String) = Regex("(?m)^  $key: *([^#\r\n]+)")
+                .find(translator)?.groupValues?.get(1)?.trim()?.trim('"', '\'')
+            val dictionary = value("dictionary")?.takeIf { it.isNotBlank() } ?: return@all id !in com.kingzcheung.xime.settings.ChineseSchemas.ids
+            val prism = value("prism") ?: dictionary
+            listOf(File(build, "$dictionary.table.bin"), File(build, "$prism.prism.bin"))
+                .all { it.isFile && !isBrokenBuildArtifact(it) }
+        }
     }
 
     private fun fileUpdateDigest(digest: java.security.MessageDigest, file: File) {
@@ -253,6 +257,12 @@ object RimeConfigHelper {
             ?.forEach { dictFile ->
                 digest.update(dictFile.name.toByteArray())
                 fileUpdateDigest(digest, dictFile)
+            }
+
+        rimeDir.walkTopDown().onEnter { it == rimeDir || it.name !in setOf("build", "market") }
+            .filter { it.isFile && it.parentFile != rimeDir && it.name.endsWith(".dict.yaml") }
+            .sortedBy { it.relativeTo(rimeDir).path }.forEach {
+                digest.update("${it.relativeTo(rimeDir).invariantSeparatorsPath}:${it.length()}:${it.lastModified()}".toByteArray())
             }
 
         val defaultYaml = File(rimeDir, "default.yaml")

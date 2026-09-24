@@ -145,11 +145,12 @@ fun EmojiKeyboardLayout(
             .fillMaxWidth()
             .background(backgroundColor)
     ) {
-        // 导航区：返回按钮 + 顶层 Tab（Emoji / 插件）
-        Box(
+        // With no plugins there is only one group; its lone tab wastes a full row.
+        if (pluginGroupEntries.isNotEmpty()) Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
+                .testTag("emoji-groups")
                 .padding(start = if (isLandscape) 50.dp else 8.dp, end = if (isLandscape) 50.dp else 8.dp),
             contentAlignment = Alignment.CenterStart
         ) {

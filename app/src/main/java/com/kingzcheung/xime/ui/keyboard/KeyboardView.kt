@@ -280,6 +280,10 @@ fun KeyboardView(
                 com.kingzcheung.xime.service.JapaneseTyping.usesKanaCase(state.currentSchemaId, false) -> "あいう"
             else -> "中文"
         },
+        LocalKeyboardPunctuation provides if (state.isCalculatorMode) null else KeyboardPunctuation(
+            full = state.schemaSwitches.firstOrNull { it.name == "full_shape" }?.currentIndex?.let { it == 1 }
+                ?: SettingsPreferences.punctuationFullWidth(androidx.compose.ui.platform.LocalContext.current, !state.isAsciiMode),
+            japanese = state.currentSchemaId in com.kingzcheung.xime.settings.JapaneseSchemas.ids || state.currentSchemaId == "jaroomaji"),
         LocalKeyboardInputPreferences provides inputPreferences,
         LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(state.themeId, state.isDarkTheme), specialKeyTextColor),
         LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBgColor, specialKeyTextColor),

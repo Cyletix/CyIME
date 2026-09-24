@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.BuildConfig
@@ -76,6 +77,11 @@ object AppInfo {
     val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"
     
     val dependencies = listOf(
+        LicenseItem(
+            name = "CyIME（由 Cyletix 维护开发）",
+            license = "GPL-3.0",
+            url = "https://github.com/Cyletix/CyIME/blob/main/LICENSE"
+        ),
         LicenseItem(
             name = "Xime（上游，原名曦码）",
             license = "GPL-3.0",
@@ -208,7 +214,7 @@ fun AboutContent(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "由 Cyletix 维护，基于 Xime / Rime 的 Android 输入法。遵循 GPL v3，保留上游及第三方版权声明。",
+                            text = "基于 Xime 项目 fork 的 Android 输入法，采用 Rime 输入引擎，由 Cyletix 维护开发，遵循 GNU GPLv3 开源协议。保留上游作者及第三方版权与许可声明。",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -249,110 +255,32 @@ fun AboutContent(
                 }
             }
             
-            // 作者信息
+            // 本分支维护者优先，与源代码、上游作者使用同一种完整卡片。
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "维护者与上游作者",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Cyletix · Fork 维护者",
-                            modifier = Modifier.clickable { uriHandler.openUri("https://github.com/Cyletix") },
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 14.sp,
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { uriHandler.openUri("https://github.com/kingzcheung") },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.TwoTone.PersonOutline,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Kor1 (kingzcheung) · 上游作者",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "github.com/kingzcheung",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.TwoTone.OpenInNew,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
+                AboutLinkCard(
+                    title = "Cyletix · 维护与开发",
+                    subtitle = "github.com/Cyletix",
+                    icon = Icons.TwoTone.PersonOutline,
+                    onClick = { uriHandler.openUri("https://github.com/Cyletix") },
+                )
             }
-            
-            // 源代码
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            uriHandler.openUri("https://github.com/Cyletix/CyIME")
-                        },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.TwoTone.Code,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "源代码",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "github.com/Cyletix/CyIME",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                AboutLinkCard(
+                    title = "CyIME 源代码",
+                    subtitle = "github.com/Cyletix/CyIME",
+                    icon = Icons.TwoTone.Code,
+                    onClick = { uriHandler.openUri("https://github.com/Cyletix/CyIME") },
+                )
             }
-            
+            item {
+                AboutLinkCard(
+                    title = "Kor1 (kingzcheung) · 上游作者",
+                    subtitle = "github.com/kingzcheung",
+                    icon = Icons.TwoTone.PersonOutline,
+                    onClick = { uriHandler.openUri("https://github.com/kingzcheung") },
+                )
+            }
+
             // 链接项
             item {
                 Card(
@@ -700,6 +628,29 @@ fun LicensesContent(
                     }
                 }
             }
+        }
+    }
+}
+@Composable
+private fun AboutLinkCard(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(12.dp))
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
     }
 }

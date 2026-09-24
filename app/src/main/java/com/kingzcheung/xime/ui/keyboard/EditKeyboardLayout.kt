@@ -9,6 +9,11 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,9 +21,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -65,70 +76,144 @@ fun EditKeyboardLayout(
     ) {
         Column(bodyModifier.fillMaxSize().background(backgroundColor).padding(horizontal = 2.dp)) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                // 中央九宫格保持方形；两侧操作独立贴边，不跟随九宫格缩进。
-                val keySide = minOf(maxWidth / 5, maxHeight / 3)
-                Box(Modifier.fillMaxSize()) {
-                    Column(Modifier.align(Alignment.CenterStart).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-                        listOf(Triple(Icons.Default.SelectAll, "全选", "select_all"),
-                            Triple(Icons.Default.ContentCut, "剪切", "cut"),
-                            Triple(Icons.Default.KeyboardArrowLeft, "返回键盘", "back")).forEach { (icon, label, action) ->
-                            if (action != "back" || showBackKey)
-                                EditorActionKey(icon, label, { if (action == "back") onBack() else onAction(action) }, keyBgColor, textColor, Modifier.size(keySide))
-                            else Spacer(Modifier.size(keySide))
-                        }
+                val config = LocalConfiguration.current
+                val landscape = config.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val minimumBody = (keyboardHeightBounds(config.screenHeightDp, landscape).first - 44 - bottomPaddingDp).coerceAtLeast(96).dp
+                val cellWidth = maxWidth / 5
+                val cellHeight = maxHeight / 3
+                // Resizing the keyboard only stretches the surrounding cells. The pad,
+                // its square centre key, glyphs and gaps all use the minimum-height baseline.
+                val baseline = minOf(minimumBody, maxHeight)
+                val padDiameter = minOf(cellWidth * 3 * .75f, baseline)
+                val spacing = keyboardKeySpacingScale(cellWidth.value, padDiameter.value / 3)
+                val inset = 2.dp * spacing.value
+                val glyphScale = KeyboardKeyMetrics.contentScale(cellWidth.value * .92f, padDiameter.value / 3 * .92f)
+                val padColor = androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f)
+                @Composable
+                fun key(command: String, keyModifier: Modifier, cutout: Shape? = null,
+                    offsetX: Dp = 0.dp, offsetY: Dp = 0.dp, compact: Boolean = false) {
+                    val (icon, label) = when (command) {
+                        "undo" -> Icons.AutoMirrored.Filled.Undo to "撤销"
+                        "redo" -> Icons.AutoMirrored.Filled.Redo to "重做"
+                        "cut" -> Icons.Default.ContentCut to "剪切"
+                        "copy" -> Icons.Default.ContentCopy to "复制"
+                        "paste" -> Icons.Default.ContentPaste to "粘贴"
+                        "home" -> Icons.Default.FirstPage to "段首"
+                        "end" -> Icons.Default.LastPage to "段尾"
+                        "up" -> Icons.Default.KeyboardArrowUp to "向上"
+                        "down" -> Icons.Default.KeyboardArrowDown to "向下"
+                        "left" -> Icons.Default.KeyboardArrowLeft to "向左"
+                        "right" -> Icons.Default.KeyboardArrowRight to "向右"
+                        "delete" -> Icons.AutoMirrored.Filled.Backspace to "删除"
+                        "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn to "回车"
+                        "select_all" -> Icons.Default.SelectAll to "全选"
+                        else -> Icons.Default.TextFields to if (selecting) "取消选择" else "选择"
                     }
-                    Column(Modifier.align(Alignment.Center)) {
-                        val rows = listOf(
-                            listOf("home", "up", "end"),
-                            listOf("left", "select", "right"),
-                            listOf("copy", "down", "paste"))
-                        rows.forEach { row ->
-                            Row {
-                                row.forEach { direction ->
-                                    if (direction == "select") EditorActionKey(
-                                    Icons.Default.SelectAll, if (selecting) "取消选择" else "选择",
-                                    { selecting = !selecting; onAction(if (selecting) "select_begin" else "select_end") },
-                                    if (selecting) accentColor.copy(alpha = 0.3f) else keyBgColor, textColor, Modifier.size(keySide))
+                    val arrow = command in listOf("up", "down", "left", "right")
+                    val colors = when (command) {
+                        "enter" -> LocalEnterKeyColors.current
+                        "delete" -> LocalFunctionKeyColors.current
+                        else -> null
+                    }
+                    EditorActionKey(icon, label, {
+                        when {
+                            command == "select" -> {
+                                selecting = !selecting
+                                onAction(if (selecting) "select_begin" else "select_end")
+                            }
+                            arrow -> onAction((if (selecting) "select_" else "") + "arrow_$command")
+                            selecting && command == "home" -> onAction("select_paragraph_start")
+                            selecting && command == "end" -> onAction("select_paragraph_end")
+                            else -> onAction(command)
+                        }
+                    }, when {
+                        command == "select" && selecting -> accentColor
+                        arrow -> Color.Transparent
+                        else -> colors?.background ?: keyBgColor
+                    }, colors?.foreground ?: textColor, keyModifier,
+                        repeatable = arrow || command in listOf("delete", "enter"),
+                        plain = arrow, visualShape = cutout, compact = compact,
+                        contentOffsetX = offsetX, contentOffsetY = offsetY)
+                }
+                CompositionLocalProvider(LocalKeyboardKeySpacingScale provides spacing,
+                    LocalKeyboardKeyContentScale provides glyphScale) {
+                    val rows = listOf(
+                        listOf("undo", "home", "", "end", "delete"),
+                        listOf("redo", "", "", "", "select_all"),
+                        listOf("cut", "copy", "", "paste", "enter"))
+                    Column(Modifier.fillMaxSize().testTag("editor-grid")) {
+                        rows.forEachIndexed { rowIndex, row ->
+                            Row(Modifier.weight(1f).fillMaxWidth()) {
+                                row.forEachIndexed { columnIndex, command ->
+                                    val cellModifier = Modifier.weight(1f).fillMaxHeight()
+                                    if (command.isEmpty()) Spacer(cellModifier)
+                                    else if (columnIndex == 0 || columnIndex == 4) key(command, cellModifier)
                                     else {
-                                        val (icon, label, action) = when (direction) {
-                                            "home" -> Triple(Icons.Default.FirstPage, "段首", if (selecting) "select_paragraph_start" else "home")
-                                            "end" -> Triple(Icons.Default.LastPage, "段尾", if (selecting) "select_paragraph_end" else "end")
-                                            "copy" -> Triple(Icons.Default.ContentCopy, "复制", "copy")
-                                            "paste" -> Triple(Icons.Default.ContentPaste, "粘贴", "paste")
-                                            else -> {
-                                                val icon = when (direction) {
-                                                    "up" -> Icons.Default.KeyboardArrowUp
-                                                    "down" -> Icons.Default.KeyboardArrowDown
-                                                    "left" -> Icons.Default.KeyboardArrowLeft
-                                                    else -> Icons.Default.KeyboardArrowRight
-                                                }
-                                                val label = when (direction) { "up" -> "向上"; "down" -> "向下"; "left" -> "向左"; else -> "向右" }
-                                                Triple(icon, label, (if (selecting) "select_" else "") + "arrow_" + direction)
-                                            }
-                                        }
-                                        val arrow = direction in listOf("up", "down", "left", "right")
-                                        EditorActionKey(icon, label, { onAction(action) },
-                                            if (arrow) androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f) else keyBgColor,
-                                            textColor, Modifier.size(keySide),
-                                            repeatable = arrow)
+                                        val circleX = (2.5f - columnIndex) * cellWidth.value
+                                        val circleY = (1.5f - rowIndex) * cellHeight.value
+                                        val contentScale = glyphScale.coerceAtMost(1.15f)
+                                        val offset = editorCornerContentOffset(cellWidth.value, cellHeight.value,
+                                            circleX, circleY, padDiameter.value / 2 + inset.value,
+                                            12f * contentScale, 17f * contentScale, inset.value + 4f)
+                                        key(command, cellModifier,
+                                            EditorPadCutout(circleX.dp - inset, circleY.dp - inset, padDiameter / 2 + inset),
+                                            offset.x.dp, offset.y.dp, compact = true)
                                     }
                                 }
                             }
                         }
                     }
-                    Column(Modifier.align(Alignment.CenterEnd).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-                        listOf(Triple(Icons.AutoMirrored.Filled.Backspace, "删除", "delete"),
-                            Triple(Icons.AutoMirrored.Filled.KeyboardReturn, "回车", "enter")).forEach { (icon, label, action) ->
-                            val colors = if (action == "enter") LocalEnterKeyColors.current else LocalFunctionKeyColors.current
-                            EditorActionKey(icon, label, { onAction(action) }, colors?.background ?: keyBgColor,
-                                colors?.foreground ?: textColor, Modifier.size(keySide), repeatable = true)
+                    Box(Modifier.align(Alignment.Center).size(padDiameter).padding(inset)
+                        .testTag("editor-direction-pad").drawBehind { drawCircle(padColor) })
+                    Column(Modifier.align(Alignment.Center).size(padDiameter).testTag("editor-pad-controls")) {
+                        listOf(listOf("", "up", ""), listOf("left", "select", "right"),
+                            listOf("", "down", "")).forEach { row ->
+                            Row(Modifier.weight(1f).fillMaxWidth()) {
+                                row.forEach { command ->
+                                    val cell = Modifier.weight(1f).fillMaxHeight()
+                                    if (command.isEmpty()) Spacer(cell) else key(command, cell)
+                                }
+                            }
                         }
                     }
                 }
             }
+
             Spacer(Modifier.height(bottomPaddingDp.dp))
         }
     }
+    }
+}
+
+/** Keep labels centred in the usable part of a corner, clear of the circle and outer edge. */
+internal fun editorCornerContentOffset(width: Float, height: Float, circleX: Float, circleY: Float,
+    radius: Float, halfWidth: Float, halfHeight: Float, margin: Float): Offset {
+    val start = Offset(width / 2, height / 2)
+    val target = Offset(
+        if (circleX > width / 2) halfWidth + margin else width - halfWidth - margin,
+        if (circleY > height / 2) halfHeight + margin else height - halfHeight - margin)
+    fun fits(point: Offset): Boolean {
+        val dx = (kotlin.math.abs(point.x - circleX) - halfWidth).coerceAtLeast(0f)
+        val dy = (kotlin.math.abs(point.y - circleY) - halfHeight).coerceAtLeast(0f)
+        return dx * dx + dy * dy >= radius * radius
+    }
+    if (fits(start)) return Offset.Zero
+    var low = 0f; var high = 1f
+    repeat(16) {
+        val mid = (low + high) / 2
+        if (fits(start + (target - start) * mid)) high = mid else low = mid
+    }
+    return (target - start) * high
+}
+
+private data class EditorPadCutout(val x: Dp, val y: Dp, val radius: Dp) : Shape {
+    override fun createOutline(size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density): Outline = with(density) {
+        val cell = Path().apply { addRect(Rect(0f, 0f, size.width, size.height)) }
+        val pad = Path().apply { addOval(Rect(x.toPx() - radius.toPx(), y.toPx() - radius.toPx(),
+            x.toPx() + radius.toPx(), y.toPx() + radius.toPx())) }
+        Outline.Generic(Path.combine(PathOperation.Difference, cell, pad))
     }
 }
 
@@ -142,14 +227,19 @@ internal fun EditorActionKey(
     foreground: Color,
     modifier: Modifier = Modifier,
     repeatable: Boolean = false,
+    plain: Boolean = false,
+    visualShape: Shape? = null,
+    compact: Boolean = false,
+    contentOffsetX: Dp = 0.dp,
+    contentOffsetY: Dp = 0.dp,
 ) {
     val action by rememberUpdatedState(onAction)
     val scope = rememberCoroutineScope()
     var pressed by remember { mutableStateOf(false) }
     val shadow = LocalEditorKeyShadow.current
     val density = LocalDensity.current
-    val shadowModifier = remember(shadow, density, background) {
-        if (shadow.enabled) {
+    val shadowModifier = remember(shadow, density, background, plain) {
+        if (shadow.enabled && !plain) {
             val offsetPx = with(density) { shadow.elevation.toPx() }
             val cornerPx = with(density) { shadow.shapeRadius.toPx() }
             val color = crispShadowColor(background)
@@ -186,9 +276,17 @@ internal fun EditorActionKey(
             })
         }
         .padding(scaledKeyVisualPadding(PaddingValues(2.dp)))
-        .keyGlow(Modifier.then(shadowModifier)
+        .keyGlow(Modifier.then(if (visualShape != null) Modifier.clip(visualShape) else Modifier)
+        .then(shadowModifier)
         .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
         .background(if (pressed) foreground.copy(alpha = 0.18f) else background)), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(KeyboardKeyMetrics.FunctionIconSize))
+        Column(Modifier.offset(contentOffsetX, contentOffsetY).testTag("editor-label-$label"),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let { if (compact) it.coerceAtMost(1.15f) else it }
+            Icon(icon, contentDescription = null, tint = foreground,
+                modifier = Modifier.size((if (compact) 20.dp else 24.dp) * scale))
+            Text(label, color = foreground, fontSize = (10f * scale).sp, maxLines = 1,
+                lineHeight = (12f * scale).sp)
+        }
     }
 }

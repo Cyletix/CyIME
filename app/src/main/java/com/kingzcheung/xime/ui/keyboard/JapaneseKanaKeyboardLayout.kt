@@ -207,7 +207,7 @@ internal fun KanaFlickButton(
         val fontSp = keyLabelSizeSp(key.center.label, KeyboardKeyMetrics.LabelSize.value,
             maxWidth.value, maxHeight.value, density.fontScale, textScale)
         if (pressed) KanaDirectionIndicator(direction, MaterialTheme.colorScheme.primary)
-        Text(key.center.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+        Text(punctuationKeyLabel(key.center.label), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
             color = foreground, fontSize = fontSp.sp, lineHeight = (fontSp * 1.2f).sp,
             maxLines = 1, softWrap = false, fontFamily = AppFonts.keyFontFamily)
         if (pressed) KanaFlickPreview(key, direction, background, foreground, contentScale)

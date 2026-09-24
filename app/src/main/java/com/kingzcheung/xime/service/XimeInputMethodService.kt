@@ -607,6 +607,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         rimeEngine.updateLastBuildTime()
                     } else {
                         FileLogger.e(TAG, "initRimeEngine: ensureDeployment failed, deployment may not have completed")
+                        notifyDeploymentStatus(false, "词库准备未完成，请重新打开键盘重试")
+                        return@launch
                     }
                 } else {
                     Log.d(TAG, "initRimeEngine: Already deployed, creating session directly")
@@ -1591,14 +1593,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun performEditorMenuAction(actionId: Int) {
         when (actionId) {
-            android.R.id.undo -> {
+            android.R.id.undo, android.R.id.redo -> {
                 // performContextMenuAction 对 undo 支持不一致，改用 Ctrl+Z 键盘快捷键
                 val now = SystemClock.uptimeMillis()
                 currentInputConnection?.sendKeyEvent(
-                    KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON)
+                    KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON or if (actionId == android.R.id.redo) KeyEvent.META_SHIFT_ON else 0)
                 )
                 currentInputConnection?.sendKeyEvent(
-                    KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON)
+                    KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON or if (actionId == android.R.id.redo) KeyEvent.META_SHIFT_ON else 0)
                 )
             }
             else -> currentInputConnection?.performContextMenuAction(actionId)

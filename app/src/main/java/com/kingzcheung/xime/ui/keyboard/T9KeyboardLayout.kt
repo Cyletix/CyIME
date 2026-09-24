@@ -872,7 +872,7 @@ private fun CandidateItem(
                     .padding(horizontal = 3.dp, vertical = 1.dp)
             ) {
                 Text(
-                    text = text,
+                    text = punctuationKeyLabel(text),
                     color = accentColor,
                     fontSize = fontSize,
                     fontWeight = FontWeight.Medium,
@@ -883,7 +883,7 @@ private fun CandidateItem(
             }
         } else {
             Text(
-                text = text,
+                text = punctuationKeyLabel(text),
                 color = textColor,
                 fontSize = fontSize,
                 fontWeight = FontWeight.Normal,

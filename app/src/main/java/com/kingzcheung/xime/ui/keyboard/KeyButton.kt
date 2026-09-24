@@ -219,7 +219,7 @@ fun KeyButton(
             maxWidth.value, maxHeight.value, density.fontScale,
             LocalKeyboardInputPreferences.current.keyTextScale)
         Text(
-            text = text,
+            text = punctuationKeyLabel(text),
             modifier = Modifier.fillMaxWidth().offset(y = if (!swipeText.isNullOrEmpty()) 2.dp else 0.dp),
             color = textColor,
             fontSize = labelSize.sp,
@@ -233,7 +233,7 @@ fun KeyButton(
         if (!swipeText.isNullOrEmpty() && swipeText != badgeText) {
             val displayText = if (swipeText.length <= 4) swipeText else swipeText.take(4)
             Text(
-                text = displayText,
+                text = punctuationKeyLabel(displayText),
                 color = textColor.copy(alpha = 0.5f),
                 fontSize = hintSize.sp,
                 lineHeight = (hintSize * 1.2f).sp,
@@ -399,7 +399,7 @@ fun SwipeableKeyButton(
                     )
                 } else {
                     Text(
-                        text = text,
+                        text = punctuationKeyLabel(text),
                         color = textColor,
                         fontSize = labelSize.sp,
                         fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
@@ -424,7 +424,7 @@ fun SwipeableKeyButton(
                     if (!swipeUpHint.isNullOrEmpty()) {
                         val displayText = if (swipeUpHint.length <= 2) swipeUpHint else swipeUpHint.take(2)
                         Text(
-                            text = displayText,
+                            text = punctuationKeyLabel(displayText),
                             color = textColor.copy(alpha = 0.6f),
                             fontSize = effectiveSwipeFontSize,
                             fontWeight = FontWeight.Medium,
@@ -446,7 +446,7 @@ fun SwipeableKeyButton(
                         ) {
                             val displayText = if (swipeDownHint.length <= 12) swipeDownHint else swipeDownHint.take(12)
                             Text(
-                                text = displayText,
+                                text = punctuationKeyLabel(displayText),
                                 color = textColor.copy(alpha = 0.7f),
                                 fontSize = adjustedFontSize,
                                 fontWeight = FontWeight.Medium,
@@ -469,7 +469,7 @@ fun SwipeableKeyButton(
                 )
             } else {
                 Text(
-                    text = text,
+                    text = punctuationKeyLabel(text),
                     modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty()) 2.dp else 0.dp),
                     color = textColor,
                     fontSize = labelSize.sp,
@@ -487,7 +487,7 @@ fun SwipeableKeyButton(
                 val keyLabel = (swipeUpKeyLabel ?: swipeText)!!
                 val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
                 Text(
-                    text = displayText,
+                    text = punctuationKeyLabel(displayText),
                     color = textColor.copy(alpha = 0.6f),
                     fontSize = effectiveSwipeFontSize,
                     lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
@@ -502,7 +502,7 @@ fun SwipeableKeyButton(
             if (!swipeDownKeyLabel.isNullOrEmpty()) {
                 val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
                 Text(
-                    text = displayText,
+                    text = punctuationKeyLabel(displayText),
                     color = textColor.copy(alpha = 0.5f),
                     fontSize = effectiveSwipeFontSize,
                     lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
@@ -976,7 +976,7 @@ fun SwipeableIconKeyButton(
             val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
             val hintSize = 9f * adaptiveHintScale(contentScale)
             Text(
-                text = swipeText,
+                text = punctuationKeyLabel(swipeText),
                 color = iconColor.copy(alpha = 0.5f),
                 fontSize = hintSize.sp,
                 lineHeight = (hintSize * 1.2f).sp,

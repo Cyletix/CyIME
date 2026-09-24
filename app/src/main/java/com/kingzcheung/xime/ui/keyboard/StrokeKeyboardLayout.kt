@@ -661,7 +661,7 @@ private fun StrokeSymbolItem(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = text,
+            text = punctuationKeyLabel(text),
             color = textColor,
             fontSize = fontSize,
             fontWeight = FontWeight.Normal,

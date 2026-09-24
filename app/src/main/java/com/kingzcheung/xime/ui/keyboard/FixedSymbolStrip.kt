@@ -14,7 +14,7 @@ internal fun FixedSymbolStrip(symbols: List<String>, onSelect: (String) -> Unit)
     Row(Modifier.fillMaxWidth().height(36.dp).horizontalScroll(rememberScrollState())) {
         symbols.forEach { symbol ->
             TextButton(onClick = { onSelect(symbol) }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) {
-                Text(symbol, maxLines = 1)
+                Text(punctuationKeyLabel(symbol), maxLines = 1)
             }
         }
     }
