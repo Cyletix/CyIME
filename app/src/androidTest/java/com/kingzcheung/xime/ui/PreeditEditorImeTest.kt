@@ -270,7 +270,13 @@ class PreeditEditorImeTest {
             rule.onNodeWithTag("preedit-editor-code").performSemanticsAction(SemanticsActions.SetSelection) { assertTrue(it(caret, caret, false)) }
             rule.onNodeWithText("ni'hao", useUnmergedTree = true).assertExists()
         }
-        assertEquals("opening and moving must not rewrite code", "nihao", engine.getInput())
+        rule.waitUntil(5000) {
+            rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.TextSelectionRange].start == 3
+        }
+        // getInput() deliberately returns "" when its non-blocking engine lock is busy.
+        // Read the locked editor snapshot so pending caret jobs cannot look like lost code.
+        assertEquals("opening and moving must not rewrite code", "nihao", engine.readPinyinEditSnapshot().firstOrNull())
         rule.onNodeWithContentDescription("删除", true).performTouchInput { click() }
         rule.waitUntil(5000) { rule.onNodeWithTag("preedit-editor-code").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text == "nihao" }
         rule.onNodeWithTag("preedit-editor-code").assertTextEquals("nihao")

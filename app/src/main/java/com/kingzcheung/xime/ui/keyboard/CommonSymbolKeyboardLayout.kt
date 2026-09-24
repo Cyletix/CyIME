@@ -163,7 +163,7 @@ fun CommonSymbolKeyboardLayout(
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
                     horizontal = keySpacingX ?: 2.dp,
-                    vertical = keySpacingY ?: 4.dp,
+                    vertical = keySpacingY ?: 2.dp,
                 )
             ) {
             Column(

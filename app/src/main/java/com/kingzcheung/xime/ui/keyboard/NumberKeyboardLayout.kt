@@ -66,7 +66,7 @@ fun NumberKeyboardLayout(
     isFloatingMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f) { bodyModifier ->
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
@@ -112,8 +112,8 @@ fun NumberKeyboardLayout(
         run {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 4.dp,
-                    vertical = keySpacingY ?: 4.dp,
+                    horizontal = keySpacingX ?: 2.dp,
+                    vertical = keySpacingY ?: 2.dp,
                 )
             ) {
             Column(

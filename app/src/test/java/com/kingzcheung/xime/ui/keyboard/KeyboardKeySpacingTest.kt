@@ -1,29 +1,26 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyboardKeySpacingTest {
-    @Test fun normalPhonesAndSmallFloatingCardsKeepTheirSpacing() {
-        for ((width, height) in listOf(360f to 240f, 412f to 280f, 300f to 210f)) {
-            assertEquals(KeyboardKeySpacingScale(), keyboardKeySpacingScale(width, height))
+    @Test fun oneGapTracksTheNormalKeysShortEdgeOnEveryScreen() {
+        for ((width, height) in listOf(28f to 48f, 40f to 68f, 90f to 68f, 96f to 120f, 200f to 90f)) {
+            val gap = 4f * keyboardKeySpacingScale(width, height).value
+            assertEquals(0.08f, gap / minOf(width, height), 0.00001f)
+            assertEquals(gap * 2, 4f * keyboardKeySpacingScale(width * 2, height * 2).value, 0.00001f)
         }
     }
-    @Test fun proportionalBodyGrowthProducesProportionalGaps() {
-        assertEquals(KeyboardKeySpacingScale(1f, 1f), keyboardKeySpacingScale(420f, 280f))
-        assertEquals(KeyboardKeySpacingScale(1.5f, 1.5f), keyboardKeySpacingScale(630f, 420f))
-        assertEquals(KeyboardKeySpacingScale(2f, 2f), keyboardKeySpacingScale(840f, 560f))
+    @Test fun wideningAShortKeyDoesNotCreateHugeHorizontalGaps() {
+        assertEquals(keyboardKeySpacingScale(100f, 60f), keyboardKeySpacingScale(250f, 60f))
     }
-    @Test fun widthOnlyGrowthPreservesTheHorizontalGapToKeyWidthRatio() {
-        val scale = keyboardKeySpacingScale(1260f, 280f)
-        assertEquals(3f, scale.horizontal, 0.0001f)
-        assertEquals(1f, scale.vertical, 0.0001f)
-        assertEquals(4f / (420f / 10f), (4f * scale.horizontal) / (1260f / 10f), 0.0001f)
+    @Test fun smallFloatingKeysAlsoShrinkTheirGap() {
+        assertEquals(0.4f, keyboardKeySpacingScale(20f, 40f).value, 0.00001f)
     }
-    @Test fun unboundedOrInvalidConstraintsDoNotExplodeSpacing() {
-        assertEquals(KeyboardKeySpacingScale(), keyboardKeySpacingScale(Float.POSITIVE_INFINITY, 280f))
-        assertEquals(KeyboardKeySpacingScale(), keyboardKeySpacingScale(420f, Float.NaN))
-        assertEquals(KeyboardKeySpacingScale(), keyboardKeySpacingScale(0f, 280f))
+    @Test fun invalidSizesRemainFinite() {
+        for (size in listOf(Float.NaN, Float.POSITIVE_INFINITY, 0f, -1f)) {
+            assertEquals(KeyboardKeySpacingScale(), keyboardKeySpacingScale(size, 70f))
+            assertEquals(KeyboardKeySpacingScale(), keyboardKeySpacingScale(40f, size))
+        }
     }
 }

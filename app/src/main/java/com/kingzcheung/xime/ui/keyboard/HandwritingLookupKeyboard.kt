@@ -55,7 +55,7 @@ fun HandwritingLookupKeyboard(
     clearSignal: Int,
     modifier: Modifier = Modifier,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 6f) { bodyModifier ->
     val strokes = remember { mutableStateListOf<List<StrokePoint>>() }
     // 与主手写键盘一致的叠写视觉状态（三段前缀渲染 + 识别窗口），见 HandwritingStrokeFx
     var settledCount by remember { mutableIntStateOf(0) }

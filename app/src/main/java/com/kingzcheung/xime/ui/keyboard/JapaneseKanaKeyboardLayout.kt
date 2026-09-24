@@ -59,10 +59,10 @@ fun JapaneseKanaKeyboardLayout(
     bottomPaddingDp: Int = 0,
     hasKanaInput: Boolean = false,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = bottomPaddingDp.dp) { bodyModifier ->
     CompositionLocalProvider(
         LocalKeyCornerRadius provides keyCornerRadius,
-        LocalKeyVisualPadding provides PaddingValues(horizontal = (keySpacingX ?: 4.dp), vertical = (keySpacingY ?: 4.dp)),
+        LocalKeyVisualPadding provides PaddingValues(horizontal = (keySpacingX ?: 2.dp), vertical = (keySpacingY ?: 2.dp)),
     ) {
         Row(bodyModifier.fillMaxSize().background(keyboardBackgroundColor)
             .padding(start = 4.dp, end = 4.dp, bottom = bottomPaddingDp.dp)) {
@@ -203,8 +203,8 @@ internal fun KanaFlickButton(
             .background(if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background)),
         contentAlignment = Alignment.Center,
     ) {
-        val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
-        val fontSp = KeyboardKeyMetrics.labelSizeSp(key.center.label, KeyboardKeyMetrics.LabelSize.value,
+        val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
+        val fontSp = keyLabelSizeSp(key.center.label, KeyboardKeyMetrics.LabelSize.value,
             maxWidth.value, maxHeight.value, density.fontScale, textScale)
         if (pressed) KanaDirectionIndicator(direction, MaterialTheme.colorScheme.primary)
         Text(key.center.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,

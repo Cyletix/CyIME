@@ -73,6 +73,18 @@ class ModeNavigationTest {
         rule.waitForIdle()
     }
 
+    @Test fun chineseCommaTapAndPeriodSwipe() = verifyComma(false)
+    @Test fun englishCommaTapAndPeriodSwipe() = verifyComma(true)
+    @Test fun splitEnglishCommaTapAndPeriodSwipe() = verifyComma(true, split = true)
+
+    private fun verifyComma(english: Boolean, split: Boolean = false) {
+        mount("rime_ice", english = english, split = split, width = if (split) 1000 else 400)
+        val comma = rule.onNodeWithText(if (english) "," else "，", useUnmergedTree = true)
+        comma.performTouchInput { click() }
+        comma.performTouchInput { swipe(center, center - androidx.compose.ui.geometry.Offset(0f, 80f), 180) }
+        rule.runOnIdle { assertEquals(listOf(",", "."), keys) }
+    }
+
     private fun bounds(slot: Int): Rect = rule.onNodeWithTag("mode-slot-$slot", true).fetchSemanticsNode().boundsInRoot
     private fun same(expected: Rect, actual: Rect) {
         assertEquals("slot left", expected.left, actual.left, 1.5f)

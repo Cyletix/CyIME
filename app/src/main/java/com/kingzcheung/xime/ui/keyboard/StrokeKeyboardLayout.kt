@@ -92,7 +92,7 @@ fun StrokeKeyboardLayout(
     specialKeyTextColor: Color = Color.White,
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f) { bodyModifier ->
     StrokeKeyboardSwipeOverlay(
         modifier = bodyModifier,
         keyboardBackgroundColor = keyboardBackgroundColor,
@@ -189,8 +189,8 @@ onKeyPressDown: ((String) -> Unit)?,
             // 笔画布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 4.dp,
-                    vertical = keySpacingY ?: 4.dp,
+                    horizontal = keySpacingX ?: 2.dp,
+                    vertical = keySpacingY ?: 2.dp,
                 )
             ) {
                 Box(
@@ -217,15 +217,15 @@ onKeyPressDown: ((String) -> Unit)?,
         } else {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 4.dp,
-                    vertical = keySpacingY ?: 4.dp,
+                    horizontal = keySpacingX ?: 2.dp,
+                    vertical = keySpacingY ?: 2.dp,
                 )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(4.dp))
+                    horizontalArrangement = Arrangement.Start
                 ) {
                     StrokeKeyboardContent(
                         onKeyPress = onKeyPress,

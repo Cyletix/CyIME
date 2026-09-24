@@ -54,7 +54,7 @@ fun EditKeyboardLayout(
     shadowShapeRadius: Dp = 8.dp,
     modifier: Modifier = Modifier,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f, rows = 3f, horizontalInset = 4.dp, verticalInset = bottomPaddingDp.dp) { bodyModifier ->
     var selecting by remember { mutableStateOf(false) }
     val latestAction by rememberUpdatedState(onAction)
     // 离开面板只清本地锚点，复制等操作后仍可保留宿主中的选区。
@@ -109,7 +109,7 @@ fun EditKeyboardLayout(
                                         val arrow = direction in listOf("up", "down", "left", "right")
                                         EditorActionKey(icon, label, { onAction(action) },
                                             if (arrow) androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f) else keyBgColor,
-                                            textColor, Modifier.size(keySide).padding(if (arrow) 0.dp else keySide * 0.06f),
+                                            textColor, Modifier.size(keySide),
                                             repeatable = arrow)
                                     }
                                 }

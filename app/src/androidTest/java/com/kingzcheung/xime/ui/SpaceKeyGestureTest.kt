@@ -50,14 +50,16 @@ class SpaceKeyGestureTest {
         }
     }
 
-    @Test fun verticalCursorNeedsTwiceTheHorizontalDistance() {
+    @Test fun verticalCursorRequiresDeliberateMovementAndNeverJumpsSeveralRows() {
         setKey(); rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("space").performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(320L)
-        rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(0f, 12f * density)) }
+        rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(0f, 40f * density)) }
         rule.runOnIdle { assertTrue(rows.isEmpty()) }
-        rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(0f, 22f * density)); up() }
+        rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(0f, 52f * density)) }
         rule.runOnIdle { assertEquals(listOf(1), rows); assertTrue(moves.isEmpty()); assertEquals(0, spaces) }
+        rule.onNodeWithTag("space").performTouchInput { moveTo(center - Offset(0f, 140f * density)); up() }
+        rule.runOnIdle { assertEquals(listOf(1, -1), rows); assertEquals(0, spaces) }
     }
 
     @Test fun tapProducesOneSpace() {

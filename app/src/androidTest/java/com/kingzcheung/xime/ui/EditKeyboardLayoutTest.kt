@@ -74,15 +74,16 @@ class EditKeyboardLayoutTest {
             val all = rule.onNodeWithContentDescription("全选").fetchSemanticsNode().boundsInRoot
             val cut = rule.onNodeWithContentDescription("剪切").fetchSemanticsNode().boundsInRoot
             val back = rule.onNodeWithContentDescription("返回键盘").fetchSemanticsNode().boundsInRoot
+            // Semantics/pointer bounds cover the whole cell; cap insets are pixel-tested separately.
             val unit = panel.width / 320f
-            assertEquals(panel.right - 4 * unit, delete.right, 1f)
-            assertEquals(panel.top + 2 * unit, delete.top, 1f)
+            assertEquals(panel.right - 2 * unit, delete.right, 1f)
+            assertEquals(panel.top, delete.top, 1f)
             assertEquals(delete.right, enter.right, 1f)
-            assertEquals(panel.bottom - 2 * unit, enter.bottom, 1f)
-            assertEquals(panel.left + 4 * unit, all.left, 1f)
+            assertEquals(panel.bottom, enter.bottom, 1f)
+            assertEquals(panel.left + 2 * unit, all.left, 1f)
             assertEquals(all.left, cut.left, 1f)
             assertEquals(all.left, back.left, 1f)
-            assertEquals(panel.bottom - 2 * unit, back.bottom, 1f)
+            assertEquals(panel.bottom, back.bottom, 1f)
             val left = rule.onNodeWithContentDescription("向左").fetchSemanticsNode().boundsInRoot
             val right = rule.onNodeWithContentDescription("向右").fetchSemanticsNode().boundsInRoot
             assertTrue(cut.right <= left.left)

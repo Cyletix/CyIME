@@ -59,9 +59,9 @@ import androidx.compose.ui.Alignment
 /** 按键视觉缩进（padding），用于消除 spacedBy 死区。
  *  pointerInput 在 padding 之前，触摸区=全尺寸；
  *  shadow/clip/background 在 padding 之后，视觉区=缩进后。
- *  各布局按需要覆盖：QWERTY 默认 (2.dp, 4.25.dp)，T9/数字 (2.dp, 2.dp) */
+ *  所有布局默认同一比例；自定义 spacing_x/y 可显式覆盖。 */
 val LocalKeyVisualPadding = staticCompositionLocalOf {
-    PaddingValues(horizontal = 2.dp, vertical = 4.25.dp)
+    PaddingValues(2.dp)
 }
 
 /** 按键圆角半径，由各布局在根层通过 CompositionLocalProvider 提供。
@@ -209,11 +209,11 @@ fun KeyButton(
             )),
         contentAlignment = Alignment.Center
     ) {
-        val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
+        val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val hintScale = adaptiveHintScale(contentScale)
         val hintSize = 9f * hintScale
         val hintOffset = KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale).dp
-        val labelSize = KeyboardKeyMetrics.labelSizeSp(text,
+        val labelSize = keyLabelSizeSp(text,
             fontSize?.takeUnless { it == androidx.compose.ui.unit.TextUnit.Unspecified }?.value
                 ?: if (text.length > 2) 14f else 16f,
             maxWidth.value, maxHeight.value, density.fontScale,
@@ -355,11 +355,11 @@ fun SwipeableKeyButton(
             )),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
-        val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
+        val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val defaultFontSize = if (layoutMode == ButtonLayout.COMPACT) {
             if (text.length > 2) 13f else 16f
         } else if (text.length > 2) 14f else 18f
-        val labelSize = KeyboardKeyMetrics.labelSizeSp(text,
+        val labelSize = keyLabelSizeSp(text,
             if (fontSize != androidx.compose.ui.unit.TextUnit.Unspecified) fontSize.value else defaultFontSize,
             maxWidth.value, maxHeight.value, density.fontScale,
             LocalKeyboardInputPreferences.current.keyTextScale)
@@ -370,7 +370,7 @@ fun SwipeableKeyButton(
         val hintOffset = adaptiveHintOffsetDp(contentScale)
             .coerceAtMost(((maxHeight.value - hintHeightDp) / 2f - 2f).coerceAtLeast(0f)).dp
 
-        val compactIconSize = KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value, 16f).dp
+        val compactIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, 16f).dp
         if (layoutMode == ButtonLayout.COMPACT) {
             Box(modifier = Modifier.fillMaxSize()) {
                 if (icon != null) {
@@ -451,7 +451,7 @@ fun SwipeableKeyButton(
                     painter = icon,
                     contentDescription = text,
                     tint = textColor,
-                    modifier = Modifier.size(KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value).dp)
+                    modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value).dp)
                 )
             } else {
                 Text(
@@ -643,7 +643,7 @@ fun IconKeyButton(
             painter = icon,
             contentDescription = contentDescription,
             tint = iconColor,
-            modifier = Modifier.size(KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value, iconSize.value).dp)
+            modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value, iconSize.value).dp)
         )
 
         // 右上角小圆点指示 — 仅在 isHighlighted 时显示
@@ -952,11 +952,11 @@ fun SwipeableIconKeyButton(
             painter = icon,
             contentDescription = null,
             tint = iconColor,
-            modifier = Modifier.size(KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value, iconSize.value).dp)
+            modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value, iconSize.value).dp)
         )
         
         if (!swipeText.isNullOrEmpty()) {
-            val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
+            val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
             val hintSize = 9f * adaptiveHintScale(contentScale)
             Text(
                 text = swipeText,

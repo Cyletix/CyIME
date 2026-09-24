@@ -1,7 +1,5 @@
 package com.kingzcheung.xime.ui.keyboard
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -13,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.keyboard.KeyboardInputPage
 import com.kingzcheung.xime.keyboard.modeSlotTarget
 
-val LocalModeKeyPadding = staticCompositionLocalOf { PaddingValues(4.dp) }
 val LocalModeSlotWeight = staticCompositionLocalOf { 0.8f }
 val LocalTextModeLabel = staticCompositionLocalOf { "中文" }
 
@@ -32,7 +29,6 @@ fun KeyboardModeKey(
     shadowShapeRadius: Dp = 8.dp,
 ) {
     val target = modeSlotTarget(page, slot, LocalTextModeLabel.current)
-    CompositionLocalProvider(LocalKeyVisualPadding provides LocalModeKeyPadding.current) {
     KeyButton(
         text = target.label,
         fontSize = 16.sp,
@@ -45,5 +41,4 @@ fun KeyboardModeKey(
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
     )
-    }
 }

@@ -112,7 +112,15 @@ fun KeyboardLayout(
     isAsciiMode: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    // 配置或方案变化时，行列与间距一起更新。
+    val cfgVer by KeysConfigHelper.configVersion.collectAsState()
+    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) { KeysConfigHelper.getKeyRows(isAsciiMode) }
+    val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
+        supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
+    KeyboardKeySpacingScope(modifier,
+        columns = keyRows.firstOrNull()?.size?.toFloat() ?: 10f,
+        widthFraction = if (splitKeyboard) 0.9f else 1f,
+    ) { bodyModifier ->
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     val isShifted = shiftMode.isShifted
 
@@ -145,7 +153,6 @@ fun KeyboardLayout(
     val isSttEnabled = uiState.isSttEnabled
     val isVoiceMode = uiState.isVoiceMode
     val isVoiceSticky = uiState.voiceSticky
-    val keyRows = KeysConfigHelper.getKeyRows(isAsciiMode)
     val onKeyPressDown = callbacks.onKeyPressDown
     val onKeyRelease = callbacks.onKeyRelease
     val onVoiceModeChange = callbacks.onVoiceModeChange
@@ -218,9 +225,6 @@ fun KeyboardLayout(
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
 
-    // 监听手势配置版本号，部署后强制刷新键帽显示
-    val cfgVer by KeysConfigHelper.configVersion.collectAsState()
-
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         val newState = if (state.isSwipeDown && state.swipeText != null) {
             state.copy(charInfos = SubcharHelper.parseSwipeDownText(state.swipeText))
@@ -248,8 +252,6 @@ fun KeyboardLayout(
         keyboardWidth = keyboardBounds.width
     )
 
-    val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
-        supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
 
     CompositionLocalProvider(
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
@@ -257,7 +259,7 @@ fun KeyboardLayout(
         LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBackgroundColor, specialKeyTextColor),
         LocalKeyVisualPadding provides PaddingValues(
             horizontal = kbKey.spacingFor("qwerty").first?.dp ?: 2.dp,
-            vertical = kbKey.spacingFor("qwerty").second?.dp ?: 4.25.dp,
+            vertical = kbKey.spacingFor("qwerty").second?.dp ?: 2.dp,
         ),
     ) {
     Box(
@@ -1275,9 +1277,7 @@ private fun SplitKeyboardContent(
     CompositionLocalProvider(
         LocalKeyVisualPadding provides PaddingValues(
             horizontal = kbKey.spacingFor("qwerty").first?.dp ?: 2.dp,
-            // 竖向只认 qwerty 专属覆盖（keyboard.key.qwerty.spacing_y），不回退全局 spacing_y
-            // ——全局值是竖屏行距（4.25dp），横屏行盒被它撑开后按键只剩 ~23dp 高
-            vertical = kbKey.spacingOverrides["qwerty"]?.spacingY?.dp ?: 2.dp,
+            vertical = kbKey.spacingFor("qwerty").second?.dp ?: 2.dp,
         )
     ) {
         Row(
@@ -1534,7 +1534,7 @@ private fun SplitKeyboardContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(keyboardKeyGapX(4.dp)),
+                horizontalArrangement = Arrangement.Start,
             ) {
                 SplitSpaceKey(
                     onClick = { onKeyPress("space") },

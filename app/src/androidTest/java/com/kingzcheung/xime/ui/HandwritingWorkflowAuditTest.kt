@@ -83,40 +83,42 @@ class HandwritingWorkflowAuditTest {
                 stroke()
                 rule.waitUntil(20_000) { rule.onAllNodesWithContentDescription("取消输入").fetchSemanticsNodes().isNotEmpty() }
             }
-            // A separator must finish ownership of the preceding handwritten character.
+            // Merely recognizing or starting the next character never writes to the editor.
+            recognize()
+            assertEquals("", text())
+            stroke()
+            rule.waitUntil(20_000) { rule.onAllNodesWithText("第1/2字", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+            assertEquals("两字未点选都不能自动上屏", "", text())
+            rule.onNodeWithText("一").performTouchInput { click() }
+            rule.waitUntil(5_000) { text() == "一" }
+            rule.onNodeWithText("一").performTouchInput { click() }
+            rule.waitUntil(5_000) { text() == "一一" }
+            rule.onAllNodesWithContentDescription("取消输入").assertCountEquals(0)
+            // Separators explicitly confirm pending characters, but the next one stays pending.
             for (separator in listOf("space", "，", "。", "enter")) {
+                val before = text()
                 recognize()
+                assertEquals(before, text())
                 key(separator)
                 rule.waitForIdle()
+                rule.waitUntil(5_000) { text().length > before.length }
                 val prefix = text()
+                assertTrue("确认时应提交待选字", prefix.length > before.length)
                 recognize()
-                assertTrue("手写在 $separator 后的下一字必须追加，prefix=$prefix actual=${text()}",
-                    text().startsWith(prefix) && text().length > prefix.length)
+                assertEquals(prefix, text())
                 rule.onNodeWithContentDescription("取消输入").performClick()
-                assertEquals("取消仅删除分隔符后的当前字", prefix, text())
+                assertEquals("取消未确认手写不应修改宿主", prefix, text())
             }
-            // Cursor movement/selection invalidates candidate replacement, without deleting unrelated text.
             recognize()
             val written = text()
             rule.runOnUiThread { editor.setSelection(0, editor.text.length) }
             rule.onNodeWithContentDescription("取消输入").performClick()
-            assertEquals("选区不能被旧候选取消删除", written, text())
+            assertEquals(written, text())
             rule.runOnUiThread { editor.setSelection(editor.text.length) }
             recognize()
-            val beforeDelete = text()
-            rule.runOnUiThread { editor.setSelection(0) }
             key("delete")
-            rule.waitForIdle()
-            assertEquals("光标在开头删除不能回删手写尾部", beforeDelete, text())
-            rule.runOnUiThread { editor.setSelection(editor.text.length) }
-            val prefixBefore = text()
-            recognize()
-            val glyph = text().removePrefix(prefixBefore)
-            val duplicate = text() + "中间内容" + glyph
-            // 修改原 Editable，避免 setText 更换缓冲区触发 restartInput 而提前清掉候选。
-            rule.runOnUiThread { editor.text.append("中间内容").append(glyph); editor.setSelection(editor.text.length) }
-            rule.onNodeWithContentDescription("取消输入").performClick()
-            assertEquals("相同文字的新位置不属于旧手写候选", duplicate, text())
+            assertEquals("删除先移除未确认字", written, text())
+            rule.onAllNodesWithContentDescription("取消输入").assertCountEquals(0)
             // A new input session must cancel its pending recognition even while the panel stays handwriting.
             rule.runOnUiThread { editor.setSelection(editor.text.length) }
             stroke()

@@ -45,7 +45,8 @@ class KeySpacingGeometryTest {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 MaterialTheme {
                     KeyboardKeySpacingScope(Modifier.size((420 * factor.floatValue).dp,
-                        (280 * factor.floatValue).dp).background(Color.Black).testTag("spacing-root")) { body ->
+                        (280 * factor.floatValue).dp).background(Color.Black).testTag("spacing-root"),
+                        columns = 4f, rows = 2f, horizontalInset = 0.dp, verticalInset = 0.dp) { body ->
                         Row(body) {
                             Column(Modifier.weight(1f)) {
                                 KeyButton("A", {}, Color.Cyan, Color.White, Modifier.weight(1f).testTag("letter"), shadowEnabled = false)
@@ -79,8 +80,8 @@ class KeySpacingGeometryTest {
                 measured
             }
             insets.forEach { (tag, inset) ->
-                assertEquals("$tag horizontal inset", 2f * size, inset.first, 1f)
-                assertEquals("$tag vertical inset", 4.25f * size, inset.second, 1f)
+                assertEquals("$tag horizontal inset", 420f * size / 4f * 0.04f, inset.first, 1f)
+                assertEquals("$tag square inset", inset.first, inset.second, 1f)
                 if (size == 2f) {
                     assertEquals("$tag horizontal ratio", phoneInsets.getValue(tag).first * 2f, inset.first, 1f)
                     assertEquals("$tag vertical ratio", phoneInsets.getValue(tag).second * 2f, inset.second, 1.1f)
@@ -90,12 +91,12 @@ class KeySpacingGeometryTest {
         }
     }
 
-    @Test fun realChineseJapaneseAndSplitLayoutsScaleNeighbouringKeycapGaps() {
+    @Test fun realLayoutsUseEqualPaintedGapsAndTheSameKeySizeRatio() {
         data class Mode(val schema: String, val ascii: Boolean = false, val split: Boolean = false)
         val modes = listOf(Mode("rime_ice", true), Mode("rime_ice"), Mode("pinyin_14jian"),
-            Mode("t9_pinyin"), Mode("japanese"), Mode("japanese_kana"), Mode("rime_ice", true, true))
+            Mode("t9_pinyin"), Mode("jaroomaji"), Mode("japanese_kana"), Mode("rime_ice", true, true))
         val mode = mutableStateOf(modes.first())
-        val factor = mutableFloatStateOf(1f)
+        val dimensions = mutableStateOf(420 to 280)
         rule.setContent {
             val configuration = Configuration(LocalConfiguration.current).apply {
                 screenWidthDp = 1400; screenHeightDp = 1000; orientation = Configuration.ORIENTATION_PORTRAIT
@@ -106,44 +107,67 @@ class KeySpacingGeometryTest {
                     key(mode.value) {
                         val vm = remember { KeyboardViewModel(app) }
                         val ui = KeyboardUiState(currentSchemaId = mode.value.schema, isAsciiMode = mode.value.ascii)
-                        val body = Modifier.size((420 * factor.floatValue).dp, (280 * factor.floatValue).dp)
                         val callbacks = KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {})
-                        when (mode.value.schema) {
-                            "japanese_kana" -> JapaneseKanaKeyboardLayout({}, {}, Color.Cyan, Color.White, Color.Blue,
-                                modifier = body, shadowEnabled = false)
-                            "t9_pinyin" -> T9KeyboardLayout({}, callbacks, ui, remember { T9InputController() },
-                                Color.Cyan, Color.White, Color.Blue, modifier = body, shadowEnabled = false, isFloatingMode = true)
-                            else -> KeyboardLayout({}, vm, callbacks, ui, mode.value.ascii, body)
+                        Box(Modifier.size(dimensions.value.first.dp, dimensions.value.second.dp)
+                            .background(Color.Black).testTag("actual-grid")) {
+                            val body = Modifier.fillMaxSize()
+                            when (mode.value.schema) {
+                                "japanese_kana" -> JapaneseKanaKeyboardLayout({}, {}, Color.Cyan, Color.White, Color.Blue,
+                                    modifier = body, shadowEnabled = false)
+                                "t9_pinyin" -> T9KeyboardLayout({}, callbacks, ui, remember { T9InputController() },
+                                    Color.Cyan, Color.White, Color.Blue, modifier = body, shadowEnabled = false, isFloatingMode = true)
+                                else -> KeyboardLayout({}, vm, callbacks, ui, mode.value.ascii, body)
+                            }
                         }
                     }
                 }
             }
         }
-        for (current in modes) {
+        val report = StringBuilder()
+        for (current in modes) for (size in listOf(320 to 240, 420 to 280, 1000 to 360, 840 to 560)) {
             rule.runOnIdle {
                 KeysConfigHelper.setActiveKeyboardSchema(current.schema)
                 mode.value = current
-                factor.floatValue = 1f
+                dimensions.value = size
             }
             rule.waitForIdle()
+            val rows = KeysConfigHelper.getKeyRows(current.ascii)
             val labels = when (current.schema) {
-                "japanese_kana" -> "あ" to "か"
-                "t9_pinyin" -> "ABC" to "DEF"
-                else -> KeysConfigHelper.getKeyRows(current.ascii).first().take(2).map {
+                "japanese_kana" -> listOf("あ", "か", "た")
+                "t9_pinyin" -> listOf("ABC", "DEF", "JKL")
+                else -> listOf(rows[0][0], rows[0][1], rows[1][0]).map {
                     KeysConfigHelper.getKeyDisplayLabel(it, current.ascii, false)
-                }.let { it[0] to it[1] }
+                }
             }
-            fun gap(): Float {
-                val first = rule.onNodeWithText(labels.first, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val second = rule.onNodeWithText(labels.second, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                return second.left - first.right
+            val root = rule.onNodeWithTag("actual-grid", true)
+            val origin = root.fetchSemanticsNode().boundsInRoot.topLeft
+            val bitmap = root.captureToImage().asAndroidBitmap()
+            val cellHeight = (size.second - if (current.schema == "japanese_kana") 0 else 8) / 4f
+            // Text spans the keycap width. Measure its painted vertical extent from the screenshot,
+            // so this catches extra row gaps, not just the formula used by production code.
+            fun cap(label: String, row: Int): Rect {
+                val text = rule.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                    .translate(-origin.x, -origin.y)
+                val left = text.left.toInt() + 1
+                val right = text.right.toInt() - 1
+                val colors = (left until right).map { bitmap.getPixel(it, text.center.y.toInt()) }
+                val background = colors.groupingBy { it }.eachCount().maxBy { it.value }.key
+                val paintedRows = ((row * cellHeight).roundToInt() until ((row + 1) * cellHeight).roundToInt()).filter { y ->
+                    (left until right).count { bitmap.getPixel(it, y) == background } > (right - left) * 0.05f
+                }
+                return Rect(text.left, paintedRows.first().toFloat(), text.right, paintedRows.last() + 1f)
             }
-            val phoneGap = gap()
-            assertTrue("${current.schema} phone gap", phoneGap > 0f)
-            rule.runOnIdle { factor.floatValue = 2f }
-            rule.waitForIdle()
-            assertEquals("${current.schema} split=${current.split} gap must grow with body", phoneGap * 2f, gap(), 1.5f)
+            val a = cap(labels[0], 0); val b = cap(labels[1], 0); val below = cap(labels[2], 1)
+            val gx = b.left - a.right; val gy = below.top - a.bottom
+            val cellWidth = a.width + gx
+            val expected = minOf(cellWidth, cellHeight) * 0.08f
+            val note = "${current.schema} ascii=${current.ascii} split=${current.split} $size gap=($gx,$gy) cell=($cellWidth,$cellHeight)"
+            report.appendLine(note)
+            assertEquals(note, gx, gy, 2f) // integer rasterisation + rounded corners
+            assertEquals(note, expected, gx, 1.6f)
+            saveSpacingImage("grid-${current.schema}-${current.ascii}-${current.split}-${size.first}", bitmap)
         }
+        File(app.getExternalFilesDir(null), "spacing-measurements.txt").writeText(report.toString())
     }
 
     @Test fun handwritingAndEditingAuxiliaryKeysUseTheSameBodyScale() {
@@ -171,13 +195,13 @@ class KeySpacingGeometryTest {
             val key = if (panel == "edit") rule.onNodeWithContentDescription("删除", useUnmergedTree = true)
                 else rule.onNodeWithTag("handwriting-key:delete", useUnmergedTree = true)
             val insets = paintedInsets(bitmap, key.fetchSemanticsNode().boundsInRoot.translate(-origin.x, -origin.y))
-            assertEquals("$panel horizontal gap", 2 * size, insets.first, 1f)
-            assertEquals("$panel vertical gap", 2 * size, insets.second, 1f)
+            assertEquals("$panel equal axes", insets.first, insets.second, 1f)
+            assertTrue("$panel proportional inset", insets.second in (1f * size)..(4.5f * size))
         }
     }
 
     @Test fun smallNestedCardUsesItsOwnBoundsAndNeverMultipliesTheParentScale() {
-        var measured = KeyboardKeySpacingScale(0f, 0f)
+        var measured = KeyboardKeySpacingScale(0f)
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 KeyboardKeySpacingScope(Modifier.size(840.dp, 560.dp)) {
@@ -188,7 +212,7 @@ class KeySpacingGeometryTest {
                 }
             }
         }
-        rule.runOnIdle { assertEquals(KeyboardKeySpacingScale(), measured) }
+        rule.runOnIdle { assertEquals(KeyboardKeySpacingScale(0.624f), measured) }
     }
 
     private fun saveSpacingImage(name: String, bitmap: Bitmap) {

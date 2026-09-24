@@ -57,7 +57,7 @@ fun HandwritingKeyboardLayout(
     sessionKey: Long = 0,
     specialKeyTextColor: Color = Color.White,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = (8 + bottomPaddingDp).dp) { bodyModifier ->
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val keyAction by rememberUpdatedState(onKeyPress)

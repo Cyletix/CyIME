@@ -2574,19 +2574,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /**
-     * 手写活动区固化后触发一轮联想推理（基于已上屏文本）。
-     * 空格/标点上屏走全量 commitText 自带推理，无需调用此方法。
-     */
-    internal fun finalizeHandwritingPrediction() {
-        if (!isChineseMode) return
-        mainHandler.post {
-            if (!uiState.value.isAsciiMode) {
-                getPredictionFromPlugin(predictionManager.lastCommittedText)
-            }
-        }
-    }
-
-    /**
      * 删除光标前 count 个字符。
      * 焦点在输入法内部编辑器（快捷发送/工具面板）时作用于对应 EditText，
      * 否则作用于宿主 InputConnection。需在主线程调用。
