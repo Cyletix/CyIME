@@ -73,6 +73,7 @@ internal fun rememberImeKeyboardCallbacks(
                 } else service.schemaController.handleJapaneseKanaAction(action)
             },
             onKeyPressDown = { key ->
+                service.predictionManager.invalidatePendingPredictions()
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },
             onKeyRelease = { key ->

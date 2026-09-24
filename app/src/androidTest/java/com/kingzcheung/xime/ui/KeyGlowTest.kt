@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -56,31 +57,77 @@ class KeyGlowTest {
             return cap.last() - cap.first() + 1
         }
         assertTrue("the background must shrink with the letters", coloredWidth(glow) < coloredWidth(before))
-        rule.mainClock.advanceTimeBy(96)
+        rule.mainClock.advanceTimeBy(160)
         val recovered = snapshot("frame")
-        assertEquals("cap must recover by 150 ms", coloredWidth(before), coloredWidth(recovered))
+        assertEquals("cap must recover by 235 ms", coloredWidth(before), coloredWidth(recovered))
         assertFalse(before.sameAs(recovered))
         save("key-glow-recovered.png", recovered)
-        rule.mainClock.advanceTimeBy(352)
+        rule.mainClock.advanceTimeBy(288)
         assertTrue("animation must finish at half a second (plus frame scheduling)", before.sameAs(snapshot("frame")))
         rule.runOnIdle { assertEquals(1, taps) }
     }
 
-    @Test fun exportActualSoftGlowFrames() {
+    @Test fun exportActualSquareGlowFrames() {
         rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
-            Box(Modifier.size(180.dp, 130.dp).background(Color(0xFF191C22)).testTag("soft-frame").padding(24.dp)) {
-                KeyButton("ABC", {}, Color(0xFF525252), Color.White, Modifier.testTag("soft-key"), shadowEnabled = false)
+            Box(Modifier.size(180.dp, 130.dp).background(Color(0xFF191C22)).testTag("square-frame").padding(24.dp)) {
+                KeyButton("ABC", {}, Color(0xFF525252), Color.White, Modifier.testTag("square-key"), shadowEnabled = false)
             }
         } } }
         rule.mainClock.autoAdvance = false
-        val before = snapshot("soft-frame")
-        save("soft-glow-000.png", before)
-        rule.onNodeWithTag("soft-key").performTouchInput { down(center); up() }
+        val before = snapshot("square-frame")
+        save("square-glow-000.png", before)
+        rule.onNodeWithTag("square-key").performTouchInput { down(center); up() }
         for (frame in 1..34) {
             rule.mainClock.advanceTimeByFrame()
-            val image = snapshot("soft-frame")
-            save("soft-glow-${(frame * 16).toString().padStart(3, '0')}.png", image)
+            val image = snapshot("square-frame")
+            save("square-glow-${(frame * 16).toString().padStart(3, '0')}.png", image)
             if (frame == 34) assertTrue("finished glow restores original pixels", before.sameAs(image))
+        }
+    }
+
+    @Test fun featheredParticleRetainsSquareCornersInsteadOfBecomingACircle() {
+        rule.setContent {
+            Canvas(Modifier.size(100.dp).background(Color.Black).testTag("square-shape")) {
+                drawKeyGlowSquare(Color.White, center, size.minDimension * .6f, 1f)
+            }
+        }
+        val image = snapshot("square-shape")
+        fun red(x: Float, y: Float) = android.graphics.Color.red(image.getPixel(
+            (image.width * x).toInt(), (image.height * y).toInt()))
+        // These points are inside the square corners but outside a radius-.3 circle.
+        for (x in listOf(.25f, .75f)) for (y in listOf(.25f, .75f))
+            assertTrue("the four square corners must be visible", red(x, y) > 50)
+        assertEquals("narrow feather must not spill far outside the square", 0, red(.85f, .5f))
+    }
+
+    @Test fun exportActualSquareGlowGrid() {
+        val labels = listOf("分词", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz")
+        rule.setContent { MaterialTheme { CompositionLocalProvider(
+            LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true),
+            LocalKeyCornerRadius provides 5.dp,
+        ) {
+            Column(Modifier.size(338.dp, 199.dp).background(Color.Black).testTag("glow-grid")) {
+                repeat(3) { row -> Row(Modifier.weight(1f)) {
+                    repeat(3) { col ->
+                        val key = row * 3 + col
+                        KeyButton(labels[key], {}, Color(0xFF38383A), Color.White,
+                            Modifier.weight(1f).fillMaxHeight().testTag("glow-grid-$key"),
+                            swipeText = (key + 1).toString(), shadowEnabled = false)
+                    }
+                } }
+            }
+        } } }
+        rule.mainClock.autoAdvance = false
+        val before = snapshot("glow-grid")
+        save("square-grid-000.png", before)
+        val tapFrames = listOf(6, 28, 50, 66, 81, 97, 115, 137, 162)
+        for (frame in 1..200) {
+            val key = tapFrames.indexOf(frame)
+            if (key >= 0) rule.onNodeWithTag("glow-grid-$key").performTouchInput { down(center); up() }
+            rule.mainClock.advanceTimeByFrame()
+            val image = snapshot("glow-grid")
+            save("square-grid-${frame.toString().padStart(3, '0')}.png", image)
+            if (frame == 200) assertTrue(before.sameAs(image))
         }
     }
 

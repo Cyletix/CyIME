@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.ui.keyboard.EditKeyboardLayout
@@ -26,7 +28,8 @@ import org.junit.runner.RunWith
 class EditKeyboardLayoutTest {
     @get:Rule val rule = createComposeRule()
 
-    private val panelHeight = mutableStateOf(260.dp)
+    private val panelWidth = mutableStateOf(400.dp)
+    private val panelHeight = mutableStateOf(184.dp)
     private val actions = mutableListOf<String>()
 
     private fun setPanel() {
@@ -34,60 +37,54 @@ class EditKeyboardLayoutTest {
             Box(Modifier.fillMaxSize().clickable { }, contentAlignment = Alignment.Center) {
                 EditKeyboardLayout(
                     onAction = { actions += it }, onBack = {},
-                    backgroundColor = Color.Black, textColor = Color.White,
-                    accentColor = Color.Blue, keyBgColor = Color.DarkGray,
-                    modifier = Modifier.size(320.dp, panelHeight.value).testTag("edit-panel"),
+                    backgroundColor = Color(0xFF211E29), textColor = Color(0xFFF2EDF7),
+                    accentColor = Color(0xFFCEB7F7), keyBgColor = Color(0xFF35313E),
+                    modifier = Modifier.size(panelWidth.value, panelHeight.value).testTag("edit-panel"),
                     shadowEnabled = false,
                 )
             }
         }
     }
 
-    @Test fun nineGridKeepsSquareCellsAndTheRequestedCornerActions() {
+    @Test fun circleAndCentreSquareKeepTheirMinimumHeightSizeAndLabelsStayClear() {
         setPanel()
-        val rows = listOf(listOf("段首", "向上", "段尾"), listOf("向左", "选择", "向右"), listOf("复制", "向下", "粘贴"))
-        val before = rows.map { row -> row.map { rule.onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot } }
-        before.forEachIndexed { rowIndex, row ->
-            row.forEachIndexed { columnIndex, bounds ->
-                assertEquals(bounds.width, bounds.height, 1f)
-                assertEquals(before[0][columnIndex].center.x, bounds.center.x, 1f)
-                assertEquals(row[0].center.y, bounds.center.y, 1f)
-                if (rowIndex > 0) assertTrue(bounds.top >= before[rowIndex - 1][columnIndex].bottom)
-                if (columnIndex > 0) assertTrue(bounds.left >= row[columnIndex - 1].right)
+        var initialPad = 0f
+        var initialCentre = 0f
+        for (height in listOf(184.dp, 280.dp, 400.dp)) {
+            rule.runOnIdle { panelHeight.value = height }
+            val pad = rule.onNodeWithTag("editor-direction-pad", true).fetchSemanticsNode().boundsInRoot
+            val centre = rule.onNodeWithContentDescription("选择").fetchSemanticsNode().boundsInRoot
+            assertEquals(pad.width, pad.height, 1f)
+            assertEquals(centre.width, centre.height, 1f)
+            if (initialPad == 0f) { initialPad = pad.width; initialCentre = centre.width }
+            assertEquals(initialPad, pad.width, 1f)
+            assertEquals(initialCentre, centre.width, 1f)
+            val corners = listOf("段首", "段尾", "复制", "粘贴")
+            for (label in corners) {
+                val key = rule.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
+                val content = rule.onNodeWithTag("editor-label-$label", true).fetchSemanticsNode().boundsInRoot
+                assertTrue("$label outer margin", content.left > key.left && content.right < key.right && content.top > key.top && content.bottom < key.bottom)
+                val dx = (kotlin.math.abs(content.center.x - pad.center.x) - content.width / 2).coerceAtLeast(0f)
+                val dy = (kotlin.math.abs(content.center.y - pad.center.y) - content.height / 2).coerceAtLeast(0f)
+                assertTrue("$label clear of circle", dx * dx + dy * dy > pad.width * pad.width / 4)
             }
-        }
-        rule.runOnIdle { panelHeight.value = 440.dp }
-        rows.flatten().forEachIndexed { index, label ->
-            val bounds = rule.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
-            assertEquals(bounds.width, bounds.height, 1f)
-            assertEquals(before[index / 3][index % 3].width, bounds.width, 1f)
+            for (row in listOf(listOf("撤销", "段首", "段尾", "删除"), listOf("剪切", "复制", "粘贴", "回车"))) {
+                val keys = row.map { rule.onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot }
+                keys.forEach { assertEquals(keys.first().top, it.top, 1f); assertEquals(keys.first().bottom, it.bottom, 1f) }
+            }
         }
     }
 
-    @Test fun sideActionsStayAtPanelEdgesAtBothShortAndTallHeights() {
+    @Test fun exportMinimumAndMaximumHeightPreviews() {
         setPanel()
-        listOf(180.dp, 440.dp).forEach { height ->
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        for (height in listOf(184.dp, 400.dp)) {
             rule.runOnIdle { panelHeight.value = height }
-            val panel = rule.onNodeWithTag("edit-panel", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            val delete = rule.onNodeWithContentDescription("删除").fetchSemanticsNode().boundsInRoot
-            val enter = rule.onNodeWithContentDescription("回车").fetchSemanticsNode().boundsInRoot
-            val all = rule.onNodeWithContentDescription("全选").fetchSemanticsNode().boundsInRoot
-            val cut = rule.onNodeWithContentDescription("剪切").fetchSemanticsNode().boundsInRoot
-            val back = rule.onNodeWithContentDescription("返回键盘").fetchSemanticsNode().boundsInRoot
-            // Semantics/pointer bounds cover the whole cell; cap insets are pixel-tested separately.
-            val unit = panel.width / 320f
-            assertEquals(panel.right - 2 * unit, delete.right, 1f)
-            assertEquals(panel.top, delete.top, 1f)
-            assertEquals(delete.right, enter.right, 1f)
-            assertEquals(panel.bottom, enter.bottom, 1f)
-            assertEquals(panel.left + 2 * unit, all.left, 1f)
-            assertEquals(all.left, cut.left, 1f)
-            assertEquals(all.left, back.left, 1f)
-            assertEquals(panel.bottom, back.bottom, 1f)
-            val left = rule.onNodeWithContentDescription("向左").fetchSemanticsNode().boundsInRoot
-            val right = rule.onNodeWithContentDescription("向右").fetchSemanticsNode().boundsInRoot
-            assertTrue(cut.right <= left.left)
-            assertTrue(right.right <= delete.left)
+            rule.waitForIdle()
+            val image = rule.onNodeWithTag("edit-panel", true).captureToImage().asAndroidBitmap()
+            java.io.File(context.getExternalFilesDir(null), "editor-preview-${height.value.toInt()}.png").outputStream().use {
+                image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
         }
     }
 
@@ -106,9 +103,9 @@ class EditKeyboardLayoutTest {
 
     @Test fun copyPasteAndAuxiliaryEditingActionsRemainAvailable() {
         setPanel()
-        listOf("复制", "粘贴", "全选", "剪切", "删除", "回车").forEach {
+        listOf("撤销", "重做", "复制", "粘贴", "全选", "剪切", "删除", "回车").forEach {
             rule.onNodeWithContentDescription(it).performClick()
         }
-        rule.runOnIdle { assertEquals(listOf("copy", "paste", "select_all", "cut", "delete", "enter"), actions) }
+        rule.runOnIdle { assertEquals(listOf("undo", "redo", "copy", "paste", "select_all", "cut", "delete", "enter"), actions) }
     }
 }

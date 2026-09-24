@@ -66,7 +66,7 @@ internal fun KanaFlickPreview(key: KanaFlickKey, direction: KanaFlickDirection, 
                         if (selected == KanaFlickDirection.TAP) {
                             KanaDirectionLabels(key, foreground, 28f * scale, 17f * scale)
                         } else {
-                            Text(key.choice(selected)?.label ?: "—", color = foreground, fontSize = (30f * scale).sp,
+                            Text(punctuationKeyLabel(key.choice(selected)?.label ?: "—"), color = foreground, fontSize = (30f * scale).sp,
                                 lineHeight = (34f * scale).sp, maxLines = 1, fontFamily = AppFonts.keyFontFamily)
                         }
                     }
@@ -90,7 +90,7 @@ internal fun KanaDirectionLabels(key: KanaFlickKey, color: Color, centerSize: Fl
                 KanaFlickDirection.DOWN -> Alignment.BottomCenter
             }
             val fontSize = if (direction == KanaFlickDirection.TAP) centerSize else hintSize
-            Text(choice.label, color = color, fontSize = fontSize.sp, lineHeight = (fontSize * 1.15f).sp,
+            Text(punctuationKeyLabel(choice.label), color = color, fontSize = fontSize.sp, lineHeight = (fontSize * 1.15f).sp,
                 maxLines = 1, softWrap = false, fontFamily = AppFonts.keyFontFamily, modifier = Modifier.align(alignment))
         }
     }

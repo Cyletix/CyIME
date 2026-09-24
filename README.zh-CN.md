@@ -1,4 +1,6 @@
-> **Cyletix 分支 · 修改日期 2026-09-23。** [CyIME](https://github.com/Cyletix/Xime) 基于 Kor1（kingzcheung）及贡献者开发的 [Xime](https://github.com/ximeiorg/Xime)。应用继续遵循 [GNU GPL v3](LICENSE)，保留原作者及第三方版权声明。请从 [本分支 Releases](https://github.com/Cyletix/Xime/releases) 下载，F-Droid 链接指向上游原版。对应源代码在本仓库公开，改动和验证见 [命名与整理记录](docs/cyime-identity.md)。
+> **Cyletix 分支 · 修改日期 2026-09-23。** [CyIME](https://github.com/Cyletix/CyIME) 基于 Kor1（kingzcheung）及贡献者开发的 [Xime](https://github.com/ximeiorg/Xime)。应用继续遵循 [GNU GPL v3](LICENSE)，保留原作者及第三方版权声明。请从 [本分支 Releases](https://github.com/Cyletix/CyIME/releases) 下载，F-Droid 链接指向上游原版。对应源代码在本仓库公开，改动和验证见 [命名与整理记录](docs/cyime-identity.md)。
+
+[CyIME 1.0.0 发布说明与下载](docs/cyime-1.0.0.md)
 
 [CyIME 0.1.5 键盘交互修复](docs/cyime-0.1.5.md)
 
@@ -111,7 +113,7 @@
 
 ### 从 Release 下载
 
-1. 在 [Releases](https://github.com/Cyletix/Xime/releases) 页面下载最新版本的 APK
+1. 在 [Releases](https://github.com/Cyletix/CyIME/releases) 页面下载最新版本的 APK
 2. 安装应用
 3. 在系统设置中启用 CyIME 输入法
 4. 将 CyIME 设为当前输入法
@@ -140,7 +142,7 @@
 
 ```bash
 # 克隆项目（包含子模块）
-git clone --recursive https://github.com/Cyletix/Xime.git
+git clone --recursive https://github.com/Cyletix/CyIME.git
 
 # 或者在已克隆的项目中初始化子模块
 git submodule update --init --recursive

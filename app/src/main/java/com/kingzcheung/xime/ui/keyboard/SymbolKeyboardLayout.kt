@@ -242,7 +242,7 @@ private fun SymbolButton(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = symbol,
+            text = punctuationKeyLabel(symbol),
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
             color = textColor,

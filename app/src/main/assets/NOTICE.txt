@@ -1,4 +1,10 @@
-NOTICE for Xime Application
+NOTICE for CyIME
+
+CyIME is an Android input method forked from Xime, maintained and developed by Cyletix.
+CyIME source: https://github.com/Cyletix/CyIME
+Upstream Xime by Kor1 (kingzcheung) and contributors: https://github.com/ximeiorg/Xime
+The application is licensed under GNU GPL version 3; see licenses/CyIME-GPL-3.0.txt.
+Original copyright and third-party license notices are retained.
 
 This application uses third-party libraries and code:
 

@@ -32,10 +32,17 @@ class PredictionManager(
      * 使所有在途的异步预测结果失效。否则长按退格删除时，旧的联想结果会迟到并反复
      * 回填 associationCandidates，候选栏在"显示联想词 ↔ 空"之间闪动（一闪一闪）。
      */
-    private var requestEpoch = 0L
+    private val latest = LatestPrediction(serviceScope, predict = { text ->
+        try {
+            if (!SettingsPreferences.isSmartPredictionEnabled(context)) emptyList()
+            else if (!AssociationManager.isInitialized() && !AssociationManager.initialize(context)) emptyList()
+            else AssociationManager.predict(text, MAX_ASSOCIATION_COUNT).map { it.text }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (error: Exception) { Log.e(TAG, "Prediction failed", error); emptyList() }
+    }, deliver = onPredictionResult)
 
     fun invalidatePendingPredictions() {
-        requestEpoch++
+        latest.invalidate()
     }
 
     /**
@@ -100,6 +107,7 @@ class PredictionManager(
     }
     
     fun getPrediction(contextText: String) {
+        latest.invalidate()
         // 单次联想：消费抑制标志——联想上屏引发的本轮推理不执行，回调空结果清空候选栏
         if (suppressNextPrediction) {
             suppressNextPrediction = false
@@ -117,41 +125,7 @@ class PredictionManager(
             return
         }
         
-        val epoch = requestEpoch
-        serviceScope.launch {
-            try {
-                if (!AssociationManager.isInitialized()) {
-                    val initSuccess = withContext(Dispatchers.IO) {
-                        AssociationManager.initialize(context)
-                    }
-                    if (!initSuccess) {
-                        Log.e(TAG, "Failed to initialize AssociationManager")
-                        withContext(Dispatchers.Main) {
-                            if (epoch == requestEpoch) {
-                                onPredictionResult(emptyList())
-                            }
-                        }
-                        return@launch
-                    }
-                }
-                
-                val candidates = AssociationManager.predict(contextText, MAX_ASSOCIATION_COUNT)
-
-                withContext(Dispatchers.Main) {
-                    // 代际过期说明上下文已被退格/清空修改，丢弃过期结果避免候选栏闪动
-                    if (epoch == requestEpoch) {
-                        onPredictionResult(candidates.map { it.text })
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Prediction failed", e)
-                withContext(Dispatchers.Main) {
-                    if (epoch == requestEpoch) {
-                        onPredictionResult(emptyList())
-                    }
-                }
-            }
-        }
+        latest.submit(contextText)
     }
     
     fun recordInput(text: String) {

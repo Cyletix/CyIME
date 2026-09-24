@@ -49,6 +49,9 @@ class XimeApplication : Application(), ImageLoaderFactory {
         super.onCreate()
 
         FileLogger.init(this)
+        // Model services run in separate processes. They must not copy/deploy the
+        // same Rime directory or load the keyboard/plugin runtime a second time.
+        if (android.os.Build.VERSION.SDK_INT >= 28 && getProcessName() != packageName) return
         AppFonts.initialize(this)
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -106,6 +109,7 @@ class XimeApplication : Application(), ImageLoaderFactory {
         // 初始化模型运行时（内存管理 + 生命周期）
         ModelRuntime.attach(this)
 
+        com.kingzcheung.xime.model.DefaultModelInstaller.start(this)
         preInitializeRimeEngine()
     }
     

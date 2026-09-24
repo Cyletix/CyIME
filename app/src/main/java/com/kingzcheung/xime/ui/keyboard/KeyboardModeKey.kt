@@ -29,6 +29,7 @@ fun KeyboardModeKey(
     shadowShapeRadius: Dp = 8.dp,
 ) {
     val target = modeSlotTarget(page, slot, LocalTextModeLabel.current)
+    androidx.compose.runtime.CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
     KeyButton(
         text = target.label,
         fontSize = 16.sp,
@@ -41,4 +42,5 @@ fun KeyboardModeKey(
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
     )
+    }
 }

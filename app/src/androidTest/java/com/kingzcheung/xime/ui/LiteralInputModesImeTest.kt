@@ -173,6 +173,20 @@ class LiteralInputModesImeTest {
         assertEquals("字面上屏后不能留旧编码", "", engine.getInput())
     }
 
+    @Test fun editingPanelCutUndoRedoAndSelectionUseTheRealHost() {
+        chooseMode(InputModes.ENGLISH)
+        rule.runOnUiThread { editor.setText("abc"); editor.setSelection(3) }
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription("编辑").performClick()
+        rule.onNodeWithContentDescription("全选").performClick()
+        rule.onNodeWithContentDescription("剪切").performClick()
+        rule.waitUntil(5000) { text().isEmpty() }
+        rule.onNodeWithContentDescription("撤销").performClick()
+        rule.waitUntil(5000) { text().equals("abc", ignoreCase = true) }
+        rule.onNodeWithContentDescription("重做").performClick()
+        rule.waitUntil(5000) { text().isEmpty() }
+    }
+
     @Test fun punctuationWidthWorksFromMenuIn26Keys() = verifyPunctuationWidth("rime_ice", "，")
     @Test fun punctuationWidthWorksFromMenuIn14Keys() = verifyPunctuationWidth("pinyin_14jian", "，")
     @Test fun punctuationWidthWorksFromMenuInNineKeys() = verifyPunctuationWidth("t9_pinyin", "，")
@@ -201,20 +215,20 @@ class LiteralInputModesImeTest {
     private fun verifyPunctuationWidth(schema: String, commaLabel: String) {
         chooseMode(schema)
         setWidthFromMenu(false)
-        rule.onAllNodesWithText(commaLabel).onLast().performTouchInput { click() }
+        rule.onAllNodesWithText(",").onLast().performTouchInput { click() }
         assertSettled(",")
         setWidthFromMenu(true)
-        rule.onAllNodesWithText(commaLabel).onLast().performTouchInput { click() }
         val fullComma = if (schema.startsWith("japanese")) "、" else "，"
+        rule.onAllNodesWithText(fullComma).onLast().performTouchInput { click() }
         assertSettled("," + fullComma)
         setWidthFromMenu(false)
-        rule.onAllNodesWithText(commaLabel).onLast().performTouchInput { click() }
+        rule.onAllNodesWithText(",").onLast().performTouchInput { click() }
         assertSettled("," + fullComma + ",")
         rule.onNodeWithTag("candidate-expansion").assertDoesNotExist()
         // A separate symbol-page path uses onCommitText and must obey the same switch.
         if (schema != "japanese_kana") {
             rule.onNodeWithTag("mode-slot-1", true).performTouchInput { click() }
-            rule.onNodeWithText(if (schema == InputModes.ENGLISH) "?" else "？", useUnmergedTree = true).performTouchInput { click() }
+            rule.onNodeWithText("?", useUnmergedTree = true).performTouchInput { click() }
             assertSettled("," + fullComma + ",?")
             rule.onNodeWithTag("mode-slot-1", true).performTouchInput { click() }
         }
