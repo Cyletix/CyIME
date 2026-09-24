@@ -119,7 +119,7 @@ fun T9KeyboardLayout(
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f) { bodyModifier ->
     val controller = t9Controller
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -250,8 +250,8 @@ private fun T9KeyboardSwipeOverlay(
             // 九键布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 4.dp,
-                    vertical = keySpacingY ?: 4.dp,
+                    horizontal = keySpacingX ?: 2.dp,
+                    vertical = keySpacingY ?: 2.dp,
                 )
             ) {
                 Box(
@@ -283,8 +283,8 @@ private fun T9KeyboardSwipeOverlay(
         } else {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
-                    horizontal = keySpacingX ?: 4.dp,
-                    vertical = keySpacingY ?: 4.dp,
+                    horizontal = keySpacingX ?: 2.dp,
+                    vertical = keySpacingY ?: 2.dp,
                 )
             ) {
                 Column(
@@ -984,13 +984,13 @@ private fun ResetKey(
             .clip(shape)
             .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)), contentAlignment = Alignment.Center
     ) {
-        val contentScale = KeyboardKeyMetrics.contentScale(maxWidth.value, maxHeight.value)
+        val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val hintSize = 9f * adaptiveHintScale(contentScale)
         Icon(
             imageVector = Icons.Default.Refresh,
             contentDescription = "重输",
             tint = textColor,
-            modifier = Modifier.size(KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value, if (compactMode) 16f else 20f).dp)
+            modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value, if (compactMode) 16f else 20f).dp)
         )
 
         if (!compactMode) {

@@ -50,7 +50,6 @@ internal fun rememberImeKeyboardCallbacks(
 ): KeyboardCallbacks {
     val view = LocalView.current
     val preeditEditor = remember(service) { ImePreeditEditor(service) }
-    val handwritingCursor = remember(state.inputSessionId) { androidx.compose.runtime.mutableStateOf<Int?>(null) }
     return remember(floatingMinY, state.isFloatingMode, effectiveScreenH, state.inputSessionId, state.showKeyboardResize) {
         val floatingDragX = FloatingDragAxis()
         val floatingDragY = FloatingDragAxis()
@@ -157,24 +156,6 @@ internal fun rememberImeKeyboardCallbacks(
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             onCommitText = { text -> service.textCommit.commitLiteralText(text) },
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
-            onHandwritingAutoCommit = { newTail, expectedTail ->
-                val cursor = service.currentEditorCursorPosition()
-                if (service.uiState.value.inputSessionId != state.inputSessionId || service.currentInputConnection == null) {
-                    false
-                } else if (expectedTail.isEmpty()) {
-                    service.commitTextSilently(newTail)
-                    handwritingCursor.value = cursor?.plus(newTail.length)
-                    true
-                } else if (handwritingCursor.value != null && cursor != null && handwritingCursor.value != cursor) {
-                    // 同样的字可能出现在多处；仅文本匹配不代表仍属于本轮手写。
-                    false
-                } else {
-                    val replaced = service.replaceBeforeCursor(expectedTail, newTail)
-                    if (replaced) handwritingCursor.value = cursor?.let { it + newTail.length - expectedTail.length }
-                    replaced
-                }
-            },
-            onHandwritingFinalize = { service.finalizeHandwritingPrediction() },
             onQuickSend = {},
             onKeyboardResize = {
                 service.keyboardViewModel.closeOverlay()

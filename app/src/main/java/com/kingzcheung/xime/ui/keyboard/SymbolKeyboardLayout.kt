@@ -89,7 +89,7 @@ fun SymbolKeyboardLayout(
     )
 
     KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp)) { bodyModifier ->
-    CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(4.dp)) {
+    CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(2.dp)) {
     Column(
         modifier = bodyModifier
             .fillMaxWidth()
@@ -104,6 +104,8 @@ fun SymbolKeyboardLayout(
                 .padding(bottom = 4.dp)
         ) {
             val columns = (maxWidth.value / 48f).toInt().coerceIn(6, 15)
+            CompositionLocalProvider(LocalKeyboardKeySpacingScale provides keyboardKeySpacingScale(
+                maxWidth.value / columns, maxWidth.value / columns)) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
@@ -126,12 +128,12 @@ fun SymbolKeyboardLayout(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.Top
                 ) {
                     category.symbols.chunked(columns).forEach { rowSymbols ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            horizontalArrangement = Arrangement.Start
                         ) {
                             rowSymbols.forEach { symbol ->
                                 SymbolButton(
@@ -154,6 +156,8 @@ fun SymbolKeyboardLayout(
                     }
                 }
             }
+        }
+
         }
 
         // 左侧双槽位与文本/数字键盘同位；右侧仍是分类和删除。
@@ -229,6 +233,7 @@ private fun SymbolButton(
                 interactionSource = interactionSource,
                 onClick = onClick
             )
+            .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.clip(RoundedCornerShape(8.dp))
                 .background(
                     if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)

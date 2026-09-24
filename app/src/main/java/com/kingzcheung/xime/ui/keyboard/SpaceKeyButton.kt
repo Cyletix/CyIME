@@ -83,7 +83,9 @@ fun SpaceKeyButton(
                     var lastX = down.position.x
                     var lastY = down.position.y
                     val cursorSteps = CursorStepAccumulator(step)
-                    val verticalSteps = CursorStepAccumulator(step * 2f)
+                    // A line is a much larger edit than a character. Keep its threshold
+                    // independent of fast horizontal settings; coalesced events never skip rows.
+                    val verticalSteps = CursorStepAccumulator(maxOf(48.dp.toPx(), step * 5f))
                     val timer = scope.launch {
                         delay(300L)
                         held = true
@@ -113,7 +115,7 @@ fun SpaceKeyButton(
                             if (cursorActive) {
                                 val steps = cursorSteps.move(dx)
                                 if (steps != 0) onMove?.invoke(steps)
-                                val rows = verticalSteps.move(dy)
+                                val rows = verticalSteps.move(dy).coerceIn(-1, 1)
                                 if (rows != 0) onMoveVertical?.invoke(rows)
                             }
                             change.consume()
@@ -139,9 +141,9 @@ fun SpaceKeyButton(
             .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)),
         contentAlignment = Alignment.Center
     ) {
-        val iconSize = KeyboardKeyMetrics.iconSizeDp(maxWidth.value, maxHeight.value)
+        val iconSize = keyIconSizeDp(maxWidth.value, maxHeight.value)
         val labelHeight = (maxHeight.value - iconSize).coerceAtLeast(1f)
-        val labelSize = minOf(KeyboardKeyMetrics.labelSizeSp(schemaName, 10f,
+        val labelSize = minOf(keyLabelSizeSp(schemaName, 10f,
             maxWidth.value, maxHeight.value, density.fontScale, settings.keyTextScale),
             labelHeight / (density.fontScale * 1.4f)).coerceAtLeast(1f)
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

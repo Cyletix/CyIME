@@ -12,25 +12,41 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
-/** One pair of axis scales for the measured body, including both halves of a split keyboard. */
-internal data class KeyboardKeySpacingScale(val horizontal: Float = 1f, val vertical: Float = 1f)
+/** The short edge of a normal key defines one physical gap for the entire grid. */
+internal data class KeyboardKeySpacingScale(val value: Float = 1f)
 
-internal fun keyboardKeySpacingScale(widthDp: Float, heightDp: Float): KeyboardKeySpacingScale {
-    fun axis(actual: Float, reference: Float): Float =
-        if (!actual.isFinite() || actual <= 0f) 1f else (actual / reference).coerceIn(1f, 4f)
-    // Keep normal phone gaps; when a tablet grows only in width, its horizontal gap must grow
-    // by the same proportion. Tall enter and wide space use this same body-level pair.
-    return KeyboardKeySpacingScale(axis(widthDp, 420f), axis(heightDp, 280f))
+internal fun keyboardKeySpacingScale(cellWidthDp: Float, cellHeightDp: Float): KeyboardKeySpacingScale {
+    if (!cellWidthDp.isFinite() || !cellHeightDp.isFinite() || cellWidthDp <= 0 || cellHeightDp <= 0)
+        return KeyboardKeySpacingScale()
+    // 2dp inset per side at a 50dp cell: gap = 8% of the short cell edge.
+    // Do not clamp small floating keyboards or scale horizontal and vertical separately.
+    return KeyboardKeySpacingScale(minOf(cellWidthDp, cellHeightDp) / 50f)
 }
 
 internal val LocalKeyboardKeySpacingScale = staticCompositionLocalOf { KeyboardKeySpacingScale() }
 
 @Composable
-internal fun KeyboardKeySpacingScope(modifier: Modifier, content: @Composable (Modifier) -> Unit) {
+internal fun KeyboardKeySpacingScope(
+    modifier: Modifier,
+    columns: Float = 10f,
+    rows: Float = 4f,
+    horizontalInset: Dp = 8.dp,
+    verticalInset: Dp = 8.dp,
+    widthFraction: Float = 1f,
+    content: @Composable (Modifier) -> Unit,
+) {
     BoxWithConstraints(modifier) {
-        val scale = keyboardKeySpacingScale(maxWidth.value, maxHeight.value)
-        CompositionLocalProvider(LocalKeyboardKeySpacingScale provides scale) {
+        val scale = keyboardKeySpacingScale(
+            (maxWidth.value - horizontalInset.value) * widthFraction / columns,
+            (maxHeight.value - verticalInset.value) / rows,
+        )
+        val normalCapEdge = scale.value * 50f * 0.92f
+        CompositionLocalProvider(
+            LocalKeyboardKeySpacingScale provides scale,
+            LocalKeyboardKeyContentScale provides KeyboardKeyMetrics.contentScale(normalCapEdge, normalCapEdge),
+        ) {
             content(Modifier.fillMaxSize())
         }
     }
@@ -43,16 +59,10 @@ internal fun scaledKeyVisualPadding(padding: PaddingValues = LocalKeyVisualPaddi
     val direction = LocalLayoutDirection.current
     return remember(padding, scale, direction) {
         PaddingValues(
-            start = padding.calculateStartPadding(direction) * scale.horizontal,
-            top = padding.calculateTopPadding() * scale.vertical,
-            end = padding.calculateEndPadding(direction) * scale.horizontal,
-            bottom = padding.calculateBottomPadding() * scale.vertical,
+            start = padding.calculateStartPadding(direction) * scale.value,
+            top = padding.calculateTopPadding() * scale.value,
+            end = padding.calculateEndPadding(direction) * scale.value,
+            bottom = padding.calculateBottomPadding() * scale.value,
         )
     }
 }
-
-@Composable
-internal fun keyboardKeyGapX(gap: Dp): Dp = gap * LocalKeyboardKeySpacingScale.current.horizontal
-
-@Composable
-internal fun keyboardKeyGapY(gap: Dp): Dp = gap * LocalKeyboardKeySpacingScale.current.vertical

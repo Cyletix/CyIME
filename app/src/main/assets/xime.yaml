@@ -407,19 +407,12 @@ keyboard:
   
   # ── 按键配置（可选，不设置则使用默认值）──
   # corner_radius:      按键圆角半径（dp，默认 8），独立于 shadow.shape_radius
-  # spacing_x:          按键横向间距（dp，默认 2），未设置时各键盘使用自身默认值
-  # spacing_y:          按键竖向间距（dp，默认 4.25；横屏默认 2），未设置时各键盘使用自身默认值
+  # spacing_x:          横向单侧缩进基数（默认 2dp，以 50dp 普通键短边为基准等比缩放）
+  # spacing_y:          纵向单侧缩进基数（默认同横向；所有布局和屏幕使用同一缩放比例）
   # 各键盘可单独覆盖间距（可选），键盘名：qwerty / t9 / number / stroke / symbol
-  # 例如：t9: { spacing_x: 1, spacing_y: 2 }
+  # 例如：t9: { spacing_x: 2, spacing_y: 2 }（仅显式配置会覆盖统一默认）
   key:
     corner_radius: 8
-    spacing_x: 2
-    spacing_y: 4.25
-    t9: { spacing_x: 4, spacing_y: 4 }
-    japanese_kana: { spacing_x: 4, spacing_y: 4 }
-    number: { spacing_x: 4, spacing_y: 4 }
-    stroke: { spacing_x: 4, spacing_y: 4 }
-    symbol: { spacing_x: 2, spacing_y: 4.25 }
 
   # ── 按键阴影（可选，不设置则使用默认值）──
   # enabled:            是否启用阴影
@@ -533,7 +526,7 @@ keyboard:
       n: { tap: "n", swipe_up: "%", long_press: { display: "bubble", values: ["n", "N"] } }
       m: { tap: "m", swipe_up: "#", long_press: { display: "bubble", values: ["m", "M"] } }
       #  逗号键，label 为中文显示，value 为英文显示+提交值
-      "'": { tap: { label: ".", value: "." }, swipe_up: { label: ",", value: "," } }
+      "'": { tap: { label: ",", value: "," }, swipe_up: { label: ".", value: "." } }
       # 中/英切换键，label 为按键显示文字
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
