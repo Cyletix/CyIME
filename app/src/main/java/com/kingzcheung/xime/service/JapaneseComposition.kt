@@ -10,6 +10,12 @@ internal fun RimeEngine.japaneseReading(input: String): String {
     return getComposition().preedit.filterNot { it.isWhitespace() || it == '\'' }
 }
 
+/**
+ * 读音长度探测边界（仅供转换预览的切换范围使用）。
+ *
+ * 不要再用于退格删除单位：ん 与 っ 都是单字符，长度比较判不出假名边界，会把整串一次删光
+ * （2026-09-25 复现）。删除单位已改为同源的 [com.kingzcheung.xime.rime.romajiDeleteStart]。
+ */
 internal fun RimeEngine.previousJapaneseBoundary(input: String): Int {
     if (input.isEmpty()) return 0
     RimeEngine.rimeLock.lock()

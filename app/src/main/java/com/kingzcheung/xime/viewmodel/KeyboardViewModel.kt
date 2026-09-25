@@ -82,6 +82,10 @@ data class KeyboardUiState(
     val floatingOffsetY: Int = 0,
     val floatingMinOffsetY: Int = 0,
     val floatingScreenHeightDp: Int = 0,
+    /** 调节中的悬浮宽度（dp）；0 = 本次没在调宽度。 */
+    val resizePreviewWidthDp: Int = 0,
+    /** 已保存的悬浮宽度（dp）；0 = 未设置，按高度推导。 */
+    val floatingWidthDp: Int = 0,
     val t9ResetSignal: Long = 0L,
     val swipeCancelEpoch: Long = 0L,
     val t9RightCandidateSelectedCount: Long = 0L,

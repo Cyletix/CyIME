@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.service
 
 import com.kingzcheung.xime.rime.RimeProcessResult
+import com.kingzcheung.xime.rime.romajiDeleteStart
 import com.kingzcheung.xime.settings.JapaneseSchemas
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -101,7 +102,10 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
         val input = engine.getInput()
         if (input.isEmpty()) { conversion = null; return false }
         conversion = null
-        val end = engine.previousJapaneseBoundary(input)
+        // 删除单位与显示同源（romajiDeleteStart）：未拼完的罗马音只删一个字母，
+        // 已拼完的假名整体删。不能再用引擎读音长度探测边界——ん 与 っ 等长时
+        // 判不出假名边界，会把整串一次删光（2026-09-25 复现）。
+        val end = romajiDeleteStart(input)
         engine.setInput(input.take(end))
         show()
         return true

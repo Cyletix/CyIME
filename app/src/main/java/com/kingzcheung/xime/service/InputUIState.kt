@@ -23,6 +23,10 @@ data class InputUIState(
     val keyboardOpacity: Float = 1f,
     val showKeyboardResize: Boolean = false,
     val resizePreviewHeightDp: Int = 0,
+    /** 调节中的悬浮宽度；0 = 本次没动宽度（沿用 [floatingWidthDp] 或按高度推导）。 */
+    val resizePreviewWidthDp: Int = 0,
+    /** 已保存的悬浮宽度（dp）；0 = 未设置，按高度推导（历史行为）。 */
+    val floatingWidthDp: Int = 0,
     val resizeInitialFloating: Boolean = false,
     val resizeInitialSplit: Boolean = false,
     val resizeInitialX: Int = 0,

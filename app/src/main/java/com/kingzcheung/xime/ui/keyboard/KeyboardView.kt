@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -252,10 +253,19 @@ fun KeyboardView(
     val screenH = LocalConfiguration.current.screenHeightDp
     val wideFloating = !isT9Schema(state.currentSchemaId) && state.currentSchemaId != "japanese_kana" && keyboardState !is KeyboardLayoutState.Stroke
     val portraitHeight = SettingsPreferences.getKeyboardHeightDp(androidx.compose.ui.platform.LocalContext.current, false)
-    val cardWidthDp = floatingKeyboardWidth(screenW, screenH, state.keyboardHeightDp, portraitHeight, wideFloating)
+    // 宽度与高度解耦：调节预览宽度优先，其次用户保存的宽度，最后按高度推导（历史行为）。
+    val cardWidthDp = resolvedFloatingWidth(
+        screenWidth = screenW,
+        screenHeight = screenH,
+        height = state.keyboardHeightDp,
+        portraitHeight = portraitHeight,
+        wide = wideFloating,
+        overrideWidth = if (state.resizePreviewWidthDp > 0) state.resizePreviewWidthDp else state.floatingWidthDp,
+    )
     val floatScaleFactor = if (state.isFloatingMode) cardWidthDp.toFloat() / screenW.toFloat() else 0.85f
-
-    // 调节控件与键盘预览是兄弟层：透明度只作用于键盘，操作面板始终清晰。
+    // 调节态不再读取 window 坐标，也不再依赖 onGloballyPositioned 回灌。
+    // 预览矩形直接使用 KeyboardView 根容器的本地坐标；真实卡片、边框、命中共用这一份 Rect。
+    val resizeActive = resizeOverlay != null
     val resizeControlDensity = LocalDensity.current
     val previewModifier = if (resizeOverlay != null) Modifier.graphicsLayer {
         alpha = state.keyboardOpacity
@@ -302,6 +312,96 @@ fun KeyboardView(
             voiceSticky = state.voiceSticky,
         ),
     ) {
+    // 调节态的坐标宿主。Service 在“悬浮 + 调节”时把这一层扩成整个可用 IME 区域；
+    // 因而这里的 (0,0) 就是卡片与调节框共同使用的唯一坐标原点。
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val hostWidthPx = with(resizeControlDensity) { maxWidth.toPx() }
+        val hostHeightPx = with(resizeControlDensity) { maxHeight.toPx() }
+        val dragBarPx = with(resizeControlDensity) { FLOATING_DRAG_BAR_HEIGHT_DP.dp.toPx() }
+
+        val hostLandscape = maxWidth > maxHeight
+        val hostHeightDp = maxHeight.value.roundToInt().coerceAtLeast(1)
+        val seedPreviewRect = if (resizeActive && hostWidthPx > 1f && hostHeightPx > 1f) {
+            if (state.isFloatingMode) {
+                val floatingHeightBounds = floatingResizeHeightBounds(hostHeightDp, hostLandscape)
+                val contentHeightDp = state.keyboardHeightDp.coerceIn(floatingHeightBounds)
+                val totalHeightDp = contentHeightDp + FLOATING_DRAG_BAR_HEIGHT_DP
+                val minimumBottomOffsetDp = state.floatingMinOffsetY.coerceAtLeast(0)
+                val maximumBottomOffsetDp = (maxHeight.value - totalHeightDp)
+                    .coerceAtLeast(minimumBottomOffsetDp.toFloat())
+                val safeBottomOffsetDp = state.floatingOffsetY.toFloat()
+                    .coerceIn(minimumBottomOffsetDp.toFloat(), maximumBottomOffsetDp)
+                    .roundToInt()
+
+                val marginPx = with(resizeControlDensity) { 12.dp.toPx() }
+                val resizeBounds = ResizeRect(
+                    left = marginPx,
+                    top = marginPx,
+                    right = (hostWidthPx - marginPx).coerceAtLeast(marginPx + 1f),
+                    bottom = (hostHeightPx - marginPx).coerceAtLeast(marginPx + 1f),
+                )
+                val rawSeed = geometryToResizeRect(
+                    widthDp = cardWidthDp,
+                    heightDp = contentHeightDp,
+                    horizontalOffsetDp = state.floatingOffsetX,
+                    bottomOffsetDp = safeBottomOffsetDp,
+                    viewWidthPx = hostWidthPx,
+                    viewHeightPx = hostHeightPx,
+                    dragBarHeightPx = dragBarPx,
+                    density = resizeControlDensity.density,
+                ).coerceInside(resizeBounds)
+                // 历史设置可能留下“极窄 + 极高”的畸形尺寸。进入调节时只做一次安全夹紧，
+                // 保持中心/底边语义，不让旧状态把调节框直接撑成长柱。
+                val minWidthPx = with(resizeControlDensity) { FLOATING_RESIZE_MIN_WIDTH_DP.dp.toPx() }
+                val minHeightPx = with(resizeControlDensity) {
+                    (floatingHeightBounds.first + FLOATING_DRAG_BAR_HEIGHT_DP).dp.toPx()
+                }
+                val screenMaxHeightPx = with(resizeControlDensity) {
+                    (floatingHeightBounds.last + FLOATING_DRAG_BAR_HEIGHT_DP).dp.toPx()
+                }
+                rawSeed.coerceFloatingResizeSeed(
+                    bounds = resizeBounds,
+                    minWidth = minWidthPx,
+                    minHeight = minHeightPx,
+                    maxHeight = screenMaxHeightPx,
+                    maxAspect = floatingResizeMaxAspect(hostLandscape),
+                )
+            } else {
+                // 固定键盘调节也使用稳定的全屏坐标系：底边固定在宿主底部，只移动顶边改高度。
+                val fixedBounds = keyboardHeightBounds(hostHeightDp, hostLandscape)
+                val contentHeightDp = state.keyboardHeightDp.coerceIn(fixedBounds)
+                val heightPx = with(resizeControlDensity) { contentHeightDp.dp.toPx() }
+                ResizeRect(
+                    left = 0f,
+                    top = (hostHeightPx - heightPx).coerceAtLeast(0f),
+                    right = hostWidthPx,
+                    bottom = hostHeightPx,
+                )
+            }
+        } else null
+
+        var resizePreviewRect by remember(
+            resizeActive,
+            state.isFloatingMode,
+            maxWidth,
+            maxHeight,
+            cardWidthDp,
+            state.keyboardHeightDp,
+            state.floatingOffsetX,
+            state.floatingOffsetY,
+            state.floatingMinOffsetY,
+        ) { mutableStateOf(seedPreviewRect) }
+
+        val activePreviewRect = if (resizeActive) {
+            resizePreviewRect ?: seedPreviewRect
+        } else null
+
+        val resizePreviewSession = KeyboardResizePreviewState(
+            rect = activePreviewRect,
+            initialRect = seedPreviewRect,
+            onRectChange = { resizePreviewRect = it },
+        )
+
     FloatingKeyboardContainer(
         isFloatingMode = state.isFloatingMode,
         opacity = if (resizeOverlay != null) 1f else state.keyboardOpacity,
@@ -312,14 +412,15 @@ fun KeyboardView(
         offsetY = state.floatingOffsetY,
         minOffsetY = state.floatingMinOffsetY,
         availableHeightDp = state.floatingScreenHeightDp,
+        contentHeightDp = state.keyboardHeightDp,
         backgroundColor = keyboardBgColor,
         onDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
+        previewRect = activePreviewRect,
         onCardPositioned = onCardPositioned,
     ) {
-    Box(modifier = modifier) {
-        Box(modifier = contentModifier) {
+        Box(modifier = Modifier.fillMaxSize().then(contentModifier)) {
         // 长按候选删除自造词：确认覆盖层状态（键盘视图内渲染，不弹独立
         // 窗口——焦点型弹窗会抢焦点导致 IME 被系统收起）
         // 长按删除待确认项：词文本 + 确认后执行（候选栏/展开页共用同一确认覆盖层）
@@ -1502,12 +1603,15 @@ fun KeyboardView(
         }
         }
     }
+    } // FloatingKeyboardContainer: resize overlay must stay outside the floating card.
     resizeOverlay?.let { controls ->
-        CompositionLocalProvider(LocalDensity provides resizeControlDensity) {
+        CompositionLocalProvider(
+            LocalDensity provides resizeControlDensity,
+            LocalKeyboardResizePreviewState provides resizePreviewSession,
+        ) {
             Box(Modifier.matchParentSize()) { controls() }
         }
     }
-}
 }
 }
 

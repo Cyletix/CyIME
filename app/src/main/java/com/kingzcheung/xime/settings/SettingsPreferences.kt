@@ -635,6 +635,8 @@ object SettingsPreferences {
     private const val KEY_FLOATING_OFFSET_X_LANDSCAPE = "floating_offset_x_landscape"
     private const val KEY_FLOATING_OFFSET_Y = "floating_offset_y"
     private const val KEY_FLOATING_OFFSET_Y_LANDSCAPE = "floating_offset_y_landscape"
+    private const val KEY_FLOATING_WIDTH_DP = "floating_width_dp"
+    private const val KEY_FLOATING_WIDTH_DP_LANDSCAPE = "floating_width_dp_landscape"
     private const val KEY_KEYBOARD_OPACITY = "keyboard_opacity"
 
     private fun ensureLandscapeDefaults(context: Context) {
@@ -684,6 +686,21 @@ object SettingsPreferences {
     fun setFloatingOffsetY(context: Context, offset: Int, isLandscape: Boolean = false) {
         val key = if (isLandscape) KEY_FLOATING_OFFSET_Y_LANDSCAPE else KEY_FLOATING_OFFSET_Y
         getPrefs(context).edit().putInt(key, offset).apply()
+    }
+
+    /**
+     * 悬浮键盘宽度（dp）；0 = 未设置，按高度自动推导（历史行为）。
+     * 用户在键盘调节里拖左右边或四角后写入具体值，之后宽度与高度各自独立，
+     * 「点哪个边只调哪个方向」才有意义。
+     */
+    fun getFloatingWidthDp(context: Context, isLandscape: Boolean = false): Int {
+        val key = if (isLandscape) KEY_FLOATING_WIDTH_DP_LANDSCAPE else KEY_FLOATING_WIDTH_DP
+        return getPrefs(context).getInt(key, 0)
+    }
+
+    fun setFloatingWidthDp(context: Context, widthDp: Int, isLandscape: Boolean = false) {
+        val key = if (isLandscape) KEY_FLOATING_WIDTH_DP_LANDSCAPE else KEY_FLOATING_WIDTH_DP
+        getPrefs(context).edit().putInt(key, widthDp).apply()
     }
 
     fun getPageSize(context: Context): Int {

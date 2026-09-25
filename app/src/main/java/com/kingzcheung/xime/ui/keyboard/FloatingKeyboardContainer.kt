@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +42,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
@@ -51,8 +53,12 @@ import androidx.compose.ui.semantics.stateDescription
 
 import kotlin.math.roundToInt
 
+/** 悬浮键盘卡片圆角；调整覆盖层的四角示意与它同心，避免示意被圆角切掉。 */
+internal val FloatingKeyboardCardCorner = 16.dp
+internal val FloatingKeyboardCardShape = RoundedCornerShape(FloatingKeyboardCardCorner)
+
 @Composable
-fun FloatingKeyboardContainer(
+internal fun FloatingKeyboardContainer(
     isFloatingMode: Boolean,
     scaleFactor: Float,
     fontScaleFactor: Float = 1f,
@@ -61,26 +67,63 @@ fun FloatingKeyboardContainer(
     offsetY: Int,
     minOffsetY: Int = 0,
     availableHeightDp: Int = 0,
+    /** 非调节态真实键盘内容高度；宿主可以是全屏，但卡片不能再拿宿主高度当自身高度。 */
+    contentHeightDp: Int,
     backgroundColor: Color = Color.Transparent,
     onDrag: (dx: Float, dy: Float) -> Unit,
     onDragEnd: () -> Unit,
     onDock: () -> Unit = {},
+    /** 调节模式中的唯一预览矩形；非空时直接决定真实卡片最终位置与尺寸。 */
+    previewRect: ResizeRect? = null,
     onCardPositioned: (left: Int, top: Int, right: Int, bottom: Int) -> Unit = { _: Int, _: Int, _: Int, _: Int -> },
     keyboardContent: @Composable () -> Unit,
 ) {
+    val density = LocalDensity.current
+
+    // 调节模式下固定键盘也放进稳定的全屏宿主里，previewRect 直接决定它的真实区域。
+    // 这样控制面板可以放在键盘外面，边框也不会因为宿主高度变化而漂移。
     if (!isFloatingMode) {
-        keyboardContent()
+        if (previewRect == null) {
+            keyboardContent()
+        } else {
+            val previewWidth = with(density) { previewRect.width.toDp() }
+            val previewHeight = with(density) { previewRect.height.toDp() }
+            Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset { IntOffset(previewRect.left.roundToInt(), previewRect.top.roundToInt()) }
+                        .size(previewWidth, previewHeight)
+                        .testTag("fixed-keyboard-resize-preview")
+                        .onGloballyPositioned { coords ->
+                            val pos = coords.positionInWindow()
+                            val size = coords.size
+                            onCardPositioned(
+                                pos.x.roundToInt(),
+                                pos.y.roundToInt(),
+                                (pos.x + size.width).roundToInt(),
+                                (pos.y + size.height).roundToInt(),
+                            )
+                        }
+                ) {
+                    keyboardContent()
+                }
+            }
+        }
         return
     }
 
-    val density = LocalDensity.current
     val screenHeightDp = availableHeightDp.takeIf { it > 0 } ?: LocalConfiguration.current.screenHeightDp
 
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter
     ) {
-        val cardTotalHeight = maxHeight
+        val previewWidthDp = previewRect?.let { with(density) { it.width.toDp() } }
+        val previewHeightDp = previewRect?.let { with(density) { it.height.toDp() } }
+        // 宿主在悬浮模式下可以是整屏；卡片高度必须来自键盘内容高度，而不是 BoxWithConstraints.maxHeight。
+        val normalCardHeight = (contentHeightDp.coerceAtLeast(1) + FLOATING_DRAG_BAR_HEIGHT_DP).dp
+        val cardTotalHeight = previewHeightDp ?: normalCardHeight
         val horizontalTravel = (maxWidth.value * (1f - scaleFactor) / 2f).coerceAtLeast(0f)
         val minimumY = minOffsetY.coerceAtLeast(0).toFloat()
         val maxOffsetY = (screenHeightDp - cardTotalHeight.value).coerceAtLeast(minimumY)
@@ -134,12 +177,20 @@ fun FloatingKeyboardContainer(
                     .testTag("floating-dock-preview").semantics { stateDescription = if (dockReady) "ready" else "expanding" },
             )
         }
-        Box(
-            modifier = Modifier
+        val cardPlacement = if (previewRect != null && previewWidthDp != null && previewHeightDp != null) {
+            Modifier
+                .align(Alignment.TopStart)
+                .offset { IntOffset(previewRect.left.roundToInt(), previewRect.top.roundToInt()) }
+                .size(previewWidthDp, previewHeightDp)
+        } else {
+            Modifier
                 .fillMaxWidth(scaleFactor)
                 .height(cardTotalHeight)
                 .offset(x = offsetX.dp, y = (-safeOffsetY).dp)
-                .clip(RoundedCornerShape(16.dp))
+        }
+        Box(
+            modifier = cardPlacement
+                .clip(FloatingKeyboardCardShape)
                 .graphicsLayer {
                     alpha = opacity.coerceIn(0.3f, 1f)
                     compositingStrategy = CompositingStrategy.Offscreen
