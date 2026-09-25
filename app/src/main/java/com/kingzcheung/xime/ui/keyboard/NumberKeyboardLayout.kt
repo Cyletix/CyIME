@@ -67,7 +67,8 @@ fun NumberKeyboardLayout(
     isFloatingMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
 ) {
-    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f,
+        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }

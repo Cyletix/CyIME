@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -14,19 +15,23 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** The short edge of a normal key defines one physical gap for the entire grid. */
-internal data class KeyboardKeySpacingScale(val value: Float = 1f)
+/**
+ * 当前键盘体的视觉度量（由布局策略算出）。
+ *
+ * [KeyVisualMetrics.Unspecified] = 没有策略上下文（候选栏等嵌套网格），
+ * 此时 [scaledKeyVisualPadding] 原样返回声明值，不改变嵌套网格的既有视觉。
+ */
+internal val LocalKeyboardKeyVisualMetrics = staticCompositionLocalOf { KeyVisualMetrics.Unspecified }
 
-internal fun keyboardKeySpacingScale(cellWidthDp: Float, cellHeightDp: Float): KeyboardKeySpacingScale {
-    if (!cellWidthDp.isFinite() || !cellHeightDp.isFinite() || cellWidthDp <= 0 || cellHeightDp <= 0)
-        return KeyboardKeySpacingScale()
-    // 2dp inset per side at a 50dp cell: gap = 8% of the short cell edge.
-    // Do not clamp small floating keyboards or scale horizontal and vertical separately.
-    return KeyboardKeySpacingScale(minOf(cellWidthDp, cellHeightDp) / 50f)
-}
-
-internal val LocalKeyboardKeySpacingScale = staticCompositionLocalOf { KeyboardKeySpacingScale() }
-
+/**
+ * 键盘体尺寸上下文：算出 gutter、每侧 inset 与内容缩放。
+ *
+ * - 命中区域不变：gutter 只作用于内容尺寸，键仍按整格接收触摸（见 KeyButton）。
+ * - [columns] 是“单位列数”（26 键 = 首行键数；九键/数字/笔画 = 4.41）。
+ * - [policy] 决定缝的目标值与上下限，集中定义在 [KeyVisualPolicy]。
+ * - [allowShrink] 悬浮键盘：允许整体缩小，不套用手机最小缝。
+ * - [applyGutter] 是否把算出的 gutter 作为内容左右边距（手机呼吸空间 + 大屏居中）。
+ */
 @Composable
 internal fun KeyboardKeySpacingScope(
     modifier: Modifier,
@@ -35,34 +40,58 @@ internal fun KeyboardKeySpacingScope(
     horizontalInset: Dp = 8.dp,
     verticalInset: Dp = 8.dp,
     widthFraction: Float = 1f,
+    policy: KeyVisualPolicy = KeyVisualPolicy.Qwerty,
+    allowShrink: Boolean = false,
+    applyGutter: Boolean = false,
     content: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(modifier) {
-        val scale = keyboardKeySpacingScale(
-            (maxWidth.value - horizontalInset.value) * widthFraction / columns,
-            (maxHeight.value - verticalInset.value) / rows,
+        // 不铺 gutter 时（嵌套面板/编辑盘）：不加键宽上限，度量按真实格宽算，
+        // 避免"按上限缩格"却又不把多出的宽度变成留白。
+        val effectivePolicy = if (applyGutter) policy else policy.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f)
+        val metrics = keyVisualMetrics(
+            policy = effectivePolicy,
+            availableWidthDp = maxWidth.value * widthFraction,
+            availableHeightDp = maxHeight.value,
+            columns = columns,
+            rows = rows,
+            verticalInsetDp = verticalInset.value,
+            allowShrink = allowShrink,
         )
-        val normalCapEdge = scale.value * 50f * 0.92f
         CompositionLocalProvider(
-            LocalKeyboardKeySpacingScale provides scale,
-            LocalKeyboardKeyContentScale provides KeyboardKeyMetrics.contentScale(normalCapEdge, normalCapEdge),
+            LocalKeyboardKeyVisualMetrics provides metrics,
+            LocalKeyboardKeyContentScale provides KeyboardKeyMetrics.contentScale(metrics.capShortEdge, metrics.capShortEdge),
         ) {
-            content(Modifier.fillMaxSize())
+            // 调用方声明的 horizontalInset 只作为 gutter 下限（历史参数：曾经只是公式预留）
+            val gutter = if (applyGutter) maxOf(metrics.gutterX, horizontalInset.value) else 0f
+            content(Modifier.fillMaxSize().padding(start = gutter.dp, end = gutter.dp))
         }
     }
 }
 
-/** Configured padding stays unscaled in its local; this accessor applies the body scale once. */
+/**
+ * 把布局声明的键帽内缩解析成最终视觉。
+ *
+ * - 声明值 == [KeyVisualPolicy.DeclaredDefaultGap]（2dp，历史默认）→ 用布局策略的每侧 inset；
+ * - 声明其他数值 → 视为相邻键帽之间的**总缝**（单侧 = 一半），供 xime.yaml 逐键盘覆盖；
+ * - 无策略上下文 → 原样返回声明值。
+ */
 @Composable
 internal fun scaledKeyVisualPadding(padding: PaddingValues = LocalKeyVisualPadding.current): PaddingValues {
-    val scale = LocalKeyboardKeySpacingScale.current
+    val metrics = LocalKeyboardKeyVisualMetrics.current
     val direction = LocalLayoutDirection.current
-    return remember(padding, scale, direction) {
+    return remember(padding, metrics, direction) {
         PaddingValues(
-            start = padding.calculateStartPadding(direction) * scale.value,
-            top = padding.calculateTopPadding() * scale.value,
-            end = padding.calculateEndPadding(direction) * scale.value,
-            bottom = padding.calculateBottomPadding() * scale.value,
+            start = resolvedKeyInset(padding.calculateStartPadding(direction), metrics.insetX),
+            top = resolvedKeyInset(padding.calculateTopPadding(), metrics.insetY),
+            end = resolvedKeyInset(padding.calculateEndPadding(direction), metrics.insetX),
+            bottom = resolvedKeyInset(padding.calculateBottomPadding(), metrics.insetY),
         )
     }
+}
+
+private fun resolvedKeyInset(declared: Dp, policyInset: Float?): Dp = when {
+    policyInset == null -> declared
+    declared.value == KeyVisualPolicy.DeclaredDefaultGap -> policyInset.dp
+    else -> (declared.value / 2f).dp
 }

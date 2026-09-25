@@ -121,6 +121,7 @@ fun KeyboardLayoutScreen(
                         keyCornerRadius = kbKey.cornerRadius.dp,
                         keySpacingX = kbKey.spacingFor("japanese_kana").first?.dp,
                         keySpacingY = kbKey.spacingFor("japanese_kana").second?.dp,
+                        isFloatingMode = uiState.isFloatingMode,
                         modifier = modifier,
                     )
                 } else if (isHandwritingLookup) {

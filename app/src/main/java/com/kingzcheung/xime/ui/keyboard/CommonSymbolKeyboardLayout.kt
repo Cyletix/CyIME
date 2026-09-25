@@ -84,7 +84,8 @@ fun CommonSymbolKeyboardLayout(
     /** 进入面板时的初始模式（来自 ascii 记忆状态机），为 null 时退回 [isAsciiMode]。 */
     initialAsciiMode: Boolean? = null,
 ) {
-    KeyboardKeySpacingScope(modifier) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, policy = KeyVisualPolicy.Qwerty,
+        allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
     var localAsciiMode by remember(initialAsciiMode) { mutableStateOf(initialAsciiMode ?: isAsciiMode) }
 
     val configuration = LocalConfiguration.current
@@ -170,7 +171,7 @@ fun CommonSymbolKeyboardLayout(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+                    .padding(bottom = 8.dp),
             ) {
                 Row(
                     modifier = Modifier

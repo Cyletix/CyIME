@@ -58,14 +58,16 @@ fun JapaneseKanaKeyboardLayout(
     keySpacingY: Dp? = null,
     bottomPaddingDp: Int = 0,
     hasKanaInput: Boolean = false,
+    isFloatingMode: Boolean = false,
 ) {
-    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = bottomPaddingDp.dp) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = bottomPaddingDp.dp,
+        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
     CompositionLocalProvider(
         LocalKeyCornerRadius provides keyCornerRadius,
         LocalKeyVisualPadding provides PaddingValues(horizontal = (keySpacingX ?: 2.dp), vertical = (keySpacingY ?: 2.dp)),
     ) {
         Row(bodyModifier.fillMaxSize().background(keyboardBackgroundColor)
-            .padding(start = 4.dp, end = 4.dp, bottom = bottomPaddingDp.dp)) {
+            .padding(bottom = bottomPaddingDp.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 val convert = KanaChoice("変換", "japanese_convert")
                 val undo = KanaChoice("↶", "japanese_undo")

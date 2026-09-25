@@ -92,7 +92,8 @@ fun StrokeKeyboardLayout(
     specialKeyTextColor: Color = Color.White,
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
-    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f,
+        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
     StrokeKeyboardSwipeOverlay(
         modifier = bodyModifier,
         keyboardBackgroundColor = keyboardBackgroundColor,

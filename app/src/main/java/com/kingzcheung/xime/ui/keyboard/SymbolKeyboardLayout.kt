@@ -88,13 +88,14 @@ fun SymbolKeyboardLayout(
         pageCount = { displayCategories.size }
     )
 
-    KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp)) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp),
+        policy = KeyVisualPolicy.Qwerty, applyGutter = true) { bodyModifier ->
     CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(2.dp)) {
     Column(
         modifier = bodyModifier
             .fillMaxWidth()
             .background(backgroundColor)
-            .padding(start = 4.dp, end = 4.dp, bottom = 8.dp)
+            .padding(bottom = 8.dp)
     ) {
         // 内容区：符号网格 + HorizontalPager
         BoxWithConstraints(
@@ -104,8 +105,14 @@ fun SymbolKeyboardLayout(
                 .padding(bottom = 4.dp)
         ) {
             val columns = (maxWidth.value / 48f).toInt().coerceIn(6, 15)
-            CompositionLocalProvider(LocalKeyboardKeySpacingScale provides keyboardKeySpacingScale(
-                maxWidth.value / columns, maxWidth.value / columns)) {
+            // 符号网格自成一格：按网格自身格宽算度量（不套主体键宽上限/gutter）
+            val gridMetrics = keyVisualMetrics(
+                policy = KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f),
+                availableWidthDp = maxWidth.value,
+                availableHeightDp = maxHeight.value,
+                columns = columns.toFloat(),
+            )
+            CompositionLocalProvider(LocalKeyboardKeyVisualMetrics provides gridMetrics) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
