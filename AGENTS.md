@@ -7,6 +7,14 @@
 - 构建： `./gradlew assembleDebug --quiet`
 - 测试： `./gradlew test`
 
+## 构建环境（路径约束）
+- 仓库路径**不能含空格**（例如 `Xime CyletixFork`）：原生 librime/Boost 构建对空格敏感，会在 CMake 编译器探测阶段失败。
+- 不要用 `subst X: <仓库路径>` 之类的映射盘绕过：映射会让 CMake / Kotlin 缓存写入映射盘绝对路径（`X:\app\...`），
+  即使之后删掉映射，构建仍会去碰 `X:\`（Kotlin 报 `different roots`、CMake 找不到 boost 源目录），
+  表面现象就是"部署反复创建/使用 X 盘"。
+- 已经用过映射的机器：先 `subst X: /D` 删映射，再删除 `app/.cxx`、`app/build/intermediates/cxx`、`app/build/kotlin`，然后在真实路径下重新构建。
+- 推荐做法：把仓库放在不含空格的真实路径（例如 `D:\GitHub\CyIME`）。根 `build.gradle.kts` 检测到映射盘或含空格路径时会给出警告。
+
 ## 插件开发
 - 清除插件数据： `./gradlew clearPlugins`
 - 完全卸载主应用： `./gradlew uninstallApp`
