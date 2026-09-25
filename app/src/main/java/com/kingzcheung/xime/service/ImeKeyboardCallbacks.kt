@@ -166,9 +166,14 @@ internal fun rememberImeKeyboardCallbacks(
                 val config = service.resources.configuration
                 val isLandscape = config.screenWidthDp > config.screenHeightDp
                 val currentHeight = SettingsPreferences.getKeyboardHeightDp(service, isLandscape)
+                // 宽度基准取实际渲染的卡片宽度：左右边/四角从当前外观出发，不跳变。
+                val currentWidth = service.currentFloatingCardWidthDp.takeIf { it > 0 }
+                    ?: SettingsPreferences.getFloatingWidthDp(service, isLandscape).takeIf { it > 0 }
+                    ?: (minOf(config.screenWidthDp, config.screenHeightDp) * 0.85f).roundToInt()
                 service.uiState.value = service.uiState.value.copy(
                     showKeyboardResize = true,
                     resizePreviewHeightDp = currentHeight,
+                    resizePreviewWidthDp = currentWidth,
                     resizeInitialFloating = service.uiState.value.isFloatingMode,
                     resizeInitialSplit = SettingsPreferences.isSplitKeyboardEnabled(service),
                     resizeInitialX = service.uiState.value.floatingOffsetX,

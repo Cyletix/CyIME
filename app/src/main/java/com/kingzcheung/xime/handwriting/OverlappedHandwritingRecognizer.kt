@@ -115,6 +115,12 @@ class OverlappedHandwritingRecognizer(
         }
         if (bestK == 0) return Result(emptyList(), 0f, 0f)
 
+        // 最小诊断日志（2026-09-25 手写“第1/3字”排查）：把切分决策的输入与结论一次打出来
+        android.util.Log.i(
+            "HandwritingChain",
+            "recognize strokes=$n gaps=$gaps bestK=$bestK norm=$bestNorm pauseBoundary=${hasPauseBoundary(gaps)}"
+        )
+
         // "一个字"先验：DP 选出多段时，必须存在"显著换字停顿"才信任切分。
         // 显著性用相对阈值判定——边界间隔显著高于窗口内笔间间隔中位数
         // （慢写者字内间隔本身高，绝对阈值会把匀速书写的复杂字拆开；
@@ -137,6 +143,10 @@ class OverlappedHandwritingRecognizer(
             // Keep clear multi-character results and explicit inter-character pauses intact.
             if (merged.isNotEmpty() && (mergedScore >= MERGED_CHAR_MIN_SCORE ||
                     n <= maxStrokesPerSegment && !confidentFragments)) {
+                android.util.Log.i(
+                    "HandwritingChain",
+                    "recognize→merged single char score=$mergedScore bestK=$bestK strokes=$n"
+                )
                 return Result(listOf(Segment(0, n, merged)), mergedScore, mergedScore)
             }
         }
@@ -149,6 +159,11 @@ class OverlappedHandwritingRecognizer(
             i = j
         }
         val total = best[bestK][n]
+        android.util.Log.i(
+            "HandwritingChain",
+            "recognize→segments=${segments.size} counts=${segments.map { it.strokeCount }} " +
+                "heads=${segments.map { it.candidates.firstOrNull()?.char }}"
+        )
         return Result(segments, total, total / bestK)
     }
 
