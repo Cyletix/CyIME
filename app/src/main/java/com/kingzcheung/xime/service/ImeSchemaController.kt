@@ -69,8 +69,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
         FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: toggleAsciiMode ok, took ${(System.nanoTime() - t0) / 1_000_000}ms, rime ascii=${service.rimeEngine.isAsciiMode()}, thread=${Thread.currentThread().name}")
         if (!service.rimeEngine.isAsciiMode()) {
-            // The English width guard must not erase the user's explicit Chinese-width choice.
-            service.rimeEngine.setOption("full_shape", service.rimeEngine.getUserConfigBool("var/option/full_shape"))
+            // 回到中文/日文：按用户的「全角／半角」选择回写标点宽度。
+            // 过去只恢复 full_shape（且取自 user.yaml），与菜单显示用的是两套状态，
+            // 于是出现"显示半角、实际输出全角"。
+            service.sessionController.applyPunctuationWidth(service.rimeEngine.isAsciiMode())
         }
         service.sessionController.persistSchemaOption("ascii_mode", service.rimeEngine.isAsciiMode())
         withContext(Dispatchers.Main) {
@@ -394,7 +396,6 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 }
                 // 英文是独立入口；选中中文/日语方案必须退出此前遗留的 ASCII 模式。
                 service.rimeEngine.setOption("ascii_mode", false)
-                service.rimeEngine.setOption("ascii_punct", false)
                 service.sessionController.persistSchemaOption("ascii_mode", false)
                 withContext(Dispatchers.Main) {
                     com.kingzcheung.xime.handwriting.HandwritingEngine.release()
@@ -409,6 +410,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     service.updateUI()
                     Toast.makeText(service, "已切换输入方案", Toast.LENGTH_SHORT).show()
                 }
+                // 显示状态同步后再回写标点宽度：此处 uiState 可能还残留英文态，
+                // 显式 asciiMode=false，保证中文/日文方案按用户选择输出标点。
+                service.sessionController.applyPunctuationWidth(asciiMode = false)
             } catch (e: Exception) {
                 FileLogger.e(XimeInputMethodService.TAG, "Failed to switch schema", e)
             }

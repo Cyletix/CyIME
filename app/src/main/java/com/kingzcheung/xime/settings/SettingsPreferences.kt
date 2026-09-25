@@ -13,6 +13,15 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_PUNCTUATION_FULL_WIDTH, full).apply()
     }
 
+    /**
+     * 用户是否显式选择过标点宽度。
+     *
+     * 未选择时界面回退到方案自身的 ascii_punct，显示与引擎同源，无需回写引擎；
+     * 只有用户显式选择过，全角/半角才是唯一权威状态，切换方案/中英时必须回写。
+     */
+    fun hasPunctuationFullWidth(context: Context): Boolean =
+        getPrefs(context).contains(KEY_PUNCTUATION_FULL_WIDTH)
+
     private const val KEY_CURRENT_SCHEMA = "current_schema"
     /** 双写标记：仅新版本双写后置 true，本地值才可信（旧版本只写 rime，本地是过时迁移值） */
     private const val KEY_CURRENT_SCHEMA_DUAL = "current_schema_dual"

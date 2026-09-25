@@ -46,7 +46,29 @@ class KeyboardMenuTest {
             .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "半角"))
         rule.onNodeWithTag("menu-item:输入选项").performClick()
         rule.onNodeWithTag("input-option:full_shape").assertDoesNotExist()
-        rule.onNodeWithTag("input-option:ascii_punct").assertIsDisplayed()
+        // 标点样式（ascii_punct）与全角/半角重复，已合并：输入选项里不应再出现
+        rule.onNodeWithTag("input-option:ascii_punct").assertDoesNotExist()
         rule.onNodeWithTag("input-option:ascii_mode").assertDoesNotExist()
+    }
+
+    @Test fun englishMenuHasNoFullWidthEntryBecausePunctuationIsAlwaysHalfWidth() {
+        var toggles = 0
+        rule.setContent {
+            MenuBar(MenuBarState(true, true, backgroundColor = Color(0xFF292929),
+                keyBgColor = Color(0xFF525252), keyTextColor = Color.White,
+                isAsciiMode = true,
+                schemaSwitches = listOf(
+                    SchemaSwitchUiState("full_shape", states = listOf("半角", "全角"), currentIndex = 0),
+                    SchemaSwitchUiState("simplification", states = listOf("简", "繁")))),
+                MenuBarCallbacks(onDismiss = {}, onClipboard = {}, onQuickSend = {},
+                    onKeyboardResize = {}, onEmoji = {}, onReloadConfig = {},
+                    onSettings = {}, onSchemaList = {}, onToggleDarkMode = {},
+                    onToggleSchemaSwitch = { toggles++ }),
+                Modifier.width(360.dp).height(260.dp))
+        }
+        // 全角/半角只作用于中文与日文：英文下入口不出现，也不可能被点掉状态
+        rule.onNodeWithTag("menu-item:全角／半角").assertDoesNotExist()
+        rule.onNodeWithTag("menu-item:键盘调节").assertIsDisplayed()
+        assertEquals(0, toggles)
     }
 }

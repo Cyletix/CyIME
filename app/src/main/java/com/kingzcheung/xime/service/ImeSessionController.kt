@@ -6,6 +6,7 @@ import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.rime.buildT9DisplayState
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.isPunctuationWidthSwitch
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
 import com.kingzcheung.xime.util.FileLogger
@@ -342,9 +343,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (schemaId.isEmpty()) return emptyList()
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
         val fullPunctuation = service.textCommit.isFullWidthPunctuation()
-        val switches = defs.filter { it.name != "full_shape" }.map { def ->
+        // 全角/半角是标点宽度的唯一入口：方案里的 full_shape / half_shape / ascii_punct
+        //（含 options 选项组）不再作为独立菜单项重复列出；引擎选项改由 applyPunctuationWidth 同步。
+        val switches = defs.filterNot { isPunctuationWidthSwitch(it) }.map { def ->
             val index = when {
-                def.name == "ascii_punct" -> if (fullPunctuation) 0 else 1
                 def.name.isNotEmpty() && def.states.isNotEmpty() ->
                     if (service.rimeEngine.getOption(def.name)) minOf(1, def.states.size - 1) else 0
                 def.options.isNotEmpty() -> {
@@ -383,13 +385,13 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             if (sw.name == "ascii_mode") {
                 service.schemaController.switchInputMethod()
             } else if (sw.name == "full_shape" || sw.name == "ascii_punct") {
+                // 英文（ASCII）模式标点固定半角，全角/半角对它不生效：入口已隐藏，这里再兜底，
+                // 不让英文下的点击悄悄改掉用户的中文宽度选择。
+                if (service.uiState.value.isAsciiMode) return@launch
                 val full = !service.textCommit.isFullWidthPunctuation()
                 SettingsPreferences.setPunctuationFullWidth(service, full)
-                service.rimeEngine.setOption("ascii_punct", !full)
-                persistSchemaOption("ascii_punct", !full)
-                // Retain native width semantics in Chinese; English letters remain ASCII.
-                service.rimeEngine.setOption("full_shape", full && !service.uiState.value.isAsciiMode)
-                persistSchemaOption("full_shape", full)
+                // 用户选择是唯一权威：把同一份选择写回引擎，避免"菜单显示半角、实际输出全角"。
+                applyPunctuationWidth(asciiMode = false)
                 service.updateUI()
             } else if (sw.name.isNotEmpty()) {
                 val newValue = !service.rimeEngine.getOption(sw.name)
@@ -408,6 +410,27 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
     }
 
+    /**
+     * 把用户持久化的标点宽度选择写回引擎选项，让菜单/键面显示与实际输出同源。
+     *
+     * 全角/半角只作用于中文与日文：英文（ASCII）模式固定半角，只清掉全角字符输出
+     * （ascii_punct 在英文态由 ascii_composer 接管，不动它，退出英文后中文标点不会被改写）。
+     * 用户从未选择过宽度时同样不动引擎——此时界面显示值取自方案自身的 ascii_punct，两者本来一致。
+     *
+     * @param asciiMode 权威的中英状态，由调用方给出；不要读 uiState，切换方案/退出英文时
+     *   uiState 尚未同步，会误判成英文而把中文键盘按半角处理。
+     */
+    internal fun applyPunctuationWidth(asciiMode: Boolean) {
+        if (asciiMode) {
+            service.rimeEngine.setOption("full_shape", false)
+            return
+        }
+        if (!SettingsPreferences.hasPunctuationFullWidth(service)) return
+        val full = SettingsPreferences.punctuationFullWidth(service, true)
+        service.rimeEngine.setOption("ascii_punct", !full)
+        service.rimeEngine.setOption("full_shape", full)
+    }
+
     /** 将方案选项状态写入 librime user.yaml（var/option/<name>）。 */
     internal fun persistSchemaOption(name: String, value: Boolean) {
         if (RimeEngine.isInitialized()) {
@@ -423,6 +446,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         val rimeAsciiBefore = service.rimeEngine.isAsciiMode()
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
         for (def in defs) {
+            // 标点宽度不从 user.yaml 恢复：它的权威来源是用户的「全角／半角」选择，
+            // 由 applyPunctuationWidth 统一回写（否则这里会把用户选择覆盖成旧值）。
+            if (isPunctuationWidthSwitch(def)) continue
             if (def.name.isNotEmpty()) {
                 service.rimeEngine.setOption(def.name, service.rimeEngine.getUserConfigBool("var/option/${def.name}"))
             } else if (def.options.isNotEmpty()) {
@@ -432,6 +458,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                 }
             }
         }
+        applyPunctuationWidth(service.rimeEngine.isAsciiMode())
         val rimeAsciiAfter = service.rimeEngine.isAsciiMode()
         if (rimeAsciiBefore != rimeAsciiAfter) {
             FileLogger.i(XimeInputMethodService.TAG, "restorePersistedSchemaOptions: ascii $rimeAsciiBefore -> $rimeAsciiAfter (ui=${service.uiState.value.isAsciiMode})")

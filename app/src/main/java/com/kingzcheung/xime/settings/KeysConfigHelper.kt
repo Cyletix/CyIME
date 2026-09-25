@@ -675,6 +675,17 @@ object KeysConfigHelper {
         _schemaSectionBindings[schemaId]?.takeIf { it in CODE_LAYOUT_SECTIONS }
 
     /**
+     * 仅供单测：清空方案绑定缓存。
+     *
+     * 绑定只在 [loadConfig] 里由 xime.yaml / xime.custom.yaml 写入，是进程级状态；
+     * 其他用例（如 [CyimeResearchPresetTest]）会加载绑定，若先于"未声明即不识别"的断言执行，
+     * 断言就会随用例执行顺序变红。需要"未加载绑定"场景的用例先调用本方法。
+     */
+    internal fun clearSchemaBindingsForTest() {
+        _schemaSectionBindings = emptyMap()
+    }
+
+    /**
      * 按当前方案切换中文行布局与手势缓存（合并键布局 ↔ 标准 26 键）。
      * 在 KeyboardViewModel.dispatch/resetKeyboard 收到 schemaId 时调用；
      * 英文键盘不受影响（合并键布局仅中文拼音方案使用）。

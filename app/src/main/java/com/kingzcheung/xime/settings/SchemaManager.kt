@@ -57,6 +57,20 @@ data class SchemaSwitch(
     val abbrev: List<String> = emptyList(),
 )
 
+/** 标点宽度/样式相关的方案选项名：full_shape / half_shape / ascii_punct 是同一件事的三种写法。 */
+internal val PUNCTUATION_WIDTH_SWITCH_NAMES = setOf("full_shape", "half_shape", "ascii_punct")
+
+/**
+ * 该方案开关是否属于「标点宽度」。
+ *
+ * 界面只保留统一的「全角／半角」入口（见 [com.kingzcheung.xime.service.ImeSessionController]），
+ * 方案里的 full_shape / half_shape / ascii_punct（含 options 选项组形式，如
+ * `options: [full_shape, half_shape]`）都不再作为独立菜单项重复展示。
+ */
+internal fun isPunctuationWidthSwitch(switch: SchemaSwitch): Boolean =
+    switch.name in PUNCTUATION_WIDTH_SWITCH_NAMES ||
+        switch.options.any { it in PUNCTUATION_WIDTH_SWITCH_NAMES }
+
 @Serializable
 internal data class SchemaYaml(val schema: SchemaEntry)
 

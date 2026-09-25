@@ -190,9 +190,17 @@ class LiteralInputModesImeTest {
     @Test fun punctuationWidthWorksFromMenuIn26Keys() = verifyPunctuationWidth("rime_ice", "，")
     @Test fun punctuationWidthWorksFromMenuIn14Keys() = verifyPunctuationWidth("pinyin_14jian", "，")
     @Test fun punctuationWidthWorksFromMenuInNineKeys() = verifyPunctuationWidth("t9_pinyin", "，")
-    @Test fun punctuationWidthWorksInEnglishWithoutFullWidthLetters() {
-        verifyPunctuationWidth(InputModes.ENGLISH, ",")
-        setWidthFromMenu(true)
+    @Test fun englishPunctuationStaysHalfWidthAndOffersNoWidthEntry() {
+        chooseMode(InputModes.ENGLISH)
+        // 英文（ASCII）模式标点固定半角：菜单里不出现全角／半角入口，
+        // 因此也不会出现"点了看不到状态变化、实际却已经改了状态"的情况。
+        rule.onNodeWithTag("toolbar-leading").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("menu-item:键盘调节").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("menu-item:全角／半角").assertDoesNotExist()
+        rule.onNodeWithTag("toolbar-leading").performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(",").onLast().performTouchInput { click() }
+        assertSettled(",")
         tap("a")
         rule.waitUntil(5000) { text().endsWith("a", ignoreCase = true) }
         assertFalse(text().contains('ａ'))
