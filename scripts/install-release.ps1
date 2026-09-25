@@ -1,10 +1,10 @@
-# Xime Release Installation Script
+# CyIME Release Installation Script
 param(
     [string]$Action = "all",
     [string]$Source = "ide"
 )
 
-$PackageName = "com.kingzcheung.xime"
+$PackageName = "com.cyletix.cyime"
 $Plugins = @(
     "com.kingzcheung.xime.plugin.emoji",
     "com.kingzcheung.xime.plugin.kaomoji"
@@ -12,7 +12,7 @@ $Plugins = @(
 
 Write-Host ""
 Write-Host "================================"
-Write-Host "  Xime Release Install Script"
+Write-Host "  CyIME Release Install Script"
 Write-Host "================================"
 Write-Host ""
 Write-Host "Actions: all | app | plugins | uninstall"

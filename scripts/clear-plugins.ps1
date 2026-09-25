@@ -1,14 +1,14 @@
-# 清除 Xime 主应用的所有插件数据
+# 清除 CyIME 主应用的所有插件数据
 #
 # 使用方式：
 #   powershell -File scripts/clear-plugins.ps1
 #
 # 需要 adb 在 PATH 中，且设备已连接
 
-$PackageName = "com.kingzcheung.xime"
+$PackageName = "com.cyletix.cyime"
 $PluginsDir = "/data/data/$PackageName/files/plugins"
 
-Write-Host "=== 清除 Xime 插件数据 ===" -ForegroundColor Cyan
+Write-Host "=== 清除 CyIME 插件数据 ===" -ForegroundColor Cyan
 
 # 检查 adb 是否可用
 try {
@@ -43,4 +43,4 @@ foreach ($file in $files) {
 }
 
 Write-Host "=== 完成 ===" -ForegroundColor Green
-Write-Host "请重启 Xime 应用以重新加载插件" -ForegroundColor Yellow
+Write-Host "请重启 CyIME 应用以重新加载插件" -ForegroundColor Yellow

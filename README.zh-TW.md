@@ -1,89 +1,41 @@
-> **Cyletix 分支 · 修改日期 2026-09-23。** [CyIME](https://github.com/Cyletix/CyIME) 基于 Kor1（kingzcheung）及贡献者开发的 [Xime](https://github.com/ximeiorg/Xime)。应用继续遵循 [GNU GPL v3](LICENSE)，保留原作者及第三方版权声明。请从 [本分支 Releases](https://github.com/Cyletix/CyIME/releases) 下载，F-Droid 链接指向上游原版。对应源代码在本仓库公开，改动和验证见 [命名与整理记录](docs/cyime-identity.md)。
-
-[CyIME 1.0.0 发布说明与下载](docs/cyime-1.0.0.md)
-
-[CyIME 0.1.5 键盘交互修复](docs/cyime-0.1.5.md)
-
-[CyIME 0.1.1 變更與驗證](docs/cyime-0.1.1.md)
-
-
 <h1 align="center">CyIME</h1>
 
 <p align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-## CyIME 项目定位
+**CyIME** 是 Cyletix 維護的 Android 輸入法，基於 [Rime](https://rime.im/) 引擎，提供中文（五筆 / 拼音 / 九宮格 / 雙拼）、日文假名、英文、手寫與語音輸入。
 
-**CyIME** 是 Cyletix 独立命名和维护的 Android 输入法，基于 [Xime](https://github.com/ximeiorg/Xime) 与 Rime 开发，保留上游署名及 GPL-3.0 许可。2024 年的 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) 是键盘布局研究前身，与 Android 应用分别保留历史。
+## 專案定位
 
-当前仓库仍为 `Cyletix/Xime`；`Cyletix/CyIME` 是建议迁移名称，尚未作为下载地址启用。既有 Releases 可能仍使用旧名称；新构建命名为 `CyIME-0.1.1-<abi>.apk`，包标识与签名配置保持升级兼容。
+- 對外身分：應用名稱 **CyIME**，維護者 **Cyletix**，安裝包識別碼 `com.cyletix.cyime`，APK 命名為 `CyIME-<版本>-<abi>.apk`。
+- 原始碼衍生自上游 [Xime](https://github.com/ximeiorg/Xime)（作者 Kor1 / kingzcheung 及貢獻者），繼續遵循 [GNU GPL v3](LICENSE)。上游與第三方版權聲明保留在 [LICENSE](LICENSE)、`app/src/main/assets/NOTICE.txt` 與 [TRADEMARKS.md](TRADEMARKS.md)。
+- 為了持續追蹤上游、減少合併衝突，原始碼 namespace（`com.kingzcheung.xime`）、外掛 ID、`xime.yaml` / `xime.custom.yaml`、擴充商店與 index 協定維持不變，僅安裝身分（applicationId）獨立。取捨與影響見 [命名與身分記錄](docs/cyime-identity.md)。
 
-[旧项目结论与可选实验配置](docs/cyime-keyboard-research.md) · [命名及目录迁移决策](docs/cyime-identity.md)
+## 截圖
 
-已提供 GA_10 v4 英文实验配置，保留历史 30 键顺序，默认不启用；尚无手机速度提升的验证结果。下文包含继承的 Xime 功能说明；链接中的 Windows/Linux 应用与上游服务属于各自项目。
-
-[Upstream Xime on F-Droid](https://f-droid.org/packages/com.kingzcheung.xime)
-
-
-[Xime 輸入法 (Windows 版)](https://github.com/ximeiorg/winxime) | [Xime 輸入法 (Linux 版)](https://github.com/ximeiorg/xime-wayland) | [聯想詞預測模型](https://github.com/ximeiorg/predictive-text) | [手寫輸入法模型](https://github.com/ximeiorg/ochwpro)
-
-
-一款基於 <a href="https://rime.im/">Rime</a> 引擎構建的 Android 五筆/拼音輸入法，專注於簡潔高效的中文輸入體驗。
-
-如果你覺得 UI 或者功能不符合你的要求，你可以直接 fork 一份自行修改。
-
----
-
-> 本輸入法支援五筆/拼音輸入，只是本人以五筆為主，拼音為輔，因此資源會傾向於五筆為主。
-
+<!-- 截圖待補：將截圖放入 docs/Screenshot/ 後在此插入，例如
 <table align="center">
   <tr>
-    <td><img src="docs/Screenshot/full_keyboard_light.jpg" width="180"><br><p align="center">全鍵盤（亮色）</p></td>
-    <td><img src="docs/Screenshot/full_keyboard_dark.jpg" width="180"><br><p align="center">全鍵盤（暗色）</p></td>
-    <td><img src="docs/Screenshot/全键盘_下滑_light.jpg" width="180"><br><p align="center">字根下滑</p></td>
-    <td><img src="docs/Screenshot/shotcut_light.jpg" width="180"><br><p align="center">快捷操作</p></td>
-  </tr>
-  <tr>
-    <td><img src="docs/Screenshot/floating.jpg" width="180"><br><p align="center">懸浮鍵盤</p></td>
-    <td><img src="docs/Screenshot/t9_pinyin.jpg" width="180"><br><p align="center">T9 九宮格拼音</p></td>
-    <td><img src="docs/Screenshot/number.jpg" width="180"><br><p align="center">數字鍵盤</p></td>
-    <td><img src="docs/Screenshot/symbol.jpg" width="180"><br><p align="center">符號鍵盤</p></td>
-  </tr>
-  <tr>
-    <td><img src="docs/Screenshot/hw.png" width="180"><br><p align="center">手寫輸入</p></td>
-    <td><img src="docs/Screenshot/hw2.png" width="180"><br><p align="center">手寫找字（候選）</p></td>
-    <td><img src="docs/Screenshot/voice.jpg" width="180"><br><p align="center">語音輸入</p></td>
-    <td><img src="docs/Screenshot/emoji.jpg" width="180"><br><p align="center">Emoji 鍵盤</p></td>
-  </tr>
-  <tr>
-    <td><img src="docs/Screenshot/theme_light.jpg" width="180"><br><p align="center">主題設定（亮色）</p></td>
-    <td><img src="docs/Screenshot/theme_dark.jpg" width="180"><br><p align="center">主題設定（暗色）</p></td>
-    <td><img src="docs/Screenshot/plugin_light.jpg" width="180"><br><p align="center">外掛管理</p></td>
-    <td><img src="docs/Screenshot/扩展商店.png" width="180"><br><p align="center">擴充商店</p></td>
+    <td><img src="docs/Screenshot/xxx.jpg" width="180"><br><p align="center">說明</p></td>
   </tr>
 </table>
+-->
 
 ## 功能特點
 
-- **多種輸入方案** - 內建五筆86/98、拼音、混輸方案，支援自訂（雙拼、筆畫等），可透過方案市場下載或無線匯入
-- **Rime 引擎** - 使用成熟穩定的 Rime 輸入法引擎，精準可靠的中文輸入體驗
-- **豐富鍵盤佈局** - QWERTY 全鍵盤、T9 九宮格拼音、九宮格筆畫、手寫、數字（含計算機）
-- **懸浮鍵盤** - 懸浮卡片樣式，支援拖拽移動、半透明圓角設計
-- **語音轉文字** - 本地離線語音辨識（內建串流 zipformer2 引擎），也支援線上 ASR 外掛（FunAsr、Volc 等）
-- **AI 智能增強** - 基於 Transformer 的聯想詞預測，輸入更高效
-- **簡潔介面** - Material Design 3 風格，支援淺色/深色主題及多種配色方案
-- **鍵盤調節** - 支援鍵盤高度調整和位置移動
-- **工具列定製** - 可自訂工具列按鈕佈局和功能
-- **按鍵反饋** - 可調節音效和振動強度
-- **滑動手勢** - 游標移動、刪除、符號輸入等滑動手勢操作
-- **剪貼簿管理** - 剪貼簿歷史記錄，支援快捷傳送和置頂
-- **剪貼簿同步** - 透過外掛與遠端裝置雙向同步剪貼簿（WebDAV、ximed 等）
-- **候選詞編碼提示** - 候選詞顯示五筆編碼，輔助學習
-- **字根顯示** - 下滑按鈕顯示五筆字根，方便健忘用戶
-- **實體鍵盤支援** - 連接實體/藍牙鍵盤時顯示浮動候選欄
-- **WebDAV 同步** - 透過 WebDAV 備份和還原方案與設定
-- **外掛市場** - 透過內建擴充商店安裝可擴充 Lua 外掛（表情、剪貼簿同步、線上 ASR 等）
+- **多種輸入方案** — 內建霧凇拼音詞庫，提供五筆、拼音與混輸方案，支援自訂（雙拼、筆畫、九鍵 / 14 鍵等），可從方案市場下載或無線匯入
+- **Rime 引擎** — 使用成熟穩定的 Rime（librime）引擎
+- **豐富鍵盤版面** — QWERTY 全鍵盤、T9 九宮格拼音、九宮格筆畫、手寫、數字（含計算機）、符號與 Emoji
+- **懸浮鍵盤** — 懸浮卡片樣式，支援拖曳移動與半透明圓角
+- **語音輸入** — 本機離線串流辨識，也可透過外掛接入線上 ASR
+- **AI 聯想** — 基於 Transformer 的聯想詞預測（可選）
+- **Material 3 介面** — 淺色 / 深色主題與多種配色
+- **鍵盤與工具列自訂** — 鍵盤高度 / 位置調整、工具列按鈕自訂、按鍵音效與震動強度
+- **滑動手勢** — 游標移動、刪除、符號等滑動手勢
+- **剪貼簿管理** — 剪貼簿歷史、快速傳送與置頂，可透過外掛與遠端雙向同步
+- **實體鍵盤支援** — 連接實體 / 藍牙鍵盤時顯示浮動候選列
+- **外掛擴充** — 透過擴充商店安裝 Lua 外掛（表情、剪貼簿同步、線上語音、WebDAV 備份等）
 
 ## 系統需求
 
@@ -91,95 +43,48 @@
 
 ## 安裝
 
-### 主程式下載
+### 從 Releases 下載
 
-選擇對應架構的 APK：
-- **arm64-v8a**: 適用於大多數現代手機（**絕大部分人的手機都是這個**）
-- **armeabi-v7a**: 適用於舊款32位元手機
-- **x86_64**: 適用於模擬器
-- **universal**: 包含所有架構，體積較大
+1. 在 [Releases](https://github.com/Cyletix/CyIME/releases) 下載對應架構的 `CyIME-<版本>-<abi>.apk`：
+   - `arm64-v8a`：絕大多數現代手機
+   - `armeabi-v7a`：舊款 32 位元手機
+   - `x86_64` / `x86`：模擬器
+   - `universal`：包含全部架構，體積較大
+2. 安裝後在系統設定中啟用 **CyIME**，並設為目前的輸入法。
 
-### 外掛下載（選用）
+> **從舊版（`com.kingzcheung.xime`）移轉**：安裝身分已獨立為 `com.cyletix.cyime`，系統視為新應用，可與舊版並存；舊版的資料與設定不會自動繼承，需要重新設定。若 GitHub 下載不穩定，可自行建置（見下）。
 
-外掛為 Lua 指令碼外掛（.xipk 格式），可在主應用程式「設定 > 擴充商店」中安裝和啟用：
-- **kaomoji**: 顏文字外掛（提供精選顏文字）
-- **meme-bunny**: 惡搞兔表情包外掛（提供8個表情）
-- **xime-fluent-emoji**: Fluent UI 3D 風格表情外掛（222 個精選 3D 表情，9 大分類）
-- **funasr-asr**: 阿里百煉 FunAsr 線上語音辨識
-- **volc-asr**: 火山引擎線上語音辨識
-- **webdav-clipboard-sync**: 基於 WebDAV 的剪貼簿同步
-- **ximed-clipboard-sync**: 基於 ximed 服務的剪貼簿同步
+### 外掛（可選）
 
-更多外掛請查看 [外掛中心列表](https://ime.ximei.me/plugin-list.html)，或直接到手機應用程式「設定 > 擴充商店」中瀏覽安裝。
+Lua 外掛（`.xipk`）可在主應用程式「設定 > 擴充商店」中安裝與啟用：顏文字、表情包、線上語音辨識（FunAsr / 火山等）、WebDAV 剪貼簿同步與備份等。外掛 ID 與市場協定沿用上游。
 
-### 從 Release 下載
-
-1. 在 [Releases](https://github.com/Cyletix/CyIME/releases) 頁面下載最新版本的 APK
-2. 安裝應用程式
-3. 在系統設定中啟用 CyIME 輸入法
-4. 將 CyIME 設為目前輸入法
-
-### 國內下載
-
-由於 APK 包是透過 GitHub Actions 自動構建的，國內的倉庫沒有免費的功能使用，因此如果你覺得 GitHub Release 下載不穩定，請自行構建安裝，或者透過 [https://github.akams.cn](https://github.akams.cn) 來下載。
-
-### 手動構建安裝
-
-1. 克隆專案並構建 APK
-2. 安裝應用程式
-3. 在系統設定中啟用 CyIME 輸入法
-4. 將 CyIME 設為目前輸入法
-
-## 使用文件
-
-詳細使用說明請檢視 [使用文件](https://ime.ximei.me)。
-
-- [常見問題 FAQ](https://ime.ximei.me/faq.html)
-- [Rime 方案列表](https://ime.ximei.me/rime-list.html)
-- [外掛列表](https://ime.ximei.me/plugin-list.html)
-- [AI 模型列表](https://ime.ximei.me/model-list.html)
-
-## 構建
+## 建置
 
 ```bash
-# 克隆專案（包含子模組）
+# 複製專案（包含子模組）
 git clone --recursive https://github.com/Cyletix/CyIME.git
 
-# 或者在已克隆的專案中初始化子模組
+# 已複製過則初始化子模組
 git submodule update --init --recursive
 
-# 構建 Release APK
+# 除錯包 / 發行包
+./gradlew assembleDebug
 ./gradlew assembleRelease
 ```
 
-## 技術棧
+## 技術堆疊
 
-- Kotlin
-- Jetpack Compose
-- Material Design 3
-- Rime (librime)
-- JNI (Native C++)
+Kotlin · Jetpack Compose · Material 3 · Rime (librime) · JNI (Native C++)
 
 ## 貢獻
 
-歡迎貢獻！在提交 PR 之前，請先閱讀 [CONTRIBUTING.md](CONTRIBUTING.md) 瞭解貢獻流程。
-
-核心規則：
-- **先提 Issue** — 所有改動必須先建立 Issue 討論
-- **最小修改** — PR 只包含所需的最小改動
-- **GPG 簽章** — 所有 commit 必須 GPG 簽章
+見 [CONTRIBUTING.md](CONTRIBUTING.md)：先提 Issue、最小修改、commit 需 GPG 簽章。
 
 ## 致謝
 
-- [Rime](https://rime.im/) - 中州韻輸入法引擎
-- [Trime](https://github.com/osfans/trime) - 同文輸入法，設定參考
-- [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) - 鍵盤佈局參考
-- [onnxruntime](https://github.com/microsoft/onnxruntime) - 聯想詞預測與語音辨識的 ONNX 推論引擎
+- 上游 [Xime](https://github.com/ximeiorg/Xime)：本分支的起點
+- [Rime](https://rime.im/) · [Trime](https://github.com/osfans/trime) · [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) · [onnxruntime](https://github.com/microsoft/onnxruntime)
 
-## 授權條款
+## 授權
 
-GPLv3 License
-
-Copyright © 2026 Kingz Cheung
-
-"Xime" 名稱、Logo 及其他品牌資產**不屬於** GPLv3 開源授權範圍，詳見 [TRADEMARKS.md](TRADEMARKS.md)。
+[GPLv3](LICENSE)。上游程式碼版權歸其作者所有，本分支的修改由 Cyletix 維護。"Xime" 名稱、Logo 及其他品牌資產**不屬於** GPLv3 授權範圍，詳見 [TRADEMARKS.md](TRADEMARKS.md)。

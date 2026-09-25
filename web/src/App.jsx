@@ -246,9 +246,9 @@ export default function App() {
       {/* 左栏：Logo + 上传，贴左、占满高度 */}
       <div className="flex h-full w-[480px] shrink-0 flex-col border-r border-gray-200 bg-white p-8">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <img src={logo} alt="Xime 输入法" className="h-28 w-28 rounded-3xl object-contain" />
+          <img src={logo} alt="CyIME 输入法" className="h-28 w-28 rounded-3xl object-contain" />
           <div>
-            <div className="text-xl font-semibold text-gray-900">Xime 输入法</div>
+            <div className="text-xl font-semibold text-gray-900">CyIME 输入法</div>
             <div className="text-sm text-gray-400">无线导入方案</div>
           </div>
         </div>

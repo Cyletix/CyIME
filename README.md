@@ -1,138 +1,64 @@
-> **Cyletix fork — modified 2026-09-24.** This is [CyIME](https://github.com/Cyletix/CyIME), based on [Xime](https://github.com/ximeiorg/Xime) by Kor1 (kingzcheung) and contributors. The application remains under [GNU GPL v3](LICENSE); original copyright and third-party notices are retained. Download this fork from [its releases](https://github.com/Cyletix/CyIME/releases), not the upstream F-Droid listing. Corresponding source is available in this repository. See [identity and migration decisions](docs/cyime-identity.md).
-
-[CyIME 1.0.0 发布说明与下载](docs/cyime-1.0.0.md)
-
-[CyIME 0.1.11 首次使用与编辑面板](docs/cyime-0.1.11.md) · [CyIME 0.1.10 标点宽度与柔和光效](docs/cyime-0.1.10.md) · [CyIME 0.1.9 合并键拼音与 Shift 手势](docs/cyime-0.1.9.md) · [CyIME 0.1.8 统一间距与手写确认](docs/cyime-0.1.8.md) · [0.1.7 拼音、语音标点与动画修复](docs/cyime-0.1.7.md) · [CyIME 0.1.6 语音、手写与按键效果](docs/cyime-0.1.6.md) · [0.1.5 键盘交互修复](docs/cyime-0.1.5.md)
-
-[CyIME 0.1.4 speech changes](docs/cyime-0.1.4-speech.md) · [0.1.3 keyboard changes](docs/cyime-0.1.3.md)
-
-
 <h1 align="center">CyIME</h1>
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a>
 </p>
 
-## CyIME project identity
+**CyIME** is a Cyletix-maintained Android input method built on the [Rime](https://rime.im/) engine, covering Chinese (Wubi / Pinyin / 9-key / Shuangpin), Japanese kana, English, handwriting and voice input.
 
-CyIME is Cyletix’s independently named Android input method, developed from [Xime](https://github.com/ximeiorg/Xime) and Rime. It retains upstream attribution and GPL-3.0 licensing. The 2024 [Cyletix-Keyboard](https://github.com/Cyletix/Cyletix-Keyboard) project is its keyboard-layout research predecessor, not the Android application.
+## Project identity
 
-The repository is now `Cyletix/CyIME`; former `Cyletix/Xime` URLs redirect to it. Existing releases may still carry the former name. New builds use `CyIME-1.0.0-<abi>.apk`. The application ID and signing configuration remain compatible with the existing fork.
+- Public identity: app name **CyIME**, maintainer **Cyletix**, install ID `com.cyletix.cyime`, APK name `CyIME-<version>-<abi>.apk`.
+- The source is derived from upstream [Xime](https://github.com/ximeiorg/Xime) (by Kor1 / kingzcheung and contributors) and stays under [GNU GPL v3](LICENSE). Upstream and third-party notices are kept in [LICENSE](LICENSE), `app/src/main/assets/NOTICE.txt` and [TRADEMARKS.md](TRADEMARKS.md).
+- To keep tracking upstream with few merge conflicts, the source namespace (`com.kingzcheung.xime`), plugin IDs, `xime.yaml` / `xime.custom.yaml`, the extension market and the index protocol are intentionally unchanged; only the install identity (applicationId) is independent. See [identity notes](docs/cyime-identity.md).
 
-[Research findings and experimental layout](docs/cyime-keyboard-research.md) · [Naming and migration decisions](docs/cyime-identity.md)
+## Screenshots
 
-The optional GA_10 v4 English preset preserves the historical 30-key ordering. It is not enabled by default and has no validated mobile speed advantage. The sections below include inherited Xime feature documentation; linked Windows/Linux applications and upstream services are separate projects.
-
-[Upstream Xime on F-Droid](https://f-droid.org/packages/com.kingzcheung.xime)
-
-
-[Windows Version](https://github.com/ximeiorg/winxime) | [Linux Version](https://github.com/ximeiorg/xime-wayland) | [Predictive Text Model](https://github.com/ximeiorg/predictive-text) | [Handwriting Model](https://github.com/ximeiorg/ochwpro)
-
-An Android input method built on the [Rime](https://rime.im/) engine, designed for efficient Chinese text input with Wubi (五笔) and Pinyin support.
-
----
-
-> This input method supports both Wubi (五笔) and Pinyin input. The author primarily uses Wubi with Pinyin as a fallback, so resources lean toward Wubi.
-
+<!-- Screenshots pending: add images under docs/Screenshot/ and insert a table here, e.g.
 <table align="center">
   <tr>
-    <td><img src="docs/Screenshot/full_keyboard_light.jpg" width="180"><br><p align="center">Full Keyboard (Light)</p></td>
-    <td><img src="docs/Screenshot/full_keyboard_dark.jpg" width="180"><br><p align="center">Full Keyboard (Dark)</p></td>
-    <td><img src="docs/Screenshot/全键盘_下滑_light.jpg" width="180"><br><p align="center">Radical Swipe</p></td>
-    <td><img src="docs/Screenshot/shotcut_light.jpg" width="180"><br><p align="center">Quick Actions</p></td>
-  </tr>
-  <tr>
-    <td><img src="docs/Screenshot/floating.jpg" width="180"><br><p align="center">Floating Keyboard</p></td>
-    <td><img src="docs/Screenshot/t9_pinyin.jpg" width="180"><br><p align="center">T9 Pinyin</p></td>
-    <td><img src="docs/Screenshot/number.jpg" width="180"><br><p align="center">Numpad</p></td>
-    <td><img src="docs/Screenshot/symbol.jpg" width="180"><br><p align="center">Symbols</p></td>
-  </tr>
-  <tr>
-    <td><img src="docs/Screenshot/hw.png" width="180"><br><p align="center">Handwriting</p></td>
-    <td><img src="docs/Screenshot/hw2.png" width="180"><br><p align="center">Handwriting (Candidates)</p></td>
-    <td><img src="docs/Screenshot/voice.jpg" width="180"><br><p align="center">Voice Input</p></td>
-    <td><img src="docs/Screenshot/emoji.jpg" width="180"><br><p align="center">Emoji Keyboard</p></td>
-  </tr>
-  <tr>
-    <td><img src="docs/Screenshot/theme_light.jpg" width="180"><br><p align="center">Theme Settings (Light)</p></td>
-    <td><img src="docs/Screenshot/theme_dark.jpg" width="180"><br><p align="center">Theme Settings (Dark)</p></td>
-    <td><img src="docs/Screenshot/plugin_light.jpg" width="180"><br><p align="center">Plugin Manager</p></td>
-    <td><img src="docs/Screenshot/扩展商店.png" width="180"><br><p align="center">Extension Store</p></td>
+    <td><img src="docs/Screenshot/xxx.jpg" width="180"><br><p align="center">Caption</p></td>
   </tr>
 </table>
+-->
 
 ## Features
 
-- **Multiple Input Schemas** - Built-in Wubi 86/98, Pinyin, and mixed schemas; supports custom schemas (Shuangpin, Stroke, etc.) via the schema marketplace or wireless import
-- **Rime Engine** - Powered by the mature and reliable Rime input method engine for accurate Chinese input
-- **Rich Keyboard Layouts** - QWERTY full keyboard, T9 Pinyin, Stroke 9-key, Handwriting, Numpad (with calculator)
-- **Floating Keyboard** - Floating card style with drag support, semi-transparent rounded design
-- **Voice-to-Text** - Local offline ASR (sherpa-onnx: Zipformer, Paraformer, SenseVoice, or two-pass Paraformer + SenseVoice) plus online ASR plugins (FunAsr, Volc, etc.)
-- **AI Enhancement** - Transformer-based predictive text for faster input
-- **Clean UI** - Material Design 3, light/dark themes with multiple color schemes
-- **Keyboard Adjustment** - Adjustable keyboard height and position
-- **Toolbar Customization** - Customizable toolbar button layout and functions
-- **Haptic Feedback** - Adjustable sound and vibration intensity
-- **Swipe Gestures** - Cursor movement, deletion, symbol input via swipe gestures
-- **Clipboard Manager** - Clipboard history with quick send and pinning
-- **Clipboard Sync** - Bidirectional clipboard sync with remote devices via plugins (WebDAV, ximed, etc.)
-- **Candidate Coding Hints** - Display Wubi codes for candidates to aid learning
-- **Radical Display** - Swipe down on keys to show Wubi radicals for memory aid
-- **Physical Keyboard Support** - Floating candidate bar when using hardware/bluetooth keyboards
-- **WebDAV Sync** - Backup and restore schemas and settings via WebDAV
-- **Plugin Marketplace** - Extensible Lua plugins (emoji, clipboard sync, online ASR, etc.) via the built-in marketplace
+- **Multiple input schemes** — bundled Pinyin dictionary plus Wubi / Pinyin / mixed schemes, custom schemes (Shuangpin, stroke, 9-key / 14-key), downloadable or importable over Wi-Fi
+- **Rime engine** — mature and stable Rime (librime)
+- **Rich keyboard layouts** — QWERTY, T9 Pinyin, stroke, handwriting, number (with calculator), symbols and Emoji
+- **Floating keyboard** — draggable translucent card
+- **Voice input** — local offline streaming recognition, plus online ASR plugins
+- **AI suggestions** — Transformer-based next-word prediction (optional)
+- **Material 3 UI** — light / dark themes and multiple color schemes
+- **Keyboard and toolbar customization** — height / position, toolbar buttons, key sound and vibration
+- **Swipe gestures** — cursor movement, delete, symbols
+- **Clipboard manager** — history, quick send and pinning, with optional two-way sync via plugins
+- **Physical keyboard support** — floating candidate bar for Bluetooth keyboards
+- **Plugin ecosystem** — Lua plugins from the in-app extension store (emoji, clipboard sync, online ASR, WebDAV backup, ...)
 
 ## Requirements
 
-- Android 9.0 (API 28) or later
+- Android 9.0 (API 28) or newer
 
 ## Installation
 
-### Download
+### Download from Releases
 
-Choose the APK matching your device architecture:
-- **arm64-v8a**: Modern phones (recommended for most users)
-- **armeabi-v7a**: Older 32-bit phones
-- **x86_64**: Emulators
-- **universal**: All architectures (larger file size)
+1. Download `CyIME-<version>-<abi>.apk` for your ABI from [Releases](https://github.com/Cyletix/CyIME/releases):
+   - `arm64-v8a` — most modern phones
+   - `armeabi-v7a` — 32-bit devices
+   - `x86_64` / `x86` — emulators
+   - `universal` — all ABIs, larger package
+2. Enable **CyIME** in system settings and select it as the current input method.
 
-### From Releases
+> **Upgrading from the old `com.kingzcheung.xime` build**: the install identity is now `com.cyletix.cyime`, so Android treats it as a separate app. The two can coexist, and data / settings from the old build are not migrated automatically. If GitHub downloads are slow, build the APK yourself (see below).
 
-1. Download the latest APK from [Releases](https://github.com/Cyletix/CyIME/releases)
-2. Install the application
-3. Enable CyIME in system input method settings
-4. Set CyIME as the current input method
+### Plugins (optional)
 
-### Plugins (Optional)
+Lua plugins (`.xipk`) are installed from the in-app extension store: kaomoji, stickers, online speech recognition (FunAsr, Volcano, ...), WebDAV clipboard sync and backup. Plugin IDs and the market protocol stay upstream-compatible.
 
-Plugins are Lua-script plugins (`.xipk` format), installable and enabled from the app's Settings > Extension Store:
-- **kaomoji**: Kaomoji text emoticons
-- **meme-bunny**: Funny bunny sticker pack (8 stickers)
-- **xime-fluent-emoji**: Fluent UI 3D-style emoji plugin (222 curated 3D emojis, 9 categories)
-- **funasr-asr**: Alibaba Bailian FunAsr online speech recognition
-- **volc-asr**: Volcano Engine online speech recognition
-- **webdav-clipboard-sync**: WebDAV-based clipboard sync
-- **ximed-clipboard-sync**: ximed-service-based clipboard sync
-
-For the full plugin list, see the [Plugin Center](https://ime.ximei.me/plugin-list.html), or browse and install directly from the app's Settings > Extension Store.
-
-### Build from Source
-
-1. Clone the project and build the APK
-2. Install the application
-3. Enable CyIME in system input method settings
-4. Set CyIME as the current input method
-
-## Documentation
-
-For detailed documentation, visit [https://ime.ximei.me](https://ime.ximei.me).
-
-- [FAQ](https://ime.ximei.me/faq.html)
-- [Rime Schemas List](https://ime.ximei.me/rime-list.html)
-- [Plugin List](https://ime.ximei.me/plugin-list.html)
-- [AI Models List](https://ime.ximei.me/model-list.html)
-
-## Building
+## Build
 
 ```bash
 # Clone with submodules
@@ -141,39 +67,24 @@ git clone --recursive https://github.com/Cyletix/CyIME.git
 # Or initialize submodules in an existing clone
 git submodule update --init --recursive
 
-# Build Release APK
+# Debug / release builds
+./gradlew assembleDebug
 ./gradlew assembleRelease
 ```
 
-## Tech Stack
+## Tech stack
 
-- Kotlin
-- Jetpack Compose
-- Material Design 3
-- Rime (librime)
-- JNI (Native C++)
+Kotlin · Jetpack Compose · Material 3 · Rime (librime) · JNI (Native C++)
 
 ## Contributing
 
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR.
-
-Core rules:
-- **File an Issue first** — All changes require a prior discussion via an Issue
-- **Minimal changes** — PRs must contain only the minimum changes needed
-- **GPG signing** — All commits must be GPG-signed
+See [CONTRIBUTING.md](CONTRIBUTING.md): open an Issue first, keep changes minimal, sign every commit with GPG.
 
 ## Acknowledgments
 
-- [Rime](https://rime.im/) - Input method engine
-- [Trime](https://github.com/osfans/trime) - Configuration reference
-- [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) - Keyboard layout reference
-- [onnxruntime](https://github.com/microsoft/onnxruntime) - ONNX inference runtime for predictive text and speech recognition models
+- Upstream [Xime](https://github.com/ximeiorg/Xime), the starting point of this branch
+- [Rime](https://rime.im/) · [Trime](https://github.com/osfans/trime) · [fcitx5-android](https://github.com/fcitx5-android/fcitx5-android) · [onnxruntime](https://github.com/microsoft/onnxruntime)
 
 ## License
 
-GPLv3 License
-
-Copyright © 2026 Kingz Cheung
-
-The Xime name, logo and other brand assets are **not** covered by the GPLv3 license.
-See [TRADEMARKS.md](TRADEMARKS.md) for details.
+[GPLv3](LICENSE). Upstream code remains copyright of its authors; this branch is maintained by Cyletix. The "Xime" name, logo and other brand assets are **not** covered by GPLv3 — see [TRADEMARKS.md](TRADEMARKS.md).

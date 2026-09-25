@@ -43,8 +43,8 @@ class ChineseDefaultsImeTest {
         assertEquals("中文26键", discovered["rime_ice"]?.name)
         assertEquals("中文14键", discovered["pinyin_14jian"]?.name)
         ChineseSchemas.ids.forEach { assertTrue("$it 已编译", SchemaManager.isSchemaCompiled(context, it)) }
-        shell("ime enable ${context.packageName}/.service.XimeInputMethodService")
-        shell("ime set ${context.packageName}/.service.XimeInputMethodService")
+        shell("ime enable ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")
+        shell("ime set ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")
         rule.setContent { AndroidView(factory = { EditText(it).also { editor = it; it.hint = "全新安装中文输入验证" } }, modifier = Modifier.fillMaxWidth().height(120.dp)) }
         rule.runOnUiThread { editor.requestFocus(); (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT) }
         rule.waitUntil(30_000) { rule.onAllNodesWithTag("language-key-control", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }

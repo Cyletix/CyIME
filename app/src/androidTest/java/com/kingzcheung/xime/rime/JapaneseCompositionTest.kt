@@ -41,4 +41,38 @@ class JapaneseCompositionTest {
             }
         } finally { engine.clearComposition(); if (previous.isNotBlank()) engine.switchSchema(previous) }
     }
+
+    /**
+     * 26 键罗马音只按下声母时，屏幕必须显示按下的字母，而不是原方案为促音/拨音
+     * 准备的回显（k→っ、n→ん）；已拼完的假名仍沿用原方案回显。
+     */
+    @Test fun partialRomajiShowsPressedLettersWhileCompleteKanaKeepTheirEcho() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val (user, shared) = RimeConfigHelper.initializeRimeDataAsync(context)
+        val engine = RimeEngine.getInstance()
+        engine.initialize(user, shared)
+        assertTrue(RimeConfigHelper.ensureDeployment(context)); assertTrue(engine.ensureSession())
+        val previous = engine.getCurrentSchema()
+        try {
+            JapaneseSchemas.ids.forEach { schema ->
+                assertTrue(engine.switchSchema(schema)); engine.setOption("ascii_mode", false)
+                assertEquals("$schema 单个声母显示按下的字母", "k", displayText(engine, "k"))
+                assertEquals("$schema 单个 n 显示按下的字母", "n", displayText(engine, "n"))
+                assertEquals("$schema nn 是完整假名，沿用回显", "ん", displayText(engine, "nn"))
+                assertEquals("$schema ka 是完整假名，沿用回显", "か", displayText(engine, "ka"))
+                assertEquals("$schema 已构成部分保留假名，尾部显示字母", "かk", displayText(engine, "kak"))
+                assertEquals("$schema 完整假名不改写", "かん", displayText(engine, "kann"))
+                assertEquals("$schema 以元音结尾不改写", "かきな", displayText(engine, "kakina"))
+                engine.setInput("kak")
+                engine.japaneseDisplayText(engine.getInput())
+                assertEquals("显示探测不得更改编码", "kak", engine.getInput())
+            }
+        } finally { engine.clearComposition(); if (previous.isNotBlank()) engine.switchSchema(previous) }
+    }
+
+    /** 显示文本：未被改写时即原方案回显，二者用同一断言口径。 */
+    private fun displayText(engine: RimeEngine, input: String): String {
+        engine.setInput(input)
+        return engine.japaneseDisplayText(input) ?: engine.japaneseReading(input)
+    }
 }

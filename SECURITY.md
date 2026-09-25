@@ -4,7 +4,7 @@
 
 如果发现安全相关漏洞，**请不要公开提交 issue**，而是通过以下方式私下报告：
 
-- 发送邮件至项目维护者（见 [GitHub 主页](https://github.com/kingzcheung)）
+- 发送邮件至项目维护者（见 [GitHub 主页](https://github.com/Cyletix)）
 
 我们会尽快确认并处理。
 

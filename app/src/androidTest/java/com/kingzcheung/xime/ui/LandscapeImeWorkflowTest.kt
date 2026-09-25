@@ -47,8 +47,8 @@ class LandscapeImeWorkflowTest {
             assertTrue(SettingsPreferences.isFloatingMode(context, true))
             assertEquals(0.5f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
             assertTrue(SettingsPreferences.getKeyboardHeightDp(context, true) >= 228)
-            shell("ime enable ${context.packageName}/.service.XimeInputMethodService")
-            shell("ime set ${context.packageName}/.service.XimeInputMethodService")
+            shell("ime enable ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")
+            shell("ime set ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")
             rule.setContent { AndroidView(factory = { EditText(it).also { editor = it; it.hint = "横屏悬浮输入回归" } }, modifier = Modifier.fillMaxWidth().height(60.dp)) }
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             rule.runOnUiThread { editor.requestFocus(); imm.restartInput(editor); imm.showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT) }

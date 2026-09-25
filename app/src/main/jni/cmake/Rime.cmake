@@ -62,6 +62,7 @@ endif()
 option(BUILD_TEST "" OFF)
 option(BUILD_STATIC "" ON)
 add_subdirectory(librime)
+include("${CMAKE_CURRENT_LIST_DIR}/T9SingleKeyRecall.cmake")
 target_compile_options(
   rime-static PRIVATE "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." "-Wno-error=deprecated-declarations")
 

@@ -1,6 +1,6 @@
-# WebDAV 云备份（Xime 插件）
+# WebDAV 云备份（CyIME 插件）
 
-通过 WebDAV 将曦码输入法的数据备份到云端。备份内容（由宿主打包）：
+通过 WebDAV 将 CyIME 输入法的数据备份到云端。备份内容（由宿主打包）：
 
 - rime/ 目录：输入方案、词典、用户配置、**自造词**（userdb / t9_digit.userdb）
 - 设置项、插件配置、插件注册表（plugins.xml）
