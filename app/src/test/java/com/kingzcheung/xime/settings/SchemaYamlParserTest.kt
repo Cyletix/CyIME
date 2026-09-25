@@ -219,6 +219,34 @@ class SchemaYamlParserTest {
     }
 
     @Test
+    fun `punctuation width switches never repeat as their own menu item`() {
+        val f = writeSchema("""
+            schema:
+              schema_id: test_schema
+              name: Test Schema
+            switches:
+              - name: ascii_mode
+                states: [ 中文, 西文 ]
+              - name: full_shape
+                states: [ 半角, 全角 ]
+              - name: half_shape
+                states: [ 全角, 半角 ]
+              - name: ascii_punct
+                states: [ 。，, ．， ]
+              - options: [ full_shape, half_shape ]
+                states: [ 全角符号, 半角符号 ]
+              - name: simplification
+                states: [ 简, 繁 ]
+        """.trimIndent())
+        val defs = SchemaManager.parseSchemaSwitches(f)
+        assertEquals(6, defs.size)
+        // 界面只保留统一的「全角／半角」入口：full_shape / half_shape / ascii_punct
+        // （含 options 选项组形式）都不再作为独立菜单项重复出现。
+        val shown = defs.filterNot { isPunctuationWidthSwitch(it) }
+        assertEquals(listOf("ascii_mode", "simplification"), shown.map { it.name })
+    }
+
+    @Test
     fun `getSchemaSwitches ignores switches without states`() {
         val f = writeSchema("""
             schema:

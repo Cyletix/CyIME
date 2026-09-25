@@ -167,6 +167,10 @@ class KeyboardMergedLayoutTest {
 
     @Test
     fun `九键笔画手写判断无代码硬编码`() {
+        // 绑定缓存是进程级状态，同 JVM 的其他用例（CyimeResearchPresetTest /
+        // KeysConfigLayoutReloadTest）会通过 loadConfig 写入它；这里显式清空，
+        // 断言的才是"识别只能来自 schemas 声明"，而不是用例执行顺序。
+        KeysConfigHelper.clearSchemaBindingsForTest()
         // 单测环境未加载绑定（无 Context），任何 id（含内置 t9_pinyin/stroke/handwriting）
         // 都不应被识别为九键/笔画/手写——识别只能来自 schemas 声明
         assertFalse(isT9Schema("t9_pinyin"))

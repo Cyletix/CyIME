@@ -281,8 +281,9 @@ fun KeyboardView(
             else -> "中文"
         },
         LocalKeyboardPunctuation provides if (state.isCalculatorMode) null else KeyboardPunctuation(
-            full = state.schemaSwitches.firstOrNull { it.name == "full_shape" }?.currentIndex?.let { it == 1 }
-                ?: SettingsPreferences.punctuationFullWidth(androidx.compose.ui.platform.LocalContext.current, !state.isAsciiMode),
+            // 全角/半角只作用于中文与日文：英文键盘的键面提示与上滑标点保持半角
+            full = !state.isAsciiMode && (state.schemaSwitches.firstOrNull { it.name == "full_shape" }?.currentIndex?.let { it == 1 }
+                ?: SettingsPreferences.punctuationFullWidth(androidx.compose.ui.platform.LocalContext.current, true)),
             japanese = state.currentSchemaId in com.kingzcheung.xime.settings.JapaneseSchemas.ids || state.currentSchemaId == "jaroomaji"),
         LocalKeyboardInputPreferences provides inputPreferences,
         LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(state.themeId, state.isDarkTheme), specialKeyTextColor),
@@ -1329,6 +1330,7 @@ fun KeyboardView(
                             keyTextColor = keyTextColor,
                             isFloatingMode = state.isFloatingMode,
                             schemaSwitches = state.schemaSwitches,
+                            isAsciiMode = state.isAsciiMode,
                         ),
                         callbacks = MenuBarCallbacks(
                             onDismiss = { onHapticFeedback?.invoke(); viewModel.closeOverlay() },

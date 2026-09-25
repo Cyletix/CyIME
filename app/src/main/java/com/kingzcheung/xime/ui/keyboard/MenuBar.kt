@@ -61,6 +61,8 @@ data class MenuBarState(
     val keyTextColor: Color = Color(0xFF202124),
     val isFloatingMode: Boolean = false,
     val schemaSwitches: List<SchemaSwitchUiState> = emptyList(),
+    /** 英文（ASCII）模式下标点固定半角，全角／半角入口不适用。 */
+    val isAsciiMode: Boolean = false,
 )
 
 data class MenuBarCallbacks(
@@ -111,7 +113,10 @@ fun MenuBar(
     }
 
     var showOptions by remember { mutableStateOf(false) }
-    val widthSwitch = state.schemaSwitches.firstOrNull { it.name == "full_shape" }
+    // 英文（ASCII）模式标点固定半角，全角／半角对它不生效：入口直接不出现，
+    // 避免"点了看不到状态变化，实际却改了状态"的误导；中文/日文仍保留该入口。
+    val widthSwitch = if (state.isAsciiMode) null
+        else state.schemaSwitches.firstOrNull { it.name == "full_shape" }
     val options = state.schemaSwitches.filter { it.name != "ascii_mode" && it.name != "full_shape" }
     if (showOptions) {
         Column(modifier.fillMaxSize().background(state.backgroundColor)
@@ -124,7 +129,6 @@ fun MenuBar(
             options.forEach { sw ->
                 val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
                 val title = when (sw.name) {
-                    "ascii_punct" -> "标点样式"
                     "simplification" -> "简繁转换"
                     else -> sw.states.joinToString(" / ")
                 }
