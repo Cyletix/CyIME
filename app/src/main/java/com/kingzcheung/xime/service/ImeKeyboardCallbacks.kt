@@ -342,20 +342,27 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onT9RightCommitUndone = { count ->
-                // 半提交文本在 composing 区域时无法用 deleteSurroundingText 删除，
-                // 需通过 endComposingInputBox 清空，交由后续 applyComposition 重建。
+                // 右侧候选的 partial commit 只存在于输入法状态的 t9PartialSegments：
+                // 候选栏模式只在候选栏显示，输入框模式写在 composing 区里，**都没有写入正文**。
+                // 历史实现把 C++ 的"撤销段数"当成正文字符数调用 deleteBeforeCursor(count)，
+                // 直接把光标前的正文删掉（2026-09-25 真机实证：选词后退格删掉正文）。
                 if (SettingsPreferences.getInputTextLocation(service)
                     == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
                     service.endComposingInputBox()
-                } else {
-                    service.deleteBeforeCursor(count)
                 }
-                // undo 联动：撤销 right commit 段时回滚用户词典调频。
-                val undone = service.t9PartialSegments.removeLastOrNull()
-                if (undone != null) {
+                // 只回滚输入法自己的段状态：count 是段数，不是字符数。
+                val removed = service.t9PartialSegments.rollbackPartialSegments(count)
+                removed.forEach { undone ->
                     service.serviceScope.launch(service.keyProcessingDispatcher) {
                         service.rimeEngine.t9Forget(undone.text, undone.pinyin)
                     }
+                }
+                if (removed.isNotEmpty()) {
+                    service.uiState.value = service.uiState.value.copy(
+                        t9RightCandidateSelectedCount =
+                            (service.uiState.value.t9RightCandidateSelectedCount - removed.size).coerceAtLeast(0L),
+                        t9SelectedCandidatePinyin = ""
+                    )
                 }
             },
             onT9RefreshComposition = { composition, injections ->

@@ -2575,30 +2575,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
-    /**
-     * 删除光标前 count 个字符。
-     * 焦点在输入法内部编辑器（快捷发送/工具面板）时作用于对应 EditText，
-     * 否则作用于宿主 InputConnection。需在主线程调用。
-     */
-    internal fun deleteBeforeCursor(count: Int) {
-        val quickSendFocused = uiState.value.quickSendFormFocused
-        if (quickSendFocused || uiState.value.toolPanelInputFocused) {
-            val et = when {
-                quickSendFocused && uiState.value.quickSendCodeFocused ->
-                    QuickSendFormCodeEditTextHolder.editText
-                quickSendFocused -> QuickSendFormEditTextHolder.editText
-                else -> ToolPanelEditTextHolder.editText
-            }
-            et?.let { box ->
-                val end = box.selectionStart.coerceAtLeast(0)
-                val start = (end - count).coerceAtLeast(0)
-                box.text?.replace(start, end, "")
-            }
-            return
-        }
-        currentInputConnection?.deleteSurroundingText(count, 0)
-    }
-
     /** 当前编辑目标的绝对光标位置，供手写候选验证文字所属位置。 */
     internal fun currentEditorCursorPosition(): Int? {
         val state = uiState.value
