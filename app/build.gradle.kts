@@ -58,8 +58,11 @@ android {
         applicationId = "com.cyletix.cyime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 20261010
-        versionName = "1.0.1"
+        // 版本规则（与用户约定）：每次发包 PATCH +1、versionCode 独立 +1；
+        // 只有成组的新功能才升 MINOR，不兼容的大改才升 MAJOR。
+        // 例：1.0.1/20261010 → 1.0.2/20261011 → 1.0.3/20261012 → 1.1.0/20261020
+        versionCode = 20261011
+        versionName = "1.0.2"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
