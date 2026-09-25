@@ -874,20 +874,26 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // RIME 退格删除，会一直卡在候选栏。这里撤销最近一次部分提交：
                     // 清空 composing 区域（或删除上屏文本）并从累积列表移除。
                     if (service.t9PartialSegments.isNotEmpty()) {
-                        val len = service.t9PartialSegments.last().text.length
+                        // 已撤销段只存在于输入法状态（候选栏/输入框 composing 的显示），
+                        // 从未上屏到正文：候选栏模式不能按段文本长度删宿主文本，
+                        // 否则会误删光标前的正文（2026-09-25 真机实证）。
+                        val removed = service.t9PartialSegments.rollbackPartialSegments(1)
                         withContext(Dispatchers.Main) {
                             if (SettingsPreferences.getInputTextLocation(service)
                                 == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
                                 service.endComposingInputBox()
-                            } else {
-                                service.deleteBeforeCursor(len)
+                            }
+                            if (removed.isNotEmpty()) {
+                                service.uiState.value = service.uiState.value.copy(
+                                    t9RightCandidateSelectedCount =
+                                        (service.uiState.value.t9RightCandidateSelectedCount - removed.size)
+                                            .coerceAtLeast(0L),
+                                    t9SelectedCandidatePinyin = ""
+                                )
                             }
                         }
-                        // undo 联动：撤销段时回滚用户词典调频。
-                        val undone = service.t9PartialSegments.removeLastOrNull()
-                        if (undone != null) {
-                            service.rimeEngine.t9Forget(undone.text, undone.pinyin)
-                        }
+                        // undo 联动：撤销段时回滚用户词典调频（按段，不按字符）。
+                        removed.forEach { service.rimeEngine.t9Forget(it.text, it.pinyin) }
                     }
                 }
                 sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
