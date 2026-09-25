@@ -85,8 +85,16 @@ fun EditKeyboardLayout(
                 // its square centre key, glyphs and gaps all use the minimum-height baseline.
                 val baseline = minOf(minimumBody, maxHeight)
                 val padDiameter = minOf(cellWidth * 3 * .75f, baseline)
-                val spacing = keyboardKeySpacingScale(cellWidth.value, padDiameter.value / 3)
-                val inset = 2.dp * spacing.value
+                // 编辑盘自成一格：按 pad 自己的格尺寸算度量（不套主体键宽上限/gutter）
+                val padMetrics = keyVisualMetrics(
+                    policy = KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f),
+                    availableWidthDp = cellWidth.value * 5f,
+                    availableHeightDp = padDiameter.value,
+                    columns = 5f,
+                    rows = 3f,
+                    verticalInsetDp = 0f,
+                )
+                val inset = (padMetrics.insetX ?: 2f).dp
                 val glyphScale = KeyboardKeyMetrics.contentScale(cellWidth.value * .92f, padDiameter.value / 3 * .92f)
                 val padColor = androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f)
                 @Composable
@@ -135,7 +143,7 @@ fun EditKeyboardLayout(
                         plain = arrow, visualShape = cutout, compact = compact,
                         contentOffsetX = offsetX, contentOffsetY = offsetY)
                 }
-                CompositionLocalProvider(LocalKeyboardKeySpacingScale provides spacing,
+                CompositionLocalProvider(LocalKeyboardKeyVisualMetrics provides padMetrics,
                     LocalKeyboardKeyContentScale provides glyphScale) {
                     val rows = listOf(
                         listOf("undo", "home", "", "end", "delete"),

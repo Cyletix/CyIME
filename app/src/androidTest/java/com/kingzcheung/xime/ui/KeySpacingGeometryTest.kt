@@ -79,15 +79,22 @@ class KeySpacingGeometryTest {
                     "bitmap=${bitmap.width}x${bitmap.height} measured=$measured " + edgePixels(bitmap, relative))
                 measured
             }
+            // 新模型：缝 = 布局策略目标值（QWERTY 4.5/5.5dp）按格短边有限缩放（1.0~1.2x），两侧各一半
+            val cellWidth = 420f * size / 4f
+            val cellHeight = 280f * size / 2f
+            val scale = (minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell).coerceIn(1f, KeyVisualPolicy.ScaleMax)
+            val expectedX = KeyVisualPolicy.Qwerty.gapX * scale / 2f
+            val expectedY = KeyVisualPolicy.Qwerty.gapY * scale / 2f
             insets.forEach { (tag, inset) ->
-                assertEquals("$tag horizontal inset", 420f * size / 4f * 0.04f, inset.first, 1f)
-                assertEquals("$tag square inset", inset.first, inset.second, 1f)
-                if (size == 2f) {
-                    assertEquals("$tag horizontal ratio", phoneInsets.getValue(tag).first * 2f, inset.first, 1f)
-                    assertEquals("$tag vertical ratio", phoneInsets.getValue(tag).second * 2f, inset.second, 1.1f)
-                }
+                assertEquals("$tag horizontal inset", expectedX, inset.first, 1f)
+                assertEquals("$tag vertical inset", expectedY, inset.second, 1f)
             }
             if (size == 1f) phoneInsets = insets
+        }
+        // 键帽变大时缝不跟着放大（缩放封顶 1.2），只保留整数化误差
+        phoneInsets.forEach { (tag, inset) ->
+            assertEquals("$tag capped horizontal ratio", inset.first, 4.5f * 1.2f / 2f, 1f)
+            assertEquals("$tag capped vertical ratio", inset.second, 5.5f * 1.2f / 2f, 1f)
         }
     }
 
@@ -160,11 +167,21 @@ class KeySpacingGeometryTest {
             val a = cap(labels[0], 0); val b = cap(labels[1], 0); val below = cap(labels[2], 1)
             val gx = b.left - a.right; val gy = below.top - a.bottom
             val cellWidth = a.width + gx
-            val expected = minOf(cellWidth, cellHeight) * 0.08f
-            val note = "${current.schema} ascii=${current.ascii} split=${current.split} $size gap=($gx,$gy) cell=($cellWidth,$cellHeight)"
+            // 新模型：缝来自布局策略（26键 4.5/5.5、14键 5/6、九宫格 6/6），按格短边有限缩放
+            val policy = when (current.schema) {
+                "pinyin_14jian" -> KeyVisualPolicy.FourteenKey
+                "t9_pinyin", "japanese_kana" -> KeyVisualPolicy.T9
+                else -> KeyVisualPolicy.Qwerty
+            }
+            val scale = (minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell)
+                .coerceIn(1f, KeyVisualPolicy.ScaleMax)
+            val expectedX = (policy.gapX * scale).coerceIn(policy.minGapX, policy.maxGapX)
+            val expectedY = (policy.gapY * scale).coerceIn(policy.minGapY, policy.maxGapY)
+            val note = "${current.schema} ascii=${current.ascii} split=${current.split} $size gap=($gx,$gy) " +
+                "expected=($expectedX,$expectedY) cell=($cellWidth,$cellHeight)"
             report.appendLine(note)
-            assertEquals(note, gx, gy, 2f) // integer rasterisation + rounded corners
-            assertEquals(note, expected, gx, 1.6f)
+            assertEquals("$note gapX", expectedX, gx, 1.6f)
+            assertEquals("$note gapY", expectedY, gy, 1.6f)
             saveSpacingImage("grid-${current.schema}-${current.ascii}-${current.split}-${size.first}", bitmap)
         }
         File(app.getExternalFilesDir(null), "spacing-measurements.txt").writeText(report.toString())
@@ -195,24 +212,34 @@ class KeySpacingGeometryTest {
             val key = if (panel == "edit") rule.onNodeWithContentDescription("删除", useUnmergedTree = true)
                 else rule.onNodeWithTag("handwriting-key:delete", useUnmergedTree = true)
             val insets = paintedInsets(bitmap, key.fetchSemanticsNode().boundsInRoot.translate(-origin.x, -origin.y))
-            assertEquals("$panel equal axes", insets.first, insets.second, 1f)
-            assertTrue("$panel proportional inset", insets.second in (1f * size)..(4.5f * size))
+            // 新模型：QWERTY 策略 4.5/5.5dp 目标缝，按格短边在 1.0~1.2x 内有限缩放
+            val cellWidth = 420f * size / 5f
+            val cellHeight = if (panel == "edit") 280f * size / 3f else (280f * size - 8f) / 4f
+            val scale = (minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell).coerceIn(1f, KeyVisualPolicy.ScaleMax)
+            assertEquals("$panel horizontal inset size=$size", KeyVisualPolicy.Qwerty.gapX * scale / 2f, insets.first, 1f)
+            assertEquals("$panel vertical inset size=$size", KeyVisualPolicy.Qwerty.gapY * scale / 2f, insets.second, 1f)
+            assertTrue("$panel longitudinal gap larger than lateral", insets.second >= insets.first)
         }
     }
 
     @Test fun smallNestedCardUsesItsOwnBoundsAndNeverMultipliesTheParentScale() {
-        var measured = KeyboardKeySpacingScale(0f)
+        var nested = KeyVisualMetrics.Unspecified
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 KeyboardKeySpacingScope(Modifier.size(840.dp, 560.dp)) {
                     KeyboardKeySpacingScope(Modifier.size(320.dp, 240.dp)) { _ ->
-                        val scale = LocalKeyboardKeySpacingScale.current
-                        SideEffect { measured = scale }
+                        val metrics = LocalKeyboardKeyVisualMetrics.current
+                        SideEffect { nested = metrics }
                     }
                 }
             }
         }
-        rule.runOnIdle { assertEquals(KeyboardKeySpacingScale(0.624f), measured) }
+        // 320×240、默认 10 列 4 行：格 32×58dp → 缩放取 1.0（不缩小），缝用策略目标值
+        rule.runOnIdle {
+            assertEquals(1f, nested.scale, 0.001f)
+            assertEquals(KeyVisualPolicy.Qwerty.gapX / 2f, nested.insetX!!, 0.01f)
+            assertEquals(KeyVisualPolicy.Qwerty.gapY / 2f, nested.insetY!!, 0.01f)
+        }
     }
 
     private fun saveSpacingImage(name: String, bitmap: Bitmap) {

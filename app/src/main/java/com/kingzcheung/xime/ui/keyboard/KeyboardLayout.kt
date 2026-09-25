@@ -115,9 +115,16 @@ fun KeyboardLayout(
     val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) { KeysConfigHelper.getKeyRows(isAsciiMode) }
     val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
         supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
+    // 合并键布局（14 键）键更宽：缝给更大的绝对 dp，不按键宽比例放大
+    val mergedSection = remember(cfgVer, uiState.currentSchemaId) {
+        KeysConfigHelper.mergedSectionForSchema(uiState.currentSchemaId)
+    }
     KeyboardKeySpacingScope(modifier,
         columns = keyRows.firstOrNull()?.size?.toFloat() ?: 10f,
         widthFraction = if (splitKeyboard) 0.9f else 1f,
+        policy = if (mergedSection == "qwerty_14") KeyVisualPolicy.FourteenKey else KeyVisualPolicy.Qwerty,
+        allowShrink = uiState.isFloatingMode,
+        applyGutter = true,
     ) { bodyModifier ->
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     val isShifted = shiftMode.isShifted
@@ -290,7 +297,7 @@ fun KeyboardLayout(
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight()
-                        .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+                        .padding(bottom = 8.dp),
             ) {
 
                 Column(

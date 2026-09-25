@@ -407,10 +407,15 @@ keyboard:
   
   # ── 按键配置（可选，不设置则使用默认值）──
   # corner_radius:      按键圆角半径（dp，默认 8），独立于 shadow.shape_radius
-  # spacing_x:          横向单侧缩进基数（默认 2dp，以 50dp 普通键短边为基准等比缩放）
-  # spacing_y:          纵向单侧缩进基数（默认同横向；所有布局和屏幕使用同一缩放比例）
-  # 各键盘可单独覆盖间距（可选），键盘名：qwerty / t9 / number / stroke / symbol
-  # 例如：t9: { spacing_x: 2, spacing_y: 2 }（仅显式配置会覆盖统一默认）
+  # spacing_x:          相邻键帽之间的横向总缝覆盖值（dp）；不设置（或写 2）表示用布局策略默认：
+  #                       26 键 4.5 / 14 键 5 / 九宫格·数字·笔画 6
+  # spacing_y:          纵向总缝覆盖值（dp）；不设置（或写 2）表示用布局策略默认：
+  #                       26 键 5.5 / 14 键 6 / 九宫格·数字·笔画 6
+  # 说明：总缝 = 相邻两个键帽之间的可见间隙（两侧各一半）；实际会随格尺寸在
+  #       0.85x~1.20x 之间有限缩放，并被各布局的上下限封顶（见 KeyVisualPolicy.kt）。
+  #       触摸区域始终是整格，不会因为缝变大而变小。
+  # 各键盘可单独覆盖（可选），键盘名：qwerty / t9 / number / stroke / symbol / japanese_kana
+  # 例如：t9: { spacing_x: 8, spacing_y: 8 }
   key:
     corner_radius: 8
 

@@ -119,7 +119,8 @@ fun T9KeyboardLayout(
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
-    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f,
+        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
     val controller = t9Controller
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -257,7 +258,7 @@ private fun T9KeyboardSwipeOverlay(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+                        .padding(bottom = 8.dp),
                 ) {
                     T9KeyboardContent(
                         onKeyPress = onKeyPress,
@@ -291,7 +292,7 @@ private fun T9KeyboardSwipeOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight()
-                        .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+                        .padding(bottom = 8.dp),
                 ) {
                     T9KeyboardContent(
                         onKeyPress = onKeyPress,
