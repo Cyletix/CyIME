@@ -37,3 +37,13 @@
 ## 2026-09-24 仓库名称确认
 
 GitHub 当前返回仓库正式名称 `Cyletix/CyIME`，所有者仍为 Cyletix，仍为 `ximeiorg/Xime` 的 fork；原 `Cyletix/Xime` 地址会重定向。0.1.2 同步 origin、README 和关于页入口。上文记录保留当时尚未改名的历史状态。
+
+## 2026-09-25 applicationId 迁移（对外身份独立）
+
+决策：对外身份与内部命名分离——安装身份改为 `com.cyletix.cyime`，源码 namespace 仍为 `com.kingzcheung.xime`，以保留上游同步能力。
+
+- 已改：`app/build.gradle.kts` 的 applicationId（namespace 不动）；`AndroidManifest.xml` 中本应用组件由相对名（`.MainActivity` 等）改为全限定类名，避免 applicationId 与 namespace 不同时相对名解析结果随 AGP 版本漂移；`scripts/install-release.ps1`、`scripts/clear-plugins.ps1|sh`、`app/build-logic/tasks-plugin-dev.gradle.kts` 里的主机包名（插件 ID 列表不动）；androidTest 的应用包名断言与输入法组件 id；README（三语）、fastlane 元数据、`.github` 模板、AGENTS/CONTRIBUTING/SECURITY 的对外名称与仓库链接；内置无线导入网页（`web/` 与其 `assets/www` 产物的标题与文案，`xime.custom.yaml` 字样保留）；`RimeExportManager` 导出文件名、`KeysConfigHelper` metadata 默认 app_name。
+- 有意保留（数据兼容面 / 上游同步面）：namespace 与源码包路径、类名（`XimeApplication`、`XimeInputMethodService`、`XimeIndexSource` 等）、plugin-core 包名与插件 ID、`xime.yaml` / `xime.custom.yaml` 文件名、扩展市场与 `index` 协议、SharedPreferences（`kime_settings`）/ Room 数据库名 / Keystore 别名（`xime_plugin_config`）/ 手写样本格式号等持久化标识、日志与 wake-lock 标签、LICENSE 版权与上游署名。改动这些会丢失用户配置或显著增加后续合并冲突。
+- 影响：Android 视为新应用，可与旧 `com.kingzcheung.xime` 安装并存；旧版数据与配置不自动继承，输入法需在系统设置中重新启用。输入法组件 id 现为 `com.cyletix.cyime/com.kingzcheung.xime.service.XimeInputMethodService`。
+- 验证：`processDebugManifest` 产物 `package="com.cyletix.cyime"`，组件类名仍指向 `com.kingzcheung.xime.*`，FileProvider authority 自动变为 `com.cyletix.cyime.fileprovider`（与代码中的 `packageName + ".fileprovider"` 一致）；`compileDebugKotlin` / `compileDebugAndroidTestKotlin` 通过。真机安装显示名、输入法启用与升级行为待设备验收。
+- 上游截图（`docs/Screenshot/*`）与 fastlane 的图标 / 商店截图已删除，占位说明见 `docs/Screenshot/README.md` 与 `fastlane/metadata/android/README.md`；应用启动图标仍是继承的 Xime 图标，待替换。

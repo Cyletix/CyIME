@@ -22,8 +22,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Add
@@ -262,11 +264,16 @@ fun ClipboardView(
             }
         }
 
-        HorizontalPager(
-            state = pagerState,
+        // 列表区容器：网格与长按操作菜单/清空确认覆盖层共用同一受限高度区域，
+        // 覆盖层高度因此随键盘高度变化，不会再画到列表区（屏幕）之外。
+        Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+        ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
         ) { page ->
             if (page == 0) {
                 ClipboardTabContent(
@@ -306,55 +313,6 @@ fun ClipboardView(
                 )
             }
         }
-
-        if (isMultiSelect) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "已选 ${selectedIds.size} 项",
-                    color = textColor,
-                    fontSize = 13.sp
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            if (selectedIds.isNotEmpty()) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        )
-                        .clickable(enabled = selectedIds.isNotEmpty()) {
-                            viewModel.removeClipboardItems(selectedIds.toList())
-                            exitMultiSelect()
-                        }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "删除",
-                            color = Color.White,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(if (isLandscape) 15.dp else bottomPaddingDp.dp))
 
         menuAnchor?.let { anchor ->
             val menuItems = if (anchor.tab == 0) {
@@ -443,6 +401,56 @@ fun ClipboardView(
                 }
             )
         }
+        } // 列表区容器
+
+        if (isMultiSelect) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "已选 ${selectedIds.size} 项",
+                    color = textColor,
+                    fontSize = 13.sp
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (selectedIds.isNotEmpty()) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                        .clickable(enabled = selectedIds.isNotEmpty()) {
+                            viewModel.removeClipboardItems(selectedIds.toList())
+                            exitMultiSelect()
+                        }
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "删除",
+                            color = Color.White,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(if (isLandscape) 15.dp else bottomPaddingDp.dp))
     }
 }
 
@@ -654,10 +662,13 @@ fun LongPressMenuOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 10.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.weight(if (isLeftColumn) 2f else 1f),
+                modifier = Modifier
+                    .weight(if (isLeftColumn) 2f else 1f)
+                    .fillMaxHeight(),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLeftColumn) {
@@ -672,7 +683,9 @@ fun LongPressMenuOverlay(
             }
 
             Box(
-                modifier = Modifier.weight(if (isLeftColumn) 1f else 2f),
+                modifier = Modifier
+                    .weight(if (isLeftColumn) 1f else 2f)
+                    .fillMaxHeight(),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLeftColumn) {
@@ -707,7 +720,10 @@ private fun ContentCard(
             lineHeight = 20.sp,
             maxLines = 8,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+            // 卡片高度受列表区高度限制（短键盘/横屏）：超出部分改为可滚动，不再画到屏幕外
+            modifier = Modifier
+                .padding(horizontal = 10.dp, vertical = 10.dp)
+                .verticalScroll(rememberScrollState())
         )
     }
 }
@@ -718,12 +734,18 @@ private fun MenuCard(
     cardBgColor: Color,
     onDismiss: () -> Unit,
 ) {
+    // 操作菜单：高度随内容自适应并被列表区高度约束，超出时整卡可滚动，
+    // 保证「删除」等最后一项在任何键盘高度下都能点到
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = cardBgColor
     ) {
-        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(vertical = 6.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
             menuItems.forEachIndexed { index, entry ->
                 if (index > 0) {
                     HorizontalDivider(
@@ -731,6 +753,7 @@ private fun MenuCard(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                     )
                 }
+
                 LongPressMenuItem(
                     icon = entry.icon,
                     label = entry.label,

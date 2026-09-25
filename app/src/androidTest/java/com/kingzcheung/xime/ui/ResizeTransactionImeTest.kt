@@ -38,7 +38,7 @@ class ResizeTransactionImeTest {
     private val engine = RimeEngine.getInstance()
     private lateinit var editor: EditText
     private val swipeDistance get() = 80f * context.resources.displayMetrics.density
-    private val imeComponent get() = ComponentName(context, "${context.packageName}.service.XimeInputMethodService")
+    private val imeComponent get() = ComponentName(context, "com.kingzcheung.xime.service.XimeInputMethodService")
     private val imeId get() = imeComponent.flattenToShortString()
     private val inputMethodManager get() = context.getSystemService(InputMethodManager::class.java)
     private var previousIme: String? = null

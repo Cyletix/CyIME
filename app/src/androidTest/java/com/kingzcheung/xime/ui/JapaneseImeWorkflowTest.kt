@@ -42,8 +42,8 @@ class JapaneseImeWorkflowTest {
             SettingsPreferences.setFloatingMode(context, false)
             SettingsPreferences.setKeyboardHeightDp(context, 300)
             SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
-            shell("ime enable ${context.packageName}/.service.XimeInputMethodService")
-            shell("ime set ${context.packageName}/.service.XimeInputMethodService")
+            shell("ime enable ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")
+            shell("ime set ${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService")
             rule.setContent { AndroidView(factory = { EditText(it).also { editor = it; it.hint = "日语连续流程" } }, modifier = Modifier.fillMaxWidth().height(120.dp)) }
             rule.runOnUiThread { editor.requestFocus(); (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT) }
             rule.waitUntil(30000) { rule.onAllNodesWithTag("kana-key:na").fetchSemanticsNodes().isNotEmpty() }

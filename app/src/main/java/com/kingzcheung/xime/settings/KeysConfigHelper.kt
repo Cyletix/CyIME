@@ -393,7 +393,7 @@ data class ColorSchemeEntry(
 @Serializable
 data class MetadataConfig(
     @SerialName("app_name")
-    val appName: String = "Xime",
+    val appName: String = "CyIME",
     @SerialName("app_version")
     val appVersion: String = "",
     @SerialName("platform")

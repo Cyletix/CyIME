@@ -80,7 +80,7 @@ object RimeExportManager {
     fun buildArchive(context: Context, mode: ExportMode): Result<Pair<String, ByteArray>> {
         try {
             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val fileName = "Xime配置-$dateStr.zip"
+            val fileName = "CyIME配置-$dateStr.zip"
             val rimeDir = File(context.filesDir, "rime")
             if (!rimeDir.exists()) {
                 return Result.failure(Exception("Rime 目录不存在"))

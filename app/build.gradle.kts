@@ -52,11 +52,14 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.kingzcheung.xime"
+        // 安装身份（对外）与源码 namespace（内部）分离：
+        // applicationId 使用 CyIME 自己的包名，namespace 保留 com.kingzcheung.xime，
+        // 以便继续跟踪上游、避免大规模移动源码目录。
+        applicationId = "com.cyletix.cyime"
         minSdk = 28
         targetSdk = 35
         versionCode = 20261010
-        versionName = "1.0.0"
+        versionName = "1.0.1"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

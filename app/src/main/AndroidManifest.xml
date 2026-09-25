@@ -9,8 +9,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
+    <!-- 本应用组件统一使用全限定类名：applicationId（com.cyletix.cyime）与 namespace
+         （com.kingzcheung.xime）不同，相对类名的解析结果取决于 AGP 版本，
+         写全限定名可无歧义地指向实际类所在包。 -->
     <application
-        android:name=".XimeApplication"
+        android:name="com.kingzcheung.xime.XimeApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -24,7 +27,7 @@
         
         <!-- 主Activity -->
         <activity
-            android:name=".MainActivity"
+            android:name="com.kingzcheung.xime.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Xime">
             <intent-filter>
@@ -42,7 +45,7 @@
         
         <!-- 输入法服务 -->
         <service
-            android:name=".service.XimeInputMethodService"
+            android:name="com.kingzcheung.xime.service.XimeInputMethodService"
             android:exported="true"
             android:label="@string/ime_service_label"
             android:permission="android.permission.BIND_INPUT_METHOD">
@@ -66,13 +69,13 @@
         
         <!-- AI 模型推理服务（独立进程，crash 不影响 IME） -->
         <service
-            android:name=".service.InferenceService"
+            android:name="com.kingzcheung.xime.service.InferenceService"
             android:exported="false"
             android:process=":inference" />
         
         <!-- 离线语音识别服务（独立进程，模型推理不占用输入法进程内存） -->
         <service
-            android:name=".service.AsrInferenceService"
+            android:name="com.kingzcheung.xime.service.AsrInferenceService"
             android:exported="false"
             android:process=":asr" />
         

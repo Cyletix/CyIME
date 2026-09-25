@@ -37,7 +37,7 @@ class RealFloatingImeTest {
             "current_schema", "current_schema_dual")
         val saved = keys.associateWith { prefs.all[it] }
         val previousIme = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
-        val ime = "${context.packageName}/.service.XimeInputMethodService"
+        val ime = "${context.packageName}/com.kingzcheung.xime.service.XimeInputMethodService"
         val enabledBefore = shell("ime list -s").lineSequence().any { it == ime }
         val engine = RimeEngine.getInstance()
         var previousSchema = ""

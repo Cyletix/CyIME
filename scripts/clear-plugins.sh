@@ -1,15 +1,15 @@
 #!/bin/bash
-# 清除 Xime 主应用的所有插件数据
+# 清除 CyIME 主应用的所有插件数据
 # 
 # 使用方式：
 #   bash scripts/clear-plugins.sh
 #
 # 需要 adb 在 PATH 中，且设备已连接
 
-PACKAGE_NAME="com.kingzcheung.xime"
+PACKAGE_NAME="com.cyletix.cyime"
 PLUGINS_DIR="/data/data/$PACKAGE_NAME/files/plugins"
 
-echo "=== 清除 Xime 插件数据 ==="
+echo "=== 清除 CyIME 插件数据 ==="
 
 # 检查设备连接
 if ! adb devices | grep -q "device$"; then
@@ -36,4 +36,4 @@ adb shell "ls /data/data/$PACKAGE_NAME/shared_prefs/" 2>/dev/null | while read f
 done
 
 echo "=== 完成 ==="
-echo "请重启 Xime 应用以重新加载插件"
+echo "请重启 CyIME 应用以重新加载插件"

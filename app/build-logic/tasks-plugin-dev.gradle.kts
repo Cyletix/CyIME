@@ -16,10 +16,10 @@ tasks.register("clearPlugins", DefaultTask::class) {
     description = "Clear all plugin data from device (requires connected device with adb)"
 
     doLast {
-        val packageName = "com.kingzcheung.xime"
+        val packageName = "com.cyletix.cyime"
         val pluginsDir = "/data/data/$packageName/files/plugins"
 
-        println("=== Clearing Xime plugin data ===")
+        println("=== Clearing CyIME plugin data ===")
 
         val devicesCheck = executeCommand("adb devices")
         if (!devicesCheck.contains("device")) {
@@ -33,19 +33,19 @@ tasks.register("clearPlugins", DefaultTask::class) {
             executeCommand("adb shell rm -rf /data/data/$packageName/shared_prefs/plugins.xml")
 
             println("=== Done ===")
-            println("Please restart Xime app to reload plugins")
+            println("Please restart CyIME app to reload plugins")
         }
     }
 }
 
 tasks.register("uninstallApp", DefaultTask::class) {
     group = "plugin-dev"
-    description = "Completely uninstall Xime app (clear all data)"
+    description = "Completely uninstall CyIME app (clear all data)"
 
     doLast {
-        val packageName = "com.kingzcheung.xime"
+        val packageName = "com.cyletix.cyime"
 
-        println("=== Completely uninstalling Xime app ===")
+        println("=== Completely uninstalling CyIME app ===")
 
         val devicesCheck = executeCommand("adb devices")
         if (!devicesCheck.contains("device")) {

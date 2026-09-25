@@ -34,10 +34,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         result: com.kingzcheung.xime.rime.RimeProcessResult,
         afterUpdate: (suspend () -> Unit)? = null,
     ) {
-        val transformed = service.candidateTransform.transformFor(result)
+        // 日语罗马音：末尾尚未拼完的输入显示按下的字母（引擎回显会给 っ / ん）
+        val displayed = service.japaneseInputController.withDisplayPreedit(result)
+        val transformed = service.candidateTransform.transformFor(displayed)
         service.uiEventChannel.trySend {
             service.sessionController.updateUIWithResult(
-                transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
+                transformed?.let { displayed.copy(candidates = it.candidates.toTypedArray()) } ?: displayed,
                 transformed?.actions ?: emptyList()
             )
             if (afterUpdate != null) afterUpdate()

@@ -1,4 +1,4 @@
-# Xime 输入法
+# CyIME 输入法
 
 ## 项目简介
 这是一个基于 rime 框架实现的安卓手机输入法，采用 kotlin + jetpack compose 构建。
