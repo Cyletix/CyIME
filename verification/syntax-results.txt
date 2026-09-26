@@ -1,0 +1,4 @@
+PASS KeyboardHeightProfiles.kt: Kotlin syntax
+PASS XimeInputMethodService.kt: Kotlin syntax
+PASS FloatingKeyboardContainer.kt: Kotlin syntax
+RESULT 3 files, 0 syntax errors (not full Android type checking)

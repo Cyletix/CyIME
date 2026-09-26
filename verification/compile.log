@@ -1,0 +1,6 @@
+mnt/data/cyime_height_fix/base_v7/KeyboardGeometry.kt:39:73: warning: parameter 'height' is never used
+internal fun floatingKeyboardWidth(screenWidth: Int, screenHeight: Int, height: Int, portraitHeight: Int, wide: Boolean): Int {
+                                                                        ^
+mnt/data/cyime_height_fix/base_v7/KeyboardGeometry.kt:39:86: warning: parameter 'portraitHeight' is never used
+internal fun floatingKeyboardWidth(screenWidth: Int, screenHeight: Int, height: Int, portraitHeight: Int, wide: Boolean): Int {
+                                                                                     ^

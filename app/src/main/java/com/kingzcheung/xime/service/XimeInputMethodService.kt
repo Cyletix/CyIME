@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.SystemClock
 import android.os.Looper
 import android.util.Log
+import com.kingzcheung.xime.settings.KeyboardHeightProfiles
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.CursorAnchorInfo
@@ -399,22 +400,31 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     private fun loadDarkModePreference() {
         val isLandscape = resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
-        val isFloatingMode = SettingsPreferences.isFloatingMode(this, isLandscape)
+        val isFloatingMode = if (uiState.value.showKeyboardResize) uiState.value.isFloatingMode
+            else SettingsPreferences.isFloatingMode(this, isLandscape)
         val loadedX = SettingsPreferences.getFloatingOffsetX(this, isLandscape)
         val loadedY = SettingsPreferences.getFloatingOffsetY(this, isLandscape)
         val screenW = resources.configuration.screenWidthDp
         val screenH = resources.configuration.screenHeightDp
-        val portraitWidth = minOf(screenW, screenH)
-        // 设置过悬浮宽度就按它算水平拖动范围（与 KeyboardView 一致：0 = 按高度推导）。
+        // 悬浮窗口的坐标宿主使用物理可见高度，而不是 configuration.screenHeightDp。
+        // 后者在 IME 已显示时可能已经被宿主窗口/系统栏裁过，再拿它限制悬浮卡片会导致顶部直接被截掉。
+        val physicalScreenDp = (resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt()
+        val statusBarDp = tryGetStatusBarHeightDp(this, window.window)
+        val effectiveH = if (isFloatingMode) (physicalScreenDp - statusBarDp).coerceAtLeast(1) else screenH
+
+        // 设置过悬浮宽度就按它算水平拖动范围；未设置时与 KeyboardGeometry 的默认比例保持一致。
         val savedWidth = SettingsPreferences.getFloatingWidthDp(this, isLandscape)
-        val cardWidth = savedWidth.takeIf { it > 0 } ?: (portraitWidth * 0.85f).roundToInt()
+        val defaultWidthRatio = if (isLandscape) 0.48f else 0.78f
+        val cardWidth = savedWidth.takeIf { it > 0 } ?: (screenW * defaultWidthRatio).roundToInt()
         val halfMargin = maxOf(0, (screenW - cardWidth) / 2)
-        val kbH = SettingsPreferences.getKeyboardHeightDp(this, isLandscape)
-        val cappedKbH = kbH.coerceAtMost((screenH * 8) / 10)
+
+        KeyboardHeightProfiles.migrateLegacy(this, isLandscape, effectiveH)
+        val kbH = KeyboardHeightProfiles.selected(this, isFloatingMode, isLandscape, effectiveH)
+        val floatingBounds = com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds(effectiveH, isLandscape)
+        val cappedKbH = if (isFloatingMode) kbH.coerceIn(floatingBounds) else kbH.coerceAtMost((screenH * 8) / 10)
         val cardH = cappedKbH + FLOATING_DRAG_BAR_HEIGHT_DP
         val navBarDp = tryGetNavBarHeightDp(this, window.window)
         val minY = if (isFloatingMode) navBarDp else 0
-        val effectiveH = if (isFloatingMode) screenH - tryGetStatusBarHeightDp(this, window.window) else screenH
         val maxY = maxOf(minY, effectiveH - cardH - 20)
         val clampedX = loadedX.coerceIn(-halfMargin, halfMargin)
         val clampedY = loadedY.coerceIn(minY, maxY)
@@ -426,7 +436,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             darkMode = SettingsPreferences.getDarkMode(this),
             themeId = SettingsPreferences.getKeyboardTheme(this),
             isSttEnabled = SettingsPreferences.isSttEnabled(this@XimeInputMethodService),
-            keyboardHeightDp = SettingsPreferences.getKeyboardHeightDp(this, isLandscape),
+            keyboardHeightDp = kbH,
             keyboardBottomPaddingDp = SettingsPreferences.getKeyboardBottomPaddingDp(this),
             keyboardOpacity = SettingsPreferences.getKeyboardOpacity(this),
             toolbarButtons = SettingsPreferences.getToolbarButtons(this),
@@ -441,11 +451,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val prefs = SettingsPreferences.getPrefsPublic(this)
         sharedPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
-                "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
+                "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
                     loadDarkModePreference()
                     applyWindowBackground()
                 }
-                "floating_mode", "floating_mode_landscape", "floating_width_dp", "floating_width_dp_landscape" -> {
+                "floating_mode", "floating_mode_landscape", "floating_width_dp", "floating_width_dp_landscape",
+                KeyboardHeightProfiles.FLOATING_HEIGHT, KeyboardHeightProfiles.FLOATING_HEIGHT_LANDSCAPE -> {
                     loadDarkModePreference()
                     applyWindowBackground()
                 }
@@ -1241,21 +1252,24 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val screenIsLandscape = screenWidthDp > screenHeightDp
                 val portraitScreenHeightDp = if (screenIsLandscape) screenWidthDp else screenHeightDp
                 val isLandscape = !state.isFloatingMode && screenIsLandscape
-                val orientationHeight = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, screenIsLandscape)
+                val orientationHeight = KeyboardHeightProfiles.selected(
+                    this@XimeInputMethodService, state.isFloatingMode, screenIsLandscape, effectiveScreenH
+                )
                 val displayHeight = orientationHeight.coerceAtMost((if (state.isFloatingMode) portraitScreenHeightDp else screenHeightDp) * 8 / 10)
-                val heightBounds = com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds(screenHeightDp, screenIsLandscape, floatingMinY)
+                val heightBounds = KeyboardHeightProfiles.fixedBounds(this@XimeInputMethodService, screenIsLandscape)
                 // 悬浮模式必须按当前“可见高度”限制内容高；旧逻辑按竖屏长边上限计算，
                 // 横屏时会得到比实际窗口还高的卡片，导致顶部/底部被裁切。
                 val floatingHeightBounds = com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds(
                     effectiveScreenH, screenIsLandscape
                 )
-                val keyboardHeight = (if (state.showKeyboardResize) state.resizePreviewHeightDp else displayHeight)
+                // 悬浮拖动仅由 Compose 的 previewRect 驱动，不能把进入调节时的固定高度当作悬浮高度。
+                val keyboardHeight = (if (state.showKeyboardResize && !state.isFloatingMode)
+                    state.resizePreviewHeightDp else displayHeight)
                     .let {
                         when {
                             // 悬浮高度使用专用范围：比旧的普通键盘范围宽，但绝不允许拉成整屏长条。
                             state.isFloatingMode -> it.coerceIn(floatingHeightBounds)
-                            screenIsLandscape -> it.coerceIn(heightBounds)
-                            else -> it
+                            else -> it.coerceIn(heightBounds)
                         }
                     }
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
@@ -1457,7 +1471,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             val resizeControls: (@Composable () -> Unit)? = if (state.showKeyboardResize) {
                                 {
                               KeyboardResizeOverlay(
-                                     initialHeightDp = state.resizePreviewHeightDp,
+                                     initialHeightDp = effectiveKeyboardHeight,
                                      // 左右边/四角可调宽度：边界与屏宽一致，与几何纯函数同源。
                                      initialWidthDp = state.resizePreviewWidthDp,
                                      minWidthDp = com.kingzcheung.xime.ui.keyboard.keyboardWidthBounds(resources.configuration.screenWidthDp).first,
@@ -1466,7 +1480,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                      currentBottomPaddingDp = contentBottomPaddingDp,
                                      isFloatingMode = state.isFloatingMode,
                                      initialOpacity = state.keyboardOpacity,
-                                     onFloatingModeChange = { enabled -> schemaController.toggleFloatingMode(enabled, floatingMinY, persist = false) },
+                                     onFloatingModeChange = { enabled ->
+                                         schemaController.toggleFloatingMode(enabled, floatingMinY, persist = false)
+                                         val targetHeight = KeyboardHeightProfiles.selected(
+                                             this@XimeInputMethodService, enabled, screenIsLandscape, effectiveScreenH
+                                         )
+                                         uiState.value = uiState.value.copy(
+                                             keyboardHeightDp = targetHeight,
+                                             resizePreviewHeightDp = targetHeight,
+                                         )
+                                     },
                                      isSplitKeyboard = SettingsPreferences.isSplitKeyboardEnabled(this@XimeInputMethodService),
                                      // 始终传入回调：当前方案不支持分体时由覆盖层禁用按钮，
                                      // 而不是让按钮整个消失（用户无法判断是禁用还是坏了）。
@@ -1515,30 +1538,40 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                        )
                                    },
                                   onConfirm = { newHeight, newPadding, floatingMode, opacity ->
-                                        // 宽度已随拖动写入 resizePreviewWidthDp，未调过则保持原值。
-                                        val savedWidth = uiState.value.resizePreviewWidthDp
-                                        if (savedWidth > 0) {
-                                            SettingsPreferences.setFloatingWidthDp(this@XimeInputMethodService, savedWidth, screenIsLandscape)
-                                        }
-                                       SettingsPreferences.setFloatingOffsetX(this@XimeInputMethodService, uiState.value.floatingOffsetX, screenIsLandscape)
-                                       SettingsPreferences.setFloatingOffsetY(this@XimeInputMethodService, uiState.value.floatingOffsetY, screenIsLandscape)
-                                       schemaController.setKeyboardHeight(newHeight)
-                                       val savedPadding = if (floatingMode) SettingsPreferences.getKeyboardBottomPaddingDp(this@XimeInputMethodService) else newPadding
-                                       SettingsPreferences.setKeyboardBottomPaddingDp(this@XimeInputMethodService, savedPadding)
+                                       // 先快照：写偏好会触发监听器，不能再读被监听器重载过的预览偏移。
+                                       val preview = uiState.value
+                                       val savedHeight = KeyboardHeightProfiles.save(
+                                           this@XimeInputMethodService, floatingMode, screenIsLandscape,
+                                           newHeight, effectiveScreenH,
+                                       )
+                                       val savedWidth = preview.resizePreviewWidthDp
+                                           .takeIf { floatingMode && it > 0 } ?: preview.floatingWidthDp
+                                       if (floatingMode) {
+                                           SettingsPreferences.setFloatingWidthDp(this@XimeInputMethodService, savedWidth, screenIsLandscape)
+                                           SettingsPreferences.setFloatingOffsetX(this@XimeInputMethodService, preview.floatingOffsetX, screenIsLandscape)
+                                           SettingsPreferences.setFloatingOffsetY(this@XimeInputMethodService, preview.floatingOffsetY, screenIsLandscape)
+                                       }
+                                       val savedPadding = if (floatingMode) {
+                                           SettingsPreferences.getKeyboardBottomPaddingDp(this@XimeInputMethodService)
+                                       } else newPadding
+                                       if (!floatingMode) SettingsPreferences.setKeyboardBottomPaddingDp(this@XimeInputMethodService, savedPadding)
                                        SettingsPreferences.setKeyboardOpacity(this@XimeInputMethodService, opacity)
+                                       SettingsPreferences.setFloatingMode(this@XimeInputMethodService, floatingMode, screenIsLandscape)
                                        uiState.value = uiState.value.copy(
                                            showKeyboardResize = false,
                                            isFloatingMode = floatingMode,
-                                           keyboardHeightDp = newHeight,
+                                           keyboardHeightDp = savedHeight,
+                                           resizePreviewHeightDp = 0,
                                            keyboardBottomPaddingDp = savedPadding,
-                                            floatingWidthDp = if (savedWidth > 0) savedWidth else uiState.value.floatingWidthDp,
-                                            resizePreviewWidthDp = 0,
+                                           floatingWidthDp = savedWidth,
+                                           resizePreviewWidthDp = 0,
+                                           floatingOffsetX = preview.floatingOffsetX,
+                                           floatingOffsetY = preview.floatingOffsetY,
                                            keyboardOpacity = opacity,
                                        )
-                                       // 确认时才持久化悬浮模式；关闭/重新唤起输入法必须保持用户刚确认的状态。
-                                       SettingsPreferences.setFloatingMode(this@XimeInputMethodService, floatingMode, screenIsLandscape)
-                                       schemaController.toggleFloatingMode(floatingMode, floatingMinY, persist = true)
+                                       // 不再重复 toggleFloatingMode；它会重新读取设置并覆盖刚确认的预览位置。
                                        refreshKeyboardGeometry()
+                                       applyWindowBackground()
                                     },
                                     onCancel = { cancelKeyboardResize() },
                                     modifier = Modifier
@@ -1631,8 +1664,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 按偏好高度预设首帧真实几何，之后仍由 SideEffect 统一维护。
                 val isLandscape =
                     resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
-                val displayHeight = SettingsPreferences.getKeyboardHeightDp(this, isLandscape)
-                    .coerceAtMost((resources.configuration.screenHeightDp * 8) / 10)
+                val displayHeight = KeyboardHeightProfiles.fixed(this, isLandscape)
                 val density = resources.displayMetrics.density
                 val rawDp = if (bottomInsetPxState.value > 0)
                     (bottomInsetPxState.value / density).toInt() else 0
@@ -1674,7 +1706,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             floatingOffsetX = uiState.value.resizeInitialX,
             floatingOffsetY = uiState.value.resizeInitialY,
             resizePreviewWidthDp = 0,
-            keyboardHeightDp = SettingsPreferences.getKeyboardHeightDp(this, isLandscape),
+            resizePreviewHeightDp = 0,
+            keyboardHeightDp = KeyboardHeightProfiles.selected(
+                this, uiState.value.resizeInitialFloating, isLandscape,
+                ((resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt() -
+                    tryGetStatusBarHeightDp(this, window.window)).coerceAtLeast(1),
+            ),
             keyboardBottomPaddingDp = SettingsPreferences.getKeyboardBottomPaddingDp(this),
             keyboardOpacity = SettingsPreferences.getKeyboardOpacity(this),
         )
@@ -1694,9 +1731,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val rawBottomDp = (bottomInsetPxState.value / resources.displayMetrics.density).toInt()
             val bottomSpace = (rawBottomDp - (if (landscape) 16 else 8) - (if (rawBottomDp >= 120) 8 else 0)).coerceAtLeast(0)
             val activeBottom = bottomSpace.takeIf { it > 0 } ?: 18
-            val height = if (state.isFloatingMode || state.isCompact) screenHeight else {
-                val content = SettingsPreferences.getKeyboardHeightDp(this, landscape).coerceAtMost(screenHeight * 8 / 10)
-                content + state.keyboardBottomPaddingDp + activeBottom
+            // 悬浮模式必须让输入法宿主保持“物理可见全高”。
+            // 不能在确认后又退回 configuration.screenHeightDp；那会把卡片上半部裁出 IME 宿主。
+            val physicalScreenDp = (resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt()
+            val statusBarDp = tryGetStatusBarHeightDp(this, window.window)
+            val floatingHostHeight = (physicalScreenDp - statusBarDp).coerceAtLeast(1)
+            val height = when {
+                state.isFloatingMode -> floatingHostHeight
+                state.isCompact -> screenHeight
+                else -> {
+                    val content = KeyboardHeightProfiles.fixed(this, landscape)
+                    content + state.keyboardBottomPaddingDp + activeBottom
+                }
             }
             keyboardContainer.updateHeight(height)
             keyboardContainer.requestLayout()
@@ -2490,8 +2536,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val decor = window.window?.decorView ?: return
                 if (currentEffectiveKeyboardHeight <= 0) {
                     val isLandscape = resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
-                    val kbH = SettingsPreferences.getKeyboardHeightDp(this@XimeInputMethodService, isLandscape)
-                        .coerceAtMost((resources.configuration.screenHeightDp * 8) / 10)
+                    val kbH = KeyboardHeightProfiles.floating(
+                        this@XimeInputMethodService, isLandscape,
+                        ((resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt() -
+                            tryGetStatusBarHeightDp(this@XimeInputMethodService, window.window)).coerceAtLeast(1),
+                    )
                     currentEffectiveKeyboardHeight = kbH + FLOATING_DRAG_BAR_HEIGHT_DP
                 }
                 val density = resources.displayMetrics.density

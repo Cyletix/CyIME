@@ -1,0 +1,21 @@
+PASS portrait: floating minimum must not change fixed 320
+PASS landscape: floating minimum must not change fixed 270
+PASS portrait: fixed confirm does not change floating height
+PASS portrait and landscape floating keys are independent
+PASS fixed lower bound is enforced when reading portrait preferences
+PASS fixed lower bound is enforced when confirming portrait
+PASS fixed lower bound is enforced when confirming landscape
+PASS legacy corrupted fixed value is backed up and restored to default
+PASS legacy valid custom fixed height is preserved exactly
+PASS migration is idempotent and preserves later user settings
+PASS migration leaves unrelated theme and dictionary keys intact
+PASS migration callbacks observe complete transaction
+PASS fresh install does not create a fake fixed preference
+PASS existing new floating preference survives legacy migration
+PASS actual confirm callback: floating save keeps fixed preference and padding
+PASS actual confirm callback: fixed save leaves floating size and position untouched
+PASS actual confirm callback: preference listener cannot erase preview offsets
+PASS actual confirm callback: landscape saves separate floating key
+PASS close-open and dock read the appropriate saved profile
+PASS repeated floating confirmations never overwrite either fixed key
+RESULT 20 tests, 0 failures
