@@ -39,6 +39,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import com.kingzcheung.xime.settings.KeyboardHeightProfiles
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
@@ -158,8 +160,10 @@ internal fun FloatingKeyboardContainer(
         }
         if (isDragging && edge != null) {
             val progress = dockProgress.value
-            val restoredHeight = (cardTotalHeight.value - FLOATING_DRAG_BAR_HEIGHT_DP)
-                .coerceIn(48f, screenHeightDp * 0.8f)
+            val config = LocalConfiguration.current
+            val restoredHeight = KeyboardHeightProfiles.fixed(
+                LocalContext.current, config.screenWidthDp > config.screenHeightDp
+            ).toFloat()
             val previewColor = MaterialTheme.colorScheme.primary
             Box(
                 modifier = Modifier
