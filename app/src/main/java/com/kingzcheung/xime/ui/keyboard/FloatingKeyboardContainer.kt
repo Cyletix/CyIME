@@ -90,12 +90,17 @@ internal fun FloatingKeyboardContainer(
     if (!isFloatingMode) {
         if (previewRect == null) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                val width = if (fixedWidthDp > 0) fixedWidthDp.dp.coerceAtMost(maxWidth) else maxWidth
+                val width = resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), fixedWidthDp).dp.coerceAtMost(maxWidth)
                 val travel = ((maxWidth - width) / 2f).value
                 Box(Modifier.align(Alignment.TopCenter)
                     .absoluteOffset(x = fixedOffsetX.toFloat().coerceIn(-travel, travel).dp)
-                    .width(width).fillMaxSize().testTag("fixed-keyboard-card")) {
-                    keyboardContent()
+                    .width(width).fillMaxSize().clip(FloatingKeyboardCardShape).testTag("fixed-keyboard-card")
+                    .onGloballyPositioned { coords ->
+                        val pos = coords.positionInWindow()
+                        onCardPositioned(pos.x.roundToInt(), pos.y.roundToInt(),
+                            (pos.x + coords.size.width).roundToInt(), (pos.y + coords.size.height).roundToInt())
+                    }) {
+                    LanguageMenuPanel { keyboardContent() }
                 }
             }
         } else {
@@ -107,6 +112,7 @@ internal fun FloatingKeyboardContainer(
                         .align(Alignment.TopStart)
                         .absoluteOffset { IntOffset(previewRect.left.roundToInt(), previewRect.top.roundToInt()) }
                         .size(previewWidth, previewHeight)
+                        .clip(FloatingKeyboardCardShape)
                         .testTag("fixed-keyboard-resize-preview")
                         .onGloballyPositioned { coords ->
                             val pos = coords.positionInWindow()
@@ -119,7 +125,7 @@ internal fun FloatingKeyboardContainer(
                             )
                         }
                 ) {
-                    keyboardContent()
+                    LanguageMenuPanel { keyboardContent() }
                 }
             }
         }
@@ -229,7 +235,7 @@ internal fun FloatingKeyboardContainer(
                     CompositionLocalProvider(
                         LocalDensity provides Density(density = density.density, fontScale = density.fontScale * fontScaleFactor)
                     ) {
-                        keyboardContent()
+                        LanguageMenuPanel { keyboardContent() }
                     }
                 }
                 DragBar(

@@ -13,7 +13,16 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,7 +74,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SettingsMainContent(
     onNavigateToSchema: () -> Unit,
@@ -83,6 +92,9 @@ fun SettingsMainContent(
     onNavigateToBackup: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val imeBottomDp = with(density) { imeBottomPx.toDp() }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     
     Scaffold(
@@ -107,9 +119,13 @@ fun SettingsMainContent(
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .consumeWindowInsets(innerPadding)
-                .padding(horizontal = 16.dp)
-                .imePadding(),
-            contentPadding = innerPadding,
+                .padding(horizontal = 16.dp),
+            // Keep drawing behind the transparent IME gutters. IME space belongs to
+            // scroll content, not a clipped full-width viewport below the toolbar.
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding(),
+                bottom = maxOf(innerPadding.calculateBottomPadding(), imeBottomDp),
+            ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
@@ -145,6 +161,14 @@ fun SettingsMainContent(
                     )
                     var testText by remember { mutableStateOf("") }
                     var isFocused by remember { mutableStateOf(false) }
+                    val editorVisibility = remember { BringIntoViewRequester() }
+                    var editorSize by remember { mutableStateOf(IntSize.Zero) }
+                    LaunchedEffect(isFocused, imeBottomPx, editorSize) {
+                        if (isFocused && imeBottomPx > 0 && editorSize.height > 0) {
+                            editorVisibility.bringIntoView(Rect(0f, 0f, editorSize.width.toFloat(),
+                                editorSize.height + imeBottomPx.toFloat()))
+                        }
+                    }
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -153,7 +177,9 @@ fun SettingsMainContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .onFocusEvent { isFocused = it.isFocused }
+                                .onFocusEvent { isFocused = it.hasFocus }
+                                .bringIntoViewRequester(editorVisibility)
+                                .onSizeChanged { editorSize = it }
                                 .clip(RoundedCornerShape(28.dp))
                                 .background(
                                     if (isFocused) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

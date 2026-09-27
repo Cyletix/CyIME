@@ -31,7 +31,7 @@ class FloatingResizeGeometryTest {
             var y by remember { mutableStateOf(90) }
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 MaterialTheme {
-                    Box(Modifier.size(640.dp, 320.dp).testTag("root")) {
+                    Box(Modifier.size(640.dp, 600.dp).testTag("root")) {
                         FloatingKeyboardContainer(floating, 0.5f, 1f, 0.5f, x, y, 48, 700, 220, Color.Black,
                             onDrag = { a, b -> x += a.toInt(); y += b.toInt(); dx++ }, onDragEnd = {}) {
                             KeyboardResizeOverlay(288, 288, 0, floating,
@@ -48,7 +48,7 @@ class FloatingResizeGeometryTest {
         val after = rule.onNodeWithContentDescription("确认").fetchSemanticsNode().boundsInRoot
         assertTrue(dx > 0)
         assertTrue(after.left < before.left && after.top < before.top)
-        assertTrue(after.bottom < 320f - 48f)
+        assertTrue(after.bottom < 600f - 48f)
         rule.onNodeWithContentDescription("悬浮键盘").performClick()
         rule.runOnIdle { assertFalse(enabled) }
         rule.onNodeWithContentDescription("确认").assertIsDisplayed()

@@ -267,6 +267,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         set(value) { keyboardReportsChinese = value }
     internal var currentEffectiveKeyboardHeight: Int = 0
     private var floatingCardBounds: android.graphics.Rect? = null
+    private var fixedCardBounds: android.graphics.Rect? = null
     internal var currentFloatingCardWidthDp = 0
     internal var currentFloatingCardHeightDp: Int = 0
     internal var previousSchemaId: String = ""
@@ -1232,16 +1233,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         keyboardContainer.clipChildren = false
 
         bottomInsetPxState.value = getActiveBottomInsetPx(window.window)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            keyboardContainer.setOnApplyWindowInsetsListener { v, insets ->
-                val px = extractBottomInset(insets)
-                if (px != bottomInsetPxState.value) {
-                    bottomInsetPxState.value = px
-                }
-                v.onApplyWindowInsets(insets)
+        keyboardContainer.setOnApplyWindowInsetsListener { v, insets ->
+            val px = extractBottomInset(insets)
+            if (px != bottomInsetPxState.value) {
+                bottomInsetPxState.value = px
             }
+            v.onApplyWindowInsets(insets)
         }
-        
+
         val composeView = ComposeView(this).apply {
             isFocusable = true
             isFocusableInTouchMode = true
@@ -1296,24 +1295,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val density = LocalDensity.current
                 // 统一使用 View 层多类型检测的 insets，避免 Compose
                 // navigationBars 恒为手势条高度导致与系统栏（三键导航）差异被抹平。
-                val activeBottomPx = bottomInsetPxState.value
-                val rawDp = if (activeBottomPx > 0) {
-                    with(density) { activeBottomPx.toDp().value.toInt() }
-                } else 0
-                // 底部留白整体缩减量（dp）：让键盘比系统导航栏实际高度再低一点，
-                // 键盘背景已 edge-to-edge 延伸到系统栏后，留白可小于系统栏高度。
-                // 横屏手势区 inset 更大（约 32dp vs 竖屏 16dp），固定减 8 会留下过厚的
-                // 底条（24dp，为竖屏 3 倍）；横屏多减一档到 16dp，仍足以盖住手势条。
-                val bottomInsetShrinkDp = if (isLandscape) 16 else 8
-                // 标准（三键）导航栏 inset 明显大于手势条，额外多减一点，
-                // 让标准模式高度更接近抬高模式，但保留可辨识的差异。
-                val extraShrinkDp = if (rawDp >= 120) 8 else 0
-                val bottomSpaceDp = if (rawDp > 0) (rawDp - bottomInsetShrinkDp - extraShrinkDp).coerceAtLeast(0) else 0
-                // 兜底仅用于彻底检测不到任何底部 inset 的场景（全屏沉浸），
-                // 不再把已有差异（标准 44dp / 手势 16dp）强行垫平。
-                val minBottomDp = 18
-                val activeBottomDp = if (bottomSpaceDp == 0) minBottomDp else bottomSpaceDp
-                android.util.Log.d("ImeWindowInsets", "viewState=${bottomInsetPxState.value} rawDp=$rawDp shrink=$bottomInsetShrinkDp extra=$extraShrinkDp activeBottomDp=$activeBottomDp")
+                val activeBottomDp = imeBottomSpaceDp(bottomInsetPxState.value, density.density)
                 val navBarDp = activeBottomDp.dp
                 val hasNavBar = navBarDp > 0.dp
 
@@ -1357,7 +1339,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             ?: if (isDark) longToColor(kbColors.candidateTextColorDark) else longToColor(kbColors.candidateTextColor)
                         val accentCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getAccentColor(state.themeId, isDark)
                         val selectedTextCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getCandidateSelectedTextColor(state.themeId, isDark)
-                        val keyboardBgColor = cardBg
+                        val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
                         val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(state.themeId)
                         if (state.isCompact && (cand.candidates.isNotEmpty() || cand.isShowingRecentClipboard || cand.inputText.isNotEmpty())) {
                             HardwareKeyboardCandidateBar(
@@ -1621,6 +1603,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onHapticFeedback = { feedbackManager.hapticFeedback(hapticView) },
                                 onCardPositioned = { left: Int, top: Int, right: Int, bottom: Int ->
                                     val cardHeightPx = bottom - top
+                                    if (!state.isFloatingMode && !state.showKeyboardResize && cardHeightPx > 0) {
+                                        val bounds = android.graphics.Rect(left, top, right, bottom)
+                                        if (fixedCardBounds != bounds) {
+                                            fixedCardBounds = bounds
+                                            keyboardContainer.requestLayout()
+                                        }
+                                    }
                                     if (state.isFloatingMode && cardHeightPx > 0) {
                                         currentEffectiveKeyboardHeight = (cardHeightPx / density.density).roundToInt()
                                         currentFloatingCardHeightDp = currentEffectiveKeyboardHeight
@@ -1668,6 +1657,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     // 栏外编码气泡越出容器顶边后进入 inputArea 空白区，
                     // inputArea 默认 clipChildren=true 会把越界部分裁掉。
                     area.clipChildren = false
+                    // Only the keyboard card and navigation strip paint a background.
+                    area.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 }
             // 容器在 inputArea 内底部对齐（gravity BOTTOM）：
             // 容器物理高度 = Compose 内容总高，小于全屏窗口时若默认 top-left
@@ -1690,11 +1681,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
                 val displayHeight = KeyboardHeightProfiles.fixed(this, isLandscape)
                 val density = resources.displayMetrics.density
-                val rawDp = if (bottomInsetPxState.value > 0)
-                    (bottomInsetPxState.value / density).toInt() else 0
-                val extraShrink = if (rawDp >= 120) 8 else 0
-                val bottomSpace = if (rawDp > 0) (rawDp - 8 - extraShrink).coerceAtLeast(0) else 0
-                val activeBottomDp = if (bottomSpace == 0) 18 else bottomSpace
+                val activeBottomDp = imeBottomSpaceDp(bottomInsetPxState.value, density)
                 view.updateLayoutParams<android.widget.FrameLayout.LayoutParams> {
                     height = ((displayHeight + state.keyboardBottomPaddingDp + activeBottomDp) * density).toInt()
                 }
@@ -1773,6 +1760,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 模式变化立即撤销旧卡片的高度/触摸区域，避免宿主缓存上一帧的浮动留白。 */
     internal fun refreshKeyboardGeometry() {
         floatingCardBounds = null
+        fixedCardBounds = null
         currentFloatingCardHeightDp = 0
         currentEffectiveKeyboardHeight = 0
         if (::keyboardContainer.isInitialized) {
@@ -1780,9 +1768,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val config = resources.configuration
             val screenHeight = config.screenHeightDp
             val landscape = config.screenWidthDp > screenHeight
-            val rawBottomDp = (bottomInsetPxState.value / resources.displayMetrics.density).toInt()
-            val bottomSpace = (rawBottomDp - (if (landscape) 16 else 8) - (if (rawBottomDp >= 120) 8 else 0)).coerceAtLeast(0)
-            val activeBottom = bottomSpace.takeIf { it > 0 } ?: 18
+            val activeBottom = imeBottomSpaceDp(bottomInsetPxState.value, resources.displayMetrics.density)
             // 悬浮模式必须让输入法宿主保持“物理可见全高”。
             // 不能在确认后又退回 configuration.screenHeightDp；那会把卡片上半部裁出 IME 宿主。
             val physicalScreenDp = (resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt()
@@ -2642,7 +2628,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 } else loc[1].coerceAtLeast(0)
                 outInsets.contentTopInsets = topPx
                 outInsets.visibleTopInsets = topPx
-                outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
+                // Transparent side gutters must not swallow touches to the host app.
+                val card = fixedCardBounds
+                if (card != null && card.width() < keyboardContainer.width) {
+                    // 透明和触摸范围不改变固定键盘的避让高度。宿主底部操作栏也必须
+                    // 避让整张卡片（包含工具栏/候选栏），不能仅依赖编辑框的自动平移。
+                    outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+                    outInsets.touchableRegion.set(card.left, topPx, card.right, card.bottom)
+                } else {
+                    outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
+                }
             } else {
                 super.onComputeInsets(outInsets)
             }

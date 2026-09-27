@@ -9,7 +9,7 @@ import kotlin.math.roundToInt
  * 现在两个方向共用同一基准，横屏只允许更大，不允许因比例算法变小。
  */
 internal const val FLOATING_RESIZE_MIN_WIDTH_DP = 400
-internal const val FLOATING_RESIZE_MIN_HEIGHT_DP = 300
+internal const val FLOATING_RESIZE_MIN_HEIGHT_DP = 228
 
 /**
  * 悬浮调节专用高度范围。
@@ -47,7 +47,8 @@ internal fun floatingResizeMaxAspect(landscape: Boolean): Float = if (landscape)
 internal fun keyboardHeightBounds(screenHeight: Int, landscape: Boolean, navInset: Int = 24): IntRange {
     val max = if (landscape) (screenHeight - navInset - FLOATING_DRAG_BAR_HEIGHT_DP - 24).coerceAtLeast(160)
         else (screenHeight * 45 / 100).coerceAtLeast(228)
-    val min = if (landscape) 244.coerceAtMost(max) else (screenHeight * 28 / 100).coerceAtLeast(228).coerceAtMost(max)
+    // 固定与悬浮共享面板下限，不能随平板屏幕高度放大最小值。
+    val min = FLOATING_RESIZE_MIN_HEIGHT_DP.coerceAtMost(max)
     return min..max
 }
 
@@ -82,3 +83,8 @@ internal fun resolvedFloatingWidth(
 } else {
     floatingKeyboardWidth(screenWidth, screenHeight, height, portraitHeight, wide)
 }
+
+/** 固定卡片与调整框共同解析旧尺寸；0 仍表示全宽。 */
+internal fun resolvedFixedKeyboardWidth(availableWidthDp: Int, savedWidthDp: Int): Int =
+    if (savedWidthDp > 0) savedWidthDp.coerceIn(keyboardWidthBounds(availableWidthDp))
+    else availableWidthDp.coerceAtLeast(1)
