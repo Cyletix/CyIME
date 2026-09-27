@@ -194,7 +194,7 @@ object SettingsPreferences {
         }
         val legacy = prefs.getString(KEY_CURRENT_SCHEMA, null)
         if (!legacy.isNullOrBlank()) return legacy
-        return "t9_pinyin"
+        return "rime_ice"
     }
 
     fun setCurrentSchema(context: Context, schemaId: String, language: InputLanguage = InputLanguage.forSchema(schemaId)) {

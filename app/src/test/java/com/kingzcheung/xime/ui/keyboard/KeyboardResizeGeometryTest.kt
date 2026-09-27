@@ -24,6 +24,29 @@ class KeyboardResizeGeometryTest {
         assertEquals(0f, fixedKeyboardRect(360f, 400f, 300f, 0f, 24f, 800f, -300f).left, 0.01f)
     }
 
+    @Test fun fixedAndFloatingShareMinimumPanelSizeOnTablet() {
+        for (landscape in listOf(false, true)) {
+            for (height in listOf(800, 1400)) {
+                assertEquals(floatingResizeHeightBounds(height, landscape).first,
+                    keyboardHeightBounds(height, landscape).first)
+            }
+        }
+        for (width in listOf(320, 800, 1400)) {
+            assertEquals(floatingResizeMinWidthDp(width), resolvedFixedKeyboardWidth(width, 280))
+            assertEquals(width, resolvedFixedKeyboardWidth(width, 0))
+        }
+    }
+
+    @Test fun qwertyPunctuationFitsUnderXAndMatchesLanguageKey() {
+        val row = QwertyBottomRowWeights.Standard
+        val old = QwertyBottomRowWeights.Legacy
+        assertEquals(row.punctuation, row.language, 0f)
+        assertTrue((2 * row.mode + row.punctuation) / row.total <= (1.4f + 2f) / 9.8f)
+        assertTrue(row.mode / row.total > old.mode / old.total)
+        assertEquals(1f / 10f, row.punctuation / row.total, 0.00001f)
+        assertEquals(1f / 10f, row.language / row.total, 0.00001f)
+    }
+
     private val bounds = ResizeRect(0f, 0f, 1000f, 800f)
     private val start = ResizeRect(100f, 100f, 700f, 500f)
 
@@ -220,14 +243,16 @@ class KeyboardResizeGeometryTest {
 
     @Test
     fun `最小尺寸：手机基准与可用区域取小`() {
-        // 契约：手机基准不低于 360×220，横屏不放宽；具体取值允许按需调大
-        assertTrue(FLOATING_RESIZE_MIN_WIDTH_DP >= 360)
+        // 最低面板高度恢复手机基准228dp，各设备与显示模式一致。
+        assertEquals(400, FLOATING_RESIZE_MIN_WIDTH_DP)
+        assertEquals(228, FLOATING_RESIZE_MIN_HEIGHT_DP)
         assertTrue(FLOATING_RESIZE_MIN_HEIGHT_DP >= 220)
         assertEquals(FLOATING_RESIZE_MIN_WIDTH_DP, floatingResizeMinWidthDp(1000))
         assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeMinHeightDp(800))
         // 可用区比基准还小时取可用区，不产生越界初值
         assertEquals(280, floatingResizeMinWidthDp(280))
         assertEquals(180, floatingResizeMinHeightDp(180))
+
     }
 
     @Test

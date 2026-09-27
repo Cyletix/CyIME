@@ -174,7 +174,7 @@ internal fun KeyboardResizeOverlay(
                     drawRoundRect(
                         color = surfaceColor.copy(alpha = 0.88f),
                         topLeft = Offset(frame.left, frame.top), size = rectSize,
-                        cornerRadius = CornerRadius(if (floatingMode) cornerPx else 0f),
+                        cornerRadius = CornerRadius(cornerPx),
                     )
                     // 边框只画一次。所有 stroke 都向框内收半线宽，避免贴屏幕/圆角时被裁成畸形。
                     val inset = stroke / 2f
@@ -182,7 +182,7 @@ internal fun KeyboardResizeOverlay(
                     val borderTop = frame.top + inset
                     val borderWidth = (frame.width - stroke).coerceAtLeast(1f)
                     val borderHeight = (frame.height - stroke).coerceAtLeast(1f)
-                    if (floatingMode && previewState.rect != null) {
+                    if (previewState.rect != null) {
                         drawRoundRect(
                             color = accentColor,
                             topLeft = Offset(borderLeft, borderTop),
@@ -250,7 +250,7 @@ internal fun KeyboardResizeOverlay(
                         )
                         // 四角对角线提示（↖ ↗ ↙ ↘）：只做视觉，命中仍是 resizeHandleAt 的边带。
                         val cornerLineLength = 12.dp.toPx()
-                        resizeCornerDiagonals(frame, cornerLineLength, handleInset).forEach { (start, end) ->
+                        resizeCornerDiagonals(frame, cornerLineLength, handleInset).take(if (floatingMode) 4 else 2).forEach { (start, end) ->
                             drawLine(color = accentColor, start = start, end = end, strokeWidth = stroke)
                         }
                     }
@@ -351,7 +351,7 @@ internal fun KeyboardResizeOverlay(
                                             dx = amount.x,
                                             dy = amount.y,
                                             bounds = stableBounds,
-                                            minWidth = minOf(280f * density.density, stableBounds.width),
+                                            minWidth = minOf(FLOATING_RESIZE_MIN_WIDTH_DP * density.density, stableBounds.width),
                                             minHeight = minHeightPx,
                                             maxWidth = stableBounds.width,
                                             maxHeight = screenMaxHeightPx,

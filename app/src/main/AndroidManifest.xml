@@ -28,6 +28,7 @@
         <!-- 主Activity -->
         <activity
             android:name="com.kingzcheung.xime.MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:theme="@style/Theme.Xime">
             <intent-filter>

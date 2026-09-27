@@ -79,21 +79,25 @@ internal fun tryGetStatusBarHeightDp(context: Context, imeWindow: Window?): Int 
 
 /**
  * 多类型检测底部 inset。
- * 与主流输入法一致：navigationBars 与 mandatorySystemGestures 取最大，
- * 全部为空时再回退 systemGestures / tappableElement。
+ * 与主流输入法一致：navigationBars、mandatorySystemGestures 与 tappableElement 取最大，
+ * 全部为空时再回退 systemGestures。
  * 手势导航下 navigationBars 通常为 0，但 mandatorySystemGestures / systemGestures
  * 会返回手势条高度（约 20~32dp），阈值不能过滤掉它们，否则底部手势条区域会露出窗口背景。
  */
 internal fun extractBottomInset(
     insets: WindowInsets
 ): Int {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+        @Suppress("DEPRECATION")
+        return insets.systemWindowInsetBottom.coerceAtLeast(0)
+    }
     val sys = insets.getInsets(WindowInsets.Type.systemBars()).bottom
     val nav = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
     val tappable = insets.getInsets(WindowInsets.Type.tappableElement()).bottom
     val mandatory = insets.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom
     val gestures = insets.getInsets(WindowInsets.Type.systemGestures()).bottom
-    val primary = maxOf(nav, mandatory)
-    val fallback = maxOf(gestures, tappable)
+    val primary = maxOf(nav, mandatory, tappable)
+    val fallback = gestures
     val pick = if (primary > 0) primary else fallback
     Log.d(INSETS_TAG, "bottom: sys=$sys nav=$nav tappable=$tappable mandatory=$mandatory gestures=$gestures pick=$pick")
     return pick
@@ -101,7 +105,6 @@ internal fun extractBottomInset(
 
 /** 获取当前活跃的底部 inset（px）。 */
 internal fun getActiveBottomInsetPx(imeWindow: Window?): Int {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
     return try {
         val decorView = imeWindow?.decorView ?: return 0
         val insets = decorView.rootWindowInsets ?: return 0
