@@ -88,8 +88,15 @@ object ChineseSchemas {
         val available = SchemaManager.getRimeDir(context).listFiles().orEmpty()
             .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.toSet()
         val normalized = CyimeInputDefaults.canonicalIds(enabled, available)
-        if (prefs.getBoolean(ADDED, false)) return normalized
-        val updated = (normalized.filterNot { it in CyimeInputDefaults.legacyDefaults } + ids.filter { it in available }).distinct()
+        // An early UI read must not consume the migration before bundled files are installed.
+        if (!available.containsAll(CyimeInputDefaults.recommended)) return normalized
+        if (prefs.getBoolean(ADDED, false)) {
+            // Persist canonical IDs too: a stale custom.yaml patch otherwise overrides default.yaml at deploy time.
+            val repaired = normalized.ifEmpty { CyimeInputDefaults.recommended.filter { it in available } }
+            if (repaired != enabled) SchemaManager.setEnabledSchemas(context, repaired)
+            return repaired
+        }
+        val updated = (normalized.filterNot { it in CyimeInputDefaults.legacyDefaults } + CyimeInputDefaults.recommended.filter { it in available }).distinct()
         if (updated != enabled) SchemaManager.setEnabledSchemas(context, updated)
         val current = SettingsPreferences.getCurrentSchema(context)
         val selected = CyimeInputDefaults.canonicalIds(listOf(current), available).firstOrNull()

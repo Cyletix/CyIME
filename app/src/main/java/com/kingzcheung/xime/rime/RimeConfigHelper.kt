@@ -47,11 +47,16 @@ object RimeConfigHelper {
             rimeDir.mkdirs()
         }
         
+        // Settings/IME may query schemas concurrently while the directory is only half copied.
+        // Readers must not persist a legacy/empty schema list or consume migration flags then.
+        val installing = File(rimeDir, SchemaManager.ASSET_INSTALL_MARKER)
+        installing.writeText("installing")
         copyAssetsToRimeDir(context, rimeDir)
         com.kingzcheung.xime.settings.BundledRimeSync.install(
             rimeDir, File(context.filesDir, "rime-upgrade-backups"),
             context.assets.open("rime-bundled-manifest.tsv").bufferedReader().use { it.readText() },
         ) { context.assets.open(it) }
+        check(installing.delete()) { "Cannot finish bundled asset installation" }
         // F1: assets 会用内置 default.yaml 覆盖，这里把启用方案重新写回 schema_list
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         // 为所有启用方案打个人词库补丁
@@ -304,6 +309,7 @@ object RimeConfigHelper {
             syncBuiltinDefaultCustom(context, targetDir)
             return false
         }
+        val previousCustom = File(targetDir, ASSETS_DEFAULT_CUSTOM).takeIf { it.isFile }?.readBytes()
         val copied = try {
             copyAssetsRecursively(context, ASSETS_RIME_DIR, targetDir)
         } catch (e: IOException) {
@@ -312,6 +318,11 @@ object RimeConfigHelper {
         }
         if (copied) {
             seedBuiltinPackageVersion(context)
+            val custom = File(targetDir, ASSETS_DEFAULT_CUSTOM)
+            if (previousCustom != null) custom.writeBytes(previousCustom)
+            else context.assets.open(ASSETS_DEFAULT_CUSTOM).use { input ->
+                custom.outputStream().use { input.copyTo(it) }
+            }
         }
         syncBuiltinDefaultCustom(context, targetDir)
         return copied

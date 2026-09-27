@@ -43,19 +43,34 @@ fun SetupWizardScreen(
     onCompleted: () -> Unit
 ) {
     var currentStep by remember { mutableStateOf(SetupStep.EnableIme) }
-    var hasBeenToSettings by remember { mutableStateOf(false) }
     var deployReminder by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    var preparing by remember { mutableStateOf(true) }
+    var ready by remember { mutableStateOf(false) }
+    var preparationAttempt by remember { mutableIntStateOf(0) }
+    // Defaults are already selected; optional layouts can be enabled separately.
+    val enabledSchemas = remember { mutableStateOf(emptyList<String>()) }
 
-    // 从设置页返回后检查已启用的方案（初始为空，用户必须主动选择）
-    val enabledSchemas = remember { mutableStateOf(if (hasBeenToSettings) SchemaManager.getEnabledSchemas(context) else emptyList()) }
-
-    // 每次向导重新可见时（从设置页返回），刷新方案列表
-    LaunchedEffect(visible) {
+    // Returning from optional settings automatically prepares the selection.
+    LaunchedEffect(visible, preparationAttempt) {
         if (visible) {
-            enabledSchemas.value = SchemaManager.getEnabledSchemas(context)
+            preparing = true
+            ready = false
+            deployReminder = null
+            try {
+                enabledSchemas.value = withContext(Dispatchers.IO) {
+                    val (user, shared) = RimeConfigHelper.initializeRimeDataAsync(context)
+                    RimeEngine.getInstance().initialize(user, shared)
+                    check(RimeConfigHelper.ensureDeployment(context)) { "中文词库准备未完成" }
+                    SchemaManager.getEnabledSchemas(context)
+                }
+                ready = true
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
+            } catch (e: Exception) {
+                deployReminder = "词库准备失败，请点击重试"
+                Log.e("SetupWizard", "Automatic preparation failed", e)
+            } finally { preparing = false }
         }
     }
 
@@ -95,32 +110,13 @@ fun SetupWizardScreen(
                         SetupStep.SelectSchemas -> SelectSchemasStep(
                         enabledSchemas = enabledSchemas.value,
                         deployReminder = deployReminder,
+                        preparing = preparing, ready = ready,
+                        onRetry = { preparationAttempt++ },
                         onNavigateToSchemaSettings = {
-                            hasBeenToSettings = true
                             deployReminder = null
                             onNavigateToSchemaSettings()
                         },
-                        onNext = {
-                            enabledSchemas.value = SchemaManager.getEnabledSchemas(context)
-                            if (enabledSchemas.value.isNotEmpty()) {
-                                // isDeploymentComplete 内部计算部署 hash（读取大词库文件），
-                                // 移到 IO 线程避免主线程卡顿
-                                scope.launch {
-                                    val complete = withContext(Dispatchers.IO) {
-                                        RimeConfigHelper.isDeploymentComplete(context)
-                                    }
-                                    if (!complete) {
-                                        deployReminder = "方案已选择，但尚未部署。请前往设置点击「部署」按钮编译词库"
-                                    } else {
-                                        deployReminder = null
-                                        currentStep = SetupStep.SwitchToIme
-                                    }
-                                }
-                            } else {
-                                deployReminder = null
-                                currentStep = SetupStep.SwitchToIme
-                            }
-                        }
+                        onNext = { if (ready) currentStep = SetupStep.SwitchToIme }
                     )
                     SetupStep.SwitchToIme -> SwitchToImeStep(
                         onCompleted = {
@@ -132,8 +128,6 @@ fun SetupWizardScreen(
                                 SettingsPreferences.setCurrentSchema(context, enabledSchemas.first())
                             }
                             SettingsPreferences.setSetupCompleted(context, true)
-                            SettingsPreferences.setDeploymentDone(context, true)
-                            RimeConfigHelper.storeDeploymentHash(context)
                             onCompleted()
                         }
                     )
@@ -310,6 +304,9 @@ private fun checkImeEnabled(context: Context): Boolean {
 private fun SelectSchemasStep(
     enabledSchemas: List<String>,
     deployReminder: String? = null,
+    preparing: Boolean,
+    ready: Boolean,
+    onRetry: () -> Unit,
     onNavigateToSchemaSettings: () -> Unit,
     onNext: () -> Unit
 ) {
@@ -326,14 +323,14 @@ private fun SelectSchemasStep(
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "点击下方按钮前往设置，选择您需要的输入方案并点击「部署」",
+            text = "自动准备中文26键和中文九键，无需下载词库或手动部署",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "请至少选择一个方案后才能继续",
+            text = "其他输入方案可以按需启用",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -342,15 +339,25 @@ private fun SelectSchemasStep(
 
         Button(
             onClick = { onNavigateToSchemaSettings() },
+            enabled = !preparing,
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
         ) {
-            Text("去设置选择方案")
+            Text("选择其他方案（可选）")
         }
 
-        if (enabledSchemas.isNotEmpty()) {
+        if (preparing) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+            Text("正在准备词库，首次编译可能需要几分钟…", fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 12.dp))
+        }
+        if (deployReminder != null) {
+            Text(deployReminder, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = onRetry, enabled = !preparing) { Text("重试") }
+        }
+        if (ready && enabledSchemas.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "✓ 已选择 ${enabledSchemas.size} 个方案",
+                text = "✓ ${enabledSchemas.size} 个方案已就绪",
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
@@ -376,38 +383,6 @@ private fun SelectSchemasStep(
     }
 }
 
-private suspend fun doCompile(
-    context: Context,
-    enabledSchemas: List<String>,
-    onProgress: (String) -> Unit,
-    onDone: () -> Unit,
-    onError: () -> Unit
-) {
-    withContext(Dispatchers.IO) {
-        try {
-            onProgress("正在初始化输入法引擎...")
-
-            // 1. 初始化 Rime 引擎
-            val (userDataDir, sharedDataDir) =
-                RimeConfigHelper.initializeRimeDataAsync(context)
-            val engine = RimeEngine.getInstance()
-            engine.initialize(userDataDir, sharedDataDir)
-
-            // 2. 部署 = 编译词库 + 创建 session（一步完成）
-            onProgress("正在编译词库...")
-            engine.deploy()
-            RimeConfigHelper.storeDeploymentHash(context)
-            SettingsPreferences.setDeploymentDone(context, true)
-
-            onDone()
-        } catch (e: Exception) {
-            Log.e("SetupWizard", "Compile failed", e)
-            onProgress("错误：${e.message}")
-            onError()
-        }
-    }
-}
-
 @Composable
 private fun SwitchToImeStep(onCompleted: () -> Unit) {
     val context = LocalContext.current
@@ -419,7 +394,7 @@ private fun SwitchToImeStep(onCompleted: () -> Unit) {
         Spacer(Modifier.weight(1f))
 
         Text(
-            text = "步骤 4：切换输入法",
+            text = "步骤 3：切换输入法",
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
         )

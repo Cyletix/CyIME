@@ -6,12 +6,8 @@
 
 patch:
   schema_list:
-    - schema: t9_pinyin
     - schema: rime_ice
-    - schema: pinyin_14jian
-    - schema: double_pinyin_flypy
-    - schema: japanese
-    - schema: japanese_kana
+    - schema: t9_pinyin
 
   # Menu
   menu:

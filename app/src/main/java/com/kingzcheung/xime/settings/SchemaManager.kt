@@ -84,6 +84,7 @@ internal data class SchemaEntry(
 
 object SchemaManager {
     private const val TAG = "SchemaManager"
+    internal const val ASSET_INSTALL_MARKER = ".cyime-assets-installing"
     private const val CUSTOM_YAML = "default.custom.yaml"
     internal val yaml = Yaml(configuration = YamlConfiguration(strictMode = false, anchorsAndAliases = com.charleskorn.kaml.AnchorsAndAliases.Permitted(maxAliasCount = UInt.MAX_VALUE)))
 
@@ -822,10 +823,14 @@ object SchemaManager {
 
     fun getEnabledSchemas(context: Context): List<String> {
         val customFile = getCustomYamlFile(context)
+        if (File(getRimeDir(context), ASSET_INSTALL_MARKER).exists()) return BUILTIN_SCHEMAS
+        // UI can query while assets are still being copied. Return the intended defaults
+        // without creating an empty custom list or marking migrations complete.
+        if (getRimeDir(context).listFiles().orEmpty().none { it.name.endsWith(".schema.yaml") }) return BUILTIN_SCHEMAS
         if (!customFile.exists()) {
             setEnabledSchemas(context, BUILTIN_SCHEMAS)
             SettingsPreferences.setBuiltinSchemasMerged(context, true)
-            return ChineseSchemas.addOnFirstUpgrade(context, JapaneseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS))
+            return ChineseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS)
         }
 
         try {
@@ -845,7 +850,7 @@ object SchemaManager {
             if (schemas == null) {
                 setEnabledSchemas(context, BUILTIN_SCHEMAS)
                 SettingsPreferences.setBuiltinSchemasMerged(context, true)
-                return ChineseSchemas.addOnFirstUpgrade(context, JapaneseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS))
+                return ChineseSchemas.addOnFirstUpgrade(context, BUILTIN_SCHEMAS)
             }
             if (schemas.isNotEmpty()) {
                 // 内置方案补齐只执行一次（新版本首次运行，治老版本升级残留：
@@ -863,7 +868,7 @@ object SchemaManager {
                     SettingsPreferences.setBuiltinSchemasMerged(context, true)
                     m
                 }
-                return ChineseSchemas.addOnFirstUpgrade(context, JapaneseSchemas.addOnFirstUpgrade(context, merged))
+                return ChineseSchemas.addOnFirstUpgrade(context, merged)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to read custom.yaml", e)
