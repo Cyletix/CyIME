@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,6 +41,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +73,7 @@ fun SymbolKeyboardLayout(
     shadowShapeRadius: Dp = 8.dp,
     specialKeyBackgroundColor: Color = accentColor,
     specialKeyTextColor: Color = textColor,
+    onSelectExact: (String) -> Unit = onSelect,
 ) {
     val context = LocalContext.current
     // 常用在首屏；最近使用（LRU）作为紧邻分类，点击符号时置顶记录
@@ -78,7 +83,7 @@ fun SymbolKeyboardLayout(
     val textLabel = LocalTextModeLabel.current
     val displayCategories = remember(recentSymbols, textLabel) {
         listOf(SymbolCategory(name = "常用", id = "common", symbols = commonSymbolsFor(textLabel)),
-            SymbolCategory(name = "最近使用", id = "recentSymbols", symbols = recentSymbols)) +
+            SymbolCategory(name = "最近", id = "recentSymbols", symbols = recentSymbols)) +
             SymbolData.categories
     }
     val scope = rememberCoroutineScope()
@@ -118,6 +123,7 @@ fun SymbolKeyboardLayout(
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val category = displayCategories[page]
+                val preserveWidth = category.id == "englishSymbols"
 
                 if (category.symbols.isEmpty()) {
                     // 最近使用为空时的占位提示
@@ -145,11 +151,12 @@ fun SymbolKeyboardLayout(
                             rowSymbols.forEach { symbol ->
                                 SymbolButton(
                                     symbol = symbol,
+                                    preserveWidth = preserveWidth,
                                     onClick = {
                                         recentSymbols = RecentUsageStore.record(
                                             context, RecentUsageStore.KEY_RECENT_SYMBOLS, symbol
                                         )
-                                        onSelect(symbol)
+                                        if (preserveWidth) onSelectExact(symbol) else onSelect(symbol)
                                     },
                                     modifier = Modifier.weight(1f),
                                     textColor = textColor,
@@ -189,8 +196,9 @@ fun SymbolKeyboardLayout(
             Row(
                 modifier = Modifier
                     .weight(4.2f - 2 * LocalModeSlotWeight.current)
+                    .fillMaxHeight()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.Start
             ) {
                 displayCategories.forEachIndexed { index, category ->
                     SymbolCategoryTab(
@@ -200,9 +208,12 @@ fun SymbolKeyboardLayout(
                             onHapticFeedback?.invoke()
                             scope.launch { pagerState.animateScrollToPage(index) }
                         },
-                        backgroundColor = backgroundColor,
+                        backgroundColor = keyBgColor,
                         textColor = textColor,
-                        selectedBackgroundColor = accentColor
+                        selectedBackgroundColor = accentColor.copy(alpha = 0.24f),
+                        modifier = Modifier.testTag("symbol-category:${category.id}"),
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                        shadowShapeRadius = shadowShapeRadius
                     )
                 }
             }
@@ -212,7 +223,7 @@ fun SymbolKeyboardLayout(
                 onClick = { onSelect("delete") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(0.8f),
+                modifier = Modifier.weight(0.8f).testTag("symbol-delete"),
                 fontSize = 12.sp
             )
         }
@@ -229,6 +240,7 @@ private fun SymbolButton(
     modifier: Modifier = Modifier,
     textColor: Color = Color.Unspecified,
     backgroundColor: Color,
+    preserveWidth: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -249,7 +261,7 @@ private fun SymbolButton(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = punctuationKeyLabel(symbol),
+            text = if (preserveWidth) symbol else punctuationKeyLabel(symbol),
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
             color = textColor,
@@ -265,28 +277,21 @@ private fun SymbolCategoryTab(
     onClick: () -> Unit,
     backgroundColor: Color,
     textColor: Color,
-    selectedBackgroundColor: Color = textColor.copy(alpha = 0.15f),
-    modifier: Modifier = Modifier
+    selectedBackgroundColor: Color,
+    modifier: Modifier = Modifier,
+    shadowEnabled: Boolean,
+    shadowElevation: Dp,
+    shadowShapeRadius: Dp,
 ) {
-    Box(
-        modifier = modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .tolerantClick(onClick = onClick)
-            .keyGlow(Modifier.clip(RoundedCornerShape(8.dp))
-            .background(
-                if (isSelected) selectedBackgroundColor
-                else backgroundColor
-            ))
-            .padding(horizontal = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = name,
-            fontSize = 16.sp,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            color = if (isSelected) textColor else textColor.copy(alpha = 0.5f)
-        )
-    }
+    // Share the mode keys' full row height, visual insets and adaptive typography.
+    KeyButton(
+        text = name,
+        onClick = onClick,
+        backgroundColor = if (isSelected) selectedBackgroundColor else backgroundColor,
+        textColor = textColor,
+        fontSize = 16.sp,
+        modifier = modifier.width(56.dp).fillMaxHeight().semantics { selected = isSelected },
+        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+        shadowShapeRadius = shadowShapeRadius,
+    )
 }

@@ -309,8 +309,11 @@ private fun StrokeKeyboardContent(
     val swipeHints = rememberSwipeHintsEnabled()
     val hintsActive = !compactMode
     // 左侧快捷符号列来自 xime.yaml keyboard.stroke.side_symbols（可自定义，>4 滚动显示）
-    val commitSymbol = LocalKeyboardInputActions.current.onCommitText ?: onKeyPress
-    val strokeSideSymbols = LocalKeyboardInputPreferences.current.symbols()
+    val customSymbols = LocalKeyboardInputPreferences.current.symbols()
+    val inputActions = LocalKeyboardInputActions.current
+    val commitSymbol = (if (customSymbols != null) inputActions.onCommitExactText else null)
+        ?: inputActions.onCommitText ?: onKeyPress
+    val strokeSideSymbols = customSymbols
         ?: remember(configVersion) { KeysConfigHelper.getStrokeSideSymbols() }
 
     // 符号面板统一阴影（与九键左栏候选面板同款样式）
@@ -391,6 +394,7 @@ private fun StrokeKeyboardContent(
                         strokeSideSymbols.forEach { symbol ->
                             StrokeSymbolItem(
                                 text = symbol,
+                                preserveWidth = customSymbols != null,
                                 onClick = { commitSymbol(symbol) },
                                 onPress = { onKeyPressDown?.invoke(symbol) },
                                 backgroundColor = keyBackgroundColor,
@@ -409,6 +413,7 @@ private fun StrokeKeyboardContent(
                         itemsIndexed(strokeSideSymbols) { _, symbol ->
                             StrokeSymbolItem(
                                 text = symbol,
+                                preserveWidth = customSymbols != null,
                                 onClick = { commitSymbol(symbol) },
                                 onPress = { onKeyPressDown?.invoke(symbol) },
                                 backgroundColor = keyBackgroundColor,
@@ -641,6 +646,7 @@ private fun StrokeSymbolItem(
     textColor: Color,
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
+    preserveWidth: Boolean = false,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
@@ -662,7 +668,7 @@ private fun StrokeSymbolItem(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = punctuationKeyLabel(text),
+            text = if (preserveWidth) text else punctuationKeyLabel(text),
             color = textColor,
             fontSize = fontSize,
             fontWeight = FontWeight.Normal,

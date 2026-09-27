@@ -150,11 +150,14 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
             !service.rimeEngine.getOption("ascii_punct"))
     }
 
-    internal fun commitLiteralText(text: String) {
-        if (text.isEmpty()) return
-        val literal = punctuationWidth(text, isFullWidthPunctuation(),
+    internal fun keyboardLiteral(text: String, numberPanel: Boolean = false, preserveWidth: Boolean = false): String =
+        keyboardLiteralWidth(text, isFullWidthPunctuation(),
             service.uiState.value.currentSchemaId in com.kingzcheung.xime.settings.JapaneseSchemas.ids ||
-                service.uiState.value.currentSchemaId == "jaroomaji")
+                service.uiState.value.currentSchemaId == "jaroomaji", numberPanel, preserveWidth)
+
+    internal fun commitLiteralText(text: String, preserveWidth: Boolean = false) {
+        if (text.isEmpty()) return
+        val literal = keyboardLiteral(text, preserveWidth = preserveWidth)
         service.voiceRecognitionHandler.abandonPendingOnManualInput()
         val owner = service.uiState.value.inputSessionId
         val submit: suspend () -> Unit = literal@ {

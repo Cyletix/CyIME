@@ -133,7 +133,8 @@ fun CommonSymbolKeyboardLayout(
     ) {
         Column(Modifier.fillMaxSize()) {
         LocalKeyboardInputPreferences.current.symbols()?.let { symbols ->
-            FixedSymbolStrip(symbols, LocalKeyboardInputActions.current.onCommitText ?: onKeyPress)
+            FixedSymbolStrip(symbols, LocalKeyboardInputActions.current.onCommitExactText
+                ?: LocalKeyboardInputActions.current.onCommitText ?: onKeyPress)
         }
         Box(Modifier.weight(1f)) {
         if (isLandscape) {

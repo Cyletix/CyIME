@@ -111,7 +111,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     } else {
                         ToolPanelEditTextHolder.editText?.let { et ->
                             val start = et.selectionStart.coerceAtLeast(0)
-                            et.text?.insert(start, " ")
+                            et.text?.insert(start, service.textCommit.keyboardLiteral(" "))
                             try { et.setSelection(start + 1) } catch (_: Exception) {}
                         }
                     }
@@ -436,7 +436,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                     } else {
                         withContext(Dispatchers.Main) {
-                            service.commitText(" ")
+                            service.commitText(service.textCommit.keyboardLiteral(" "))
                         }
                     }
                 }
@@ -506,7 +506,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         calculatorEngine = service.calculatorEngine,
                     )
                     if (routeResult is com.kingzcheung.xime.calculator.CalculatorRouteResult.Handled) {
-                        withContext(Dispatchers.Main) { service.commitText(routeResult.commitText) }
+                        withContext(Dispatchers.Main) { service.commitText(service.textCommit.keyboardLiteral(routeResult.commitText, numberPanel = isNumberKeyboard)) }
                         if (isNumberKeyboard) updateCalculatorCandidates()
                         needsUIUpdate = true
                         return@launch

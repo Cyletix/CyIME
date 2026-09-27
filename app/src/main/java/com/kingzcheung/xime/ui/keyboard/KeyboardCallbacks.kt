@@ -143,4 +143,6 @@ data class KeyboardCallbacks(
     val onCommitCandidateBeforeModeChange: (() -> Unit)? = null,
     /** 假名按序进入 Rime；变音仅修改仍在组合中的末尾编码。 */
     val onJapaneseKanaAction: ((JapaneseKanaAction) -> Unit)? = null,
+    /** Explicit symbol categories commit the chosen glyph without width conversion. */
+    val onCommitExactText: ((String) -> Unit)? = null,
 )
