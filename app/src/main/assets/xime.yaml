@@ -670,8 +670,8 @@ keyboard:
       l: { tap: { label: "l", value: "l" }, swipe_up: { label: "-", value: "-" } }
       z: { tap: { label: "z", value: "z" }, swipe_up: { label: "「", value: "「" } }
       x: { tap: { label: "x", value: "x" }, swipe_up: { label: "」", value: "」" } }
-      c: { tap: { label: "c", value: "c" }, swipe_up: { label: "、", value: "、" } }
-      v: { tap: { label: "v", value: "v" }, swipe_up: { label: "。", value: "。" } }
+      c: { tap: { label: "c", value: "c" }, swipe_up: { label: "・", value: "・" } }
+      v: { tap: { label: "v", value: "v" }, swipe_up: { label: "〜", value: "〜" } }
       b: { tap: { label: "b", value: "b" }, swipe_up: { label: "？", value: "？" } }
       n: { tap: { label: "n", value: "n" }, swipe_up: { label: "！", value: "！" } }
       m: { tap: { label: "m", value: "m" }, swipe_up: { label: "ー", value: "ー" } }

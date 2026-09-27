@@ -294,7 +294,8 @@ fun KeyboardView(
                 com.kingzcheung.xime.service.JapaneseTyping.usesKanaCase(state.currentSchemaId, false) -> "あいう"
             else -> "中文"
         },
-        LocalKeyboardPunctuation provides if (state.isCalculatorMode) null else KeyboardPunctuation(
+        LocalKeyboardPunctuation provides if (state.isCalculatorMode &&
+            state.currentSchemaId !in com.kingzcheung.xime.settings.JapaneseSchemas.ids && state.currentSchemaId != "jaroomaji") null else KeyboardPunctuation(
             // 全角/半角只作用于中文与日文：英文键盘的键面提示与上滑标点保持半角
             full = !state.isAsciiMode && (state.schemaSwitches.firstOrNull { it.name == "full_shape" }?.currentIndex?.let { it == 1 }
                 ?: SettingsPreferences.punctuationFullWidth(androidx.compose.ui.platform.LocalContext.current, true)),
@@ -312,6 +313,7 @@ fun KeyboardView(
             currentInputModeId = com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode),
             onSwitchSchema = callbacks.onSwitchSchema,
             onCommitText = callbacks.onCommitText,
+            onCommitExactText = callbacks.onCommitExactText,
             isVoiceMode = state.isVoiceMode,
             voiceSticky = state.voiceSticky,
         ),
@@ -341,7 +343,7 @@ fun KeyboardView(
             state.keyboardHeightDp.coerceIn(fixedRange) * resizeControlDensity.density,
             state.keyboardBottomPaddingDp.coerceAtLeast(0) * resizeControlDensity.density,
             fixedBottomInsetDp.coerceAtLeast(0) * resizeControlDensity.density,
-            widthPx = if (state.fixedWidthDp > 0) state.fixedWidthDp * resizeControlDensity.density else hostWidthPx,
+            widthPx = resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), state.fixedWidthDp) * resizeControlDensity.density,
             horizontalOffsetPx = state.fixedOffsetX * resizeControlDensity.density,
         )
         // 只在进入调节、切模式或视口变化时创建事务。主题/透明度/偏好监听不能重置它。
@@ -433,9 +435,11 @@ fun KeyboardView(
             if (!candidateState.value.isComposing && candidateState.value.inputText.isEmpty()) closePreeditEditor()
         }
 
+        // 面板高度包含工具栏/候选栏；按键区只分配剩余高度。
+        // Service 以整张卡片顶部上报避让区域，不能只上报按键区。
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
         ) {
             var handwritingCandidates by remember(state.inputSessionId) { mutableStateOf<List<String>>(emptyList()) }
             var handwritingComments by remember(state.inputSessionId) { mutableStateOf<List<String>>(emptyList()) }
@@ -1489,6 +1493,10 @@ fun KeyboardView(
                         onHapticFeedback = onHapticFeedback,
                     )
                     is OverlayRoute.Symbol -> SymbolKeyboardLayout(
+                        onSelectExact = { symbol ->
+                            onHapticFeedback?.invoke()
+                            (callbacks.onCommitExactText ?: callbacks.onCommitText)?.invoke(symbol)
+                        },
                         onSelect = { symbol ->
                             onHapticFeedback?.invoke()
                             if (symbol == "delete") {

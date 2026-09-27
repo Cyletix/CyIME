@@ -71,6 +71,7 @@ data class KeyboardInputActions(
     val onCommitText: ((String) -> Unit)? = null,
     val isVoiceMode: Boolean = false,
     val voiceSticky: Boolean = false,
+    val onCommitExactText: ((String) -> Unit)? = null,
 )
 
 val LocalKeyboardInputPreferences = staticCompositionLocalOf { KeyboardInputPreferences() }

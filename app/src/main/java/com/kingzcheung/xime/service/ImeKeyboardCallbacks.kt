@@ -159,6 +159,7 @@ internal fun rememberImeKeyboardCallbacks(
             onClipboardSelect = { text -> service.textCommit.selectClipboardItem(text) },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             onCommitText = { text -> service.textCommit.commitLiteralText(text) },
+            onCommitExactText = { text -> service.textCommit.commitLiteralText(text, preserveWidth = true) },
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
             onQuickSend = {},
             onKeyboardResize = {

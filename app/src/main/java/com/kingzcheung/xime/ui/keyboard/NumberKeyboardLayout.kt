@@ -100,7 +100,8 @@ fun NumberKeyboardLayout(
         )
     }
 
-    CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius) {
+    CompositionLocalProvider(LocalKeyCornerRadius provides keyCornerRadius,
+        LocalKeyboardPunctuation provides LocalKeyboardPunctuation.current?.copy(numberPanel = true)) {
     Box(
         modifier = bodyModifier
             .onGloballyPositioned { coordinates ->

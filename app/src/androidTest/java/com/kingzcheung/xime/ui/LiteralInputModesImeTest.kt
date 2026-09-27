@@ -40,6 +40,7 @@ class LiteralInputModesImeTest {
     private val imeComponent get() = ComponentName(context, "com.kingzcheung.xime.service.XimeInputMethodService")
     private val imeId get() = imeComponent.flattenToShortString()
     private val inputMethodManager get() = context.getSystemService(InputMethodManager::class.java)
+    private var previousEnabledSchemas: List<String>? = null
     private var previousPunctuationWidth: Boolean? = null
     private var previousAsciiPunct = false
     private var previousFullShape = false
@@ -61,6 +62,10 @@ class LiteralInputModesImeTest {
         stopKeyboardService()
         val (user, shared) = RimeConfigHelper.initializeRimeDataAsync(context)
         engine.initialize(user, shared)
+        // This isolated IME test exercises optional Japanese schemes as well as the defaults.
+        previousEnabledSchemas = com.kingzcheung.xime.settings.SchemaManager.getEnabledSchemas(context)
+        com.kingzcheung.xime.settings.SchemaManager.setEnabledSchemas(context,
+            previousEnabledSchemas.orEmpty() + listOf("rime_ice", "t9_pinyin", "pinyin_14jian", "japanese", "japanese_kana"))
         assertTrue(RimeConfigHelper.ensureDeployment(context))
         assertTrue(engine.ensureSession())
         previousAsciiPunct = engine.getUserConfigBool("var/option/ascii_punct")
@@ -93,6 +98,7 @@ class LiteralInputModesImeTest {
     @After fun stopKeyboardAndRestoreSystemIme() {
         if (!savedSystemImeState) return
         try {
+            previousEnabledSchemas?.let { com.kingzcheung.xime.settings.SchemaManager.setEnabledSchemas(context, it) }
             SettingsPreferences.getPrefsPublic(context).edit().apply {
                 val previous = previousPunctuationWidth
                 if (previous == null) remove(SettingsPreferences.KEY_PUNCTUATION_FULL_WIDTH)
@@ -177,6 +183,26 @@ class LiteralInputModesImeTest {
     @Test fun punctuationWidthWorksFromMenuIn26Keys() = verifyPunctuationWidth("rime_ice", "，")
     @Test fun punctuationWidthWorksFromMenuIn14Keys() = verifyPunctuationWidth("pinyin_14jian", "，")
     @Test fun punctuationWidthWorksFromMenuInNineKeys() = verifyPunctuationWidth("t9_pinyin", "，")
+    @Test fun englishSymbolCategoryKeepsLiteralGlyphsInFullWidthChineseT9() {
+        chooseMode("t9_pinyin")
+        setWidthFromMenu(true)
+        rule.onNodeWithTag("mode-slot-1", true).performTouchInput { click() }
+        rule.onNodeWithTag("symbol-category:englishSymbols", true).performScrollTo().performTouchInput { click() }
+        rule.waitForIdle()
+        tap(".")
+        tap(",")
+        tap("?")
+        assertSettled(".,?")
+        // Selecting English symbols must not change the Chinese punctuation preference.
+        rule.onNodeWithTag("symbol-category:common", true).performScrollTo().performTouchInput { click() }
+        rule.waitForIdle()
+        tap("，")
+        assertSettled(".,?，")
+        rule.onNodeWithTag("mode-slot-1", true).performTouchInput { click() }
+        rule.onAllNodesWithText("，").onLast().performTouchInput { click() }
+        assertSettled(".,?，，")
+    }
+
     @Test fun englishPunctuationStaysHalfWidthAndOffersNoWidthEntry() {
         chooseMode(InputModes.ENGLISH)
         // 英文（ASCII）模式标点固定半角：菜单里不出现全角／半角入口，
@@ -194,6 +220,25 @@ class LiteralInputModesImeTest {
     }
     @Test fun punctuationWidthWorksInJapaneseFlick() = verifyPunctuationWidth("japanese_kana", "、")
     @Test fun punctuationWidthWorksInJapanese26() = verifyPunctuationWidth("japanese", "、")
+
+    @Test fun japaneseSpaceAndDigitsFollowFullWidthIn26Keys() = verifyJapaneseSpaceAndDigits("japanese")
+    @Test fun japaneseSpaceAndDigitsFollowFullWidthInKanaKeys() = verifyJapaneseSpaceAndDigits("japanese_kana")
+
+    private fun verifyJapaneseSpaceAndDigits(schema: String) {
+        chooseMode(schema)
+        setWidthFromMenu(true)
+        rule.onNodeWithTag(if (schema == "japanese_kana") "kana-space" else "space-key").performTouchInput { click() }
+        assertSettled("　")
+        rule.onNodeWithTag(if (schema == "japanese_kana") "kana-number" else "mode-slot-2").performTouchInput { click() }
+        tap("１")
+        tap("．")
+        tap("２")
+        assertSettled("　１．２")
+        setWidthFromMenu(false)
+        tap("3")
+        rule.onNodeWithTag("space-key").performTouchInput { click() }
+        assertSettled("　１．２3 ")
+    }
 
     private fun setWidthFromMenu(full: Boolean) {
         rule.onNodeWithTag("toolbar-leading").performClick()

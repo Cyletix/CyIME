@@ -37,3 +37,28 @@ internal fun punctuationWidth(text: String, full: Boolean, japanese: Boolean = f
         }
     }
 }
+
+/** Only keyboard literals use this policy; pasted text, speech and candidate words stay intact. */
+internal fun keyboardLiteralWidth(text: String, full: Boolean, japanese: Boolean, numberPanel: Boolean = false, preserveWidth: Boolean = false): String {
+    if (preserveWidth) return text
+    if (!japanese) return if (numberPanel) text else punctuationWidth(text, full)
+    // Numeric-panel punctuation is arithmetic (a decimal point is not a Japanese full stop).
+    if (numberPanel) return text.map { c ->
+        when {
+            full && c == ' ' -> '\u3000'
+            full && c in '!'..'~' -> (c.code + 0xFEE0).toChar()
+            !full && c == '\u3000' -> ' '
+            !full && c in '！'..'～' -> (c.code - 0xFEE0).toChar()
+            else -> c
+        }
+    }.joinToString("")
+    return punctuationWidth(text, full, japanese = true).map { c ->
+        when {
+            full && c == ' ' -> '\u3000'
+            full && c in '0'..'9' -> (c.code + 0xFEE0).toChar()
+            !full && c == '\u3000' -> ' '
+            !full && c in '０'..'９' -> (c.code - 0xFEE0).toChar()
+            else -> c
+        }
+    }.joinToString("")
+}
