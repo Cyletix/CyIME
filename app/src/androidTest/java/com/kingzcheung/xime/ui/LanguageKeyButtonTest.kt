@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +40,56 @@ class LanguageKeyButtonTest {
 
     private val events = mutableListOf<String>()
     private var density = 1f
+
+    @Test fun menuIsCenteredAnchoredAndBoundedAtExtremePanelSizes() {
+        var panelSize by androidx.compose.runtime.mutableStateOf(androidx.compose.ui.unit.DpSize(200.dp, 160.dp))
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides androidx.compose.ui.unit.Density(1f),
+                LocalKeyboardInputActions provides KeyboardInputActions(
+                    schemas = listOf(
+                        SchemaInfo("first", "中文九键", "", "", ""),
+                        SchemaInfo("second", "日语26键", "", "", "", language = com.kingzcheung.xime.settings.InputLanguage.JAPANESE)),
+                    currentInputModeId = "first", onSwitchSchema = {})) {
+                androidx.compose.material3.MaterialTheme {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(panelSize).testTag("menu-panel")) {
+                            com.kingzcheung.xime.ui.keyboard.LanguageMenuPanel {
+                                Box(Modifier.fillMaxSize().padding(end = 12.dp), contentAlignment = Alignment.BottomEnd) {
+                                    LanguageKeyButton(onClick = {}, backgroundColor = Color.Gray,
+                                        modifier = Modifier.size(44.dp).testTag("language-key"))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (size in listOf(androidx.compose.ui.unit.DpSize(200.dp,160.dp),
+            androidx.compose.ui.unit.DpSize(400.dp,228.dp), androidx.compose.ui.unit.DpSize(1000.dp,500.dp))) {
+            rule.runOnIdle { panelSize = size }
+            rule.mainClock.autoAdvance = false
+            rule.onNodeWithTag("language-key").performTouchInput { down(center) }
+            rule.mainClock.advanceTimeBy(350L)
+            val panel = rule.onNodeWithTag("menu-panel").fetchSemanticsNode()
+            val key = rule.onNodeWithTag("language-key").fetchSemanticsNode()
+            val menu = rule.onNodeWithTag("language-menu").fetchSemanticsNode()
+            assertEquals(key.positionOnScreen.x + key.size.width, menu.positionOnScreen.x + menu.size.width, 1f)
+            assertTrue(menu.positionOnScreen.x >= panel.positionOnScreen.x)
+            assertTrue(menu.positionOnScreen.y >= panel.positionOnScreen.y)
+            assertTrue(menu.positionOnScreen.y + menu.size.height <= panel.positionOnScreen.y + panel.size.height + 1f)
+            assertTrue(menu.size.width <= 280)
+            val label = rule.onNodeWithText("中文", useUnmergedTree = true).fetchSemanticsNode()
+            assertEquals(menu.positionOnScreen.x + menu.size.width / 2f,
+                label.positionOnScreen.x + label.size.width / 2f, 1f)
+            val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+            java.io.File(context.getExternalFilesDir(null), "language-menu-${size.width.value.toInt()}.png").outputStream().use {
+                rule.onNodeWithTag("language-menu").captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)
+            }
+            rule.onNodeWithTag("language-key").performTouchInput { cancel() }
+            rule.mainClock.advanceTimeByFrame()
+            rule.mainClock.autoAdvance = true
+        }
+    }
 
     private fun setKey() {
         rule.setContent {

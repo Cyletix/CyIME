@@ -28,7 +28,14 @@ internal fun ComposeTestRule.chooseModeThroughLanguageAndPanel(id: String) {
     waitForIdle()
     if (id != InputModes.ENGLISH && engine.getCurrentSchema() != id) {
         onNodeWithContentDescription("输入模式").performClick()
-        waitUntil(5000) { onAllNodesWithTag("schema-pages", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            waitUntil(5000) { onAllNodesWithTag("schema-pages", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        } catch (failure: Throwable) {
+            onAllNodes(isRoot()).fetchSemanticsNodes().indices.forEach { index ->
+                println("MODE_NAVIGATION_ROOT $index " + onAllNodes(isRoot()).get(index).printToString())
+            }
+            throw failure
+        }
         val choice = onNodeWithTag("schema-tile:$id")
         var pages = 0
         while (!choice.isDisplayed() && pages++ < 12) {

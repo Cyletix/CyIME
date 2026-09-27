@@ -38,6 +38,15 @@ class InputModesTest {
             InputModes.mergeOrder(current, listOf("rime_ice", "t9_pinyin")))
     }
 
+    @Test fun independentLanguageOrderKeepsTheRememberedInputMode() {
+        val order = InputModes.languageOrder(listOf("en", "ja", "ja", "unknown"))
+        assertEquals(listOf(InputLanguage.ENGLISH, InputLanguage.JAPANESE, InputLanguage.CHINESE), order)
+        val choices = InputModes.languageChoices(modes, "rime_ice", mapOf(InputLanguage.JAPANESE to "japanese_kana"), order)
+        assertEquals(listOf(InputModes.ENGLISH, "japanese_kana", "rime_ice"), choices.map { it.schemaId })
+        assertEquals(listOf("rime_ice", "t9_pinyin"), InputModes.available(modes, InputModes.defaultModeOrder).take(2).map { it.schemaId })
+        assertEquals("t9_pinyin", InputModes.available(modes, listOf("t9_pinyin", "rime_ice")).first().schemaId)
+    }
+
     @Test fun englishIsAvailableWithNoEnabledSchemas() {
         assertEquals(listOf(InputModes.english), InputModes.available(emptyList()))
     }

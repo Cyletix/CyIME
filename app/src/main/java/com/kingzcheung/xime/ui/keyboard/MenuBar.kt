@@ -186,7 +186,7 @@ fun MenuItemButton(
             Text(
                 text = item.textIcon,
                 color = textColor.copy(alpha = 0.7f),
-                fontSize = if (isLandscape) 18.sp else 24.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )
@@ -195,14 +195,14 @@ fun MenuItemButton(
                 painter = item.icon,
                 contentDescription = item.label,
                 tint = textColor.copy(alpha = 0.7f),
-                modifier = Modifier.size(if (isLandscape) 18.dp else 24.dp)
+                modifier = Modifier.size(26.dp)
             )
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = item.label,
             color = textColor,
-            fontSize = if (isLandscape) 11.sp else 12.sp,
+            fontSize = 12.sp,
             lineHeight = if (isLandscape) 13.sp else 14.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,

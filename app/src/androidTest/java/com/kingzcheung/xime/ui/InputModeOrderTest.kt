@@ -32,7 +32,7 @@ class InputModeOrderTest {
                         InputModes.saveOrder(context, ids); modes = InputModes.ordered(context, initial)
                     }, modifier = Modifier.size(360.dp, 250.dp))
             } }
-            rule.onNodeWithText("调整顺序").performClick()
+            rule.onNodeWithText("模式顺序").performClick()
             val from = rule.onNodeWithTag("input-mode-order:t9")
             val first = from.fetchSemanticsNode().boundsInRoot
             val second = rule.onNodeWithTag("input-mode-order:japanese").fetchSemanticsNode().boundsInRoot
@@ -46,7 +46,7 @@ class InputModeOrderTest {
             rule.onNodeWithContentDescription("上移英文").performClick()
             assertEquals(listOf("japanese", InputModes.ENGLISH, "t9"), InputModes.ordered(context, initial).map { it.schemaId })
             rule.onNodeWithText("完成").performClick()
-            rule.onNodeWithText("调整顺序").performClick()
+            rule.onNodeWithText("模式顺序").performClick()
             val english = rule.onNodeWithTag("input-mode-order:__xime_english").fetchSemanticsNode().boundsInRoot
             val t9 = rule.onNodeWithTag("input-mode-order:t9").fetchSemanticsNode().boundsInRoot
             assertTrue(english.top < t9.top)

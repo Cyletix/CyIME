@@ -116,7 +116,8 @@ fun LanguageKeyButton(
     val context = LocalContext.current
     val schemas by rememberUpdatedState(com.kingzcheung.xime.settings.InputModes.languageChoices(
         actions.schemas, actions.currentInputModeId,
-        com.kingzcheung.xime.settings.InputModes.rememberedModes(context, actions.schemas)))
+        com.kingzcheung.xime.settings.InputModes.rememberedModes(context, actions.schemas),
+        com.kingzcheung.xime.settings.InputModes.languageOrder(context)))
     val switchSchema by rememberUpdatedState(actions.onSwitchSchema)
     val hasMenu = schemas.isNotEmpty() && switchSchema != null
     val scope = rememberCoroutineScope()
@@ -131,7 +132,12 @@ fun LanguageKeyButton(
     var selectedId by remember { mutableStateOf<String?>(null) }
     val scroll = rememberScrollState()
     val density = LocalDensity.current
-    val rowHeight = with(density) { 64.dp.toPx() }
+    val panelBounds = LocalLanguageMenuPanel.current
+    val fallbackBounds = Rect(0f, 0f, view.width.toFloat(), view.height.toFloat())
+    val menuGeometry = languageMenuGeometry(
+        panelBounds.takeIf { it.width > 0f && it.height > 0f } ?: fallbackBounds,
+        keyWindowBounds, density.density, menuSchemas.size)
+    val rowHeight = menuGeometry.rowHeightPx
     val edgeSize = with(density) { 20.dp.toPx() }
     val scrollStep = with(density) { 8.dp.toPx() }
 
@@ -228,15 +234,15 @@ fun LanguageKeyButton(
             shadowShapeRadius = shadowShapeRadius,
         )
         if (menuOpen) {
-            val positionProvider = remember(keyWindowBounds) {
+            val positionProvider = remember(menuGeometry) {
                 object : PopupPositionProvider {
                     override fun calculatePosition(
                         anchorBounds: IntRect, windowSize: IntSize,
                         layoutDirection: LayoutDirection, popupContentSize: IntSize,
                     ): IntOffset = IntOffset(
-                        (keyWindowBounds.center.x - popupContentSize.width / 2f).roundToInt()
+                        menuGeometry.bounds.left.roundToInt()
                             .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
-                        (keyWindowBounds.top - popupContentSize.height).roundToInt()
+                        menuGeometry.bounds.top.roundToInt()
                             .coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
                     )
                 }
@@ -246,15 +252,19 @@ fun LanguageKeyButton(
                 properties = PopupProperties(focusable = false, dismissOnBackPress = false,
                     dismissOnClickOutside = false, clippingEnabled = false),
             ) {
+                // Popup owns a separate view; retain the keyboard density and font scale.
+                androidx.compose.runtime.CompositionLocalProvider(LocalDensity provides density) {
                 Surface(
                     shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp, shadowElevation = 8.dp,
-                    modifier = Modifier.width(minOf(280, LocalConfiguration.current.screenWidthDp - 24).dp),
+                    modifier = Modifier.width(with(density) { menuGeometry.bounds.width.toDp() })
+                        .height(with(density) { menuGeometry.bounds.height.toDp() }).testTag("language-menu"),
                 ) {
-                    Column(Modifier.padding(8.dp)) {
-                        Text("语言", style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                    Column(Modifier.padding(6.dp)) {
+                        Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+                            Text("语言", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                        }
                         Column(
-                            Modifier.heightIn(max = minOf(264, LocalConfiguration.current.screenHeightDp / 2).dp)
+                            Modifier.fillMaxWidth().height(with(density) { (menuGeometry.bounds.height - 40.dp.toPx()).coerceAtLeast(1f).toDp() })
                                 .onGloballyPositioned {
                                     val topLeft = it.positionOnScreen()
                                     viewport = Rect(topLeft, androidx.compose.ui.geometry.Size(it.size.width.toFloat(), it.size.height.toFloat()))
@@ -265,7 +275,7 @@ fun LanguageKeyButton(
                                 val modeName = if (schema.schemaId == com.kingzcheung.xime.settings.InputModes.ENGLISH) "English"
                                     else actions.schemas.firstOrNull { it.schemaId == schema.schemaId }?.name ?: schema.schemaId
                                 Column(
-                                    Modifier.fillMaxWidth().height(64.dp)
+                                    Modifier.fillMaxWidth().height(with(density) { rowHeight.toDp() })
                                         .testTag("language-schema:${schema.schemaId}")
                                         .semantics {
                                             selected = (selectedId ?: actions.currentInputModeId) == schema.schemaId
@@ -275,7 +285,7 @@ fun LanguageKeyButton(
                                         .background(if (schema.schemaId == (selectedId ?: actions.currentInputModeId))
                                             MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
                                         .padding(horizontal = 12.dp),
-                                    horizontalAlignment = Alignment.Start,
+                                    horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
                                 ) {
                                     Text(schema.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -289,6 +299,7 @@ fun LanguageKeyButton(
                             }
                         }
                     }
+                }
                 }
             }
         }

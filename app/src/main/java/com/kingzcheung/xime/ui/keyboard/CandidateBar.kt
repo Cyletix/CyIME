@@ -171,7 +171,7 @@ fun CandidateBar(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val horizontalPadding = if (isLandscape && state is CandidateBarState.Idle) 50.dp else 8.dp
+    val horizontalPadding = 8.dp
     val context = LocalContext.current
 
     // M3 角色色：图标按钮背景用 surface 与 primary 的混合色调（带种子色但不过于强烈），
@@ -482,7 +482,7 @@ fun CandidateBar(
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            if (state !is CandidateBarState.Idle) Spacer(modifier = Modifier.width(8.dp))
 
             when {
                 state is CandidateBarState.Idle -> {
@@ -583,7 +583,7 @@ private fun ToolbarActionButton(
         }
     }
     Box(
-        Modifier.padding(horizontal = 2.dp).size(40.dp).clip(CircleShape)
+        Modifier.size(40.dp).clip(CircleShape)
             .background(if (action.active) visuals.accentColor.copy(alpha = 0.28f)
                 else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha.value)
                 else Color(0xFFE0E0E0).copy(alpha = pressAlpha.value))

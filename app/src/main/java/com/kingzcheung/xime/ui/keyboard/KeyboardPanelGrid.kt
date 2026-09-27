@@ -23,18 +23,20 @@ internal fun <T> KeyboardPanelGrid(
     if (items.isEmpty()) return
     BoxWithConstraints(modifier.padding(horizontal = if (isLandscape) 16.dp else 12.dp, vertical = 8.dp)) {
         val twoRowModes = compactCards && items.size > 2 && maxHeight >= 240.dp
-        val columns = if (twoRowModes) 2 else if (compactCards) minOf(items.size, 4) else if (isLandscape && maxWidth >= 560.dp) 8 else 4
+        val minimumRowHeight = (34 + 28 * LocalDensity.current.fontScale).dp
+        val lowWidePanel = maxWidth >= 560.dp && maxHeight < minimumRowHeight * 2 + 24.dp
+        val columns = if (twoRowModes) 2 else if (compactCards) minOf(items.size, 4) else if (lowWidePanel) 8 else 4
         val spacing = 8.dp
         val indicatorHeight = 16.dp
-        val minimumRowHeight = (34 + 28 * LocalDensity.current.fontScale).dp
         val rows = if (twoRowModes) 2 else if ((if (compactCards) items.size > columns else columns == 4) &&
             maxHeight - indicatorHeight >= minimumRowHeight * 2 + spacing) 2 else 1
         val pages = items.chunked(rows * columns)
         val pagerState = rememberPagerState(pageCount = { pages.size })
-        val pageIndicatorHeight = if (compactCards && pages.size == 1) 0.dp else indicatorHeight
+        val pageIndicatorHeight = if (pages.size == 1) 0.dp else indicatorHeight
         val gridHeight = if (compactCards) minOf(maxHeight,
-            maxOf(120.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight) else maxHeight
-        val gridWidth = if (compactCards) minOf(maxWidth, 180.dp * columns + spacing * (columns - 1)) else maxWidth
+            maxOf(120.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight) else minOf(maxHeight,
+            maxOf(104.dp, minimumRowHeight) * rows + spacing * (rows - 1) + pageIndicatorHeight)
+        val gridWidth = if (compactCards) minOf(maxWidth, 180.dp * columns + spacing * (columns - 1)) else minOf(maxWidth, 144.dp * columns + spacing * (columns - 1))
         Column(Modifier.align(Alignment.Center).width(gridWidth).height(gridHeight), horizontalAlignment = Alignment.CenterHorizontally) {
             HorizontalPager(pagerState, pageSpacing = spacing, modifier = Modifier.fillMaxWidth().weight(1f).testTag(pagerTag)) { page ->
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(spacing)) {

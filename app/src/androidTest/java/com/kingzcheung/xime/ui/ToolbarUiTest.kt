@@ -57,6 +57,38 @@ class ToolbarUiTest {
     @get:Rule
     val rule = createComposeRule()
 
+    @Test fun toolbarEdgesStayAlignedAndDefaultActionsFitPhoneAndTablet() {
+        var width by mutableStateOf(360.dp)
+        val buttons = ToolbarButton.DEFAULT_VISIBLE.toList()
+        rule.setContent {
+            val config = android.content.res.Configuration(androidx.compose.ui.platform.LocalConfiguration.current).apply {
+                orientation = android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            }
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalConfiguration provides config,
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(1f)) {
+                MaterialTheme {
+                    CandidateBar(CandidateBarState.Idle,
+                        toolbarActions = buttons.map { ToolbarAction(ToolbarButtonItem.Builtin(it)) {} },
+                        visuals = CandidateBarVisuals(Color.White, Color.Black, Color.Gray),
+                        callbacks = CandidateBarCallbacks(onCandidateSelect = {}, onHideKeyboard = {}),
+                        modifier = Modifier.width(width).testTag("bar"))
+                }
+            }
+        }
+        for (size in listOf(360.dp, 1000.dp)) {
+            rule.runOnIdle { width = size }
+            val bar = rule.onNodeWithTag("bar").fetchSemanticsNode().boundsInRoot
+            val left = rule.onNodeWithTag("toolbar-leading").fetchSemanticsNode().boundsInRoot
+            val right = rule.onNodeWithTag("toolbar-hide").fetchSemanticsNode().boundsInRoot
+            assertEquals(8f, left.left - bar.left, 0.1f)
+            assertEquals(8f, bar.right - right.right, 0.1f)
+            buttons.forEach {
+                val bounds = rule.onNodeWithContentDescription(it.label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                assertTrue("${it.label} must fit without scrolling at $size", bounds.width >= 22f && bounds.left >= left.right && bounds.right <= right.left)
+            }
+        }
+    }
+
     @Test
     fun aFewToolbarButtonsSpreadAcrossTheBar() {
         val buttons = listOf(ToolbarButton.CLIPBOARD, ToolbarButton.EDIT, ToolbarButton.SCHEMA)
