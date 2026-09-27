@@ -141,6 +141,7 @@ fun EditKeyboardLayout(
                     }, colors?.foreground ?: textColor, keyModifier,
                         repeatable = arrow || command in listOf("delete", "enter"),
                         plain = arrow, visualShape = cutout, compact = compact,
+                        glowSize = if (arrow) androidx.compose.ui.unit.DpSize(padDiameter / 3, padDiameter / 3) else null,
                         contentOffsetX = offsetX, contentOffsetY = offsetY)
                 }
                 CompositionLocalProvider(LocalKeyboardKeyVisualMetrics provides padMetrics,
@@ -259,6 +260,7 @@ internal fun EditorActionKey(
     plain: Boolean = false,
     visualShape: Shape? = null,
     compact: Boolean = false,
+    glowSize: androidx.compose.ui.unit.DpSize? = null,
     contentOffsetX: Dp = 0.dp,
     contentOffsetY: Dp = 0.dp,
 ) {
@@ -308,7 +310,9 @@ internal fun EditorActionKey(
         .keyGlow(Modifier.then(if (visualShape != null) Modifier.clip(visualShape) else Modifier)
         .then(shadowModifier)
         .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-        .background(if (pressed) foreground.copy(alpha = 0.18f) else background), animateCap = !plain), contentAlignment = Alignment.Center) {
+        .background(if (pressed && !LocalKeyboardInputPreferences.current.keyGlowEnabled) foreground.copy(alpha = 0.18f) else background),
+            animateCap = !plain, particleSize = glowSize,
+            particleOffset = if (plain) androidx.compose.ui.unit.DpOffset(contentOffsetX, contentOffsetY) else androidx.compose.ui.unit.DpOffset.Zero), contentAlignment = Alignment.Center) {
         Column(Modifier.offset(contentOffsetX, contentOffsetY).testTag("editor-label-$label"),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let { if (compact) it.coerceAtMost(1.15f) else it }

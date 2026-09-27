@@ -30,7 +30,11 @@ internal const val KEY_GLOW_DURATION_MS = 500
 private data class GlowSquare(val x: Float, val y: Float, val side: Float, val angle: Float, val spin: Float)
 
 /** Transform only the cap/shadow, inside the unchanged key hit target. */
-internal fun Modifier.keyGlow(cap: Modifier, animateCap: Boolean = true): Modifier = composed {
+internal fun Modifier.keyGlow(
+    cap: Modifier, animateCap: Boolean = true,
+    particleSize: androidx.compose.ui.unit.DpSize? = null,
+    particleOffset: androidx.compose.ui.unit.DpOffset = androidx.compose.ui.unit.DpOffset.Zero,
+): Modifier = composed {
     if (!LocalKeyboardInputPreferences.current.keyGlowEnabled) return@composed this.then(cap)
     // One coherent colour per press, as in the reference; overlapping squares
     // vary in brightness instead of mixing three unrelated theme colours.
@@ -63,10 +67,14 @@ internal fun Modifier.keyGlow(cap: Modifier, animateCap: Boolean = true): Modifi
         scaleX = scale
         scaleY = scale
     }.then(cap).drawWithCache {
+        // A direction sector owns a disc-sized hit target, but its particles use one key's size.
+        val lightSize = particleSize?.let { Size(it.width.toPx(), it.height.toPx()) } ?: size
+        val lightOrigin = Offset((size.width - lightSize.width) / 2 + particleOffset.x.toPx(),
+            (size.height - lightSize.height) / 2 + particleOffset.y.toPx())
         // Only the halo uses a gradient. The four particles must remain squares.
         val glowBrush = Brush.radialGradient(
             listOf(color.copy(alpha = 0.25f), Color.Transparent),
-            center = Offset.Zero, radius = size.maxDimension.coerceAtLeast(1f) * 0.8f,
+            center = Offset.Zero, radius = lightSize.maxDimension.coerceAtLeast(1f) * 0.8f,
         )
         onDrawWithContent {
             val t = elapsed.value
@@ -76,16 +84,16 @@ internal fun Modifier.keyGlow(cap: Modifier, animateCap: Boolean = true): Modifi
                 val fade = remaining
                 val travel = keyGlowTravel(t)
                 drawRect(color, alpha = fade * 0.75f)
-                val glowCenter = Offset(size.width * 0.5f, size.height * 0.55f)
+                val glowCenter = lightOrigin + Offset(lightSize.width * 0.5f, lightSize.height * 0.55f)
                 translate(glowCenter.x, glowCenter.y) {
                     drawRect(glowBrush, topLeft = -glowCenter, size = size, alpha = fade,
                         blendMode = BlendMode.Screen)
                 }
                 particles.forEach { square ->
-                    val side = size.minDimension * square.side * keyGlowSquareSize(t)
+                    val side = lightSize.minDimension * square.side * keyGlowSquareSize(t)
                     val center = Offset(
-                        size.width * square.x,
-                        size.height * (square.y - travel * 0.06f),
+                        lightOrigin.x + lightSize.width * square.x,
+                        lightOrigin.y + lightSize.height * (square.y - travel * 0.06f),
                     )
                     rotate(square.angle + square.spin * travel, center) {
                         drawKeyGlowSquare(color, center, side, fade)
