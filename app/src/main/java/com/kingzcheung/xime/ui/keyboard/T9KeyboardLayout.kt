@@ -68,6 +68,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -345,7 +347,6 @@ private fun T9KeyboardContent(
 ) {
     val t9DigitFontSize = if (compactMode) 13.sp else 16.sp
     val ctrlFontSize = if (compactMode) 11.sp else androidx.compose.ui.unit.TextUnit.Unspecified
-    val candidateFontSize = if (compactMode) 11.sp else 13.sp
     val specialKeyTextColor = if (uiState.isDarkTheme) Color.White
         else KeyboardThemes.getSpecialKeyTextColor(uiState.themeId, false)
 
@@ -414,7 +415,7 @@ private fun T9KeyboardContent(
                 .weight(0.8f),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(3f)
@@ -427,94 +428,52 @@ private fun T9KeyboardContent(
                 val currentFirstOptions = controller.firstOptions
                 // 空闲态符号列表来自 xime.yaml keyboard.t9.side_symbols（可自定义，>4 滚动）
                 val configVersion by KeysConfigHelper.configVersion.collectAsState()
-                val t9SideSymbols = LocalKeyboardInputPreferences.current.symbols()
+                val customSymbols = LocalKeyboardInputPreferences.current.symbols()
+                val t9SideSymbols = customSymbols
                     ?: remember(configVersion) { KeysConfigHelper.getT9SideSymbols() }
                 val displayItems: List<String> = if (showCandidates) {
                     currentFirstOptions.map { it.pinyin }
                 } else {
                     t9SideSymbols
                 }
-                if (displayItems.size <= 4) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        displayItems.forEachIndexed { index, item ->
-                            if (showCandidates) {
-                            val option = currentFirstOptions[index]
-                            val isSelected = controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
-                                    controller.selectedOption == option &&
-                                    controller.isSelectedOptionInCurrentCandidates()
-                                    CandidateItem(
-                                        text = option.pinyin,
-                                        onClick = { callbacks.onDismissPreeditEditor?.invoke(); controller.onChoiceSelected(option) },
-                                        onPress = { onKeyPressDown?.invoke(option.pinyin) },
-                                        textColor = keyTextColor,
-                                        backgroundColor = keyBackgroundColor,
-                                        accentColor = accentColor,
-                                        fontSize = candidateFontSize,
-                                        isSelected = isSelected,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .weight(1f)
-                                    )
-                            } else {
-                                CandidateItem(
-                                    text = item,
-                                    onClick = { commitDirect(item) },
-                                    onPress = { onKeyPressDown?.invoke(item) },
-                                    textColor = keyTextColor,
-                                    backgroundColor = keyBackgroundColor,
-                                    accentColor = accentColor,
-                                    fontSize = candidateFontSize,
-                                    isSelected = false,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f)
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        itemsIndexed(displayItems) { index, item ->
-                            if (showCandidates) {
-                                val option = currentFirstOptions[index]
-                                val isSelected = controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
-                                        controller.selectedOption == option &&
-                                        controller.isSelectedOptionInCurrentCandidates()
-                                CandidateItem(
-                                    text = option.pinyin,
-                                    onClick = { callbacks.onDismissPreeditEditor?.invoke(); controller.onChoiceSelected(option) },
-                                    onPress = { onKeyPressDown?.invoke(option.pinyin) },
-                                    textColor = keyTextColor,
-                                    backgroundColor = keyBackgroundColor,
-                                    accentColor = accentColor,
-                                    fontSize = candidateFontSize,
-                                    isSelected = isSelected,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(if (compactMode) 26.dp else 32.dp)
-                                )
-                            } else {
-                                CandidateItem(
-                                    text = item,
-                                    onClick = { commitDirect(item) },
-                                    onPress = { onKeyPressDown?.invoke(item) },
-                                    textColor = keyTextColor,
-                                    backgroundColor = keyBackgroundColor,
-                                    accentColor = accentColor,
-                                    fontSize = candidateFontSize,
-                                    isSelected = false,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(if (compactMode) 26.dp else 32.dp)
-                                )
-                            }
-                        }
+                // One four-slot scale for letters and syllables, independent of option count.
+                val metrics = t9CandidateMetrics(maxWidth.value, maxHeight.value,
+                    LocalDensity.current.fontScale, LocalKeyboardInputPreferences.current.keyTextScale,
+                    keyContentScale(maxWidth.value, maxHeight.value / 4f))
+                val sample = rememberTextMeasurer().measure("shuang",
+                    TextStyle(fontSize = metrics.fontSizeSp.sp, fontFamily = AppFonts.candidateFontFamily),
+                    maxLines = 1, softWrap = false)
+                val availableTextWidth = with(LocalDensity.current) { (maxWidth - 8.dp).toPx() }.coerceAtLeast(1f)
+                val candidateFontSize = metrics.fontSizeSp * minOf(1f, availableTextWidth / sample.size.width.coerceAtLeast(1))
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().testTag("t9-pinyin-options"),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    itemsIndexed(displayItems) { index, item ->
+                        val option = currentFirstOptions.getOrNull(index).takeIf { showCandidates }
+                        val isSelected = option != null &&
+                            controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
+                            controller.selectedOption == option && controller.isSelectedOptionInCurrentCandidates()
+                        CandidateItem(
+                            text = item,
+                            preserveWidth = !showCandidates && customSymbols != null,
+                            onClick = {
+                                if (option != null) {
+                                    callbacks.onDismissPreeditEditor?.invoke()
+                                    controller.onChoiceSelected(option)
+                                } else if (customSymbols != null) {
+                                    (callbacks.onCommitExactText ?: callbacks.onCommitText ?: onKeyPress)(item)
+                                } else commitDirect(item)
+                            },
+                            onPress = { onKeyPressDown?.invoke(item) },
+                            textColor = keyTextColor,
+                            backgroundColor = keyBackgroundColor,
+                            accentColor = accentColor,
+                            fontSize = candidateFontSize.sp,
+                            isSelected = isSelected,
+                            modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp)
+                                .testTag("t9-pinyin-option:$index")
+                        )
                     }
                 }
             }
@@ -749,12 +708,21 @@ private fun T9KeyboardContent(
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
+            NineKeyButton(
+                digit = "", letters = "0", onClick = { commitDirect("0") },
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                modifier = Modifier.weight(1f).testTag("t9-zero-key"),
+                onPress = { onKeyPressDown?.invoke("0") },
+                onSwipeStateChange = onSwipeStateChange, swipes = swipesFor("0"),
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius,
+            )
             ActionKeyButton(
                 text = uiState.enterKeyText,
                 onClick = { onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(2f),
+                modifier = Modifier.weight(1f),
                 onPress = { onKeyPressDown?.invoke("enter") },
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
@@ -844,11 +812,12 @@ private fun CandidateItem(
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
     isSelected: Boolean = false,
+    preserveWidth: Boolean = false,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnPress by rememberUpdatedState(onPress)
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else Color.Transparent)
@@ -862,6 +831,7 @@ private fun CandidateItem(
             },
         contentAlignment = Alignment.Center
     ) {
+        val fittedFontSize = fontSize
         if (isSelected) {
             Box(
                 modifier = Modifier
@@ -870,9 +840,10 @@ private fun CandidateItem(
                     .padding(horizontal = 3.dp, vertical = 1.dp)
             ) {
                 Text(
-                    text = punctuationKeyLabel(text),
+                    text = if (preserveWidth) text else punctuationKeyLabel(text),
                     color = accentColor,
-                    fontSize = fontSize,
+                    fontSize = fittedFontSize,
+                    lineHeight = fittedFontSize * 1.2f,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -881,9 +852,10 @@ private fun CandidateItem(
             }
         } else {
             Text(
-                text = punctuationKeyLabel(text),
+                text = if (preserveWidth) text else punctuationKeyLabel(text),
                 color = textColor,
-                fontSize = fontSize,
+                fontSize = fittedFontSize,
+                    lineHeight = fittedFontSize * 1.2f,
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,

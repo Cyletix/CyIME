@@ -211,7 +211,7 @@ fun KeyButton(
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val hintScale = adaptiveHintScale(contentScale)
-        val hintSize = 9f * hintScale
+        val hintSize = 10f * hintScale
         val hintOffset = KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale).dp
         val labelSize = keyLabelSizeSp(text,
             fontSize?.takeUnless { it == androidx.compose.ui.unit.TextUnit.Unspecified }?.value
@@ -290,7 +290,7 @@ fun SwipeableKeyButton(
     /** 右上角角标文字（如 T9 数字键的数字浮标） */
     badgeText: String? = null,
     fontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
-    swipeFontSize: androidx.compose.ui.unit.TextUnit = 9.sp,
+    swipeFontSize: androidx.compose.ui.unit.TextUnit = 10.sp,
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
@@ -974,7 +974,7 @@ fun SwipeableIconKeyButton(
         
         if (!swipeText.isNullOrEmpty()) {
             val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
-            val hintSize = 9f * adaptiveHintScale(contentScale)
+            val hintSize = 10f * adaptiveHintScale(contentScale)
             Text(
                 text = punctuationKeyLabel(swipeText),
                 color = iconColor.copy(alpha = 0.5f),
