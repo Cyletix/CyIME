@@ -563,6 +563,8 @@ fun KeyboardLayout(
                         }
                     }
 
+                    // 26键底行：逗号与地球等宽，逗号右缘不超过上一行 X 键右缘。
+                    val bottom = if (keyRows.firstOrNull()?.size == 10) QwertyBottomRowWeights.Standard else QwertyBottomRowWeights.Legacy
                     // 第四行（控制行）
                     Row(
                         modifier = Modifier
@@ -572,11 +574,11 @@ fun KeyboardLayout(
                         if (isVoiceMode && !isVoiceSticky) {
                             DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(1.4f)
+                                modifier = Modifier.weight(bottom.mode * 2)
                             )
                             DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(0.6f)
+                                modifier = Modifier.weight(bottom.punctuation)
                             )
                         } else {
                             for (slot in 1..2) {
@@ -584,7 +586,7 @@ fun KeyboardLayout(
                                     slot = slot, onKeyPress = onKeyPress,
                                     backgroundColor = specialKeyBackgroundColor,
                                     textColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(0.7f),
+                                    modifier = Modifier.weight(bottom.mode),
                                     onKeyPressDown = onKeyPressDown,
                                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                                     shadowShapeRadius = shadowShapeRadius,
@@ -660,7 +662,7 @@ fun KeyboardLayout(
                                     onClick = k2OnClick,
                                     backgroundColor = specialKeyBackgroundColor,
                                     iconColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(0.6f),
+                                    modifier = Modifier.weight(bottom.punctuation),
                                     onPress = { onKeyPressDown?.invoke(k2TapValue) },
                                     onRelease = { onKeyRelease?.invoke(k2TapValue) },
                                     swipeText = k2SwipeUpLabel,
@@ -680,7 +682,7 @@ fun KeyboardLayout(
                                     onClick = k2OnClick,
                                     backgroundColor = keyBackgroundColor,
                                     textColor = keyTextColor,
-                                    modifier = Modifier.weight(0.6f),
+                                    modifier = Modifier.weight(bottom.punctuation),
                                     swipeText = k2SwipeUpLabel,
                                     swipeDownText = k2SwipeDownBubbleText,
                                     swipeDownKeyLabel = if ((k2SwipeDownDisplay == DisplayMode.KEY || k2SwipeDownDisplay == DisplayMode.BOTH)) k2SwipeDownLabel else null,
@@ -711,7 +713,7 @@ fun KeyboardLayout(
                             shadowEnabled = shadowEnabled,
                             shadowElevation = shadowElevation,
                             shadowShapeRadius = shadowShapeRadius,
-                            modifier = Modifier.weight(3f),
+                            modifier = Modifier.weight(bottom.space),
                             onKeyPress = onKeyPress,
                             onKeyPressDown = onKeyPressDown,
                             onKeyRelease = onKeyRelease,
@@ -722,11 +724,11 @@ fun KeyboardLayout(
                         if (isVoiceMode && !isVoiceSticky) {
                             DummyKeyButton(
                                 backgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(0.8f)
+                                modifier = Modifier.weight(bottom.language)
                             )
                             DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                modifier = Modifier.weight(1.2f)
+                                modifier = Modifier.weight(bottom.enter)
                             )
                         } else {
                             // earth — 从配置读取
@@ -809,7 +811,7 @@ fun KeyboardLayout(
                                     onClick = k4OnClick,
                                     backgroundColor = specialKeyBackgroundColor,
                                     iconColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(0.8f),
+                                    modifier = Modifier.weight(bottom.language),
                                     onPress = { onKeyPressDown?.invoke(k4TapValue) },
                                     onRelease = { onKeyRelease?.invoke(k4TapValue) },
                                     swipeText = k4SwipeUpLabel.takeIf { it.isNotEmpty() },
@@ -829,7 +831,7 @@ fun KeyboardLayout(
                                     onClick = k4OnClick,
                                     backgroundColor = specialKeyBackgroundColor,
                                     textColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(0.8f),
+                                    modifier = Modifier.weight(bottom.language),
                                     icon = k4Icon,
                                     swipeText = k4SwipeUpLabel.takeIf { it.isNotEmpty() },
                                     swipeDownText = k4SwipeDownBubbleText,
@@ -855,7 +857,7 @@ fun KeyboardLayout(
                                 onClick = { onKeyPress("enter") },
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
-                                modifier = Modifier.weight(1.2f),
+                                modifier = Modifier.weight(bottom.enter),
                                 onPress = { onKeyPressDown?.invoke("enter") },
                                 onRelease = { onKeyRelease?.invoke("enter") },
                                 shadowEnabled = shadowEnabled,
@@ -1245,7 +1247,7 @@ private fun SplitKeyboardContent(
     val suppressCursorMove = LocalSuppressCursorMove.current
     val staggerStep = 6.dp
     val landscapeFontSize = 18.sp
-    val landscapeSwipeFontSize = 9.sp
+    val landscapeSwipeFontSize = 10.sp
 
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
@@ -1732,7 +1734,7 @@ fun SwipeableKeyButtonLandscape(
     onLongPressSelect: ((String) -> Unit)? = null,
     longPressItems: List<String>? = null,
     fontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
-    swipeFontSize: androidx.compose.ui.unit.TextUnit = 8.sp,
+    swipeFontSize: androidx.compose.ui.unit.TextUnit = 10.sp,
     onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,

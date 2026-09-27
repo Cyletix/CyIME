@@ -11,7 +11,7 @@ data class KeyboardRowConfig(
     val keyTextColor: Color,
     val keyboardBackgroundColor: Color = Color.Transparent,
     val fontSize: TextUnit = TextUnit.Unspecified,
-    val swipeFontSize: TextUnit = 9.sp,
+    val swipeFontSize: TextUnit = 10.sp,
     val shadowEnabled: Boolean = true,
     val shadowElevation: Dp = 1.dp,
     val shadowShapeRadius: Dp = 8.dp,
