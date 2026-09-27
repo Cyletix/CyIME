@@ -23,11 +23,30 @@ class ChineseSchemasTest {
         ChineseSchemas.installAssets(context, File(directory, "rime"))
         val old = listOf("my_custom", "japanese_kana")
         val updated = ChineseSchemas.addOnFirstUpgrade(context, old)
-        assertEquals(old + ChineseSchemas.ids, updated)
+        assertEquals(old + CyimeInputDefaults.recommended, updated)
         assertFalse(updated.contains("wubi86"))
-        val disabledAgain = updated - "pinyin_14jian"
+        val disabledAgain = updated - "t9_pinyin"
         assertEquals(disabledAgain, ChineseSchemas.addOnFirstUpgrade(context, disabledAgain))
     }
+    @Test fun earlyReadsCannotPersistPartialAssetListsOrConsumeMigrations() {
+        val rime = File(directory, "rime")
+        File(rime, SchemaManager.ASSET_INSTALL_MARKER).writeText("installing")
+        File(rime, "pinyin_simp.schema.yaml").writeText("schema: {schema_id: pinyin_simp, name: old}")
+        val config = File(rime, "default.custom.yaml")
+        config.writeText("patch:\n  schema_list:\n    - schema: pinyin_simp\n")
+        val original = config.readText()
+        assertEquals(CyimeInputDefaults.recommended, SchemaManager.getEnabledSchemas(context))
+        assertEquals(original, config.readText())
+        assertFalse(SettingsPreferences.isBuiltinSchemasMerged(context))
+        assertFalse(SettingsPreferences.getPrefsPublic(context).getBoolean("cyime_chinese_defaults_v1", false))
+        ChineseSchemas.installAssets(context, rime)
+        File(rime, SchemaManager.ASSET_INSTALL_MARKER).delete()
+        assertEquals(CyimeInputDefaults.recommended, SchemaManager.getEnabledSchemas(context))
+        assertFalse(SchemaManager.getEnabledSchemas(context).any { it in JapaneseSchemas.ids || it == "pinyin_14jian" })
+        SchemaManager.setEnabledSchemas(context, listOf("t9_pinyin", "japanese"))
+        assertEquals(listOf("t9_pinyin", "japanese"), SchemaManager.getEnabledSchemas(context))
+    }
+
     @Test fun packagedSchemaHasClearNameAndDoesNotOverwriteMarketReplacement() {
         val target = File(directory, "rime")
         ChineseSchemas.installAssets(context, target)

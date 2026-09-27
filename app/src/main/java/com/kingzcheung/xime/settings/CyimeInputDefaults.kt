@@ -2,7 +2,7 @@ package com.kingzcheung.xime.settings
 
 /** 面向用户的是布局；词典依赖继续安装/编译，但不重复占用语言菜单。 */
 object CyimeInputDefaults {
-    val recommended = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "japanese", "japanese_kana")
+    val recommended = listOf("rime_ice", "t9_pinyin")
     val legacyDefaults = setOf("wubi86", "wubi86_pinyin", "wubi86_trad", "wubi86_trad_pinyin")
     val dependencies = setOf("melt_eng", "radical_pinyin", "numbers", "handwriting")
 

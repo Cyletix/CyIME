@@ -16,7 +16,7 @@ class CyimeInputDefaultsTest {
         assertEquals(ids, CyimeInputDefaults.canonicalIds(ids, ids.toSet()))
     }
     @Test fun defaultChineseModesShareOneOfflineDictionaryFamily() {
-        assertEquals(listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "japanese", "japanese_kana"), CyimeInputDefaults.recommended)
+        assertEquals(listOf("rime_ice", "t9_pinyin"), CyimeInputDefaults.recommended)
         assertFalse(CyimeInputDefaults.recommended.any { it in CyimeInputDefaults.dependencies })
     }
 }
