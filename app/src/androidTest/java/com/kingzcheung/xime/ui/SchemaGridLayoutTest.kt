@@ -98,7 +98,7 @@ class SchemaGridLayoutTest {
         rule.onNodeWithTag("schema-pages", useUnmergedTree = true).performTouchInput { swipeLeft() }
         rule.onNodeWithTag("schema-tile:mode4").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals("mode4", selected) }
-        rule.onNodeWithText("调整顺序").performClick()
+        rule.onNodeWithText("模式顺序").performClick()
         rule.onNodeWithTag("input-mode-order:mode4").performScrollTo().assertIsDisplayed()
     }
 }

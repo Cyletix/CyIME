@@ -19,6 +19,19 @@ enum class InputLanguage(val id: String, val displayName: String) {
 object InputModes {
     const val ENGLISH = "__xime_english"
     private const val ORDER_KEY = "input_mode_order"
+    private const val LANGUAGE_ORDER_KEY = "input_language_order"
+    val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH)
+
+    fun languageOrder(ids: List<String>): List<InputLanguage> =
+        (ids.mapNotNull { id -> InputLanguage.entries.firstOrNull { it.id == id } } + InputLanguage.entries).distinct()
+
+    fun languageOrder(context: Context): List<InputLanguage> = languageOrder(
+        SettingsPreferences.getPrefsPublic(context).getString(LANGUAGE_ORDER_KEY, "").orEmpty().lines())
+
+    fun saveLanguageOrder(context: Context, ids: List<String>) {
+        SettingsPreferences.getPrefsPublic(context).edit()
+            .putString(LANGUAGE_ORDER_KEY, languageOrder(ids).joinToString("\n") { it.id }).apply()
+    }
     val english = SchemaInfo(ENGLISH, "英文", "", "", "内置英文模式，始终启用", isDownloaded = true)
 
     fun available(schemas: List<SchemaInfo>, order: List<String> = emptyList()): List<SchemaInfo> {
@@ -36,7 +49,7 @@ object InputModes {
     }
 
     fun ordered(context: Context, schemas: List<SchemaInfo>): List<SchemaInfo> =
-        available(schemas, SettingsPreferences.getPrefsPublic(context).getString(ORDER_KEY, "").orEmpty().lines())
+        available(schemas, SettingsPreferences.getPrefsPublic(context).getString(ORDER_KEY, null)?.lines() ?: defaultModeOrder)
 
     fun saveOrder(context: Context, ids: List<String>) {
         SettingsPreferences.getPrefsPublic(context).edit()
@@ -54,9 +67,9 @@ object InputModes {
 
     /** One entry per language, pointing to that language's last available mode. */
     fun languageChoices(schemas: List<SchemaInfo>, currentModeId: String,
-        remembered: Map<InputLanguage, String>): List<SchemaInfo> {
+        remembered: Map<InputLanguage, String>, languageOrder: List<InputLanguage> = InputLanguage.entries): List<SchemaInfo> {
         val modes = available(schemas)
-        return InputLanguage.entries.mapNotNull { language ->
+        return (languageOrder + InputLanguage.entries).distinct().mapNotNull { language ->
             val group = modes.filter { it.language == language }
             val chosen = group.firstOrNull { it.schemaId == currentModeId }
                 ?: group.firstOrNull { it.schemaId == remembered[language] }
