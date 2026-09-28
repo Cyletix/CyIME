@@ -61,6 +61,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.FirstBaseline
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -116,6 +119,8 @@ data class CandidateBarVisuals(
 
 data class CandidateBarCallbacks(
     val onCandidateSelect: (Int) -> Unit,
+    val onVisibleCandidatesChanged: ((List<String>) -> Unit)? = null,
+    val onVisibleAssociationsChanged: ((List<String>) -> Unit)? = null,
     val onLogoClick: (() -> Unit)? = null,
     val onBack: (() -> Unit)? = null,
     val onHideKeyboard: (() -> Unit)? = null,
@@ -242,42 +247,9 @@ fun CandidateBar(
             displayCandidates = taken
             displayComments = s.comments
 
-            hasAnyMore = s.hasMore || candidateListState.canScrollForward
+            hasAnyMore = s.hasMore || s.candidates.size > 1
             showLeftIcon = false
-            displayAssociation = remember(s.associationCandidates, taken, s.inputText, textMeasurer, candidateTextSize, showCompositionCancel, screenWidthPx, density) {
-                if (s.associationCandidates.isEmpty()) {
-                    // 常规输入没有追加联想时，避免每次按键测量整页候选文字。
-                    emptyList()
-                } else if (taken.isEmpty()) {
-                    s.associationCandidates.take(PredictionManager.MAX_ASSOCIATION_COUNT)
-                } else {
-                    val measureText = { text: String ->
-                        textMeasurer.measure(
-                            text = AnnotatedString(text),
-                            style = TextStyle(fontSize = candidateTextSize.sp)
-                        ).size.width.toFloat()
-                    }
-                    val leftPx = with(density) { rowPaddingPx + if (showCompositionCancel) 44.dp.toPx() else 0f }
-                    val rowWidthPx = screenWidthPx - leftPx - rightSidePx
-                    val regularWidthPx = taken.sumOf { c ->
-                        measureText(c).toDouble() + itemPaddingPx
-                    }.toFloat()
-                    val dividerWidthPx = with(density) { 9.dp.toPx() }
-                    val availablePx = rowWidthPx - regularWidthPx - dividerWidthPx
-
-                    var used = 0f
-                    val result = mutableListOf<String>()
-                    for (c in s.associationCandidates) {
-                        val w =
-                            measureText(c) + itemPaddingPx + (if (result.isEmpty()) 0f else spacingPx)
-                        if (used + w <= availablePx) {
-                            used += w
-                            result.add(c)
-                        } else break
-                    }
-                    result
-                }
-            }
+            displayAssociation = s.associationCandidates.take(PredictionManager.MAX_ASSOCIATION_COUNT)
         }
         is CandidateBarState.AssociationOnly -> {
             displayCandidates = emptyList()
@@ -418,7 +390,15 @@ fun CandidateBar(
                 }
             }
 
-            LazyRow(
+            if (state is CandidateBarState.ChineseCandidates) {
+                FixedCandidateStrip(
+                    candidates = displayCandidates, associations = displayAssociation,
+                    comments = if (showComments) displayComments else emptyList(),
+                    visuals = visuals, callbacks = callbacks,
+                    fontSize = candidateTextSize.sp,
+                    modifier = Modifier.weight(1f),
+                )
+            } else LazyRow(
                 modifier = if (state is CandidateBarState.Idle) Modifier else Modifier.weight(1f),
                 state = candidateListState,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -670,6 +650,7 @@ fun CandidateItem(
 ) {
     Row(
         modifier = modifier
+            .height(with(LocalDensity.current) { (fontSize.value * 1.35f).sp.toDp() } + 4.dp)
             .clip(RoundedCornerShape(5.dp))
             .background(
                 if (isSelected) accentColor.copy(alpha = 0.2f)
@@ -684,16 +665,21 @@ fun CandidateItem(
     ) {
         Text(
             text = text,
+            modifier = Modifier.candidateBaseline(fontSize),
             color = if (isSelected) selectedTextColor else textColor,
             fontSize = fontSize,
             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1,
-            fontFamily = candidateFontFamily
+            fontFamily = candidateFontFamily,
+            style = TextStyle(lineHeight = (fontSize.value * 1.35f).sp,
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)),
+            overflow = TextOverflow.Ellipsis,
         )
         if (comment.isNotEmpty()) {
             Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = comment,
+                modifier = Modifier.candidateBaseline(fontSize),
                 color = if (isSelected) selectedTextColor.copy(alpha = 0.6f) else textColor.copy(alpha = 0.5f),
                 fontSize = (fontSize.value * 11f / 19f).sp,
                 fontWeight = FontWeight.Normal,
@@ -757,5 +743,63 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
                 color = visuals.textColor.copy(alpha = 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
                 softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
         }
+    }
+}
+
+/** One measured, non-scrolling row. Overflow belongs to the expanded panel. */
+@Composable
+internal fun FixedCandidateStrip(
+    candidates: List<String>, associations: List<String> = emptyList(), comments: List<String>, visuals: CandidateBarVisuals,
+    callbacks: CandidateBarCallbacks, fontSize: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")) {
+        val panelWidth = maxWidth
+        val all = candidates + associations
+        val widths = remember(all, comments, fontSize, density, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
+            all.mapIndexed { index, text ->
+                val primary = measurer.measure(AnnotatedString(text), TextStyle(
+                    fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily,
+                    fontWeight = if (index == 0) FontWeight.Medium else FontWeight.Normal), softWrap = false).size.width
+                val comment = comments.getOrElse(index) { "" }
+                val secondary = if (comment.isEmpty()) 0 else measurer.measure(AnnotatedString(comment),
+                    TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
+                        fontFamily = AppFonts.commentFontFamily), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
+                primary + secondary + with(density) { 8.dp.roundToPx() }
+            }
+        }
+        val count = candidatePrefixCount(widths, constraints.maxWidth, with(density) { 4.dp.roundToPx() })
+        val visible = all.take(count)
+        androidx.compose.runtime.SideEffect {
+            callbacks.onVisibleCandidatesChanged?.invoke(candidates.take(count))
+            callbacks.onVisibleAssociationsChanged?.invoke(associations.take((count - candidates.size).coerceAtLeast(0)))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            visible.forEachIndexed { index, text ->
+                CandidateItem(text, index, {
+                    if (index < candidates.size) callbacks.onCandidateSelect(index)
+                    else callbacks.onAssociationSelect?.invoke(index - candidates.size)
+                }, visuals.textColor,
+                    comment = comments.getOrElse(index) { "" }, isSelected = index == 0,
+                    accentColor = visuals.accentColor, selectedTextColor = visuals.selectedTextColor,
+                    fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
+                    commentFontFamily = AppFonts.commentFontFamily,
+                    modifier = Modifier.widthIn(max = panelWidth).testTag("bar-candidate:$index"),
+                    onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null)
+            }
+        }
+    }
+}
+
+// Latin and CJK fallback fonts have different ascents. Anchor actual baselines,
+// not just differently sized text boxes, to the same position in the candidate row.
+private fun Modifier.candidateBaseline(fontSize: androidx.compose.ui.unit.TextUnit): Modifier = layout { measurable, constraints ->
+    val child = measurable.measure(constraints.copy(minHeight = 0))
+    val height = (fontSize.toPx() * 1.35f).roundToInt().coerceIn(constraints.minHeight, constraints.maxHeight)
+    val baseline = child[FirstBaseline]
+    layout(child.width, height) {
+        child.placeRelative(0, (fontSize.toPx() * 1.05f).roundToInt() - baseline)
     }
 }

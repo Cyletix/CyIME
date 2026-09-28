@@ -38,7 +38,7 @@ class ExpandedCandidateLayoutTest {
                 orientation = if (landscape.value) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
             }
             CompositionLocalProvider(LocalConfiguration provides config,
-                LocalDensity provides Density(LocalDensity.current.density, fontScale.value)) {
+                LocalDensity provides Density(1f, fontScale.value)) {
                 MaterialTheme {
                     CandidatePage(
                         state = CandidatePageState(candidates = entries, backgroundColor = Color(0xFF211D29),
