@@ -59,6 +59,12 @@ import kotlin.math.roundToInt
 /** 悬浮键盘卡片圆角；调整覆盖层的四角示意与它同心，避免示意被圆角切掉。 */
 internal val FloatingKeyboardCardCorner = 16.dp
 internal val FloatingKeyboardCardShape = RoundedCornerShape(FloatingKeyboardCardCorner)
+// 固定面板底边与导航区连成一体，仅保留顶部圆角；预览使用同一形状。
+internal val FixedKeyboardCardShape = RoundedCornerShape(
+    topStart = FloatingKeyboardCardCorner, topEnd = FloatingKeyboardCardCorner,
+)
+internal fun keyboardPanelShape(isFloating: Boolean, roundedBottom: Boolean = false) =
+    if (isFloating || roundedBottom) FloatingKeyboardCardShape else FixedKeyboardCardShape
 
 @Composable
 internal fun FloatingKeyboardContainer(
@@ -84,6 +90,7 @@ internal fun FloatingKeyboardContainer(
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
+    val fixedCardShape = keyboardPanelShape(false, rememberRoundedKeyboardBottom())
 
     // 调节模式下固定键盘也放进稳定的全屏宿主里，previewRect 直接决定它的真实区域。
     // 这样控制面板可以放在键盘外面，边框也不会因为宿主高度变化而漂移。
@@ -94,7 +101,7 @@ internal fun FloatingKeyboardContainer(
                 val travel = ((maxWidth - width) / 2f).value
                 Box(Modifier.align(Alignment.TopCenter)
                     .absoluteOffset(x = fixedOffsetX.toFloat().coerceIn(-travel, travel).dp)
-                    .width(width).fillMaxSize().clip(FloatingKeyboardCardShape).testTag("fixed-keyboard-card")
+                    .width(width).fillMaxSize().clip(fixedCardShape).testTag("fixed-keyboard-card")
                     .onGloballyPositioned { coords ->
                         val pos = coords.positionInWindow()
                         onCardPositioned(pos.x.roundToInt(), pos.y.roundToInt(),
@@ -112,7 +119,7 @@ internal fun FloatingKeyboardContainer(
                         .align(Alignment.TopStart)
                         .absoluteOffset { IntOffset(previewRect.left.roundToInt(), previewRect.top.roundToInt()) }
                         .size(previewWidth, previewHeight)
-                        .clip(FloatingKeyboardCardShape)
+                        .clip(fixedCardShape)
                         .testTag("fixed-keyboard-resize-preview")
                         .onGloballyPositioned { coords ->
                             val pos = coords.positionInWindow()

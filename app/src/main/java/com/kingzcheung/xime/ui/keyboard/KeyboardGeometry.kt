@@ -3,10 +3,10 @@ package com.kingzcheung.xime.ui.keyboard
 import kotlin.math.roundToInt
 
 /**
- * 悬浮键盘调节时的最小尺寸：手机基准下限，横屏也不放宽。
+ * 悬浮键盘大屏宽度基准与共用面板最小高度。
  *
- * 以前横屏单独给更小的下限（高度 130），平板横屏反而能缩得比手机还小；
- * 现在两个方向共用同一基准，横屏只允许更大，不允许因比例算法变小。
+ * 手机上宽度通过 floatingResizeMinWidthDp 自适应，避免 400dp 把宽度锁成全屏；
+ * 高度仍保持两个方向共用同一基准，尺寸调节不切换布局比例。
  */
 internal const val FLOATING_RESIZE_MIN_WIDTH_DP = 400
 internal const val FLOATING_RESIZE_MIN_HEIGHT_DP = 228
@@ -22,19 +22,19 @@ internal const val FLOATING_RESIZE_MIN_HEIGHT_DP = 228
 internal fun floatingResizeHeightBounds(hostHeightDp: Int, landscape: Boolean): IntRange {
     val host = hostHeightDp.coerceAtLeast(1)
     val min = FLOATING_RESIZE_MIN_HEIGHT_DP
-    // 悬浮调节不能把九键拉成长柱。横屏留出操作面板空间，竖屏最多占可用高约一半。
-    val maxByScreen = if (landscape) {
-        (host * 64 / 100) - FLOATING_DRAG_BAR_HEIGHT_DP
-    } else {
-        (host * 48 / 100) - FLOATING_DRAG_BAR_HEIGHT_DP
-    }
+    // 放宽大屏纵向调节空间；独立的高宽比上限继续防止拉成长柱。
+    val maxByScreen = (host * 70 / 100) - FLOATING_DRAG_BAR_HEIGHT_DP
     val max = maxByScreen.coerceAtLeast(min)
     return min..max
 }
 
 /** 最小宽度：手机基准下限与可用宽度取小（[availableWidthDp] 已扣边距）。 */
 internal fun floatingResizeMinWidthDp(availableWidthDp: Int): Int =
-    minOf(FLOATING_RESIZE_MIN_WIDTH_DP, availableWidthDp.coerceAtLeast(1))
+    availableWidthDp.coerceAtLeast(1).let { available ->
+        // 400dp 在手机上会被夹成全屏宽，导致没有缩小空间；大屏仍保留可用尺寸。
+        (available * 0.65f).roundToInt().coerceIn(260, FLOATING_RESIZE_MIN_WIDTH_DP)
+            .coerceAtMost(available)
+    }
 
 /** 最小高度：手机基准下限与可用高度取小（[availableHeightDp] 已扣边距）。 */
 internal fun floatingResizeMinHeightDp(availableHeightDp: Int): Int =
@@ -58,13 +58,13 @@ internal fun floatingKeyboardWidth(screenWidth: Int, screenHeight: Int, height: 
     // 不再从普通键盘高度反推宽度，避免横屏默认尺寸忽大忽小。
     val ratio = if (landscape) (if (wide) 0.52f else 0.48f) else 0.78f
     return ((screenWidth * ratio / 10f).roundToInt() * 10)
-        .coerceIn(minOf(FLOATING_RESIZE_MIN_WIDTH_DP, screenWidth), screenWidth)
+        .coerceIn(keyboardWidthBounds(screenWidth))
 }
 
 /** 悬浮键盘宽度范围（dp）。 */
 internal fun keyboardWidthBounds(screenWidth: Int): IntRange {
     val cap = screenWidth.coerceAtLeast(1)
-    return minOf(FLOATING_RESIZE_MIN_WIDTH_DP, cap)..cap
+    return floatingResizeMinWidthDp(cap)..cap
 }
 
 /**

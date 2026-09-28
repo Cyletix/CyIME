@@ -25,10 +25,12 @@ internal fun <T> KeyboardPanelGrid(
         val twoRowModes = compactCards && items.size > 2 && maxHeight >= 240.dp
         val minimumRowHeight = (34 + 28 * LocalDensity.current.fontScale).dp
         val lowWidePanel = maxWidth >= 560.dp && maxHeight < minimumRowHeight * 2 + 24.dp
-        val columns = if (twoRowModes) 2 else if (compactCards) minOf(items.size, 4) else if (lowWidePanel) 8 else 4
+        val menuColumns = ((maxWidth.value + 8f) / (64f * LocalDensity.current.fontScale + 8f))
+            .toInt().coerceIn(1, if (lowWidePanel) 8 else 4)
+        val columns = minOf(items.size, if (twoRowModes) 2 else if (compactCards) 4 else menuColumns)
         val spacing = 8.dp
         val indicatorHeight = 16.dp
-        val rows = if (twoRowModes) 2 else if ((if (compactCards) items.size > columns else columns == 4) &&
+        val rows = if (twoRowModes) 2 else if (items.size > columns &&
             maxHeight - indicatorHeight >= minimumRowHeight * 2 + spacing) 2 else 1
         val pages = items.chunked(rows * columns)
         val pagerState = rememberPagerState(pageCount = { pages.size })
