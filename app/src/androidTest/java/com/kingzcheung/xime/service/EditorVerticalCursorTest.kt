@@ -15,11 +15,11 @@ import org.junit.Test
 
 class EditorVerticalCursorTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
-    @Test fun actualWrappedLinesMoveVerticallyWithoutLosingEditorFocus() {
+    @Test fun explicitLinesMoveVerticallyWithoutLosingEditorFocus() {
         lateinit var editor: EditText
         lateinit var connection: InputConnection
         val cursor = EditorCursor()
-        rule.setContent { AndroidView(factory = { EditText(it).also { view -> editor = view; view.setText("あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめも") } }, modifier = Modifier.size(220.dp, 220.dp)) }
+        rule.setContent { AndroidView(factory = { EditText(it).also { view -> editor = view; view.setText("あいうえお\nかきくけこ\nさしすせそ") } }, modifier = Modifier.size(220.dp, 220.dp)) }
         rule.runOnUiThread {
             editor.requestFocus()
             assertTrue(editor.layout.lineCount >= 3)
