@@ -46,9 +46,7 @@ class HandwritingWorkflowAuditTest {
         lateinit var editor: EditText
         try {
             SettingsPreferences.setShowCandidateCancelButton(context, true)
-            val (userDir, sharedDir) = RimeConfigHelper.initializeRimeDataAsync(context)
-            engine.initialize(userDir, sharedDir)
-            assertTrue(RimeConfigHelper.ensureDeployment(context))
+            assertTrue(RimeConfigHelper.prepareEngine(context))
             assertTrue(engine.ensureSession())
             previousSchema = engine.getCurrentSchema()
             previousAscii = engine.isAsciiMode()
@@ -87,11 +85,10 @@ class HandwritingWorkflowAuditTest {
             recognize()
             assertEquals("", text())
             stroke()
-            rule.waitUntil(20_000) { rule.onAllNodesWithText("第1/2字", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+            rule.waitUntil(20_000) { rule.onAllNodesWithText("一一").fetchSemanticsNodes().isNotEmpty() }
+            rule.onAllNodesWithText("第1/2字", useUnmergedTree = true).assertCountEquals(0)
             assertEquals("两字未点选都不能自动上屏", "", text())
-            rule.onNodeWithText("一").performTouchInput { click() }
-            rule.waitUntil(5_000) { text() == "一" }
-            rule.onNodeWithText("一").performTouchInput { click() }
+            rule.onNodeWithText("一一").performTouchInput { click() }
             rule.waitUntil(5_000) { text() == "一一" }
             rule.onAllNodesWithContentDescription("取消输入").assertCountEquals(0)
             // Separators explicitly confirm pending characters, but the next one stays pending.
