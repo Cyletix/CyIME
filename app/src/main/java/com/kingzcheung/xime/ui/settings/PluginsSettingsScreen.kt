@@ -64,6 +64,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -105,6 +107,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PluginsSettingsContent(
     onBack: () -> Unit,
+    onNavigateToPluginMarket: () -> Unit = {},
     onNavigateToPluginSettings: (String) -> Unit = {},
     onNavigateToPluginMarketDetail: (String) -> Unit = {},
     onNavigateToSpeechToText: () -> Unit = {},
@@ -115,6 +118,7 @@ fun PluginsSettingsContent(
     val viewModel: PluginsSettingsViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val importMessage by viewModel.importMessage.collectAsState()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshPlugins() }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -156,6 +160,7 @@ fun PluginsSettingsContent(
                     }
                 },
                 actions = {
+                    TextButton(onClick = onNavigateToPluginMarket) { Text("安装插件") }
                     IconButton(onClick = { viewModel.refreshPlugins() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,

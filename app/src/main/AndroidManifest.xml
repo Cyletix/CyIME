@@ -44,6 +44,8 @@
             </intent-filter>
         </activity>
         
+        <activity android:name="com.kingzcheung.xime.CustomLayoutActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+
         <!-- 输入法服务 -->
         <service
             android:name="com.kingzcheung.xime.service.XimeInputMethodService"

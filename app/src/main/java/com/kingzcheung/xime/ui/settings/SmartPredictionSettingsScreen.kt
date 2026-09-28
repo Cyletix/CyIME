@@ -135,7 +135,7 @@ fun SmartPredictionSettingsContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "基于 AI 模型的智能联想词预测",
+                                text = "内置中文基础联想，可下载模型增强预测",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -172,14 +172,14 @@ fun SmartPredictionSettingsContent(
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "未检测到模型文件，请先下载模型",
+                                text = "已内置基础联想；下载模型可增强预测",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

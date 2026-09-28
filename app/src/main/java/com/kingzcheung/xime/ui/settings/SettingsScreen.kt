@@ -128,6 +128,7 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.Plugins) {
             PluginsSettingsContent(
+                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
                 onBack = { navController.popBackStack() },
                 onNavigateToPluginSettings = { pluginId ->
                     navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
@@ -171,6 +172,7 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.SpeechToText) {
             SpeechToTextSettingsContent(
+                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
                 onBack = { navController.popBackStack() },
                 onNavigateToPluginSettings = { pluginId ->
                     navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
@@ -195,12 +197,14 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.ClipboardSync) {
             ClipboardSyncSettingsContent(
+                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
                 onBack = { navController.popBackStack() },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
             )
         }
         composable(SettingsRoutes.Backup) {
             BackupSettingsContent(
+                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
                 onBack = { navController.popBackStack() },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
             )
@@ -236,6 +240,23 @@ fun SettingsScreen(
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
                 initialTab = 1,
+            )
+        }
+        composable(SettingsRoutes.MarketPlugins) {
+            MarketHubContent(
+                onBack = { navController.popBackStack() },
+                onNavigateToDetail = { schemeId ->
+                    navController.navigate("schema_market_detail/$schemeId")
+                },
+                onNavigateToModelDetail = { modelId ->
+                    navController.navigate("model_market_detail/$modelId")
+                },
+                onNavigateToPluginDetail = { pluginId ->
+                    navController.navigate("plugin_market_detail/$pluginId")
+                },
+                onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
+                onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
+                initialTab = 2,
             )
         }
         composable(SettingsRoutes.LogViewer) {

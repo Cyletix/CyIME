@@ -12,6 +12,8 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -56,8 +58,11 @@ fun HandwritingKeyboardLayout(
     clearSignal: Int = 0,
     sessionKey: Long = 0,
     specialKeyTextColor: Color = Color.White,
+    expanded: Boolean = false,
+    panelBackgroundColor: Color = Color.Transparent,
+    expandedCandidateBar: @Composable () -> Unit = {},
 ) {
-    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = (8 + bottomPaddingDp).dp) { bodyModifier ->
+    KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = (4 + bottomPaddingDp).dp) { bodyModifier ->
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val keyAction by rememberUpdatedState(onKeyPress)
@@ -92,10 +97,16 @@ fun HandwritingKeyboardLayout(
         session.press(action)
     }
 
-    // 实际布局就是触摸边界：左侧书写区与底部按键、右侧按键互不覆盖。
-    Row(bodyModifier.fillMaxSize().testTag("handwriting-panel").padding(start = 4.dp, end = 4.dp, bottom = (8 + bottomPaddingDp).dp)) {
-        Column(Modifier.weight(4.2f).fillMaxHeight()) {
-            Canvas(Modifier.weight(3.4f).fillMaxWidth().clipToBounds().testTag("handwriting-canvas")
+    // Five equal rows: four writing/side-key rows and one full-width function row.
+    BoxWithConstraints(bodyModifier.fillMaxSize().testTag("handwriting-panel")
+        .padding(start = 4.dp, end = 4.dp, bottom = (4 + bottomPaddingDp).dp)) {
+        // Bound function-key width on wide panels; extra width belongs to writing and space.
+        val functionKeyWidth = (maxWidth / 7.5f).coerceAtMost(104.dp)
+        val footerHeight = if (expanded) 52.dp.coerceAtMost(maxHeight / 3) else maxHeight / 5
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+            Canvas(Modifier.fillMaxSize().clipToBounds().testTag("handwriting-canvas")
                 .semantics { contentDescription = "手写区域"; stateDescription = session.phase.description }
                 .pointerInput(session) {
                     awaitEachGesture {
@@ -120,24 +131,39 @@ fun HandwritingKeyboardLayout(
                 }) {
                 renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), keyTextColor)
             }
-            Row(Modifier.fillMaxWidth().weight(0.6f)) {
-                listOf("symbol" to 0.8f, "number" to 0.8f, "space" to 1.8f, "ime_switch" to 0.8f).forEach { (action, weight) ->
-                    HandwritingFunctionKey(action, { press(action) },
-                        if (action == "space") keyBackgroundColor else specialKeyBackgroundColor,
-                        if (action == "space") keyTextColor else specialKeyTextColor,
-                        Modifier.weight(weight).fillMaxHeight())
+                }
+                if (!expanded) Column(Modifier.width(functionKeyWidth).fillMaxHeight().testTag("handwriting-side-keys")) {
+                    listOf("delete", "？", "，", "。").forEach { action ->
+                        HandwritingFunctionKey(action, { press(action) },
+                            if (action == "delete") specialKeyBackgroundColor else keyBackgroundColor,
+                            if (action == "delete") specialKeyTextColor else keyTextColor,
+                            Modifier.weight(1f).fillMaxWidth())
+                    }
                 }
             }
-        }
-        Column(Modifier.weight(0.8f).fillMaxHeight()) {
-            listOf("delete", "，", "。", "enter").forEach { action ->
-                // All function keys share the compact bottom-row height; keep Enter bottom-aligned.
-                if (action == "enter") Spacer(Modifier.weight(1.6f))
-                val special = action == "delete" || action == "enter"
-                HandwritingFunctionKey(action, { press(action) },
-                    if (special) specialKeyBackgroundColor else keyBackgroundColor,
-                    if (special) specialKeyTextColor else keyTextColor,
-                    Modifier.weight(0.6f).fillMaxWidth())
+            if (expanded) Box(Modifier.fillMaxWidth().background(panelBackgroundColor)) { expandedCandidateBar() }
+            if (expanded) {
+                Row(Modifier.fillMaxWidth().height(footerHeight).background(panelBackgroundColor)
+                    .testTag("handwriting-symbol-row")) {
+                    listOf("；", "：", "！", "？", "，", "。").forEach { action ->
+                        HandwritingFunctionKey(action, { press(action) }, keyBackgroundColor, keyTextColor,
+                            Modifier.weight(1f).fillMaxHeight())
+                    }
+                    HandwritingFunctionKey("delete", { press("delete") }, specialKeyBackgroundColor,
+                        specialKeyTextColor, Modifier.width(functionKeyWidth).fillMaxHeight())
+                }
+            }
+            Row(Modifier.fillMaxWidth().height(footerHeight).background(panelBackgroundColor)
+                .testTag("handwriting-bottom-row")) {
+                val keys = listOf("symbol", "number", "space",
+                    if (expanded) "collapse" else "expand", "ime_switch", "enter")
+                keys.forEach { action ->
+                    val special = action != "space"
+                    HandwritingFunctionKey(action, { press(action) },
+                        if (special) specialKeyBackgroundColor else keyBackgroundColor,
+                        if (special) specialKeyTextColor else keyTextColor,
+                        (if (action == "space") Modifier.weight(1f) else Modifier.width(functionKeyWidth)).fillMaxHeight())
+                }
             }
         }
     }
@@ -148,7 +174,8 @@ fun HandwritingKeyboardLayout(
 private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, background: Color, foreground: Color, modifier: Modifier) {
     val label = when (action) {
         "delete" -> "删除"; "enter" -> "回车"; "space" -> "空格"
-        "symbol" -> "!@#"; "number" -> "123"; "ime_switch" -> "语言切换"; else -> action
+        "symbol" -> "!@#"; "number" -> "123"; "ime_switch" -> "语言切换"
+        "expand" -> "全屏手写"; "collapse" -> "收起全屏手写"; else -> punctuationKeyLabel(action)
     }
     val enter = LocalEnterKeyColors.current.takeIf { action == "enter" }
     val keyBackground = enter?.background ?: background
@@ -161,6 +188,8 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
             "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn
             "space" -> Icons.Default.SpaceBar
             "ime_switch" -> Icons.Default.Language
+            "expand" -> Icons.Default.OpenInFull
+            "collapse" -> Icons.Default.CloseFullscreen
             else -> null
         }
         if (icon != null) Icon(icon, contentDescription = null, tint = keyForeground, modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value).dp))
