@@ -439,7 +439,7 @@ void T9DateTranslator::InitTriggers() {
   };
 
   static const DefaultTrigger kDefaults[] = {
-      {"date",      "rq",   "t9/date_translator/date"},
+      {"date",      "riqi",   "t9/date_translator/date"},
       {"time",      "sj",   "t9/date_translator/time"},
       {"week",      "xq",   "t9/date_translator/week"},
       {"datetime",  "dt",   "t9/date_translator/datetime"},
@@ -457,8 +457,10 @@ void T9DateTranslator::InitTriggers() {
     }
     Trigger t;
     t.keyword = keyword;
-    t.digit_code = PinyinToDigitCode(keyword);
     t.type = def.type;
+    // Old custom.yaml files may still explicitly contain date: rq. Keep its
+    // letter trigger, but migrate only the numeric date trigger away from 77.
+    t.digit_code = PinyinToDigitCode(t.type == "date" && keyword == "rq" ? "riqi" : keyword);
     triggers_.push_back(std::move(t));
   }
 }

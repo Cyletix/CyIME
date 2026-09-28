@@ -207,13 +207,8 @@ std::string T9ConvertPreedit(const std::string& preedit,
                     if (is_last_non_separator || next_is_separator) {
                         // 末尾单数字段或分隔符前的单数字段 → 使用首字母作为简拼
                         // 如 "5" → "j" (从 "jia" 取首字母)
-                        std::string prefix = py.substr(0, 2);
-                        for (auto& c : prefix) c = static_cast<char>(tolower(c));
-                        if (prefix == "zh" || prefix == "ch" || prefix == "sh") {
-                            part.text = prefix;
-                        } else {
-                            part.text = std::string(1, static_cast<char>(tolower(py[0])));
-                        }
+                        // One physical key represents one letter, never the digraph zh/ch/sh.
+                        part.text = std::string(1, static_cast<char>(tolower(py[0])));
                     } else {
                         // 中间段单数字 → 使用完整拼音（如 "7公民" 中的 "7"→"shen"）
                         std::string lower = py;
@@ -231,6 +226,10 @@ std::string T9ConvertPreedit(const std::string& preedit,
                 } else {
                     std::string lower = py;
                     for (auto& c : lower) c = static_cast<char>(tolower(c));
+                    if (lower.size() > part.text.size() &&
+                        T9PinyinMap::Instance().PinyinToDigitCode(lower).value_or("").compare(0, part.text.size(), part.text) == 0) {
+                        lower.resize(part.text.size());
+                    }
                     part.text = lower;
                 }
                 ++pi;

@@ -23,6 +23,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("revision", chineseRevision)
     inputs.property("sha256", chineseArchiveSha)
     inputs.property("files", chineseTopFiles)
+    inputs.property("qwjrtkPreset", 1)
+    inputs.property("t9EnglishIndex", 2)
     outputs.dir(chineseRoot)
     doLast {
         val archive = File(rootProject.projectDir, ".gradle/chinese-data/$chineseRevision.zip")
@@ -52,6 +54,40 @@ val prepareChineseDictionaries by tasks.registering {
                 }
             }
         }
+        // Re-index the pinned English word sources; never lowercase the displayed text.
+        // Exact whole-word digits only: no abbreviation/completion collisions with Chinese.
+        val english = linkedMapOf<String, String>()
+        val digits = "22233344455566677778889999"
+        for (source in listOf("en_ext", "en")) {
+            File(root, "en_dicts/$source.dict.yaml").useLines { lines ->
+                var body = false
+                lines.forEach { line ->
+                    if (line.trim() == "...") body = true
+                    else if (body && !line.startsWith("#")) {
+                        val fields = line.split('\t')
+                        if (fields.size >= 2 && fields[0].matches(Regex("[A-Za-z]{2,32}")) &&
+                            fields[1].matches(Regex("[A-Za-z]{2,32}"))) {
+                            val code = fields[0].lowercase(java.util.Locale.ROOT)
+                                .map { digits[it - 'a'] }.joinToString("")
+                            val weight = fields.getOrNull(2)?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
+                            val row = fields[0] + "\t" + code + (weight?.let { "\t$it" } ?: "")
+                            english.putIfAbsent(fields[0] + "\t" + code, row)
+                        }
+                    }
+                }
+            }
+        }
+        File(root, "cyime_t9_english.dict.yaml").writeText(
+            "# Generated from bundled rime-ice en_dicts; licenses retained alongside sources.\n" +
+            "---\nname: cyime_t9_english\nversion: \"1\"\nsort: by_weight\n...\n" +
+            english.values.joinToString("\n", postfix = "\n"))
+
+        // Same engine, dictionary and options as Chinese26; only the keyboard arrangement differs.
+        val baseSchema = File(root, "rime_ice.schema.yaml").readText()
+        File(root, "pinyin_qwjrtk.schema.yaml").writeText(baseSchema
+            .replace("schema_id: rime_ice", "schema_id: pinyin_qwjrtk")
+            .replace("name: 雾凇拼音", "name: QWJRTK（双拇指）"))
+
     }
 }
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareChineseDictionaries) }

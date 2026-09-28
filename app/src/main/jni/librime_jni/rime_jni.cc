@@ -8,6 +8,7 @@
 #include <rime/schema.h>
 #include <rime/context.h>
 #include <rime/candidate.h>
+#include <rime/menu.h>
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
 #include "t9_digit_userdict.h"
@@ -438,6 +439,23 @@ public:
             }
             rime->free_context(&context);
         }
+    }
+
+    // Diagnostic snapshot: preserve actual engine order, type and score, never infer from text.
+    std::vector<std::vector<std::string>> inspectCandidates(size_t limit) {
+        std::vector<std::vector<std::string>> rows;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || session->context()->composition().empty()) return rows;
+        auto menu = session->context()->composition().back().menu;
+        if (!menu) return rows;
+        menu->Prepare(limit);
+        for (size_t i = 0; i < limit && i < menu->candidate_count(); ++i) {
+            auto c = menu->GetCandidateAt(i);
+            if (!c) break;
+            rows.push_back({c->text(), c->comment(), rime::Candidate::GetGenuineCandidate(c)->type(), std::to_string(c->quality()),
+                            std::to_string(i), std::to_string(c->start()), std::to_string(c->end())});
+        }
+        return rows;
     }
 
     bool selectCandidate(int index) {
@@ -1444,6 +1462,25 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetAllCandidates(
         env->DeleteLocalRef(pair);
     }
 
+    return result;
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeInspectCandidates(JNIEnv* env, jobject, jint limit) {
+    auto rows = Rime::Instance().inspectCandidates(static_cast<size_t>(std::max(0, std::min(500, (int)limit))));
+    auto strings = env->FindClass("java/lang/String");
+    auto arrays = env->FindClass("[Ljava/lang/String;");
+    auto result = env->NewObjectArray(rows.size(), arrays, nullptr);
+    for (size_t i = 0; i < rows.size(); ++i) {
+        auto row = env->NewObjectArray(rows[i].size(), strings, nullptr);
+        for (size_t j = 0; j < rows[i].size(); ++j) {
+            auto value = env->NewStringUTF(rows[i][j].c_str());
+            env->SetObjectArrayElement(row, j, value);
+            env->DeleteLocalRef(value);
+        }
+        env->SetObjectArrayElement(result, i, row);
+        env->DeleteLocalRef(row);
+    }
     return result;
 }
 

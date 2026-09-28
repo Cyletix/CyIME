@@ -27,12 +27,21 @@ if(NOT T9_TAIL_GUARD_COUNT EQUAL 2)
 endif()
 set(T9_TAIL_GUARD_NEW [=[const bool t9_tail_abbreviation =
             k->second.type == kAbbreviation &&
-            j->first == input.size() &&
+            (j->first == input.size() ||
+             (j->first > 0 && j->first <= input.size() && input[j->first - 1] == '\'')) &&
             !input.empty() &&
-            input.find_first_not_of("23456789") == std::string::npos;
+            input.find_first_not_of("23456789\' ") == std::string::npos;
         if (k->second.type > last_type && !t9_tail_abbreviation) {]=])
 string(REPLACE "${T9_TAIL_GUARD_OLD}" "${T9_TAIL_GUARD_NEW}"
        T9_SYLLABIFIER_CODE "${T9_SYLLABIFIER_CODE}")
+
+# Keep vertices that still have valid outgoing edges after the bounded T9 guard.
+# Otherwise an explicitly delimited initial survives as an edge but loses its vertex.
+set(T9_VERTEX_OLD "if (graph->vertices[i] > last_type || graph->edges[i].empty()) {")
+set(T9_VERTEX_NEW [=[if ((graph->vertices[i] > last_type &&
+         (input.empty() || input.find_first_not_of("23456789' ") != std::string::npos)) ||
+        graph->edges[i].empty()) {]=])
+string(REPLACE "${T9_VERTEX_OLD}" "${T9_VERTEX_NEW}" T9_SYLLABIFIER_CODE "${T9_SYLLABIFIER_CODE}")
 
 string(REPLACE "#include \"syllabifier.h\"" "#include <rime/algo/syllabifier.h>" T9_SYLLABIFIER_CODE "${T9_SYLLABIFIER_CODE}")
 set(T9_SYLLABIFIER_COPY "${CMAKE_CURRENT_BINARY_DIR}/cyime-syllabifier.cc")
