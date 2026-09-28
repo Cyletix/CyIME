@@ -84,34 +84,25 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     }
     
     private fun validateModelState() {
-        if (_uiState.value.isEnabled && !_uiState.value.hasModel) {
-            _uiState.update { it.copy(isEnabled = false) }
-            SettingsPreferences.setSmartPredictionEnabled(context, false)
-            _uiState.update { it.copy(toastMessage = "模型文件不存在，已自动关闭智能联想") }
-        }
+        // The bundled public prior is available without a downloaded neural model.
     }
-    
+
     fun selectModel(id: String) {
         SettingsPreferences.setPredictionSelectedModel(context, id)
         checkModelState()
         viewModelScope.launch {
             withContext(Dispatchers.IO) { AssociationManager.release() }
             _uiState.update { it.copy(isInitialized = false) }
-            if (_uiState.value.isEnabled && _uiState.value.hasModel) loadModel()
+            if (_uiState.value.isEnabled) loadModel()
         }
     }
 
     fun setEnabled(enabled: Boolean) {
         checkModelState()
-        if (enabled && !_uiState.value.hasModel) {
-            _uiState.update { it.copy(toastMessage = "请先下载模型文件") }
-            return
-        }
-        
         SettingsPreferences.setSmartPredictionEnabled(context, enabled)
         _uiState.update { it.copy(isEnabled = enabled) }
         
-        if (enabled && !_uiState.value.isInitialized && _uiState.value.hasModel) {
+        if (enabled && !_uiState.value.isInitialized) {
             loadModel()
             if (_uiState.value.isInitialized) {
                 ModelRuntime.keepWarm("predictive_text")

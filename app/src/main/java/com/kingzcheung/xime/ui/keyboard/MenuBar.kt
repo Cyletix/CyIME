@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.WidthFull
+import androidx.compose.material.icons.twotone.WidthNormal
+import androidx.compose.material.icons.twotone.BrightnessAuto
 import androidx.compose.material.icons.twotone.DarkMode
 import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material.icons.twotone.LightMode
@@ -44,12 +47,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 
+internal fun menuAppearanceLabel(mode: Int): String = when (mode) {
+    0 -> "浅色模式"
+    1 -> "深色模式"
+    else -> "跟随系统"
+}
+
 data class MenuItem(
     val icon: Painter? = null,
     val label: String,
     val action: () -> Unit,
     val textIcon: String? = null,
     val currentState: String? = null,
+    val id: String = label,
 )
 
 data class MenuBarState(
@@ -94,30 +104,24 @@ fun MenuBar(
     val configuration = LocalConfiguration.current
     val isLandscape = !state.isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
-    val quickSendIcon = rememberVectorPainter(Icons.TwoTone.Quickreply)
     val keyboardResizeIcon = rememberVectorPainter(Icons.TwoTone.SettingsOverscan)
     val darkModeIcon = when (state.darkMode) {
-        0 -> rememberVectorPainter(Icons.TwoTone.DarkMode)
-        1 -> rememberVectorPainter(Icons.TwoTone.LightMode)
-        else -> rememberVectorPainter(if (state.isDarkTheme) Icons.TwoTone.LightMode else Icons.TwoTone.DarkMode)
+        0 -> rememberVectorPainter(Icons.TwoTone.LightMode)
+        1 -> rememberVectorPainter(Icons.TwoTone.DarkMode)
+        else -> rememberVectorPainter(Icons.TwoTone.BrightnessAuto)
     }
-    val deployIcon = rememberVectorPainter(Icons.TwoTone.Rotate90DegreesCcw)
     val customizeIcon = rememberVectorPainter(Icons.TwoTone.Padding)
     val schemaIcon = rememberVectorPainter(Icons.TwoTone.Keyboard)
     val settingsIcon = rememberVectorPainter(Icons.TwoTone.Settings)
 
-    val darkModeLabel = when (state.darkMode) {
-        0 -> "深色模式"
-        1 -> "浅色模式"
-        else -> "跟随系统"
-    }
+    val darkModeLabel = menuAppearanceLabel(state.darkMode)
 
     var showOptions by remember { mutableStateOf(false) }
     // 英文（ASCII）模式标点固定半角，全角／半角对它不生效：入口直接不出现，
     // 避免"点了看不到状态变化，实际却改了状态"的误导；中文/日文仍保留该入口。
     val widthSwitch = if (state.isAsciiMode) null
         else state.schemaSwitches.firstOrNull { it.name == "full_shape" }
-    val options = state.schemaSwitches.filter { it.name != "ascii_mode" && it.name != "full_shape" }
+    val options = state.schemaSwitches.filter { it.name != "ascii_mode" && it.name != "full_shape" && it.name != "ascii_punct" }
     if (showOptions) {
         Column(modifier.fillMaxSize().background(state.backgroundColor)
             .padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
@@ -144,23 +148,25 @@ fun MenuBar(
         }
         return
     }
+    // 高频调整与状态切换在前，工具栏定制和设置入口在后。
     val menuItems = listOf(
         MenuItem(keyboardResizeIcon, "键盘调节", callbacks.onKeyboardResize),
-        MenuItem(settingsIcon, "设置", callbacks.onSettings),
     ) + listOfNotNull(widthSwitch?.let { sw ->
         val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
-        MenuItem(label = "全角／半角", action = { callbacks.onToggleSchemaSwitch?.invoke(sw) },
-            textIcon = current, currentState = current)
+        MenuItem(
+            icon = rememberVectorPainter(if (current == "全角") Icons.TwoTone.WidthFull else Icons.TwoTone.WidthNormal),
+            label = current, action = { callbacks.onToggleSchemaSwitch?.invoke(sw) },
+            currentState = current, id = "全角／半角",
+        )
     }) + listOf(
-        MenuItem(quickSendIcon, "快捷发送", callbacks.onQuickSend),
+        MenuItem(darkModeIcon, darkModeLabel, callbacks.onToggleDarkMode, currentState = darkModeLabel),
         MenuItem(customizeIcon, "定制工具栏", callbacks.onToolbarCustomize),
-        MenuItem(darkModeIcon, darkModeLabel, callbacks.onToggleDarkMode),
     ) + (if (options.isNotEmpty()) listOf(MenuItem(schemaIcon, "输入选项", { showOptions = true })) else emptyList()) +
-        listOf(MenuItem(deployIcon, "部署方案", callbacks.onReloadConfig))
+        listOf(MenuItem(settingsIcon, "设置", callbacks.onSettings))
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
         modifier.fillMaxWidth().background(state.backgroundColor)) { item, cellModifier ->
         MenuItemButton(item, itemBgColor, textColor,
-            cellModifier.testTag("menu-item:${item.label}"), isLandscape)
+            cellModifier.testTag("menu-item:${item.id}"), isLandscape)
     }
 }
 
