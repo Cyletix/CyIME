@@ -51,7 +51,10 @@ class ToolbarOverlayWorkflowTest {
             if (tool == "编辑") {
                 rule.onAllNodesWithContentDescription("返回键盘").assertCountEquals(0)
                 rule.runOnIdle { feedback.clear(); edits.clear() }
-                rule.onNodeWithContentDescription("向左").performTouchInput { down(center); up() }
+                // Direction sectors share the full disk bounds; its centre is the separate selection key.
+                rule.onNodeWithContentDescription("向左").performTouchInput {
+                    down(androidx.compose.ui.geometry.Offset(width * 0.15f, height * 0.5f)); up()
+                }
                 rule.runOnIdle { assertEquals(listOf("arrow_left"), feedback); assertEquals(listOf("arrow_left"), edits) }
                 rule.onNodeWithContentDescription("选择").performClick()
                 rule.onNodeWithContentDescription("取消选择").performClick()

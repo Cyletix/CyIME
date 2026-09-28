@@ -192,6 +192,11 @@ fun CandidatePage(
             ((maxWidth - 12.dp) * 0.16f - state.leftRailHorizontalInsetDp.dp * 2f)
                 .coerceIn(32.dp, maxOf(32.dp, maxWidth * 0.24f))
         } else leftRailWidth
+        val railFontSize = t9CandidateMetrics(
+            resolvedRailWidth.value, (maxHeight.value - state.bottomPaddingDp) * .75f,
+            LocalDensity.current.fontScale, LocalKeyboardInputPreferences.current.keyTextScale,
+            keyContentScale(resolvedRailWidth.value, maxHeight.value / 4f),
+        ).fontSizeSp.sp
         val railWidthModifier = Modifier.fillMaxHeight().width(resolvedRailWidth).testTag("candidate-left-rail")
         Column(
             modifier = Modifier.fillMaxSize()
@@ -235,7 +240,8 @@ fun CandidatePage(
                                     isLast = index == railItems.lastIndex,
                                     isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
                                     accentColor = state.railAccentColor,
-                                    isPinyin = isPinyinRail
+                                    isPinyin = isPinyinRail,
+                                    pinyinFontSize = railFontSize
                                 )
                             }
                         } else {
@@ -258,7 +264,8 @@ fun CandidatePage(
                                         isLast = index == railItems.lastIndex,
                                         isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
                                         accentColor = state.railAccentColor,
-                                        isPinyin = isPinyinRail
+                                        isPinyin = isPinyinRail,
+                                    pinyinFontSize = railFontSize
                                     )
                                 }
                             }
@@ -362,15 +369,14 @@ fun CandidatePage(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // ── 右栏：退格 / 上一页 / 下一页 / 回车 ──
-                // 竖屏固定方块、垂直居中分布；横屏栏高有限改为等分压缩
-                val railKeyModifier = if (isLandscape) Modifier.weight(1f) else Modifier.size(46.dp)
+                // 按实际面板高度等分，最低高度仍完整保留四个按键。
+                val railKeyModifier = Modifier.weight(1f)
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(rightRailWidth)
                         .padding(vertical = 6.dp),
-                    verticalArrangement = if (isLandscape) Arrangement.spacedBy(4.dp)
-                    else Arrangement.spacedBy(10.dp, Alignment.CenterVertically)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     RailKey(
                         onClick = { callbacks.onDelete?.invoke() },
@@ -436,7 +442,7 @@ fun CandidatePage(
             // 底部留白
             Spacer(
                 modifier = Modifier.height(
-                    if (isLandscape) 15.dp else state.bottomPaddingDp.dp
+                    state.bottomPaddingDp.dp
                 )
             )
         }
@@ -501,7 +507,8 @@ private fun CandidatePageItem(
     ) {
         BasicText(
             text = annotated,
-            style = TextStyle(fontWeight = FontWeight.Normal),
+            style = TextStyle(fontWeight = FontWeight.Normal, lineHeight = 25.sp,
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -679,6 +686,7 @@ private fun CandidateRailSymbolKey(
     isSelected: Boolean = false,
     accentColor: Color = Color.Unspecified,
     isPinyin: Boolean = false,
+    pinyinFontSize: androidx.compose.ui.unit.TextUnit = 15.sp,
 ) {
     val cornerRadius = LocalKeyCornerRadius.current
     val shape = RoundedCornerShape(
@@ -713,7 +721,7 @@ private fun CandidateRailSymbolKey(
                 Text(
                     text = text,
                     color = pillColor,
-                    fontSize = 13.sp,
+                    fontSize = pinyinFontSize,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     fontFamily = AppFonts.candidateFontFamily
@@ -723,7 +731,7 @@ private fun CandidateRailSymbolKey(
             Text(
                 text = text,
                 color = textColor,
-                fontSize = if (isPinyin) 13.sp else 16.sp,
+                fontSize = if (isPinyin) pinyinFontSize else 16.sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 fontFamily = AppFonts.candidateFontFamily
@@ -746,7 +754,7 @@ private fun RailKey(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
             .background(
                 when {
                     !enabled -> keyBg.copy(alpha = 0.4f)
