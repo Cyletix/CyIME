@@ -19,7 +19,7 @@ class AsrModelManager(private val context: Context) {
         /** 内置默认 ASR 模型（远程索引加载前/失败时的兜底）。 */
         val DEFAULT_MODEL = AsrModelInfo(
             id = "zipformer-zh-int8",
-            name = "中文 Zipformer int8",
+            name = "Zipformer · 中文",
             description = "Zipformer 架构，适合实时语音识别，int8 量化",
             language = "zh",
             size = "132.63MB",
@@ -37,7 +37,7 @@ class AsrModelManager(private val context: Context) {
             val fileNames = info.files.map { it.name }
             return AsrModelInfo(
                 id = info.id,
-                name = info.name,
+                name = SpeechModelSelection.displayName(info.id) ?: info.name,
                 description = info.description,
                 language = when (info.id) { SpeechModelCatalog.SENSEVOICE -> "auto"; SpeechModelCatalog.PARAFORMER -> "zh-en"; else -> "zh" },
                 size = version?.size ?: info.size,
@@ -107,34 +107,20 @@ class AsrModelManager(private val context: Context) {
     private val preferences get() = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
 
     /** Persist the complete selection as one value, also passed explicitly to the :asr process. */
-    fun getSelectedModelId(): String {
-        val stored = preferences.getString("selected_model", SpeechModelCatalog.ZIPFORMER) ?: SpeechModelCatalog.ZIPFORMER
-        if (stored != SpeechModelCatalog.SENSEVOICE) return stored
-        // Migrate the retired standalone choice without downloading or pretending missing weights are ready.
-        val base = if (selection(SpeechModelCatalog.PARAFORMER).ready) SpeechModelCatalog.PARAFORMER else SpeechModelCatalog.ZIPFORMER
-        val migrated = combinedMode(base, true)
-        setModel(migrated)
-        return migrated
-    }
+    fun getSelectedModelId(): String =
+        preferences.getString("selected_model", SpeechModelCatalog.ZIPFORMER) ?: SpeechModelCatalog.ZIPFORMER
 
-    fun getFirstPassModelId(): String = when (val mode = getSelectedModelId()) {
-        SpeechModelCatalog.TWO_PASS -> SpeechModelCatalog.PARAFORMER
-        SpeechModelCatalog.ZIPFORMER_TWO_PASS -> SpeechModelCatalog.ZIPFORMER
-        else -> mode
-    }
+    fun getFirstPassModelId(): String = SpeechModelSelection.primary(getSelectedModelId())
 
-    fun isRefinementEnabled(): Boolean = getSelectedModelId() in setOf(
-        SpeechModelCatalog.TWO_PASS, SpeechModelCatalog.ZIPFORMER_TWO_PASS)
+    fun isRefinementEnabled(): Boolean = SpeechModelSelection.hasCorrection(getSelectedModelId())
 
     fun setFirstPassModel(modelId: String) {
-        require(modelId in listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.PARAFORMER))
-        setModel(combinedMode(modelId, isRefinementEnabled()))
+        setModel(SpeechModelSelection.selectPrimary(getSelectedModelId(), modelId))
     }
 
-    fun setRefinementEnabled(enabled: Boolean) = setModel(combinedMode(getFirstPassModelId(), enabled))
-
-    private fun combinedMode(base: String, refine: Boolean): String = if (!refine) base
-        else if (base == SpeechModelCatalog.PARAFORMER) SpeechModelCatalog.TWO_PASS else SpeechModelCatalog.ZIPFORMER_TWO_PASS
+    fun setRefinementEnabled(enabled: Boolean) {
+        setModel(SpeechModelSelection.withCorrection(getSelectedModelId(), enabled))
+    }
 
     fun setModel(modelId: String) {
         preferences.edit().putString("selected_model", modelId).apply()

@@ -42,6 +42,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -88,7 +90,8 @@ data class AsrProvider(
 fun SpeechToTextSettingsContent(
     onBack: () -> Unit,
     onNavigateToPluginSettings: (String) -> Unit = {},
-    onNavigateToPlugins: () -> Unit = {}
+    onNavigateToPlugins: () -> Unit = {},
+    onNavigateToPluginMarket: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -104,7 +107,12 @@ fun SpeechToTextSettingsContent(
         mutableStateOf(SettingsPreferences.isSttKeepEngineAlive(context))
     }
 
-    val onlineProviders = remember(activeAsrPluginId) {
+    var providersRevision by remember { mutableStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        activeAsrPluginId = SettingsPreferences.getSttOnlinePluginId(context)
+        providersRevision++
+    }
+    val onlineProviders = remember(activeAsrPluginId, providersRevision) {
         val installedAsr = ExtensionManager.getAllInstalledPlugins()
             .filter { it.category == PluginCategory.ASR }
         mutableStateListOf<AsrProvider>().apply {
@@ -224,7 +232,7 @@ fun SpeechToTextSettingsContent(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "语音结束后模型不自动释放（约150MB常驻内存），闲置后再用免重新加载，响应更快",
+                                    text = "语音结束后保留所选模型，减少下次加载等待；内存占用因模型而异，不保留麦克风录音。",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
                                 )
@@ -277,6 +285,7 @@ fun SpeechToTextSettingsContent(
                         }
                     },
                     onManagePlugins = onNavigateToPlugins,
+                    onInstallPlugins = onNavigateToPluginMarket,
                     onSettings = onNavigateToPluginSettings
                 )
             }
@@ -289,6 +298,7 @@ fun OnlineAsrTab(
     providers: List<AsrProvider>,
     onProviderClick: (AsrProvider) -> Unit,
     onManagePlugins: () -> Unit = {},
+    onInstallPlugins: () -> Unit = {},
     onSettings: (String) -> Unit = {}
 ) {
     LazyColumn(
@@ -297,12 +307,10 @@ fun OnlineAsrTab(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text(
-                text = "在线语音识别服务商只能同时使用一个",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            PluginSetupCard("在线语音", onInstallPlugins, onManagePlugins)
+            Text(if (providers.isEmpty()) "尚未安装在线语音插件；也可以返回上方选择本地模型。"
+                else "选择一个在线服务，再填写该服务的连接配置。",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         items(providers) { provider ->
@@ -314,21 +322,10 @@ fun OnlineAsrTab(
         }
 
         item {
-            OutlinedButton(
-                onClick = onManagePlugins,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("管理插件")
-            }
-        }
-
-        item {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "在线 ASR 需要网络连接，适合需要高准确率的场景",
+                text = "在线服务需要网络连接，可能需要账号或 API 密钥；费用和数据处理方式以服务提供方为准。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
                 modifier = Modifier.padding(top = 8.dp)

@@ -151,6 +151,13 @@ class VoiceRecognitionHandler(
         // when the final stopRecognition result arrives
     }
 
+    /** Independent of UI flags: pre-start/model loading can own resources before voice UI appears. */
+    fun endInputSession() {
+        abandonSession()
+        cancelPreStart()
+        if (::speechRecognitionManager.isInitialized) speechRecognitionManager.cancelRecognition()
+    }
+
     fun release() {
         abandonSession()
         cancelPreStart()
