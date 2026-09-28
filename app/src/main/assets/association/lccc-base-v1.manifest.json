@@ -1,0 +1,15 @@
+{
+  "source": "https://huggingface.co/datasets/thu-coai/lccc",
+  "license": "MIT",
+  "source_sha256": "2162e0ed923fba62329cabf7e1493fbe59248afc94a62508e4abdea61e624627",
+  "split": "train only",
+  "sampling": "zero-based dialogue index modulo 34 == 0",
+  "dialogs": 200604,
+  "sentences": 589546,
+  "contexts": 9191,
+  "entries": 29245,
+  "bytes": 160873,
+  "sha256": "ecb745047b3d1c368b3a0097750b97618919927ac9fc1137e3018ff67451d394",
+  "purpose": "post-commit word association baseline, not a pinyin decoder or personal history",
+  "validation": "file integrity only; quality evaluation separate"
+}

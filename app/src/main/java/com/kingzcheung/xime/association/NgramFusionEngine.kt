@@ -14,13 +14,24 @@ class NgramFusionEngine(private val context: Context) {
     private val userNgramCache = UserNgramCache(context)
     private var lambda = DEFAULT_LAMBDA
     private var isInitialized = false
+    private var baseModel: BaseAssociationModel? = null
     
     suspend fun initialize(): Boolean {
         if (isInitialized) return true
         
         val result = userNgramCache.initialize()
-        isInitialized = result
-        return result
+        baseModel = withContext(Dispatchers.IO) {
+            try {
+                context.assets.open(BaseAssociationModel.ASSET).use { input ->
+                    java.util.zip.GZIPInputStream(input).reader(Charsets.UTF_8).use(BaseAssociationModel::read)
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Bundled association model failed to load", error)
+                null
+            }
+        }
+        isInitialized = result || baseModel != null
+        return isInitialized
     }
     
     fun recordUserInput(text: String) {
@@ -39,6 +50,7 @@ class NgramFusionEngine(private val context: Context) {
         
         val allCandidates = mutableMapOf<String, Float>()
         
+        baseModel?.predict(context, 10)?.forEach { allCandidates[it.text] = it.score }
         modelCandidates.forEach { candidate ->
             val modelScore = normalizeModelScore(candidate.score)
             allCandidates[candidate.text] = modelScore
@@ -54,18 +66,7 @@ class NgramFusionEngine(private val context: Context) {
             }
         }
         
-        if (userCandidates.isEmpty() && modelCandidates.isNotEmpty()) {
-            return modelCandidates.map { candidate ->
-                val modelScore = normalizeModelScore(candidate.score)
-                val userScore = userNgramCache.getContextualScore(context, candidate.text)
-                
-                val effectiveLambda = if (userScore > 0) 0.3f else lambda
-                val fusedScore = effectiveLambda * modelScore + (1 - effectiveLambda) * userScore
-                
-                AssociationCandidate(candidate.text, fusedScore)
-            }.sortedByDescending { it.score }
-        }
-        
+
         return allCandidates.map { (word, score) ->
             AssociationCandidate(word, score)
         }.sortedByDescending { it.score }
