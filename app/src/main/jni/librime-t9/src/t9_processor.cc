@@ -801,7 +801,10 @@ int T9Processor::QueryRimeConsumedDigits(
     // 精确计算出候选在输入中的匹配结束位置（Candidate::end()），
     // 其坐标基于 RIME 引擎当前 input 字符串（可能含分隔符）。
     // 换算规则：消费数字位数 = input[0:end) 中数字字符的个数。
-    if (!candidate_pinyin.has_value() || candidate_pinyin->empty()) return -1;
+    // Table/English candidates can have an empty comment. Their real end position
+    // is still authoritative when the displayed text identifies the candidate.
+    if ((!candidate_pinyin.has_value() || candidate_pinyin->empty()) && candidate_text.empty()) return -1;
+    const std::string requested_comment = candidate_pinyin.value_or("");
     auto* ctx = engine_->context();
     if (!ctx) return -1;
     const std::string& rime_input = ctx->input();
@@ -823,7 +826,7 @@ int T9Processor::QueryRimeConsumedDigits(
             // 精确比较会漏匹配 → 调频码捕获失败 → fallback 命中轻声音节。
             // 归一化后两者同为 "jihua"；多音字（yínháng/yínxíng）仍可区分。
             if (NormalizePinyinComment(genuine->comment()) !=
-                NormalizePinyinComment(*candidate_pinyin))
+                NormalizePinyinComment(requested_comment))
                 continue;
             // 注释歧义根治：Kotlin 同时传入候选文本，双条件精确定位用户点选
             // 的候选（如 几股/击鼓 同注释 "ji gu"），避免捕获同注释他词的码。
@@ -833,7 +836,9 @@ int T9Processor::QueryRimeConsumedDigits(
             // t9_user_translator 已移除后正常候选不会再命中；防御性保留）。
             if (out_is_t9_user) *out_is_t9_user = (genuine->type() == "t9_user");
             // 顺带捕获 Phrase 的真实码（含声调真相），供调频保留声调。
-            if (captured_code || captured_text) {
+            // Table dictionary codes belong to a different syllabary, never memorize
+            // them into the Chinese script user dictionary.
+            if ((captured_code || captured_text) && genuine->type() != "table" && genuine->type() != "user_table") {
                 if (auto phrase = As<Phrase>(genuine)) {
                     if (captured_code) *captured_code = phrase->code();
                     if (captured_text) *captured_text = phrase->text();
@@ -841,7 +846,7 @@ int T9Processor::QueryRimeConsumedDigits(
                     // 候选被 lua filter 链重建（非 Phrase）：从 t9_filter 预存的
                     // Phrase 码缓存兜底（filters 最前阶段候选尚为带调 Phrase）。
                     auto cached = FindPhraseCode(
-                        genuine->text(), NormalizePinyinComment(*candidate_pinyin));
+                        genuine->text(), NormalizePinyinComment(requested_comment));
                     if (!cached.empty()) {
                         if (captured_code) *captured_code = Code(cached.begin(), cached.end());
                         if (captured_text) *captured_text = genuine->text();
@@ -855,7 +860,7 @@ int T9Processor::QueryRimeConsumedDigits(
                 if (rime_input[k] >= '0' && rime_input[k] <= '9') ++digits;
             }
             T9LOG(">> QueryRimeConsumedDigits: pinyin='%s' end=%zu inputLen=%zu -> digits=%d",
-                  candidate_pinyin->c_str(), end, rime_input.size(), digits);
+                  requested_comment.c_str(), end, rime_input.size(), digits);
             return digits;
         }
     }

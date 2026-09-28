@@ -1,0 +1,16 @@
+# Internal compilation dependency, not a user-visible input mode.
+schema:
+  schema_id: cyime_t9_english
+  name: 九键英文词典依赖
+  version: "1"
+engine:
+  processors: [speller, selector, express_editor]
+  segmentors: [abc_segmentor]
+  translators: [table_translator]
+speller:
+  alphabet: "23456789"
+  algebra: []
+translator:
+  dictionary: cyime_t9_english
+  enable_completion: false
+  enable_sentence: false

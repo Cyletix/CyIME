@@ -22,7 +22,7 @@ t9:
 
   # 日期翻译器触发词配置 参考白霜实现，感谢白霜方案
   date_translator:
-    date: rq
+    date: riqi
     time: sj
     week: xq
     datetime: dt
@@ -33,8 +33,10 @@ t9:
 
 schema:
   schema_id: t9_pinyin
+  dependencies:
+    - cyime_t9_english
   name: 中文九键
-  version: "2.0"
+  version: "2.1"
   description: |
     拼音九键方案，使用 ABC/DEF/GHI/JKL/MNO/PQRS/TUV/WXYZ 键位
 
@@ -70,6 +72,7 @@ engine:
     - t9_date_translator
     - punct_translator
     - script_translator
+    - table_translator@t9_english
   filters:
     - t9_filter
     - uniquifier
@@ -89,7 +92,7 @@ speller:
     - derive/ui$/uei/
     - derive/iu$/iou/
     - derive/([aeiou])ng$/$1gn/
-    - derive/([dtngkhrzcs])o(u|ng)$/$1o/
+    # T9 keys already encode letter ambiguity; do not treat sho (746) as shou (7468).
     - derive/ong$/on/
     - derive/ao$/oa/
     - derive/([iu])a(o|ng?)$/a$1$2/
@@ -105,6 +108,7 @@ speller:
 
 translator:
   dictionary: rime_ice
+  max_sentences: 3
   prism: t9_pinyin
   spelling_hints: 100
   always_show_comments: true
@@ -126,3 +130,13 @@ key_binder:
 editor:
   bindings:
     space: confirm
+
+# Whole English words from the bundled melt_eng sources, indexed by T9 digits.
+# Native table candidates retain their original casing and global selection index.
+t9_english:
+  dictionary: cyime_t9_english
+  enable_completion: false
+  enable_sentence: false
+  enable_user_dict: true
+  initial_quality: 0.2
+  comment_format: []

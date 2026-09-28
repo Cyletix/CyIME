@@ -39,7 +39,7 @@ iter_incremented:
   const bool t9_numeric_input =
       !active_input.empty() &&
       std::all_of(active_input.begin(), active_input.end(),
-                  [](char c) { return c >= '2' && c <= '9'; });
+                  [](char c) { return (c >= '2' && c <= '9') || c == '\'' || c == ' '; });
 
   const bool has_full_user_phrase =
       user_phrase_ && user_phrase_iter_ != user_phrase_->rend() &&
@@ -53,6 +53,7 @@ iter_incremented:
 
   if (!sentences_.empty() &&
       (!t9_numeric_input ||
+       (max_sentences_ > 1 && max_sentences_ <= 8 && candidate_index_ >= 3) ||
        (!has_full_user_phrase && !has_full_sys_phrase))) {
     candidate_source_ = kSentence;
     candidate_ = sentences_[0];
@@ -72,6 +73,27 @@ string(REPLACE "${T9_SENTENCE_RANK_OLD}"
                "${T9_SENTENCE_RANK_NEW}"
                T9_SCRIPT_TRANSLATOR_CODE
                "${T9_SCRIPT_TRANSLATOR_CODE}")
+
+# Numeric ambiguity can have an exact dictionary phrase while the intended text
+# is a composition of words (e.g. wo + wanshang). Opt in to at most eight results (default three);
+# max_sentences=3 gives a nine-state Poet beam; limit it to 6..24 input characters.
+set(T9_SENTENCE_GATE_OLD [=[if (has_at_least_two_syllables && !has_reliable_phrase &&
+      !has_reliable_user_phrase) {]=])
+set(T9_SENTENCE_GATE_NEW [=[const auto& numeric_input = syllabifier_->input();
+  const bool bounded_t9_sentences = max_sentences_ > 1 && max_sentences_ <= 8 &&
+      numeric_input.size() >= 6 && numeric_input.size() <= 24 &&
+      numeric_input.find_first_not_of("23456789' ") == std::string::npos;
+  if (has_at_least_two_syllables &&
+      ((!has_reliable_phrase && !has_reliable_user_phrase) || bounded_t9_sentences)) {]=])
+string(FIND "${T9_SCRIPT_TRANSLATOR_CODE}" "${T9_SENTENCE_GATE_OLD}" T9_GATE_POS)
+if(T9_GATE_POS EQUAL -1)
+  message(FATAL_ERROR "librime sentence generation changed: review bounded T9 gate")
+endif()
+string(REPLACE "${T9_SENTENCE_GATE_OLD}" "${T9_SENTENCE_GATE_NEW}"
+       T9_SCRIPT_TRANSLATOR_CODE "${T9_SCRIPT_TRANSLATOR_CODE}")
+# Deferred sentences must remain accessible even after the final dictionary phrase.
+string(REPLACE "set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_"
+       T9_SCRIPT_TRANSLATOR_CODE "${T9_SCRIPT_TRANSLATOR_CODE}")
 
 set(T9_SCRIPT_TRANSLATOR_COPY
     "${CMAKE_CURRENT_BINARY_DIR}/cyime-script-translator.cc")

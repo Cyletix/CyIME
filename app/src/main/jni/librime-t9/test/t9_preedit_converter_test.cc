@@ -46,11 +46,11 @@ TEST(T9PreeditConverterTest, LastSingleDigitJianpin) {
 
 TEST(T9PreeditConverterTest, LastSingleDigitZhChSh) {
     // "9" + "zhong" → "zh"
-    EXPECT_EQ(T9ConvertPreedit("9", "zhong"), "zh");
+    EXPECT_EQ(T9ConvertPreedit("9", "zhong"), "z");
     // "2" + "cheng" → "ch"
-    EXPECT_EQ(T9ConvertPreedit("2", "cheng"), "ch");
+    EXPECT_EQ(T9ConvertPreedit("2", "cheng"), "c");
     // "7" + "shen" → "sh"
-    EXPECT_EQ(T9ConvertPreedit("7", "shen"), "sh");
+    EXPECT_EQ(T9ConvertPreedit("7", "shen"), "s");
 }
 
 TEST(T9PreeditConverterTest, LastSingleDigitAfterSeparator) {
@@ -188,7 +188,7 @@ TEST(T9PreeditConverterTest, TonedCommentPreserveExisting) {
     EXPECT_EQ(T9ConvertPreedit("54482", "ji gua"), "jigua");
     EXPECT_EQ(T9ConvertPreedit("54482", "ji hua"), "jihua");
     EXPECT_EQ(T9ConvertPreedit("5", "le"), "l");
-    EXPECT_EQ(T9ConvertPreedit("9", "zhong"), "zh");
+    EXPECT_EQ(T9ConvertPreedit("9", "zhong"), "z");
 }
 
 // ── NormalizePinyinComment（调频声调保真的基础）──
@@ -229,4 +229,10 @@ TEST(NormalizePinyinCommentTest, NonLetterCharsDropped) {
 TEST(NormalizePinyinCommentTest, UppercaseNormalized) {
     EXPECT_EQ(rime::NormalizePinyinComment("JĪ HUÀ"), "ji hua");
     EXPECT_EQ(rime::NormalizePinyinComment("JI HUA"), "ji hua");
+}
+
+TEST(T9PreeditConverterTest, DoesNotInventTrailingLetters) {
+    EXPECT_EQ(T9ConvertPreedit("74", "shi"), "sh");
+    EXPECT_EQ(T9ConvertPreedit("746", "shou"), "sho");
+    EXPECT_EQ(T9ConvertPreedit("7468", "shou"), "shou");
 }
