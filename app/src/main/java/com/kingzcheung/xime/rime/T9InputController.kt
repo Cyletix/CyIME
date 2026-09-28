@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.rime
 
 import com.kingzcheung.xime.util.FileLogger
+import com.kingzcheung.xime.util.InputLatencyTrace
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -44,6 +45,7 @@ class T9InputController(
     /** 候选词变换（hotPath 插件能力）：后台取数后、post 主线程前同步调用
      *  （阻塞至多 15ms，主线程零等待）；返回带引擎锚点的插件候选注入列表
      *  （text 追加项），引擎结果原样使用（T9 不支持引擎引用替换）。null = 不干预。 */
+    private val inputAdmissionTicket: () -> Long? = { 0L },
     private val candidateTransform: ((RimeProcessResult) -> List<com.kingzcheung.xime.service.T9CandidateInjection>?)? = null,
 ) {
     companion object {
@@ -105,6 +107,11 @@ class T9InputController(
         }
     }
 
+    private fun enqueueInput(block: suspend CoroutineScope.() -> Unit) {
+        val admission = inputAdmissionTicket() ?: return
+        enqueue { if (inputAdmissionTicket() == admission) block() }
+    }
+
     /**
      * 同步等待后台队列排空（仅 onRightCandidateSelected 使用）。
      * 该方法必须且只会被**非主线程**调用（服务层 keyProcessingDispatcher），
@@ -159,7 +166,7 @@ class T9InputController(
 
     /** 字面输入和普通九键触摸共用 FIFO，随后输入不能越过数字提交。 */
     internal fun enqueueLiteralInput(block: suspend () -> Unit) {
-        enqueue { block() }
+        enqueueInput { block() }
     }
 
     /** Refresh is enqueued behind the editor replacement, ahead of the user's next key. */
@@ -206,15 +213,20 @@ class T9InputController(
      * getComposition）。post 为 fire-and-forget，任务完成不依赖 Main 线程；
      * 携带代际号，过期刷新在 Main 执行时丢弃。
      */
-    private fun refreshOnBackground() {
-        val data = fetchAll()
-        val (finalResult, injections) = transformInjections(data.result)
-        val composition = finalResult.toComposition()
+    private fun refreshOnBackground(traceId: Int = 0) {
+        val data = InputLatencyTrace.phase(traceId, "snapshot-jni") { fetchAll() }
+        val (finalResult, injections) = InputLatencyTrace.phase(traceId, "candidate-transform") { transformInjections(data.result) }
+        val composition = finalResult.toComposition().also { it.traceEventId = traceId }
         val gen = ++uiGeneration
         mainHandler.post {
-            if (gen != uiGeneration) return@post
-            onCompositionRefresh?.invoke(composition, injections)
-            applyCandidates(finalResult, data.panel, data.options)
+            if (gen != uiGeneration) {
+                InputLatencyTrace.finish(traceId, "superseded")
+                return@post
+            }
+            InputLatencyTrace.phase(traceId, "state-publish") {
+                onCompositionRefresh?.invoke(composition, injections)
+                applyCandidates(finalResult, data.panel, data.options)
+            }
         }
     }
 
@@ -322,15 +334,22 @@ class T9InputController(
     }
 
     fun onDigitPressed(digit: String) {
+        if (inputAdmissionTicket() == null) return
         val code = digit[0].code
-        enqueue {
-            rimeEngine.processQueuedT9Key(code)
-            refreshOnBackground()
+        val traceId = InputLatencyTrace.begin()
+        enqueueInput {
+            try {
+                InputLatencyTrace.phase(traceId, "engine-jni-flush") { rimeEngine.processQueuedT9Key(code) }
+                refreshOnBackground(traceId)
+            } catch (e: Throwable) {
+                InputLatencyTrace.finish(traceId, "failed")
+                throw e
+            }
         }
     }
 
     fun onChoiceSelected(option: SyllableOption) {
-        enqueue {
+        enqueueInput {
             rimeEngine.t9SelectPinyinDirect(option.pinyin, option.digitLength)
             rimeEngine.t9FlushRimeInput()
             refreshOnBackground()
@@ -375,6 +394,7 @@ class T9InputController(
      * @param callback 在 Main 线程调用，参数为退格结果。
      */
     fun onDeleted(callback: (DeleteResult) -> Unit) {
+        val admission = inputAdmissionTicket() ?: return
         val shouldLaunch = synchronized(deleteCoalesceLock) {
             if (deleteJobActive) {
                 pendingDeleteCount++
@@ -387,15 +407,15 @@ class T9InputController(
         if (!shouldLaunch) return
         enqueue {
             try {
-                processDelete(callback)
+                if (inputAdmissionTicket() == admission) processDelete(callback, admission)
             } finally {
-                drainPendingDeletes(callback)
+                drainPendingDeletes(callback, admission)
             }
         }
     }
 
     /** 单次退格：processKey → flush → 撤销计数 → 取全量结果 → Main 刷新 + 回调。 */
-    private suspend fun processDelete(callback: (DeleteResult) -> Unit) {
+    private suspend fun processDelete(callback: (DeleteResult) -> Unit, admission: Long) {
         val composingBefore = rimeEngine.compositionActiveForDeletion()
         val result = rimeEngine.processQueuedT9Key(0xff08)
         val undoneCount = rimeEngine.t9GetAndConsumeUndoneRightCommitCount()
@@ -406,6 +426,7 @@ class T9InputController(
             DeleteResult.DELETED else DeleteResult.NOT_CONSUMED
         val gen = ++uiGeneration
         mainHandler.post {
+            if (inputAdmissionTicket() != admission) return@post
             // 撤销计数与退格结果始终回调；仅当刷新仍是最新代际时应用，
             // 避免后续更快的按键刷新被本退格的旧状态覆盖。
             if (undoneCount > 0) {
@@ -420,10 +441,11 @@ class T9InputController(
     }
 
     /** 消费长按退格期间累积的额外退格请求（t9Dispatcher 上顺序执行）。 */
-    private suspend fun drainPendingDeletes(callback: (DeleteResult) -> Unit) {
+    private suspend fun drainPendingDeletes(callback: (DeleteResult) -> Unit, admission: Long) {
         while (true) {
             val shouldDrain = synchronized(deleteCoalesceLock) {
-                if (pendingDeleteCount == 0) {
+                if (inputAdmissionTicket() != admission || pendingDeleteCount == 0) {
+                    pendingDeleteCount = 0
                     deleteJobActive = false
                     false
                 } else {
@@ -433,7 +455,7 @@ class T9InputController(
             }
             if (!shouldDrain) break
             try {
-                processDelete(callback)
+                processDelete(callback, admission)
             } catch (t: Throwable) {
                 FileLogger.e(TAG, "onDeleted drain failed", t)
             }

@@ -122,6 +122,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
 
         service.candidateState.value = service.candidateState.value.copy(
+            traceEventId = composition.traceEventId,
             // T9 保持合成显示态同源；非 T9 仅显示层用 preedit 回显，inputText 保留原始键入串
             inputText = if (isT9Schema) displayText else inputText,
             preeditText = displayText,

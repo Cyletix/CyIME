@@ -49,6 +49,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         // 空键无任何按键语义，且下游 Rime 路由按 key[0] 取码（key.lowercase()[0]），
         // 空串会越界崩溃（2026-09-14 真机实证：滑动手势 commit 值为空时触发）。
         if (key.isEmpty()) return
+        val admission = service.inputReadiness.ticket() ?: return
         service.voiceRecognitionHandler.abandonPendingOnManualInput()
         if (service.uiState.value.toolPanelInputFocused) {
             val candState = service.candidateState.value
@@ -198,6 +199,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             return
         }
         val job = service.serviceScope.launch(service.keyProcessingDispatcher, start = CoroutineStart.LAZY) {
+            if (!service.inputReadiness.accepts(admission)) return@launch
             if (service.japaneseInputController.handleKey(key)) return@launch
             val state = service.uiState.value
             val candState = service.candidateState.value
@@ -752,6 +754,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 候选栏 UI 更新保持平滑，抬手后最多多删 1~2 个字符。
      */
     internal fun handleDeleteKey() {
+        if (service.inputReadiness.ticket() == null) return
         val shouldLaunch = synchronized(service.deleteCoalesceLock) {
             if (service.deleteJobActive) {
                 service.pendingDeleteCount++
@@ -773,14 +776,19 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 也保持与其它按键的相对顺序——合并的退格会在夹在中间的字母键之后执行。
      */
     internal fun launchDeleteJob() {
+        val admission = service.inputReadiness.ticket()
         val owner = service.uiState.value.inputSessionId
         val job = service.serviceScope.launch(service.keyProcessingDispatcher, start = CoroutineStart.LAZY) {
             try {
-                if (owner == service.uiState.value.inputSessionId) processDeleteKey()
+                if (admission != null && service.inputReadiness.accepts(admission) && owner == service.uiState.value.inputSessionId) processDeleteKey()
             } catch (t: Throwable) {
                 FileLogger.e(XimeInputMethodService.TAG, "processDeleteKey failed", t)
             } finally {
-                maybeScheduleFollowUp()
+                if (admission != null && service.inputReadiness.accepts(admission)) maybeScheduleFollowUp()
+                else synchronized(service.deleteCoalesceLock) {
+                    service.pendingDeleteCount = 0
+                    service.deleteJobActive = false
+                }
             }
         }
         service.keyJobs.trySend(job)
@@ -960,7 +968,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * Ensures no interleaving with key processing.
      */
     internal fun postRimeJob(block: suspend CoroutineScope.() -> Unit) {
+        val admission = service.inputReadiness.ticket() ?: return
         val job = service.serviceScope.launch(service.keyProcessingDispatcher, start = CoroutineStart.LAZY) {
+            if (!service.inputReadiness.accepts(admission)) return@launch
             block()
         }
         service.keyJobs.trySend(job)
@@ -997,7 +1007,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
 
         val isT9 = isT9Schema(service.uiState.value.currentSchemaId)
         val candidatePinyin = if (isT9) {
-            expandedCandidate?.comment?.takeIf { it.isNotEmpty() }
+            expandedCandidate?.comment
                 ?: if (index < service.candidateState.value.candidateComments.size) {
                     service.candidateState.value.candidateComments[index]
                 } else {

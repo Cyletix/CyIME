@@ -6,6 +6,12 @@ import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 
 object SettingsPreferences {
     private const val PREFS_NAME = "kime_settings"
+    const val KEY_ROUNDED_KEYBOARD_BOTTOM = "rounded_keyboard_bottom"
+    fun roundedKeyboardBottom(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_ROUNDED_KEYBOARD_BOTTOM, false)
+    fun setRoundedKeyboardBottom(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_ROUNDED_KEYBOARD_BOTTOM, enabled).apply()
+    }
     const val KEY_PUNCTUATION_FULL_WIDTH = "punctuation_full_width"
     fun punctuationFullWidth(context: Context, default: Boolean): Boolean =
         getPrefs(context).getBoolean(KEY_PUNCTUATION_FULL_WIDTH, default)

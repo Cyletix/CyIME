@@ -7,6 +7,7 @@ import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 
 data class KeyboardCallbacks(
     val onKeyPress: (String, Boolean) -> Unit,
+    val inputAdmissionTicket: () -> Long? = { 0L },
     val onKeyPressDown: ((String) -> Unit)? = null,
     val onKeyRelease: ((String) -> Unit)? = null,
     val onCandidateSelect: (Int) -> Unit,
@@ -41,6 +42,7 @@ data class KeyboardCallbacks(
     val onSettings: (() -> Unit)? = null,
     val onSwitchSchema: ((String) -> Unit)? = null,
     val onReorderSchemas: ((List<String>) -> Unit)? = null,
+    val onHandwritingExpand: ((Boolean) -> Unit)? = null,
     val onHandwritingToggle: (() -> Unit)? = null,
     val onToggleSchemaSwitch: ((SchemaSwitchUiState) -> Unit)? = null,
     val onHideKeyboard: (() -> Unit)? = null,

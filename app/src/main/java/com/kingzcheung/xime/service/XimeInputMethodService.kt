@@ -40,6 +40,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -128,7 +129,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import android.os.Bundle
 import android.view.inputmethod.InlineSuggestion
@@ -189,6 +189,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         get() = savedStateRegistryController.savedStateRegistry
 
     internal val rimeEngine = RimeEngine.getInstance()
+    internal val inputReadiness = InputReadiness(android.os.SystemClock::uptimeMillis)
     
     internal lateinit var clipboardManager: ClipboardManager
 
@@ -467,7 +468,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val prefs = SettingsPreferences.getPrefsPublic(this)
         sharedPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
-                "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
+                RimeConfigHelper.DEPLOYMENT_REVISION -> {
+                    val pending = rimeInitializationJob
+                    if (pending?.isActive == true) {
+                        pending.invokeOnCompletion { serviceScope.launch { initRimeEngine() } }
+                    } else initRimeEngine()
+                }
+                com.kingzcheung.xime.settings.CustomKeyboardLayouts.REVISION -> schemaController.applyCustomLayouts()
+                SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
                     loadDarkModePreference()
                     applyWindowBackground()
                 }
@@ -597,66 +605,31 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         predictionManager.getPrediction(contextText)
     }
     
+    private var rimeInitializationJob: kotlinx.coroutines.Job? = null
+
     private fun initRimeEngine() {
+        if (rimeInitializationJob?.isActive == true) return
+        inputReadiness.deployment(true)
         Log.d(TAG, "initRimeEngine: Starting initialization...")
         
-        // 必须在任何异步操作之前同步加载键盘按键配置，
-        // 否则 KeyboardLayout 组合时 swipeUp/swipeDown 配置可能尚未就绪，
-        // 导致按键上的符号不显示、上滑/下滑手势不触发。
-        runBlocking(Dispatchers.IO) {
-            KeysConfigHelper.loadConfig(this@XimeInputMethodService)
-        }
+        // Parsing all layout YAMLs can take seconds on first launch. Keep the service
+        // main thread responsive; the existing loading overlay gates input until the
+        // configVersion publication and engine initialization have both completed.
+        uiState.value = uiState.value.copy(isDeploying = true, deploymentMessage = "正在加载键盘配置...")
         
-        RimeEngine.setDeploymentCallback { isDeploying, message ->
-            serviceScope.launch(Dispatchers.Main) {
-                uiState.value = uiState.value.copy(
-                    isDeploying = isDeploying,
-                    deploymentMessage = message
-                )
-            }
-        }
-        
-        val initJob = serviceScope.launch(Dispatchers.IO) {
+        rimeInitializationJob = serviceScope.launch(Dispatchers.IO) {
             try {
-                notifyDeploymentStatus(true, "正在初始化...")
-                
-                val (userDataDir, sharedDataDir) = RimeConfigHelper.initializeRimeDataAsync(this@XimeInputMethodService)
-                
-                notifyDeploymentStatus(true, "正在加载输入法引擎...")
-                rimeEngine.initialize(userDataDir, sharedDataDir)
+                KeysConfigHelper.loadConfig(this@XimeInputMethodService)
 
-                // 检查词库是否已部署（deploymentDone 标记 + 部署 hash 一致）
-                val deploymentDone = SettingsPreferences.isDeploymentDone(this@XimeInputMethodService)
-                val needsDeployment = !deploymentDone || !RimeConfigHelper.isDeploymentComplete(this@XimeInputMethodService)
-
-                if (needsDeployment) {
-                    // 统一部署入口（进程内互斥，hash 一致时内部跳过）。
-                    // 与 XimeApplication 预初始化共享，避免两者并发触发两次全量编译。
-                    notifyDeploymentStatus(true, "正在编译词库...")
-                    if (RimeConfigHelper.ensureDeployment(this@XimeInputMethodService)) {
-                        rimeEngine.updateLastBuildTime()
-                    } else {
-                        FileLogger.e(TAG, "initRimeEngine: ensureDeployment failed, deployment may not have completed")
-                        notifyDeploymentStatus(false, "词库准备未完成，请重新打开键盘重试")
-                        return@launch
-                    }
-                } else {
-                    Log.d(TAG, "initRimeEngine: Already deployed, creating session directly")
+                RimeEngine.setDeploymentCallback { isDeploying, message ->
+                    // A native "finished" callback only means nativeInitialize returned.
+                    // Deployment and schema restoration still have to finish before typing.
+                    if (isDeploying) notifyDeploymentStatus(true, message)
                 }
 
-                // 创建 session（已部署时跳过 maintenance 直接创建）
-                val sessionReady = rimeEngine.ensureSession(180_000L)
-                if (sessionReady) {
-                    Log.d(TAG, "initRimeEngine: Session ready")
-                    // 确保部署成功后才标记完成，避免首次部署超时后误标记
-                    if (needsDeployment) {
-                        SettingsPreferences.setDeploymentDone(this@XimeInputMethodService, true)
-                        RimeConfigHelper.storeDeploymentHash(this@XimeInputMethodService)
-                    }
-                } else {
-                    FileLogger.w(TAG, "initRimeEngine: Session not ready after 60s, continuing in background")
-                }
-                notifyDeploymentStatus(false, "")
+                notifyDeploymentStatus(true, "正在准备词库，首次使用需要稍候...")
+                check(RimeConfigHelper.prepareEngine(this@XimeInputMethodService)) { "词库部署失败" }
+                check(rimeEngine.ensureSession(180_000L)) { "输入会话未就绪" }
 
                 withContext(Dispatchers.Main) {
                     val savedSchema = SettingsPreferences.getCurrentSchema(this@XimeInputMethodService)
@@ -703,20 +676,26 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             // 因为 nativeCreateSession 后 schema 的 processor/translator 等
                             // 可能未完全初始化，switchSchema 会触发完整的初始化流程
                             Log.d(TAG, "initRimeEngine: Switching to saved schema: $savedSchema")
-                            schemaController.applyPageSizeSetting(savedSchema)
-                            rimeEngine.switchSchema(savedSchema)
+                            withContext(Dispatchers.IO) {
+                                schemaController.applyPageSizeSetting(savedSchema)
+                                check(rimeEngine.switchSchema(savedSchema)) { "输入方案加载失败" }
+                            }
                         }
                         SchemaManager.isSchemaCompiled(this@XimeInputMethodService, savedSchema) -> {
                             Log.d(TAG, "initRimeEngine: Schema compiled but not in get_schema_list, switching anyway")
-                            schemaController.applyPageSizeSetting(savedSchema)
-                            rimeEngine.switchSchema(savedSchema)
+                            withContext(Dispatchers.IO) {
+                                schemaController.applyPageSizeSetting(savedSchema)
+                                check(rimeEngine.switchSchema(savedSchema)) { "输入方案加载失败" }
+                            }
                         }
                         availableSchemas.isNotEmpty() -> {
                             // savedSchema 不可用且未编译，退而求其次用第一个可用方案
                             val fallbackSchema = availableSchemas.first()
                             Log.d(TAG, "initRimeEngine: savedSchema '$savedSchema' not available, falling back to '$fallbackSchema'")
-                            schemaController.applyPageSizeSetting(fallbackSchema)
-                            rimeEngine.switchSchema(fallbackSchema)
+                            withContext(Dispatchers.IO) {
+                                schemaController.applyPageSizeSetting(fallbackSchema)
+                                check(rimeEngine.switchSchema(fallbackSchema)) { "输入方案加载失败" }
+                            }
                             SettingsPreferences.setCurrentSchema(this@XimeInputMethodService, fallbackSchema)
                         }
                     }
@@ -724,27 +703,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     sessionController.updateSchemaName()
                     // onStartInput 在部署进行中会跳过 schema 切换与选项恢复，
                     // 部署完成后这里补齐 UI 状态，保证键盘可用
-                    sessionController.restorePersistedSchemaOptions()
+                    withContext(Dispatchers.IO) { sessionController.restorePersistedSchemaOptions() }
                     updateUI()
+                    inputReadiness.completeStartup()
+                    uiState.value = uiState.value.copy(isDeploying = false, deploymentMessage = "")
                     Log.d(TAG, "initRimeEngine: Rime engine initialized successfully")
                 }
             } catch (e: Exception) {
                 FileLogger.e(TAG, "initRimeEngine: Failed to initialize Rime engine", e)
-                notifyDeploymentStatus(false, "初始化失败")
+                notifyDeploymentStatus(true, "初始化失败，请在输入方案设置中重新部署")
             }
         }
         
-        // Watchdog: force-clear loading state after 190s
+        // Watchdog reports timeout without permitting input against an unready engine.
         // withTimeout cannot cancel native JNI calls; if rimeEngine.initialize() hangs
         // in librime, the IO coroutine would block forever. This watchdog ensures the
-        // user is never permanently stuck on the loading screen.
+        // user gets an explicit error; keyboard dismissal remains available.
         // 首次编译最多等 120s + ensureSession 60s + 10s 缓冲
+        val attempt = rimeInitializationJob
         serviceScope.launch(Dispatchers.Main) {
             delay(190_000L)
-            if (uiState.value.isDeploying) {
-                FileLogger.w(TAG, "initRimeEngine: Watchdog triggered - native init appears stuck, forcing loading state cleared")
+            if (rimeInitializationJob === attempt && attempt?.isActive == true && uiState.value.isDeploying) {
+                FileLogger.w(TAG, "initRimeEngine: Watchdog triggered - native init appears stuck, keeping input blocked")
                 uiState.value = uiState.value.copy(
-                    isDeploying = false,
+                    isDeploying = true,
                     deploymentMessage = "初始化超时，请重启输入法"
                 )
             }
@@ -752,9 +734,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     internal fun notifyDeploymentStatus(isDeploying: Boolean, message: String) {
+        inputReadiness.deployment(isDeploying)
         serviceScope.launch(Dispatchers.Main) {
             uiState.value = uiState.value.copy(
-                isDeploying = isDeploying,
+                isDeploying = inputReadiness.ticket() == null,
                 deploymentMessage = message
             )
         }
@@ -1204,6 +1187,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onCreateInputView(): View {
         keyboardContainer = VoiceKeyboardContainer(
             context = this,
+            acceptTouchDown = { downTime -> uiState.value.isDeploying || inputReadiness.acceptsEvent(downTime) },
             uiStateProvider = { uiState.value },
             onUiStateChanged = { newState -> uiState.value = newState },
             onPerformVibration = { view -> feedbackManager.hapticFeedback(view) },
@@ -1250,7 +1234,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val state = uiState.value
                 val page by keyboardViewModel.page.collectAsState(com.kingzcheung.xime.keyboard.KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL))
                 val isHandwritingMode = (page as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
+                val handwritingExpanded = state.handwritingExpanded && isHandwritingMode && !state.showKeyboardResize
+                androidx.compose.runtime.LaunchedEffect(isHandwritingMode) {
+                    if (!isHandwritingMode && uiState.value.handwritingExpanded)
+                        uiState.value = uiState.value.copy(handwritingExpanded = false)
+                }
                 val isDarkTheme = isDarkTheme()
+                val roundedKeyboardBottom = com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardBottom()
                 val screenHeightDp = resources.configuration.screenHeightDp
                 val physicalScreenDp = (resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt()
                 val statusBarHeightDp = tryGetStatusBarHeightDp(this@XimeInputMethodService, window.window)
@@ -1287,9 +1277,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         }
                     }
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
-                val effectiveKeyboardHeight = keyboardHeight
-                val contentBottomPaddingDp = if (state.isFloatingMode) 0 else state.keyboardBottomPaddingDp
-                val floatingDragBarHeight = if (state.isFloatingMode) FLOATING_DRAG_BAR_HEIGHT_DP else 0
+                val effectiveKeyboardHeight = if (handwritingExpanded) (effectiveScreenH - floatingMinY).coerceAtLeast(1) else keyboardHeight
+                val contentBottomPaddingDp = if (handwritingExpanded || state.isFloatingMode) 0 else state.keyboardBottomPaddingDp
+                val floatingDragBarHeight = if (state.isFloatingMode && !handwritingExpanded) FLOATING_DRAG_BAR_HEIGHT_DP else 0
                 val floatingCardContentHeight = effectiveKeyboardHeight + floatingDragBarHeight
                 
                 val density = LocalDensity.current
@@ -1318,7 +1308,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     Box(modifier = Modifier.fillMaxSize()) {
                         // Sync FrameLayout height with Compose content height
                         val contentHeight = if (state.showKeyboardResize) state.resizePreviewHeightDp else floatingCardContentHeight + overlayPanelExtra
-                        val totalDp = if (state.showKeyboardResize || state.isCompact || state.isFloatingMode) effectiveScreenH
+                        val totalDp = if (handwritingExpanded || state.showKeyboardResize || state.isCompact || state.isFloatingMode) effectiveScreenH
                             else contentHeight + contentBottomPaddingDp + activeBottomDp
                         SideEffect {
                             // 容器物理高度 = Compose 内容总高（含底部留白），全模式统一。
@@ -1326,6 +1316,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             // 自动以新高度重算并上报（ViewRootImpl 每次 traversal 都 dispatch
                             // OnComputeInternalInsetsListener，值变化即 setInsets），
                             // 无需 +1dp hack 强制造型变化。
+                            handwritingNormalInsetDp = keyboardHeight + state.keyboardBottomPaddingDp + activeBottomDp
                             keyboardContainer.updateHeight(totalDp)
                             currentEffectiveKeyboardHeight = if (state.isFloatingMode) floatingCardContentHeight + overlayPanelExtra
                                 else if (state.isCompact) HARDWARE_CANDIDATE_BAR_HEIGHT
@@ -1363,7 +1354,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         // 非浮动：背景与键盘内容同区域，贴底覆盖键盘内容高度 + 底部导航栏留白，
                         // 键盘内容通过 offset 上移 activeBottomDp 留出导航栏空间（对齐参考实现 bottomPaddingSpace）。
                         // 浮动模式：卡片由 KeyboardView 内部 FloatingKeyboardContainer 自绘背景与定位，此处不做背景/偏移。
-                        if (!state.isFloatingMode) {
+                        if (!state.isFloatingMode && !roundedKeyboardBottom) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1374,7 +1365,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             )
                         }
                         Box(
-                            modifier = if (com.kingzcheung.xime.ui.keyboard.usesFullKeyboardHost(
+                            modifier = if (handwritingExpanded) Modifier.fillMaxWidth().height(effectiveKeyboardHeight.dp)
+                                .align(androidx.compose.ui.Alignment.BottomCenter).offset(y = (-activeBottomDp).dp)
+                            else if (com.kingzcheung.xime.ui.keyboard.usesFullKeyboardHost(
                                 state.isFloatingMode, state.showKeyboardResize
                             )) {
                                 // 正常悬浮也必须全高。确认后缩成键盘高度会让上移的卡片被图层裁掉。
@@ -1414,6 +1407,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     isDarkTheme = isDarkTheme,
                                     darkMode = state.darkMode,
                                     themeId = state.themeId,
+                                    handwritingExpanded = handwritingExpanded,
                                     keyboardHeightDp = effectiveKeyboardHeight,
                                     keyboardBottomPaddingDp = contentBottomPaddingDp,
                                     keyboardOpacity = state.keyboardOpacity,
@@ -1433,7 +1427,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     toolbarPluginButtons = state.toolbarPluginButtons,
                                     isCalculatorMode = calculatorEngine.isActive(),
                                     inputSessionId = state.inputSessionId,
-                                    isFloatingMode = state.isFloatingMode,
+                                    isFloatingMode = state.isFloatingMode && !handwritingExpanded,
                                     isHandwritingMode = isHandwritingMode,
                                     floatingOffsetX = state.floatingOffsetX,
                                     floatingOffsetY = state.floatingOffsetY,
@@ -1441,8 +1435,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     floatingScreenHeightDp = effectiveScreenH,
                                     resizePreviewWidthDp = state.resizePreviewWidthDp,
                                     floatingWidthDp = state.floatingWidthDp,
-                                    fixedWidthDp = state.fixedWidthDp,
-                                    fixedOffsetX = state.fixedOffsetX,
+                                    fixedWidthDp = if (handwritingExpanded) resources.configuration.screenWidthDp else state.fixedWidthDp,
+                                    fixedOffsetX = if (handwritingExpanded) 0 else state.fixedOffsetX,
                                     t9ResetSignal = state.t9ResetSignal,
                                     swipeCancelEpoch = state.swipeCancelEpoch,
                                     t9RightCandidateSelectedCount = state.t9RightCandidateSelectedCount,
@@ -1603,14 +1597,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onHapticFeedback = { feedbackManager.hapticFeedback(hapticView) },
                                 onCardPositioned = { left: Int, top: Int, right: Int, bottom: Int ->
                                     val cardHeightPx = bottom - top
-                                    if (!state.isFloatingMode && !state.showKeyboardResize && cardHeightPx > 0) {
+                                    if (!handwritingExpanded && !state.isFloatingMode && !state.showKeyboardResize && cardHeightPx > 0) {
                                         val bounds = android.graphics.Rect(left, top, right, bottom)
                                         if (fixedCardBounds != bounds) {
                                             fixedCardBounds = bounds
                                             keyboardContainer.requestLayout()
                                         }
                                     }
-                                    if (state.isFloatingMode && cardHeightPx > 0) {
+                                    if (!handwritingExpanded && state.isFloatingMode && cardHeightPx > 0) {
                                         currentEffectiveKeyboardHeight = (cardHeightPx / density.density).roundToInt()
                                         currentFloatingCardHeightDp = currentEffectiveKeyboardHeight
                                         currentFloatingCardWidthDp = ((right - left) / density.density).roundToInt()
@@ -1790,7 +1784,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK &&
-            (keyboardCallbacks?.onDismissPreeditEditor != null || uiState.value.showKeyboardResize)) {
+            (keyboardCallbacks?.onDismissPreeditEditor != null || uiState.value.showKeyboardResize || uiState.value.handwritingExpanded)) {
             event?.startTracking()
             return true
         }
@@ -1847,6 +1841,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.handwritingExpanded) {
+            if (event?.isCanceled != true) uiState.value = uiState.value.copy(handwritingExpanded = false)
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && keyboardCallbacks?.onDismissPreeditEditor != null) {
             if (event?.isCanceled != true) keyboardCallbacks?.onDismissPreeditEditor?.invoke()
             return true
@@ -1859,6 +1857,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun sendKeyEvent(keyCode: Int) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            schemaController.moveEditorCursorVertical(if (keyCode == KeyEvent.KEYCODE_DPAD_UP) -1 else 1)
+            return
+        }
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
     }
@@ -1899,6 +1901,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        voiceRecognitionHandler.endInputSession()
         if (uiState.value.isVoiceMode || voiceRecordingStarted) {
             voiceRecognitionHandler.abandonSession()
             voiceRecognitionHandler.cancelPreStart()
@@ -1935,7 +1938,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             SettingsPreferences.isVerboseLoggingEnabled(this)
         )
         
-        if (RimeEngine.isInitialized()) {
+        if ((RimeEngine.isInitialized() && !uiState.value.isDeploying)) {
             // 部署/全量编译进行中：不执行 schema 切换（switchSchema 会等待 rimeLock，
             // 60MB 词库编译可达 30s+，主线程等待会导致 ANR）。部署完成后
             // initRimeEngine 的流程会自动切换到正确方案，这里只做 UI 状态恢复。
@@ -2023,7 +2026,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 必须携带当前 schemaId，否则 T9/笔画等专用布局会被错误重置为默认全键盘。
         // restarting=true 表示同一输入会话内的状态刷新（应用 restartInput），此时不应
         // 重置布局，否则数字/符号面板会在输入中被切回全键盘。
-        if (RimeEngine.isInitialized() && !restarting) {
+        if ((RimeEngine.isInitialized() && !uiState.value.isDeploying) && !restarting) {
             val rimeAscii = rimeEngine.isAsciiMode()
             FileLogger.i(TAG, "onStartInput: reset keyboard, rimeAscii=$rimeAscii")
             uiState.value = uiState.value.copy(isAsciiMode = rimeAscii)
@@ -2040,7 +2043,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             )
             keyboardViewModel.resetKeyboard(rimeAscii, schemaId, forceNumberPanel)
         } else {
-            val rimeAscii = if (RimeEngine.isInitialized()) rimeEngine.isAsciiMode() else "n/a"
+            val rimeAscii = if ((RimeEngine.isInitialized() && !uiState.value.isDeploying)) rimeEngine.isAsciiMode() else "n/a"
             FileLogger.i(TAG, "onStartInput: skip keyboard reset, restarting=$restarting, rimeAscii=$rimeAscii, ui=${uiState.value.isAsciiMode}")
         }
 
@@ -2201,21 +2204,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     // 非浮动模式：参考成熟输入法 FULL 方案的背景/高度布局。
                     // 1) edge-to-edge：窗口绘制到系统导航栏后面，键盘背景（渐变/图片）可延伸到底部；
                     // 2) 窗口背景透明：键盘内容由 Compose 绘制，键盘上方露出应用内容而不是白色/主题色块；
-                    // 3) 导航栏透明 + 关闭强制对比度：底部导航栏区域由键盘背景覆盖，不会露出系统白色。
+                    // 3) 直角模式由 Compose 填充导航区；圆角模式保留透明并启用系统对比度保护。
                     androidx.core.view.WindowCompat.setDecorFitsSystemWindows(win, false)
                     win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                     win.setDimAmount(0f)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        win.isNavigationBarContrastEnforced = false
+                        win.isNavigationBarContrastEnforced = SettingsPreferences.roundedKeyboardBottom(this)
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         win.setNavigationBarColor(android.graphics.Color.TRANSPARENT)
                     }
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     win.decorView?.let { decor ->
                         val controller = androidx.core.view.WindowInsetsControllerCompat(win, decor)
-                        controller.isAppearanceLightNavigationBars = !isDark
+                        val rounded = SettingsPreferences.roundedKeyboardBottom(this)
+                        val systemDark = (resources.configuration.uiMode and
+                            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                            android.content.res.Configuration.UI_MODE_NIGHT_YES
+                        val colors = KeysConfigHelper.getKeyboardColors()
+                        val textValue = if (isDark) colors.keyTextColorDark else colors.keyTextColor
+                        val textColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyTextColorOverride(state.themeId, isDark)
+                            ?: androidx.compose.ui.graphics.Color(if (textValue > 0xFFFFFF) textValue else (0xFF000000L or textValue))
+                        controller.isAppearanceLightNavigationBars =
+                            com.kingzcheung.xime.ui.keyboard.useDarkNavigationIcons(rounded, systemDark, textColor.luminance())
                     }
                 }
                 // setDecorFitsSystemWindows(false) 后必须重新分发 insets，
@@ -2289,6 +2301,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        voiceRecognitionHandler.endInputSession()
         // 手写模型轻量，按"用键盘时加载、键盘收起即卸载"管理：输入会话结束
         // （收起键盘/焦点离开）即释放，:inference 侧同步卸载模型；未初始化时
         // release() 幂等空操作。下次落笔由 predict 自愈或布局重建重载。
@@ -2327,6 +2340,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private fun clearInputState() {
+        if (uiState.value.handwritingExpanded) uiState.value = uiState.value.copy(handwritingExpanded = false)
+        voiceRecognitionHandler.endInputSession()
         // 即使 Compose 在隐藏时尚未销毁，旧手写回调也不能再写入宿主。
         uiState.value = uiState.value.copy(inputSessionId = System.nanoTime())
         closeToolPanel()
@@ -2340,11 +2355,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         calculatorEngine.clear()
         rimeEngine.clearComposition()
         t9PartialSegments.clear()
-        // 输入法隐藏/结束输入：静默停止语音会话，丢弃未识别文本，避免迟到结果写入新输入框
+        // 录音已在本方法入口停止；这里仅重置语音 UI。
         if (uiState.value.isVoiceMode || voiceRecordingStarted) {
-            voiceRecognitionHandler.abandonSession()
-            voiceRecognitionHandler.stopRecognition()
-            voiceRecognitionHandler.cancelPreStart()
             isTrackingVoiceButtons = false
             voiceRecordingStarted = false
             voiceAmplitudeState.floatValue = 0f
@@ -2542,8 +2554,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    private var handwritingNormalInsetDp = 0
+
     override fun onComputeInsets(outInsets: Insets) {
         val state = uiState.value
+        if (state.handwritingExpanded &&
+            (keyboardViewModel.page.value as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING) {
+            val windowHeight = window.window?.decorView?.height ?: resources.displayMetrics.heightPixels
+            val reserve = if (state.isFloatingMode) 0 else (handwritingNormalInsetDp * resources.displayMetrics.density).roundToInt()
+            outInsets.contentTopInsets = (windowHeight - reserve).coerceAtLeast(0)
+            outInsets.visibleTopInsets = outInsets.contentTopInsets
+            outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_FRAME
+            return
+        }
         if (state.showKeyboardResize) {
             // 调节层是全屏交互画布，但不能把宿主 App 顶到只剩一条缝。
             // 整个 IME 窗口可触摸；内容 inset 仍报告为“悬浮”，底层页面保持原位。

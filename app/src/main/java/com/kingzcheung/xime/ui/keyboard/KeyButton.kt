@@ -295,6 +295,11 @@ fun SwipeableKeyButton(
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
 ) {
+    val customLayout = LocalCustomLayout.current
+    val customAccent = LocalCustomAccent.current
+    val resolvedColors = customLayoutKeyColors(customLayout, text, backgroundColor, textColor, customAccent)
+    val resolvedBackground = resolvedColors.first
+    val resolvedText = resolvedColors.second
     var isPressed by remember { mutableStateOf(false) }
     var buttonBounds by remember { mutableStateOf(Rect.Zero) }
 
@@ -331,11 +336,11 @@ fun SwipeableKeyButton(
     }
     val shiftHovered = shiftLetter != null && shiftTargets?.hovered == shiftLetter
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, resolvedBackground) {
         if (shadowEnabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
-            val color = crispShadowColor(backgroundColor)
+            val color = crispShadowColor(resolvedBackground)
             Modifier.drawBehind {
                 drawRoundRect(
                     color = color,
@@ -363,9 +368,9 @@ fun SwipeableKeyButton(
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(
-                if (isPressed || shiftHovered) backgroundColor.copy(alpha = 0.7f)
-                else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
-                else backgroundColor
+                if (isPressed || shiftHovered) resolvedBackground.copy(alpha = 0.7f)
+                else if (isHighlighted) resolvedBackground.copy(alpha = 0.8f)
+                else resolvedBackground
             )),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
@@ -391,7 +396,7 @@ fun SwipeableKeyButton(
                     Icon(
                         painter = icon,
                         contentDescription = text,
-                        tint = textColor,
+                        tint = resolvedText,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(top = 2.dp, start = 4.dp)
@@ -399,8 +404,8 @@ fun SwipeableKeyButton(
                     )
                 } else {
                     Text(
-                        text = punctuationKeyLabel(text),
-                        color = textColor,
+                        text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent),
+                        color = resolvedText,
                         fontSize = labelSize.sp,
                         fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
                         textAlign = TextAlign.Start,
@@ -425,7 +430,7 @@ fun SwipeableKeyButton(
                         val displayText = if (swipeUpHint.length <= 2) swipeUpHint else swipeUpHint.take(2)
                         Text(
                             text = punctuationKeyLabel(displayText),
-                            color = textColor.copy(alpha = 0.6f),
+                            color = resolvedText.copy(alpha = 0.6f),
                             fontSize = effectiveSwipeFontSize,
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.End,
@@ -447,7 +452,7 @@ fun SwipeableKeyButton(
                             val displayText = if (swipeDownHint.length <= 12) swipeDownHint else swipeDownHint.take(12)
                             Text(
                                 text = punctuationKeyLabel(displayText),
-                                color = textColor.copy(alpha = 0.7f),
+                                color = resolvedText.copy(alpha = 0.7f),
                                 fontSize = adjustedFontSize,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Right,
@@ -464,14 +469,14 @@ fun SwipeableKeyButton(
                 Icon(
                     painter = icon,
                     contentDescription = text,
-                    tint = textColor,
+                    tint = resolvedText,
                     modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value).dp)
                 )
             } else {
                 Text(
-                    text = punctuationKeyLabel(text),
+                    text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent),
                     modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty()) 2.dp else 0.dp),
-                    color = textColor,
+                    color = resolvedText,
                     fontSize = labelSize.sp,
                     lineHeight = (labelSize * 1.2f).sp,
                     fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
@@ -488,7 +493,7 @@ fun SwipeableKeyButton(
                 val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
                 Text(
                     text = punctuationKeyLabel(displayText),
-                    color = textColor.copy(alpha = 0.6f),
+                    color = resolvedText.copy(alpha = 0.6f),
                     fontSize = effectiveSwipeFontSize,
                     lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
                     fontWeight = FontWeight.Medium,
@@ -503,7 +508,7 @@ fun SwipeableKeyButton(
                 val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
                 Text(
                     text = punctuationKeyLabel(displayText),
-                    color = textColor.copy(alpha = 0.5f),
+                    color = resolvedText.copy(alpha = 0.5f),
                     fontSize = effectiveSwipeFontSize,
                     lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
                     fontWeight = FontWeight.Normal,
@@ -517,7 +522,7 @@ fun SwipeableKeyButton(
             if (badgeText != null) {
                 Text(
                     text = badgeText,
-                    color = textColor.copy(alpha = 0.5f),
+                    color = resolvedText.copy(alpha = 0.5f),
                     fontSize = (10f * hintScale).sp,
                     fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.End,
