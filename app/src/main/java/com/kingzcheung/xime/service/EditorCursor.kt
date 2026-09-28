@@ -171,27 +171,23 @@ internal class EditorCursor {
         return null
     }
 
-    /** 上下移动交给宿主按实际排版处理，包含自动换行；文首文末截停，避免焦点外移。 */
-    fun moveVertical(ic: InputConnection, rows: Int, selecting: Boolean = false) {
-        if (rows == 0) return
+    /** 只修改当前编辑器选区；不能发送 DPAD_UP/DOWN，宿主可能将它解释为焦点导航。 */
+    fun moveVertical(ic: InputConnection, rows: Int, selecting: Boolean = false): Boolean {
+        if (rows == 0) return false
         bind(ic)
         if (!selecting) resetSelection()
-        repeat(abs(rows)) {
-            val extracted = snapshot(ic)
-            if (selecting && extracted != null) syncSelection(extracted)
-            val position = extracted?.let { if (selecting) active!! - it.startOffset else it.selectionEnd }
-            val knownText = extracted?.text
-            val hasAdjacent = if (position != null && knownText != null &&
-                (if (rows < 0) position > 0 else position < knownText.length)) true
-            else runCatching {
-                if (rows < 0) !ic.getTextBeforeCursor(1, 0).isNullOrEmpty()
-                else !ic.getTextAfterCursor(1, 0).isNullOrEmpty()
-            }.getOrDefault(false)
-            if (!hasAdjacent) return
-            sendDirection(ic, if (rows < 0) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN, selecting)
+        var moved = false
+        repeat(abs(rows).coerceAtMost(1000)) {
+            val extracted = snapshot(ic) ?: return moved
+            if (selecting) syncSelection(extracted)
+            val position = if (selecting) active!! - extracted.startOffset else extracted.selectionEnd
+            val target = verticalTextTarget(extracted.text, position, rows.compareTo(0))
+            if (target == position) return moved
+            if (!setSelection(ic, extracted.startOffset + target, selecting)) return moved
+            moved = true
         }
+        return moved
     }
-
     fun sendDirection(ic: InputConnection, key: Int, selecting: Boolean = false, additionalMeta: Int = 0): Boolean {
         bind(ic)
         if (!selecting) resetSelection()
@@ -199,6 +195,9 @@ internal class EditorCursor {
             syncSelection(it)
             // 恢复方向后再交给宿主处理上下行，避免规范化选区改变 Shift 的活动端。
             runCatching { ic.setSelection(anchor!!, active!!) }
+        }
+        if (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN) {
+            return moveVertical(ic, if (key == KeyEvent.KEYCODE_DPAD_UP) -1 else 1, selecting)
         }
         val meta = additionalMeta or if (selecting) KeyEvent.META_SHIFT_ON else 0
         val downAccepted = ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, key, 0, meta))
@@ -233,4 +232,24 @@ internal fun offsetByCharacters(text: CharSequence, position: Int, steps: Int): 
         }
     }
     return cursor
+}
+
+/** 保持码点列号，跨显式换行；未暴露视觉折行时停在当前段首/尾。 */
+internal fun verticalTextTarget(text: CharSequence, position: Int, direction: Int): Int {
+    val from = position.coerceIn(0, text.length)
+    val start = paragraphBoundary(text, from, false)
+    val end = paragraphBoundary(text, from, true)
+    val column = Character.codePointCount(text, start, from)
+    if (direction < 0) {
+        if (start == 0) return 0
+        var previousEnd = start - 1
+        if (previousEnd > 0 && text[previousEnd] == '\n' && text[previousEnd - 1] == '\r') previousEnd--
+        val previousStart = paragraphBoundary(text, previousEnd, false)
+        return offsetByCharacters(text.subSequence(previousStart, previousEnd), 0, column) + previousStart
+    }
+    if (end == text.length) return text.length
+    var nextStart = end + 1
+    if (text[end] == '\r' && nextStart < text.length && text[nextStart] == '\n') nextStart++
+    val nextEnd = paragraphBoundary(text, nextStart, true)
+    return offsetByCharacters(text.subSequence(nextStart, nextEnd), 0, column) + nextStart
 }

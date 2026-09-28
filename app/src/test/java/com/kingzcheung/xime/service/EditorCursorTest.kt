@@ -66,13 +66,44 @@ class EditorCursorTest {
         assertEquals(0, ticks)
     }
 
-    @Test fun `vertical arrows delegate visual wrapping to the editor`() {
-        val up = editor(4, text = "abcdefghijklmnop")
-        assertCancelKeyPair(up, KeyEvent.KEYCODE_DPAD_UP) { EditorCursor().moveVertical(up, -1) }
-        val down = editor(4, text = "abcdefghijklmnop")
-        assertCancelKeyPair(down, KeyEvent.KEYCODE_DPAD_DOWN) { EditorCursor().moveVertical(down, 1) }
+    @Test fun `vertical arrows use selection without focus navigation events`() {
+        val up = editor(6, text = "abcd\nefgh\nijkl")
+        EditorCursor().moveVertical(up, -1)
+        verify(up).setSelection(1, 1)
+        verify(up, never()).sendKeyEvent(any())
+        val down = editor(6, text = "abcd\nefgh\nijkl")
+        EditorCursor().sendDirection(down, KeyEvent.KEYCODE_DPAD_DOWN)
+        verify(down).setSelection(11, 11)
+        verify(down, never()).sendKeyEvent(any())
     }
 
+    @Test fun `single line middle cannot transfer focus up or down`() {
+        val up = editor(2)
+        val down = editor(2)
+        EditorCursor().moveVertical(up, -20)
+        EditorCursor().moveVertical(down, 20)
+        verify(up).setSelection(0, 0)
+        verify(down).setSelection(4, 4)
+        verify(up, never()).sendKeyEvent(any())
+        verify(down, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `unsupported vertical movement stops rather than navigating to another element`() {
+        val missing = mock<InputConnection>()
+        EditorCursor().moveVertical(missing, 1)
+        verify(missing, never()).sendKeyEvent(any())
+        val rejected = editor(1, text = "abc\ndef")
+        doReturn(false).whenever(rejected).setSelection(any(), any())
+        EditorCursor().moveVertical(rejected, 1)
+        verify(rejected, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `vertical selection preserves anchor across CRLF and emoji`() {
+        val ic = editor(3, text = "a😀b\r\nc😀d")
+        EditorCursor().moveVertical(ic, 1, true)
+        verify(ic).setSelection(3, 9)
+        verify(ic, never()).sendKeyEvent(any())
+    }
     @Test fun `vertical arrows never escape the text at either boundary`() {
         val first = editor(0)
         val last = editor(4)
