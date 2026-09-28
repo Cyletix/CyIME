@@ -197,18 +197,20 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
         if (_uiState.value.isDeploying) return
         viewModelScope.launch {
             _uiState.update { it.copy(isDeploying = true) }
-            val success = withContext(Dispatchers.IO) {
-                PersonalDictManager.ensureSchemaPacks(context)
-                KeysConfigHelper.loadConfig(context)
-                KeyboardThemes.reload(context)
-                val engine = RimeEngine.getInstance()
-                val deployed = engine.deploy()
-                if (deployed) {
-                    RimeConfigHelper.storeDeploymentHash(context)
+            val success = try {
+                withContext(Dispatchers.IO) {
+                    KeysConfigHelper.loadConfig(context)
+                    KeyboardThemes.reload(context)
+                    RimeConfigHelper.redeploy(context)
                 }
-                deployed
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                com.kingzcheung.xime.util.FileLogger.e("SchemaSettings", "Deployment repair failed", error)
+                false
+            } finally {
+                _uiState.update { it.copy(isDeploying = false) }
             }
-            _uiState.update { it.copy(isDeploying = false) }
             showToast(if (success) "部署完成" else "部署失败")
             refresh()
         }

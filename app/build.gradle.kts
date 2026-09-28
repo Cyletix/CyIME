@@ -60,11 +60,11 @@ android {
         applicationId = "com.cyletix.cyime"
         minSdk = 28
         targetSdk = 35
-        // 版本规则（与用户约定）：每次发包 PATCH +1、versionCode 独立 +1；
-        // 只有成组的新功能才升 MINOR，不兼容的大改才升 MAJOR。
-        // 例：1.0.1/20261010 → 1.0.2/20261011 → 1.0.3/20261012 → 1.1.0/20261020
-        versionCode = 20261013
-        versionName = "1.0.4"
+        // 版本规则：本地小改递增 PATCH；对外正式发包递增 MINOR，保留 PATCH。
+        // 例：1.0.5 开发 → 1.1.5 正式 → 1.1.6 开发 → 1.2.6 正式。
+        // versionCode 每次生成新版本独立递增，保证覆盖升级。
+        versionCode = 20261020
+        versionName = "1.2.8"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -101,6 +101,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 本地有正式密钥时沿用它，debug/release 都能覆盖原应用，避免卸载丢数据。
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -182,7 +188,8 @@ android.applicationVariants.all {
     val appName = "CyIME"
     outputs.all {
         val abi = filters.find { it.filterType.toString() == "ABI" }?.identifier ?: "universal"
-        (this as BaseVariantOutputImpl).outputFileName = "$appName-$versionName-$abi.apk"
+        val buildLabel = if (buildType.name == "debug") "-debug" else ""
+        (this as BaseVariantOutputImpl).outputFileName = "$appName-$versionName$buildLabel-$abi.apk"
     }
 }
 
