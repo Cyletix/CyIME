@@ -91,7 +91,7 @@ class LanguageKeyButtonTest {
         }
     }
 
-    private fun setKey() {
+    private fun setKey(currentModeId: String = "first") {
         rule.setContent {
             density = LocalDensity.current.density
             CompositionLocalProvider(
@@ -100,7 +100,7 @@ class LanguageKeyButtonTest {
                         SchemaInfo("first", "同名方案", "", "", ""),
                         SchemaInfo("second", "日语模式", "", "", "", language = com.kingzcheung.xime.settings.InputLanguage.JAPANESE),
                     ),
-                    currentInputModeId = "first",
+                    currentInputModeId = currentModeId,
                     onSwitchSchema = { events += "schema:$it" },
                 )
             ) {
@@ -254,4 +254,31 @@ class LanguageKeyButtonTest {
         rule.onNodeWithTag("language-key").performTouchInput { moveTo(target - key.positionOnScreen); up() }
         rule.runOnIdle { assertEquals(listOf("schema:$englishId"), events) }
     }
-}
+    @Test fun draggingAboveMenuKeepsChineseInsteadOfReturningToEnglish() {
+        setKey(com.kingzcheung.xime.settings.InputModes.ENGLISH)
+        holdKey()
+        moveToSecondSchema()
+        val key = rule.onNodeWithTag("language-key").fetchSemanticsNode()
+        val first = rule.onNodeWithTag("language-schema:first").fetchSemanticsNode()
+        val target = first.positionOnScreen + Offset(first.size.width / 2f, -200f)
+        rule.onNodeWithTag("language-key").performTouchInput { moveTo(target - key.positionOnScreen) }
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("language-schema:first").assertIsSelected()
+        rule.onNodeWithTag("language-key").performTouchInput { up() }
+        rule.runOnIdle { assertEquals(listOf("schema:first"), events) }
+    }
+
+    @Test fun draggingBelowMenuKeepsLastLanguageAndReleaseCommitsIt() {
+        setKey()
+        holdKey()
+        moveToSecondSchema()
+        val key = rule.onNodeWithTag("language-key").fetchSemanticsNode()
+        val englishId = com.kingzcheung.xime.settings.InputModes.ENGLISH
+        val last = rule.onNodeWithTag("language-schema:$englishId").fetchSemanticsNode()
+        val target = last.positionOnScreen + Offset(last.size.width / 2f, last.size.height + 20f)
+        rule.onNodeWithTag("language-key").performTouchInput { moveTo(target - key.positionOnScreen) }
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("language-schema:$englishId").assertIsSelected()
+        rule.onNodeWithTag("language-key").performTouchInput { up() }
+        rule.runOnIdle { assertEquals(listOf("schema:$englishId"), events) }
+    }}

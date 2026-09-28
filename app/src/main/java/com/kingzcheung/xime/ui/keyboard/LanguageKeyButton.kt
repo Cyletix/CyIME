@@ -77,10 +77,19 @@ internal fun languageMenuSelection(
     viewport: Rect,
     scrollOffset: Int,
     rowHeight: Float,
+    previousSelection: String? = null,
 ): String? {
-    if (rowHeight <= 0f || !viewport.contains(pointer)) return null
-    val index = ((pointer.y - viewport.top + scrollOffset) / rowHeight).toInt()
-    return schemas.getOrNull(index)?.schemaId
+    if (schemas.isEmpty() || rowHeight <= 0f || !rowHeight.isFinite() ||
+        viewport.width <= 0f || viewport.height <= 0f ||
+        !pointer.x.isFinite() || !pointer.y.isFinite()) return null
+    val previous = previousSelection?.takeIf { id -> schemas.any { it.schemaId == id } }
+    // 尚未进入菜单时，原地松手仍只是关闭菜单。选中过后越界不能退回当前语言。
+    if (!viewport.contains(pointer) && previous == null) return null
+    if (pointer.x < viewport.left || pointer.x >= viewport.right) return previous
+    val y = pointer.y.coerceIn(viewport.top, Math.nextDown(viewport.bottom))
+    val index = ((y - viewport.top + scrollOffset.coerceAtLeast(0)) / rowHeight).toInt()
+        .coerceIn(0, schemas.lastIndex)
+    return schemas[index].schemaId
 }
 
 /** 统一语言键：点按切换英文、长按选语言；不接受方案定义的文字预览和滑动菜单。 */
@@ -144,7 +153,8 @@ fun LanguageKeyButton(
     LaunchedEffect(menuOpen) { if (menuOpen) scroll.scrollTo((menuSchemas.indexOfFirst { it.schemaId == actions.currentInputModeId }.coerceAtLeast(0) * rowHeight).toInt()) }
     // 仅在手指进入边缘时滚动；新菜单不继承上次手势的位置。
     LaunchedEffect(menuOpen, pointer, viewport) {
-        if (!menuOpen || !viewport.contains(pointer)) return@LaunchedEffect
+        if (!menuOpen || selectedId == null || !pointer.x.isFinite() || !pointer.y.isFinite() ||
+            pointer.x < viewport.left || pointer.x >= viewport.right) return@LaunchedEffect
         val delta = when {
             pointer.y < viewport.top + edgeSize -> -scrollStep
             pointer.y > viewport.bottom - edgeSize -> scrollStep
@@ -152,7 +162,7 @@ fun LanguageKeyButton(
         }
         while (menuOpen) {
             if (scroll.scrollBy(delta) == 0f) break
-            selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, rowHeight)
+            selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, rowHeight, selectedId)
             delay(30L)
         }
     }
@@ -190,7 +200,7 @@ fun LanguageKeyButton(
                             } else if (menuOpen) {
                                 change.consume()
                                 pointer = keyScreenPosition + change.position
-                                selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, rowHeight)
+                                selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, rowHeight, selectedId)
                                 if (!change.pressed) {
                                     chosenId = selectedId
                                     break

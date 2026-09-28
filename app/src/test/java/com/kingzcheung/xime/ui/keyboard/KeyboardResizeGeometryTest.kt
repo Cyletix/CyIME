@@ -32,7 +32,7 @@ class KeyboardResizeGeometryTest {
             }
         }
         for (width in listOf(320, 800, 1400)) {
-            assertEquals(floatingResizeMinWidthDp(width), resolvedFixedKeyboardWidth(width, 280))
+            assertEquals(280.coerceIn(keyboardWidthBounds(width)), resolvedFixedKeyboardWidth(width, 280))
             assertEquals(width, resolvedFixedKeyboardWidth(width, 0))
         }
     }
@@ -250,7 +250,7 @@ class KeyboardResizeGeometryTest {
         assertEquals(FLOATING_RESIZE_MIN_WIDTH_DP, floatingResizeMinWidthDp(1000))
         assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeMinHeightDp(800))
         // 可用区比基准还小时取可用区，不产生越界初值
-        assertEquals(280, floatingResizeMinWidthDp(280))
+        assertEquals(260, floatingResizeMinWidthDp(280))
         assertEquals(180, floatingResizeMinHeightDp(180))
 
     }
@@ -279,4 +279,15 @@ class KeyboardResizeGeometryTest {
         assertEquals(Offset(888f, 438f), lines[3].first)
         assertEquals(Offset(864f, 414f), lines[3].second)
     }
-}
+    @Test fun phoneFloatingWidthCanShrinkWhileTabletKeepsUsableMinimum() {
+        for (width in listOf(320, 360, 393, 412)) {
+            val bounds = keyboardWidthBounds(width)
+            assertTrue(bounds.first <= width * 0.82f)
+            assertEquals(bounds.first, resolvedFloatingWidth(width, 800, 260, 260, false, 1))
+            assertEquals(width, bounds.last)
+        }
+        assertEquals(400, keyboardWidthBounds(1200).first)
+        assertEquals(1200, keyboardWidthBounds(1200).last)
+        assertTrue(floatingResizeHeightBounds(800, true).last >= 520)
+        assertEquals(228, floatingResizeHeightBounds(800, true).first)
+    }}

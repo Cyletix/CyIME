@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.HorizontalSplit
@@ -106,6 +108,7 @@ internal fun KeyboardResizeOverlay(
     onPositionDragEnd: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
+    val roundedBottom = rememberRoundedKeyboardBottom()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
@@ -167,41 +170,27 @@ internal fun KeyboardResizeOverlay(
                     val tabThickness = 3.dp.toPx()
                     val handleInset = 6.dp.toPx()
                     val tabLength = 34.dp.toPx().coerceAtMost(frame.width / 4f)
-                    val cornerPx = FloatingKeyboardCardCorner.toPx()
                     val rectSize = Size(frame.width.coerceAtLeast(1f), frame.height.coerceAtLeast(1f))
 
-                    // 用整张键盘的主题色承载调节控件，不再绘制中央独立小面板。
-                    drawRoundRect(
-                        color = surfaceColor.copy(alpha = 0.88f),
-                        topLeft = Offset(frame.left, frame.top), size = rectSize,
-                        cornerRadius = CornerRadius(cornerPx),
-                    )
-                    // 边框只画一次。所有 stroke 都向框内收半线宽，避免贴屏幕/圆角时被裁成畸形。
-                    val inset = stroke / 2f
-                    val borderLeft = frame.left + inset
-                    val borderTop = frame.top + inset
-                    val borderWidth = (frame.width - stroke).coerceAtLeast(1f)
-                    val borderHeight = (frame.height - stroke).coerceAtLeast(1f)
-                    if (previewState.rect != null) {
-                        drawRoundRect(
-                            color = accentColor,
-                            topLeft = Offset(borderLeft, borderTop),
-                            size = Size(borderWidth, borderHeight),
-                            cornerRadius = CornerRadius(
-                                (cornerPx - inset).coerceAtLeast(0f),
-                                (cornerPx - inset).coerceAtLeast(0f),
-                            ),
-                            style = Stroke(stroke),
-                        )
-                    } else {
-                        drawRect(
-                            color = accentColor,
-                            topLeft = Offset(borderLeft, borderTop),
-                            size = Size(borderWidth, borderHeight),
-                            style = Stroke(stroke),
+                    // 正常面板与调节态共用用户选择的底部轮廓；悬浮始终保留四角圆角。
+                    val panelShape = keyboardPanelShape(isFloatingMode, roundedBottom)
+                    translate(frame.left, frame.top) {
+                        drawOutline(
+                            panelShape.createOutline(rectSize, layoutDirection, this),
+                            color = surfaceColor.copy(alpha = 0.88f),
                         )
                     }
-
+                    val inset = stroke / 2f
+                    val borderSize = Size(
+                        (frame.width - stroke).coerceAtLeast(1f),
+                        (frame.height - stroke).coerceAtLeast(1f),
+                    )
+                    translate(frame.left + inset, frame.top + inset) {
+                        drawOutline(
+                            panelShape.createOutline(borderSize, layoutDirection, this),
+                            color = accentColor, style = Stroke(stroke),
+                        )
+                    }
                     // 手柄全部画在边框内侧，不跨出 Rect，因此不会被宿主裁切，也不会和圆角重复描边。
                     fun horizontalHandle(y: Float, insideSign: Float) {
                         drawRoundRect(
@@ -351,7 +340,7 @@ internal fun KeyboardResizeOverlay(
                                             dx = amount.x,
                                             dy = amount.y,
                                             bounds = stableBounds,
-                                            minWidth = minOf(FLOATING_RESIZE_MIN_WIDTH_DP * density.density, stableBounds.width),
+                                            minWidth = floatingResizeMinWidthDp(availableWidthDp) * density.density,
                                             minHeight = minHeightPx,
                                             maxWidth = stableBounds.width,
                                             maxHeight = screenMaxHeightPx,
