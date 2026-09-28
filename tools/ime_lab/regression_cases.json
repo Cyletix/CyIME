@@ -1,0 +1,143 @@
+[
+  {
+    "id": "T9-001",
+    "input": "3",
+    "expected": [
+      "的"
+    ],
+    "check": "recall",
+    "root": "A1",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-002",
+    "input": "5833",
+    "expected": [
+      "觉得"
+    ],
+    "check": "recall",
+    "root": "A1",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-003",
+    "input": "3242458",
+    "expected": [
+      "大概率"
+    ],
+    "check": "rank",
+    "root": "A3",
+    "status": "待采样，未验收",
+    "top_k": 3
+  },
+  {
+    "id": "T9-004",
+    "input": "9692674264",
+    "expected": [
+      "我晚上"
+    ],
+    "check": "rank",
+    "root": "A3",
+    "status": "待采样，未验收",
+    "top_k": 3
+  },
+  {
+    "id": "T9-005",
+    "input": "77",
+    "expected": [],
+    "check": "no_date",
+    "root": "A4",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-006",
+    "input": "7474",
+    "expected": [],
+    "check": "date",
+    "root": "A4",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-007",
+    "input": "65",
+    "expected": [
+      "OK",
+      "ok"
+    ],
+    "check": "recall",
+    "root": "A5",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-008",
+    "input": "77",
+    "expected": [
+      "QQ",
+      "qq"
+    ],
+    "check": "recall",
+    "root": "A5",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-010",
+    "input": "645831316",
+    "expected": [
+      "你觉得呢"
+    ],
+    "check": "recall",
+    "root": "A1",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-011",
+    "input": "94294744",
+    "expected": [
+      "下意识"
+    ],
+    "check": "recall",
+    "root": "A2/A3",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-012",
+    "input": "32942426",
+    "expected": [
+      "打一遍"
+    ],
+    "check": "rank",
+    "root": "A3",
+    "status": "待采样，未验收",
+    "top_k": 3
+  },
+  {
+    "id": "T9-013",
+    "input": "936848",
+    "expected": [
+      "问题太"
+    ],
+    "check": "recall",
+    "root": "A1/A3",
+    "status": "待采样，未验收",
+    "top_k": 20
+  },
+  {
+    "id": "T9-014",
+    "input": null,
+    "expected": [
+      "词库里"
+    ],
+    "check": "recall",
+    "root": "A2/A6",
+    "status": "待确认原始按键",
+    "top_k": 20
+  }
+]
