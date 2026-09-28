@@ -123,6 +123,7 @@ fun isHandwritingSchema(schemaId: String): Boolean =
 
 /** 分体只适用于26键，不能把14键、九键、手写或日语九键拆开。 */
 internal fun supportsSplitKeyboard(schemaId: String, asciiMode: Boolean): Boolean = asciiMode || (
+    com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(schemaId)?.rows?.flatten()?.none { it.length > 1 } != false &&
     !isT9Schema(schemaId) && !isStrokeSchema(schemaId) && !isHandwritingSchema(schemaId) &&
         KeysConfigHelper.mergedSectionForSchema(schemaId) == null &&
         KeysConfigHelper.codeLayoutForSchema(schemaId) != "japanese_kana"

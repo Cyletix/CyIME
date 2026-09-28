@@ -46,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.settings.SchemaInfo
 
+// The add action is presentation-only: never include it in schema switching or saved order.
+private data class SchemaPanelItem(val schema: SchemaInfo?)
+
 @Composable
 fun SchemaListView(
     schemas: List<SchemaInfo>,
@@ -64,6 +67,8 @@ fun SchemaListView(
     var languageOrder by remember { mutableStateOf(com.kingzcheung.xime.settings.InputModes.languageOrder(context)) }
     var editingOrder by remember(com.kingzcheung.xime.settings.InputModes.languageOf(currentSchemaId, schemas)) { mutableStateOf(false) }
     // 功能 item 背景：与键盘按键背景一致（keyBgColor，浅色纯白、深色跟随 keyboard.colors）
+    val isChinese = com.kingzcheung.xime.settings.InputModes.languageOf(currentSchemaId, schemas) == com.kingzcheung.xime.settings.InputLanguage.CHINESE
+    val panelItems = schemas.map { SchemaPanelItem(it) } + if (isChinese) listOf(SchemaPanelItem(null)) else emptyList()
     val itemBgColor = keyBgColor
     val textColor = keyTextColor
     val subTextColor = keyTextColor.copy(alpha = 0.65f)
@@ -103,17 +108,22 @@ fun SchemaListView(
             return@Column
         }
 
-        if (schemas.isEmpty()) {
+        if (panelItems.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("没有可用的输入方案", color = subTextColor, fontSize = 13.sp)
             }
         } else {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                KeyboardPanelGrid(schemas, isLandscape, textColor, "schema-pages",
-                    Modifier.fillMaxWidth().fillMaxHeight(), compactCards = true) { schema, cellModifier ->
-                    SchemaGridItem(schema, schema.schemaId == currentSchemaId, itemBgColor, textColor,
-                        accentColor = accentColor, onSelect = { onSelectSchema(schema.schemaId) },
-                        modifier = cellModifier.testTag("schema-tile:${schema.schemaId}"), isLandscape = isLandscape)
+                KeyboardPanelGrid(panelItems, isLandscape, textColor, "schema-pages",
+                    Modifier.fillMaxWidth().fillMaxHeight(), compactCards = true) { item, cellModifier ->
+                    val schema = item.schema
+                    SchemaGridItem(schema, schema?.schemaId == currentSchemaId, itemBgColor, textColor,
+                        accentColor = accentColor, onSelect = {
+                            if (schema != null) onSelectSchema(schema.schemaId)
+                            else context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
+                                .putExtra("create_layout", true).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        },
+                        modifier = cellModifier.testTag(if (schema == null) "add-layout-tile" else "schema-tile:${schema.schemaId}"), isLandscape = isLandscape)
                 }
             }
         }
@@ -122,7 +132,7 @@ fun SchemaListView(
 
 @Composable
 private fun SchemaGridItem(
-    schema: SchemaInfo,
+    schema: SchemaInfo?,
     isSelected: Boolean,
     bgColor: Color,
     textColor: Color,
@@ -144,6 +154,9 @@ private fun SchemaGridItem(
         verticalArrangement = Arrangement.Center
     ) {
         when {
+            schema == null -> Icon(
+                imageVector = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
+                contentDescription = null, tint = textColor, modifier = Modifier.size(24.dp))
             isHandwritingSchema(schema.schemaId) ->
                 Icon(
                     imageVector = Icons.TwoTone.Gesture,
@@ -168,7 +181,7 @@ private fun SchemaGridItem(
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = schema.name,
+            text = schema?.name ?: "添加布局",
             color = if (isSelected) accentColor else textColor,
             fontSize = 12.sp,
             lineHeight = 14.sp,

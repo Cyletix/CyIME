@@ -66,5 +66,11 @@ class KeysConfigLayoutReloadTest {
             listOf("a", "s", "d", "f", "g", "h", "j", "k", "l", ";"),
             KeysConfigHelper.getKeyRows(false)[1],
         )
+        // A subsequent user edit must be visible after a reload; parsed YAML reuse
+        // must not turn into a process-lifetime stale configuration cache.
+        File(rimeDir, "xime.custom.yaml").writeText(defaultXime)
+        KeysConfigHelper.loadConfig(context)
+        assertEquals(listOf("a", "s", "d", "f", "g", "h", "j", "k", "l"),
+            KeysConfigHelper.getKeyRows(false)[1])
     }
 }

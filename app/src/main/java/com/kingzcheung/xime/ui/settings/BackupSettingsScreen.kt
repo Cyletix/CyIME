@@ -26,6 +26,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,12 +62,13 @@ import java.util.Locale
 @Composable
 fun BackupSettingsContent(
     onBack: () -> Unit,
-    onNavigateToPlugins: () -> Unit
+    onNavigateToPlugins: () -> Unit,
+    onNavigateToPluginMarket: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val installedPlugins = remember { ExtensionManager.getAllInstalledPlugins() }
-    val backupPlugins = remember { installedPlugins.filter { it.category == PluginCategory.BACKUP } }
+    var installedPlugins by remember { mutableStateOf(ExtensionManager.getAllInstalledPlugins()) }
+    val backupPlugins = remember(installedPlugins) { installedPlugins.filter { it.category == PluginCategory.BACKUP } }
     val syncPlugins = remember { ExtensionManager.getEnabledBackupPlugins(context) }
     var selectedPluginId by remember {
         mutableStateOf(
@@ -86,6 +89,13 @@ fun BackupSettingsContent(
     val busy = busyOp != null
     var message by remember { mutableStateOf<String?>(null) }
     var remoteList by remember { mutableStateOf<List<com.kingzcheung.xime.plugin.core.api.RemoteBackupEntry>?>(null) }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        installedPlugins = ExtensionManager.getAllInstalledPlugins()
+        val available = ExtensionManager.getEnabledBackupPlugins(context)
+        selectedPluginId = SettingsPreferences.getBackupPluginId(context)
+        activePlugin = available.firstOrNull { it.first == selectedPluginId } ?: available.firstOrNull()
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -115,6 +125,7 @@ fun BackupSettingsContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            PluginSetupCard("云备份", onNavigateToPluginMarket, onNavigateToPlugins)
             SettingsSection(
                 title = "备份服务",
                 content = {
@@ -126,61 +137,58 @@ fun BackupSettingsContent(
                     ) {
                         if (backupPlugins.isEmpty()) {
                             Text(
-                                text = "未安装备份插件，请先在插件中心安装后再配置。",
+                                text = "尚未安装云备份插件，请从上方安装。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Button(
-                                onClick = onNavigateToPlugins,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("前往插件中心")
-                            }
                         } else {
                             backupPlugins.forEach { plugin ->
-                                val isActive = plugin.id == selectedPluginId
-                                val protocols = plugin.capabilities?.backup?.protocols.orEmpty()
-                                SettingsToggleItem(
-                                    icon = Icons.TwoTone.Backup,
-                                    title = plugin.name,
-                                    subtitle = buildString {
-                                        append(plugin.description)
-                                        if (protocols.isNotEmpty()) {
-                                            append("\n备份协议: ")
-                                            append(protocols.joinToString("、"))
-                                        }
-                                    },
-                                    checked = isActive,
-                                    onCheckedChange = { checked ->
-                                        if (checked && !isActive) {
-                                            selectedPluginId = plugin.id
-                                            SettingsPreferences.setBackupPluginId(context, plugin.id)
-                                            remoteList = null
-                                            scope.launch(Dispatchers.IO) {
-                                                // 单选激活：同一时间只启用 1 个备份插件
-                                                backupPlugins
-                                                    .filter { it.id != plugin.id }
-                                                    .forEach {
+                                val isActive = plugin.id == activePlugin?.first
+                                PluginServiceChoice(plugin.name, plugin.description, isActive, !busy) {
+                                    if (!isActive) {
+                                        busyOp = "select"
+                                        message = null
+                                        scope.launch {
+                                            try {
+                                                val instance = withContext(Dispatchers.IO) {
+                                                    backupPlugins.filter { it.id != plugin.id }.forEach {
                                                         SettingsPreferences.setPluginEnabled(context, it.id, false)
                                                         PluginManager.unloadPlugin(it.id)
                                                     }
-                                                SettingsPreferences.setPluginEnabled(context, plugin.id, true)
-                                                PluginManager.launchPlugin(plugin.id)
-                                                val instance = ExtensionManager.getEnabledBackupPlugins(context)
-                                                    .firstOrNull { it.first == plugin.id }
+                                                    SettingsPreferences.setBackupPluginId(context, plugin.id)
+                                                    SettingsPreferences.setPluginEnabled(context, plugin.id, true)
+                                                    PluginManager.launchPlugin(plugin.id)
+                                                    ExtensionManager.getEnabledBackupPlugins(context).firstOrNull { it.first == plugin.id }
+                                                }
+                                                selectedPluginId = plugin.id
                                                 activePlugin = instance
-                                            }
+                                                remoteList = null
+                                                if (instance == null) message = "插件未能启动，请在已安装插件中检查状态。"
+                                            } catch (error: Exception) {
+                                                activePlugin = null
+                                                message = "无法启用服务：${error.message}"
+                                            } finally { busyOp = null }
                                         }
                                     }
-                                )
+                                }
                             }
                         }
                     }
                 }
             )
 
+            if (activePlugin == null) message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
             activePlugin?.let { selected ->
                 val plugin = selected.second
+                // 服务器地址等配置由插件表单承载（host.config）
+                PluginConfigFormScreen(
+                    pluginId = selected.first,
+                    plugin = plugin,
+                    pluginName = installedPlugins.find { it.id == selected.first }?.name ?: selected.first,
+                    onBack = {},
+                    embedded = true
+                )
                 SettingsSection(
                     title = "备份设置",
                     content = {
@@ -405,14 +413,7 @@ fun BackupSettingsContent(
                     )
                 }
 
-                // 服务器地址等配置由插件表单承载（host.config）
-                PluginConfigFormScreen(
-                    pluginId = selected.first,
-                    plugin = plugin,
-                    pluginName = installedPlugins.find { it.id == selected.first }?.name ?: selected.first,
-                    onBack = {},
-                    embedded = true
-                )
+
             }
         }
     }

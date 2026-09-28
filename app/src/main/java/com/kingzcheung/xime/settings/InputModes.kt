@@ -20,7 +20,7 @@ object InputModes {
     const val ENGLISH = "__xime_english"
     private const val ORDER_KEY = "input_mode_order"
     private const val LANGUAGE_ORDER_KEY = "input_language_order"
-    val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH)
+    val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH, QwjrtkLayout.ID)
 
     fun languageOrder(ids: List<String>): List<InputLanguage> =
         (ids.mapNotNull { id -> InputLanguage.entries.firstOrNull { it.id == id } } + InputLanguage.entries).distinct()
@@ -46,6 +46,7 @@ object InputModes {
         val ordered = canonicalOrder.distinct().mapNotNull { byId[it] }
         val used = ordered.mapTo(mutableSetOf()) { it.schemaId }
         return ordered + unique.filterNot { it.schemaId in used }
+            .let { remaining -> if (order.isEmpty()) remaining else remaining.sortedBy { it.schemaId == QwjrtkLayout.ID } }
     }
 
     fun ordered(context: Context, schemas: List<SchemaInfo>): List<SchemaInfo> =

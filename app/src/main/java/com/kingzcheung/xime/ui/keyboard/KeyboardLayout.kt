@@ -112,7 +112,11 @@ fun KeyboardLayout(
 ) {
     // 配置或方案变化时，行列与间距一起更新。
     val cfgVer by KeysConfigHelper.configVersion.collectAsState()
-    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) { KeysConfigHelper.getKeyRows(isAsciiMode) }
+    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) {
+        if (isAsciiMode) KeysConfigHelper.getKeyRows(true)
+        else com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId)?.typingRows()
+            ?: KeysConfigHelper.getKeyRows(false)
+    }
     val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
         supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
     // 合并键布局（14 键）键更宽：缝给更大的绝对 dp，不按键宽比例放大
@@ -259,6 +263,8 @@ fun KeyboardLayout(
 
 
     CompositionLocalProvider(
+        LocalCustomLayout provides if (isAsciiMode) null else com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId),
+        LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
         LocalShiftSlideTargets provides remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() },
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
         LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(uiState.themeId, uiState.isDarkTheme), specialKeyTextColor),
@@ -364,7 +370,7 @@ fun KeyboardLayout(
                     } else {
                         Box(modifier = Modifier.weight(1f)) {
                             val row1 = keyRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
-                            val row1Padding = if (row1.size > 9) Modifier else Modifier.padding(horizontal = 16.dp)
+                            val row1Padding = if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) Modifier else Modifier.padding(horizontal = 16.dp)
                             KeyboardRowWithConfig(
                                 keys = row1,
                                 onKeyPress = onKeyPress,
@@ -506,7 +512,7 @@ fun KeyboardLayout(
                                         onClick = onClick,
                                         backgroundColor = keyBackgroundColor,
                                         textColor = keyTextColor,
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
                                         swipeText = swipeUpText,
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
@@ -1050,7 +1056,7 @@ fun KeyboardRowWithConfig(
                 onClick = onClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
                 swipeText = swipeUpText,
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
@@ -1842,7 +1848,7 @@ fun CompactKeyboardRowWithConfig(
                 onClick = compactOnClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
                 swipeText = swipeUpText,
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,

@@ -637,6 +637,7 @@ object KeysConfigHelper {
     private var _mergedRows: Map<String, List<List<String>>> = emptyMap()
     private var _mergedGestureConfigs: Map<String, Map<String, KeyGestureConfig>> = emptyMap()
     private var _activeMergedSection: String? = null
+    private var _appliedLayoutSchemaId: String? = null
     private var _activeSchemaId: String = ""
 
     // 合并键绑定缓存：schemaId → 键盘 section（xime.yaml keyboard.<section>.schemas 声明）
@@ -693,9 +694,14 @@ object KeysConfigHelper {
     fun setActiveKeyboardSchema(schemaId: String) {
         _activeSchemaId = schemaId
         val section = mergedSectionForSchema(schemaId)
-        if (section == _activeMergedSection) return
+        if (schemaId == _appliedLayoutSchemaId && section == _activeMergedSection) return
+        _appliedLayoutSchemaId = schemaId
         _activeMergedSection = section
-        if (section != null) {
+        val custom = CustomKeyboardLayouts.find(schemaId)
+        if (custom != null) {
+            _zhRows = custom.typingRows()
+            _keyGestureConfig.value = custom.gestures(_keyGestureConfigZhBase)
+        } else if (section != null) {
             _zhRows = _mergedRows[section] ?: DEFAULT_ZH_ROWS
             _keyGestureConfig.value = _mergedGestureConfigs[section] ?: emptyMap()
         } else {
@@ -716,8 +722,23 @@ object KeysConfigHelper {
     private var mergedConfigCache: XimeConfig? = null
     private var mergedConfigVersion = 0
     
+    // The same two YAML documents are read by many section parsers. Share their
+    // immutable syntax trees only within one load; every reload sees fresh text.
+    // Thread-local scope avoids retaining user configuration or mixing concurrent loads.
+    private val loadYamlNodes = ThreadLocal<MutableMap<String, YamlNode>>()
+    private fun keyboardYamlNode(text: String): YamlNode {
+        val nodes = loadYamlNodes.get()
+        return if (nodes == null) yaml.parseToYamlNode(text)
+        else nodes.getOrPut(text) { yaml.parseToYamlNode(text) }
+    }
+
     fun loadConfig(context: Context): KeysConfig {
-        loadXimeConfig(context)
+        val previousNodes = loadYamlNodes.get()
+        loadYamlNodes.set(mutableMapOf())
+        try { loadXimeConfig(context) }
+        finally {
+            if (previousNodes == null) loadYamlNodes.remove() else loadYamlNodes.set(previousNodes)
+        }
         config = config.copy(
             swipeUp = getDefaultSwipeUp(),
             swipeDownEnglish = getDefaultSwipeDownEnglish()
@@ -727,6 +748,7 @@ object KeysConfigHelper {
     
     private fun loadXimeConfig(context: Context) {
         try {
+            CustomKeyboardLayouts.load(context)
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
             _keyGestureConfigZhBase = parsed?.first ?: emptyMap()
@@ -773,12 +795,12 @@ object KeysConfigHelper {
             _strokeGestureConfigs = parseGesturesSection(context, "stroke")
             // 基线缓存已刷新，先落标准 26 键的行布局/手势，合并键方案再由
             // setActiveKeyboardSchema 覆盖。不能只依赖 setActiveKeyboardSchema：
-            // 非合并键方案 section 为 null，与刚重置的 _activeMergedSection(null) 相等
-            // 会被提前 return，导致 xime.custom.yaml 的行布局/手势不生效（重新部署也无效）。
+            // 清除已应用方案标记，保证同一方案重载时也采用最新配置。
             _zhRows = _zhRowsBase
             _keyGestureConfig.value = _keyGestureConfigZhBase
             // 重新应用当前方案对应的合并键布局（上面重置了基线缓存）
             _activeMergedSection = null
+            _appliedLayoutSchemaId = null
             setActiveKeyboardSchema(_activeSchemaId)
             // 校验配置版本兼容性
             val merged = try { loadMergedConfig(context) } catch (_: YamlException) { null }
@@ -876,7 +898,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.colors 段（仅显式字段非 null）。 */
     internal fun parseKeyboardColorsYamlText(yamlText: String): KeyboardColorsPartial? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val colorsNode = keyboardNode.opt<YamlMap>("colors") ?: return null
             var kBg: Long? = null
@@ -937,7 +959,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.shadow 段（仅显式字段非 null）。 */
     internal fun parseKeyboardShadowYamlText(yamlText: String): KeyboardShadowPartial? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val shadowNode = keyboardNode.opt<YamlMap>("shadow") ?: return null
             var enabled: Boolean? = null
@@ -1015,7 +1037,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.key 段（仅显式字段非 null）。 */
     private fun parseKeyboardKeyYamlPartial(yamlText: String): KeyboardKeyPartial? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             var cornerRadius: Int? = null
             var spacingX: Float? = null
@@ -1095,7 +1117,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.t9 段（仅显式字段非 null）。 */
     internal fun parseKeyboardT9YamlPartial(yamlText: String): KeyboardT9Partial? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val t9Node = keyboardNode.opt<YamlMap>("t9") ?: return null
             val sideSymbols = t9Node.opt<YamlList>("side_symbols")
@@ -1125,7 +1147,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.stroke 段（仅显式字段非 null）。 */
     internal fun parseKeyboardStrokeYamlPartial(yamlText: String): KeyboardStrokePartial? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val strokeNode = keyboardNode.opt<YamlMap>("stroke") ?: return null
             val sideSymbols = strokeNode.opt<YamlList>("side_symbols")
@@ -1157,7 +1179,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.fonts 字体配置段（仅显式字段非 null）。 */
     internal fun parseKeyboardFontsYamlText(yamlText: String): KeyboardFontPartial? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val fontsNode = keyboardNode.opt<YamlMap>("fonts") ?: return null
             var keyFont: String? = null
@@ -1247,7 +1269,7 @@ object KeysConfigHelper {
      */
     internal fun parseSchemaBindingsYamlText(yamlText: String): Map<String, String> {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return emptyMap()
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return emptyMap()
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return emptyMap()
             val bindings = mutableMapOf<String, String>()
             for ((kNode, vNode) in keyboardNode.entries) {
@@ -1272,7 +1294,7 @@ object KeysConfigHelper {
      */
     internal fun parseKeyboardLayoutYamlText(yamlText: String, section: String): List<List<String>>? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val sectionNode = keyboardNode.opt<YamlMap>(section) ?: return null
             val layoutNode = sectionNode.opt<YamlMap>("layout") ?: return null
@@ -1351,7 +1373,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.<section>.button_layout。 */
     private fun parseButtonLayoutYamlText(yamlText: String, section: String): ButtonLayout? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val sectionNode = keyboardNode.opt<YamlMap>(section) ?: return null
             val layoutNode = sectionNode.opt<YamlScalar>("button_layout") ?: return null
@@ -1365,7 +1387,7 @@ object KeysConfigHelper {
     /** 从 YAML 文本中提取 keyboard.<section>.keys 段。 */
     internal fun parseKeyboardYamlSection(yamlText: String, section: String): Map<String, KeyGestureConfig>? {
         return try {
-            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return null
+            val root = keyboardYamlNode(yamlText) as? YamlMap ?: return null
             val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
             val sectionNode = keyboardNode.opt<YamlMap>(section) ?: return null
             val keysNode = sectionNode.opt<YamlMap>("keys") ?: return null

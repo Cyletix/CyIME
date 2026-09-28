@@ -76,6 +76,31 @@ fun LayoutDisplaySettingsContent(
         ) {
             item { InputExperienceSettings() }
             item {
+                SettingsSection(title = "键盘底部样式", content = {
+                    var rounded by remember { mutableStateOf(SettingsPreferences.roundedKeyboardBottom(context)) }
+                    Row(
+                        Modifier.fillMaxWidth().testTag("rounded-keyboard-bottom-setting")
+                            .toggleable(value = rounded, role = Role.Switch, onValueChange = {
+                                rounded = it
+                                SettingsPreferences.setRoundedKeyboardBottom(context, it)
+                            }).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("底部圆角与透明导航栏", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                if (rounded) "底部保留圆角，导航栏透明；图标跟随系统明暗，系统可能添加对比度底色"
+                                else "底部直角，导航栏跟随键盘背景；图标深浅跟随按键文字",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = rounded, onCheckedChange = null)
+                    }
+                })
+            }
+            item {
                 SettingsSection(title = "候选词", content = {
                     val candidateTextSizePref = SettingsPreferences.getCandidateTextSize(context)
                     var candidateTextSize by remember(candidateTextSizePref) {

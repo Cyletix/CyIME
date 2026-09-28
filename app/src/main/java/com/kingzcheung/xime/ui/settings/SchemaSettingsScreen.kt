@@ -589,7 +589,7 @@ fun SchemaSettingsContent(
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「部署方案」生效。",
+                                text = "九键、14键、26键和小鹤双拼共享雾凇词库；两种日语布局共享日语词库。词库随应用内置。安装或启停其他方案后，点击「应用方案更改」生效。日常打字不需要定期部署。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -637,7 +637,7 @@ fun SchemaSettingsContent(
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                             Spacer(Modifier.width(8.dp))
                         }
-                        Text("部署方案")
+                        Text("应用方案更改")
                     }
                 }
 
@@ -671,7 +671,7 @@ fun SchemaSettingsContent(
                             item {
                                 Spacer(Modifier.height(16.dp))
                                 Text(
-                                    "安装后需切到「已安装」tab 点击「部署方案」生效",
+                                    "安装后需切到「已安装」tab 点击「应用方案更改」生效",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.padding(bottom = 16.dp),

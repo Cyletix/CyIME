@@ -21,6 +21,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,12 +37,15 @@ import com.kingzcheung.xime.plugin.core.model.PluginCategory
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClipboardSyncSettingsContent(
     onBack: () -> Unit,
-    onNavigateToPlugins: () -> Unit
+    onNavigateToPlugins: () -> Unit,
+    onNavigateToPluginMarket: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -62,8 +67,17 @@ fun ClipboardSyncSettingsContent(
             syncPlugins.firstOrNull { it.first == selectedPluginId } ?: syncPlugins.firstOrNull()
         )
     }
-    val installedPlugins = remember { ExtensionManager.getAllInstalledPlugins() }
-    val clipboardPlugins = remember { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
+    var installedPlugins by remember { mutableStateOf(ExtensionManager.getAllInstalledPlugins()) }
+    val clipboardPlugins = remember(installedPlugins) { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
+
+    var selecting by remember { mutableStateOf(false) }
+    var selectionError by remember { mutableStateOf<String?>(null) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        installedPlugins = ExtensionManager.getAllInstalledPlugins()
+        val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
+        selectedPluginId = SettingsPreferences.getClipboardSyncPluginId(context)
+        activePlugin = available.firstOrNull { it.first == selectedPluginId } ?: available.firstOrNull()
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -94,126 +108,68 @@ fun ClipboardSyncSettingsContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            SettingsSection(
-                title = "同步开关",
-                content = {
-                    SettingsToggleItem(
-                        icon = Icons.TwoTone.Sync,
-                        title = "启用剪贴板同步",
-                        subtitle = "将剪贴板文本与远端设备双向同步（拉取在启动及打开键盘/剪贴板面板时触发）",
-                        checked = enabled,
-                        onCheckedChange = { checked ->
+            PluginSetupCard("剪贴板同步", onNavigateToPluginMarket, onNavigateToPlugins)
+            SettingsSection(title = "同步服务", content = {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    if (clipboardPlugins.isEmpty()) {
+                        Text("尚未安装剪贴板同步插件，请从上方安装。")
+                    }
+                    clipboardPlugins.forEach { plugin ->
+                        val isActive = plugin.id == activePlugin?.first
+                        PluginServiceChoice(plugin.name, plugin.description, isActive, !selecting) {
+                            if (!isActive) {
+                                selecting = true
+                                selectionError = null
+                                scope.launch {
+                                    try {
+                                        val instance = withContext(Dispatchers.IO) {
+                                            clipboardPlugins.filter { it.id != plugin.id }.forEach {
+                                                SettingsPreferences.setPluginEnabled(context, it.id, false)
+                                                PluginManager.unloadPlugin(it.id)
+                                            }
+                                            SettingsPreferences.setClipboardSyncPluginId(context, plugin.id)
+                                            SettingsPreferences.setPluginEnabled(context, plugin.id, true)
+                                            PluginManager.launchPlugin(plugin.id)
+                                            ExtensionManager.getEnabledClipboardSyncPlugins(context).firstOrNull { it.first == plugin.id }
+                                        }
+                                        selectedPluginId = plugin.id
+                                        activePlugin = instance
+                                        if (instance == null) selectionError = "插件未能启动，请在已安装插件中检查状态。"
+                                    } catch (error: Exception) {
+                                        activePlugin = null
+                                        selectionError = "无法启用服务：${error.message}"
+                                    } finally { selecting = false }
+                                }
+                            }
+                        }
+                    }
+                    selectionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            })
+            activePlugin?.let { selected ->
+                PluginConfigFormScreen(
+                    pluginId = selected.first,
+                    plugin = selected.second,
+                    pluginName = installedPlugins.find { it.id == selected.first }?.name ?: selected.first,
+                    onBack = {}, embedded = true
+                )
+            }
+            SettingsSection(title = "同步开关", content = {
+                SettingsToggleItem(
+                    icon = Icons.TwoTone.Sync,
+                    title = "启用剪贴板同步",
+                    subtitle = "先选择服务并完成配置，再开启双向同步。开启后会向该服务传输剪贴板文本。",
+                    checked = enabled,
+                    onCheckedChange = { checked ->
+                        if (checked && activePlugin == null) {
+                            selectionError = "请先安装并选择同步服务，再完成连接配置。"
+                        } else {
                             enabled = checked
                             SettingsPreferences.setClipboardSyncEnabled(context, checked)
                         }
-                    )
-                }
-            )
-
-            if (enabled) {
-                val plugin = syncPlugins.firstOrNull()
-                if (plugin == null) {
-                    SettingsSection(
-                        title = "同步服务",
-                        content = {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "未启用剪贴板同步插件，请先在插件中心启用后再配置。",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Button(
-                                    onClick = onNavigateToPlugins,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("前往插件中心")
-                                }
-                            }
-                        }
-                    )
-                } else {
-                    SettingsSection(
-                        title = "同步服务",
-                        content = {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                if (clipboardPlugins.isEmpty()) {
-                                    Text(
-                                        text = "未安装剪贴板同步插件，请先在插件中心安装后再配置。",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Button(
-                                        onClick = onNavigateToPlugins,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("前往插件中心")
-                                    }
-                                } else {
-                                    clipboardPlugins.forEach { plugin ->
-                                        val pluginId = plugin.id
-                                        val isActive = pluginId == selectedPluginId
-                                        val protocols = plugin.capabilities?.clipboardSync?.protocols.orEmpty()
-                                        SettingsToggleItem(
-                                            icon = Icons.TwoTone.Sync,
-                                            title = plugin.name,
-                                            subtitle = buildString {
-                                                append(plugin.description)
-                                                if (protocols.isNotEmpty()) {
-                                                    append("\n同步协议: ")
-                                                    append(protocols.joinToString("、"))
-                                                }
-                                            },
-                                            checked = isActive,
-                                            onCheckedChange = { checked ->
-                                                if (checked && !isActive) {
-                                                    selectedPluginId = pluginId
-                                                    SettingsPreferences.setClipboardSyncPluginId(context, pluginId)
-                                                    scope.launch(Dispatchers.IO) {
-                                                        // 单选激活：同一时间只能运行 1 个剪贴板同步插件
-                                                        clipboardPlugins
-                                                            .filter { it.id != pluginId }
-                                                            .forEach {
-                                                                SettingsPreferences.setPluginEnabled(context, it.id, false)
-                                                                com.kingzcheung.xime.plugin.core.runtime.PluginManager.unloadPlugin(it.id)
-                                                            }
-                                                        SettingsPreferences.setPluginEnabled(context, pluginId, true)
-                                                        com.kingzcheung.xime.plugin.core.runtime.PluginManager.launchPlugin(pluginId)
-                                                        // 重新获取已启用实例，驱动表单切换到新插件
-                                                        val instance = ExtensionManager.getEnabledClipboardSyncPlugins(context)
-                                                            .firstOrNull { it.first == pluginId }
-                                                        activePlugin = instance
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    )
-                    activePlugin?.let { selected ->
-                        val pluginId = selected.first
-                        val pluginName = installedPlugins.find { it.id == pluginId }?.name ?: pluginId
-                        PluginConfigFormScreen(
-                            pluginId = pluginId,
-                            plugin = selected.second,
-                            pluginName = pluginName,
-                            onBack = {},
-                            embedded = true
-                        )
                     }
-                }
-            }
+                )
+            })
         }
     }
 }
