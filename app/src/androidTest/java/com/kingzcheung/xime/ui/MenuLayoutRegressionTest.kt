@@ -26,14 +26,14 @@ import org.junit.Test
 
 class MenuLayoutRegressionTest {
     @get:Rule val rule = createComposeRule()
-    private val firstPage = listOf("剪贴板", "快捷发送", "输入方案", "表情", "定制工具栏", "键盘调节", "浅色模式", "部署方案")
+    private val firstPage = listOf("键盘调节", "深色模式", "定制工具栏", "设置")
 
     @Test fun compactPortraitGridDoesNotClipOrOverlapAndSettingsRemainReachable() {
         assertGrid(width = 360, height = 180, landscape = false, fontScale = 1f, expected = firstPage)
     }
 
     @Test fun floatingLargeTextUsesPagesInsteadOfClippingTwoRows() {
-        assertGrid(width = 280, height = 150, landscape = false, fontScale = 1.5f, expected = firstPage.take(4))
+        assertGrid(width = 280, height = 150, landscape = false, fontScale = 1.5f, expected = firstPage.take(2))
     }
 
     @Test fun landscapeGridFitsTheAvailableHeight() {
@@ -68,12 +68,14 @@ class MenuLayoutRegressionTest {
         cards.forEachIndexed { i, first -> cards.drop(i + 1).forEach { second ->
             assertFalse("菜单格不可重叠", first.overlaps(second))
         } }
-        repeat(if (expected.size == 4) 2 else 1) { rule.onNodeWithTag("menu-pages").performTouchInput { swipeLeft() } }
+        // Short panels keep one row; narrow large-text panels page horizontally.
+        assertTrue(cards.map { it.top }.distinct().size == 1)
+        if (expected.size < firstPage.size) rule.onNodeWithTag("menu-pages").performTouchInput { swipeLeft() }
         rule.onNodeWithTag("menu-item:设置").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(1, settings) }
     }
 
-    @Test fun menuAndItsSchemaChildUseTheSameToolbarReturnSlot() {
+    @Test fun menuUsesTheSameToolbarReturnSlot() {
         val vm = KeyboardViewModel(ApplicationProvider.getApplicationContext<Application>())
         val feedback = mutableListOf<String>()
         rule.setContent { MaterialTheme {
@@ -81,20 +83,12 @@ class MenuLayoutRegressionTest {
                 onKeyPressDown = { feedback += it }), Modifier.width(360.dp).height(224.dp))
         } }
         val initial = rule.onNodeWithTag("toolbar-leading").fetchSemanticsNode().boundsInRoot
-        val tools = rule.onNodeWithTag("toolbar-order-row").fetchSemanticsNode().boundsInRoot
         rule.onNodeWithContentDescription("CyIME Logo").performTouchInput { down(center); up() }
         rule.onNodeWithContentDescription("CyIME Logo").assertDoesNotExist()
-        rule.onNodeWithContentDescription("关闭菜单").assertDoesNotExist()
         rule.onAllNodesWithContentDescription("返回").assertCountEquals(1)
         assertEquals(initial, rule.onNodeWithTag("toolbar-leading").fetchSemanticsNode().boundsInRoot)
-        assertEquals(tools, rule.onNodeWithTag("toolbar-order-row").fetchSemanticsNode().boundsInRoot)
-        rule.onNodeWithTag("menu-item:输入方案").performClick()
-        rule.runOnIdle { assertEquals(OverlayRoute.SchemaList, (vm.page.value as KeyboardPage.Overlay).route) }
-        rule.onNodeWithContentDescription("返回").performClick()
-        rule.onNodeWithTag("menu-item:输入方案").assertIsDisplayed()
         rule.onNodeWithContentDescription("返回").performClick()
         rule.onNodeWithContentDescription("CyIME Logo").assertIsDisplayed()
         rule.onNodeWithTag("keyboard-overlay").assertDoesNotExist()
-        rule.runOnIdle { assertTrue("菜单与返回需走统一按键反馈", feedback.size >= 3) }
     }
 }

@@ -24,6 +24,7 @@ class KeyboardMenuTest {
                 keyBgColor = Color(0xFF525252), keyTextColor = Color.White,
                 schemaSwitches = listOf(SchemaSwitchUiState("full_shape", states = listOf("半角", "全角"), currentIndex = index),
                     SchemaSwitchUiState("ascii_punct", states = listOf("中文标点", "西文标点")),
+                    SchemaSwitchUiState("simplification", states = listOf("简体", "繁体")),
                     SchemaSwitchUiState("ascii_mode", states = listOf("中文", "西文")))),
                 MenuBarCallbacks(onDismiss = {}, onClipboard = {}, onQuickSend = {},
                     onKeyboardResize = { resized++ }, onEmoji = {}, onReloadConfig = {},
@@ -32,12 +33,12 @@ class KeyboardMenuTest {
                 Modifier.width(360.dp).height(260.dp))
         }
         val first = rule.onNodeWithTag("menu-item:键盘调节").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val second = rule.onNodeWithTag("menu-item:设置").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val second = rule.onNodeWithTag("menu-item:全角／半角").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertEquals(first.top, second.top, 1f); assertTrue(first.left < second.left)
         rule.onNodeWithTag("menu-item:键盘调节").performClick()
         rule.onNodeWithTag("menu-item:设置").performClick()
         assertEquals(1, resized); assertEquals(1, settings)
-        listOf("剪贴板", "表情", "输入方案").forEach { rule.onNodeWithText(it).assertDoesNotExist() }
+        listOf("剪贴板", "表情", "输入方案", "快捷发送", "部署方案").forEach { rule.onNodeWithText(it).assertDoesNotExist() }
         rule.onNodeWithTag("menu-item:全角／半角").assertIsDisplayed()
             .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "半角"))
             .performClick()

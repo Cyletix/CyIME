@@ -280,6 +280,17 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
+                        icon = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
+                        title = "自定义布局",
+                        subtitle = "创建、编辑和管理按键布局",
+                        onClick = { context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp), thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
                         icon = Icons.TwoTone.Ballot,
                         title = "词库管理",
                         subtitle = "管理个人词库和自定义短语",
@@ -310,18 +321,6 @@ fun SettingsMainContent(
                         onClick = onNavigateToPlugins,
                         showArrow = true
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Straighten,
-                        title = "模型管理",
-                        subtitle = "管理本地下载的智能模型",
-                        onClick = onNavigateToModelLocal,
-                        showArrow = true
-                    )
                 })
             }
 
@@ -330,7 +329,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.AutoAwesome,
                         title = "智能联想",
-                        subtitle = "基于 AI 模型的智能联想词预测",
+                        subtitle = "基础联想、个人学习与可选模型增强",
                         onClick = onNavigateToSmartPrediction,
                         showArrow = true
                     )
@@ -343,16 +342,28 @@ fun SettingsMainContent(
                     SettingsToggleItem(
                         icon = Icons.TwoTone.GraphicEq,
                         title = "语音转文本",
-                        subtitle = "在线 ASR 服务（需安装语音识别插件）",
+                        subtitle = "本地模型或在线服务，下载并选择识别方式",
                         checked = sttEnabled,
                         showArrow = true,
                         onClick = {
-                            if (sttEnabled) onNavigateToSpeechToText()
+                            onNavigateToSpeechToText()
                         },
                         onCheckedChange = { enabled ->
                             sttEnabled = enabled
                             SettingsPreferences.setSttEnabled(context, enabled)
                         }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.Straighten,
+                        title = "模型管理",
+                        subtitle = "管理语音、手写和联想使用的本地模型",
+                        onClick = onNavigateToModelLocal,
+                        showArrow = true
                     )
                 })
             }
