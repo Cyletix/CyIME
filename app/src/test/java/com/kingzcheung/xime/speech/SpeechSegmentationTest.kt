@@ -94,6 +94,20 @@ class SpeechSegmentationTest {
     }
     private fun pcm(count: Int, sample: Int = 1600) = ByteArray(count * 2) { if (it % 2 == 0) sample.toByte() else (sample shr 8).toByte() }
 
+    @Test fun `standalone offline model finalizes without a streaming model`() {
+        val engine = object : FakeEngine() {
+            override val isStreaming = false
+            override fun accept(samples: FloatArray): String = error("standalone must not stream")
+            override fun finishStream(): String = error("standalone must not finalize a first pass")
+        }
+        val errors = mutableListOf<String>()
+        val session = LocalSpeechSession(engine, {}, { errors.add(it) })
+        session.acceptPcm(pcm(16000))
+        assertEquals("最终结果", session.finish())
+        assertTrue(errors.isEmpty())
+        assertTrue(session.isIdle)
+    }
+
     @Test fun `stop flushes partial frame and does not wait a fixed spinner interval`() {
         val engine = FakeEngine()
         val errors = mutableListOf<String>()

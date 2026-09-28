@@ -25,8 +25,15 @@ class AsrModelSelectionTest {
             manager.setRefinementEnabled(true)
             assertEquals(SpeechModelCatalog.TWO_PASS, manager.getSelectedModelId())
             manager.setModel(SpeechModelCatalog.SENSEVOICE)
-            assertTrue(manager.isRefinementEnabled())
-            assertNotEquals(SpeechModelCatalog.SENSEVOICE, manager.getFirstPassModelId())
+            assertFalse(manager.isRefinementEnabled())
+            assertEquals(SpeechModelCatalog.SENSEVOICE, AsrModelManager(context).getSelectedModelId())
+            assertEquals(SpeechModelCatalog.SENSEVOICE, manager.getFirstPassModelId())
+            assertNull(manager.selection().first)
+            assertEquals(SpeechModelCatalog.SENSEVOICE, manager.selection().secondDir!!.name)
+            manager.setRefinementEnabled(true)
+            assertEquals(SpeechModelCatalog.SENSEVOICE, manager.getSelectedModelId())
+            manager.setFirstPassModel(SpeechModelCatalog.PARAFORMER)
+            assertFalse(manager.isRefinementEnabled())
         } finally { manager.setModel(original) }
     }
 }

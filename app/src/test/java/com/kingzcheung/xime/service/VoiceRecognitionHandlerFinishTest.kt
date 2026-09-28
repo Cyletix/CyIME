@@ -446,4 +446,14 @@ class VoiceRecognitionHandlerFinishTest {
         verify(mockInputConnection).setComposingText(eq("0.05。"), eq(1))
         verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
     }
+    @Test fun `input ends before voice UI appears cancels prestart and pending recording`() {
+        currentState = currentState.copy(isVoiceMode = false)
+        handler.startDelayedPreStart()
+        handler.endInputSession()
+        assertTrue(posted.isEmpty())
+        verify(mockManager).cancelPreStart()
+        verify(mockManager).cancelRecognition()
+        onPartial("late")
+        verify(mockInputConnection, never()).setComposingText(any(), anyInt())
+    }
 }

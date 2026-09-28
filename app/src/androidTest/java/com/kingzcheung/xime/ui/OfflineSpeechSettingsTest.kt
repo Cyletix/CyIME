@@ -37,20 +37,21 @@ class OfflineSpeechSettingsTest {
             val zip = rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.ZIPFORMER}")
             val para = rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.PARAFORMER}")
             val sense = rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.SENSEVOICE}")
-            assertTrue(rule.onAllNodes(isSelectable()).fetchSemanticsNodes().size == 2)
+            assertTrue(rule.onAllNodes(isSelectable()).fetchSemanticsNodes().size == 3)
             assertTrue(rule.onAllNodes(isToggleable()).fetchSemanticsNodes().size == 1)
+            val correction = rule.onNodeWithTag("speech-correction")
             assertTrue(zip.fetchSemanticsNode().boundsInRoot.top < para.fetchSemanticsNode().boundsInRoot.top)
             assertTrue(para.fetchSemanticsNode().boundsInRoot.top < sense.fetchSemanticsNode().boundsInRoot.top)
             if (manager.selection(SpeechModelCatalog.TWO_PASS).ready && manager.selection(SpeechModelCatalog.ZIPFORMER).ready) {
                 para.performScrollTo().performClick()
-                if (!manager.isRefinementEnabled()) sense.performScrollTo().performClick()
+                if (!manager.isRefinementEnabled()) correction.performScrollTo().performClick()
                 assertEquals(SpeechModelCatalog.TWO_PASS, manager.getSelectedModelId())
                 zip.performScrollTo().performClick()
                 assertEquals(SpeechModelCatalog.ZIPFORMER_TWO_PASS, manager.getSelectedModelId())
-                sense.performScrollTo().assertIsOn().performClick().assertIsOff()
+                correction.performScrollTo().assertIsOn().performClick().assertIsOff()
                 assertEquals(SpeechModelCatalog.ZIPFORMER, manager.getSelectedModelId())
                 para.performScrollTo().performClick()
-                sense.performScrollTo().assertIsOff()
+                correction.performScrollTo().assertIsOff()
                 assertEquals(SpeechModelCatalog.PARAFORMER, AsrModelManager(rule.activity).getSelectedModelId())
             }
             val output = File(rule.activity.getExternalFilesDir(null), "speech-eval/model-settings.png")
@@ -60,5 +61,19 @@ class OfflineSpeechSettingsTest {
             }
         } finally { manager.setModel(original) }
     }
+    @Test fun standaloneSenseVoiceIsSelectedAndCannotCorrectItself() {
+        val manager = AsrModelManager(rule.activity)
+        val original = manager.getSelectedModelId()
+        try {
+            manager.setFirstPassModel(SpeechModelCatalog.SENSEVOICE)
+            rule.setContent { XimeTheme {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { OfflineModelCard() }
+            } }
+            rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.SENSEVOICE}").performScrollTo().assertIsSelected()
+            rule.onNodeWithTag("speech-correction").performScrollTo().assertIsOff().assertIsNotEnabled()
+            assertEquals(SpeechModelCatalog.SENSEVOICE, AsrModelManager(rule.activity).getSelectedModelId())
+        } finally { manager.setModel(original) }
+    }
+
     private fun Bitmap.useBitmap(block: (Bitmap) -> Unit) { try { block(this) } finally { recycle() } }
 }
