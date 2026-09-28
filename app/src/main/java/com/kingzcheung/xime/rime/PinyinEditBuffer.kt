@@ -22,7 +22,7 @@ internal object PinyinEditBuffer {
     fun supports(schema: String): Boolean = schema in setOf(
         "t9_pinyin", "pinyin_14jian", "rime_ice", "double_pinyin_flypy",
         "luna_pinyin", "luna_pinyin_simp", "pinyin_simp",
-    ) || schema.startsWith("double_pinyin")
+    ) || schema.startsWith("double_pinyin") || com.kingzcheung.xime.settings.CustomKeyboardLayouts.isCustom(schema)
 
     fun normalizedT9(text: String): String = text.lowercase().replace('ü', 'v')
         .replace(' ', '\'').filter { it in 'a'..'z' || it in '2'..'9' || it == '\'' }
@@ -34,7 +34,7 @@ internal object PinyinEditBuffer {
 
 /** Maps engine syllables to code. Editor sessions retain these boundaries as editable text. */
 internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = false,
-    includeAutomaticBoundaries: Boolean = true, isMerged14: Boolean = false) {
+    includeAutomaticBoundaries: Boolean = true, isMerged14: Boolean = false, groups: List<String> = if (isMerged14) merged14Groups else emptyList()) {
     val text: String
     private val offsets: List<Int>
     init {
@@ -51,7 +51,7 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
         // Literal letters and caret offsets retain their original identity.
         val matches = input.length == reading.length && input.indices.all {
             input[it] == reading[it] || isT9 && input[it] in '2'..'9' && input[it] == digit(reading[it]) ||
-                isMerged14 && merged14Representative(input[it]) == merged14Representative(reading[it])
+                groups.isNotEmpty() && groupRepresentative(input[it], groups) == groupRepresentative(reading[it], groups)
         }
         if (matches) {
             var letters = 0
@@ -64,7 +64,7 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
                 if (includeAutomaticBoundaries && character != '\'' && letters in boundaries && isNotEmpty() && last() != '\'') {
                     append('\''); mapping.add(index)
                 }
-                append(if (matches && (character in '2'..'9' || isMerged14 && character != '\'')) reading[letters] else character); mapping.add(index + 1)
+                append(if (matches && (character in '2'..'9' || groups.isNotEmpty() && character != '\'')) reading[letters] else character); mapping.add(index + 1)
                 if (character != '\'') letters++
             }
         }
@@ -82,14 +82,15 @@ internal val merged14Groups = listOf("qw", "er", "ty", "ui", "op", "as", "df", "
 internal fun merged14Representative(c: Char): Char = merged14Groups.firstOrNull { c in it }?.first() ?: c
 
 /** Only substitute a dictionary reading when every entered key is accounted for. */
-internal fun merged14Preedit(raw: String, preedit: String, spelling: String): String {
+internal fun groupRepresentative(c: Char, groups: List<String>): Char = groups.firstOrNull { c in it }?.first() ?: c
+internal fun merged14Preedit(raw: String, preedit: String, spelling: String, groups: List<String> = merged14Groups): String {
     val reading = spelling.trim()
     if (reading.isEmpty() || reading.any { it !in 'a'..'z' && it != '\'' && !it.isWhitespace() && it != 'ü' }) return preedit
     val input = PinyinEditBuffer.normalized(raw).replace("'", "")
     val letters = PinyinEditBuffer.normalized(reading).replace("'", "")
     if (input.isEmpty() || input.length != letters.length || input.indices.any {
-            merged14Representative(input[it]) != merged14Representative(letters[it]) }) return preedit
-    return PinyinEditDisplay(raw, reading, isMerged14 = true).text
+            groupRepresentative(input[it], groups) != groupRepresentative(letters[it], groups) }) return preedit
+    return PinyinEditDisplay(raw, reading, groups = groups).text
 }
 
 /** Multi-tap exists only in the explicit pinyin editor, never in ordinary composition. */

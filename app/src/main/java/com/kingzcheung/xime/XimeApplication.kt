@@ -120,13 +120,8 @@ class XimeApplication : Application(), ImageLoaderFactory {
         
         applicationScope.launch {
             try {
-                val (userDataDir, sharedDataDir) = RimeConfigHelper.initializeRimeDataAsync(this@XimeApplication)
-                val engine = RimeEngine.getInstance()
-                engine.initialize(userDataDir, sharedDataDir)
+                check(RimeConfigHelper.prepareEngine(this@XimeApplication)) { "Bundled dictionary deployment failed" }
 
-                // 首次安装/升级后静默编译词库。ensureDeployment 内部带互斥且 hash 一致时跳过，
-                // 统一负责 deploymentDone/hash 状态，避免与输入法服务的初始化重复触发全量编译。
-                check(RimeConfigHelper.ensureDeployment(this@XimeApplication)) { "Bundled dictionary deployment failed" }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to pre-initialize Rime engine", e)
             }

@@ -34,6 +34,52 @@ object RimeConfigHelper {
     private val deploymentLock = Any()
     private val assetInitializationMutex = kotlinx.coroutines.sync.Mutex()
     
+    private val preparationMutex = kotlinx.coroutines.sync.Mutex()
+    private var preparedInProcess = false
+    const val DEPLOYMENT_REVISION = "rime_deployment_revision"
+
+    /** Share the entire copy/init/deploy operation, not just the final compilation lock. */
+    suspend fun prepareEngine(context: Context): Boolean = preparationMutex.withLock {
+        // A previous IME service may have destroyed the process-wide engine.
+        // Cached preparation is valid only while that native session is still usable.
+        if (preparedInProcess && RimeEngine.isInitialized() &&
+            RimeEngine.getInstance().ensureSession(1_000L)) return@withLock true
+        preparedInProcess = false
+        val (user, shared) = initializeRimeDataAsync(context)
+        RimeEngine.getInstance().initialize(user, shared)
+        ensureDeployment(context).also { preparedInProcess = it }
+    }
+
+    /** Explicit repair from settings: initialize first, then validate both files and the live session. */
+    suspend fun redeploy(context: Context): Boolean = preparationMutex.withLock {
+        preparedInProcess = false
+        SettingsPreferences.setDeploymentDone(context, false)
+        val (user, shared) = initializeRimeDataAsync(context)
+        val engine = RimeEngine.getInstance()
+        engine.initialize(user, shared)
+        val success = synchronized(deploymentLock) {
+            val usable = engine.deploy() && hasRequiredBuildArtifacts(context) && liveSchemasReady(context)
+            if (usable) storeDeploymentHash(context)
+            SettingsPreferences.setDeploymentDone(context, usable)
+            usable
+        }
+        preparedInProcess = success
+        if (success) {
+            // An already-created IME may still be showing its failed-startup screen.
+            val prefs = SettingsPreferences.getPrefsPublic(context)
+            prefs.edit().putLong(DEPLOYMENT_REVISION, prefs.getLong(DEPLOYMENT_REVISION, 0L) + 1L).apply()
+        }
+        success
+    }
+
+    private fun liveSchemasReady(context: Context): Boolean {
+        val engine = RimeEngine.getInstance()
+        if (!RimeEngine.isInitialized() || !engine.ensureSession(10_000L)) return false
+        val enabled = SchemaManager.getEnabledSchemas(context)
+        val available = engine.getAvailableSchemas().toSet()
+        return enabled.isNotEmpty() && enabled.all { it in available } && engine.getCurrentSchema().isNotBlank()
+    }
+
     suspend fun initializeRimeDataAsync(context: Context): Pair<String, String> = assetInitializationMutex.withLock {
         val rimeDir = File(context.filesDir, "rime")
         
@@ -78,8 +124,12 @@ object RimeConfigHelper {
      */
     fun ensureDeployment(context: Context): Boolean {
         synchronized(deploymentLock) {
+            if (!RimeEngine.isInitialized()) {
+                SettingsPreferences.setDeploymentDone(context, false)
+                return false
+            }
             val currentHash = computeDeploymentHash(context)
-            if (currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && hasRequiredBuildArtifacts(context)) {
+            if (currentHash.isNotEmpty() && currentHash == SettingsPreferences.getDeploymentHash(context) && hasRequiredBuildArtifacts(context) && liveSchemasReady(context)) {
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
             }
@@ -105,11 +155,12 @@ object RimeConfigHelper {
                 buildDir.mkdirs()
                 deployed = engine.deploy()
             }
-            if (deployed && hasRequiredBuildArtifacts(context)) {
+            if (deployed && hasRequiredBuildArtifacts(context) && liveSchemasReady(context)) {
                 storeDeploymentHash(context)
                 SettingsPreferences.setDeploymentDone(context, true)
                 return true
             }
+            SettingsPreferences.setDeploymentDone(context, false)
             return false
         }
     }
@@ -207,7 +258,8 @@ object RimeConfigHelper {
     /** A compiled YAML alone is not a usable dictionary. Never cache that as ready. */
     internal fun hasRequiredBuildArtifacts(context: Context): Boolean {
         val build = File(context.filesDir, "rime/build")
-        return SchemaManager.getEnabledSchemas(context).all { id ->
+        val enabled = SchemaManager.getEnabledSchemas(context)
+        return enabled.isNotEmpty() && enabled.all { id ->
             val schema = File(build, "$id.schema.yaml")
             if (!schema.isFile) return@all false
             val translator = Regex("""(?ms)^translator:\s*\n(.*?)(?=^\S|\z)""")

@@ -18,6 +18,7 @@ data class InputUIState(
     val darkMode: Int = 0,
     val themeId: String = "ocean_blue",
     val isSttEnabled: Boolean = false,
+    val handwritingExpanded: Boolean = false,
     val keyboardHeightDp: Int = 0,
     val keyboardBottomPaddingDp: Int = 0,
     val keyboardOpacity: Float = 1f,

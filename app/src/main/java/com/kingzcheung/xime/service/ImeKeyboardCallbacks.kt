@@ -54,9 +54,11 @@ internal fun rememberImeKeyboardCallbacks(
         val floatingDragX = FloatingDragAxis()
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
+            inputAdmissionTicket = service.inputReadiness::ticket,
             onOpenPreeditEditor = preeditEditor::open,
             onLivePreeditEdit = preeditEditor::edit,
-            onKeyPress = { key, isShifted ->
+            onKeyPress = keyPress@{ key, isShifted ->
+                if (service.inputReadiness.ticket() == null) return@keyPress
                 if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke(key) != true) {
                     val numberPanel = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number
                     val separator = key == "'" && service.candidateState.value.isComposing && !service.uiState.value.isAsciiMode
@@ -65,7 +67,8 @@ internal fun rememberImeKeyboardCallbacks(
                     } else service.keyRouter.handleKeyPress(key, isShifted)
                 }
             },
-            onJapaneseKanaAction = { action ->
+            onJapaneseKanaAction = kana@{ action ->
+                if (service.inputReadiness.ticket() == null) return@kana
                 val input = (action as? com.kingzcheung.xime.ui.keyboard.JapaneseKanaAction.Input)?.romaji
                 if (input in listOf(",", ".", "?", "!", "/", "(", ")")) {
                     val punctuation = when (input) { "," -> "、"; "." -> "。"; "/" -> "・"; else -> input!! }
@@ -158,8 +161,8 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onClipboardSelect = { text -> service.textCommit.selectClipboardItem(text) },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
-            onCommitText = { text -> service.textCommit.commitLiteralText(text) },
-            onCommitExactText = { text -> service.textCommit.commitLiteralText(text, preserveWidth = true) },
+            onCommitText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text) },
+            onCommitExactText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text, preserveWidth = true) },
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
             onQuickSend = {},
             onKeyboardResize = {
@@ -191,7 +194,7 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onReloadConfig = { service.schemaController.reloadConfig() },
             onSettings = { service.schemaController.openSettings() },
-            onSwitchSchema = { schemaId -> service.schemaController.switchSchema(schemaId) },
+            onSwitchSchema = { schemaId -> if (service.inputReadiness.ticket() != null) service.schemaController.switchSchema(schemaId) },
             onReorderSchemas = { ids ->
                 val schemas = service.uiState.value.schemas
                 val order = com.kingzcheung.xime.settings.InputModes.mergeOrder(schemas.map { it.schemaId }, ids)
@@ -199,6 +202,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.uiState.value = service.uiState.value.copy(
                     schemas = com.kingzcheung.xime.settings.InputModes.available(schemas, order))
             },
+            onHandwritingExpand = { expanded -> service.uiState.value = service.uiState.value.copy(handwritingExpanded = expanded) },
             onHandwritingToggle = { service.schemaController.toggleHandwriting() },
             onToggleSchemaSwitch = { sw -> service.sessionController.toggleSchemaSwitch(sw) },
             onHideKeyboard = { service.hideKeyboard() },
@@ -305,7 +309,7 @@ internal fun rememberImeKeyboardCallbacks(
                     }
                 }
             },
-            onDismissDeploying = { service.notifyDeploymentStatus(false, "") },
+            onDismissDeploying = { service.hideKeyboard() },
             onFloatingModeChange = { enabled -> service.schemaController.toggleFloatingMode(enabled, floatingMinY, persist = !service.uiState.value.showKeyboardResize) },
             onFloatingKeyboardDrag = { dx, dy ->
                 val s = service.uiState.value

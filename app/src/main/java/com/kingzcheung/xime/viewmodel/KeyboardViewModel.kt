@@ -54,6 +54,7 @@ data class KeyboardUiState(
     val isDarkTheme: Boolean = false,
     val darkMode: Int = 2,
     val themeId: String = "ocean_blue",
+    val handwritingExpanded: Boolean = false,
     val keyboardHeightDp: Int = 0,
     val keyboardBottomPaddingDp: Int = 0,
     val keyboardOpacity: Float = 1f,

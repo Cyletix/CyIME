@@ -20,5 +20,6 @@ data class CandidateState(
     val candidateActions: List<CandidateAction> = emptyList(),
     /** 跨页全量候选（仅候选展开态时由服务层填充，供本地分页与单字筛选）。
      *  空列表 = 未填充或引擎无候选。全局索引用于 selectCandidateByGlobalIndex。 */
-    val expandedCandidates: List<RimeCandidate> = emptyList()
+    val expandedCandidates: List<RimeCandidate> = emptyList(),
+    val traceEventId: Int = 0
 )

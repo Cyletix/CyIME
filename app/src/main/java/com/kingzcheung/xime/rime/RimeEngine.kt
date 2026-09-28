@@ -25,6 +25,7 @@ data class RimeComposition(
     val hasPrevPage: Boolean,
     val isAsciiMode: Boolean
 ) {
+    internal var traceEventId: Int = 0
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is RimeComposition) return false
@@ -148,6 +149,7 @@ class RimeEngine {
         }
     }
 
+    @Volatile
     private var isInitialized = false
     private val initLock = Any()
     @Volatile
@@ -341,17 +343,27 @@ class RimeEngine {
         }
     }
 
+    /** Explicit Debug diagnostics only; never called by the keyboard render path. */
+    internal fun inspectCandidates(limit: Int = 100): Array<Array<String>> = locked {
+        check(com.kingzcheung.xime.BuildConfig.DEBUG)
+        if (!nativeHasSession()) emptyArray() else nativeInspectCandidates(limit.coerceIn(0, 500))
+    }
+    private external fun nativeInspectCandidates(limit: Int): Array<Array<String>>
+
     internal fun conversionPreview(): String = locked { nativeConversionPreview() }
     internal fun highlightCandidate(index: Int): Boolean = locked { nativeHighlightCandidate(index) }
     private external fun nativeConversionPreview(): String
     private external fun nativeHighlightCandidate(index: Int): Boolean
 
     private fun displayPreedit(input: String, preedit: String, spelling: String): String {
-        if (nativeGetCurrentSchema() != "pinyin_14jian" || nativeIsAsciiMode()) return preedit
+        val schema = nativeGetCurrentSchema().orEmpty()
+        val groups = if (schema == "pinyin_14jian") merged14Groups else
+            com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(schema)?.rows?.flatten().orEmpty()
+        if (groups.none { it.length > 1 } || nativeIsAsciiMode()) return preedit
         val snapshot = nativePinyinEditSnapshot()
         val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0
         val prefix = snapshot.getOrNull(3).orEmpty()
-        return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), spelling)
+        return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), spelling, groups)
     }
 
     private fun withDisplayPreedit(result: RimeProcessResult): RimeProcessResult = result.copy(
