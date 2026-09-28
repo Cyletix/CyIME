@@ -25,14 +25,14 @@ class HandwritingTwoCharacterChainTest {
 
     private fun stroke(x: Float) = listOf(x to 0f, x to 1f, x to 2f)
 
-    /** 基线：两轮各出一个字 → 队列 2 条，候选栏显示“第1/2字”。 */
+    /** 基线：两轮各出一个字 → 队列 2 条，候选栏显示“你好”整串。 */
     @Test
     fun twoSeparateRoundsQueueTwoCharacters() {
         val queue = HandwritingCandidateQueue()
         queue.append(listOf(segment("你")))
         queue.append(listOf(segment("好")))
         assertEquals(2, queue.size)
-        assertEquals(listOf("你"), queue.candidates) // 候选栏只展示队首（先写的字）
+        assertEquals(listOf("你好"), queue.candidates) // 展示整串候选
         assertEquals("你好", queue.confirmAll())
     }
 
@@ -43,7 +43,7 @@ class HandwritingTwoCharacterChainTest {
         queue.append(listOf(segment("你")))                // 第一轮：写第 1 个字
         queue.append(listOf(segment("女"), segment("子"))) // 第二轮：第 2 个字被切成部件
         assertEquals(3, queue.size)                        // ← 候选栏“第1/3字”里的 3
-        assertEquals(listOf("你"), queue.candidates)       // 展示的仍是队首候选，不是刚写的字
+        assertEquals(listOf("你女子"), queue.candidates) // 候选串忠实反映识别分段
         assertEquals("你女子", queue.confirmAll())          // 上屏 3 个字，而用户只写了 2 个字
     }
 
