@@ -9,6 +9,7 @@ import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 
 data class InputUIState(
+    val rejectedCommitText: String? = null,
     val isAsciiMode: Boolean = false,
     val schemaName: String = "",
     val currentSchemaId: String = "",

@@ -302,7 +302,10 @@ ProcessResult T9Processor::HandleBackspace() {
     bool handled = undo_model_.Backspace();
     if (handled) {
         // 撤销 commit 操作计数累加，供 Kotlin 同步 t9PartialCommitTexts
-        undone_right_commit_count_ += undo_model_.ConsumeUndoneCommitCount();
+        const int undone = undo_model_.ConsumeUndoneCommitCount();
+        undone_right_commit_count_ += undone;
+        for (int i = 0; i < undone; ++i) undo_model_.PopLastCommitCapture();
+        if (undone > 0) pending_fullcommit_capture_.reset();
         input_buffer_ = undo_model_.ToBuffer();
         DeriveStateMachineFromUndoModel();
         // 分隔符删空后解锁左侧面板（分词键锁定状态）
@@ -505,13 +508,21 @@ bool T9Processor::SelectCandidate(const std::string& candidate_pinyin,
     T9LOG(">> SelectCandidate: rimeConsumedDigits=%d (consumed=%d, isT9User=%d, hasSels=%d)",
           rime_consumed, input_buffer_.consumed_count, is_t9_user ? 1 : 0,
           !input_buffer_.selections.empty() ? 1 : 0);
+    // One capture per selected segment, even when its code is unavailable, so undo
+    // always removes the matching selection. Missing codes must not be guessed.
+    undo_model_.PushCommitCapture(captured_text,
+                                  T9SyllableCode(captured_code.begin(), captured_code.end()));
+    pending_fullcommit_capture_.reset();
+    std::string phrase_text;
+    T9SyllableCode phrase_code;
+    bool complete_capture = true;
+    for (const auto& capture : undo_model_.commit_captures()) {
+        if (capture.first.empty() || capture.second.empty()) complete_capture = false;
+        phrase_text += capture.first;
+        phrase_code.insert(phrase_code.end(), capture.second.begin(), capture.second.end());
+    }
+    if (complete_capture) pending_fullcommit_capture_ = {phrase_text, phrase_code};
     if (!captured_code.empty()) {
-        undo_model_.PushCommitCapture(captured_text,
-                                      T9SyllableCode(captured_code.begin(), captured_code.end()));
-        // 同步暂存调频捕获：跨异步上屏链路存活
-        pending_fullcommit_capture_ = {captured_text,
-                                       T9SyllableCode(captured_code.begin(),
-                                                      captured_code.end())};
         std::string ids;
         for (auto id : captured_code) ids += std::to_string(id) + ",";
         T9LOG(">> SelectCandidate: captured '%s' code=[%s] (%zu syl)",
@@ -732,44 +743,22 @@ bool T9Processor::UpdateDictEntry(const std::string& text,
 
 bool T9Processor::MemorizeEntry(const std::string& text,
                                 const std::string& pinyin) {
-    // 场景判定：full_code == input_digits → 写 RIME userdb，否则 → 写 T9 数字词典。
-    // capture 机制不再用于场景判定——多段拼接自造词的 capture 只存最后一段，文本不匹配。
-    T9LOG(">> MemorizeEntry digitSeq='%s' lastCommit='%s' consumed=%d",
-          input_buffer_.digit_sequence.c_str(),
-          last_commit_digit_sequence_.c_str(),
-          input_buffer_.consumed_count);
-    T9LOG(">> MemorizeEntry: text='%s' pinyin='%s'", text.c_str(), pinyin.c_str());
-
+    // The captured native code includes the actual pronunciation (and tone).
+    // Empty pinyin denotes a selected phrase: it requires the complete captured
+    // code. Explicit dictionary imports may supply pinyin to build a new entry.
+    auto capture = std::move(pending_fullcommit_capture_);
     pending_fullcommit_capture_.reset();
     undo_model_.ClearCommitCaptures();
-
-    const std::string& digits = last_commit_digit_sequence_;
-    std::string full_code_str = T9DigitUserDictCore::PinyinToFullCode(pinyin);
-
-    // 统一优先写 RIME userdb：召回由 script_translator 的 UserDictionary
-    // 音节图查询承担，按「拼音音节路径」召回，对多段拼接自造词（左选择器
-    // 分段上屏）、简拼组词都鲁棒。旧的 full_code==digits 判定按「单段整串
-    // 提交」设计：经选择器分段上屏时 last_commit_digit_sequence_ 带左选
-    // 后缀（如 "584826494664:lu"）或被截断，多段词被错误路由进 T9 数字
-    // 词典——其召回器 t9_user_translator 已移除，且精确数字键匹配天然
-    // 召回不到重输场景（卢广仲案例：第二次输入候选列表与未学习时完全相同）。
-    // 仅当拼音无法解析为音节码（英文/符号混入）时才退回数字词典。
-    DictEntry entry;
-    bool userdb_ok = false;
-    const bool resolvable = BuildEntryForPinyin(text, pinyin, &entry);
-    if (resolvable) {
-        userdb_ok = WriteDictEntry(text, entry.code, 1);
-    } else if (digit_recall_key_valid_ && !text.empty() && !digits.empty()) {
-        T9DigitUserDict::Instance().Memorize(digits, text, pinyin);
+    if (capture && capture->first == text && !capture->second.empty()) {
+        Code code(capture->second.begin(), capture->second.end());
+        return WriteDictEntry(text, code, 1);
     }
-    // 地面真相诊断：T9LOG 发布包被 T9_ENABLE_VERBOSE_LOG 门控，用
-    // RimePerf INFO 直出（与 [T9Inc] 同模式），真机可据此判断调频路由。
-    T9_DICT_LOG(
-        "memorize text='%s' pinyin='%s' digits='%s' full_code='%s' "
-        "resolvable=%d userdb_ok=%d",
-        text.c_str(), pinyin.c_str(), digits.c_str(), full_code_str.c_str(),
-        resolvable ? 1 : 0, userdb_ok ? 1 : 0);
-    return true;
+    if (pinyin.empty()) return false;
+    DictEntry entry;
+    if (!BuildEntryForPinyin(text, pinyin, &entry)) return false;
+    // Do not report success by writing to the retired digit dictionary: it has
+    // no active recall path and cannot affect subsequent candidate ordering.
+    return WriteDictEntry(text, entry.code, 1);
 }
 
 bool T9Processor::ForgetEntry(const std::string& text,

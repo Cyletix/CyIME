@@ -18,4 +18,13 @@ class CandidateStripGeometryTest {
   assertEquals(0,candidatePrefixCount(emptyList(),200,4))
   assertEquals(0,candidatePrefixCount(listOf(20),0,4))
  }
+ @Test fun offscreenCandidatesAreNeverMeasured() {
+  var measured=0
+  val count=candidatePrefixCount(500,114,4) { index -> measured++; listOf(40,70,30)[index] }
+  assertEquals(2,count)
+  assertEquals(3,measured)
+ }
+ @Test fun zeroWidthDoesNotMeasureAnyText() {
+  assertEquals(0,candidatePrefixCount(500,0,4) { error("offscreen text measured") })
+ }
 }

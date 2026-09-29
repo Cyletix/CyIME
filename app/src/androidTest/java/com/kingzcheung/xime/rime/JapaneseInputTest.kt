@@ -10,6 +10,9 @@ import org.junit.Test
 
 /** 使用发布的完整词库和真实 librime，验证两种布局背后的日文汉字转换。 */
 class JapaneseInputTest {
+    companion object {
+        @org.junit.ClassRule @JvmField val schemas = JapaneseSchemaFixture()
+    }
     @Test fun bothJapaneseSchemasConvertRomanizedReadingsIntoKanji() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val (userDir, sharedDir) = RimeConfigHelper.initializeRimeDataAsync(context)

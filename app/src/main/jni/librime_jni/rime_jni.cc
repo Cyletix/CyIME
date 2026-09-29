@@ -378,12 +378,7 @@ public:
             rime->free_context(&context);
         }
 
-        // 3. commit text（统一返回，避免调用方额外查询）
-        RIME_STRUCT(RimeCommit, commit);
-        if (rime->get_commit(session_id_, &commit)) {
-            result.committedText = commit.text ? commit.text : "";
-            rime->free_commit(&commit);
-        }
+        // Snapshot reads never consume commit effects. Only command results / commit() do.
 
         // 4. status: ascii mode
         RIME_STRUCT(RimeStatus, status);
@@ -466,10 +461,10 @@ public:
     // 跨页遍历整个候选列表（librime candidate_list 迭代器，与引擎分页无关），
     // 供候选展开页本地分页使用；maxCount 防御超大列表。
     bool getAllCandidates(std::vector<std::pair<std::string, std::string>>& candidates,
-                          size_t maxCount) {
+                          size_t maxCount, int offset = 0) {
         if (!rime || !session_id_) return false;
         RimeCandidateListIterator iterator;
-        if (!rime->candidate_list_begin(session_id_, &iterator)) return false;
+        if (!rime->candidate_list_from_index(session_id_, &iterator, offset)) return false;
         while (candidates.size() < maxCount && rime->candidate_list_next(&iterator)) {
             const char* text = iterator.candidate.text;
             const char* comment = iterator.candidate.comment;
@@ -901,6 +896,13 @@ public:
         }
         rime->set_option(session_id_, option, value);
         LOGI("setOption: %s = %s", option, value ? "true" : "false");
+    }
+
+    void setNeighborMap(const char* value) {
+        if (!rime || !session_id_) return;
+        char existing[512] = {};
+        rime->get_property(session_id_, "cyime_neighbors", existing, sizeof(existing));
+        if (std::string(existing) != value) rime->set_property(session_id_, "cyime_neighbors", value);
     }
 
     Bool getOption(const char* option) {
@@ -1444,6 +1446,36 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetAllCandidates(
 ) {
     std::vector<std::pair<std::string, std::string>> candidates;
     Rime::Instance().getAllCandidates(candidates, static_cast<size_t>(maxCount));
+
+    jclass stringClass = env->FindClass("java/lang/String");
+    jclass stringArrayClass = env->FindClass("[Ljava/lang/String;");
+
+    jobjectArray result = env->NewObjectArray(candidates.size(), stringArrayClass, nullptr);
+
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        jobjectArray pair = env->NewObjectArray(2, stringClass, nullptr);
+        jstring text = env->NewStringUTF(candidates[i].first.c_str());
+        jstring comment = env->NewStringUTF(candidates[i].second.c_str());
+        env->SetObjectArrayElement(pair, 0, text);
+        env->SetObjectArrayElement(pair, 1, comment);
+        env->SetObjectArrayElement(result, i, pair);
+        env->DeleteLocalRef(text);
+        env->DeleteLocalRef(comment);
+        env->DeleteLocalRef(pair);
+    }
+
+    return result;
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetCandidateBatch(
+    JNIEnv* env,
+    jobject thiz,
+    jint offset,
+    jint maxCount
+) {
+    std::vector<std::pair<std::string, std::string>> candidates;
+    Rime::Instance().getAllCandidates(candidates, static_cast<size_t>(maxCount), offset);
 
     jclass stringClass = env->FindClass("java/lang/String");
     jclass stringArrayClass = env->FindClass("[Ljava/lang/String;");
@@ -2054,6 +2086,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetOption(
 }
 
 // 读取 Rime 选项
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetNeighborMap(JNIEnv* env, jobject, jstring value) {
+    const char* encoded = env->GetStringUTFChars(value, nullptr);
+    if (!encoded) return;
+    Rime::Instance().setNeighborMap(encoded);
+    env->ReleaseStringUTFChars(value, encoded);
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetOption(
     JNIEnv* env,

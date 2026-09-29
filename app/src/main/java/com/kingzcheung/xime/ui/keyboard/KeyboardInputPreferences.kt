@@ -12,7 +12,11 @@ internal fun normalizeHandwritingPause(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.5f).coerceIn(0.1f, 2.5f) * 10).roundToInt() / 10f
 
 enum class SpaceHoldAction(val label: String) {
-    CURSOR("移动光标"), REPEAT("连续空格")
+    CURSOR("移动光标"), REPEAT("连续空格"), VOICE_TOGGLE("语音开关")
+}
+
+enum class CursorGestureMode(val label: String) {
+    SPACE("长按空格"), KEYBOARD("键盘滑动"), NONE("关闭")
 }
 
 data class KeyboardInputPreferences(
@@ -24,20 +28,29 @@ data class KeyboardInputPreferences(
     val handwritingPauseSeconds: Float = 0.5f,
     val showPressBubble: Boolean = false,
     val splitKeyboardEnabled: Boolean = false,
+    val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
+    val neighborCorrection: Boolean = true,
 ) {
+    val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
+        else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
+    val spaceHoldDelayMs: Long get() = if (effectiveSpaceHold == SpaceHoldAction.CURSOR) 100L else 300L
     companion object {
         fun read(context: Context): KeyboardInputPreferences {
             val prefs = SettingsPreferences.getPrefsPublic(context)
             val legacyPause = prefs.getFloat("handwriting_pause_seconds", 0.5f)
             // 本轮将旧的一秒默认值迁移为半秒；其他已设时长保留。
             val pause = prefs.getFloat("handwriting_pause_seconds_v2", if (legacyPause == 1f) 0.5f else legacyPause)
+            val hold = SpaceHoldAction.entries.firstOrNull { it.name == prefs.getString("space_hold_action", "CURSOR") }
+                ?: SpaceHoldAction.CURSOR
             return KeyboardInputPreferences(
                 keyGlowEnabled = prefs.getBoolean("key_glow_enabled", false),
                 showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
                 splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
-                spaceHold = SpaceHoldAction.entries.firstOrNull { it.name == prefs.getString("space_hold_action", "CURSOR") }
-                    ?: SpaceHoldAction.CURSOR,
+                spaceHold = hold,
+                cursorGesture = CursorGestureMode.entries.firstOrNull { it.name == prefs.getString("cursor_gesture_mode", null) }
+                    ?: if (hold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,
+                neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
                 fixedSymbols = prefs.getString("fixed_symbols", "").orEmpty(),
@@ -48,6 +61,8 @@ data class KeyboardInputPreferences(
     fun save(context: Context) {
         SettingsPreferences.getPrefsPublic(context).edit()
             .putString("space_hold_action", spaceHold.name)
+            .putString("cursor_gesture_mode", cursorGesture.name)
+            .putBoolean("neighbor_correction", neighborCorrection)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
@@ -64,6 +79,7 @@ data class KeyboardInputActions(
     val onCursorMoveVertical: ((Int) -> Unit)? = null,
     val onCursorModeChange: ((Boolean) -> Unit)? = null,
     val onVoiceModeChange: ((Boolean) -> Unit)? = null,
+    val onVoiceToggle: (() -> Unit)? = null,
     val isSttEnabled: Boolean = false,
     val schemas: List<SchemaInfo> = emptyList(),
     val currentInputModeId: String = "",
@@ -85,7 +101,7 @@ fun rememberKeyboardInputPreferences(): KeyboardInputPreferences {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val relevantKeys = setOf("key_glow_enabled", SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
             SettingsPreferences.KEY_SPLIT_KEYBOARD,
-            "space_hold_action", "cursor_step_dp", "key_text_scale", "fixed_symbols",
+            "space_hold_action", "cursor_gesture_mode", "neighbor_correction", "cursor_step_dp", "key_text_scale", "fixed_symbols",
             "handwriting_pause_seconds", "handwriting_pause_seconds_v2")
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == null || key in relevantKeys) settings = KeyboardInputPreferences.read(context)

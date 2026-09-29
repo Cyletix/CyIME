@@ -54,6 +54,8 @@ fun SpaceKeyButton(
     val onMove by rememberUpdatedState(actions.onCursorMove)
     val onMoveVertical by rememberUpdatedState(actions.onCursorMoveVertical)
     val onCursorMode by rememberUpdatedState(actions.onCursorModeChange)
+    val onVoiceToggle by rememberUpdatedState(actions.onVoiceToggle)
+    val holdAction = settings.effectiveSpaceHold
     DisposableEffect(Unit) { onDispose { onCursorMode?.invoke(false) } }
     val currentClick by rememberUpdatedState(onClick)
     val currentPress by rememberUpdatedState(onPress)
@@ -71,7 +73,7 @@ fun SpaceKeyButton(
     }
     BoxWithConstraints(
         modifier.fillMaxSize().testTag("space-key")
-            .pointerInput(settings.spaceHold, settings.cursorStepDp) {
+            .pointerInput(holdAction, settings.cursorStepDp) {
                 val step = settings.cursorStepDp.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -87,12 +89,13 @@ fun SpaceKeyButton(
                     // independent of fast horizontal settings; coalesced events never skip rows.
                     val verticalSteps = CursorStepAccumulator(maxOf(48.dp.toPx(), step * 5f))
                     val timer = scope.launch {
-                        delay(300L)
+                        delay(settings.spaceHoldDelayMs)
                         held = true
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                        when (settings.spaceHold) {
+                        when (holdAction) {
                             SpaceHoldAction.CURSOR -> { cursorActive = true; onCursorMode?.invoke(true) }
                             SpaceHoldAction.REPEAT -> while (true) { currentClick(); delay(70L) }
+                            SpaceHoldAction.VOICE_TOGGLE -> onVoiceToggle?.invoke()
                         }
                     }
                     try {
@@ -100,7 +103,7 @@ fun SpaceKeyButton(
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (change.isConsumed) break
-                            if (held && settings.spaceHold == SpaceHoldAction.REPEAT &&
+                            if (held && holdAction == SpaceHoldAction.REPEAT &&
                                 (change.position.x < 0f || change.position.x > size.width ||
                                     change.position.y < 0f || change.position.y > size.height)) break
                             val dx = change.position.x - lastX

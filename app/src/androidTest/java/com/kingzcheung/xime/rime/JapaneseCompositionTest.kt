@@ -8,6 +8,9 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class JapaneseCompositionTest {
+    companion object {
+        @org.junit.ClassRule @JvmField val schemas = JapaneseSchemaFixture()
+    }
     @Test fun wholeKanaDeletionConversionRangeAndKatakanaUseTheInstalledEngine() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val (user, shared) = RimeConfigHelper.initializeRimeDataAsync(context)

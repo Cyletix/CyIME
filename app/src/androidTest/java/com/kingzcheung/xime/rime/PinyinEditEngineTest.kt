@@ -4,9 +4,36 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.BeforeClass
+import org.junit.AfterClass
+import com.kingzcheung.xime.settings.SchemaManager
 import org.junit.Test
 
 class PinyinEditEngineTest {
+    companion object {
+        private var originalSchemas: List<String>? = null
+
+        @BeforeClass @JvmStatic fun deployTestSchemas(): Unit = runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            assertTrue(RimeConfigHelper.prepareEngine(context))
+            originalSchemas = SchemaManager.getEnabledSchemas(context)
+            // Fourteen-key and double-pinyin are opt-in: tests must install their fixtures.
+            SchemaManager.setEnabledSchemas(context,
+                (originalSchemas!! + listOf("pinyin_14jian", "double_pinyin_flypy")).distinct())
+            assertTrue(RimeConfigHelper.redeploy(context))
+            for (schema in listOf("pinyin_14jian", "double_pinyin_flypy")) {
+                assertTrue("Missing compiled test schema: $schema", SchemaManager.isSchemaCompiled(context, schema))
+            }
+        }
+
+        @AfterClass @JvmStatic fun restoreSchemas(): Unit = runBlocking {
+            originalSchemas?.let { previous ->
+                val context = InstrumentationRegistry.getInstrumentation().targetContext
+                SchemaManager.setEnabledSchemas(context, previous)
+                assertTrue(RimeConfigHelper.redeploy(context))
+            }
+        }
+    }
     private val engine = RimeEngine.getInstance()
     @Before fun ready(): Unit = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

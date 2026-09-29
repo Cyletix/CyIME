@@ -123,6 +123,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
 
         service.candidateState.value = service.candidateState.value.copy(
             traceEventId = composition.traceEventId,
+            engineRevision = composition.engineRevision,
             // T9 保持合成显示态同源；非 T9 仅显示层用 preedit 回显，inputText 保留原始键入串
             inputText = if (isT9Schema) displayText else inputText,
             preeditText = displayText,
@@ -248,6 +249,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
 
         service.candidateState.value = service.candidateState.value.copy(
+            engineRevision = result.engineRevision,
             inputText = if (isT9Schema) displayText else result.inputText,
             preeditText = displayText,
             candidates = displayCandidates,
@@ -492,12 +494,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             }
         }
 
-        service.rimeEngine.clearComposition()
+        service.rimeEngine.clearQueuedT9Composition()
 
         withContext(Dispatchers.Main) {
-            service.keyboardCallbacks?.onT9ReplaceFullPinyin?.invoke(T9InputController.CLEAR_ALL)
+            service.keyboardCallbacks?.onT9CompositionCleared?.invoke()
             service.uiState.value = service.uiState.value.copy(
-                t9ResetSignal = service.uiState.value.t9ResetSignal + 1,
                 t9RightCandidateSelectedCount = 0,
                 t9SelectedCandidatePinyin = ""
             )

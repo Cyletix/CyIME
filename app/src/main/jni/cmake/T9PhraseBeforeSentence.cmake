@@ -95,6 +95,17 @@ string(REPLACE "${T9_SENTENCE_GATE_OLD}" "${T9_SENTENCE_GATE_NEW}"
 string(REPLACE "set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_"
        T9_SCRIPT_TRANSLATOR_CODE "${T9_SCRIPT_TRANSLATOR_CODE}")
 
+# Diagnostic timers/log strings are opt-in, including ordinary pinyin translation.
+# Patch the generated copy so the pinned upstream source remains reproducible.
+set(T9_DIAGNOSTIC_GATE "#if defined(__ANDROID__)\n#include <android/log.h>\n#include <chrono>")
+string(FIND "${T9_SCRIPT_TRANSLATOR_CODE}" "${T9_DIAGNOSTIC_GATE}" T9_DIAGNOSTIC_POS)
+if(T9_DIAGNOSTIC_POS EQUAL -1)
+  message(FATAL_ERROR "librime diagnostic gate changed: review logging policy")
+endif()
+string(REPLACE "${T9_DIAGNOSTIC_GATE}"
+    "#if defined(__ANDROID__) && defined(CYIME_ENABLE_DIAGNOSTICS)\n#include <android/log.h>\n#include <chrono>"
+    T9_SCRIPT_TRANSLATOR_CODE "${T9_SCRIPT_TRANSLATOR_CODE}")
+
 set(T9_SCRIPT_TRANSLATOR_COPY
     "${CMAKE_CURRENT_BINARY_DIR}/cyime-script-translator.cc")
 file(CONFIGURE

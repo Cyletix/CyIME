@@ -21,5 +21,17 @@ data class CandidateState(
     /** 跨页全量候选（仅候选展开态时由服务层填充，供本地分页与单字筛选）。
      *  空列表 = 未填充或引擎无候选。全局索引用于 selectCandidateByGlobalIndex。 */
     val expandedCandidates: List<RimeCandidate> = emptyList(),
+    val expandedCandidatesLoaded: Boolean = false,
+    /** Identity of the native candidate list, independent of displayed preedit text. */
+    val engineRevision: Long = 0L,
     val traceEventId: Int = 0
 )
+
+/** Appending expanded pages or updating suggestions does not change existing candidate identities. */
+internal fun CandidateState.hasSameSelectionSource(current: CandidateState): Boolean =
+    engineRevision == current.engineRevision && inputText == current.inputText &&
+        isShowingRecentClipboard == current.isShowingRecentClipboard &&
+        candidates == current.candidates && candidateComments == current.candidateComments &&
+        candidateActions == current.candidateActions &&
+        expandedCandidates.size <= current.expandedCandidates.size &&
+        expandedCandidates.indices.all { expandedCandidates[it] == current.expandedCandidates[it] }

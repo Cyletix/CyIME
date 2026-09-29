@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui
 
+import com.kingzcheung.xime.service.hasSameSelectionSource
+
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
@@ -42,6 +44,7 @@ class CandidateExpansionContinuityTest {
         val words = List(60) { "词条$it" }
         val candidates = mutableStateOf(com.kingzcheung.xime.service.CandidateState(
             candidates = words.take(15), inputText = "746", preeditText = "pin", isComposing = true,
+            expandedCandidatesLoaded = true,
             expandedCandidates = words.map { com.kingzcheung.xime.rime.RimeCandidate(it, "") },
         ))
         var selected = -1
@@ -50,6 +53,7 @@ class CandidateExpansionContinuityTest {
                 MaterialTheme {
                     KeyboardView(vm, KeyboardUiState(currentSchemaId = "t9_pinyin"),
                         KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {},
+                            isCandidateSnapshotCurrent = { it.hasSameSelectionSource(candidates.value) },
                             onGlobalCandidateSelect = { selected = it }),
                         modifier = Modifier.size(360.dp, 240.dp).testTag("candidate-test-keyboard"), candidateState = candidates)
                 }
@@ -62,6 +66,12 @@ class CandidateExpansionContinuityTest {
         val list = rule.onNodeWithTag("expanded-candidates").fetchSemanticsNode().boundsInRoot
         assertTrue("Expansion must include the former bottom row", list.height > delete.height * 3.5f)
         rule.onNodeWithContentDescription("回车").assertIsDisplayed()
+        rule.runOnIdle { vm.toggleSingleCharFilter() }
+        rule.onAllNodes(SemanticsMatcher("header candidates") {
+            (it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag) ?: "").startsWith("bar-candidate:")
+        }).assertCountEquals(0)
+        rule.onNodeWithTag("expanded-candidate:0").assertDoesNotExist()
+        rule.runOnIdle { vm.toggleSingleCharFilter() }
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
         File(context.getExternalFilesDir(null), "candidate-full-panel.png").outputStream().use {
             rule.onNodeWithTag("candidate-test-keyboard").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
@@ -72,7 +82,14 @@ class CandidateExpansionContinuityTest {
         assertTrue(bars.isNotEmpty())
         val prefixCount = bars.size
         for (i in 0 until prefixCount) rule.onNodeWithTag("expanded-candidate:$i").assertDoesNotExist()
-        rule.onNodeWithTag("expanded-candidate:$prefixCount").performTouchInput { click() }
+        rule.onNodeWithTag("expanded-candidate:$prefixCount").performTouchInput { down(center) }
+        rule.runOnIdle {
+            candidates.value = candidates.value.copy(
+                associationCandidates = listOf("无关联想刷新"),
+                expandedCandidates = candidates.value.expandedCandidates + com.kingzcheung.xime.rime.RimeCandidate("补页候选", ""),
+            )
+        }
+        rule.onNodeWithTag("expanded-candidate:$prefixCount").performTouchInput { up() }
         rule.runOnIdle { assertEquals(prefixCount, selected); assertFalse(vm.candidatePageExpanded.value) }
         rule.onNodeWithTag("expanded-candidates").assertDoesNotExist()
     }

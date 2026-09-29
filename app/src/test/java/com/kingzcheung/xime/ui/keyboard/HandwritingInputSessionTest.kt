@@ -12,6 +12,16 @@ import org.junit.Test
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class HandwritingInputSessionTest {
+    @Test fun clearGestureDiscardsInkWithoutRecognitionOrDocumentAction() = runTest {
+        val f = Fixture(this)
+        f.stroke()
+        f.session.press("clear_all")
+        advanceUntilIdle()
+        assertFalse(f.session.hasInk)
+        assertEquals(listOf("begin"), f.events)
+        assertTrue(f.windows.isEmpty())
+    }
+
     private class Fixture(scope: TestScope, slow: Boolean = false) {
         val events = mutableListOf<String>()
         val windows = mutableListOf<Int>()

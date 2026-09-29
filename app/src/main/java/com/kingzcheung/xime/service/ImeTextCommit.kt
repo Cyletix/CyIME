@@ -222,7 +222,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 service.t9PartialSegments.clear()
                 if (isT9) {
                     // 引擎已在九键 FIFO 清空，仅重置本地显示，不得在队列末尾再清一次。
-                    service.keyboardCallbacks?.onT9ResetAfterLiteralCommit?.invoke()
+                    service.keyboardCallbacks?.onT9CompositionCleared?.invoke()
                     service.uiState.value = service.uiState.value.copy(
                         t9RightCandidateSelectedCount = 0,
                         t9SelectedCandidatePinyin = "",

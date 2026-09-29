@@ -57,7 +57,10 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
             else it.copy(preeditText = active.preview, candidates = active.candidates, hasNextPage = false, hasPrevPage = false)
         }
         val owner = service.uiState.value.inputSessionId
-        withContext(Dispatchers.Main) { if (owner == service.uiState.value.inputSessionId) service.sessionController.updateUIWithResult(result) }
+        withContext(Dispatchers.Main) {
+            InputCommandOwner.requireOwner().requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
+            if (owner == service.uiState.value.inputSessionId) service.sessionController.updateUIWithResult(result)
+        }
     }
     suspend fun cancel() { conversion = null; show() }
     suspend fun commit(index: Int? = null): Boolean {
@@ -66,13 +69,7 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
         val text = active.preview
         val owner = session
         conversion = null
-        engine.clearComposition()
-        withContext(Dispatchers.Main) {
-            if (owner == service.uiState.value.inputSessionId) {
-                service.commitText(text)
-                service.sessionController.updateUIWithResult(engine.getProcessResult(true))
-            }
-        }
+        if (owner == service.uiState.value.inputSessionId) service.keyRouter.commitSelectedText(text)
         return true
     }
     suspend fun prepareKana(modify: Boolean) { if (current() != null) { if (modify) cancel() else commit() } }

@@ -40,4 +40,22 @@ class InputReadinessTest {
         assertFalse(gate.accepts(old))
         assertTrue(gate.accepts(gate.ticket()!!))
     }
+    @Test fun editorSwitchInvalidatesQueuedKeysWithoutDisablingNewInput() {
+        val gate = InputReadiness()
+        gate.completeStartup()
+        val old = gate.ticket()!!
+        gate.newEditorSession()
+        assertFalse(gate.accepts(old))
+        assertTrue(gate.accepts(gate.ticket()!!))
+    }
+    @Test fun destroyedServiceCannotBeReopenedByLateDeploymentCompletion() {
+        val gate = InputReadiness()
+        gate.completeStartup()
+        val old = gate.ticket()!!
+        gate.close()
+        gate.completeStartup()
+        gate.deployment(false)
+        assertNull(gate.ticket())
+        assertFalse(gate.accepts(old))
+    }
 }

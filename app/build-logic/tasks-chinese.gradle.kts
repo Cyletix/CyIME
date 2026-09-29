@@ -25,6 +25,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("files", chineseTopFiles)
     inputs.property("qwjrtkPreset", 1)
     inputs.property("t9EnglishIndex", 2)
+    inputs.property("measuredNeighborCorrection", 1)
     outputs.dir(chineseRoot)
     doLast {
         val archive = File(rootProject.projectDir, ".gradle/chinese-data/$chineseRevision.zip")
@@ -83,7 +84,10 @@ val prepareChineseDictionaries by tasks.registering {
             english.values.joinToString("\n", postfix = "\n"))
 
         // Same engine, dictionary and options as Chinese26; only the keyboard arrangement differs.
-        val baseSchema = File(root, "rime_ice.schema.yaml").readText()
+        val baseSchema = File(root, "rime_ice.schema.yaml").readText().replace("\ntranslator:\n",
+            "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
+        check(baseSchema.contains("cyime_neighbor_correction: true"))
+        File(root, "rime_ice.schema.yaml").writeText(baseSchema)
         File(root, "pinyin_qwjrtk.schema.yaml").writeText(baseSchema
             .replace("schema_id: rime_ice", "schema_id: pinyin_qwjrtk")
             .replace("name: 雾凇拼音", "name: QWJRTK（双拇指）"))
