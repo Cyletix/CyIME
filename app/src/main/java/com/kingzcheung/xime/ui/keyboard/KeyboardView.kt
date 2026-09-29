@@ -248,7 +248,7 @@ fun KeyboardView(
         ?: if (state.isDarkTheme) longToColor(kbColors.keyTextColorDark)
         else longToColor(kbColors.keyTextColor)
     val accentColor = KeyboardThemes.getAccentColor(state.themeId, state.isDarkTheme)
-    val themeScheme = KeyboardThemes.getThemeById(state.themeId)
+    val themeScheme = KeyboardThemes.getRenderingScheme(state.themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(state.themeId, state.isDarkTheme)
     val specialKeyBgColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(
         themeScheme, state.isDarkTheme,
@@ -866,6 +866,7 @@ fun KeyboardView(
                         railPinyinOptions = railPinyinOptions,
                         railSelectedPinyinIndex = railSelectedPinyinIndex,
                         railAccentColor = accentColor,
+                        enterKeyText = state.enterKeyText,
                     ),
                     callbacks = CandidatePageCallbacks(
                         onCandidateSelect = { entry ->
@@ -915,7 +916,6 @@ fun KeyboardView(
                             }
                         },
                         onDelete = {
-                            onHapticFeedback?.invoke()
                             if (isT9Layout) {
                                 // 与九键键盘本体退格键（T9KeyboardLayout.handleDelete）
                                 // 完全同路径：T9 撤销模型（删未分配数字/撤销左栏选择/
@@ -938,11 +938,17 @@ fun KeyboardView(
                         },
                         onClear = { callbacks.onKeyPress("clear_all", false) },
                         onEnter = {
-                            onHapticFeedback?.invoke()
                             callbacks.onKeyPress("enter", false)
                         },
+                        onKeyPressDown = callbacks.onKeyPressDown,
+                        onKeyRelease = callbacks.onKeyRelease,
+                        onClearComposition = { callbacks.onKeyPress("clear_composition", false) },
+                        onUndoClear = { callbacks.onKeyPress("undo_clear", false) },
                     ),
                     pageScrollEvents = viewModel.expandedPageScrollEvents,
+                    shadowEnabled = kbShadow.enabled,
+                    shadowElevation = kbShadow.elevation.dp,
+                    shadowShapeRadius = kbShadow.shapeRadius.dp,
                     onHapticFeedback = onHapticFeedback,
                     modifier = Modifier.fillMaxSize()
                 )

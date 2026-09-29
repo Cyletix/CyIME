@@ -57,6 +57,8 @@ class PinyinDeletionWorkflowTest {
             shell("ime set $ime")
             rule.setContent {
                 AndroidView(factory = { EditText(it).also { view ->
+                    view.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                    view.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_ENTER_ACTION
                     editor = view; view.setText("正文"); view.setSelection(view.text.length)
                 } }, modifier = Modifier.fillMaxWidth().height(80.dp))
             }
@@ -69,6 +71,21 @@ class PinyinDeletionWorkflowTest {
                 rule.waitUntil(5000) { rule.onAllNodesWithTag("candidate-preedit").fetchSemanticsNodes().isNotEmpty() }
             }
             fun document(): String { var text = ""; rule.runOnUiThread { text = editor.text.toString() }; return text }
+            // Raw pinyin confirmation consumes one Enter. Only a second Enter adds a newline.
+            for (letter in "hello") rule.onNodeWithTag("qwerty-key:$letter").performTouchInput { click() }
+            rule.waitUntil(5000) { engine.getInput() == "hello" }
+            rule.onNodeWithTag("qwerty-enter-key").performTouchInput { click() }
+            rule.waitUntil(5000) { engine.getInput().isEmpty() }
+            assertEquals("正文hello", document())
+            rule.onNodeWithTag("qwerty-enter-key").performTouchInput { click() }
+            rule.waitUntil(5000) { document() == "正文hello\n" }
+            // Engine input can precede candidate UI publication. It is still input,
+            // never permission to send a newline to the editor.
+            assertTrue(engine.setInput("world"))
+            rule.onNodeWithTag("qwerty-enter-key").performTouchInput { click() }
+            rule.waitUntil(5000) { document() == "正文hello\nworld" }
+            rule.waitUntil(5000) { engine.getInput().isEmpty() }
+            rule.runOnUiThread { editor.setText("正文"); editor.setSelection(editor.text.length) }
             type()
             for (remaining in listOf("gg", "g", "")) {
                 rule.onNodeWithTag("qwerty-delete-key").performTouchInput { click() }
@@ -86,6 +103,13 @@ class PinyinDeletionWorkflowTest {
             assertTrue("measured software keyboard must enable adjacent s→a", engine.getAllCandidates(300).any { it.text == "你好" })
             for (letter in "nihso") rule.onNodeWithTag("qwerty-delete-key").performTouchInput { click() }
             rule.waitUntil(5000) { engine.getInput().isEmpty() }
+            type()
+            rule.onNodeWithTag("candidate-expansion").performTouchInput { click() }
+            rule.waitUntil(5000) { rule.onAllNodesWithTag("expanded-delete-key").fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithTag("expanded-enter-key").performTouchInput { click() }
+            rule.waitUntil(5000) { engine.getInput().isEmpty() }
+            assertEquals("正文ggd", document())
+            rule.runOnUiThread { editor.setText("正文"); editor.setSelection(editor.text.length) }
             type()
             rule.onNodeWithTag("candidate-expansion").performTouchInput { click() }
             rule.waitUntil(5000) { rule.onAllNodesWithTag("expanded-delete-key").fetchSemanticsNodes().isNotEmpty() }

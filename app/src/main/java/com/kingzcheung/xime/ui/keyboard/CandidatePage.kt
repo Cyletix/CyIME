@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -26,7 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -108,6 +110,7 @@ data class CandidatePageState(
     val railSelectedPinyinIndex: Int = -1,
     /** 拼音选中胶囊强调色（对齐九键 CandidateItem）；Unspecified 时用 textColor 兜底 */
     val railAccentColor: Color = Color.Unspecified,
+    val enterKeyText: String = "回车",
 )
 
 /**
@@ -131,6 +134,10 @@ data class CandidatePageCallbacks(
     val onDelete: (() -> Unit)? = null,
     val onClear: (() -> Unit)? = null,
     val onEnter: (() -> Unit)? = null,
+    val onKeyPressDown: ((String) -> Unit)? = null,
+    val onKeyRelease: ((String) -> Unit)? = null,
+    val onClearComposition: (() -> Unit)? = null,
+    val onUndoClear: (() -> Unit)? = null,
 )
 
 /** 左栏快捷符号（对齐主流输入法候选展开页的符号栏）。 */
@@ -160,6 +167,9 @@ fun CandidatePage(
     modifier: Modifier = Modifier,
     pageScrollEvents: Flow<Int>? = null,
     onHapticFeedback: (() -> Unit)? = null,
+    shadowEnabled: Boolean = true,
+    shadowElevation: Dp = 1.dp,
+    shadowShapeRadius: Dp = 8.dp,
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape =
@@ -388,11 +398,22 @@ fun CandidatePage(
                         icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
                         onClick = { callbacks.onDelete?.invoke() },
                         onLongClick = callbacks.onDelete,
+                        onPress = { callbacks.onKeyPressDown?.invoke("delete") },
+                        onRelease = { callbacks.onKeyRelease?.invoke("delete") },
+                        swipeText = "清空",
+                        onSwipe = callbacks.onClearComposition,
+                        swipeUpLabel = "上滑清空",
+                        swipeDownLabel = "下滑撤回",
                         onSwipeUp = callbacks.onClear,
-                        backgroundColor = keyBg, iconColor = state.textColor,
+                        onSwipeDown = callbacks.onUndoClear,
+                        onSwipeLeft = callbacks.onClearComposition,
+                        backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
+                        iconColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
                         modifier = railKeyModifier.semantics { contentDescription = "退格" }
                             .testTag("expanded-delete-key"),
-                        visualPadding = PaddingValues(0.dp), shadowEnabled = false,
+                        shadowEnabled = shadowEnabled,
+                        shadowElevation = shadowElevation,
+                        shadowShapeRadius = shadowShapeRadius,
                     )
                     RailKey(
                         onClick = {
@@ -426,19 +447,18 @@ fun CandidatePage(
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    RailKey(
+                    ActionKeyButton(
+                        text = state.enterKeyText,
                         onClick = { callbacks.onEnter?.invoke() },
-                        keyBg = keyBg,
-                        modifier = railKeyModifier,
-                        enabled = callbacks.onEnter != null
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardReturn,
-                            contentDescription = "回车",
-                            tint = state.textColor,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                        backgroundColor = keyBg,
+                        textColor = state.textColor,
+                        modifier = railKeyModifier.testTag("expanded-enter-key"),
+                        onPress = { callbacks.onKeyPressDown?.invoke("enter") },
+                        onRelease = { callbacks.onKeyRelease?.invoke("enter") },
+                        shadowEnabled = shadowEnabled,
+                        shadowElevation = shadowElevation,
+                        shadowShapeRadius = shadowShapeRadius,
+                    )
                 }
             }
 
@@ -765,6 +785,7 @@ private fun RailKey(
                     else -> keyBg
                 }
             )
+            .visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current)
             .tolerantClick(
                 enabled = enabled,
                 showRipple = false,

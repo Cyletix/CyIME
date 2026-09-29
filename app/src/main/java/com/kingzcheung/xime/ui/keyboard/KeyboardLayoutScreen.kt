@@ -46,7 +46,7 @@ fun KeyboardLayoutScreen(
     }
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
-    val themeScheme = KeyboardThemes.getThemeById(uiState.themeId)
+    val themeScheme = KeyboardThemes.getRenderingScheme(uiState.themeId)
     val themeBgColor =
         themeScheme.keyboardBackground?.let { resolveSolidColor(it, uiState.isDarkTheme) }
     val keyboardBgColor = themeBgColor ?: KeyboardThemes.getKeyboardBackgroundColor(

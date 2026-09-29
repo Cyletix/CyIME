@@ -128,6 +128,7 @@ object KeyboardThemes {
 
     /** 重新加载 xime.yaml/xime.custom.yaml 中的配色方案并更新缓存。 */
     fun reload(context: Context) {
+        VisualStyles.current = com.kingzcheung.xime.settings.SettingsPreferences.getVisualStyle(context)
         configOverrides = KeysConfigHelper.loadColorSchemes(context)
         // 1) 对硬编码主题应用配置覆盖
         val overridden = defaultThemes.map { applyConfigOverrides(context, it) }
@@ -450,25 +451,29 @@ object KeyboardThemes {
         return themesMapCache[id] ?: cache[0]
     }
 
+    /** Rendering overrides do not change the stored theme or the theme catalogue. */
+    fun getRenderingScheme(id: String): KeyboardColorScheme =
+        VisualStyles.palette(VisualStyles.current) ?: getThemeById(id)
+
     fun getSpecialKeyColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.specialKeyDark else theme.specialKeyLight
     }
 
     fun getAccentColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.accentDark else theme.accentLight
     }
 
     /** 特殊键文字颜色：暗色用强调色，亮色用更深的版本以提高对比度。 */
     fun getEnterKeyColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.enterKeyDark ?: theme.specialKeyDark
         else theme.enterKeyLight ?: theme.specialKeyLight
     }
 
     fun getSpecialKeyTextColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         (if (isDark) theme.specialKeyTextColorDark else theme.specialKeyTextColorLight)?.let { return it }
         val accent = getAccentColor(themeId, isDark)
         return if (isDark) accent else Color(
@@ -477,60 +482,60 @@ object KeyboardThemes {
     }
 
     fun getPrimaryColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.primaryDark else theme.primaryLight
     }
 
     fun getPrimaryContainerColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.primaryContainerDark else theme.primaryContainerLight
     }
 
     fun getSurfaceColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.surfaceDark else theme.surfaceLight
     }
 
     fun getKeyboardBackgroundColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.keyboardBgDark else theme.keyboardBgLight
     }
 
     fun getKeyBackgroundColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.keyBgDark else theme.keyBgLight
     }
 
     fun getCandidateBarBackgroundColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.candidateBarBgDark else theme.candidateBarBgLight
     }
 
     fun getKeyTextColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.keyTextColorDark else theme.keyTextColorLight
     }
 
     fun getCandidateTextColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.candidateTextColorDark else theme.candidateTextColorLight
     }
 
     /** 候选选中文字色，未显式配置时回退到按键文字色。 */
     fun getCandidateSelectedTextColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.candidateSelectedTextColorDark else theme.candidateSelectedTextColorLight
     }
 
     fun getDividerColor(themeId: String, isDark: Boolean): Color {
-        val theme = getThemeById(themeId)
+        val theme = getRenderingScheme(themeId)
         return if (isDark) theme.dividerColorDark else theme.dividerColorLight
     }
 
     /** 完整调色板直接从主题缓存取色，避免固定蓝和低版本回退又混入旧全局颜色。 */
     private inline fun dynamicThemeColor(themeId: String, selector: (KeyboardColorScheme) -> Color): Color? {
         // 从状态化缓存查找以建立 Compose 订阅：缓存整体替换后 UI 自动重组
-        val theme = themesCache.firstOrNull { it.id == themeId } ?: return null
+        val theme = VisualStyles.palette(VisualStyles.current) ?: themesCache.firstOrNull { it.id == themeId } ?: return null
         if (!theme.isDynamic && !theme.useThemeColors) return null
         return selector(theme)
     }

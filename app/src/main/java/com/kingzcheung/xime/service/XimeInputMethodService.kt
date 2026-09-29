@@ -394,7 +394,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (uiState.value.showKeyboardResize) {
             // 编辑事务的几何不从偏好回灌；确认写完后统一恢复普通读取。
             uiState.value = uiState.value.copy(
-                darkMode = SettingsPreferences.getDarkMode(this),
+                darkMode = SettingsPreferences.getEffectiveDarkMode(this),
                 themeId = SettingsPreferences.getKeyboardTheme(this),
                 toolbarButtons = SettingsPreferences.getToolbarButtons(this),
                 isSttEnabled = SettingsPreferences.isSttEnabled(this),
@@ -438,7 +438,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val clampedY = loadedY.coerceIn(minY, maxY)
         // 越界只在当前视口中夹紧，不让一次配置/主题刷新改写另一个方向的保存位置。
         uiState.value = uiState.value.copy(
-            darkMode = SettingsPreferences.getDarkMode(this),
+            darkMode = SettingsPreferences.getEffectiveDarkMode(this),
             themeId = SettingsPreferences.getKeyboardTheme(this),
             isSttEnabled = SettingsPreferences.isSttEnabled(this@XimeInputMethodService),
             keyboardHeightDp = kbH,
@@ -465,7 +465,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     } else initRimeEngine()
                 }
                 com.kingzcheung.xime.settings.CustomKeyboardLayouts.REVISION -> schemaController.applyCustomLayouts()
-                SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
+                SettingsPreferences.KEY_VISUAL_STYLE, SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
+                    com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this@XimeInputMethodService)
                     loadDarkModePreference()
                     applyWindowBackground()
                 }
@@ -526,6 +527,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     fun isDarkTheme(): Boolean {
+        com.kingzcheung.xime.ui.theme.VisualStyles.current.dark?.let { return it }
         return when (uiState.value.darkMode) {
             DARK_MODE_DARK -> true
             DARK_MODE_SYSTEM -> {
@@ -1321,7 +1323,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         val accentCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getAccentColor(state.themeId, isDark)
                         val selectedTextCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getCandidateSelectedTextColor(state.themeId, isDark)
                         val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
-                        val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(state.themeId)
+                        val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
                         if (state.isCompact && (cand.candidates.isNotEmpty() || cand.isShowingRecentClipboard || cand.inputText.isNotEmpty())) {
                             HardwareKeyboardCandidateBar(
                                 inputText = cand.inputText,
@@ -2167,7 +2169,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val state = uiState.value
         val isDark = isDarkTheme()
         try {
-            val theme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(state.themeId)
+            val theme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
             // 图片背景无法映射到 window 层，用主题主色作为导航栏/窗口兜底色；
             // solid / gradient 用解析出的键盘背景兜底色。
             val bgColor = if (theme.keyboardBackground?.type == "image") {

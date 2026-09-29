@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -13,6 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.unit.dp
@@ -34,6 +40,7 @@ class EditKeyboardLayoutTest {
 
     private fun setPanel() {
         rule.setContent {
+          CompositionLocalProvider(LocalDensity provides Density(1f)) {
             Box(Modifier.fillMaxSize().clickable { }, contentAlignment = Alignment.Center) {
                 EditKeyboardLayout(
                     onAction = { actions += it }, onBack = {},
@@ -43,22 +50,23 @@ class EditKeyboardLayoutTest {
                     shadowEnabled = false,
                 )
             }
+          }
         }
     }
 
-    @Test fun circleAndCentreSquareKeepTheirMinimumHeightSizeAndLabelsStayClear() {
+    @Test fun circleAndCentreSquareGrowWithPanelAndLabelsStayClear() {
         setPanel()
         var initialPad = 0f
         var initialCentre = 0f
-        for (height in listOf(184.dp, 280.dp, 400.dp)) {
-            rule.runOnIdle { panelHeight.value = height }
+        for ((width, height) in listOf(320.dp to 144.dp, 480.dp to 280.dp, 640.dp to 400.dp)) {
+            rule.runOnIdle { panelWidth.value = width; panelHeight.value = height }
             val pad = rule.onNodeWithTag("editor-direction-pad", true).fetchSemanticsNode().boundsInRoot
             val centre = rule.onNodeWithContentDescription("选择").fetchSemanticsNode().boundsInRoot
             assertEquals(pad.width, pad.height, 1f)
             assertEquals(centre.width, centre.height, 1f)
-            if (initialPad == 0f) { initialPad = pad.width; initialCentre = centre.width }
-            assertEquals(initialPad, pad.width, 1f)
-            assertEquals(initialCentre, centre.width, 1f)
+            assertTrue("pad grows with available panel", pad.width > initialPad)
+            assertTrue("centre grows with available panel", centre.width > initialCentre)
+            initialPad = pad.width; initialCentre = centre.width
             val corners = listOf("段首", "段尾", "复制", "粘贴")
             for (label in corners) {
                 val key = rule.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
@@ -93,7 +101,10 @@ class EditKeyboardLayoutTest {
         rule.onNodeWithContentDescription("选择").performClick()
         rule.onNodeWithContentDescription("段首").performClick()
         rule.onNodeWithContentDescription("段尾").performClick()
-        rule.onNodeWithContentDescription("向左").performClick()
+        // A sector's bounding-box centre belongs to Select, not to the arrow.
+        rule.onNodeWithContentDescription("向左").performTouchInput {
+            click(Offset(width / 6f, height / 2f))
+        }
         rule.onNodeWithContentDescription("取消选择").performClick()
         rule.onNodeWithContentDescription("段首").performClick()
         rule.runOnIdle {

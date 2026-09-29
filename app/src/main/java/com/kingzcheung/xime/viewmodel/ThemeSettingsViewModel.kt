@@ -31,6 +31,7 @@ class ThemeSettingsViewModel(application: Application) : AndroidViewModel(applic
     }
     
     fun setColorTheme(themeId: String) {
+        SettingsPreferences.setVisualStyle(context, com.kingzcheung.xime.ui.theme.VisualStyle.ORIGINAL)
         SettingsPreferences.setKeyboardTheme(context, themeId)
         _uiState.update { it.copy(colorTheme = themeId) }
     }

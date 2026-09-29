@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -182,6 +185,7 @@ fun MenuItemButton(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
+            .visualMaterial(VisualStyles.current, 12.dp, panel = true)
             .clickable { item.action() }
             .semantics { item.currentState?.let { stateDescription = it } }
             .padding(4.dp),

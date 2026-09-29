@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -68,6 +69,45 @@ class DeletionAndEdgeTouchTest {
                 Modifier.size(360.dp, 240.dp))
         } }
         checkHold("expanded-delete-key") { count }
+    }
+
+    @Test fun expandedActionKeysUsePressReleaseFeedbackAndEqualBounds() {
+        val events = mutableListOf<String>()
+        val panelHeight = mutableStateOf(144.dp)
+        rule.setContent { MaterialTheme {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                CandidatePage(CandidatePageState(backgroundColor = Color.Black, textColor = Color.White,
+                    enterKeyText = "发送"),
+                    CandidatePageCallbacks(onCandidateSelect = {},
+                        onDelete = { events += "delete" }, onEnter = { events += "enter" },
+                        onKeyPressDown = { events += "down:$it" },
+                        onKeyRelease = { events += "up:$it" }),
+                    Modifier.size(360.dp, panelHeight.value).testTag("expanded-feedback-preview"))
+            }
+        } }
+        for (height in listOf(144.dp, 300.dp)) {
+            rule.runOnIdle { panelHeight.value = height; events.clear() }
+            val delete = rule.onNodeWithTag("expanded-delete-key").fetchSemanticsNode().boundsInRoot
+            val enter = rule.onNodeWithTag("expanded-enter-key").fetchSemanticsNode().boundsInRoot
+            assertEquals(delete.width, enter.width, 1f)
+            assertEquals(delete.height, enter.height, 1f)
+            rule.onNodeWithTag("expanded-enter-key").assertIsDisplayed()
+            rule.onNodeWithContentDescription("发送").assertExists()
+            rule.onNodeWithTag("expanded-delete-key").performTouchInput { click() }
+            rule.onNodeWithTag("expanded-enter-key").performTouchInput { click() }
+            rule.runOnIdle {
+                for (key in listOf("delete", "enter")) {
+                    assertEquals(1, events.count { it == key })
+                    assertEquals(1, events.count { it == "down:$key" })
+                    assertEquals(1, events.count { it == "up:$key" })
+                }
+            }
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        java.io.File(context.getExternalFilesDir(null), "expanded-feedback-preview.png").outputStream().use {
+            rule.onNodeWithTag("expanded-feedback-preview").captureToImage().asAndroidBitmap()
+                .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
     }
 
     @Test fun handwritingDeleteRepeatsInNormalAndFullScreenPanels() {

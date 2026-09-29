@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -76,15 +75,11 @@ fun EditKeyboardLayout(
     ) {
         Column(bodyModifier.fillMaxSize().background(backgroundColor).padding(horizontal = 2.dp)) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val config = LocalConfiguration.current
-                val landscape = config.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                val minimumBody = (keyboardHeightBounds(config.screenHeightDp, landscape).first - 44 - bottomPaddingDp).coerceAtLeast(96).dp
                 val cellWidth = maxWidth / 5
                 val cellHeight = maxHeight / 3
-                // Resizing the keyboard only stretches the surrounding cells. The pad,
-                // its square centre key, glyphs and gaps all use the minimum-height baseline.
-                val baseline = minOf(minimumBody, maxHeight)
-                val padDiameter = minOf(cellWidth * 3 * .75f, baseline)
+                // Scale with the actual panel, including resized and floating tablet panels.
+                // Reserve the outer columns and space for the four corner actions.
+                val padDiameter = minOf(cellWidth * 3 * .75f, maxHeight)
                 // 编辑盘自成一格：按 pad 自己的格尺寸算度量（不套主体键宽上限/gutter）
                 val padMetrics = keyVisualMetrics(
                     policy = KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f),
