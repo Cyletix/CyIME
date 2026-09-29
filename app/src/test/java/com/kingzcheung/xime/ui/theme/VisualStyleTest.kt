@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.compositeOver
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -14,10 +15,11 @@ class VisualStyleTest {
         assertEquals(4, styles.size)
         styles.forEach { style ->
             val palette = requireNotNull(VisualStyles.palette(style))
-            assertTrue(style.id, contrast(palette.keyTextColorLight, palette.keyBgLight) >= 4.5f)
-            assertTrue(style.id, contrast(palette.keyTextColorLight, palette.specialKeyLight) >= 4.5f)
+            assertTrue(style.id, contrast(palette.keyTextColorLight, palette.keyBgLight.compositeOver(palette.keyboardBgLight)) >= 4.5f)
+            assertTrue(style.id, contrast(palette.keyTextColorLight, palette.specialKeyLight.compositeOver(palette.keyboardBgLight)) >= 4.5f)
             assertTrue(style.id, contrast(palette.candidateTextColorLight, palette.keyboardBgLight) >= 4.5f)
-            assertEquals(1f, palette.keyBgLight.alpha, 0f)
+            assertEquals(1f, palette.keyboardBgLight.alpha, 0f)
+            if (style == VisualStyle.GLASS) assertTrue(palette.keyBgLight.alpha < .4f)
         }
     }
 

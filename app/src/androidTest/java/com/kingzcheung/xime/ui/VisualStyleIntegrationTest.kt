@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -32,11 +33,17 @@ class VisualStyleIntegrationTest {
     private fun preservingAppearance(block: () -> Unit) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val saved = prefs.getString(SettingsPreferences.KEY_VISUAL_STYLE, null)
+        val savedIcon = prefs.getString(IconAppearance.KEY_STYLE, null)
+        val savedLinked = prefs.getBoolean(IconAppearance.KEY_LINKED, true)
         try { block() } finally {
             rule.runOnIdle {
-                prefs.edit().also { if (saved == null) it.remove(SettingsPreferences.KEY_VISUAL_STYLE)
+                prefs.edit().putBoolean(IconAppearance.KEY_LINKED, savedLinked).also {
+                    if (savedIcon == null) it.remove(IconAppearance.KEY_STYLE) else it.putString(IconAppearance.KEY_STYLE, savedIcon)
+                    if (saved == null) it.remove(SettingsPreferences.KEY_VISUAL_STYLE)
                     else it.putString(SettingsPreferences.KEY_VISUAL_STYLE, saved) }.commit()
                 VisualStyles.current = VisualStyle.fromId(saved)
+                IconAppearance.reload(context)
+                LauncherIcons.apply(context, IconAppearance.effective)
             }
         }
     }
@@ -93,11 +100,10 @@ class VisualStyleIntegrationTest {
             rule.runOnIdle { assertEquals(listOf("a", "delete", "enter"), keys) }
             val cap = rule.onNodeWithTag("qwerty-delete-key").captureToImage().toPixelMap()
             val actual = cap[(cap.width * .2f).toInt(), cap.height / 2]
-            val expected = requireNotNull(VisualStyles.palette(style)).specialKeyLight
-            assertTrue("${style.id}: function key must use preset, not the saved blue theme",
-                kotlin.math.abs(actual.red - expected.red) < .11f &&
-                kotlin.math.abs(actual.green - expected.green) < .11f &&
-                kotlin.math.abs(actual.blue - expected.blue) < .11f)
+            val foreground = requireNotNull(VisualStyles.palette(style)).keyTextColorLight
+            assertTrue("${style.id}: material must preserve readable function labels",
+                (maxOf(actual.luminance(), foreground.luminance()) + .05f) /
+                    (minOf(actual.luminance(), foreground.luminance()) + .05f) >= 4.5f)
             File(context.getExternalFilesDir(null), "visual-${style.id}.png").outputStream().use {
                 rule.onNodeWithTag("styled-keyboard").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
             }

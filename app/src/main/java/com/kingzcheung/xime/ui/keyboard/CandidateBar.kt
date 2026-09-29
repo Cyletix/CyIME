@@ -343,8 +343,11 @@ fun CandidateBar(
                         } else {
                             KeyboardToolbarButton({ callbacks.onLogoClick?.invoke() }, iconButtonContainer,
                                 modifier = Modifier.testTag("toolbar-leading")) {
-                                Icon(painterResource(id = if (visuals.isDarkTheme) R.drawable.logo_dark else R.drawable.logo),
-                                    contentDescription = "CyIME Logo", tint = Color.Unspecified, modifier = Modifier.size(20.dp))
+                                val iconStyle = com.kingzcheung.xime.ui.theme.IconAppearance.effective
+                                if (iconStyle == com.kingzcheung.xime.ui.theme.VisualStyle.ORIGINAL) {
+                                    Icon(painterResource(id = if (visuals.isDarkTheme) R.drawable.logo_dark else R.drawable.logo),
+                                        contentDescription = "CyIME Logo", tint = Color.Unspecified, modifier = Modifier.size(20.dp))
+                                } else com.kingzcheung.xime.ui.theme.CyimeGeneratedIcon(iconStyle, Modifier.size(26.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(4.dp))

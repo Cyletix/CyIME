@@ -43,6 +43,11 @@ fun ThemeSettingsContent(
     val viewModel: ThemeSettingsViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showIconSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    if (showIconSettings) {
+        IconSettingsContent(onBack = { showIconSettings = false }, onChanged = onThemeChanged)
+        return
+    }
     
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -74,9 +79,13 @@ fun ThemeSettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
+                androidx.compose.material3.OutlinedButton(onClick = { showIconSettings = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("图标设置 · " + if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择")
+                }
+            }
+            item {
                 VisualStylePicker(VisualStyles.current) { style ->
-                    SettingsPreferences.setVisualStyle(context, style)
-                    onThemeChanged()
+                    changeAppearance(context, onThemeChanged) { SettingsPreferences.setVisualStyle(context, style) }
                 }
             }
             item {
@@ -99,8 +108,7 @@ fun ThemeSettingsContent(
                         theme = currentTheme,
                         isSelected = uiState.darkMode == 2,
                         onClick = {
-                            viewModel.setDarkMode(2)
-                            onThemeChanged()
+                            changeAppearance(context, onThemeChanged) { viewModel.setDarkMode(2) }
                         },
                         modifier = Modifier.weight(1f),
                         title = "跟随系统"
@@ -111,8 +119,7 @@ fun ThemeSettingsContent(
                         isSelected = uiState.darkMode == 0,
                         previewDark = false,
                         onClick = {
-                            viewModel.setDarkMode(0)
-                            onThemeChanged()
+                            changeAppearance(context, onThemeChanged) { viewModel.setDarkMode(0) }
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -122,8 +129,7 @@ fun ThemeSettingsContent(
                         isSelected = uiState.darkMode == 1,
                         previewDark = true,
                         onClick = {
-                            viewModel.setDarkMode(1)
-                            onThemeChanged()
+                            changeAppearance(context, onThemeChanged) { viewModel.setDarkMode(1) }
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -191,9 +197,10 @@ fun ThemeSettingsContent(
             ThemePreviewSheet(
                 theme = theme,
                 onApply = {
-                    viewModel.setColorTheme(theme.id)
-                    previewTheme = null
-                    onThemeChanged()
+                    changeAppearance(context, onThemeChanged) {
+                        viewModel.setColorTheme(theme.id)
+                        previewTheme = null
+                    }
                 },
                 onDismiss = { previewTheme = null },
             )

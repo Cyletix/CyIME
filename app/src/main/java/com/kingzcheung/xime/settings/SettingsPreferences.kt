@@ -398,8 +398,7 @@ object SettingsPreferences {
         getPrefs(context).getString(KEY_VISUAL_STYLE, null))
 
     fun setVisualStyle(context: Context, style: com.kingzcheung.xime.ui.theme.VisualStyle) {
-        com.kingzcheung.xime.ui.theme.VisualStyles.current = style
-        getPrefs(context).edit().putString(KEY_VISUAL_STYLE, style.id).apply()
+        com.kingzcheung.xime.ui.theme.IconAppearance.setKeyboardStyle(context, style)
     }
     
     fun setKeyboardTheme(context: Context, themeId: String) {
