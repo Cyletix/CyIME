@@ -50,7 +50,7 @@ class LuaTypingStatsTest {
             store,
             cryptoHostApi = MockCrypto()
         )
-        runtime.initEvents(setOf(PluginEvent.TYPE_INPUT_CHANGED, PluginEvent.TYPE_TEXT_COMMITTED))
+        runtime.initEvents(setOf(PluginEvent.TYPE_INPUT_CHANGED, PluginEvent.TYPE_TEXT_COMMITTED, PluginEvent.TYPE_TYPING_TOTALS))
         assertTrue("main.lua 应能加载", runtime.load())
         return runtime
     }
@@ -68,6 +68,63 @@ class LuaTypingStatsTest {
                 )
             )
         )
+    }
+
+    @Test fun classifiedSnapshotsRecoverSkippedEventsAndReloadWithoutCountingPasteOrDuplicates() {
+        val store = InMemoryConfigStore()
+        fun snapshot(runtime: LuaScriptRuntime, count: Int, session: String = "session-a") {
+            assertTrue(runtime.dispatchEvent(PluginEvent(PluginEvent.TYPE_TYPING_TOTALS, mapOf(
+                "counter_session_id" to session, "typed_chars" to count * 2,
+                "typed_commits" to count, "pasted_chars" to count * 100,
+                "pasted_commits" to count,
+            ))))
+            assertTrue(runtime.dispatchEvent(PluginEvent(PluginEvent.TYPE_INPUT_CHANGED, mapOf("input_text" to "n"))))
+        }
+        fun awaitTotals(expected: String) {
+            val deadline = System.nanoTime() + 5_000_000_000L
+            while (store.get("total_chars") != expected && System.nanoTime() < deadline) Thread.sleep(10)
+            assertEquals(expected, store.get("total_chars"))
+        }
+        val first = newRuntime(store)
+        try {
+            repeat(1000) { snapshot(first, it + 1) }
+            awaitTotals("2000")
+            assertEquals("1000", store.get("total_commits"))
+            assertEquals(null, first.eventStreamFailure)
+        } finally { first.close() }
+        val reloaded = newRuntime(store)
+        try {
+            snapshot(reloaded, 1000)
+            snapshot(reloaded, 1003)
+            awaitTotals("2006")
+            snapshot(reloaded, 2, "session-b")
+            awaitTotals("2010")
+            assertEquals("1005", store.get("total_commits"))
+        } finally { reloaded.close() }
+    }
+
+    @Test fun burstOfTypedPastedAndStateEventsCountsOnlyTypedText() {
+        val store = InMemoryConfigStore()
+        val runtime = newRuntime(store)
+        try {
+            var total = 0L
+            repeat(20) { i ->
+                val paste = i % 2 == 1
+                val count = if (paste) 100 else 2
+                total += count
+                assertTrue(runtime.dispatchEvent(PluginEvent(PluginEvent.TYPE_TEXT_COMMITTED, mapOf(
+                    "committed_text" to if (paste) "paste" else "中文",
+                    "committed_char_count" to count,
+                    "session_total_chars" to total,
+                    "session_total_commits" to i + 1,
+                    "is_paste" to paste,
+                ))))
+                assertTrue(runtime.dispatchEvent(PluginEvent(PluginEvent.TYPE_INPUT_CHANGED, mapOf("input_text" to "$i"))))
+            }
+            awaitConsumed(store, total.toString())
+            assertEquals("20", store.get("total_chars"))
+            assertEquals("10", store.get("total_commits"))
+        } finally { runtime.close() }
     }
 
     private fun awaitPanelUi(runtime: LuaScriptRuntime, contains: String): Map<*, *>? {

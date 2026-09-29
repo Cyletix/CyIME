@@ -8,16 +8,15 @@ name: 输入统计
 icon: "统"
 description: 统计打字量（今日/累计字数、提交次数）。基于宿主下行事件，无网络访问。
 
-# 0.3.0：text_committed 事件契约扩展——payload 新增 is_paste（粘贴性质上屏标记），
-# 本插件据此不计粘贴字数；依赖宿主 2.8.1 投递该字段，低于此版本禁用本插件。
-version: 0.3.0
+# 0.3.1：按分类累计快照恢复统计，不依赖逐条文本事件；要求 CyIME 1.2.9。
+version: 0.3.1
 
 type: tool
 activation: multi
 
 entry: main.lua
 
-minHostVersion: 2.8.1
+minHostVersion: 1.2.9
 
 # 工具栏入口
 toolbarButtons:
@@ -33,4 +32,4 @@ capabilities:
     display: passive
   events:
     - input_changed
-    - text_committed
+    - typing_totals

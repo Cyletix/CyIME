@@ -19,13 +19,17 @@ open class LuaPluginAdapter(
     protected val pluginContext: PluginContext
 ) : IPluginEntryClass, IPluginConfigurable {
 
-    override fun getSettingsSchema(): List<UiNode> {
-        val result = runtime.call("getSettingsSchema")
-        if (!result.istable()) return emptyList()
-        // 设置字段必须带 key（configStore 绑定）；无 key 的展示节点（SECTION/DIVIDER 等）
-        // 由渲染层容忍，这里仅过滤无法绑定的节点
-        return parseUiNodes(result).filter { !it.key.isNullOrBlank() }
+    /** Definition snapshot validated during load; mutable options use getOptions. */
+    private val cachedSchema: List<UiNode> by lazy {
+        val result = runtime.callChecked("getSettingsSchema")
+        if (result.isnil()) emptyList() else {
+            check(result.istable()) { "getSettingsSchema must return a table" }
+            // 设置字段必须带 key（configStore 绑定）；无 key 的展示节点（SECTION/DIVIDER 等）
+            // 由渲染层容忍，这里仅过滤无法绑定的节点
+            parseUiNodes(result).filter { !it.key.isNullOrBlank() }
+        }
     }
+    override fun getSettingsSchema(): List<UiNode> = cachedSchema
 
     override suspend fun onAction(action: String): String? {
         if (action.isBlank()) return "未知操作"
@@ -110,9 +114,9 @@ open class LuaPluginAdapter(
     }
 
     override fun onLoad(context: PluginContext) {
-        if (runtime.load()) {
-            runtime.callOnLoad()
-        }
+        check(runtime.load()) { "Plugin script failed to load" }
+        check(runtime.callOnLoad()) { "Plugin onLoad failed" }
+        getSettingsSchema() // An unreadable schema must not become 'configured'.
     }
 
     override fun onUnload() {

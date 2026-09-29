@@ -226,7 +226,9 @@ class LuaCandidateTransformTest {
         assertTrue(rt.load())
         val outcome = rt.transformCandidates(request())
         assertEquals(CandidateTransformOutcome.Failed, outcome)
-        // 不调用 close()：死循环线程不响应中断，close 的 unload 会等满 180s 业务超时
+        val closeStart = System.nanoTime()
+        rt.close()
+        assertTrue("unload must not wait on a looping Lua call", (System.nanoTime() - closeStart) / 1_000_000 < 1500)
     }
 
     @Test
