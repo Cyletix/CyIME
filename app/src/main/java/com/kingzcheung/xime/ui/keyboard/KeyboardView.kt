@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.ui.zIndex
+
 import androidx.compose.ui.draw.drawWithContent
 import com.kingzcheung.xime.util.InputLatencyTrace
 
@@ -154,12 +156,19 @@ fun KeyboardView(
     val t9Controller = remember {
         T9InputController(
             inputAdmissionTicket = callbacks.inputAdmissionTicket,
+            captureInputContext = callbacks.captureInputContext,
+            inputCommands = callbacks.inputCommands,
+            onUnconsumedDelete = callbacks.onT9UnconsumedDelete,
             onCompositionRefresh = { composition, snapshots ->
                 callbacks.onT9RefreshComposition?.invoke(composition, snapshots)
             },
             onRightCommitUndone = callbacks.onT9RightCommitUndone,
             candidateTransform = callbacks.onTCandidateTransform,
         )
+    }
+
+    DisposableEffect(t9Controller) {
+        onDispose { t9Controller.close() }
     }
 
     LaunchedEffect(state.inputSessionId) {
@@ -196,23 +205,23 @@ fun KeyboardView(
 
     SideEffect {
         callbacks.onT9RefreshAfterPreeditEdit = { t9Controller.refreshAfterPreeditEdit() }
-        callbacks.onT9RightCandidateWillBeSelected = { pinyin, text, textLength ->
+        callbacks.onT9RightCandidateWillBeSelected = { pinyin, text, textLength, revision ->
             // 返回 C++ T9RightCommitHandler 的 full_commit 权威标志，
             // 不依赖 RIME 引擎 input（full_commit 后引擎 input 可能残留，判断会失真）
             if (pinyin.isNullOrBlank()) {
-                t9Controller.onRightCandidateSelectedByDirectCommit()
+                t9Controller.onRightCandidateSelectedByDirectCommit(revision)
             } else {
-                t9Controller.onRightCandidateSelected(pinyin, text, textLength)
+                t9Controller.onRightCandidateSelected(pinyin, text, textLength, revision)
             }
         }
         callbacks.onT9ForceSendToRime = {
-            t9Controller.forceSendToRime()
+            t9Controller.refreshRemainingInput()
         }
         callbacks.onT9RunLiteralInput = { block ->
             t9Controller.enqueueLiteralInput(block)
         }
-        callbacks.onT9ResetAfterLiteralCommit = {
-            t9Controller.resetLocalState()
+        callbacks.onT9CompositionCleared = {
+            t9Controller.resetDisplayAfterCommit()
         }
         callbacks.onFilterT9Candidates = { candidates, comments ->
             Pair(candidates, comments)  // no-op: t9_processor handles filtering
@@ -313,6 +322,7 @@ fun KeyboardView(
             onCursorMoveVertical = callbacks.onCursorMoveVertical,
             onCursorModeChange = { cursorControlActive = it },
             onVoiceModeChange = callbacks.onVoiceModeChange,
+            onVoiceToggle = callbacks.onVoiceStickyToggle,
             isSttEnabled = state.isSttEnabled,
             schemas = com.kingzcheung.xime.settings.InputModes.available(state.schemas),
             currentInputModeId = com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode),
@@ -482,7 +492,7 @@ fun KeyboardView(
             // （expandedCandidates，展开时服务层重新拉取）；非展开态候选栏保持
             // 引擎当前页（"每页候选词数"）
             val expandedDataMode = candidatePageExpanded &&
-                candidateState.value.expandedCandidates.isNotEmpty()
+                candidateState.value.expandedCandidatesLoaded
 
             val isHandwritingPage = page is KeyboardPage.Main && (page as KeyboardPage.Main).type == MainType.HANDWRITING
             // Panel/input-session changes discard unconfirmed ink, never alter host text.
@@ -498,7 +508,7 @@ fun KeyboardView(
             val railExpanded = if (expandedDataMode) {
                 if (singleCharFilter) {
                     cs.expandedCandidates.withIndex()
-                        .mapNotNull { (i, c) -> if (c.text.length == 1) i to c else null }
+                        .mapNotNull { (i, c) -> if (c.text.codePointCount(0, c.text.length) == 1) i to c else null }
                 } else {
                     cs.expandedCandidates.withIndex().map { it.index to it.value }
                 }
@@ -509,7 +519,7 @@ fun KeyboardView(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
                 state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
-                railExpanded, isHandwritingPage,
+                railExpanded, expandedDataMode, isHandwritingPage,
             ) {
                 if (showHandwritingCandidates) {
                     CandidateBarState.AssociationOnly(
@@ -521,8 +531,8 @@ fun KeyboardView(
                     CandidateBarState.Idle
                 } else {
                     CandidateBarState.from(
-                        candidates = if (railExpanded.isNotEmpty()) railExpanded.map { it.second.text } else cs.candidates,
-                        candidateComments = if (railExpanded.isNotEmpty()) railExpanded.map { it.second.comment } else cs.candidateComments,
+                        candidates = if (expandedDataMode) railExpanded.map { it.second.text } else cs.candidates,
+                        candidateComments = if (expandedDataMode) railExpanded.map { it.second.comment } else cs.candidateComments,
                         inputText = cs.inputText,
                         preeditText = cs.preeditText,
                         isComposing = cs.isComposing,
@@ -704,7 +714,8 @@ fun KeyboardView(
                         callbacks.onDismissClipboardPreview?.invoke()
                         viewModel.showOverlay(OverlayRoute.Clipboard(0))
                     },
-                    onCandidateSelect = { index ->
+                    onCandidateSelect = select@{ index ->
+                        if (!showHandwritingCandidates && !callbacks.isCandidateSnapshotCurrent(cs)) return@select
                         closePreeditEditor()
                         if (showHandwritingCandidates && index in handwritingCandidates.indices) {
                             selectHandwriting(index)
@@ -723,9 +734,10 @@ fun KeyboardView(
                     onCandidateLongPress = { index ->
                         val railEntry = if (expandedDataMode) railExpanded.getOrNull(index) else null
                         val word = railEntry?.second?.text
-                            ?: candidateState.value.candidates.getOrNull(index)
+                            ?: cs.candidates.getOrNull(index)
                         if (!word.isNullOrEmpty()) {
                             deletePending = DeletePendingWord(word) {
+                                if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                 if (railEntry != null) {
                                     callbacks.onGlobalCandidateDelete?.invoke(railEntry.first)
                                 } else {
@@ -840,6 +852,7 @@ fun KeyboardView(
                 CandidatePage(
                     state = CandidatePageState(
                         candidates = expandedEntries,
+                        engineRevision = candidateState.value.engineRevision,
                         associationCandidates = candidateState.value.associationCandidates.drop(visibleBarAssociations.size),
                         backgroundColor = keyboardBgColor,
                         textColor = candidateTextColor,
@@ -856,17 +869,19 @@ fun KeyboardView(
                     ),
                     callbacks = CandidatePageCallbacks(
                         onCandidateSelect = { entry ->
+                            if (!callbacks.isCandidateSnapshotCurrent(cs)) return@CandidatePageCallbacks
                             // entry.globalIndex 即跨页全局索引（引擎侧 select_candidate）
                             callbacks.onGlobalCandidateSelect?.invoke(entry.globalIndex)
                             viewModel.setCandidatePageExpanded(false)
                         },
                         onCandidateLongPress = { entry ->
                             // 长按删除自造词：与候选栏共用确认弹窗
-                            val word = candidateState.value.expandedCandidates
+                            val word = cs.expandedCandidates
                                 .getOrNull(entry.globalIndex)?.text
                             if (!word.isNullOrEmpty()) {
                                 onHapticFeedback?.invoke()
                                 deletePending = DeletePendingWord(word) {
+                                    if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                     callbacks.onGlobalCandidateDelete?.invoke(entry.globalIndex)
                                 }
                             }
@@ -921,6 +936,7 @@ fun KeyboardView(
                                 callbacks.onKeyPress("delete", false)
                             }
                         },
+                        onClear = { callbacks.onKeyPress("clear_all", false) },
                         onEnter = {
                             onHapticFeedback?.invoke()
                             callbacks.onKeyPress("enter", false)
@@ -942,9 +958,9 @@ fun KeyboardView(
                     MainType.FULL -> {
                         val currentOnCursorMove = rememberUpdatedState(callbacks.onCursorMove)
                         val suppressCursorMove = remember { mutableStateOf(false) }
-                        val cursorMod = if (callbacks.onCursorMove != null) {
-                            Modifier.pointerInput(Unit) {
-                                val stepThresholdPx = 25.dp.toPx()
+                        val cursorMod = if (callbacks.onCursorMove != null && inputPreferences.cursorGesture == CursorGestureMode.KEYBOARD) {
+                            Modifier.pointerInput(inputPreferences.cursorStepDp) {
+                                val stepThresholdPx = inputPreferences.cursorStepDp.dp.toPx()
                                 val activationThresholdPx = 60.dp.toPx()
                                 awaitEachGesture {
                                     suppressCursorMove.value = false
@@ -1142,6 +1158,10 @@ fun KeyboardView(
                                             refreshHandwritingCandidates()
                                         } else callbacks.onKeyPress("delete", false)
                                     }
+                                    "clear_all", "clear_composition" -> {
+                                        if (handwritingPending.size > 0) clearHandwriting()
+                                        else callbacks.onKeyPress(key, false)
+                                    }
                                     "symbol" -> { clearHandwriting(); viewModel.showOverlay(OverlayRoute.Symbol) }
                                     "number" -> { clearHandwriting(); viewModel.enterPanel(PanelType.NUMBER) }
                                     "ime_switch" -> {
@@ -1292,6 +1312,13 @@ fun KeyboardView(
         }
 
         if (cursorControlActive) CursorControlOverlay(Modifier.matchParentSize())
+
+        state.rejectedCommitText?.let { rejected ->
+            Box(Modifier.matchParentSize().then(Modifier.zIndex(20f))) {
+                RejectedCommitOverlay(rejected, keyboardBgColor, keyTextColor,
+                    callbacks.onRetryRejectedCommit, callbacks.onCancelRejectedCommit)
+            }
+        }
 
         if (state.isDeploying) {
             val isError = state.deploymentMessage.contains("超时") || state.deploymentMessage.contains("失败")
@@ -1569,8 +1596,7 @@ fun KeyboardView(
                         viewModel = viewModel,
                         onBack = { viewModel.popOverlay() },
                         onNavigateToQuickSend = { viewModel.pushOverlay(OverlayRoute.Clipboard(1)) },
-                        onSelectChar = { char -> callbacks.onCommitText?.invoke(char) },
-                        onDeleteText = { count -> callbacks.onDeleteText?.invoke(count) },
+                        onConfirmText = { text -> callbacks.onCommitText?.invoke(text) },
                         bottomPaddingDp = renderedBottomPaddingDp,
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )

@@ -32,14 +32,15 @@ class SpaceKeyGestureTest {
     private val moves = mutableListOf<Int>()
     private val rows = mutableListOf<Int>()
 
-    private fun setKey(mode: SpaceHoldAction = SpaceHoldAction.CURSOR, voiceSticky: Boolean = false) {
+    private fun setKey(mode: SpaceHoldAction = SpaceHoldAction.CURSOR, voiceSticky: Boolean = false,
+        cursor: CursorGestureMode = if (mode == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE) {
         rule.setContent {
             density = LocalDensity.current.density
             var cursorActive by remember { mutableStateOf(false) }
             CompositionLocalProvider(
-                LocalKeyboardInputPreferences provides KeyboardInputPreferences(spaceHold = mode, cursorStepDp = 10f),
+                LocalKeyboardInputPreferences provides KeyboardInputPreferences(spaceHold = mode, cursorGesture = cursor, cursorStepDp = 10f),
                 LocalKeyboardInputActions provides KeyboardInputActions(onCursorMove = { moves += it }, onCursorMoveVertical = { rows += it }, onCursorModeChange = { cursorActive = it },
-                    isVoiceMode = voiceSticky, voiceSticky = voiceSticky),
+                    onVoiceToggle = { voices++ }, isVoiceMode = voiceSticky, voiceSticky = voiceSticky),
             ) {
                 Box(Modifier.size(240.dp, 64.dp)) {
                     SpaceKeyButton(onClick = { spaces++ }, backgroundColor = Color.White, textColor = Color.Black,
@@ -75,11 +76,14 @@ class SpaceKeyGestureTest {
         rule.onNodeWithText("长按语音").assertDoesNotExist()
     }
 
-    @Test fun holdArmsAt300msAndSmallMovesAccumulateWithoutVoiceOrSpace() {
+    @Test fun holdArmsAt100msAndSmallMovesAccumulateWithoutVoiceOrSpace() {
         setKey()
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("space").performTouchInput { down(center) }
-        rule.mainClock.advanceTimeBy(320L)
+        rule.mainClock.advanceTimeBy(80L)
+        rule.onNodeWithTag("cursor-control-overlay").assertDoesNotExist()
+        rule.mainClock.advanceTimeBy(48L)
+        rule.onNodeWithTag("cursor-control-overlay").assertExists()
         rule.onNodeWithTag("space").performTouchInput {
             moveTo(center + Offset(6f * density, 0f))
             moveTo(center + Offset(12f * density, 0f))
@@ -147,5 +151,25 @@ class SpaceKeyGestureTest {
         rule.runOnIdle { stopped = spaces; assertTrue(stopped > 0) }
         rule.mainClock.advanceTimeBy(500L)
         rule.runOnIdle { assertEquals(stopped, spaces) }
+    }
+
+    @Test fun voiceHoldTogglesOnceWithoutSpaceOrCursor() {
+        setKey(SpaceHoldAction.VOICE_TOGGLE, cursor = CursorGestureMode.KEYBOARD)
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("space").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(128L)
+        rule.runOnIdle { assertEquals(0, voices) }
+        rule.mainClock.advanceTimeBy(500L)
+        rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(12f * density, 0f)); up() }
+        rule.runOnIdle { assertEquals(1, voices); assertEquals(0, spaces); assertTrue(moves.isEmpty()) }
+    }
+
+    @Test fun spaceCursorOverridesSavedVoiceActionWithoutStartingMicrophone() {
+        setKey(SpaceHoldAction.VOICE_TOGGLE, cursor = CursorGestureMode.SPACE)
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("space").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(400L)
+        rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(12f * density, 0f)); up() }
+        rule.runOnIdle { assertEquals(0, voices); assertEquals(0, spaces); assertEquals(listOf(1), moves) }
     }
 }

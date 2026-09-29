@@ -45,6 +45,7 @@ data class SchemaSwitchUiState(
 )
 
 data class KeyboardUiState(
+    val rejectedCommitText: String? = null,
     val isAsciiMode: Boolean = false,
     val schemaName: String = "",
     val currentSchemaId: String = "",

@@ -43,6 +43,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.Placeable
@@ -83,6 +86,7 @@ data class CandidateEntry(
  */
 data class CandidatePageState(
     val candidates: List<CandidateEntry> = emptyList(),
+    val engineRevision: Long = 0L,
     val associationCandidates: List<String> = emptyList(),
     val backgroundColor: Color,
     val textColor: Color,
@@ -125,6 +129,7 @@ data class CandidatePageCallbacks(
     val onRailPinyinSelect: ((Int) -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
     val onDelete: (() -> Unit)? = null,
+    val onClear: (() -> Unit)? = null,
     val onEnter: (() -> Unit)? = null,
 )
 
@@ -179,7 +184,8 @@ fun CandidatePage(
         }
     }
     // 候选内容变化（新输入/切过滤/删词）回到顶部（宽度变化只重排，不重置滚动）
-    LaunchedEffect(state.candidates) {
+    // More batches of this composition append in place; only a new query/filter resets scroll.
+    LaunchedEffect(if (state.engineRevision != 0L) state.engineRevision else state.candidates, state.singleCharFilter) {
         listState.scrollToItem(0)
     }
     // 硬件键盘 DPAD 上/下的翻页联动
@@ -378,19 +384,16 @@ fun CandidatePage(
                         .padding(vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    RailKey(
+                    SwipeableIconKeyButton(
+                        icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
                         onClick = { callbacks.onDelete?.invoke() },
-                        keyBg = keyBg,
-                        modifier = railKeyModifier,
-                        enabled = callbacks.onDelete != null
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Backspace,
-                            contentDescription = "退格",
-                            tint = state.textColor,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                        onLongClick = callbacks.onDelete,
+                        onSwipeUp = callbacks.onClear,
+                        backgroundColor = keyBg, iconColor = state.textColor,
+                        modifier = railKeyModifier.semantics { contentDescription = "退格" }
+                            .testTag("expanded-delete-key"),
+                        visualPadding = PaddingValues(0.dp), shadowEnabled = false,
+                    )
                     RailKey(
                         onClick = {
                             onHapticFeedback?.invoke()

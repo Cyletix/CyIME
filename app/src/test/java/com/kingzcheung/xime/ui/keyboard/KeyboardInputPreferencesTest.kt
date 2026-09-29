@@ -81,6 +81,15 @@ class KeyboardInputPreferencesTest {
         assertEquals(SpaceHoldAction.CURSOR, KeyboardInputPreferences.read(context).spaceHold)
     }
 
+    @Test fun `explicit new voice toggle survives save while cursor override preserves it`() {
+        val voice = KeyboardInputPreferences(spaceHold = SpaceHoldAction.VOICE_TOGGLE, cursorGesture = CursorGestureMode.KEYBOARD)
+        voice.save(context)
+        assertEquals(SpaceHoldAction.VOICE_TOGGLE, KeyboardInputPreferences.read(context).effectiveSpaceHold)
+        voice.copy(cursorGesture = CursorGestureMode.SPACE).save(context)
+        assertEquals(SpaceHoldAction.CURSOR, KeyboardInputPreferences.read(context).effectiveSpaceHold)
+        assertEquals(SpaceHoldAction.VOICE_TOGGLE, KeyboardInputPreferences.read(context).spaceHold)
+    }
+
     @Test
     fun `unknown modes and invalid numeric settings recover to usable defaults`() {
         values["space_hold_action"] = "REMOVED_MODE"

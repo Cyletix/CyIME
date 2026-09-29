@@ -119,6 +119,14 @@ fun KeyboardLayout(
     }
     val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
         supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
+    val correctionEnabled = LocalKeyboardInputPreferences.current.neighborCorrection && !isAsciiMode
+    val geometry = remember(cfgVer, keyRows, correctionEnabled, uiState.currentSchemaId, splitKeyboard) {
+        LetterGeometry { encoded -> callbacks.onLetterNeighbors?.invoke(uiState.currentSchemaId, if (correctionEnabled) encoded else "") }
+    }
+    DisposableEffect(geometry) {
+        callbacks.onLetterNeighbors?.invoke(uiState.currentSchemaId, "")
+        onDispose { }
+    }
     // 合并键布局（14 键）键更宽：缝给更大的绝对 dp，不按键宽比例放大
     val mergedSection = remember(cfgVer, uiState.currentSchemaId) {
         KeysConfigHelper.mergedSectionForSchema(uiState.currentSchemaId)
@@ -263,6 +271,7 @@ fun KeyboardLayout(
 
 
     CompositionLocalProvider(
+        LocalLetterGeometry provides geometry,
         LocalCustomLayout provides if (isAsciiMode) null else com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId),
         LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
         LocalShiftSlideTargets provides remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() },
@@ -370,7 +379,7 @@ fun KeyboardLayout(
                     } else {
                         Box(modifier = Modifier.weight(1f)) {
                             val row1 = keyRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
-                            val row1Padding = if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) Modifier else Modifier.padding(horizontal = 16.dp)
+                            val row1Inset = if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) 0.dp else 16.dp
                             KeyboardRowWithConfig(
                                 keys = row1,
                                 onKeyPress = onKeyPress,
@@ -384,7 +393,7 @@ fun KeyboardLayout(
                                 ),
                                 isShifted = isShifted,
                                 isAsciiMode = isAsciiMode,
-                                modifier = row1Padding,
+                                edgeInset = row1Inset,
                                 onSwipeStateChange = { state, bounds ->
                                     processSwipeState(
                                         state,
@@ -545,7 +554,7 @@ fun KeyboardLayout(
                                 iconColor = specialKeyTextColor,
                                 modifier = Modifier
                                     .weight(1.4f)
-                                    .fillMaxHeight().semantics { contentDescription = "删除" },
+                                    .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
                                 swipeText = "清空",
                                 onSwipe = { onKeyPress("clear_composition") },
                                 onLongClick = { onKeyPress("delete") },
@@ -979,12 +988,20 @@ fun KeyboardRowWithConfig(
     onCommitText: ((String) -> Unit)? = null,
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
     configVersion: Int = 0,
+    edgeInset: Dp = 0.dp,
+    edgeStartInset: Dp = edgeInset,
+    edgeEndInset: Dp = edgeInset,
 ) {
+    val customLayout = LocalCustomLayout.current
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+    val totalWeight = keys.sumOf { if (customLayout != null) it.length else 1 }.coerceAtLeast(1)
+    val startInset = edgeStartInset.coerceAtMost(maxWidth / 4)
+    val endInset = edgeEndInset.coerceAtMost(maxWidth / 4)
+    val unitWidth = (maxWidth - startInset - endInset) / totalWeight
     Row(
-        modifier = modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        keys.forEach { key ->
+        keys.forEachIndexed { index, key ->
             val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
             val swipeUpText = if (swipeUpHintsEnabled) rawSwipeUpLabel else null
             val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
@@ -1056,7 +1073,13 @@ fun KeyboardRowWithConfig(
                 onClick = onClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
-                modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
+                modifier = Modifier.weight((unitWidth * (if (customLayout != null) key.length else 1) +
+                    (if (index == 0) startInset else 0.dp) + (if (index == keys.lastIndex) endInset else 0.dp)).value.coerceAtLeast(1f))
+                    .testTag("qwerty-key:$key"),
+                edgeContentPadding = PaddingValues(
+                    start = if (index == 0) startInset else 0.dp,
+                    end = if (index == keys.lastIndex) endInset else 0.dp,
+                ),
                 swipeText = swipeUpText,
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
@@ -1082,6 +1105,7 @@ fun KeyboardRowWithConfig(
                 shadowShapeRadius = config.shadowShapeRadius,
             )
         }
+    }
     }
 }
 
@@ -1368,10 +1392,10 @@ private fun SplitKeyboardContent(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = staggerStep)
             ) {
                 KeyboardRowWithConfig(
                     keys = row1Left,
+                    edgeStartInset = staggerStep,
                     onKeyPress = onKeyPress,
                     config = KeyboardRowConfig(
                         keyBackgroundColor = keyBackgroundColor,
@@ -1503,10 +1527,10 @@ private fun SplitKeyboardContent(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(end = staggerStep)
             ) {
                 KeyboardRowWithConfig(
                     keys = row1Right,
+                    edgeEndInset = staggerStep,
                     onKeyPress = onKeyPress,
                     config = KeyboardRowConfig(
                         keyBackgroundColor = keyBackgroundColor,

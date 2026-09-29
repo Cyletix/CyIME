@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.keyboard.SpaceHoldAction
+import com.kingzcheung.xime.ui.keyboard.CursorGestureMode
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 
 @Composable
@@ -19,11 +20,31 @@ internal fun InputExperienceSettings() {
     var settings by remember(saved) { mutableStateOf(saved) }
     SettingsSection(title = "基础输入", content = {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("空格键长按行为", style = MaterialTheme.typography.titleSmall)
-            Text("长按 0.3 秒后触发。光标模式松手不会输入空格。", style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("26 键邻键纠错", style = MaterialTheme.typography.titleSmall)
+                Switch(checked = settings.neighborCorrection, onCheckedChange = {
+                    settings = settings.copy(neighborCorrection = it); settings.save(context)
+                })
+            }
+            Text("中文全拼按当前键位补充相邻字母误触的候选，保留原输入；不用于九键、双拼或合并键。", style = MaterialTheme.typography.bodySmall)
+            HorizontalDivider()
+            Text("滑动移动光标", style = MaterialTheme.typography.titleSmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CursorGestureMode.entries.forEach { mode ->
+                    FilterChip(selected = settings.cursorGesture == mode,
+                        modifier = Modifier.weight(1f),
+                        onClick = { settings = settings.copy(cursorGesture = mode); settings.save(context) },
+                        label = { Text(mode.label) })
+                }
+            }
+            Text("长按空格 0.1 秒后滑动，松手不输入空格。两种移动方式互斥。", style = MaterialTheme.typography.bodySmall)
+            Text("空格键其他长按行为", style = MaterialTheme.typography.titleSmall)
+            Text(if (settings.cursorGesture == CursorGestureMode.SPACE) "当前用于移动光标，以下功能暂停，选择其他移动方式后恢复。"
+                else "长按 0.3 秒触发；语音再次长按结束，也可用工具栏麦克风结束。", style = MaterialTheme.typography.bodySmall)
             Row(Modifier.fillMaxWidth().testTag("space-hold-options"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SpaceHoldAction.entries.forEach { action ->
-                    FilterChip(selected = settings.spaceHold == action,
+                listOf(SpaceHoldAction.REPEAT, SpaceHoldAction.VOICE_TOGGLE).forEach { action ->
+                    FilterChip(selected = (settings.spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT) == action,
+                        enabled = settings.cursorGesture != CursorGestureMode.SPACE,
                         modifier = Modifier.weight(1f),
                         onClick = { settings = settings.copy(spaceHold = action); settings.save(context) },
                         label = { Text(action.label) })

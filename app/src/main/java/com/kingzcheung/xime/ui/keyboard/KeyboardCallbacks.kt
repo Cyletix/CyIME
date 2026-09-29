@@ -7,10 +7,18 @@ import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 
 data class KeyboardCallbacks(
     val onKeyPress: (String, Boolean) -> Unit,
+    val onLetterNeighbors: ((String, String) -> Unit)? = null,
     val inputAdmissionTicket: () -> Long? = { 0L },
+    val captureInputContext: () -> kotlin.coroutines.CoroutineContext = { kotlin.coroutines.EmptyCoroutineContext },
+    val inputCommands: com.kingzcheung.xime.rime.InputCommandQueue? = null,
+    val onT9UnconsumedDelete: (suspend () -> Unit)? = null,
     val onKeyPressDown: ((String) -> Unit)? = null,
     val onKeyRelease: ((String) -> Unit)? = null,
     val onCandidateSelect: (Int) -> Unit,
+    val onRetryRejectedCommit: () -> Unit = {},
+    val onCancelRejectedCommit: () -> Unit = {},
+    /** Validate the rendered list again when a tap or delayed deletion is delivered. */
+    val isCandidateSnapshotCurrent: (com.kingzcheung.xime.service.CandidateState) -> Boolean = { true },
     val onOpenPreeditEditor: (((com.kingzcheung.xime.rime.PinyinEditSession?) -> Unit) -> Unit)? = null,
     var onT9RefreshAfterPreeditEdit: (() -> Unit)? = null,
     /** Installed by the visible editor; the IME service consumes Back before hiding. */
@@ -96,7 +104,7 @@ data class KeyboardCallbacks(
      * @param text 候选词文本（可空），用于 C++ (comment, text) 双条件精确定位
      * @param textLength 候选词文字长度（汉字数），0 表示未知
      */
-    var onT9RightCandidateWillBeSelected: ((String?, String?, Int) -> Boolean)? = null,
+    var onT9RightCandidateWillBeSelected: (suspend (String?, String?, Int, Long) -> Boolean?)? = null,
     /**
      * T9 键盘切换离开（至数字/英文键盘）时调用。
      * 服务层负责提交首位候选词并清理 T9 状态。
@@ -106,11 +114,11 @@ data class KeyboardCallbacks(
      * 强制 T9 控制器重新发送当前 inputBuffer 到 RIME。
      * 用于右侧候选 partial commit 后，RIME composition 被清除需要重新构建。
      */
-    var onT9ForceSendToRime: (() -> Unit)? = null,
+    var onT9ForceSendToRime: (suspend () -> Unit)? = null,
     /** 与普通九键触摸共用 FIFO，字面提交也等待之前的输入。 */
     var onT9RunLiteralInput: ((suspend () -> Unit) -> Unit)? = null,
     /** 引擎已在队列中清空，仅同步复位 T9 控制器显示状态。 */
-    var onT9ResetAfterLiteralCommit: (() -> Unit)? = null,
+    var onT9CompositionCleared: (() -> Unit)? = null,
     /**
      * T9 候选词过滤器。服务层在获取 RIME 候选词后调用，由键盘层根据
      * [com.kingzcheung.xime.rime.T9InputController.selectionHistory] 过滤不匹配的候选词。

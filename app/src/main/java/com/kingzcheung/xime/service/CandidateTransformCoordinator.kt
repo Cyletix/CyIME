@@ -86,10 +86,7 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
         }
     }
 
-    /** 连续失败熔断标记（本会话禁用；插件重载/进程重启恢复）。 */
-    @Volatile
-    private var disabledThisSession = false
-    private var consecutiveFailures = 0
+    private val failureCircuit = RuntimeFailureCircuit(MAX_CONSECUTIVE_FAILURES)
 
     /** 对一次引擎按键结果做变换。返回 null = 不干预，调用方原样渲染。 */
     fun transformFor(result: RimeProcessResult): CandidateTransformResult? {
@@ -113,11 +110,11 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
         engineCandidates: List<RimeCandidate>,
         asciiMode: Boolean,
     ): CandidateTransformResult? {
-        if (disabledThisSession) return null
         if (asciiMode) return null
         if (isT9Schema(service.uiState.value.currentSchemaId)) return null
         if (service.pluginEvents.isCurrentEditorSensitive) return null
         val (pluginId, runtime) = findRuntime() ?: return null
+        if (!failureCircuit.permits(runtime)) return null
         val outcome = runtime.transformCandidates(
             CandidateTransformRequest(
                 inputText = inputText,
@@ -128,24 +125,22 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
         )
         return when (outcome) {
             is CandidateTransformOutcome.NoResponse -> {
-                consecutiveFailures = 0
+                failureCircuit.record(runtime, false)
                 logTransform("QWERTY", pluginId, inputText, "no-intervention", 0)
                 null
             }
             is CandidateTransformOutcome.Failed -> {
-                consecutiveFailures++
                 logTransform("QWERTY", pluginId, inputText, "failed", 0)
-                if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                    disabledThisSession = true
+                if (failureCircuit.record(runtime, true)) {
                     FileLogger.w(
                         XimeInputMethodService.TAG,
-                        "candidate_transform 连续失败 $consecutiveFailures 次，本会话禁用该插件变换"
+                        "candidate_transform 连续失败 $MAX_CONSECUTIVE_FAILURES 次，禁用当前实例的变换；重载可恢复"
                     )
                 }
                 null
             }
             is CandidateTransformOutcome.Success -> {
-                consecutiveFailures = 0
+                failureCircuit.record(runtime, false)
                 val transformed = buildDisplay(outcome.items, engineCandidates)
                 logTransform("QWERTY", pluginId, inputText, "inject", transformed?.candidates?.size ?: 0)
                 transformed
@@ -162,11 +157,11 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
      * 短路条件同 [transform]；T9 本身不作短路（本方法即 T9 路径）。
      */
     fun transformForT9(result: RimeProcessResult): List<T9CandidateInjection>? {
-        if (disabledThisSession) return null
         if (result.isAsciiMode) return null
         if (result.inputText.isEmpty() && result.candidates.isEmpty()) return null
         if (service.pluginEvents.isCurrentEditorSensitive) return null
         val (pluginId, runtime) = findRuntime() ?: return null
+        if (!failureCircuit.permits(runtime)) return null
         val outcome = runtime.transformCandidates(
             CandidateTransformRequest(
                 inputText = result.inputText,
@@ -177,24 +172,22 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
         )
         return when (outcome) {
             is CandidateTransformOutcome.NoResponse -> {
-                consecutiveFailures = 0
+                failureCircuit.record(runtime, false)
                 logTransform("T9", pluginId, result.inputText, "no-intervention", 0)
                 null
             }
             is CandidateTransformOutcome.Failed -> {
-                consecutiveFailures++
                 logTransform("T9", pluginId, result.inputText, "failed", 0)
-                if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                    disabledThisSession = true
+                if (failureCircuit.record(runtime, true)) {
                     FileLogger.w(
                         XimeInputMethodService.TAG,
-                        "candidate_transform(T9) 连续失败 $consecutiveFailures 次，本会话禁用该插件变换"
+                        "candidate_transform(T9) 连续失败 $MAX_CONSECUTIVE_FAILURES 次，禁用当前实例的变换；重载可恢复"
                     )
                 }
                 null
             }
             is CandidateTransformOutcome.Success -> {
-                consecutiveFailures = 0
+                failureCircuit.record(runtime, false)
                 val injections = mutableListOf<T9CandidateInjection>()
                 var lastEngineAnchor: Int? = null
                 for (item in outcome.items) {
@@ -218,6 +211,7 @@ internal class CandidateTransformCoordinator(private val service: XimeInputMetho
     private fun findRuntime(): Pair<String, LuaScriptRuntime>? {
         for ((pluginId, loaded) in PluginManager.loadedPluginsFlow.value) {
             if (loaded.pluginInfo.capabilities?.candidateTransform != true) continue
+            if (!com.kingzcheung.xime.settings.SettingsPreferences.isPluginEnabled(service, pluginId)) continue
             val script = loaded.script ?: continue
             return pluginId to script
         }

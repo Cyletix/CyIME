@@ -758,8 +758,9 @@ internal fun FixedCandidateStrip(
     BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")) {
         val panelWidth = maxWidth
         val all = candidates + associations
-        val widths = remember(all, comments, fontSize, density, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
-            all.mapIndexed { index, text ->
+        val count = remember(all, comments, fontSize, density, measurer, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
+            candidatePrefixCount(all.size, constraints.maxWidth, with(density) { 4.dp.roundToPx() }) { index ->
+                val text = all[index]
                 val primary = measurer.measure(AnnotatedString(text), TextStyle(
                     fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily,
                     fontWeight = if (index == 0) FontWeight.Medium else FontWeight.Normal), softWrap = false).size.width
@@ -770,7 +771,6 @@ internal fun FixedCandidateStrip(
                 primary + secondary + with(density) { 8.dp.roundToPx() }
             }
         }
-        val count = candidatePrefixCount(widths, constraints.maxWidth, with(density) { 4.dp.roundToPx() })
         val visible = all.take(count)
         androidx.compose.runtime.SideEffect {
             callbacks.onVisibleCandidatesChanged?.invoke(candidates.take(count))

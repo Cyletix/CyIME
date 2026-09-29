@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -137,7 +138,7 @@ fun HandwritingKeyboardLayout(
                         HandwritingFunctionKey(action, { press(action) },
                             if (action == "delete") specialKeyBackgroundColor else keyBackgroundColor,
                             if (action == "delete") specialKeyTextColor else keyTextColor,
-                            Modifier.weight(1f).fillMaxWidth())
+                            Modifier.weight(1f).fillMaxWidth(), onClear = { press("clear_all") })
                     }
                 }
             }
@@ -150,7 +151,7 @@ fun HandwritingKeyboardLayout(
                             Modifier.weight(1f).fillMaxHeight())
                     }
                     HandwritingFunctionKey("delete", { press("delete") }, specialKeyBackgroundColor,
-                        specialKeyTextColor, Modifier.width(functionKeyWidth).fillMaxHeight())
+                        specialKeyTextColor, Modifier.width(functionKeyWidth).fillMaxHeight(), onClear = { press("clear_all") })
                 }
             }
             Row(Modifier.fillMaxWidth().height(footerHeight).background(panelBackgroundColor)
@@ -171,7 +172,8 @@ fun HandwritingKeyboardLayout(
 }
 
 @Composable
-private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, background: Color, foreground: Color, modifier: Modifier) {
+private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, background: Color, foreground: Color, modifier: Modifier,
+    onClear: (() -> Unit)? = null) {
     val label = when (action) {
         "delete" -> "删除"; "enter" -> "回车"; "space" -> "空格"
         "symbol" -> "!@#"; "number" -> "123"; "ime_switch" -> "语言切换"
@@ -180,6 +182,16 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
     val enter = LocalEnterKeyColors.current.takeIf { action == "enter" }
     val keyBackground = enter?.background ?: background
     val keyForeground = enter?.foreground ?: foreground
+    if (action == "delete") {
+        SwipeableIconKeyButton(
+            icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
+            onClick = onClick, onLongClick = onClick, onSwipeUp = onClear,
+            backgroundColor = keyBackground, iconColor = keyForeground,
+            modifier = modifier.semantics { contentDescription = label }.testTag("handwriting-key:delete"),
+            shadowEnabled = false,
+        )
+        return
+    }
     BoxWithConstraints(modifier.clickable(onClick = onClick).semantics { contentDescription = label }
         .testTag("handwriting-key:$action")
         .padding(scaledKeyVisualPadding(PaddingValues(2.dp))).keyGlow(Modifier.clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(keyBackground)), contentAlignment = Alignment.Center) {

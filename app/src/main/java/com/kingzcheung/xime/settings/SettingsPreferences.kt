@@ -394,19 +394,12 @@ object SettingsPreferences {
 
     
     fun isPluginEnabled(context: Context, pluginId: String): Boolean {
-        val prefs = getPrefs(context)
-        val key = "plugin_enabled_$pluginId"
-        
-        if (prefs.contains(key)) {
-            return prefs.getBoolean(key, false)
-        }
-        
-        val pluginInfo = PluginManager.getAllInstallPlugins().find { it.id == pluginId }
-        return pluginInfo?.enabled ?: true
+        val installed = PluginManager.getAllInstallPlugins().find { it.id == pluginId }
+        return com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.isEnabled(context, pluginId, installed?.enabled ?: true)
     }
-    
+
     fun setPluginEnabled(context: Context, pluginId: String, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean("plugin_enabled_$pluginId", enabled).apply()
+        com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.setEnabled(context, pluginId, enabled)
     }
     
     fun isSmartPredictionEnabled(context: Context): Boolean {

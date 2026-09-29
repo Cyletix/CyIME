@@ -202,28 +202,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         Thread(r, "key-process").also { it.isDaemon = true }
     }.asCoroutineDispatcher()
     
-    internal val keyJobs = Channel<Job>(Channel.UNLIMITED)
+    internal val inputCommands = com.kingzcheung.xime.rime.InputCommandQueue(serviceScope, keyProcessingDispatcher)
     internal val uiEventChannel = Channel<suspend () -> Unit>(Channel.CONFLATED)
 
-    /**
-     * 长按退格合并锁/状态。
-     *
-     * 长按退格以约 80ms 的固定频率重复派发，而 rime 退格（JNI + 输入重组）耗时可能
-     * 超过 80ms。若每次重复都排队，keyJobs 会堆积，候选栏 UI 更新变成"迟到的跳帧"
-     * 突发式刷新（一闪一闪）。这里把高频重复的退格合并为单个 job：处理完一次后
-     * 立即消费累积的 [pendingDeleteCount]，删除速率被 rime 吞吐自然限制，
-     * UI 更新平滑，抬手后也不会洪水式多删。
-     */
-    internal val deleteCoalesceLock = Any()
-    internal var deleteJobActive = false
-    internal var pendingDeleteCount = 0
-
     init {
-        serviceScope.launch {
-            keyJobs.consumeEach { job ->
-                job.join()
-            }
-        }
         serviceScope.launch(Dispatchers.Main) {
             uiEventChannel.consumeEach { work -> work() }
         }
@@ -295,21 +277,29 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
-    /** 刷新展开页的跨页全量候选；非展开态清空以省内存。编码变化与展开动作时调用 */
+    private val expandedCandidateLoader by lazy {
+        ExpandedCandidateLoader(serviceScope, keyProcessingDispatcher, rimeEngine::readCandidateBatch)
+    }
+
+    /** Expanded candidates belong to an engine revision and editor session, never display text. */
     internal fun refreshExpandedCandidates() {
-        if (!keyboardViewModel.candidatePageExpanded.value) {
-            if (candidateState.value.expandedCandidates.isNotEmpty()) {
-                candidateState.value = candidateState.value.copy(expandedCandidates = emptyList())
-            }
+        expandedCandidateLoader.cancel()
+        candidateState.value = candidateState.value.copy(expandedCandidates = emptyList(), expandedCandidatesLoaded = false)
+        if (!keyboardViewModel.candidatePageExpanded.value) return
+        val snapshot = candidateState.value
+        val session = uiState.value.inputSessionId
+        val admission = inputReadiness.ticket() ?: return
+        japaneseInputController.displayCandidates(snapshot.inputText)?.let {
+            candidateState.value = snapshot.copy(expandedCandidates = it, expandedCandidatesLoaded = true)
             return
         }
-        val perfT0 = android.os.SystemClock.elapsedRealtime()
-        val all = japaneseInputController.displayCandidates(candidateState.value.inputText) ?: rimeEngine.getAllCandidates().toList()
-        candidateState.value = candidateState.value.copy(expandedCandidates = all)
-        android.util.Log.d(
-            "CandidatePerf",
-            "refreshExpandedCandidates: count=${all.size} cost=${android.os.SystemClock.elapsedRealtime() - perfT0}ms"
-        )
+        expandedCandidateLoader.load(snapshot.engineRevision, isCurrent = {
+            inputReadiness.accepts(admission) && uiState.value.inputSessionId == session &&
+                keyboardViewModel.candidatePageExpanded.value &&
+                candidateState.value.engineRevision == snapshot.engineRevision
+        }) { candidates ->
+            candidateState.value = candidateState.value.copy(expandedCandidates = candidates, expandedCandidatesLoaded = true)
+        }
     }
 
     /** 硬件键盘在展开态按 DPAD_DOWN/UP：展开页滚动一屏（经事件流驱动 UI） */
@@ -1398,6 +1388,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             calculatorEngine.isActive(),
                             ) {
                                 KeyboardUiState(
+                                    rejectedCommitText = state.rejectedCommitText,
                                     isAsciiMode = state.isAsciiMode,
                                     schemaName = if (state.isAsciiMode) "英文" else state.schemaName,
                                     currentSchemaId = state.currentSchemaId,
@@ -1901,6 +1892,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        inputReadiness.newEditorSession()
+        keyRouter.discardPendingCandidateCommit()
         voiceRecognitionHandler.endInputSession()
         if (uiState.value.isVoiceMode || voiceRecordingStarted) {
             voiceRecognitionHandler.abandonSession()
@@ -2340,6 +2333,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private fun clearInputState() {
+        inputReadiness.newEditorSession()
+        keyRouter.discardPendingCandidateCommit()
         if (uiState.value.handwritingExpanded) uiState.value = uiState.value.copy(handwritingExpanded = false)
         voiceRecognitionHandler.endInputSession()
         // 即使 Compose 在隐藏时尚未销毁，旧手写回调也不能再写入宿主。
@@ -2450,6 +2445,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onDestroy() {
+        inputReadiness.close()
+        serviceScope.cancel()
         super.onDestroy()
         sharedPrefsListener?.let {
             SettingsPreferences.getPrefsPublic(this).unregisterOnSharedPreferenceChangeListener(it)
@@ -2467,7 +2464,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         com.kingzcheung.xime.handwriting.HandwritingEngine.release()
         ExtensionManager.release()
         com.kingzcheung.xime.association.NativeOnnxEngine.releaseSharedEnv()
-        serviceScope.cancel()
         keyProcessingDispatcher.close()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
@@ -2478,30 +2474,29 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         requestHideSelf(0)
     }
     
+    private var compositionRefreshJob: kotlinx.coroutines.Job? = null
+
+    /** Refresh requests never run JNI or plugin transforms on Main, nor fabricate an empty state on contention. */
     internal fun updateUI() {
-        val composition = rimeEngine.getComposition()
-        // 候选词变换（hotPath 插件能力）：仅 key-processing 线程同步等插件（至多 15ms），
-        // 主线程调用点（联想上屏/光标移动/剪贴板点选后的刷新）一律跳过——主线程永不等待插件；
-        // 这些调用点组合态已清空（input 为空），正常不触发，Looper 判定仅为防御
-        val transformed = if (composition.input.isNotEmpty() &&
-            android.os.Looper.myLooper() != android.os.Looper.getMainLooper()
-        ) {
-            candidateTransform.transform(
-                inputText = composition.input,
-                preedit = composition.preedit,
-                engineCandidates = composition.candidates.toList(),
-                asciiMode = composition.isAsciiMode,
-            )
-        } else {
-            null
-        }
-        if (transformed != null) {
-            sessionController.applyComposition(
-                composition.copy(candidates = transformed.candidates.toTypedArray()),
-                transformed.actions
-            )
-        } else {
-            sessionController.applyComposition(composition)
+        val admission = inputReadiness.ticket() ?: return
+        serviceScope.launch(Dispatchers.Main.immediate) {
+            if (!inputReadiness.accepts(admission)) return@launch
+            compositionRefreshJob?.cancel()
+            val session = uiState.value.inputSessionId
+            compositionRefreshJob = launch(keyProcessingDispatcher) {
+                val composition = rimeEngine.readQueuedComposition() ?: return@launch
+                val transformed = if (composition.input.isNotEmpty()) candidateTransform.transform(
+                    inputText = composition.input, preedit = composition.preedit,
+                    engineCandidates = composition.candidates.toList(), asciiMode = composition.isAsciiMode,
+                ) else null
+                withContext(Dispatchers.Main) {
+                    if (!inputReadiness.accepts(admission) || uiState.value.inputSessionId != session ||
+                        !rimeEngine.isCandidateRevisionCurrent(composition.engineRevision)) return@withContext
+                    if (transformed != null) sessionController.applyComposition(
+                        composition.copy(candidates = transformed.candidates.toTypedArray()), transformed.actions,
+                    ) else sessionController.applyComposition(composition)
+                }
+            }
         }
     }
 
@@ -2687,20 +2682,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         commitTextAndPredict(text, isPaste = true)
     }
 
-    private fun commitTextAndPredict(text: String, isPaste: Boolean) {
-        commitTextSilently(text, isPaste)
+    internal fun submitText(text: String): TextCommitResult {
+        InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
+        return commitTextAndPredict(text, false)
+    }
+
+    private fun commitTextAndPredict(text: String, isPaste: Boolean): TextCommitResult {
+        val result = commitTextSilently(text, isPaste)
+        if (result != TextCommitResult.ACCEPTED_HOST) return result
         if (!canPredictAfter(text)) {
             predictionManager.invalidatePendingPredictions()
             candidateState.value = candidateState.value.copy(associationCandidates = emptyList(), pendingEnglishText = "")
-            return
+            return result
         }
         if (isChineseMode) {
+            val predictionAdmission = inputReadiness.ticket()
+            val predictionEditor = uiState.value.inputSessionId
             mainHandler.post {
-                if (!uiState.value.isAsciiMode) {
+                if (predictionAdmission != null && inputReadiness.accepts(predictionAdmission) &&
+                    uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode) {
                     getPredictionFromPlugin(predictionManager.lastCommittedText)
                 }
             }
         }
+        return result
     }
 
     /**
@@ -2734,44 +2739,45 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * [isPaste] 标记粘贴性质上屏，透传到 text_committed payload（见 commitPastedText）。
      * 需在主线程调用。
      */
-    internal fun commitTextSilently(text: String, isPaste: Boolean = false) {
-        if (uiState.value.quickSendFormFocused) {
-            // 焦点在触发编码输入框时路由到编码框，否则路由到快捷发送文本框
-            val codeFocused = uiState.value.quickSendCodeFocused
-            mainHandler.post {
-                val et = if (codeFocused) QuickSendFormCodeEditTextHolder.editText
-                else QuickSendFormEditTextHolder.editText
-                et?.let { box ->
-                    val start = box.selectionStart.coerceAtLeast(0)
-                    val textLen = text.length
-                    box.text?.replace(start, box.selectionEnd.coerceAtLeast(start), text)
-                    try { box.setSelection(start + textLen) } catch (_: Exception) {}
-                }
+    internal fun commitTextSilently(text: String, isPaste: Boolean = false): TextCommitResult {
+        check(Looper.myLooper() == Looper.getMainLooper()) { "Editor commits belong to Main" }
+        if (InputCommandOwner.current.get() == null) {
+            check(com.kingzcheung.xime.rime.RimeCommandContext.validity.get() == null) {
+                "Queued editor delivery lost its command owner"
             }
-            return
-        }
-        if (uiState.value.toolPanelInputFocused) {
-            mainHandler.post {
-                ToolPanelEditTextHolder.editText?.let { et ->
-                    val start = et.selectionStart.coerceAtLeast(0)
-                    val textLen = text.length
-                    et.text?.replace(start, et.selectionEnd.coerceAtLeast(start), text)
-                    try { et.setSelection(start + textLen) } catch (_: Exception) {}
-                }
+            // Explicit boundary for synchronous Main callbacks (clipboard/handwriting/voice).
+            // Queued keyboard commands use submitText(), which requires an existing owner.
+            val admission = inputReadiness.ticket() ?: return TextCommitResult.NO_CONNECTION
+            val editor = uiState.value.inputSessionId
+            val owner = InputCommandOwner(admission, editor) {
+                if (!inputReadiness.accepts(admission) || uiState.value.inputSessionId != editor)
+                    throw kotlinx.coroutines.CancellationException("Expired direct editor action")
             }
-            return
+            return owner.runInline { commitTextSilently(text, isPaste) }
         }
-        currentInputConnection?.commitText(text, 1)
-
-        // text_committed 事件：真实上屏才累计/投递（内部编辑器分支已在上方 return；
-        // 敏感输入框（密码）不计不投；粘贴性质上屏带 is_paste 标记，见 commitPastedText；
-        // 详见 PluginEventDispatcher）
+        InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
+        val state = uiState.value
+        if (state.quickSendFormFocused || state.toolPanelInputFocused) {
+            val editor = when {
+                state.quickSendFormFocused && state.quickSendCodeFocused -> QuickSendFormCodeEditTextHolder.editText
+                state.quickSendFormFocused -> QuickSendFormEditTextHolder.editText
+                else -> ToolPanelEditTextHolder.editText
+            } ?: return TextCommitResult.NO_CONNECTION
+            val editable = editor.text ?: return TextCommitResult.NO_CONNECTION
+            val start = editor.selectionStart.coerceIn(0, editable.length)
+            val end = editor.selectionEnd.coerceIn(start, editable.length)
+            editable.replace(start, end, text)
+            editor.setSelection(start + text.length)
+            return TextCommitResult.ACCEPTED_INTERNAL
+        }
+        val connection = currentInputConnection ?: return TextCommitResult.NO_CONNECTION
+        if (!connection.commitText(text, 1)) return TextCommitResult.REJECTED
         pluginEvents.onTextCommitted(text, isPaste)
-
         if (isChineseMode) {
             predictionManager.appendCommittedText(text)
             predictionManager.recordInput(text)
         }
+        return TextCommitResult.ACCEPTED_HOST
     }
 
     /** 当前编辑目标的绝对光标位置，供手写候选验证文字所属位置。 */

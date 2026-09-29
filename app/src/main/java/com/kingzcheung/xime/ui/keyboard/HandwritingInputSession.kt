@@ -73,7 +73,7 @@ internal class HandwritingInputSession(
 
     fun press(action: String) {
         when {
-            action == "delete" && hasInk -> clear()
+            action in setOf("delete", "clear_all", "clear_composition") && hasInk -> clear()
             action in setOf("symbol", "number", "ime_switch") -> {
                 clear()
                 onKey(action)

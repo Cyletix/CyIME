@@ -103,6 +103,7 @@ object RimeConfigHelper {
             context.assets.open("rime-bundled-manifest.tsv").bufferedReader().use { it.readText() },
         ) { context.assets.open(it) }
         check(installing.delete()) { "Cannot finish bundled asset installation" }
+        com.kingzcheung.xime.settings.CustomKeyboardLayouts.enableMeasuredCorrection(context)
         // F1: assets 会用内置 default.yaml 覆盖，这里把启用方案重新写回 schema_list
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         // 为所有启用方案打个人词库补丁

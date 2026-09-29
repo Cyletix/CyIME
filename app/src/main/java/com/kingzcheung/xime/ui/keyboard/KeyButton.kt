@@ -31,6 +31,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.kingzcheung.xime.settings.ButtonLayout
 import com.kingzcheung.xime.util.CharInfo
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -287,6 +289,8 @@ fun SwipeableKeyButton(
     onLongPressSelect: ((String) -> Unit)? = null,
     longPressItems: List<String>? = null,
     longPressDrawableIds: List<Int>? = null,
+    /** Transparent row-edge space belongs to this key's gestures, but not its keycap. */
+    edgeContentPadding: PaddingValues = PaddingValues(0.dp),
     /** 右上角角标文字（如 T9 数字键的数字浮标） */
     badgeText: String? = null,
     fontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
@@ -296,6 +300,7 @@ fun SwipeableKeyButton(
     shadowShapeRadius: Dp = 8.dp,
 ) {
     val customLayout = LocalCustomLayout.current
+    val letterGeometry = LocalLetterGeometry.current
     val customAccent = LocalCustomAccent.current
     val resolvedColors = customLayoutKeyColors(customLayout, text, backgroundColor, textColor, customAccent)
     val resolvedBackground = resolvedColors.first
@@ -361,8 +366,10 @@ fun SwipeableKeyButton(
             .fillMaxHeight()
             .fillMaxWidth()
             .pointerInput(Unit) { detectExclusiveKeyGestures { currentActions } }
+            .padding(edgeContentPadding)
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
+                letterGeometry?.place(text, buttonBounds)
             }
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
@@ -404,7 +411,7 @@ fun SwipeableKeyButton(
                     )
                 } else {
                     Text(
-                        text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent),
+                        text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent, textColor),
                         color = resolvedText,
                         fontSize = labelSize.sp,
                         fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
@@ -474,7 +481,7 @@ fun SwipeableKeyButton(
                 )
             } else {
                 Text(
-                    text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent),
+                    text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent, textColor),
                     modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty()) 2.dp else 0.dp),
                     color = resolvedText,
                     fontSize = labelSize.sp,
@@ -703,6 +710,7 @@ fun SwipeableIconKeyButton(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    visualPadding: PaddingValues? = null,
 ) {
     // Gesture coroutines survive recomposition; route to the current editor/input callbacks.
     val currentOnClick by rememberUpdatedState(onClick)
@@ -749,18 +757,19 @@ fun SwipeableIconKeyButton(
     // 消除 30~60dp 位移区间"点击被取消但光标手势未激活"的死区（打字吃键）。
     val horizontalClickCancelThreshold = with(density) { 60.dp.toPx() }
     
+    val activeRepeat = remember { arrayOfNulls<com.kingzcheung.xime.keyboard.RepeatInput>(1) }
     LaunchedEffect(isLongPress) {
         if (isLongPress && currentOnLongClick != null) {
             hasTriggeredLongPress = true
-            while (isLongPress) {
-                // Each repeat is a new delete action, with the same configured feedback
-                // as a physical press. Holding must not become silent after the first tick.
-                currentOnPress?.invoke()
-                currentOnLongClick?.invoke()
-                // 长按重复间隔 30ms：80ms 时退格删除以 12.5Hz 离散更新
-                // 候选栏，低于视觉融合阈值，看起来像"一闪一闪"；30ms 时更新更密集更顺滑。
-                delay(30)
-            }
+            val hold = com.kingzcheung.xime.keyboard.RepeatInput()
+            activeRepeat[0] = hold
+            try {
+                while (isLongPress) {
+                    currentOnPress?.invoke()
+                    hold.dispatch { currentOnLongClick?.invoke() }
+                    delay(30)
+                }
+            } finally { hold.stop(); activeRepeat[0] = null }
         }
     }
 
@@ -795,12 +804,14 @@ fun SwipeableIconKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .fillMaxWidth()
+            .semantics { onClick { currentOnClick(); true } }
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
                         isPressed = true
                         currentOnPress?.invoke()
                         val released = tryAwaitRelease()
+                        activeRepeat[0]?.stop()
                         if (released || !dragActivated) {
                             isPressed = false
                             currentOnRelease?.invoke()
@@ -960,7 +971,7 @@ fun SwipeableIconKeyButton(
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
             }
-            .padding(scaledKeyVisualPadding())
+            .padding(visualPadding ?: scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(

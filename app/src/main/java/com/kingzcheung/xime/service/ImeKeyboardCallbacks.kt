@@ -54,7 +54,13 @@ internal fun rememberImeKeyboardCallbacks(
         val floatingDragX = FloatingDragAxis()
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
-            inputAdmissionTicket = service.inputReadiness::ticket,
+            onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
+            inputAdmissionTicket = { if (service.keyRouter.hasPendingCandidateCommit) null else service.inputReadiness.ticket() },
+            captureInputContext = service.keyRouter::captureInputContext,
+            inputCommands = service.inputCommands,
+            onT9UnconsumedDelete = service.keyRouter::processDeleteKey,
+            onRetryRejectedCommit = service.keyRouter::retryRejectedCommit,
+            onCancelRejectedCommit = service.keyRouter::cancelRejectedCommit,
             onOpenPreeditEditor = preeditEditor::open,
             onLivePreeditEdit = preeditEditor::edit,
             onKeyPress = keyPress@{ key, isShifted ->
@@ -85,6 +91,7 @@ internal fun rememberImeKeyboardCallbacks(
             onCandidateSelect = { index ->
                 service.keyRouter.selectCandidate(index)
             },
+            isCandidateSnapshotCurrent = { snapshot -> snapshot.hasSameSelectionSource(service.candidateState.value) },
             onCandidateDelete = { index ->
                 service.keyRouter.deleteCandidate(index)
             },
@@ -375,11 +382,7 @@ internal fun rememberImeKeyboardCallbacks(
                 }
                 // 只回滚输入法自己的段状态：count 是段数，不是字符数。
                 val removed = service.t9PartialSegments.rollbackPartialSegments(count)
-                removed.forEach { undone ->
-                    service.serviceScope.launch(service.keyProcessingDispatcher) {
-                        service.rimeEngine.t9Forget(undone.text, undone.pinyin)
-                    }
-                }
+                // Partial selections have not been learned. Undo must never delete a user phrase.
                 if (removed.isNotEmpty()) {
                     service.uiState.value = service.uiState.value.copy(
                         t9RightCandidateSelectedCount =
