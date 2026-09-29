@@ -102,7 +102,7 @@ class CustomKeyboardLayoutTest {
         assertTrue(layout.isRed('J'))
         assertTrue(layout.isRed('A'))
         assertFalse(layout.isRed('R'))
-        val text = customLayoutLabel(layout, "JR", Color.White, Color(0xFF6750A4))
+        val text = customLayoutLabel(layout, "JR", Color.White, Color(0xFF6750A4), Color.Black)
         assertEquals(1, text.spanStyles.size)
         assertEquals(0, text.spanStyles.single().start)
         assertEquals(1, text.spanStyles.single().end)
@@ -132,9 +132,9 @@ class CustomKeyboardLayoutTest {
                 val (fill, text) = customLayoutKeyColors(layout, "e", bg, Color.White, accent)
                 assertNotEquals(bg, fill)
                 assertTrue(layoutContrast(text, fill) >= 4.5f)
-                val red = vowelColor(fill, accent)
+                val red = vowelColor(fill, accent, Color.White)
                 assertTrue(layoutContrast(red, fill) >= 4.5f)
-                assertNotEquals(vowelColor(fill, Color(0xFF146C2E)), vowelColor(fill, Color(0xFF6750A4)))
+                assertNotEquals(vowelColor(fill, Color(0xFF146C2E), Color.White), vowelColor(fill, Color(0xFF6750A4), Color.White))
             }
         }
     }
