@@ -41,7 +41,16 @@ internal class StreamingVoiceText {
         val next = when {
             frozenPrefix.isEmpty() -> text
             text.startsWith(frozenPrefix) -> text.removePrefix(frozenPrefix)
-            else -> "" // 修订涉及用户已编辑的旧前缀时，不回删用户文字。
+            else -> {
+                // ASR 会修订累计结果的旧前缀。无法可靠区分这次修订与新增文字时，
+                // 保留编辑器现状，并以本次结果重新建立增量起点；不能永久等待旧前缀。
+                // 此前已上屏的尾部也交还用户，避免下一次更新误删它。
+                frozenPrefix = text
+                previousResult = text
+                visibleTail = ""
+                ownedCursor = null
+                return
+            }
         }
         if (next != visibleTail) {
             ic.beginBatchEdit()

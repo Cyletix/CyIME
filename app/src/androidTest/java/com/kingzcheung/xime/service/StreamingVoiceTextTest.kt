@@ -13,6 +13,56 @@ import org.junit.Test
 class StreamingVoiceTextTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
+    @Test fun manualDeletionAndPrefixRevisionDoNotPermanentlyBlockSpeech() {
+        lateinit var editor: EditText
+        rule.setContent { AndroidView(factory = { EditText(it).also { view -> editor = view } }) }
+        rule.runOnUiThread {
+            editor.requestFocus()
+            val ic = editor.onCreateInputConnection(EditorInfo())!!
+            var state = InputUIState(voiceSticky = true)
+            val handler = VoiceRecognitionHandler(rule.activity, { state = it }, { state }, { ic })
+            VoiceRecognitionHandler::class.java.getDeclaredField("toolbarSession")
+                .apply { isAccessible = true }.setBoolean(handler, true)
+            fun partial(text: String) {
+                VoiceRecognitionHandler::class.java.getDeclaredMethod("handlePartialResult", String::class.java)
+                    .apply { isAccessible = true }.invoke(handler, text)
+            }
+            partial("今天去公园")
+            editor.setSelection(2)
+            ic.deleteSurroundingText(1, 0)
+            partial("明天去公园")
+            assertEquals("今去公园", editor.text.toString())
+            partial("明天去公园散步")
+            assertEquals("今散步去公园", editor.text.toString())
+            // 旧前缀再次修订，不能删除刚刚上屏的尾部，也不能锁死后续输入。
+            partial("明天到公园散步")
+            assertEquals("今散步去公园", editor.text.toString())
+            partial("明天到公园散步吧")
+            assertEquals("今散步吧去公园", editor.text.toString())
+            VoiceRecognitionHandler::class.java.getDeclaredMethod("handleSpeechResult", String::class.java)
+                .apply { isAccessible = true }.invoke(handler, "明天到公园散步吧")
+            assertEquals("最终结果不得重复写入", "今散步吧去公园", editor.text.toString())
+        }
+    }
+
+    @Test fun selectionThenRevisedPrefixAllowsSubsequentSpeech() {
+        lateinit var editor: EditText
+        rule.setContent { AndroidView(factory = { EditText(it).also { view -> editor = view } }) }
+        rule.runOnUiThread {
+            editor.requestFocus()
+            val ic = editor.onCreateInputConnection(EditorInfo())!!
+            val stream = StreamingVoiceText()
+            stream.update(ic, "你好")
+            editor.setSelection(0, 2)
+            stream.update(ic, "你好朋友")
+            assertEquals("你好", editor.text.toString())
+            editor.setSelection(2)
+            stream.update(ic, "您好朋友")
+            stream.update(ic, "您好朋友再见")
+            assertEquals("你好再见", editor.text.toString())
+        }
+    }
+
     @Test fun realEditorReceivesSpaceSeparatedSpeechPartialsAndFinals() {
         lateinit var editor: EditText
         rule.setContent { AndroidView(factory = { EditText(it).also { view -> editor = view } }) }
