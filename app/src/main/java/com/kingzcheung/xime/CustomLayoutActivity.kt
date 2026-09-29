@@ -188,7 +188,7 @@ private fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boole
                 Text("强调改位字母", modifier = Modifier.weight(1f))
                 Switch(checked = redMoved, onCheckedChange = { redMoved = it }, enabled = !busy)
             }
-            Text("改位或合并按键使用主题底色，强调文字随键盘主题配色。备用空位不显示在键盘中。只有开启“独立分号键”才增加分号按键。", style = MaterialTheme.typography.bodySmall)
+            Text("开启后，对应字母的文字和按键底色随主题强调；两个选项均关闭时使用普通按键颜色。备用空位不显示在键盘中。只有开启“独立分号键”才增加分号按键。", style = MaterialTheme.typography.bodySmall)
             }
             }
             Button(modifier = Modifier.fillMaxWidth(), enabled = !busy && layout.valid(), onClick = {
@@ -281,7 +281,7 @@ private fun CustomLayoutGrid(layout: CustomKeyboardLayout, selected: String?, en
                                             target = bounds.entries.firstOrNull { it.key != letter && it.key in layout.rows.flatten() && it.value.contains(pointer) }?.key })
                                 }) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(com.kingzcheung.xime.ui.keyboard.customLayoutLabel(layout, if (letter == CustomKeyboardLayout.EMPTY_SLOT) "空位" else letter.uppercase(), colors.first, accent),
+                                Text(com.kingzcheung.xime.ui.keyboard.customLayoutLabel(layout, if (letter == CustomKeyboardLayout.EMPTY_SLOT) "空位" else letter.uppercase(), colors.first, accent, keyForeground),
                                     fontSize = if (letter.length == 1) 19.sp else 17.sp, modifier = Modifier.padding(2.dp), maxLines = 1)
                             }
                         }

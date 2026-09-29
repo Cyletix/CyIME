@@ -5,6 +5,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 
 data class CustomKeyboardLayout(
     val id: String,
@@ -13,6 +16,9 @@ data class CustomKeyboardLayout(
     val redVowels: Boolean = false,
     val redMoved: Boolean = true,
 ) {
+    /** Precomputed for the per-key preedit path; copies rebuild it with the new rows. */
+    val mergedGroups: List<String> = rows.flatten().filter { it.length > 1 }
+
     fun valid(): Boolean = name.isNotBlank() && name.length <= 32 &&
         (id == QwjrtkLayout.ID || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
         rows.map { row -> row.sumOf { it.length } } == (if (hasExtraSlot()) listOf(10, 10, 7) else listOf(10, 9, 7)) &&
@@ -98,7 +104,7 @@ data class CustomKeyboardLayout(
 object CustomKeyboardLayouts {
     const val REVISION = "custom_keyboard_layout_revision"
     const val STATUS = "custom_keyboard_layout_status"
-    @Volatile private var cached: List<CustomKeyboardLayout> = emptyList()
+    private var cached: List<CustomKeyboardLayout> by mutableStateOf(emptyList())
     fun find(id: String) = cached.firstOrNull { it.id == id }
     fun isCustom(id: String) = id == QwjrtkLayout.ID || id.startsWith("custom_pinyin_")
     @Synchronized fun load(context: Context): List<CustomKeyboardLayout> {
@@ -159,6 +165,23 @@ object CustomKeyboardLayouts {
         }
         SchemaManager.setEnabledSchemas(context, (SchemaManager.getEnabledSchemas(context) + layout.id).distinct())
         notifyChanged(context)
+    }
+
+    /** Upgrade only the translator flags of layouts owned by this editor; keep user key order and dictionaries. */
+    fun enableMeasuredCorrection(context: Context) = synchronized(this) {
+        val dir = SchemaManager.getRimeDir(context)
+        for (layout in load(context)) {
+            val file = File(dir, "${layout.id}.schema.yaml")
+            if (!file.isFile) continue
+            val old = file.readText()
+            if (old.contains("cyime_neighbor_correction: true")) continue
+            val section = Regex("(?ms)^translator:\\r?\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(old) ?: continue
+            val updated = section.value.replace(Regex("(?m)^  enable_correction:.*\\r?\\n"), "")
+                .replaceFirst(Regex("^translator:\\r?\\n"), "translator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
+            val backup = File(context.filesDir, "rime-upgrade-backups/neighbor-correction/${file.name}")
+            if (!backup.exists()) { backup.parentFile!!.mkdirs(); writeAtomically(backup, old) }
+            writeAtomically(file, old.replaceRange(section.range, updated))
+        }
     }
     fun delete(context: Context, id: String) {
         val remaining = SchemaManager.getEnabledSchemas(context).filterNot { it == id }
