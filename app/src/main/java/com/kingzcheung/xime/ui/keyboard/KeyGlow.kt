@@ -24,6 +24,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
 
 internal const val KEY_GLOW_DURATION_MS = 500
 
@@ -35,7 +37,8 @@ internal fun Modifier.keyGlow(
     particleSize: androidx.compose.ui.unit.DpSize? = null,
     particleOffset: androidx.compose.ui.unit.DpOffset = androidx.compose.ui.unit.DpOffset.Zero,
 ): Modifier = composed {
-    if (!LocalKeyboardInputPreferences.current.keyGlowEnabled) return@composed this.then(cap)
+    val paintedCap = cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current)
+    if (!LocalKeyboardInputPreferences.current.keyGlowEnabled) return@composed this.then(paintedCap)
     // One coherent colour per press, as in the reference; overlapping squares
     // vary in brightness instead of mixing three unrelated theme colours.
     var color by remember { mutableStateOf(glowPalette.first()) }
@@ -66,7 +69,7 @@ internal fun Modifier.keyGlow(
         val scale = if (animateCap) keyGlowScale(elapsed.value) else 1f
         scaleX = scale
         scaleY = scale
-    }.then(cap).drawWithCache {
+    }.then(paintedCap).drawWithCache {
         // A direction sector owns a disc-sized hit target, but its particles use one key's size.
         val lightSize = particleSize?.let { Size(it.width.toPx(), it.height.toPx()) } ?: size
         val lightOrigin = Offset((size.width - lightSize.width) / 2 + particleOffset.x.toPx(),

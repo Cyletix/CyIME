@@ -50,6 +50,8 @@ import com.kingzcheung.xime.settings.KeyboardColorsConfig
 import com.kingzcheung.xime.ui.theme.KeyboardColorScheme
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
+import com.kingzcheung.xime.ui.theme.visualMaterial
+import com.kingzcheung.xime.ui.theme.VisualStyles
 
 @Composable
 fun SettingsSection(
@@ -69,7 +71,7 @@ fun SettingsSection(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shadowElevation = 0.dp
         ) {
-            Column(content = content)
+            Column(Modifier.visualMaterial(VisualStyles.current, 12.dp, panel = true), content = content)
         }
     }
 }

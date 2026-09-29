@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
 
 /** 固定40dp占位和32dp圆形底板，切换图标不会挤动工具栏。 */
 @Composable
@@ -27,7 +29,7 @@ internal fun KeyboardToolbarButton(
 ) {
     Box(modifier.size(40.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Box(Modifier.size(32.dp).clip(CircleShape).background(background)
-            .border(1.dp, outline, CircleShape), contentAlignment = Alignment.Center) { content() }
+            .border(1.dp, outline, CircleShape).visualMaterial(VisualStyles.current, 16.dp), contentAlignment = Alignment.Center) { content() }
     }
 }
 

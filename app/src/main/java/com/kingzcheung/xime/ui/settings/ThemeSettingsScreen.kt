@@ -30,6 +30,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.ui.theme.KeyboardColorScheme
 import com.kingzcheung.xime.viewmodel.ThemeSettingsViewModel
+import androidx.compose.ui.platform.LocalContext
+import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.ui.theme.VisualStyles
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +42,7 @@ fun ThemeSettingsContent(
 ) {
     val viewModel: ThemeSettingsViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -69,6 +73,12 @@ fun ThemeSettingsContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                VisualStylePicker(VisualStyles.current) { style ->
+                    SettingsPreferences.setVisualStyle(context, style)
+                    onThemeChanged()
+                }
+            }
             item {
                 Text(
                     text = "显示模式",

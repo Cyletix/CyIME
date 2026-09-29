@@ -156,7 +156,7 @@ fun XimeTheme(
     } else {
         currentThemeId
     }
-    val scheme = KeyboardThemes.getThemeById(effectiveThemeId)
+    val scheme = KeyboardThemes.getRenderingScheme(effectiveThemeId)
     val colorScheme = if (scheme.isDynamic && DynamicThemes.isSupported()) {
         // Material You 动态配色：由系统壁纸调色板生成（官方实现），随壁纸自动更新
         if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

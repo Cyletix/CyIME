@@ -145,7 +145,7 @@ fun KeyboardLayout(
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
     val keyboardBackgroundColor = KeyboardThemes.getKeyboardBackgroundColor(uiState.themeId, uiState.isDarkTheme)
-    val themeScheme = KeyboardThemes.getThemeById(uiState.themeId)
+    val themeScheme = KeyboardThemes.getRenderingScheme(uiState.themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(uiState.themeId, uiState.isDarkTheme)
     val keyBackgroundColor = KeyboardThemes.getKeyBgColorOverride(uiState.themeId, uiState.isDarkTheme)
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
@@ -872,7 +872,7 @@ fun KeyboardLayout(
                                 onClick = { onKeyPress("enter") },
                                 backgroundColor = specialKeyBackgroundColor,
                                 textColor = specialKeyTextColor,
-                                modifier = Modifier.weight(bottom.enter),
+                                modifier = Modifier.weight(bottom.enter).testTag("qwerty-enter-key"),
                                 onPress = { onKeyPressDown?.invoke("enter") },
                                 onRelease = { onKeyRelease?.invoke("enter") },
                                 shadowEnabled = shadowEnabled,
@@ -1282,7 +1282,7 @@ private fun SplitKeyboardContent(
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
     val keyboardBackgroundColor = KeyboardThemes.getKeyboardBackgroundColor(uiState.themeId, uiState.isDarkTheme)
-    val themeScheme = KeyboardThemes.getThemeById(uiState.themeId)
+    val themeScheme = KeyboardThemes.getRenderingScheme(uiState.themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(uiState.themeId, uiState.isDarkTheme)
     val keyBackgroundColor = KeyboardThemes.getKeyBgColorOverride(uiState.themeId, uiState.isDarkTheme)
         ?: if (uiState.isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)

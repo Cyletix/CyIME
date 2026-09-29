@@ -281,8 +281,12 @@ object SettingsPreferences {
     }
     
     fun setDarkMode(context: Context, mode: Int) {
+        setVisualStyle(context, com.kingzcheung.xime.ui.theme.VisualStyle.ORIGINAL)
         getPrefs(context).edit().putInt(KEY_DARK_MODE, mode).apply()
     }
+
+    fun getEffectiveDarkMode(context: Context): Int =
+        getVisualStyle(context).dark?.let { if (it) 1 else 0 } ?: getDarkMode(context)
     
     fun isSoundEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_SOUND_ENABLED, true)
@@ -386,6 +390,16 @@ object SettingsPreferences {
 
     fun getKeyboardTheme(context: Context): String {
         return getPrefs(context).getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
+    }
+
+    const val KEY_VISUAL_STYLE = "cyime_visual_style"
+
+    fun getVisualStyle(context: Context) = com.kingzcheung.xime.ui.theme.VisualStyle.fromId(
+        getPrefs(context).getString(KEY_VISUAL_STYLE, null))
+
+    fun setVisualStyle(context: Context, style: com.kingzcheung.xime.ui.theme.VisualStyle) {
+        com.kingzcheung.xime.ui.theme.VisualStyles.current = style
+        getPrefs(context).edit().putString(KEY_VISUAL_STYLE, style.id).apply()
     }
     
     fun setKeyboardTheme(context: Context, themeId: String) {

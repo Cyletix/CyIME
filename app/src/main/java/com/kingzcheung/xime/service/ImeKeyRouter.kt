@@ -395,7 +395,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
                 "enter" -> {
                     service.calculatorEngine.clear()
-                    updateCalculatorCandidates()
                     val japaneseResult = service.rimeEngine.processJapaneseEnterIfComposing()
                     if (japaneseResult != null) {
                         // 原生 Return 按日语方案提交假名读音；commit 不能经过可覆盖的 UI channel。
@@ -408,16 +407,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // 未处理时保留输入；成功时按结果刷新，不能再 clearComposition 或重复取 commit。
                         return@command
                     }
-                    if (candState.isComposing) {
+                    val engineInput = service.rimeEngine.getInput()
+                    // UI publication may lag the FIFO. Enter consumes unfinished input;
+                    // only a subsequent, idle Enter may invoke the editor action.
+                    if (engineInput.isNotEmpty() || candState.isComposing ||
+                        (!state.isAsciiMode && candState.pendingEnglishText.isNotEmpty())) {
                         // T9 模式提交完整预编辑（含 partial commit 累积），非 T9 模式用 RIME input。
                         val isT9 = isT9Schema(state.currentSchemaId)
                         val input = if (isT9 && candState.preeditText.isNotEmpty()) {
                             candState.preeditText
                         } else {
-                            service.rimeEngine.getInput()
+                            engineInput
                         }
                         if (input.isNotEmpty()) {
-                            withEditor { service.commitText(input) }
+                            val accepted = withEditor { service.submitText(input).accepted }
+                            if (!accepted) return@command
                         }
                         if (isT9) {
                             // 同步清空，避免异步 postRimeJob 延迟导致后续 backspace 拿到旧状态。

@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
+
 import com.kingzcheung.xime.service.PredictionManager
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
@@ -306,6 +309,7 @@ fun CandidateBar(
             .fillMaxWidth()
             .height(44.dp)
             .background(visuals.backgroundColor)
+            .visualMaterial(VisualStyles.current, 0.dp, panel = true)
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center,
     ) {

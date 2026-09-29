@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
             val setupCompleted = SettingsPreferences.isSetupCompleted(context)
             var showWizard by remember { mutableStateOf(!setupCompleted) }
             var wizardToSettings by remember { mutableStateOf(false) }
-            var darkMode by remember { mutableIntStateOf(SettingsPreferences.getDarkMode(context)) }
+            var darkMode by remember { mutableIntStateOf(SettingsPreferences.getEffectiveDarkMode(context)) }
             var keyboardTheme by remember { mutableStateOf(SettingsPreferences.getKeyboardTheme(context)) }
             
             val isDarkTheme = when (darkMode) {
@@ -166,7 +166,7 @@ class MainActivity : ComponentActivity() {
                                 SettingsScreen(
                                     initialRoute = "schema",
                                     onThemeChanged = {
-                                        darkMode = SettingsPreferences.getDarkMode(context)
+                                        darkMode = SettingsPreferences.getEffectiveDarkMode(context)
                                         keyboardTheme = SettingsPreferences.getKeyboardTheme(context)
                                     },
                                     onWizardBack = { wizardToSettings = false }
@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
                             initialRoute = openFragment,
                             initialPluginId = openPluginId,
                             onThemeChanged = {
-                                darkMode = SettingsPreferences.getDarkMode(context)
+                                darkMode = SettingsPreferences.getEffectiveDarkMode(context)
                                 keyboardTheme = SettingsPreferences.getKeyboardTheme(context)
                             }
                         )
