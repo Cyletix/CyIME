@@ -27,6 +27,11 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
 
     /** 进程生命周期累计上屏提交次数。 */
     private var sessionCommits: Long = 0L
+    private val counterSessionId = java.util.UUID.randomUUID().toString()
+    private var typedChars = 0L
+    private var typedCommits = 0L
+    private var pastedChars = 0L
+    private var pastedCommits = 0L
 
     /** 当前输入会话是否敏感输入框（密码类 / 不学习标记）。
      *  主线程写（onStartInput）、key-processing 线程读（候选词变换短路），volatile 保证可见性。 */
@@ -71,11 +76,24 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
         // String.length 的 UTF-16 单元会把它们算成 2（"复制12个字统计13"的根源）
         sessionCommittedChars += text.codePointCount(0, text.length)
         sessionCommits++
+        if (isPaste) {
+            pastedChars += text.codePointCount(0, text.length)
+            pastedCommits++
+        } else {
+            typedChars += text.codePointCount(0, text.length)
+            typedCommits++
+        }
+        PluginManager.dispatchEvent(PluginEvent(PluginEvent.TYPE_TYPING_TOTALS, mapOf(
+            "counter_session_id" to counterSessionId,
+            "typed_chars" to typedChars, "typed_commits" to typedCommits,
+            "pasted_chars" to pastedChars, "pasted_commits" to pastedCommits,
+        )))
         PluginManager.dispatchEvent(
             PluginEvent(
                 PluginEvent.TYPE_TEXT_COMMITTED,
                 mapOf(
                     PluginEvent.FIELD_COMMITTED_TEXT to text,
+                    "committed_char_count" to text.codePointCount(0, text.length),
                     PluginEvent.FIELD_SESSION_TOTAL_CHARS to sessionCommittedChars,
                     PluginEvent.FIELD_SESSION_TOTAL_COMMITS to sessionCommits,
                     PluginEvent.FIELD_IS_PASTE to isPaste,

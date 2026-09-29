@@ -53,7 +53,8 @@ class LuaScriptRuntime(
     private val quickSendHostApi: QuickSendHostApi? = null,
     private val clipboardHostApi: ClipboardHostApi? = null,
     private val callTimeoutMs: Long = CALL_TIMEOUT_MS,
-    private val callbackTimeoutMs: Long = CALLBACK_TIMEOUT_MS
+    private val callbackTimeoutMs: Long = CALLBACK_TIMEOUT_MS,
+    eventQueueCapacity: Int = 256,
 ) {
 
     companion object {
@@ -187,14 +188,14 @@ class LuaScriptRuntime(
     }
 
     private val api: LuaHostApi = hostApi ?: LuaHostApiImpl(pluginId, pluginDir, configStore)
+    @Volatile private var executionBudget: LuaExecutionBudget? = null
     private val globals: Globals = buildSandbox()
     private val loadedModules = ConcurrentHashMap<String, LuaValue>()
     private val libsDir = File(pluginDir, "libs")
 
     /**
      * 插件 Lua 执行的专用线程：宿主 IO 协程线程池不被插件死循环耗尽。
-     * 超时后线程被弃用（Java 无法强杀死循环线程，但影响被隔离在该线程内），
-     * 插件标记中毒，后续调用直接失败，用户可在插件中心重载/卸载。
+     * Lua 指令检查截止时间并退出死循环；宿主 I/O 仍由各 API 的超时控制。
      */
     private val executor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "xime-lua-$pluginId").apply { isDaemon = true }
@@ -207,7 +208,10 @@ class LuaScriptRuntime(
     /** 在专用线程内执行 Lua 代码并限时；超时返回 null（可选的调用方按失败处理）。 */
     private fun <T> runGuarded(timeoutMs: Long, poisonOnTimeout: Boolean, block: () -> T): T? {
         if (poisoned) return null
-        val future = executor.submit(Callable(block))
+        val future = executor.submit(Callable {
+            executionBudget = LuaExecutionBudget(timeoutMs)
+            try { block() } finally { executionBudget = null }
+        })
         return try {
             future.get(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (e: TimeoutException) {
@@ -216,15 +220,17 @@ class LuaScriptRuntime(
             null
         } catch (e: Exception) {
             future.cancel(true)
+            if (poisonOnTimeout && e.cause is LuaExecutionStopped) poison()
             throw e
         }
     }
 
-    private fun poison() {
+    private fun poison(reason: String = "插件执行超时，已停止该实例；请重载或卸载") {
         if (poisoned) return
         poisoned = true
+        if (eventStreamFailure == null) eventStreamFailure = reason
         executor.shutdownNow()
-        api.logError("插件执行超时（疑似死循环），已停止执行该插件，请重载或卸载")
+        api.logError(reason)
     }
 
     /** ASR 插件后端设置的宿主结果回调（Lua 的 emit* 桥接目标）。 */
@@ -258,8 +264,15 @@ class LuaScriptRuntime(
     @Volatile
     private var subscribedEvents: Set<String> = emptySet()
 
-    /** 下行事件通道：conflated，只保最新，插件消费慢不积压。 */
-    private var eventChannel: Channel<PluginEvent>? = null
+    /** Coalesced wakeups for a bounded queue; the wakeup carries no event data. */
+    private var eventChannel: Channel<Unit>? = null
+    private val eventQueue = PluginEventQueue(eventQueueCapacity)
+    private val eventStreamId = java.util.UUID.randomUUID().toString()
+    private var eventSequence = 0L
+    @Volatile private var firstMissingEvent: Long? = null
+    /** A failed stream is not a successful/healthy subscription. Reload starts a new stream. */
+    @Volatile var eventStreamFailure: String? = null
+        private set
 
     /** 事件消费协程域；close 时 cancel。 */
     private var eventScope: CoroutineScope? = null
@@ -272,28 +285,51 @@ class LuaScriptRuntime(
         subscribedEvents = subscribed
         if (subscribed.isEmpty()) return
         if (eventChannel != null) return
-        val channel = Channel<PluginEvent>(Channel.CONFLATED)
+        val channel = Channel<Unit>(Channel.CONFLATED)
         eventChannel = channel
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         eventScope = scope
         scope.launch {
-            for (event in channel) {
-                invokeEventCallback(event)
+            for (signal in channel) {
+                while (true) {
+                    val event = eventQueue.poll() ?: break
+                    invokeEventCallback(event)
+                }
+                firstMissingEvent?.let { sequence ->
+                    invokeEventCallback(PluginEvent(PluginEvent.TYPE_EVENT_STREAM_FAILED, mapOf(
+                        "stream_id" to eventStreamId, "first_missing_sequence" to sequence,
+                        "reason" to eventStreamFailure,
+                    )))
+                    poison(eventStreamFailure!!)
+                    channel.close()
+                }
+                if (firstMissingEvent != null) break
             }
         }
     }
 
     /** 向插件投递事件：未声明该类型或未启用通道时静默丢弃。返回是否已投递。 */
-    fun dispatchEvent(event: PluginEvent): Boolean {
+    @Synchronized fun dispatchEvent(event: PluginEvent): Boolean {
         val channel = eventChannel ?: return false
-        if (event.type !in subscribedEvents) return false
-        return channel.trySend(event).isSuccess
+        if (poisoned || firstMissingEvent != null || event.type !in subscribedEvents) return false
+        val sequence = ++eventSequence
+        val sequenced = event.copy(payload = event.payload + mapOf(
+            "stream_id" to eventStreamId, "sequence" to sequence,
+        ))
+        if (!eventQueue.offer(sequenced)) {
+            eventStreamFailure = "事件流 $eventStreamId 从第 $sequence 项开始缺失；已停止接收，排空已接收事件后停止实例。逐条统计可能不完整，请重载。"
+            firstMissingEvent = sequence
+            api.logError(eventStreamFailure!!)
+            channel.trySend(Unit)
+            return false
+        }
+        return channel.trySend(Unit).isSuccess
     }
 
     /** 事件 → Lua onPluginEvent(type, payload)（网络回调同级超时，不中毒）。 */
     private fun invokeEventCallback(event: PluginEvent) {
         try {
-            runGuarded(callbackTimeoutMs, poisonOnTimeout = false) {
+            val completed = runGuarded(callbackTimeoutMs, poisonOnTimeout = true) {
                 synchronized(luaLock) {
                     if (!loaded) return@runGuarded
                     val fn = pluginTable.get(LuaPluginContract.FN_ON_PLUGIN_EVENT)
@@ -301,8 +337,9 @@ class LuaScriptRuntime(
                     fn.invoke(LuaValue.valueOf(event.type), payloadToLuaTable(event.payload))
                 }
             }
+            if (completed == null) poison("插件事件执行未完成，事件流中止；统计可能不完整，请重载")
         } catch (e: Exception) {
-            api.log("onPluginEvent 回调失败: ${e.message}")
+            poison("插件事件执行失败，事件流中止；统计可能不完整，请重载: ${e.message}")
         }
     }
 
@@ -445,6 +482,19 @@ class LuaScriptRuntime(
     private fun buildSandbox(): Globals {
         // JsePlatform 自动配置 compiler 与 loader；随后剥离全部危险库
         val g = org.luaj.vm2.lib.jse.JsePlatform.standardGlobals()
+        // Keep the instruction hook private: plugins must not replace/disable it.
+        g.load(object : org.luaj.vm2.lib.DebugLib() {
+            private var instructions = 0
+            override fun onInstruction(pc: Int, v: Varargs?, top: Int) {
+                if (++instructions and 1023 == 0) {
+                    (executionBudget ?: throw LuaExecutionStopped()).check()
+                }
+            }
+            override fun onCall(f: org.luaj.vm2.LuaFunction?) {}
+            override fun onCall(c: org.luaj.vm2.LuaClosure?, args: Varargs?, stack: Array<LuaValue>?) {}
+            override fun onReturn() {}
+        })
+        g.get("package").get("loaded").set("debug", LuaValue.NIL)
 
         // 危险库剥离：io/os（文件与系统调用）、luajava（Java 反射）、loadfile/dofile（任意文件加载）、
         // debug（getregistry/getmetatable 可篡改宿主注入表与注册表，扩大攻击面）
@@ -891,7 +941,8 @@ class LuaScriptRuntime(
                     }
                     val chunk = globals.load(entryFile.readText(), "@$entryScript")
                     val result = chunk.call()
-                    pluginTable = result.takeIf { it.istable() } ?: LuaValue.NIL
+                    check(result.istable()) { "Plugin entry must return its exports table" }
+                    pluginTable = result
                     loaded = true
                     Log.d(TAG, "Plugin $pluginId loaded from $entryScript")
                     true
@@ -903,26 +954,30 @@ class LuaScriptRuntime(
         }
     }
 
-    fun callOnLoad() {
-        if (!loaded) return
-        try {
-            val fn = synchronized(luaLock) { pluginTable.get(LuaPluginContract.FN_ON_LOAD) }
-            if (!fn.isfunction()) return
+    fun callOnLoad(): Boolean {
+        if (!loaded) return false
+        return try {
             runGuarded(callTimeoutMs, poisonOnTimeout = true) {
-                synchronized(luaLock) { fn.invoke() }
-            }
+                synchronized(luaLock) {
+                    val fn = pluginTable.get(LuaPluginContract.FN_ON_LOAD)
+                    if (fn.isfunction()) fn.invoke()
+                    true
+                }
+            } ?: false
         } catch (e: Exception) {
             Log.e(TAG, "onLoad failed for $pluginId", e)
+            false
         }
     }
 
     fun callOnUnload() {
-        if (!loaded) return
+        if (!loaded || poisoned) return
         try {
-            val fn = synchronized(luaLock) { pluginTable.get(LuaPluginContract.FN_ON_UNLOAD) }
-            if (!fn.isfunction()) return
-            runGuarded(callTimeoutMs, poisonOnTimeout = true) {
-                synchronized(luaLock) { fn.invoke() }
+            runGuarded(minOf(callTimeoutMs, 500L), poisonOnTimeout = true) {
+                synchronized(luaLock) {
+                    val fn = pluginTable.get(LuaPluginContract.FN_ON_UNLOAD)
+                    if (fn.isfunction()) fn.invoke()
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "onUnload failed for $pluginId", e)
@@ -931,27 +986,26 @@ class LuaScriptRuntime(
 
     /** 调用插件导出的函数，返回 LuaValue 结果；不存在、出错或超时返回 NIL。 */
     fun call(name: String, vararg args: LuaValue): LuaValue {
-        if (!loaded) return LuaValue.NIL
         return try {
-            runGuarded(callTimeoutMs, poisonOnTimeout = true) {
-                synchronized(luaLock) {
-                    val fn = pluginTable.get(name)
-                    if (!fn.isfunction()) {
-                        Log.w(TAG, "Plugin $pluginId does not export '$name'")
-                        return@runGuarded LuaValue.NIL
-                    }
-                    if (args.isEmpty()) {
-                        fn.invoke().arg1()
-                    } else {
-                        fn.invoke(args).arg1()
-                    }
-                }
-            } ?: LuaValue.NIL
+            callChecked(name, *args)
         } catch (e: Exception) {
             Log.e(TAG, "Call '$name' failed for $pluginId: ${e.message}", e)
             api.log("Call '$name' failed: ${e.message}")
             LuaValue.NIL
         }
+    }
+
+    /** Missing optional exports return NIL; load, execution and timeout failures throw. */
+    fun callChecked(name: String, vararg args: LuaValue): LuaValue {
+        check(loaded && !poisoned) { "Plugin $pluginId is not running" }
+        return runGuarded(callTimeoutMs, poisonOnTimeout = true) {
+            synchronized(luaLock) {
+                val fn = pluginTable.get(name)
+                if (fn.isnil()) return@runGuarded LuaValue.NIL
+                check(fn.isfunction()) { "Plugin export '$name' is not a function" }
+                fn.invoke(args).arg1()
+            }
+        } ?: throw IllegalStateException("Plugin '$name' timed out or stopped")
     }
 
     fun close() {
@@ -962,6 +1016,7 @@ class LuaScriptRuntime(
             eventScope = null
             eventChannel?.close()
             eventChannel = null
+            eventQueue.clear()
             subscribedEvents = emptySet()
             executor.shutdownNow()
             loadedModules.clear()

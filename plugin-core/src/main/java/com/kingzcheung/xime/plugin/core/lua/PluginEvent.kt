@@ -13,6 +13,10 @@ data class PluginEvent(
     val payload: Map<String, Any?> = emptyMap(),
 ) {
     companion object {
+        /** Classified cumulative counters. Contains no text; safe to coalesce. */
+        const val TYPE_TYPING_TOTALS = "typing_totals"
+        /** Terminal stream notification after accepted events drain. Reload creates a new stream. */
+        const val TYPE_EVENT_STREAM_FAILED = "event_stream_failed"
         /** 用户正在输入的编码变化：payload = { input_text: String }。 */
         const val TYPE_INPUT_CHANGED = "input_changed"
 

@@ -70,7 +70,7 @@ class PluginLifecycleManager(
 
         val hostVersion = com.kingzcheung.xime.plugin.core.util.VersionUtil.getHostVersionName(application)
         val enabledPlugins = allPlugins.filter { plugin ->
-            if (!plugin.enabled || loadedPlugins.containsKey(plugin.id)) return@filter false
+            if (!com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.isEnabled(application, plugin.id, plugin.enabled) || loadedPlugins.containsKey(plugin.id)) return@filter false
             val compatible = com.kingzcheung.xime.plugin.core.util.VersionUtil.isHostSupported(
                 hostVersion ?: "", plugin.minHostVersion, plugin.maxHostVersion
             )
@@ -105,6 +105,7 @@ class PluginLifecycleManager(
             return false
         }
         val hostVersion = com.kingzcheung.xime.plugin.core.util.VersionUtil.getHostVersionName(application)
+        if (!com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.isEnabled(application, pluginId, pluginInfo.enabled)) return false
         if (!com.kingzcheung.xime.plugin.core.util.VersionUtil.isHostSupported(
                 hostVersion ?: "", pluginInfo.minHostVersion, pluginInfo.maxHostVersion
             )
@@ -220,6 +221,7 @@ class PluginLifecycleManager(
             adapter
         } catch (e: Exception) {
             Log.e(TAG, "Failed to instantiate Lua plugin ${plugin.id}", e)
+            loadedPlugin.script?.close()
             null
         }
     }

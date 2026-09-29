@@ -187,6 +187,7 @@ object PluginManager {
         val context = frameworkContext ?: return 0
         var delivered = 0
         for ((_, loaded) in context.loadedPlugins) {
+            if (!com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.isEnabled(context.application, loaded.pluginInfo.id, loaded.pluginInfo.enabled)) continue
             val runtime = loaded.script ?: continue
             if (runtime.dispatchEvent(event)) delivered++
         }
@@ -204,10 +205,7 @@ object PluginManager {
     suspend fun setPluginEnabled(pluginId: String, enabled: Boolean): Boolean {
         return try {
             val pluginInfo = requireContext().xmlManager.getPluginById(pluginId) ?: return false
-            if (pluginInfo.enabled == enabled) return true
-            val updatedPluginInfo = pluginInfo.copy(enabled = enabled)
-            requireContext().xmlManager.updatePlugin(updatedPluginInfo)
-            requireContext().xmlManager.flushToDisk()
+            com.kingzcheung.xime.plugin.core.config.PluginEnablementStore.setEnabled(requireContext().application, pluginId, enabled)
             if (!enabled) {
                 // 禁用时同步卸载运行中实例，避免插件继续后台运行（网络会话/剪贴板监听）
                 unloadPlugin(pluginId)

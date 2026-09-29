@@ -40,6 +40,9 @@ local totalChars = tonumber(host.config.get(KEY_TOTAL_CHARS)) or 0
 local totalCommits = tonumber(host.config.get(KEY_TOTAL_COMMITS)) or 0
 -- 首次使用（无记录）时从当前快照起算，不回溯历史（差值按 0）
 local lastSeenChars = tonumber(host.config.get(KEY_LAST_SEEN))
+local lastCounterSession = host.config.get("counter_session_id")
+local lastTypedChars = tonumber(host.config.get("last_typed_chars")) or 0
+local lastTypedCommits = tonumber(host.config.get("last_typed_commits")) or 0
 local daily = host.json.decode(host.config.get(KEY_DAILY) or "") or {}
 local currentInput = ""
 -- 打字速度滑动窗口：{ {ts = 绝对秒, chars = 增量}, ... }（仅内存）
@@ -175,9 +178,31 @@ end
 -- ===== 事件 =====
 
 function plugin.onPluginEvent(eventType, payload)
-  if eventType == "text_committed" and payload ~= nil then
+  if eventType == "typing_totals" and payload ~= nil then
+    local session = payload.counter_session_id
+    if session == nil then return end
+    if session ~= lastCounterSession then
+      lastTypedChars, lastTypedCommits = 0, 0
+    end
+    local chars = payload.typed_chars or 0
+    local commits = payload.typed_commits or 0
+    local delta = math.max(0, chars - lastTypedChars)
+    totalChars = totalChars + delta
+    totalCommits = totalCommits + math.max(0, commits - lastTypedCommits)
+    if delta > 0 then
+      local d = todayStr()
+      daily[d] = (daily[d] or 0) + delta
+      recordSpeed(nowSec(), delta)
+    end
+    lastCounterSession, lastTypedChars, lastTypedCommits = session, chars, commits
+    host.config.set("counter_session_id", session)
+    host.config.set("last_typed_chars", tostring(chars))
+    host.config.set("last_typed_commits", tostring(commits))
+    persist()
+  elseif eventType == "text_committed" and payload ~= nil then
     local sessionChars = payload.session_total_chars or 0
-    local delta = sessionChars - (lastSeenChars or sessionChars)
+    local delta = payload.committed_char_count
+    if delta == nil then delta = sessionChars - (lastSeenChars or sessionChars) end
     lastSeenChars = sessionChars
     if delta < 0 then
       -- 宿主重启（session 归零）：新会话起点，本快照即增量
