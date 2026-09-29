@@ -27,6 +27,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CancellationException
+import com.kingzcheung.xime.settings.ClipboardWordSegmenter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -51,54 +55,6 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
 import kotlin.math.max
 
-/**
- * 将文本拆分为独立单元：
- * - 中文按字拆分
- * - 英文按空格拆分
- * - 标点符号作为独立拆分点
- */
-private fun splitText(text: String): List<String> {
-    val result = mutableListOf<String>()
-    val englishBuffer = StringBuilder()
-
-    fun flushEnglish() {
-        if (englishBuffer.isNotEmpty()) {
-            result.add(englishBuffer.toString())
-            englishBuffer.clear()
-        }
-    }
-
-    for (char in text) {
-        when {
-            // CJK 字符（中文、日文、韩文）
-            char in '\u4E00'..'\u9FFF' || char in '\u3400'..'\u4DBF' || char in '\uF900'..'\uFAFF' -> {
-                flushEnglish()
-                result.add(char.toString())
-            }
-            // 英文字母
-            char.isLetter() -> {
-                englishBuffer.append(char)
-            }
-            // 空格
-            char.isWhitespace() -> {
-                flushEnglish()
-            }
-            // 数字
-            char.isDigit() -> {
-                englishBuffer.append(char)
-            }
-            // 其他（标点、符号等）
-            else -> {
-                flushEnglish()
-                result.add(char.toString())
-            }
-        }
-    }
-    flushEnglish()
-
-    return result
-}
-
 @Composable
 fun SplitWordsView(
     text: String,
@@ -106,32 +62,29 @@ fun SplitWordsView(
     viewModel: KeyboardViewModel,
     onBack: () -> Unit,
     onNavigateToQuickSend: (() -> Unit)? = null,
-    onSelectChar: (String) -> Unit,
-    onDeleteText: ((Int) -> Unit)? = null,
+    onConfirmText: (String) -> Unit,
     bottomPaddingDp: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface
     val accentColor = MaterialTheme.colorScheme.primary
     val chipBgColor = MaterialTheme.colorScheme.surfaceContainerLow
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-
-    val splitParts = remember(text) { splitText(text) }
-    val selectedIndices = remember { mutableStateListOf<Int>() }
-    var committedText by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    var splitParts by remember(text) { mutableStateOf<List<String>>(emptyList()) }
+    var loading by remember(text) { mutableStateOf(true) }
+    var error by remember(text) { mutableStateOf<String?>(null) }
+    val selectedIndices = remember(text) { mutableStateListOf<Int>() }
+    LaunchedEffect(text) {
+        try { splitParts = ClipboardWordSegmenter.split(context, text) }
+        catch (e: CancellationException) { throw e }
+        catch (e: Exception) { error = "分词失败：${e.message}" }
+        finally { loading = false }
+    }
+    val selectedText = selectedIndices.joinToString("") { splitParts[it] }
 
     fun addSelected(index: Int) {
         val pos = selectedIndices.binarySearch(index)
         if (pos < 0) selectedIndices.add(-(pos + 1), index)
-    }
-
-    fun commitSelection() {
-        val newText = selectedIndices.joinToString("") { splitParts[it] }
-        if (newText == committedText) return
-        onDeleteText?.invoke(committedText.length)
-        newText.forEach { c -> onSelectChar(c.toString()) }
-        committedText = newText
     }
 
     Column(
@@ -149,7 +102,7 @@ fun SplitWordsView(
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(40.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable { onBack() },
@@ -170,10 +123,12 @@ fun SplitWordsView(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = textColor,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
             )
 
+            Spacer(Modifier.weight(1f))
             TextButton(
+                enabled = selectedText.isNotEmpty(),
                 onClick = {
                     val text = selectedIndices.joinToString("") { splitParts[it] }
                     if (text.isNotEmpty()) {
@@ -191,6 +146,11 @@ fun SplitWordsView(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("添加到快捷发送", color = accentColor, fontSize = 13.sp)
             }
+            Spacer(Modifier.weight(1f))
+            TextButton(enabled = selectedText.isNotEmpty(), onClick = {
+                onConfirmText(selectedText)
+                onBack()
+            }) { Text("确定", fontWeight = FontWeight.Bold) }
         }
 
         // 内容区（白色卡片样式）
@@ -198,7 +158,7 @@ fun SplitWordsView(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 4.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
@@ -211,11 +171,13 @@ fun SplitWordsView(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)
+                        .padding(8.dp)
                 ) {
 
+                    if (loading) Text("正在按词库拆词…", color = textColor)
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     // 拆词结果（支持点击 + 滑动选词）
-                    val chipBounds = remember { mutableMapOf<Int, Rect>() }
+                    val chipBounds = remember(splitParts) { mutableMapOf<Int, Rect>() }
                     var containerRootPos by remember { mutableStateOf(Offset.Zero) }
 
                     fun findChipAt(pos: Offset): Int? {
@@ -245,10 +207,10 @@ fun SplitWordsView(
                                         } else {
                                             addSelected(firstChip)
                                         }
-                                        commitSelection()
+
                                     }
 
-                                    // 滑动过程（边滑边上屏）
+                                    // 滑动过程只修改面板内的选择
                                     do {
                                         val event = awaitPointerEvent(PointerEventPass.Final)
                                         val change = event.changes.firstOrNull() ?: break
@@ -266,7 +228,7 @@ fun SplitWordsView(
                                                         addSelected(i)
                                                     }
                                                 }
-                                                commitSelection()
+
                                             }
                                         } else {
                                             break
@@ -287,13 +249,13 @@ fun SplitWordsView(
                                         .onGloballyPositioned { chipBounds[index] = it.boundsInRoot() }
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (isSelected) accentColor else chipBgColor)
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = part,
-                                        color = if (isSelected) Color.White else textColor,
-                                        fontSize = 14.sp,
+                                        text = if (part.isBlank()) if (part.contains('\n')) "换行" else "空格" else part,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else textColor,
+                                        fontSize = 17.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -305,6 +267,6 @@ fun SplitWordsView(
         }
 
         // 底部留空
-        Spacer(modifier = Modifier.height(if (isLandscape) 15.dp else bottomPaddingDp.dp))
+        Spacer(modifier = Modifier.height(bottomPaddingDp.dp))
     }
 }
