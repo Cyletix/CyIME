@@ -129,6 +129,7 @@ object KeyboardThemes {
     /** 重新加载 xime.yaml/xime.custom.yaml 中的配色方案并更新缓存。 */
     fun reload(context: Context) {
         VisualStyles.current = com.kingzcheung.xime.settings.SettingsPreferences.getVisualStyle(context)
+        IconAppearance.reload(context)
         configOverrides = KeysConfigHelper.loadColorSchemes(context)
         // 1) 对硬编码主题应用配置覆盖
         val overridden = defaultThemes.map { applyConfigOverrides(context, it) }

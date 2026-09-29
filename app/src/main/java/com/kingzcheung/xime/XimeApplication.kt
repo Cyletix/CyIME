@@ -52,6 +52,14 @@ class XimeApplication : Application(), ImageLoaderFactory {
         // Model services run in separate processes. They must not copy/deploy the
         // same Rime directory or load the keyboard/plugin runtime a second time.
         if (android.os.Build.VERSION.SDK_INT >= 28 && getProcessName() != packageName) return
+        com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this)
+        com.kingzcheung.xime.ui.theme.IconAppearance.reload(this)
+        try {
+            com.kingzcheung.xime.ui.theme.LauncherIcons.apply(this, com.kingzcheung.xime.ui.theme.IconAppearance.effective)
+        } catch (e: RuntimeException) {
+            // A launcher failure must not prevent typing. The explicit settings action reports it too.
+            FileLogger.e(TAG, "Unable to synchronize launcher icon", e)
+        }
         AppFonts.initialize(this)
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->

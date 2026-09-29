@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.theme.VisualStyle
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
+import com.kingzcheung.xime.ui.theme.CyimeGeneratedIcon
+import com.kingzcheung.xime.ui.theme.visualEnvironment
 
 @Composable
 internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) -> Unit) {
@@ -34,11 +36,12 @@ internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) ->
                     val shape = RoundedCornerShape(16.dp)
                     Column(Modifier.weight(1f).testTag("visual-style-${style.id}")
                         .semantics { this.selected = selected == style }
-                        .clip(shape).background(palette.surfaceLight)
+                        .clip(shape).background(palette.surfaceLight).visualEnvironment(style)
                         .border(if (selected == style) 2.dp else 1.dp,
                             palette.accentLight.copy(alpha = if (selected == style) 1f else .24f), shape)
                         .clickable { onSelect(style) }.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CyimeGeneratedIcon(style, Modifier.size(46.dp).align(Alignment.CenterHorizontally), background = true)
                         Text("你好   拼音", color = palette.candidateTextColorLight, fontSize = 13.sp,
                             modifier = Modifier.fillMaxWidth().visualMaterial(style, 6.dp, panel = true).padding(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {

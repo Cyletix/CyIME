@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
+
 import android.annotation.SuppressLint
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -1216,7 +1219,7 @@ private fun ShiftCapsKeyButton(
                 else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
                 else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
                 else backgroundColor
-            ),
+            ).visualMaterial(VisualStyles.current, keyCornerRadius),
         contentAlignment = Alignment.Center
     ) {
         val painter = when (shiftMode) {

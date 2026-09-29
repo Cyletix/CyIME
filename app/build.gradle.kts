@@ -63,8 +63,8 @@ android {
         // 版本规则：本地小改递增 PATCH；对外正式发包递增 MINOR，保留 PATCH。
         // 例：1.0.5 开发 → 1.1.5 正式 → 1.1.6 开发 → 1.2.6 正式。
         // versionCode 每次生成新版本独立递增，保证覆盖升级。
-        versionCode = 20261023
-        versionName = "1.2.11"
+        versionCode = 20261025
+        versionName = "1.3.12"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
