@@ -330,10 +330,15 @@ internal fun EditorActionKey(
         .background(if (pressed && !LocalKeyboardInputPreferences.current.keyGlowEnabled) foreground.copy(alpha = 0.18f) else background),
             animateCap = !plain, particleSize = glowSize,
             particleOffset = if (plain) androidx.compose.ui.unit.DpOffset(contentOffsetX, contentOffsetY) else androidx.compose.ui.unit.DpOffset.Zero), contentAlignment = Alignment.Center) {
-        val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let { if (compact) it.coerceAtMost(1.15f) else it }
+        val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let {
+            if (compact) minOf(it, 1.15f,
+                ((maxHeight.value - 12f) / (20f + 14f * density.fontScale)).coerceAtLeast(.25f)) else it
+        }
         val iconSize = (if (compact) 20.dp else 24.dp) * scale
         val labelHeight = with(density) { (14f * scale).sp.toDp() }
-        val showLabel = maxHeight >= iconSize + labelHeight
+        // Direction arrows already describe the action; stacked text can cross
+        // the sector's curved edge after the disc is reduced for corner spacing.
+        val showLabel = !plain && maxHeight >= iconSize + labelHeight
         val fittedIconSize = iconSize.coerceAtMost(maxHeight)
         val shapeSize = androidx.compose.ui.geometry.Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         val measuredShape = visualShape?.let { RenderedControlShape(it.createOutline(shapeSize,

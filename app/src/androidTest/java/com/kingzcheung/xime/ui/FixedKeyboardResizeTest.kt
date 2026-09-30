@@ -79,8 +79,11 @@ class FixedKeyboardResizeTest {
             assertEquals(400, reported!!.width())
             val image = rule.onNodeWithTag("host").captureToImage().asAndroidBitmap()
             for (px in 0 until image.width) {
-                assertEquals(if (px in left until right) android.graphics.Color.BLUE else android.graphics.Color.MAGENTA,
-                    image.getPixel(px, image.height / 2))
+                val expected = if (px in left until right) android.graphics.Color.BLUE else android.graphics.Color.MAGENTA
+                val actual = image.getPixel(px, image.height / 2)
+                // Capturing a wide-gamut surface can round an sRGB channel by one.
+                for (shift in listOf(0, 8, 16, 24)) assertTrue("pixel $px channel $shift",
+                    kotlin.math.abs(((actual ushr shift) and 255) - ((expected ushr shift) and 255)) <= 2)
             }
         }
     }
@@ -117,11 +120,12 @@ class FixedKeyboardResizeTest {
             swipe(Offset(width - 10f, 365f), Offset(width - 210f, 365f), 600)
         }
         rule.runOnIdle {
-            if (width <= FLOATING_RESIZE_MIN_WIDTH_DP) assertEquals(width.toFloat(), rect.width, 1f)
+            val minimumWidth = floatingResizeMinWidthDp(width)
+            if (width <= minimumWidth) assertEquals(width.toFloat(), rect.width, 1f)
             else {
                 // Drag recognition consumes platform touch slop before resizing begins.
                 assertTrue("Right edge narrows without crossing the shared minimum: $rect", rect.width < width - 40)
-                assertTrue(rect.width >= FLOATING_RESIZE_MIN_WIDTH_DP)
+                assertTrue(rect.width >= minimumWidth)
             }
             assertEquals(0f, rect.left, 1f)
             assertEquals(340f, rect.height, 1f)
