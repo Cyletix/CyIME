@@ -35,23 +35,29 @@ internal fun OfflineModelCard() {
     val senseReady = remember(downloads, models) {
         runCatching { manager.selection(SpeechModelCatalog.SENSEVOICE).ready }.getOrDefault(false)
     }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp).selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("离线语音模型", style = MaterialTheme.typography.titleMedium)
-            Text("选择一个主模型。切换对下一次录音生效；未下载的模型请先下载。", style = MaterialTheme.typography.bodyMedium)
+    SettingsSection(title = "离线语音模型") {
+        Column(Modifier.selectableGroup()) {
+            Text("选择一个主模型。切换对下一次录音生效；未下载的模型请先下载。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp))
             choices.forEach { id ->
                 val info = manager.getAsrModels().firstOrNull { it.id == id }
                 val state = downloads[id] as? ModelDownloadState.Downloading
                 val ready = remember(id, downloads, models) { runCatching { manager.selection(id).ready }.getOrDefault(false) }
                 val checked = firstPass == id
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Row(Modifier.fillMaxWidth().testTag("speech-choice:$id")
                     .selectable(selected = checked, enabled = ready, role = Role.RadioButton,
-                        onClick = { manager.setFirstPassModel(id); selected = manager.getSelectedModelId() }),
+                        onClick = { manager.setFirstPassModel(id); selected = manager.getSelectedModelId() })
+                    .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = checked, enabled = ready, onClick = null)
+                    Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(SpeechModelSelection.displayName(id).orEmpty(), style = MaterialTheme.typography.titleSmall)
+                        Text(SpeechModelSelection.displayName(id).orEmpty(),
+                            style = MaterialTheme.typography.bodyLarge)
                         Text(info?.description.orEmpty(), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -60,16 +66,18 @@ internal fun OfflineModelCard() {
                     }) { Text("下载") }
                 }
                 if (state != null) LinearProgressIndicator(progress = { state.progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth())
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
             }
-            HorizontalDivider()
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             val canRefine = firstPass != SpeechModelCatalog.SENSEVOICE
             Row(Modifier.fillMaxWidth().testTag("speech-correction")
                 .toggleable(value = refine, enabled = canRefine && (senseReady || refine), role = Role.Switch,
-                    onValueChange = { manager.setRefinementEnabled(it); selected = manager.getSelectedModelId() }),
+                    onValueChange = { manager.setRefinementEnabled(it); selected = manager.getSelectedModelId() })
+                .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("SenseVoice 二次校正", style = MaterialTheme.typography.titleSmall)
+                    Text("SenseVoice 二次校正", style = MaterialTheme.typography.bodyLarge)
                     Text(when {
                         !canRefine -> "SenseVoice 已作为主模型，无需再次校正。"
                         !senseReady -> "先下载上方的 SenseVoice 模型，再为主模型启用二次校正。"
@@ -78,7 +86,8 @@ internal fun OfflineModelCard() {
                 }
                 Switch(checked = refine, enabled = canRefine && (senseReady || refine), onCheckedChange = null)
             }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp)) }
         }
     }
 }
