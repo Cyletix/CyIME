@@ -25,7 +25,7 @@ class ExpandedCandidateLayoutTest {
     @get:Rule val rule = createComposeRule()
 
     @Test fun floatingCandidatesReflowByTheirViewportAndKeepSelectionIndices() {
-        val width = mutableStateOf(400)
+        val width = mutableStateOf(240)
         val fontScale = mutableStateOf(1f)
         val landscape = mutableStateOf(true)
         val t9Rail = mutableStateOf(true)
@@ -74,7 +74,7 @@ class ExpandedCandidateLayoutTest {
         }
         checkVisible()
         val narrowCount = firstRowCount()
-        rule.runOnIdle { width.value = 700 }
+        rule.runOnIdle { width.value = 360 }
         checkVisible()
         val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         val screenshot = instrumentation.uiAutomation.takeScreenshot()

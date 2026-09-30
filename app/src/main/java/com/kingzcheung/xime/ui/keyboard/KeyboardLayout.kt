@@ -524,7 +524,8 @@ fun KeyboardLayout(
                                         onClick = onClick,
                                         backgroundColor = keyBackgroundColor,
                                         textColor = keyTextColor,
-                                        modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
+                                        modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f)
+                                            .testTag("qwerty-key:$key"),
                                         swipeText = swipeUpText,
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
@@ -1219,7 +1220,7 @@ private fun ShiftCapsKeyButton(
                 else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
                 else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
                 else backgroundColor
-            ).visualMaterial(VisualStyles.current, keyCornerRadius),
+            ).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
         val painter = when (shiftMode) {

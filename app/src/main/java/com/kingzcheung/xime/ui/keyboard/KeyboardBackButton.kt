@@ -29,7 +29,7 @@ internal fun KeyboardToolbarButton(
 ) {
     Box(modifier.size(40.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Box(Modifier.size(32.dp).clip(CircleShape).background(background)
-            .border(1.dp, outline, CircleShape).visualMaterial(VisualStyles.current, 16.dp), contentAlignment = Alignment.Center) { content() }
+            .border(1.dp, outline, CircleShape).visualMaterial(VisualStyles.current, 16.dp, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED), contentAlignment = Alignment.Center) { content() }
     }
 }
 
