@@ -73,7 +73,6 @@ fun Modifier.keyboardBackground(
     isDark: Boolean,
     fallbackColor: Color = Color(0xFFE3E4E8),
 ): Modifier {
-    if (VisualStyles.current != VisualStyle.ORIGINAL) return this.background(fallbackColor).visualEnvironment(VisualStyles.current)
     if (background == null) return this.then(Modifier.background(fallbackColor))
 
     when (background.type) {

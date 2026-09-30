@@ -43,42 +43,50 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("同步图标与视觉样式", style = MaterialTheme.typography.titleMedium)
-                    Text(if (IconAppearance.linked) "任一处选择，键盘和图标一起变化" else "图标与键盘分别设置",
+            SettingsSection(title = "图标联动") {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("同步图标与视觉样式", style = MaterialTheme.typography.bodyLarge)
+                            Text(if (IconAppearance.linked) "任一处选择，键盘和图标一起变化" else "图标与键盘分别设置",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = IconAppearance.linked, onCheckedChange = {
+                            changeAppearance(context, onChanged) { IconAppearance.setLinked(context, it) }
+                        }, modifier = Modifier.testTag("icon-link"))
+                    }
+                    Text("桌面图标使用所选样式；键盘左上角使用简洁线稿，颜色跟随键盘主题。桌面可能需要片刻刷新。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = IconAppearance.linked, onCheckedChange = {
-                    changeAppearance(context, onChanged) { IconAppearance.setLinked(context, it) }
-                }, modifier = Modifier.testTag("icon-link"))
             }
-            Text("同时用于键盘左上角标志和桌面应用图标。桌面可能需要片刻刷新。",
-                style = MaterialTheme.typography.bodyMedium)
-            VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { style ->
-                        val selected = IconAppearance.effective == style
-                        val palette = requireNotNull(VisualStyles.palette(style))
-                        val shape = RoundedCornerShape(18.dp)
-                        Column(Modifier.weight(1f).testTag("icon-style-${style.id}").semantics { this.selected = selected }
-                            .background(palette.surfaceLight, shape)
-                            .border(if (selected) 2.dp else 1.dp, palette.accentLight.copy(alpha = if (selected) 1f else .25f), shape)
-                            .clickable { changeAppearance(context, onChanged) { IconAppearance.setIconStyle(context, style) } }
-                            .padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            CyimeGeneratedIcon(style, Modifier.fillMaxWidth().aspectRatio(1f), background = true)
-                            Text(style.title + if (selected) " · 已选" else "", color = palette.keyTextColorLight,
-                                style = MaterialTheme.typography.labelLarge)
+            SettingsSection(title = "图标样式") {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { style ->
+                                val selected = IconAppearance.effective == style
+                                val palette = MaterialTheme.colorScheme
+                                val shape = RoundedCornerShape(12.dp)
+                                Column(Modifier.weight(1f).testTag("icon-style-${style.id}").semantics { this.selected = selected }
+                                    .background(palette.surfaceContainerHigh, shape)
+                                    .border(if (selected) 2.dp else 1.dp, palette.primary.copy(alpha = if (selected) 1f else .25f), shape)
+                                    .clickable { changeAppearance(context, onChanged) { IconAppearance.setIconStyle(context, style) } }
+                                    .padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CyimeGeneratedIcon(style, Modifier.fillMaxWidth().aspectRatio(1f), background = true)
+                                    Text(style.title + if (selected) " · 已选" else "", color = palette.onSurface,
+                                        style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
                         }
                     }
+                    TextButton(onClick = { changeAppearance(context, onChanged) { IconAppearance.setIconStyle(context, VisualStyle.ORIGINAL) } },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("icon-style-original")) {
+                        Text(if (IconAppearance.effective == VisualStyle.ORIGINAL) "原有图标 · 已选" else "恢复原有图标")
+                    }
+                    Text("绑定开启时，恢复原有图标也会恢复原有外观。关闭绑定后可单独恢复图标。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            TextButton(onClick = { changeAppearance(context, onChanged) { IconAppearance.setIconStyle(context, VisualStyle.ORIGINAL) } },
-                modifier = Modifier.testTag("icon-style-original")) {
-                Text(if (IconAppearance.effective == VisualStyle.ORIGINAL) "原有图标 · 已选" else "恢复原有图标")
-            }
-            Text("绑定开启时，恢复原有图标也会恢复原有外观。关闭绑定后可单独恢复图标。",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

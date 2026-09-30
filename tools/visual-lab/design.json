@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "levels": {
+    "BASE": 1,
+    "RAISED": 1.15,
+    "FLOATING": 1.25
+  },
+  "styles": {
+    "neon": {
+      "label": "霓光", "material": { "shade": 0.11, "tint": 0.025, "top": 0, "topReach": 0.1, "border": 0.36, "depth": 0.02, "facet": 0, "matte": 0, "glow": 0.07 },
+      "icon": { "highlight": "#F6E9FF", "light": "#D0BBFF", "midLight": "#DDC9FE", "leftEdge": "#BDA7FF", "bottomStart": "#F8EEFF", "bottomMid": "#CAB8FF", "bottomEdge": "#AC94FF", "purple": "#855AFD", "purpleEdge": "#9569FF", "fold": "#7155D5", "foldTop": "#443386", "foldLower": "#6850C4", "foldLight": "#E0C6FE", "shadow": "#110F1D" }
+    },
+    "glass": {
+      "label": "玻璃", "material": { "shade": 0, "tint": 0.05, "top": 0.20, "topReach": 0.38, "border": 0.20, "depth": 0.10, "facet": 0, "matte": 0, "glow": 0 },
+      "icon": { "highlight": "#F3E6FC", "light": "#C6B8FA", "midLight": "#D6C5FA", "leftEdge": "#B19DFA", "bottomStart": "#F3ECFD", "bottomMid": "#C4B5FA", "bottomEdge": "#A994FA", "purple": "#8762FA", "purpleEdge": "#946BFA", "fold": "#705CD0", "foldTop": "#40387D", "foldLower": "#6A54C0", "foldLight": "#DCC4FA", "shadow": "#19152D" }
+    },
+    "facet": {
+      "label": "折面", "material": { "shade": 0.025, "tint": 0.02, "top": 0.03, "topReach": 0.15, "border": 0.07, "depth": 0.12, "facet": 0.10, "matte": 0, "glow": 0 },
+      "icon": { "highlight": "#F4E8FF", "light": "#C9B7FA", "midLight": "#D6C2FC", "leftEdge": "#AE97F8", "bottomStart": "#F1E8FC", "bottomMid": "#C0ACF9", "bottomEdge": "#9F88F8", "purple": "#7D5BF8", "purpleEdge": "#946EF9", "fold": "#6A52D0", "foldTop": "#382B82", "foldLower": "#6448C2", "foldLight": "#D2B5FA", "shadow": "#1B1531" }
+    },
+    "frost": {
+      "label": "毛玻璃", "material": { "shade": 0, "tint": 0, "top": 0.08, "topReach": 0.85, "border": 0.025, "depth": 0, "facet": 0, "matte": 0.12, "glow": 0 },
+      "icon": { "highlight": "#EDE5F7", "light": "#C9B9E9", "midLight": "#D7C9ED", "leftEdge": "#B19FD9", "bottomStart": "#EBE1F2", "bottomMid": "#C4B2DF", "bottomEdge": "#A895D2", "purple": "#866BCC", "purpleEdge": "#9B80D8", "fold": "#6755A0", "foldTop": "#40356A", "foldLower": "#605198", "foldLight": "#D0BEEA", "shadow": "#241D34" }
+    }
+  },
+  "icon": {
+    "segments": [
+      {
+        "name": "upper-fold",
+        "path": "M 287 380 L 388 277 Q 420 255 445 275 L 528 357 Q 514 378 498 378 L 341 378 C 316 378 301 390 303 407 C 305 417 305 421 301 419 C 288 414 279 401 282 388 C 283 384 285 381 287 380 Z",
+        "from": [287, 390], "to": [430, 265],
+        "stops": [[0, "midLight"], [0.27, "leftEdge"], [0.5, "fold"], [0.75, "foldTop"], [1, "shadow"]]
+      },
+      {
+        "name": "left-fold",
+        "path": "M 270 619 L 350 693 Q 380 709 380 673 L 380 528 L 287 617 Z",
+        "from": [270, 620], "to": [380, 650],
+        "stops": [[0, "shadow"], [0.2, "shadow"], [0.66, "foldTop"], [1, "fold"]]
+      },
+      {
+        "name": "lower-fold",
+        "path": "M 495 627 Q 506 606 523 606 L 672 606 Q 692 606 705 592 L 714 579 Q 735 595 728 609 L 615 713 Q 595 731 578 718 L 495 652 Q 484 639 495 627 Z",
+        "from": [525, 640], "to": [740, 600],
+        "stops": [[0, "shadow"], [0.46, "foldLower"], [0.7, "bottomEdge"], [0.89, "foldLight"], [1, "highlight"]]
+      },
+      {
+        "name": "top-face",
+        "path": "M 450 237 L 634 237 C 651 237 663 252 657 269 Q 655 274 652 278 L 580 379 Q 568 394 552 380 L 438 262 C 427 250 433 237 450 237 Z",
+        "from": [470, 385], "to": [630, 220],
+        "stops": [[0, "bottomMid"], [0.5, "light"], [1, "highlight"]]
+      },
+      {
+        "name": "left-face",
+        "path": "M 259 412 C 247 412 240 421 240 434 L 240 576 Q 240 594 270 619 Q 279 624 287 617 L 373 541 Q 381 532 376 522 L 273 416 Q 266 411 259 412 Z",
+        "from": [257, 433], "to": [363, 527],
+        "stops": [[0, "midLight"], [0.55, "leftEdge"], [1, "bottomEdge"]]
+      },
+      {
+        "name": "bottom-face",
+        "path": "M 468 602 Q 475 600 482 607 L 587 721 Q 598 728 598 733 Q 591 747 574 747 L 399 747 Q 390 747 385 743 Q 365 725 379 707 L 454 611 Q 461 601 468 602 Z",
+        "from": [445, 605], "to": [610, 720],
+        "stops": [[0, "bottomStart"], [0.4, "bottomMid"], [0.9, "bottomEdge"], [1, "bottomEdge"]]
+      },
+      {
+        "name": "right-face",
+        "path": "M 656 355 Q 643 354 643 371 L 643 467 Q 642 478 651 486 L 750 590 Q 765 603 779 591 Q 788 584 788 568 L 788 492 Q 788 482 780 473 L 666 358 Q 660 354 656 355 Z",
+        "from": [640, 476], "to": [799, 514],
+        "stops": [[0, "purple"], [0.7, "purple"], [1, "purpleEdge"]]
+      }
+    ]
+  }
+}

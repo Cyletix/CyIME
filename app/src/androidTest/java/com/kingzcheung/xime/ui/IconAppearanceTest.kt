@@ -67,7 +67,7 @@ class IconAppearanceTest {
                 val entries = context.packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(context.packageName), 0)
                 assertEquals(1, entries.size)
                 assertEquals(LauncherIcons.component(context, style).className, entries.single().activityInfo.name)
-                val expectedIcon = if (style == VisualStyle.ORIGINAL) "ic_launcher" else "cyime_${style.id}"
+                val expectedIcon = "cyime_mark_" + if (style == VisualStyle.ORIGINAL) "facet" else style.id
                 assertEquals(expectedIcon, context.resources.getResourceEntryName(entries.single().activityInfo.icon))
                 assertNotNull(entries.single().loadIcon(context.packageManager))
                 assertTrue(context.packageManager.getActivityInfo(ComponentName(context.packageName, "com.kingzcheung.xime.MainActivity"), 0).enabled)
@@ -85,6 +85,7 @@ class IconAppearanceTest {
         rule.runOnIdle { IconAppearance.setLinked(context, true) }
         rule.onNodeWithTag("icon-link").performClick()
         rule.onNodeWithTag("icon-style-glass").performClick().assertIsSelected()
+        rule.assertGeometry("icon-settings", "reference icon settings")
         File(context.getExternalFilesDir(null), "icon-settings.png").outputStream().use {
             rule.onNodeWithTag("icon-settings").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)
         }
@@ -96,7 +97,17 @@ class IconAppearanceTest {
         VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.forEach { style ->
             for (foreground in listOf(false, true)) {
                 val name = "cyime_${style.id}" + if (foreground) "_foreground" else ""
-                val bitmap = CyimeIconGenerator.render(style, 432, foreground)
+                val bitmap = CyimeIconGenerator.render(context, style, 432, foreground)
+                // Catch reintroduced baked-in tiles/frames, including the old inset squircle.
+                val edge = (bitmap.width * .18f).toInt()
+                for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) {
+                    if (x < edge || y < edge || x >= bitmap.width - edge || y >= bitmap.height - edge) {
+                        assertEquals("${style.id}: exterior must be transparent at $x,$y", 0, android.graphics.Color.alpha(bitmap.getPixel(x, y)))
+                    }
+                }
+                assertTrue("glyph must contain visible artwork", (edge until bitmap.width - edge).any { x ->
+                    (edge until bitmap.height - edge).any { y -> android.graphics.Color.alpha(bitmap.getPixel(x, y)) > 0 }
+                })
                 File(context.getExternalFilesDir(null), "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 bitmap.recycle()
             }
