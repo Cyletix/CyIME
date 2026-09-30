@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,6 +46,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,11 +60,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Constraints
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
 import kotlin.math.max
@@ -109,11 +120,8 @@ fun ClipboardView(
         selectedIds = emptySet()
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(backgroundColor)
-    ) {
+    Box(modifier.fillMaxSize().background(backgroundColor)) {
+    Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -125,7 +133,7 @@ fun ClipboardView(
 
             Box(
                 modifier = Modifier
-                    .height(28.dp)
+                    .height(maxOf(28.dp, with(LocalDensity.current) { 18.sp.toDp() } + 4.dp))
                     .clip(RoundedCornerShape(13.dp))
                     .background(iconButtonContainer)
                     .padding(2.dp),
@@ -148,6 +156,7 @@ fun ClipboardView(
                             text = "剪贴板",
                             color = if (selectedTab == 0) Color.White else textColor,
                             fontSize = 11.sp,
+                            lineHeight = 14.sp,
                             fontWeight = if (selectedTab == 0) FontWeight.Medium else FontWeight.Normal
                         )
                     }
@@ -165,6 +174,7 @@ fun ClipboardView(
                             text = "快捷发送",
                             color = if (selectedTab == 1) Color.White else textColor,
                             fontSize = 11.sp,
+                            lineHeight = 14.sp,
                             fontWeight = if (selectedTab == 1) FontWeight.Medium else FontWeight.Normal
                         )
                     }
@@ -387,20 +397,6 @@ fun ClipboardView(
             )
         }
 
-        if (showClearConfirm) {
-            ClearClipboardConfirmOverlay(
-                itemCount = clipboardItems.size,
-                backgroundColor = backgroundColor,
-                cardBgColor = itemBgColor,
-                textColor = textColor,
-                subTextColor = subTextColor,
-                onCancel = { showClearConfirm = false },
-                onConfirm = {
-                    showClearConfirm = false
-                    viewModel.clearClipboard()
-                }
-            )
-        }
         } // 列表区容器
 
         if (isMultiSelect) {
@@ -452,10 +448,25 @@ fun ClipboardView(
 
         Spacer(modifier = Modifier.height(if (isLandscape) 15.dp else bottomPaddingDp.dp))
     }
+        if (showClearConfirm) {
+            ClearClipboardConfirmOverlay(
+                itemCount = clipboardItems.size,
+                backgroundColor = backgroundColor,
+                cardBgColor = itemBgColor,
+                textColor = textColor,
+                subTextColor = subTextColor,
+                onCancel = { showClearConfirm = false },
+                onConfirm = {
+                    showClearConfirm = false
+                    viewModel.clearClipboard()
+                }
+            )
+        }
+    }
 }
 
 @Composable
-private fun ClearClipboardConfirmOverlay(
+internal fun ClearClipboardConfirmOverlay(
     itemCount: Int,
     backgroundColor: Color,
     cardBgColor: Color,
@@ -464,65 +475,67 @@ private fun ClearClipboardConfirmOverlay(
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-            .clickable(onClick = onCancel),
+    BoxWithConstraints(
+        Modifier.fillMaxSize().testTag("clipboard-clear-overlay")
+            .background(backgroundColor).clickable(onClick = onCancel).padding(4.dp),
         contentAlignment = Alignment.Center
     ) {
+        val density = LocalDensity.current
+        val measurer = rememberTextMeasurer()
+        val inheritedStyle = LocalTextStyle.current
+        val cardWidth = with(density) { maxWidth.coerceAtMost(360.dp).roundToPx() }
+        val contentWidth = (cardWidth - with(density) { 24.dp.roundToPx() }).coerceAtLeast(1)
+        fun textHeight(text: String, style: TextStyle, width: Int = contentWidth): Int = measurer.measure(
+            text, style = inheritedStyle.merge(style), constraints = Constraints(maxWidth = width)
+        ).size.height
+        val titleHeight = textHeight("清空剪贴板", TextStyle(fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium))
+        val messageHeight = textHeight("将删除全部 $itemCount 条剪贴板记录", TextStyle(fontSize = 13.sp, lineHeight = 18.sp))
+        val buttonTextHeight = textHeight("清空", TextStyle(fontSize = 13.sp, lineHeight = 16.sp),
+            ((contentWidth - with(density) { 12.dp.roundToPx() }) / 2 - with(density) { 16.dp.roundToPx() }).coerceAtLeast(1))
+        val buttonHeight = maxOf(with(density) { 48.dp.roundToPx() }, buttonTextHeight + with(density) { 16.dp.roundToPx() })
+        // A short panel uses a complete, concise question instead of a half-visible
+        // paragraph. Keep the count available to accessibility services in both forms.
+        val compact = constraints.maxHeight < titleHeight + messageHeight + buttonHeight + with(density) { 40.dp.roundToPx() }
+        val compactTitleHeight = textHeight("清空剪贴板？", TextStyle(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+            (cardWidth - with(density) { 16.dp.roundToPx() }).coerceAtLeast(1))
+        val scrollWholeCard = constraints.maxHeight < compactTitleHeight + buttonHeight + with(density) { 4.dp.roundToPx() }
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = cardBgColor
+            modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth().testTag("clipboard-clear-card"),
+            shape = RoundedCornerShape(16.dp), color = cardBgColor,
+            onClick = {},
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "清空剪贴板",
-                    color = textColor,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "将删除全部 $itemCount 条剪贴板记录",
-                    color = subTextColor,
-                    fontSize = 13.sp
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .clickable(onClick = onCancel)
-                            .padding(horizontal = 18.dp, vertical = 7.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "取消",
-                            color = textColor,
-                            fontSize = 13.sp
-                        )
+            Column(Modifier.then(if (scrollWholeCard) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .padding(horizontal = if (compact) 8.dp else 12.dp,
+                    vertical = if (compact) 2.dp else 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.then(if (scrollWholeCard) Modifier else
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()))
+                    .fillMaxWidth().padding(bottom = if (compact) 0.dp else 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(if (compact) "清空剪贴板？" else "清空剪贴板", color = textColor,
+                        modifier = Modifier.semantics { contentDescription = "将删除全部 $itemCount 条剪贴板记录" },
+                        fontSize = if (compact) 13.sp else 16.sp,
+                        lineHeight = if (compact) 16.sp else 20.sp,
+                        fontWeight = FontWeight.Medium)
+                    if (!compact) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("将删除全部 $itemCount 条剪贴板记录", color = subTextColor,
+                            fontSize = 13.sp, lineHeight = 18.sp)
                     }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.error)
-                            .clickable(onClick = onConfirm)
-                            .padding(horizontal = 18.dp, vertical = 7.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "清空",
-                            color = Color.White,
-                            fontSize = 13.sp
-                        )
+                }
+                Row(Modifier.fillMaxWidth().testTag("clipboard-clear-actions"),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.weight(1f).heightIn(min = 48.dp).testTag("clipboard-clear-cancel")
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable(onClick = onCancel).padding(horizontal = 8.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center) {
+                        Text("取消", color = textColor, fontSize = 13.sp, lineHeight = 16.sp)
+                    }
+                    Box(Modifier.weight(1f).heightIn(min = 48.dp).testTag("clipboard-clear-confirm")
+                        .clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.error)
+                        .clickable(onClick = onConfirm).padding(horizontal = 8.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center) {
+                        Text("清空", color = MaterialTheme.colorScheme.onError, fontSize = 13.sp, lineHeight = 16.sp)
                     }
                 }
             }
