@@ -2,7 +2,10 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')][string]$BuildType = 'Release',
-    [string[]]$GradleArguments = @()
+    [string[]]$GradleArguments = @(),
+    [switch]$BundleModels,
+    [int]$AdbPort = 5037,
+    [string]$Serial = ''
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
@@ -36,7 +39,8 @@ try {
             }
         }
     }
-    & ./gradlew.bat ":app:assemble$BuildType" --no-daemon @GradleArguments
+    $editionArguments = @("-PbundleModels=$($BundleModels.IsPresent.ToString().ToLowerInvariant())")
+    & ./gradlew.bat ":app:assemble$BuildType" ':app:assembleDebug' ':app:assembleDebugAndroidTest' --no-daemon @editionArguments @GradleArguments
     if ($LASTEXITCODE -ne 0) { throw "Build failed. Previous packages remain in $archive" }
     $output = Join-Path $apkRoot $kind
     $metadata = Get-Content (Join-Path $output 'output-metadata.json') -Raw | ConvertFrom-Json
@@ -47,8 +51,30 @@ try {
         if ($apk.DirectoryName -ne $output) { throw 'Unexpected APK output location.' }
         [pscustomobject]@{ path=$apk.FullName; bytes=$apk.Length; sha256=(Get-FileHash -LiteralPath $apk.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
     }
-    [pscustomobject]@{ version=$version; versionCode=$versionCode; buildType=$kind; files=@($files) } |
+    # No successful-package receipt until rendered geometry passes on this exact Debug build.
+    try {
+        & "$PSScriptRoot/verify-layout.ps1" -AdbPort $AdbPort -Serial $Serial
+    } catch {
+        $rejected = [IO.Path]::GetFullPath((Join-Path $apkRoot ('rejected/' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))))
+        if (-not $rejected.StartsWith($apkRoot + [IO.Path]::DirectorySeparatorChar)) { throw 'Unsafe rejected APK path.' }
+        New-Item -ItemType Directory -Force -Path $rejected | Out-Null
+        foreach ($item in $files) {
+            if ([IO.Path]::GetDirectoryName($item.path) -ne $output) { throw 'Unexpected rejected APK path.' }
+            Move-Item -LiteralPath $item.path -Destination $rejected
+        }
+        throw "Layout gate failed; APKs isolated in $rejected. $($_.Exception.Message)"
+    }
+    [pscustomobject]@{ version=$version; versionCode=$versionCode; buildType=$kind; bundledModels=$BundleModels.IsPresent; files=@($files); layoutGate='passed'; sourceCommit=(git rev-parse HEAD).Trim() } |
         ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $output 'latest.json')
+    # Keep both editions when the next build replaces the shared Gradle output folder.
+    $edition = if ($BundleModels) { 'full' } else { 'standard' }
+    $delivery = Join-Path $apkRoot "editions/$version/$edition/$kind"
+    New-Item -ItemType Directory -Force -Path $delivery | Out-Null
+    foreach ($item in $files) { Copy-Item -LiteralPath $item.path -Destination $delivery }
+    $savedReceipt = Get-Content (Join-Path $output 'latest.json') -Raw | ConvertFrom-Json
+    foreach ($item in $savedReceipt.files) { $item.path = Join-Path $delivery ([IO.Path]::GetFileName($item.path)) }
+    $savedReceipt | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $delivery 'latest.json')
+    Copy-Item -LiteralPath 'app/build/reports/layout-gate/passed.json' -Destination (Join-Path $delivery 'layout-gate.json')
     Write-Host "Built CyIME $version ($BuildType). Old packages: $archive"
     $files | Format-Table path, bytes -AutoSize
 } finally { Pop-Location }

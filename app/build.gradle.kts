@@ -11,7 +11,9 @@ plugins {
 }
 
 apply(from = "build-logic/tasks-native.gradle.kts")
+apply(from = "build-logic/tasks-source-patches.gradle.kts")
 apply(from = "build-logic/tasks-speech.gradle.kts")
+apply(from = "build-logic/tasks-bundled-models.gradle.kts")
 apply(from = "build-logic/tasks-plugin-dev.gradle.kts")
 apply(from = "build-logic/tasks-japanese.gradle.kts")
 apply(from = "build-logic/tasks-chinese.gradle.kts")
@@ -41,6 +43,9 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.kingzcheung.xime"
+    if (providers.gradleProperty("bundleModels").orNull == "true") {
+        sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/bundled-model-assets").get().asFile)
+    }
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/chinese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/rime-manifest").get().asFile)
@@ -63,8 +68,8 @@ android {
         // 版本规则：本地小改递增 PATCH；对外正式发包递增 MINOR，保留 PATCH。
         // 例：1.0.5 开发 → 1.1.5 正式 → 1.1.6 开发 → 1.2.6 正式。
         // versionCode 每次生成新版本独立递增，保证覆盖升级。
-        versionCode = 20261025
-        versionName = "1.3.12"
+        versionCode = 20261033
+        versionName = "1.3.20"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -76,6 +81,7 @@ android {
 
         // 构建信息
         buildConfigField("String", "GIT_HASH", "\"${getGitHash()}\"")
+        buildConfigField("boolean", "BUNDLED_MODELS", (providers.gradleProperty("bundleModels").orNull == "true").toString())
     }
 
     signingConfigs {
@@ -189,7 +195,8 @@ android.applicationVariants.all {
     outputs.all {
         val abi = filters.find { it.filterType.toString() == "ABI" }?.identifier ?: "universal"
         val buildLabel = if (buildType.name == "debug") "-debug" else ""
-        (this as BaseVariantOutputImpl).outputFileName = "$appName-$versionName$buildLabel-$abi.apk"
+        val edition = if (providers.gradleProperty("bundleModels").orNull == "true") "-full" else ""
+        (this as BaseVariantOutputImpl).outputFileName = "$appName-$versionName$edition$buildLabel-$abi.apk"
     }
 }
 

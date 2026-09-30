@@ -1,4 +1,4 @@
-﻿name: Build and Release APK
+name: Build and Release APK
 
 on:
   push:
@@ -78,8 +78,47 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Required rendered layout gate
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_3a
+          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.kingzcheung.xime.ui.LayoutGeometryGateTest,com.kingzcheung.xime.ui.PanelLayoutAuditTest,com.kingzcheung.xime.ui.ExpandedCandidateLayoutTest,com.kingzcheung.xime.ui.OfflineEditionTest,com.kingzcheung.xime.ui.VisualStyleIntegrationTest,com.kingzcheung.xime.ui.IconAppearanceTest --no-daemon
+
+      - name: Keep layout gate reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-layout-gate
+          path: app/build/outputs/androidTest-results/connected/
+
       - name: Build Release APKs (Signed)
-        run: ./gradlew assembleRelease --no-daemon
+        # A failed geometry test aborts this job before any release asset is built/uploaded.
+        if: success()
+        run: |
+          ./gradlew assembleRelease --no-daemon
+          mkdir -p app/build/outputs/apk/distribution
+          cp app/build/outputs/apk/release/CyIME-*.apk app/build/outputs/apk/distribution/
+
+      - name: Required offline edition gate
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_3a
+          script: ./gradlew :app:connectedDebugAndroidTest -PbundleModels=true -PpythonExecutable=python3 -Pandroid.testInstrumentationRunnerArguments.class=com.kingzcheung.xime.ui.LayoutGeometryGateTest,com.kingzcheung.xime.ui.PanelLayoutAuditTest,com.kingzcheung.xime.ui.ExpandedCandidateLayoutTest,com.kingzcheung.xime.ui.OfflineEditionTest,com.kingzcheung.xime.ui.VisualStyleIntegrationTest,com.kingzcheung.xime.ui.IconAppearanceTest --no-daemon
+
+      - name: Build offline Release APKs
+        run: |
+          ./gradlew assembleRelease -PbundleModels=true -PpythonExecutable=python3 --no-daemon
+          cp app/build/outputs/apk/release/CyIME-*-full-*.apk app/build/outputs/apk/distribution/
 
       - name: Build Plugin XIPKs (Unsigned)
         run: bash scripts/build-plugins.sh
@@ -87,7 +126,7 @@ jobs:
       - name: Verify APK signatures
         run: |
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
-          for apk in app/build/outputs/apk/release/CyIME-*.apk; do
+          for apk in app/build/outputs/apk/distribution/CyIME-*.apk; do
             "$APKSIGNER" verify --print-certs "$apk" >/dev/null
             echo "Verified: $apk"
           done
@@ -99,7 +138,7 @@ jobs:
       - name: Find APKs and plugin XIPKs
         id: find_apks
         run: |
-          MAIN_APKS=$(find app/build/outputs/apk/release -name "CyIME-*.apk" -type f | sort | tr '\n' ',' | sed 's/,$//')
+          MAIN_APKS=$(find app/build/outputs/apk/distribution -name "CyIME-*.apk" -type f | sort | tr '\n' ',' | sed 's/,$//')
           PLUGIN_XIPKS=$(find build/plugin-release -name "*.xipk" -type f | sort | tr '\n' ',' | sed 's/,$//')
 
           echo "main_apks=$MAIN_APKS" >> $GITHUB_OUTPUT
