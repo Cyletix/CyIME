@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** 首次打开应用时安装默认模型；与市场共用下载器、版本和目录，不另建模型副本。 */
 object DefaultModelInstaller {
-    internal val modelIds = listOf("ochwpro", "zipformer-zh-int8")
+    internal val modelIds = listOf("ochwpro", "zipformer-zh-int8", "predictive-text-base")
     private val started = AtomicBoolean(false)
     private val observingNetwork = AtomicBoolean(false)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -30,6 +30,15 @@ object DefaultModelInstaller {
 
     fun start(context: Context) {
         val app = context.applicationContext
+        if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) {
+            if (!started.compareAndSet(false, true)) return
+            scope.launch {
+                try { BundledModelInstaller.install(app) }
+                catch (error: Exception) { FileLogger.e("DefaultModels", "内置模型准备失败，下次启动重试", error) }
+                finally { started.set(false) }
+            }
+            return
+        }
         if (observingNetwork.compareAndSet(false, true)) {
             runCatching { app.getSystemService(ConnectivityManager::class.java)
                 .registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
@@ -39,7 +48,10 @@ object DefaultModelInstaller {
         if (!started.compareAndSet(false, true)) return
         scope.launch {
             val prefs = preferences(app)
-            val pending = modelIds.filterNot { isHandled(app, it) }
+            val pending = modelIds.filterNot { isHandled(app, it) }.filter { id ->
+                id != "predictive-text-base" || (SettingsPreferences.isSmartPredictionEnabled(app) &&
+                    SettingsPreferences.getPredictionSelectedModel(app) == id)
+            }
             if (pending.isEmpty()) { started.set(false); return@launch }
             try {
                 ModelManager.initialize()

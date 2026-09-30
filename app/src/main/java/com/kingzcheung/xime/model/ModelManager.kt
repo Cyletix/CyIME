@@ -21,6 +21,42 @@ object ModelManager {
     val installedRevision: StateFlow<Long> = _installedRevision
     fun notifyInstalledModelsChanged() { _installedRevision.update { it + 1 } }
 
+    internal suspend fun installBundled(context: Context, entry: org.json.JSONObject) {
+        val id = entry.getString("id")
+        val model = requireNotNull(getModel(id))
+        val target = model.versions.first { it.version == entry.getString("version") }
+        val guard = installGuards.getOrPut(id) { ModelInstallGuard() }
+        val generation = guard.currentGeneration()
+        downloadLocks.getOrPut(id) { Mutex() }.withLock {
+            if (isModelDownloaded(context, model)) return@withLock
+            val root = ModelStorage.getModelsRoot(context).apply { mkdirs() }
+            val staging = File(root, ".bundle-$id-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+            _downloadStates.update { it + (id to ModelDownloadState.Downloading(0f, 0, -1)) }
+            try {
+                val files = entry.getJSONArray("files")
+                check((0 until files.length()).map { files.getJSONObject(it).getString("name") }.toSet() == target.files.map { it.name }.toSet())
+                for (i in 0 until files.length()) {
+                    val info = files.getJSONObject(i)
+                    val name = info.getString("name")
+                    val file = modelDownloadFile(staging, name)
+                    file.parentFile?.mkdirs()
+                    context.assets.open("bundled-models/$id/$name").use { input -> file.outputStream().use { input.copyTo(it) } }
+                    check(file.length() == info.getLong("size")) { "内置模型文件不完整：$name" }
+                    verifyModelDigest(file, info.getString("sha256"))
+                }
+                validateDownloadedModel(staging, target)
+                check(guard.install(generation, staging, ModelStorage.getModelDir(context, id)) {
+                    MarketVersionStore.setModelVersion(context, id, target.version)
+                }) { "内置模型安装已取消：$id" }
+                _downloadStates.update { it + (id to ModelDownloadState.Complete) }
+                notifyInstalledModelsChanged()
+            } catch (error: Exception) {
+                _downloadStates.update { it + (id to ModelDownloadState.Error(error.message ?: "内置模型准备失败")) }
+                throw error
+            } finally { if (staging.exists()) staging.deleteRecursively() }
+        }
+    }
+
     /** Same readiness contract as the prediction loader, including installs before index loading. */
     fun isModelReady(context: Context, id: String): Boolean {
         ModelStorage.migrateLegacyForModel(context, id)

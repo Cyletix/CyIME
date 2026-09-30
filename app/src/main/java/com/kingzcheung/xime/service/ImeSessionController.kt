@@ -319,9 +319,12 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             val name = SchemaManager.getSchemaDisplayName(context, currentSchemaId)
 
             val enabledIds = SchemaManager.getEnabledSchemas(context)
+            val enabledLanguages = com.kingzcheung.xime.settings.LanguagePreferences.enabled(context)
             val allSchemas = SchemaManager.discoverSchemas(context)
             val schemas = allSchemas
-                .filter { meta -> meta.schemaId in enabledIds && SchemaManager.isSchemaCompiled(context, meta.schemaId) }
+                .filter { meta -> meta.schemaId in enabledIds &&
+                    com.kingzcheung.xime.settings.InputLanguage.forSchema(meta.schemaId) in enabledLanguages &&
+                    SchemaManager.isSchemaCompiled(context, meta.schemaId) }
                 .map { meta ->
                     com.kingzcheung.xime.settings.SchemaInfo(
                         schemaId = meta.schemaId,
@@ -464,6 +467,12 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                     def.options.forEachIndexed { i, opt -> service.rimeEngine.setOption(opt, i == activeIndex) }
                 }
             }
+        }
+        // A disabled language may still be the real Rime fallback for the virtual English mode.
+        if (com.kingzcheung.xime.settings.InputLanguage.forSchema(schemaId) !in
+            com.kingzcheung.xime.settings.LanguagePreferences.enabled(service)) {
+            service.rimeEngine.setOption("ascii_mode", true)
+            persistSchemaOption("ascii_mode", true)
         }
         applyPunctuationWidth(service.rimeEngine.isAsciiMode())
         val rimeAsciiAfter = service.rimeEngine.isAsciiMode()

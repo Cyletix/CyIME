@@ -52,6 +52,8 @@ class XimeApplication : Application(), ImageLoaderFactory {
         // Model services run in separate processes. They must not copy/deploy the
         // same Rime directory or load the keyboard/plugin runtime a second time.
         if (android.os.Build.VERSION.SDK_INT >= 28 && getProcessName() != packageName) return
+        com.kingzcheung.xime.settings.LanguagePreferences.initialize(this)
+        com.kingzcheung.xime.model.DeviceDefaults.initialize(this)
         com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this)
         com.kingzcheung.xime.ui.theme.IconAppearance.reload(this)
         try {
@@ -128,7 +130,7 @@ class XimeApplication : Application(), ImageLoaderFactory {
         
         applicationScope.launch {
             try {
-                check(RimeConfigHelper.prepareEngine(this@XimeApplication)) { "Bundled dictionary deployment failed" }
+                RimeConfigHelper.prepareAutomatically(this@XimeApplication)
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to pre-initialize Rime engine", e)
