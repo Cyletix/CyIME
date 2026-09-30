@@ -24,6 +24,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("sha256", chineseArchiveSha)
     inputs.property("files", chineseTopFiles)
     inputs.property("qwjrtkPreset", 1)
+    inputs.property("cyletix10Preset", 1)
     inputs.property("t9EnglishIndex", 2)
     inputs.property("measuredNeighborCorrection", 1)
     outputs.dir(chineseRoot)
@@ -91,6 +92,9 @@ val prepareChineseDictionaries by tasks.registering {
         File(root, "pinyin_qwjrtk.schema.yaml").writeText(baseSchema
             .replace("schema_id: rime_ice", "schema_id: pinyin_qwjrtk")
             .replace("name: 雾凇拼音", "name: QWJRTK（双拇指）"))
+        File(root, "pinyin_cyletix10.schema.yaml").writeText(baseSchema
+            .replace("schema_id: rime_ice", "schema_id: pinyin_cyletix10")
+            .replace("name: 雾凇拼音", "name: Cyletix10（实验）"))
 
     }
 }

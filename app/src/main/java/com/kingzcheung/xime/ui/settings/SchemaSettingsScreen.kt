@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -60,6 +61,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,7 +72,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,9 +87,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SchemaMeta
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.settings.LanguagePreferences
+import com.kingzcheung.xime.settings.InputModes
+import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.viewmodel.LocalPackageItem
 import com.kingzcheung.xime.viewmodel.SchemaLocalViewModel
 import com.kingzcheung.xime.viewmodel.SchemaSettingsViewModel
+import com.kingzcheung.xime.ui.menubar.reorderOnLongPress
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,8 +110,22 @@ fun SchemaSettingsContent(
     val localUiState by localViewModel.uiState.collectAsStateWithLifecycle()
     var tabIndex by remember { mutableStateOf(0) }
     var showExtraSchemas by remember { mutableStateOf(false) }
+    var englishEnabled by remember { mutableStateOf(InputLanguage.ENGLISH in LanguagePreferences.enabled(context)) }
+    var modeOrderRevision by remember { mutableIntStateOf(0) }
+    var draggedModeId by remember { mutableStateOf<String?>(null) }
+    var dropTargetModeId by remember { mutableStateOf<String?>(null) }
+    var draggedOrder by remember { mutableStateOf<List<String>?>(null) }
+    var dragStartOrder by remember { mutableStateOf<List<String>?>(null) }
+    var dragDistance by remember { mutableFloatStateOf(0f) }
+    val cardHeights = remember { mutableStateMapOf<String, Int>() }
+    val cardSpacing = with(LocalDensity.current) { 8.dp.toPx() }
     // F6: 从方案市场/导入返回时自动重扫描，新装方案立即出现
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh(); localViewModel.loadLocalPackages() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refresh()
+        localViewModel.loadLocalPackages()
+        englishEnabled = InputLanguage.ENGLISH in LanguagePreferences.enabled(context)
+        modeOrderRevision++
+    }
     // 切 tab 时刷新对应列表，保持数据一致
     LaunchedEffect(tabIndex) {
         if (tabIndex == 0) viewModel.refresh() else localViewModel.loadLocalPackages()
@@ -538,6 +563,47 @@ fun SchemaSettingsContent(
 
             when (tabIndex) {
                 0 -> {
+                    val installedIds = uiState.allSchemas.map { it.schemaId }.toSet()
+                    val visibleSchemas = uiState.allSchemas.filter {
+                        com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds)
+                    }
+                    val schemaById = visibleSchemas.associateBy { it.schemaId }
+                    val fullOrder = remember(uiState.allSchemas, modeOrderRevision) {
+                        orderedInstalledModeIds(context, uiState.allSchemas)
+                    }
+                    val enabledIds = uiState.enabledSchemas.toSet()
+                    val savedEnabledIds = fullOrder.filter { id ->
+                        (id == InputModes.ENGLISH && englishEnabled) || (id in enabledIds && id in schemaById)
+                    }
+                    val orderedEnabledIds = savedEnabledIds
+                    fun dragSchema(id: String, delta: Float) {
+                        val original = dragStartOrder ?: return
+                        dragDistance += delta
+                        val centers = mutableMapOf<String, Float>()
+                        var top = 0f
+                        val fallbackHeight = (cardHeights[id] ?: return).toFloat()
+                        original.forEach { modeId ->
+                            val height = (cardHeights[modeId]?.toFloat() ?: fallbackHeight)
+                            centers[modeId] = top + height / 2f
+                            top += height + cardSpacing
+                        }
+                        val from = original.indexOf(id)
+                        val center = centers.getValue(id) + dragDistance
+                        var target = from
+                        if (dragDistance > 0f) {
+                            for (index in from + 1..original.lastIndex) {
+                                val midpoint = (centers.getValue(original[index - 1]) + centers.getValue(original[index])) / 2f
+                                if (center >= midpoint) target = index else break
+                            }
+                        } else if (dragDistance < 0f) {
+                            for (index in from - 1 downTo 0) {
+                                val midpoint = (centers.getValue(original[index]) + centers.getValue(original[index + 1])) / 2f
+                                if (center <= midpoint) target = index else break
+                            }
+                        }
+                        dropTargetModeId = original.getOrNull(target)?.takeIf { target != from }
+                        draggedOrder = original.toMutableList().apply { add(target, removeAt(from)) }
+                    }
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)
@@ -546,25 +612,17 @@ fun SchemaSettingsContent(
                     ) {
                         item {
                             Text(
-                                text = "已启用的输入布局",
+                                text = "已启用的输入方案",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                             )
+                            Text("长按已启用方案卡片拖动排序；方案开关控制部署，键盘显示的语言由「语言管理」控制。顺序与键盘中的模式顺序同步。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        item(key = "builtin-english-mode") {
-                            SchemaToggleItem(
-                                schema = SchemaMeta(com.kingzcheung.xime.settings.InputModes.ENGLISH, "英文"),
-                                enabled = true, isCompiled = true, isCurrent = false,
-                                onToggle = {}, onSelect = {}, isBuiltIn = true,
-                            )
-                        }
-                        val installedIds = uiState.allSchemas.map { it.schemaId }.toSet()
-                        val visibleSchemas = uiState.allSchemas.filter { com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds) }
-                        val enabledSchemas = visibleSchemas.filter { it.schemaId in uiState.enabledSchemas }
-
-                        if (enabledSchemas.isEmpty()) {
+                        if (orderedEnabledIds.isEmpty()) {
                             item {
                                 Text(
                                     text = "暂未启用任何方案",
@@ -575,14 +633,46 @@ fun SchemaSettingsContent(
                             }
                         }
 
-                        items(enabledSchemas, key = { it.schemaId }) { schema ->
+                        items(orderedEnabledIds, key = { it }) { id ->
+                            val isEnglish = id == InputModes.ENGLISH
+                            val schema = if (isEnglish) SchemaMeta(id, "英文") else schemaById.getValue(id)
                             SchemaToggleItem(
                                 schema = schema,
                                 enabled = true,
-                                isCompiled = SchemaManager.isSchemaCompiled(context, schema.schemaId),
-                                isCurrent = schema.schemaId == uiState.currentSchema,
-                                onToggle = { viewModel.toggleSchema(schema) },
-                                onSelect = { viewModel.selectSchema(schema) },
+                                isCompiled = isEnglish || SchemaManager.isSchemaCompiled(context, id),
+                                isCurrent = !isEnglish && id == uiState.currentSchema,
+                                onToggle = { if (!isEnglish) viewModel.toggleSchema(schema) },
+                                onSelect = { if (!isEnglish) viewModel.selectSchema(schema) },
+                                isBuiltIn = isEnglish,
+                                isDragging = draggedModeId == id,
+                                isDropTarget = dropTargetModeId == id,
+                                reorderModifier = Modifier
+                                    .onSizeChanged { cardHeights[id] = it.height }
+                                    .then(if (orderedEnabledIds.size > 1) Modifier.reorderOnLongPress(
+                                        onStart = {
+                                            draggedOrder = orderedEnabledIds
+                                            dragStartOrder = orderedEnabledIds
+                                            draggedModeId = id
+                                            dropTargetModeId = null
+                                            dragDistance = 0f
+                                        },
+                                        onDrag = { delta -> dragSchema(id, delta) },
+                                        onEnd = {
+                                            val reordered = draggedOrder
+                                            draggedModeId = null
+                                            dropTargetModeId = null
+                                            draggedOrder = null
+                                            dragStartOrder = null
+                                            if (reordered != null && reorderEnabledModes(context, uiState.allSchemas,
+                                                    enabledIds, englishEnabled, reordered)) modeOrderRevision++
+                                        },
+                                        onCancel = {
+                                            draggedModeId = null
+                                            dropTargetModeId = null
+                                            draggedOrder = null
+                                            dragStartOrder = null
+                                        },
+                                    ) else Modifier),
                             )
                         }
 
@@ -685,6 +775,25 @@ fun SchemaSettingsContent(
     }
 }
 
+internal fun orderedInstalledModeIds(context: Context, schemas: List<SchemaMeta>): List<String> =
+    InputModes.ordered(context, schemas.map { schema ->
+        SchemaInfo(schema.schemaId, schema.name, schema.version, schema.author, schema.description)
+    }).map { it.schemaId }
+
+/** Keep inactive modes in their saved slots while reordering the visible cards. */
+internal fun reorderEnabledModes(context: Context, schemas: List<SchemaMeta>, enabledIds: Set<String>,
+    englishEnabled: Boolean, reordered: List<String>): Boolean {
+    val installedIds = schemas.map { it.schemaId }.toSet()
+    val visibleIds = schemas.filter {
+        com.kingzcheung.xime.settings.CyimeInputDefaults.visibleSchema(it.schemaId, installedIds)
+    }.mapTo(mutableSetOf()) { it.schemaId }
+    val fullOrder = orderedInstalledModeIds(context, schemas)
+    val enabledOrder = fullOrder.filter { id ->
+        (id == InputModes.ENGLISH && englishEnabled) || (id in enabledIds && id in visibleIds)
+    }
+    return InputModes.saveReorderedModes(context, fullOrder, enabledOrder, reordered)
+}
+
 @Composable
 internal fun SchemaToggleItem(
     schema: SchemaMeta,
@@ -694,18 +803,27 @@ internal fun SchemaToggleItem(
     onToggle: () -> Unit,
     onSelect: () -> Unit,
     isBuiltIn: Boolean = false,
+    reorderModifier: Modifier = Modifier,
+    isDragging: Boolean = false,
+    isDropTarget: Boolean = false,
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("schema-card:${schema.schemaId}")
+            .then(reorderModifier)
             .then(if (isBuiltIn) Modifier else Modifier.clickable { if (enabled && isCompiled) onSelect() }),
         colors = CardDefaults.cardColors(
-            containerColor = if (isCurrent)
+            containerColor = if (isDragging)
+                MaterialTheme.colorScheme.secondaryContainer
+            else if (isDropTarget)
+                MaterialTheme.colorScheme.primaryContainer
+            else if (isCurrent)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
             else
                 MaterialTheme.colorScheme.surface
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDragging) 6.dp else 0.dp),
     ) {
         Row(
             modifier = Modifier
@@ -738,7 +856,7 @@ internal fun SchemaToggleItem(
                     Text(description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (isBuiltIn) {
-                    Text("内置输入模式 · 始终启用", style = MaterialTheme.typography.labelSmall,
+                    Text("内置英文模式 · 始终开启", style = MaterialTheme.typography.labelSmall,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.outline)
                 } else Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -792,7 +910,9 @@ private fun LocalPackageItemCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

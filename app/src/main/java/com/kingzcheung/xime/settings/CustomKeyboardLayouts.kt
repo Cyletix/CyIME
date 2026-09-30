@@ -19,12 +19,15 @@ data class CustomKeyboardLayout(
     /** Precomputed for the per-key preedit path; copies rebuild it with the new rows. */
     val mergedGroups: List<String> = rows.flatten().filter { it.length > 1 }
 
-    fun valid(): Boolean = name.isNotBlank() && name.length <= 32 &&
-        (id == QwjrtkLayout.ID || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
-        rows.map { row -> row.sumOf { it.length } } == (if (hasExtraSlot()) listOf(10, 10, 7) else listOf(10, 9, 7)) &&
-        rows.flatten().count { it == EMPTY_SLOT || it == ";" } <= 1 &&
-        rows.flatten().all { it == EMPTY_SLOT || it == ";" || it.length in 1..2 && it.all { c -> c in 'a'..'z' } } &&
-        rows.flatten().joinToString("").toSet() == (('a'..'z').toSet() + (if (hasSemicolon()) setOf(';') else emptySet()) + (if (EMPTY_SLOT in rows.flatten()) setOf('_') else emptySet()))
+    fun valid(): Boolean {
+        if (name.isBlank() || name.length > 32) return false
+        if (id == Cyletix10Layout.ID) return rows == Cyletix10Layout.rows
+        return (id == QwjrtkLayout.ID || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
+            rows.map { row -> row.sumOf { it.length } } == (if (hasExtraSlot()) listOf(10, 10, 7) else listOf(10, 9, 7)) &&
+            rows.flatten().count { it == EMPTY_SLOT || it == ";" } <= 1 &&
+            rows.flatten().all { it == EMPTY_SLOT || it == ";" || it.length in 1..2 && it.all { c -> c in 'a'..'z' } } &&
+            rows.flatten().joinToString("").toSet() == (('a'..'z').toSet() + (if (hasSemicolon()) setOf(';') else emptySet()) + (if (EMPTY_SLOT in rows.flatten()) setOf('_') else emptySet()))
+    }
     fun representative(c: Char): Char = rows.flatten().firstOrNull { c in it }?.first() ?: c
     fun encode(text: String) = text.map(::representative).joinToString("")
     /** Empty cells are editor-only; typing compacts them without creating a punctuation key. */
@@ -39,7 +42,11 @@ data class CustomKeyboardLayout(
             if (enabled && it == EMPTY_SLOT) ";" else if (!enabled && it == ";") EMPTY_SLOT else it
         } })
     }
-    private fun referenceRows() = if (hasExtraSlot()) listOf(BASE[0], BASE[1] + ";", BASE[2]) else BASE
+    private fun referenceRows() = when {
+        id == Cyletix10Layout.ID -> Cyletix10Layout.referenceRows
+        hasExtraSlot() -> listOf(BASE[0], BASE[1] + ";", BASE[2])
+        else -> BASE
+    }
     fun movedLetters(): Set<Char> = rows.zip(referenceRows()).flatMap { (row, original) ->
         row.joinToString("").zip(original).filter { (letter, base) -> letter != base && letter in 'a'..'z' }.map { it.first }
     }.toSet()
@@ -105,13 +112,18 @@ object CustomKeyboardLayouts {
     const val REVISION = "custom_keyboard_layout_revision"
     const val STATUS = "custom_keyboard_layout_status"
     private var cached: List<CustomKeyboardLayout> by mutableStateOf(emptyList())
-    fun find(id: String) = cached.firstOrNull { it.id == id }
-    fun isCustom(id: String) = id == QwjrtkLayout.ID || id.startsWith("custom_pinyin_")
+    private val qwjrtkPreset = CustomKeyboardLayout(QwjrtkLayout.ID, "QWJRTK（双拇指）",
+        listOf("qwjrtkuiop", "asdfghenl", "zxcybvm").map { it.map(Char::toString) })
+    fun find(id: String) = cached.firstOrNull { it.id == id } ?: when (id) {
+        QwjrtkLayout.ID -> qwjrtkPreset
+        Cyletix10Layout.ID -> Cyletix10Layout.preset
+        else -> null
+    }
+    fun isCustom(id: String) = id == QwjrtkLayout.ID || id == Cyletix10Layout.ID || id.startsWith("custom_pinyin_")
     @Synchronized fun load(context: Context): List<CustomKeyboardLayout> {
         val file = File(context.filesDir, "custom-keyboard-layouts.json")
         if (!file.exists()) {
-            cached = listOf(CustomKeyboardLayout(QwjrtkLayout.ID, "QWJRTK（双拇指）",
-                listOf("qwjrtkuiop", "asdfghenl", "zxcybvm").map { it.map(Char::toString) }))
+            cached = emptyList()
             persist(context, cached)
         } else {
             val array = JSONArray(file.readText())

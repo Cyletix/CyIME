@@ -18,7 +18,7 @@ enum class InputLanguage(val id: String, val displayName: String) {
 /** 英文始终存在；排序独立于方案的启用与部署，不改变市场方案。 */
 object InputModes {
     const val ENGLISH = "__xime_english"
-    private const val ORDER_KEY = "input_mode_order"
+    const val ORDER_KEY = "input_mode_order"
     private const val LANGUAGE_ORDER_KEY = "input_language_order"
     val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH, QwjrtkLayout.ID)
 
@@ -27,10 +27,12 @@ object InputModes {
 
     fun languageOrder(context: Context): List<InputLanguage> = languageOrder(
         SettingsPreferences.getPrefsPublic(context).getString(LANGUAGE_ORDER_KEY, "").orEmpty().lines())
+        .filter { it in LanguagePreferences.enabled(context) }
 
     fun saveLanguageOrder(context: Context, ids: List<String>) {
-        SettingsPreferences.getPrefsPublic(context).edit()
-            .putString(LANGUAGE_ORDER_KEY, languageOrder(ids).joinToString("\n") { it.id }).apply()
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        val current = languageOrder(prefs.getString(LANGUAGE_ORDER_KEY, "").orEmpty().lines()).map { it.id }
+        prefs.edit().putString(LANGUAGE_ORDER_KEY, mergeOrder(current, ids).joinToString("\n")).apply()
     }
     val english = SchemaInfo(ENGLISH, "英文", "", "", "内置英文模式，始终启用", isDownloaded = true)
 
@@ -57,6 +59,18 @@ object InputModes {
             .putString(ORDER_KEY, ids.distinct().joinToString("\n")).apply()
     }
 
+    /** Save a reordered visible subset without dropping disabled or uncompiled mode slots. */
+    fun saveReorderedModes(context: Context, allModeIds: List<String>, visibleOrder: List<String>,
+        reordered: List<String>): Boolean {
+        if (reordered == visibleOrder || reordered.size != visibleOrder.size ||
+            reordered.toSet() != visibleOrder.toSet()) return false
+        val saved = SettingsPreferences.getPrefsPublic(context).getString(ORDER_KEY, null)
+            ?.lines()?.filter { it.isNotBlank() } ?: defaultModeOrder
+        val fullOrder = (saved + allModeIds + defaultModeOrder + visibleOrder).distinct()
+        saveOrder(context, mergeOrder(fullOrder, reordered))
+        return true
+    }
+
     fun languageOf(modeId: String, schemas: List<SchemaInfo> = emptyList()): InputLanguage =
         schemas.firstOrNull { it.schemaId == modeId }?.language ?: InputLanguage.forSchema(modeId)
 
@@ -70,7 +84,7 @@ object InputModes {
     fun languageChoices(schemas: List<SchemaInfo>, currentModeId: String,
         remembered: Map<InputLanguage, String>, languageOrder: List<InputLanguage> = InputLanguage.entries): List<SchemaInfo> {
         val modes = available(schemas)
-        return (languageOrder + InputLanguage.entries).distinct().mapNotNull { language ->
+        return languageOrder.distinct().mapNotNull { language ->
             val group = modes.filter { it.language == language }
             val chosen = group.firstOrNull { it.schemaId == currentModeId }
                 ?: group.firstOrNull { it.schemaId == remembered[language] }

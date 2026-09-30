@@ -16,6 +16,8 @@ val prepareRimeManifest by tasks.registering {
         for ((assetRoot, root) in roots) root.walkTopDown().filter { it.isFile }.forEach { source ->
             val relative = source.relativeTo(root).invariantSeparatorsPath
             if (relative.endsWith(".md") || relative.startsWith("LICENSE") || relative.endsWith(".custom.yaml")) return@forEach
+            // Optional layouts are installed only when missing; a user's edited schema stays theirs.
+            if (assetRoot == "rime_ice" && relative in setOf("pinyin_qwjrtk.schema.yaml", "pinyin_cyletix10.schema.yaml")) return@forEach
             val target = if (assetRoot == "rime_japanese" && relative.endsWith(".lua")) "lua/$relative" else relative
             val digest = MessageDigest.getInstance("SHA-256")
             source.inputStream().use { input ->
