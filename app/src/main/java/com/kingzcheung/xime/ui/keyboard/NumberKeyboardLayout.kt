@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -284,7 +285,7 @@ private fun NumberSymbolKey(
             }
         } else Modifier
     }
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .then(shadowModifier)
@@ -299,10 +300,12 @@ private fun NumberSymbolKey(
                 }, onTap = { currentOnClick() })
             }, contentAlignment = Alignment.Center
     ) {
+        val fittedSize = keyLabelSizeSp(text, fontSize.value, maxWidth.value, maxHeight.value - 4f, density.fontScale)
         Text(
             text = punctuationKeyLabel(text),
             color = textColor,
-            fontSize = fontSize,
+            fontSize = fittedSize.sp,
+            lineHeight = (fittedSize * 1.2f).sp,
             fontWeight = FontWeight.Normal,
             modifier = Modifier.padding(vertical = 2.dp),
             fontFamily = AppFonts.keyFontFamily

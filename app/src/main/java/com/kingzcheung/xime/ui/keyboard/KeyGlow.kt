@@ -34,10 +34,11 @@ private data class GlowSquare(val x: Float, val y: Float, val side: Float, val a
 /** Transform only the cap/shadow, inside the unchanged key hit target. */
 internal fun Modifier.keyGlow(
     cap: Modifier, animateCap: Boolean = true,
+    materialLevel: com.kingzcheung.xime.ui.theme.MaterialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.BASE,
     particleSize: androidx.compose.ui.unit.DpSize? = null,
     particleOffset: androidx.compose.ui.unit.DpOffset = androidx.compose.ui.unit.DpOffset.Zero,
 ): Modifier = composed {
-    val paintedCap = cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current)
+    val paintedCap = cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current, materialLevel)
     if (!LocalKeyboardInputPreferences.current.keyGlowEnabled) return@composed this.then(paintedCap)
     // One coherent colour per press, as in the reference; overlapping squares
     // vary in brightness instead of mixing three unrelated theme colours.

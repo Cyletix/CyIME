@@ -653,7 +653,7 @@ private fun StrokeSymbolItem(
     val currentOnPress by rememberUpdatedState(onPress)
     // 面板样式与九键左栏（CandidateItem）一致：条目自身透明、按压时垫底层加深，
     // 圆角/阴影由外层面板统一负责
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else Color.Transparent)
@@ -667,10 +667,12 @@ private fun StrokeSymbolItem(
             },
         contentAlignment = Alignment.Center
     ) {
+        val fittedSize = keyLabelSizeSp(text, fontSize.value, maxWidth.value, maxHeight.value, LocalDensity.current.fontScale)
         Text(
             text = if (preserveWidth) text else punctuationKeyLabel(text),
             color = textColor,
-            fontSize = fontSize,
+            fontSize = fittedSize.sp,
+            lineHeight = (fittedSize * 1.2f).sp,
             fontWeight = FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -816,7 +818,7 @@ private fun ResetKey(
         } else Modifier
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(Unit) {
@@ -839,15 +841,16 @@ private fun ResetKey(
             tint = textColor,
             modifier = Modifier.size(if (compactMode) 16.dp else 20.dp)
         )
-        if (!compactMode) {
+        if (!compactMode && maxHeight >= 48.dp) {
 Text(
             text = "重输",
             color = textColor.copy(alpha = 0.5f),
             fontSize = 9.sp,
+            lineHeight = 11.sp,
             fontWeight = FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = Modifier.offset(y = (-14).dp),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp),
             fontFamily = AppFonts.keyFontFamily
         )
         }

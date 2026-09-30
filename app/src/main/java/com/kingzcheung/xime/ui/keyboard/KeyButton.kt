@@ -222,7 +222,7 @@ fun KeyButton(
             LocalKeyboardInputPreferences.current.keyTextScale)
         Text(
             text = punctuationKeyLabel(text),
-            modifier = Modifier.fillMaxWidth().offset(y = if (!swipeText.isNullOrEmpty()) 2.dp else 0.dp),
+            modifier = Modifier.fillMaxWidth().offset(y = if (!swipeText.isNullOrEmpty() && maxHeight >= 40.dp) 2.dp else 0.dp),
             color = textColor,
             fontSize = labelSize.sp,
             lineHeight = (labelSize * 1.2f).sp,
@@ -482,7 +482,7 @@ fun SwipeableKeyButton(
             } else {
                 Text(
                     text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent, textColor),
-                    modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty()) 2.dp else 0.dp),
+                    modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && maxHeight >= 40.dp) 2.dp else 0.dp),
                     color = resolvedText,
                     fontSize = labelSize.sp,
                     lineHeight = (labelSize * 1.2f).sp,
@@ -662,7 +662,7 @@ fun IconKeyButton(
                 if (isPressed) darkenColor(backgroundColor, 0.1f)
                 else if (isHighlighted) darkenColor(backgroundColor, 0.2f)
                 else backgroundColor
-            )),
+            ), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -978,7 +978,7 @@ fun SwipeableIconKeyButton(
                 if (isPressed) darkenColor(backgroundColor, 0.2f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor
-            )),
+            ), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
         Icon(

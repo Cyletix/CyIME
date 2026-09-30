@@ -80,7 +80,9 @@ class ReportedLayoutsTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val saved = prefs.getString("input_language_order", null)
+        val savedLanguages = prefs.getStringSet(com.kingzcheung.xime.settings.LanguagePreferences.KEY, null)?.toSet()
         try {
+            prefs.edit().putStringSet(com.kingzcheung.xime.settings.LanguagePreferences.KEY, setOf("zh", "ja", "en")).commit()
             InputModes.saveLanguageOrder(context, listOf("zh", "ja", "en"))
             rule.setContent { MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) {
                 SchemaListView(listOf(SchemaInfo("rime_ice", "中文26键", "", "", ""), SchemaInfo("t9_pinyin", "中文九键", "", "", "")),
@@ -89,12 +91,25 @@ class ReportedLayoutsTest {
             } }
             save("modes-preview", "chinese-mode-order.png")
             rule.onNodeWithTag("language-order-button").performClick()
-            rule.onNodeWithContentDescription("上移英文").performClick()
+            val english = rule.onNodeWithTag("input-mode-order:en")
+            val englishCenter = english.fetchSemanticsNode().boundsInRoot.center
+            val japaneseCenter = rule.onNodeWithTag("input-mode-order:ja").fetchSemanticsNode().boundsInRoot.center
+            rule.mainClock.autoAdvance = false
+            try {
+                english.performTouchInput { down(center) }
+                rule.mainClock.advanceTimeBy(700)
+                english.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(0f, japaneseCenter.y - englishCenter.y)); up() }
+            } finally { rule.mainClock.autoAdvance = true }
+            rule.waitForIdle()
             assertEquals(listOf("zh", "en", "ja"), InputModes.languageOrder(context).map { it.id })
             save("modes-preview", "language-order.png")
             rule.onNodeWithText("完成").performClick()
             rule.onNodeWithTag("schema-tile:rime_ice").assertExists()
-        } finally { prefs.edit().also { if (saved == null) it.remove("input_language_order") else it.putString("input_language_order", saved) }.commit() }
+        } finally { prefs.edit().also {
+            if (saved == null) it.remove("input_language_order") else it.putString("input_language_order", saved)
+            if (savedLanguages == null) it.remove(com.kingzcheung.xime.settings.LanguagePreferences.KEY)
+            else it.putStringSet(com.kingzcheung.xime.settings.LanguagePreferences.KEY, savedLanguages)
+        }.commit() }
     }
     @Test fun editorSectorGlowPreservesCentreAndOtherDirections() {
         rule.setContent { MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) { CompositionLocalProvider(

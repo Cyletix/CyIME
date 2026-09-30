@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,7 +39,7 @@ fun KeyboardModeKey(
         onPress = { onKeyPressDown?.invoke("mode_change") },
         backgroundColor = backgroundColor,
         textColor = textColor,
-        modifier = modifier.testTag("mode-slot-$slot"),
+        modifier = modifier.testTag("mode-slot-$slot").semantics { if (target.action == "abc") contentDescription = "返回键盘" },
         shadowEnabled = shadowEnabled,
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
