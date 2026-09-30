@@ -79,7 +79,7 @@ fun KeyEffectSettingsContent(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text("键内炫光", style = MaterialTheme.typography.bodyLarge)
-                                Text("默认关闭以降低耗电和卡顿；开启后显示半秒渐变光效与轻微按压动画", style = MaterialTheme.typography.bodySmall,
+                                Text("开启后显示半秒渐变光效与轻微按压动画。老人版首次按设备配置设置，可随时修改。", style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Switch(checked = uiState.keyGlowEnabled, onCheckedChange = viewModel::setKeyGlowEnabled)

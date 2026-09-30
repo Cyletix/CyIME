@@ -71,7 +71,7 @@ fun SettingsSection(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shadowElevation = 0.dp
         ) {
-            Column(Modifier.visualMaterial(VisualStyles.current, 12.dp, panel = true), content = content)
+            Column(Modifier.visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED), content = content)
         }
     }
 }
