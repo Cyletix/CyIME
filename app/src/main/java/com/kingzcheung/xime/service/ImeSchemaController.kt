@@ -33,6 +33,10 @@ import kotlinx.coroutines.withContext
  */
 internal class ImeSchemaController(private val service: XimeInputMethodService) {
     internal suspend fun switchInputMethod(): Boolean {
+        // The native fallback must stay in ASCII when its language is disabled.
+        if (service.rimeEngine.isAsciiMode() &&
+            com.kingzcheung.xime.settings.InputModes.languageOf(service.rimeEngine.getCurrentSchema(), service.uiState.value.schemas) !in
+            com.kingzcheung.xime.settings.LanguagePreferences.enabled(service)) return false
         val candState = service.candidateState.value
         val pendingEnglish = candState.pendingEnglishText
         FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: start, pendingEnglish='${if (pendingEnglish.isEmpty()) '-' else pendingEnglish}', isComposing=${candState.isComposing}, candidates=${candState.candidates.size}")
@@ -171,9 +175,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
     
-    internal fun openSettings() {
+    internal fun openSettings(route: String? = null) {
         try {
             val intent = Intent(service, MainActivity::class.java)
+            route?.let { intent.putExtra("open_fragment", it) }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             service.startActivity(intent)
         } catch (e: Exception) {
@@ -354,6 +359,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             }
             return
         }
+        if (com.kingzcheung.xime.settings.InputModes.languageOf(schemaId, service.uiState.value.schemas) !in
+            com.kingzcheung.xime.settings.LanguagePreferences.enabled(service)) return
         if (isHandwritingSchema(schemaId)) {
             // 检查手写模型文件是否已下载
             if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service)) {

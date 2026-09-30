@@ -89,7 +89,8 @@ fun SettingsMainContent(
     onNavigateToSpeechToText: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToClipboardSync: () -> Unit = {},
-    onNavigateToBackup: () -> Unit = {}
+    onNavigateToBackup: () -> Unit = {},
+    onNavigateToLanguages: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -267,6 +268,13 @@ fun SettingsMainContent(
 
             item {
                 SettingsSection(title = "方案与词库", content = {
+                    SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "语言管理",
+                        subtitle = "选择需要的语言，自动准备输入方案", onClick = onNavigateToLanguages, showArrow = true)
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
                     SettingsItem(
                         icon = Icons.TwoTone.KeyboardAlt,
                         title = "输入方案",
@@ -376,6 +384,11 @@ fun SettingsMainContent(
                         subtitle = "通过备份插件将配置备份到云端并恢复",
                         onClick = onNavigateToBackup,
                         showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
                         icon = Icons.TwoTone.Sync,
