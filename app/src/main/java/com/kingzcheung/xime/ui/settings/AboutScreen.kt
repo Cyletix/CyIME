@@ -1,8 +1,10 @@
 package com.kingzcheung.xime.ui.settings
 
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,14 +15,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.twotone.OpenInNew
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
@@ -52,6 +57,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +66,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.ui.theme.MaterialLevel
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.util.FileLogger
 
 data class LicenseItem(
@@ -186,23 +195,25 @@ fun AboutContent(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // App 信息
-            item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -253,49 +264,36 @@ fun AboutContent(
                         }
                     }
                 }
-            }
             
             // 本分支维护者优先，与源代码、上游作者使用同一种完整卡片。
-            item {
                 AboutLinkCard(
                     title = "Cyletix · 维护与开发",
                     subtitle = "github.com/Cyletix",
                     icon = Icons.TwoTone.PersonOutline,
                     onClick = { uriHandler.openUri("https://github.com/Cyletix") },
                 )
-            }
-            item {
                 AboutLinkCard(
                     title = "CyIME 源代码",
                     subtitle = "github.com/Cyletix/CyIME",
                     icon = Icons.TwoTone.Code,
                     onClick = { uriHandler.openUri("https://github.com/Cyletix/CyIME") },
                 )
-            }
-            item {
                 AboutLinkCard(
                     title = "Kor1 (kingzcheung) · 上游作者",
                     subtitle = "github.com/kingzcheung",
                     icon = Icons.TwoTone.PersonOutline,
                     onClick = { uriHandler.openUri("https://github.com/kingzcheung") },
                 )
-            }
 
             // 链接项
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                ) {
-                    Column {
+                SettingsSection(title = "信息与工具") {
                         SettingsItem(
                             icon = Icons.TwoTone.PrivacyTip,
                             title = "隐私策略",
                             onClick = onNavigateToPrivacy
                         )
                         HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
+                            modifier = Modifier.padding(start = 56.dp),
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
@@ -305,7 +303,7 @@ fun AboutContent(
                             onClick = onNavigateToLicenses
                         )
                         HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
+                            modifier = Modifier.padding(start = 56.dp),
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
@@ -315,7 +313,7 @@ fun AboutContent(
                             onClick = onNavigateToLogViewer
                         )
                         HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
+                            modifier = Modifier.padding(start = 56.dp),
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
@@ -326,7 +324,7 @@ fun AboutContent(
                         )
                         if (captureUnlocked) {
                             HorizontalDivider(
-                                modifier = Modifier.padding(start = 72.dp),
+                                modifier = Modifier.padding(start = 56.dp),
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                             )
@@ -338,7 +336,7 @@ fun AboutContent(
                         }
                         if (BuildConfig.DEBUG) {
                             HorizontalDivider(
-                                modifier = Modifier.padding(start = 72.dp),
+                                modifier = Modifier.padding(start = 56.dp),
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                             )
@@ -358,20 +356,19 @@ fun AboutContent(
                                 }
                             )
                         }
-                    }
                 }
-            }
             
             // 设备信息
-            item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)
                             .clickable { onDeviceInfoTapped() }
                             .padding(16.dp)
                     ) {
@@ -385,7 +382,6 @@ fun AboutContent(
                         InfoRow(label = "设备型号", value = AppInfo.deviceModel)
                     }
                 }
-            }
         }
     }
 }
@@ -404,22 +400,32 @@ private fun SettingsItem(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            fontSize = 16.sp,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
         )
         if (trailing != null) {
             trailing()
         } else {
             Icon(
-                imageVector = Icons.Default.ChevronRight,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -482,11 +488,14 @@ fun PrivacyPolicyContent(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)
+                            .padding(16.dp)
                     ) {
                         Text(
                             text = "CyIME隐私策略",
@@ -588,7 +597,7 @@ fun LicensesContent(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(AppInfo.dependencies) { item ->
                 Card(
@@ -597,10 +606,14 @@ fun LicensesContent(
                         .clickable {
                             uriHandler.openUri(item.url)
                         },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)
+                            .padding(16.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -636,17 +649,28 @@ private fun AboutLinkCard(title: String, subtitle: String, icon: ImageVector, on
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth()
+                .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(12.dp))
+            Box(
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(12.dp))
             Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null,
