@@ -22,6 +22,7 @@ Android 输入法，基于 Rime，Kotlin + Jetpack Compose。
 - 每次开发修改完成后，生成 Debug 包，有设备连接 ADB 时通过 ADB 覆盖安装到连接设备（install -r），保留数据。
 - 不覆盖或还原用户未提交改动。
 - 测试通过不等于真机验收；未真机验证必须标明“未验收”。
+- 尺寸验收是发包门禁：使用 `scripts/build-apk.ps1` 打包（连接模拟器/设备），必须通过 `scripts/verify-layout.ps1`；失败不得发包、发布 Release 或以旧测试报告代替。新增面板、弹窗和布局必须补入尺寸场景，检查文字真实高度、裁切、交互区域和极端尺寸。正式发布使用 `scripts/publish-release.ps1` 校验包与验收记录。
 
 ## 导航
 
