@@ -396,14 +396,27 @@ class RoundThreeImeTest {
             // 真实服务回调保存顺序，关闭重开后仍显示同一顺序。
             rule.onNodeWithContentDescription("输入模式").performClick()
             rule.onAllNodesWithContentDescription("返回").assertCountEquals(1)
-            rule.onNodeWithText("调整顺序").performClick()
-            rule.onNodeWithContentDescription("上移英文").performScrollTo().performClick()
+            rule.onNodeWithText("模式顺序").performClick()
+            val englishCard = rule.onNodeWithTag("input-mode-order:${com.kingzcheung.xime.settings.InputModes.ENGLISH}")
+                .performScrollTo()
+            val englishCenter = englishCard.fetchSemanticsNode().boundsInRoot.center
+            val t9Center = rule.onNodeWithTag("input-mode-order:t9_pinyin").performScrollTo()
+                .fetchSemanticsNode().boundsInRoot.center
+            rule.mainClock.autoAdvance = false
+            try {
+                englishCard.performTouchInput { down(center) }
+                rule.mainClock.advanceTimeBy(700)
+                englishCard.performTouchInput {
+                    moveBy(androidx.compose.ui.geometry.Offset(0f, t9Center.y - englishCenter.y)); up()
+                }
+            } finally { rule.mainClock.autoAdvance = true }
+            rule.waitForIdle()
             val savedOrder = prefs.getString("input_mode_order", "").orEmpty().lines()
             assertEquals(1, savedOrder.count { it == com.kingzcheung.xime.settings.InputModes.ENGLISH })
-            assertTrue("英文可调整位置而不被移除", savedOrder.indexOf(com.kingzcheung.xime.settings.InputModes.ENGLISH) < savedOrder.lastIndex)
+            assertTrue("英文可调整位置而不被移除", savedOrder.indexOf(com.kingzcheung.xime.settings.InputModes.ENGLISH) < savedOrder.indexOf("t9_pinyin"))
             screenshot("toolbar-mode-order")
             rule.onNodeWithText("完成").performClick()
-            rule.onNodeWithText("调整顺序").assertIsDisplayed()
+            rule.onNodeWithText("模式顺序").assertIsDisplayed()
             screenshot("toolbar-schema-single-back")
             rule.onNodeWithContentDescription("返回").performClick()
             rule.onNodeWithTag("keyboard-overlay").assertDoesNotExist()

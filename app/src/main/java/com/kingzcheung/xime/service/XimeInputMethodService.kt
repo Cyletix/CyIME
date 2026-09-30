@@ -458,11 +458,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val prefs = SettingsPreferences.getPrefsPublic(this)
         sharedPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
-                RimeConfigHelper.DEPLOYMENT_REVISION -> {
+                RimeConfigHelper.DEPLOYMENT_REVISION, com.kingzcheung.xime.settings.LanguagePreferences.KEY -> {
                     val pending = rimeInitializationJob
                     if (pending?.isActive == true) {
                         pending.invokeOnCompletion { serviceScope.launch { initRimeEngine() } }
                     } else initRimeEngine()
+                }
+                com.kingzcheung.xime.settings.InputModes.ORDER_KEY -> {
+                    uiState.value = uiState.value.copy(schemas =
+                        com.kingzcheung.xime.settings.InputModes.ordered(this@XimeInputMethodService, uiState.value.schemas))
                 }
                 com.kingzcheung.xime.settings.CustomKeyboardLayouts.REVISION -> schemaController.applyCustomLayouts()
                 SettingsPreferences.KEY_VISUAL_STYLE, SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
@@ -620,12 +624,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
 
                 notifyDeploymentStatus(true, "正在准备词库，首次使用需要稍候...")
-                check(RimeConfigHelper.prepareEngine(this@XimeInputMethodService)) { "词库部署失败" }
+                RimeConfigHelper.prepareAutomatically(this@XimeInputMethodService) { notifyDeploymentStatus(true, it) }
                 check(rimeEngine.ensureSession(180_000L)) { "输入会话未就绪" }
 
                 withContext(Dispatchers.Main) {
-                    val savedSchema = SettingsPreferences.getCurrentSchema(this@XimeInputMethodService)
                     val availableSchemas = rimeEngine.getAvailableSchemas()
+                    val storedSchema = SettingsPreferences.getCurrentSchema(this@XimeInputMethodService)
+                    val selectableSchemas = if (storedSchema.isNotBlank() && storedSchema !in availableSchemas && storedSchema != com.kingzcheung.xime.settings.InputModes.ENGLISH &&
+                        (isHandwritingSchema(storedSchema) || SchemaManager.isSchemaCompiled(this@XimeInputMethodService, storedSchema)))
+                        availableSchemas.toList() + storedSchema else availableSchemas.toList()
+                    val savedSchema = com.kingzcheung.xime.settings.LanguagePreferences.nativeSchema(
+                        storedSchema, selectableSchemas,
+                        com.kingzcheung.xime.settings.LanguagePreferences.enabled(this@XimeInputMethodService))
+                    if (savedSchema != storedSchema) SettingsPreferences.setCurrentSchema(this@XimeInputMethodService, savedSchema)
                     val currentSchema = rimeEngine.getCurrentSchema()
                     Log.d(TAG, "initRimeEngine: currentSchema=$currentSchema, savedSchema=$savedSchema, availableSchemas=${availableSchemas.joinToString()}")
                     
@@ -696,14 +707,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     // onStartInput 在部署进行中会跳过 schema 切换与选项恢复，
                     // 部署完成后这里补齐 UI 状态，保证键盘可用
                     withContext(Dispatchers.IO) { sessionController.restorePersistedSchemaOptions() }
+                    val ascii = rimeEngine.isAsciiMode()
+                    uiState.value = uiState.value.copy(isAsciiMode = ascii)
+                    keyboardViewModel.dispatch(com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
+                        ascii, rimeEngine.getCurrentSchema()))
                     updateUI()
                     inputReadiness.completeStartup()
                     uiState.value = uiState.value.copy(isDeploying = false, deploymentMessage = "")
                     Log.d(TAG, "initRimeEngine: Rime engine initialized successfully")
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 FileLogger.e(TAG, "initRimeEngine: Failed to initialize Rime engine", e)
-                notifyDeploymentStatus(true, "初始化失败，请在输入方案设置中重新部署")
+                notifyDeploymentStatus(true, "输入准备未完成，3 秒后自动重试")
+                delay(3_000)
+                withContext(Dispatchers.Main) { rimeInitializationJob = null; initRimeEngine() }
             }
         }
         
@@ -719,7 +737,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 FileLogger.w(TAG, "initRimeEngine: Watchdog triggered - native init appears stuck, keeping input blocked")
                 uiState.value = uiState.value.copy(
                     isDeploying = true,
-                    deploymentMessage = "初始化超时，请重启输入法"
+                    deploymentMessage = "准备时间较长，仍在后台处理中，可先切换输入法"
                 )
             }
         }
@@ -1597,7 +1615,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             keyboardContainer.requestLayout()
                                         }
                                     }
-                                    if (!handwritingExpanded && state.isFloatingMode && cardHeightPx > 0) {
+                                    if (!handwritingExpanded && state.isFloatingMode && !state.showKeyboardResize && cardHeightPx > 0) {
                                         currentEffectiveKeyboardHeight = (cardHeightPx / density.density).roundToInt()
                                         currentFloatingCardHeightDp = currentEffectiveKeyboardHeight
                                         currentFloatingCardWidthDp = ((right - left) / density.density).roundToInt()
@@ -1938,9 +1956,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // 60MB 词库编译可达 30s+，主线程等待会导致 ANR）。部署完成后
             // initRimeEngine 的流程会自动切换到正确方案，这里只做 UI 状态恢复。
             if (!rimeEngine.isMaintaining()) {
-                val savedSchema = SettingsPreferences.getCurrentSchema(this)
-                val currentSchema = rimeEngine.getCurrentSchema()
                 val availableSchemas = rimeEngine.getAvailableSchemas()
+                val storedSchema = SettingsPreferences.getCurrentSchema(this)
+                val selectableSchemas = if (storedSchema.isNotBlank() && storedSchema !in availableSchemas && storedSchema != com.kingzcheung.xime.settings.InputModes.ENGLISH &&
+                    (isHandwritingSchema(storedSchema) || SchemaManager.isSchemaCompiled(this, storedSchema)))
+                    availableSchemas.toList() + storedSchema else availableSchemas.toList()
+                val savedSchema = com.kingzcheung.xime.settings.LanguagePreferences.nativeSchema(
+                    storedSchema, selectableSchemas,
+                    com.kingzcheung.xime.settings.LanguagePreferences.enabled(this))
+                if (savedSchema != storedSchema) SettingsPreferences.setCurrentSchema(this, savedSchema)
+                val currentSchema = rimeEngine.getCurrentSchema()
                 debugLog("onStartInput: saved=$savedSchema, current=$currentSchema, available=${availableSchemas.joinToString()}")
                 
                 val actualSchema: String
@@ -2006,6 +2031,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 
                 // 从 user.yaml 恢复方案选项（中/西、简/繁等，含 ascii_mode）
                 sessionController.restorePersistedSchemaOptions()
+                val restoredAscii = rimeEngine.isAsciiMode()
+                if (restoredAscii != uiState.value.isAsciiMode) {
+                    uiState.value = uiState.value.copy(isAsciiMode = restoredAscii)
+                    keyboardViewModel.dispatch(com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
+                        restoredAscii, rimeEngine.getCurrentSchema()))
+                }
                 updateUI()
             } else {
                 debugLog("onStartInput: deployment in progress, skipping schema switch")

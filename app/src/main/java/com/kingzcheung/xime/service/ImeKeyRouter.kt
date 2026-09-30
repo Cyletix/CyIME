@@ -558,8 +558,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 乐观更新：立即按目标模式切换 UI（主键盘布局/面板字符），不等引擎异步切换，
                     // 消除"进入面板/切键盘后才闪变"的可见延迟（引擎切换完成后权威同步，一致则无感）。
                     val state = service.uiState.value
-                    val optimisticTarget = !state.isAsciiMode
                     val schemaId = service.rimeEngine.getCurrentSchema()
+                    val nativeLanguageEnabled = com.kingzcheung.xime.settings.InputModes.languageOf(
+                        schemaId, state.schemas) in com.kingzcheung.xime.settings.LanguagePreferences.enabled(service)
+                    val optimisticTarget = if (nativeLanguageEnabled) !state.isAsciiMode else true
                     withEditor {
                         service.uiState.value = service.uiState.value.copy(isAsciiMode = optimisticTarget)
                         service.keyboardViewModel.dispatch(
@@ -571,11 +573,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val t0 = System.nanoTime()
                     FileLogger.i(XimeInputMethodService.TAG, "ime_switch dispatched, ui ascii=${service.uiState.value.isAsciiMode}, thread=${Thread.currentThread().name}")
                     if (!service.schemaController.switchInputMethod()) {
-                        // 引擎不可用：回滚乐观状态
+                        // 无法切换时按引擎实际状态回滚乐观更新。
                         withEditor {
-                            service.uiState.value = service.uiState.value.copy(isAsciiMode = state.isAsciiMode)
+                            val actualAscii = service.rimeEngine.isAsciiMode()
+                            service.uiState.value = service.uiState.value.copy(isAsciiMode = actualAscii)
                             service.keyboardViewModel.dispatch(
-                                com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(state.isAsciiMode, schemaId)
+                                com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(actualAscii, schemaId)
                             )
                         }
                     }
