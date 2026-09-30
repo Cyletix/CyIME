@@ -9,6 +9,7 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction
 import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.MainType
 import com.kingzcheung.xime.keyboard.PanelType
+import com.kingzcheung.xime.keyboard.OverlayRoute
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,6 +46,19 @@ class HandwritingToggleTest {
         assertEquals(KeyboardLayoutState.Number, vm.keyboardState.value)
         vm.exitPanel()
         assertEquals(KeyboardLayoutState.T9Pinyin, vm.keyboardState.value)
+    }
+
+    @Test fun handwritingOpenedFromToolOverlayReturnsToKeyboard() {
+        for (route in listOf(OverlayRoute.Clipboard(0), OverlayRoute.Edit)) {
+            val vm = model()
+            vm.setKeyboardState(KeyboardLayoutState.T9Pinyin)
+            vm.showOverlay(route)
+            vm.enterTemporaryHandwriting()
+            assertEquals(KeyboardPage.Main(MainType.HANDWRITING), vm.page.value)
+            assertTrue(vm.exitTemporaryHandwriting())
+            assertEquals(KeyboardPage.Main(MainType.FULL), vm.page.value)
+            assertEquals(KeyboardLayoutState.T9Pinyin, vm.keyboardState.value)
+        }
     }
 
     @Test fun explicitSchemaSelectionDiscardsTemporaryReturn() {

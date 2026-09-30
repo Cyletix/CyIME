@@ -180,7 +180,9 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     fun enterTemporaryHandwriting() {
         if (handwritingReturn != null) return
-        handwritingReturn = HandwritingReturn(_page.value, _keyboardState.value, _savedKbStateBeforePanel)
+        val current = _page.value
+        val returnPage = if (current is KeyboardPage.Overlay) current.behind else current
+        handwritingReturn = HandwritingReturn(returnPage, _keyboardState.value, _savedKbStateBeforePanel)
         _savedKbStateBeforePanel = null
         _page.value = KeyboardPage.Main(MainType.HANDWRITING)
         _syncViewState()

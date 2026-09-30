@@ -4,6 +4,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.dp
 import kotlin.math.sqrt
 
 private const val MIN_WIDTH = 12f
@@ -25,30 +27,27 @@ fun DrawScope.renderStrokes(
     currentStroke: List<StrokePoint>,
     color: Color,
 ) {
-    for (stroke in strokes) {
-        if (stroke.size == 1) {
-            drawCircle(color, radius = MAX_WIDTH / 2, center = Offset(stroke[0].x, stroke[0].y))
-        } else {
-            var lastWidth = MAX_WIDTH
-            for (j in 1 until stroke.size) {
-                val p0 = stroke[j - 1]
-                val p1 = stroke[j]
-                val dx = p1.x - p0.x
-                val dy = p1.y - p0.y
-                val dist = sqrt(dx * dx + dy * dy)
-                val dt = (p1.timeMs - p0.timeMs).coerceAtLeast(1L).toFloat() / 1000f
-                val speed = dist / dt / 100f
-                val w = computeWidth(speed, lastWidth)
-                lastWidth = w
-                drawLine(color, start = Offset(p0.x, p0.y), end = Offset(p1.x, p1.y), strokeWidth = w, cap = StrokeCap.Round)
-            }
-        }
+    // The canvas may be transparent over an app or image unlike the keyboard palette.
+    // Paint the opposite color underneath so the writing remains visible on either surface.
+    val outlineColor = (if (color.luminance() > 0.5f) Color.Black else Color.White)
+        .copy(alpha = color.alpha)
+    val outlineGrowth = 4.dp.toPx()
+    fun drawLayer(ink: Color, growth: Float) {
+        strokes.forEach { drawStroke(it, ink, growth) }
+        if (currentStroke.size >= 2) drawStroke(currentStroke, ink, growth)
     }
-    if (currentStroke.size >= 2) {
+    drawLayer(outlineColor, outlineGrowth)
+    drawLayer(color, 0f)
+}
+
+private fun DrawScope.drawStroke(stroke: List<StrokePoint>, color: Color, growth: Float) {
+    if (stroke.size == 1) {
+        drawCircle(color, radius = (MAX_WIDTH + growth) / 2, center = Offset(stroke[0].x, stroke[0].y))
+    } else {
         var lastWidth = MAX_WIDTH
-        for (j in 1 until currentStroke.size) {
-            val p0 = currentStroke[j - 1]
-            val p1 = currentStroke[j]
+        for (j in 1 until stroke.size) {
+            val p0 = stroke[j - 1]
+            val p1 = stroke[j]
             val dx = p1.x - p0.x
             val dy = p1.y - p0.y
             val dist = sqrt(dx * dx + dy * dy)
@@ -56,7 +55,7 @@ fun DrawScope.renderStrokes(
             val speed = dist / dt / 100f
             val w = computeWidth(speed, lastWidth)
             lastWidth = w
-            drawLine(color, start = Offset(p0.x, p0.y), end = Offset(p1.x, p1.y), strokeWidth = w, cap = StrokeCap.Round)
+            drawLine(color, start = Offset(p0.x, p0.y), end = Offset(p1.x, p1.y), strokeWidth = w + growth, cap = StrokeCap.Round)
         }
     }
 }
