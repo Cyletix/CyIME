@@ -24,6 +24,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** A shortcut must open its destination even when a settings task already exists. */
+internal fun settingsActivityIntent(context: android.content.Context, route: String? = null) =
+    Intent(context, MainActivity::class.java).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        route?.let { putExtra("open_fragment", it) }
+    }
+
 /**
  * 方案管理与输入模式切换。
  *
@@ -177,10 +184,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     
     internal fun openSettings(route: String? = null) {
         try {
-            val intent = Intent(service, MainActivity::class.java)
-            route?.let { intent.putExtra("open_fragment", it) }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            service.startActivity(intent)
+            service.startActivity(settingsActivityIntent(service, route))
         } catch (e: Exception) {
             FileLogger.e(XimeInputMethodService.TAG, "Failed to open settings", e)
         }
