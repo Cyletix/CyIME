@@ -1,0 +1,743 @@
+{
+  "source": "Android · 1.3.18",
+  "selectedTheme": "soft_blue",
+  "themes": [
+    {
+      "id": "soft_blue",
+      "name": "柔和蓝",
+      "light": {
+        "keyboard": {
+          "bg": "#F4F6FA",
+          "key": "#FFFFFF",
+          "fn": "#DCE6FA",
+          "enter": "#DCE6FA",
+          "ink": "#20242C",
+          "fnInk": "#283B5E",
+          "accent": "#42639C",
+          "toolbarInk": "#42639C",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F4F6FA",
+          "card": "#EFF0F0",
+          "key": "#E4E5E7",
+          "ink": "#20242C",
+          "muted": "#42639C",
+          "accent": "#42639C",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#191C22",
+          "key": "#2E323A",
+          "fn": "#495A7D",
+          "enter": "#495A7D",
+          "ink": "#E9EDF5",
+          "fnInk": "#FFFFFF",
+          "accent": "#B4CAFA",
+          "toolbarInk": "#B4CAFA",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#191C22",
+          "card": "#2D2D2F",
+          "key": "#484B51",
+          "ink": "#E9EDF5",
+          "muted": "#B4CAFA",
+          "accent": "#B4CAFA",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "lavender_purple",
+      "name": "薰衣草紫",
+      "light": {
+        "keyboard": {
+          "bg": "#F7F4FA",
+          "key": "#FFFBFF",
+          "fn": "#E9E3F9",
+          "enter": "#E9E3F9",
+          "ink": "#25212C",
+          "fnInk": "#564588",
+          "accent": "#8F73E2",
+          "toolbarInk": "#685191",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F7F4FA",
+          "card": "#EFEFF0",
+          "key": "#E5E4E7",
+          "ink": "#25212C",
+          "muted": "#685191",
+          "accent": "#8F73E2",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#211E28",
+          "key": "#38333F",
+          "fn": "#58576D",
+          "enter": "#58576D",
+          "ink": "#F0EAF5",
+          "fnInk": "#FFFFFF",
+          "accent": "#C1B2EF",
+          "toolbarInk": "#D0BCFF",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#211E28",
+          "card": "#2D2D2F",
+          "key": "#4A4851",
+          "ink": "#F0EAF5",
+          "muted": "#D0BCFF",
+          "accent": "#C1B2EF",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "858AdvanceColor",
+      "name": "858AdvanceColor",
+      "light": {
+        "keyboard": {
+          "bg": "#292929",
+          "key": "#525252",
+          "fn": "#6D717C",
+          "enter": "#3F4E68",
+          "ink": "#FFFFFF",
+          "fnInk": "#FFFFFF",
+          "accent": "#C3CDDF",
+          "toolbarInk": "#E0E0E0",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#292929",
+          "card": "#2D2E2F",
+          "key": "#4A4C4F",
+          "ink": "#FFFFFF",
+          "muted": "#E0E0E0",
+          "accent": "#DEE4ED",
+          "dark": true
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#292929",
+          "key": "#525252",
+          "fn": "#6D717C",
+          "enter": "#3F4E68",
+          "ink": "#FFFFFF",
+          "fnInk": "#FFFFFF",
+          "accent": "#DEE4ED",
+          "toolbarInk": "#E0E0E0",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#292929",
+          "card": "#2D2E2F",
+          "key": "#4A4C4F",
+          "ink": "#FFFFFF",
+          "muted": "#E0E0E0",
+          "accent": "#DEE4ED",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "dynamic",
+      "name": "跟随系统动态配色",
+      "light": {
+        "keyboard": {
+          "bg": "#FEFBFF",
+          "key": "#FFFFFF",
+          "fn": "#D9E2FF",
+          "enter": "#D9E2FF",
+          "ink": "#1A1B20",
+          "fnInk": "#2B3858",
+          "accent": "#475D92",
+          "toolbarInk": "#2F4578",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#FAF8FF",
+          "card": "#F4F3FA",
+          "key": "#E1E2EC",
+          "ink": "#1A1B20",
+          "muted": "#44464F",
+          "accent": "#475D92",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#1A1B20",
+          "key": "#2F3036",
+          "fn": "#535C71",
+          "enter": "#535C71",
+          "ink": "#E2E2E9",
+          "fnInk": "#FFFFFF",
+          "accent": "#B0C6FF",
+          "toolbarInk": "#B0C6FF",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#121318",
+          "card": "#1A1B20",
+          "key": "#44464F",
+          "ink": "#E2E2E9",
+          "muted": "#C5C6D0",
+          "accent": "#B0C6FF",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "ocean_blue",
+      "name": "海洋蔚蓝",
+      "light": {
+        "keyboard": {
+          "bg": "#E3E4E8",
+          "key": "#FFFFFF",
+          "fn": "#D1E3FA",
+          "enter": "#D1E3FA",
+          "ink": "#202124",
+          "fnInk": "#10458B",
+          "accent": "#1A73E8",
+          "toolbarInk": "#202124",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#EFF0F0",
+          "key": "#E4E5E7",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#1A73E8",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#0D1B33",
+          "key": "#FFFFFF",
+          "fn": "#47576E",
+          "enter": "#47576E",
+          "ink": "#E8EAED",
+          "fnInk": "#FFFFFF",
+          "accent": "#81B2F2",
+          "toolbarInk": "#E8EAED",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2D2E2F",
+          "key": "#484C51",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#81B2F2",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "sunset_orange",
+      "name": "落日橙光",
+      "light": {
+        "keyboard": {
+          "bg": "#E3E4E8",
+          "key": "#FFFFFF",
+          "fn": "#FADCCC",
+          "enter": "#FADCCC",
+          "ink": "#202124",
+          "fnInk": "#8A3100",
+          "accent": "#E65100",
+          "toolbarInk": "#202124",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#F0F0EF",
+          "key": "#E7E5E4",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#E65100",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#1A0D00",
+          "key": "#FFFFFF",
+          "fn": "#66534E",
+          "enter": "#66534E",
+          "ink": "#E8EAED",
+          "fnInk": "#FFFFFF",
+          "accent": "#F19F73",
+          "toolbarInk": "#E8EAED",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2F2D2D",
+          "key": "#514B48",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#F19F73",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "slate_gray",
+      "name": "沉稳石墨",
+      "light": {
+        "keyboard": {
+          "bg": "#E3E4E8",
+          "key": "#FFFFFF",
+          "fn": "#D9D9D9",
+          "enter": "#D9D9D9",
+          "ink": "#202124",
+          "fnInk": "#282828",
+          "accent": "#424242",
+          "toolbarInk": "#202124",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#F0F0F0",
+          "key": "#E6E6E6",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#424242",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#1A1A1A",
+          "key": "#FFFFFF",
+          "fn": "#4D5056",
+          "enter": "#4D5056",
+          "ink": "#E8EAED",
+          "fnInk": "#FFFFFF",
+          "accent": "#979797",
+          "toolbarInk": "#E8EAED",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2E2E2E",
+          "key": "#4D4D4D",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#979797",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "rose_pink",
+      "name": "浪漫玫瑰",
+      "light": {
+        "keyboard": {
+          "bg": "#E3E4E8",
+          "key": "#FFFFFF",
+          "fn": "#EFD0DD",
+          "enter": "#EFD0DD",
+          "ink": "#202124",
+          "fnInk": "#680C34",
+          "accent": "#AD1457",
+          "toolbarInk": "#202124",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#F0EFF0",
+          "key": "#E7E4E5",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#AD1457",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#2D1020",
+          "key": "#FFFFFF",
+          "fn": "#5E4A59",
+          "enter": "#5E4A59",
+          "ink": "#E8EAED",
+          "fnInk": "#FFFFFF",
+          "accent": "#D27EA3",
+          "toolbarInk": "#E8EAED",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2F2D2E",
+          "key": "#50494C",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#D27EA3",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "teal_cyan",
+      "name": "青碧如水",
+      "light": {
+        "keyboard": {
+          "bg": "#E3E4E8",
+          "key": "#FFFFFF",
+          "fn": "#CCE4E1",
+          "enter": "#CCE4E1",
+          "ink": "#202124",
+          "fnInk": "#004940",
+          "accent": "#00796B",
+          "toolbarInk": "#202124",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#EFF0F0",
+          "key": "#E4E7E7",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#00796B",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#002622",
+          "key": "#FFFFFF",
+          "fn": "#44585C",
+          "enter": "#44585C",
+          "ink": "#E8EAED",
+          "fnInk": "#FFFFFF",
+          "accent": "#73B5AE",
+          "toolbarInk": "#E8EAED",
+          "dark": true
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2D2F2E",
+          "key": "#4A4F4E",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#73B5AE",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "sakura_pink",
+      "name": "樱花粉黛",
+      "light": {
+        "keyboard": {
+          "bg": "#FDF0F4",
+          "key": "#FFF8FB",
+          "fn": "#FBD2E0",
+          "enter": "#FBD2E0",
+          "ink": "#7D3A52",
+          "fnInk": "#8C123B",
+          "accent": "#E91E63",
+          "toolbarInk": "#7D3A52",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#F0EFF0",
+          "key": "#E7E4E5",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#E91E63",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#FDF0F4",
+          "key": "#FFF8FB",
+          "fn": "#674C5B",
+          "enter": "#674C5B",
+          "ink": "#7D3A52",
+          "fnInk": "#FFFFFF",
+          "accent": "#F383A9",
+          "toolbarInk": "#7D3A52",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2F2D2D",
+          "key": "#51484B",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#F383A9",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "sky_blue",
+      "name": "晴空浅蓝",
+      "light": {
+        "keyboard": {
+          "bg": "#E8F4FD",
+          "key": "#F7FCFF",
+          "fn": "#CCE7F6",
+          "enter": "#CCE7F6",
+          "ink": "#2D5F7A",
+          "fnInk": "#01527D",
+          "accent": "#0288D1",
+          "toolbarInk": "#2D5F7A",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#EFF0F0",
+          "key": "#E4E6E7",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#0288D1",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#E8F4FD",
+          "key": "#F7FCFF",
+          "fn": "#455A6B",
+          "enter": "#455A6B",
+          "ink": "#2D5F7A",
+          "fnInk": "#FFFFFF",
+          "accent": "#74BEE6",
+          "toolbarInk": "#2D5F7A",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2D2E2F",
+          "key": "#484E51",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#74BEE6",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "mint_green",
+      "name": "薄荷浅绿",
+      "light": {
+        "keyboard": {
+          "bg": "#E9F5EC",
+          "key": "#F6FBF7",
+          "fn": "#D5E5D6",
+          "enter": "#D5E5D6",
+          "ink": "#3C5C44",
+          "fnInk": "#1C4B1E",
+          "accent": "#2E7D32",
+          "toolbarInk": "#3C5C44",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#EFF0EF",
+          "key": "#E4E7E4",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#2E7D32",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#E9F5EC",
+          "key": "#F6FBF7",
+          "fn": "#4A5954",
+          "enter": "#4A5954",
+          "ink": "#3C5C44",
+          "fnInk": "#FFFFFF",
+          "accent": "#8CB88E",
+          "toolbarInk": "#3C5C44",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2D2E2D",
+          "key": "#4B4E4B",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#8CB88E",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "lilac_purple",
+      "name": "丁香浅紫",
+      "light": {
+        "keyboard": {
+          "bg": "#F3EDF8",
+          "key": "#FBF8FD",
+          "fn": "#E8D3EE",
+          "enter": "#E8D3EE",
+          "ink": "#5D4A70",
+          "fnInk": "#551666",
+          "accent": "#8E24AA",
+          "toolbarInk": "#5D4A70",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#F0EFF0",
+          "key": "#E6E4E7",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#8E24AA",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#F3EDF8",
+          "key": "#FBF8FD",
+          "fn": "#594C65",
+          "enter": "#594C65",
+          "ink": "#5D4A70",
+          "fnInk": "#FFFFFF",
+          "accent": "#C187D0",
+          "toolbarInk": "#5D4A70",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2E2D2F",
+          "key": "#4E4950",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#C187D0",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "peach_orange",
+      "name": "蜜桃浅橙",
+      "light": {
+        "keyboard": {
+          "bg": "#FDF0E3",
+          "key": "#FFFAF3",
+          "fn": "#FCE2CC",
+          "enter": "#FCE2CC",
+          "ink": "#7A5130",
+          "fnInk": "#8F4100",
+          "accent": "#EF6C00",
+          "toolbarInk": "#7A5130",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#F0F0EF",
+          "key": "#E7E5E4",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#EF6C00",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#FDF0E3",
+          "key": "#FFFAF3",
+          "fn": "#67574F",
+          "enter": "#67574F",
+          "ink": "#7A5130",
+          "fnInk": "#FFFFFF",
+          "accent": "#F6AE73",
+          "toolbarInk": "#7A5130",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2F2E2D",
+          "key": "#514C48",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#F6AE73",
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "cream_beige",
+      "name": "奶油米白",
+      "light": {
+        "keyboard": {
+          "bg": "#FAF5EE",
+          "key": "#FFFDF8",
+          "fn": "#E8E2E0",
+          "enter": "#E8E2E0",
+          "ink": "#5D4037",
+          "fnInk": "#55423B",
+          "accent": "#8D6E63",
+          "toolbarInk": "#5D4037",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#F5F5F5",
+          "card": "#F0F0F0",
+          "key": "#E6E5E5",
+          "ink": "#1A1A1A",
+          "muted": "#595959",
+          "accent": "#8D6E63",
+          "dark": false
+        }
+      },
+      "dark": {
+        "keyboard": {
+          "bg": "#FAF5EE",
+          "key": "#FFFDF8",
+          "fn": "#58565B",
+          "enter": "#58565B",
+          "ink": "#5D4037",
+          "fnInk": "#FFFFFF",
+          "accent": "#C0AFA9",
+          "toolbarInk": "#5D4037",
+          "dark": false
+        },
+        "settings": {
+          "bg": "#0F0F0F",
+          "card": "#2E2E2E",
+          "key": "#4E4C4B",
+          "ink": "#E6E6E6",
+          "muted": "#CCCCCC",
+          "accent": "#C0AFA9",
+          "dark": true
+        }
+      }
+    }
+  ],
+  "icons": {
+    "schema": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAGeSURBVHic7duhS0NRHMXxc4ZYxGa0GG1qsokGo2DQP2ErJv0\/TILB\/8JoESw2FQzCipgExbZiuqbJ9e6O45jvvjs8n3bvNvjx5T3f7kDAzMzMzMzMSuO4F0IIRwCOAayUG6cVzwBOSZ7lXhwJFEJYBnAFYLXhwWrzAGCX5Hu8mQt0C2Cz1FSVuSa5E2904kUIoYv\/GwcAtkMIh\/FGJ3lDr+AwterGix+3WAjhE8B80XHq80FyabhIA4UxH9prdKT2XOY2SX53SW8xSziQ4ECCAwkOJMxN+fnsUwDjn3q1vV\/yFSQ4kOBAggMJDiT4LJbhs9gEHEhwIMGBBAcSfBYTfAUJDiQ4kOBAggMJPotl+Cw2AQcSHEhwIMGBhGnPYr8x7nz0Vxp9wvoKEhxIKHGLzfSXTF9BggMJDiQ4kOBAQvpzxwDAQkuz1GJAcnG4SK+gp8LD1OgxXqSBLgoOUqvzeJH7b587AOvFxqnLDcmteCP3R3ofQL\/MPFW5B3CQbo4EIvkCYA3ACYDX5udqXR9Aj+QGybe2hzEzMzOzGfEFmYNKrBQrO2cAAAAASUVORK5CYII=",
+    "emoji": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAbHSURBVHic7Zx56FVFFMc\/p9SfmYHmVmnZbju0UlZU0oKR2WJGRuYfFZUQRERge0RBCwSlSRkttBAtllq2iGULpmSRpmlJQZmWtpqmlfntj3mP7PXOzL33bT\/hfeCizDlzZu753Tt35syZB23atGnTps3WijW7QUl7AcOA\/YD+QL+KazPwA7AGWF36dxWwFHjDzFY2u88NR9Lhku6V9JVqZ4mk2yXt3er7qhlJl0paXAeneMyVNLrV95mbkmNWNNAxlSyXNLLV951EUh9JM5vomEqmSOrRaj9URdJoSd+30Dlllks6vl73VfNXTFIf4GHg7BzVlgGfla6vgW8dvYHAYOCg0rV7jjYeBK4xsw056vyPmhwkaWfgHSDLF2UjMBV4Ffi1YJO9gBHASKBbBv13geFmtr5ge8UdJGlPYA4wKKG6DngWeBP4vWh7FWwPDAdGA90Tuh8Dw8zslyINFXKQpN6lhgdH1NYCTwJvAX8UaScD2wGnAmNK\/\/eYC5xgZn\/lbSC3gyR1Izw5R0fUFgF3AIUf7Zz0Am4G9oroPG1mF+Y1vE2BzjxE3DnTgOtpnnMAfgGuA96O6IyRdG1ew7meIEmXEL5YHpMJg3CrMMLrdr4j3wScaGbv5zGYCYVF5qf4g+IDwBtZ7TWYC\/GdtAIYYmaZPhh5XrHJ+M55ls7jHICnCB+HagwCbslqKNMTJOlc4HlHPA+4PautJtIB3I0\/uRxiZp+njGR10BdUnwz+CIynfvObetMPeMSRPWdmyUhA8hWTNBZ\/pjyRzuscCMG2KY5slKQDUgaST5CkxUA1QwuBGyJVuxCWBOcAOwC\/AS8CMyg+cSxisxth\/OxbRfa4mY2LNRh1kKSjCGNMNSYQvmrV6ABuBA6pIltIGLM2xtqus83TCENBJRuB3mbm9iX1io11yr\/Bdw7AKVS\/EUrlJyXarbfNd5zy7sCoWKMpB53rlHtftDJn1Civt80NwMuOLBqJdB2kEBTfyRF\/EDMK9EnI+yfkjbA5yymPBtdiT9CJTvkCwl8kxo81yhthcwXV+z1A0n5epZiDjnDKP0l0BOCVhHxGBhv1tvk38JEjO9yrFHPQEKd8WaIjEIJjixzZopI8L\/Wwudgp38er0CVibH+nfHWGjmwEbiWER7ecszwHzKTYPKgeNr3Yt\/uKufMgSXJEZ2boSGdlICGYX8lcMxtarULsFfMctDWzzikf4FWIOaizrc7rgff1LeQgL8C9bebudD42OeVdvQoxB3mPY2xg7+x4e2m\/eRViDvIqdWTuTufD6\/tar0LMQauc8tSUvzPTzyl3k7JiDvImhO6AthWwi1P+mVch5iAvXutNILcGvAiiuzqIDbgLnPLDgEcTHbkJfy3XKD4EbkvoeBueH3oVYk\/Qe075YKB3oiPTE\/JGkGpzALCjI3PDN66DzGwdvmdTCUpLge8TOvXkO2BJQseLOM6pJeQ6zSk\/K1FvAzApoVNPJhNfrHbgRw5fihlOOcgba\/oCRybqfkw68lgP5uHHecoMJeQUVbKZsAvrEnWQma3AD3h7e99b8gCNzfJYX2ojRlfgAkc23czWxCpn2Zu\/2ynfFzg2UXctcF+GNopyD+l0vlPwY+t3pBpIOsjMZuA\/wuOBngkT84D7U+0UYCL+VKRMH+ByR\/a6mc1PNZI1u8NLPOoZkW3Jm8Bd+KvpPGwC7gVeT+h1EN\/5nZClsUwOMrPZhNBmNQ4FxmUw8x5wCf5ObRbmA5cSUgBTjMdPyZtkZqmBHciXQLUrYc1S7WsA4ZFP\/VXLDCbkVQ\/LqP8WYePvy4z6FwHnObLVhNSXTFmveVPwRhOSpTwmAa\/lMNkTOJiwBBgE7FwqX0XYx5pP2Hd34zUVdAEuxp\/zbAZOMjPvy\/w\/imS5TgSujKi8CDyW124d6A5cBRwX0ZlgZnfmMVrEQV0JY8AxEbWPCINys3KHehGyO3aL6Ew1s3PyGq4lkXwekQ03QmruEwRn5k7gzkgP4HTCpDUW6fyAkEj+Z94GajmKsAfh5ndNqP4MPAPMBnJ30KEnIZtjTAbdBcDJTT2KUEbSLoTk7diTVGY98ALhS5d10K2kH2GhfDrZdlfeB05ryWGWMqXjUFNIr\/C3ZEnpWko4DvVdFZ0u\/Hsc6kBCktTAHG3cZ2ZX59BvLAoH6lY35chcnGWSYkclWoek\/pJmtdA5kySljke1HklXqLnHM5dIGt7q+86NpMskfd5Ax8yRNKLV91kzkoZKekjSyjo4ZaGkmxVOPDacVvw0xRDCInVf\/vvTFH1L12bCgnIV8BP\/\/jTFImBWKgLYpk2bNm3atCnzD8Dx9woodm7FAAAAAElFTkSuQmCC",
+    "edit": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAH+SURBVHic7drLbsMgEIVh3HUfN9sq2fuhTzehRcQ2F58ZbvOvGxi+SLaK4pxlWasE4Ang2XqOLgPwwH+P1vN0VYRjSGEnOIbkXBJnbaRMnDWRCnHWQqrEWQPpJs7cSCScOZHIOHMhCeHMgSSMMzaSEs6YSMo4okibxKI5AUDJ32\/b1mTWrxabjpQBJaIAAXgx1mEG4Kf1DM65v2vSoufJ+3NFVa7f9u2G4G1V8VkNoHZIiF7lFZ\/XAtJHinEGANJDOsIZBEge6Qyn5gDSXVjLIF3hDAbER0rhDAjEQ8rByY0ykCt\/fl10Dwnk\/8pJPkwgoBYJAlcWnQIBpUgQus\/pGAjIRYLgZVfnQEAKCcI3gQMAARFSfN3xzTrEwF0bANilvhrWCaTmQ+69FoSQOgfaS4egI3UMVIYjhdQpUB1OMAwNieTDBLqHEwyURKJsREwNJ9jwEom6GSFVnGDTUySRDW+kjhNsfIhUsU5RpPVlcYLNP5Aq1tAG0sEJBtjJB5AE0sUJhthJB5AEaoMTDLJ3DNQWx1cziAIQBcd+QJXIfh+UyIASiQABeAk9dK96CRxFLgjeTB7Ux9uqNCWkMXF8wkhj4\/iEkObA8ZGR5sLxkZDmxPHdRJobx1eJtAaOrxBpLRxfJtKaOL4E0to4vhMkwwmLkAznqDeS4VjWOv0CYS06\/8tT+HkAAAAASUVORK5CYII=",
+    "clipboard": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAIQSURBVHic7doxa1RBFIbhc8RSG9EiRQr1D0gsxIhIwMLKRrQXCeofMkH\/hWIlWkgMIkIEBUEEsQhCQrDYgIXFa2Nwi02+2buZnbvxeyBNMuw992V2bwY2wsyOMmARWAUG\/DMAHgGXWs\/XDDAPvEB7Dsy1nneqgBvAbkGcPT+Bq63nngrgwhhhhg2Ac63nrw541zEQwLPW81cFLB1w89+B5b8\/mwesu9j6PvYFnAKeANsT7IJRfgHzQ9c5f8ivD\/AVeFAzzhzwucLgAO9HXO9DpWttAGdqBHpTaeA9wzvobOVrvSq972OFce5GxGKHruNYA+4B9yNirfK1loA7JQuzZBHwNiKO2n+1LzPzulpUGuh3RByfeKR+2cnM02pRaSD2+dPNsUZq5+moX2amvP+iz6D\/mQMJDiQ4kOBAQq1H98inxhQc+lPVO0hwIMGBBAcSHEio9RSblTOa5B0kOJDgQIIDCQ4k+CwmeAcJDiQ4kOBAggMJPosJ3kGCAwkOJDiQ4EDCLJ3FmjwZvYMEBxIcSHAgwYEEn8UE7yDBgQQHEhxIcCCh9Jv2g4g4UXmWadvNzJNqUekO+jThMH30sWRRaaDHEwzSVysli4reYhERwHpEXO48Tr+8zsxrJQvH+ZC+FRHr3ebplY2IuF26uDhQZv7IzCsR8TAivnUYrLUvEbGcmQuZudV6GDMzMzObcX8APEmzFxm6lMsAAAAASUVORK5CYII=",
+    "handwriting_lookup": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAATLSURBVHic7ZtdiBZVGMf\/J4LUNshMLbFM2jBrC7KiUEzNG6WgCz+igi4ig6i0oKWiuigE6YM+lESywoxC6sKwiPRCi0SSPjQpSm1Dpdpks12XaC9\/Xcy7tLz7zjzP+87MezTmB3vzznme83\/+c2bmnJmzUkVFRUVFRUVFRUXRANOAp4BtQA8JfwLPAdNi64sG0AV8is16YGxsvW0FeNxhzEi2xtbcNoD3mzRnmPtjay+d2uXSKif4P19qwMs5zBlmSew6SgGYXYA5ABti19IKZ1gNQgh7JHUX0Nf0AnKcugCPZYyOlUAHsDmjzf7YNZROA5OOA\/NHHH81w6CdEaW3D\/6bBx0CJtcd60n3h3diaW47wIPA1LrfVmaYA\/BELL3RASYAA4ZBV8TWGQ1go2HOwdgaowHcYpgDcFdsna0S8gQD50o6KGlSRrN9IYRZOfqYJOl6SVMlnS9pQFKfpGMhhC9bzdsWgA2O0XNjC3k7SB4Ee4zcv5BMPTrKqC8XwA0Oc9Y1mXMcsAY46cg9ksPANWXV2hLAPkP0782cWeA24Ncmjann1jJrdgOscohd5sw1HngvpzEjmV12\/Z6CBg2R7zpzXQz8XKA5AL3AOWX7kFXUC4bAPmCCI88MksuwDF5qhxeNirrQIe4BR56rSd4ylskFRdR8ZpPtHzKO94QQXstqQDJ32ibpPGefRyVtlLS\/FjNT0hxJNxlx90l61tlHfoAxwF\/GWVvqyPOxcwScJGM0AsuM+B+KdcAAuNsQ9J0jh\/fF\/wFgiiPfNiPPxGKqdwB8aIhZbsR7v6ftJbkMPZruMHK1b14EDGUI6TViFznN2QmMa0LT5Ua+R\/PW7bpJAwsljclokjrvIXmabHZ0sz2EsMijp5Z3iqTrjGarskZRCGG+tz9LzL3Gmbo5JW4ycNAxcr4BznbomEOyQD7syGlSiDk1YU8bfTX8agp85tB5BONmSnKv2ZvTj1F4avfOg7LmLL+FEIYaFLVe0jwj76CkxSGEvkYHgU5JWyRd69RZOOaHwxonMo6dVf8DyWYFz4aFO0MIPzY6UMtxQBHNcQOsMEZrZxNth1mT0d+LLV83TVCkQXONvnYAi4E3nNp2ZPT1fJ6im8FTu\/udNNAvyTWBMzgiaVYIob9BH49IKnIl3ivpUNrBwh7zkgRsKuCkDQBXpeSf2WSu3WTvFwBYXZgBDoOmkz2bthgAUm+4wNfOPJ8AXbWYLqPtirYZVBPU3aI5\/YY5tzvz3FMXt9xov6B8V0YXk7WDoxF\/YHx2Br43cvQDcxvEvWLEjS\/PiQyAZ5zmfEXdJocGuRYYOf4hxWDgp4y4Y+VU74RkJb2O0S\/R+oAPSFmfNciz1jDo4ZQ46\/6zqdCC80CyiJyHMVpSYrMWnscz4t4yDMp8P3XaYBS5NiVmhhE3REGfo71rsVLA\/n51NOX31424rSGEv1uQdOphjITtdW3HAh8ZMQBXxqqncLC\/rH4OLAFWO9oCvBm7pkIheRIWxSAFf8mIeg+qUeTu1+60l2+nNfj+98xiS+w6SgO4iHwbGd6OXUPpAJ3A0RbMeTK29rYBTCRZpnj4ljZsu8u1y7UsgEslLZW0UNJlki6RNCRpd+1vVwjhi2gCKyoqKioqKioqKv4FHbpoRVsbRrQAAAAASUVORK5CYII=",
+    "voice": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAANBSURBVHic7ZtLiI1hGMf\/HxbElEsuQzNIGSlKZpJxGTtZWGgidhZ2bjUWWMkKOxqRclkQoaxcF4oRTW47CxsLl4aUS0aM6GdxzsTiPN\/7nfluRs+vzmL+53nf5\/\/+5\/3mO9P3HslxHMdxhitR2QaAFZLWSVomqaUqP5d0T9KVKIoelOWtVID5wGPC9AJzyvZbKEAr8CFBOIP0AS3hmf8DgDnAxzrCGeQ1MLVs\/7kDPB1COINcL9t\/rgCdKcIZZGmRnkcU2UzShpj3jknaVH0dj6lbn6mjAKOKbCZpuaEfknT\/r59vSPohaWeN2pVZm4qj6B000dAf19B6jdpCb\/lFBzTa0AdqaF+N2vEZeUlE0QENOzygAB5QAA8ogAcUwAMK4AEF8IACeEABPKAAHlAADyiABxTAAwrgAQXwgAJ4QAFSBQT0G08exhlD+g19bEJNkr4YXhoMLzXrk5J2B7019EZDf23obTW0dqP2paFPN3TLYyLSBvTO0C2zPYbeJWmNpDGSGiStlbTdqL1j6DMMvc\/Q8we4ZGzrLqN+dcqHhgAdxty7jfoLadaYdgc9NPR1tcQoim5JSnOc5VYURXeN9zoN3Xp8lD\/Awpjf9CRjzEzg\/RB2zhug5qULNMWMK\/dUCPDOMHYgZswi4FMd4fQB82LmO2KMe5XPqusAOGmY68fYRdVxSQ9Q3QSaYuZpjBnbnc+q6wCYG2PwaILxHcBh4BHwmcrBqgfAQWBxgvFnY\/rPzGaVKQHOxZjcmmPffTF9T+TVt26AlhijAJtz6Lkj0LM5656pAPYGDO\/JsNehQK9tWfXKFOB2wPgpYHKK+RuBi4EeV7NcU6YA00j2GaebOi4BKjeC0wnmfQVMyHONqaHy9+hNgsUA9ABbgDZgVnX8OGA2sAToonJ3S8IL\/pW7VgiguWq4KJ4BU8ped11Qudx6CgjnGv\/6ZWUBjAT2A79yCGYA2FX2GjMBWEWyfyuScocEn7KHHUA7cBn4OYRQvgNngAVFei7l61BAg6RWSYurr41G6XlVjgg\/kvQkiqJvxTj8Q+nfF5MkgFp6FEWl+\/PHPgE8oAAeUAAPKIAHFMADCuABBfCAHMdxHMdxHGco\/Abu23YpIWY9MAAAAABJRU5ErkJggg==",
+    "hide": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAEMSURBVHic7dIxbsMwDEZhoVPXzhlyzW7hlpPlGkWB9hKZ\/i4iUAS1q8RUaEjvWw2I9JNKAQAAAAAAAAAAAIBeJL2NOCuEpLOkT0mHJ8w61Fnn3rNC1Diua6Rfcdy+I93E6RrpjzjuFD0rxEKcLpFW4rj3qFkvUQeVUq4r346llEtEpHrGpZ655HXrnC4k2cqtbn5JDS9Hkizwl+L1ijREHBcdaag4LiqSpONwcdzWSDXO95Bx3KORpojj7o00VRwn6dQSaco4ruElfUj6mjKOa4g0bxz3YCTL3vup7oxk2fumaIxk2Xum+ieSZe+3CwuRLHuvXbmJZNn77FKNZNl7AAAAAAAAAAAAALP5ARTbhZWjZimRAAAAAElFTkSuQmCC",
+    "delete": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAANTSURBVHic7Zs9axRRFIafEzFoYZANWOifCIK9CtGEFbERtfADxMreP6GIImg60SB+1Gq+iIWNpVYGEWu\/QEEtQlK8Fjsbls3s7szce2dvkvuUu7PvOfPOvTv3njMDiUQikUgkEolEDuZLSNJ54DJwBBj3pVszX4BbZjbT\/sDZIEl7gVfAMVetiPgAnDCznyMexG6zvcwBmACeg+MIkjQJLPrIKFLO7ar6S0n7gCVgzF8+0dFwmWJ3gEO+MomUiUpTTNJxYNlzMlFS2iBJY8AKcNB\/OvFRZYrdZYeYAyVHkKRp4HWgXKKksEHZ1PoMHAiXTnyUmWL32GHmQEGDsql1yXPseeCUZ00yzfkAuvlIGpP0XX6ZkzSa6U9KWvOguabWyh5Jo1kMZ4oYNOsjUAcb5nTEcDVpw5wOzVFJy67JDjJn2jVAF5vM8WDSJnM6NPfI0aR+5jQkfXURz+F0gAtycoDmGZeE+wk\/cRHuQc+r3RG36EjyqdUTn1eyKD5ObNWDRiHyhBvyf9fqxsWkVUlH6zBHyjfomQ\/hAlQxqVZzpC6D5PiHVoEyJtVujiRZh\/g48JHhbCemzazn6letlfyamfWsQUlqAi9DJNcO8MKn8yUZOJIG5O595LRpB6h7auVRySQFNEeSTFKDVhmjUfUKemQdaJrZUpGDM0NfAbtDJTQCzBCHOdA60cUiI6kOc6BayTU068NOoJM0xQYwYma\/gKuhApSglDkA2bFN6hh1qm8FnUe0t\/lYFopTZrbQ60tJUwAFFpNhOy4Ku4vPo8xWo5byRjd5QZ76DNCHKiWL2k3KC1BHucNl41mrSb0ChJxqPnbltZnUL0CIkqvPksXwSq6Z+H5J31zEc5gecELNAJphivaZ+FZv+zg3EPsalAXZyo1D5+5qEYNS67mASSHuanOBdJvyZI7UsdUoYNJj4GLR47cL6QGqARQumJnZH+BKuFTipFRF0czmgEeBcomS9BjwAErXpLOptmP+rCsV7c3sDfDQcy4x8q\/y2z5qvcyywvZ+X+Nd5baPmf0ljmJ\/SB449cWyOvJNT8nExlszm3VuHJrZDeC+h4Ri4j1wFjx1Vs3sOnABWAB++9AcEp+Aa2Z22Mx+DDuZRCKRSCQSiUTE\/AeaREvmVgNBuQAAAABJRU5ErkJggg==",
+    "reset": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAOjSURBVHic7ZpfiA1RHMd\/g\/y3hCReVvJAsllEHvwJy4N4QJYlEi+0RCtL+ZMSuWVb4lXxwIsHEfKglGSLB7YolAhxs9cS7Rb18TBXbXfvOTN3Zs6ZWc7nZdtz557f53zn7M6ZmSPicDgcDofD4XA4HI7\/AmAKsAloBdpQ8whoARqAyQnUPZGEvxGAQcAO4IUmkCCeApuBARHq5wBMjC0WwAjgAPApRjClvAV2AYNCOuT+ftH0eEMDVAGHgUKCwZTyEWgEBmo8cj2\/YDMDJUBNUd4W7UB1GY9zpQemEEcvqfUWg+nJV2BhD48z5Q6qdDxewuHsF5HTIQ\/\/KiKXReS6iOSLv3cUPxsjIqNFZJyIrBGRBhGpCtnvFhGpEZF95T70PC\/RMYcGOBjyTN8EVkXofyPwOO40MzH2sPJB3AbmJFBrGfCgzwQE1ALdGqcuYLWBunuA35kOCH+N807jkyeBWaOpvwL4keWAWjUuBcpceg04XMlkQMDUAJcFFhzOVxKO7YAuajx2W6h\/odJwrAUEjNc43LdQvyVKODYDOqJxmGm4duRwbAb0QVH\/kuG6OUXd7AQEzNDUrzVYN9bMsRnQTkXttwZrnkwinCgB9YvgO1fRfjVCX4HgPyZtNtG3EYAnipOz3ECtY0nNnKgzKIr0d0Vto1evtIjyJzZY0d6haO\/TVPzwCPglIuXeKgz0PO9XfKVsEWUGdSvaVTOrTxMloJ+K9glxRLJKlIA6Fe0uoCKvFO3VMTwyS5SAniva6+KI\/DMAaxXroE6gf9p+qQOM1SxUF2fAr07h1gUMtyXxTCFxzYqA3u2Ows3IvaJKolEzi+ZbE+ntNVPjlfirJ53ISOCnQqTNmkhvr3aFUyENmbOas9WUgs9RjY\/9xyXAJI0QwFKLLqorK\/jbcNK5DQJOacRsvThcEnCidph20MkNBd5o5PLAPIP1twaE89BU7UokawIkAeoN1C27Qark5GTj\/hCoDxHSDRJ46ggsAl6HqGds5kYCaA4hDf4+oZUV9j0E2Eb4fUEbTI0zFsChkAMAf1twC7AYmA5MLPYxHJgMzAf2ArfwbxPCsi7tHLTg76BPi4q39qUCMAf4bDGYNmBa2uOuCGAUcBz4ZjCYDmA7kM7O1SQoBnUE+JJgMAX8W4uRaY8vMfAXlTvRLyyDeAk0AcNseacyNfH\/X8wVkdnFn7NKDsmL\/3KgU\/xn4PdE5K7nee9tejocDofD4XA4HA6HIx3+ALQ6T2nz2hQDAAAAAElFTkSuQmCC",
+    "language": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAXySURBVHic7ZxJjFRVFIbPI2JwAGmBlnlUQFcqhhgSEJHEmAgmgkQTQjDOLiBENMIGF64MJiyAoHGhCzcqgyAgSKI44IRoZBAQRemWDpMTY6L256KqTfms\/9xbXa+GjvUnlU7uO\/89\/\/3r9Xu37jv3mTXQQAMNNNBAV0VS7YTAKDObYmZjzazZzPqlPu1mdtLMTpjZ8fzfNjPbb2ZbkyQ5Wm3NFQcwDngeOEz52Ac8C1xd63GVDeAhYG8Gpih8DMyq9ThLRt6Y1goak8Yh4K5ajzsIoA+wuYrGpPEScGmtfSgKYBZwrIbmdOAQMLHWfvwDcmfNuowG9wawOqO+VgKX1NqcAcA3kYLPASuAs+L4b0B\/YCBwRsScyfdxLjLnduCyWpkzEmiJEHkEWABcQe7fUOHBgr4fdeJm5vtamO87hF1A72qb0wT8EBDWDiwFuhfwdovY\/UC3grhuwHci9pOCuO75HO0BLTsKdVTanIvJzT88tAGTUrzJTvzdRfLc58RPTMVOyuf08GqlvekQ83JAyBaKnNLARhG\/y8m1R3DWFYntnc\/tYWHWfqRFPBAQsFHwrnE4ciYMzHV4wwVHfREdqMwUABgFnHcSr3W4iwXnSETe44L7pMNZ7+hsoRKTSeAdJ+nbAe7nghc85YFnBHdHgLfV0ftcqeMPiZzhJDsO9HW4Qx3uwIjcIxz+AIfXDzjhcEd31o90Iu+WCzA1wJ8veB+UoEGdgY8HeNMc3a\/H5g+Jm+MkWR7B3y6480rQ8IToY1sE9wXBbQeuC\/GDK4rAXjMLdtRF8UqSJHO9ANcgYLyZfZqlojrDBTNrSpLkggropg7kMSdbPXWHHmZ2jxcQMmhGdlrqFtO9g\/JfjNyi+LeZy6k\/nEqSRE5TvDNocvZa6hJ9gLHqoGfQTaJ9bRIBMxsl+Cdj+KLPn0WfIyL5bwr+OGWCZ5By9UuHUwg1S26J5BdDq2iXM+oUvhLtclbdGYPk8kQKg0R78AeqA2VQ8CdLHsqgMYrgGaQuXIcjxVwp2k9G8kvhqlxpfC\/ahymCZ5A69kukGPVE4UwkvxRu7PKFuoY1K4JnkJoCnIoUo0RXwqDYJxdK+1WK4Bn0Ryc4hUC0l1NR8lcZXA9yQd8brPq2miKTnhft5azmXS7az0Xy1bXqtCJ0xqDYC6ISXc6DPGXQ2Uh+H9H+uyJ4BqlCpeGRYtTFXE7rI6C4sdfFkaJdFmV5Bh0U7ddHimkT7UMi+aVwY6vObhDt+xXBM+iAaI81SIkeGskvhftTJP9G0S4Nusjp7AvRPhNQd6gYNJfJL4YjZXa5Ux3wljt6mtmvFn9b76r408x6qlVFOfgkSU5b\/O+uroyPyllyXZ+xmHrEf57zFyK0aD\/YylueqHe0m1n\/JElOqAD3DEqSpNXM3s9aVR1hg2dOFIA7nQeHKyP47wnu\/BI0LBB9BL88YJWjf3yshlCSXU6S2wPceYL3YQn5VcHWUwHeVEf3ltj8MQKnOIlCxQuDHW5M8cIQh3+twwsVL6hJY+cAvOYk2xzgfiZ4MeUvqrZoT4Dnlb+sKHX8QZD7JlV5LsBqh7tIcNQacyFX1R4udjgbHJ3HqFTVK3CvkxiK1A7meV4J3kwn32yHV3QdmfBWiFuy8kOJXh4QsAnoVYT3lohXv\/m8Is5NRWJ7A9sC2hZl7Ucx0d3J1R17aAUmpHi3OvGzi+R5xImfnoq9jXAZ8JpKe1MoqAk4GBAEqVpA9HShJRXXE70x5lAqdlmEjugpRWYgVzsYsxXgR3LbBnrhF4cvKeh7qRN3P7mtCE8TtydtJ9XeilAwkEHEb2bp2IiiNrOcB4YBowN9rCJ+M8u75JZtagdy26HWRAoOYQ3ZbchbVlNj0iC3k0cVfVcTB4Cba+1HUQDNhG+1lcRKoEetfQgCeIzqbs\/cB9xR63GXDOBh4qYDncV2YFqtx1k2gAnAi8DRDEz5GlgCqIeAmaIWr6YYY7lXU4y2f7+aom\/+0265V1K0Wa5cpePVFLvNbFvZK4ANNNBAAw008L\/B35UovVjYxVEIAAAAAElFTkSuQmCC",
+    "enter": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAEMSURBVHic7dpBasNAEETRmuwMvkFyUEMWkQ\/qxDcpLyITY9CoIdA9Y\/7bCkTpIxCIkQAAAAAAAABgCLYX21\/VO4a0xrk7Ve8ZylMcIj3aiFMaaWtMxZBeHNu+2D4U7KoPFIhztf2eOupvW22gkeOs++oCjR5n3VgTaIY46878QLPEkQoCzRRHSg40WxwpMdCMcaSkQLPGkRICzRxH+l+gFrj5Iuklf1m01naf\/6138ZXjRG0GIs6v7huETqDW2iLpnDdlTN03iEhBgc\/8j+2P6p2liBRApAAiBRApgEgBRAogUgCRAogUEIj0bftYvbPUTiROeEgcfwkxB6j22T7b\/qzeAQAAAAAAAAA5bvACD7BrS8HDAAAAAElFTkSuQmCC",
+    "palette": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAbmSURBVHic7Zx5jGVTHsc\/P4qiddl17FpQ2ox1LEOQoJsglrQttB4jocU6k1iCGCOxpu1Ea7sQtE4ndrEXEwRj6Q6ttLZ1R2MQS1NoY8bXH6eaV8\/9nXvuve\/Vq0reJ3mpd8\/v\/H7n3N+7597z+51zC9q0adOmTZvhig12g5LWBvYExgCjgNXqPgCf13w+6\/\/bCzxqZh8Pdp+bjqRNJE2WNFfVmSPpAkndrT6vykjaT9LMBjjF42VJJ0haodXnWghJYyQ93kTHZHGLpNGtPvcokkZIumiQHVPPVEnLtdoXv0PSXpI+bLFzFjNH0h8bcV6Vn2IK438KcHgBtfcJT6Ve4APgI6feWsD6wB+ATYHRBdr4HjjSzGYU0PkdlRwkaRTwFKHzKUwHHgG+LNnkCsCfgLHA5ok655vZ2SXbK+8gSesAPcCGOVX7gGn9db8r214GqwA7AxOAZXLq3m1mh5VppJSD+ofVC8AmkWrfAbcBzwCLyrSTyAhgH2BiTr0eYF8z+76I8bIO6gF2jVR5HZgMfFvGfknWA84E1ozUucPM\/lLE6BJFeyHpWuLOeQD4B4PrHID5wCnA7EidiZImFTFa6AqSdBhwV6TKVMJNuJ4OYH\/gAKCL4Lx7gIeAH3OaLaq7FHAqsINjbxGwmZm9m9MuUMBB\/TflOYQxn8UU4LGM8k7gbLKfOq8D5+Pfo8rqdgAnAzs5dp83M082gCJD7Bp850wn2zkAu+M\/kjcnPlzL6v4PuAKY5ch3lHRcpN1fSXKQpL2B\/Rzxv4E7I+r75JiPyavo\/gRcCPzHkZ8nqSvHfvIVdLFTvpDwS8VYJUc+qkm6EIbf5IjtM3L08x0k6RDAi2uuIn\/y90UFeRXdxbwH3O\/IjpG0VEw55Qo6zSmfBbySoP9wjvyhJunWMt0pXxUYH1OMOkjSGGAbR3x3fr8AeAJ4w5G90S9vhm4tfcC9jiwaZEcf85IuJUy+6vkA+HtS1wJLA\/sycC4zgzBnypsHVdGtZR3CVKSeRWa2rKeU56B3gQ0yRJcTYqzhxq1k3\/jHmdlTWQruEJO0FtnOAXipeN+GBM845W7qJHYP8iZhLwM\/JHZoqPGOU+5mHzsixrZ2ymfWHf8MbAEcT8gALiCM9V5AEfuNJDVeW+DouzmtmIPGOOW1Qd4I4Fhgl5qytYGLCJfzVJp\/tWXFa13AX4GtGBivfe3YWMMzHhtiXjLs05rvuzLQObXsQkiNNpsi8Zr3Y7k5pJiDVnPKv6r5Pi6iD7BbjrwRVInXFvOzJ4g5KGsK\/v+641j2LkXeCIrEa956mbeqUthBS9Yd520kcBtuIEXitZWdOqUclELm5KqGJyvaT6FIvLalU+d9TznmIG\/tqrPm+9PAm0692cC\/IvYbRZF4zbsnPuoZd0MNSfOBdTNEE4Fvao5HEFKb4\/ltHnQf8DyNXQeLkRKvbQmc6+h3mVlfliDmoBeA7TNEfwPmpfR6CNFBmLxmzXceMbO9PcXYEJvrlK9eoGNDhUn4k8GrYooxB73tlHsz7KHKIcBejqzHzLzFBiDuoNecci9GG2p0EG4H3pK0gJNSjHg855SvB6zEwBn1UGMH4AjCQ8Pjn2bWm2coL2H2ErBdhuhG4ME844NEJzCSkF\/enhCbLZ+jc5+ZRXPRi4ldQRCckOWg8YSFwv+mNFKBTQlDekNgY\/K3uaQwG0jewJB3BY0m5J+zOJe0VY0ydBLuHzs32G4PcICZLUxViIYaZjYPfzZ8aHq\/CtEJnEPjnXOdmY0t4hxIi8Uudcq78TcHVOF40rf0pfAYMNbMktbi60na3SHpVcLewHr6CBnFbzJkZViXsEmiEUwDrjazF6sYSY3mvdXVkcDp5N\/sU\/EWKfP4hBA0P0GYNa9oZhOqOgcST8zMeiTNAA7OEG9GeCrcWrUzwEZO+TQzm9AA+4Upkg86GT86Hw+4AV8BvBXORg27wiQ7yMwWEC5fj2NJy\/\/G8FYdjqxotzSFMopmNg24NlLlGOAoQn6mDF4GYVL\/NpxBp1nbgGcClxCeckUYBdzkyOaa2cYF7VWmbE76QPxfG8KC3fXAHhS7mj4D7nBk3f3bcQaVUg4ys68IJ\/9hpFoXcCJwCyEfkxpH3Ut4bGexbWofG0XpVQ0zm0+Int\/Kqbo8cBxwO3AQ+ZH2T8Djjmww1tkG0IjXoVYGbiAMu1R6CY6dR8grLSTMxvsIQ\/Iysp1xtJndXKW\/LUPS\/pI+afKLct661vBA0khJVzbJOUmvDgwLJG0h6dkGO8jbyD58kXSQwvujVTmr1efSVCT9WeFt5I9LOOeEVva9Ff+aopuwsaqbgf+SYtX+Tx9hTX0WMMXM3I0Fbdq0adOmTZsYvwCIM2j3jXJB8QAAAABJRU5ErkJggg==",
+    "effects": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAFJSURBVHic7dvBSQNRAITheZKDWIxeFLEJD17swwKswINiF4IXy5AgeldbGStYJmRnI9H\/K2Cy+XnJhpBIAAAAwNJsH9l+sP3p3fu0fW\/7sPmcRnPM9rukk+bmFtZjjLPW2EFryPatfj+OJJ3avmmN1QJJuipuzXXdGqq9xGy7tdUwxqg8t+YJ+pNWO3iMy4X3X5Yc5wQFBAoIFBAoIFCw0V1s6jNO67PG0uZcPycoIFBAoIBAAYGC1b7foVqmOnCCAgIFBAoIFBAoIFBAoIBAAYECAgUECggUECggUECggEABgYLVf\/vmcMpUB05QQKCAQAGBAgIFG\/26Y9\/vdHOunxMUECggUECggEAB\/9UIOEFBM9BbcWuudWuoGei5uDXXU2uo\/ZfMD0nHzc0tvI4xzltj7fegC0mPkr7Lu5v4knTXjAMAAABM+gGc57Yaxr34dQAAAABJRU5ErkJggg==",
+    "layout": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAGOSURBVHic7dsxSgNRFIXhc0RsxM7SDdiplZ1oYSlY6BKSJp2LsXAXljaCjZ0KFkKKgJWg2KWxum5gnufNzAvzEs9X5maGm5+ZEEICmJmZmZmVEBGTiJjFcptFxCTn9bJFmB0AdwB2u8at0AuAU5JfqSe0CfQI4LDEVpW5J3mSGq7lnCEiRljNOABwHBGXqWFWIADjQsvUapQaZN1iEfEDYKPYOvX5JrndNMgNFInRWeeVhnPb9CDJxha5t9i\/5UCCAwkOJDiQ4ECCAwkOJPT9oLgy\/EGxIwcSHEhwIMGBhPWex+d83dH49ULmsYs4Z+rYRr6CBAcSHEhwIMGBBAcSHEhwIMGBBAcSHEhwIMGBBAcSHEhwIMGBBAcSHEhwIMGBBAcSHEhwIMGBBAcScn9ANQewueBdhjQnudU0yL2C3gouU6PX1CA30E2hRWp1nRq0+UPdE4D9IuvU5YHkUWrY5k36HMC0\/z5VeQZw8dcTsgORfAewB+AKwEe\/vQY3BTAmeUDyc+hlzMzMzGwJ\/QIWRgI5Tj903AAAAABJRU5ErkJggg==",
+    "next": "data:image\/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAC9SURBVHic7doxCgJBEAXR1lRvoAc1czJPKXqT2lARtrdBZBqpd4H5FB1OhCRJkiRJkiS1BlyBMXtHS8CFlzF7TysfcYz0biWOkSIigCNwTwIZCTgDDyMljFRgpAIjFRipwEgFRiowUoGRCoxUYKQCIxV0ibT\/9QNfICJ2s0e0BJyA5+zrack4CeMkjJMwTsI4CeMkjJMwTsI4CeMkjJMADsbZgJ8Xtq1EGrN3tQIM42wAbsaRJEmSJEmS9H8W\/I2jfW3BsD8AAAAASUVORK5CYII="
+  }
+}

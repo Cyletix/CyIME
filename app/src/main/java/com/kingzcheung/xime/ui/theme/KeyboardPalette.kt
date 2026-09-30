@@ -2,6 +2,40 @@ package com.kingzcheung.xime.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.kingzcheung.xime.settings.KeysConfigHelper
+
+/** Resolved keyboard colors, shared by the keyboard, material samples and preview export. */
+@Immutable
+data class KeyboardPalette(
+    val background: Color, val key: Color, val text: Color, val accent: Color,
+    val function: Color, val functionText: Color, val enter: Color,
+    val candidateText: Color, val selectedText: Color,
+)
+
+fun resolveKeyboardPalette(themeId: String, dark: Boolean): KeyboardPalette {
+    val legacy = KeysConfigHelper.getKeyboardColors()
+    fun color(value: Long) = Color(if (value > 0xFFFFFF) value else 0xFF000000 or value)
+    return KeyboardPalette(
+        background = KeyboardThemes.getKeyboardBackgroundColor(themeId, dark),
+        key = KeyboardThemes.getKeyBgColorOverride(themeId, dark)
+            ?: color(if (dark) legacy.keyBgColorDark else legacy.keyBgColor),
+        text = KeyboardThemes.getKeyTextColorOverride(themeId, dark)
+            ?: color(if (dark) legacy.keyTextColorDark else legacy.keyTextColor),
+        accent = KeyboardThemes.getAccentColor(themeId, dark),
+        function = resolvedSpecialKeyColor(KeyboardThemes.getRenderingScheme(themeId), dark,
+            (if (dark) legacy.specialKeyBgColorDark else legacy.specialKeyBgColor)?.let(::color)),
+        functionText = if (dark) Color.White else KeyboardThemes.getSpecialKeyTextColor(themeId, false),
+        enter = KeyboardThemes.getEnterKeyColor(themeId, dark),
+        candidateText = KeyboardThemes.getCandidateTextColorOverride(themeId, dark)
+            ?: color(if (dark) legacy.candidateTextColorDark else legacy.candidateTextColor),
+        selectedText = KeyboardThemes.getCandidateSelectedTextColorOverride(themeId, dark)
+            ?: KeyboardThemes.getCandidateSelectedTextColor(themeId, dark),
+    )
+}
+
+internal val LocalKeyboardPalette = staticCompositionLocalOf<KeyboardPalette?> { null }
 
 /** 功能键使用带少量主题色的中性容器，避免直接把高饱和主色铺满深色键盘。 */
 internal fun softDarkKeyContainer(accent: Color): Color =

@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,52 +17,73 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kingzcheung.xime.ui.theme.MaterialLevel
 import com.kingzcheung.xime.ui.theme.VisualStyle
-import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
-import com.kingzcheung.xime.ui.theme.CyimeGeneratedIcon
 import com.kingzcheung.xime.ui.theme.visualEnvironment
+import com.kingzcheung.xime.ui.theme.LocalKeyboardPalette
+import com.kingzcheung.xime.ui.theme.LocalMaterialPalette
+import com.kingzcheung.xime.ui.theme.MaterialPalette
 
 @Composable
 internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) -> Unit) {
+    val keyboard = LocalKeyboardPalette.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("视觉样式", style = MaterialTheme.typography.titleMedium)
-        Text("四组材质与配色预设，即点即用。原有主题配置保留，可随时恢复。",
+        Text("视觉样式", style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary)
+        Text("只改变材质。明暗、配色和背景始终跟随下方的主题设置。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.chunked(2).forEach { row ->
+        VisualStyle.entries.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { style ->
-                    val palette = requireNotNull(VisualStyles.palette(style))
+                    val palette = MaterialTheme.colorScheme
+                    val surface = keyboard?.background ?: palette.surface
+                    val accent = keyboard?.accent ?: palette.primary
+                    val key = keyboard?.key ?: palette.surfaceContainerHigh
+                    val ink = keyboard?.text ?: palette.onSurface
                     val shape = RoundedCornerShape(16.dp)
+                    CompositionLocalProvider(LocalMaterialPalette provides MaterialPalette(surface, accent)) {
                     Column(Modifier.weight(1f).testTag("visual-style-${style.id}")
                         .semantics { this.selected = selected == style }
-                        .clip(shape).background(palette.surfaceLight).visualEnvironment(style)
+                        .clip(shape).background(surface).visualEnvironment(style)
                         .border(if (selected == style) 2.dp else 1.dp,
-                            palette.accentLight.copy(alpha = if (selected == style) 1f else .24f), shape)
-                        .clickable { onSelect(style) }.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CyimeGeneratedIcon(style, Modifier.size(46.dp).align(Alignment.CenterHorizontally), background = true)
-                        Text("你好   拼音", color = palette.candidateTextColorLight, fontSize = 13.sp,
-                            modifier = Modifier.fillMaxWidth().visualMaterial(style, 6.dp, panel = true).padding(6.dp))
+                            accent.copy(alpha = if (selected == style) 1f else .24f), shape)
+                        .clickable { onSelect(style) }.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("拼音    你好", color = keyboard?.candidateText ?: ink, fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 36.dp)
+                                .visualMaterial(style, 6.dp, level = MaterialLevel.BASE)
+                                .padding(horizontal = 7.dp, vertical = 6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            listOf("A", "S", "↵").forEach { label ->
+                            listOf("A", "S", "D").forEach { label ->
                                 Box(Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(8.dp))
-                                    .background(if (label == "↵") palette.specialKeyLight else palette.keyBgLight)
+                                    .background(key)
                                     .visualMaterial(style, 8.dp), contentAlignment = Alignment.Center) {
-                                    Text(label, color = palette.keyTextColorLight, fontSize = 16.sp)
+                                    Text(label, color = ink, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            listOf("Z", "X", "↵").forEach { label ->
+                                Box(Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(8.dp))
+                                    .background(if (label == "↵") keyboard?.enter ?: palette.primaryContainer else key)
+                                    .visualMaterial(style, 8.dp,
+                                        level = if (label == "↵") MaterialLevel.RAISED else MaterialLevel.BASE),
+                                    contentAlignment = Alignment.Center) {
+                                    Text(label, color = if (label == "↵") keyboard?.functionText ?: ink else ink,
+                                        fontSize = 16.sp)
                                 }
                             }
                         }
                         Text(style.title + if (selected == style) " · 已选" else "",
-                            color = palette.keyTextColorLight, style = MaterialTheme.typography.labelLarge)
+                            color = ink, style = MaterialTheme.typography.labelLarge)
+                    }
                     }
                 }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-        TextButton(onClick = { onSelect(VisualStyle.ORIGINAL) }, modifier = Modifier.testTag("visual-style-original")) {
-            Text(if (selected == VisualStyle.ORIGINAL) "原有外观 · 已选" else "恢复原有外观")
-        }
-        if (selected != VisualStyle.ORIGINAL) Text("当前使用预设的配色和明暗。选择下面的配色方案或显示模式，将恢复原有外观。",
+        if (selected != VisualStyle.ORIGINAL) Text("切换明暗或配色不会关闭当前材质效果。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

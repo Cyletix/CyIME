@@ -454,7 +454,7 @@ object KeyboardThemes {
 
     /** Rendering overrides do not change the stored theme or the theme catalogue. */
     fun getRenderingScheme(id: String): KeyboardColorScheme =
-        VisualStyles.palette(VisualStyles.current) ?: getThemeById(id)
+        getThemeById(id)
 
     fun getSpecialKeyColor(themeId: String, isDark: Boolean): Color {
         val theme = getRenderingScheme(themeId)
@@ -536,7 +536,7 @@ object KeyboardThemes {
     /** 完整调色板直接从主题缓存取色，避免固定蓝和低版本回退又混入旧全局颜色。 */
     private inline fun dynamicThemeColor(themeId: String, selector: (KeyboardColorScheme) -> Color): Color? {
         // 从状态化缓存查找以建立 Compose 订阅：缓存整体替换后 UI 自动重组
-        val theme = VisualStyles.palette(VisualStyles.current) ?: themesCache.firstOrNull { it.id == themeId } ?: return null
+        val theme = themesCache.firstOrNull { it.id == themeId } ?: return null
         if (!theme.isDynamic && !theme.useThemeColors) return null
         return selector(theme)
     }

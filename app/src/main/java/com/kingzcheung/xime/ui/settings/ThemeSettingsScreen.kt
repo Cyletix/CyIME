@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,8 +80,14 @@ fun ThemeSettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                androidx.compose.material3.OutlinedButton(onClick = { showIconSettings = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text("图标设置 · " + if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择")
+                SettingsSection(title = "应用图标") {
+                    SettingsItem(
+                        icon = Icons.TwoTone.Palette,
+                        title = "图标设置",
+                        subtitle = if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择",
+                        onClick = { showIconSettings = true },
+                        showArrow = true
+                    )
                 }
             }
             item {

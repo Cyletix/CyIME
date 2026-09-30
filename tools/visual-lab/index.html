@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CyIME · 图形工作台</title><link rel="stylesheet" href="lab.css"></head><body>
+<header><div class="brand"><span class="mark">◈</span><div><strong>CyIME</strong><span>图形工作台</span></div></div><div class="header-note">代码 → 图形 → Android <span class="dot"></span> 本地预览</div><button id="reset">恢复仓库版本</button></header>
+<main><section class="editor-pane"><div class="pane-heading"><div><small>01 / SOURCE</small><h1>从代码看效果</h1></div><select id="mode" aria-label="代码类型"><option value="json">共享参数 · JSON</option><option value="svg">自由图形 · SVG</option></select></div>
+<p class="hint">在这里粘贴或修改代码，右侧立即更新。参数可编译为输入法使用的同一份资源。</p>
+<div class="editor-wrap"><pre id="lines" aria-hidden="true"></pre><textarea id="code" spellcheck="false" aria-label="图形源代码"></textarea></div>
+<div id="status" role="status" aria-live="polite">加载中…</div><div class="editor-actions"><button id="import">打开文件</button><input id="file" type="file" accept=".json,.svg" hidden><button id="save">保存代码</button><button id="compile" class="primary">编译 Android 资源</button></div>
+<details><summary>用法与预览范围</summary><p>JSON 是图标几何及材质参数的共同来源。编译会保存 design.json，并生成 Android 矢量图标和 Kotlin 材质参数。任意 SVG 可以预览、导出；不执行脚本，不会写入输入法。</p><p>这里的键盘是材质样片，不模拟 Android 的布局与触摸行为。Android 实机截图在下方单独展示。</p></details>
+</section><section class="preview-pane"><div class="pane-heading"><div><small>02 / LIVE CANVAS</small><h2>实时效果</h2></div><span id="timing"></span></div>
+<div class="controls"><select id="style" aria-label="视觉样式"><option value="original">原有外观</option><option value="neon">霓光</option><option value="glass">玻璃</option><option value="facet" selected>折面</option><option value="frost">毛玻璃</option></select><select id="scene" aria-label="预览对象"><option value="icon">图标</option><option value="keyboard" selected>键盘</option><option value="settings">设置卡片</option></select><select id="palette" aria-label="输入法主题"></select><select id="theme" aria-label="明暗模式"><option value="dark">深色模式</option><option value="light">浅色模式</option></select><select id="backdrop" aria-label="画布背景"><option value="checker">透明网格</option><option value="dark">深底</option><option value="light">浅底</option></select></div>
+<p id="resource-source" class="hint">正在读取 Android 原有图标与主题色…</p>
+<div id="canvas" class="checker"><img id="render" alt="实时图形预览"></div>
+<div class="export-bar"><span id="dimensions">1024 × 1024 · 透明底</span><button id="svg">导出 SVG</button><button id="png">导出 PNG</button></div>
+<div class="gallery-heading"><h2>逐项对照</h2><span>原有外观 + 4 种材质 · 明暗键盘与卡片</span></div><div id="gallery"></div>
+<details id="device"><summary>Android 实际截图（上次验收，非实时）</summary><div id="captures"></div></details>
+</section></main><script type="module" src="lab.mjs"></script></body></html>

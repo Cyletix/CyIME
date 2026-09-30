@@ -177,6 +177,7 @@ fun XimeTheme(
     }
 
     CompositionLocalProvider(
+        LocalKeyboardPalette provides resolveKeyboardPalette(effectiveThemeId, darkTheme),
         LocalDensity provides Density(
             density = LocalDensity.current.density,
             fontScale = 1.0f
