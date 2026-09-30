@@ -121,13 +121,20 @@ class ResizeControlsContrastTest {
         assertEquals("opaque control interior inherited keyboard transparency", 0, changedInteriorPixels)
         val image = button.captureToImage().toPixelMap()
         val panelPixel = image[image.width / 2, 5]
-        assertTrue("mode button needs its own opaque dark fill: $panelPixel", panelPixel.red < 0.15f && panelPixel.green < 0.15f && panelPixel.blue < 0.15f)
+        // Light and dark themes can place the outline on either side of the fill's luminance.
         val border = image[image.width / 2, 0]
-        assertTrue("mode button border missing", border.red > panelPixel.red + 0.15f)
+        assertTrue("mode button border missing", kotlin.math.abs(border.red - panelPixel.red) > 0.15f)
         val reset = rule.onNodeWithContentDescription("重置").fetchSemanticsNode().boundsInRoot
         val mode = button.fetchSemanticsNode().boundsInRoot
         val confirm = rule.onNodeWithContentDescription("确认").fetchSemanticsNode().boundsInRoot
-        val slider = rule.onNodeWithTag("keyboard-opacity-slider").fetchSemanticsNode().boundsInRoot
+        val controls = rule.onNodeWithTag("keyboard-resize-controls", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val opacityPanel = rule.onNodeWithTag("keyboard-resize-opacity-panel", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val slider = rule.onNodeWithTag("keyboard-opacity-slider", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val opacityLabel = rule.onNodeWithTag("keyboard-opacity-overlay-label", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("opacity bar must leave space for side resize handles", opacityPanel.width <= controls.width * 0.8f)
+        assertEquals(controls.center.x, opacityPanel.center.x, 1f)
+        assertEquals(slider.center.x, opacityLabel.center.x, 1f)
+        assertTrue("opacity label must sit on the progress bar", opacityLabel.top >= slider.top && opacityLabel.bottom <= slider.bottom)
         assertTrue(slider.bottom <= reset.top)
         assertTrue(reset.right < mode.left && mode.right < confirm.left)
         assertEquals(reset.center.y, mode.center.y, 1f)
