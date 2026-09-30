@@ -21,12 +21,20 @@ class SettingsShortcutActivityTest {
             val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
             val deadline = SystemClock.uptimeMillis() + 10_000
             var shown = false
+            var visibleText = emptyList<String>()
+            fun collectText(node: android.view.accessibility.AccessibilityNodeInfo?, result: MutableList<String>) {
+                if (node == null) return
+                node.text?.toString()?.takeIf { it.isNotBlank() }?.let(result::add)
+                repeat(node.childCount) { collectText(node.getChild(it), result) }
+            }
             while (!shown && SystemClock.uptimeMillis() < deadline) {
-                shown = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText(title)
-                    ?.any { it.text?.toString() == title } == true
+                // Compose exposes virtual descendants; walk them like UI Automator instead
+                // of relying on the platform view-provider text-search implementation.
+                visibleText = mutableListOf<String>().also { collectText(automation.rootInActiveWindow, it) }
+                shown = title in visibleText
                 if (!shown) SystemClock.sleep(50)
             }
-            assertTrue("Shortcut did not open $title", shown)
+            assertTrue("Shortcut did not open $title; visible: $visibleText", shown)
         }
         try {
             ActivityScenario.launch<MainActivity>(settingsActivityIntent(context, SettingsRoutes.Theme)).use {
