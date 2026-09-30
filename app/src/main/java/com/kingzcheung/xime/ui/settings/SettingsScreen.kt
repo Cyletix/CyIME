@@ -21,6 +21,15 @@ fun SettingsScreen(
     else if (initialRoute == "plugins") SettingsRoutes.Plugins
     else SettingsRoutes.Main
 
+    // Shortcuts enter the existing settings graph with Main underneath, so Back
+    // works exactly as it does when the page is opened from the settings home.
+    LaunchedEffect(initialRoute) {
+        if (initialRoute in setOf(SettingsRoutes.Theme, SettingsRoutes.SmartPrediction,
+                SettingsRoutes.SpeechToText, SettingsRoutes.ModelLocal)) {
+            navController.navigate(requireNotNull(initialRoute)) { launchSingleTop = true }
+        }
+    }
+
     LaunchedEffect(initialPluginId) {
         if (initialPluginId != null) {
             navController.navigate("plugin_market_detail/$initialPluginId")
@@ -33,6 +42,7 @@ fun SettingsScreen(
     ) {
         composable(SettingsRoutes.Main) {
             SettingsMainContent(
+                onNavigateToLanguages = { navController.navigate("languages") },
                 onNavigateToSchema = { navController.navigate(SettingsRoutes.Schema) },
                 onNavigateToMarket = { navController.navigate(SettingsRoutes.Market) },
                 onNavigateToTheme = { navController.navigate(SettingsRoutes.Theme) },
@@ -48,6 +58,7 @@ fun SettingsScreen(
                 onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) }
             )
         }
+        composable("languages") { LanguageSettingsContent(onBack = { navController.popBackStack() }) }
         composable(SettingsRoutes.Schema) {
             SchemaSettingsContent(
                 onBack = {

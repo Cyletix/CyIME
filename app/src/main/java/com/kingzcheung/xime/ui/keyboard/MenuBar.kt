@@ -27,6 +27,11 @@ import androidx.compose.material.icons.twotone.Quickreply
 import androidx.compose.material.icons.twotone.Rotate90DegreesCcw
 import androidx.compose.material.icons.twotone.Settings
 import androidx.compose.material.icons.twotone.SettingsOverscan
+import androidx.compose.material.icons.twotone.Palette
+import androidx.compose.material.icons.twotone.AutoAwesome
+import androidx.compose.material.icons.twotone.Mic
+import androidx.compose.material.icons.twotone.Storage
+import com.kingzcheung.xime.ui.settings.SettingsRoutes
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -91,6 +96,7 @@ data class MenuBarCallbacks(
     val onFloatingModeToggle: (() -> Unit)? = null,
     val onToolbarCustomize: () -> Unit = {},
     val onToggleSchemaSwitch: ((SchemaSwitchUiState) -> Unit)? = null,
+    val onSettingsPage: (String) -> Unit = {},
 )
 
 @Composable
@@ -164,6 +170,10 @@ fun MenuBar(
     }) + listOf(
         MenuItem(darkModeIcon, darkModeLabel, callbacks.onToggleDarkMode, currentState = darkModeLabel),
         MenuItem(customizeIcon, "定制工具栏", callbacks.onToolbarCustomize),
+        MenuItem(rememberVectorPainter(Icons.TwoTone.Palette), "主题与定制", { callbacks.onSettingsPage(SettingsRoutes.Theme) }),
+        MenuItem(rememberVectorPainter(Icons.TwoTone.AutoAwesome), "智能联想", { callbacks.onSettingsPage(SettingsRoutes.SmartPrediction) }),
+        MenuItem(rememberVectorPainter(Icons.TwoTone.Mic), "语音转文本", { callbacks.onSettingsPage(SettingsRoutes.SpeechToText) }),
+        MenuItem(rememberVectorPainter(Icons.TwoTone.Storage), "模型管理", { callbacks.onSettingsPage(SettingsRoutes.ModelLocal) }),
     ) + (if (options.isNotEmpty()) listOf(MenuItem(schemaIcon, "输入选项", { showOptions = true })) else emptyList()) +
         listOf(MenuItem(settingsIcon, "设置", callbacks.onSettings))
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
@@ -185,7 +195,7 @@ fun MenuItemButton(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
-            .visualMaterial(VisualStyles.current, 12.dp, panel = true)
+            .visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED)
             .clickable { item.action() }
             .semantics { item.currentState?.let { stateDescription = it } }
             .padding(4.dp),

@@ -236,31 +236,19 @@ fun KeyboardView(
         FileLogger.i("XimeKeyboard", "keyboardState switched: $keyboardState, vs=$viewState, page=$page, ascii=${state.isAsciiMode}")
     }
 
-    val kbColors = KeysConfigHelper.getKeyboardColors()
     val kbShadow = KeysConfigHelper.getKeyboardShadow()
     val kbKey = KeysConfigHelper.getKeyboardKeyConfig()
-    val longToColor: (Long) -> androidx.compose.ui.graphics.Color = { if (it > 0xFFFFFF) androidx.compose.ui.graphics.Color(it) else androidx.compose.ui.graphics.Color(0xFF000000 or it) }
-    val keyboardBgColor = KeyboardThemes.getKeyboardBackgroundColor(state.themeId, state.isDarkTheme)
-    val keyBgColor = KeyboardThemes.getKeyBgColorOverride(state.themeId, state.isDarkTheme)
-        ?: if (state.isDarkTheme) longToColor(kbColors.keyBgColorDark)
-        else longToColor(kbColors.keyBgColor)
-    val keyTextColor = KeyboardThemes.getKeyTextColorOverride(state.themeId, state.isDarkTheme)
-        ?: if (state.isDarkTheme) longToColor(kbColors.keyTextColorDark)
-        else longToColor(kbColors.keyTextColor)
-    val accentColor = KeyboardThemes.getAccentColor(state.themeId, state.isDarkTheme)
+    val palette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, state.isDarkTheme)
+    val keyboardBgColor = palette.background
+    val keyBgColor = palette.key
+    val keyTextColor = palette.text
+    val accentColor = palette.accent
     val themeScheme = KeyboardThemes.getRenderingScheme(state.themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(state.themeId, state.isDarkTheme)
-    val specialKeyBgColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(
-        themeScheme, state.isDarkTheme,
-        (if (state.isDarkTheme) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor)
-    )
-    val specialKeyTextColor = if (state.isDarkTheme) androidx.compose.ui.graphics.Color.White
-        else KeyboardThemes.getSpecialKeyTextColor(state.themeId, false)
-    val candidateTextColor = KeyboardThemes.getCandidateTextColorOverride(state.themeId, state.isDarkTheme)
-        ?: if (state.isDarkTheme) longToColor(kbColors.candidateTextColorDark)
-        else longToColor(kbColors.candidateTextColor)
-    val candidateSelectedTextColor = KeyboardThemes.getCandidateSelectedTextColorOverride(state.themeId, state.isDarkTheme)
-        ?: KeyboardThemes.getCandidateSelectedTextColor(state.themeId, state.isDarkTheme)
+    val specialKeyBgColor = palette.function
+    val specialKeyTextColor = palette.functionText
+    val candidateTextColor = palette.candidateText
+    val candidateSelectedTextColor = palette.selectedText
     val dividerColor = if (state.isDarkTheme) androidx.compose.ui.graphics.Color(0xFF3C4043) else androidx.compose.ui.graphics.Color(0xFFDADCE0)
 
     val clipboardTab = (page as? KeyboardPage.Overlay)?.let {
@@ -293,6 +281,8 @@ fun KeyboardView(
     val inputPreferences = rememberKeyboardInputPreferences()
     var cursorControlActive by remember { mutableStateOf(false) }
     CompositionLocalProvider(
+        com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
+            com.kingzcheung.xime.ui.theme.MaterialPalette(keyboardBgColor, accentColor),
         LocalKeyboardExplicitWidth provides (!state.isFloatingMode && (state.fixedWidthDp > 0 || resizeActive)),
         LocalModeSlotWeight provides if (
             page.textMainType() != MainType.HANDWRITING &&
@@ -365,24 +355,14 @@ fun KeyboardView(
         val sessionKey = listOf(resizeActive, state.isFloatingMode, maxWidth, maxHeight)
         val initialPreviewRect = remember(sessionKey) { seedPreviewRect }
         val initialPadding = remember(sessionKey) { state.keyboardBottomPaddingDp }
-        var resizePreviewRect by remember(sessionKey) { mutableStateOf(initialPreviewRect) }
-        var resizePaddingDp by remember(sessionKey) { mutableIntStateOf(initialPadding) }
-        val activePreviewRect = if (resizeActive) resizePreviewRect else null
+        val resizePreviewRect = remember(sessionKey) { mutableStateOf(initialPreviewRect) }
+        val previewPaddingDp = remember(sessionKey) { mutableIntStateOf(initialPadding) }
+        var layoutPreviewRect by remember(sessionKey) { mutableStateOf(initialPreviewRect) }
+        var layoutPaddingDp by remember(sessionKey) { mutableIntStateOf(initialPadding) }
+        // Drag events only update the visual rect. Reflow all keys once on release.
+        val activePreviewRect = if (resizeActive) layoutPreviewRect else null
         val renderedBottomPaddingDp = if (resizeActive && !state.isFloatingMode)
-            resizePaddingDp else state.keyboardBottomPaddingDp
-        val resizePreviewSession = KeyboardResizePreviewState(
-            rect = activePreviewRect,
-            initialRect = initialPreviewRect,
-            onRectChange = { resizePreviewRect = it },
-            bounds = if (state.isFloatingMode) floatingViewportBounds(hostWidthPx, hostHeightPx, minBottomPx)
-                else ResizeRect(0f, 0f, hostWidthPx,
-                    (hostHeightPx - fixedBottomInsetDp * resizeControlDensity.density).coerceAtLeast(1f)),
-            fixedHeightRange = fixedRange,
-            fixedBottomInsetDp = fixedBottomInsetDp,
-            bottomPaddingDp = renderedBottomPaddingDp,
-            initialBottomPaddingDp = initialPadding,
-            onBottomPaddingChange = { resizePaddingDp = it },
-        )
+            layoutPaddingDp else state.keyboardBottomPaddingDp
 
     FloatingKeyboardContainer(
         isFloatingMode = state.isFloatingMode,
@@ -402,6 +382,7 @@ fun KeyboardView(
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
         previewRect = activePreviewRect,
+        previewTransformRect = if (resizeActive) resizePreviewRect else null,
         onCardPositioned = onCardPositioned,
     ) {
         Box(modifier = Modifier.fillMaxSize().then(contentModifier)) {
@@ -1333,9 +1314,7 @@ fun KeyboardView(
                     .fillMaxWidth()
                     .fillMaxHeight()
                     .background(keyboardBgColor.copy(alpha = 0.9f))
-                    .clickable {
-                        if (isError) callbacks.onDismissDeploying?.invoke()
-                    },
+                    .clickable {},
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -1349,7 +1328,7 @@ fun KeyboardView(
                     if (isError) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "点击关闭",
+                            text = "正在自动处理，未就绪前无法输入",
                             color = keyTextColor.copy(alpha = 0.5f),
                             style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center
@@ -1461,6 +1440,7 @@ fun KeyboardView(
                             onEmoji = { onHapticFeedback?.invoke(); viewModel.showOverlay(OverlayRoute.Emoji) },
                             onReloadConfig = { onHapticFeedback?.invoke(); callbacks.onReloadConfig?.invoke(); viewModel.closeOverlay() },
                             onSettings = { onHapticFeedback?.invoke(); callbacks.onSettings?.invoke(); viewModel.closeOverlay() },
+                            onSettingsPage = { route -> onHapticFeedback?.invoke(); callbacks.onSettingsPage?.invoke(route); viewModel.closeOverlay() },
                             onSchemaList = { onHapticFeedback?.invoke(); viewModel.pushOverlay(OverlayRoute.SchemaList) },
                             onToggleDarkMode = { onHapticFeedback?.invoke(); callbacks.onToggleDarkMode?.invoke() },
                             onToolbarCustomize = { onHapticFeedback?.invoke(); viewModel.showOverlay(OverlayRoute.ToolbarCustomize) },
@@ -1471,6 +1451,7 @@ fun KeyboardView(
                     )
                     is OverlayRoute.SchemaList -> SchemaListView(
                         onReorderSchemas = callbacks.onReorderSchemas,
+                        orderableSchemas = state.schemas,
                         schemas = com.kingzcheung.xime.settings.InputModes.inCurrentLanguage(state.schemas,
                             com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode)),
                         currentSchemaId = com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode),
@@ -1629,18 +1610,60 @@ fun KeyboardView(
     }
     } // FloatingKeyboardContainer: resize overlay must stay outside the floating card.
     resizeOverlay?.let { controls ->
-        CompositionLocalProvider(
-            LocalDensity provides resizeControlDensity,
-            LocalKeyboardResizePreviewState provides resizePreviewSession,
-        ) {
-            Box(Modifier.matchParentSize()) { controls() }
-        }
+        KeyboardResizeControlsHost(
+            previewRect = resizePreviewRect,
+            initialRect = initialPreviewRect,
+            previewPaddingDp = previewPaddingDp,
+            fixedHeightRange = fixedRange,
+            fixedBottomInsetDp = fixedBottomInsetDp,
+            bounds = if (state.isFloatingMode) floatingViewportBounds(hostWidthPx, hostHeightPx, minBottomPx)
+                else ResizeRect(0f, 0f, hostWidthPx,
+                    (hostHeightPx - fixedBottomInsetDp * resizeControlDensity.density).coerceAtLeast(1f)),
+            initialBottomPaddingDp = initialPadding,
+            onDragEnd = {
+                layoutPreviewRect = resizePreviewRect.value
+                layoutPaddingDp = previewPaddingDp.intValue
+            },
+            density = resizeControlDensity,
+            controls = controls,
+        )
     }
 }
 }
+}
 
-
-
+@Composable
+private fun KeyboardResizeControlsHost(
+    previewRect: androidx.compose.runtime.MutableState<ResizeRect>,
+    initialRect: ResizeRect,
+    previewPaddingDp: androidx.compose.runtime.MutableIntState,
+    fixedHeightRange: IntRange,
+    fixedBottomInsetDp: Int,
+    bounds: ResizeRect,
+    initialBottomPaddingDp: Int,
+    onDragEnd: () -> Unit,
+    density: androidx.compose.ui.unit.Density,
+    controls: @Composable () -> Unit,
+) {
+    // Keep reads of the rapidly changing preview state inside this small overlay subtree.
+    val session = KeyboardResizePreviewState(
+        rect = previewRect.value,
+        initialRect = initialRect,
+        onRectChange = { previewRect.value = it },
+        bounds = bounds,
+        fixedHeightRange = fixedHeightRange,
+        fixedBottomInsetDp = fixedBottomInsetDp,
+        bottomPaddingDp = previewPaddingDp.intValue,
+        initialBottomPaddingDp = initialBottomPaddingDp,
+        onBottomPaddingChange = { previewPaddingDp.intValue = it },
+        onDragEnd = onDragEnd,
+    )
+    CompositionLocalProvider(
+        LocalDensity provides density,
+        LocalKeyboardResizePreviewState provides session,
+    ) {
+        Box(Modifier.fillMaxSize()) { controls() }
+    }
 }
 
 /** 长按删除待确认项：词文本 + 用户确认后执行的删除动作（候选栏/展开页共用）。 */
