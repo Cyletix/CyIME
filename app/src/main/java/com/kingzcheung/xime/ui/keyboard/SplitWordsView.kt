@@ -6,6 +6,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -87,16 +89,14 @@ fun SplitWordsView(
         if (pos < 0) selectedIndices.add(-(pos + 1), index)
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(backgroundColor)
-    ) {
+    BoxWithConstraints(modifier.fillMaxWidth().background(backgroundColor)) {
+    val compactActions = maxWidth < 420.dp
+    Column(Modifier.fillMaxSize()) {
         // 导航区
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .heightIn(min = 50.dp)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -126,8 +126,8 @@ fun SplitWordsView(
                 modifier = Modifier
             )
 
-            Spacer(Modifier.weight(1f))
             TextButton(
+                modifier = Modifier.weight(1f),
                 enabled = selectedText.isNotEmpty(),
                 onClick = {
                     val text = selectedIndices.joinToString("") { splitParts[it] }
@@ -144,9 +144,8 @@ fun SplitWordsView(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("添加到快捷发送", color = accentColor, fontSize = 13.sp)
+                Text(if (compactActions) "快捷" else "添加到快捷发送", color = accentColor, fontSize = 13.sp, maxLines = 1)
             }
-            Spacer(Modifier.weight(1f))
             TextButton(enabled = selectedText.isNotEmpty(), onClick = {
                 onConfirmText(selectedText)
                 onBack()
@@ -269,4 +268,5 @@ fun SplitWordsView(
         // 底部留空
         Spacer(modifier = Modifier.height(bottomPaddingDp.dp))
     }
+}
 }

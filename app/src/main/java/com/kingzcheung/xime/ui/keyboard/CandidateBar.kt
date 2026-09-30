@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -182,14 +184,13 @@ fun CandidateBar(
     val horizontalPadding = 8.dp
     val context = LocalContext.current
 
-    // M3 角色色：图标按钮背景用 surface 与 primary 的混合色调（带种子色但不过于强烈），
-    // 按压态用 onSurface 12% state layer
+    // Toolbar and keys share the selected keyboard palette, including in previews.
     val iconButtonContainer = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.primary,
+        visuals.backgroundColor,
+        visuals.accentColor,
         0.15f
     )
-    val iconButtonTint = MaterialTheme.colorScheme.onSurfaceVariant
+    val iconButtonTint = visuals.textColor
     val preferences = remember(context) { SettingsPreferences.getPrefsPublic(context) }
     var showCancelButton by remember(preferences) {
         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
@@ -307,9 +308,9 @@ fun CandidateBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .then(if (state is CandidateBarState.ClipboardDisplay) Modifier.heightIn(min = 44.dp) else Modifier.height(44.dp))
             .background(visuals.backgroundColor)
-            .visualMaterial(VisualStyles.current, 0.dp, panel = true)
+            .visualMaterial(VisualStyles.current, 0.dp, level = if (state is CandidateBarState.Idle) com.kingzcheung.xime.ui.theme.MaterialLevel.FLOATING else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE)
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center,
     ) {
@@ -318,7 +319,7 @@ fun CandidateBar(
         }
 
         if (state is CandidateBarState.ClipboardDisplay) {
-            ClipboardPreviewBar(state.candidates, visuals, callbacks)
+            ClipboardPreviewBar(state.candidates, visuals, callbacks, iconButtonContainer)
             return@Column
         }
 
@@ -343,11 +344,8 @@ fun CandidateBar(
                         } else {
                             KeyboardToolbarButton({ callbacks.onLogoClick?.invoke() }, iconButtonContainer,
                                 modifier = Modifier.testTag("toolbar-leading")) {
-                                val iconStyle = com.kingzcheung.xime.ui.theme.IconAppearance.effective
-                                if (iconStyle == com.kingzcheung.xime.ui.theme.VisualStyle.ORIGINAL) {
-                                    Icon(painterResource(id = if (visuals.isDarkTheme) R.drawable.logo_dark else R.drawable.logo),
-                                        contentDescription = "CyIME Logo", tint = Color.Unspecified, modifier = Modifier.size(20.dp))
-                                } else com.kingzcheung.xime.ui.theme.CyimeGeneratedIcon(iconStyle, Modifier.size(26.dp))
+                                Icon(painterResource(R.drawable.cyime_toolbar_mark), contentDescription = "CyIME Logo",
+                                    tint = iconButtonTint, modifier = Modifier.size(22.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(4.dp))
@@ -599,41 +597,73 @@ private fun ClipboardPreviewBar(
     candidates: List<String>,
     visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks,
+    iconButtonContainer: Color,
 ) {
+    val previews = remember(candidates) { candidates.map { it.replace(Regex("[\\r\\n]+"), " ") } }
+    val textMeasurer = rememberTextMeasurer()
+    val textStyle = LocalTextStyle.current.merge(TextStyle(fontSize = 15.sp))
+    val density = LocalDensity.current
+    val tallestPreviewPx = previews.maxOfOrNull {
+        textMeasurer.measure(it.take(80), style = textStyle, maxLines = 1, softWrap = false).size.height
+    } ?: 0
+    val verticalTextPadding = with(density) { ((44.dp - tallestPreviewPx.toDp()) / 2).coerceIn(0.dp, 7.dp) }
+    val capsuleColor = visuals.preeditBackgroundColor.takeIf { it != Color.Unspecified }
+        ?: MaterialTheme.colorScheme.surfaceContainer
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         KeyboardBackButton({ callbacks.onDismissClipboardPreview?.invoke() },
-            visuals.textColor.copy(alpha = 0.12f), visuals.textColor, label = "返回工具栏")
-        Box(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+            iconButtonContainer, visuals.textColor, label = "返回工具栏")
+        BoxWithConstraints(Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+            // Reserve space for both icons and the scroll area's padding. Short previews
+            // size the capsule to their text; long previews keep the full scroll viewport.
+            val chromeWidth = 82.dp
+            val maxTextWidthPx = with(density) { (maxWidth - chromeWidth).coerceAtLeast(0.dp).roundToPx() }
+            var textWidthPx = 0
+            for ((index, preview) in previews.withIndex()) {
+                if (textWidthPx >= maxTextWidthPx || preview.length > 80) {
+                    textWidthPx = maxTextWidthPx
+                    break
+                }
+                val itemWidth = textMeasurer.measure(preview, style = textStyle,
+                    maxLines = 1, softWrap = false).size.width
+                val itemPadding = if (index == 0) 0 else with(density) { 16.dp.roundToPx() }
+                textWidthPx = (textWidthPx + itemWidth + itemPadding).coerceAtMost(maxTextWidthPx)
+            }
+            val capsuleWidth = (chromeWidth + with(density) { textWidthPx.toDp() }).coerceAtMost(maxWidth)
             Row(
-                Modifier.fillMaxWidth().height(36.dp).clip(CircleShape)
-                    .background(if (visuals.isDarkTheme) Color(0xFF242832) else Color(0xFFF3F5FA))
-                    .border(1.dp, Brush.horizontalGradient(listOf(
-                        Color(0xFF8D8DEF).copy(alpha = 0.5f),
-                        Color(0xFF668ECC).copy(alpha = 0.3f),
-                        Color(0xFF69BCAF).copy(alpha = 0.5f),
-                    )), CircleShape)
+                Modifier.width(capsuleWidth).heightIn(min = 36.dp).testTag("clipboard-preview-pill")
+                    .clip(CircleShape)
+                    .background(capsuleColor)
+                    .border(1.dp, visuals.accentColor.copy(alpha = 0.45f), CircleShape)
                     .padding(start = 12.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Default.ContentPaste, contentDescription = null,
                     tint = visuals.textColor, modifier = Modifier.size(18.dp))
                 LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll")) {
-                    itemsIndexed(candidates) { index, text ->
+                    itemsIndexed(previews) { index, preview ->
                         // 预览可横向滚动全部内容；换行仅在显示时折成空格，粘贴仍使用原文。
-                        val preview = remember(text) { text.replace(Regex("[\\r\\n]+"), " ") }
                         Text(preview, color = visuals.textColor, fontSize = 15.sp, maxLines = 1,
                             softWrap = false,
                             modifier = Modifier.testTag("clipboard-preview-text:$index")
                                 .clickable { callbacks.onCandidateSelect(index) }
-                                .padding(vertical = 7.dp, horizontal = if (index == 0) 0.dp else 8.dp))
+                                .padding(vertical = verticalTextPadding, horizontal = if (index == 0) 0.dp else 8.dp))
                     }
                 }
                 Box(Modifier.size(30.dp).clip(CircleShape).clickable { callbacks.onOpenClipboard?.invoke() },
                     contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "打开剪贴板",
-                        tint = Color(0xFF75A7FF), modifier = Modifier.size(22.dp))
+                        tint = visuals.accentColor, modifier = Modifier.size(22.dp))
                 }
             }
+        }
+        if (callbacks.onHideKeyboard != null) {
+            KeyboardToolbarButton(callbacks.onHideKeyboard, iconButtonContainer,
+                modifier = Modifier.testTag("toolbar-hide")) {
+                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "收起键盘",
+                    tint = visuals.textColor, modifier = Modifier.size(24.dp))
+            }
+        } else {
+            Spacer(Modifier.size(40.dp))
         }
     }
 }
