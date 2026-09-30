@@ -38,11 +38,16 @@ object RimeConfigHelper {
     private var preparedInProcess = false
     const val DEPLOYMENT_REVISION = "rime_deployment_revision"
 
+    /** Retry failures, never queue user keystrokes, and never overlap a running native deployment. */
+    suspend fun prepareAutomatically(context: Context, status: (String) -> Unit = {}) {
+        retryPreparation(status = status) { prepareEngine(context) }
+    }
+
     /** Share the entire copy/init/deploy operation, not just the final compilation lock. */
     suspend fun prepareEngine(context: Context): Boolean = preparationMutex.withLock {
         // A previous IME service may have destroyed the process-wide engine.
         // Cached preparation is valid only while that native session is still usable.
-        if (preparedInProcess && RimeEngine.isInitialized() &&
+        if (preparedInProcess && SettingsPreferences.isDeploymentDone(context) && RimeEngine.isInitialized() &&
             RimeEngine.getInstance().ensureSession(1_000L)) return@withLock true
         preparedInProcess = false
         val (user, shared) = initializeRimeDataAsync(context)
@@ -102,6 +107,7 @@ object RimeConfigHelper {
             rimeDir, File(context.filesDir, "rime-upgrade-backups"),
             context.assets.open("rime-bundled-manifest.tsv").bufferedReader().use { it.readText() },
         ) { context.assets.open(it) }
+        com.kingzcheung.xime.settings.ChineseSchemas.installOptionalLayoutSchemas(context, rimeDir)
         check(installing.delete()) { "Cannot finish bundled asset installation" }
         com.kingzcheung.xime.settings.CustomKeyboardLayouts.enableMeasuredCorrection(context)
         // F1: assets 会用内置 default.yaml 覆盖，这里把启用方案重新写回 schema_list

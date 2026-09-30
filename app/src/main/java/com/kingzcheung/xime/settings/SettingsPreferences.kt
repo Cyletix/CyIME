@@ -281,12 +281,11 @@ object SettingsPreferences {
     }
     
     fun setDarkMode(context: Context, mode: Int) {
-        setVisualStyle(context, com.kingzcheung.xime.ui.theme.VisualStyle.ORIGINAL)
         getPrefs(context).edit().putInt(KEY_DARK_MODE, mode).apply()
     }
 
     fun getEffectiveDarkMode(context: Context): Int =
-        getVisualStyle(context).dark?.let { if (it) 1 else 0 } ?: getDarkMode(context)
+        getDarkMode(context)
     
     fun isSoundEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_SOUND_ENABLED, true)
@@ -400,6 +399,7 @@ object SettingsPreferences {
     fun setVisualStyle(context: Context, style: com.kingzcheung.xime.ui.theme.VisualStyle) {
         com.kingzcheung.xime.ui.theme.IconAppearance.setKeyboardStyle(context, style)
     }
+
     
     fun setKeyboardTheme(context: Context, themeId: String) {
         getPrefs(context).edit().putString(KEY_KEYBOARD_THEME, themeId).apply()
@@ -416,7 +416,7 @@ object SettingsPreferences {
     }
     
     fun isSmartPredictionEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_SMART_PREDICTION_ENABLED, false)
+        return getPrefs(context).getBoolean(KEY_SMART_PREDICTION_ENABLED, true)
     }
     
     fun setSmartPredictionEnabled(context: Context, enabled: Boolean) {
@@ -433,8 +433,8 @@ object SettingsPreferences {
     }
     
     fun getPredictionSelectedModel(context: Context): String {
-        return getPrefs(context).getString(KEY_PREDICTION_SELECTED_MODEL, "predictive-text-small")
-            ?: "predictive-text-small"
+        return getPrefs(context).getString(KEY_PREDICTION_SELECTED_MODEL, "predictive-text-base")
+            ?: "predictive-text-base"
     }
     
     fun setPredictionSelectedModel(context: Context, modelId: String) {
@@ -452,10 +452,10 @@ object SettingsPreferences {
 
     /**
      * 联想模式：false = 连续联想（联想上屏后继续推理，可连续上屏），true = 单次联想（只推理一次）。
-     * 默认连续（保持历史行为）。
+     * 默认单次；保留用户明确选择的连续模式。
      */
     fun isSingleAssociationMode(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_ASSOCIATION_SINGLE_MODE, false)
+        return getPrefs(context).getBoolean(KEY_ASSOCIATION_SINGLE_MODE, true)
     }
 
     fun setAssociationSingleMode(context: Context, single: Boolean) {
@@ -463,7 +463,7 @@ object SettingsPreferences {
     }
     
     fun isSttEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_STT_ENABLED, false)
+        return getPrefs(context).getBoolean(KEY_STT_ENABLED, true)
     }
     
     fun setSttEnabled(context: Context, enabled: Boolean) {
@@ -480,7 +480,7 @@ object SettingsPreferences {
 
     /** 语音转文本是否使用本地（离线）识别引擎。 */
     fun isSttUseLocal(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_STT_USE_LOCAL, false)
+        return getPrefs(context).getBoolean(KEY_STT_USE_LOCAL, getSttOnlinePluginId(context).isBlank())
     }
 
     fun setSttUseLocal(context: Context, useLocal: Boolean) {

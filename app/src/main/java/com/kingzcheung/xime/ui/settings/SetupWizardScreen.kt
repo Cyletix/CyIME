@@ -60,9 +60,7 @@ fun SetupWizardScreen(
             deployReminder = null
             try {
                 enabledSchemas.value = withContext(Dispatchers.IO) {
-                    val (user, shared) = RimeConfigHelper.initializeRimeDataAsync(context)
-                    RimeEngine.getInstance().initialize(user, shared)
-                    check(RimeConfigHelper.ensureDeployment(context)) { "中文词库准备未完成" }
+                    RimeConfigHelper.prepareAutomatically(context) { deployReminder = it }
                     SchemaManager.getEnabledSchemas(context)
                 }
                 ready = true
@@ -96,6 +94,9 @@ fun SetupWizardScreen(
             ) {
                 // Step indicator
                 StepIndicator(currentStep = currentStep)
+                Text(if (ready) "中文输入已准备好" else deployReminder ?: "正在后台准备中文输入，无需操作",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 16.dp))
                 Spacer(Modifier.height(32.dp))
 
                 AnimatedContent(
@@ -105,7 +106,7 @@ fun SetupWizardScreen(
                 ) { step ->
                     when (step) {
                         SetupStep.EnableIme -> EnableImeStep(
-                            onNext = { currentStep = SetupStep.SelectSchemas }
+                        onNext = { currentStep = SetupStep.SwitchToIme }
                         )
                         SetupStep.SelectSchemas -> SelectSchemasStep(
                         enabledSchemas = enabledSchemas.value,
@@ -140,7 +141,7 @@ fun SetupWizardScreen(
 
 @Composable
 private fun StepIndicator(currentStep: SetupStep) {
-    val steps = SetupStep.entries
+    val steps = listOf(SetupStep.EnableIme, SetupStep.SwitchToIme)
     val currentIndex = steps.indexOf(currentStep)
 
     Row(
@@ -394,13 +395,13 @@ private fun SwitchToImeStep(onCompleted: () -> Unit) {
         Spacer(Modifier.weight(1f))
 
         Text(
-            text = "步骤 3：切换输入法",
+            text = "步骤 2：选择输入法",
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "一切准备就绪！请切换到CyIME开始使用",
+            text = "选择 CyIME 即可，词库会在后台自动准备",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
