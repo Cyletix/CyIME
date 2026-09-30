@@ -117,13 +117,25 @@ class CustomKeyboardLayoutTest {
         assertFalse(layout.redVowels)
         assertTrue(layout.isRed('e'))
     }
-    @Test fun deletingSeedDoesNotRecreateItOnReload() {
+    @Test fun freshInstallAndReloadDoNotCreateExperimentalLayouts() {
         val dir = tmp.newFolder()
         val context = mock<Context>(); whenever(context.filesDir).thenReturn(dir)
-        assertEquals(QwjrtkLayout.ID, CustomKeyboardLayouts.load(context).single().id)
-        File(dir, "custom-keyboard-layouts.json").writeText("[]")
+        assertTrue(CustomKeyboardLayouts.load(context).isEmpty())
+        assertEquals("[]", File(dir, "custom-keyboard-layouts.json").readText())
+        assertTrue(CustomKeyboardLayouts.find(QwjrtkLayout.ID)!!.valid())
+        val cyletix = CustomKeyboardLayouts.find(Cyletix10Layout.ID)!!
+        assertTrue(cyletix.valid())
+        assertEquals(listOf("qwdrf;jkyp", "asetghliou", "zxcvbnm"), cyletix.rows.map { it.joinToString("") })
         assertTrue(CustomKeyboardLayouts.load(context).isEmpty())
         assertTrue(CustomKeyboardLayouts.load(context).isEmpty())
+    }
+    @Test fun savedQwjrtkLayoutOverridesOptionalPreset() {
+        val dir = tmp.newFolder()
+        val context = mock<Context>(); whenever(context.filesDir).thenReturn(dir)
+        File(dir, "custom-keyboard-layouts.json").writeText("""[{"id":"pinyin_qwjrtk","name":"我的双拇指","rows":"q,w,j,r,t,k,u,i,o,p/a,s,d,f,g,h,e,n,l/z,x,c,y,b,v,m"}]""")
+        CustomKeyboardLayouts.load(context)
+        assertEquals("我的双拇指", CustomKeyboardLayouts.find(QwjrtkLayout.ID)?.name)
+        assertEquals("Cyletix10（实验）", CustomKeyboardLayouts.find(Cyletix10Layout.ID)?.name)
     }
     @Test fun lightDarkAndColoredThemesHaveReadableVowelsAndMovedKeys() {
         val layout = CustomKeyboardLayout.fresh().swap("e", "j").copy(redVowels = true)

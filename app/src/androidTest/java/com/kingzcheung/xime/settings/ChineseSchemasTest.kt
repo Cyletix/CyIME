@@ -17,16 +17,51 @@ class ChineseSchemasTest {
         override fun getSharedPreferences(name: String, mode: Int) = super.getSharedPreferences("chinese_test_$name", mode)
     }
     @Before fun before() { File(directory, "rime").mkdirs(); SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
-    @After fun after() { directory.deleteRecursively(); SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
+    @After fun after() {
+        directory.deleteRecursively()
+        SettingsPreferences.getPrefsPublic(context).edit().clear().commit()
+        CustomKeyboardLayouts.load(base)
+    }
 
     @Test fun migrationAddsOnlyMissingChineseModesOnceAndPreservesOrdering() {
+        File(directory, "custom-keyboard-layouts.json").writeText("""[{"id":"pinyin_qwjrtk","name":"个人双指","rows":"q,w,j,r,t,k,u,i,o,p/a,s,d,f,g,h,e,n,l/z,x,c,y,b,v,m","redVowels":false}]""")
         ChineseSchemas.installAssets(context, File(directory, "rime"))
+        assertTrue(File(directory, "rime/${QwjrtkLayout.ID}.schema.yaml").isFile)
+        assertEquals("个人双指", CustomKeyboardLayouts.find(QwjrtkLayout.ID)?.name)
         val old = listOf("my_custom", "japanese_kana")
         val updated = ChineseSchemas.addOnFirstUpgrade(context, old)
         assertEquals(old + CyimeInputDefaults.recommended, updated)
         assertFalse(updated.contains("wubi86"))
+        assertFalse(updated.contains(QwjrtkLayout.ID))
         val disabledAgain = updated - "t9_pinyin"
         assertEquals(disabledAgain, ChineseSchemas.addOnFirstUpgrade(context, disabledAgain))
+    }
+    @Test fun absentLanguagePreferenceKeepsJapaneseDisabledAfterSetup() {
+        SettingsPreferences.setSetupCompleted(context, true)
+        assertEquals(setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH), LanguagePreferences.enabled(context))
+        LanguagePreferences.initialize(context)
+        assertEquals(setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH), LanguagePreferences.enabled(context))
+        SettingsPreferences.getPrefsPublic(context).edit()
+            .putStringSet(LanguagePreferences.KEY, setOf("zh", "ja")).commit()
+        assertEquals(setOf(InputLanguage.CHINESE, InputLanguage.JAPANESE, InputLanguage.ENGLISH), LanguagePreferences.enabled(context))
+    }
+    @Test(expected = IllegalArgumentException::class)
+    fun englishCannotBeDisabled() {
+        LanguagePreferences.save(context, InputLanguage.ENGLISH, false)
+    }
+    @Test fun optionalSchemaInstallKeepsAnExistingPersonalLayout() {
+        val rime = File(directory, "rime")
+        val personal = File(rime, "${QwjrtkLayout.ID}.schema.yaml")
+        personal.writeText("# personal schema\n")
+        ChineseSchemas.installOptionalLayoutSchemas(context, rime)
+        assertEquals("# personal schema\n", personal.readText())
+        val cyletix = File(rime, "${Cyletix10Layout.ID}.schema.yaml")
+        assertTrue(cyletix.isFile)
+        val original = cyletix.readText()
+        cyletix.writeText("# personal Cyletix10 schema\n")
+        ChineseSchemas.installOptionalLayoutSchemas(context, rime)
+        assertEquals("# personal Cyletix10 schema\n", cyletix.readText())
+        assertTrue(original.contains("schema_id: ${Cyletix10Layout.ID}"))
     }
     @Test fun earlyReadsCannotPersistPartialAssetListsOrConsumeMigrations() {
         val rime = File(directory, "rime")
@@ -41,8 +76,13 @@ class ChineseSchemasTest {
         assertFalse(SettingsPreferences.getPrefsPublic(context).getBoolean("cyime_chinese_defaults_v1", false))
         ChineseSchemas.installAssets(context, rime)
         File(rime, SchemaManager.ASSET_INSTALL_MARKER).delete()
+        val available = SchemaManager.discoverSchemas(context).map { it.schemaId }
+        assertTrue(QwjrtkLayout.ID in available)
+        assertTrue(Cyletix10Layout.ID in available)
         assertEquals(CyimeInputDefaults.recommended, SchemaManager.getEnabledSchemas(context))
-        assertFalse(SchemaManager.getEnabledSchemas(context).any { it in JapaneseSchemas.ids || it == "pinyin_14jian" })
+        assertFalse(SchemaManager.getEnabledSchemas(context).any {
+            it in JapaneseSchemas.ids || it == "pinyin_14jian" || it in setOf(QwjrtkLayout.ID, Cyletix10Layout.ID)
+        })
         SchemaManager.setEnabledSchemas(context, listOf("t9_pinyin", "japanese"))
         assertEquals(listOf("t9_pinyin", "japanese"), SchemaManager.getEnabledSchemas(context))
     }

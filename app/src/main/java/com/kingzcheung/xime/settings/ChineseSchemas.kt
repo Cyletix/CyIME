@@ -7,7 +7,7 @@ import org.json.JSONObject
 
 /** 统一中文词库；标准 Rime ID 不变，现有市场版本和个人补丁优先。 */
 object ChineseSchemas {
-    val ids = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", QwjrtkLayout.ID)
+    val ids = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", QwjrtkLayout.ID, Cyletix10Layout.ID)
     private const val ADDED = "cyime_chinese_defaults_v1"
 
     private const val MAX_MIGRATION_FILE_BYTES = 256 * 1024L
@@ -35,7 +35,6 @@ object ChineseSchemas {
     @Synchronized
     fun installAssets(context: Context, target: File) {
         target.mkdirs()
-        val sampleDeleted = CustomKeyboardLayouts.load(context).none { it.id == QwjrtkLayout.ID }
         val registryFile = SchemaManifestManager.getRegistryFile(context)
         val registry = if (registryFile.isFile) runCatching { JSONObject(registryFile.readText()) }.getOrNull() else null
         fun isMarketOwned(relative: String): Boolean {
@@ -52,7 +51,6 @@ object ChineseSchemas {
             }
             // 许可随 APK 分发，不作为 Rime 配置安装。
             if (relative.endsWith(".md") || relative == "LICENSE") return
-            if (relative == "${QwjrtkLayout.ID}.schema.yaml" && sampleDeleted) return
             val destination = File(target, relative)
             var replacement: ByteArray? = null
             if (destination.exists()) {
@@ -83,23 +81,27 @@ object ChineseSchemas {
         install("rime_chinese")
     }
 
+    /** Offer the experimental layouts without enabling them or rewriting user schemas. */
+    @Synchronized
+    fun installOptionalLayoutSchemas(context: Context, target: File) {
+        target.mkdirs()
+        for (id in listOf(QwjrtkLayout.ID, Cyletix10Layout.ID)) {
+            val destination = File(target, "$id.schema.yaml")
+            if (destination.exists()) continue
+            val pending = File(target, "$id.schema.yaml.installing")
+            try {
+                context.assets.open("rime_ice/$id.schema.yaml").use { input ->
+                    pending.outputStream().use { input.copyTo(it) }
+                }
+                java.nio.file.Files.move(pending.toPath(), destination.toPath())
+            } finally { pending.delete() }
+        }
+    }
+
     /** 一次整理旧默认和重复模式，之后用户的启停选择继续有效。 */
     @Synchronized
-    fun addOnFirstUpgrade(context: Context, enabled: List<String>): List<String> {
-        val normalized = addChineseDefaults(context, enabled)
-        val prefs = SettingsPreferences.getPrefsPublic(context)
-        val key = "qwjrtk_preset_added_v1"
-        if (prefs.getBoolean(key, false)) return normalized
-        val available = SchemaManager.getRimeDir(context).listFiles().orEmpty()
-            .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.toSet()
-        if (QwjrtkLayout.ID !in available) return normalized
-        val customLayouts = CustomKeyboardLayouts.load(context)
-        val updated = if (customLayouts.any { it.id == QwjrtkLayout.ID }) QwjrtkLayout.appendToEnabled(normalized, available) else normalized
-        if (updated != normalized) SchemaManager.setEnabledSchemas(context, updated)
-        // Once offered, respect later manual disabling; never change the selected mode.
-        prefs.edit().putBoolean(key, true).apply()
-        return updated
-    }
+    fun addOnFirstUpgrade(context: Context, enabled: List<String>): List<String> =
+        addChineseDefaults(context, enabled)
 
     private fun addChineseDefaults(context: Context, enabled: List<String>): List<String> {
         val prefs = SettingsPreferences.getPrefsPublic(context)
@@ -127,6 +129,7 @@ object ChineseSchemas {
     fun displayName(id: String, original: String): String = CustomKeyboardLayouts.find(id)?.name ?: when (id) {
         "rime_ice" -> "中文26键"
         QwjrtkLayout.ID -> "QWJRTK（双拇指）"
+        Cyletix10Layout.ID -> "Cyletix10（实验）"
         "pinyin_simp" -> "旧版简体拼音"
         "t9_pinyin", "t9" -> "中文九键"
         "pinyin_14jian" -> "中文14键"

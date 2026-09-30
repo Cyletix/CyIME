@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -60,7 +61,8 @@ fun SchemaListView(
     onSelectSchema: (String) -> Unit,
     onBack: (() -> Unit)? = null,
     onReorderSchemas: ((List<String>) -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    orderableSchemas: List<SchemaInfo> = schemas,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var editingLanguages by remember { mutableStateOf(false) }
@@ -81,16 +83,20 @@ fun SchemaListView(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         run {
-            Row(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 12.dp),
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(if (editingLanguages) "语言顺序" else if (editingOrder) "模式顺序" else
                     "${com.kingzcheung.xime.settings.InputModes.languageOf(currentSchemaId, schemas).displayName}输入模式", color = textColor, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                TextButton(onClick = { editingLanguages = !editingLanguages; editingOrder = false },
+                TextButton(onClick = {
+                    if (!editingLanguages) languageOrder = com.kingzcheung.xime.settings.InputModes.languageOrder(context)
+                    editingLanguages = !editingLanguages
+                    editingOrder = false
+                },
                     modifier = Modifier.testTag("language-order-button")) {
                     Text(if (editingLanguages) "完成" else "语言顺序", color = accentColor)
                 }
-                if (!editingLanguages && onReorderSchemas != null && schemas.size > 1) TextButton(onClick = { editingOrder = !editingOrder }) {
+                if (!editingLanguages && onReorderSchemas != null && orderableSchemas.size > 1) TextButton(onClick = { editingOrder = !editingOrder }) {
                     Text(if (editingOrder) "完成" else "模式顺序", color = accentColor)
                 }
             }
@@ -98,12 +104,12 @@ fun SchemaListView(
         if (editingLanguages) {
             InputModeOrderEditor(languageOrder.map { SchemaInfo(it.id, it.displayName, "", "", "") }, { ids ->
                 com.kingzcheung.xime.settings.InputModes.saveLanguageOrder(context, ids)
-                languageOrder = com.kingzcheung.xime.settings.InputModes.languageOrder(ids)
+                languageOrder = com.kingzcheung.xime.settings.InputModes.languageOrder(context)
             }, keyBgColor, textColor, accentColor, Modifier.fillMaxWidth().weight(1f))
             return@Column
         }
         if (editingOrder && onReorderSchemas != null) {
-            InputModeOrderEditor(schemas, onReorderSchemas, keyBgColor, textColor, accentColor,
+            InputModeOrderEditor(orderableSchemas, onReorderSchemas, keyBgColor, textColor, accentColor,
                 Modifier.fillMaxWidth().weight(1f))
             return@Column
         }
