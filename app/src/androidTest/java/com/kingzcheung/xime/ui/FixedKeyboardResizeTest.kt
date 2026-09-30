@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -23,6 +24,36 @@ class FixedKeyboardResizeTest {
     @get:Rule val rule = createComposeRule()
     @Test fun phoneCanNarrowAndDockOnEitherSide() = checkResize(360)
     @Test fun tabletCanNarrowAndDockOnEitherSide() = checkResize(900)
+
+    @Test fun dragPreviewDoesNotRemeasureKeyboardUntilRelease() {
+        val initial = ResizeRect(0f, 200f, 360f, 540f)
+        val visual = mutableStateOf(initial)
+        var settled by mutableStateOf(initial)
+        var measures = 0
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                Box(Modifier.size(360.dp, 540.dp)) {
+                    FloatingKeyboardContainer(false, 1f, offsetX = 0, offsetY = 0,
+                        contentHeightDp = 340, previewRect = settled, previewTransformRect = visual,
+                        onDrag = { _, _ -> }, onDragEnd = {}) {
+                        Box(Modifier.fillMaxSize().layout { measurable, constraints ->
+                            measures++
+                            val child = measurable.measure(constraints)
+                            layout(child.width, child.height) { child.place(0, 0) }
+                        })
+                    }
+                }
+            }
+        }
+        var baseline = 0
+        rule.runOnIdle { baseline = measures }
+        repeat(10) { step ->
+            rule.runOnIdle { visual.value = ResizeRect(0f, 200f - step * 4f, 360f, 540f) }
+        }
+        rule.runOnIdle { assertEquals(baseline, measures) }
+        rule.runOnIdle { settled = visual.value }
+        rule.runOnIdle { assertTrue(measures > baseline) }
+    }
 
     @Test fun narrowedCardLeavesBothGuttersTransparentAndReportsItsActualBounds() {
         var offset by mutableStateOf(0)

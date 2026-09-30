@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -36,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -84,6 +86,8 @@ internal fun FloatingKeyboardContainer(
     onDock: () -> Unit = {},
     /** 调节模式中的唯一预览矩形；非空时直接决定真实卡片最终位置与尺寸。 */
     previewRect: ResizeRect? = null,
+    /** 拖动时只变换图层；卡片内容保留上次松手时的测量尺寸。 */
+    previewTransformRect: State<ResizeRect>? = null,
     onCardPositioned: (left: Int, top: Int, right: Int, bottom: Int) -> Unit = { _: Int, _: Int, _: Int, _: Int -> },
     fixedWidthDp: Int = 0,
     fixedOffsetX: Int = 0,
@@ -119,6 +123,7 @@ internal fun FloatingKeyboardContainer(
                         .align(Alignment.TopStart)
                         .absoluteOffset { IntOffset(previewRect.left.roundToInt(), previewRect.top.roundToInt()) }
                         .size(previewWidth, previewHeight)
+                        .then(resizePreviewTransform(previewRect, previewTransformRect))
                         .clip(fixedCardShape)
                         .testTag("fixed-keyboard-resize-preview")
                         .onGloballyPositioned { coords ->
@@ -132,7 +137,9 @@ internal fun FloatingKeyboardContainer(
                             )
                         }
                 ) {
-                    LanguageMenuPanel { keyboardContent() }
+                    // Window bounds change every preview frame; the menu host would recompose every key.
+                    if (previewTransformRect == null) LanguageMenuPanel { keyboardContent() }
+                    else keyboardContent()
                 }
             }
         }
@@ -218,6 +225,7 @@ internal fun FloatingKeyboardContainer(
             .align(Alignment.TopStart)
             .absoluteOffset { IntOffset(cardRect.left.roundToInt(), cardRect.top.roundToInt()) }
             .size(with(density) { cardRect.width.toDp() }, with(density) { cardRect.height.toDp() })
+            .then(if (previewRect != null) resizePreviewTransform(previewRect, previewTransformRect) else Modifier)
         Box(
             modifier = cardPlacement
                 .clip(FloatingKeyboardCardShape)
@@ -242,7 +250,9 @@ internal fun FloatingKeyboardContainer(
                     CompositionLocalProvider(
                         LocalDensity provides Density(density = density.density, fontScale = density.fontScale * fontScaleFactor)
                     ) {
-                        LanguageMenuPanel { keyboardContent() }
+                        // The resize overlay owns input while the card is being transformed.
+                        if (previewRect != null && previewTransformRect != null) keyboardContent()
+                        else LanguageMenuPanel { keyboardContent() }
                     }
                 }
                 DragBar(
@@ -294,6 +304,19 @@ internal fun FloatingKeyboardContainer(
         }
 
     }
+}
+
+private fun resizePreviewTransform(
+    layoutRect: ResizeRect,
+    visualRect: State<ResizeRect>?,
+): Modifier = if (visualRect == null) Modifier else Modifier.graphicsLayer {
+    // Snapshot state is read by the layer, not composition or measure.
+    val target = visualRect.value
+    transformOrigin = TransformOrigin(0f, 0f)
+    scaleX = target.width / layoutRect.width.coerceAtLeast(1f)
+    scaleY = target.height / layoutRect.height.coerceAtLeast(1f)
+    translationX = target.left - layoutRect.left
+    translationY = target.top - layoutRect.top
 }
 
 @Composable

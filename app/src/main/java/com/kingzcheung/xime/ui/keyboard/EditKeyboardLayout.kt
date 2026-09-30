@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.hypot
 
 private data class EditorKeyShadow(
     val enabled: Boolean = true,
@@ -77,18 +78,36 @@ fun EditKeyboardLayout(
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val cellWidth = maxWidth / 5
                 val cellHeight = maxHeight / 3
-                // Scale with the actual panel, including resized and floating tablet panels.
-                // Reserve the outer columns and space for the four corner actions.
-                val padDiameter = minOf(cellWidth * 3 * .75f, maxHeight)
-                // 编辑盘自成一格：按 pad 自己的格尺寸算度量（不套主体键宽上限/gutter）
-                val padMetrics = keyVisualMetrics(
+                // Fill the space between the outer action columns, or the panel height.
+                // In near-square panels the corner labels can become the tighter limit.
+                val availableDiameter = minOf(cellWidth * 3, maxHeight)
+                fun metricsFor(diameter: Dp) = keyVisualMetrics(
                     policy = KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f),
                     availableWidthDp = cellWidth.value * 5f,
-                    availableHeightDp = padDiameter.value,
+                    availableHeightDp = diameter.value,
                     columns = 5f,
                     rows = 3f,
                     verticalInsetDp = 0f,
                 )
+                val cornerInset = metricsFor(availableDiameter).insetX ?: 2f
+                val cornerScale = KeyboardKeyMetrics.contentScale(
+                    cellWidth.value * .92f, availableDiameter.value / 3 * .92f).coerceAtMost(1.15f)
+                val fontScale = LocalDensity.current.fontScale
+                val cornerHalfWidth = maxOf(12f, 10f * fontScale) * cornerScale
+                val cornerHalfHeight = (11f + 6f * fontScale) * cornerScale
+                // Reserve real breathing room before fitting the disc. Corner
+                // labels may move only a little, never all the way to the edge.
+                val cornerMargin = maxOf(8f, cornerInset + 2f)
+                val shiftX = (cellWidth.value / 2 - cornerHalfWidth - cornerMargin)
+                    .coerceIn(0f, cellWidth.value * .2f)
+                val shiftY = (cellHeight.value / 2 - cornerHalfHeight - cornerMargin)
+                    .coerceIn(0f, cellHeight.value * .15f)
+                val clearX = (cellWidth.value + shiftX - cornerHalfWidth).coerceAtLeast(0f)
+                val clearY = (cellHeight.value + shiftY - cornerHalfHeight).coerceAtLeast(0f)
+                val cornerSafeDiameter = (2 * (hypot(clearX, clearY) - cornerInset)).coerceAtLeast(0f).dp
+                val padDiameter = minOf(availableDiameter, cornerSafeDiameter)
+                // 编辑盘自成一格：按 pad 自己的格尺寸算度量（不套主体键宽上限/gutter）
+                val padMetrics = metricsFor(padDiameter)
                 val inset = (padMetrics.insetX ?: 2f).dp
                 val glyphScale = KeyboardKeyMetrics.contentScale(cellWidth.value * .92f, padDiameter.value / 3 * .92f)
                 val padColor = androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f)
@@ -158,7 +177,8 @@ fun EditKeyboardLayout(
                                         val contentScale = glyphScale.coerceAtMost(1.15f)
                                         val offset = editorCornerContentOffset(cellWidth.value, cellHeight.value,
                                             circleX, circleY, padDiameter.value / 2 + inset.value,
-                                            12f * contentScale, 17f * contentScale, inset.value + 4f)
+                                            maxOf(12f, 10f * fontScale) * contentScale,
+                                            (11f + 6f * fontScale) * contentScale, maxOf(8f, inset.value + 2f))
                                         key(command, cellModifier,
                                             EditorPadCutout(circleX.dp - inset, circleY.dp - inset, padDiameter / 2 + inset),
                                             offset.x.dp, offset.y.dp, compact = true)
@@ -193,9 +213,11 @@ fun EditKeyboardLayout(
 internal fun editorCornerContentOffset(width: Float, height: Float, circleX: Float, circleY: Float,
     radius: Float, halfWidth: Float, halfHeight: Float, margin: Float): Offset {
     val start = Offset(width / 2, height / 2)
-    val target = Offset(
-        if (circleX > width / 2) halfWidth + margin else width - halfWidth - margin,
-        if (circleY > height / 2) halfHeight + margin else height - halfHeight - margin)
+    val shiftX = (width / 2 - halfWidth - margin).coerceIn(0f, width * .2f)
+    val shiftY = (height / 2 - halfHeight - margin).coerceIn(0f, height * .15f)
+    val target = start + Offset(
+        if (circleX > width / 2) -shiftX else shiftX,
+        if (circleY > height / 2) -shiftY else shiftY)
     fun fits(point: Offset): Boolean {
         val dx = (kotlin.math.abs(point.x - circleX) - halfWidth).coerceAtLeast(0f)
         val dy = (kotlin.math.abs(point.y - circleY) - halfHeight).coerceAtLeast(0f)
@@ -279,7 +301,7 @@ internal fun EditorActionKey(
             }
         } else Modifier
     }
-    Box(modifier.fillMaxSize()
+    BoxWithConstraints(modifier.fillMaxSize()
         // 独立合并每个按键，避免被面板的点击屏障合并成一个无障碍节点。
         .semantics(mergeDescendants = true) { contentDescription = label; role = Role.Button; onClick { action(); true } }
         .pointerInput(repeatable) {
@@ -308,12 +330,20 @@ internal fun EditorActionKey(
         .background(if (pressed && !LocalKeyboardInputPreferences.current.keyGlowEnabled) foreground.copy(alpha = 0.18f) else background),
             animateCap = !plain, particleSize = glowSize,
             particleOffset = if (plain) androidx.compose.ui.unit.DpOffset(contentOffsetX, contentOffsetY) else androidx.compose.ui.unit.DpOffset.Zero), contentAlignment = Alignment.Center) {
-        Column(Modifier.offset(contentOffsetX, contentOffsetY).testTag("editor-label-$label"),
+        val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let { if (compact) it.coerceAtMost(1.15f) else it }
+        val iconSize = (if (compact) 20.dp else 24.dp) * scale
+        val labelHeight = with(density) { (14f * scale).sp.toDp() }
+        val showLabel = maxHeight >= iconSize + labelHeight
+        val fittedIconSize = iconSize.coerceAtMost(maxHeight)
+        val shapeSize = androidx.compose.ui.geometry.Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+        val measuredShape = visualShape?.let { RenderedControlShape(it.createOutline(shapeSize,
+            androidx.compose.ui.unit.LayoutDirection.Ltr, density), shapeSize) }
+        Column(Modifier.offset(contentOffsetX, contentOffsetY).testTag("editor-label-$label")
+            .semantics { if (measuredShape != null) this[ControlShape] = measuredShape },
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let { if (compact) it.coerceAtMost(1.15f) else it }
             Icon(icon, contentDescription = null, tint = foreground,
-                modifier = Modifier.size((if (compact) 20.dp else 24.dp) * scale))
-            Text(label, color = foreground, fontSize = (10f * scale).sp, maxLines = 1,
+                modifier = Modifier.size(fittedIconSize))
+            if (showLabel) Text(label, color = foreground, fontSize = (10f * scale).sp, maxLines = 1,
                 lineHeight = (12f * scale).sp)
         }
     }

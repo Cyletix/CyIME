@@ -36,11 +36,12 @@ class EditKeyboardLayoutTest {
 
     private val panelWidth = mutableStateOf(400.dp)
     private val panelHeight = mutableStateOf(184.dp)
+    private val panelFontScale = mutableStateOf(1f)
     private val actions = mutableListOf<String>()
 
     private fun setPanel() {
         rule.setContent {
-          CompositionLocalProvider(LocalDensity provides Density(1f)) {
+          CompositionLocalProvider(LocalDensity provides Density(1f, panelFontScale.value)) {
             Box(Modifier.fillMaxSize().clickable { }, contentAlignment = Alignment.Center) {
                 EditKeyboardLayout(
                     onAction = { actions += it }, onBack = {},
@@ -58,14 +59,25 @@ class EditKeyboardLayoutTest {
         setPanel()
         var initialPad = 0f
         var initialCentre = 0f
-        for ((width, height) in listOf(320.dp to 144.dp, 480.dp to 280.dp, 640.dp to 400.dp)) {
+        var initialAvailableDiameter = 0f
+        for ((width, height) in listOf(320.dp to 144.dp, 330.dp to 280.dp,
+            480.dp to 280.dp, 640.dp to 400.dp)) {
             rule.runOnIdle { panelWidth.value = width; panelHeight.value = height }
             val pad = rule.onNodeWithTag("editor-direction-pad", true).fetchSemanticsNode().boundsInRoot
+            val controls = rule.onNodeWithTag("editor-pad-controls", true).fetchSemanticsNode().boundsInRoot
+            val grid = rule.onNodeWithTag("editor-grid", true).fetchSemanticsNode().boundsInRoot
             val centre = rule.onNodeWithContentDescription("选择").fetchSemanticsNode().boundsInRoot
             assertEquals(pad.width, pad.height, 1f)
             assertEquals(centre.width, centre.height, 1f)
-            assertTrue("pad grows with available panel", pad.width > initialPad)
-            assertTrue("centre grows with available panel", centre.width > initialCentre)
+            val availableDiameter = minOf(grid.width * 3f / 5f, grid.height)
+            assertTrue("$width x $height respects the limiting dimension", controls.width <= availableDiameter + 1f)
+            assertTrue("pad must not shrink as the measured panel grows", pad.width >= initialPad - 1f)
+            assertTrue("centre must not shrink as the measured panel grows", centre.width >= initialCentre - 1f)
+            if (availableDiameter > initialAvailableDiameter + 1f) {
+                assertTrue("pad grows with measured available space", pad.width > initialPad)
+                assertTrue("centre grows with measured available space", centre.width > initialCentre)
+            }
+            initialAvailableDiameter = availableDiameter
             initialPad = pad.width; initialCentre = centre.width
             val corners = listOf("段首", "段尾", "复制", "粘贴")
             for (label in corners) {
@@ -83,10 +95,51 @@ class EditKeyboardLayoutTest {
         }
     }
 
+    @Test fun cornerLabelsStayOutsideDiscWhenTextOrPanelShapeLimitsIt() {
+        setPanel()
+        for ((width, height, font) in listOf(
+            Triple(320.dp, 200.dp, 1f),
+            Triple(280.dp, 220.dp, 1.3f),
+            Triple(280.dp, 220.dp, 2f),
+        )) {
+            rule.runOnIdle { panelWidth.value = width; panelHeight.value = height; panelFontScale.value = font }
+            val pad = rule.onNodeWithTag("editor-direction-pad", true).fetchSemanticsNode().boundsInRoot
+            val controls = rule.onNodeWithTag("editor-pad-controls", true).fetchSemanticsNode().boundsInRoot
+            val grid = rule.onNodeWithTag("editor-grid", true).fetchSemanticsNode().boundsInRoot
+            assertTrue("$width x $height font=$font stays within the available dimensions",
+                controls.width <= minOf(grid.width * 3f / 5f, grid.height) + 1f)
+            for (label in listOf("段首", "段尾", "复制", "粘贴")) {
+                val content = rule.onNodeWithTag("editor-label-$label", true).fetchSemanticsNode().boundsInRoot
+                val dx = (kotlin.math.abs(content.center.x - pad.center.x) - content.width / 2).coerceAtLeast(0f)
+                val dy = (kotlin.math.abs(content.center.y - pad.center.y) - content.height / 2).coerceAtLeast(0f)
+                assertTrue("$label overlaps disc at $width x $height font=$font",
+                    dx * dx + dy * dy > pad.width * pad.width / 4)
+            }
+        }
+    }
+
+    @Test fun minimumHeightReservesCornerBreathingRoom() {
+        setPanel()
+        for ((width, height) in listOf(280.dp to 140.dp, 320.dp to 144.dp, 400.dp to 144.dp, 640.dp to 140.dp)) {
+            rule.runOnIdle { panelWidth.value = width; panelHeight.value = height }
+            for (label in listOf("段首", "段尾", "复制", "粘贴")) {
+                val key = rule.onNodeWithContentDescription(label).fetchSemanticsNode().boundsInRoot
+                val content = rule.onNodeWithTag("editor-label-$label", true).fetchSemanticsNode().boundsInRoot
+                val margin = minOf(content.left - key.left, key.right - content.right,
+                    content.top - key.top, key.bottom - content.bottom)
+                assertTrue("$label at $width x $height margin=$margin", margin >= 7f)
+                rule.onNodeWithContentDescription(label).performTouchInput {
+                    click(Offset(content.center.x - key.left, content.center.y - key.top))
+                }
+            }
+        }
+        rule.runOnIdle { assertEquals(List(4) { listOf("home", "end", "copy", "paste") }.flatten(), actions) }
+    }
+
     @Test fun exportMinimumAndMaximumHeightPreviews() {
         setPanel()
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-        for (height in listOf(184.dp, 400.dp)) {
+        for (height in listOf(144.dp, 184.dp, 400.dp)) {
             rule.runOnIdle { panelHeight.value = height }
             rule.waitForIdle()
             val image = rule.onNodeWithTag("edit-panel", true).captureToImage().asAndroidBitmap()
