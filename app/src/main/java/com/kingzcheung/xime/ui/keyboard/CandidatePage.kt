@@ -26,9 +26,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -415,38 +418,16 @@ fun CandidatePage(
                         shadowElevation = shadowElevation,
                         shadowShapeRadius = shadowShapeRadius,
                     )
-                    RailKey(
-                        onClick = {
-                            onHapticFeedback?.invoke()
-                            scrollPage(-1)
-                        },
-                        keyBg = keyBg,
-                        modifier = railKeyModifier,
-                        enabled = listState.canScrollBackward
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.KeyboardArrowUp,
-                            contentDescription = "上一页",
-                            tint = if (listState.canScrollBackward) state.textColor else state.textColor.copy(alpha = 0.3f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    RailKey(
-                        onClick = {
-                            onHapticFeedback?.invoke()
-                            scrollPage(1)
-                        },
-                        keyBg = keyBg,
-                        modifier = railKeyModifier,
-                        enabled = listState.canScrollForward
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.KeyboardArrowDown,
-                            contentDescription = "下一页",
-                            tint = if (listState.canScrollForward) state.textColor else state.textColor.copy(alpha = 0.3f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                    CandidatePagingButton(
+                        onClick = { onHapticFeedback?.invoke(); scrollPage(-1) },
+                        enabled = listState.canScrollBackward,
+                        previous = true, foreground = state.textColor, modifier = railKeyModifier,
+                    )
+                    CandidatePagingButton(
+                        onClick = { onHapticFeedback?.invoke(); scrollPage(1) },
+                        enabled = listState.canScrollForward,
+                        previous = false, foreground = state.textColor, modifier = railKeyModifier,
+                    )
                     ActionKeyButton(
                         text = state.enterKeyText,
                         onClick = { callbacks.onEnter?.invoke() },
@@ -795,4 +776,22 @@ private fun RailKey(
         contentAlignment = Alignment.Center,
         content = content
     )
+}
+
+/** Original circular paging glyph; the surrounding rail still owns alignment and touch size. */
+@Composable
+private fun CandidatePagingButton(
+    onClick: () -> Unit, enabled: Boolean, previous: Boolean, foreground: Color,
+    modifier: Modifier,
+) {
+    Box(modifier.fillMaxWidth().tolerantClick(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center) {
+        Box(Modifier.size(28.dp).clip(CircleShape)
+            .background(foreground.copy(alpha = if (!enabled) .10f else if (previous) .50f else .25f)),
+            contentAlignment = Alignment.Center) {
+            Icon(if (previous) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (previous) "上一页" else "下一页",
+                tint = foreground.copy(alpha = if (enabled) 1f else .3f), modifier = Modifier.size(20.dp))
+        }
+    }
 }
