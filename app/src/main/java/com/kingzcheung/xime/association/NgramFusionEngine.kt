@@ -5,13 +5,12 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class NgramFusionEngine(private val context: Context) {
+class NgramFusionEngine(private val context: Context, private val userNgramCache: UserNgramCache = UserNgramCache(context)) {
     companion object {
         private const val TAG = "NgramFusionEngine"
         private const val DEFAULT_LAMBDA = 0.7f
     }
     
-    private val userNgramCache = UserNgramCache(context)
     private var lambda = DEFAULT_LAMBDA
     private var isInitialized = false
     private var baseModel: BaseAssociationModel? = null
@@ -55,6 +54,9 @@ class NgramFusionEngine(private val context: Context) {
             val modelScore = normalizeModelScore(candidate.score)
             allCandidates[candidate.text] = modelScore
         }
+        userNgramCache.profileCandidates(context).forEach { candidate ->
+            allCandidates[candidate.text] = maxOf(allCandidates[candidate.text] ?: 0f, candidate.score)
+        }
         
         userCandidates.forEach { (word, userScore) ->
             val existingScore = allCandidates[word]
@@ -89,6 +91,8 @@ class NgramFusionEngine(private val context: Context) {
     }
     
     fun getCacheSize(): Int = userNgramCache.getCacheSize()
+    fun learningData(): PersonalLearningData = userNgramCache.snapshot()
+    suspend fun importLearningData(data: PersonalLearningData) = userNgramCache.importData(data)
     
     fun isInitialized(): Boolean = isInitialized
 }

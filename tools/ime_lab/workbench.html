@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CyIME · 个人学习数据</title><link rel="stylesheet" href="/workbench.css">
+<header><div><small>CyIME / 本地数据工作台</small><h1>把习惯看清楚，再交给输入法</h1><p>手机学习、对话语料与笔记分开标记。取消勾选即可排除，随时可重新启用。</p></div><a class="button" href="/api/export">导出当前方案 ↓</a></header>
+<main><section class="stats" id="stats" aria-label="统计"></section>
+<aside>数据仅在本机处理。这里编辑的是电脑副本，手机不会立即改变。导出后，在手机「智能联想 → 导入学习文件」应用；导入会替换手机学习与个人语料方案，原数据会备份。Rime 用户词库不受影响。笔记可能含摘录或 AI 文本，来源标记不代表全部亲笔，请按需审阅。</aside>
+<section class="toolbar"><label>搜索<input id="search" placeholder="输入上下文或联想词"></label><label>类型<select id="kind"><option value="">全部</option><option value="bigrams">手机 · 二元组</option><option value="trigrams">手机 · 三元组</option><option value="profile">语料 · 整词联想</option></select></label><label>来源<select id="source"><option value="">全部来源</option><option value="phone">手机</option><option value="codex">Codex</option><option value="cline">Cline</option><option value="notebook">Obsidian 笔记</option></select></label><span id="status" role="status"></span></section>
+<div class="table-wrap"><table><thead><tr><th>采用</th><th>类型</th><th>输入上下文</th><th>→ 联想内容</th><th>次数（可改）</th><th>来源 / 次数</th></tr></thead><tbody id="rows"></tbody></table></div>
+<footer><button id="prev">← 上一页</button><span id="page"></span><button id="next">下一页 →</button></footer>
+<p class="hint">手机计数保留真实学习次数。语料计数每篇、每种组合最多贡献 3 次，至少出现在两份文本中，避免长文或重复模板占据联想。取消勾选以停用保存，原始次数仍保留。</p></main><script src="/workbench.js"></script></html>

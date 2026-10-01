@@ -10,7 +10,8 @@ data class TrieNode(
 class NgramTrie {
     private val root = TrieNode()
     
-    fun insert(ngram: List<String>) {
+    fun insert(ngram: List<String>, count: Int = 1) {
+        require(count > 0)
         if (ngram.isEmpty()) return
         
         var node = root
@@ -32,7 +33,7 @@ class NgramTrie {
             node = nextNode
         }
         
-        node.count++
+        node.count = Math.addExact(node.count, count)
         updateFrequency(node)
     }
     
@@ -51,15 +52,23 @@ class NgramTrie {
             node = node.children[token] ?: return 0f
         }
         
-        val prefixCount = node.prefixCount
-        if (prefixCount == 0) return 0f
+        val prefixCount = node.children.values.sumOf { it.count.toLong() }
+        if (prefixCount == 0L) return 0f
         
         val lastToken = ngram.last()
         val lastNode = node.children[lastToken] ?: return 0f
         
-        val frequency = lastNode.count.toFloat() / prefixCount
+        val frequency = lastNode.count.toFloat() / prefixCount.toFloat()
         
         return frequency.coerceIn(0f, 1f)
+    }
+
+    fun next(prefix: List<String>): List<Pair<String, Float>> {
+        var node = root
+        for (token in prefix) node = node.children[token] ?: return emptyList()
+        val total = node.children.values.sumOf { it.count.toLong() }.toFloat()
+        if (total == 0f) return emptyList()
+        return node.children.map { (token, child) -> token to child.count / total }
     }
     
     fun getAllEntries(): List<Pair<List<String>, Int>> {

@@ -74,6 +74,23 @@ fun SmartPredictionSettingsContent(
     val viewModel: SmartPredictionSettingsViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    var pendingImport by remember { mutableStateOf<android.net.Uri?>(null) }
+    val exportFile = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let(viewModel::exportLearningData) }
+    val importFile = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> pendingImport = uri }
+    pendingImport?.let { uri ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingImport = null },
+            title = { Text("导入学习文件") },
+            text = { Text("将替换本机学习记录和个人语料方案。导入前会保留一份本机备份；不会修改 Rime 用户词库或模型。") },
+            confirmButton = { Button(onClick = { pendingImport = null; viewModel.importLearningData(uri) }) { Text("导入替换") } },
+            dismissButton = { OutlinedButton(onClick = { pendingImport = null }) { Text("取消") } }
+        )
+    }
+
     // 模型清单来自远程 index，响应式收集以在加载完成后刷新（仅 PREDICTION 类别）
     val allModels by ModelManager.modelsFlow.collectAsStateWithLifecycle()
     val predictionModels = allModels.filter { it.category == ModelCategory.PREDICTION }
@@ -262,69 +279,15 @@ fun SmartPredictionSettingsContent(
                 }
             }
 
-            if (uiState.isInitialized) {
-                item {
-                    SettingsSection(title = "用户学习数据", content = {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "缓存大小",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "记录用户输入习惯以提升预测准确度",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    text = "${uiState.cacheSize} 条",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            if (uiState.cacheSize > 0) {
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.saveUserData() },
-                                        enabled = !uiState.isSaving,
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        if (uiState.isSaving) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                        }
-                                        Text(if (uiState.isSaving) "保存中..." else "保存数据")
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = { viewModel.refreshCacheSize() },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("刷新")
-                                    }
-                                }
-                            }
-                        }
-                    })
-                }
+            item {
+                LearningDataControls(
+                    unique = uiState.cacheSize, observations = uiState.observations,
+                    profileSize = uiState.profileSize, busy = uiState.isSaving,
+                    status = uiState.learningStatus,
+                    onSave = viewModel::saveUserData, onRefresh = viewModel::refreshCacheSize,
+                    onExport = { exportFile.launch("CyIME-personal-learning.json") },
+                    onImport = { importFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
+                )
             }
 
             item {
@@ -488,6 +451,27 @@ private fun PredictionModelCard(
                 Spacer(Modifier.width(4.dp))
                 Text("去商店")
             }
+        }
+    }
+}
+
+@Composable
+internal fun LearningDataControls(
+    unique: Int, observations: Long, profileSize: Int, busy: Boolean, status: String,
+    onSave: () -> Unit, onRefresh: () -> Unit, onExport: () -> Unit, onImport: () -> Unit,
+) {
+    SettingsSection(title = "用户学习数据") {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("本机学习：$unique 种组合 · 累计 $observations 次")
+            Text("个人语料方案：$profileSize 条联想", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("输入后自动保存。语料方案与实际输入记录分开统计；可导出到电脑查看、删改后再导入。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Stack actions so large fonts and narrow keyboards cannot clip labels.
+            OutlinedButton(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("立即保存到本机") }
+            OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("刷新统计") }
+            Button(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("导出文件") }
+            OutlinedButton(onClick = onImport, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("导入学习文件") }
+            if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
