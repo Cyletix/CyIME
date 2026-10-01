@@ -6,7 +6,8 @@ param(
     [string]$Serial = ''
 )
 $ErrorActionPreference = 'Stop'
+$releaseArguments = @('-I', (Join-Path $PSScriptRoot 'release-abis.gradle')) + $GradleArguments
 foreach ($bundled in @($false, $true)) {
     & "$PSScriptRoot/build-apk.ps1" -BuildType Release -BundleModels:$bundled `
-        -AdbPort $AdbPort -Serial $Serial -GradleArguments $GradleArguments
+        -AdbPort $AdbPort -Serial $Serial -GradleArguments $releaseArguments
 }
