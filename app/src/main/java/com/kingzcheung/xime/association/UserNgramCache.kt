@@ -1,202 +1,148 @@
 package com.kingzcheung.xime.association
 
 import android.content.Context
+import android.util.AtomicFile
 import android.util.Log
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
-class UserNgramCache(private val context: Context) {
-    companion object {
-        private const val TAG = "UserNgramCache"
-        private const val CACHE_FILE_NAME = "user_ngram_cache.json"
-        private const val MAX_ENTRIES = 1000
-        private const val MAX_HISTORY_SIZE = 100
-    }
-    
+class UserNgramCache(context: Context) {
+    private val cacheFile = File(context.filesDir, "user_ngram_cache.json")
     private val bigramTrie = NgramTrie()
     private val trigramTrie = NgramTrie()
     private val recentInputs = mutableListOf<String>()
-    
-    private val cacheFile: File
-        get() = File(context.filesDir, CACHE_FILE_NAME)
-    
+    private var profileName = ""
+    private var continuations = emptyList<PersonalContinuation>()
+    private var profileIndex = PersonalContinuationIndex(emptyList())
+    private val stateLock = Any()
+    private val fileMutex = Mutex()
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var pendingSave: Job? = null
+    private var loaded = false
+    private var storedProfileRows: List<PersonalContinuation>? = null
+    private var storedProfileReference: String? = null
+
     suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            if (cacheFile.exists()) {
-                val json = JSONObject(cacheFile.readText())
-                loadFromJson(json)
+        fileMutex.withLock {
+            if (!loaded) {
+                if (cacheFile.exists()) {
+                    val root = org.json.JSONObject(AtomicFile(cacheFile).readFully().toString(Charsets.UTF_8))
+                    if (root.has("profileReference")) {
+                        val reference = root.getString("profileReference")
+                        require(reference.matches(Regex("[a-f0-9]{64}"))) { "无效的个人方案引用" }
+                        val profile = File(cacheFile.parentFile, "learning-profiles/$reference.json")
+                        root.put("profile", org.json.JSONObject(profile.readText()))
+                    }
+                    replaceInMemory(PersonalLearningData.decode(root.toString()))
+                }
+                loaded = true
             }
             true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize cache", e)
-            false
         }
     }
-    
+
     fun recordInput(text: String) {
-        if (text.isBlank()) return
-        
         val tokens = tokenize(text)
         if (tokens.isEmpty()) return
-        
-        updateRecentInputs(tokens)
-        
-        tokens.windowed(2).forEach { window ->
-            bigramTrie.insert(window)
-        }
-        
-        tokens.windowed(3).forEach { window ->
-            trigramTrie.insert(window)
-        }
-        
-    }
-    
-    private fun tokenize(text: String): List<String> {
-        val punctuation = setOf('，', '。', '！', '？', '、', '；', '：', '"', '"', '\'', '\'', ' ', '\n', '\t')
-        return text.filter { it.isLetterOrDigit() || it in punctuation }
-            .map { it.toString() }
-    }
-    
-    private fun updateRecentInputs(newTokens: List<String>) {
-        recentInputs.addAll(newTokens)
-        if (recentInputs.size > MAX_HISTORY_SIZE) {
-            recentInputs.subList(0, recentInputs.size - MAX_HISTORY_SIZE).clear()
-        }
-    }
-    
-    fun getBigramScore(word1: String, word2: String): Float {
-        return bigramTrie.getFrequency(listOf(word1, word2))
-    }
-    
-    fun getTrigramScore(word1: String, word2: String, word3: String): Float {
-        return trigramTrie.getFrequency(listOf(word1, word2, word3))
-    }
-    
-    fun getContextualScore(context: String, candidate: String): Float {
-        val tokens = tokenize(context)
-        if (tokens.isEmpty()) return 0f
-        
-        val lastToken = tokens.last()
-        val bigramScore = getBigramScore(lastToken, candidate)
-        
-        val trigramScore = if (tokens.size >= 2) {
-            getTrigramScore(tokens[tokens.size - 2], lastToken, candidate)
-        } else {
-            0f
-        }
-        
-        return maxOf(bigramScore, trigramScore)
-    }
-    
-    fun getUserCandidates(context: String, topK: Int = 5): List<Pair<String, Float>> {
-        val tokens = tokenize(context)
-        if (tokens.isEmpty()) {
-            return emptyList()
-        }
-        
-        val lastToken = tokens.last()
-        val candidates = mutableListOf<Pair<String, Float>>()
-        
-        bigramTrie.getAllEntries().forEach { (ngram, count) ->
-            if (ngram.size == 2 && ngram[0] == lastToken) {
-                val score = getBigramScore(ngram[0], ngram[1])
-                if (score > 0) {
-                    candidates.add(ngram[1] to score)
-                }
+        synchronized(stateLock) {
+            recentInputs.addAll(tokens)
+            if (recentInputs.size > 100) recentInputs.subList(0, recentInputs.size - 100).clear()
+            tokens.windowed(2).forEach { bigramTrie.insert(it) }
+            tokens.windowed(3).forEach { trigramTrie.insert(it) }
+            pendingSave?.cancel()
+            pendingSave = saveScope.launch {
+                delay(500)
+                try { save() }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { Log.e("UserNgramCache", "Automatic learning save failed", error) }
             }
         }
-        
-        if (tokens.size >= 2) {
-            trigramTrie.getAllEntries().forEach { (ngram, count) ->
-                if (ngram.size == 3 && ngram[0] == tokens[tokens.size - 2] && ngram[1] == lastToken) {
-                    val score = getTrigramScore(ngram[0], ngram[1], ngram[2])
-                    if (score > 0) {
-                        candidates.add(ngram[2] to score)
-                    }
-                }
-            }
-        }
-        
-        return candidates.sortedByDescending { it.second }.take(topK)
     }
-    
-    suspend fun save() = withContext(Dispatchers.IO) {
+
+    private fun tokenize(text: String): List<String> = text.filter {
+        it.isLetterOrDigit() || it in "，。！？、；：\"' \n\t"
+    }.map { it.toString() }
+
+    fun getUserCandidates(context: String, topK: Int = 5): List<Pair<String, Float>> = synchronized(stateLock) {
+        val tokens = tokenize(context)
+        if (tokens.isEmpty()) return@synchronized emptyList()
+        val results = bigramTrie.next(tokens.takeLast(1)).toMap().toMutableMap()
+        if (tokens.size >= 2) trigramTrie.next(tokens.takeLast(2)).forEach { (text, score) ->
+            results[text] = maxOf(results[text] ?: 0f, score)
+        }
+        results.entries.sortedByDescending { it.value }.take(topK).map { it.key to it.value }
+    }
+
+    fun profileCandidates(context: String): List<AssociationCandidate> = synchronized(stateLock) { profileIndex.predict(context) }
+    fun snapshot(): PersonalLearningData = synchronized(stateLock) {
+        PersonalLearningData(bigramTrie.getAllEntries().map { LearnedSequence(it.first, it.second) },
+            trigramTrie.getAllEntries().map { LearnedSequence(it.first, it.second) }, recentInputs.toList(), profileName, continuations)
+    }
+    private fun replaceInMemory(data: PersonalLearningData) = synchronized(stateLock) {
+        bigramTrie.clear(); trigramTrie.clear()
+        data.bigrams.forEach { bigramTrie.insert(it.tokens, it.count) }
+        data.trigrams.forEach { trigramTrie.insert(it.tokens, it.count) }
+        recentInputs.clear(); recentInputs.addAll(data.recentInputs)
+        profileName = data.profileName
+        continuations = data.continuations
+        profileIndex = PersonalContinuationIndex(continuations)
+    }
+    private fun write(data: PersonalLearningData) {
+        // Large imported corpora are immutable blobs. Ordinary typing rewrites only
+        // the small observation file, not the entire corpus after every pause.
+        if (storedProfileRows !== data.continuations) {
+            storedProfileReference = if (data.continuations.isEmpty()) null else {
+                val profile = org.json.JSONObject(data.encode()).getJSONObject("profile").toString().toByteArray(Charsets.UTF_8)
+                val hash = java.security.MessageDigest.getInstance("SHA-256").digest(profile).joinToString("") { "%02x".format(it) }
+                val file = File(cacheFile.parentFile, "learning-profiles/$hash.json")
+                if (!file.exists()) {
+                    check(file.parentFile!!.mkdirs() || file.parentFile!!.isDirectory)
+                    val atomic = AtomicFile(file)
+                    val stream = atomic.startWrite()
+                    try { stream.write(profile); atomic.finishWrite(stream) }
+                    catch (error: Exception) { atomic.failWrite(stream); throw error }
+                }
+                hash
+            }
+            storedProfileRows = data.continuations
+        }
+        val root = org.json.JSONObject(data.copy(profileName = "", continuations = emptyList()).encode())
+        storedProfileReference?.let { root.put("profileReference", it) }
+        val atomic = AtomicFile(cacheFile)
+        val stream = atomic.startWrite()
         try {
-            val json = toJson()
-            cacheFile.writeText(json.toString(2))
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save cache", e)
+            stream.write(root.toString().toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(stream)
+        } catch (error: Exception) {
+            atomic.failWrite(stream)
+            throw error
         }
     }
-    
-    fun clear() {
-        bigramTrie.clear()
-        trigramTrie.clear()
-        recentInputs.clear()
-        if (cacheFile.exists()) {
-            cacheFile.delete()
+    suspend fun save() {
+        val caller = currentCoroutineContext()[Job]
+        synchronized(stateLock) {
+            if (pendingSave !== caller) pendingSave?.cancel()
+            pendingSave = null
+        }
+        withContext(Dispatchers.IO) { fileMutex.withLock {
+            check(loaded) { "学习数据尚未成功读取，不能覆盖保存" }
+            write(snapshot())
+        } }
+    }
+    suspend fun importData(data: PersonalLearningData) = withContext(Dispatchers.IO) {
+        fileMutex.withLock {
+            // Keep an exact recoverable pre-import snapshot. Validation happens before this method.
+            File(cacheFile.parentFile, "user_learning_before_import.json").writeText(snapshot().encode())
+            write(data)
+            replaceInMemory(data)
         }
     }
-    
-    fun getCacheSize(): Int = bigramTrie.size() + trigramTrie.size()
-    
-    private fun toJson(): JSONObject {
-        val json = JSONObject()
-        
-        val bigrams = JSONArray()
-        bigramTrie.getAllEntries().forEach { (tokens, count) ->
-            val entry = JSONObject()
-            entry.put("tokens", JSONArray(tokens))
-            entry.put("count", count)
-            bigrams.put(entry)
-        }
-        json.put("bigrams", bigrams)
-        
-        val trigrams = JSONArray()
-        trigramTrie.getAllEntries().forEach { (tokens, count) ->
-            val entry = JSONObject()
-            entry.put("tokens", JSONArray(tokens))
-            entry.put("count", count)
-            trigrams.put(entry)
-        }
-        json.put("trigrams", trigrams)
-        
-        json.put("recentInputs", JSONArray(recentInputs))
-        
-        return json
+    fun clear() = synchronized(stateLock) {
+        replaceInMemory(PersonalLearningData())
+        pendingSave?.cancel()
+        pendingSave = saveScope.launch { save() }
     }
-    
-    private fun loadFromJson(json: JSONObject) {
-        bigramTrie.clear()
-        trigramTrie.clear()
-        recentInputs.clear()
-        
-        val bigrams = json.optJSONArray("bigrams") ?: JSONArray()
-        for (i in 0 until bigrams.length()) {
-            val entry = bigrams.getJSONObject(i)
-            val tokens = entry.getJSONArray("tokens").let { arr ->
-                (0 until arr.length()).map { arr.getString(it) }
-            }
-            val count = entry.getInt("count")
-            repeat(count) { bigramTrie.insert(tokens) }
-        }
-        
-        val trigrams = json.optJSONArray("trigrams") ?: JSONArray()
-        for (i in 0 until trigrams.length()) {
-            val entry = trigrams.getJSONObject(i)
-            val tokens = entry.getJSONArray("tokens").let { arr ->
-                (0 until arr.length()).map { arr.getString(it) }
-            }
-            val count = entry.getInt("count")
-            repeat(count) { trigramTrie.insert(tokens) }
-        }
-        
-        val recentArray = json.optJSONArray("recentInputs") ?: JSONArray()
-        for (i in 0 until recentArray.length()) {
-            recentInputs.add(recentArray.getString(i))
-        }
-    }
+    fun getCacheSize(): Int = synchronized(stateLock) { bigramTrie.size() + trigramTrie.size() }
 }

@@ -21,6 +21,10 @@ object AssociationManager {
     
     private lateinit var fusionEngine: NgramFusionEngine
     private var context: Context? = null
+    private var learningCache: UserNgramCache? = null
+    private fun learningCache(ctx: Context): UserNgramCache = synchronized(this) {
+        learningCache ?: UserNgramCache(ctx.applicationContext).also { learningCache = it }
+    }
     
     suspend fun initialize(ctx: Context): Boolean = withContext(Dispatchers.IO) {
         context = ctx
@@ -36,7 +40,7 @@ object AssociationManager {
             }
             
             try {
-                fusionEngine = NgramFusionEngine(ctx)
+                fusionEngine = NgramFusionEngine(ctx, learningCache(ctx))
                 
                 ModelRuntime.register(
                     id = "predictive_text",
@@ -123,8 +127,19 @@ object AssociationManager {
     }
     
     suspend fun saveUserData() {
-        if (!isInitialized) return
-        fusionEngine.saveCache()
+        checkNotNull(learningCache) { "学习数据尚未加载" }.save()
+    }
+
+    suspend fun learningData(ctx: Context): PersonalLearningData {
+        val cache = learningCache(ctx)
+        cache.initialize()
+        return cache.snapshot()
+    }
+
+    suspend fun importLearningData(ctx: Context, data: PersonalLearningData) {
+        val cache = learningCache(ctx)
+        cache.initialize()
+        cache.importData(data)
     }
     
     fun getCacheSize(): Int {

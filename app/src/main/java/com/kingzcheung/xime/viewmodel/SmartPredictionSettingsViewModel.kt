@@ -21,6 +21,9 @@ data class SmartPredictionUiState(
     val isEnabled: Boolean = false,
     val isInitialized: Boolean = false,
     val cacheSize: Int = 0,
+    val observations: Long = 0,
+    val profileSize: Int = 0,
+    val learningStatus: String = "",
     val isSaving: Boolean = false,
     val isLoading: Boolean = false,
     val isDownloading: Boolean = false,
@@ -76,11 +79,62 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     
     private fun loadCacheSize() {
         viewModelScope.launch {
-            val size = withContext(Dispatchers.IO) {
-                AssociationManager.getCacheSize()
+            try {
+                updateLearningCounts()
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _uiState.update { it.copy(learningStatus = "读取失败：${error.message}") }
             }
-            _uiState.update { it.copy(cacheSize = size) }
         }
+    }
+
+    private suspend fun updateLearningCounts() {
+        val data = withContext(Dispatchers.IO) { AssociationManager.learningData(context) }
+        _uiState.update { it.copy(cacheSize = data.uniqueSequences, observations = data.observations,
+            profileSize = data.continuations.size) }
+    }
+
+    private fun learningOperation(success: String, block: suspend () -> Unit) {
+        if (_uiState.value.isSaving) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, learningStatus = "处理中…") }
+            try {
+                withContext(Dispatchers.IO) { block() }
+                updateLearningCounts()
+                _uiState.update { it.copy(learningStatus = success, toastMessage = success) }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                val message = "操作失败：${error.message}"
+                _uiState.update { it.copy(learningStatus = message, toastMessage = message) }
+            } finally {
+                _uiState.update { it.copy(isSaving = false) }
+            }
+        }
+    }
+
+    fun exportLearningData(uri: android.net.Uri) = learningOperation("已导出学习文件") {
+        val data = AssociationManager.learningData(context)
+        AssociationManager.saveUserData()
+        val output = checkNotNull(context.contentResolver.openOutputStream(uri)) { "无法写入所选位置" }
+        output.bufferedWriter().use { it.write(data.encode()) }
+    }
+
+    fun importLearningData(uri: android.net.Uri) = learningOperation("已导入；导入前数据已备份") {
+        val input = checkNotNull(context.contentResolver.openInputStream(uri)) { "无法读取所选文件" }
+        val bytes = input.use { stream ->
+            val output = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = stream.read(buffer)
+                if (count < 0) break
+                require(output.size() + count <= com.kingzcheung.xime.association.PersonalLearningData.MAX_BYTES) { "学习文件超过 32 MB" }
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
+        }
+        require(bytes.size <= com.kingzcheung.xime.association.PersonalLearningData.MAX_BYTES) { "学习文件超过 32 MB" }
+        val data = com.kingzcheung.xime.association.PersonalLearningData.decode(bytes.toString(Charsets.UTF_8))
+        AssociationManager.importLearningData(context, data)
     }
     
     private fun validateModelState() {
@@ -142,25 +196,11 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     }
     
     fun saveUserData() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
-            
-            withContext(Dispatchers.IO) {
-                AssociationManager.saveUserData()
-            }
-            
-            _uiState.update { it.copy(isSaving = false) }
-        }
+        learningOperation("已保存到本机；导出请使用“导出文件”") { AssociationManager.saveUserData() }
     }
     
     fun refreshCacheSize() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                AssociationManager.saveUserData()
-            }
-            val size = AssociationManager.getCacheSize()
-            _uiState.update { it.copy(cacheSize = size) }
-        }
+        learningOperation("已刷新统计") { }
     }
     
     fun downloadModelFiles() {
