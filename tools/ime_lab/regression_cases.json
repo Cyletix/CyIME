@@ -7,8 +7,9 @@
     ],
     "check": "recall",
     "root": "A1",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 1,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-002",
@@ -18,8 +19,9 @@
     ],
     "check": "recall",
     "root": "A1",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 3,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-003",
@@ -29,8 +31,9 @@
     ],
     "check": "rank",
     "root": "A3",
-    "status": "待采样，未验收",
-    "top_k": 3
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 3,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-004",
@@ -40,8 +43,9 @@
     ],
     "check": "rank",
     "root": "A3",
-    "status": "待采样，未验收",
-    "top_k": 3
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 3,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-005",
@@ -49,8 +53,9 @@
     "expected": [],
     "check": "no_date",
     "root": "A4",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 20,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-006",
@@ -58,8 +63,9 @@
     "expected": [],
     "check": "date",
     "root": "A4",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 20,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-007",
@@ -70,8 +76,9 @@
     ],
     "check": "recall",
     "root": "A5",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 20,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-008",
@@ -82,8 +89,9 @@
     ],
     "check": "recall",
     "root": "A5",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 20,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-010",
@@ -93,8 +101,9 @@
     ],
     "check": "recall",
     "root": "A1",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 20,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-011",
@@ -104,8 +113,9 @@
     ],
     "check": "recall",
     "root": "A2/A3",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 20,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-012",
@@ -115,8 +125,9 @@
     ],
     "check": "rank",
     "root": "A3",
-    "status": "待采样，未验收",
-    "top_k": 3
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 3,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-013",
@@ -126,8 +137,9 @@
     ],
     "check": "recall",
     "root": "A1/A3",
-    "status": "待采样，未验收",
-    "top_k": 20
+    "status": "1.3.20隔离模拟器真实引擎通过；未真机验收",
+    "top_k": 20,
+    "evidence": "docs/development/1.3.20-input-quality-repair.md"
   },
   {
     "id": "T9-014",

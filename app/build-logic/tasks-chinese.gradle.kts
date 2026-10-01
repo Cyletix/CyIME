@@ -27,6 +27,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("cyletix10Preset", 1)
     inputs.property("t9EnglishIndex", 2)
     inputs.property("measuredNeighborCorrection", 1)
+    inputs.property("candidatePolicy", 2)
     outputs.dir(chineseRoot)
     doLast {
         val archive = File(rootProject.projectDir, ".gradle/chinese-data/$chineseRevision.zip")
@@ -87,6 +88,9 @@ val prepareChineseDictionaries by tasks.registering {
         // Same engine, dictionary and options as Chinese26; only the keyboard arrangement differs.
         val baseSchema = File(root, "rime_ice.schema.yaml").readText().replace("\ntranslator:\n",
             "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
+            .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }.joinToString("\n")
+            .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
+            "\ncyime:\n  candidate_policy: true\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
         File(root, "rime_ice.schema.yaml").writeText(baseSchema)
         File(root, "pinyin_qwjrtk.schema.yaml").writeText(baseSchema

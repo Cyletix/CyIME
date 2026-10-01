@@ -1375,13 +1375,13 @@ fun KeyboardView(
                 ) {
                     Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
                         Text(
-                            text = "删除自造词",
+                            text = "不再推荐",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "将「${pending.word}」从用户词典中移除？",
+                            text = "不再显示「${pending.word}」这个候选？",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1402,7 +1402,7 @@ fun KeyboardView(
                                 deletePending = null
                                 pending.onConfirm()
                             }) {
-                                Text("删除", color = MaterialTheme.colorScheme.error)
+                                Text("不再推荐", color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
