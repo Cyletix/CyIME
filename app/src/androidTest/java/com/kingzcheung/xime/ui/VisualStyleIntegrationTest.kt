@@ -142,7 +142,7 @@ class VisualStyleIntegrationTest {
             return IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
         }
         val original = pixels()
-        rule.runOnIdle { host.value = "858AdvanceColor" }
+        rule.runOnIdle { host.value = "soft_blue" }
         assertArrayEquals("An unrelated host theme must not recolor the keyboard", original, pixels())
         rule.runOnIdle { keyboard.value = "lavender_purple" }
         assertFalse("Changing the selected keyboard theme must update its material", original.contentEquals(pixels()))

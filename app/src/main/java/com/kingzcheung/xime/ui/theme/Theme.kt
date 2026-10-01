@@ -162,7 +162,7 @@ fun XimeTheme(
         if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else {
         val surface = if (darkTheme) scheme.surfaceDark else scheme.surfaceLight
-        // A complete palette may intentionally stay dark in a light system (858AdvanceColor).
+        // Complete palettes own their surface colors; material effects do not override them.
         // Derive Material contrast from that actual surface, not the system appearance flag.
         val materialDark = if (scheme.useThemeColors) surface.luminance() < 0.5f else darkTheme
         val seed = if (materialDark) scheme.primaryDark else scheme.primaryLight

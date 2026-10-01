@@ -109,8 +109,7 @@ object KeyboardThemes {
     /** 硬编码的默认主题列表（兜底，其余主题由 xime.yaml color_schemes 提供）。 */
     private val defaultThemes = listOf(
         SoftBlueTheme.create(),
-        SoftLavenderTheme.create(),
-        Advance858Theme.create()
+        SoftLavenderTheme.create()
     )
 
     /**
@@ -130,7 +129,7 @@ object KeyboardThemes {
     fun reload(context: Context) {
         VisualStyles.current = com.kingzcheung.xime.settings.SettingsPreferences.getVisualStyle(context)
         IconAppearance.reload(context)
-        configOverrides = KeysConfigHelper.loadColorSchemes(context)
+        configOverrides = KeysConfigHelper.loadColorSchemes(context).filterKeys { it != "858AdvanceColor" }
         // 1) 对硬编码主题应用配置覆盖
         val overridden = defaultThemes.map { applyConfigOverrides(context, it) }
         // 2) 把配置中有但硬编码列表中没有的新主题也加入缓存
@@ -400,25 +399,29 @@ object KeyboardThemes {
             return DynamicThemes.create(context, scheme.id, entry.name.ifEmpty { scheme.name })
                 ?: scheme
         }
-        val primary = if (entry.primaryColor != 0L) entry.primaryColor
-        else extractImageSeedColor(context, entry)
-        val cfgColor = longToColor(primary)
+        val hasSeedOverride = entry.primaryColor != 0L ||
+            (entry.keyboardBackground?.type == "image" && !entry.keyboardBackground.src.isNullOrBlank())
+        val cfgColor = when {
+            entry.primaryColor != 0L -> longToColor(entry.primaryColor)
+            hasSeedOverride -> longToColor(extractImageSeedColor(context, entry))
+            else -> scheme.primaryLight
+        }
         val lightened = lightenColor(cfgColor)
         val global = KeysConfigHelper.getKeyboardColors()
         return scheme.copy(
             name = entry.name.ifEmpty { scheme.name },
-            specialKeyLight = entry.specialKeyBgColor?.let(::longToColor) ?: lightenColor(cfgColor, 0.8f),
-            specialKeyDark = entry.specialKeyBgColorDark?.let(::longToColor) ?: softDarkKeyContainer(lightened),
+            specialKeyLight = entry.specialKeyBgColor?.let(::longToColor) ?: if (hasSeedOverride) lightenColor(cfgColor, 0.8f) else scheme.specialKeyLight,
+            specialKeyDark = entry.specialKeyBgColorDark?.let(::longToColor) ?: if (hasSeedOverride) softDarkKeyContainer(lightened) else scheme.specialKeyDark,
             enterKeyLight = entry.enterKeyBgColor?.let(::longToColor) ?: scheme.enterKeyLight,
             enterKeyDark = entry.enterKeyBgColorDark?.let(::longToColor) ?: scheme.enterKeyDark,
             specialKeyTextColorLight = entry.specialKeyTextColor?.let(::longToColor) ?: scheme.specialKeyTextColorLight,
             specialKeyTextColorDark = entry.specialKeyTextColorDark?.let(::longToColor) ?: scheme.specialKeyTextColorDark,
-            primaryContainerLight = lightenColor(cfgColor, 0.8f),
-            primaryContainerDark = softDarkKeyContainer(lightened),
-            accentLight = cfgColor,
-            accentDark = lightened,
+            primaryContainerLight = if (hasSeedOverride) lightenColor(cfgColor, 0.8f) else scheme.primaryContainerLight,
+            primaryContainerDark = if (hasSeedOverride) softDarkKeyContainer(lightened) else scheme.primaryContainerDark,
+            accentLight = if (hasSeedOverride) cfgColor else scheme.accentLight,
+            accentDark = if (hasSeedOverride) lightened else scheme.accentDark,
             primaryLight = cfgColor,
-            primaryDark = lightened,
+            primaryDark = if (hasSeedOverride) lightened else scheme.primaryDark,
             keyboardBgLight = resolveBgColor(entry, isDark = false) ?: scheme.keyboardBgLight,
             keyboardBgDark = resolveBgColor(entry, isDark = true) ?: scheme.keyboardBgDark,
             keyBgLight = resolveKeyBgColor(entry, isDark = false) ?: if (scheme.useThemeColors) scheme.keyBgLight else longToColor(global.keyBgColor),
@@ -433,9 +436,9 @@ object KeyboardThemes {
             candidateTextColorDark = entry.candidateTextColorDark?.let { longToColor(it) }
                 ?: if (scheme.useThemeColors) scheme.candidateTextColorDark else longToColor(global.candidateTextColorDark),
             candidateSelectedTextColorLight = entry.candidateSelectedTextColor?.let { longToColor(it) }
-                ?: cfgColor,
+                ?: if (hasSeedOverride) cfgColor else scheme.candidateSelectedTextColorLight,
             candidateSelectedTextColorDark = entry.candidateSelectedTextColorDark?.let { longToColor(it) }
-                ?: lightened,
+                ?: if (hasSeedOverride) lightened else scheme.candidateSelectedTextColorDark,
             keyboardBackground = entry.keyboardBackground ?: scheme.keyboardBackground,
             keyBackground = entry.keyBackground ?: scheme.keyBackground,
             candidateBarBackground = entry.candidateBarBackground ?: scheme.candidateBarBackground,

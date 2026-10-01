@@ -72,22 +72,10 @@ class KeyboardPaletteTest {
             minOf(background.red, background.green, background.blue) < 0.06f)
     }
 
-    @Test fun advance858UsesRequestedRolesInBothLightAndDarkModes() {
-        val theme = Advance858Theme.create()
-        assertEquals("858AdvanceColor", theme.id)
-        assertEquals(theme.id, theme.name)
-        assertEquals(Color(0xFF292929), theme.keyboardBgLight)
-        assertEquals(theme.keyboardBgLight, theme.keyboardBgDark)
-        assertEquals(Color(0xFF525252), theme.keyBgLight)
-        assertEquals(theme.keyBgLight, theme.keyBgDark)
-        assertEquals(Color(0xFF6D717C), theme.specialKeyLight)
-        assertEquals(theme.specialKeyLight, theme.specialKeyDark)
-        assertEquals(Color(0xFF3F4E68), theme.enterKeyLight)
-        assertEquals(theme.enterKeyLight, theme.enterKeyDark)
-        assertEquals(Color.White, theme.keyTextColorLight)
-        assertEquals(Color.White, theme.specialKeyTextColorLight)
-        assertTrue(contrast(Color.White, theme.keyBgDark) >= 4.5f)
-        assertTrue(contrast(Color.White, theme.enterKeyDark!!) >= 4.5f)
+    @Test fun retiredThemeFallsBackToDayNightCapableDefault() {
+        assertFalse(KeyboardThemes.themes.any { it.id == "858AdvanceColor" })
+        val theme = KeyboardThemes.getThemeById("858AdvanceColor")
+        assertEquals("soft_blue", theme.id)
+        assertNotEquals(theme.keyboardBgLight, theme.keyboardBgDark)
     }
-
 }

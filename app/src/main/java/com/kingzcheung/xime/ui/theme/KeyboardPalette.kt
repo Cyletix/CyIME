@@ -98,23 +98,3 @@ object SoftLavenderTheme {
         useThemeColors = true,
     )
 }
-
-/** 用户指定的固定深色主题；跟随系统亮暗时也保留相同的键盘配色。 */
-object Advance858Theme {
-    const val ID = "858AdvanceColor"
-    fun create() = KeyboardColorScheme(
-        id = ID, name = ID,
-        specialKeyLight = Color(0xFF6D717C), specialKeyDark = Color(0xFF6D717C),
-        enterKeyLight = Color(0xFF3F4E68), enterKeyDark = Color(0xFF3F4E68),
-        accentLight = Color(0xFFC3CDDF), accentDark = Color(0xFFC3CDDF),
-        surfaceLight = Color(0xFF292929), surfaceDark = Color(0xFF292929),
-        keyboardBgLight = Color(0xFF292929), keyboardBgDark = Color(0xFF292929),
-        candidateBarBgLight = Color(0xFF292929), candidateBarBgDark = Color(0xFF292929),
-        keyBgLight = Color(0xFF525252), keyBgDark = Color(0xFF525252),
-        keyTextColorLight = Color.White, keyTextColorDark = Color.White,
-        specialKeyTextColorLight = Color.White, specialKeyTextColorDark = Color.White,
-        candidateTextColorLight = Color(0xFFE0E0E0), candidateTextColorDark = Color(0xFFE0E0E0),
-        candidateSelectedTextColorLight = Color.White, candidateSelectedTextColorDark = Color.White,
-        useThemeColors = true,
-    )
-}
