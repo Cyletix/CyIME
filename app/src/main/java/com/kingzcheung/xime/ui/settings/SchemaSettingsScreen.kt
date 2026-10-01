@@ -94,7 +94,8 @@ import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.viewmodel.LocalPackageItem
 import com.kingzcheung.xime.viewmodel.SchemaLocalViewModel
 import com.kingzcheung.xime.viewmodel.SchemaSettingsViewModel
-import com.kingzcheung.xime.ui.menubar.reorderOnLongPress
+import com.kingzcheung.xime.ui.menubar.rememberDragOrder
+import com.kingzcheung.xime.ui.menubar.dragOrderItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,13 +113,6 @@ fun SchemaSettingsContent(
     var showExtraSchemas by remember { mutableStateOf(false) }
     var englishEnabled by remember { mutableStateOf(InputLanguage.ENGLISH in LanguagePreferences.enabled(context)) }
     var modeOrderRevision by remember { mutableIntStateOf(0) }
-    var draggedModeId by remember { mutableStateOf<String?>(null) }
-    var dropTargetModeId by remember { mutableStateOf<String?>(null) }
-    var draggedOrder by remember { mutableStateOf<List<String>?>(null) }
-    var dragStartOrder by remember { mutableStateOf<List<String>?>(null) }
-    var dragDistance by remember { mutableFloatStateOf(0f) }
-    val cardHeights = remember { mutableStateMapOf<String, Int>() }
-    val cardSpacing = with(LocalDensity.current) { 8.dp.toPx() }
     // F6: 从方案市场/导入返回时自动重扫描，新装方案立即出现
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.refresh()
@@ -575,36 +569,12 @@ fun SchemaSettingsContent(
                     val savedEnabledIds = fullOrder.filter { id ->
                         (id == InputModes.ENGLISH && englishEnabled) || (id in enabledIds && id in schemaById)
                     }
-                    val orderedEnabledIds = savedEnabledIds
-                    fun dragSchema(id: String, delta: Float) {
-                        val original = dragStartOrder ?: return
-                        dragDistance += delta
-                        val centers = mutableMapOf<String, Float>()
-                        var top = 0f
-                        val fallbackHeight = (cardHeights[id] ?: return).toFloat()
-                        original.forEach { modeId ->
-                            val height = (cardHeights[modeId]?.toFloat() ?: fallbackHeight)
-                            centers[modeId] = top + height / 2f
-                            top += height + cardSpacing
-                        }
-                        val from = original.indexOf(id)
-                        val center = centers.getValue(id) + dragDistance
-                        var target = from
-                        if (dragDistance > 0f) {
-                            for (index in from + 1..original.lastIndex) {
-                                val midpoint = (centers.getValue(original[index - 1]) + centers.getValue(original[index])) / 2f
-                                if (center >= midpoint) target = index else break
-                            }
-                        } else if (dragDistance < 0f) {
-                            for (index in from - 1 downTo 0) {
-                                val midpoint = (centers.getValue(original[index]) + centers.getValue(original[index + 1])) / 2f
-                                if (center <= midpoint) target = index else break
-                            }
-                        }
-                        dropTargetModeId = original.getOrNull(target)?.takeIf { target != from }
-                        draggedOrder = original.toMutableList().apply { add(target, removeAt(from)) }
+                    val dragOrder = rememberDragOrder(savedEnabledIds) { reordered ->
+                        if (reorderEnabledModes(context, uiState.allSchemas, enabledIds, englishEnabled, reordered)) modeOrderRevision++
                     }
+                    val orderedEnabledIds = dragOrder.order
                     LazyColumn(
+                        state = dragOrder.list,
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 16.dp),
@@ -644,35 +614,9 @@ fun SchemaSettingsContent(
                                 onToggle = { if (!isEnglish) viewModel.toggleSchema(schema) },
                                 onSelect = { if (!isEnglish) viewModel.selectSchema(schema) },
                                 isBuiltIn = isEnglish,
-                                isDragging = draggedModeId == id,
-                                isDropTarget = dropTargetModeId == id,
-                                reorderModifier = Modifier
-                                    .onSizeChanged { cardHeights[id] = it.height }
-                                    .then(if (orderedEnabledIds.size > 1) Modifier.reorderOnLongPress(
-                                        onStart = {
-                                            draggedOrder = orderedEnabledIds
-                                            dragStartOrder = orderedEnabledIds
-                                            draggedModeId = id
-                                            dropTargetModeId = null
-                                            dragDistance = 0f
-                                        },
-                                        onDrag = { delta -> dragSchema(id, delta) },
-                                        onEnd = {
-                                            val reordered = draggedOrder
-                                            draggedModeId = null
-                                            dropTargetModeId = null
-                                            draggedOrder = null
-                                            dragStartOrder = null
-                                            if (reordered != null && reorderEnabledModes(context, uiState.allSchemas,
-                                                    enabledIds, englishEnabled, reordered)) modeOrderRevision++
-                                        },
-                                        onCancel = {
-                                            draggedModeId = null
-                                            dropTargetModeId = null
-                                            draggedOrder = null
-                                            dragStartOrder = null
-                                        },
-                                    ) else Modifier),
+                                isDragging = dragOrder.dragging == id,
+                                isDropTarget = false,
+                                reorderModifier = dragOrderItem(dragOrder, id, orderedEnabledIds.size > 1),
                             )
                         }
 
