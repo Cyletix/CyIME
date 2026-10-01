@@ -157,7 +157,7 @@ class OfflineEditionTest {
             val high = DeviceDefaults.supportsRefinement(fresh)
             assertEquals("predictive-text-base", SettingsPreferences.getPredictionSelectedModel(fresh))
             val asr = com.kingzcheung.xime.speech.AsrModelManager(fresh)
-            assertEquals(com.kingzcheung.xime.speech.SpeechModelCatalog.PARAFORMER, asr.getFirstPassModelId())
+            assertEquals(com.kingzcheung.xime.speech.SpeechModelCatalog.ZIPFORMER, asr.getFirstPassModelId())
             assertEquals(high, asr.isRefinementEnabled())
             assertEquals(high, SettingsPreferences.getPrefsPublic(fresh).getBoolean("key_glow_enabled", !high))
             asr.setRefinementEnabled(!high)
