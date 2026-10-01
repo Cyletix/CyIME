@@ -1,4 +1,4 @@
-# Build from the repository root, archive obsolete APKs, then print verified output paths.
+﻿# Build from the repository root, archive obsolete APKs, then print verified output paths.
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')][string]$BuildType = 'Release',
@@ -45,7 +45,11 @@ try {
     $output = Join-Path $apkRoot $kind
     $metadata = Get-Content (Join-Path $output 'output-metadata.json') -Raw | ConvertFrom-Json
     if ($metadata.applicationId -ne 'com.cyletix.cyime') { throw 'Unexpected application ID.' }
-    $files = foreach ($element in $metadata.elements) {
+    $deliveryElements = if ($BuildType -eq "Release") {
+        @($metadata.elements | Where-Object { $_.filters.identifier -contains "arm64-v8a" })
+    } else { @($metadata.elements) }
+    if ($deliveryElements.Count -eq 0) { throw "No APK matches the delivery architecture." }
+    $files = foreach ($element in $deliveryElements) {
         if ($element.versionName -ne $version -or $element.versionCode -ne $versionCode) { throw 'APK metadata version mismatch.' }
         $apk = Get-Item -LiteralPath (Join-Path $output $element.outputFile)
         if ($apk.DirectoryName -ne $output) { throw 'Unexpected APK output location.' }

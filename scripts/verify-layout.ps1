@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([int]$AdbPort = 5037, [string]$Serial = '',
     [string]$Adb = "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe")
 $ErrorActionPreference = 'Stop'
@@ -23,7 +23,8 @@ try {
     if ($LASTEXITCODE) { throw 'Layout gate: app installation failed.' }
     & $Adb -P $AdbPort -s $Serial install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
     if ($LASTEXITCODE) { throw 'Layout gate: test installation failed.' }
-    $classes = 'com.kingzcheung.xime.ui.LayoutGeometryGateTest,com.kingzcheung.xime.ui.PanelLayoutAuditTest,com.kingzcheung.xime.ui.EditKeyboardLayoutTest,com.kingzcheung.xime.ui.ExpandedCandidateLayoutTest,com.kingzcheung.xime.ui.OfflineEditionTest,com.kingzcheung.xime.ui.VisualStyleIntegrationTest,com.kingzcheung.xime.ui.IconAppearanceTest,com.kingzcheung.xime.ui.VisualLabResourcesTest,com.kingzcheung.xime.ui.LanguageSettingsOrderTest,com.kingzcheung.xime.ui.SpeechSettingsLayoutGateTest,com.kingzcheung.xime.ui.SettingsSecondaryLayoutGateTest,com.kingzcheung.xime.ui.MenuSettingsShortcutTest,com.kingzcheung.xime.ui.HandwritingToggleTest,com.kingzcheung.xime.ui.InputModeOrderTest,com.kingzcheung.xime.ui.FixedKeyboardResizeTest,com.kingzcheung.xime.ui.ResizeControlsContrastTest,com.kingzcheung.xime.ui.SettingsShortcutActivityTest'
+    $classes = 'com.kingzcheung.xime.ui.LayoutGeometryGateTest,com.kingzcheung.xime.ui.PanelLayoutAuditTest,com.kingzcheung.xime.ui.EditKeyboardLayoutTest,com.kingzcheung.xime.ui.ExpandedCandidateLayoutTest,com.kingzcheung.xime.ui.OfflineEditionTest,com.kingzcheung.xime.ui.HandwritingInkAppearanceTest,com.kingzcheung.xime.ui.VisualStyleIntegrationTest,com.kingzcheung.xime.ui.IconAppearanceTest,com.kingzcheung.xime.ui.VisualLabResourcesTest,com.kingzcheung.xime.ui.LanguageSettingsOrderTest,com.kingzcheung.xime.ui.SpeechSettingsLayoutGateTest,com.kingzcheung.xime.ui.SettingsSecondaryLayoutGateTest,com.kingzcheung.xime.ui.MenuSettingsShortcutTest,com.kingzcheung.xime.ui.HandwritingToggleTest,com.kingzcheung.xime.ui.InputModeOrderTest,com.kingzcheung.xime.ui.FixedKeyboardResizeTest,com.kingzcheung.xime.ui.ResizeControlsContrastTest,com.kingzcheung.xime.ui.SettingsShortcutActivityTest,com.kingzcheung.xime.ui.LearningDataTest'
+    $classes += ',com.kingzcheung.xime.ui.VerificationCodeLayoutTest,com.kingzcheung.xime.settings.KeyboardPaletteUpgradeTest,com.kingzcheung.xime.ui.KeyColorRolesTest'
     $expectedTests = 0
     foreach ($testClass in $classes.Split(',')) {
         $testSource = Join-Path 'app/src/androidTest/java' (($testClass -replace '\.', '/') + '.kt')

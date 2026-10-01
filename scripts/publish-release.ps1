@@ -1,10 +1,14 @@
-[CmdletBinding()]
-param([Parameter(Mandatory)][string]$NotesFile)
+﻿[CmdletBinding()]
+param([Parameter(Mandatory)][string]$NotesFile, [string]$ReleaseTag = "")
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try {
     $version = [regex]::Match((Get-Content app/build.gradle.kts -Raw), 'versionName = "([^"]+)"').Groups[1].Value
+    if (-not $ReleaseTag) { $ReleaseTag = $version }
+    if ($ReleaseTag -notmatch ("^" + [regex]::Escape($version) + "(-r[0-9]+)?$")) {
+        throw "Release tag must match the application version, optionally with a revision suffix."
+    }
     $assets = @()
     $commit = (git rev-parse HEAD).Trim()
     foreach ($edition in @('standard', 'full')) {
@@ -14,6 +18,9 @@ try {
         if ($receipt.buildType -ne 'release' -or $receipt.layoutGate -ne 'passed' -or $gate.version -ne $version -or
             $gate.bundledModels -ne ($edition -eq 'full') -or $receipt.sourceCommit -ne $commit) {
             throw "Release blocked: no matching successful gate for $edition."
+        }
+        if (@($receipt.files).Count -ne 1 -or $receipt.files[0].path -notlike "*-arm64-v8a.apk") {
+            throw "Release blocked: each edition must contain exactly one ARM64 delivery APK."
         }
         foreach ($item in $receipt.files) {
             if ((Get-FileHash -LiteralPath $item.path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $item.sha256) {
@@ -33,6 +40,6 @@ try {
         & git -C $source[0] apply --reverse --check (Join-Path $root "patches/$($source[1])")
         if ($LASTEXITCODE) { throw "Release blocked: source patch does not match $($source[0])" }
     }
-    & gh release create $version @assets --target $commit --title "CyIME $version" --notes-file $NotesFile --latest
+    & gh release create $ReleaseTag @assets --target $commit --title "CyIME $ReleaseTag" --notes-file $NotesFile --latest
     if ($LASTEXITCODE) { throw 'GitHub release failed.' }
 } finally { Pop-Location }
