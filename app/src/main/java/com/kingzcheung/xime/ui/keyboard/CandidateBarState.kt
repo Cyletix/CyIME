@@ -28,6 +28,7 @@ sealed interface CandidateBarState {
 
     data class ClipboardDisplay(
         val candidates: List<String> = emptyList(),
+        val smsVerificationCode: String? = null,
     ) : CandidateBarState
 
     data class Calculator(
@@ -48,13 +49,14 @@ sealed interface CandidateBarState {
             isShowingRecentClipboard: Boolean,
             hasNextPage: Boolean,
             isCalculatorActive: Boolean = false,
+            smsVerificationCode: String? = null,
         ): CandidateBarState {
             val hasCandidates = candidates.isNotEmpty()
             val hasAssociations = associationCandidates.isNotEmpty()
             val hasInput = inputText.isNotEmpty()
             return when {
                 isShowingRecentClipboard && hasCandidates ->
-                    ClipboardDisplay(candidates = candidates)
+                    ClipboardDisplay(candidates = candidates, smsVerificationCode = smsVerificationCode)
                 isCalculatorActive && hasCandidates ->
                     Calculator(candidates = candidates, comments = candidateComments)
                 isComposing && (hasCandidates || hasInput) ->

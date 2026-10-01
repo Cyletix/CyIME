@@ -5,6 +5,10 @@ import android.content.SharedPreferences
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 
 object SettingsPreferences {
+    fun isSmsCodeEnabled(context: Context): Boolean = getPrefs(context).getBoolean("sms_code_enabled", false)
+    fun setSmsCodeEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean("sms_code_enabled", enabled).apply()
+    }
     private const val PREFS_NAME = "kime_settings"
     const val KEY_ROUNDED_KEYBOARD_BOTTOM = "rounded_keyboard_bottom"
     fun roundedKeyboardBottom(context: Context): Boolean =

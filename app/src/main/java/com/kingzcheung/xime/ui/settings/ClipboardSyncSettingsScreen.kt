@@ -108,6 +108,7 @@ fun ClipboardSyncSettingsContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            VerificationCodeSettings()
             PluginSetupCard("剪贴板同步", onNavigateToPluginMarket, onNavigateToPlugins)
             SettingsSection(title = "同步服务", content = {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {

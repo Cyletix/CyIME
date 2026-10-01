@@ -500,7 +500,7 @@ fun KeyboardView(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
                 state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
-                railExpanded, expandedDataMode, isHandwritingPage,
+                railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode,
             ) {
                 if (showHandwritingCandidates) {
                     CandidateBarState.AssociationOnly(
@@ -525,6 +525,7 @@ fun KeyboardView(
                         isShowingRecentClipboard = cs.isShowingRecentClipboard,
                         hasNextPage = cs.hasNextPage,
                         isCalculatorActive = state.isCalculatorMode,
+                        smsVerificationCode = cs.smsVerificationCode,
                     )
                 }
             }
@@ -695,6 +696,7 @@ fun KeyboardView(
                         callbacks.onDismissClipboardPreview?.invoke()
                         viewModel.showOverlay(OverlayRoute.Clipboard(0))
                     },
+                    onVerificationCodeSelect = callbacks.onVerificationCodeSelect,
                     onCandidateSelect = select@{ index ->
                         if (!showHandwritingCandidates && !callbacks.isCandidateSnapshotCurrent(cs)) return@select
                         closePreeditEditor()

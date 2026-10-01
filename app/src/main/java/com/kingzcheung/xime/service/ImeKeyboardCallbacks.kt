@@ -82,6 +82,7 @@ internal fun rememberImeKeyboardCallbacks(
                 } else service.schemaController.handleJapaneseKanaAction(action)
             },
             onKeyPressDown = { key ->
+                service.cancelVerificationCodeInput()
                 service.predictionManager.invalidatePendingPredictions()
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },
@@ -167,6 +168,7 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onClipboardSelect = { text -> service.textCommit.selectClipboardItem(text) },
+            onVerificationCodeSelect = { code, sequential -> service.fillVerificationCode(code, sequential) },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             onCommitText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text) },
             onCommitExactText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text, preserveWidth = true) },

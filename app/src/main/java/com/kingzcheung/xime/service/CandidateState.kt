@@ -24,7 +24,8 @@ data class CandidateState(
     val expandedCandidatesLoaded: Boolean = false,
     /** Identity of the native candidate list, independent of displayed preedit text. */
     val engineRevision: Long = 0L,
-    val traceEventId: Int = 0
+    val traceEventId: Int = 0,
+    val smsVerificationCode: String? = null,
 )
 
 /** Appending expanded pages or updating suggestions does not change existing candidate identities. */

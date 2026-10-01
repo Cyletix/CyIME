@@ -393,7 +393,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.Sync,
                         title = "剪贴板同步",
-                        subtitle = "通过插件将剪贴板与远端设备双向同步",
+                        subtitle = "验证码提取、短信自动复制与远端设备同步",
                         onClick = onNavigateToClipboardSync,
                         showArrow = true
                     )
