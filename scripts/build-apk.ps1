@@ -46,7 +46,7 @@ try {
     $metadata = Get-Content (Join-Path $output 'output-metadata.json') -Raw | ConvertFrom-Json
     if ($metadata.applicationId -ne 'com.cyletix.cyime') { throw 'Unexpected application ID.' }
     $deliveryElements = if ($BuildType -eq "Release") {
-        @($metadata.elements | Where-Object { $_.filters.identifier -contains "arm64-v8a" })
+        @($metadata.elements | Where-Object { @($_.filters | Where-Object { $_.filterType -eq "ABI" -and $_.value -eq "arm64-v8a" }).Count -eq 1 })
     } else { @($metadata.elements) }
     if ($deliveryElements.Count -eq 0) { throw "No APK matches the delivery architecture." }
     $files = foreach ($element in $deliveryElements) {

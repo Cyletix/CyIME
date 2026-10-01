@@ -2,7 +2,6 @@
 gradle.beforeProject { p ->
     if (p.path == ':app') p.afterEvaluate {
         p.android.defaultConfig.ndk.abiFilters.clear()
-        p.android.defaultConfig.ndk.abiFilters.addAll(['arm64-v8a', 'x86_64'])
         p.android.splits.abi.reset()
         p.android.splits.abi.include('arm64-v8a', 'x86_64')
         p.android.splits.abi.universalApk = false
