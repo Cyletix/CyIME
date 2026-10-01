@@ -35,14 +35,17 @@ class HandwritingInkAppearanceTest {
         val cases = listOf(Triple("soft_blue", false, false), Triple("soft_blue", true, false),
             Triple("lavender_purple", false, false), Triple("lavender_purple", true, false),
             Triple("lavender_purple", true, true))
+        val samples = cases + cases.takeLast(3)
         val metrics = mutableListOf<String>()
         rule.setContent {
-            val (id, dark, complex) = cases[index.intValue]
+            val (id, dark, complex) = samples[index.intValue]
+            val phone = index.intValue >= cases.size
+            val density = if (phone) 2.75f else 1f
             val palette = resolveKeyboardPalette(id, dark)
-            CompositionLocalProvider(LocalDensity provides Density(1f), LocalKeyboardPalette provides palette,
+            CompositionLocalProvider(LocalDensity provides Density(density), LocalKeyboardPalette provides palette,
                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(handwritingPauseSeconds = 2.5f)) {
                 MaterialTheme {
-                    Box(Modifier.requiredSize(620.dp, 360.dp).background(palette.background).testTag("ink-host")) {
+                    Box(Modifier.requiredSize(if(phone) 384.dp else 620.dp, if(phone) 300.dp else 360.dp).background(palette.background).testTag("ink-host")) {
                         if (complex) Canvas(Modifier.fillMaxSize()) {
                             drawRect(Brush.linearGradient(listOf(Color.Black, Color.White, Color(0xFFBD713C), Color(0xFF153E54))))
                             for (x in 0..12) for (y in 0..7) if ((x+y)%2 == 0)
@@ -58,40 +61,59 @@ class HandwritingInkAppearanceTest {
             }
         }
         val context = ApplicationProvider.getApplicationContext<Context>()
-        for (i in cases.indices) {
+        for (i in samples.indices) {
             rule.runOnIdle { index.intValue=i }
             rule.waitForIdle()
             rule.mainClock.autoAdvance=false
-            // Real pointer strokes for 中, not a bitmap or a different preview renderer.
+            val paper = rule.onNodeWithTag("ink-host").captureToImage().toPixelMap()
+            // Continuous pointer paths for handwritten 手写, including bends and hooks.
             rule.onNodeWithTag("handwriting-canvas").performTouchInput {
                 fun stroke(vararg points: Pair<Float,Float>) {
                     val first=points.first(); down(Offset(width*first.first,height*first.second))
-                    points.drop(1).forEach { (x,y) -> moveTo(Offset(width*x,height*y), 70) }
-                    up(); advanceEventTime(35)
+                    var last=first
+                    points.drop(1).forEach { point ->
+                        // Feed intermediate touch samples as a real drag, not disconnected endpoints.
+                        for (step in 1..6) {
+                            val t=step/6f
+                            moveTo(Offset(width*(last.first+(point.first-last.first)*t),
+                                height*(last.second+(point.second-last.second)*t)), 12)
+                        }
+                        last=point
+                    }
+                    up(); advanceEventTime(50)
                 }
-                stroke(.30f to .30f,.30f to .66f)
-                stroke(.30f to .30f,.68f to .30f,.68f to .66f)
-                stroke(.30f to .66f,.68f to .66f)
-                stroke(.49f to .14f,.49f to .84f)
+                stroke(.32f to .23f,.27f to .26f,.21f to .285f,.155f to .295f)
+                stroke(.155f to .39f,.22f to .382f,.30f to .375f)
+                stroke(.12f to .525f,.20f to .515f,.29f to .51f,.355f to .505f)
+                stroke(.255f to .285f,.252f to .40f,.256f to .55f,.255f to .69f,.245f to .76f,.224f to .718f)
+                stroke(.475f to .225f,.495f to .28f)
+                stroke(.445f to .335f,.54f to .326f,.63f to .32f,.655f to .34f,.635f to .405f)
+                stroke(.515f to .445f,.595f to .437f)
+                stroke(.484f to .432f,.468f to .515f,.463f to .542f,.54f to .535f,.627f to .53f,
+                    .62f to .625f,.607f to .725f,.583f to .77f,.554f to .736f)
+                stroke(.427f to .656f,.505f to .647f,.58f to .641f,.65f to .638f)
             }
             rule.mainClock.advanceTimeByFrame()
             val image = rule.onNodeWithTag("ink-host").captureToImage()
-            val (id,dark,complex)=cases[i]
+            val (id,dark,complex)=samples[i]
+            val density = if(i >= cases.size) 2.75f else 1f
             val palette=resolveKeyboardPalette(id,dark)
             val ink=handwritingInk(palette.accent,palette.background)
             val ratio=contrast(ink,palette.background)
             assertTrue("$id dark=$dark contrast=$ratio",ratio >= 4.499f)
             val pixels=image.toPixelMap()
             var matching=0
-            for(y in 0 until pixels.height) for(x in 0 until pixels.width) {
-                val c=pixels[x,y]
-                if(kotlin.math.abs(c.red-ink.red)<.015f && kotlin.math.abs(c.green-ink.green)<.015f && kotlin.math.abs(c.blue-ink.blue)<.015f) matching++
+            // Compare with the same panel before writing; unchanged controls cannot satisfy this assertion.
+            for(y in 0 until image.height) for(x in 0 until image.width) {
+                val c=pixels[x,y]; val old=paper[x,y]
+                if(kotlin.math.abs(c.red-old.red)+kotlin.math.abs(c.green-old.green)+kotlin.math.abs(c.blue-old.blue)>.08f) matching++
             }
-            assertTrue("Actual pointer ink must use accent: $id/$dark/$complex", matching>500)
+            val changedAreaDp = matching / (density * density)
+            assertTrue("Continuous pen should be visible and slim: $id/$dark/$complex ($changedAreaDp)", changedAreaDp in 300f..6000f)
             File(context.getExternalFilesDir(null),"handwriting-$i.png").outputStream().use {
                 image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)
             }
-            metrics += "$id,dark=$dark,complex=$complex,contrast=$ratio,corePixels=$matching"
+            metrics += "$id,dark=$dark,complex=$complex,density=$density,opaqueInkContrast=$ratio,changedAreaDp=$changedAreaDp"
             rule.mainClock.autoAdvance=true
         }
         File(context.getExternalFilesDir(null),"handwriting-contrast.txt").writeText(metrics.joinToString("\n"))

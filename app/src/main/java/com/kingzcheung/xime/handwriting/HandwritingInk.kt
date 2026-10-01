@@ -29,7 +29,7 @@ fun handwritingInk(preferred: Color, background: Color): Color {
     return lerp(opaque, target, high)
 }
 
-/** Full-screen paper is transparent; its unknown host is protected by the stroke keylines. */
+/** Full-screen paper is transparent; its unknown host receives a narrow translucent separation layer. */
 @Composable
 internal fun rememberHandwritingInk(background: Color): Color {
     val palette = LocalKeyboardPalette.current

@@ -94,24 +94,47 @@ class OfflineEditionTest {
         assertTrue("真实笔迹应明显区别于白纸", pixels[pixels.width / 2, pixels.height / 2].red < .2f)
     }
 
-    @Test fun handwritingOutlineSurvivesATransparentCanvasOverEitherSurface() {
-        val background = mutableStateOf(Color.White)
-        val ink = mutableStateOf(Color.White)
+    @Test fun handwritingPenHasBoundedWidthAndTransparentGradientWithoutDarkRim() {
         rule.setContent {
-            Canvas(Modifier.size(160.dp).background(background.value).testTag("outlined-ink")) {
-                renderStrokes(listOf(listOf(StrokePoint(size.width / 2, size.height / 2))), emptyList(), ink.value)
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                Canvas(Modifier.size(160.dp).background(Color.White).testTag("pen")) {
+                    renderStrokes(listOf(listOf(StrokePoint(20f,80f),StrokePoint(140f,80f))),
+                        emptyList(), Color(0xFF685191))
+                }
             }
         }
-        fun pixels() = rule.onNodeWithTag("outlined-ink").captureToImage().toPixelMap()
-        val light = pixels()
-        assertTrue("白底白色笔画需要黑色外缘", (19..40).any {
-            light[light.width / 2, light.height / 2 + it].red < .25f
-        })
-        rule.runOnIdle { background.value = Color.Black; ink.value = Color.Black }
-        val dark = pixels()
-        assertTrue("黑底黑色笔画需要白色外缘", (19..40).any {
-            dark[dark.width / 2, dark.height / 2 + it].red > .75f
-        })
+        val pixels = rule.onNodeWithTag("pen").captureToImage().toPixelMap()
+        fun changed(x: Int) = (0 until pixels.height).count { pixels[x,it].green < .99f }
+        assertTrue("Pen including its translucent shoulder must stay below 6 pixels at density 1", changed(80) in 3..6)
+        assertTrue("Start must not turn into a broad dot", changed(20) <= 6)
+        assertTrue("Ink should fade toward its start", pixels[24,80].green > pixels[80,80].green + .08f)
+        for (y in 0 until pixels.height) for (x in 0 until pixels.width) {
+            assertTrue("No opaque black rim", pixels[x,y].green >= .30f)
+        }
+    }
+
+    @Test fun diagonalPenHasAntialiasedEdgesAtPhoneDensity() {
+        val scale = 2.75f
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(scale)) {
+                Canvas(Modifier.size(160.dp).background(Color.White).testTag("diagonal-pen")) {
+                    renderStrokes(listOf(listOf(StrokePoint(20.dp.toPx(),20.dp.toPx()),
+                        StrokePoint(140.dp.toPx(),110.dp.toPx()))), emptyList(), Color.Black)
+                }
+            }
+        }
+        val pixels = rule.onNodeWithTag("diagonal-pen").captureToImage().toPixelMap()
+        val edgeShades = mutableSetOf<Int>()
+        // Sample the outer shoulder, away from the gradient-filled core and rounded caps.
+        // A non-antialiased rasterizer leaves one flat shoulder shade, not coverage levels.
+        for (x in 130 until 310) for (y in 70 until 310) {
+            val distance = kotlin.math.abs(.6f*(x+.5f-20f*scale)-.8f*(y+.5f-20f*scale))
+            if (distance in (2.1f*scale)..(2.7f*scale)) {
+                val level=(pixels[x,y].green*255).toInt()
+                if(level in 222..252) edgeShades += level
+            }
+        }
+        assertTrue("Slanted edge should contain multiple subpixel coverage levels: $edgeShades", edgeShades.size >= 8)
     }
 
     @Test fun offlineEditionInstallsEveryModelAndDoesNotResetLaterChoices() = runBlocking {

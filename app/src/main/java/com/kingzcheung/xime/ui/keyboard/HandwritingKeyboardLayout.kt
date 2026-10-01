@@ -132,7 +132,7 @@ fun HandwritingKeyboardLayout(
                         } finally { session.end(token, cancelled = !released) }
                     }
                 }) {
-                renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), inkColor)
+                renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), inkColor, transparentPaper = expanded)
             }
                 }
                 if (!expanded) Column(Modifier.width(functionKeyWidth).fillMaxHeight().testTag("handwriting-side-keys")) {
