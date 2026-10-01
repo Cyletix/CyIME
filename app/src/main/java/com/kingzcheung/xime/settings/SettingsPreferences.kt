@@ -392,7 +392,12 @@ object SettingsPreferences {
     }
 
     fun getKeyboardTheme(context: Context): String {
-        return getPrefs(context).getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
+        val stored = getPrefs(context).getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
+        if (stored == "858AdvanceColor") {
+            setKeyboardTheme(context, defaultKeyboardTheme)
+            return defaultKeyboardTheme
+        }
+        return stored
     }
 
     const val KEY_VISUAL_STYLE = "cyime_visual_style"

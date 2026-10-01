@@ -49,30 +49,31 @@ class KeyboardPaletteUpgradeTest {
         assertEquals(Color(0xFF102030), theme.keyboardBgDark)
         assertEquals(Color(0xFF304050), theme.keyBgDark)
     }
-    @Test fun advance858AssetRolesMatchFallbackAndRemainAvailableWithoutChangingDefault() {
-        KeysConfigHelper.loadConfig(context)
-        KeyboardThemes.reload(context)
-        for (dark in listOf(false, true)) {
-            assertEquals(Color(0xFF6D717C), KeyboardThemes.getSpecialKeyColor("858AdvanceColor", dark))
-            assertEquals(Color(0xFF3F4E68), KeyboardThemes.getEnterKeyColor("858AdvanceColor", dark))
-            assertEquals(Color(0xFF525252), KeyboardThemes.getKeyBgColorOverride("858AdvanceColor", dark))
-            assertEquals(Color.White, KeyboardThemes.getSpecialKeyTextColor("858AdvanceColor", dark))
-            assertEquals(Color.White, KeyboardThemes.getKeyTextColorOverride("858AdvanceColor", dark))
-        }
-        assertEquals("soft_blue", KeyboardThemes.themes.first().id)
-    }
-
-    @Test fun customEnterColorOverridesOnlyEnterRole() {
+    @Test fun removedThemeCannotReturnFromOldDeployedConfig() {
         File(folder, "rime/xime.custom.yaml").writeText("""
             color_schemes:
               858AdvanceColor:
+                name: "858AdvanceColor"
+                primary_color: 0xC3CDDF
+        """.trimIndent())
+        KeysConfigHelper.loadConfig(context)
+        KeyboardThemes.reload(context)
+        assertFalse(KeyboardThemes.themes.any { it.id == "858AdvanceColor" })
+        assertEquals("soft_blue", KeyboardThemes.getThemeById("858AdvanceColor").id)
+    }
+
+    @Test fun customEnterColorOverridesOnlyEnterRole() {
+        KeysConfigHelper.loadConfig(context)
+        KeyboardThemes.reload(context)
+        val before = KeyboardThemes.getSpecialKeyColor("soft_blue", true)
+        File(folder, "rime/xime.custom.yaml").writeText("""
+            color_schemes:
+              soft_blue:
                 enter_key_bg_color_dark: 0xFF112233
         """.trimIndent())
         KeysConfigHelper.loadConfig(context)
         KeyboardThemes.reload(context)
-        assertEquals(Color(0xFF112233), KeyboardThemes.getEnterKeyColor("858AdvanceColor", true))
-        assertEquals(Color(0xFF3F4E68), KeyboardThemes.getEnterKeyColor("858AdvanceColor", false))
-        assertEquals(Color(0xFF6D717C), KeyboardThemes.getSpecialKeyColor("858AdvanceColor", true))
+        assertEquals(Color(0xFF112233), KeyboardThemes.getEnterKeyColor("soft_blue", true))
+        assertEquals(before, KeyboardThemes.getSpecialKeyColor("soft_blue", true))
     }
-
 }
