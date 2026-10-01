@@ -6,15 +6,19 @@
 #include <rime/dict/reverse_lookup_dictionary.h>
 #include <rime/service.h>
 #include <rime/schema.h>
+#include <rime/config/config_data.h>
 #include <rime/context.h>
 #include <rime/candidate.h>
 #include <rime/menu.h>
+#include <rime/gear/translator_commons.h>
+#include "candidate_policy.h"
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
 #include "t9_digit_userdict.h"
 #include <jni.h>
 #include <android/log.h>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <unistd.h>  // for usleep
@@ -127,6 +131,7 @@ public:
         LOGI("Rime setup completed");
         
         rime->initialize(&traits);
+        cyime::InitializeCandidatePolicy(user_data_dir_);
         LOGI("Rime initialize completed");
         initialized_ = true;
         
@@ -447,8 +452,18 @@ public:
         for (size_t i = 0; i < limit && i < menu->candidate_count(); ++i) {
             auto c = menu->GetCandidateAt(i);
             if (!c) break;
-            rows.push_back({c->text(), c->comment(), rime::Candidate::GetGenuineCandidate(c)->type(), std::to_string(c->quality()),
-                            std::to_string(i), std::to_string(c->start()), std::to_string(c->end())});
+            auto genuine = rime::Candidate::GetGenuineCandidate(c);
+            auto phrase = rime::As<rime::Phrase>(genuine);
+            auto sentence = rime::As<rime::Sentence>(genuine);
+            std::string components;
+            if (sentence) for (const auto& entry : sentence->components()) {
+                if (!components.empty()) components += "|";
+                components += entry.text + ":" + std::to_string(entry.weight);
+            }
+            rows.push_back({c->text(), c->comment(), genuine->type(), std::to_string(c->quality()),
+                            std::to_string(i), std::to_string(c->start()), std::to_string(c->end()),
+                            phrase ? std::to_string(phrase->weight()) : "",
+                            phrase ? std::to_string(phrase->code().size()) : "", components});
         }
         return rows;
     }
@@ -493,7 +508,15 @@ public:
     // librime 对 Phrase 候选执行 userdb tombstone（UpdateEntry -1），
     // 即自造词/调频词删除；非用户词由 rime 侧自行判定，无副作用。
     bool deleteCandidateOnCurrentPage(int index) {
-        if (!rime || !session_id_) return false;
+        if (!rime || !session_id_ || index < 0) return false;
+        auto session = rime::Service::instance().GetSession(session_id_);
+        if (session && session->context() && !session->context()->composition().empty()) {
+            int size = 5;
+            session->schema()->config()->GetInt("menu/page_size", &size);
+            auto& segment = session->context()->composition().back();
+            return deleteCandidateByGlobalIndex(
+                (segment.selected_index / std::max(1, size)) * std::max(1, size) + index);
+        }
         return rime->delete_candidate_on_current_page(session_id_, index);
     }
 
@@ -503,6 +526,19 @@ public:
         if (!rime || !session_id_ || index < 0) {
             LOGD("deleteCandidateByGlobalIndex: invalid state, index=%d", index);
             return false;
+        }
+        auto session = rime::Service::instance().GetSession(session_id_);
+        bool policy = false;
+        if (session) session->schema()->config()->GetBool("cyime/candidate_policy", &policy);
+        if (policy && session->context() && !session->context()->composition().empty()) {
+            auto* context = session->context();
+            auto menu = context->composition().back().menu;
+            auto candidate = menu ? menu->GetCandidateAt(static_cast<size_t>(index)) : nullptr;
+            if (!candidate || !cyime::HideCandidate(candidate->text())) return false;
+            // Persist first. Never report success on failed storage, and do not
+            // erase unrelated learning entries when the action means "hide".
+            context->RefreshNonConfirmedComposition();
+            return true;
         }
         bool result = rime->delete_candidate(session_id_, static_cast<size_t>(index));
         LOGD("deleteCandidateByGlobalIndex: index=%d -> %d", index, result ? 1 : 0);
@@ -1717,6 +1753,30 @@ static std::string StripLinesContaining(const std::string& text,
     return result;
 }
 
+// A dictionary pack is a Rime resource, not necessarily a generated user_* pack.
+// Parse the YAML list before applying the legacy malformed-name migration, so
+// ordinary named packs, block lists and an explicit empty list remain untouched.
+static std::optional<std::vector<std::string>> ConfiguredDictionaryPacks(
+    const std::string& yaml) {
+    rime::ConfigData config;
+    std::istringstream input(yaml);
+    if (!config.LoadFromStream(input)) return std::nullopt;
+    auto root = rime::As<rime::ConfigMap>(config.root);
+    auto patch = root ? rime::As<rime::ConfigMap>(root->Get("patch")) : nullptr;
+    auto packs = patch ? rime::As<rime::ConfigList>(patch->Get("translator/packs")) : nullptr;
+    if (!packs) return std::nullopt;
+    std::vector<std::string> names;
+    for (const auto& item : *packs) {
+        auto value = rime::As<rime::ConfigValue>(item);
+        if (!value || value->str().empty()) return std::nullopt;
+        const auto& name = value->str();
+        // Only the known broken legacy user_ token is eligible for migration.
+        if (name == "user_" || name.find('"') != std::string::npos) return std::nullopt;
+        names.push_back(name);
+    }
+    return names;
+}
+
 // 确保 T9 方案 schema 补丁已注入到 custom.yaml（幂等）。
 //   - 判定 T9 方案：schema_id 含 "t9"，或 schema.yaml 的 schema_id 字段含 "t9"。
 //   - 补齐缺失组件：t9_processor / t9_filter / t9_date_translator /
@@ -1826,7 +1886,10 @@ static jboolean DoEnsureT9SchemaPatches(
     const std::string packs_name = "user_" + rime::t9_patch_utils::SanitizePackName(schema);
     bool need_packs_patch = false;
     std::string actual_pack_name;  // 实际生效的个人词库名（用于词库编译判定）
-    if (!packs_name.empty()) {
+    const auto configured_packs = ConfiguredDictionaryPacks(existing_content);
+    if (configured_packs) {
+        if (!configured_packs->empty()) actual_pack_name = configured_packs->front();
+    } else if (!packs_name.empty()) {
         switch (rime::t9_patch_utils::EvaluatePacksState(existing_content, &actual_pack_name)) {
           case rime::t9_patch_utils::PacksState::kKeep:
           case rime::t9_patch_utils::PacksState::kMissing:

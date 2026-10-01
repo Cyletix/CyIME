@@ -74,6 +74,7 @@ engine:
     - script_translator
     - table_translator@t9_english
   filters:
+    - cyime_candidate_policy
     - t9_filter
     - uniquifier
 
@@ -108,13 +109,19 @@ speller:
 
 translator:
   dictionary: rime_ice
-  max_sentences: 3
+  # Multiple terminal initials must reach composition scoring (t can be ta/tai/tian).
+  # The existing numeric search beam bounds hypotheses; direct word lookup is unchanged.
+  max_sentences: 8
+  max_homophones: 8
   prism: t9_pinyin
   spelling_hints: 100
   always_show_comments: true
   comment_format: []
   preedit_format:
     - xlit/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/
+
+cyime:
+  candidate_policy: true
 
 punctuator:
   import_preset: default

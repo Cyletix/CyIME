@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.18.0)
 # librime JNI 库
 add_library(rime_jni SHARED
     rime_jni.cc
+    candidate_policy.cc
 )
 
 # 日志开关：Debug 构建保留 verbose 日志（支持运行时切换），

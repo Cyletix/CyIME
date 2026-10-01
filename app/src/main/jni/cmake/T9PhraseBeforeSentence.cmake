@@ -53,7 +53,6 @@ iter_incremented:
 
   if (!sentences_.empty() &&
       (!t9_numeric_input ||
-       (max_sentences_ > 1 && max_sentences_ <= 8 && candidate_index_ >= 3) ||
        (!has_full_user_phrase && !has_full_sys_phrase))) {
     candidate_source_ = kSentence;
     candidate_ = sentences_[0];
@@ -91,6 +90,26 @@ if(T9_GATE_POS EQUAL -1)
 endif()
 string(REPLACE "${T9_SENTENCE_GATE_OLD}" "${T9_SENTENCE_GATE_NEW}"
        T9_SCRIPT_TRANSLATOR_CODE "${T9_SCRIPT_TRANSLATOR_CODE}")
+# The extra numeric sentence beam is deliberately bounded to the same 6..24
+# range as the recall gate above. Outside that range keep the ordinary best
+# composition; exact dictionary lookup and input length remain unrestricted.
+set(T9_EVALUATE_OLD [=[bool ScriptTranslation::Evaluate(Dictionary* dict, UserDictionary* user_dict) {
+  size_t consumed]=])
+set(T9_EVALUATE_NEW [=[bool ScriptTranslation::Evaluate(Dictionary* dict, UserDictionary* user_dict) {
+  const auto& query_input = syllabifier_->input();
+  if (!query_input.empty() &&
+      query_input.find_first_not_of("23456789' ") == std::string::npos &&
+      (query_input.size() < 6 || query_input.size() > 24)) {
+    max_sentences_ = 1;
+  }
+  size_t consumed]=])
+string(FIND "${T9_SCRIPT_TRANSLATOR_CODE}" "${T9_EVALUATE_OLD}" T9_EVALUATE_POS)
+if(T9_EVALUATE_POS EQUAL -1)
+  message(FATAL_ERROR "librime evaluation changed: review bounded sentence beam")
+endif()
+string(REPLACE "${T9_EVALUATE_OLD}" "${T9_EVALUATE_NEW}"
+       T9_SCRIPT_TRANSLATOR_CODE "${T9_SCRIPT_TRANSLATOR_CODE}")
+
 # Deferred sentences must remain accessible even after the final dictionary phrase.
 string(REPLACE "set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_"
        T9_SCRIPT_TRANSLATOR_CODE "${T9_SCRIPT_TRANSLATOR_CODE}")
