@@ -74,32 +74,6 @@ fun KeyEffectSettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                SettingsSection(title = "按键光效", content = {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("键内炫光", style = MaterialTheme.typography.bodyLarge)
-                                Text("开启后显示半秒渐变光效与轻微按压动画。老人版首次按设备配置设置，可随时修改。", style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(checked = uiState.keyGlowEnabled, onCheckedChange = viewModel::setKeyGlowEnabled)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Text("点按下方按键预览", style = MaterialTheme.typography.labelMedium)
-                        CompositionLocalProvider(LocalKeyboardInputPreferences provides rememberKeyboardInputPreferences()) {
-                            Row(Modifier.fillMaxWidth().height(56.dp)) {
-                                listOf("A", "あ", "123").forEach { label ->
-                                    KeyButton(label, {}, MaterialTheme.colorScheme.secondaryContainer,
-                                        MaterialTheme.colorScheme.onSecondaryContainer, Modifier.weight(1f))
-                                }
-                                ActionKeyButton("删除", {}, MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
-                            }
-                        }
-                    }
-                })
-            }
-            item {
                 SettingsSection(title = "按键音效", content = {
                     Row(
                         modifier = Modifier
@@ -362,6 +336,32 @@ fun KeyEffectSettingsContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                         )
+                    }
+                })
+            }
+            item {
+                SettingsSection(title = "按键光效", content = {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("键内炫光", style = MaterialTheme.typography.bodyLarge)
+                                Text("开启后显示半秒渐变光效与轻微按压动画。老人版首次按设备配置设置，可随时修改。", style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(checked = uiState.keyGlowEnabled, onCheckedChange = viewModel::setKeyGlowEnabled)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text("点按下方按键预览", style = MaterialTheme.typography.labelMedium)
+                        CompositionLocalProvider(LocalKeyboardInputPreferences provides rememberKeyboardInputPreferences()) {
+                            Row(Modifier.fillMaxWidth().height(56.dp)) {
+                                listOf("A", "あ", "123").forEach { label ->
+                                    KeyButton(label, {}, MaterialTheme.colorScheme.secondaryContainer,
+                                        MaterialTheme.colorScheme.onSecondaryContainer, Modifier.weight(1f))
+                                }
+                                ActionKeyButton("删除", {}, MaterialTheme.colorScheme.primaryContainer,
+                                    MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
+                            }
+                        }
                     }
                 })
             }

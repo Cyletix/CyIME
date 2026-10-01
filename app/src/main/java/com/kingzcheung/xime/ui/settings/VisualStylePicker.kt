@@ -31,7 +31,7 @@ internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) ->
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("视觉样式", style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary)
-        Text("只改变材质。明暗、配色和背景始终跟随下方的主题设置。",
+        Text("只改变材质。明暗、配色和背景始终跟随主题设置。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         VisualStyle.entries.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -60,18 +60,6 @@ internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) ->
                                     .background(key)
                                     .visualMaterial(style, 8.dp), contentAlignment = Alignment.Center) {
                                     Text(label, color = ink, fontSize = 16.sp)
-                                }
-                            }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            listOf("Z", "X", "↵").forEach { label ->
-                                Box(Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(8.dp))
-                                    .background(if (label == "↵") keyboard?.enter ?: palette.primaryContainer else key)
-                                    .visualMaterial(style, 8.dp,
-                                        level = if (label == "↵") MaterialLevel.RAISED else MaterialLevel.BASE),
-                                    contentAlignment = Alignment.Center) {
-                                    Text(label, color = if (label == "↵") keyboard?.functionText ?: ink else ink,
-                                        fontSize = 16.sp)
                                 }
                             }
                         }

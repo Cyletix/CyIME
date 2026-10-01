@@ -892,6 +892,7 @@ fun KeyboardThemeCard(
     modifier: Modifier = Modifier,
     title: String? = null,
     previewDark: Boolean? = null,
+    previewAspectRatio: Float = 1.75f,
 ) {
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
@@ -905,7 +906,7 @@ fun KeyboardThemeCard(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1.3f)
+                .aspectRatio(previewAspectRatio)
                 .then(
                     if (isSelected) {
                         Modifier.border(

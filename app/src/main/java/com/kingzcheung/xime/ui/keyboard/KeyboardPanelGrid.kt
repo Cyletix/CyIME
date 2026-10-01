@@ -18,12 +18,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun <T> KeyboardPanelGrid(
     items: List<T>, isLandscape: Boolean, textColor: Color, pagerTag: String,
-    modifier: Modifier = Modifier, compactCards: Boolean = false, content: @Composable (T, Modifier) -> Unit,
+    modifier: Modifier = Modifier, compactCards: Boolean = false, preferSinglePage: Boolean = false, content: @Composable (T, Modifier) -> Unit,
 ) {
     if (items.isEmpty()) return
     BoxWithConstraints(modifier.padding(horizontal = if (isLandscape) 16.dp else 12.dp, vertical = 8.dp)) {
         val twoRowModes = compactCards && items.size > 2 && maxHeight >= 240.dp
-        val minimumRowHeight = (34 + 28 * LocalDensity.current.fontScale).dp
+        val minimumRowHeight = (34 + (if (preferSinglePage && LocalDensity.current.fontScale <= 1.3f) 14 else 28) * LocalDensity.current.fontScale).dp
         val lowWidePanel = maxWidth >= 560.dp && maxHeight < minimumRowHeight * 2 + 24.dp
         val menuColumns = ((maxWidth.value + 8f) / (64f * LocalDensity.current.fontScale + 8f))
             .toInt().coerceIn(1, if (lowWidePanel) 8 else 4)
@@ -31,7 +31,7 @@ internal fun <T> KeyboardPanelGrid(
         val spacing = 8.dp
         val indicatorHeight = 16.dp
         val rows = if (twoRowModes) 2 else if (items.size > columns &&
-            maxHeight - indicatorHeight >= minimumRowHeight * 2 + spacing) 2 else 1
+            maxHeight - (if (preferSinglePage && items.size <= columns * 2) 0.dp else indicatorHeight) >= minimumRowHeight * 2 + spacing) 2 else 1
         val pages = items.chunked(rows * columns)
         val pagerState = rememberPagerState(pageCount = { pages.size })
         val pageIndicatorHeight = if (pages.size == 1) 0.dp else indicatorHeight
