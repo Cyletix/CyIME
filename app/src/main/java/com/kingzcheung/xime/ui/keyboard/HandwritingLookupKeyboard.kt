@@ -30,7 +30,7 @@ import com.kingzcheung.xime.handwriting.HandwritingStrokeFx
 import com.kingzcheung.xime.handwriting.OverlappedHandwritingRecognizer
 import com.kingzcheung.xime.handwriting.StrokePoint
 import com.kingzcheung.xime.handwriting.renderStrokes
-import com.kingzcheung.xime.handwriting.handwritingInk
+import com.kingzcheung.xime.handwriting.rememberHandwritingInk
 import com.kingzcheung.xime.keyboard.KeyboardDimensions
 import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +58,7 @@ fun HandwritingLookupKeyboard(
 ) {
     KeyboardKeySpacingScope(modifier, columns = 6f) { bodyModifier ->
     val strokes = remember { mutableStateListOf<List<StrokePoint>>() }
-    val inkColor = handwritingInk(keyTextColor, keyboardBgColor)
+    val inkColor = rememberHandwritingInk(keyboardBgColor)
     // 与主手写键盘一致的叠写视觉状态（三段前缀渲染 + 识别窗口），见 HandwritingStrokeFx
     var settledCount by remember { mutableIntStateOf(0) }
     var fadingPrefix by remember { mutableIntStateOf(0) }

@@ -36,7 +36,7 @@ import com.kingzcheung.xime.handwriting.HandwritingStrokeFx
 import com.kingzcheung.xime.handwriting.OverlappedHandwritingRecognizer
 import com.kingzcheung.xime.handwriting.StrokePoint
 import com.kingzcheung.xime.handwriting.renderStrokes
-import com.kingzcheung.xime.handwriting.handwritingInk
+import com.kingzcheung.xime.handwriting.rememberHandwritingInk
 import com.kingzcheung.xime.model.ModelDownloadState
 import com.kingzcheung.xime.model.ModelManager
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +66,7 @@ fun HandwritingKeyboardLayout(
 ) {
     KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = (4 + bottomPaddingDp).dp) { bodyModifier ->
     val context = LocalContext.current
-    val inkColor = if (expanded) Color.Black else handwritingInk(keyTextColor, panelBackgroundColor)
+    val inkColor = rememberHandwritingInk(panelBackgroundColor)
     val scope = rememberCoroutineScope()
     val keyAction by rememberUpdatedState(onKeyPress)
     val newCharacter by rememberUpdatedState(onNewCharacter)

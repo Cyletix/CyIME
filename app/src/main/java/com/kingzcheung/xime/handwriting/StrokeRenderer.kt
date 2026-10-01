@@ -4,7 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import kotlin.math.sqrt
 
@@ -27,16 +27,16 @@ fun DrawScope.renderStrokes(
     currentStroke: List<StrokePoint>,
     color: Color,
 ) {
-    // The canvas may be transparent over an app or image unlike the keyboard palette.
-    // Paint the opposite color underneath so the writing remains visible on either surface.
-    val outlineColor = (if (color.luminance() > 0.5f) Color.Black else Color.White)
-        .copy(alpha = color.alpha)
-    val outlineGrowth = 4.dp.toPx()
+    // Two 0.75dp keylines keep a colored core legible across light/dark image boundaries.
+    // No blur, glow, background readback or per-point color calculation.
+    val outer = lerp(color.copy(alpha = 1f), Color.Black, .94f).copy(alpha = color.alpha)
+    val inner = lerp(color.copy(alpha = 1f), Color.White, .96f).copy(alpha = color.alpha)
     fun drawLayer(ink: Color, growth: Float) {
         strokes.forEach { drawStroke(it, ink, growth) }
-        if (currentStroke.size >= 2) drawStroke(currentStroke, ink, growth)
+        if (currentStroke.isNotEmpty()) drawStroke(currentStroke, ink, growth)
     }
-    drawLayer(outlineColor, outlineGrowth)
+    drawLayer(outer, 3.dp.toPx())
+    drawLayer(inner, 1.5.dp.toPx())
     drawLayer(color, 0f)
 }
 
