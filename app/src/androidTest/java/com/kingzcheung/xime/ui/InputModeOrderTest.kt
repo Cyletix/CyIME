@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kingzcheung.xime.settings.*
 import com.kingzcheung.xime.ui.menubar.SchemaListView
+import com.kingzcheung.xime.ui.menubar.dragOrderItem
+import androidx.compose.ui.platform.testTag
 import com.kingzcheung.xime.ui.settings.reorderEnabledModes
 import com.kingzcheung.xime.ui.settings.orderedInstalledModeIds
 import org.junit.Assert.*
@@ -22,6 +24,50 @@ import org.junit.Test
 
 class InputModeOrderTest {
     @get:Rule val rule = createComposeRule()
+
+    @Test fun draggedCardMovesBeforeDropAndEdgeScrollsWithoutSavingUntilRelease() {
+        lateinit var state: com.kingzcheung.xime.ui.menubar.DragOrderState
+        var saved: List<String>? = null
+        val ids = (0..15).map { "mode$it" }
+        rule.setContent {
+            state = com.kingzcheung.xime.ui.menubar.rememberDragOrder(ids) { saved = it }
+            androidx.compose.foundation.lazy.LazyColumn(state = state.list, modifier = Modifier.size(320.dp, 240.dp).testTag("drag-list")) {
+                items(state.order.size, key = { state.order[it] }) { index ->
+                    val id = state.order[index]
+                    Box(Modifier.then(dragOrderItem(state, id)).fillMaxWidth().height(48.dp).testTag(id))
+                }
+            }
+        }
+        val before = rule.onNodeWithTag("mode0").fetchSemanticsNode().boundsInRoot
+        rule.mainClock.autoAdvance = false
+        try {
+            rule.onNodeWithTag("mode0").performTouchInput { down(Offset(20f, center.y)) }
+            rule.mainClock.advanceTimeBy(700)
+            rule.runOnUiThread { assertEquals("mode0", state.dragging); assertEquals(0, state.list.firstVisibleItemScrollOffset) }
+            rule.onRoot().performTouchInput { moveBy(Offset(0f, 12f)) }
+            rule.mainClock.advanceTimeBy(32)
+            val moved = rule.onNodeWithTag("mode0").fetchSemanticsNode().boundsInRoot
+            assertTrue("卡片在松手之前应跟手移动", moved.top > before.top)
+            assertNull(saved)
+            val viewport = rule.onNodeWithTag("drag-list").fetchSemanticsNode().boundsInRoot
+            rule.onRoot().performTouchInput { moveTo(Offset(before.center.x, viewport.bottom - 8f)) }
+            repeat(80) { rule.mainClock.advanceTimeByFrame(); Thread.sleep(3) }
+            rule.runOnUiThread {
+                assertTrue("边缘拖动应自动滚动", state.list.firstVisibleItemIndex > 0)
+                assertTrue("拖动应连续穿过中间卡片", state.order.indexOf("mode0") >= 4)
+                assertNull(saved)
+            }
+            rule.onRoot().performTouchInput { up() }
+            rule.runOnUiThread {
+                assertEquals(state.order, saved)
+                state.start(state.list.layoutInfo.visibleItemsInfo.first { it.key in state.order }.key as String)
+                state.drag(80f)
+                state.cancel()
+                assertEquals(saved, state.order)
+            }
+        } finally { rule.mainClock.autoAdvance = true }
+        rule.waitForIdle()
+    }
 
     @Test fun settingsOrderUsesKeyboardPreferenceAndKeepsInactiveSlots() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext

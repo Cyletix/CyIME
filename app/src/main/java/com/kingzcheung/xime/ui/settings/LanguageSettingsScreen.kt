@@ -21,7 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.kingzcheung.xime.settings.*
-import com.kingzcheung.xime.ui.menubar.reorderOnLongPress
+import com.kingzcheung.xime.ui.menubar.rememberDragOrder
+import com.kingzcheung.xime.ui.menubar.dragOrderItem
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import com.kingzcheung.xime.ui.theme.MaterialLevel
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
@@ -38,13 +41,10 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
     var orderedLanguages by remember { mutableStateOf(InputModes.languageOrder(context)) }
     var saving by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
-    val cardCenters = remember { mutableStateMapOf<InputLanguage, Float>() }
-    var dragging by remember { mutableStateOf<InputLanguage?>(null) }
-    var dropTarget by remember { mutableStateOf<InputLanguage?>(null) }
-    var draggedOrder by remember { mutableStateOf<List<InputLanguage>?>(null) }
-    var dragDistance by remember { mutableFloatStateOf(0f) }
-    var dragStartCenters by remember { mutableStateOf<Map<InputLanguage, Float>>(emptyMap()) }
-    var dragStartOrder by remember { mutableStateOf<List<InputLanguage>>(emptyList()) }
+    val dragOrder = rememberDragOrder(orderedLanguages.map { it.id }) { ids ->
+        InputModes.saveLanguageOrder(context, ids)
+        orderedLanguages = InputModes.languageOrder(context)
+    }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         languages = LanguagePreferences.enabled(context)
         orderedLanguages = InputModes.languageOrder(context)
@@ -54,84 +54,21 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+        LazyColumn(Modifier.fillMaxSize().padding(padding)
             .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("英文始终开启；中文和日语可按需开启。长按已开启语言卡片拖动排序，与键盘中的语言顺序同步。",
+            state = dragOrder.list, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item { Text("英文始终开启；中文和日语可按需开启。长按已开启语言卡片拖动排序，与键盘中的语言顺序同步。",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            (orderedLanguages + InputLanguage.entries.filterNot { it in languages }).forEach { language -> key(language.id) {
+                color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            items(dragOrder.order + InputLanguage.entries.filterNot { it in languages }.map { it.id }, key = { it }) { id ->
+                val language = InputLanguage.entries.first { it.id == id }
                 val checked = language in languages
                 val canChange = language != InputLanguage.ENGLISH && !saving
                 Surface(modifier = Modifier.fillMaxWidth().testTag("language-drag:${language.id}")
-                    .onGloballyPositioned { cardCenters[language] = it.positionInRoot().y + it.size.height / 2f }
-                    .then(if (checked && orderedLanguages.size > 1 && !saving) Modifier.reorderOnLongPress(
-                        onStart = {
-                            dragging = language
-                            dropTarget = null
-                            draggedOrder = orderedLanguages
-                            dragDistance = 0f
-                            dragStartOrder = orderedLanguages
-                            dragStartCenters = orderedLanguages.mapNotNull { item ->
-                                cardCenters[item]?.let { item to it }
-                            }.toMap()
-                        },
-                        onDrag = { dy ->
-                            if (dragging == language) {
-                                dragDistance += dy
-                                val center = dragStartCenters[language]
-                                if (center != null) {
-                                    val from = dragStartOrder.indexOf(language)
-                                    if (from >= 0) {
-                                        val movingCenter = center + dragDistance
-                                        var target = from
-                                        if (dragDistance > 0f) {
-                                            for (index in from + 1..dragStartOrder.lastIndex) {
-                                                val previous = dragStartCenters[dragStartOrder[index - 1]] ?: break
-                                                val next = dragStartCenters[dragStartOrder[index]] ?: break
-                                                if (movingCenter >= (previous + next) / 2f) target = index else break
-                                            }
-                                        } else if (dragDistance < 0f) {
-                                            for (index in from - 1 downTo 0) {
-                                                val previous = dragStartCenters[dragStartOrder[index]] ?: break
-                                                val next = dragStartCenters[dragStartOrder[index + 1]] ?: break
-                                                if (movingCenter <= (previous + next) / 2f) target = index else break
-                                            }
-                                        }
-                                        dropTarget = dragStartOrder.getOrNull(target)?.takeIf { target != from }
-                                        draggedOrder = dragStartOrder.toMutableList().apply { add(target, removeAt(from)) }
-                                    }
-                                }
-                            }
-                        },
-                        onEnd = {
-                            if (dragging == language) {
-                                val nextOrder = draggedOrder
-                                if (nextOrder != null && nextOrder != dragStartOrder) {
-                                    InputModes.saveLanguageOrder(context, nextOrder.map { it.id })
-                                    orderedLanguages = InputModes.languageOrder(context)
-                                }
-                                dragging = null
-                                dropTarget = null
-                                draggedOrder = null
-                            }
-                        },
-                        onCancel = {
-                            if (dragging == language) {
-                                dragging = null
-                                dropTarget = null
-                                draggedOrder = null
-                            }
-                        },
-                    ) else Modifier),
+                    .then(dragOrderItem(dragOrder, id, checked && orderedLanguages.size > 1 && !saving)),
                     shape = RoundedCornerShape(12.dp),
-                    border = when (language) {
-                        dragging -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                        dropTarget -> BorderStroke(2.dp, MaterialTheme.colorScheme.secondary)
-                        else -> null
-                    },
-                    color = if (dragging == language) MaterialTheme.colorScheme.primaryContainer
-                        else if (dropTarget == language) MaterialTheme.colorScheme.secondaryContainer
+                    border = if (dragOrder.dragging == id) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                    color = if (dragOrder.dragging == id) MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(Modifier.fillMaxWidth().testTag("language-${language.id}")
                         .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)) {
@@ -161,9 +98,9 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
                         }
                     }
                 }
-            } }
-            if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(16.dp))
+            }
+            item { if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
     }
 }
