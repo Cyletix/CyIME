@@ -22,6 +22,28 @@ import org.junit.Test
 class MenuSettingsShortcutTest {
     @get:Rule val rule = createComposeRule()
 
+    @Test fun eightItemsFitOnePageAtMinimumNormalFontHeight() {
+        var settingsOpened = false
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                Box(Modifier.requiredSize(320.dp, 144.dp).testTag("menu-host")) {
+                    MenuBar(MenuBarState(true, true, backgroundColor = Color.Black, schemaSwitches = listOf(
+                        com.kingzcheung.xime.viewmodel.SchemaSwitchUiState(name = "full_shape", states = listOf("半角", "全角")),
+                        com.kingzcheung.xime.viewmodel.SchemaSwitchUiState(name = "simplification", states = listOf("简体", "繁体")))),
+                        MenuBarCallbacks({}, {}, {}, {}, {}, {}, { settingsOpened = true }, {}, {}))
+                }
+            }
+        }
+        listOf("设置", "键盘调节", "全角／半角", "定制工具栏", "主题与定制", "智能联想", "语音转文本", "输入选项").forEach {
+            rule.onNodeWithTag("menu-item:$it").assertIsDisplayed()
+        }
+        rule.onNodeWithTag("menu-item:设置").performClick()
+        rule.runOnIdle { org.junit.Assert.assertTrue(settingsOpened) }
+        rule.onAllNodesWithText("深色模式").assertCountEquals(0)
+        rule.onAllNodesWithText("模型管理").assertCountEquals(0)
+        rule.assertGeometry("menu-host", "八项菜单单页")
+    }
+
     @Test fun themeShortcutOpensRealPageAndBackReturnsToSettingsHome() {
         rule.setContent {
             androidx.compose.material3.MaterialTheme { SettingsScreen(initialRoute = SettingsRoutes.Theme) }
@@ -43,7 +65,7 @@ class MenuSettingsShortcutTest {
             }
         }
         val entries = listOf("主题与定制" to SettingsRoutes.Theme, "智能联想" to SettingsRoutes.SmartPrediction,
-            "语音转文本" to SettingsRoutes.SpeechToText, "模型管理" to SettingsRoutes.ModelLocal)
+            "语音转文本" to SettingsRoutes.SpeechToText)
         for (size in listOf(Triple(320, 144, 1f), Triple(280, 180, 2f), Triple(640, 140, 1f))) {
             rule.runOnIdle { viewport.value = size }
             for ((label, route) in entries) {

@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -36,6 +37,60 @@ import org.junit.Test
 
 class SettingsSecondaryLayoutGateTest {
     @get:Rule val rule = createComposeRule()
+
+    @Test fun themeStartsWithAppearanceThenPaletteAndMaterialLivesBehindCompactEntry() {
+        val size = mutableStateOf(Triple(360, 640, 1f))
+        rule.setContent {
+            val (width, height, font) = size.value
+            CompositionLocalProvider(LocalDensity provides Density(1f, font)) {
+                MaterialTheme {
+                    Box(Modifier.requiredSize(width.dp, height.dp).testTag("theme-host")) {
+                        com.kingzcheung.xime.ui.settings.ThemeSettingsContent(onBack = {})
+                    }
+                }
+            }
+        }
+        rule.onNodeWithText("显示模式").assertIsDisplayed()
+        listOf("跟随系统", "浅色", "深色").forEach { rule.onNodeWithText(it).assertIsDisplayed() }
+        rule.onNodeWithText("配色方案").assertIsDisplayed()
+        assertTrue(rule.onNodeWithText("显示模式").fetchSemanticsNode().boundsInRoot.top <
+            rule.onNodeWithText("配色方案").fetchSemanticsNode().boundsInRoot.top)
+        rule.onAllNodesWithTag("visual-style-original").assertCountEquals(0)
+        rule.assertGeometry("theme-host", "明暗预览优先于配色")
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        java.io.File(context.getExternalFilesDir(null), "settings-palette.png").outputStream().use {
+            rule.onNodeWithTag("theme-host").captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("视觉样式"))
+        rule.onNodeWithText("视觉样式").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("visual-style-original").assertIsDisplayed()
+        rule.assertGeometry("theme-host", "独立视觉样式页")
+        rule.runOnIdle { size.value = Triple(280, 360, 2f) }
+        rule.assertGeometry("theme-host", "视觉样式窄屏大字体")
+        rule.onNodeWithContentDescription("返回").performClick()
+        rule.onNodeWithText("主题与定制").assertIsDisplayed()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("显示模式"))
+        rule.assertGeometry("theme-host", "明暗预览窄屏大字体")
+    }
+
+    @Test fun practicalSettingsPrecedeDecorations() {
+        val page = mutableStateOf(0)
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                MaterialTheme {
+                    Box(Modifier.requiredSize(360.dp, 640.dp).testTag("priority-host")) {
+                        if (page.value == 0) com.kingzcheung.xime.ui.settings.KeyEffectSettingsContent(onBack = {})
+                        else com.kingzcheung.xime.ui.settings.LayoutDisplaySettingsContent(onBack = {})
+                    }
+                }
+            }
+        }
+        rule.onNodeWithText("按键音效").assertIsDisplayed()
+        rule.onAllNodesWithText("按键光效").assertCountEquals(0)
+        rule.runOnIdle { page.value = 1 }
+        rule.onNodeWithText("候选词").assertIsDisplayed()
+        rule.onAllNodesWithText("键盘底部样式").assertCountEquals(0)
+    }
 
     private data class Viewport(val width: Int, val height: Int, val font: Float)
     private val viewports = listOf(Viewport(280, 360, 2f), Viewport(360, 640, 1f))
@@ -115,7 +170,8 @@ class SettingsSecondaryLayoutGateTest {
         for (v in viewports) {
             rule.runOnIdle { viewport.value = v }
             rule.assertGeometry("language-host", "语言管理顶部 $v")
-            val card = rule.onNodeWithTag("language-drag:en").performScrollTo().assertIsDisplayed()
+            rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("language-drag:en"))
+            val card = rule.onNodeWithTag("language-drag:en").assertIsDisplayed()
             assertInside("language-host", card, "语言管理末项卡片 $v")
             assertTrue("语言卡片拖动区域高度不足 $v", card.fetchSemanticsNode().size.height >= 71)
             assertTrue("语言卡片拖动区域宽度不足 $v", card.fetchSemanticsNode().size.width >= v.width - 33)

@@ -114,16 +114,10 @@ fun MenuBar(
     val isLandscape = !state.isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
     val keyboardResizeIcon = rememberVectorPainter(Icons.TwoTone.SettingsOverscan)
-    val darkModeIcon = when (state.darkMode) {
-        0 -> rememberVectorPainter(Icons.TwoTone.LightMode)
-        1 -> rememberVectorPainter(Icons.TwoTone.DarkMode)
-        else -> rememberVectorPainter(Icons.TwoTone.BrightnessAuto)
-    }
     val customizeIcon = rememberVectorPainter(Icons.TwoTone.Padding)
     val schemaIcon = rememberVectorPainter(Icons.TwoTone.Keyboard)
     val settingsIcon = rememberVectorPainter(Icons.TwoTone.Settings)
 
-    val darkModeLabel = menuAppearanceLabel(state.darkMode)
 
     var showOptions by remember { mutableStateOf(false) }
     // 英文（ASCII）模式标点固定半角，全角／半角对它不生效：入口直接不出现，
@@ -157,8 +151,9 @@ fun MenuBar(
         }
         return
     }
-    // 高频调整与状态切换在前，工具栏定制和设置入口在后。
+    // 设置始终在首屏；明暗和模型管理保留在其所属设置页，常规菜单最多八项。
     val menuItems = listOf(
+        MenuItem(settingsIcon, "设置", callbacks.onSettings),
         MenuItem(keyboardResizeIcon, "键盘调节", callbacks.onKeyboardResize),
     ) + listOfNotNull(widthSwitch?.let { sw ->
         val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
@@ -168,16 +163,13 @@ fun MenuBar(
             currentState = current, id = "全角／半角",
         )
     }) + listOf(
-        MenuItem(darkModeIcon, darkModeLabel, callbacks.onToggleDarkMode, currentState = darkModeLabel),
         MenuItem(customizeIcon, "定制工具栏", callbacks.onToolbarCustomize),
         MenuItem(rememberVectorPainter(Icons.TwoTone.Palette), "主题与定制", { callbacks.onSettingsPage(SettingsRoutes.Theme) }),
         MenuItem(rememberVectorPainter(Icons.TwoTone.AutoAwesome), "智能联想", { callbacks.onSettingsPage(SettingsRoutes.SmartPrediction) }),
         MenuItem(rememberVectorPainter(Icons.TwoTone.Mic), "语音转文本", { callbacks.onSettingsPage(SettingsRoutes.SpeechToText) }),
-        MenuItem(rememberVectorPainter(Icons.TwoTone.Storage), "模型管理", { callbacks.onSettingsPage(SettingsRoutes.ModelLocal) }),
-    ) + (if (options.isNotEmpty()) listOf(MenuItem(schemaIcon, "输入选项", { showOptions = true })) else emptyList()) +
-        listOf(MenuItem(settingsIcon, "设置", callbacks.onSettings))
+    ) + (if (options.isNotEmpty()) listOf(MenuItem(schemaIcon, "输入选项", { showOptions = true })) else emptyList())
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
-        modifier.fillMaxWidth().background(state.backgroundColor)) { item, cellModifier ->
+        modifier.fillMaxWidth().background(state.backgroundColor), preferSinglePage = true) { item, cellModifier ->
         MenuItemButton(item, itemBgColor, textColor,
             cellModifier.testTag("menu-item:${item.id}"), isLandscape)
     }

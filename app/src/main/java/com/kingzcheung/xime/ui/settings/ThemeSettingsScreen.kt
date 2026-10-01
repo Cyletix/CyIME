@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -45,6 +46,20 @@ fun ThemeSettingsContent(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showIconSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var showVisualSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    BackHandler(showIconSettings || showVisualSettings) { showIconSettings = false; showVisualSettings = false }
+    if (showVisualSettings) {
+        Scaffold(topBar = { TopAppBar(title = { Text("视觉样式") }, navigationIcon = {
+            IconButton(onClick = { showVisualSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+        }) }) { padding ->
+            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp)) { item {
+                VisualStylePicker(VisualStyles.current) { style ->
+                    changeAppearance(context, onThemeChanged) { SettingsPreferences.setVisualStyle(context, style) }
+                }
+            } }
+        }
+        return
+    }
     if (showIconSettings) {
         IconSettingsContent(onBack = { showIconSettings = false }, onChanged = onThemeChanged)
         return
@@ -80,22 +95,6 @@ fun ThemeSettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                SettingsSection(title = "应用图标") {
-                    SettingsItem(
-                        icon = Icons.TwoTone.Palette,
-                        title = "图标设置",
-                        subtitle = if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择",
-                        onClick = { showIconSettings = true },
-                        showArrow = true
-                    )
-                }
-            }
-            item {
-                VisualStylePicker(VisualStyles.current) { style ->
-                    changeAppearance(context, onThemeChanged) { SettingsPreferences.setVisualStyle(context, style) }
-                }
-            }
-            item {
                 Text(
                     text = "显示模式",
                     style = MaterialTheme.typography.labelLarge,
@@ -113,6 +112,7 @@ fun ThemeSettingsContent(
                 ) {
                     KeyboardThemeCard(
                         theme = currentTheme,
+                        previewAspectRatio = 1.3f,
                         isSelected = uiState.darkMode == 2,
                         onClick = {
                             changeAppearance(context, onThemeChanged) { viewModel.setDarkMode(2) }
@@ -122,6 +122,7 @@ fun ThemeSettingsContent(
                     )
                     KeyboardThemeCard(
                         theme = currentTheme,
+                        previewAspectRatio = 1.3f,
                         title = "浅色",
                         isSelected = uiState.darkMode == 0,
                         previewDark = false,
@@ -132,6 +133,7 @@ fun ThemeSettingsContent(
                     )
                     KeyboardThemeCard(
                         theme = currentTheme,
+                        previewAspectRatio = 1.3f,
                         title = "深色",
                         isSelected = uiState.darkMode == 1,
                         previewDark = true,
@@ -189,6 +191,15 @@ fun ThemeSettingsContent(
                 }
             }
             
+            item {
+                SettingsSection(title = "外观细节") {
+                    SettingsItem(icon = Icons.TwoTone.Palette, title = "视觉样式",
+                        subtitle = VisualStyles.current.title, onClick = { showVisualSettings = true }, showArrow = true)
+                    SettingsItem(icon = Icons.TwoTone.Palette, title = "图标设置",
+                        subtitle = if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择",
+                        onClick = { showIconSettings = true }, showArrow = true)
+                }
+            }
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
