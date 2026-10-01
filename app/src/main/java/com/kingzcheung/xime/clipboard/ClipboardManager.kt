@@ -56,6 +56,7 @@ class ClipboardManager private constructor(private val context: Context) {
     }
 
     private val androidClipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as AndroidClipboardManager
+    private var lastSmsClipTimestamp = -1L
 
     private val clipboardListener = AndroidClipboardManager.OnPrimaryClipChangedListener {
         readClipboard()
@@ -73,6 +74,19 @@ class ClipboardManager private constructor(private val context: Context) {
                     else -> null
                 }
                 if (!text.isNullOrEmpty()) {
+                    if (clipData.description.label == VerificationCodeSmsReceiver.CLIP_LABEL && VerificationCodeExtractor.isCode(text)) {
+                        // Automatic SMS codes stay in memory and never enter history or sync.
+                        val timestamp = clipData.description.timestamp
+                        if (lastSmsClipTimestamp != timestamp) {
+                            lastSmsClipTimestamp = timestamp
+                            _verificationCode.value = ClipboardItem(text = text, timestamp = timestamp)
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                if (_verificationCode.value?.timestamp == timestamp) _verificationCode.value = null
+                            }, (timestamp + 5 * 60_000L - System.currentTimeMillis()).coerceAtLeast(0))
+                        }
+                        return
+                    }
+                    _verificationCode.value = null
                     addItem(text)
                     return
                 }
@@ -95,6 +109,17 @@ class ClipboardManager private constructor(private val context: Context) {
 
     private val _clipboardItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val clipboardItems: StateFlow<List<ClipboardItem>> = _clipboardItems.asStateFlow()
+    private val _verificationCode = MutableStateFlow<ClipboardItem?>(null)
+    val verificationCode: StateFlow<ClipboardItem?> = _verificationCode.asStateFlow()
+
+    fun refreshClipboard() {
+        val clip = androidClipboardManager.primaryClip ?: return
+        if (clip.itemCount == 0) return
+        if (clip.description.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
+            (System.currentTimeMillis() - clip.description.timestamp < 30_000 &&
+                _clipboardItems.value.none { it.text == clip.getItemAt(0).text?.toString() })
+        ) readClipboard(retries = 0)
+    }
 
     private val _quickSendItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val quickSendItems: StateFlow<List<ClipboardItem>> = _quickSendItems.asStateFlow()
@@ -339,7 +364,8 @@ class ClipboardManager private constructor(private val context: Context) {
         val now = System.currentTimeMillis()
         val cutoff = now - seconds * 1000L
         // 候选栏只展示未消费的最近剪贴板项（用户点选上屏后标记 consumed 不再显示）
-        return _clipboardItems.value.filter { it.timestamp >= cutoff && !it.consumed }
+        val sms = _verificationCode.value?.takeIf { it.timestamp >= now - 5 * 60_000L }
+        return listOfNotNull(sms) + _clipboardItems.value.filter { it.timestamp >= cutoff && !it.consumed && it.text != sms?.text }
     }
 
     /**
@@ -347,6 +373,7 @@ class ClipboardManager private constructor(private val context: Context) {
      * 匹配最近一条未消费的相同文本，避免影响历史重复条目。
      */
     fun markConsumed(text: String) {
+        if (_verificationCode.value?.text == text) _verificationCode.value = null
         scope.launch {
             val item = _clipboardItems.value
                 .filter { it.text == text && !it.consumed }

@@ -135,6 +135,7 @@ data class CandidateBarCallbacks(
     val onAssociationSelect: ((Int) -> Unit)? = null,
     val onDismissClipboardPreview: (() -> Unit)? = null,
     val onOpenClipboard: (() -> Unit)? = null,
+    val onVerificationCodeSelect: ((String, Boolean) -> Unit)? = null,
     val onCancelInput: (() -> Unit)? = null,
     val onReorderToolbar: ((List<String>) -> Unit)? = null,
     // 长按候选：抛事件给宿主（键盘视图内弹确认覆盖层，不弹独立窗口——
@@ -319,7 +320,7 @@ fun CandidateBar(
         }
 
         if (state is CandidateBarState.ClipboardDisplay) {
-            ClipboardPreviewBar(state.candidates, visuals, callbacks, iconButtonContainer)
+            ClipboardPreviewBar(state.candidates, visuals, callbacks, iconButtonContainer, state.smsVerificationCode)
             return@Column
         }
 
@@ -598,7 +599,18 @@ private fun ClipboardPreviewBar(
     visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks,
     iconButtonContainer: Color,
+    smsVerificationCode: String? = null,
 ) {
+    val code = remember(candidates, smsVerificationCode) {
+        candidates.firstNotNullOfOrNull {
+            com.kingzcheung.xime.clipboard.VerificationCodeExtractor.extract(it)
+                ?: it.takeIf { value -> value == smsVerificationCode }
+        }
+    }
+    if (code != null && callbacks.onVerificationCodeSelect != null) {
+        VerificationCodeActions(code, visuals, callbacks)
+        return
+    }
     val previews = remember(candidates) { candidates.map { it.replace(Regex("[\\r\\n]+"), " ") } }
     val textMeasurer = rememberTextMeasurer()
     val textStyle = LocalTextStyle.current.merge(TextStyle(fontSize = 15.sp))
@@ -665,6 +677,24 @@ private fun ClipboardPreviewBar(
         } else {
             Spacer(Modifier.size(40.dp))
         }
+    }
+}
+
+@Composable
+internal fun VerificationCodeActions(code: String, visuals: CandidateBarVisuals, callbacks: CandidateBarCallbacks) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("verification-code-actions"),
+        verticalAlignment = Alignment.CenterVertically) {
+        KeyboardBackButton({ callbacks.onDismissClipboardPreview?.invoke() }, visuals.backgroundColor,
+            visuals.textColor, label = "返回工具栏")
+        Text("验证码 $code", color = visuals.textColor, fontSize = 15.sp, softWrap = false,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("verification-code-paste")
+                .clickable { callbacks.onVerificationCodeSelect?.invoke(code, false) }.padding(12.dp))
+        Text("逐位填入", color = visuals.accentColor, fontSize = 15.sp, softWrap = false,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("verification-code-digits")
+                .clickable { callbacks.onVerificationCodeSelect?.invoke(code, true) }.padding(12.dp))
+        Text("原文", color = visuals.textColor, fontSize = 15.sp, softWrap = false,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("verification-code-original")
+                .clickable { callbacks.onOpenClipboard?.invoke() }.padding(12.dp))
     }
 }
 

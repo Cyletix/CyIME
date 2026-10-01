@@ -42,6 +42,7 @@ data class KeyboardCallbacks(
     val onClipboard: (() -> Unit)? = null,
     val onDismissClipboardPreview: (() -> Unit)? = null,
     val onClipboardSelect: ((String) -> Unit)? = null,
+    val onVerificationCodeSelect: ((String, Boolean) -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
     val onDeleteText: ((Int) -> Unit)? = null,
     val onQuickSend: (() -> Unit)? = null,
