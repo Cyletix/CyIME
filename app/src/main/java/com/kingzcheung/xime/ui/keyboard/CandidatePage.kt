@@ -281,6 +281,7 @@ fun CandidatePage(
                         onClick = { callbacks.onToggleSingleCharFilter?.invoke() },
                         keyBg = if (state.singleCharFilter) state.textColor.copy(alpha = 0.28f) else keyBg,
                         textColor = state.textColor,
+                        opacityScale = if (state.singleCharFilter) 0.28f else 1f,
                         modifier = Modifier.weight(1f)
                     ) {
                         // 显示当前模式：候选（全部）/ 单字（筛选中，高亮底色）
@@ -759,6 +760,7 @@ private fun RailKey(
     textColor: Color,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    opacityScale: Float = 1f,
     content: @Composable BoxScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -775,7 +777,7 @@ private fun RailKey(
                     else -> keyBg
                 },
                 pressed = isPressed,
-                opacityScale = if (enabled) 1f else 0.4f,
+                opacityScale = opacityScale * if (enabled) 1f else 0.4f,
             ))
             .tolerantClick(
                 enabled = enabled,
