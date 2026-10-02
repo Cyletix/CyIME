@@ -12,15 +12,33 @@ import org.junit.Test
 class ChineseSchemasTest {
     private val base = InstrumentationRegistry.getInstrumentation().targetContext
     private val directory = File(base.cacheDir, "chinese-schema-tests")
+    private var deviceWidth = 411
     private val context = object : ContextWrapper(base) {
+        override fun getResources() = base.createConfigurationContext(
+            android.content.res.Configuration(base.resources.configuration).apply { smallestScreenWidthDp = deviceWidth }).resources
         override fun getFilesDir() = directory
         override fun getSharedPreferences(name: String, mode: Int) = super.getSharedPreferences("chinese_test_$name", mode)
     }
     @Before fun before() { File(directory, "rime").mkdirs(); SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
-    @After fun after() {
-        directory.deleteRecursively()
-        SettingsPreferences.getPrefsPublic(context).edit().clear().commit()
-        CustomKeyboardLayouts.load(base)
+    @After fun after() { directory.deleteRecursively(); SettingsPreferences.getPrefsPublic(context).edit().clear().commit(); CustomKeyboardLayouts.load(base) }
+
+    @Test fun freshPhoneAndTabletDefaultsLeaveSampleOptional() {
+        // Defaults must not vary with screen dimensions or whether the sample file exists.
+        for (width in listOf(411, 934)) {
+            deviceWidth = width
+            assertEquals(width, context.resources.configuration.smallestScreenWidthDp)
+            SettingsPreferences.getPrefsPublic(context).edit().clear().commit()
+            val rime = File(directory, "rime")
+            ChineseSchemas.installAssets(context, rime)
+            assertTrue(File(rime, "${QwjrtkLayout.ID}.schema.yaml").isFile)
+            File(rime, "default.custom.yaml").delete()
+            assertEquals(CyimeInputDefaults.recommended, SchemaManager.getEnabledSchemas(context))
+            assertEquals(CyimeInputDefaults.recommended, SchemaManager.getEnabledSchemas(context))
+            SchemaManager.setEnabledSchemas(context, listOf("t9_pinyin", QwjrtkLayout.ID))
+            assertEquals(listOf("t9_pinyin", QwjrtkLayout.ID), SchemaManager.getEnabledSchemas(context))
+            SchemaManager.setEnabledSchemas(context, listOf("t9_pinyin"))
+            assertEquals(listOf("t9_pinyin"), SchemaManager.getEnabledSchemas(context))
+        }
     }
 
     @Test fun migrationAddsOnlyMissingChineseModesOnceAndPreservesOrdering() {

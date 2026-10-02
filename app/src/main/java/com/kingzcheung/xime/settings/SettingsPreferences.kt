@@ -63,7 +63,7 @@ object SettingsPreferences {
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
     @JvmStatic
-    var defaultKeyboardTheme: String = "soft_blue"
+    var defaultKeyboardTheme: String = com.kingzcheung.xime.ui.theme.PureBlackTheme.ID
 
     /** 默认显示模式，可从 xime.yaml 的 style.dark_mode 初始化。 */
     @JvmStatic
@@ -379,23 +379,31 @@ object SettingsPreferences {
         getPrefs(context).edit().putInt(KEY_VIBRATION_LONG_PRESS_AMPLITUDE, amplitude).apply()
     }
 
-    /** CyIME 默认固定柔和蓝；一次迁移旧默认紫色/动态色，后续用户重新选择仍有效。 */
+    /** 新安装使用配置中的默认配色；保留已有主题选择及原迁移标记。 */
     fun applyForkThemeDefaults(context: Context) {
         val prefs = getPrefs(context)
         if (prefs.getBoolean("cyime_soft_blue_v1", false)) return
         val theme = prefs.getString(KEY_KEYBOARD_THEME, null)
         prefs.edit().apply {
-            if (theme.isNullOrBlank() || theme in setOf("lavender_purple", "dynamic")) putString(KEY_KEYBOARD_THEME, "soft_blue")
+            if (theme.isNullOrBlank()) putString(KEY_KEYBOARD_THEME, defaultKeyboardTheme)
             if (!prefs.contains(KEY_DARK_MODE)) putInt(KEY_DARK_MODE, 1)
             putBoolean("cyime_soft_blue_v1", true)
         }.apply()
     }
 
     fun getKeyboardTheme(context: Context): String {
-        val stored = getPrefs(context).getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
+        val prefs = getPrefs(context)
+        val stored = prefs.getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
+        // Migrate the former independent effect without resetting its parameters.
+        if (prefs.getBoolean(FrostedGlassPreferences.KEY_ENABLED, false) &&
+            stored != com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID) {
+            setKeyboardTheme(context, com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID)
+            return com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID
+        }
         if (stored == "858AdvanceColor") {
-            setKeyboardTheme(context, defaultKeyboardTheme)
-            return defaultKeyboardTheme
+            // 已移除主题仍沿用原兼容映射，不随新安装默认配色改变。
+            setKeyboardTheme(context, com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID)
+            return com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID
         }
         return stored
     }
@@ -411,7 +419,9 @@ object SettingsPreferences {
 
     
     fun setKeyboardTheme(context: Context, themeId: String) {
-        getPrefs(context).edit().putString(KEY_KEYBOARD_THEME, themeId).apply()
+        getPrefs(context).edit().putString(KEY_KEYBOARD_THEME, themeId)
+            .putBoolean(FrostedGlassPreferences.KEY_ENABLED,
+                themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID).apply()
     }
 
     
@@ -442,8 +452,8 @@ object SettingsPreferences {
     }
     
     fun getPredictionSelectedModel(context: Context): String {
-        return getPrefs(context).getString(KEY_PREDICTION_SELECTED_MODEL, "predictive-text-base")
-            ?: "predictive-text-base"
+        val initial = com.kingzcheung.xime.model.DeviceDefaults.predictionModel(context)
+        return getPrefs(context).getString(KEY_PREDICTION_SELECTED_MODEL, initial) ?: initial
     }
     
     fun setPredictionSelectedModel(context: Context, modelId: String) {

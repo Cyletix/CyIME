@@ -130,7 +130,7 @@ fun KeyboardLayout(
         callbacks.onLetterNeighbors?.invoke(uiState.currentSchemaId, "")
         onDispose { }
     }
-    // 合并键布局（14 键）键更宽：缝给更大的绝对 dp，不按键宽比例放大
+    // 合并键布局使用自身的参考格宽，避免把手机宽键误当作平板键。
     val mergedSection = remember(cfgVer, uiState.currentSchemaId) {
         KeysConfigHelper.mergedSectionForSchema(uiState.currentSchemaId)
     }
@@ -141,6 +141,14 @@ fun KeyboardLayout(
         allowShrink = uiState.isFloatingMode,
         applyGutter = true,
     ) { bodyModifier ->
+    val letterRowGeometry = standardLetterRowGeometry(
+        keyRows = keyRows,
+        cellWidthDp = LocalKeyboardKeyVisualMetrics.current.cellWidthDp,
+        hasCustomLayout = !isAsciiMode && com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId) != null,
+        isSplit = splitKeyboard,
+    )
+    val standardRowInset = letterRowGeometry?.middleRowInsetDp?.dp
+    val letterSideKeyWeight = letterRowGeometry?.outerKeyWeight ?: 1.4f
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     val isShifted = shiftMode.isShifted
 
@@ -371,7 +379,7 @@ fun KeyboardLayout(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 16.dp)
+                                .padding(horizontal = standardRowInset ?: 16.dp)
                         ) {
                             DummyKeyboardRow(
                                 keysCount = 9,
@@ -382,7 +390,8 @@ fun KeyboardLayout(
                     } else {
                         Box(modifier = Modifier.weight(1f)) {
                             val row1 = keyRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
-                            val row1Inset = if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) 0.dp else 16.dp
+                            val row1Inset = standardRowInset
+                                ?: if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) 0.dp else 16.dp
                             KeyboardRowWithConfig(
                                 keys = row1,
                                 onKeyPress = onKeyPress,
@@ -420,7 +429,8 @@ fun KeyboardLayout(
                             DummyBottomRow(
                                 keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
                                 specialKeyBackgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
-                                keyboardBackgroundColor = keyboardBackgroundColor
+                                keyboardBackgroundColor = keyboardBackgroundColor,
+                                sideKeyWeight = if (standardRowInset != null) letterSideKeyWeight else 1.2f,
                             )
                         }
                     } else {
@@ -438,7 +448,7 @@ fun KeyboardLayout(
                                 backgroundColor = specialKeyBackgroundColor,
                                 iconColor = specialKeyTextColor,
                                 modifier = Modifier
-                                    .weight(1.4f)
+                                    .weight(letterSideKeyWeight)
                                     .fillMaxHeight(),
                                 shadowEnabled = shadowEnabled,
                                 shadowElevation = shadowElevation,
@@ -527,6 +537,7 @@ fun KeyboardLayout(
                                         modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f)
                                             .testTag("qwerty-key:$key"),
                                         swipeText = swipeUpText,
+                                        symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
                                         swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH)) swipeDownLabel else null,
@@ -557,7 +568,7 @@ fun KeyboardLayout(
                                 backgroundColor = specialKeyBackgroundColor,
                                 iconColor = specialKeyTextColor,
                                 modifier = Modifier
-                                    .weight(1.4f)
+                                    .weight(letterSideKeyWeight)
                                     .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
                                 swipeText = "清空",
                                 onSwipe = { onKeyPress("clear_composition") },
@@ -703,6 +714,7 @@ fun KeyboardLayout(
                                     textColor = keyTextColor,
                                     modifier = Modifier.weight(bottom.punctuation),
                                     swipeText = k2SwipeUpLabel,
+                                    symbolInputText = symbolInputValue(k2SwipeUpCommitValue, k2SwipeUpRaw?.action),
                                     swipeDownText = k2SwipeDownBubbleText,
                                     swipeDownKeyLabel = if ((k2SwipeDownDisplay == DisplayMode.KEY || k2SwipeDownDisplay == DisplayMode.BOTH)) k2SwipeDownLabel else null,
                                     onSwipe = if (k2SwipeUpCommitValue != null) { { onKeyPress(k2SwipeUpCommitValue) } } else null,
@@ -934,7 +946,8 @@ private fun DummyKeyboardRow(
 private fun DummyBottomRow(
     keyBackgroundColor: Color,
     specialKeyBackgroundColor: Color,
-    keyboardBackgroundColor: Color = Color.Transparent
+    keyboardBackgroundColor: Color = Color.Transparent,
+    sideKeyWeight: Float = 1.2f,
 ) {
     Row(
         modifier = Modifier
@@ -942,7 +955,7 @@ private fun DummyBottomRow(
     ) {
         DummyKeyButton(
             backgroundColor = specialKeyBackgroundColor,
-            modifier = Modifier.weight(1.2f)
+            modifier = Modifier.weight(sideKeyWeight)
         )
         Row(
             modifier = Modifier
@@ -958,7 +971,7 @@ private fun DummyBottomRow(
         }
         DummyKeyButton(
             backgroundColor = specialKeyBackgroundColor,
-            modifier = Modifier.weight(1.2f)
+            modifier = Modifier.weight(sideKeyWeight)
         )
     }
 }
@@ -972,7 +985,8 @@ private fun DummyKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(backgroundColor)
+            .background(frostedKeyColor(backgroundColor, Color.White,
+                LocalKeyboardInputPreferences.current.frostedGlass, opacityScale = 0.5f))
     )
 }
 
@@ -1085,6 +1099,7 @@ fun KeyboardRowWithConfig(
                     end = if (index == keys.lastIndex) endInset else 0.dp,
                 ),
                 swipeText = swipeUpText,
+                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
                 swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && swipeDownHintsEnabled) swipeDownLabel else null,
@@ -1134,8 +1149,9 @@ private fun ShiftCapsKeyButton(
     val currentKey by rememberUpdatedState(onKeyPress)
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -1215,12 +1231,14 @@ private fun ShiftCapsKeyButton(
             .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
-            .background(
-                if (isPressed) darkenColor(backgroundColor, 0.1f)
+            .background(frostedKeyColor(
+                backgroundColor, iconColor, frostedGlass,
+                legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.1f)
                 else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
                 else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
-                else backgroundColor
-            ).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
+                else backgroundColor,
+                pressed = isPressed, highlighted = shiftMode != ShiftMode.OFF,
+            )).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
         val painter = when (shiftMode) {
@@ -1758,6 +1776,7 @@ fun SwipeableKeyButtonLandscape(
     textColor: Color,
     modifier: Modifier = Modifier,
     swipeText: String? = null,
+    symbolInputText: String? = null,
     swipeDownText: String? = null,
     swipeUpKeyLabel: String? = null,
     swipeDownKeyLabel: String? = null,
@@ -1777,6 +1796,7 @@ fun SwipeableKeyButtonLandscape(
 
     SwipeableKeyButton(text = text, onClick = onClick, backgroundColor = backgroundColor,
         textColor = textColor, modifier = modifier, swipeText = swipeText, swipeDownText = swipeDownText,
+        symbolInputText = symbolInputText,
         swipeUpKeyLabel = swipeUpKeyLabel, swipeDownKeyLabel = swipeDownKeyLabel,
         onSwipe = onSwipe, onSwipeDown = onSwipeDown, onPress = onPress, onRelease = onRelease,
         onLongPressSelect = onLongPressSelect, longPressItems = longPressItems,
@@ -1878,6 +1898,7 @@ fun CompactKeyboardRowWithConfig(
                 textColor = config.keyTextColor,
                 modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f),
                 swipeText = swipeUpText,
+                symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
                 swipeDownText = swipeDownBubbleText,
                 swipeUpKeyLabel = swipeUpKeyLabel,
                 swipeDownKeyLabel = swipeDownKeyLabel,

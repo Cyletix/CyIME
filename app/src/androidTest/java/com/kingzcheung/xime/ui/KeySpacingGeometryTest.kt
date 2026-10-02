@@ -79,22 +79,20 @@ class KeySpacingGeometryTest {
                     "bitmap=${bitmap.width}x${bitmap.height} measured=$measured " + edgePixels(bitmap, relative))
                 measured
             }
-            // 新模型：缝 = 布局策略目标值（QWERTY 4.5/5.5dp）按格短边有限缩放（1.0~1.2x），两侧各一半
+            // 验证实际绘制采用布局度量，宽回车/空格不会按自身宽高二次放大间隙。
             val cellWidth = 420f * size / 4f
             val cellHeight = 280f * size / 2f
-            val scale = (minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell).coerceIn(1f, KeyVisualPolicy.ScaleMax)
-            val expectedX = KeyVisualPolicy.Qwerty.gapX * scale / 2f
-            val expectedY = KeyVisualPolicy.Qwerty.gapY * scale / 2f
+            val expected = cellMetrics(KeyVisualPolicy.Qwerty, cellWidth, cellHeight)
             insets.forEach { (tag, inset) ->
-                assertEquals("$tag horizontal inset", expectedX, inset.first, 1f)
-                assertEquals("$tag vertical inset", expectedY, inset.second, 1f)
+                assertEquals("$tag horizontal inset", expected.insetX!!, inset.first, 1f)
+                assertEquals("$tag vertical inset", expected.insetY!!, inset.second, 1f)
             }
             if (size == 1f) phoneInsets = insets
         }
-        // 键帽变大时缝不跟着放大（缩放封顶 1.2），只保留整数化误差
+        // 这组宽键夹具已达到间距上限，只保留整数化误差。
         phoneInsets.forEach { (tag, inset) ->
-            assertEquals("$tag capped horizontal ratio", inset.first, 4.5f * 1.2f / 2f, 1f)
-            assertEquals("$tag capped vertical ratio", inset.second, 5.5f * 1.2f / 2f, 1f)
+            assertEquals("$tag capped horizontal ratio", 6f, inset.first, 1f)
+            assertEquals("$tag capped vertical ratio", 5.5f, inset.second, 1f)
         }
     }
 
@@ -167,16 +165,15 @@ class KeySpacingGeometryTest {
             val a = cap(labels[0], 0); val b = cap(labels[1], 0); val below = cap(labels[2], 1)
             val gx = b.left - a.right; val gy = below.top - a.bottom
             val cellWidth = a.width + gx
-            // 新模型：缝来自布局策略（26键 4.5/5.5、14键 5/6、九宫格 6/6），按格短边有限缩放
+            // 截图测量检查真实布局接入度量，宽度响应本身由 JVM 回归约束。
             val policy = when (current.schema) {
                 "pinyin_14jian" -> KeyVisualPolicy.FourteenKey
                 "t9_pinyin", "japanese_kana" -> KeyVisualPolicy.T9
                 else -> KeyVisualPolicy.Qwerty
             }
-            val scale = (minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell)
-                .coerceIn(1f, KeyVisualPolicy.ScaleMax)
-            val expectedX = (policy.gapX * scale).coerceIn(policy.minGapX, policy.maxGapX)
-            val expectedY = (policy.gapY * scale).coerceIn(policy.minGapY, policy.maxGapY)
+            val expected = cellMetrics(policy, cellWidth, cellHeight, current.schema == "t9_pinyin")
+            val expectedX = expected.insetX!! * 2f
+            val expectedY = expected.insetY!! * 2f
             val note = "${current.schema} ascii=${current.ascii} split=${current.split} $size gap=($gx,$gy) " +
                 "expected=($expectedX,$expectedY) cell=($cellWidth,$cellHeight)"
             report.appendLine(note)
@@ -212,13 +209,12 @@ class KeySpacingGeometryTest {
             val key = if (panel == "edit") rule.onNodeWithContentDescription("删除", useUnmergedTree = true)
                 else rule.onNodeWithTag("handwriting-key:delete", useUnmergedTree = true)
             val insets = paintedInsets(bitmap, key.fetchSemanticsNode().boundsInRoot.translate(-origin.x, -origin.y))
-            // 新模型：QWERTY 策略 4.5/5.5dp 目标缝，按格短边在 1.0~1.2x 内有限缩放
+            // 辅助面板仍按自身键格计算，不叠乘父键盘倍率。
             val cellWidth = 420f * size / 5f
             val cellHeight = if (panel == "edit") 280f * size / 3f else (280f * size - 8f) / 4f
-            val scale = (minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell).coerceIn(1f, KeyVisualPolicy.ScaleMax)
-            assertEquals("$panel horizontal inset size=$size", KeyVisualPolicy.Qwerty.gapX * scale / 2f, insets.first, 1f)
-            assertEquals("$panel vertical inset size=$size", KeyVisualPolicy.Qwerty.gapY * scale / 2f, insets.second, 1f)
-            assertTrue("$panel longitudinal gap larger than lateral", insets.second >= insets.first)
+            val expected = cellMetrics(KeyVisualPolicy.Qwerty, cellWidth, cellHeight)
+            assertEquals("$panel horizontal inset size=$size", expected.insetX!!, insets.first, 1f)
+            assertEquals("$panel vertical inset size=$size", expected.insetY!!, insets.second, 1f)
         }
     }
 
@@ -241,6 +237,10 @@ class KeySpacingGeometryTest {
             assertEquals(KeyVisualPolicy.Qwerty.gapY / 2f, nested.insetY!!, 0.01f)
         }
     }
+
+    private fun cellMetrics(policy: KeyVisualPolicy, width: Float, height: Float, allowShrink: Boolean = false) =
+        keyVisualMetrics(policy.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f),
+            width, height, columns = 1f, rows = 1f, verticalInsetDp = 0f, allowShrink = allowShrink)
 
     private fun saveSpacingImage(name: String, bitmap: Bitmap) {
         val directory = File(app.getExternalFilesDir(null), "cyime").apply { mkdirs() }

@@ -1,6 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -340,31 +342,55 @@ fun KeyEffectSettingsContent(
                 })
             }
             item {
-                SettingsSection(title = "按键光效", content = {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("键内炫光", style = MaterialTheme.typography.bodyLarge)
-                                Text("开启后显示半秒渐变光效与轻微按压动画。老人版首次按设备配置设置，可随时修改。", style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(checked = uiState.keyGlowEnabled, onCheckedChange = viewModel::setKeyGlowEnabled)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Text("点按下方按键预览", style = MaterialTheme.typography.labelMedium)
-                        CompositionLocalProvider(LocalKeyboardInputPreferences provides rememberKeyboardInputPreferences()) {
-                            Row(Modifier.fillMaxWidth().height(56.dp)) {
-                                listOf("A", "あ", "123").forEach { label ->
-                                    KeyButton(label, {}, MaterialTheme.colorScheme.secondaryContainer,
-                                        MaterialTheme.colorScheme.onSecondaryContainer, Modifier.weight(1f))
-                                }
-                                ActionKeyButton("删除", {}, MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
-                            }
-                        }
-                    }
-                })
+                KeyVisualEffectSettings(uiState.keyGlowEnabled, uiState.keyAnimationEnabled,
+                    viewModel::setKeyGlowEnabled, viewModel::setKeyAnimationEnabled)
             }
         }
+    }
+}
+
+@Composable
+internal fun KeyVisualEffectSettings(
+    glowEnabled: Boolean, animationEnabled: Boolean,
+    onGlowChange: (Boolean) -> Unit, onAnimationChange: (Boolean) -> Unit,
+) {
+    SettingsSection(title = "按键视觉效果", content = {
+        Column(Modifier.padding(16.dp)) {
+            KeyVisualEffectToggle("按键动效", "点按时键帽缩放回弹，可单独开启。",
+                animationEnabled, onAnimationChange)
+            Spacer(Modifier.height(12.dp))
+            KeyVisualEffectToggle("键内炫光", "点按时显示半秒渐变光效，可单独开启。",
+                glowEnabled, onGlowChange)
+            Spacer(Modifier.height(12.dp))
+            Text("首次使用时按设备配置推荐，两项均可自行调整。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            Text("点按下方按键预览", style = MaterialTheme.typography.labelMedium)
+            val preview = rememberKeyboardInputPreferences().copy(
+                keyGlowEnabled = glowEnabled, keyAnimationEnabled = animationEnabled)
+            CompositionLocalProvider(LocalKeyboardInputPreferences provides preview) {
+                Row(Modifier.fillMaxWidth().height(56.dp)) {
+                    listOf("A", "あ", "123").forEach { label ->
+                        KeyButton(label, {}, MaterialTheme.colorScheme.secondaryContainer,
+                            MaterialTheme.colorScheme.onSecondaryContainer, Modifier.weight(1f))
+                    }
+                    ActionKeyButton("删除", {}, MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
+                }
+            }
+        }
+    })
+}
+
+@Composable
+private fun KeyVisualEffectToggle(title: String, description: String, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .toggleable(value = enabled, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = enabled, onCheckedChange = null)
     }
 }

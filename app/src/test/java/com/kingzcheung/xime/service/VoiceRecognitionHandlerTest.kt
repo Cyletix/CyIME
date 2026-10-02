@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VoiceRecognitionHandlerTest {
+    @Test fun `Chinese dictated commands do not rewrite another language`() {
+        for (language in listOf(com.kingzcheung.xime.settings.InputLanguage.ENGLISH,
+            com.kingzcheung.xime.settings.InputLanguage.JAPANESE, com.kingzcheung.xime.settings.InputLanguage.UNSPECIFIED)) {
+            assertEquals("句号 逗号 問題", normalizeVoiceText("句号，逗号。問題", language))
+        }
+    }
     @Test fun `normalization preserves english words and separates punctuation`() {
         assertEquals("Hello world How are you", normalizeVoiceText("Hello, world! How are you?"))
         assertEquals("你好 世界 こんにちは", normalizeVoiceText("你好，世界。こんにちは！"))

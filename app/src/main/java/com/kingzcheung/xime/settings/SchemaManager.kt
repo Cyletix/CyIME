@@ -41,8 +41,13 @@ data class SchemaMeta(
     val name: String,
     val version: String = "",
     val author: String = "",
-    val description: String = ""
-)
+    val description: String = "",
+    val language: InputLanguage = InputProfiles.builtin(schemaId).language,
+    val scheme: InputScheme = InputProfiles.builtin(schemaId).scheme,
+) {
+    fun toSchemaInfo() = SchemaInfo(schemaId, name, version, author, description,
+        isDownloaded = true, language = language, scheme = scheme)
+}
 
 /**
  * 方案中 `switches` 定义的一个开关项。
@@ -80,6 +85,8 @@ internal data class SchemaEntry(
     val name: String = "",
     val version: String = "",
     val description: String? = null,
+    val language: String? = null,
+    @SerialName("input_scheme") val inputScheme: String? = null,
 )
 
 object SchemaManager {
@@ -618,7 +625,7 @@ object SchemaManager {
 
     fun discoverSchemas(context: Context): List<SchemaMeta> {
         val rimeDir = getRimeDir(context)
-        if (!rimeDir.exists()) return emptyList()
+        if (!rimeDir.exists()) return emptyList<SchemaMeta>().also(InputProfiles::updateInstalled)
 
         val schemas = mutableListOf<SchemaMeta>()
         val schemaFiles = rimeDir.listFiles { f -> f.name.endsWith(".schema.yaml") }
@@ -632,6 +639,7 @@ object SchemaManager {
         }
 
         schemas.sortBy { it.name }
+        InputProfiles.updateInstalled(schemas)
         return schemas
     }
 
@@ -649,7 +657,9 @@ object SchemaManager {
                 name = ChineseSchemas.displayName(entry.schemaId, entry.name.ifEmpty { entry.schemaId }),
                 version = entry.version,
                 author = author,
-                description = entry.description ?: ""
+                description = entry.description ?: "",
+                language = entry.language?.let(InputLanguage::fromId) ?: InputProfiles.builtin(entry.schemaId).language,
+                scheme = entry.inputScheme?.let(InputScheme::fromId) ?: InputProfiles.builtin(entry.schemaId).scheme,
             )
         } catch (e: Exception) {
             try { Log.w(TAG, "Failed to parse schema file: ${file.name}, error=${e.message}, skip", e) } catch (_: Exception) {}

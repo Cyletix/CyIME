@@ -26,6 +26,8 @@ data class CandidateState(
     val engineRevision: Long = 0L,
     val traceEventId: Int = 0,
     val smsVerificationCode: String? = null,
+    val clipboardImage: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
+    val candidateFocus: CandidateFocus? = null,
 )
 
 /** Appending expanded pages or updating suggestions does not change existing candidate identities. */

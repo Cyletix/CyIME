@@ -9,7 +9,11 @@ import kotlin.math.roundToInt
 /** 所有键盘共用键帽内容尺度：跟随实际键帽，不能用屏幕尺寸放大悬浮键盘。 */
 internal object KeyboardKeyMetrics {
     val FunctionIconSize = 20.dp
-    val LabelSize = 16.sp
+    val LabelSize = 18.sp
+
+    fun longPressMenuWidthPx(keyWidth: Float, cells: Int, keyboardWidth: Float, margin: Float): Float =
+        (cells.coerceAtLeast(1) * keyWidth.coerceAtLeast(1f))
+            .coerceAtMost((keyboardWidth - 2f * margin).coerceAtLeast(1f))
 
     fun contentScale(widthDp: Float, heightDp: Float): Float {
         // Compose 按像素分配等权行列，兄弟键可能相差不足 1dp；字号不能跟着逐键抖动。

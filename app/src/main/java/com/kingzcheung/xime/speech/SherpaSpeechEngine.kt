@@ -30,7 +30,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
             if (selection.secondDir != null) {
                 offline = OfflineRecognizer(config = OfflineRecognizerConfig(modelConfig = OfflineModelConfig(
                     senseVoice = OfflineSenseVoiceModelConfig(
-                        model = requireFile(selection.secondDir, "model.int8.onnx"), language = "auto", useInverseTextNormalization = true),
+                        model = requireFile(selection.secondDir, "model.int8.onnx"), language = selection.recognitionLanguage, useInverseTextNormalization = true),
                     tokens = requireFile(selection.secondDir, "tokens.txt"), numThreads = 1,
                 )))
             }
@@ -74,7 +74,8 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
         try {
             s.acceptWaveform(samples, 16000)
             recognizer.decode(s)
-            return cleanSenseVoiceText(recognizer.getResult(s).text)
+            val result = recognizer.getResult(s)
+            return cleanSenseVoiceText(result.text, result.lang)
         } finally { s.release() }
     }
     override fun reset() { stream?.release(); stream = null; vad?.reset() }

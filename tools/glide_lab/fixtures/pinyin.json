@@ -1,0 +1,627 @@
+{
+  "schema": "cyime.glide.fixture.v1",
+  "kind": "synthetic",
+  "id": "pinyin-path-smoke-v1",
+  "language": "zh",
+  "scheme": "pinyin",
+  "notes": "Only Latin code-path retrieval with handwritten Chinese labels; NOT Rime decoding, tone handling, syllable segmentation, phrase ranking, or real Chinese glide support. shijie and xian deliberately preserve ambiguous labels.",
+  "layout": {
+    "revision": "synthetic-qwerty-unit-v1",
+    "key_unit": 1.0,
+    "keys": [
+      {
+        "symbol": "q",
+        "x": 0.0,
+        "y": 0
+      },
+      {
+        "symbol": "w",
+        "x": 1.0,
+        "y": 0
+      },
+      {
+        "symbol": "e",
+        "x": 2.0,
+        "y": 0
+      },
+      {
+        "symbol": "r",
+        "x": 3.0,
+        "y": 0
+      },
+      {
+        "symbol": "t",
+        "x": 4.0,
+        "y": 0
+      },
+      {
+        "symbol": "y",
+        "x": 5.0,
+        "y": 0
+      },
+      {
+        "symbol": "u",
+        "x": 6.0,
+        "y": 0
+      },
+      {
+        "symbol": "i",
+        "x": 7.0,
+        "y": 0
+      },
+      {
+        "symbol": "o",
+        "x": 8.0,
+        "y": 0
+      },
+      {
+        "symbol": "p",
+        "x": 9.0,
+        "y": 0
+      },
+      {
+        "symbol": "a",
+        "x": 0.25,
+        "y": 1
+      },
+      {
+        "symbol": "s",
+        "x": 1.25,
+        "y": 1
+      },
+      {
+        "symbol": "d",
+        "x": 2.25,
+        "y": 1
+      },
+      {
+        "symbol": "f",
+        "x": 3.25,
+        "y": 1
+      },
+      {
+        "symbol": "g",
+        "x": 4.25,
+        "y": 1
+      },
+      {
+        "symbol": "h",
+        "x": 5.25,
+        "y": 1
+      },
+      {
+        "symbol": "j",
+        "x": 6.25,
+        "y": 1
+      },
+      {
+        "symbol": "k",
+        "x": 7.25,
+        "y": 1
+      },
+      {
+        "symbol": "l",
+        "x": 8.25,
+        "y": 1
+      },
+      {
+        "symbol": "z",
+        "x": 0.75,
+        "y": 2
+      },
+      {
+        "symbol": "x",
+        "x": 1.75,
+        "y": 2
+      },
+      {
+        "symbol": "c",
+        "x": 2.75,
+        "y": 2
+      },
+      {
+        "symbol": "v",
+        "x": 3.75,
+        "y": 2
+      },
+      {
+        "symbol": "b",
+        "x": 4.75,
+        "y": 2
+      },
+      {
+        "symbol": "n",
+        "x": 5.75,
+        "y": 2
+      },
+      {
+        "symbol": "m",
+        "x": 6.75,
+        "y": 2
+      }
+    ]
+  },
+  "lexicon": [
+    {
+      "id": "nihao",
+      "code": "nihao",
+      "text": "你好",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "nihaoma",
+      "code": "nihaoma",
+      "text": "你好吗",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "shijie",
+      "code": "shijie",
+      "text": "世界",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "shijie-season",
+      "code": "shijie",
+      "text": "时节",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "shijian",
+      "code": "shijian",
+      "text": "时间",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "shiqing",
+      "code": "shiqing",
+      "text": "事情",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "shuru",
+      "code": "shuru",
+      "text": "输入",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "shurufa",
+      "code": "shurufa",
+      "text": "输入法",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "huaxing",
+      "code": "huaxing",
+      "text": "滑行",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "huadong",
+      "code": "huadong",
+      "text": "滑动",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "zhongwen",
+      "code": "zhongwen",
+      "text": "中文",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "yingwen",
+      "code": "yingwen",
+      "text": "英文",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "women",
+      "code": "women",
+      "text": "我们",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "wenti",
+      "code": "wenti",
+      "text": "问题",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "ceshi",
+      "code": "ceshi",
+      "text": "测试",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "zhege",
+      "code": "zhege",
+      "text": "这个",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "keyi",
+      "code": "keyi",
+      "text": "可以",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "jianpan",
+      "code": "jianpan",
+      "text": "键盘",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "xian",
+      "code": "xian",
+      "text": "先",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "xian-city",
+      "code": "xian",
+      "text": "西安",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "xianzai",
+      "code": "xianzai",
+      "text": "现在",
+      "prior_cost": 0.5
+    }
+  ],
+  "cases": [
+    {
+      "id": "nihao-offset",
+      "description": "Synthetic nihao waypoints; offset=0.15; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "nihao"
+      ],
+      "points": [
+        [
+          5.645,
+          1.925,
+          0
+        ],
+        [
+          7.09,
+          0.06,
+          70
+        ],
+        [
+          5.145,
+          1.06,
+          140
+        ],
+        [
+          0.34,
+          0.925,
+          210
+        ],
+        [
+          7.895,
+          0.06,
+          280
+        ]
+      ]
+    },
+    {
+      "id": "nihaoma-offset",
+      "description": "Synthetic nihaoma waypoints; offset=0.12; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "nihaoma"
+      ],
+      "points": [
+        [
+          5.666,
+          1.94,
+          0
+        ],
+        [
+          7.072,
+          0.048,
+          70
+        ],
+        [
+          5.166,
+          1.048,
+          140
+        ],
+        [
+          0.322,
+          0.94,
+          210
+        ],
+        [
+          7.916,
+          0.048,
+          280
+        ],
+        [
+          6.822,
+          2.048,
+          350
+        ],
+        [
+          0.166,
+          0.94,
+          420
+        ]
+      ]
+    },
+    {
+      "id": "world-homophones",
+      "description": "Synthetic shijie waypoints; offset=0.15; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "shijie",
+        "shijie-season"
+      ],
+      "points": [
+        [
+          1.145,
+          0.925,
+          0
+        ],
+        [
+          5.34,
+          1.06,
+          70
+        ],
+        [
+          6.895,
+          0.06,
+          140
+        ],
+        [
+          6.34,
+          0.925,
+          210
+        ],
+        [
+          6.895,
+          0.06,
+          280
+        ],
+        [
+          2.09,
+          0.06,
+          350
+        ]
+      ]
+    },
+    {
+      "id": "input-method",
+      "description": "Synthetic shurufa waypoints; offset=0.1; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "shurufa"
+      ],
+      "points": [
+        [
+          1.18,
+          0.95,
+          0
+        ],
+        [
+          5.31,
+          1.04,
+          70
+        ],
+        [
+          5.93,
+          0.04,
+          140
+        ],
+        [
+          3.06,
+          -0.05,
+          210
+        ],
+        [
+          5.93,
+          0.04,
+          280
+        ],
+        [
+          3.31,
+          1.04,
+          350
+        ],
+        [
+          0.18,
+          0.95,
+          420
+        ]
+      ]
+    },
+    {
+      "id": "glide",
+      "description": "Synthetic huaxing waypoints; offset=0.2; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "huaxing"
+      ],
+      "points": [
+        [
+          5.11,
+          0.9,
+          0
+        ],
+        [
+          6.12,
+          0.08,
+          70
+        ],
+        [
+          0.11,
+          1.08,
+          140
+        ],
+        [
+          1.87,
+          1.9,
+          210
+        ],
+        [
+          6.86,
+          0.08,
+          280
+        ],
+        [
+          5.87,
+          2.08,
+          350
+        ],
+        [
+          4.11,
+          0.9,
+          420
+        ]
+      ]
+    },
+    {
+      "id": "keyboard-paused",
+      "description": "Synthetic jianpan waypoints; offset=0.1; pause=True; not recorded handwriting",
+      "expected_ids": [
+        "jianpan"
+      ],
+      "points": [
+        [
+          6.18,
+          0.95,
+          0
+        ],
+        [
+          7.06,
+          0.04,
+          70
+        ],
+        [
+          0.18,
+          1.04,
+          140
+        ],
+        [
+          5.81,
+          1.95,
+          210
+        ],
+        [
+          5.81,
+          1.95,
+          330
+        ],
+        [
+          5.81,
+          1.95,
+          450
+        ],
+        [
+          8.93,
+          0.04,
+          520
+        ],
+        [
+          0.31,
+          1.04,
+          590
+        ],
+        [
+          5.68,
+          1.95,
+          660
+        ]
+      ]
+    },
+    {
+      "id": "syllable-boundary-ambiguity",
+      "description": "Synthetic xian waypoints; offset=0.0; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "xian",
+        "xian-city"
+      ],
+      "points": [
+        [
+          1.75,
+          2.0,
+          0
+        ],
+        [
+          7.0,
+          0.0,
+          70
+        ],
+        [
+          0.25,
+          1.0,
+          140
+        ],
+        [
+          5.75,
+          2.0,
+          210
+        ]
+      ]
+    },
+    {
+      "id": "tap",
+      "description": "Single point must not trigger word candidates",
+      "expected_ids": [],
+      "points": [
+        [
+          4.25,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "stationary",
+      "description": "Stationary long hold is not a glide",
+      "expected_ids": [],
+      "points": [
+        [
+          4.25,
+          1,
+          0
+        ],
+        [
+          4.25,
+          1,
+          350
+        ]
+      ]
+    },
+    {
+      "id": "short-motion",
+      "description": "Small movement below 0.75 key-unit path threshold",
+      "expected_ids": [],
+      "points": [
+        [
+          4.25,
+          1,
+          0
+        ],
+        [
+          4.35,
+          1.1,
+          30
+        ]
+      ]
+    },
+    {
+      "id": "outside",
+      "description": "Trace far outside keyboard must be rejected",
+      "expected_ids": [],
+      "points": [
+        [
+          30,
+          30,
+          0
+        ],
+        [
+          40,
+          40,
+          100
+        ]
+      ]
+    }
+  ]
+}

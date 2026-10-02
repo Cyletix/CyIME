@@ -15,6 +15,8 @@
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
 #include "t9_digit_userdict.h"
+#include "t9_suppression.h"
+#include "t9_sentence_scorer.h"
 #include <jni.h>
 #include <android/log.h>
 #include <memory>
@@ -194,6 +196,10 @@ public:
             return false;
         }
         LOGD("processKey: keycode=%d, mask=%d", keycode, mask);
+        // Stop obsolete inference before decoding the next soft-key edit,
+        // rather than letting it compete until the new candidate batch exists.
+        if (mask == 0 && ((keycode >= '2' && keycode <= '9') || keycode == 0xff08))
+            rime::T9CancelSentenceScores();
         bool result = rime->process_key(session_id_, keycode, mask);
         LOGD("processKey result: %d", result);
         return result;
@@ -454,16 +460,17 @@ public:
             if (!c) break;
             auto genuine = rime::Candidate::GetGenuineCandidate(c);
             auto phrase = rime::As<rime::Phrase>(genuine);
-            auto sentence = rime::As<rime::Sentence>(genuine);
             std::string components;
-            if (sentence) for (const auto& entry : sentence->components()) {
-                if (!components.empty()) components += "|";
-                components += entry.text + ":" + std::to_string(entry.weight);
+            if (auto sentence = rime::As<rime::Sentence>(genuine)) {
+                for (const auto& entry : sentence->components()) {
+                    components += entry.text + ":" + std::to_string(entry.weight) + ":" +
+                        std::to_string(entry.quality_len) + ";";
+                }
             }
             rows.push_back({c->text(), c->comment(), genuine->type(), std::to_string(c->quality()),
                             std::to_string(i), std::to_string(c->start()), std::to_string(c->end()),
                             phrase ? std::to_string(phrase->weight()) : "",
-                            phrase ? std::to_string(phrase->code().size()) : "", components});
+                            phrase ? phrase->code().ToString() : "", components});
         }
         return rows;
     }
@@ -545,6 +552,64 @@ public:
         return result;
     }
     
+    bool suppressCandidate(int index, bool global) {
+        if (!rime || !session_id_ || index < 0) return false;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session) return false;
+        if (session->schema()->schema_id() != "t9_pinyin") {
+            return global ? deleteCandidateByGlobalIndex(index) : deleteCandidateOnCurrentPage(index);
+        }
+        auto* context = session->context();
+        if (context->composition().empty()) return false;
+        auto& segment = context->composition().back();
+        if (!segment.menu) return false;
+        const auto pageSize = std::max(1, session->schema()->page_size());
+        const size_t nativeIndex = global ? static_cast<size_t>(index) :
+            segment.selected_index / pageSize * pageSize + index;
+        auto candidate = segment.menu->GetCandidateAt(nativeIndex);
+        if (!candidate) return false;
+        auto store = rime::GetT9SuppressionStore();
+        if (!store->Set(session->schema()->schema_id(), candidate->text(), true)) return false;
+        segment.menu->SuppressText(candidate->text());
+        segment.selected_index = 0;
+        // Read APIs now see the very same Menu and surviving Candidate objects.
+        // A composition refresh would regenerate and reorder the survivors.
+        return true;
+    }
+
+    bool reloadSessionAfterMaintenance() {
+        if (!rime || rime->is_maintenance_mode()) return false;
+        const auto schema = getCurrentSchema();
+        if (session_id_) rime->destroy_session(session_id_);
+        session_id_ = 0;
+        if (!createSession()) return false;
+        if (!schema.empty() && schema != getCurrentSchema()) rime->select_schema(session_id_, schema.c_str());
+        reapplyPageSizeIfNeeded();
+        return true;
+    }
+
+    bool refineT9Sentences() {
+        if (!rime || !session_id_ || rime::T9SentenceRefinementState() != 2) return false;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || session->context()->input().empty() || session->schema()->schema_id() != "t9_pinyin") return false;
+        struct RefinementScope {
+            RefinementScope() { rime::T9SetRefiningSentences(true); }
+            ~RefinementScope() { rime::T9SetRefiningSentences(false); }
+        } scope;
+        session->context()->RefreshNonConfirmedComposition();
+        return true;
+    }
+
+    bool restoreSuppressedCandidate(const std::string& text) {
+        if (!rime || !session_id_) return false;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session) return false;
+        if (!rime::GetT9SuppressionStore()->Set("t9_pinyin", text, false)) return false;
+        if (session->schema()->schema_id() == "t9_pinyin")
+            session->context()->RefreshNonConfirmedComposition();
+        return true;
+    }
+
     bool pageDown() {
         if (!rime || !session_id_) return false;
         return rime->process_key(session_id_, 0xFF56, 0);
@@ -592,6 +657,7 @@ public:
 
     void clearComposition() {
         if (!rime || !session_id_) return;
+        rime::T9CancelSentenceScores();
         rime->clear_composition(session_id_);
     }
 
@@ -1583,6 +1649,41 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeDeleteCandidateByGlobalIndex(
     return Rime::Instance().deleteCandidateByGlobalIndex(index) ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSuppressCandidate(
+    JNIEnv*, jobject, jint index, jboolean global) {
+    return Rime::Instance().suppressCandidate(index, global) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeRestoreSuppressedCandidate(
+    JNIEnv* env, jobject, jstring text) {
+    if (!text) return JNI_FALSE;
+    const char* chars = env->GetStringUTFChars(text, nullptr);
+    const bool result = Rime::Instance().restoreSuppressedCandidate(chars);
+    env->ReleaseStringUTFChars(text, chars);
+    return result ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetSuppressedCandidates(JNIEnv* env, jobject) {
+    const auto words = rime::GetT9SuppressionStore()->List("t9_pinyin");
+    auto strings = env->FindClass("java/lang/String");
+    auto result = env->NewObjectArray(words.size(), strings, nullptr);
+    for (size_t i = 0; i < words.size(); ++i) {
+        auto text = env->NewStringUTF(words[i].c_str());
+        env->SetObjectArrayElement(result, i, text);
+        env->DeleteLocalRef(text);
+    }
+    env->DeleteLocalRef(strings);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9ScoringStatus(JNIEnv* env, jobject) {
+    return env->NewStringUTF(rime::T9ScoringStatus().c_str());
+}
+
 // 翻页 - 下一页
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativePageDown(
@@ -2184,6 +2285,20 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeDestroy(
 
 // 部署
 JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeReloadSessionAfterMaintenance(JNIEnv*, jobject) {
+    return Rime::Instance().reloadSessionAfterMaintenance() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9RefinementState(JNIEnv*, jobject) {
+    return rime::T9SentenceRefinementState();
+}
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeRefineT9Sentences(JNIEnv*, jobject) {
+    return Rime::Instance().refineT9Sentences() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeDeploy(
     JNIEnv* env,
     jobject thiz
@@ -2394,6 +2509,7 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9ClearComposition(
     jobject thiz,
     jint mode
 ) {
+    rime::T9CancelSentenceScores();
     rime::T9Processor* proc = rime::T9ProcessorRequire();
     if (!proc) return;
     proc->ClearComposition(mode);

@@ -17,9 +17,10 @@ data class InputUIState(
     val schemaSwitches: List<SchemaSwitchUiState> = emptyList(),
     val enterKeyText: String = "发送",
     val darkMode: Int = 0,
-    val themeId: String = "ocean_blue",
+    val themeId: String = SettingsPreferences.defaultKeyboardTheme,
     val isSttEnabled: Boolean = false,
     val handwritingExpanded: Boolean = false,
+    val clipboardImagesExpanded: Boolean = false,
     val keyboardHeightDp: Int = 0,
     val keyboardBottomPaddingDp: Int = 0,
     val keyboardOpacity: Float = 1f,
@@ -58,9 +59,8 @@ data class InputUIState(
     val isFloatingMode: Boolean = false,
     val floatingOffsetX: Int = 0,
     val floatingOffsetY: Int = 0,
-    val cursorX: Int = 0,
-    val cursorY: Int = 0,
-    val cursorVisible: Boolean = false,
+    /** Current editor's cursor in screen pixels; null until it reports a usable anchor. */
+    val cursorAnchor: HardwareCursorAnchor? = null,
     val showQuickSendForm: Boolean = false,
     val quickSendFormFocused: Boolean = false,
     /** 快捷发送表单内焦点是否在"触发编码"输入框（false=在文本输入框）；决定按键输入路由目标。 */
@@ -89,4 +89,9 @@ data class InputUIState(
     /** passive 纯展示节点树（getPanelState.ui，统一 UiNode 声明式模型）。 */
     val toolPanelUiNodes: List<com.kingzcheung.xime.plugin.core.config.UiNode>? = null,
     val clipboardSyncEnabled: Boolean = false,
-)
+) {
+    val inputProfile: com.kingzcheung.xime.settings.InputProfile get() {
+        val entry = schemas.firstOrNull { it.schemaId == currentSchemaId }
+        return com.kingzcheung.xime.settings.InputProfiles.current(currentSchemaId, isAsciiMode, entry?.language, entry?.scheme)
+    }
+}

@@ -154,7 +154,7 @@ class LuaScriptRuntime(
         return when {
             value.isnil() -> null
             // LuaString 必须先于 isstring() 判断：二进制字节流（如备份 zip）若走
-            // tojstring→UTF-8 重编码会损坏；文本字符串两种路径结果一致
+            // tojstring→UTF-8 重编码会损坏。文本含补充平面字符时，调用方先用 bin.utf8。
             value is LuaString -> luaToBytes(value)
             value.isstring() -> value.tojstring().toByteArray(Charsets.UTF_8)
             value.istable() -> SimpleJson.encode(tableToJava(value)).toByteArray(Charsets.UTF_8)
@@ -598,6 +598,11 @@ class LuaScriptRuntime(
 
         // 二进制原语：大端 int32（帧序号，负数按补码输出）与 gzip 压缩/解压（火山等二进制协议需要）
         val bin = LuaTable()
+        // LuaJ 3.0.1 uses CESU-8 internally for Java strings (surrogate pairs are six
+        // bytes). Protocol sizes/digests need real UTF-8, while binary APIs stay raw.
+        bin.set("utf8", luaFunction { args ->
+            LuaString.valueOf(args.arg1().checkjstring().toByteArray(Charsets.UTF_8))
+        })
         bin.set("int32be", luaFunction { args ->
             val n = args.arg1().toint()
             LuaString.valueOf(
@@ -774,9 +779,8 @@ class LuaScriptRuntime(
             }
             val bodyArg = args.arg(4)
             val body: ByteArray? = bodyToBytes(bodyArg)
-            Log.d("LuaHttpBridge", "[$pluginId] request(method=$method url=$url nargs=${args.narg()} bodyType=" +
-                if (bodyArg.isnil()) "nil" else bodyArg.typename() +
-                " body=${body?.toString(Charsets.UTF_8)?.take(300) ?: "<空>"}")
+            // Clipboard content and pairing credentials must not enter diagnostics.
+            Log.d("LuaHttpBridge", "[$pluginId] request(method=$method bodyBytes=${body?.size ?: 0})")
             val timeoutMillis = args.arg(5).optint(0)?.takeIf { it > 0 }
             val response = httpHostApi?.request(method, url, headers, body, timeoutMillis)
             if (response == null) {

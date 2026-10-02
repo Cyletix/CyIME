@@ -1,6 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import com.kingzcheung.xime.settings.KeysConfigHelper
+import com.kingzcheung.xime.settings.InputProfiles
+import com.kingzcheung.xime.settings.LayoutKind
 
 /**
  * 键盘布局状态 — 取代 [KeyboardMode] 枚举，
@@ -105,26 +107,22 @@ fun initialKeyboardLayoutState(
  * （xime.yaml / xime.custom.yaml），未声明的方案一律全键盘。
  */
 fun isT9Schema(schemaId: String): Boolean =
-    KeysConfigHelper.boundSectionForSchema(schemaId) == "t9"
+    InputProfiles.current(schemaId).layout.kind == LayoutKind.T9
 
 /**
  * 判断是否为笔画方案：仅认 keyboard.stroke.schemas 绑定声明，
  * 未声明的方案一律全键盘。
  */
 fun isStrokeSchema(schemaId: String): Boolean =
-    KeysConfigHelper.boundSectionForSchema(schemaId) == "stroke"
+    InputProfiles.current(schemaId).layout.kind == LayoutKind.STROKE_KEYPAD
 
 /**
  * 判断是否为手写方案：仅认 keyboard.handwriting.schemas 绑定声明，
  * 未声明的方案一律全键盘（手写方案不经过 rime 引擎）。
  */
 fun isHandwritingSchema(schemaId: String): Boolean =
-    KeysConfigHelper.boundSectionForSchema(schemaId) == "handwriting"
+    InputProfiles.current(schemaId).layout.kind == LayoutKind.HANDWRITING
 
 /** 分体只适用于26键，不能把14键、九键、手写或日语九键拆开。 */
-internal fun supportsSplitKeyboard(schemaId: String, asciiMode: Boolean): Boolean = asciiMode || (
-    com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(schemaId)?.rows?.flatten()?.none { it.length > 1 } != false &&
-    !isT9Schema(schemaId) && !isStrokeSchema(schemaId) && !isHandwritingSchema(schemaId) &&
-        KeysConfigHelper.mergedSectionForSchema(schemaId) == null &&
-        KeysConfigHelper.codeLayoutForSchema(schemaId) != "japanese_kana"
-    )
+internal fun supportsSplitKeyboard(schemaId: String, asciiMode: Boolean): Boolean =
+    InputProfiles.current(schemaId, asciiMode).layout.kind == LayoutKind.ALPHABETIC

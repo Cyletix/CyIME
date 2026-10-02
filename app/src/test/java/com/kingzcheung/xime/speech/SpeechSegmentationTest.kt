@@ -69,6 +69,22 @@ class SpeechSegmentationTest {
         assertEquals("hello world 你好 世界", cleanSenseVoiceText("hello world，你 好，世界。"))
     }
 
+    @Test fun `SenseVoice no speech metadata rejects hallucinated words before cleanup`() {
+        for (language in listOf("<|nospeech|>", "nospeech")) {
+            assertEquals("", cleanSenseVoiceText("Yeah.", language))
+            assertEquals("", cleanSenseVoiceText("谢谢观看", language))
+        }
+        assertEquals("", cleanSenseVoiceText("<|nospeech|><|NEUTRAL|><|Event_UNK|>Yeah"))
+    }
+
+    @Test fun `real short words and mixed language speech are not blacklisted`() {
+        assertEquals("Yeah", cleanSenseVoiceText("Yeah!", "<|en|>"))
+        assertEquals("嗯", cleanSenseVoiceText("嗯。", "<|zh|>"))
+        assertEquals("はい", cleanSenseVoiceText("はい。", "<|ja|>"))
+        assertEquals("Yeah 可以", cleanSenseVoiceText("Yeah，可以。", "<|zh|>"))
+        assertEquals("Yeah", cleanSenseVoiceText("Yeah")) // Missing metadata is not proof of silence.
+    }
+
 
     @Test fun `second pass and region assembly preserve decimals and dictated names until UI`() {
         val t = SpeechTranscript()
@@ -93,6 +109,63 @@ class SpeechSegmentationTest {
         override fun close() { }
     }
     private fun pcm(count: Int, sample: Int = 1600) = ByteArray(count * 2) { if (it % 2 == 0) sample.toByte() else (sample shr 8).toByte() }
+
+    @Test fun `hard limit followed by silence never asks SenseVoice to invent another phrase`() {
+        for (twoPass in listOf(false, true)) {
+            val decoded = mutableListOf<FloatArray>()
+            val errors = mutableListOf<String>()
+            val engine = object : FakeEngine(twoPass) {
+                override val isStreaming = twoPass
+                override fun refine(samples: FloatArray): String {
+                    decoded.add(samples)
+                    return if (samples.any { it != 0f }) "有效语音" else "Yeah"
+                }
+            }
+            val session = LocalSpeechSession(engine, {}, { errors.add(it) })
+            // 6 s target + 2 s forced-cut margin, exactly 250 frames; then no new speech.
+            session.acceptPcm(pcm(128000))
+            session.acceptPcm(pcm(16000, 0))
+            assertEquals("mode twoPass=$twoPass", "有效语音", session.finish())
+            assertEquals(1, decoded.size)
+            assertTrue(errors.isEmpty())
+        }
+    }
+
+    @Test fun `hard limit cannot use a padded stop tail to start a silent region`() {
+        val regions = mutableListOf<FloatArray>()
+        val segmenter = SpeechSegmenter(Detector(), 1000, { _, _ -> }, { _, pcm, _ -> regions.add(pcm) })
+        // First forced cut at ceil(3000 ms * 16 / 512) frames, then a sub-frame silent tail.
+        segmenter.accept(FloatArray(94 * 512) { .1f })
+        segmenter.accept(FloatArray(73))
+        segmenter.finishInput()
+        assertEquals(1, regions.size)
+        assertTrue(regions.single().all { it == .1f })
+    }
+
+    @Test fun `VAD hangover after a hard limit cannot turn low energy silence into speech`() {
+        val regions = mutableListOf<FloatArray>()
+        val hangover = object : SpeechDetector {
+            override fun speech(frame: FloatArray) = true
+            override fun reset() {}
+        }
+        val segmenter = SpeechSegmenter(hangover, 1000, { _, _ -> }, { _, pcm, _ -> regions.add(pcm) })
+        segmenter.accept(FloatArray(94 * 512) { .1f })
+        segmenter.accept(FloatArray(16000))
+        segmenter.finishInput()
+        assertEquals(1, regions.size)
+    }
+
+    @Test fun `new short speech after a forced cut and silence still reaches decoder`() {
+        val regions = mutableListOf<FloatArray>()
+        val segmenter = SpeechSegmenter(Detector(), 1000, { _, _ -> }, { _, pcm, _ -> regions.add(pcm) })
+        segmenter.accept(FloatArray(94 * 512) { .1f })
+        segmenter.accept(FloatArray(16000))
+        segmenter.accept(FloatArray(4000) { .2f })
+        segmenter.finishInput()
+        assertEquals(2, regions.size)
+        assertEquals(4000, regions[1].count { it == .2f })
+        assertFalse(regions.any { region -> region.all { it == 0f } })
+    }
 
     @Test fun `standalone offline model finalizes without a streaming model`() {
         val engine = object : FakeEngine() {

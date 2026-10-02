@@ -26,6 +26,27 @@ import kotlinx.coroutines.withContext
  * 共享状态通过 service 引用访问。
  */
 internal class ImeTextCommit(private val service: XimeInputMethodService) {
+    internal suspend fun pasteClipboardImage(image: com.kingzcheung.xime.clipboard.ClipboardImage): Boolean? {
+        val connection = service.currentInputConnection ?: return null
+        val editor = service.currentInputEditorInfo ?: return null
+        val session = service.uiState.value.inputSessionId
+        if (service.uiState.value.quickSendFormFocused || service.uiState.value.toolPanelInputFocused) return null
+        val cached = service.clipboardManager.images.prepare(image)
+        if (service.uiState.value.inputSessionId != session || service.currentInputConnection !== connection) return null
+        val uri = Uri.parse(cached.uri)
+        runCatching { service.grantUriPermission(editor.packageName, uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        val content = InputContentInfo(uri, android.content.ClipDescription("图片", arrayOf(cached.mimeType)), null)
+        val accepted = ImagePasteProtocol.commit(connection, editor, content)
+        if (accepted) {
+            service.clipboardManager.images.dismissPreview(image.uri)
+            service.clipboardManager.images.dismissPreview(cached.uri)
+        }
+        else {
+            service.clipboardManager.copyImageUriToSystemClipboard(cached)
+            service.clipboardManager.images.reportPasteFailure(cached, editor.packageName)
+        }
+        return accepted
+    }
     internal fun performUndo() {
         val currentTextBeforeCursor = service.currentInputConnection?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
         val currentLength = currentTextBeforeCursor.length
@@ -152,8 +173,8 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
 
     internal fun keyboardLiteral(text: String, numberPanel: Boolean = false, preserveWidth: Boolean = false): String =
         keyboardLiteralWidth(text, isFullWidthPunctuation(),
-            service.uiState.value.currentSchemaId in com.kingzcheung.xime.settings.JapaneseSchemas.ids ||
-                service.uiState.value.currentSchemaId == "jaroomaji", numberPanel, preserveWidth)
+            service.uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.JAPANESE,
+            numberPanel, preserveWidth)
 
     internal fun commitLiteralText(text: String, preserveWidth: Boolean = false) {
         if (text.isEmpty()) return

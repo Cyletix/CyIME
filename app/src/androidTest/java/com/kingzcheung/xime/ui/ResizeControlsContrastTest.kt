@@ -131,7 +131,12 @@ class ResizeControlsContrastTest {
         val opacityPanel = rule.onNodeWithTag("keyboard-resize-opacity-panel", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val slider = rule.onNodeWithTag("keyboard-opacity-slider", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val opacityLabel = rule.onNodeWithTag("keyboard-opacity-overlay-label", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("opacity bar must leave space for side resize handles", opacityPanel.width <= controls.width * 0.8f)
+        val actions = rule.onNodeWithTag("keyboard-resize-actions", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("opacity bar must leave space for side resize handles", opacityPanel.left >= controls.left + 11f &&
+            opacityPanel.right <= controls.right - 11f)
+        assertEquals("slider and actions must share the same width", actions.width, opacityPanel.width, 1f)
+        assertEquals(actions.left, opacityPanel.left, 1f)
+        assertTrue("tablet action buttons must not stretch across the screen", reset.width <= 140f)
         assertEquals(controls.center.x, opacityPanel.center.x, 1f)
         assertEquals(slider.center.x, opacityLabel.center.x, 1f)
         assertTrue("opacity label must sit on the progress bar", opacityLabel.top >= slider.top && opacityLabel.bottom <= slider.bottom)

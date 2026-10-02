@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,6 +47,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.MaterialLevel
+import com.kingzcheung.xime.ui.theme.visualMaterial
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -126,7 +132,8 @@ fun LanguageKeyButton(
     val schemas by rememberUpdatedState(com.kingzcheung.xime.settings.InputModes.languageChoices(
         actions.schemas, actions.currentInputModeId,
         com.kingzcheung.xime.settings.InputModes.rememberedModes(context, actions.schemas),
-        com.kingzcheung.xime.settings.InputModes.languageOrder(context)))
+        com.kingzcheung.xime.settings.InputModes.languageOrder(context),
+        com.kingzcheung.xime.settings.InputModes.selectedProfiles(context)))
     val switchSchema by rememberUpdatedState(actions.onSwitchSchema)
     val hasMenu = schemas.isNotEmpty() && switchSchema != null
     val scope = rememberCoroutineScope()
@@ -269,7 +276,7 @@ fun LanguageKeyButton(
                     modifier = Modifier.width(with(density) { menuGeometry.bounds.width.toDp() })
                         .height(with(density) { menuGeometry.bounds.height.toDp() }).testTag("language-menu"),
                 ) {
-                    Column(Modifier.padding(6.dp)) {
+                    Column(Modifier.visualMaterial(VisualStyles.current, 16.dp, MaterialLevel.FLOATING).padding(6.dp)) {
                         Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
                             Text("语言", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
                         }
@@ -282,29 +289,36 @@ fun LanguageKeyButton(
                                 .verticalScroll(scroll)
                         ) {
                             menuSchemas.forEach { schema ->
-                                val modeName = if (schema.schemaId == com.kingzcheung.xime.settings.InputModes.ENGLISH) "English"
-                                    else actions.schemas.firstOrNull { it.schemaId == schema.schemaId }?.name ?: schema.schemaId
+                                val modeName = schema.profile.summary
+                                val isSelected = schema.schemaId == (selectedId ?: actions.currentInputModeId)
                                 Column(
                                     Modifier.fillMaxWidth().height(with(density) { rowHeight.toDp() })
                                         .testTag("language-schema:${schema.schemaId}")
                                         .semantics {
-                                            selected = (selectedId ?: actions.currentInputModeId) == schema.schemaId
+                                            selected = isSelected
                                             contentDescription = "选择${schema.name}"
                                         }
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (schema.schemaId == (selectedId ?: actions.currentInputModeId))
-                                            MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                                        .background(if (isSelected)
+                                            MaterialTheme.colorScheme.primary else Color.Transparent)
                                         .padding(horizontal = 12.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
                                 ) {
-                                    Text(schema.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
-                                        color = if (schema.schemaId == (selectedId ?: actions.currentInputModeId))
-                                            MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+                                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                        if (isSelected) Icon(Icons.Default.Check, contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.align(Alignment.CenterStart).size(16.dp))
+                                        Text(schema.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 20.dp),
+                                            style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
+                                            color = if (isSelected)
+                                                MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                                    }
                                     Text(modeName, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }

@@ -2,6 +2,9 @@ package com.kingzcheung.xime.model
 
 import android.content.Context
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.speech.AsrModelManager
+import com.kingzcheung.xime.speech.SpeechModelCatalog
+import com.kingzcheung.xime.speech.SpeechModelSelection
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** 首次打开应用时安装默认模型；与市场共用下载器、版本和目录，不另建模型副本。 */
 object DefaultModelInstaller {
-    internal val modelIds = listOf("ochwpro", "zipformer-zh-int8", "predictive-text-base")
+    internal val modelIds = setOf("ochwpro", SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.SENSEVOICE,
+        DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE)
     private val started = AtomicBoolean(false)
     private val observingNetwork = AtomicBoolean(false)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -22,6 +26,24 @@ object DefaultModelInstaller {
     private fun preferences(context: Context) = context.getSharedPreferences("default_models", Context.MODE_PRIVATE)
 
     internal fun isHandled(context: Context, id: String): Boolean = preferences(context).getBoolean("handled_$id", false)
+
+    /** Prepare only the initial recommendation while the user still requests it. Manual
+     * alternatives remain under the model centre's control, not a new auto-download loop. */
+    internal fun requestedModelIds(context: Context): List<String> = buildList {
+        add("ochwpro")
+        if (SettingsPreferences.isSttEnabled(context) && SettingsPreferences.isSttUseLocal(context)) {
+            fun dependencies(mode: String): List<String> = listOf(SpeechModelSelection.primary(mode)) +
+                if (SpeechModelSelection.hasCorrection(mode)) listOf(SpeechModelCatalog.SENSEVOICE) else emptyList()
+            val current = dependencies(AsrModelManager(context).getSelectedModelId())
+            addAll(dependencies(DeviceDefaults.voiceModel(context)).filter { it in current })
+        }
+        val prediction = DeviceDefaults.predictionModel(context)
+        if (SettingsPreferences.isSmartPredictionEnabled(context) &&
+            SettingsPreferences.getPredictionSelectedModel(context) == prediction) add(prediction)
+    }.distinct()
+
+    internal fun isPendingDefault(context: Context, id: String): Boolean =
+        !isHandled(context, id) && id in requestedModelIds(context)
 
     internal fun markHandled(context: Context, id: String) {
         if (id in modelIds) preferences(context).edit()
@@ -48,10 +70,7 @@ object DefaultModelInstaller {
         if (!started.compareAndSet(false, true)) return
         scope.launch {
             val prefs = preferences(app)
-            val pending = modelIds.filterNot { isHandled(app, it) }.filter { id ->
-                id != "predictive-text-base" || (SettingsPreferences.isSmartPredictionEnabled(app) &&
-                    SettingsPreferences.getPredictionSelectedModel(app) == id)
-            }
+            val pending = requestedModelIds(app).filterNot { isHandled(app, it) }
             if (pending.isEmpty()) { started.set(false); return@launch }
             try {
                 ModelManager.initialize()
@@ -60,7 +79,7 @@ object DefaultModelInstaller {
                     ModelManager.loadFromRemote(app)
                     for (id in pending) {
                         // 前一模型可能下载较久，用户此时删除后续模型应立即从队列退出。
-                        if (isHandled(app, id)) continue
+                        if (!isPendingDefault(app, id)) continue
                         val model = ModelManager.getModel(id) ?: continue
                         // 下载先写暂存目录，已有完整市场版本可以直接复用，包括非最新版本。
                         val ready = ModelManager.isModelDownloaded(app, model)
@@ -89,7 +108,7 @@ object DefaultModelInstaller {
                             }
                         }
                     }
-                    if (pending.all { isHandled(app, it) }) return@launch
+                    if (pending.none { isPendingDefault(app, it) }) return@launch
                 }
             } catch (error: Exception) {
                 FileLogger.w("DefaultModels", "默认模型准备失败，联网或下次启动重试：${error.message}")

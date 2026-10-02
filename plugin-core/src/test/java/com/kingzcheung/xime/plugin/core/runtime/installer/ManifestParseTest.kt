@@ -6,6 +6,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ManifestParseTest {
+    @Test
+    fun `Windows clipboard polling capability and host version parse from real manifest`() {
+        val content = java.io.File("../plugins/cyime-windows-sync/manifest.yaml").readText()
+        val config = (InstallerManager.parseManifestContent(content) as PluginParseResult.Success).config
+        assertEquals("1.3.20", config.minHostVersion)
+        assertEquals(listOf("cyime-windows-v1"), config.capabilities?.clipboardSync?.protocols)
+        assertEquals(2_000L, config.capabilities?.clipboardSync?.foregroundPollIntervalMs)
+        assertEquals(65_536, config.capabilities?.clipboardSync?.maxTextBytes)
+        val capped = (InstallerManager.parseManifestContent(content.replace("2000", "1")) as PluginParseResult.Success).config
+        assertEquals(2_000L, capped.capabilities?.clipboardSync?.foregroundPollIntervalMs)
+    }
 
     @Test
     fun `正常 manifest 解析成功且字段正确`() {

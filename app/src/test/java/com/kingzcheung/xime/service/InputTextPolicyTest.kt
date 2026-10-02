@@ -39,7 +39,8 @@ class InputTextPolicyTest {
         assertEquals(",", keyboardLiteralWidth(",", false, false))
     }
     @Test fun explicitlyChosenSymbolsKeepTheirExactCodepointsAcrossWidthAndLanguage() {
-        val literals = listOf("-", "－", ",", "，", ".", "。", "123", "１２３", " ", "　", "a-b")
+        val literals = listOf("-", "－", ",", "，", ".", "。", "123", "１２３", " ", "　", "a-b",
+            "(*´▽｀*)", "(＾▽＾)", "¯\\_(ツ)_/¯", "(╯°□°）╯︵ ┻━┻")
         for (full in listOf(false, true)) for (japanese in listOf(false, true))
             for (numberPanel in listOf(false, true)) for (literal in literals) {
                 assertEquals(literal, keyboardLiteralWidth(literal, full, japanese, numberPanel, preserveWidth = true))

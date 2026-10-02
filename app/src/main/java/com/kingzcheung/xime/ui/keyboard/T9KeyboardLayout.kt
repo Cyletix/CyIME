@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,6 +79,7 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
+import com.kingzcheung.xime.service.usesT9CandidateNavigation
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.util.PermissionHelper
 import com.kingzcheung.xime.util.SubcharHelper
@@ -374,6 +376,7 @@ private fun T9KeyboardContent(
             else -> upHint
         }
         return T9KeySwipes(
+            symbolInputText = gesture.swipeUp?.let { symbolInputValue(it.value.ifEmpty { it.label }, it.action) },
             onSwipeUp = swipeHandlerFor(gesture.swipeUp, commitDirect, onGestureAction),
             onSwipeDown = swipeHandlerFor(gesture.swipeDown, commitDirect, onGestureAction),
             swipeUpText = if (swipeHints.up &&
@@ -387,8 +390,9 @@ private fun T9KeyboardContent(
     }
 
     val density = LocalDensity.current
-    val candidateShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val candidateShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(keyBackgroundColor)
@@ -422,7 +426,7 @@ private fun T9KeyboardContent(
                     .padding(scaledKeyVisualPadding())
                     .then(candidateShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                    .background(keyBackgroundColor)
+                    .background(frostedKeyColor(keyBackgroundColor, keyTextColor, frostedGlass))
             ) {
                 val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
                 val currentFirstOptions = controller.firstOptions
@@ -708,10 +712,22 @@ private fun T9KeyboardContent(
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
+            val nextCandidate = candidateState.value.usesT9CandidateNavigation(uiState.inputProfile)
             NineKeyButton(
-                digit = "", letters = "0", onClick = { commitDirect("0") },
+                digit = "", letters = if (nextCandidate) "下一项" else "0",
+                icon = if (nextCandidate) rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowRight) else null,
+                onClick = {
+                    if (nextCandidate) {
+                        callbacks.onDismissPreeditEditor?.invoke()
+                        callbacks.onNextCandidate(candidateState.value)
+                    } else commitDirect("0")
+                },
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                 modifier = Modifier.weight(1f).testTag("t9-zero-key"),
+                onSwipeLeft = if (nextCandidate) ({
+                    callbacks.onDismissPreeditEditor?.invoke()
+                    callbacks.onPreviousCandidate(candidateState.value)
+                }) else null,
                 onPress = { onKeyPressDown?.invoke("0") },
                 onSwipeStateChange = onSwipeStateChange, swipes = swipesFor("0"),
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
@@ -736,6 +752,7 @@ private fun T9KeyboardContent(
 
 /** 九键数字键的滑动配置：回调 + 提示文本（均受 keyboard.t9.keys 配置与提示开关控制）。 */
 private data class T9KeySwipes(
+    val symbolInputText: String? = null,
     val onSwipeUp: (() -> Unit)? = null,
     val onSwipeDown: (() -> Unit)? = null,
     /** 上滑滑动气泡文本（display: key 时不传） */
@@ -788,6 +805,7 @@ private fun T9DigitKey(
         onSwipeStateChange = onSwipeStateChange,
         badgeText = digit,
         swipeText = currentSwipes.swipeUpText,
+        symbolInputText = currentSwipes.symbolInputText,
         swipeDownText = currentSwipes.swipeDownText,
         swipeUpKeyLabel = currentSwipes.swipeUpKeyLabel,
         swipeDownKeyLabel = currentSwipes.swipeDownKeyLabel,
@@ -820,7 +838,10 @@ private fun CandidateItem(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else Color.Transparent)
+            .background(if (isPressed) frostedKeyColor(
+                backgroundColor, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
+                legacyStateColor = backgroundColor.copy(alpha = 0.7f), pressed = true,
+            ) else Color.Transparent)
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -881,9 +902,14 @@ private fun NineKeyButton(
     shadowShapeRadius: Dp = 8.dp,
     fontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
     swipes: T9KeySwipes = T9KeySwipes(),
+    icon: androidx.compose.ui.graphics.painter.Painter? = null,
+    onSwipeLeft: (() -> Unit)? = null,
 ) {
     SwipeableKeyButton(
         text = letters,
+        icon = icon,
+        onSwipeLeft = onSwipeLeft,
+        swipeLeftText = if (onSwipeLeft != null) "上一项" else null,
         onClick = onClick,
         backgroundColor = backgroundColor,
         textColor = textColor,
@@ -892,6 +918,7 @@ private fun NineKeyButton(
         onSwipeStateChange = onSwipeStateChange,
         badgeText = digit,
         swipeText = swipes.swipeUpText,
+        symbolInputText = swipes.symbolInputText,
         swipeDownText = swipes.swipeDownText,
         swipeUpKeyLabel = swipes.swipeUpKeyLabel,
         swipeDownKeyLabel = swipes.swipeDownKeyLabel,
@@ -922,8 +949,9 @@ private fun ResetKey(
     val currentOnPress by rememberUpdatedState(onPress)
     val density = LocalDensity.current
     val shape = RoundedCornerShape(shadowShapeRadius)
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -952,7 +980,11 @@ private fun ResetKey(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)), contentAlignment = Alignment.Center
+            .background(frostedKeyColor(
+                backgroundColor, textColor, frostedGlass,
+                legacyStateColor = if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
+                pressed = isPressed,
+            ))), contentAlignment = Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val hintSize = 9f * adaptiveHintScale(contentScale)

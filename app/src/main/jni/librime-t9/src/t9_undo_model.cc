@@ -252,11 +252,12 @@ void T9UndoModel::Clear() {
     commit_captures_.clear();
 }
 
-void T9UndoModel::PushCommitCapture(const std::string& text, const T9SyllableCode& code) {
-    commit_captures_.emplace_back(text, code);
+void T9UndoModel::PushCommitCapture(const std::string& text, const T9SyllableCode& code,
+                                  const std::string& table_code) {
+    commit_captures_.push_back({text, code, table_code});
 }
 
-std::optional<std::pair<std::string, T9SyllableCode>> T9UndoModel::PopLastCommitCapture() {
+std::optional<T9CommitCapture> T9UndoModel::PopLastCommitCapture() {
     if (commit_captures_.empty())
         return std::nullopt;
     auto capture = std::move(commit_captures_.back());

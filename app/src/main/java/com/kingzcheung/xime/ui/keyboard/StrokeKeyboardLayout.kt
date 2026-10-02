@@ -259,6 +259,7 @@ private data class StrokeKeyDef(
 
 /** 笔画键的滑动配置：回调 + 提示文本（keyboard.stroke.keys 配置，无配置时回退内置默认）。 */
 private data class StrokeKeySwipes(
+    val symbolInputText: String? = null,
     val onSwipeUp: (() -> Unit)? = null,
     val onSwipeDown: (() -> Unit)? = null,
     val swipeUpText: String? = null,
@@ -318,8 +319,9 @@ private fun StrokeKeyboardContent(
 
     // 符号面板统一阴影（与九键左栏候选面板同款样式）
     val density = LocalDensity.current
-    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(keyBackgroundColor)
@@ -339,6 +341,7 @@ private fun StrokeKeyboardContent(
         if (gesture == null || (gesture.swipeUp == null && gesture.swipeDown == null)) {
             // 回退行为与内置默认（display: "key"）一致：仅键面提示，无滑动气泡
             return StrokeKeySwipes(
+                symbolInputText = fallbackDigit,
                 onSwipeUp = { onKeyPress(fallbackDigit) },
                 swipeUpKeyLabel = if (swipeHints.up && hintsActive) fallbackDigit else null,
             )
@@ -354,6 +357,7 @@ private fun StrokeKeyboardContent(
             else -> hint(gesture.swipeUp)
         }
         return StrokeKeySwipes(
+            symbolInputText = gesture.swipeUp?.let { symbolInputValue(it.value.ifEmpty { it.label }, it.action) },
             onSwipeUp = swipeHandlerFor(gesture.swipeUp, onKeyPress, onGestureAction),
             onSwipeDown = swipeHandlerFor(gesture.swipeDown, onKeyPress, onGestureAction),
             swipeUpText = if (swipeHints.up && hintsActive &&
@@ -384,7 +388,7 @@ private fun StrokeKeyboardContent(
                     .padding(scaledKeyVisualPadding())
                     .then(symbolPanelShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                    .background(keyBackgroundColor)
+                    .background(frostedKeyColor(keyBackgroundColor, keyTextColor, frostedGlass))
             ) {
                 if (strokeSideSymbols.size <= 4) {
                     Column(
@@ -656,7 +660,10 @@ private fun StrokeSymbolItem(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else Color.Transparent)
+            .background(if (isPressed) frostedKeyColor(
+                backgroundColor, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
+                legacyStateColor = backgroundColor.copy(alpha = 0.7f), pressed = true,
+            ) else Color.Transparent)
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -711,6 +718,7 @@ private fun StrokeKeyItem(
         onSwipeStateChange = onSwipeStateChange,
         badgeText = swipeDigit,
         swipeText = swipes.swipeUpText,
+        symbolInputText = swipes.symbolInputText,
         swipeDownText = swipes.swipeDownText,
         swipeUpKeyLabel = swipes.swipeUpKeyLabel,
         swipeDownKeyLabel = swipes.swipeDownKeyLabel,
@@ -749,6 +757,7 @@ private fun StrokeDigitKey(
         onSwipeStateChange = onSwipeStateChange,
         badgeText = swipeDigit,
         swipeText = swipes.swipeUpText,
+        symbolInputText = swipes.symbolInputText,
         swipeDownText = swipes.swipeDownText,
         swipeUpKeyLabel = swipes.swipeUpKeyLabel,
         swipeDownKeyLabel = swipes.swipeDownKeyLabel,
@@ -802,8 +811,9 @@ private fun ResetKey(
     val currentOnPress by rememberUpdatedState(onPress)
     val density = LocalDensity.current
     val shape = RoundedCornerShape(shadowShapeRadius)
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -832,7 +842,11 @@ private fun ResetKey(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)),
+            .background(frostedKeyColor(
+                backgroundColor, textColor, frostedGlass,
+                legacyStateColor = if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
+                pressed = isPressed,
+            ))),
         contentAlignment = Alignment.Center
     ) {
         Icon(

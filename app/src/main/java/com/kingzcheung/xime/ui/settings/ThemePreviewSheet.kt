@@ -1,5 +1,18 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
+import com.kingzcheung.xime.ui.theme.TransparentGlassTheme
+import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.frostedKeyColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,9 +76,14 @@ private val QWERTY_ROW2 = listOf("Z", "X", "C", "V", "B", "N", "M")
 @Composable
 fun ThemePreviewSheet(
     theme: KeyboardColorScheme,
-    onApply: () -> Unit,
+    onApply: (FrostedGlassConfig) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var glass by rememberSaveable(theme.id, stateSaver = listSaver(
+        save = { listOf(it.blurRadiusDp, it.backgroundOpacity, it.keyOpacity) },
+        restore = { FrostedGlassConfig(theme.id == TransparentGlassTheme.ID, it[0], it[1], it[2]) },
+    )) { mutableStateOf(FrostedGlassPreferences.read(context).copy(enabled = theme.id == TransparentGlassTheme.ID)) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -76,6 +94,7 @@ fun ThemePreviewSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp),
         ) {
@@ -87,7 +106,13 @@ fun ThemePreviewSheet(
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
-            ThemePreviewPager(theme = theme)
+            CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = glass)) {
+                ThemePreviewPager(theme = theme)
+            }
+            if (glass.enabled) {
+                Spacer(Modifier.height(16.dp))
+                FrostedThemeControls(glass) { glass = it }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -105,7 +130,7 @@ fun ThemePreviewSheet(
                     Text("取消", fontSize = 16.sp)
                 }
                 Button(
-                    onClick = onApply,
+                    onClick = { onApply(glass) },
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp),
@@ -224,7 +249,7 @@ private fun ThemeKeyboardPreview(
         Box(
             modifier = modifier
                 .clip(RoundedCornerShape(12.dp))
-                .keyboardBackground(theme.keyboardBackground, isDark, bgColor),
+                .keyboardBackground(theme.keyboardBackground, isDark, bgColor, LocalKeyboardInputPreferences.current.frostedGlass),
         ) {
             Column(
                 modifier = Modifier
@@ -405,10 +430,11 @@ private fun RowScope.PreviewKey(
     fontSize: androidx.compose.ui.unit.TextUnit = 14.sp,
     extraModifier: Modifier = Modifier,
 ) {
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
     val shadow = KeysConfigHelper.getKeyboardShadow()
     val density = LocalDensity.current
-    val shadowModifier = remember(shadow, density, color) {
-        if (shadow.enabled) {
+    val shadowModifier = remember(shadow, density, color, glass.enabled) {
+        if (shadow.enabled && !glass.enabled) {
             val offsetPx = with(density) { shadow.elevation.dp.toPx() }
             val cornerPx = with(density) { shadow.shapeRadius.dp.toPx() }
             Modifier.drawBehind {
@@ -429,7 +455,7 @@ private fun RowScope.PreviewKey(
             .fillMaxWidth()
             .then(shadowModifier)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(color),
+            .background(frostedKeyColor(color, textColor, glass)),
         contentAlignment = Alignment.Center,
     ) {
         if (icon != null) {

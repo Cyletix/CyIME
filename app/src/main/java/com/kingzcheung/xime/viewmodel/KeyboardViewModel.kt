@@ -22,6 +22,8 @@ import com.kingzcheung.xime.plugin.core.api.PluginResultItem
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.speech.RecognitionState
+import com.kingzcheung.xime.rime.T9InputController
+import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState
 import com.kingzcheung.xime.ui.keyboard.transition
@@ -54,8 +56,9 @@ data class KeyboardUiState(
     val enterKeyText: String = "发送",
     val isDarkTheme: Boolean = false,
     val darkMode: Int = 2,
-    val themeId: String = "ocean_blue",
+    val themeId: String = com.kingzcheung.xime.ui.theme.PureBlackTheme.ID,
     val handwritingExpanded: Boolean = false,
+    val clipboardImagesExpanded: Boolean = false,
     val keyboardHeightDp: Int = 0,
     val keyboardBottomPaddingDp: Int = 0,
     val keyboardOpacity: Float = 1f,
@@ -89,6 +92,8 @@ data class KeyboardUiState(
     /** 已保存的悬浮宽度（dp）；0 = 未设置，按高度推导。 */
     val floatingWidthDp: Int = 0,
     val fixedWidthDp: Int = 0,
+    /** Width after window/layout aspect protection; independent of expanded tool panels. */
+    val keyboardWidthDp: Int = 0,
     val fixedOffsetX: Int = 0,
     val t9ResetSignal: Long = 0L,
     val swipeCancelEpoch: Long = 0L,
@@ -110,7 +115,12 @@ data class KeyboardUiState(
     val toolPanelDisplay: String? = null,
     val toolPanelUiNodes: List<com.kingzcheung.xime.plugin.core.config.UiNode>? = null,
     val clipboardSyncEnabled: Boolean = false,
-)
+) {
+    val inputProfile: com.kingzcheung.xime.settings.InputProfile get() {
+        val entry = schemas.firstOrNull { it.schemaId == currentSchemaId }
+        return com.kingzcheung.xime.settings.InputProfiles.current(currentSchemaId, isAsciiMode, entry?.language, entry?.scheme)
+    }
+}
 
 class KeyboardViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -202,6 +212,72 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     /** 键盘 ascii 状态机（顶层统一管理各键盘上下文的 ascii 记忆） */
     val asciiStateMachine = KeyboardAsciiStateMachine()
+
+    private val inputSession = KeyboardInputSession()
+    @Volatile private var currentKeyboardCallbacks: KeyboardCallbacks? = null
+    private var retainedT9Controller: T9InputController? = null
+
+    /**
+     * Keep the controller and its queued input alive when only the keyboard surface changes.
+     * The service also binds while compact so candidate actions work before the first expansion.
+     */
+    internal fun bindT9Controller(callbacks: KeyboardCallbacks): T9InputController {
+        currentKeyboardCallbacks = callbacks
+        // Null means a standalone UI handles unconsumed deletion in its result callback.
+        val onUnconsumedDelete: (suspend () -> Unit)? =
+            if (callbacks.onT9UnconsumedDelete == null) null
+            else { { currentKeyboardCallbacks?.onT9UnconsumedDelete?.invoke(); Unit } }
+        val controller = retainedT9Controller ?: T9InputController(
+            inputAdmissionTicket = { currentKeyboardCallbacks?.inputAdmissionTicket?.invoke() },
+            captureInputContext = {
+                currentKeyboardCallbacks?.captureInputContext?.invoke() ?: kotlin.coroutines.EmptyCoroutineContext
+            },
+            inputCommands = callbacks.inputCommands,
+            onUnconsumedDelete = onUnconsumedDelete,
+            onCompositionRefresh = { composition, snapshots ->
+                currentKeyboardCallbacks?.onT9RefreshComposition?.invoke(composition, snapshots)
+            },
+            onRightCommitUndone = { currentKeyboardCallbacks?.onT9RightCommitUndone?.invoke(it) },
+            candidateTransform = { currentKeyboardCallbacks?.onTCandidateTransform?.invoke(it) },
+        ).also {
+            retainedT9Controller = it
+            // A physical-keyboard editor may already contain input before this first binding.
+            // Read its snapshot; refreshRemainingInput would rewrite the engine's input.
+            if (inputSession.initialized) it.refreshAfterPreeditEdit()
+        }
+        callbacks.onT9RefreshAfterPreeditEdit = { controller.refreshAfterPreeditEdit() }
+        callbacks.onT9RightCandidateWillBeSelected = { pinyin, text, textLength, revision ->
+            if (pinyin.isNullOrBlank()) controller.onRightCandidateSelectedByDirectCommit(revision)
+            else controller.onRightCandidateSelected(pinyin, text, textLength, revision)
+        }
+        callbacks.onT9ForceSendToRime = { controller.refreshRemainingInput() }
+        callbacks.onT9RunLiteralInput = { controller.enqueueLiteralInput(it) }
+        callbacks.onT9CompositionCleared = { controller.resetDisplayAfterCommit() }
+        callbacks.onFilterT9Candidates = { candidates, comments -> candidates to comments }
+        return controller
+    }
+
+    /** Call at the editor boundary, including when no screen keyboard is mounted. */
+    internal fun synchronizeInputSession(
+        sessionId: Long,
+        resetSignal: Long,
+        isAsciiMode: Boolean,
+        schemaId: String,
+    ) {
+        val change = inputSession.update(sessionId, resetSignal)
+        if (change.resetController) retainedT9Controller?.reset()
+        if (change.newSession) {
+            asciiStateMachine.reset()
+            dispatch(KeyboardDispatchAction.InputSessionStarted(isAsciiMode, schemaId))
+        }
+    }
+
+    override fun onCleared() {
+        retainedT9Controller?.close()
+        retainedT9Controller = null
+        currentKeyboardCallbacks = null
+        super.onCleared()
+    }
 
     /** 统一视图状态（替换 keyboardState + page 双轴） */
     private val _viewState = MutableStateFlow<KeyboardViewState>(KeyboardViewState.ChineseFull)

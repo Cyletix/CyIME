@@ -186,13 +186,12 @@ private:
     // 候选按 comment 归一化匹配（容忍带调/无调差异，见 NormalizePinyinComment），
     // candidate_text 非空时再按文本双条件定位（同注释歧义防错码）。
     // 返回 -1 表示无法确定（fallback 到现有消费算法）。
-    // captured_code / captured_text（可空）：命中候选为 Phrase 时顺带捕获其真实码。
+    // capture（可空）：捕获 Phrase 的真实码，并保留中英文词典边界。
     // out_is_t9_user（可空）：命中候选为 T9 用户词时置 true。
     int QueryRimeConsumedDigits(
         const std::optional<std::string>& candidate_pinyin,
         const std::string& candidate_text,
-        Code* captured_code = nullptr,
-        std::string* captured_text = nullptr,
+        T9CommitCapture* capture = nullptr,
         bool* out_is_t9_user = nullptr) const;
 
     // ════════════════════════════════════════
@@ -220,7 +219,7 @@ private:
     // 本次 FullCommit 右选的调频捕获，跨异步上屏链路存活。
     // SelectCandidate 中同步暂存（避免 undo_model 在 EnterIdle 时被清空，
     // 导致 MemorizeEntry 读到时为空、词典词被误判为场景 B/C）。
-    std::optional<std::pair<std::string, T9SyllableCode>>
+    std::optional<std::vector<T9CommitCapture>>
         pending_fullcommit_capture_;
     // 左侧候选区模式（2026-08-07，英文九键适配）：
     // 构造时按 engine/translators 是否含 script_translator 判定（auto），
@@ -236,6 +235,8 @@ private:
     // 由 Kotlin 在 full commit 时调用 MemorizeEntry/ForgetEntry 写入（UpdateEntry）。
     the<Dictionary> dict_;
     the<UserDictionary> user_dict_;
+    the<Dictionary> english_dict_;
+    the<UserDictionary> english_user_dict_;
     // 音节→SyllableId 映射（惰性构建，与 UserDictionary::Lookup 的 RecruitEntry
     // 构造方式一致：GetSyllabary 返回顺序即 id）。用于把拼音音节转为原生 Code。
     std::unordered_map<std::string, SyllableId> syllabary_map_;

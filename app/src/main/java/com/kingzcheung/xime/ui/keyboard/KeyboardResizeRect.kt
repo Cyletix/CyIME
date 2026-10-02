@@ -67,6 +67,40 @@ internal fun ResizeRect.coerceInside(bounds: ResizeRect): ResizeRect {
     return ResizeRect(newLeft, newTop, newLeft + w, newTop + h)
 }
 
+/** Keep the unsnapped position so small drag events can accumulate and leave the center magnet. */
+internal class FixedKeyboardMoveGesture(
+    initial: ResizeRect,
+    private val bounds: ResizeRect,
+    snapDistancePx: Float,
+) {
+    private var raw = initial.coerceInside(bounds)
+    // Even a nearly full-width keyboard must still be movable all the way to either edge.
+    private val snapDistance = snapDistancePx.coerceIn(0f, (bounds.width - raw.width).coerceAtLeast(0f) / 4f)
+
+    fun move(dx: Float): ResizeRect {
+        raw = raw.translated(dx, 0f).coerceInside(bounds)
+        val toCenter = bounds.centerX - raw.centerX
+        return if (kotlin.math.abs(toCenter) <= snapDistance) raw.translated(toCenter, 0f) else raw
+    }
+}
+
+/** Only snap the edge being resized; callers keep their unsnapped drag accumulator. */
+internal fun ResizeRect.snapFixedEdgeToCenter(
+    handle: ResizeHandle, bounds: ResizeRect, minWidth: Float, snapDistance: Float,
+): ResizeRect {
+    val center = bounds.centerX
+    val distance = snapDistance.coerceAtLeast(0f)
+    return when (handle) {
+        ResizeHandle.LEFT, ResizeHandle.TOP_LEFT, ResizeHandle.BOTTOM_LEFT ->
+            if (kotlin.math.abs(left - center) <= distance && right - center >= minWidth)
+                copy(left = center) else this
+        ResizeHandle.RIGHT, ResizeHandle.TOP_RIGHT, ResizeHandle.BOTTOM_RIGHT ->
+            if (kotlin.math.abs(right - center) <= distance && center - left >= minWidth)
+                copy(right = center) else this
+        else -> this
+    }
+}
+
 /**
  * 拖动手柄的结果矩形。固定对边，只移动被拖的边（角同时移动两条边）。
  *
@@ -136,13 +170,33 @@ internal enum class ResizeHandle {
     NONE, TOP, BOTTOM, LEFT, RIGHT, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT
 }
 
+internal const val RESIZE_EDGE_HIT_DP = 26f
+internal const val RESIZE_CORNER_HIT_DP = 36f
+
 /**
  * 手柄命中：只认正在绘制的那一个矩形（[frame]）的边带，
  * 所以「看得见的边框」就是「拖得动的边框」，不存在两套坐标。
  *
  * 固定和悬浮都支持左右及角手柄；固定底边保留底部留白语义。
  */
-internal fun resizeHandleAt(frame: ResizeRect, point: Offset, hitPx: Float, floating: Boolean): ResizeHandle {
+internal fun resizeHandleAt(
+    frame: ResizeRect, point: Offset, hitPx: Float, floating: Boolean,
+    cornerHitPx: Float = hitPx,
+): ResizeHandle {
+    // Corners take priority over sides and movement. Cap inward reach on tiny windows
+    // so the four targets cannot swallow the middle of an edge or the whole card.
+    val corner = cornerHitPx.coerceAtLeast(hitPx)
+        .coerceAtMost(minOf(frame.width, frame.height) / 3f)
+    val nearLeft = kotlin.math.abs(point.x - frame.left) <= corner
+    val nearRight = kotlin.math.abs(point.x - frame.right) <= corner
+    val nearTop = kotlin.math.abs(point.y - frame.top) <= corner
+    val nearBottom = kotlin.math.abs(point.y - frame.bottom) <= corner
+    when {
+        nearLeft && nearTop -> return ResizeHandle.TOP_LEFT
+        nearRight && nearTop -> return ResizeHandle.TOP_RIGHT
+        nearLeft && nearBottom -> return ResizeHandle.BOTTOM_LEFT
+        nearRight && nearBottom -> return ResizeHandle.BOTTOM_RIGHT
+    }
     if (point.x < frame.left - hitPx || point.x > frame.right + hitPx) return ResizeHandle.NONE
     if (point.y < frame.top - hitPx || point.y > frame.bottom + hitPx) return ResizeHandle.NONE
     val top = point.y < frame.top + hitPx

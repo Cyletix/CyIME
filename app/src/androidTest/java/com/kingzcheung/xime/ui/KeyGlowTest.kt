@@ -33,7 +33,7 @@ class KeyGlowTest {
 
     @Test fun quickTapShrinksWholeCapThenRecoversAndDisappearsAtHalfSecond() {
         var taps = 0
-        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true)) {
             Box(Modifier.size(160.dp, 110.dp).background(Color.White).testTag("frame").padding(24.dp)) {
                 KeyButton("A", { taps++ }, Color.DarkGray, Color.White, Modifier.testTag("key"), shadowEnabled = false)
             }
@@ -68,7 +68,7 @@ class KeyGlowTest {
     }
 
     @Test fun exportActualSquareGlowFrames() {
-        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true)) {
             Box(Modifier.size(180.dp, 130.dp).background(Color(0xFF191C22)).testTag("square-frame").padding(24.dp)) {
                 KeyButton("ABC", {}, Color(0xFF525252), Color.White, Modifier.testTag("square-key"), shadowEnabled = false)
             }
@@ -103,7 +103,7 @@ class KeyGlowTest {
     @Test fun exportActualSquareGlowGrid() {
         val labels = listOf("分词", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz")
         rule.setContent { MaterialTheme { CompositionLocalProvider(
-            LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true),
+            LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true),
             LocalKeyCornerRadius provides 5.dp,
         ) {
             Column(Modifier.size(338.dp, 199.dp).background(Color.Black).testTag("glow-grid")) {
@@ -134,7 +134,7 @@ class KeyGlowTest {
     @Test fun repeatedPressesRestartDecorationAndDisableRemovesItImmediately() {
         var enabled by mutableStateOf(true)
         var taps = 0
-        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = enabled)) {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = enabled, keyAnimationEnabled = enabled)) {
             KeyButton("A", { taps++ }, Color.DarkGray, Color.White, Modifier.size(100.dp, 60.dp).testTag("key"), shadowEnabled = false)
         } } }
         rule.mainClock.autoAdvance = false
@@ -155,7 +155,7 @@ class KeyGlowTest {
 
     @Test fun textIconSwipeKanaAndSpaceKeysAllUseTheSameDecoration() {
         var taps = 0
-        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) { Column(Modifier.width(160.dp)) {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true)) { Column(Modifier.width(160.dp)) {
             val color = Color.DarkGray
             KeyButton("A", { taps++ }, color, Color.White, Modifier.height(55.dp).testTag("plain"), shadowEnabled = false)
             SwipeableKeyButton("Q", { taps++ }, color, Color.White, Modifier.height(55.dp).testTag("swipe"), shadowEnabled = false)
@@ -190,9 +190,59 @@ class KeyGlowTest {
         rule.runOnIdle { assertEquals(20, taps) }
     }
 
+    @Test fun glowAndMotionOperateIndependentlyAndKeepEdgeTapsUsable() {
+        var glow by mutableStateOf(false)
+        var motion by mutableStateOf(false)
+        var taps = 0
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides
+            KeyboardInputPreferences(keyGlowEnabled = glow, keyAnimationEnabled = motion)) {
+            Box(Modifier.size(160.dp, 110.dp).background(Color.White).testTag("frame").padding(24.dp)) {
+                KeyButton("A", { taps++ }, Color.DarkGray, Color.White, Modifier.testTag("key"), shadowEnabled = false)
+            }
+        } } }
+        rule.mainClock.autoAdvance = false
+        fun capWidth(bitmap: Bitmap): Int {
+            val xs = (0 until bitmap.width).filter { bitmap.getPixel(it, bitmap.height / 2) != android.graphics.Color.WHITE }
+            return xs.last() - xs.first() + 1
+        }
+        val before = snapshot("frame")
+        val keyBounds = rule.onNodeWithTag("key").fetchSemanticsNode().boundsInRoot
+        for (g in listOf(false, true)) for (m in listOf(false, true)) {
+            rule.runOnIdle { glow = g; motion = m }
+            rule.mainClock.advanceTimeByFrame()
+            rule.onNodeWithTag("key").performTouchInput { down(center); up() }
+            rule.mainClock.advanceTimeBy(96)
+            val active = snapshot("frame")
+            assertEquals(g || m, !before.sameAs(active))
+            assertEquals(m, capWidth(active) < capWidth(before))
+            // An edge tap during shrink must still enter the key's full original target.
+            rule.onNodeWithTag("key").performTouchInput {
+                down(androidx.compose.ui.geometry.Offset(width * .02f, height * .5f)); up()
+            }
+            rule.mainClock.advanceTimeBy(272)
+            val recovered = snapshot("frame")
+            assertEquals(capWidth(before), capWidth(recovered))
+            assertEquals("only glow remains after cap recovery", g, !before.sameAs(recovered))
+            rule.mainClock.advanceTimeBy(288)
+            assertTrue(before.sameAs(snapshot("frame")))
+            val afterBounds = rule.onNodeWithTag("key").fetchSemanticsNode().boundsInRoot
+            assertEquals(keyBounds.width, afterBounds.width, .1f)
+            assertEquals(keyBounds.height, afterBounds.height, .1f)
+        }
+        rule.runOnIdle { assertEquals(8, taps) }
+        // Toggling during an active press must remove the old clock and scaled layer.
+        rule.runOnIdle { glow = true; motion = true }
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("key").performTouchInput { down(center); up() }
+        rule.mainClock.advanceTimeBy(96)
+        rule.runOnIdle { glow = false; motion = false }
+        rule.mainClock.advanceTimeByFrame()
+        assertTrue(before.sameAs(snapshot("frame")))
+    }
+
     @Test fun animationNeverShrinksEmojiHitTargetsDuringRapidEdgeTaps() {
         var taps = 0
-        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true)) {
             EmojiButton("🙂", { taps++ }, Modifier.size(100.dp).testTag("emoji"))
         } } }
         rule.mainClock.autoAdvance = false

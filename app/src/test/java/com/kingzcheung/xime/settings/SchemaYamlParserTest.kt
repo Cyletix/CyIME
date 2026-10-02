@@ -12,6 +12,20 @@ import java.io.File
 
 class SchemaYamlParserTest {
 
+    @Test fun `imported profile carries explicit language and scheme into UI`() {
+        val file = writeSchema("""
+            schema:
+              schema_id: my_romaji
+              name: 我的日语配置
+              language: ja
+              input_scheme: romaji
+        """.trimIndent())
+        val entry = SchemaManager.parseSchemaYaml(file)!!.toSchemaInfo()
+        assertEquals(InputLanguage.JAPANESE, entry.profile.language)
+        assertEquals(InputScheme.ROMAJI, entry.profile.scheme)
+        assertEquals(EngineProfile.Rime("my_romaji"), entry.profile.engineProfile)
+    }
+
     @get:Rule
     val tempDir = TemporaryFolder()
 

@@ -301,7 +301,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.Ballot,
                         title = "词库管理",
-                        subtitle = "管理个人词库和自定义短语",
+                        subtitle = "分类词库开关、个人词库和自定义短语",
                         onClick = onNavigateToDictionary,
                         showArrow = true
                     )

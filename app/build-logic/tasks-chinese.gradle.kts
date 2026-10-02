@@ -25,7 +25,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("files", chineseTopFiles)
     inputs.property("qwjrtkPreset", 1)
     inputs.property("cyletix10Preset", 1)
-    inputs.property("t9EnglishIndex", 2)
+    inputs.property("t9EnglishIndex", 4)
     inputs.property("measuredNeighborCorrection", 1)
     inputs.property("candidatePolicy", 2)
     outputs.dir(chineseRoot)
@@ -68,13 +68,22 @@ val prepareChineseDictionaries by tasks.registering {
                     if (line.trim() == "...") body = true
                     else if (body && !line.startsWith("#")) {
                         val fields = line.split('\t')
-                        if (fields.size >= 2 && fields[0].matches(Regex("[A-Za-z]{2,32}")) &&
-                            fields[1].matches(Regex("[A-Za-z]{2,32}"))) {
-                            val code = fields[0].lowercase(java.util.Locale.ROOT)
-                                .map { digits[it - 'a'] }.joinToString("")
+                        if (fields.size >= 2 && fields[0].isNotBlank() &&
+                            fields[1].length in 2..64 && fields[1].any { it in 'A'..'Z' || it in 'a'..'z' } &&
+                            fields[1].all { it.code in 32..126 }) {
+                            // Keep literal spelling as well as upstream aliases (Counter-Strike 2 -> CS2).
+                            // Punctuation is implicit; literal digits retain their value. Do not lose
+                            // an existing word's spelling when its upstream code is an abbreviation.
                             val weight = fields.getOrNull(2)?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
-                            val row = fields[0] + "\t" + code + (weight?.let { "\t$it" } ?: "")
-                            english.putIfAbsent(fields[0] + "\t" + code, row)
+                            for (spelling in listOf(fields[1], fields[0]).distinct()) {
+                                if (spelling.length !in 2..64 || !spelling.all { it.code in 32..126 }) continue
+                                val code = spelling.lowercase(java.util.Locale.ROOT).mapNotNull {
+                                    when (it) { in 'a'..'z' -> digits[it - 'a']; in '0'..'9' -> it; else -> null }
+                                }.joinToString("")
+                                if (code.length < 2) continue
+                                val row = fields[0] + "\t" + code + (weight?.let { "\t$it" } ?: "")
+                                english.putIfAbsent(fields[0] + "\t" + code, row)
+                            }
                         }
                     }
                 }

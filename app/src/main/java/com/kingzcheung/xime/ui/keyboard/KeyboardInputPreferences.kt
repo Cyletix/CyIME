@@ -5,8 +5,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.KeyEffectPreferences
 
 internal fun normalizeHandwritingPause(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.5f).coerceIn(0.1f, 2.5f) * 10).roundToInt() / 10f
@@ -25,11 +28,14 @@ data class KeyboardInputPreferences(
     val keyTextScale: Float = 1.15f,
     val fixedSymbols: String = "",
     val keyGlowEnabled: Boolean = false,
+    val keyAnimationEnabled: Boolean = false,
     val handwritingPauseSeconds: Float = 0.5f,
     val showPressBubble: Boolean = false,
     val splitKeyboardEnabled: Boolean = false,
     val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
     val neighborCorrection: Boolean = true,
+    val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
+    val symbolInputMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
 ) {
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
@@ -43,7 +49,9 @@ data class KeyboardInputPreferences(
             val hold = SpaceHoldAction.entries.firstOrNull { it.name == prefs.getString("space_hold_action", "CURSOR") }
                 ?: SpaceHoldAction.CURSOR
             return KeyboardInputPreferences(
-                keyGlowEnabled = prefs.getBoolean("key_glow_enabled", false),
+                keyGlowEnabled = KeyEffectPreferences.glowEnabled(prefs),
+                keyAnimationEnabled = KeyEffectPreferences.animationEnabled(prefs),
+                frostedGlass = FrostedGlassPreferences.read(context),
                 showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
                 splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
                 spaceHold = hold,
@@ -51,6 +59,9 @@ data class KeyboardInputPreferences(
                     ?: if (hold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
+                symbolInputMode = SymbolInputMode.entries.firstOrNull {
+                    it.name == prefs.getString("symbol_input_mode", null)
+                } ?: SymbolInputMode.SWIPE_UP,
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
                 fixedSymbols = prefs.getString("fixed_symbols", "").orEmpty(),
@@ -63,6 +74,7 @@ data class KeyboardInputPreferences(
             .putString("space_hold_action", spaceHold.name)
             .putString("cursor_gesture_mode", cursorGesture.name)
             .putBoolean("neighbor_correction", neighborCorrection)
+            .putString("symbol_input_mode", symbolInputMode.name)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
@@ -99,10 +111,10 @@ fun rememberKeyboardInputPreferences(): KeyboardInputPreferences {
     var settings by remember(context) { mutableStateOf(KeyboardInputPreferences.read(context)) }
     DisposableEffect(context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        val relevantKeys = setOf("key_glow_enabled", SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
+        val relevantKeys = setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
             SettingsPreferences.KEY_SPLIT_KEYBOARD,
-            "space_hold_action", "cursor_gesture_mode", "neighbor_correction", "cursor_step_dp", "key_text_scale", "fixed_symbols",
-            "handwriting_pause_seconds", "handwriting_pause_seconds_v2")
+            "space_hold_action", "cursor_gesture_mode", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols",
+            "handwriting_pause_seconds", "handwriting_pause_seconds_v2") + FrostedGlassPreferences.keys
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == null || key in relevantKeys) settings = KeyboardInputPreferences.read(context)
         }

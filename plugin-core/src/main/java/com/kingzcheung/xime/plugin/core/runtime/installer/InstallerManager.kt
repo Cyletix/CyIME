@@ -113,7 +113,9 @@ internal data class ToolCapabilitiesConfig(
 
 @Serializable
 internal data class ClipboardSyncCapabilitiesConfig(
-    val protocols: List<String> = emptyList()
+    val protocols: List<String> = emptyList(),
+    @kotlinx.serialization.SerialName("foreground_poll_interval_ms") val foregroundPollIntervalMs: Long = 0,
+    @kotlinx.serialization.SerialName("max_text_bytes") val maxTextBytes: Int = 0,
 )
 
 @Serializable
@@ -151,6 +153,8 @@ private fun CapabilitiesConfig.toModel(): com.kingzcheung.xime.plugin.core.model
         },
         clipboardSync = clipboardSync?.let {
             com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ClipboardSyncCapabilities(
+                foregroundPollIntervalMs = if (it.foregroundPollIntervalMs > 0) it.foregroundPollIntervalMs.coerceIn(2_000, 60_000) else 0,
+                maxTextBytes = it.maxTextBytes.coerceAtLeast(0),
                 protocols = it.protocols.filter { p -> p.isNotBlank() }
             )
         },

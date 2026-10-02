@@ -150,7 +150,7 @@ class XmlManager(private val context: Application) {
                 root["tool"] = mapOf("display" to it.display?.name)
             }
             cap.clipboardSync?.let {
-                root["clipboardSync"] = mapOf("protocols" to it.protocols)
+                root["clipboardSync"] = mapOf("protocols" to it.protocols, "foregroundPollIntervalMs" to it.foregroundPollIntervalMs, "maxTextBytes" to it.maxTextBytes)
             }
             cap.backup?.let {
                 root["backup"] = mapOf("protocols" to it.protocols)
@@ -202,6 +202,8 @@ class XmlManager(private val context: Application) {
                     },
                     clipboardSync = (root["clipboardSync"] as? Map<*, *>)?.let { m ->
                         com.kingzcheung.xime.plugin.core.model.PluginCapabilities.ClipboardSyncCapabilities(
+                            foregroundPollIntervalMs = (m["foregroundPollIntervalMs"] as? Number)?.toLong()?.let { if (it > 0) it.coerceIn(2_000, 60_000) else 0 } ?: 0,
+                            maxTextBytes = (m["maxTextBytes"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
                             protocols = (m["protocols"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
                         )
                     },

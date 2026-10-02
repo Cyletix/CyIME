@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CyIME generated lexicon reply v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "entries"],
+  "properties": {
+    "format": {"const": "cyime.lexicon.v1"},
+    "entries": {
+      "type": "array", "minItems": 1, "maxItems": 128,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["word", "pinyin", "kind", "sense", "example", "confusions"],
+        "properties": {
+          "word": {"type": "string", "pattern": "^[\u3400-\u4dbf\u4e00-\u9fff]{2,32}$"},
+          "pinyin": {"type": "string", "pattern": "^[a-zv]+[1-5]( [a-zv]+[1-5])*$"},
+          "kind": {"enum": ["word", "polyphone", "confusable", "mispronunciation"]},
+          "sense": {"type": "string", "minLength": 1, "maxLength": 200},
+          "example": {"type": "string", "minLength": 1, "maxLength": 160},
+          "confusions": {
+            "type": "array", "maxItems": 6,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["type", "text", "pinyin"],
+              "properties": {
+                "type": {"enum": ["spelling", "reading"]},
+                "text": {"type": "string", "pattern": "^[\u3400-\u4dbf\u4e00-\u9fff]{2,32}$"},
+                "pinyin": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

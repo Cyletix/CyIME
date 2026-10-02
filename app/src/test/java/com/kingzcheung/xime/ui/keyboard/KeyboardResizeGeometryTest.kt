@@ -12,6 +12,118 @@ import org.junit.Test
  * 两边一起动（看起来像整体缩放），而且调节框由屏幕宽度和偏移另算，和真实卡片边界对不上。
  */
 class KeyboardResizeGeometryTest {
+    @Test fun largerCornerTargetsDoNotStealStraightEdgesOrMiddle() {
+        for (density in listOf(1f, 1.875f, 3f)) for (floating in listOf(false, true)) {
+            val frame = ResizeRect(50f * density, 80f * density, 410f * density, 420f * density)
+            fun hit(x: Float, y: Float) = resizeHandleAt(frame, Offset(x * density, y * density),
+                RESIZE_EDGE_HIT_DP * density, floating, RESIZE_CORNER_HIT_DP * density)
+            assertEquals(ResizeHandle.TOP_LEFT, hit(82f, 112f))
+            assertEquals(ResizeHandle.TOP_RIGHT, hit(378f, 112f))
+            assertEquals(ResizeHandle.BOTTOM_LEFT, hit(82f, 388f))
+            assertEquals(ResizeHandle.BOTTOM_RIGHT, hit(378f, 388f))
+            assertEquals(ResizeHandle.TOP_LEFT, hit(20f, 50f))
+            assertEquals(ResizeHandle.TOP, hit(230f, 84f))
+            assertEquals(ResizeHandle.LEFT, hit(54f, 250f))
+            assertEquals(ResizeHandle.NONE, hit(82f, 250f))
+            assertEquals(ResizeHandle.NONE, hit(230f, 112f))
+            assertEquals(ResizeHandle.NONE, hit(230f, 250f))
+            assertEquals(if (floating) ResizeHandle.NONE else ResizeHandle.BOTTOM, hit(230f, 416f))
+        }
+    }
+
+    @Test fun resizeControlsLeaveExpandedCornersFreeOnPhonesAndTablets() {
+        for (density in listOf(1f, 1.875f, 3f)) for (floating in listOf(false, true))
+            for (width in listOf(280f, 360f, 700f, 1400f)) {
+                val frame = ResizeRect(0f, 0f, width * density, 228f * density)
+                val controls = resizeControlsRect(frame, density, floating, 28f * density)
+                assertTrue(controls.top >= RESIZE_CORNER_HIT_DP * density)
+                assertTrue(frame.bottom - controls.bottom >= RESIZE_CORNER_HIT_DP * density)
+                assertTrue(controls.width > 0f && controls.height >= 96f * density)
+            }
+    }
+
+    @Test fun fixedSideAndCornerEdgesSnapToHalfScreenWithoutMovingOppositeEdge() {
+        for (density in listOf(1f, 1.875f, 3f)) {
+            val bounds = ResizeRect(0f, 0f, 1000f * density, 800f * density)
+            for (handle in listOf(ResizeHandle.RIGHT, ResizeHandle.TOP_RIGHT, ResizeHandle.BOTTOM_RIGHT)) {
+                val raw = ResizeRect(0f, 200f * density, 492f * density, 700f * density)
+                val snapped = raw.snapFixedEdgeToCenter(handle, bounds, 280f * density, 12f * density)
+                assertEquals(bounds.centerX, snapped.right, .001f)
+                assertEquals(raw.left, snapped.left, 0f)
+                assertEquals(raw.top, snapped.top, 0f)
+                assertEquals(raw.bottom, snapped.bottom, 0f)
+            }
+            val raw = ResizeRect(508f * density, 200f * density, bounds.right, 700f * density)
+            val snapped = raw.snapFixedEdgeToCenter(ResizeHandle.LEFT, bounds, 280f * density, 12f * density)
+            assertEquals(bounds.centerX, snapped.left, .001f)
+            assertEquals(raw.right, snapped.right, 0f)
+        }
+    }
+
+    @Test fun centerEdgeSnapRespectsMinimumWidthAndOnlyChangesDraggedAxis() {
+        val bounds = ResizeRect(0f, 0f, 500f, 800f)
+        val raw = ResizeRect(0f, 200f, 258f, 700f)
+        assertEquals(raw, raw.snapFixedEdgeToCenter(ResizeHandle.RIGHT, bounds, 280f, 12f))
+        assertEquals(raw, raw.snapFixedEdgeToCenter(ResizeHandle.TOP, bounds, 100f, 12f))
+        val outside = raw.copy(right = 263f)
+        assertEquals(outside, outside.snapFixedEdgeToCenter(ResizeHandle.RIGHT, bounds, 100f, 12f))
+    }
+
+    @Test fun smallResizeDeltasCanLeaveCenterSnapUsingRawAccumulator() {
+        val bounds = ResizeRect(0f, 0f, 1000f, 800f)
+        var raw = ResizeRect(0f, 200f, 500f, 700f)
+        repeat(24) {
+            raw = raw.dragBy(ResizeHandle.RIGHT, .5f, 0f, bounds, 280f, 200f)
+            assertEquals(500f, raw.snapFixedEdgeToCenter(ResizeHandle.RIGHT, bounds, 280f, 12f).right, 0f)
+        }
+        raw = raw.dragBy(ResizeHandle.RIGHT, .5f, 0f, bounds, 280f, 200f)
+        assertEquals(512.5f, raw.snapFixedEdgeToCenter(ResizeHandle.RIGHT, bounds, 280f, 12f).right, 0f)
+    }
+
+
+    @Test fun fixedMoveSnapsFromEitherSideWithoutChangingSizeOrVerticalPosition() {
+        for (density in listOf(1f, 2.75f)) for (side in listOf(-1, 1)) {
+            val bounds = ResizeRect(0f, 0f, 800f * density, 600f * density)
+            val initial = ResizeRect(200f * density, 200f * density, 600f * density, 550f * density)
+                .translated(side * 60f * density, 0f)
+            val move = FixedKeyboardMoveGesture(initial, bounds, 12f * density)
+            val snapped = move.move(-side * 50f * density)
+            assertEquals(bounds.centerX, snapped.centerX, 0.001f)
+            assertEquals(initial.width, snapped.width, 0.001f)
+            assertEquals(initial.top, snapped.top, 0f)
+            assertEquals(initial.bottom, snapped.bottom, 0f)
+            assertEquals(0, snapped.toGeometry(bounds.width, bounds.height, 0f, density).horizontalOffsetDp)
+        }
+    }
+
+    @Test fun smallDragStepsCanLeaveCenterAndReturnWithoutSticking() {
+        val bounds = ResizeRect(0f, 0f, 800f, 600f)
+        val initial = ResizeRect(200f, 200f, 600f, 550f)
+        val move = FixedKeyboardMoveGesture(initial, bounds, 12f)
+        repeat(24) { assertEquals(400f, move.move(0.5f).centerX, 0f) }
+        assertEquals(412.5f, move.move(0.5f).centerX, 0f)
+        assertEquals(400f, move.move(-0.5f).centerX, 0f)
+        assertEquals(400f, move.move(-24f).centerX, 0f)
+        assertEquals(387.5f, move.move(-0.5f).centerX, 0f)
+    }
+
+    @Test fun freshDragStartsAtVisibleCenterWithoutPreviousHiddenOffset() {
+        val bounds = ResizeRect(0f, 0f, 800f, 600f)
+        val first = FixedKeyboardMoveGesture(ResizeRect(150f, 200f, 550f, 550f), bounds, 12f)
+        val snapped = first.move(40f)
+        val next = FixedKeyboardMoveGesture(snapped, bounds, 12f)
+        assertEquals(420f, next.move(20f).centerX, 0f)
+    }
+
+    @Test fun nearlyFullWidthStillReachesBothEdgesAndFullWidthStaysCentered() {
+        val bounds = ResizeRect(0f, 0f, 360f, 600f)
+        for (width in listOf(280f, 350f, 360f)) {
+            val move = FixedKeyboardMoveGesture(ResizeRect(0f, 200f, width, 550f), bounds, 12f)
+            assertEquals(0f, move.move(-1000f).left, 0f)
+            assertEquals(360f, move.move(2000f).right, 0f)
+            assertEquals(180f, move.move(-(360f - width) / 2f).centerX, 0f)
+        }
+    }
 
     @Test fun fixedWidthAndPositionPreserveBottomInsetsAcrossHostHeights() {
         val normal = fixedKeyboardRect(1000f, 400f, 300f, 20f, 24f, 400f, 300f)

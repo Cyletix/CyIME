@@ -6,6 +6,26 @@ using rime::T9Buffer;
 using rime::T9Segment;
 using rime::T9UndoModel;
 
+TEST(T9CommitCaptureTest, EnglishCodeSurvivesEditAndPopsWithoutChineseSyllableIds) {
+    T9UndoModel model;
+    model.PushCommitCapture("你", {123});
+    model.PushCommitCapture("Dota2", {}, "36822 ");
+    ASSERT_EQ(2u, model.commit_captures().size());
+    auto english = model.PopLastCommitCapture();
+    ASSERT_TRUE(english.has_value());
+    EXPECT_TRUE(english->valid());
+    EXPECT_EQ("Dota2", english->text);
+    EXPECT_EQ("36822 ", english->table_code);
+    EXPECT_TRUE(english->code.empty());
+    auto chinese = model.PopLastCommitCapture();
+    ASSERT_TRUE(chinese.has_value());
+    EXPECT_EQ(rime::T9SyllableCode({123}), chinese->code);
+    EXPECT_TRUE(chinese->table_code.empty());
+    model.PushCommitCapture("steam", {}, "78326 ");
+    model.Clear();
+    EXPECT_FALSE(model.PopLastCommitCapture().has_value());
+}
+
 namespace {
 T9UndoModel Selected(const std::string& digits,
                      const std::vector<SyllableOption>& choices) {
@@ -60,15 +80,15 @@ TEST(T9EditSuffixTest, PreservesCommittedPrefixAndItsCaptureThenUndoesOriginalWo
     EXPECT_EQ(T9Segment::kCommitted, model.segments()[0].phase);
     EXPECT_EQ(0, model.ConsumeUndoneCommitCount());
     ASSERT_EQ(1u, model.commit_captures().size());
-    EXPECT_EQ("你", model.commit_captures()[0].first);
-    EXPECT_EQ(rime::T9SyllableCode({123}), model.commit_captures()[0].second);
+    EXPECT_EQ("你", model.commit_captures()[0].text);
+    EXPECT_EQ(rime::T9SyllableCode({123}), model.commit_captures()[0].code);
     DeleteWo(model);
     EXPECT_EQ("64", model.ToBuffer().digit_sequence);
     ASSERT_TRUE(model.Backspace());
     EXPECT_EQ(1, model.ConsumeUndoneCommitCount());
     EXPECT_EQ("64", model.ToBuffer().unassigned());
     EXPECT_FALSE(model.HasPendingCommit());
-    EXPECT_EQ("你", model.PopLastCommitCapture()->first);
+    EXPECT_EQ("你", model.PopLastCommitCapture()->text);
     EXPECT_TRUE(model.commit_captures().empty());
 }
 
@@ -208,5 +228,5 @@ TEST(T9EditSuffixTest, LiveCaretEditPreservesAmbiguousDigitsAndUndoPrefix) {
     ASSERT_TRUE(model.ReplaceEditableSuffix("hao"));
     EXPECT_EQ("hao", model.ToBuffer().ToRimeInputString());
     ASSERT_EQ(1u, model.commit_captures().size());
-    EXPECT_EQ("你", model.commit_captures()[0].first);
+    EXPECT_EQ("你", model.commit_captures()[0].text);
 }

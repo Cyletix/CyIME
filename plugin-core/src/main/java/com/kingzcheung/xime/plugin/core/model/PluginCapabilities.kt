@@ -61,6 +61,10 @@ data class PluginCapabilities(
     /** clipboard_sync 剪贴板同步能力声明。 */
     data class ClipboardSyncCapabilities(
         val protocols: List<String> = emptyList(),
+        /** 0 = visibility-triggered only; LAN plugins may request foreground polling. */
+        val foregroundPollIntervalMs: Long = 0,
+        /** 0 leaves size policy to the legacy transport. */
+        val maxTextBytes: Int = 0,
     )
 
     /** backup 备份能力声明：宿主负责备份包生成/恢复，插件只承载传输协议。 */

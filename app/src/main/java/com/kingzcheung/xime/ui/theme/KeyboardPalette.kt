@@ -41,6 +41,28 @@ internal val LocalKeyboardPalette = staticCompositionLocalOf<KeyboardPalette?> {
 internal fun softDarkKeyContainer(accent: Color): Color =
     lerp(Color(0xFF30343C), accent, 0.30f)
 
+/** 中性黑白配色：浅色保持浅底深字，深色使用纯黑画布，键帽保留可辨边界。 */
+object PureBlackTheme {
+    const val ID = "pure_black"
+
+    fun create() = SoftBlueTheme.create(ID, "黑白").copy(
+        keyboardBgLight = Color(0xFFF2F2F2), keyboardBgDark = Color.Black,
+        candidateBarBgLight = Color(0xFFF2F2F2), candidateBarBgDark = Color.Black,
+        surfaceLight = Color(0xFFF2F2F2), surfaceDark = Color.Black,
+        keyBgLight = Color.White, keyBgDark = Color(0xFF1C1C1C),
+        specialKeyLight = Color(0xFFDEDEDE), specialKeyDark = Color(0xFF353535),
+        specialKeyTextColorLight = Color(0xFF202020), specialKeyTextColorDark = Color.White,
+        enterKeyLight = Color(0xFFDEDEDE), enterKeyDark = Color(0xFF353535),
+        keyTextColorLight = Color(0xFF202020), keyTextColorDark = Color.White,
+        candidateTextColorLight = Color(0xFF454545), candidateTextColorDark = Color(0xFFE0E0E0),
+        candidateSelectedTextColorLight = Color.Black, candidateSelectedTextColorDark = Color.White,
+        accentLight = Color(0xFF454545), accentDark = Color(0xFFE0E0E0),
+        primaryLight = Color(0xFF454545), primaryDark = Color(0xFFE0E0E0),
+        primaryContainerLight = Color(0xFFE0E0E0), primaryContainerDark = Color(0xFF353535),
+        dividerColorLight = Color(0xFFCDCDCD), dividerColorDark = Color(0xFF353535),
+    )
+}
+
 /** 固定蓝灰调色板；不读取壁纸，因此手机、平板及不同 Android 版本的色值相同。 */
 object SoftBlueTheme {
     const val ID = "soft_blue"
@@ -96,5 +118,15 @@ object SoftLavenderTheme {
         candidateTextColorLight = Color(0xFF685191), candidateTextColorDark = Color(0xFFD0BCFF),
         candidateSelectedTextColorLight = Color(0xFF59417F), candidateSelectedTextColorDark = Color(0xFFE9DDFF),
         useThemeColors = true,
+    )
+}
+
+/** A complete theme; its material parameters are edited in the theme preview. */
+object TransparentGlassTheme {
+    const val ID = "transparent_glass"
+    fun create() = PureBlackTheme.create().copy(
+        id = ID, name = "透明玻璃",
+        keyboardBackground = com.kingzcheung.xime.settings.BackgroundConfig(
+            type = "gradient", angle = 135, colors = listOf(0x9CACCCL, 0xD6BCC9L, 0x85BFBFL)),
     )
 }

@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.keyboard.SpaceHoldAction
 import com.kingzcheung.xime.ui.keyboard.CursorGestureMode
+import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 
 @Composable
@@ -27,6 +28,20 @@ internal fun InputExperienceSettings() {
                 })
             }
             Text("中文全拼按当前键位补充相邻字母误触的候选，保留原输入；不用于九键、双拼或合并键。", style = MaterialTheme.typography.bodySmall)
+            HorizontalDivider()
+            Text("按键角标的符号和数字", style = MaterialTheme.typography.titleSmall)
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SymbolInputMode.entries.forEach { mode ->
+                    FilterChip(selected = settings.symbolInputMode == mode,
+                        modifier = Modifier.testTag("symbol-input:${mode.name}"),
+                        onClick = { settings = settings.copy(symbolInputMode = mode); settings.save(context) },
+                        label = { Text(mode.label) })
+                }
+            }
+            Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
+                "按住满 0.3 秒立即输入角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。"
+                else "上滑后松手输入角标，原有长按菜单保持不变。",
+                style = MaterialTheme.typography.bodySmall)
             HorizontalDivider()
             Text("滑动移动光标", style = MaterialTheme.typography.titleSmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

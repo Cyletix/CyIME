@@ -1,0 +1,51 @@
+diff --git a/src/rime/menu.h b/src/rime/menu.h
+--- a/src/rime/menu.h
++++ b/src/rime/menu.h
+@@ -9,6 +9,7 @@
+ #define RIME_MENU_H_
+ 
+ #include <rime_api.h>
++#include <algorithm>
+ #include <rime/candidate.h>
+ #include <rime/common.h>
+ 
+@@ -35,6 +36,18 @@ class Menu {
+   // rather than the total number of available candidates.
+   size_t candidate_count() const { return candidates_.size(); }
+ 
++  // Keep materialized survivors in place; lazy refill only appends at the tail.
++  // Do not refresh composition or delete/learn dictionary entries here.
++  void SuppressText(const string& text) {
++    suppressed_.insert(text);
++    candidates_.erase(std::remove_if(candidates_.begin(), candidates_.end(),
++        [&](const auto& candidate) { return candidate->text() == text; }),
++        candidates_.end());
++  }
++
++  bool IsSuppressed(const string& text) const {
++    return suppressed_.count(text) != 0;
++  }
++
+   bool empty() const;
+ 
+  private:
+@@ -42,6 +55,7 @@ class Menu {
+   an<Translation> result_;
+   CandidateList candidates_;
++  set<string> suppressed_;
+ };
+ 
+ }  // namespace rime
+diff --git a/src/rime/menu.cc b/src/rime/menu.cc
+--- a/src/rime/menu.cc
++++ b/src/rime/menu.cc
+@@ -31,7 +31,8 @@ size_t Menu::Prepare(size_t requested) {
+   DLOG(INFO) << "preparing " << requested << " candidates.";
+   while (candidates_.size() < requested && !result_->exhausted()) {
+     if (auto cand = result_->Peek()) {
+-      candidates_.push_back(cand);
++      if (!IsSuppressed(cand->text()))
++        candidates_.push_back(cand);
+     }
+     result_->Next();
+   }

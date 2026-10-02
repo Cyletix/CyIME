@@ -100,6 +100,19 @@ T9Processor::T9Processor(const Ticket& ticket) : Processor(ticket) {
             if (dict_) user_dict_->Attach(dict_->primary_table(), dict_->prism());
         }
     }
+    if (auto dictionary = Dictionary::Require("dictionary")) {
+        english_dict_.reset(dictionary->Create(Ticket(engine_, "t9_english")));
+        if (english_dict_) english_dict_->Load();
+    }
+    if (english_dict_ && english_dict_->loaded()) {
+        if (auto dictionary = UserDictionary::Require("user_dictionary")) {
+            english_user_dict_.reset(dictionary->Create(Ticket(engine_, "t9_english")));
+            if (english_user_dict_) {
+                english_user_dict_->Load();
+                english_user_dict_->Attach(english_dict_->primary_table(), english_dict_->prism());
+            }
+        }
+    }
     T9LOG("T9Processor created (integrated T1-T6), manual_delimiter='%c', leftPanelMode=%d, userDict=%s",
           manual_delimiter_, static_cast<int>(left_panel_mode_),
           (user_dict_ && user_dict_->loaded()) ? "on" : "off");
@@ -493,13 +506,12 @@ bool T9Processor::SelectCandidate(const std::string& candidate_pinyin,
     // 方案 A：优先用 RIME 候选 end 换算的消费位数（精确反映 schema 派生编码
     // 的匹配范围），无法确定时用 -1 fallback 到现有 AlignWithBuffer 算法。
     // 顺带捕获候选真实数据（Phrase 文本 + 音节码，含声调真相）供调频使用。
-    Code captured_code;
-    std::string captured_text;
+    T9CommitCapture captured;
     // 识别候选是否为 T9 用户词：其 input_digits 与当前 unassigned 完全一致，
     // 右选应全量消费（避免音节对齐不匹配导致 partial commit）。
     bool is_t9_user = false;
     int rime_consumed =
-        QueryRimeConsumedDigits(candidate_pinyin, candidate_text, &captured_code, &captured_text,
+        QueryRimeConsumedDigits(candidate_pinyin, candidate_text, &captured,
                                 &is_t9_user);
     // 左选场景时 RIME input 含左选拼音前缀，需加 consumed_count 得到总消费位数。
     if (rime_consumed >= 0 && !input_buffer_.selections.empty()) {
@@ -510,24 +522,13 @@ bool T9Processor::SelectCandidate(const std::string& candidate_pinyin,
           !input_buffer_.selections.empty() ? 1 : 0);
     // One capture per selected segment, even when its code is unavailable, so undo
     // always removes the matching selection. Missing codes must not be guessed.
-    undo_model_.PushCommitCapture(captured_text,
-                                  T9SyllableCode(captured_code.begin(), captured_code.end()));
+    undo_model_.PushCommitCapture(captured.text, captured.code, captured.table_code);
     pending_fullcommit_capture_.reset();
-    std::string phrase_text;
-    T9SyllableCode phrase_code;
     bool complete_capture = true;
     for (const auto& capture : undo_model_.commit_captures()) {
-        if (capture.first.empty() || capture.second.empty()) complete_capture = false;
-        phrase_text += capture.first;
-        phrase_code.insert(phrase_code.end(), capture.second.begin(), capture.second.end());
+        if (!capture.valid()) complete_capture = false;
     }
-    if (complete_capture) pending_fullcommit_capture_ = {phrase_text, phrase_code};
-    if (!captured_code.empty()) {
-        std::string ids;
-        for (auto id : captured_code) ids += std::to_string(id) + ",";
-        T9LOG(">> SelectCandidate: captured '%s' code=[%s] (%zu syl)",
-              captured_text.c_str(), ids.c_str(), captured_code.size());
-    }
+    if (complete_capture) pending_fullcommit_capture_ = undo_model_.commit_captures();
 
     // 构建召回索引：剩余数字序列 + 左选标记（场景 C）或纯左选（场景 D）。
     const std::string digit_seq_before_commit = input_buffer_.digit_sequence;
@@ -749,9 +750,40 @@ bool T9Processor::MemorizeEntry(const std::string& text,
     auto capture = std::move(pending_fullcommit_capture_);
     pending_fullcommit_capture_.reset();
     undo_model_.ClearCommitCaptures();
-    if (capture && capture->first == text && !capture->second.empty()) {
-        Code code(capture->second.begin(), capture->second.end());
-        return WriteDictEntry(text, code, 1);
+    if (capture) {
+        std::string captured_text;
+        for (const auto& part : *capture) captured_text += part.text;
+        if (captured_text != text) return false;
+        // Validate the entire accepted commit before any dictionary write.
+        for (const auto& part : *capture) {
+            if (!part.valid()) return false;
+            if (!part.table_code.empty() && (!english_user_dict_ ||
+                !english_user_dict_->loaded() || english_user_dict_->readonly())) return false;
+        }
+        bool result = true;
+        std::string chinese_text;
+        Code chinese_code;
+        auto flush_chinese = [&] {
+            if (chinese_text.empty()) return;
+            result = WriteDictEntry(chinese_text, chinese_code, 1) && result;
+            chinese_text.clear();
+            chinese_code.clear();
+        };
+        for (const auto& part : *capture) {
+            if (part.table_code.empty()) {
+                chinese_text += part.text;
+                chinese_code.insert(chinese_code.end(), part.code.begin(), part.code.end());
+            } else {
+                flush_chinese();
+                DictEntry entry;
+                entry.text = part.text;
+                entry.custom_code = part.table_code;
+                english_user_dict_->Load();
+                result = english_user_dict_->UpdateEntry(entry, 1) && result;
+            }
+        }
+        flush_chinese();
+        return result;
     }
     if (pinyin.empty()) return false;
     DictEntry entry;
@@ -769,10 +801,10 @@ bool T9Processor::ForgetEntry(const std::string& text,
     auto capture = undo_model_.PopLastCommitCapture();
     if (capture) {
         auto pinyin_syllables = ParseSyllables(pinyin);
-        if (capture->first == text && !pinyin_syllables.empty() &&
-            capture->second.size() == pinyin_syllables.size()) {
+        if (capture->table_code.empty() && capture->text == text && !pinyin_syllables.empty() &&
+            capture->code.size() == pinyin_syllables.size()) {
             // T9SyllableCode → rime::Code（同型互转）
-            Code code(capture->second.begin(), capture->second.end());
+            Code code(capture->code.begin(), capture->code.end());
             return WriteDictEntry(text, code, -1);
         }
     }
@@ -782,8 +814,7 @@ bool T9Processor::ForgetEntry(const std::string& text,
 int T9Processor::QueryRimeConsumedDigits(
     const std::optional<std::string>& candidate_pinyin,
     const std::string& candidate_text,
-    Code* captured_code,
-    std::string* captured_text,
+    T9CommitCapture* capture,
     bool* out_is_t9_user) const {
     // 方案 A：右选消费优先采用 RIME 候选的实际匹配范围。
     // RIME 已通过 schema 的 speller/algebra（含 derive/abbrev 派生规则）
@@ -827,18 +858,28 @@ int T9Processor::QueryRimeConsumedDigits(
             // 顺带捕获 Phrase 的真实码（含声调真相），供调频保留声调。
             // Table dictionary codes belong to a different syllabary, never memorize
             // them into the Chinese script user dictionary.
-            if ((captured_code || captured_text) && genuine->type() != "table" && genuine->type() != "user_table") {
+            if (capture && (genuine->type() == "table" || genuine->type() == "user_table")) {
+                auto phrase = As<Phrase>(genuine);
+                if (phrase && phrase->language() && english_dict_ && english_dict_->loaded() &&
+                    phrase->language()->name() == english_dict_->name()) {
+                    std::string code = phrase->entry().custom_code;
+                    if (code.empty()) {
+                        vector<string> syllables;
+                        if (english_dict_->Decode(phrase->code(), &syllables))
+                            for (const auto& syllable : syllables) code += syllable + " ";
+                    }
+                    if (!code.empty()) *capture = {phrase->text(), {}, code};
+                }
+            } else if (capture) {
                 if (auto phrase = As<Phrase>(genuine)) {
-                    if (captured_code) *captured_code = phrase->code();
-                    if (captured_text) *captured_text = phrase->text();
+                    *capture = {phrase->text(), T9SyllableCode(phrase->code().begin(), phrase->code().end()), ""};
                 } else {
                     // 候选被 lua filter 链重建（非 Phrase）：从 t9_filter 预存的
                     // Phrase 码缓存兜底（filters 最前阶段候选尚为带调 Phrase）。
                     auto cached = FindPhraseCode(
                         genuine->text(), NormalizePinyinComment(requested_comment));
                     if (!cached.empty()) {
-                        if (captured_code) *captured_code = Code(cached.begin(), cached.end());
-                        if (captured_text) *captured_text = genuine->text();
+                        *capture = {genuine->text(), cached, ""};
                     }
                 }
             }

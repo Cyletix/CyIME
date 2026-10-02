@@ -9,8 +9,9 @@ object LanguagePreferences {
     fun enabled(context: Context): Set<InputLanguage> {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val stored = prefs.getStringSet(KEY, null)
-        return if (stored == null) setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
-        else InputLanguage.entries.filterTo(mutableSetOf()) { it.id in stored } + InputLanguage.ENGLISH
+        // Imported profiles without language metadata remain usable, without pretending to be Chinese.
+        return (if (stored == null) setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
+        else InputLanguage.entries.filterTo(mutableSetOf()) { it.id in stored } + InputLanguage.ENGLISH) + InputLanguage.UNSPECIFIED
     }
     fun initialize(context: Context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
@@ -27,7 +28,7 @@ object LanguagePreferences {
 
     /** English always remains available; language switches never delete dictionaries. */
     fun save(context: Context, language: InputLanguage, enabled: Boolean) {
-        require(language != InputLanguage.ENGLISH)
+        require(language != InputLanguage.ENGLISH && language != InputLanguage.UNSPECIFIED)
         val next = this.enabled(context).toMutableSet().apply { if (enabled) add(language) else remove(language) }
         if (language == InputLanguage.JAPANESE) {
             val schemas = SchemaManager.getEnabledSchemas(context)

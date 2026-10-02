@@ -70,7 +70,8 @@ import com.kingzcheung.xime.viewmodel.PersonalDictViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DictionarySettingsContent(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCellDictionaries: () -> Unit = {},
 ) {
     val viewModel: PersonalDictViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -79,6 +80,9 @@ fun DictionarySettingsContent(
     val customPhraseVM: CustomPhraseViewModel = viewModel(key = "dict_custom_phrase")
     val customPhraseState by customPhraseVM.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(uiState.selectedSchema) { customPhraseVM.setSchema(uiState.selectedSchema) }
+    LaunchedEffect(uiState.selectedSchema) {
+        if (uiState.selectedSchema != "t9_pinyin" && selectedDictTab == 3) selectedDictTab = 0
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -133,6 +137,9 @@ fun DictionarySettingsContent(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            TextButton(onClick = onCellDictionaries, modifier = Modifier.fillMaxWidth()) {
+                Text("分类词库 · 下载与开关")
+            }
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 TabButton("自定义短语", selected = selectedDictTab == 0, onClick = { selectedDictTab = 0 }, modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -140,10 +147,16 @@ fun DictionarySettingsContent(
                 Spacer(modifier = Modifier.width(8.dp))
                 TabButton("方案词库", selected = selectedDictTab == 2, onClick = { selectedDictTab = 2 }, modifier = Modifier.weight(1f))
             }
+            if (uiState.selectedSchema == "t9_pinyin") {
+                TextButton(onClick = { selectedDictTab = 3 }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Text("管理不再推荐的候选")
+                }
+            }
             when (selectedDictTab) {
                 0 -> CustomPhraseTabContent(viewModel = customPhraseVM, uiState = customPhraseState)
                 1 -> SchemaDictContent(viewModel = viewModel, uiState = uiState)
                 2 -> SchemaDictBrowserPanel()
+                3 -> T9SuppressionPanel()
             }
         }
     }

@@ -5,6 +5,8 @@
 #include "t9_processor.h"
 #include "t9_filter.h"
 #include "t9_date_translator.h"
+#include "t9_sentence_scorer.h"
+#include "t9_english_translator.h"
 
 using namespace rime;
 
@@ -16,9 +18,11 @@ static void rime_t9_initialize() {
     r.Register("t9_processor", new Component<T9Processor>);
     r.Register("t9_filter", new Component<T9Filter>);
     r.Register("t9_date_translator", new Component<T9DateTranslator>);
+    r.Register("t9_english_translator", new Component<T9EnglishTranslator>);
 }
 
 static void rime_t9_finalize() {
+    T9ReleaseSentenceScorer();
 }
 
 }  // namespace

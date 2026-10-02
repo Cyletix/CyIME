@@ -14,11 +14,19 @@ try {
     foreach ($edition in @('standard', 'full')) {
         $directory = "app/build/outputs/apk/editions/$version/$edition/release"
         $receipt = Get-Content "$directory/latest.json" -Raw | ConvertFrom-Json
-        $gate = Get-Content "$directory/layout-gate.json" -Raw | ConvertFrom-Json
-        if ($receipt.buildType -ne 'release' -or $receipt.layoutGate -ne 'passed' -or $gate.version -ne $version -or
-            $gate.bundledModels -ne ($edition -eq 'full') -or $receipt.sourceCommit -ne $commit) {
-            throw "Release blocked: no matching successful gate for $edition."
+        if ($receipt.buildType -ne 'release' -or $receipt.version -ne $version -or
+            $receipt.bundledModels -ne ($edition -eq 'full') -or $receipt.sourceCommit -ne $commit) {
+            throw "Release blocked: no matching build receipt for $edition."
         }
+        # The full layout gate is explicitly paused by AGENTS.md. Never claim it passed.
+        if ($receipt.layoutGate -eq 'passed') {
+            $gate = Get-Content "$directory/layout-gate.json" -Raw | ConvertFrom-Json
+            if ($gate.version -ne $version -or $gate.bundledModels -ne ($edition -eq 'full')) {
+                throw "Release blocked: mismatched layout gate for $edition."
+            }
+        } elseif ($receipt.layoutGate -eq 'not-run') {
+            Write-Host "Full layout gate not run for $edition (paused by project policy)."
+        } else { throw "Release blocked: invalid layout gate status for $edition." }
         if (@($receipt.files).Count -ne 1 -or $receipt.files[0].path -notlike "*-arm64-v8a.apk") {
             throw "Release blocked: each edition must contain exactly one ARM64 delivery APK."
         }

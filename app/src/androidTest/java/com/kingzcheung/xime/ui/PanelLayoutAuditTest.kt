@@ -112,6 +112,9 @@ class PanelLayoutAuditTest {
             ResizeScenario(640, 180, false, true, 1.3f),
             ResizeScenario(360, 220, true, false, 1.3f),
             ResizeScenario(640, 228, true, true, 2f),
+            ResizeScenario(1200, 300, false, true, 1f),
+            ResizeScenario(600, 220, false, true, 1.5f),
+            ResizeScenario(1200, 220, false, true, 2f),
         )
         val current = mutableStateOf(scenarios.first())
         rule.setContent {
@@ -146,12 +149,24 @@ class PanelLayoutAuditTest {
             val label = labelNode.fetchSemanticsNode().boundsInRoot
             val buttons = listOf("重置", "悬浮键盘", "分体键盘", "确认")
                 .map { rule.onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot }
+            val actions = rule.onNodeWithTag("keyboard-resize-actions", useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot
             val case = "$scenario frame=$frame controls=$controls panel=$panel slider=$slider label=$label"
 
             assertTrue("$case 透明度面板应在控件区域内", panel.left >= controls.left - 1f &&
                 panel.right <= controls.right + 1f && panel.top >= controls.top - 1f && panel.bottom <= controls.bottom + 1f)
-            assertTrue("$case 透明度条应收窄并避开左右 26dp 调节热区", panel.width <= controls.width * 0.82f + 1f &&
-                slider.left >= frame.left + 30f && slider.right <= frame.right - 30f)
+            assertTrue("$case 滑条和按钮应避开左右 26dp 调节热区",
+                panel.left >= frame.left + 30f && panel.right <= frame.right - 30f &&
+                    actions.left >= frame.left + 30f && actions.right <= frame.right - 30f)
+            assertEquals("$case 滑条和按钮组应等宽", actions.width, panel.width, 1f)
+            assertEquals("$case 滑条和按钮组应居中对齐", actions.center.x, panel.center.x, 1f)
+            assertTrue("$case 宽屏按钮过长", buttons.all { it.width <= 140f })
+            assertTrue("$case 按钮超出控件区域", buttons.all {
+                it.top >= controls.top && it.bottom <= controls.bottom + 1f
+            })
+            if (scenario.width >= 600) {
+                assertTrue("$case 平板滑条不应仍停留在手机宽度", slider.width >= 480f)
+            }
             assertTrue("$case 进度条应在透明度面板内", slider.left >= panel.left - 1f &&
                 slider.right <= panel.right + 1f && slider.top >= panel.top - 1f && slider.bottom <= panel.bottom + 1f)
             assertTrue("$case 透明度文字应完整叠在进度条中", label.left >= slider.left - 1f &&

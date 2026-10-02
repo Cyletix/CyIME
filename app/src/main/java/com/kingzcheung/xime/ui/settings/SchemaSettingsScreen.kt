@@ -442,7 +442,7 @@ fun SchemaSettingsContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("输入方案") },
+                title = { Text("输入配置") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -582,12 +582,12 @@ fun SchemaSettingsContent(
                     ) {
                         item {
                             Text(
-                                text = "已启用的输入方案",
+                                text = "已启用的输入组合",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                             )
-                            Text("长按已启用方案卡片拖动排序；方案开关控制部署，键盘显示的语言由「语言管理」控制。顺序与键盘中的模式顺序同步。",
+                            Text("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言管理」选择。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -721,7 +721,7 @@ fun SchemaSettingsContent(
 
 internal fun orderedInstalledModeIds(context: Context, schemas: List<SchemaMeta>): List<String> =
     InputModes.ordered(context, schemas.map { schema ->
-        SchemaInfo(schema.schemaId, schema.name, schema.version, schema.author, schema.description)
+        schema.toSchemaInfo()
     }).map { it.schemaId }
 
 /** Keep inactive modes in their saved slots while reordering the visible cards. */
@@ -796,6 +796,9 @@ internal fun SchemaToggleItem(
                         )
                     }
                 }
+                val profile = schema.toSchemaInfo().profile
+                Text("${profile.language.displayName} · ${profile.summary}",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 com.kingzcheung.xime.settings.CyimeInputDefaults.description(schema.schemaId)?.let { description ->
                     Text(description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

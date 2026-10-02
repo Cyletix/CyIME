@@ -108,8 +108,10 @@ object KeyboardThemes {
 
     /** 硬编码的默认主题列表（兜底，其余主题由 xime.yaml color_schemes 提供）。 */
     private val defaultThemes = listOf(
-        SoftBlueTheme.create(),
-        SoftLavenderTheme.create()
+        TransparentGlassTheme.create(),
+        PureBlackTheme.create(),
+        SoftLavenderTheme.create(),
+        SoftBlueTheme.create()
     )
 
     /**
@@ -452,7 +454,7 @@ object KeyboardThemes {
     fun getThemeById(id: String): KeyboardColorScheme {
         // 先读一次状态化缓存建立 Compose 订阅，动态配色重建后 UI 自动重组
         val cache = themesCache
-        return themesMapCache[id] ?: cache[0]
+        return themesMapCache[id] ?: cache.first { it.id == SoftBlueTheme.ID }
     }
 
     /** Rendering overrides do not change the stored theme or the theme catalogue. */

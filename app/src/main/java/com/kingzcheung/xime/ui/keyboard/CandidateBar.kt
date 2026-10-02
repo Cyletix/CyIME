@@ -136,6 +136,8 @@ data class CandidateBarCallbacks(
     val onDismissClipboardPreview: (() -> Unit)? = null,
     val onOpenClipboard: (() -> Unit)? = null,
     val onVerificationCodeSelect: ((String, Boolean) -> Unit)? = null,
+    val onClipboardImageSelect: ((com.kingzcheung.xime.clipboard.ClipboardImage) -> Unit)? = null,
+    val onExpandClipboardImages: (() -> Unit)? = null,
     val onCancelInput: (() -> Unit)? = null,
     val onReorderToolbar: ((List<String>) -> Unit)? = null,
     // 长按候选：抛事件给宿主（键盘视图内弹确认覆盖层，不弹独立窗口——
@@ -310,7 +312,7 @@ fun CandidateBar(
         modifier = modifier
             .fillMaxWidth()
             .then(if (state is CandidateBarState.ClipboardDisplay) Modifier.heightIn(min = 44.dp) else Modifier.height(44.dp))
-            .background(visuals.backgroundColor)
+            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else visuals.backgroundColor)
             .visualMaterial(VisualStyles.current, 0.dp, level = if (state is CandidateBarState.Idle) com.kingzcheung.xime.ui.theme.MaterialLevel.FLOATING else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE)
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center,
@@ -320,7 +322,7 @@ fun CandidateBar(
         }
 
         if (state is CandidateBarState.ClipboardDisplay) {
-            ClipboardPreviewBar(state.candidates, visuals, callbacks, iconButtonContainer, state.smsVerificationCode)
+            ClipboardPreviewBar(state.candidates, visuals, callbacks, iconButtonContainer, state.smsVerificationCode, state.image)
             return@Column
         }
 
@@ -403,6 +405,7 @@ fun CandidateBar(
                     visuals = visuals, callbacks = callbacks,
                     fontSize = candidateTextSize.sp,
                     modifier = Modifier.weight(1f),
+                    highlightIndex = state.highlightIndex,
                 )
             } else LazyRow(
                 modifier = if (state is CandidateBarState.Idle) Modifier else Modifier.weight(1f),
@@ -600,6 +603,7 @@ private fun ClipboardPreviewBar(
     callbacks: CandidateBarCallbacks,
     iconButtonContainer: Color,
     smsVerificationCode: String? = null,
+    image: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
 ) {
     val code = remember(candidates, smsVerificationCode) {
         candidates.firstNotNullOfOrNull {
@@ -607,7 +611,7 @@ private fun ClipboardPreviewBar(
                 ?: it.takeIf { value -> value == smsVerificationCode }
         }
     }
-    if (code != null && callbacks.onVerificationCodeSelect != null) {
+    if (image == null && code != null && callbacks.onVerificationCodeSelect != null) {
         VerificationCodeActions(code, visuals, callbacks)
         return
     }
@@ -629,8 +633,8 @@ private fun ClipboardPreviewBar(
             // size the capsule to their text; long previews keep the full scroll viewport.
             val chromeWidth = 82.dp
             val maxTextWidthPx = with(density) { (maxWidth - chromeWidth).coerceAtLeast(0.dp).roundToPx() }
-            var textWidthPx = 0
-            for ((index, preview) in previews.withIndex()) {
+            var textWidthPx = if (image != null) with(density) { 64.dp.roundToPx() }.coerceAtMost(maxTextWidthPx) else 0
+            if (image == null) for ((index, preview) in previews.withIndex()) {
                 if (textWidthPx >= maxTextWidthPx || preview.length > 80) {
                     textWidthPx = maxTextWidthPx
                     break
@@ -651,7 +655,11 @@ private fun ClipboardPreviewBar(
             ) {
                 Icon(Icons.Default.ContentPaste, contentDescription = null,
                     tint = visuals.textColor, modifier = Modifier.size(18.dp))
-                LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll")) {
+                if (image != null) {
+                    ClipboardImagePreview(image,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        onPaste = { callbacks.onClipboardImageSelect?.invoke(image) })
+                } else LazyRow(Modifier.weight(1f).padding(horizontal = 8.dp).testTag("clipboard-preview-scroll")) {
                     itemsIndexed(previews) { index, preview ->
                         // 预览可横向滚动全部内容；换行仅在显示时折成空格，粘贴仍使用原文。
                         Text(preview, color = visuals.textColor, fontSize = 15.sp, maxLines = 1,
@@ -661,7 +669,11 @@ private fun ClipboardPreviewBar(
                                 .padding(vertical = verticalTextPadding, horizontal = if (index == 0) 0.dp else 8.dp))
                     }
                 }
-                Box(Modifier.size(30.dp).clip(CircleShape).clickable { callbacks.onOpenClipboard?.invoke() },
+                Box(Modifier.size(30.dp).clip(CircleShape)
+                    .then(if (image != null) Modifier.testTag("clipboard-image-more") else Modifier)
+                    .clickable {
+                        (callbacks.onOpenClipboard ?: if (image != null) callbacks.onExpandClipboardImages else null)?.invoke()
+                    },
                     contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "打开剪贴板",
                         tint = visuals.accentColor, modifier = Modifier.size(22.dp))
@@ -723,6 +735,7 @@ fun CandidateItem(
                 if (isSelected) accentColor.copy(alpha = 0.2f)
                 else Color.Transparent
             )
+            .semantics { selected = isSelected }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -813,24 +826,31 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     }
 }
 
-/** One measured, non-scrolling row. Overflow belongs to the expanded panel. */
+/** Layout history only; updating it after composition must not schedule another recomposition. */
+private class CandidateStripViewport { var firstIndex: Int = 0 }
+
+/** One measured row. Keyboard focus can move its window without changing candidate identities. */
 @Composable
 internal fun FixedCandidateStrip(
     candidates: List<String>, associations: List<String> = emptyList(), comments: List<String>, visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks, fontSize: androidx.compose.ui.unit.TextUnit,
     modifier: Modifier = Modifier,
+    highlightIndex: Int = 0,
 ) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")) {
         val panelWidth = maxWidth
         val all = candidates + associations
-        val count = remember(all, comments, fontSize, density, measurer, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
-            candidatePrefixCount(all.size, constraints.maxWidth, with(density) { 4.dp.roundToPx() }) { index ->
+        val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
+        val viewport = remember(candidates, comments) { CandidateStripViewport() }
+        val visibleIndices = remember(viewport, all, comments, focused, fontSize, density, measurer, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
+            candidateWindow(all.size, focused, constraints.maxWidth, with(density) { 4.dp.roundToPx() },
+                windowStart = viewport.firstIndex) { index ->
                 val text = all[index]
                 val primary = measurer.measure(AnnotatedString(text), TextStyle(
                     fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily,
-                    fontWeight = if (index == 0) FontWeight.Medium else FontWeight.Normal), softWrap = false).size.width
+                    fontWeight = if (index == focused) FontWeight.Medium else FontWeight.Normal), softWrap = false).size.width
                 val comment = comments.getOrElse(index) { "" }
                 val secondary = if (comment.isEmpty()) 0 else measurer.measure(AnnotatedString(comment),
                     TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
@@ -838,18 +858,21 @@ internal fun FixedCandidateStrip(
                 primary + secondary + with(density) { 8.dp.roundToPx() }
             }
         }
-        val visible = all.take(count)
         androidx.compose.runtime.SideEffect {
-            callbacks.onVisibleCandidatesChanged?.invoke(candidates.take(count))
-            callbacks.onVisibleAssociationsChanged?.invoke(associations.take((count - candidates.size).coerceAtLeast(0)))
+            viewport.firstIndex = visibleIndices.first.takeUnless { visibleIndices.isEmpty() } ?: 0
+            // Expanded pagination removes a prefix only. A shifted window must not hide earlier items.
+            callbacks.onVisibleCandidatesChanged?.invoke(if (visibleIndices.first == 0)
+                candidates.take(visibleIndices.count()) else emptyList())
+            callbacks.onVisibleAssociationsChanged?.invoke(visibleIndices.filter { it >= candidates.size }
+                .map { all[it] })
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            visible.forEachIndexed { index, text ->
-                CandidateItem(text, index, {
+            visibleIndices.forEach { index ->
+                CandidateItem(all[index], index, {
                     if (index < candidates.size) callbacks.onCandidateSelect(index)
                     else callbacks.onAssociationSelect?.invoke(index - candidates.size)
                 }, visuals.textColor,
-                    comment = comments.getOrElse(index) { "" }, isSelected = index == 0,
+                    comment = comments.getOrElse(index) { "" }, isSelected = index == focused,
                     accentColor = visuals.accentColor, selectedTextColor = visuals.selectedTextColor,
                     fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
                     commentFontFamily = AppFonts.commentFontFamily,

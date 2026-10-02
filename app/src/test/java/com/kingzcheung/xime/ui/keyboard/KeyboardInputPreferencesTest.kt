@@ -2,7 +2,10 @@ package com.kingzcheung.xime.ui.keyboard
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.KeyEffectPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -65,6 +68,16 @@ class KeyboardInputPreferencesTest {
         assertEquals(true, KeyboardInputPreferences.read(context).showPressBubble)
     }
 
+    @Test fun `frosted glass is opt in and survives unrelated input preference saves`() {
+        assertEquals(FrostedGlassConfig(), KeyboardInputPreferences.read(context).frostedGlass)
+        val effect = FrostedGlassConfig(true, 18f, 0.7f, 0.3f)
+        FrostedGlassPreferences.save(context, effect)
+        assertEquals(effect, KeyboardInputPreferences.read(context).frostedGlass)
+        KeyboardInputPreferences(spaceHold = SpaceHoldAction.REPEAT).save(context)
+        assertEquals(effect, KeyboardInputPreferences.read(context).frostedGlass)
+        assertEquals(false, KeyboardInputPreferences.read(context).keyGlowEnabled)
+    }
+
     @Test
     fun `saved input preferences can be read without restarting the app`() {
         val changed = KeyboardInputPreferences(SpaceHoldAction.REPEAT, 6f, 1.4f, "…\n→")
@@ -79,6 +92,19 @@ class KeyboardInputPreferencesTest {
     fun `legacy voice hold migrates to cursor`() {
         values["space_hold_action"] = "VOICE"
         assertEquals(SpaceHoldAction.CURSOR, KeyboardInputPreferences.read(context).spaceHold)
+    }
+
+    @Test fun `symbol input keeps swipe default and persists an explicit hold choice`() {
+        assertEquals(SymbolInputMode.SWIPE_UP, KeyboardInputPreferences.read(context).symbolInputMode)
+        val hold = KeyboardInputPreferences(symbolInputMode = SymbolInputMode.LONG_PRESS,
+            spaceHold = SpaceHoldAction.VOICE_TOGGLE, cursorGesture = CursorGestureMode.KEYBOARD)
+        hold.save(context)
+        assertEquals(hold, KeyboardInputPreferences.read(context))
+        hold.copy(symbolInputMode = SymbolInputMode.SWIPE_UP).save(context)
+        assertEquals(SymbolInputMode.SWIPE_UP, KeyboardInputPreferences.read(context).symbolInputMode)
+        values["symbol_input_mode"] = "unknown-future-mode"
+        assertEquals(SymbolInputMode.SWIPE_UP, KeyboardInputPreferences.read(context).symbolInputMode)
+        assertEquals(SpaceHoldAction.VOICE_TOGGLE, KeyboardInputPreferences.read(context).effectiveSpaceHold)
     }
 
     @Test fun `explicit new voice toggle survives save while cursor override preserves it`() {
@@ -140,6 +166,38 @@ class KeyboardInputPreferencesTest {
         assertEquals(true, SettingsPreferences.isSplitKeyboardEnabled(context))
         SettingsPreferences.setSplitKeyboardEnabled(context, false)
         assertEquals(false, KeyboardInputPreferences.read(context).splitKeyboardEnabled)
+    }
+
+    @Test fun `legacy combined preference preserves both effects until edited independently`() {
+        for (old in listOf(false, true)) {
+            values.clear()
+            values[KeyEffectPreferences.GLOW] = old
+            assertEquals(old, KeyboardInputPreferences.read(context).keyAnimationEnabled)
+            KeyEffectPreferences.setGlowEnabled(prefs, !old)
+            assertEquals(old, KeyboardInputPreferences.read(context).keyAnimationEnabled)
+            assertEquals(!old, KeyboardInputPreferences.read(context).keyGlowEnabled)
+            KeyEffectPreferences.setGlowEnabled(prefs, old)
+            assertEquals(old, KeyboardInputPreferences.read(context).keyAnimationEnabled)
+        }
+    }
+
+    @Test fun `all four combinations persist without one switch changing the other`() {
+        for (glow in listOf(false, true)) for (animation in listOf(false, true)) {
+            values.clear()
+            KeyEffectPreferences.setAnimationEnabled(prefs, animation)
+            KeyEffectPreferences.setGlowEnabled(prefs, glow)
+            val effects = KeyboardInputPreferences.read(context)
+            assertEquals(glow, effects.keyGlowEnabled)
+            assertEquals(animation, effects.keyAnimationEnabled)
+            KeyboardInputPreferences().save(context)
+            assertEquals(glow, KeyboardInputPreferences.read(context).keyGlowEnabled)
+            assertEquals(animation, KeyboardInputPreferences.read(context).keyAnimationEnabled)
+            KeyEffectPreferences.setAnimationEnabled(prefs, !animation)
+            assertEquals(glow, KeyboardInputPreferences.read(context).keyGlowEnabled)
+        }
+        values.clear()
+        KeyEffectPreferences.setGlowEnabled(prefs, true)
+        assertEquals(false, KeyboardInputPreferences.read(context).keyAnimationEnabled)
     }
 
 }

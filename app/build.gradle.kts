@@ -17,6 +17,7 @@ apply(from = "build-logic/tasks-bundled-models.gradle.kts")
 apply(from = "build-logic/tasks-plugin-dev.gradle.kts")
 apply(from = "build-logic/tasks-japanese.gradle.kts")
 apply(from = "build-logic/tasks-chinese.gradle.kts")
+apply(from = "build-logic/tasks-t9-grammar.gradle.kts")
 apply(from = "build-logic/tasks-rime-manifest.gradle.kts")
 
 // 获取 Git 提交哈希
@@ -48,6 +49,7 @@ android {
     }
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/chinese-assets").get().asFile)
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/t9-grammar").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/rime-manifest").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/speech-assets").get().asFile)
     compileSdk = 36
@@ -65,11 +67,11 @@ android {
         applicationId = "com.cyletix.cyime"
         minSdk = 28
         targetSdk = 35
-        // 版本规则：本地小改递增 PATCH；对外正式发包递增 MINOR，保留 PATCH。
-        // 例：1.0.5 开发 → 1.1.5 正式 → 1.1.6 开发 → 1.2.6 正式。
-        // versionCode 每次生成新版本独立递增，保证覆盖升级。
-        versionCode = 20261034
-        versionName = "1.3.20"
+        // 按发布批次定号：兼容修复升 PATCH，兼容功能升 MINOR 并归零 PATCH。
+        // 不兼容变更升 MAJOR；日常编辑不逐次升号。完整规则见 docs/packaging.md。
+        // versionCode 是独立递增的交付序号；同批普通版与内置版共用。
+        versionCode = 20261049
+        versionName = "1.4.0"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

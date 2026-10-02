@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.view.inputmethod.InputConnection
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.speech.SpeechRecognitionManager
 import org.junit.Assert.assertEquals
@@ -53,7 +54,7 @@ class VoiceRecognitionHandlerFinishTest {
     private val stateChanges = mutableListOf<InputUIState>()
     private var recordingStoppedCount = 0
     private var voiceCompleteCount = 0
-    private var currentState = InputUIState()
+    private var currentState = InputUIState(currentSchemaId = "rime_ice")
 
     /** mock mainHandler 的 postDelayed 队列，可手动推进超时。 */
     private val posted = mutableListOf<Runnable>()
@@ -455,5 +456,45 @@ class VoiceRecognitionHandlerFinishTest {
         verify(mockManager).cancelRecognition()
         onPartial("late")
         verify(mockInputConnection, never()).setComposingText(any(), anyInt())
+    }
+
+    @Test fun `recognition receives product language including English ASCII projection`() {
+        currentState = currentState.copy(currentSchemaId = "japanese", isAsciiMode = false)
+        handler.startRecognition()
+        verify(mockManager).startRecognition(InputLanguage.JAPANESE)
+        currentState = currentState.copy(isAsciiMode = true)
+        handler.onInputLanguageChanged()
+        verify(mockManager).cancelRecognition()
+        handler.startRecognition()
+        verify(mockManager).startRecognition(InputLanguage.ENGLISH)
+    }
+
+    @Test fun `language change in same editor rejects pending voice text and final timeout`() {
+        startToolbar(); onPartial("已有文字")
+        handler.finishRecognition()
+        val before = editor.toString()
+        currentState = currentState.copy(currentSchemaId = "japanese")
+        handler.onInputLanguageChanged()
+        onPartial("旧语言结果"); onResult("迟到校正"); runTimeouts()
+        assertEquals(before, editor.toString())
+        verify(mockManager).cancelRecognition()
+    }
+
+    @Test fun `late callback checks language even before change observer runs`() {
+        startToolbar()
+        currentState = currentState.copy(isAsciiMode = true)
+        onPartial("不应进入英文会话")
+        onResult("不应提交")
+        assertEquals("", editor.toString())
+        verify(mockManager).cancelRecognition()
+    }
+
+    @Test fun `changing layout within the same language keeps the voice session`() {
+        startToolbar()
+        currentState = currentState.copy(currentSchemaId = "t9_pinyin")
+        handler.onInputLanguageChanged()
+        onPartial("继续")
+        assertEquals("继续", editor.toString())
+        verify(mockManager, never()).cancelRecognition()
     }
 }

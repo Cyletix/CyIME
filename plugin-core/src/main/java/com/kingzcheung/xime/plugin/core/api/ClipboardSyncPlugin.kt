@@ -78,9 +78,12 @@ interface ClipboardSyncPlugin : IPluginEntryClass, IPluginConfigurable {
      * ETag / If-None-Match 条件请求由插件 Lua 内部用 `host.config` 自行缓存管理：
      * 远端返回 304 或无变更时返回 null（宿主据此跳过写回）。
      *
-     * @return 远端 profile；无变更/失败返回 null
+     * @return 远端 profile；无变更返回 null；传输/校验失败应抛出异常，不能伪装成无变更。
      */
     suspend fun pull(): ClipboardProfile?
+
+    /** The host accepted this item (or already has it). Optional for legacy transports. */
+    suspend fun acknowledgePull(hash: String) {}
 
     /** 校验配置可用性（连接测试），返回错误消息（null 表示成功）。 */
     suspend fun testConnection(): String?

@@ -24,12 +24,8 @@ class QwjrtkLayoutTest {
         assertEquals("qwertyuiop", base[0].joinToString(""))
     }
 
-    @Test fun presetAppendsWithoutReplacingExistingChoices() {
+    @Test fun explicitlyEnabledSampleRespectsChosenOrder() {
         val existing = listOf("t9_pinyin", "rime_ice", "double_pinyin_flypy")
-        val available = (existing + QwjrtkLayout.ID).toSet()
-        assertEquals(existing + QwjrtkLayout.ID, QwjrtkLayout.appendToEnabled(existing, available))
-        assertEquals(existing, QwjrtkLayout.appendToEnabled(existing, existing.toSet()))
-        assertEquals(listOf("japanese"), QwjrtkLayout.appendToEnabled(listOf("japanese"), available))
         val modes = (listOf(QwjrtkLayout.ID) + existing).map { SchemaInfo(it, it, "", "", "") }
         val chosenOrder = listOf(QwjrtkLayout.ID) + existing
         val userSorted = InputModes.available(modes, chosenOrder)

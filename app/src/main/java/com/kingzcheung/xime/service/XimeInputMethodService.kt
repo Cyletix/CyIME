@@ -62,12 +62,22 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import com.kingzcheung.xime.ui.keyboard.LocalStretchFactor
+import com.kingzcheung.xime.ui.keyboard.LocalClipboardPanelExpansion
+import com.kingzcheung.xime.ui.keyboard.clipboardPanelBounds
+import com.kingzcheung.xime.ui.keyboard.clipboardPanelCanExpand
+import com.kingzcheung.xime.ui.keyboard.rememberClipboardPanelExpansion
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.keyboard.KeyboardResizeOverlay
+import com.kingzcheung.xime.ui.keyboard.ProtectedKeyboardSize
+import com.kingzcheung.xime.ui.keyboard.KeyboardAspectLimits
+import com.kingzcheung.xime.ui.keyboard.letterKeyboardDefaults
+import com.kingzcheung.xime.ui.keyboard.protectKeyboardSize
 import com.kingzcheung.xime.ui.keyboard.FLOATING_DRAG_BAR_HEIGHT_DP
 import com.kingzcheung.xime.ui.keyboard.HardwareKeyboardCandidateBar
+import com.kingzcheung.xime.ui.keyboard.HardwareKeyboardToolbar
+import com.kingzcheung.xime.ui.keyboard.HardwareToolbarPosition
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -200,6 +210,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal lateinit var keyboardContainer: VoiceKeyboardContainer
     
     internal val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var runtimeObserver: com.kingzcheung.xime.runtime.adaptation.RuntimeObserver? = null
+
+    /** P1 observes proposals only; no feature subscribes to them as an execution policy yet. */
+    private fun startRuntimeObservation() {
+        if (runtimeObserver == null) {
+            runtimeObserver = com.kingzcheung.xime.runtime.adaptation.RuntimeObserver(
+                CoroutineScope(serviceScope.coroutineContext + Dispatchers.IO),
+                com.kingzcheung.xime.runtime.adaptation.AndroidRuntimeSignalSource(this),
+                { com.kingzcheung.xime.runtime.adaptation.RuntimePreferences.read(this) },
+            ) { observation ->
+                FileLogger.i("RuntimeObservation", "observation only: generation=${observation.generation}, memory=${observation.capabilities.memoryEstimate}, " +
+                    "animation=${observation.proposal.animation.proposed}/${observation.proposal.animation.reasons}, " +
+                    "keyGlow=${observation.proposal.keyGlow.proposed}/${observation.proposal.keyGlow.reasons}, " +
+                    "neuralAdmission=${observation.proposal.neuralPrediction.proposed}/${observation.proposal.neuralPrediction.reasons}, " +
+                    "correctionAdmission=${observation.proposal.voiceCorrection.proposed}/${observation.proposal.voiceCorrection.reasons}")
+            }
+        }
+        runtimeObserver?.start()
+    }
     internal val keyProcessingDispatcher = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
         Thread(r, "key-process").also { it.isDaemon = true }
     }.asCoroutineDispatcher()
@@ -225,7 +254,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
 
     private val bottomInsetPxState = mutableStateOf(0)
-    private var hasHardwareKeyboard = false
+    private var hardwareKeyboardDisplay = HardwareKeyboardDisplayState()
+    private val hasHardwareKeyboard: Boolean get() = hardwareKeyboardDisplay.connected
+    private val hardwareToolbarPosition = mutableStateOf(HardwareToolbarPosition())
+    private val hardwareToolbarBounds = mutableStateOf<android.graphics.Rect?>(null)
+    private var hardwareCandidateBounds: android.graphics.Rect? = null
     /** 当前输入框是否受限（密码/终端/NO_SUGGESTIONS，见 EditorInfoClassifier）。
      *  主线程写（onStartInput）、key-processing 线程读（英文联想短路），volatile 保证可见性。 */
     @Volatile
@@ -247,14 +280,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private var keyboardReportsChinese = true
     internal var isChineseMode: Boolean
         get() = keyboardReportsChinese && !uiState.value.isAsciiMode &&
-            uiState.value.currentSchemaId !in com.kingzcheung.xime.settings.JapaneseSchemas.ids &&
-            uiState.value.currentSchemaId != "jaroomaji"
+            uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE
         set(value) { keyboardReportsChinese = value }
     internal var currentEffectiveKeyboardHeight: Int = 0
     private var floatingCardBounds: android.graphics.Rect? = null
     private var fixedCardBounds: android.graphics.Rect? = null
     internal var currentFloatingCardWidthDp = 0
     internal var currentFloatingCardHeightDp: Int = 0
+    /** Base keyboard only: expanded clipboard/tool panels must never seed a resize. */
+    internal var currentResolvedKeyboardSize: ProtectedKeyboardSize? = null
     internal var previousSchemaId: String = ""
     
     internal val calculatorEngine = com.kingzcheung.xime.calculator.CalculatorEngine()
@@ -393,6 +427,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     } else null
     
     private fun loadDarkModePreference() {
+        currentResolvedKeyboardSize = null
         if (uiState.value.showKeyboardResize) {
             // 编辑事务的几何不从偏好回灌；确认写完后统一恢复普通读取。
             uiState.value = uiState.value.copy(
@@ -416,25 +451,24 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val statusBarDp = tryGetStatusBarHeightDp(this, window.window)
         val effectiveH = if (isFloatingMode) (physicalScreenDp - statusBarDp).coerceAtLeast(1) else screenH
 
-        // 设置过悬浮宽度就按它算水平拖动范围；未设置时与 KeyboardGeometry 的默认比例保持一致。
         val savedWidth = SettingsPreferences.getFloatingWidthDp(this, isLandscape)
-        val wideFloating = !com.kingzcheung.xime.ui.keyboard.isT9Schema(uiState.value.currentSchemaId) &&
-            !com.kingzcheung.xime.ui.keyboard.isStrokeSchema(uiState.value.currentSchemaId) &&
-            uiState.value.currentSchemaId != "japanese_kana"
-        val cardWidth = com.kingzcheung.xime.ui.keyboard.resolvedFloatingWidth(
-            screenW, screenH, 0, 0, wideFloating, savedWidth,
-        )
-        val halfMargin = maxOf(0, (screenW - cardWidth) / 2)
-
+        val bottomPadding = SettingsPreferences.getKeyboardBottomPaddingDp(this)
+        val fixedWidth = SettingsPreferences.getFixedWidthDp(this, isLandscape)
+        val fixedOffset = SettingsPreferences.getFixedOffsetX(this, isLandscape)
         KeyboardHeightProfiles.migrateLegacy(this, isLandscape, effectiveH)
         val kbH = KeyboardHeightProfiles.selected(this, isFloatingMode, isLandscape, effectiveH)
-        val floatingBounds = com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds(effectiveH, isLandscape)
-        val cappedKbH = if (isFloatingMode) kbH.coerceIn(floatingBounds) else kbH.coerceAtMost((screenH * 8) / 10)
-        val cardH = cappedKbH + FLOATING_DRAG_BAR_HEIGHT_DP
         val minY = if (isFloatingMode) maxOf(
             tryGetVisibleNavBarHeightDp(this, window.window),
             kotlin.math.ceil(bottomInsetPxState.value / resources.displayMetrics.density).toInt(),
         ) else 0
+        // Position limits must use the same automatic/manual size as rendering.
+        // Old percentage heights incorrectly moved otherwise valid floating positions on reload.
+        val displaySize = resolveKeyboardSize(screenW, effectiveH, minY, uiState.value.copy(
+            isFloatingMode = isFloatingMode, floatingWidthDp = savedWidth,
+            fixedWidthDp = fixedWidth, keyboardBottomPaddingDp = bottomPadding,
+        ))
+        val halfMargin = maxOf(0, (screenW - displaySize.width) / 2)
+        val cardH = displaySize.height + (if (isFloatingMode) FLOATING_DRAG_BAR_HEIGHT_DP else 0)
         val maxY = maxOf(minY, effectiveH - cardH)
         val clampedX = loadedX.coerceIn(-halfMargin, halfMargin)
         val clampedY = loadedY.coerceIn(minY, maxY)
@@ -444,15 +478,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             themeId = SettingsPreferences.getKeyboardTheme(this),
             isSttEnabled = SettingsPreferences.isSttEnabled(this@XimeInputMethodService),
             keyboardHeightDp = kbH,
-            keyboardBottomPaddingDp = SettingsPreferences.getKeyboardBottomPaddingDp(this),
+            keyboardBottomPaddingDp = bottomPadding,
             keyboardOpacity = SettingsPreferences.getKeyboardOpacity(this),
             toolbarButtons = SettingsPreferences.getToolbarButtons(this),
             isFloatingMode = isFloatingMode,
             floatingOffsetX = clampedX,
             floatingOffsetY = clampedY,
             floatingWidthDp = savedWidth,
-            fixedWidthDp = SettingsPreferences.getFixedWidthDp(this, isLandscape),
-            fixedOffsetX = SettingsPreferences.getFixedOffsetX(this, isLandscape),
+            fixedWidthDp = fixedWidth,
+            fixedOffsetX = fixedOffset,
         )
     }
     
@@ -591,6 +625,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     private fun initSpeechRecognition() {
         voiceRecognitionHandler.initialize()
+        serviceScope.launch {
+            androidx.compose.runtime.snapshotFlow { uiState.value.inputProfile.language }.collect {
+                voiceRecognitionHandler.onInputLanguageChanged()
+            }
+        }
     }
     
     private fun initAssociationEngine() {
@@ -780,8 +819,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     )
                 }
             }
-            startClipboardSyncIfEnabled()
             serviceScope.launch {
+                startClipboardSyncIfEnabled()
                 PluginManager.pluginInstancesFlow.collect {
                     updateClipboardSync()
                     refreshToolbarPluginButtons()
@@ -806,20 +845,24 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val preferredId = SettingsPreferences.getClipboardSyncPluginId(this)
             val selected = enabled.firstOrNull { it.first == preferredId } ?: enabled.first()
             // 能力声明校验：未声明同步协议的插件不启动（manifest.capabilities.clipboard_sync.protocols）
-            val protocols = ExtensionManager.getAllInstalledPlugins()
+            val syncCapabilities = ExtensionManager.getAllInstalledPlugins()
                 .firstOrNull { it.id == selected.first }
-                ?.capabilities?.clipboardSync?.protocols
-            if (protocols.isNullOrEmpty()) {
+                ?.capabilities?.clipboardSync
+            if (syncCapabilities?.protocols.isNullOrEmpty()) {
                 FileLogger.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
                 return
             }
             val plugin = selected.second
             clipboardSyncBridge = ClipboardSyncBridge(
+                this,
                 clipboardManager,
                 plugin,
-                pluginId = selected.first
+                pluginId = selected.first,
+                foregroundPollIntervalMs = syncCapabilities?.foregroundPollIntervalMs ?: 0,
+                maxTextBytes = syncCapabilities?.maxTextBytes ?: 0,
             )
             clipboardSyncBridge?.start()
+            clipboardSyncBridge?.setKeyboardVisible(isInputViewShown)
             uiState.value = uiState.value.copy(clipboardSyncEnabled = true)
             Log.d(TAG, "Clipboard sync started: ${selected.first}")
         } catch (e: Exception) {
@@ -853,7 +896,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val shouldUse = (if (preferredId.isNotEmpty()) {
             enabled.firstOrNull { it.first == preferredId }
         } else null) ?: enabled.first()
-        if (shouldUse.first != clipboardSyncBridge?.pluginId) {
+        if (shouldUse.first != clipboardSyncBridge?.pluginId ||
+            !clipboardSyncBridge!!.usesPlugin(shouldUse.second)) {
             stopClipboardSync()
             startClipboardSyncIfEnabled()
         }
@@ -1242,11 +1286,22 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             isFocusableInTouchMode = true
             composeViewRef = this
             setContent {
+              androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                val inputWindowWidthDp = maxWidth.value.roundToInt().coerceAtLeast(1)
                 val cand = candidateState.value
                 val state = uiState.value
+                // Reloaded key gaps/rows and split changes affect automatic geometry even
+                // when the active input profile and stored dimensions remain unchanged.
+                KeysConfigHelper.configVersion.collectAsState().value
+                com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitKeyboardEnabled
+                val frostedGlass = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().frostedGlass
+                // 材质透明度分别应用于背景和键帽，文字不再随整层透明度变淡。
+                val keyboardLayerOpacity = if (frostedGlass.enabled) 1f else state.keyboardOpacity
                 val page by keyboardViewModel.page.collectAsState(com.kingzcheung.xime.keyboard.KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL))
                 val isHandwritingMode = (page as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
                 val handwritingExpanded = state.handwritingExpanded && isHandwritingMode && !state.showKeyboardResize
+                val clipboardPanelOpen = clipboardPanelCanExpand(page, state.showKeyboardResize, state.isCompact)
+                val imagePanelExpanded = clipboardPanelOpen && state.clipboardImagesExpanded
                 androidx.compose.runtime.LaunchedEffect(isHandwritingMode) {
                     if (!isHandwritingMode && uiState.value.handwritingExpanded)
                         uiState.value = uiState.value.copy(handwritingExpanded = false)
@@ -1258,40 +1313,46 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val statusBarHeightDp = tryGetStatusBarHeightDp(this@XimeInputMethodService, window.window)
                 val visibleNavBarHeightDp = tryGetVisibleNavBarHeightDp(this@XimeInputMethodService, window.window)
                 // 用物理屏幕高度减去状态栏，保证不同 Android 版本一致
-                val effectiveScreenH = if (state.isFloatingMode || state.showKeyboardResize) (physicalScreenDp - statusBarHeightDp).coerceAtLeast(1) else screenHeightDp
+                val effectiveScreenH = if (state.isFloatingMode || state.showKeyboardResize || state.isCompact) (physicalScreenDp - statusBarHeightDp).coerceAtLeast(1) else screenHeightDp
                 val windowVisibleHeightDp = effectiveScreenH
                 // 浮动窗口使用物理屏高，底部始终预留实际系统栏；不能根据配置屏高猜测已扣除。
                 val floatingMinY = maxOf(visibleNavBarHeightDp,
                     kotlin.math.ceil(bottomInsetPxState.value / resources.displayMetrics.density).toInt())
+                val callbacks = rememberImeKeyboardCallbacks(this@XimeInputMethodService, floatingMinY, state, effectiveScreenH)
+                keyboardCallbacks = callbacks
+                // The input controller belongs to the editor session, including compact-only starts.
+                keyboardViewModel.bindT9Controller(callbacks)
 
-                val screenWidthDp = resources.configuration.screenWidthDp
+                val screenWidthDp = inputWindowWidthDp
                 val screenIsLandscape = screenWidthDp > screenHeightDp
-                val portraitScreenHeightDp = if (screenIsLandscape) screenWidthDp else screenHeightDp
-                val isLandscape = !state.isFloatingMode && screenIsLandscape
-                val orientationHeight = KeyboardHeightProfiles.selected(
-                    this@XimeInputMethodService, state.isFloatingMode, screenIsLandscape, effectiveScreenH
-                )
-                val displayHeight = orientationHeight.coerceAtMost((if (state.isFloatingMode) portraitScreenHeightDp else screenHeightDp) * 8 / 10)
                 val heightBounds = KeyboardHeightProfiles.fixedBounds(this@XimeInputMethodService, screenIsLandscape)
-                // 悬浮模式必须按当前“可见高度”限制内容高；旧逻辑按竖屏长边上限计算，
-                // 横屏时会得到比实际窗口还高的卡片，导致顶部/底部被裁切。
-                val floatingHeightBounds = com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds(
-                    effectiveScreenH, screenIsLandscape
-                )
-                // 悬浮拖动仅由 Compose 的 previewRect 驱动，不能把进入调节时的固定高度当作悬浮高度。
-                val keyboardHeight = (if (state.showKeyboardResize && !state.isFloatingMode)
-                    state.resizePreviewHeightDp else displayHeight)
-                    .let {
-                        when {
-                            // 悬浮高度使用专用范围：比旧的普通键盘范围宽，但绝不允许拉成整屏长条。
-                            state.isFloatingMode -> it.coerceIn(floatingHeightBounds)
-                            else -> it.coerceIn(heightBounds)
-                        }
-                    }
-                // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
-                val effectiveKeyboardHeight = if (handwritingExpanded) (effectiveScreenH - floatingMinY).coerceAtLeast(1) else keyboardHeight
+                val geometryBottomSpace = if (state.isFloatingMode) floatingMinY else
+                    state.keyboardBottomPaddingDp + imeBottomSpaceDp(bottomInsetPxState.value, resources.displayMetrics.density)
+                val protectedSize = resolveKeyboardSize(screenWidthDp, effectiveScreenH, geometryBottomSpace, state)
+                val resetSize = resolveKeyboardSize(screenWidthDp, effectiveScreenH,
+                    if (state.isFloatingMode) floatingMinY else imeBottomSpaceDp(bottomInsetPxState.value, resources.displayMetrics.density),
+                    state, reset = true)
+                val keyboardHeight = protectedSize.height
                 val contentBottomPaddingDp = if (handwritingExpanded || state.isFloatingMode) 0 else state.keyboardBottomPaddingDp
                 val floatingDragBarHeight = if (state.isFloatingMode && !handwritingExpanded) FLOATING_DRAG_BAR_HEIGHT_DP else 0
+                // Keep a floating panel's bottom in place while it grows, and reserve its drag bar.
+                val clipboardBottomSpace = if (state.isFloatingMode) {
+                    state.floatingOffsetY.coerceIn(floatingMinY,
+                        (effectiveScreenH - keyboardHeight - floatingDragBarHeight).coerceAtLeast(floatingMinY)) + floatingDragBarHeight
+                } else floatingMinY + contentBottomPaddingDp
+                val clipboardExpansion = rememberClipboardPanelExpansion(
+                    clipboardPanelOpen, state.inputSessionId,
+                    clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace),
+                    state.clipboardImagesExpanded,
+                ) { expanded ->
+                    uiState.value = uiState.value.copy(clipboardImagesExpanded = expanded)
+                }
+                // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
+                val effectiveKeyboardHeight = when {
+                    handwritingExpanded -> (effectiveScreenH - floatingMinY).coerceAtLeast(1)
+                    clipboardExpansion != null -> clipboardExpansion.height.roundToInt()
+                    else -> keyboardHeight
+                }
                 val floatingCardContentHeight = effectiveKeyboardHeight + floatingDragBarHeight
                 
                 val density = LocalDensity.current
@@ -1323,6 +1384,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         val totalDp = if (handwritingExpanded || state.showKeyboardResize || state.isCompact || state.isFloatingMode) effectiveScreenH
                             else contentHeight + contentBottomPaddingDp + activeBottomDp
                         SideEffect {
+                            currentResolvedKeyboardSize = protectedSize
                             // 容器物理高度 = Compose 内容总高（含底部留白），全模式统一。
                             // 容器高度变化 → View 层 relayout → traversal → onComputeInsets
                             // 自动以新高度重算并上报（ViewRootImpl 每次 traversal 都 dispatch
@@ -1344,24 +1406,44 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         val selectedTextCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getCandidateSelectedTextColor(state.themeId, isDark)
                         val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
                         val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
-                        if (state.isCompact && (cand.candidates.isNotEmpty() || cand.isShowingRecentClipboard || cand.inputText.isNotEmpty())) {
+                        if (state.isCompact) {
+                          Box(Modifier.fillMaxSize().padding(bottom = activeBottomDp.dp)) {
                             HardwareKeyboardCandidateBar(
                                 inputText = cand.inputText,
                                 preeditText = cand.preeditText,
                                 candidates = cand.candidates,
                                 hasNextPage = cand.hasNextPage,
                                 hasPrevPage = cand.hasPrevPage,
-                                cursorX = state.cursorX,
-                                cursorY = state.cursorY,
-                                cursorVisible = state.cursorVisible,
+                                cursorAnchor = state.cursorAnchor,
                                 highlightIndex = highlightIndex.intValue,
                                 cardBackgroundColor = cardBg,
                                 candidateTextColor = candidateTextCol,
                                 activeColor = accentCol,
                                 selectedTextColor = selectedTextCol,
+                                onCandidateSelect = { index ->
+                                    if (cand.hasSameSelectionSource(candidateState.value)) {
+                                        keyRouter.selectCandidate(index)
+                                        highlightIndex.intValue = 0
+                                    }
+                                },
+                                onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = false, it) },
+                                avoidBoundsInWindow = hardwareToolbarBounds.value,
                             )
-                        } else if (state.isCompact) {
-                            Box(modifier = Modifier.fillMaxSize())
+                            HardwareKeyboardToolbar(
+                                onShowKeyboard = { showScreenKeyboardFromHardware() },
+                                onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
+                                onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
+                                onSwitchInputMethod = {
+                                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                                    imm.showInputMethodPicker()
+                                },
+                                backgroundColor = cardBg,
+                                contentColor = accentCol,
+                                position = hardwareToolbarPosition.value,
+                                onPositionChange = { hardwareToolbarPosition.value = it },
+                                onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = true, it) },
+                            )
+                          }
                         } else {
                         // 非浮动：背景与键盘内容同区域，贴底覆盖键盘内容高度 + 底部导航栏留白，
                         // 键盘内容通过 offset 上移 activeBottomDp 留出导航栏空间（对齐参考实现 bottomPaddingSpace）。
@@ -1372,7 +1454,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     .fillMaxWidth()
                                     .height(activeBottomDp.dp)
                                     .align(androidx.compose.ui.Alignment.BottomCenter)
-                                    .graphicsLayer { alpha = state.keyboardOpacity }
+                                    .graphicsLayer { alpha = keyboardLayerOpacity }
                                     .keyboardBackground(rootTheme.keyboardBackground, isDark, keyboardBgColor)
                             )
                         }
@@ -1392,7 +1474,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     .then(if (state.isFloatingMode) Modifier else Modifier.offset(y = (-activeBottomDp).dp))
                             }
                         ) {
-                        CompositionLocalProvider(LocalStretchFactor provides state.stretchFactor) {
+                        CompositionLocalProvider(
+                            LocalStretchFactor provides state.stretchFactor,
+                            LocalClipboardPanelExpansion provides clipboardExpansion,
+                        ) {
                             // 注意：kbState 只承载键盘按键/布局状态，不承载候选数据。
                             // 候选数据单独通过 candidateState 传给 KeyboardView。
                             // remember 的 key 均为候选无关依赖：候选变化时 kbState 实例保持不变，
@@ -1402,6 +1487,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 state,
                                 isDarkTheme,
                                 effectiveKeyboardHeight,
+                                protectedSize,
                                 floatingMinY,
                             isHandwritingMode,
                             clipboardItemsState.value,
@@ -1410,6 +1496,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             calculatorEngine.isActive(),
                             ) {
                                 KeyboardUiState(
+                                    clipboardImagesExpanded = imagePanelExpanded,
                                     rejectedCommitText = state.rejectedCommitText,
                                     isAsciiMode = state.isAsciiMode,
                                     schemaName = if (state.isAsciiMode) "英文" else state.schemaName,
@@ -1422,6 +1509,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     themeId = state.themeId,
                                     handwritingExpanded = handwritingExpanded,
                                     keyboardHeightDp = effectiveKeyboardHeight,
+                                    keyboardWidthDp = if (handwritingExpanded) screenWidthDp else protectedSize.width,
                                     keyboardBottomPaddingDp = contentBottomPaddingDp,
                                     keyboardOpacity = state.keyboardOpacity,
                                     clipboardItems = clipboardItemsState.value,
@@ -1442,6 +1530,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     inputSessionId = state.inputSessionId,
                                     isFloatingMode = state.isFloatingMode && !handwritingExpanded,
                                     isHandwritingMode = isHandwritingMode,
+                                    // Floating cards remain draggable even when an old size is being protected.
                                     floatingOffsetX = state.floatingOffsetX,
                                     floatingOffsetY = state.floatingOffsetY,
                                     floatingMinOffsetY = floatingMinY,
@@ -1449,7 +1538,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     resizePreviewWidthDp = state.resizePreviewWidthDp,
                                     floatingWidthDp = state.floatingWidthDp,
                                     fixedWidthDp = if (handwritingExpanded) resources.configuration.screenWidthDp else state.fixedWidthDp,
-                                    fixedOffsetX = if (handwritingExpanded) 0 else state.fixedOffsetX,
+                                    fixedOffsetX = if (handwritingExpanded) 0 else protectedSize.offsetX,
                                     t9ResetSignal = state.t9ResetSignal,
                                     swipeCancelEpoch = state.swipeCancelEpoch,
                                     t9RightCandidateSelectedCount = state.t9RightCandidateSelectedCount,
@@ -1472,8 +1561,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     clipboardSyncEnabled = state.clipboardSyncEnabled,
                                 )
                             }
-                            val callbacks = rememberImeKeyboardCallbacks(this@XimeInputMethodService, floatingMinY, state, effectiveScreenH)
-                            keyboardCallbacks = callbacks
                             val hapticView = LocalView.current
                             val resizeControls: (@Composable () -> Unit)? = if (state.showKeyboardResize) {
                                 {
@@ -1484,6 +1571,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                      minWidthDp = com.kingzcheung.xime.ui.keyboard.keyboardWidthBounds(resources.configuration.screenWidthDp).first,
                                      maxWidthDp = com.kingzcheung.xime.ui.keyboard.keyboardWidthBounds(resources.configuration.screenWidthDp).last,
                                      defaultHeightDp = SettingsPreferences.getDefaultKeyboardHeightDp(this@XimeInputMethodService, screenIsLandscape),
+                                     defaultSize = resetSize,
                                      currentBottomPaddingDp = contentBottomPaddingDp,
                                      isFloatingMode = state.isFloatingMode,
                                      initialOpacity = state.keyboardOpacity,
@@ -1589,6 +1677,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                            }
                             } else null
                             KeyboardView(
+                                inputSessionManagedByHost = true,
                                 resizeOverlay = resizeControls,
                                 fixedBottomInsetDp = activeBottomDp,
                                 fixedHeightRange = heightBounds,
@@ -1602,7 +1691,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 // 悬浮透明度在卡片本身处理，宿主不再强制创建键盘大小的离屏缓冲。
                                 modifier = if (state.isFloatingMode || state.showKeyboardResize) Modifier
                                     else Modifier.graphicsLayer {
-                                        alpha = state.keyboardOpacity
+                                        alpha = keyboardLayerOpacity
                                         compositingStrategy = CompositingStrategy.Offscreen
                                     },
                                 // 非按键交互（符号/表情面板、菜单栏、候选栏按钮）的振动，
@@ -1641,6 +1730,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
              }
          }
         
+        }
         keyboardContainer.addView(composeView)
 
         applyWindowBackground()
@@ -1684,11 +1774,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // updateHeight 下一帧才生效；部分应用按首次 inset 布局后不再响应修正，
                 // 输入框被顶到屏顶、与键盘间留大片空白（重进时容器已带正确高度故不复现）。
                 // 按偏好高度预设首帧真实几何，之后仍由 SideEffect 统一维护。
-                val isLandscape =
-                    resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
-                val displayHeight = KeyboardHeightProfiles.fixed(this, isLandscape)
                 val density = resources.displayMetrics.density
                 val activeBottomDp = imeBottomSpaceDp(bottomInsetPxState.value, density)
+                val displayHeight = resolveKeyboardSize(resources.configuration.screenWidthDp,
+                    resources.configuration.screenHeightDp, state.keyboardBottomPaddingDp + activeBottomDp, state).height
                 view.updateLayoutParams<android.widget.FrameLayout.LayoutParams> {
                     height = ((displayHeight + state.keyboardBottomPaddingDp + activeBottomDp) * density).toInt()
                 }
@@ -1714,25 +1803,82 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
-    /** 切换显示模式只读取目标模式的尺寸；不把悬浮位置归零，不混写固定高度。 */
+    /** Shared by Compose, first-frame insets, resize entry/reset and mode changes. */
+    internal fun resolveKeyboardSize(
+        availableWidthDp: Int,
+        hostHeightDp: Int,
+        bottomSpaceDp: Int,
+        state: InputUIState = uiState.value,
+        floating: Boolean = state.isFloatingMode,
+        reset: Boolean = false,
+    ): ProtectedKeyboardSize {
+        val config = resources.configuration
+        val landscape = config.screenWidthDp > config.screenHeightDp
+        val preview = state.showKeyboardResize && !reset
+        val height = if (preview && state.resizePreviewHeightDp > 0) state.resizePreviewHeightDp else
+            if (reset) SettingsPreferences.getDefaultKeyboardHeightDp(this, landscape)
+            else KeyboardHeightProfiles.selected(this, floating, landscape, hostHeightDp)
+        val heightBounds = if (floating)
+            com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds(hostHeightDp, landscape)
+            else KeyboardHeightProfiles.fixedBounds(this, landscape)
+        val savedWidth = if (reset) 0 else if (floating)
+            (state.resizePreviewWidthDp.takeIf { preview && it > 0 } ?: state.floatingWidthDp)
+            else state.fixedWidthDp
+        val width = savedWidth.takeIf { it > 0 } ?: if (floating)
+            com.kingzcheung.xime.ui.keyboard.resolvedFloatingWidth(
+                availableWidthDp, config.screenHeightDp, height, maxOf(config.screenWidthDp, config.screenHeightDp),
+                state.inputProfile.layout.kind in setOf(com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC,
+                    com.kingzcheung.xime.settings.LayoutKind.MERGED), 0,
+            ) else availableWidthDp
+        // Fixed mode's configuration height already describes its usable viewport.
+        // Resize overlays use a taller host, but must not change the default budget.
+        val availableHeight = (if (floating) hostHeightDp - bottomSpaceDp - FLOATING_DRAG_BAR_HEIGHT_DP
+            else config.screenHeightDp - (if (reset) 0 else state.keyboardBottomPaddingDp)).coerceAtLeast(1)
+        val maximumHeight = heightBounds.last.coerceAtMost(availableHeight)
+        val requestedHeight = height.coerceIn(heightBounds.first.coerceAtMost(maximumHeight)..maximumHeight)
+        return protectKeyboardSize(
+            availableWidthDp, width, requestedHeight,
+            if (reset) 0 else if (floating) state.floatingOffsetX else state.fixedOffsetX,
+            KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind),
+            customSize = !reset && (preview || savedWidth > 0 || KeyboardHeightProfiles.hasSavedHeight(this, floating, landscape)),
+            letterDefaults = letterKeyboardDefaults(state.inputProfile, availableHeight, state.isAsciiMode, floating,
+                split = SettingsPreferences.isSplitKeyboardEnabled(this)),
+        )
+    }
+
+    /** 读取目标模式的尺寸；恢复固定时透明度归零，保留各模式的位置。 */
     internal fun restoreKeyboardDisplayMode(enabled: Boolean, navBarDp: Int = 0, persist: Boolean = true) {
         val config = resources.configuration
         val landscape = config.screenWidthDp > config.screenHeightDp
         val before = uiState.value
+        val restoringFixed = before.isFloatingMode && !enabled
         val hostHeight = ((resources.displayMetrics.heightPixels / resources.displayMetrics.density).roundToInt() -
             tryGetStatusBarHeightDp(this, window.window)).coerceAtLeast(1)
-        val targetHeight = KeyboardHeightProfiles.selected(this, enabled, landscape, hostHeight)
         val savedWidth = SettingsPreferences.getFloatingWidthDp(this, landscape)
+        val savedFixedWidth = SettingsPreferences.getFixedWidthDp(this, landscape)
         val savedX = SettingsPreferences.getFloatingOffsetX(this, landscape)
         val savedY = SettingsPreferences.getFloatingOffsetY(this, landscape)
-        if (persist) SettingsPreferences.setFloatingMode(this, enabled, landscape)
+        val targetSize = resolveKeyboardSize(config.screenWidthDp,
+            if (enabled || before.showKeyboardResize) hostHeight else config.screenHeightDp,
+            if (enabled) maxOf(navBarDp, tryGetVisibleNavBarHeightDp(this, window.window),
+                kotlin.math.ceil(bottomInsetPxState.value / resources.displayMetrics.density).toInt())
+            else before.keyboardBottomPaddingDp +
+                imeBottomSpaceDp(bottomInsetPxState.value, resources.displayMetrics.density),
+            before.copy(showKeyboardResize = false, floatingWidthDp = savedWidth, fixedWidthDp = savedFixedWidth),
+            floating = enabled)
+        val targetHeight = targetSize.height
+        if (persist) {
+            if (restoringFixed) SettingsPreferences.setKeyboardOpacity(this, 1f)
+            SettingsPreferences.setFloatingMode(this, enabled, landscape)
+        }
         uiState.value = uiState.value.copy(
             isFloatingMode = enabled,
+            keyboardOpacity = if (restoringFixed) 1f else before.keyboardOpacity,
             keyboardHeightDp = targetHeight,
             resizePreviewHeightDp = if (before.showKeyboardResize) targetHeight else 0,
-            resizePreviewWidthDp = 0,
+            resizePreviewWidthDp = if (before.showKeyboardResize && enabled) targetSize.width else 0,
             floatingWidthDp = savedWidth,
-            fixedWidthDp = SettingsPreferences.getFixedWidthDp(this, landscape),
+            fixedWidthDp = if (before.showKeyboardResize && !enabled) targetSize.width else savedFixedWidth,
             fixedOffsetX = SettingsPreferences.getFixedOffsetX(this, landscape),
             floatingOffsetX = savedX,
             floatingOffsetY = savedY,
@@ -1751,6 +1897,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             isFloatingMode = uiState.value.resizeInitialFloating,
             floatingOffsetX = uiState.value.resizeInitialX,
             floatingOffsetY = uiState.value.resizeInitialY,
+            fixedWidthDp = SettingsPreferences.getFixedWidthDp(this, isLandscape),
+            fixedOffsetX = SettingsPreferences.getFixedOffsetX(this, isLandscape),
             resizePreviewWidthDp = 0,
             resizePreviewHeightDp = 0,
             keyboardHeightDp = KeyboardHeightProfiles.selected(
@@ -1768,13 +1916,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun refreshKeyboardGeometry() {
         floatingCardBounds = null
         fixedCardBounds = null
+        clearHardwareSurfaceBounds()
+        currentResolvedKeyboardSize = null
         currentFloatingCardHeightDp = 0
         currentEffectiveKeyboardHeight = 0
         if (::keyboardContainer.isInitialized) {
             val state = uiState.value
             val config = resources.configuration
             val screenHeight = config.screenHeightDp
-            val landscape = config.screenWidthDp > screenHeight
             val activeBottom = imeBottomSpaceDp(bottomInsetPxState.value, resources.displayMetrics.density)
             // 悬浮模式必须让输入法宿主保持“物理可见全高”。
             // 不能在确认后又退回 configuration.screenHeightDp；那会把卡片上半部裁出 IME 宿主。
@@ -1782,10 +1931,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val statusBarDp = tryGetStatusBarHeightDp(this, window.window)
             val floatingHostHeight = (physicalScreenDp - statusBarDp).coerceAtLeast(1)
             val height = when {
-                state.isFloatingMode || state.showKeyboardResize -> floatingHostHeight
-                state.isCompact -> screenHeight
+                state.isFloatingMode || state.showKeyboardResize || state.isCompact -> floatingHostHeight
                 else -> {
-                    val content = KeyboardHeightProfiles.fixed(this, landscape)
+                    val content = resolveKeyboardSize(config.screenWidthDp, screenHeight,
+                        state.keyboardBottomPaddingDp + activeBottom, state).height
                     content + state.keyboardBottomPaddingDp + activeBottom
                 }
             }
@@ -1798,7 +1947,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         cancelVerificationCodeInput()
         if (keyCode == KeyEvent.KEYCODE_BACK &&
-            (keyboardCallbacks?.onDismissPreeditEditor != null || uiState.value.showKeyboardResize || uiState.value.handwritingExpanded)) {
+            (keyboardCallbacks?.onDismissPreeditEditor != null || uiState.value.showKeyboardResize || uiState.value.handwritingExpanded ||
+                (hasHardwareKeyboard && hardwareKeyboardDisplay.screenKeyboardRequested))) {
             event?.startTracking()
             return true
         }
@@ -1867,6 +2017,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (event?.isCanceled != true) cancelKeyboardResize()
             return true
         }
+        if (keyCode == KeyEvent.KEYCODE_BACK && hasHardwareKeyboard && hardwareKeyboardDisplay.screenKeyboardRequested) {
+            if (event?.isCanceled != true) collapseScreenKeyboardToHardwareToolbar()
+            return true
+        }
         return super.onKeyUp(keyCode, event)
     }
 
@@ -1915,6 +2069,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        // A hardware keyboard can switch editors without starting the soft input view.
+        // Never keep the previous editor's position while waiting for this connection.
+        uiState.value = uiState.value.copy(cursorAnchor = null)
+        hardwareKeyboardDisplay = hardwareKeyboardDisplay.withConnection(
+            resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS)
+        applyCompactMode()
+        requestHardwareCursorUpdates()
         inputReadiness.newEditorSession()
         keyRouter.discardPendingCandidateCommit()
         voiceRecognitionHandler.endInputSession()
@@ -2048,6 +2209,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
         uiState.value = uiState.value.copy(
             inputSessionId = System.nanoTime(),
+            clipboardImagesExpanded = false,
             isSttEnabled = SettingsPreferences.isSttEnabled(this@XimeInputMethodService),
         )
 
@@ -2076,17 +2238,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             FileLogger.i(TAG, "onStartInput: skip keyboard reset, restarting=$restarting, rimeAscii=$rimeAscii, ui=${uiState.value.isAsciiMode}")
         }
 
+        synchronizeKeyboardInputSession()
+
         // 先重置候选状态到初始值，避免前一 session 的残留状态影响新输入
         candidateState.value = CandidateState()
 
         // 获取最近30秒的剪切板内容
         ensureClipboardManagerInitialized()
         try {
+            if (clipboardManager.images.pasteFailure.value?.packageName != attribute?.packageName) clipboardManager.images.clearPasteFailure()
             clipboardManager.refreshClipboard()
             recentClipboardItemsState.value = clipboardManager.getRecentItems(30)
             // 将最近剪切板内容显示在候选栏
             candidateState.value = candidateState.value.copy(
                 candidates = recentClipboardItemsState.value.map { it.text },
+                clipboardImage = clipboardManager.images.preview.value?.takeIf { it.timestamp >= (recentClipboardItemsState.value.maxOfOrNull { item -> item.timestamp } ?: 0) },
                 smsVerificationCode = clipboardManager.verificationCode.value?.text,
                 candidateComments = emptyList(),
                 isShowingRecentClipboard = true
@@ -2098,14 +2264,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 监听clipboardItems变化，更新候选栏
         clipboardCollectorJob?.cancel()
         clipboardCollectorJob = serviceScope.launch {
-            clipboardManager.clipboardItems.combine(clipboardManager.verificationCode) { _, _ -> Unit }.collect {
+            combine(clipboardManager.clipboardItems, clipboardManager.verificationCode, clipboardManager.images.preview) { _, _, _ -> Unit }.collect {
                 val items = clipboardManager.getRecentItems(30)
+                if (candidateState.value.isComposing && items.map { it.text } == recentClipboardItemsState.value.map { it.text }) return@collect
                 recentClipboardItemsState.value = items
-                if (items.isNotEmpty()) {
+                val image = clipboardManager.images.preview.value?.takeIf { it.timestamp >= (items.maxOfOrNull { item -> item.timestamp } ?: 0) }
+                if (items.isNotEmpty() || image != null) {
                     // 清空Rime联想词等
                     rimeEngine.clearComposition()
                     candidateState.value = candidateState.value.copy(
                         candidates = items.map { it.text },
+                        clipboardImage = image,
                         smsVerificationCode = clipboardManager.verificationCode.value?.text,
                         candidateComments = emptyList(),
                         inputText = "",
@@ -2117,6 +2286,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     // 如果没有recent items，清空候选栏
                     candidateState.value = candidateState.value.copy(
                         candidates = emptyList(),
+                        clipboardImage = null,
                         candidateComments = emptyList(),
                         isShowingRecentClipboard = false,
                         candidateActions = emptyList()
@@ -2132,44 +2302,38 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        startRuntimeObservation()
         info?.let { updateEnterKeyText(it) }
-        hasHardwareKeyboard = resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS
+        hardwareKeyboardDisplay = hardwareKeyboardDisplay.withConnection(
+            resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS)
         applyCompactMode()
         applyWindowBackground()
-        if (hasHardwareKeyboard) {
-            currentInputConnection?.requestCursorUpdates(
-                InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
-            )
-        }
+        requestHardwareCursorUpdates()
     }
 
-    private var anchorCoords = floatArrayOf(0f, 0f, 0f, 0f)
+    private fun requestHardwareCursorUpdates() {
+        if (!hasHardwareKeyboard) {
+            try { currentInputConnection?.requestCursorUpdates(0) } catch (_: Exception) { }
+            return
+        }
+        try {
+            val accepted = currentInputConnection?.requestCursorUpdates(
+                InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
+            ) == true
+            if (!accepted) uiState.value = uiState.value.copy(cursorAnchor = null)
+            debugLog("Hardware cursor updates accepted=$accepted")
+        } catch (e: Exception) {
+            uiState.value = uiState.value.copy(cursorAnchor = null)
+            FileLogger.e(TAG, "Cannot request hardware cursor updates", e)
+        }
+    }
 
     override fun onUpdateCursorAnchorInfo(info: CursorAnchorInfo) {
         if (!hasHardwareKeyboard) return
         try {
-            val bounds = info.getCharacterBounds(0)
-            if (bounds != null) {
-                anchorCoords[0] = bounds.left
-                anchorCoords[1] = bounds.bottom
-                anchorCoords[2] = bounds.left
-                anchorCoords[3] = bounds.top
-            } else {
-                anchorCoords[0] = info.insertionMarkerHorizontal
-                anchorCoords[1] = info.insertionMarkerBottom
-                anchorCoords[2] = info.insertionMarkerHorizontal
-                anchorCoords[3] = info.insertionMarkerTop
-            }
-            if (anchorCoords.any(Float::isNaN)) return
-            info.matrix.mapPoints(anchorCoords)
-            val screenY = anchorCoords[1].toInt().coerceIn(0, resources.displayMetrics.heightPixels)
-            val screenX = anchorCoords[0].toInt().coerceIn(0, resources.displayMetrics.widthPixels)
-            uiState.value = uiState.value.copy(
-                cursorX = screenX,
-                cursorY = screenY,
-                cursorVisible = true,
-            )
+            uiState.value = uiState.value.copy(cursorAnchor = resolveHardwareCursorAnchor(info))
         } catch (e: Exception) {
+            uiState.value = uiState.value.copy(cursorAnchor = null)
             FileLogger.e(TAG, "onUpdateCursorAnchorInfo failed", e)
         }
     }
@@ -2187,7 +2351,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
-        hasHardwareKeyboard = newConfig.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS
+        currentResolvedKeyboardSize = null
+        clearHardwareSurfaceBounds()
+        uiState.value = uiState.value.copy(cursorAnchor = null)
+        hardwareKeyboardDisplay = hardwareKeyboardDisplay.withConnection(
+            newConfig.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS)
         super.onConfigurationChanged(newConfig)
         if (newConfig.screenWidthDp > newConfig.screenHeightDp) {
             closeToolPanel()
@@ -2195,11 +2363,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         applyCompactMode()
         loadDarkModePreference()
         applyWindowBackground()
-        if (hasHardwareKeyboard) {
-            currentInputConnection?.requestCursorUpdates(
-                InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
-            )
-        }
+        requestHardwareCursorUpdates()
     }
 
     internal fun applyWindowBackground() {
@@ -2221,6 +2385,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             window.window?.let { win ->
                 if (state.isCompact) {
                     // 硬件键盘候选栏模式：窗口透明
+                    androidx.core.view.WindowCompat.setDecorFitsSystemWindows(win, false)
                     win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                     win.setDimAmount(0f)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -2273,18 +2438,59 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     private fun applyCompactMode() {
         val current = uiState.value
-        val isCompact = hasHardwareKeyboard
+        val isCompact = hardwareKeyboardDisplay.compact
         FileLogger.i(
             TAG,
             "applyCompactMode: keyboardCfg=${keyboardConfigName(resources.configuration.keyboard)}, " +
                 "hasHardwareKeyboard=$hasHardwareKeyboard, isCompact=$isCompact (was ${current.isCompact})"
         )
         if (current.isCompact != isCompact) {
-            uiState.value = current.copy(isCompact = isCompact)
             if (isCompact) {
-                window.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            }
+                // A keyboard may be attached while a full-screen editor/resize layer is open.
+                // Those layers must not keep a full-window touch region behind the toolbar.
+                cancelKeyboardResize()
+                keyboardCallbacks?.onDismissPreeditEditor?.invoke()
+                if (uiState.value.isVoiceMode) endVoiceSession()
+                closeToolPanel()
+                keyboardViewModel.closeOverlay()
+                keyboardViewModel.setCandidatePageExpanded(false)
+                uiState.value = uiState.value.copy(
+                    isCompact = true, handwritingExpanded = false, clipboardImagesExpanded = false,
+                    showQuickSendForm = false, quickSendFormFocused = false, quickSendCodeFocused = false,
+                )
+            } else uiState.value = uiState.value.copy(isCompact = false)
+            refreshKeyboardGeometry()
+            applyWindowBackground()
         }
+    }
+
+    private fun showScreenKeyboardFromHardware(route: OverlayRoute? = null) {
+        if (!hasHardwareKeyboard) return
+        hardwareKeyboardDisplay = hardwareKeyboardDisplay.showOnScreen()
+        if (route == null) keyboardViewModel.closeOverlay() else keyboardViewModel.showOverlay(route)
+        applyCompactMode()
+    }
+
+    /** Collapse only the surface: the current composing text and candidate session stay alive. */
+    private fun collapseScreenKeyboardToHardwareToolbar(): Boolean {
+        if (!hasHardwareKeyboard || !hardwareKeyboardDisplay.screenKeyboardRequested) return false
+        hardwareKeyboardDisplay = hardwareKeyboardDisplay.collapseToToolbar()
+        applyCompactMode()
+        requestHardwareCursorUpdates()
+        return true
+    }
+
+    private fun clearHardwareSurfaceBounds() {
+        hardwareToolbarBounds.value = null
+        hardwareCandidateBounds = null
+    }
+
+    private fun updateHardwareSurfaceBounds(toolbar: Boolean, bounds: android.graphics.Rect?) {
+        val current = if (toolbar) hardwareToolbarBounds.value else hardwareCandidateBounds
+        val next = bounds?.takeIf { uiState.value.isCompact && !it.isEmpty }?.let { android.graphics.Rect(it) }
+        if (current == next) return
+        if (toolbar) hardwareToolbarBounds.value = next else hardwareCandidateBounds = next
+        if (::keyboardContainer.isInitialized) keyboardContainer.requestLayout()
     }
 
     private fun keyboardConfigName(value: Int): String = when (value) {
@@ -2324,7 +2530,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onFinishInput() {
+        clearHardwareSurfaceBounds()
+        if (hasHardwareKeyboard) {
+            try { currentInputConnection?.requestCursorUpdates(0) } catch (_: Exception) { }
+        }
+        uiState.value = uiState.value.copy(cursorAnchor = null)
         super.onFinishInput()
+        if (::clipboardManager.isInitialized) clipboardManager.images.dismissPreview()
+        runtimeObserver?.stop()
         inlineSuggestionManager?.clear()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         clearInputState()
@@ -2333,6 +2546,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        runtimeObserver?.stop()
         voiceRecognitionHandler.endInputSession()
         // 手写模型轻量，按"用键盘时加载、键盘收起即卸载"管理：输入会话结束
         // （收起键盘/焦点离开）即释放，:inference 侧同步卸载模型；未初始化时
@@ -2342,6 +2556,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowHidden() {
         super.onWindowHidden()
+        clearHardwareSurfaceBounds()
+        if (::clipboardManager.isInitialized) clipboardManager.images.dismissPreview()
+        runtimeObserver?.stop()
+        clipboardSyncBridge?.setKeyboardVisible(false)
         cancelKeyboardResize()
         clearInputState()
         recentClipboardItemsState.value = emptyList()
@@ -2365,12 +2583,20 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowShown() {
         super.onWindowShown()
+        startRuntimeObservation()
         // 键盘弹出时对比系统取色与缓存的动态主题色，壁纸取色变化则重建主题并热更新 UI。
         // 每次弹出只做两次资源读取对比，取色未变时零成本。
         KeyboardThemes.refreshDynamicSchemes(this)
-        clipboardSyncBridge?.pullOnce()
+        clipboardSyncBridge?.setKeyboardVisible(true)
     }
     
+    private fun synchronizeKeyboardInputSession() {
+        val state = uiState.value
+        keyboardViewModel.synchronizeInputSession(
+            state.inputSessionId, state.t9ResetSignal, state.isAsciiMode, state.currentSchemaId,
+        )
+    }
+
     private fun clearInputState() {
         inputReadiness.newEditorSession()
         keyRouter.discardPendingCandidateCommit()
@@ -2409,6 +2635,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             t9RightCandidateSelectedCount = 0,
             t9SelectedCandidatePinyin = ""
         )
+        synchronizeKeyboardInputSession()
         candidateState.value = candidateState.value.copy(
             candidates = emptyList(),
             candidateComments = emptyList(),
@@ -2484,6 +2711,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onDestroy() {
+        runtimeObserver?.stop()
         inputReadiness.close()
         serviceScope.cancel()
         super.onDestroy()
@@ -2509,6 +2737,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     internal fun hideKeyboard() {
+        if (collapseScreenKeyboardToHardwareToolbar()) return
         clearInputState()
         requestHideSelf(0)
     }
@@ -2610,19 +2839,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return
         }
         if (state.isCompact) {
-            try {
-                val decor = window.window?.decorView
-                if (decor != null) {
-                    val navBarBg = decor.findViewById<View>(android.R.id.navigationBarBackground)
-                    val navBarH = navBarBg?.height ?: 0
-                    val h = (decor.height - navBarH).coerceAtLeast(0)
-                    outInsets.contentTopInsets = h
-                    outInsets.visibleTopInsets = h
-                    outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
-                    return
-                }
-            } catch (_: Exception) { }
-            super.onComputeInsets(outInsets)
+            val height = window.window?.decorView?.height ?: resources.displayMetrics.heightPixels
+            outInsets.contentTopInsets = height
+            outInsets.visibleTopInsets = height
+            outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+            outInsets.touchableRegion.setEmpty()
+            // Union the two islands, never their bounding rectangle: the transparent
+            // area between the toolbar and caret must keep passing touches to the app.
+            hardwareToolbarBounds.value?.let { outInsets.touchableRegion.op(it, android.graphics.Region.Op.UNION) }
+            hardwareCandidateBounds?.let { outInsets.touchableRegion.op(it, android.graphics.Region.Op.UNION) }
+            return
         } else if (state.isFloatingMode) {
             outInsets.apply {
                 contentTopInsets = resources.displayMetrics.heightPixels
@@ -2645,21 +2871,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     keyboardContainer.width else decor.width
                 val hostHeight = if (::keyboardContainer.isInitialized && keyboardContainer.height > 0)
                     keyboardContainer.height else decor.height
-                val config = resources.configuration
-                val wide = !com.kingzcheung.xime.ui.keyboard.isT9Schema(state.currentSchemaId) &&
-                    !com.kingzcheung.xime.ui.keyboard.isStrokeSchema(state.currentSchemaId) &&
-                    state.currentSchemaId != "japanese_kana"
-                val widthDp = com.kingzcheung.xime.ui.keyboard.resolvedFloatingWidth(
-                    (hostWidth / density).roundToInt(), config.screenHeightDp, 0, 0, wide,
-                    state.floatingWidthDp,
-                )
                 val minimumBottom = maxOf(
                     tryGetVisibleNavBarHeightDp(this@XimeInputMethodService, window.window) * density,
                     bottomInsetPxState.value.toFloat(),
                 )
+                val fallbackSize = resolveKeyboardSize((hostWidth / density).roundToInt(),
+                    (hostHeight / density).roundToInt(), kotlin.math.ceil(minimumBottom / density).toInt(), state)
                 val fallback = com.kingzcheung.xime.ui.keyboard.floatingCardRect(
-                    hostWidth.toFloat(), hostHeight.toFloat(), widthDp * density,
-                    currentEffectiveKeyboardHeight * density,
+                    hostWidth.toFloat(), hostHeight.toFloat(), fallbackSize.width * density,
+                    (if (currentFloatingCardHeightDp > 0) currentEffectiveKeyboardHeight
+                        else fallbackSize.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density,
                     state.floatingOffsetX * density, state.floatingOffsetY * density, minimumBottom,
                 )
                 floatingCardBounds?.let { touchableRegion.set(it) } ?: touchableRegion.set(

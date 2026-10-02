@@ -23,6 +23,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.handwriting.*
 import com.kingzcheung.xime.model.*
+import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
 import com.kingzcheung.xime.settings.*
 import kotlinx.coroutines.*
 import org.junit.*
@@ -53,26 +54,30 @@ class OfflineEditionTest {
         val prefs = SettingsPreferences.getPrefsPublic(fresh)
         prefs.edit().clear().commit()
         try {
+            val hardware = DeviceCapabilityProbe.read(fresh)
+            val profile = DeviceModelProfiles.choose(hardware)
+            val glow = com.kingzcheung.xime.runtime.adaptation.DeviceKeyEffectDefaults.choose(hardware).glow
+            DeviceDefaults.initialize(fresh)
             LanguagePreferences.initialize(fresh)
             assertTrue(SettingsPreferences.isSmartPredictionEnabled(fresh))
             assertTrue(SettingsPreferences.isSingleAssociationMode(fresh))
-            assertEquals("predictive-text-base", SettingsPreferences.getPredictionSelectedModel(fresh))
+            assertEquals(profile.predictionModel, SettingsPreferences.getPredictionSelectedModel(fresh))
             assertTrue(SettingsPreferences.isSttEnabled(fresh))
             assertTrue(SettingsPreferences.isSttUseLocal(fresh))
             assertFalse(SettingsPreferences.isSttKeepEngineAlive(fresh))
             DeviceDefaults.initialize(fresh)
-            assertEquals(DeviceDefaults.supportsRefinement(fresh), prefs.getBoolean("key_glow_enabled", false))
+            assertEquals(glow, prefs.getBoolean("key_glow_enabled", !glow))
             SettingsPreferences.setSmartPredictionEnabled(fresh, false)
             SettingsPreferences.setAssociationSingleMode(fresh, false)
             SettingsPreferences.setSttEnabled(fresh, false)
             SettingsPreferences.setSttUseLocal(fresh, false)
-            prefs.edit().putBoolean("key_glow_enabled", !DeviceDefaults.supportsRefinement(fresh)).commit()
+            prefs.edit().putBoolean("key_glow_enabled", !glow).commit()
             DeviceDefaults.initialize(fresh)
             assertFalse(SettingsPreferences.isSmartPredictionEnabled(fresh))
             assertFalse(SettingsPreferences.isSingleAssociationMode(fresh))
             assertFalse(SettingsPreferences.isSttEnabled(fresh))
             assertFalse(SettingsPreferences.isSttUseLocal(fresh))
-            assertEquals(!DeviceDefaults.supportsRefinement(fresh), prefs.getBoolean("key_glow_enabled", false))
+            assertEquals(!glow, prefs.getBoolean("key_glow_enabled", glow))
             assertEquals(setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH), LanguagePreferences.enabled(fresh))
             val choices = InputModes.languageChoices(listOf(SchemaInfo("rime_ice", "中文26键", "", "", "")), "rime_ice",
                 emptyMap(), InputModes.languageOrder(fresh))
@@ -164,7 +169,7 @@ class OfflineEditionTest {
         } finally { directory.deleteRecursively(); CustomKeyboardLayouts.load(app) }
     }
 
-    @Test fun bundledDefaultsUseBaseAndDeviceProfileWithoutResettingUserChoices() = runBlocking {
+    @Test fun bundledDefaultsUseDeviceProfileWithoutResettingUserChoices() = runBlocking {
         Assume.assumeTrue(BuildConfig.BUNDLED_MODELS)
         val app = ApplicationProvider.getApplicationContext<Context>()
         val used = mutableSetOf<String>()
@@ -176,16 +181,21 @@ class OfflineEditionTest {
             }
         }
         try {
+            val hardware = DeviceCapabilityProbe.read(fresh)
+            val profile = DeviceModelProfiles.choose(hardware)
+            val glow = com.kingzcheung.xime.runtime.adaptation.DeviceKeyEffectDefaults.choose(hardware).glow
             withContext(Dispatchers.IO) { BundledModelInstaller.install(fresh) }
-            val high = DeviceDefaults.supportsRefinement(fresh)
-            assertEquals("predictive-text-base", SettingsPreferences.getPredictionSelectedModel(fresh))
+            val high = profile.tier == DeviceModelTier.ENHANCED
+            assertEquals(profile.predictionModel, SettingsPreferences.getPredictionSelectedModel(fresh))
             val asr = com.kingzcheung.xime.speech.AsrModelManager(fresh)
             assertEquals(com.kingzcheung.xime.speech.SpeechModelCatalog.ZIPFORMER, asr.getFirstPassModelId())
             assertEquals(high, asr.isRefinementEnabled())
-            assertEquals(high, SettingsPreferences.getPrefsPublic(fresh).getBoolean("key_glow_enabled", !high))
+            assertEquals(glow, SettingsPreferences.getPrefsPublic(fresh).getBoolean("key_glow_enabled", !glow))
             asr.setRefinementEnabled(!high)
+            SettingsPreferences.setPredictionSelectedModel(fresh, DeviceModelProfiles.SMALL)
             SettingsPreferences.getPrefsPublic(fresh).edit().putBoolean("key_glow_enabled", !high).commit()
             withContext(Dispatchers.IO) { BundledModelInstaller.install(fresh) }
+            assertEquals(DeviceModelProfiles.SMALL, SettingsPreferences.getPredictionSelectedModel(fresh))
             assertEquals(!high, asr.isRefinementEnabled())
             assertEquals(!high, SettingsPreferences.getPrefsPublic(fresh).getBoolean("key_glow_enabled", high))
         } finally { used.forEach { app.getSharedPreferences(it, 0).edit().clear().commit() } }

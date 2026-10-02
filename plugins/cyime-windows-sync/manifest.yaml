@@ -1,0 +1,17 @@
+id: com.cyime.plugin.windows_clipboard
+name: CyIME Windows 剪贴板同步
+icon: "🔗"
+description: 与同一局域网内的 CyIME Windows 双向同步文本；填写电脑地址和配对码后启用。
+version: 0.1.0
+type: clipboard_sync
+activation: single
+entry: main.lua
+minHostVersion: 1.3.20
+capabilities:
+  clipboard_sync:
+    protocols: [cyime-windows-v1]
+    foreground_poll_interval_ms: 2000
+    max_text_bytes: 65536
+network:
+  hosts: []
+  allowCustomHosts: true

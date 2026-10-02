@@ -300,11 +300,15 @@ void T9Translation::ConvertCurrent() {
 T9Translation::T9Translation(an<Translation> translation,
                                char auto_delim,
                                char manual_delim,
-                               bool convert_preedit)
+                               bool convert_preedit,
+                               std::shared_ptr<T9SuppressionStore> suppression,
+                               std::string schema)
     : translation_(translation),
       auto_delim_(auto_delim),
       manual_delim_(manual_delim),
-      convert_preedit_(convert_preedit) {
+      convert_preedit_(convert_preedit),
+      suppression_(std::move(suppression)),
+      schema_(std::move(schema)) {
     // 定位到第一个候选（构造时 translation 已定位在第一个候选）。
     Advance();
 }
@@ -322,6 +326,10 @@ bool T9Translation::Next() {
 void T9Translation::Advance() {
     while (!translation_->exhausted()) {
         cand_ = translation_->Peek();
+        if (cand_ && suppression_ && suppression_->Contains(schema_, cand_->text())) {
+            translation_->Next();
+            continue;
+        }
         ConvertCurrent();
         return;
     }
@@ -333,6 +341,8 @@ void T9Translation::Advance() {
 
 T9Filter::T9Filter(const Ticket& ticket) : Filter(ticket) {
     if (auto* schema = ticket.schema) {
+        schema_ = schema->schema_id();
+        suppression_ = GetT9SuppressionStore();
         if (auto* config = schema->config()) {
             bool display_original = false;
             config->GetBool("t9/isDisplayOriginalPreedit", &display_original);
@@ -354,7 +364,7 @@ an<Translation> T9Filter::Apply(an<Translation> translation,
     if (!translation) return translation;
     // 去重由 filter 链末尾的 uniquifier 兜底，t9_filter 只做 preedit 转换。
     return New<T9Translation>(translation, auto_delimiter_, manual_delimiter_,
-                              convert_preedit_);
+                              convert_preedit_, suppression_, schema_);
 }
 
 #endif  // T9_ALGO_ONLY_BUILD

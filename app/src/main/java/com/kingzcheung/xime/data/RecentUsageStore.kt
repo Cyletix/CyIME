@@ -12,6 +12,7 @@ object RecentUsageStore {
     const val MAX_COUNT = 32
     private const val PREFS_NAME = "recent_usage"
     const val KEY_RECENT_EMOJIS = "recent_emojis"
+    const val KEY_RECENT_KAOMOJI = "recent_kaomoji"
     const val KEY_RECENT_SYMBOLS = "recent_symbols"
 
     /**

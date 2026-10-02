@@ -51,7 +51,7 @@ fun VoiceKeyboardLayout(
     keyboardBackgroundColor: Color,
     modifier: Modifier = Modifier,
     isDarkTheme: Boolean = false,
-    themeId: String = "ocean_blue",
+    themeId: String = com.kingzcheung.xime.ui.theme.PureBlackTheme.ID,
     bottomActive: Boolean = false,
     leftActive: Boolean = false,
     rightActive: Boolean = false,

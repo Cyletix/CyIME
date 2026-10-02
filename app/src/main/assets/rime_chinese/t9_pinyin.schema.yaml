@@ -5,6 +5,17 @@
 # 引擎原生处理数字→拼音转换和多音节歧义消解。
 # 左侧候选区由 T9PinyinMap librime-t9 计算展示。
 t9:
+  joint_decoder: true
+  source_budget: 128
+  pool_budget: 64
+  dictionary_beam: 16
+  sentence_beam: 24
+  result_budget: 12
+  spelling_penalty: 5.0
+  word_penalty: 8.0
+  # Runs after a typing pause on a coalescing worker; never blocks key decoding.
+  sentence_model: t9_sentence
+  sentence_weight: 0.25
   # 适应元书输入法的配置，是否显示 rime 中原始的预编辑文本，默认为 true
   # true: 对 preedit 不做处理，显示 rime 返回的原始 preedit 值。
   #       如果想通过 lua 自己调整 preedit 的显示，可以设置为 true。
@@ -36,7 +47,7 @@ schema:
   dependencies:
     - cyime_t9_english
   name: 中文九键
-  version: "2.1"
+  version: "2.2"
   description: |
     拼音九键方案，使用 ABC/DEF/GHI/JKL/MNO/PQRS/TUV/WXYZ 键位
 
@@ -72,7 +83,7 @@ engine:
     - t9_date_translator
     - punct_translator
     - script_translator
-    - table_translator@t9_english
+    - t9_english_translator@t9_english
   filters:
     - cyime_candidate_policy
     - t9_filter
@@ -89,14 +100,14 @@ speller:
     # 拼音容错规则
     - derive/^([nl])ve$/$1ue/
     - derive/^([jqxy])u/$1v/
-    - derive/un$/uen/
-    - derive/ui$/uei/
-    - derive/iu$/iou/
-    - derive/([aeiou])ng$/$1gn/
+    - fuzz/un$/uen/
+    - fuzz/ui$/uei/
+    - fuzz/iu$/iou/
+    - fuzz/([aeiou])ng$/$1gn/
     # T9 keys already encode letter ambiguity; do not treat sho (746) as shou (7468).
-    - derive/ong$/on/
-    - derive/ao$/oa/
-    - derive/([iu])a(o|ng?)$/a$1$2/
+    - fuzz/ong$/on/
+    - fuzz/ao$/oa/
+    - fuzz/([iu])a(o|ng?)$/a$1$2/
     # 九宫格数字映射（derive 创建双向映射：数字↔字母）
     - derive/[abc]/2/
     - derive/[def]/3/
@@ -109,10 +120,8 @@ speller:
 
 translator:
   dictionary: rime_ice
-  # Multiple terminal initials must reach composition scoring (t can be ta/tai/tian).
-  # The existing numeric search beam bounds hypotheses; direct word lookup is unchanged.
-  max_sentences: 8
-  max_homophones: 8
+  max_homophones: 32
+  max_sentences: 3
   prism: t9_pinyin
   spelling_hints: 100
   always_show_comments: true
@@ -122,6 +131,16 @@ translator:
 
 cyime:
   candidate_policy: true
+
+# amzxyz/RIME-LMDG, CC-BY-4.0. The build pins and verifies the bundled model.
+grammar:
+  language: wanxiang-lts-zh-hans
+  collocation_max_length: 6
+  collocation_min_length: 2
+  collocation_penalty: -14
+  non_collocation_penalty: -6
+  weak_collocation_penalty: -100
+  rear_penalty: -18
 
 punctuator:
   import_preset: default

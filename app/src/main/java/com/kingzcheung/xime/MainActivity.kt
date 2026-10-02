@@ -39,6 +39,7 @@ import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.settings.SettingsScreen
+import com.kingzcheung.xime.ui.settings.SettingsNavigationRequest
 import com.kingzcheung.xime.ui.settings.SetupWizardScreen
 import com.kingzcheung.xime.ui.theme.XimeTheme
 import com.kingzcheung.xime.util.PermissionHelper
@@ -51,6 +52,20 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 class MainActivity : ComponentActivity() {
+    private var settingsNavigationRequest by mutableStateOf<SettingsNavigationRequest?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSharedIntent(intent)
+        // A plain Settings tap only brings this instance forward. Do not reset its
+        // navigation, focused test field or text. Explicit shortcuts still navigate.
+        intent.getStringExtra("open_fragment")?.let { route ->
+            settingsNavigationRequest = SettingsNavigationRequest(
+                route, (settingsNavigationRequest?.id ?: 0) + 1,
+            )
+        }
+    }
     
     companion object {
         private const val TAG = "MainActivity"
@@ -177,6 +192,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             initialRoute = openFragment,
                             initialPluginId = openPluginId,
+                            navigationRequest = settingsNavigationRequest,
                             onThemeChanged = {
                                 darkMode = SettingsPreferences.getEffectiveDarkMode(context)
                                 keyboardTheme = SettingsPreferences.getKeyboardTheme(context)

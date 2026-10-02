@@ -3,6 +3,8 @@ package com.kingzcheung.xime.ui.keyboard
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
@@ -16,6 +18,8 @@ import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +36,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.handwriting.HandwritingEngine
+import com.kingzcheung.xime.handwriting.HandwritingLanguages
+import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.handwriting.HandwritingStrokeFx
 import com.kingzcheung.xime.handwriting.OverlappedHandwritingRecognizer
 import com.kingzcheung.xime.handwriting.StrokePoint
@@ -45,6 +51,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+@Composable
+internal fun HandwritingUnavailable(language: InputLanguage, modifier: Modifier, onExit: () -> Unit,
+    exitLabel: String = "返回键盘") {
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).testTag("handwriting-unavailable"),
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(HandwritingLanguages.unavailableMessage(language), color = MaterialTheme.colorScheme.onSurface)
+        TextButton(onClick = onExit) { Text(exitLabel) }
+    }
+}
 
 @Composable
 fun HandwritingKeyboardLayout(
@@ -63,7 +79,14 @@ fun HandwritingKeyboardLayout(
     expanded: Boolean = false,
     panelBackgroundColor: Color = Color.Transparent,
     expandedCandidateBar: @Composable () -> Unit = {},
+    language: InputLanguage = InputLanguage.CHINESE,
+    onUnsupportedExit: () -> Unit = {},
+    unsupportedExitLabel: String = "返回键盘",
 ) {
+    if (!HandwritingLanguages.supports(language)) {
+        HandwritingUnavailable(language, modifier, onUnsupportedExit, unsupportedExitLabel)
+        return
+    }
     KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = (4 + bottomPaddingDp).dp) { bodyModifier ->
     val context = LocalContext.current
     val inkColor = rememberHandwritingInk(panelBackgroundColor)
@@ -72,9 +95,10 @@ fun HandwritingKeyboardLayout(
     val newCharacter by rememberUpdatedState(onNewCharacter)
     val result by rememberUpdatedState(onRecognition)
     val feedback by rememberUpdatedState(onButtonFeedback)
+    val functionRowBackground = if (!expanded && LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else panelBackgroundColor
     val pauseMs by rememberUpdatedState((LocalKeyboardInputPreferences.current.handwritingPauseSeconds * 1000).toLong())
     val recognitionMutex = remember { Mutex() }
-    val session = remember(scope, sessionKey) {
+    val session = remember(scope, sessionKey, language) {
         HandwritingInputSession(scope, { pauseMs }, recognize = { strokes ->
             // 只传不可变快照；每次创建新窗口，取消的本地推理不会污染下一字缓存。
             val gaps = HandwritingStrokeFx.windowGaps(strokes).map { it * OverlappedHandwritingRecognizer.GAP_SPLIT_MS / pauseMs }
@@ -82,6 +106,7 @@ fun HandwritingKeyboardLayout(
                 withContext(Dispatchers.Default) {
                     OverlappedHandwritingRecognizer().recognize(
                         strokes.map { stroke -> stroke.map { it.x to it.y } }, gaps,
+                        predictFn = { points, topK -> HandwritingEngine.predict(points, topK, language) },
                     ).segments
                 }
             }
@@ -91,7 +116,7 @@ fun HandwritingKeyboardLayout(
     val modelDownloaded by remember {
         ModelManager.downloadStates.map { it["ochwpro"] is ModelDownloadState.Complete }.distinctUntilChanged()
     }.collectAsState(ModelManager.downloadStates.value["ochwpro"] is ModelDownloadState.Complete)
-    LaunchedEffect(modelDownloaded) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context) } }
+    LaunchedEffect(modelDownloaded, language) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context, language) } }
     LaunchedEffect(clearSignal, session) { session.clear() }
     DisposableEffect(session) { onDispose { session.clear() } }
 
@@ -146,7 +171,7 @@ fun HandwritingKeyboardLayout(
             }
             if (expanded) Box(Modifier.fillMaxWidth().background(panelBackgroundColor)) { expandedCandidateBar() }
             if (expanded) {
-                Row(Modifier.fillMaxWidth().height(footerHeight).background(panelBackgroundColor)
+                Row(Modifier.fillMaxWidth().height(footerHeight).background(functionRowBackground)
                     .testTag("handwriting-symbol-row")) {
                     listOf("；", "：", "！", "？", "，", "。").forEach { action ->
                         HandwritingFunctionKey(action, { press(action) }, keyBackgroundColor, keyTextColor,
@@ -156,7 +181,7 @@ fun HandwritingKeyboardLayout(
                         specialKeyTextColor, Modifier.width(functionKeyWidth).fillMaxHeight(), onClear = { press("clear_all") })
                 }
             }
-            Row(Modifier.fillMaxWidth().height(footerHeight).background(panelBackgroundColor)
+            Row(Modifier.fillMaxWidth().height(footerHeight).background(functionRowBackground)
                 .testTag("handwriting-bottom-row")) {
                 val keys = listOf("symbol", "number", "space",
                     if (expanded) "collapse" else "expand", "ime_switch", "enter")
@@ -196,7 +221,10 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
     }
     BoxWithConstraints(modifier.clickable(onClick = onClick).semantics { contentDescription = label }
         .testTag("handwriting-key:$action")
-        .padding(scaledKeyVisualPadding(PaddingValues(2.dp))).keyGlow(Modifier.clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(keyBackground)), contentAlignment = Alignment.Center) {
+        .padding(scaledKeyVisualPadding(PaddingValues(2.dp)))
+        .keyGlow(Modifier.clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+            .background(frostedKeyColor(keyBackground, keyForeground, LocalKeyboardInputPreferences.current.frostedGlass))),
+        contentAlignment = Alignment.Center) {
         val icon = when (action) {
             "delete" -> Icons.AutoMirrored.Filled.Backspace
             "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn

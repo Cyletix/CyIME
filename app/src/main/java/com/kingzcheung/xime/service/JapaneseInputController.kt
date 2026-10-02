@@ -18,12 +18,13 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
     private var schema = ""
     private val engine get() = service.rimeEngine
     /** 按键路径的判定：引擎是权威源（切方案/部署期间可能领先或落后 uiState 一帧）。 */
-    private fun available(): Boolean = !engine.isAsciiMode() && (engine.getCurrentSchema() in JapaneseSchemas.ids || engine.getCurrentSchema() == "jaroomaji")
+    private fun available(): Boolean = !engine.isAsciiMode() &&
+        com.kingzcheung.xime.settings.InputProfiles.describe(engine.getCurrentSchema()).capabilities.japaneseConversion
 
     /** 显示出口的判定：只读 uiState，不碰引擎——UI 每次刷新都会调用，不付出 JNI / 锁开销。 */
     private fun displayAvailable(): Boolean {
         val state = service.uiState.value
-        return !state.isAsciiMode && (state.currentSchemaId in JapaneseSchemas.ids || state.currentSchemaId == "jaroomaji")
+        return state.inputProfile.capabilities.japaneseConversion
     }
     fun displayCandidates(input: String) = conversion?.takeIf { it.input == input && session == service.uiState.value.inputSessionId }?.candidates?.toList()
 

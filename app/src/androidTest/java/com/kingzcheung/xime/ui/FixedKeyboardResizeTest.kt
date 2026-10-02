@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -22,8 +24,75 @@ import org.junit.Test
 
 class FixedKeyboardResizeTest {
     @get:Rule val rule = createComposeRule()
+    @Test fun innerCornerTargetResizesBothAxesInsteadOfMovingTheKeyboard() {
+        val initial = ResizeRect(50f, 100f, 350f, 440f)
+        var rect by mutableStateOf(initial)
+        rule.setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalDensity provides Density(1f),
+                    LocalKeyboardResizePreviewState provides KeyboardResizePreviewState(
+                        rect = rect, initialRect = initial, onRectChange = { rect = it },
+                        bounds = ResizeRect(0f, 0f, 500f, 640f), fixedHeightRange = 160..600,
+                    )) {
+                    Box(Modifier.size(500.dp, 640.dp)) {
+                        KeyboardResizeOverlay(initialHeightDp = 340, defaultHeightDp = 340,
+                            currentBottomPaddingDp = 0, isFloatingMode = false,
+                            onHeightChange = {}, onBottomPaddingChange = {}, onOpacityChange = {},
+                            onReset = {}, onConfirm = { _, _, _, _ -> }, onCancel = {})
+                    }
+                }
+            }
+        }
+        rule.onNodeWithTag("keyboard-resize-frame").performTouchInput {
+            // 32dp inward was outside the former 26dp target and under the move strip.
+            swipe(Offset(initial.left + 32f, initial.top + 32f),
+                Offset(initial.left - 8f, initial.top - 8f), durationMillis = 250)
+        }
+        rule.runOnIdle {
+            assertTrue(rect.left < initial.left)
+            assertTrue(rect.top < initial.top)
+            assertEquals(initial.right, rect.right, 0.01f)
+            assertEquals(initial.bottom, rect.bottom, 0.01f)
+        }
+    }
+
     @Test fun phoneCanNarrowAndDockOnEitherSide() = checkResize(360)
     @Test fun tabletCanNarrowAndDockOnEitherSide() = checkResize(900)
+
+    @Test fun fixedMoveSnapsAtCenterThenSmallStepsBreakFreeAndConfirmSavesZeroOffset() {
+        var rect by mutableStateOf(ResizeRect(0f, 200f, 280f, 540f))
+        var slop = 0f
+        var geometry: ResizeGeometry? = null
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                slop = LocalViewConfiguration.current.touchSlop
+                MaterialTheme {
+                    Box(Modifier.size(360.dp, 540.dp)) {
+                        CompositionLocalProvider(LocalKeyboardResizePreviewState provides
+                            KeyboardResizePreviewState(rect = rect, onRectChange = { rect = it },
+                                bounds = ResizeRect(0f, 0f, 360f, 540f))) {
+                            KeyboardResizeOverlay(340, 340, 0, false,
+                                onHeightChange = {}, onBottomPaddingChange = {}, onOpacityChange = {}, onReset = {},
+                                onGeometryChange = { geometry = it }, onConfirm = { _, _, _, _ -> }, onCancel = {})
+                        }
+                    }
+                }
+            }
+        }
+        val bar = rule.onNodeWithTag("keyboard-resize-fixed-move-bar", useUnmergedTree = true)
+        bar.performTouchInput { down(center); moveBy(Offset(40f + slop, 0f)) }
+        rule.runOnIdle { assertEquals(180f, rect.centerX, 0.01f) }
+        bar.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已居中"))
+        bar.performTouchInput { repeat(30) { moveBy(Offset(0.5f, 0f)) } }
+        rule.runOnIdle { assertEquals(195f, rect.centerX, 0.1f) }
+        bar.performTouchInput { repeat(30) { moveBy(Offset(-0.5f, 0f)) }; up() }
+        rule.onNodeWithContentDescription("确认").performClick()
+        rule.runOnIdle {
+            assertEquals(0, geometry!!.horizontalOffsetDp)
+            assertEquals(280, geometry!!.widthDp)
+            assertEquals(340, geometry!!.heightDp)
+        }
+    }
 
     @Test fun dragPreviewDoesNotRemeasureKeyboardUntilRelease() {
         val initial = ResizeRect(0f, 200f, 360f, 540f)

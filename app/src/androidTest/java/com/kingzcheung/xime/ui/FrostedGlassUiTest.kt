@@ -1,0 +1,212 @@
+package com.kingzcheung.xime.ui
+
+import android.content.ContextWrapper
+import android.graphics.Bitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.test.platform.app.InstrumentationRegistry
+import com.kingzcheung.xime.SharedPreferencesTestRule
+import com.kingzcheung.xime.settings.BackgroundConfig
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
+import com.kingzcheung.xime.ui.keyboard.KeyButton
+import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
+import com.kingzcheung.xime.ui.theme.keyboardBackground
+import java.io.File
+import kotlin.math.abs
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+
+/** Pixel-level checks of the real modifiers and key. No IME service or Rime engine is started. */
+class FrostedGlassUiTest {
+    @get:Rule val rule = createComposeRule()
+    @get:Rule val preferences = SharedPreferencesTestRule()
+    private val context by lazy {
+        object : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
+            override fun getSharedPreferences(name: String, mode: Int) = preferences.getSharedPreferences()
+        }
+    }
+
+    @Test
+    fun changingBlurSoftensBackgroundWhileForegroundTextStaysSharp() {
+        var config by mutableStateOf(FrostedGlassConfig(enabled = true, blurRadiusDp = 0f, backgroundOpacity = 0f))
+        // A repeatable high-frequency background makes the blur measurable without an external image.
+        val background = BackgroundConfig(type = "gradient", angle = 0,
+            colors = List(33) { if (it % 2 == 0) 0x183653L else 0xAE7353L })
+        rule.setContent {
+            CompositionLocalProvider(LocalContext provides context, LocalDensity provides Density(1f)) {
+                MaterialTheme {
+                    Box(Modifier.size(320.dp, 160.dp).testTag("blur-panel")
+                        .keyboardBackground(background, true, Color(0xFF030608), config),
+                        contentAlignment = Alignment.Center) {
+                        Text("Aa", color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        val sharp = awaitImage("blur-panel") { horizontalVariation(it) > 4.0 }
+        val sharpVariation = horizontalVariation(sharp)
+        rule.runOnIdle { config = config.copy(blurRadiusDp = 40f) }
+        val blurred = awaitImage("blur-panel") { horizontalVariation(it) < sharpVariation * 0.35 }
+        assertSameWhiteForeground(sharp, blurred)
+        save("01-blur-zero", sharp)
+        save("02-blur-forty", blurred)
+    }
+
+    @Test
+    fun materialOpacityEndpointsWorkInBothThemesAndDisablingRestoresOriginal() {
+        var config by mutableStateOf(FrostedGlassConfig(enabled = false, blurRadiusDp = 0f, backgroundOpacity = 0f))
+        var dark by mutableStateOf(true)
+        val background = BackgroundConfig(type = "gradient", colors = listOf(0x334E64L, 0x9B7351L), angle = 0)
+        rule.setContent {
+            CompositionLocalProvider(LocalContext provides context, LocalDensity provides Density(1f)) {
+                Box(Modifier.size(320.dp, 160.dp).testTag("tint-panel")
+                    .keyboardBackground(background, dark, Color(0xFF030608), config))
+            }
+        }
+        val original = snapshot("tint-panel")
+        rule.runOnIdle { config = config.copy(enabled = true) }
+        val untinted = awaitImage("tint-panel") { colorDistance(sample(it), sample(original)) <= 2 }
+        rule.runOnIdle { config = config.copy(backgroundOpacity = 1f) }
+        val black = awaitImage("tint-panel") { sample(it) == android.graphics.Color.BLACK }
+        assertEquals(android.graphics.Color.BLACK, black.getPixel(black.width / 4, black.height / 4))
+        rule.runOnIdle { config = config.copy(backgroundOpacity = 0f) }
+        val restoredTint = awaitImage("tint-panel") { colorDistance(sample(it), sample(untinted)) <= 2 }
+        assertTrue("zero opacity reveals the theme again", colorDistance(sample(restoredTint), sample(original)) <= 2)
+        rule.runOnIdle { dark = false; config = config.copy(backgroundOpacity = 1f) }
+        val white = awaitImage("tint-panel") { sample(it) == android.graphics.Color.WHITE }
+        assertEquals(android.graphics.Color.WHITE, white.getPixel(white.width / 4, white.height / 4))
+        rule.runOnIdle { config = config.copy(enabled = false) }
+        val disabled = awaitImage("tint-panel") { it.sameAs(original) }
+        assertTrue("disabled effect must exactly restore the original theme drawing", original.sameAs(disabled))
+        save("03-material-transparent", untinted)
+        save("04-material-dark-opaque", black)
+        save("05-material-light-opaque", white)
+        save("06-effect-disabled", disabled)
+    }
+
+    @Test
+    fun preferenceUpdatesChangeOnlyKeyFillAndKeepTextAndTapWorking() {
+        val backdrop = Color(0xFF173E52)
+        val cap = Color(0xFF49516A)
+        var taps = 0
+        val initial = FrostedGlassConfig(enabled = false, keyOpacity = 0f)
+        FrostedGlassPreferences.save(context, initial)
+        rule.setContent {
+            CompositionLocalProvider(LocalContext provides context, LocalDensity provides Density(1f)) {
+                val saved = rememberKeyboardInputPreferences()
+                MaterialTheme {
+                    CompositionLocalProvider(LocalKeyboardInputPreferences provides saved) {
+                        Box(Modifier.size(180.dp, 100.dp).background(backdrop).testTag("key-panel")) {
+                            KeyButton("A", { taps++ }, cap, Color.White,
+                                Modifier.testTag("glass-key"), fontSize = 40.sp, shadowEnabled = false)
+                        }
+                    }
+                }
+            }
+        }
+        val original = snapshot("key-panel")
+        assertEquals(0xFF49516A.toInt(), sample(original))
+        rule.runOnIdle { FrostedGlassPreferences.save(context, initial.copy(enabled = true)) }
+        val transparent = awaitImage("key-panel") { sample(it) == 0xFF173E52.toInt() }
+        assertSameWhiteForeground(original, transparent)
+        rule.runOnIdle { FrostedGlassPreferences.save(context, initial.copy(enabled = true, keyOpacity = 1f)) }
+        val opaque = awaitImage("key-panel") { sample(it) == 0xFF49516A.toInt() }
+        assertSameWhiteForeground(transparent, opaque)
+        rule.onNodeWithTag("glass-key").performTouchInput { click() }
+        rule.runOnIdle { assertEquals("frosted decoration must preserve key gestures", 1, taps) }
+        rule.runOnIdle { FrostedGlassPreferences.save(context, initial) }
+        val disabled = awaitImage("key-panel") { it.sameAs(original) }
+        assertTrue("disabling via preferences restores the original cap", disabled.sameAs(original))
+        save("07-key-transparent", transparent)
+        save("08-key-opaque", opaque)
+        save("09-key-disabled", disabled)
+    }
+
+    private fun snapshot(tag: String): Bitmap = rule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
+
+    /** Await the asynchronous background result itself, without fixed sleeps or assumptions about device speed. */
+    private fun awaitImage(tag: String, ready: (Bitmap) -> Boolean): Bitmap {
+        var result: Bitmap? = null
+        rule.waitUntil(timeoutMillis = 15_000) {
+            val current = snapshot(tag)
+            if (ready(current)) { result = current; true } else false
+        }
+        return checkNotNull(result)
+    }
+
+    private fun sample(bitmap: Bitmap): Int = bitmap.getPixel(bitmap.width / 4, bitmap.height / 4)
+
+    private fun horizontalVariation(bitmap: Bitmap): Double {
+        val y = bitmap.height * 4 / 5
+        var sum = 0
+        for (x in 12 until bitmap.width - 12) {
+            sum += abs(android.graphics.Color.red(bitmap.getPixel(x, y)) -
+                android.graphics.Color.red(bitmap.getPixel(x - 1, y)))
+        }
+        return sum.toDouble() / (bitmap.width - 24)
+    }
+
+    private fun colorDistance(first: Int, second: Int): Int = maxOf(
+        abs(android.graphics.Color.red(first) - android.graphics.Color.red(second)),
+        abs(android.graphics.Color.green(first) - android.graphics.Color.green(second)),
+        abs(android.graphics.Color.blue(first) - android.graphics.Color.blue(second)),
+    )
+
+    private fun assertSameWhiteForeground(before: Bitmap, after: Bitmap) {
+        assertEquals(before.width, after.width)
+        assertEquals(before.height, after.height)
+        fun mask(bitmap: Bitmap) = BooleanArray(bitmap.width * bitmap.height) { index ->
+            bitmap.getPixel(index % bitmap.width, index / bitmap.width) == android.graphics.Color.WHITE
+        }
+        val beforeMask = mask(before)
+        val afterMask = mask(after)
+        val beforeCount = beforeMask.count { it }
+        assertTrue("test must contain solid foreground text pixels", beforeCount > 50)
+        // Anti-aliased boundary pixels blend with the changed background. Compare
+        // every solid interior pixel and allow only a small edge-rounding tolerance.
+        assertTrue("foreground must retain its sharp text coverage",
+            abs(beforeCount - afterMask.count { it }) <= maxOf(8, beforeCount / 20))
+        for (y in 1 until before.height - 1) for (x in 1 until before.width - 1) {
+            val index = y * before.width + x
+            if (beforeMask[index] && beforeMask[index - 1] && beforeMask[index + 1] &&
+                beforeMask[index - before.width] && beforeMask[index + before.width]) {
+                assertTrue("foreground interior must stay opaque at ($x, $y)", afterMask[index])
+            }
+        }
+    }
+
+    private fun save(name: String, bitmap: Bitmap) {
+        val target = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(checkNotNull(target.getExternalFilesDir(null)), "frosted-glass").apply { mkdirs() }
+        File(directory, "$name.png").outputStream().use {
+            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
+    }
+}

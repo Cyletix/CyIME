@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-INCLUDED = {'ochwpro', 'predictive-text-base', 'zipformer-zh-int8', 'sensevoice-multilingual-int8'}
+INCLUDED = {'ochwpro', 'predictive-text-small', 'predictive-text-base', 'zipformer-zh-int8', 'sensevoice-multilingual-int8'}
 
 def digest(path):
     with path.open('rb') as stream:
@@ -49,7 +49,7 @@ def prepare(output, cache):
     payload = output / 'bundled-models'
     payload.mkdir(parents=True, exist_ok=True)
     # The generated folder can contain a previous six-model edition. Never ship stale models.
-    for obsolete in ('predictive-text-small', 'paraformer-zh-en-int8'):
+    for obsolete in ('paraformer-zh-en-int8',):
         target = (payload / obsolete).resolve()
         if target.parent != payload.resolve():
             raise ValueError('Unsafe generated model path')

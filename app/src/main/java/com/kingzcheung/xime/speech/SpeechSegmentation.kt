@@ -56,7 +56,6 @@ internal class SpeechSegmenter(
     private var samples = 0
     private var quietFrames = 0
     private var speaking = false
-    private var continuation = false
     var charactersPerSecond = 0f
 
     fun accept(input: FloatArray) {
@@ -78,8 +77,10 @@ internal class SpeechSegmenter(
         if (!speaking) {
             preRoll.addLast(pcm)
             while (preRoll.size > 32) preRoll.removeFirst()
-            if ((!active || quiet) && !continuation) return
-            speaking = true; continuation = false; id++; quietFrames = 0; charactersPerSecond = 0f
+            // A forced cut does not prove that the next frame contains speech. VAD stays warm,
+            // so continuous speech resumes normally, while silence must never start a new region.
+            if (quiet) return
+            speaking = true; id++; quietFrames = 0; charactersPerSecond = 0f
             for (part in preRoll) { audio.add(part); samples += part.size; onAudio(id, part) }
             preRoll.clear()
         } else {
@@ -112,8 +113,7 @@ internal class SpeechSegmenter(
         audio.forEach { it.copyInto(all, offset); offset += it.size }
         onEnd(id, all, reason)
         audio.clear(); preRoll.clear(); samples = 0; quietFrames = 0; speaking = false
-        // At a hard limit VAD can still be speaking. Keep the next frame, without pre-roll overlap.
-        continuation = reason == SpeechBoundary.LIMIT
+        // Keep VAD state across regions; only finishInput/reset starts a fresh acoustic session.
     }
 }
 
@@ -174,7 +174,11 @@ internal fun cleanSpeechText(text: String): String {
 
 // Remove SenseVoice's CJK token-spacing before punctuation normalization so acoustic
 // and punctuation boundaries survive. Latin word spacing is never removed.
-internal fun cleanSenseVoiceText(text: String): String {
+internal fun cleanSenseVoiceText(text: String, detectedLanguage: String = ""): String {
+    // sherpa-onnx separates the language/event prefix from text. A no-speech classification
+    // must be handled before tag cleanup; it is not a word-confidence score or a blacklist.
+    if (detectedLanguage.removePrefix("<|").removeSuffix("|>").equals("nospeech", ignoreCase = true) ||
+        text.contains("<|nospeech|>", ignoreCase = true)) return ""
     val plain = richTags.replace(text, "")
     fun cjk(c: Char) = c in '\u3040'..'\u30ff' || c in '\u3400'..'\u9fff'
     val joined = buildString {

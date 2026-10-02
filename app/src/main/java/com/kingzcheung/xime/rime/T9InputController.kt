@@ -213,6 +213,7 @@ class T9InputController(
         result: RimeProcessResult? = null,
         admission: Long,
         epoch: Long,
+        refineWhenIdle: Boolean = true,
     ) {
         val data = InputLatencyTrace.phase(traceId, "snapshot-jni") { fetchAll(result) } ?: run {
             InputLatencyTrace.finish(traceId, "engine-unavailable")
@@ -230,7 +231,32 @@ class T9InputController(
                 onCompositionRefresh?.invoke(composition, injections)
                 applyCandidates(finalResult, data.panel, data.options)
             }
+            if (refineWhenIdle && onCompositionRefresh != null)
+                scheduleRefinement(finalResult.engineRevision, gen, admission, epoch)
         }
+    }
+
+    private var refinementPoll: Runnable? = null
+    private fun scheduleRefinement(revision: Long, generation: Long, admission: Long, epoch: Long, attempt: Int = 0) {
+        refinementPoll?.let(mainHandler::removeCallbacks)
+        if (attempt >= 40 || !accepts(admission, epoch) || generation != uiGeneration.get()) return
+        val ownerContext = captureInputContext()
+        val poll = Runnable {
+            if (!accepts(admission, epoch) || generation != uiGeneration.get()) return@Runnable
+            enqueue {
+                kotlinx.coroutines.withContext(ownerContext + commandValidity(admission, epoch)) {
+                    if (!accepts(admission, epoch) || generation != uiGeneration.get() || !rimeEngine.isCandidateRevisionCurrent(revision)) return@withContext
+                    when (rimeEngine.t9RefinementState()) {
+                        2 -> rimeEngine.refineQueuedT9Result(revision)?.let {
+                            refreshOnBackground(result = it, admission = admission, epoch = epoch, refineWhenIdle = false)
+                        }
+                        1 -> mainHandler.post { scheduleRefinement(revision, generation, admission, epoch, attempt + 1) }
+                    }
+                }
+            }
+        }
+        refinementPoll = poll
+        mainHandler.postDelayed(poll, 100)
     }
 
     /** 一次 flush 后取回的全部刷新数据（composition 全量 + 左栏面板 + 首音节候选）。 */

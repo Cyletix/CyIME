@@ -11,6 +11,10 @@ import com.kingzcheung.xime.speech.AsrBackendFactory
 import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.speech.SpeechRecognitionManager
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.speech.SpeechLanguages
+import com.kingzcheung.xime.speech.SpeechModelSelection
+import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.util.FileLogger
 
 class VoiceRecognitionHandler(
@@ -92,7 +96,9 @@ class VoiceRecognitionHandler(
     }
 
     private val delayedPreStartRunnable = Runnable {
-        if (::speechRecognitionManager.isInitialized) {
+        val language = getState().inputProfile.language
+        if (::speechRecognitionManager.isInitialized && language != InputLanguage.UNSPECIFIED &&
+            (language == InputLanguage.CHINESE || SettingsPreferences.isSttUseLocal(context))) {
             speechRecognitionManager.startPreStart()
         }
     }
@@ -120,15 +126,19 @@ class VoiceRecognitionHandler(
             return
         }
 
+        val language = getState().inputProfile.language
+        if (inputLanguage != null && inputLanguage != language) endInputSession()
         // 上一次会话若还在收尾等待中（快速再次开始），直接废弃收尾状态
         finishing = false
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         suppressDuplicateFinal = false
         sessionAbandoned = false
         inputSession = getState().inputSessionId
+        inputLanguage = language
         toolbarSession = getState().voiceSticky
+        val preferred = AsrModelManager(context).getSelectedModelId()
         requiresLocalFinal = SettingsPreferences.isSttUseLocal(context) &&
-            com.kingzcheung.xime.speech.AsrModelManager(context).isRefinementEnabled()
+            SpeechLanguages.supports(preferred, language) && SpeechModelSelection.hasCorrection(preferred)
         toolbarText.reset()
         toolbarSentencePrefix = null
         lastToolbarFinal = ""
@@ -140,7 +150,7 @@ class VoiceRecognitionHandler(
         val providerName = resolveProviderName()
         onStateChanged(getState().copy(voicePluginName = providerName))
 
-        speechRecognitionManager.startRecognition()
+        speechRecognitionManager.startRecognition(language)
     }
 
     fun stopRecognition() {
@@ -188,14 +198,25 @@ class VoiceRecognitionHandler(
     }
 
     private var inputSession: Long? = null
+    private var inputLanguage: InputLanguage? = null
+
+    /** Called when the product language changes, even within the same editor session. */
+    fun onInputLanguageChanged() {
+        cancelPreStart()
+        if (inputLanguage != null && inputLanguage != getState().inputProfile.language && !sessionAbandoned) {
+            endInputSession()
+            onVoiceComplete()
+        }
+    }
 
     private fun acceptsInputSession(): Boolean {
-        if (inputSession == null || inputSession == getState().inputSessionId) return true
+        if ((inputSession == null || inputSession == getState().inputSessionId) &&
+            (inputLanguage == null || inputLanguage == getState().inputProfile.language)) return true
         // restartInput 也可能不经 onFinishInput；不允许旧录音继续作用于新会话。
         if (!sessionAbandoned) {
             abandonSession()
             cancelPreStart()
-            stopRecognition()
+            if (::speechRecognitionManager.isInitialized) speechRecognitionManager.cancelRecognition()
             onVoiceComplete()
         }
         return false
@@ -290,6 +311,7 @@ class VoiceRecognitionHandler(
     }
 
     private fun onFinishTimeout() {
+        if (!acceptsInputSession()) return
         if (!finishing) return
         finishing = false
         mainHandler.removeCallbacks(finishTimeoutRunnable)
@@ -335,7 +357,7 @@ class VoiceRecognitionHandler(
             return
         }
 
-        val cleanText = normalizeVoiceText(text)
+        val cleanText = normalizeVoiceText(text, inputLanguage ?: getState().inputProfile.language)
         if (toolbarSession) {
             // 部分引擎 stop 时重发上一句 final；没有新 partial 时只保留一次。
             if (cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：") &&
@@ -409,7 +431,7 @@ class VoiceRecognitionHandler(
     private fun handlePartialResult(text: String) {
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
-        val cleanText = normalizeVoiceText(text)
+        val cleanText = normalizeVoiceText(text, inputLanguage ?: getState().inputProfile.language)
         if (cleanText == lastPartialText) return
         lastPartialText = cleanText
         Log.d(TAG, "Speech result (partial): $cleanText")

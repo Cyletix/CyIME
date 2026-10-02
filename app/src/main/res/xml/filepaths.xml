@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="emoji_cache" path="emoji_cache/" />
+    <cache-path name="clipboard_images" path="clipboard_images/" />
     <files-path name="files" path="." />
 </paths>

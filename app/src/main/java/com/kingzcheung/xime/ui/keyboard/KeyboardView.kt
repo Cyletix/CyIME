@@ -78,6 +78,8 @@ import com.kingzcheung.xime.keyboard.ToolbarButtonItem
 import com.kingzcheung.xime.keyboard.resolveToolbarButtonItem
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
+import com.kingzcheung.xime.service.highlightedCandidateIndex
+import com.kingzcheung.xime.service.usesT9CandidateNavigation
 import com.kingzcheung.xime.service.ExpandedCandidatePager
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SettingsPreferences
@@ -117,9 +119,12 @@ fun KeyboardView(
     /** 固定键盘底边的系统留白，与 Service 正常显示分支完全相同。 */
     fixedBottomInsetDp: Int = 0,
     fixedHeightRange: IntRange? = null,
+    inputSessionManagedByHost: Boolean = false,
 ) {
     // 状态栏按钮走一次完整按键反馈，声音和振动均由用户设置控制。
     val toolbarFeedback = { callbacks.onKeyPressDown?.invoke("toolbar"); Unit }
+    // Docking defaults also depend on reloaded gaps when the visible size stays unchanged.
+    KeysConfigHelper.configVersion.collectAsStateWithLifecycle().value
     val keyboardState by viewModel.keyboardState.collectAsStateWithLifecycle()
     val page by viewModel.page.collectAsStateWithLifecycle()
     val textLayout by viewModel.lastMainLayout.collectAsStateWithLifecycle()
@@ -153,30 +158,18 @@ fun KeyboardView(
         callbacks.onKeyboardModeChange?.invoke(active)
     }
 
-    val t9Controller = remember {
-        T9InputController(
-            inputAdmissionTicket = callbacks.inputAdmissionTicket,
-            captureInputContext = callbacks.captureInputContext,
-            inputCommands = callbacks.inputCommands,
-            onUnconsumedDelete = callbacks.onT9UnconsumedDelete,
-            onCompositionRefresh = { composition, snapshots ->
-                callbacks.onT9RefreshComposition?.invoke(composition, snapshots)
-            },
-            onRightCommitUndone = callbacks.onT9RightCommitUndone,
-            candidateTransform = callbacks.onTCandidateTransform,
-        )
+    val t9Controller = remember(viewModel) {
+        viewModel.bindT9Controller(callbacks)
+    }
+    SideEffect {
+        viewModel.bindT9Controller(callbacks)
     }
 
-    DisposableEffect(t9Controller) {
-        onDispose { t9Controller.close() }
-    }
-
-    LaunchedEffect(state.inputSessionId) {
-        t9Controller.reset()
-        FileLogger.i("XimeKeyboard", "InputSessionStarted: isAsciiMode=${state.isAsciiMode}, schemaId=${state.currentSchemaId}, kb=$keyboardState, vs=$viewState, page=$page")
-        viewModel.asciiStateMachine.reset()
-        viewModel.dispatch(
-            KeyboardDispatchAction.InputSessionStarted(state.isAsciiMode, state.currentSchemaId)
+    LaunchedEffect(inputSessionManagedByHost, state.inputSessionId, state.t9ResetSignal) {
+        // The service synchronizes before accepting input. A delayed effect from an old
+        // composition must not roll that editor boundary back to an obsolete session.
+        if (!inputSessionManagedByHost) viewModel.synchronizeInputSession(
+            state.inputSessionId, state.t9ResetSignal, state.isAsciiMode, state.currentSchemaId
         )
     }
 
@@ -203,35 +196,6 @@ fun KeyboardView(
         }
     }
 
-    SideEffect {
-        callbacks.onT9RefreshAfterPreeditEdit = { t9Controller.refreshAfterPreeditEdit() }
-        callbacks.onT9RightCandidateWillBeSelected = { pinyin, text, textLength, revision ->
-            // 返回 C++ T9RightCommitHandler 的 full_commit 权威标志，
-            // 不依赖 RIME 引擎 input（full_commit 后引擎 input 可能残留，判断会失真）
-            if (pinyin.isNullOrBlank()) {
-                t9Controller.onRightCandidateSelectedByDirectCommit(revision)
-            } else {
-                t9Controller.onRightCandidateSelected(pinyin, text, textLength, revision)
-            }
-        }
-        callbacks.onT9ForceSendToRime = {
-            t9Controller.refreshRemainingInput()
-        }
-        callbacks.onT9RunLiteralInput = { block ->
-            t9Controller.enqueueLiteralInput(block)
-        }
-        callbacks.onT9CompositionCleared = {
-            t9Controller.resetDisplayAfterCommit()
-        }
-        callbacks.onFilterT9Candidates = { candidates, comments ->
-            Pair(candidates, comments)  // no-op: t9_processor handles filtering
-        }
-    }
-
-    LaunchedEffect(state.t9ResetSignal) {
-        t9Controller.reset()
-    }
-
     LaunchedEffect(keyboardState) {
         FileLogger.i("XimeKeyboard", "keyboardState switched: $keyboardState, vs=$viewState, page=$page, ascii=${state.isAsciiMode}")
     }
@@ -256,13 +220,13 @@ fun KeyboardView(
     } ?: 0
     val screenW = LocalConfiguration.current.screenWidthDp
     val screenH = LocalConfiguration.current.screenHeightDp
-    val wideFloating = !isT9Schema(state.currentSchemaId) && state.currentSchemaId != "japanese_kana" && keyboardState !is KeyboardLayoutState.Stroke
+    val wideFloating = !isT9Schema(state.currentSchemaId) && state.inputProfile.layout.kind != com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD && keyboardState !is KeyboardLayoutState.Stroke
     val portraitHeight = SettingsPreferences.getKeyboardHeightDp(androidx.compose.ui.platform.LocalContext.current, false)
-    // 宽度与高度解耦：调节预览宽度优先，其次用户保存的宽度，最后按高度推导（历史行为）。
-    val cardWidthDp = resolvedFloatingWidth(
+    // Service resolves normal geometry before sizing the IME window; expanded panels keep that width.
+    val cardWidthDp = state.keyboardWidthDp.takeIf { it > 0 } ?: resolvedFloatingWidth(
         screenWidth = screenW,
         screenHeight = screenH,
-        height = state.keyboardHeightDp,
+        height = LocalClipboardPanelExpansion.current?.collapsedHeight ?: state.keyboardHeightDp,
         portraitHeight = portraitHeight,
         wide = wideFloating,
         overrideWidth = if (state.resizePreviewWidthDp > 0) state.resizePreviewWidthDp else state.floatingWidthDp,
@@ -272,38 +236,39 @@ fun KeyboardView(
     // 预览矩形直接使用 KeyboardView 根容器的本地坐标；真实卡片、边框、命中共用这一份 Rect。
     val resizeActive = resizeOverlay != null
     val resizeControlDensity = LocalDensity.current
+    val inputPreferences = rememberKeyboardInputPreferences()
+    val keyboardLayerOpacity = if (inputPreferences.frostedGlass.enabled) 1f else state.keyboardOpacity
     val previewModifier = if (resizeOverlay != null) Modifier.graphicsLayer {
-        alpha = state.keyboardOpacity
+        alpha = keyboardLayerOpacity
         compositingStrategy = CompositingStrategy.Offscreen
     } else Modifier
     // Compose background and keys into the same layer before applying opacity.
     val contentModifier = if (state.handwritingExpanded) previewModifier else previewModifier.keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
-    val inputPreferences = rememberKeyboardInputPreferences()
     var cursorControlActive by remember { mutableStateOf(false) }
     CompositionLocalProvider(
         com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
             com.kingzcheung.xime.ui.theme.MaterialPalette(keyboardBgColor, accentColor),
-        LocalKeyboardExplicitWidth provides (!state.isFloatingMode && (state.fixedWidthDp > 0 || resizeActive)),
+        LocalKeyboardExplicitWidth provides (state.keyboardWidthDp > 0 || (!state.isFloatingMode && (state.fixedWidthDp > 0 || resizeActive))),
         LocalModeSlotWeight provides if (
             page.textMainType() != MainType.HANDWRITING &&
             (textLayout is KeyboardLayoutState.Chinese || textLayout is KeyboardLayoutState.English) &&
-            (state.isAsciiMode || KeysConfigHelper.codeLayoutForSchema(state.currentSchemaId) != "japanese_kana") &&
+            (state.isAsciiMode || state.inputProfile.layout.kind != com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD) &&
             !(inputPreferences.splitKeyboardEnabled && supportsSplitKeyboard(state.currentSchemaId, state.isAsciiMode))
         ) 0.5f else 0.8f,
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
         LocalTextModeLabel provides when {
-            page.textMainType() == MainType.HANDWRITING -> "中文"
+            page.textMainType() == MainType.HANDWRITING -> state.inputProfile.language.displayName
             textLayout is KeyboardLayoutState.English -> "ABC"
-            KeysConfigHelper.codeLayoutForSchema(state.currentSchemaId) == "japanese_kana" ||
+            state.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD ||
                 com.kingzcheung.xime.service.JapaneseTyping.usesKanaCase(state.currentSchemaId, false) -> "あいう"
-            else -> "中文"
+            else -> state.inputProfile.language.displayName
         },
         LocalKeyboardPunctuation provides if (state.isCalculatorMode &&
-            state.currentSchemaId !in com.kingzcheung.xime.settings.JapaneseSchemas.ids && state.currentSchemaId != "jaroomaji") null else KeyboardPunctuation(
+            state.inputProfile.language != com.kingzcheung.xime.settings.InputLanguage.JAPANESE) null else KeyboardPunctuation(
             // 全角/半角只作用于中文与日文：英文键盘的键面提示与上滑标点保持半角
             full = !state.isAsciiMode && (state.schemaSwitches.firstOrNull { it.name == "full_shape" }?.currentIndex?.let { it == 1 }
                 ?: SettingsPreferences.punctuationFullWidth(androidx.compose.ui.platform.LocalContext.current, true)),
-            japanese = state.currentSchemaId in com.kingzcheung.xime.settings.JapaneseSchemas.ids || state.currentSchemaId == "jaroomaji"),
+            japanese = state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.JAPANESE),
         LocalKeyboardInputPreferences provides inputPreferences,
         LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(state.themeId, state.isDarkTheme), specialKeyTextColor),
         LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBgColor, specialKeyTextColor),
@@ -337,7 +302,8 @@ fun KeyboardView(
         val normalFloatingRect = floatingCardRect(
             hostWidthPx = hostWidthPx,
             hostHeightPx = hostHeightPx,
-            widthPx = (maxWidth.value * floatScaleFactor) * resizeControlDensity.density,
+            widthPx = (state.keyboardWidthDp.takeIf { it > 0 }?.toFloat()
+                ?: (maxWidth.value * floatScaleFactor)) * resizeControlDensity.density,
             totalHeightPx = state.keyboardHeightDp * resizeControlDensity.density + dragBarPx,
             horizontalOffsetPx = state.floatingOffsetX * resizeControlDensity.density,
             bottomOffsetPx = state.floatingOffsetY * resizeControlDensity.density,
@@ -345,10 +311,11 @@ fun KeyboardView(
         )
         val seedPreviewRect = if (state.isFloatingMode) normalFloatingRect else fixedKeyboardRect(
             hostWidthPx, hostHeightPx,
-            state.keyboardHeightDp.coerceIn(fixedRange) * resizeControlDensity.density,
+            state.keyboardHeightDp * resizeControlDensity.density,
             state.keyboardBottomPaddingDp.coerceAtLeast(0) * resizeControlDensity.density,
             fixedBottomInsetDp.coerceAtLeast(0) * resizeControlDensity.density,
-            widthPx = resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), state.fixedWidthDp) * resizeControlDensity.density,
+            widthPx = (state.keyboardWidthDp.takeIf { it > 0 }
+                ?: resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), state.fixedWidthDp)) * resizeControlDensity.density,
             horizontalOffsetPx = state.fixedOffsetX * resizeControlDensity.density,
         )
         // 只在进入调节、切模式或视口变化时创建事务。主题/透明度/偏好监听不能重置它。
@@ -366,7 +333,7 @@ fun KeyboardView(
 
     FloatingKeyboardContainer(
         isFloatingMode = state.isFloatingMode,
-        opacity = if (resizeOverlay != null) 1f else state.keyboardOpacity,
+        opacity = if (resizeOverlay != null) 1f else keyboardLayerOpacity,
         scaleFactor = floatScaleFactor,
         // KeyButton already fits text to the actual key bounds; do not shrink it again against the tablet screen.
         fontScaleFactor = 1f,
@@ -377,6 +344,11 @@ fun KeyboardView(
         contentHeightDp = state.keyboardHeightDp,
         fixedWidthDp = state.fixedWidthDp,
         fixedOffsetX = state.fixedOffsetX,
+        resolvedWidthDp = state.keyboardWidthDp,
+        aspectLimits = KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind),
+        letterDefaults = letterKeyboardDefaults(state.inputProfile,
+            screenH - state.keyboardBottomPaddingDp, state.isAsciiMode,
+            split = SettingsPreferences.isSplitKeyboardEnabled(androidx.compose.ui.platform.LocalContext.current)),
         backgroundColor = keyboardBgColor,
         onDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
@@ -437,11 +409,11 @@ fun KeyboardView(
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            var handwritingCandidates by remember(state.inputSessionId) { mutableStateOf<List<String>>(emptyList()) }
-            var handwritingComments by remember(state.inputSessionId) { mutableStateOf<List<String>>(emptyList()) }
-            var handwritingClearSignal by remember(state.inputSessionId) { mutableIntStateOf(0) }
-            var isHandwritingLookup by remember(state.inputSessionId) { mutableStateOf(false) }
-            val handwritingPending = remember(state.inputSessionId) { HandwritingCandidateQueue() }
+            var handwritingCandidates by remember(state.inputSessionId, state.inputProfile.language) { mutableStateOf<List<String>>(emptyList()) }
+            var handwritingComments by remember(state.inputSessionId, state.inputProfile.language) { mutableStateOf<List<String>>(emptyList()) }
+            var handwritingClearSignal by remember(state.inputSessionId, state.inputProfile.language) { mutableIntStateOf(0) }
+            var isHandwritingLookup by remember(state.inputSessionId, state.inputProfile.language) { mutableStateOf(false) }
+            val handwritingPending = remember(state.inputSessionId, state.inputProfile.language) { HandwritingCandidateQueue() }
             fun refreshHandwritingCandidates() {
                 handwritingCandidates = handwritingPending.candidates
                 handwritingComments = emptyList()
@@ -477,7 +449,7 @@ fun KeyboardView(
 
             val isHandwritingPage = page is KeyboardPage.Main && (page as KeyboardPage.Main).type == MainType.HANDWRITING
             // Panel/input-session changes discard unconfirmed ink, never alter host text.
-            LaunchedEffect(isHandwritingPage, state.inputSessionId) {
+            LaunchedEffect(isHandwritingPage, state.inputSessionId, state.inputProfile.language) {
                 if (!isHandwritingLookup) clearHandwriting()
             }
             val showHandwritingCandidates = (isHandwritingPage || isHandwritingLookup) && handwritingCandidates.isNotEmpty()
@@ -500,7 +472,8 @@ fun KeyboardView(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
                 state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
-                railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode,
+                railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage,
+                cs.candidateFocus, cs.engineRevision, cs.candidateActions, state.inputProfile,
             ) {
                 if (showHandwritingCandidates) {
                     CandidateBarState.AssociationOnly(
@@ -526,6 +499,9 @@ fun KeyboardView(
                         hasNextPage = cs.hasNextPage,
                         isCalculatorActive = state.isCalculatorMode,
                         smsVerificationCode = cs.smsVerificationCode,
+                        clipboardImage = cs.clipboardImage,
+                        highlightIndex = if (expandedDataMode || !cs.usesT9CandidateNavigation(state.inputProfile)) 0
+                            else cs.highlightedCandidateIndex,
                     )
                 }
             }
@@ -590,7 +566,7 @@ fun KeyboardView(
             var visibleBarCandidates by remember(cs.inputText, singleCharFilter) { mutableStateOf(emptyList<String>()) }
             val renderCandidateBar: @Composable () -> Unit = {
             CandidateBar(
-                modifier = Modifier.drawWithContent {
+                modifier = Modifier.clipboardPanelExpandGesture().drawWithContent {
                     drawContent()
                     InputLatencyTrace.finish(candidateState.value.traceEventId, "draw-submitted")
                 },
@@ -697,6 +673,8 @@ fun KeyboardView(
                         viewModel.showOverlay(OverlayRoute.Clipboard(0))
                     },
                     onVerificationCodeSelect = callbacks.onVerificationCodeSelect,
+                    onClipboardImageSelect = callbacks.onClipboardImageSelect,
+                    onExpandClipboardImages = callbacks.onExpandClipboardImages,
                     onCandidateSelect = select@{ index ->
                         if (!showHandwritingCandidates && !callbacks.isCandidateSnapshotCurrent(cs)) return@select
                         closePreeditEditor()
@@ -796,7 +774,8 @@ fun KeyboardView(
             )
 
             }
-            if (!state.handwritingExpanded || candidatePageExpanded) renderCandidateBar()
+            val clipboardToolOpen = (page as? KeyboardPage.Overlay)?.route is OverlayRoute.Clipboard
+            if ((!state.handwritingExpanded || candidatePageExpanded) && !clipboardToolOpen) renderCandidateBar()
 
             val renderExpandedCandidates: @Composable () -> Unit = {
                 // 候选展开页：候选栏的在位展开态（顶部即真实候选栏，实时跟随编码/删除变化）。
@@ -1132,6 +1111,9 @@ fun KeyboardView(
 
                     MainType.HANDWRITING -> {
                         HandwritingKeyboardLayout(
+                            language = state.inputProfile.language,
+                            onUnsupportedExit = { viewModel.showOverlay(OverlayRoute.SchemaList) },
+                            unsupportedExitLabel = "选择输入方案",
                             expanded = state.handwritingExpanded,
                             expandedCandidateBar = renderCandidateBar,
                             panelBackgroundColor = keyboardBgColor,
@@ -1495,6 +1477,12 @@ fun KeyboardView(
                         },
                         onPullRemote = callbacks.onClipboardPullRemote,
                         pullRemoteAvailable = state.clipboardSyncEnabled,
+                        onImageSelect = callbacks.onClipboardImageSelect,
+                        onImageShare = callbacks.onClipboardImageShare,
+                        onSystemImagePaste = callbacks.onClipboardImageSystemPaste,
+                        imagesExpanded = state.clipboardImagesExpanded,
+                        onExpandImages = callbacks.onExpandClipboardImages,
+                        onCollapseImages = callbacks.onCollapseClipboardImages,
                     )
                     is OverlayRoute.ToolbarCustomize -> ToolbarCustomizeView(
                         toolbarButtons = state.toolbarButtons,
@@ -1539,7 +1527,8 @@ fun KeyboardView(
                             if (emoji == "delete") {
                                 callbacks.onKeyPress("delete", false)
                             } else {
-                                callbacks.onCommitText?.invoke(emoji)
+                            // 顔文字和表情插件的成品文本须保留原字符，不受标点全半角影响。
+                            (callbacks.onCommitExactText ?: callbacks.onCommitText)?.invoke(emoji)
                             }
                         },
                         onImageEmojiSelect = callbacks.onCommitImage,
@@ -1627,6 +1616,7 @@ fun KeyboardView(
                 layoutPaddingDp = previewPaddingDp.intValue
             },
             density = resizeControlDensity,
+            aspectLimits = KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind),
             controls = controls,
         )
     }
@@ -1645,6 +1635,7 @@ private fun KeyboardResizeControlsHost(
     initialBottomPaddingDp: Int,
     onDragEnd: () -> Unit,
     density: androidx.compose.ui.unit.Density,
+    aspectLimits: KeyboardAspectLimits,
     controls: @Composable () -> Unit,
 ) {
     // Keep reads of the rapidly changing preview state inside this small overlay subtree.
@@ -1659,6 +1650,7 @@ private fun KeyboardResizeControlsHost(
         initialBottomPaddingDp = initialBottomPaddingDp,
         onBottomPaddingChange = { previewPaddingDp.intValue = it },
         onDragEnd = onDragEnd,
+        aspectLimits = aspectLimits,
     )
     CompositionLocalProvider(
         LocalDensity provides density,
