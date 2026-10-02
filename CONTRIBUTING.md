@@ -15,14 +15,9 @@
    - 不要"顺便"重构无关代码或修改代码风格
    - 严格遵守 [AGENTS.md](AGENTS.md) 中的工作规则
 
-3. **Commit 签名**
-   - 所有提交必须经过 **GPG 签名**
-   - 确保 Git 配置了签名密钥：
-     ```bash
-     git config --global user.signingkey <你的密钥ID>
-     git config --global commit.gpgsign true
-     ```
-   - 未签名的 commit 将被拒绝
+3. **提交与发布签名**
+   - Git 提交使用已配置的作者身份，GPG 签名可选，不作为提交或合并的前置条件。
+   - 正式 APK 必须沿用项目发布签名，并核对应用 ID、版本及覆盖升级兼容性；Git 签名与 APK 签名是两回事。
 
 ## 编码规范
 
@@ -35,7 +30,7 @@
 
 - [ ] 关联的 Issue 已创建并讨论通过
 - [ ] 改动符合最小修改原则
-- [ ] 所有 commit 均已 GPG 签名
+- [ ] 提交身份正确；正式 APK 已验证发布签名
 - [ ] 本地构建通过：`./gradlew assembleDebug --quiet`
 - [ ] 测试通过：`./gradlew test`
 - [ ] 已更新相关文档（如有需要）
