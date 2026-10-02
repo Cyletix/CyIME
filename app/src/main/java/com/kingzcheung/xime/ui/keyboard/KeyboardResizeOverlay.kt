@@ -109,6 +109,7 @@ internal fun KeyboardResizeOverlay(
 ) {
     val density = LocalDensity.current
     val roundedBottom = rememberRoundedKeyboardBottom()
+    val frostedGlassEnabled = rememberKeyboardInputPreferences().frostedGlass.enabled
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
@@ -422,7 +423,7 @@ internal fun KeyboardResizeOverlay(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        text = "透明度 ${((1f - opacity) * 100).roundToInt()}%",
+                        text = if (frostedGlassEnabled) "磨砂：独立透明度" else "透明度 ${((1f - opacity) * 100).roundToInt()}%",
                         modifier = Modifier.fillMaxWidth(),
                         color = onSurfaceColor,
                         fontSize = 14.sp,
@@ -433,6 +434,7 @@ internal fun KeyboardResizeOverlay(
                     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides buttonHeight) {
                         Slider(
                             value = 1f - opacity,
+                            enabled = !frostedGlassEnabled,
                             onValueChange = {
                                 opacity = 1f - it
                                 currentOnPreviewOpacity(opacity)

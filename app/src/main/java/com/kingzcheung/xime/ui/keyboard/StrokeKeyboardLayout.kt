@@ -318,8 +318,9 @@ private fun StrokeKeyboardContent(
 
     // 符号面板统一阴影（与九键左栏候选面板同款样式）
     val density = LocalDensity.current
-    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(keyBackgroundColor)
@@ -384,7 +385,7 @@ private fun StrokeKeyboardContent(
                     .padding(scaledKeyVisualPadding())
                     .then(symbolPanelShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                    .background(keyBackgroundColor)
+                    .background(frostedKeyColor(keyBackgroundColor, keyTextColor, frostedGlass))
             ) {
                 if (strokeSideSymbols.size <= 4) {
                     Column(
@@ -656,7 +657,10 @@ private fun StrokeSymbolItem(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else Color.Transparent)
+            .background(if (isPressed) frostedKeyColor(
+                backgroundColor, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
+                legacyStateColor = backgroundColor.copy(alpha = 0.7f), pressed = true,
+            ) else Color.Transparent)
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -800,8 +804,9 @@ private fun ResetKey(
     val currentOnPress by rememberUpdatedState(onPress)
     val density = LocalDensity.current
     val shape = RoundedCornerShape(shadowShapeRadius)
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -830,7 +835,11 @@ private fun ResetKey(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)),
+            .background(frostedKeyColor(
+                backgroundColor, textColor, frostedGlass,
+                legacyStateColor = if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
+                pressed = isPressed,
+            ))),
         contentAlignment = Alignment.Center
     ) {
         Icon(

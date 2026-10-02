@@ -280,6 +280,8 @@ fun CandidatePage(
                     RailKey(
                         onClick = { callbacks.onToggleSingleCharFilter?.invoke() },
                         keyBg = if (state.singleCharFilter) state.textColor.copy(alpha = 0.28f) else keyBg,
+                        textColor = state.textColor,
+                        opacityScale = if (state.singleCharFilter) 0.28f else 1f,
                         modifier = Modifier.weight(1f)
                     ) {
                         // 显示当前模式：候选（全部）/ 单字（筛选中，高亮底色）
@@ -401,6 +403,7 @@ fun CandidatePage(
                         },
                         keyBg = keyBg,
                         modifier = railKeyModifier,
+                        textColor = state.textColor,
                         enabled = listState.canScrollBackward
                     ) {
                         Icon(
@@ -417,6 +420,7 @@ fun CandidatePage(
                         },
                         keyBg = keyBg,
                         modifier = railKeyModifier,
+                        textColor = state.textColor,
                         enabled = listState.canScrollForward
                     ) {
                         Icon(
@@ -430,6 +434,7 @@ fun CandidatePage(
                         onClick = { callbacks.onEnter?.invoke() },
                         keyBg = keyBg,
                         modifier = railKeyModifier,
+                        textColor = state.textColor,
                         enabled = callbacks.onEnter != null
                     ) {
                         Icon(
@@ -706,7 +711,11 @@ private fun CandidateRailSymbolKey(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (isPressed) keyBg.copy(alpha = 0.7f) else keyBg)
+            .background(frostedKeyColor(
+                keyBg, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
+                legacyStateColor = if (isPressed) keyBg.copy(alpha = 0.7f) else keyBg,
+                pressed = isPressed,
+            ))
             .tolerantClick(
                 showRipple = false,
                 interactionSource = interactionSource,
@@ -748,8 +757,10 @@ private fun CandidateRailSymbolKey(
 private fun RailKey(
     onClick: () -> Unit,
     keyBg: Color,
+    textColor: Color,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    opacityScale: Float = 1f,
     content: @Composable BoxScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -758,13 +769,16 @@ private fun RailKey(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(
-                when {
+            .background(frostedKeyColor(
+                keyBg, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
+                legacyStateColor = when {
                     !enabled -> keyBg.copy(alpha = 0.4f)
                     isPressed -> keyBg.copy(alpha = 0.7f)
                     else -> keyBg
-                }
-            )
+                },
+                pressed = isPressed,
+                opacityScale = opacityScale * if (enabled) 1f else 0.4f,
+            ))
             .tolerantClick(
                 enabled = enabled,
                 showRipple = false,

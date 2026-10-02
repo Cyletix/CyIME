@@ -168,8 +168,9 @@ fun KeyButton(
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
     ))
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -204,11 +205,13 @@ fun KeyButton(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
-            .background(
-                if (isPressed) darkenColor(backgroundColor, 0.2f)
+            .background(frostedKeyColor(
+                backgroundColor, textColor, frostedGlass,
+                legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.2f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
-                else backgroundColor
-            )),
+                else backgroundColor,
+                pressed = isPressed, highlighted = isHighlighted,
+            ))),
         contentAlignment = Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
@@ -341,8 +344,9 @@ fun SwipeableKeyButton(
     }
     val shiftHovered = shiftLetter != null && shiftTargets?.hovered == shiftLetter
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, resolvedBackground) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, resolvedBackground, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(resolvedBackground)
@@ -374,11 +378,13 @@ fun SwipeableKeyButton(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
-            .background(
-                if (isPressed || shiftHovered) resolvedBackground.copy(alpha = 0.7f)
+            .background(frostedKeyColor(
+                resolvedBackground, resolvedText, frostedGlass,
+                legacyStateColor = if (isPressed || shiftHovered) resolvedBackground.copy(alpha = 0.7f)
                 else if (isHighlighted) resolvedBackground.copy(alpha = 0.8f)
-                else resolvedBackground
-            )),
+                else resolvedBackground,
+                pressed = isPressed || shiftHovered, highlighted = isHighlighted,
+            ))),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
@@ -609,8 +615,9 @@ fun IconKeyButton(
     val currentOnRelease by rememberUpdatedState(onRelease)
     val density = LocalDensity.current
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -658,11 +665,13 @@ fun IconKeyButton(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
-            .background(
-                if (isPressed) darkenColor(backgroundColor, 0.1f)
+            .background(frostedKeyColor(
+                backgroundColor, iconColor, frostedGlass,
+                legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.1f)
                 else if (isHighlighted) darkenColor(backgroundColor, 0.2f)
-                else backgroundColor
-            )),
+                else backgroundColor,
+                pressed = isPressed, highlighted = isHighlighted,
+            ))),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -773,8 +782,9 @@ fun SwipeableIconKeyButton(
         }
     }
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -974,11 +984,13 @@ fun SwipeableIconKeyButton(
             .padding(visualPadding ?: scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
-            .background(
-                if (isPressed) darkenColor(backgroundColor, 0.2f)
+            .background(frostedKeyColor(
+                backgroundColor, iconColor, frostedGlass,
+                legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.2f)
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
-                else backgroundColor
-            )),
+                else backgroundColor,
+                pressed = isPressed, highlighted = isHighlighted,
+            ))),
         contentAlignment = Alignment.Center
     ) {
         Icon(
