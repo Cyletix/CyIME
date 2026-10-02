@@ -138,6 +138,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         // 空串会越界崩溃（2026-09-14 真机实证：滑动手势 commit 值为空时触发）。
         if (key.isEmpty()) return
         val admission = service.inputReadiness.ticket() ?: return
+        // Capture what Space meant at touch time; a later Next tap must not change this queued commit.
+        val spaceSnapshot = service.candidateState.value.takeIf {
+            key == "space" && it.candidates.isNotEmpty() && it.usesT9CandidateNavigation(service.uiState.value.inputProfile)
+        }
         service.voiceRecognitionHandler.abandonPendingOnManualInput()
         if (service.uiState.value.toolPanelInputFocused) {
             val candState = service.candidateState.value
@@ -196,8 +200,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
                 "space" -> {
                     if (hasComposing && candState.candidates.isNotEmpty()) {
-                        // 组合态：空格选第一个候选（共享输入队列保序）
-                        postRimeJob { selectCandidateAsync(0) }
+                        val snapshot = spaceSnapshot ?: candState
+                        val index = snapshot.spaceCandidateIndex(service.uiState.value.inputProfile)
+                        postRimeJob { selectCandidateAsync(index, snapshot = snapshot) }
                     } else {
                         ToolPanelEditTextHolder.editText?.let { et ->
                             val start = et.selectionStart.coerceAtLeast(0)
@@ -471,6 +476,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     }
                 }
                 "space" -> {
+                    if (spaceSnapshot != null) {
+                        selectCandidateAsync(spaceSnapshot.highlightedCandidateIndex, snapshot = spaceSnapshot)
+                        return@command
+                    }
                     val pendingEnglish = candState.pendingEnglishText
 
                     if (pendingEnglish.isNotEmpty()) {
@@ -484,7 +493,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                     } else if (candState.isComposing) {
                         if (candState.candidates.isNotEmpty()) {
-                            selectCandidateAsync(0)
+                            selectCandidateAsync(candState.spaceCandidateIndex(state.inputProfile), snapshot = candState)
                         } else {
                             val input = candState.inputText
                             if (input.isNotEmpty()) {
@@ -1298,6 +1307,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /** Main-thread display-only action. No engine mutation, buffer consumption or host commit. */
+    internal fun highlightNextCandidate(snapshot: CandidateState) = highlightCandidate(snapshot, forward = true)
+
+    internal fun highlightPreviousCandidate(snapshot: CandidateState) = highlightCandidate(snapshot, forward = false)
+
+    private fun highlightCandidate(snapshot: CandidateState, forward: Boolean) {
+        if (service.inputReadiness.ticket() == null || hasPendingCandidateCommit) return
+        val current = service.candidateState.value
+        if (!snapshot.hasSameSelectionSource(current) ||
+            !service.rimeEngine.isCandidateRevisionCurrent(snapshot.engineRevision)) return
+        val profile = service.uiState.value.inputProfile
+        service.candidateState.value = if (forward) current.advanceT9Candidate(profile)
+            else current.retreatT9Candidate(profile)
+    }
+
     internal fun selectCandidate(index: Int) {
         service.composeViewRef?.let { service.feedbackManager.performKeyPressEffect(view = it) }
 
@@ -1352,9 +1376,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /**
-     * 长按候选删除自造词（键盘无关，T9/全键盘通用）。
-     * 标准 C API delete_candidate_on_current_page：librime 对 userdb 词条
-     * 做 tombstone 标记（UpdateEntry -1），对非用户词由 rime 侧自行判定。
+     * 九键长按持久屏蔽完整候选；其他方案沿用删除用户学习词的接口。
      * 显示索引经 resolveRimeCandidateIndex 映射回引擎原始索引（插件候选
      * 注入会使两者错位，与 selectCandidateAsync 同口径），删除后刷新候选。
      */
@@ -1367,7 +1389,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             val engineIndex = resolveRimeCandidateIndex(
                 displayIndex, text, service.rimeEngine.getCandidates().toList()
             )
-            val ok = service.rimeEngine.deleteCandidateAtRevision(engineIndex, snapshot.engineRevision)
+            val ok = service.rimeEngine.suppressCandidateAtRevision(engineIndex, snapshot.engineRevision)
             FileLogger.i(
                 XimeInputMethodService.TAG,
                 "DeleteCandidate: text='$text' display=$displayIndex engine=$engineIndex ok=$ok"
@@ -1440,14 +1462,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
-    /** 候选展开页长按删除自造词：按跨页全局索引删除，删除后重拉全量候选 */
+    /** 展开页使用同一原生候选版本与全局索引执行反馈，再重读候选。 */
     internal fun deleteCandidateGlobal(globalIndex: Int) {
         val snapshot = service.candidateState.value
         postRimeJob {
             if (!snapshot.hasSameSelectionSource(service.candidateState.value)) return@postRimeJob
             val text = snapshot.expandedCandidates.getOrNull(globalIndex)?.text
             if (text.isNullOrEmpty()) return@postRimeJob
-            val ok = service.rimeEngine.deleteCandidateAtRevision(globalIndex, snapshot.engineRevision, global = true)
+            val ok = service.rimeEngine.suppressCandidateAtRevision(globalIndex, snapshot.engineRevision, global = true)
             FileLogger.i(
                 "ImeKeyRouter",
                 "deleteCandidateGlobal: text='$text' index=$globalIndex ok=$ok"

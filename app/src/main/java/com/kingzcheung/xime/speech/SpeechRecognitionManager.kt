@@ -12,11 +12,14 @@ import android.util.Log
 import androidx.annotation.RequiresPermission
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.util.FileLogger
 
 class SpeechRecognitionManager(
     private val context: Context,
-    private val backendFactory: ((Context) -> AsrBackend?)? = null
+    private val backendFactory: ((Context) -> AsrBackend?)? = null,
+    private val mainHandler: Handler = Handler(Looper.getMainLooper()),
+    private val audioRecordFactory: (() -> AudioRecord?)? = null,
 ) {
 
     companion object {
@@ -40,8 +43,9 @@ class SpeechRecognitionManager(
 
     private var backend: AsrBackend? = null
     private var recordingThread: RecordingThread? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private var pendingRecognitionLanguage: InputLanguage? = null
     @Volatile private var released = false
+    @Volatile private var recognitionLanguage = InputLanguage.CHINESE
 
     // 会话序号：用于区分连续语音会话，防止旧会话的回收线程误释放新会话的后端
     @Volatile private var sessionId = 0
@@ -83,13 +87,29 @@ class SpeechRecognitionManager(
     private val preStartTimeoutRunnable = Runnable { cancelPreStart() }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun startRecognition() {
+    fun startRecognition(language: InputLanguage = InputLanguage.CHINESE) {
         if (released) return
         // Never wait for model initialization on the UI thread: hiding the IME must be able to cancel.
-        if (recordingThread != null) {
+        if (recordingThread?.stopRequested == false) {
             FileLogger.w(TAG, "Recognition already running, ignoring start request")
             return
         }
+        if (language == InputLanguage.UNSPECIFIED ||
+            language != InputLanguage.CHINESE && !SettingsPreferences.isSttUseLocal(context) && backendFactory == null) {
+            cancelPreStart()
+            errorCallback?.invoke(if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请先选择输入语言"
+                else "当前在线语音插件尚未声明${language.displayName}支持，请使用本地多语言模型", true)
+            setState(RecognitionState.ERROR)
+            return
+        }
+        if (recordingThread != null) {
+            // The previous backend still owns its stop/cancel call. Do not let it stop a new session.
+            pendingRecognitionLanguage = language
+            synchronized(preloadLock) { sessionId++ }
+            setState(RecognitionState.PROCESSING)
+            return
+        }
+        recognitionLanguage = language
 
         loadingCancelled = false
         FileLogger.i(TAG, "Starting speech recognition")
@@ -145,6 +165,7 @@ class SpeechRecognitionManager(
         if (released || loadingCancelled) return
         val currentBackend = synchronized(preloadLock) { backend } ?: return
         synchronized(preloadLock) { sessionId++ }
+        bindSessionCallbacks(currentBackend, sessionId)
 
         // 新会话复用后端：取消上一次会话遗留的延迟释放
         mainHandler.removeCallbacks(pendingBackendRelease)
@@ -158,7 +179,7 @@ class SpeechRecognitionManager(
         }
         mainHandler.removeCallbacks(preStartTimeoutRunnable)
 
-        recordingThread = RecordingThread(currentBackend, preStarted, sessionId)
+        recordingThread = RecordingThread(currentBackend, preStarted, sessionId, recognitionLanguage)
         recordingThread!!.start()
     }
 
@@ -178,6 +199,7 @@ class SpeechRecognitionManager(
     }
 
     fun stopRecognition() {
+        pendingRecognitionLanguage = null
         loadingCancelled = true
         cancelPreStart()
         Log.d(TAG, "Stopping recognition")
@@ -192,7 +214,7 @@ class SpeechRecognitionManager(
             }
             return
         }
-        recordingThread = null
+        if (thread.stopRequested) return
         thread.stopRequested = true
         val session = synchronized(preloadLock) { sessionId }
         // 不能 interrupt：录音线程可能正阻塞在 backend.stop() 同步等待最终结果
@@ -219,6 +241,9 @@ class SpeechRecognitionManager(
     }
 
     fun cancelRecognition() {
+        pendingRecognitionLanguage = null
+        // Invalidate callbacks immediately, including results already posted to the UI thread.
+        synchronized(preloadLock) { sessionId++ }
         loadingCancelled = true
         cancelPreStart()
         Log.d(TAG, "Canceling recognition")
@@ -233,10 +258,11 @@ class SpeechRecognitionManager(
             }
             return
         }
-        recordingThread = null
+        thread.cancelRequested = true
+        if (thread.stopRequested) return
         thread.stopRequested = true
         val session = synchronized(preloadLock) { sessionId }
-        // 同 stopRecognition：不打断 backend.stop()，避免破坏引擎收尾状态
+        // Release capture immediately; backend cancellation runs on the recording thread.
         thread.forceStopAudio()
         Thread {
             try {
@@ -340,13 +366,9 @@ class SpeechRecognitionManager(
             val created = createBackend() ?: return false
             candidate = created
             created.setCallbacks(
-                onResult = { text -> if (!released) handleResult(text) },
-                onPartialResult = { text -> if (!released) handlePartialResult(text) },
-                onStateChange = { state ->
-                    val token = sessionId
-                    mainHandler.post { if (!released && token == sessionId) setState(state) }
-                },
-                onError = { error -> if (!released) handleError(error) }
+                // Model warmup is not an input session and must never write to the editor.
+                onResult = {}, onPartialResult = {}, onStateChange = {},
+                onError = { error -> Log.w(TAG, "Speech warmup: $error") }
             )
             if (!created.initialize()) return false
             synchronized(preloadLock) {
@@ -391,6 +413,7 @@ class SpeechRecognitionManager(
     }
 
     private fun createAudioRecord(bufferSecs: Float = 2.0f): AudioRecord? {
+        audioRecordFactory?.let { return it() }
         val bufferSize = (SAMPLE_RATE * bufferSecs).toInt()
         return try {
             val record = AudioRecord(
@@ -415,7 +438,8 @@ class SpeechRecognitionManager(
     private inner class RecordingThread(
         private val currentBackend: AsrBackend,
         preStarted: AudioRecord? = null,
-        private val session: Int
+        private val session: Int,
+        private val language: InputLanguage,
     ) : Thread("AsrRecording") {
 
         private val spectrumAnalyzer = SpectrumAnalyzer()
@@ -431,6 +455,7 @@ class SpeechRecognitionManager(
          */
         @Volatile
         var stopRequested = false
+        @Volatile var cancelRequested = false
 
         // Own the pre-started microphone before Thread.start(): stop may arrive before run().
         private val microphone = RecordingAudioOwner(preStarted)
@@ -442,7 +467,7 @@ class SpeechRecognitionManager(
                     ?: if (stopRequested) return else error("无法启动录音")
                 if (stopRequested) return
                 backendAttempted = true
-                check(currentBackend.start()) { "启动语音引擎失败" }
+                check(currentBackend.start(language)) { "启动语音引擎失败" }
                 if (stopRequested || !microphone.start()) return
                 mainHandler.post {
                     if (!released && !stopRequested && recordingThread === this) setState(RecognitionState.LISTENING)
@@ -471,8 +496,10 @@ class SpeechRecognitionManager(
                         val normalized = (peak / 32768f).coerceIn(0f, 1f)
                         val spectrum = spectrumAnalyzer.analyze(buffer, nread)
                         mainHandler.post {
-                            amplitudeCallback?.invoke(normalized)
-                            spectrumCallback?.invoke(spectrum)
+                            if (!released && session == sessionId) {
+                                amplitudeCallback?.invoke(normalized)
+                                spectrumCallback?.invoke(spectrum)
+                            }
                         }
                         val chunk = byteBuffer.copyOf(nread * 2)
                         if (!speechDetected) {
@@ -508,13 +535,21 @@ class SpeechRecognitionManager(
             } finally {
                 // Release capture BEFORE slow/throwing model or network shutdown.
                 microphone.close()
-                if (backendAttempted) try { currentBackend.stop() } catch (error: Exception) {
+                if (backendAttempted) try {
+                    if (cancelRequested) currentBackend.cancel() else currentBackend.stop()
+                } catch (error: Exception) {
                     Log.w(TAG, "Speech backend stop failed after microphone release", error)
                 }
                 mainHandler.post {
                     if (recordingThread === this) {
                         recordingThread = null
-                        if (!released) scheduleBackendRelease(session)
+                        val pending = pendingRecognitionLanguage
+                        pendingRecognitionLanguage = null
+                        if (!released && pending != null) startRecognition(pending)
+                        else if (!released) {
+                            if (cancelRequested) setState(RecognitionState.IDLE)
+                            scheduleBackendRelease(sessionId)
+                        }
                     }
                 }
                 Log.d(TAG, "Recognition thread ended; microphone released")
@@ -539,24 +574,18 @@ class SpeechRecognitionManager(
         }
     }
 
-    private fun handleResult(text: String) {
-        val token = sessionId
+    private fun postForSession(token: Int, action: () -> Unit) {
         mainHandler.post {
-            if (token == sessionId) resultCallback?.invoke(text)
+            if (!released && token == sessionId) action()
         }
     }
 
-    private fun handlePartialResult(text: String) {
-        val token = sessionId
-        mainHandler.post {
-            if (token == sessionId) partialResultCallback?.invoke(text)
-        }
-    }
-
-    private fun handleError(error: String) {
-        Log.e(TAG, "Recognition error: $error")
-        mainHandler.post {
-            errorCallback?.invoke(error, true)
-        }
+    private fun bindSessionCallbacks(currentBackend: AsrBackend, token: Int) {
+        currentBackend.setCallbacks(
+            onResult = { text -> postForSession(token) { resultCallback?.invoke(text) } },
+            onPartialResult = { text -> postForSession(token) { partialResultCallback?.invoke(text) } },
+            onStateChange = { state -> postForSession(token) { setState(state) } },
+            onError = { error -> postForSession(token) { errorCallback?.invoke(error, true) } },
+        )
     }
 }

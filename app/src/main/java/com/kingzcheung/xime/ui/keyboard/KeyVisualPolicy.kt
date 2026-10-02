@@ -7,7 +7,7 @@ package com.kingzcheung.xime.ui.keyboard
  * pointerInput 先于视觉 padding 的顺序），所以把缝从 3dp 放大到 6dp 不会让用户更难按。
  *
  * `gapX/gapY` 是**相邻键帽之间的最终视觉缝**（= 两侧 inset 之和），不是单侧 padding。
- * 数值来自 1080 宽真机截图的第一轮对照（26 键 / 14 键 / 九宫格），集中在这里便于真机微调。
+ * 手机基准保持原有密度；键盘变宽时，按各布局的参考键宽增加横纵间隙。
  */
 internal data class KeyVisualPolicy(
     /** 相邻键帽之间的目标横向视觉缝（dp）。 */
@@ -18,6 +18,8 @@ internal data class KeyVisualPolicy(
     val minGapY: Float,
     val maxGapX: Float,
     val maxGapY: Float,
+    /** 360dp 手机扣除两侧 8dp 后，该布局的单位格宽。不是单个宽功能键的宽度。 */
+    val referenceCellWidth: Float,
     /** 视觉键帽宽度上限（dp）：大屏多出的宽度转成左右 gutter，不允许键无限拉宽。 */
     val maxKeyWidth: Float,
     /** 内容左右最小 gutter（每侧 dp）。 */
@@ -28,30 +30,35 @@ internal data class KeyVisualPolicy(
         val Qwerty = KeyVisualPolicy(
             gapX = 4.5f, gapY = 5.5f,
             minGapX = 2.5f, minGapY = 3f,
-            maxGapX = 6f, maxGapY = 7f,
+            maxGapX = 12f, maxGapY = 11f,
+            referenceCellWidth = 344f / 10f,
             maxKeyWidth = 62f, minGutter = 8f,
         )
 
-        /** 14 键等合并键布局：键更宽，缝给绝对 dp，不按键宽比例放大。 */
+        /** 14 键等合并键布局：使用自身的参考格宽，避免手机宽键被误当作平板。 */
         val FourteenKey = KeyVisualPolicy(
             gapX = 5f, gapY = 6f,
             minGapX = 3f, minGapY = 3.5f,
-            maxGapX = 7f, maxGapY = 8f,
+            maxGapX = 10f, maxGapY = 12f,
+            referenceCellWidth = 344f / 5f,
             maxKeyWidth = 100f, minGutter = 8f,
         )
 
-        /** 九宫格（T9）/ 数字 / 笔画 / 日语九宫格：宽键，6dp 缝已足够明显。 */
+        /** 九宫格（T9）/ 数字 / 笔画 / 日语九宫格：手机约 6dp，大键盘可到 12dp。 */
         val T9 = KeyVisualPolicy(
             gapX = 6f, gapY = 6f,
             minGapX = 3.5f, minGapY = 3.5f,
-            maxGapX = 8f, maxGapY = 8f,
+            maxGapX = 12f, maxGapY = 12f,
+            referenceCellWidth = 344f / (5f * 3f / 3.4f),
             maxKeyWidth = 140f, minGutter = 8f,
         )
 
-        /** 缝的有限缩放：60dp 参考格，只允许 0.85x（悬浮缩小）~1.20x（大屏）。 */
+        /** 保留原有短边缩放，同时允许宽键盘按参考键宽放大，最高 2 倍。 */
         const val ReferenceCell = 60f
         const val ScaleMin = 0.85f
-        const val ScaleMax = 1.20f
+        const val ScaleMax = 2f
+        /** 很矮/窄的键格至少保留 80% 给键帽，避免扩大间隙挤掉文字。 */
+        const val MaxGapFraction = 0.2f
 
         /** 悬浮键盘保留的 gutter：不套用手机 8dp 下限，允许整体缩小。 */
         const val FloatingGutter = 4f
@@ -73,12 +80,41 @@ internal data class KeyVisualMetrics(
     val insetY: Float?,
     val scale: Float,
     val capShortEdge: Float,
+    /** 实际内容留白后的单位格宽，供标准字母行共用列尺寸。 */
+    val cellWidthDp: Float = 0f,
 ) {
     companion object {
         /** 无策略上下文：保持声明值。 */
         val Unspecified = KeyVisualMetrics(0f, null, null, 1f, 0f)
     }
 }
+
+/** 反映 Scope 真正应用的留白；悬浮度量的 4dp 仍可能被调用方的 8dp 下限提高。 */
+internal fun KeyVisualMetrics.withAppliedGutter(
+    availableWidthDp: Float,
+    columns: Float,
+    horizontalInsetDp: Float,
+    applyGutter: Boolean,
+    widthFraction: Float = 1f,
+): KeyVisualMetrics {
+    val gutter = if (applyGutter) maxOf(gutterX, horizontalInsetDp) else 0f
+    return copy(
+        gutterX = gutter,
+        cellWidthDp = ((availableWidthDp - 2f * gutter) * widthFraction / columns).coerceAtLeast(0f),
+    )
+}
+
+internal data class LetterRowGeometry(val middleRowInsetDp: Float, val outerKeyWeight: Float)
+
+/** 只校准标准 10/9/7 字母行；自定义、合并键和分体仍走原布局。 */
+internal fun standardLetterRowGeometry(
+    keyRows: List<List<String>>,
+    cellWidthDp: Float,
+    hasCustomLayout: Boolean,
+    isSplit: Boolean,
+): LetterRowGeometry? = if (!hasCustomLayout && !isSplit && cellWidthDp > 0f &&
+    keyRows.map { it.size } == listOf(10, 9, 7) && keyRows.all { row -> row.all { it.length == 1 } }
+) LetterRowGeometry(cellWidthDp / 2f, (10f - 7f) / 2f) else null
 
 /**
  * 由可用尺寸、列数与策略算出 gutter / 每侧 inset / 有限缩放 / 键帽短边。
@@ -111,15 +147,25 @@ internal fun keyVisualMetrics(
     )
     val cellWidth = (contentWidth / columns).coerceAtLeast(1f)
     val cellHeight = ((availableHeightDp - verticalInsetDp) / rows).coerceAtLeast(1f)
-    val scale = (minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell)
+    val scale = maxOf(
+        minOf(cellWidth, cellHeight) / KeyVisualPolicy.ReferenceCell,
+        cellWidth / policy.referenceCellWidth,
+    )
         .coerceIn(if (allowShrink) KeyVisualPolicy.ScaleMin else 1f, KeyVisualPolicy.ScaleMax)
-    val gapX = (policy.gapX * scale).coerceIn(policy.minGapX, policy.maxGapX)
-    val gapY = (policy.gapY * scale).coerceIn(policy.minGapY, policy.maxGapY)
+    // 手机基准到两倍键宽之间平滑增大至大屏间距；窄悬浮仍按比例收紧。
+    fun gap(base: Float, minimum: Float, maximum: Float, cell: Float): Float {
+        val target = if (scale <= 1f) base * scale
+            else base + (maximum - base) * (scale - 1f) / (KeyVisualPolicy.ScaleMax - 1f)
+        return target.coerceIn(minimum, maximum).coerceAtMost(cell * KeyVisualPolicy.MaxGapFraction)
+    }
+    val gapX = gap(policy.gapX, policy.minGapX, policy.maxGapX, cellWidth)
+    val gapY = gap(policy.gapY, policy.minGapY, policy.maxGapY, cellHeight)
     return KeyVisualMetrics(
         gutterX = ((availableWidthDp - contentWidth) / 2f).coerceAtLeast(0f),
         insetX = gapX / 2f,
         insetY = gapY / 2f,
         scale = scale,
         capShortEdge = minOf(cellWidth - gapX, cellHeight - gapY).coerceAtLeast(1f),
+        cellWidthDp = cellWidth,
     )
 }

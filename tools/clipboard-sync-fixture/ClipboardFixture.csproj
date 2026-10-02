@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CyimeWindowsRoot Condition="'$(CyimeWindowsRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\CyIME-Windows</CyimeWindowsRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Local verification only. Link the real server; do not copy or distribute Windows sources. -->
+    <Compile Include="$(CyimeWindowsRoot)\settings\CyIME.Settings\ClipboardServer.cs" Link="ClipboardServer.cs" />
+  </ItemGroup>
+</Project>

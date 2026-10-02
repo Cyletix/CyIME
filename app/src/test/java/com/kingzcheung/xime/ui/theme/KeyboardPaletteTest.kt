@@ -6,6 +6,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class KeyboardPaletteTest {
+    @Test fun pureBlackFollowsDisplayModeAndKeepsKeyboardAndSettingsReadable() {
+        val theme = PureBlackTheme.create()
+        assertTrue(theme.keyboardBgLight.luminance() > 0.8f)
+        assertEquals(Color.Black, theme.keyboardBgDark)
+        assertEquals(theme.keyboardBgLight, theme.candidateBarBgLight)
+        assertEquals(Color.Black, theme.candidateBarBgDark)
+        assertEquals(theme.keyboardBgLight, theme.surfaceLight)
+        assertEquals(Color.Black, theme.surfaceDark)
+        assertTrue(contrast(theme.keyTextColorLight, theme.surfaceLight) >= 4.5f)
+        assertTrue(contrast(theme.keyTextColorDark, theme.surfaceDark) >= 4.5f)
+        assertTrue(contrast(theme.candidateTextColorLight, theme.surfaceLight) >= 4.5f)
+        assertTrue(contrast(theme.candidateTextColorDark, theme.surfaceDark) >= 4.5f)
+        assertTrue(contrast(theme.keyTextColorLight, theme.keyBgLight) >= 4.5f)
+        assertTrue(contrast(theme.keyTextColorDark, theme.keyBgDark) >= 4.5f)
+        assertTrue(contrast(theme.specialKeyTextColorLight!!, theme.specialKeyLight) >= 4.5f)
+        assertTrue(contrast(theme.specialKeyTextColorDark!!, theme.specialKeyDark) >= 4.5f)
+    }
+
     private fun contrast(first: Color, second: Color): Float {
         val a = first.luminance()
         val b = second.luminance()

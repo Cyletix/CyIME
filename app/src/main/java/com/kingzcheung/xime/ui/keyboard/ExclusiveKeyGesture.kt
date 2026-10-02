@@ -10,7 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-/** 一次按下固定一组动作，松手只选择一个分支；预览永远不提交文字。 */
+/** 一次按下只触发一个输入分支；长按动作到时执行，滑动与菜单松手确认。 */
 internal data class KeyGestureActions(
     val text: String,
     val onTap: () -> Unit,
@@ -21,12 +21,16 @@ internal data class KeyGestureActions(
     val downText: String? = null,
     val onUp: ((String) -> Unit)? = null,
     val onDown: ((String) -> Unit)? = null,
+    val leftText: String? = null,
+    val onLeft: (() -> Unit)? = null,
     val longPressItems: List<String> = emptyList(),
     val longPressDrawableIds: List<Int> = emptyList(),
     val keyWidth: Float = 1f,
     val onLongPress: (() -> Unit)? = null,
     val onLongPressSelect: ((String) -> Unit)? = null,
     val onLongPressFeedback: () -> Unit = {},
+    val longPressTimeoutMillis: Long? = null,
+    val blockUpSwipe: Boolean = false,
 )
 
 internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
@@ -47,7 +51,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         var selectedIndex = 0
         val items = actions.longPressItems
         val longPressJob = if (items.isNotEmpty() || actions.onLongPress != null) gestureScope.launch {
-            delay(if (items.isNotEmpty()) 400L else viewConfiguration.longPressTimeoutMillis)
+            delay(actions.longPressTimeoutMillis ?: if (items.isNotEmpty()) 400L else viewConfiguration.longPressTimeoutMillis)
             longPressed = true
             actions.onLongPressFeedback()
             if (items.isNotEmpty()) {
@@ -69,7 +73,9 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 }
                 val up = dy < -swipeThreshold && abs(dy) > abs(dx) * 1.1f && actions.onUp != null
                 val downSwipe = dy > swipeThreshold && dy > abs(dx) * 1.1f && actions.onDown != null
-                crossedSwipeThreshold = crossedSwipeThreshold || up || downSwipe
+                val left = dx < -swipeThreshold && -dx > abs(dy) * 1.1f && actions.onLeft != null
+                val blockedUp = actions.blockUpSwipe && dy < -swipeThreshold && abs(dy) > abs(dx) * 1.1f
+                crossedSwipeThreshold = crossedSwipeThreshold || up || downSwipe || left || blockedUp
                 if (longPressed && items.isNotEmpty()) {
                     val itemWidth = (actions.keyWidth / items.size).coerceAtLeast(1f)
                     selectedIndex = ((dx / itemWidth) + if (items.size > 1) 0.5f else 0f)
@@ -78,7 +84,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         longPressItems = items, selectedLongPressIndex = selectedIndex,
                         longPressDrawableIds = actions.longPressDrawableIds))
                 } else if (!longPressed) {
-                    val hint = if (up) actions.upText else if (downSwipe) actions.downText else null
+                    val hint = if (up) actions.upText else if (downSwipe) actions.downText else if (left) actions.leftText else null
                     actions.onPreview(SwipeState(isSwiping = hint != null, swipeText = hint,
                         isSwipeDown = downSwipe, isPressed = !moved, pressedText = actions.text))
                 }
@@ -88,6 +94,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         longPressed -> items.getOrNull(selectedIndex)?.let { actions.onLongPressSelect?.invoke(it) }
                         up -> actions.onUp?.invoke(actions.upText.orEmpty())
                         downSwipe -> actions.onDown?.invoke(actions.downText.orEmpty())
+                        left -> actions.onLeft?.invoke()
                         !crossedSwipeThreshold && abs(dx) < horizontalCancelThreshold -> actions.onTap()
                     }
                     break

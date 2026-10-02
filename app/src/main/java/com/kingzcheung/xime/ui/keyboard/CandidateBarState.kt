@@ -11,6 +11,7 @@ sealed interface CandidateBarState {
         val preeditText: String = "",
         val hasMore: Boolean = false,
         val associationCandidates: List<String> = emptyList(),
+        val highlightIndex: Int = 0,
     ) : CandidateBarState
 
     data class AssociationOnly(
@@ -29,6 +30,7 @@ sealed interface CandidateBarState {
     data class ClipboardDisplay(
         val candidates: List<String> = emptyList(),
         val smsVerificationCode: String? = null,
+        val image: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
     ) : CandidateBarState
 
     data class Calculator(
@@ -50,13 +52,15 @@ sealed interface CandidateBarState {
             hasNextPage: Boolean,
             isCalculatorActive: Boolean = false,
             smsVerificationCode: String? = null,
+            clipboardImage: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
+            highlightIndex: Int = 0,
         ): CandidateBarState {
             val hasCandidates = candidates.isNotEmpty()
             val hasAssociations = associationCandidates.isNotEmpty()
             val hasInput = inputText.isNotEmpty()
             return when {
-                isShowingRecentClipboard && hasCandidates ->
-                    ClipboardDisplay(candidates = candidates, smsVerificationCode = smsVerificationCode)
+                isShowingRecentClipboard && (hasCandidates || clipboardImage != null) ->
+                    ClipboardDisplay(candidates = candidates, smsVerificationCode = smsVerificationCode, image = clipboardImage)
                 isCalculatorActive && hasCandidates ->
                     Calculator(candidates = candidates, comments = candidateComments)
                 isComposing && (hasCandidates || hasInput) ->
@@ -67,6 +71,7 @@ sealed interface CandidateBarState {
                         preeditText = preeditText,
                         hasMore = hasCandidates && hasNextPage,
                         associationCandidates = associationCandidates,
+                        highlightIndex = highlightIndex,
                     )
                 !isComposing && !hasInput && hasAssociations && !hasCandidates ->
                     AssociationOnly(

@@ -18,6 +18,16 @@ import org.junit.Test
  * tool.display 丢失（passive 面板退化成 direct 布局）。
  */
 class XmlRegistryParseTest {
+    @Test
+    fun `Windows foreground polling survives registry reload and old registry stays opt in`() {
+        val json = """{"clipboardSync":{"protocols":["cyime-windows-v1"],"foregroundPollIntervalMs":2000,"maxTextBytes":65536}}"""
+        val caps = XmlManager.parsePluginsXmlContent(registryXml(json)).single().capabilities!!
+        assertEquals(2_000L, caps.clipboardSync!!.foregroundPollIntervalMs)
+        assertEquals(65_536, caps.clipboardSync!!.maxTextBytes)
+        val old = XmlManager.parsePluginsXmlContent(registryXml("""{"clipboardSync":{"protocols":["webdav"]}}""")).single().capabilities!!
+        assertEquals(0L, old.clipboardSync!!.foregroundPollIntervalMs)
+        assertEquals(0, old.clipboardSync!!.maxTextBytes)
+    }
 
     /** 模拟 flushToDisk 实际写出的格式：capabilities 为 escapeXml 后的 JSON。 */
     private fun registryXml(capabilitiesNode: String?): String {

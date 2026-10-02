@@ -104,7 +104,7 @@ fun KeyboardLayoutScreen(
         key(uiState.swipeCancelEpoch) {
             when (keyboardState) {
             is KeyboardLayoutState.Chinese -> {
-                if (!uiState.isAsciiMode && KeysConfigHelper.codeLayoutForSchema(uiState.currentSchemaId) == "japanese_kana") {
+                if (uiState.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD) {
                     JapaneseKanaKeyboardLayout(
                         hasKanaInput = candidateState.value.inputText.isNotEmpty(),
                         onKanaAction = { callbacks.onJapaneseKanaAction?.invoke(it) },

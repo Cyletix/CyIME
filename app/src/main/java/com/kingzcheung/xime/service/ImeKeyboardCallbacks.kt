@@ -92,6 +92,8 @@ internal fun rememberImeKeyboardCallbacks(
             onCandidateSelect = { index ->
                 service.keyRouter.selectCandidate(index)
             },
+            onNextCandidate = service.keyRouter::highlightNextCandidate,
+            onPreviousCandidate = service.keyRouter::highlightPreviousCandidate,
             isCandidateSnapshotCurrent = { snapshot -> snapshot.hasSameSelectionSource(service.candidateState.value) },
             onCandidateDelete = { index ->
                 service.keyRouter.deleteCandidate(index)
@@ -159,15 +161,60 @@ internal fun rememberImeKeyboardCallbacks(
             onToggleDarkMode = { service.toggleDarkMode() },
             onClipboard = {},
             onDismissClipboardPreview = {
+                service.candidateState.value.clipboardImage?.let { service.clipboardManager.images.dismissPreview(it.uri) }
                 if (service.candidateState.value.isShowingRecentClipboard) {
                     service.candidateState.value = service.candidateState.value.copy(
                         candidates = emptyList(),
                         candidateComments = emptyList(),
                         isShowingRecentClipboard = false,
+                        clipboardImage = null,
                     )
                 }
             },
             onClipboardSelect = { text -> service.textCommit.selectClipboardItem(text) },
+            onClipboardImageSelect = { image ->
+                service.serviceScope.launch {
+                    try {
+                        when (service.textCommit.pasteClipboardImage(image)) {
+                            false -> service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(2))
+                            null -> android.widget.Toast.makeText(service, "请先选中支持图片的输入框", android.widget.Toast.LENGTH_SHORT).show()
+                            true -> service.clipboardManager.images.clearPasteFailure()
+                        }
+                    } catch (_: Exception) {
+                        android.widget.Toast.makeText(service, "图片无法读取，请重新选择（最大 32 MiB）", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onExpandClipboardImages = {
+                service.uiState.value = service.uiState.value.copy(clipboardImagesExpanded = true)
+                service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(2))
+            },
+            onCollapseClipboardImages = {
+                service.uiState.value = service.uiState.value.copy(clipboardImagesExpanded = false)
+            },
+            onClipboardImageSystemPaste = {
+                val failure = service.clipboardManager.images.pasteFailure.value
+                if (failure?.packageName == service.currentInputEditorInfo?.packageName) {
+                    val pasted = runCatching { service.currentInputConnection?.performContextMenuAction(android.R.id.paste) == true }.getOrDefault(false)
+                    if (!pasted) android.widget.Toast.makeText(service, "此输入框不支持系统图片粘贴，请使用分享图片", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            },
+            onClipboardImageShare = { image, targetPackage ->
+                val uri = android.net.Uri.parse(image.uri)
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = image.mimeType
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    clipData = android.content.ClipData.newUri(service.contentResolver, "图片", uri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                if (!targetPackage.isNullOrBlank()) {
+                    val targeted = android.content.Intent(send).setPackage(targetPackage)
+                    if (targeted.resolveActivity(service.packageManager) != null) send.setPackage(targetPackage)
+                }
+                runCatching {
+                    service.startActivity(android.content.Intent.createChooser(send, "分享图片").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                }.onFailure { android.widget.Toast.makeText(service, "没有可接收图片的应用", android.widget.Toast.LENGTH_SHORT).show() }
+            },
             onVerificationCodeSelect = { code, sequential -> service.fillVerificationCode(code, sequential) },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             onCommitText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text) },
@@ -177,24 +224,20 @@ internal fun rememberImeKeyboardCallbacks(
             onKeyboardResize = {
                 service.keyboardViewModel.closeOverlay()
                 val config = service.resources.configuration
-                val isLandscape = config.screenWidthDp > config.screenHeightDp
                 val s = service.uiState.value
-                val currentHeight = com.kingzcheung.xime.settings.KeyboardHeightProfiles.selected(
-                    service, s.isFloatingMode, isLandscape, effectiveScreenH,
+                val currentSize = service.currentResolvedKeyboardSize ?: service.resolveKeyboardSize(
+                    config.screenWidthDp, effectiveScreenH,
+                    if (s.isFloatingMode) floatingMinY else s.keyboardBottomPaddingDp + floatingMinY, s,
                 )
-                // 只有悬浮卡片测量值才可作为悬浮初值；固定模式保留独立的已保存宽度。
-                val wide = !com.kingzcheung.xime.ui.keyboard.isT9Schema(s.currentSchemaId) &&
-                    !com.kingzcheung.xime.ui.keyboard.isStrokeSchema(s.currentSchemaId) &&
-                    s.currentSchemaId != "japanese_kana"
-                val currentWidth = service.currentFloatingCardWidthDp.takeIf { s.isFloatingMode && it > 0 }
-                    ?: com.kingzcheung.xime.ui.keyboard.resolvedFloatingWidth(
-                        config.screenWidthDp, config.screenHeightDp, 0, 0, wide,
-                        SettingsPreferences.getFloatingWidthDp(service, isLandscape),
-                    )
+                // The displayed base size excludes expanded clipboard/tool panels and already
+                // incorporates automatic defaults; raw height preferences do not describe it.
+                val currentHeight = currentSize.height
+                val currentWidth = currentSize.width
                 service.uiState.value = service.uiState.value.copy(
                     showKeyboardResize = true,
                     resizePreviewHeightDp = currentHeight,
                     resizePreviewWidthDp = currentWidth,
+                    fixedWidthDp = if (s.isFloatingMode) s.fixedWidthDp else currentWidth,
                     resizeInitialFloating = service.uiState.value.isFloatingMode,
                     resizeInitialSplit = SettingsPreferences.isSplitKeyboardEnabled(service),
                     resizeInitialX = service.uiState.value.floatingOffsetX,
@@ -283,7 +326,11 @@ internal fun rememberImeKeyboardCallbacks(
             onGlobalCandidateDelete = { globalIndex ->
                 service.keyRouter.deleteCandidateGlobal(globalIndex)
             },
-            onRequestExpandedCandidates = { service.refreshExpandedCandidates() },
+            onRequestExpandedCandidates = {
+                // Expanded candidates have global indices; leave the collapsed page's focus behind.
+                service.candidateState.value = service.candidateState.value.copy(candidateFocus = null)
+                service.refreshExpandedCandidates()
+            },
             onCursorMove = { direction ->
                 if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke("preedit_cursor:$direction") == true) {
                     service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)

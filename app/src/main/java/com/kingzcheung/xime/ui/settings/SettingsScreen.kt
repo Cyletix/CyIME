@@ -8,12 +8,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
+data class SettingsNavigationRequest(val route: String, val id: Int)
+
 @Composable
 fun SettingsScreen(
     initialRoute: String? = null,
     initialPluginId: String? = null,
     onThemeChanged: () -> Unit = {},
-    onWizardBack: () -> Unit = {}
+    onWizardBack: () -> Unit = {},
+    navigationRequest: SettingsNavigationRequest? = null,
 ) {
     val navController = rememberNavController()
     val startDestination = if (initialRoute == "manage_dict") SettingsRoutes.Dictionary
@@ -33,6 +36,24 @@ fun SettingsScreen(
     LaunchedEffect(initialPluginId) {
         if (initialPluginId != null) {
             navController.navigate("plugin_market_detail/$initialPluginId")
+        }
+    }
+
+    LaunchedEffect(navigationRequest) {
+        val request = navigationRequest ?: return@LaunchedEffect
+        val destination = when (request.route) {
+            "manage_dict" -> SettingsRoutes.Dictionary
+            "model_management" -> SettingsRoutes.ModelLocal
+            else -> request.route
+        }
+        if (destination in setOf(SettingsRoutes.Main, SettingsRoutes.Schema, SettingsRoutes.Plugins,
+                SettingsRoutes.Dictionary, SettingsRoutes.Theme, SettingsRoutes.SmartPrediction,
+                SettingsRoutes.SpeechToText, SettingsRoutes.ModelLocal) &&
+            navController.currentDestination?.route != destination) {
+            navController.navigate(destination) {
+                popUpTo(navController.graph.startDestinationId) { inclusive = false }
+                launchSingleTop = true
+            }
         }
     }
     
@@ -193,8 +214,12 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.Dictionary) {
             DictionarySettingsContent(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onCellDictionaries = { navController.navigate(SettingsRoutes.CellDictionaries) }
             )
+        }
+        composable(SettingsRoutes.CellDictionaries) {
+            CellDictionarySettingsContent(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoutes.SchemaDictBrowser) {
             SchemaDictBrowserContent(

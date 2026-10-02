@@ -24,10 +24,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** A shortcut must open its destination even when a settings task already exists. */
+/** Reuse the settings activity; onNewIntent handles explicit destinations without recreating it. */
 internal fun settingsActivityIntent(context: android.content.Context, route: String? = null) =
     Intent(context, MainActivity::class.java).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         route?.let { putExtra("open_fragment", it) }
     }
 
@@ -183,6 +183,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     }
     
     internal fun openSettings(route: String? = null) {
+        // The keyboard is already editing CyIME's own settings test field.
+        // A generic Settings tap should not even relaunch the activity or disturb focus.
+        if (route == null && service.currentInputEditorInfo?.packageName == service.packageName) return
         try {
             service.startActivity(settingsActivityIntent(service, route))
         } catch (e: Exception) {
@@ -199,9 +202,13 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     internal fun handleJapaneseKanaAction(action: JapaneseKanaAction) {
         val original = service.currentInputConnection ?: return
         val inputSession = service.uiState.value.inputSessionId
+        val profileId = service.uiState.value.currentSchemaId
         service.keyRouter.postRimeJob {
             if (service.currentInputConnection !== original || service.uiState.value.inputSessionId != inputSession ||
-                service.rimeEngine.getCurrentSchema() != "japanese_kana" || service.rimeEngine.isAsciiMode()) return@postRimeJob
+                service.rimeEngine.getCurrentSchema() != profileId || service.rimeEngine.isAsciiMode()) return@postRimeJob
+            val profile = com.kingzcheung.xime.settings.InputProfiles.current(profileId)
+            if (profile.scheme != com.kingzcheung.xime.settings.InputScheme.KANA ||
+                profile.layout.kind != com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD) return@postRimeJob
             if (japaneseKanaSession != inputSession) {
                 japaneseKanaComposer.reset()
                 japaneseKanaSession = inputSession
@@ -241,7 +248,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             val transformed = service.candidateTransform.transformFor(finalResult)
             withContext(Dispatchers.Main) {
                 if (service.currentInputConnection !== original || service.uiState.value.inputSessionId != inputSession ||
-                    service.uiState.value.currentSchemaId != "japanese_kana") return@withContext
+                    service.uiState.value.currentSchemaId != profileId) return@withContext
                 if (committed.isNotEmpty()) service.commitText(committed.toString())
                 service.sessionController.updateUIWithResult(
                     transformed?.let { finalResult.copy(candidates = it.candidates.toTypedArray()) } ?: finalResult,
@@ -332,6 +339,11 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             switchSchema(service.previousSchemaId.ifEmpty { service.rimeEngine.getCurrentSchema() }.ifEmpty { "pinyin_simp" })
             return
         }
+        val language = service.uiState.value.inputProfile.language
+        if (!com.kingzcheung.xime.handwriting.HandwritingLanguages.supports(language)) {
+            Toast.makeText(service, com.kingzcheung.xime.handwriting.HandwritingLanguages.unavailableMessage(language), Toast.LENGTH_SHORT).show()
+            return
+        }
         if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service)) {
             Toast.makeText(service, "请先下载手写模型", Toast.LENGTH_SHORT).show()
             service.startActivity(android.content.Intent(service, com.kingzcheung.xime.MainActivity::class.java).apply {
@@ -413,6 +425,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     model.asciiStateMachine.reset()
                     SettingsPreferences.setCurrentSchema(service, schemaId,
                         com.kingzcheung.xime.settings.InputModes.languageOf(schemaId, service.uiState.value.schemas))
+                    service.uiState.value.schemas.firstOrNull { it.schemaId == schemaId }?.let {
+                        com.kingzcheung.xime.settings.InputModes.selectProfile(service, it)
+                    }
                     service.uiState.value = service.uiState.value.copy(isAsciiMode = false, currentSchemaId = schemaId)
                     model.switchMain(com.kingzcheung.xime.keyboard.MainType.FULL)
                     model.dispatch(com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(false, schemaId))

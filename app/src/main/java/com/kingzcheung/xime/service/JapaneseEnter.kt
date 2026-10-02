@@ -10,7 +10,7 @@ import com.kingzcheung.xime.settings.JapaneseSchemas
  */
 internal fun RimeEngine.processJapaneseEnterIfComposing(): RimeProcessResult? {
     val schemaId = getCurrentSchema()
-    if (schemaId !in JapaneseSchemas.ids && schemaId != "jaroomaji") return null
+    if (!com.kingzcheung.xime.settings.InputProfiles.describe(schemaId).capabilities.japaneseConversion) return null
     if (getInput().isEmpty()) return null
     return processKeyAndGetResult(0xff0d, 0)
 }

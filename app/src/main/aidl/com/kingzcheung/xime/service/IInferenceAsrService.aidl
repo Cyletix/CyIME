@@ -18,4 +18,6 @@ interface IInferenceAsrService {
      * 模型常驻内存（用户已明确选择以内存换响应速度）；false 恢复默认回收。
      */
     oneway void setKeepModelAlive(boolean keepAlive);
+    /** Current input language is part of the recognition session and model cache identity. */
+    boolean startAsrForLanguage(String modelId, String languageId, IInferenceAsrCallback callback);
 }

@@ -17,6 +17,14 @@ namespace rime {
 // 处理器在边界与 rime::Code 互转（迭代器拷贝即可）。
 using T9SyllableCode = std::vector<int32_t>;
 
+// Keep dictionary provenance: table codes must never enter the pinyin syllabary.
+struct T9CommitCapture {
+    std::string text;
+    T9SyllableCode code;
+    std::string table_code;
+    bool valid() const { return !text.empty() && (!code.empty() || !table_code.empty()); }
+};
+
 // 段（Segment）：一个拼音音节的完整生命周期（设计文档 §3）。
 //
 // 回退的第一性原理单元是"段"而非"命令"：
@@ -146,13 +154,14 @@ public:
     // 每次右选 push 一条；码含声调真相（Phrase::code），供调频保留声调
     // （无声调拼音解析会命中轻声音节，如带声调方案 计划→ji/hua 轻声，导致丢声调）。
     // Clear() 一并清空；MemorizeEntry 全量消费、ForgetEntry 弹栈回滚。
-    void PushCommitCapture(const std::string& text, const T9SyllableCode& code);
+    void PushCommitCapture(const std::string& text, const T9SyllableCode& code,
+                           const std::string& table_code = "");
     // 全部捕获（按选择顺序）；MemorizeEntry 校验文本拼接/音节数后消费。
-    const std::vector<std::pair<std::string, T9SyllableCode>>& commit_captures() const {
+    const std::vector<T9CommitCapture>& commit_captures() const {
         return commit_captures_;
     }
     // 弹出最近一次右选捕获（撤销段时由 ForgetEntry 消费）；空栈返回 nullopt。
-    std::optional<std::pair<std::string, T9SyllableCode>> PopLastCommitCapture();
+    std::optional<T9CommitCapture> PopLastCommitCapture();
     // 仅清空捕获（MemorizeEntry 消费后调用；Clear() 内部也调用）。
     void ClearCommitCaptures() { commit_captures_.clear(); }
 
@@ -277,7 +286,7 @@ private:
     int undone_commit_count_ = 0;
     // 右选序列的调频捕获（text+code，按选择顺序）。生命周期见上方公开 API：
     // Clear() 一并清空（EnterIdle 会话边界），Memorize/Forget 由处理器经访问器驱动。
-    std::vector<std::pair<std::string, T9SyllableCode>> commit_captures_;
+    std::vector<T9CommitCapture> commit_captures_;
 };
 
 }  // namespace rime

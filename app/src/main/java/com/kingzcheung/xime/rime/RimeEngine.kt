@@ -394,7 +394,7 @@ class RimeEngine {
 
     private fun displayPreedit(input: String, preedit: String, spelling: String): String {
         val schema = nativeGetCurrentSchema().orEmpty()
-        val groups = if (schema == "pinyin_14jian") merged14Groups else
+        val groups = if (com.kingzcheung.xime.settings.InputProfiles.describe(schema).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) merged14Groups else
             com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(schema)?.mergedGroups.orEmpty()
         if (groups.none { it.length > 1 } || nativeIsAsciiMode()) return preedit
         val snapshot = nativePinyinEditSnapshot()
@@ -538,7 +538,8 @@ class RimeEngine {
         if (!isInitialized) return false
         return tryMutating(false) {
             if (!nativeHasSession() && !nativeCreateSession()) return@tryMutating false
-            val japanese = !nativeIsAsciiMode() && nativeGetCurrentSchema() in setOf("japanese", "japanese_kana", "jaroomaji")
+            val japanese = !nativeIsAsciiMode() && com.kingzcheung.xime.settings.InputProfiles
+                .describe(nativeGetCurrentSchema().orEmpty()).capabilities.japaneseConversion
             nativeSetInput(if (japanese) canonicalJapaneseRomaji(input) else input)
         }
     }
@@ -710,7 +711,9 @@ class RimeEngine {
             }
             // 维护完成后更新 last_build_time，避免下次启动增量检测误判需重编译
             nativeUpdateLastBuildTime()
-            return true
+            // Existing sessions retain compiled ConfigData through strong references.
+            // New files alone do not refresh their translators or candidate caches.
+            return nativeReloadSessionAfterMaintenance()
         }
     }
 
@@ -865,6 +868,10 @@ class RimeEngine {
     private external fun nativeSelectCandidateByGlobalIndex(index: Int): Boolean
     private external fun nativeDeleteCandidateOnCurrentPage(index: Int): Boolean
     private external fun nativeDeleteCandidateByGlobalIndex(index: Int): Boolean
+    private external fun nativeSuppressCandidate(index: Int, global: Boolean): Boolean
+    private external fun nativeRestoreSuppressedCandidate(text: String): Boolean
+    private external fun nativeGetSuppressedCandidates(): Array<String>
+    private external fun nativeT9ScoringStatus(): String
     private external fun nativePageDown(): Boolean
     private external fun nativePageUp(): Boolean
     private external fun nativeHasNextPage(): Boolean
@@ -1063,6 +1070,46 @@ class RimeEngine {
         candidateRevision.incrementAndGet()
         if (global) nativeDeleteCandidateByGlobalIndex(index) else nativeDeleteCandidateOnCurrentPage(index)
     }
+
+    /** Negative feedback is separate from deleting a learned dictionary entry. */
+    @androidx.annotation.WorkerThread
+    internal fun suppressCandidateAtRevision(index: Int, revision: Long, global: Boolean = false): Boolean = locked {
+        if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked false
+        candidateRevision.incrementAndGet()
+        nativeSuppressCandidate(index, global)
+    }
+
+    @androidx.annotation.WorkerThread
+    internal fun restoreSuppressedCandidate(text: String): Boolean = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked false
+        candidateRevision.incrementAndGet()
+        nativeRestoreSuppressedCandidate(text)
+    }
+
+    @androidx.annotation.WorkerThread
+    internal fun getSuppressedCandidates(): List<String> = locked {
+        if (!isInitialized || nativeIsMaintaining()) emptyList()
+        else nativeGetSuppressedCandidates().toList()
+    }
+
+    internal fun t9ScoringStatus(): String = locked {
+        if (isInitialized) nativeT9ScoringStatus() else "uninitialized"
+    }
+
+    /** 0: no model work, 1: pending, 2: ready. Inference never holds rimeLock. */
+    internal fun t9RefinementState(): Int = locked {
+        if (!isInitialized || !nativeHasSession()) 0 else nativeT9RefinementState()
+    }
+
+    internal fun refineQueuedT9Result(revision: Long): RimeProcessResult? = locked {
+        if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked null
+        if (!nativeRefineT9Sentences()) return@locked null
+        candidateRevision.incrementAndGet()
+        withDisplayPreedit(nativeGetProcessResult(true))
+    }
+    private external fun nativeReloadSessionAfterMaintenance(): Boolean
+    private external fun nativeT9RefinementState(): Int
+    private external fun nativeRefineT9Sentences(): Boolean
 
     @androidx.annotation.WorkerThread
     internal fun readQueuedResult(): RimeProcessResult? = locked {

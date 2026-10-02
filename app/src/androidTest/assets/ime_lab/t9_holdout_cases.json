@@ -1,0 +1,165 @@
+{
+  "scope": "Independent colloquial phrases added after ranking parameters were frozen. Measurement only; no tuning on these results.",
+  "constructed_and_historical_replays": [
+    {
+      "id": "HOLDOUT-001",
+      "pinyin": "wo jin tian wan shang hui jia",
+      "target": "我今天晚上回家",
+      "full_digit_keys": "96546842692674264484542",
+      "with_explicit_separator_key_1": "96154618426192617426414841542",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-002",
+      "pinyin": "zhe ge wen ti yi jing jie jue le",
+      "target": "这个问题已经解决了",
+      "full_digit_keys": "943439368494546454358353",
+      "with_explicit_separator_key_1": "94314319361841941546415431583153",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-003",
+      "pinyin": "qing shao deng yi xia",
+      "target": "请稍等一下",
+      "full_digit_keys": "74647426336494942",
+      "with_explicit_separator_key_1": "746417426133641941942",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-004",
+      "pinyin": "wo bu zhi dao zen me ban",
+      "target": "我不知道怎么办",
+      "full_digit_keys": "962894432693663226",
+      "with_explicit_separator_key_1": "961281944132619361631226",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-005",
+      "pinyin": "ming tian zao shang jian",
+      "target": "明天早上见",
+      "full_digit_keys": "64648426926742645426",
+      "with_explicit_separator_key_1": "646418426192617426415426",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-006",
+      "pinyin": "jin tian de tian qi hen hao",
+      "target": "今天的天气很好",
+      "full_digit_keys": "546842633842674436426",
+      "with_explicit_separator_key_1": "546184261331842617414361426",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-007",
+      "pinyin": "wo men yi qi qu chi fan ba",
+      "target": "我们一起去吃饭吧",
+      "full_digit_keys": "9663694747824432622",
+      "with_explicit_separator_key_1": "96163619417417812441326122",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-008",
+      "pinyin": "ni xian zai zai na li",
+      "target": "你现在在哪里",
+      "full_digit_keys": "6494269249246254",
+      "with_explicit_separator_key_1": "641942619241924162154",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-009",
+      "pinyin": "xie xie ni de bang zhu",
+      "target": "谢谢你的帮助",
+      "full_digit_keys": "94394364332264948",
+      "with_explicit_separator_key_1": "9431943164133122641948",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-010",
+      "pinyin": "wo yi jing shou dao le",
+      "target": "我已经收到了",
+      "full_digit_keys": "96945464746832653",
+      "with_explicit_separator_key_1": "9619415464174681326153",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-011",
+      "pinyin": "wo ma shang jiu dao",
+      "target": "我马上就到",
+      "full_digit_keys": "966274264548326",
+      "with_explicit_separator_key_1": "9616217426415481326",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-012",
+      "pinyin": "xia ge xing qi zai lian xi",
+      "target": "下个星期再联系",
+      "full_digit_keys": "94243946474924542694",
+      "with_explicit_separator_key_1": "94214319464174192415426194",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-013",
+      "pinyin": "ji de zao dian xiu xi",
+      "target": "记得早点休息",
+      "full_digit_keys": "5433926342694894",
+      "with_explicit_separator_key_1": "541331926134261948194",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-014",
+      "pinyin": "zhu yi shen ti",
+      "target": "注意身体",
+      "full_digit_keys": "94894743684",
+      "with_explicit_separator_key_1": "94819417436184",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-015",
+      "pinyin": "yi lu shun feng",
+      "target": "一路顺风",
+      "full_digit_keys": "945874863364",
+      "with_explicit_separator_key_1": "941581748613364",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-016",
+      "pinyin": "sheng ri kuai le",
+      "target": "生日快乐",
+      "full_digit_keys": "7436474582453",
+      "with_explicit_separator_key_1": "7436417415824153",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-017",
+      "pinyin": "zhou mo yu kuai",
+      "target": "周末愉快",
+      "full_digit_keys": "946866985824",
+      "with_explicit_separator_key_1": "946816619815824",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-018",
+      "pinyin": "wo xiang he bei ka fei",
+      "target": "我想喝杯咖啡",
+      "full_digit_keys": "96942644323452334",
+      "with_explicit_separator_key_1": "9619426414312341521334",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-019",
+      "pinyin": "zhe jian shi qing hen zhong yao",
+      "target": "这件事情很重要",
+      "full_digit_keys": "9435426744746443694664926",
+      "with_explicit_separator_key_1": "9431542617441746414361946641926",
+      "target_rank_requirement": 1
+    },
+    {
+      "id": "HOLDOUT-020",
+      "pinyin": "zhe ge ban fa bu cuo",
+      "target": "这个办法不错",
+      "full_digit_keys": "943432263228286",
+      "with_explicit_separator_key_1": "94314312261321281286",
+      "target_rank_requirement": 1
+    }
+  ]
+}

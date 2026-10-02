@@ -642,6 +642,8 @@ object KeysConfigHelper {
 
     // 合并键绑定缓存：schemaId → 键盘 section（xime.yaml keyboard.<section>.schemas 声明）
     private var _schemaSectionBindings: Map<String, String> = emptyMap()
+    @Volatile internal var hasLoadedLayoutBindings: Boolean = false
+        private set
 
     /**
      * 代码布局 section：由专属组件渲染（T9KeyboardLayout / StrokeKeyboardLayout /
@@ -684,6 +686,7 @@ object KeysConfigHelper {
      */
     internal fun clearSchemaBindingsForTest() {
         _schemaSectionBindings = emptyMap()
+        hasLoadedLayoutBindings = false
     }
 
     /**
@@ -780,6 +783,7 @@ object KeysConfigHelper {
             val customBindings = readCustomText(context)
                 ?.let { parseSchemaBindingsYamlText(it) } ?: emptyMap()
             _schemaSectionBindings = builtInBindings + customBindings
+            hasLoadedLayoutBindings = true
             // 合并键布局 sections：由 schemas 绑定动态发现（内置 qwerty_14/17/18 + custom 新增）；
             // 代码布局 section（t9/stroke）无行数据，走各自的专属配置解析，不在此加载
             val mergedRowsMap = mutableMapOf<String, List<List<String>>>()
@@ -1557,15 +1561,15 @@ object KeysConfigHelper {
     /** 从 xime.yaml 加载默认主题 ID（style.color_scheme 的 light 字段）。 */
     fun loadDefaultThemeId(context: Context): String {
         val merged = loadMergedConfig(context)
-        return merged.style?.colorScheme?.light ?: "dynamic"
+        return merged.style?.colorScheme?.light ?: com.kingzcheung.xime.ui.theme.PureBlackTheme.ID
     }
 
     /** 根据显示模式加载对应的默认主题 ID。 */
     fun loadThemeIdForMode(context: Context, isDark: Boolean): String {
         val merged = loadMergedConfig(context)
-        val cs = merged.style?.colorScheme ?: return "dynamic"
-        return if (isDark) (cs.dark ?: cs.light ?: "dynamic")
-               else cs.light ?: "dynamic"
+        val cs = merged.style?.colorScheme ?: return com.kingzcheung.xime.ui.theme.PureBlackTheme.ID
+        return if (isDark) (cs.dark ?: cs.light ?: com.kingzcheung.xime.ui.theme.PureBlackTheme.ID)
+               else cs.light ?: com.kingzcheung.xime.ui.theme.PureBlackTheme.ID
     }
 
     /** 从 xime.yaml 加载默认显示模式（style.dark_mode）。 */

@@ -113,7 +113,7 @@ class ReportedLayoutsTest {
     }
     @Test fun editorSectorGlowPreservesCentreAndOtherDirections() {
         rule.setContent { MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) { CompositionLocalProvider(
-            LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true)) {
+            LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true)) {
             EditKeyboardLayout({}, {}, Color(0xFF191D25), Color.White, Color(0xFFB1C9F5), Color(0xFF303540),
                 modifier = Modifier.size(360.dp, 260.dp).testTag("editor-preview"))
         } } }

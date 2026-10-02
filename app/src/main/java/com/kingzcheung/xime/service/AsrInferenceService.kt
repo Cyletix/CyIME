@@ -9,6 +9,7 @@ import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.LocalSpeechSession
 import com.kingzcheung.xime.speech.SherpaSpeechEngine
 import com.kingzcheung.xime.util.FileLogger
+import com.kingzcheung.xime.settings.InputLanguage
 
 /** Model weights and both decode workers live in :asr, never on the keyboard UI thread. */
 class AsrInferenceService : Service() {
@@ -46,14 +47,24 @@ class AsrInferenceService : Service() {
     private fun releaseEngine() { engine?.close(); engine = null; loadedKey = null }
 
     private val binder = object : IInferenceAsrService.Stub() {
-        override fun startAsr(modelId: String, callback: IInferenceAsrCallback): Boolean = synchronized(lock) {
+        override fun startAsr(modelId: String, callback: IInferenceAsrCallback): Boolean =
+            startSession(modelId, null, callback)
+        override fun startAsrForLanguage(modelId: String, languageId: String, callback: IInferenceAsrCallback): Boolean {
+            val language = InputLanguage.fromId(languageId)
+            if (language == null || language == InputLanguage.UNSPECIFIED) {
+                callback.onError("当前方案未标注可用的语音语言")
+                return false
+            }
+            return startSession(modelId, language, callback)
+        }
+        private fun startSession(modelId: String, language: InputLanguage?, callback: IInferenceAsrCallback): Boolean = synchronized(lock) {
             idleHandler.removeCallbacks(idleRelease)
             generation++
             retireSession(true)
             val token = generation
             try {
                 check(retiring.get() == 0) { "上一段语音仍在收尾，请稍后重试" }
-                val selection = AsrModelManager(this@AsrInferenceService).selection(modelId)
+                val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, language)
                 check(selection.ready) { "所选语音模型尚未完整下载" }
                 if (loadedKey != selection.key) {
                     releaseEngine()

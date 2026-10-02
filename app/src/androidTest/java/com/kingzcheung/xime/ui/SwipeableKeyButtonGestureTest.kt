@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -16,6 +17,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.ui.keyboard.SwipeState
 import com.kingzcheung.xime.ui.keyboard.SwipeableKeyButton
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -41,6 +45,9 @@ class SwipeableKeyButtonGestureTest {
         longPressItems: List<String>? = listOf("q", "Q", "ä"),
         parentConsumesMoves: Boolean = false,
         parentConsumesDown: Boolean = false,
+        leftEnabled: Boolean = false,
+        symbolMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
+        hideUpperHint: Boolean = false,
     ): Events {
         val events = Events()
         rule.setContent {
@@ -64,6 +71,8 @@ class SwipeableKeyButtonGestureTest {
                     }
                 }
             } else Modifier
+            CompositionLocalProvider(LocalKeyboardInputPreferences provides
+                KeyboardInputPreferences(symbolInputMode = symbolMode)) {
             Box(Modifier.size(200.dp).then(parentInput)) {
                 SwipeableKeyButton(
                     text = "q",
@@ -71,10 +80,13 @@ class SwipeableKeyButtonGestureTest {
                     backgroundColor = Color.White,
                     textColor = Color.Black,
                     modifier = Modifier.testTag("key"),
-                    swipeText = "1",
+                    swipeText = if (hideUpperHint) null else "1",
+                    symbolInputText = "1",
                     swipeDownText = "!",
                     onSwipe = { events.commits += "up:$it" },
                     onSwipeDown = { events.commits += "down:$it" },
+                    onSwipeLeft = if (leftEnabled) ({ events.commits += "previous" }) else null,
+                    swipeLeftText = if (leftEnabled) "上一项" else null,
                     onPress = { events.presses++ },
                     onRelease = { events.releases++ },
                     onSwipeStateChange = { state, _ -> events.state = state },
@@ -83,8 +95,117 @@ class SwipeableKeyButtonGestureTest {
                     shadowEnabled = false,
                 )
             }
+            }
         }
         return events
+    }
+
+    @Test fun symbolHoldCommitsAtThreeHundredMillisecondsBeforeReleaseAndNeverRepeats() {
+        val events = setKey(symbolMode = SymbolInputMode.LONG_PRESS, hideUpperHint = true)
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("key").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(240L)
+        rule.runOnIdle { assertFalse(events.state.isLongPress); assertTrue(events.commits.isEmpty()) }
+        rule.onNodeWithTag("key").performTouchInput { up() }
+        rule.runOnIdle { assertEquals(listOf("tap:q"), events.commits); events.commits.clear() }
+        rule.onNodeWithTag("key").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(299L, ignoreFrameDuration = true)
+        rule.runOnIdle {
+            assertTrue(events.commits.isEmpty())
+        }
+        rule.mainClock.advanceTimeBy(1L, ignoreFrameDuration = true)
+        rule.runOnIdle {
+            assertEquals(listOf("up:1"), events.commits)
+            assertFalse(events.state.isLongPress) // Immediate input has no selection menu.
+        }
+        rule.mainClock.advanceTimeBy(1000L)
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+        rule.onNodeWithTag("key").performTouchInput { up() }
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+    }
+
+    @Test fun symbolHoldCancellationBeforeTimeoutInputsNothingAndAfterTimeoutDoesNotRepeat() {
+        val events = setKey(symbolMode = SymbolInputMode.LONG_PRESS)
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("key").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(200L)
+        rule.onNodeWithTag("key").performTouchInput { cancel() }
+        rule.mainClock.advanceTimeBy(500L)
+        rule.runOnIdle { assertTrue(events.commits.isEmpty()) }
+        rule.onNodeWithTag("key").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(320L)
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+        rule.onNodeWithTag("key").performTouchInput { cancel() }
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+    }
+
+    @Test fun slidingAfterImmediateSymbolInputDoesNotCommitAnotherActionOnRelease() {
+        val events = setKey(symbolMode = SymbolInputMode.LONG_PRESS, leftEnabled = true)
+        rule.mainClock.autoAdvance = false
+        for (direction in listOf(Offset(0f, -75f), Offset(0f, 75f), Offset(-75f, 0f), Offset(75f, 0f))) {
+            rule.onNodeWithTag("key").performTouchInput { down(center) }
+            rule.mainClock.advanceTimeBy(320L)
+            rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+            rule.onNodeWithTag("key").performTouchInput { moveTo(center + direction * events.density); up() }
+            rule.runOnIdle { assertEquals(listOf("up:1"), events.commits); events.commits.clear() }
+        }
+    }
+
+    @Test fun symbolHoldBlocksUpperSwipeWithoutLosingDownAndPreviousCandidateGestures() {
+        val events = setKey(symbolMode = SymbolInputMode.LONG_PRESS, leftEnabled = true)
+        rule.onNodeWithTag("key").performTouchInput {
+            down(center); moveTo(center - Offset(0f, 75f * events.density)); up()
+        }
+        rule.onNodeWithTag("key").performTouchInput {
+            down(center); moveTo(center - Offset(0f, 75f * events.density)); moveTo(center); up()
+        }
+        rule.runOnIdle { assertTrue(events.commits.isEmpty()) }
+        rule.onNodeWithTag("key").performTouchInput {
+            down(center); moveTo(center + Offset(0f, 75f * events.density)); up()
+        }
+        rule.onNodeWithTag("key").performTouchInput {
+            down(center); moveTo(center - Offset(75f * events.density, 0f)); up()
+        }
+        rule.runOnIdle { assertEquals(listOf("down:!", "previous"), events.commits) }
+    }
+
+    @Test
+    fun leftSwipePreviewsThenMovesOnceWithoutAlsoTappingOrTriggeringVerticalSwipe() {
+        val events = setKey(leftEnabled = true)
+        rule.onNodeWithTag("key").performTouchInput {
+            down(center)
+            moveTo(center - Offset(75f * events.density, 15f * events.density))
+        }
+        rule.runOnIdle {
+            assertTrue(events.commits.isEmpty())
+            assertEquals("上一项", events.state.swipeText)
+        }
+        rule.onNodeWithTag("key").performTouchInput { up() }
+        rule.runOnIdle {
+            assertEquals(listOf("previous"), events.commits)
+            assertEquals(1, events.releases)
+            assertEquals(SwipeState(), events.state)
+        }
+    }
+
+    @Test
+    fun returningOrCancellingLeftSwipeNeverFallsBackToNextCandidateTap() {
+        val events = setKey(leftEnabled = true)
+        rule.onNodeWithTag("key").performTouchInput {
+            down(center)
+            moveTo(center - Offset(75f * events.density, 0f))
+            moveTo(center)
+            up()
+        }
+        rule.onNodeWithTag("key").performTouchInput {
+            down(center)
+            moveTo(center - Offset(75f * events.density, 0f))
+            cancel()
+        }
+        rule.runOnIdle {
+            assertTrue(events.commits.isEmpty())
+            assertEquals(2, events.releases)
+        }
     }
 
     @Test

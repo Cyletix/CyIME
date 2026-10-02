@@ -1,0 +1,741 @@
+{
+  "schema": "cyime.glide.fixture.v1",
+  "kind": "synthetic",
+  "id": "english-smoke-v1",
+  "language": "en",
+  "scheme": "direct",
+  "notes": "Original hand-selected toy vocabulary; generated center/perturbed paths are smoke checks, not an accuracy benchmark. Priors are illustrative costs, not corpus frequencies. Repeated-letter ambiguity is intentionally visible.",
+  "layout": {
+    "revision": "synthetic-qwerty-unit-v1",
+    "key_unit": 1.0,
+    "keys": [
+      {
+        "symbol": "q",
+        "x": 0.0,
+        "y": 0
+      },
+      {
+        "symbol": "w",
+        "x": 1.0,
+        "y": 0
+      },
+      {
+        "symbol": "e",
+        "x": 2.0,
+        "y": 0
+      },
+      {
+        "symbol": "r",
+        "x": 3.0,
+        "y": 0
+      },
+      {
+        "symbol": "t",
+        "x": 4.0,
+        "y": 0
+      },
+      {
+        "symbol": "y",
+        "x": 5.0,
+        "y": 0
+      },
+      {
+        "symbol": "u",
+        "x": 6.0,
+        "y": 0
+      },
+      {
+        "symbol": "i",
+        "x": 7.0,
+        "y": 0
+      },
+      {
+        "symbol": "o",
+        "x": 8.0,
+        "y": 0
+      },
+      {
+        "symbol": "p",
+        "x": 9.0,
+        "y": 0
+      },
+      {
+        "symbol": "a",
+        "x": 0.25,
+        "y": 1
+      },
+      {
+        "symbol": "s",
+        "x": 1.25,
+        "y": 1
+      },
+      {
+        "symbol": "d",
+        "x": 2.25,
+        "y": 1
+      },
+      {
+        "symbol": "f",
+        "x": 3.25,
+        "y": 1
+      },
+      {
+        "symbol": "g",
+        "x": 4.25,
+        "y": 1
+      },
+      {
+        "symbol": "h",
+        "x": 5.25,
+        "y": 1
+      },
+      {
+        "symbol": "j",
+        "x": 6.25,
+        "y": 1
+      },
+      {
+        "symbol": "k",
+        "x": 7.25,
+        "y": 1
+      },
+      {
+        "symbol": "l",
+        "x": 8.25,
+        "y": 1
+      },
+      {
+        "symbol": "z",
+        "x": 0.75,
+        "y": 2
+      },
+      {
+        "symbol": "x",
+        "x": 1.75,
+        "y": 2
+      },
+      {
+        "symbol": "c",
+        "x": 2.75,
+        "y": 2
+      },
+      {
+        "symbol": "v",
+        "x": 3.75,
+        "y": 2
+      },
+      {
+        "symbol": "b",
+        "x": 4.75,
+        "y": 2
+      },
+      {
+        "symbol": "n",
+        "x": 5.75,
+        "y": 2
+      },
+      {
+        "symbol": "m",
+        "x": 6.75,
+        "y": 2
+      }
+    ]
+  },
+  "lexicon": [
+    {
+      "id": "hello",
+      "code": "hello",
+      "text": "hello",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "help",
+      "code": "help",
+      "text": "help",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "held",
+      "code": "held",
+      "text": "held",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "world",
+      "code": "world",
+      "text": "world",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "word",
+      "code": "word",
+      "text": "word",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "work",
+      "code": "work",
+      "text": "work",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "would",
+      "code": "would",
+      "text": "would",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "test",
+      "code": "test",
+      "text": "test",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "text",
+      "code": "text",
+      "text": "text",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "best",
+      "code": "best",
+      "text": "best",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "there",
+      "code": "there",
+      "text": "there",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "their",
+      "code": "their",
+      "text": "their",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "the",
+      "code": "the",
+      "text": "the",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "then",
+      "code": "then",
+      "text": "then",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "that",
+      "code": "that",
+      "text": "that",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "this",
+      "code": "this",
+      "text": "this",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "input",
+      "code": "input",
+      "text": "input",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "into",
+      "code": "into",
+      "text": "into",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "typing",
+      "code": "typing",
+      "text": "typing",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "type",
+      "code": "type",
+      "text": "type",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "gesture",
+      "code": "gesture",
+      "text": "gesture",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "great",
+      "code": "great",
+      "text": "great",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "good",
+      "code": "good",
+      "text": "good",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "home",
+      "code": "home",
+      "text": "home",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "how",
+      "code": "how",
+      "text": "how",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "you",
+      "code": "you",
+      "text": "you",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "your",
+      "code": "your",
+      "text": "your",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "we",
+      "code": "we",
+      "text": "we",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "are",
+      "code": "are",
+      "text": "are",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "better",
+      "code": "better",
+      "text": "better",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "letter",
+      "code": "letter",
+      "text": "letter",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "later",
+      "code": "later",
+      "text": "later",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "book",
+      "code": "book",
+      "text": "book",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "look",
+      "code": "look",
+      "text": "look",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "too",
+      "code": "too",
+      "text": "too",
+      "prior_cost": 0.6
+    },
+    {
+      "id": "to",
+      "code": "to",
+      "text": "to",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "of",
+      "code": "of",
+      "text": "of",
+      "prior_cost": 0.5
+    },
+    {
+      "id": "off",
+      "code": "off",
+      "text": "off",
+      "prior_cost": 0.5
+    }
+  ],
+  "cases": [
+    {
+      "id": "hello-centers",
+      "description": "Synthetic hello waypoints; offset=0.0; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "hello"
+      ],
+      "points": [
+        [
+          5.25,
+          1.0,
+          0
+        ],
+        [
+          2.0,
+          0.0,
+          70
+        ],
+        [
+          8.25,
+          1.0,
+          140
+        ],
+        [
+          8.0,
+          0.0,
+          210
+        ]
+      ]
+    },
+    {
+      "id": "hello-offset",
+      "description": "Synthetic hello waypoints; offset=0.2; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "hello"
+      ],
+      "points": [
+        [
+          5.11,
+          0.9,
+          0
+        ],
+        [
+          2.12,
+          0.08,
+          70
+        ],
+        [
+          8.11,
+          1.08,
+          140
+        ],
+        [
+          7.86,
+          0.08,
+          210
+        ]
+      ]
+    },
+    {
+      "id": "world-offset",
+      "description": "Synthetic world waypoints; offset=0.15; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "world"
+      ],
+      "points": [
+        [
+          0.895,
+          -0.075,
+          0
+        ],
+        [
+          8.09,
+          0.06,
+          70
+        ],
+        [
+          2.895,
+          0.06,
+          140
+        ],
+        [
+          8.34,
+          0.925,
+          210
+        ],
+        [
+          2.145,
+          1.06,
+          280
+        ]
+      ]
+    },
+    {
+      "id": "word-paused",
+      "description": "Synthetic word waypoints; offset=0.1; pause=True; not recorded handwriting",
+      "expected_ids": [
+        "word"
+      ],
+      "points": [
+        [
+          0.93,
+          -0.05,
+          0
+        ],
+        [
+          8.06,
+          0.04,
+          70
+        ],
+        [
+          2.93,
+          0.04,
+          140
+        ],
+        [
+          2.93,
+          0.04,
+          260
+        ],
+        [
+          2.93,
+          0.04,
+          380
+        ],
+        [
+          2.31,
+          0.95,
+          450
+        ]
+      ]
+    },
+    {
+      "id": "test-offset",
+      "description": "Synthetic test waypoints; offset=0.2; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "test"
+      ],
+      "points": [
+        [
+          3.86,
+          -0.1,
+          0
+        ],
+        [
+          2.12,
+          0.08,
+          70
+        ],
+        [
+          1.11,
+          1.08,
+          140
+        ],
+        [
+          4.12,
+          -0.1,
+          210
+        ]
+      ]
+    },
+    {
+      "id": "gesture-offset",
+      "description": "Synthetic gesture waypoints; offset=0.2; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "gesture"
+      ],
+      "points": [
+        [
+          4.11,
+          0.9,
+          0
+        ],
+        [
+          2.12,
+          0.08,
+          70
+        ],
+        [
+          1.11,
+          1.08,
+          140
+        ],
+        [
+          4.12,
+          -0.1,
+          210
+        ],
+        [
+          5.86,
+          0.08,
+          280
+        ],
+        [
+          3.12,
+          0.08,
+          350
+        ],
+        [
+          1.86,
+          -0.1,
+          420
+        ]
+      ]
+    },
+    {
+      "id": "better-repeat",
+      "description": "Synthetic better waypoints; offset=0.12; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "better"
+      ],
+      "points": [
+        [
+          4.666,
+          1.94,
+          0
+        ],
+        [
+          2.072,
+          0.048,
+          70
+        ],
+        [
+          3.916,
+          0.048,
+          140
+        ],
+        [
+          1.916,
+          0.048,
+          210
+        ],
+        [
+          3.072,
+          0.048,
+          280
+        ]
+      ]
+    },
+    {
+      "id": "book-repeat",
+      "description": "Synthetic book waypoints; offset=0.1; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "book"
+      ],
+      "points": [
+        [
+          4.68,
+          1.95,
+          0
+        ],
+        [
+          8.06,
+          0.04,
+          70
+        ],
+        [
+          7.31,
+          0.95,
+          140
+        ]
+      ]
+    },
+    {
+      "id": "to-too-ambiguous",
+      "description": "Synthetic to waypoints; offset=0.0; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "to",
+        "too"
+      ],
+      "points": [
+        [
+          4.0,
+          0.0,
+          0
+        ],
+        [
+          8.0,
+          0.0,
+          70
+        ]
+      ]
+    },
+    {
+      "id": "of-off-ambiguous",
+      "description": "Synthetic off waypoints; offset=0.0; pause=False; not recorded handwriting",
+      "expected_ids": [
+        "of",
+        "off"
+      ],
+      "points": [
+        [
+          8.0,
+          0.0,
+          0
+        ],
+        [
+          3.25,
+          1.0,
+          70
+        ]
+      ]
+    },
+    {
+      "id": "tap",
+      "description": "Single point must not trigger word candidates",
+      "expected_ids": [],
+      "points": [
+        [
+          4.25,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "stationary",
+      "description": "Stationary long hold is not a glide",
+      "expected_ids": [],
+      "points": [
+        [
+          4.25,
+          1,
+          0
+        ],
+        [
+          4.25,
+          1,
+          350
+        ]
+      ]
+    },
+    {
+      "id": "short-motion",
+      "description": "Small movement below 0.75 key-unit path threshold",
+      "expected_ids": [],
+      "points": [
+        [
+          4.25,
+          1,
+          0
+        ],
+        [
+          4.35,
+          1.1,
+          30
+        ]
+      ]
+    },
+    {
+      "id": "outside",
+      "description": "Trace far outside keyboard must be rejected",
+      "expected_ids": [],
+      "points": [
+        [
+          30,
+          30,
+          0
+        ],
+        [
+          40,
+          40,
+          100
+        ]
+      ]
+    }
+  ]
+}

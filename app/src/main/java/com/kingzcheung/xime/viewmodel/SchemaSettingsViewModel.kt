@@ -54,6 +54,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
         // 在 IO 线程读盘（discoverSchemas/getEnabledSchemas 扫描文件），避免 ON_RESUME 在主线程卡顿
         viewModelScope.launch {
             val (allSchemas, enabledSchemas, currentSchema) = withContext(Dispatchers.IO) {
+                if (!KeysConfigHelper.hasLoadedLayoutBindings) KeysConfigHelper.loadConfig(context)
                 Triple(
                     SchemaManager.discoverSchemas(context),
                     SchemaManager.getEnabledSchemas(context),
@@ -91,7 +92,10 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun selectSchema(schema: SchemaMeta) {
-        if (_uiState.value.currentSchema == schema.schemaId) return
+        if (_uiState.value.currentSchema == schema.schemaId) {
+            com.kingzcheung.xime.settings.InputModes.selectProfile(context, schema.toSchemaInfo())
+            return
+        }
         val previous = _uiState.value.currentSchema
         SettingsPreferences.setCurrentSchema(context, schema.schemaId)
         _uiState.update { it.copy(currentSchema = schema.schemaId) }
@@ -101,6 +105,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                 // 部署/编译进行中 switchSchema 不阻塞返回 false，避免主线程等待
                 val switched = RimeEngine.getInstance().switchSchema(schema.schemaId)
                 if (switched) {
+                    com.kingzcheung.xime.settings.InputModes.selectProfile(context, schema.toSchemaInfo())
                     showToast("已切换到${schema.name}")
                 } else {
                     rollbackSchemaSelection(previous)
@@ -110,6 +115,8 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                 rollbackSchemaSelection(previous)
                 showToast("请点击「部署」按钮")
             }
+        } else {
+            com.kingzcheung.xime.settings.InputModes.selectProfile(context, schema.toSchemaInfo())
         }
     }
 

@@ -34,6 +34,9 @@ interface ClipboardDao {
     @Query("UPDATE clipboard_entries SET timestamp = :timestamp WHERE id = :id")
     suspend fun updateTimestamp(id: Long, timestamp: Long)
 
+    @Query("UPDATE clipboard_entries SET isPinned = :pinned WHERE id = :id AND isQuickSend = 0")
+    suspend fun setClipboardPinned(id: Long, pinned: Boolean)
+
     // 再次复制是新的用户动作，同一条历史记录也应重新出现在预览栏。
     @Query("UPDATE clipboard_entries SET timestamp = :timestamp, consumed = 0 WHERE id = :id AND isQuickSend = 0")
     suspend fun refreshCopiedItem(id: Long, timestamp: Long)

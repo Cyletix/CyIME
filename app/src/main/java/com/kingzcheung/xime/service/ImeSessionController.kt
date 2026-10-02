@@ -323,7 +323,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             val allSchemas = SchemaManager.discoverSchemas(context)
             val schemas = allSchemas
                 .filter { meta -> meta.schemaId in enabledIds &&
-                    com.kingzcheung.xime.settings.InputLanguage.forSchema(meta.schemaId) in enabledLanguages &&
+                    meta.language in enabledLanguages &&
                     SchemaManager.isSchemaCompiled(context, meta.schemaId) }
                 .map { meta ->
                     com.kingzcheung.xime.settings.SchemaInfo(
@@ -332,7 +332,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
                         version = meta.version,
                         author = meta.author,
                         description = meta.description,
-                        isDownloaded = true
+                        isDownloaded = true,
+                        language = meta.language,
+                        scheme = meta.scheme,
                     )
                 }
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.update
 
 data class ThemeUiState(
     val darkMode: Int = 1,
-    val colorTheme: String = "soft_blue",
+    val colorTheme: String = SettingsPreferences.defaultKeyboardTheme,
     val colorThemes: List<KeyboardColorScheme> = KeyboardThemes.themes,
 )
 

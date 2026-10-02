@@ -64,13 +64,19 @@ internal fun KeyboardKeySpacingScope(
             rows = rows,
             verticalInsetDp = verticalInset.value,
             allowShrink = allowShrink,
+        ).withAppliedGutter(
+            availableWidthDp = maxWidth.value,
+            columns = columns,
+            horizontalInsetDp = horizontalInset.value,
+            applyGutter = applyGutter,
+            widthFraction = widthFraction,
         )
         CompositionLocalProvider(
             LocalKeyboardKeyVisualMetrics provides metrics,
             LocalKeyboardKeyContentScale provides KeyboardKeyMetrics.contentScale(metrics.capShortEdge, metrics.capShortEdge),
         ) {
             // 调用方声明的 horizontalInset 只作为 gutter 下限（历史参数：曾经只是公式预留）
-            val gutter = if (applyGutter) maxOf(metrics.gutterX, horizontalInset.value) else 0f
+            val gutter = metrics.gutterX
             content(Modifier.fillMaxSize().padding(start = gutter.dp, end = gutter.dp))
         }
     }

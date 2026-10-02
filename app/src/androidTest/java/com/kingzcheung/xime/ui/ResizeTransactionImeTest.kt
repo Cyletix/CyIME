@@ -149,6 +149,35 @@ class ResizeTransactionImeTest {
         rule.chooseModeThroughLanguageAndPanel(id)
     }
 
+    @Test fun dockingPreviewsZeroTransparencyAndCancelRestoresFloatingOpacity() {
+        chooseMode(InputModes.ENGLISH)
+        rule.onNodeWithContentDescription("键盘调节").performClick()
+        rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()
+        rule.onNodeWithTag("keyboard-opacity-slider", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(0.6f) }
+        rule.onNodeWithContentDescription("确认").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("keyboard-resize-frame", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        assertTrue(SettingsPreferences.isFloatingMode(context, landscape))
+        assertEquals(0.4f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
+
+        rule.onNodeWithContentDescription("键盘调节").performClick()
+        rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()
+        rule.onNodeWithText("透明度 0%").assertIsDisplayed()
+        assertEquals("Preview must not persist before confirmation", 0.4f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
+        shell("input keyevent KEYCODE_BACK")
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("keyboard-resize-frame", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        assertTrue(SettingsPreferences.isFloatingMode(context, landscape))
+        assertEquals(0.4f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
+
+        rule.onNodeWithContentDescription("键盘调节").performClick()
+        rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()
+        rule.onNodeWithText("透明度 0%").assertIsDisplayed()
+        rule.onNodeWithContentDescription("确认").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("keyboard-resize-frame", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        assertFalse(SettingsPreferences.isFloatingMode(context, landscape))
+        assertEquals(1f, SettingsPreferences.getKeyboardOpacity(context), 0f)
+    }
+
     @Test fun cancelRestoresSplitAndSavedGeometryAfterLivePreview() {
         chooseMode(InputModes.ENGLISH)
         rule.onNodeWithContentDescription("键盘调节").performClick()

@@ -19,10 +19,8 @@ data class PinyinEditSession(
 }
 
 internal object PinyinEditBuffer {
-    fun supports(schema: String): Boolean = schema in setOf(
-        "t9_pinyin", "pinyin_14jian", "rime_ice", "double_pinyin_flypy",
-        "luna_pinyin", "luna_pinyin_simp", "pinyin_simp",
-    ) || schema.startsWith("double_pinyin") || com.kingzcheung.xime.settings.CustomKeyboardLayouts.isCustom(schema)
+    fun supports(schema: String): Boolean =
+        com.kingzcheung.xime.settings.InputProfiles.describe(schema).capabilities.editablePinyin
 
     fun normalizedT9(text: String): String = text.lowercase().replace('ü', 'v')
         .replace(' ', '\'').filter { it in 'a'..'z' || it in '2'..'9' || it == '\'' }

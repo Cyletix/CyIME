@@ -179,7 +179,7 @@ object ModelManager {
         val completionBeforeRequest = guard.completionRevision
         // 自动准备与市场点击同一模型时串行；仅合并排队期间已完成的同版本下载。
         downloadLocks.getOrPut(model.id) { Mutex() }.withLock {
-            if (onlyIfDefaultPending && DefaultModelInstaller.isHandled(context, model.id)) {
+            if (onlyIfDefaultPending && !DefaultModelInstaller.isPendingDefault(context, model.id)) {
                 onProgress(ModelDownloadState.Idle)
                 return@withLock
             }
@@ -201,7 +201,7 @@ object ModelManager {
                     onProgress(state)
                 }, version, install = { staging, destination ->
                     guard.install(generation, staging, destination,
-                        isStillRequested = { !onlyIfDefaultPending || !DefaultModelInstaller.isHandled(context, model.id) }) {
+                        isStillRequested = { !onlyIfDefaultPending || DefaultModelInstaller.isPendingDefault(context, model.id) }) {
                         if (target != null) MarketVersionStore.setModelVersion(context, model.id, target.version)
                     }
                 })

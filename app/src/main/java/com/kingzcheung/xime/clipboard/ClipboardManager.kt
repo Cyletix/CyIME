@@ -44,6 +44,7 @@ class ClipboardManager private constructor(private val context: Context) {
         private const val PREFS_NAME = "clipboard_prefs"
         private const val KEY_CLIPBOARD_ITEMS = "clipboard_items"
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
+        private const val INTERNAL_IMAGE_CLIP_LABEL = "cyime_image"
 
         @Volatile
         private var instance: ClipboardManager? = null
@@ -57,6 +58,8 @@ class ClipboardManager private constructor(private val context: Context) {
 
     private val androidClipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as AndroidClipboardManager
     private var lastSmsClipTimestamp = -1L
+    val images = ClipboardImages.getInstance(context)
+    private var lastImageClipTimestamp = -1L
 
     private val clipboardListener = AndroidClipboardManager.OnPrimaryClipChangedListener {
         readClipboard()
@@ -67,6 +70,24 @@ class ClipboardManager private constructor(private val context: Context) {
             val clipData = androidClipboardManager.primaryClip
             if (clipData != null && clipData.itemCount > 0) {
                 val item = clipData.getItemAt(0)
+                val imageMime = (0 until clipData.description.mimeTypeCount).map { clipData.description.getMimeType(it) }
+                    .firstOrNull { it.startsWith("image/") }
+                val imageUri = item.uri?.takeIf { uri ->
+                    imageMime != null || runCatching { context.contentResolver.getType(uri)?.startsWith("image/") == true }.getOrDefault(false)
+                }
+                if (imageUri != null) {
+                    // 图片粘贴失败时写入系统剪贴板是兼容回退，不是用户新复制。
+                    if (clipData.description.label == INTERNAL_IMAGE_CLIP_LABEL) {
+                        images.dismissPreview()
+                        return
+                    }
+                    if (lastImageClipTimestamp != clipData.description.timestamp) {
+                        lastImageClipTimestamp = clipData.description.timestamp
+                        images.capture(imageUri, clipData.description.timestamp, imageMime ?: "image/png")
+                    }
+                    return
+                }
+                images.dismissPreview()
                 val text = when {
                     item.text != null -> item.text.toString()
                     item.uri != null -> item.uri.toString()
@@ -113,9 +134,10 @@ class ClipboardManager private constructor(private val context: Context) {
     val verificationCode: StateFlow<ClipboardItem?> = _verificationCode.asStateFlow()
 
     fun refreshClipboard() {
+        images.refresh()
         val clip = androidClipboardManager.primaryClip ?: return
         if (clip.itemCount == 0) return
-        if (clip.description.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
+        if (clip.description.hasMimeType("image/*") || clip.description.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
             (System.currentTimeMillis() - clip.description.timestamp < 30_000 &&
                 _clipboardItems.value.none { it.text == clip.getItemAt(0).text?.toString() })
         ) readClipboard(retries = 0)
@@ -331,6 +353,10 @@ class ClipboardManager private constructor(private val context: Context) {
         }
     }
 
+    fun setClipboardPinned(id: Long, pinned: Boolean) {
+        scope.launch { dao.setClipboardPinned(id, pinned) }
+    }
+
     fun updateQuickSendItem(id: Long, newText: String, newCode: String = ""): Boolean {
         if (newText.isBlank()) return false
         val index = _quickSendItems.value.indexOfFirst { it.id == id }
@@ -351,6 +377,10 @@ class ClipboardManager private constructor(private val context: Context) {
     fun copyToSystemClipboard(text: String) {
         val clip = ClipData.newPlainText("kime_clipboard", text)
         androidClipboardManager.setPrimaryClip(clip)
+    }
+
+    fun copyImageUriToSystemClipboard(image: ClipboardImage) {
+        androidClipboardManager.setPrimaryClip(ClipData(INTERNAL_IMAGE_CLIP_LABEL, arrayOf(image.mimeType), ClipData.Item(Uri.parse(image.uri))))
     }
 
     fun getCurrentClipboardText(): String? {

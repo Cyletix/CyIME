@@ -1,0 +1,10 @@
+diff --git a/src/rime/dict/user_dictionary.cc b/src/rime/dict/user_dictionary.cc
+--- a/src/rime/dict/user_dictionary.cc
++++ b/src/rime/dict/user_dictionary.cc
+@@ -371,3 +371,6 @@
+                                    size_t limit,
+                                    string* resume_key) {
++  // T9 accepts host commits through another UserDictionary sharing this DB.
++  // Refresh ranking time without reloading or invalidating decoded caches.
++  FetchTickCount();
+   TickCount present_tick = tick_ + 1;

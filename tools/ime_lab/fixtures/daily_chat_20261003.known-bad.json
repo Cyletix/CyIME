@@ -1,0 +1,307 @@
+{
+  "format_version": 1,
+  "fixture_sha256": "c328b224b818c861d8f3ca86d52f3cb146bafaaed338639f836e74dc61049924",
+  "review_source": ".codex-artifacts/t9-chat-20261003/semantic-review-continuous.json",
+  "review_source_sha256": "00cc2d598fe35e2f29320b2e1530a7eea99c86643f142826c4c2383e8be5c472",
+  "reviewed_replay_sha256": "bc851db8064027243ab5f3805088bbc1b84463711f72ac90b498027c3f6e118b",
+  "scope": "Exact first-candidate assertions imported from the manually reviewed clear_unnatural continuous-mode events. This is a conservative subset, not a general language classifier. Other text at the same event remains unreviewed.",
+  "assertions": [
+    {
+      "id": "c012",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "548342622662694664949426496548946453",
+      "variant": "digits",
+      "bad_first": "九点半南中医掌握就行了",
+      "reason": "九点半、南中医、掌握、就行了的组合缺少正常语义连接；南中医本身不是乱码。"
+    },
+    {
+      "id": "c012",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "548342622662694664949426496548946453",
+      "variant": "digits",
+      "bad_first": "九点半南中医掌握就行了",
+      "reason": "九点半、南中医、掌握、就行了的组合缺少正常语义连接；南中医本身不是乱码。"
+    },
+    {
+      "id": "c013",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "32652438787484289426",
+      "variant": "digits",
+      "bad_first": "到来读取睡不着",
+      "reason": "到来读取睡不着为明显词语拼接；停顿精排后才恢复目标。"
+    },
+    {
+      "id": "c016",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "96626946642653982426",
+      "variant": "digits",
+      "bad_first": "我蛮新年了无边",
+      "reason": "我蛮新年了无边和我脑中伯乐无边均为明显失去正常搭配的拼接。"
+    },
+    {
+      "id": "c016",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "96626946642653982426",
+      "variant": "digits",
+      "bad_first": "我脑中伯乐无边",
+      "reason": "我蛮新年了无边和我脑中伯乐无边均为明显失去正常搭配的拼接。"
+    },
+    {
+      "id": "c034",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "92462432652438785486254542",
+      "variant": "digits",
+      "bad_first": "外卖到来读取就那几家",
+      "reason": "外卖到来读取就那几家中读取与前后成分没有正常搭配关系。"
+    },
+    {
+      "id": "c034",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "92462432652438785486254542",
+      "variant": "digits",
+      "bad_first": "外卖到来读取就那几家",
+      "reason": "外卖到来读取就那几家中读取与前后成分没有正常搭配关系。"
+    },
+    {
+      "id": "c044",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "646294264242698692653",
+      "variant": "digits",
+      "bad_first": "密码相比奥运完了",
+      "reason": "密码相比奥运完了为名词和谓语失配的拼接。"
+    },
+    {
+      "id": "c044",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "646294264242698692653",
+      "variant": "digits",
+      "bad_first": "密码相比奥运完了",
+      "reason": "密码相比奥运完了为名词和谓语失配的拼接。"
+    },
+    {
+      "id": "c049",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "7436498446854264543",
+      "variant": "digits",
+      "bad_first": "生最后讲解",
+      "reason": "生最后讲解缺少可成立的正常句法和词语关系。"
+    },
+    {
+      "id": "c049",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "7436498446854264543",
+      "variant": "digits",
+      "bad_first": "生最后讲解",
+      "reason": "生最后讲解缺少可成立的正常句法和词语关系。"
+    },
+    {
+      "id": "c054",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "23454643266426532264394664868",
+      "variant": "digits",
+      "bad_first": "背景反面了半个钟头",
+      "reason": "背景反面了半个钟头中反面与持续时间的谓语关系不成立；停顿后恢复目标。"
+    },
+    {
+      "id": "c061",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "96325362662694726",
+      "variant": "digits",
+      "bad_first": "我发了慢慢自然",
+      "reason": "我发了慢慢自然的动宾和状语组合明显不成立。"
+    },
+    {
+      "id": "c061",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "96325362662694726",
+      "variant": "digits",
+      "bad_first": "我发了慢慢自然",
+      "reason": "我发了慢慢自然的动宾和状语组合明显不成立。"
+    },
+    {
+      "id": "c064",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "984468424744926539266426",
+      "variant": "digits",
+      "bad_first": "最后还试验了早年",
+      "reason": "试验了早年和万科晚年在当前完整候选中均为明显不合理的词语拼接。"
+    },
+    {
+      "id": "c064",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "984468424744926539266426",
+      "variant": "digits",
+      "bad_first": "最后该是万科晚年",
+      "reason": "试验了早年和万科晚年在当前完整候选中均为明显不合理的词语拼接。"
+    },
+    {
+      "id": "c069",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "98692674827447467482326943426226",
+      "variant": "digits",
+      "bad_first": "尊严其他视频刷到一点半",
+      "reason": "尊严其他视频刷到一点半开头的尊严其他视频为明显不成立的名词拼接。"
+    },
+    {
+      "id": "c074",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "92674842474236874264",
+      "variant": "digits",
+      "bad_first": "要求还啥都强",
+      "reason": "要求还啥都强的词语连接明显不成立。"
+    },
+    {
+      "id": "c074",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "92674842474236874264",
+      "variant": "digits",
+      "bad_first": "要求还啥都强",
+      "reason": "要求还啥都强的词语连接明显不成立。"
+    },
+    {
+      "id": "c082",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "524537474433694664",
+      "variant": "digits",
+      "bad_first": "来客其实分钟",
+      "reason": "来客其实分钟中其实和分钟缺少可成立的谓语关系。"
+    },
+    {
+      "id": "c082",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "524537474433694664",
+      "variant": "digits",
+      "bad_first": "来客其实分钟",
+      "reason": "来客其实分钟中其实和分钟缺少可成立的谓语关系。"
+    },
+    {
+      "id": "c092",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "629439468968243942649486342694222653",
+      "variant": "digits",
+      "bad_first": "那些一幕有车想准点下班了",
+      "reason": "那些一幕有车想准点下班了中的量词及主谓连接错乱。"
+    },
+    {
+      "id": "c092",
+      "mode": "continuous",
+      "stage": "clause_settled",
+      "keys": "629439468968243942649486342694222653",
+      "variant": "digits",
+      "bad_first": "那些一幕有车想准点下班了",
+      "reason": "那些一幕有车想准点下班了中的量词及主谓连接错乱。"
+    },
+    {
+      "id": "c013",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "3265243878",
+      "variant": "digits",
+      "bad_first": "到来读取",
+      "reason": "到来读取为无正常关系的词语拼接。"
+    },
+    {
+      "id": "c013",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "32652438787484",
+      "variant": "digits",
+      "bad_first": "到来读取水",
+      "reason": "到来读取水不能形成当前口语中的正常搭配。"
+    },
+    {
+      "id": "c013",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "32652438787484289",
+      "variant": "digits",
+      "bad_first": "到来读取睡不着",
+      "reason": "到来读取睡不着明显不成立。"
+    },
+    {
+      "id": "c031",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "7448264424744342",
+      "variant": "digits",
+      "bad_first": "食堂该市地处",
+      "reason": "食堂该市地处为多个不相连的句法片段拼接。"
+    },
+    {
+      "id": "c054",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "234546432664265322643",
+      "variant": "digits",
+      "bad_first": "背景反面了半个",
+      "reason": "背景反面了半个缺少可成立的谓语关系。"
+    },
+    {
+      "id": "c054",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "23454643266426532264394",
+      "variant": "digits",
+      "bad_first": "北京悼念可饱和以",
+      "reason": "北京悼念可饱和以的词语搭配明显错乱。"
+    },
+    {
+      "id": "c054",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "234546432664265322643946",
+      "variant": "digits",
+      "bad_first": "北京悼念科班核心",
+      "reason": "北京悼念科班核心明显词语拼接。"
+    },
+    {
+      "id": "c054",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "2345464326642653226439466",
+      "variant": "digits",
+      "bad_first": "北京悼念可饱和一抹",
+      "reason": "北京悼念可饱和一抹明显词语拼接。"
+    },
+    {
+      "id": "c054",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "234546432664265322643946648",
+      "variant": "digits",
+      "bad_first": "背景反面了半个钟头",
+      "reason": "背景反面了半个钟头明显不成立。"
+    },
+    {
+      "id": "c054",
+      "mode": "continuous",
+      "stage": "key_immediate",
+      "keys": "2345464326642653226439466486",
+      "variant": "digits",
+      "bad_first": "背景反面了半个中国",
+      "reason": "背景反面了半个中国明显不成立。"
+    }
+  ]
+}

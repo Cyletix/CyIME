@@ -4,6 +4,7 @@ import android.content.Context
 import com.kingzcheung.xime.model.ModelCategory
 import com.kingzcheung.xime.model.ModelManager
 import com.kingzcheung.xime.model.ModelStorage
+import com.kingzcheung.xime.settings.InputLanguage
 import java.io.File
 
 /**
@@ -78,16 +79,21 @@ class AsrModelManager(private val context: Context) {
     data class Selection(
         val mode: String,
         val first: AsrModelInfo?, val firstDir: File?, val secondDir: File?,
+        val recognitionLanguage: String = "auto",
     ) {
         val ready: Boolean get() = (first == null || firstDir != null && first.files.isNotEmpty() && first.files.all { File(firstDir, it).let { f -> f.isFile && f.length() > 0 } }) &&
             (secondDir == null || listOf("model.int8.onnx", "tokens.txt").all { File(secondDir, it).let { f -> f.isFile && f.length() > 0 } })
-        val key: String get() = listOfNotNull(firstDir, secondDir).joinToString(prefix = "$mode:") { dir ->
+        val key: String get() = listOfNotNull(firstDir, secondDir).joinToString(prefix = "$mode:$recognitionLanguage:") { dir ->
             dir.absolutePath + ":" + dir.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }
                 .joinToString { "${it.name}:${it.length()}:${it.lastModified()}" }
         }
     }
 
-    fun selection(mode: String = getSelectedModelId()): Selection {
+    fun selection(mode: String = getSelectedModelId(), language: InputLanguage? = null): Selection {
+        if (language != null) require(SpeechLanguages.supports(mode, language)) {
+            "所选模型不支持${language.displayName}语音"
+        }
+        val languageId = language?.id ?: "auto"
         fun dir(id: String): File {
             ModelStorage.migrateLegacyForModel(context, id)
             return ModelStorage.getModelDir(context, id)
@@ -98,17 +104,25 @@ class AsrModelManager(private val context: Context) {
             else -> null
         }
         if (firstId != null) return Selection(mode,
-            getAsrModels().first { it.id == firstId }, dir(firstId), dir(SpeechModelCatalog.SENSEVOICE))
+            getAsrModels().first { it.id == firstId }, dir(firstId), dir(SpeechModelCatalog.SENSEVOICE), languageId)
         val info = getAsrModels().firstOrNull { it.id == mode } ?: error("不支持的语音模型：$mode")
-        return if (info.modelType == "sensevoice") Selection(mode, null, null, dir(mode))
-        else Selection(mode, info, dir(mode), null)
+        return if (info.modelType == "sensevoice") Selection(mode, null, null, dir(mode), languageId)
+        else Selection(mode, info, dir(mode), null, languageId)
+    }
+
+    /** Called on the speech worker: model file checks/migration never enter the key path. */
+    fun selectionForLanguage(language: InputLanguage): Selection {
+        val mode = SpeechLanguages.select(language, getSelectedModelId()) { selection(it, language).ready }
+        return selection(mode, language)
     }
 
     private val preferences get() = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
 
     /** Persist the complete selection as one value, also passed explicitly to the :asr process. */
-    fun getSelectedModelId(): String =
-        preferences.getString("selected_model", SpeechModelCatalog.ZIPFORMER) ?: SpeechModelCatalog.ZIPFORMER
+    fun getSelectedModelId(): String {
+        val initial = com.kingzcheung.xime.model.DeviceDefaults.voiceModel(context)
+        return preferences.getString("selected_model", initial) ?: initial
+    }
 
     fun getFirstPassModelId(): String = SpeechModelSelection.primary(getSelectedModelId())
 

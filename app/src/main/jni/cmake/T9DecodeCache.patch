@@ -1,0 +1,47 @@
+diff --git a/src/rime/gear/script_translator.h b/src/rime/gear/script_translator.h
+--- a/src/rime/gear/script_translator.h
++++ b/src/rime/gear/script_translator.h
+@@ -24,6 +24,7 @@
+ class Dictionary;
+ struct SyllableGraph;
+ class UserDictionary;
++struct T9JointCache;
+ 
+ // T9（九键）快速输入的增量 compose 缓存（每个 translator 实例一份）。
+ // 仅对「单段起点 + 编码串严格追加 + 纪元/词典版本未变」的查询生效，
+@@ -72,6 +73,9 @@
+                                       const Segment& seg) override;
+ 
++  // Lifetime-bound cache of detached T9 paths; defined in the generated TU.
++  an<T9JointCache> t9_joint_cache;
++
+   string FormatPreedit(const string& preedit);
+   string Spell(const Code& code);
+   string GetPrecedingText(size_t start) const;
+diff --git a/src/rime/dict/user_dictionary.cc b/src/rime/dict/user_dictionary.cc
+--- a/src/rime/dict/user_dictionary.cc
++++ b/src/rime/dict/user_dictionary.cc
+@@ -22,3 +22,4 @@
+ #include <rime/dict/user_dictionary.h>
+ #include <rime/dict/vocabulary.h>
++#include <t9_decode_cache.h>
+ 
+@@ -170,2 +171,3 @@
+ bool UserDictionary::Load() {
++  T9InvalidateUserDictionary();
+   if (!db_ || db_->disabled())
+@@ -433,4 +435,5 @@
+ bool UserDictionary::UpdateEntry(const DictEntry& entry,
+                                  int commits,
+                                  const string& new_entry_prefix) {
++  T9InvalidateUserDictionary();
+   string code_str(entry.custom_code);
+@@ -467,2 +470,3 @@
+ bool UserDictionary::UpdateTickCount(TickCount increment) {
++  T9InvalidateUserDictionary();
+   tick_ += increment;
+@@ -508,3 +512,4 @@
+     return false;
++  T9InvalidateUserDictionary();
+   return db->AbortTransaction();
+ }

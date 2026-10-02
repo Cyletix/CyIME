@@ -2,20 +2,7 @@ package com.kingzcheung.xime.settings
 
 import android.content.Context
 
-/** Language membership is independent of layout or encoding (e.g. 双拼 is Chinese). */
-enum class InputLanguage(val id: String, val displayName: String) {
-    CHINESE("zh", "中文"), JAPANESE("ja", "日语"), ENGLISH("en", "英文");
-
-    companion object {
-        fun forSchema(id: String): InputLanguage = when {
-            id == InputModes.ENGLISH -> ENGLISH
-            id == "jaroomaji" || id == "japanese" || id.startsWith("japanese_") -> JAPANESE
-            else -> CHINESE
-        }
-    }
-}
-
-/** 英文始终存在；排序独立于方案的启用与部署，不改变市场方案。 */
+/** Legacy backend-entry ordering/storage. Product semantics live in [InputProfile]. */
 object InputModes {
     const val ENGLISH = "__xime_english"
     const val ORDER_KEY = "input_mode_order"
@@ -23,7 +10,7 @@ object InputModes {
     val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH, QwjrtkLayout.ID)
 
     fun languageOrder(ids: List<String>): List<InputLanguage> =
-        (ids.mapNotNull { id -> InputLanguage.entries.firstOrNull { it.id == id } } + InputLanguage.entries).distinct()
+        (ids.mapNotNull { id -> InputLanguage.supported.firstOrNull { it.id == id } } + InputLanguage.supported).distinct()
 
     fun languageOrder(context: Context): List<InputLanguage> = languageOrder(
         SettingsPreferences.getPrefsPublic(context).getString(LANGUAGE_ORDER_KEY, "").orEmpty().lines())
@@ -82,24 +69,42 @@ object InputModes {
 
     /** One entry per language, pointing to that language's last available mode. */
     fun languageChoices(schemas: List<SchemaInfo>, currentModeId: String,
-        remembered: Map<InputLanguage, String>, languageOrder: List<InputLanguage> = InputLanguage.entries): List<SchemaInfo> {
+        remembered: Map<InputLanguage, String>, languageOrder: List<InputLanguage> = InputLanguage.entries,
+        selectedProfiles: Map<InputLanguage, String> = emptyMap()): List<SchemaInfo> {
         val modes = available(schemas)
-        return languageOrder.distinct().mapNotNull { language ->
+        val order = languageOrder + if (modes.any { it.language == InputLanguage.UNSPECIFIED })
+            listOf(InputLanguage.UNSPECIFIED) else emptyList()
+        return order.distinct().mapNotNull { language ->
             val group = modes.filter { it.language == language }
-            val chosen = group.firstOrNull { it.schemaId == currentModeId }
+            val chosen = group.firstOrNull { it.schemaId == selectedProfiles[language] }
+                ?: group.firstOrNull { it.schemaId == currentModeId }
                 ?: group.firstOrNull { it.schemaId == remembered[language] }
                 ?: group.firstOrNull()
             chosen?.copy(name = language.displayName)
         }
     }
 
+    fun selectedProfiles(context: Context): Map<InputLanguage, String> {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        return InputLanguage.entries.mapNotNull { language ->
+            prefs.getString("selected_input_profile_${language.id}", null)?.let { language to it }
+        }.toMap()
+    }
+
     fun rememberedModes(context: Context, schemas: List<SchemaInfo> = emptyList()): Map<InputLanguage, String> {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val previous = SettingsPreferences.getCurrentSchema(context)
         return InputLanguage.entries.associateWith { language ->
-            prefs.getString("last_input_mode_${language.id}", null)
+            prefs.getString("selected_input_profile_${language.id}", null)
+                ?: prefs.getString("last_input_mode_${language.id}", null)
                 ?: previous.takeIf { languageOf(it, schemas) == language }.orEmpty()
         }
+    }
+
+    /** Explicit product choice; passive session persistence must not overwrite this selection. */
+    fun selectProfile(context: Context, entry: SchemaInfo) {
+        SettingsPreferences.getPrefsPublic(context).edit()
+            .putString("selected_input_profile_${entry.profile.language.id}", entry.schemaId).apply()
     }
 
     fun rememberMode(context: Context, schemaId: String, language: InputLanguage = languageOf(schemaId)) {

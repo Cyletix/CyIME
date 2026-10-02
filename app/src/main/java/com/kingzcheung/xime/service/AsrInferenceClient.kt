@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import com.kingzcheung.xime.util.FileLogger
+import com.kingzcheung.xime.settings.InputLanguage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.CountDownLatch
@@ -101,10 +102,11 @@ class AsrInferenceClient(private val context: Context) {
         return service ?: throw IllegalStateException("AsrInferenceService not bound")
     }
 
-    suspend fun startAsr(modelId: String, callback: AsrCallback): Boolean = withContext(Dispatchers.IO) {
+    suspend fun startAsr(modelId: String, callback: AsrCallback, language: InputLanguage? = null): Boolean = withContext(Dispatchers.IO) {
         try {
             val token = callbackGeneration.incrementAndGet()
-            requireService().startAsr(modelId, callbackStub(callback, token))
+            if (language == null) requireService().startAsr(modelId, callbackStub(callback, token))
+            else requireService().startAsrForLanguage(modelId, language.id, callbackStub(callback, token))
         } catch (e: Exception) {
             FileLogger.e(TAG, "startAsr failed", e)
             callbackGeneration.incrementAndGet()

@@ -45,7 +45,7 @@ class MicrophoneReleaseTest {
         assumeTrue("Do not interrupt another app's recording or call", idle() && audio.mode == AudioManager.MODE_NORMAL)
         val keep = SettingsPreferences.isSttKeepEngineAlive(context)
         SettingsPreferences.setSttKeepEngineAlive(context, true)
-        val manager = SpeechRecognitionManager(context) { backend }
+        val manager = SpeechRecognitionManager(context, backendFactory = { backend })
         try { run(manager, backend) }
         finally {
             ui { manager.release() }

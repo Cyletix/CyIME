@@ -3,6 +3,7 @@ package com.kingzcheung.xime.speech
 import android.content.Context
 import com.kingzcheung.xime.service.AsrInferenceClient
 import com.kingzcheung.xime.util.FileLogger
+import com.kingzcheung.xime.settings.InputLanguage
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -83,21 +84,18 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
         }
     }
 
-    override fun start(): Boolean {
+    override fun start(): Boolean = start(InputLanguage.CHINESE)
+
+    override fun start(language: InputLanguage): Boolean {
         if (!initialized) return false
         sessionGeneration.incrementAndGet()
         return try {
             val modelManager = AsrModelManager(context)
-            if (!modelManager.isModelReady()) {
-                FileLogger.e(TAG, "ASR model not downloaded")
-                errorCallback?.invoke("离线语音模型未下载，请在设置中先下载")
-                return false
-            }
+            val selection = modelManager.selectionForLanguage(language)
             // 每次会话开始都重新 startAsr：服务端会重置语音会话并重设回调，
             // 否则 preload 预热时 stop() 清空的 callback 会导致 partial 结果丢失
             syncKeepAlive()
-            val modelId = modelManager.getSelectedModelId()
-            runBlocking { client.startAsr(modelId, asrCallback) }
+            runBlocking { client.startAsr(selection.mode, asrCallback, language) }
         } catch (e: InterruptedException) {
             // 快速取消竞态：stopRecognition/cancelRecognition 会 interrupt 录音线程，
             // 中断正好落在等待 :asr 绑定/模型加载的 runBlocking 上——属正常取消，不算错误，
@@ -107,6 +105,7 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
             false
         } catch (e: Exception) {
             FileLogger.e(TAG, "start failed", e)
+            errorCallback?.invoke(e.message ?: "离线语音启动失败")
             false
         }
     }

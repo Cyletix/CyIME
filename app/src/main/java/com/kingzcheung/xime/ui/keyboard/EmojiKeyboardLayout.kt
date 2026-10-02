@@ -68,6 +68,33 @@ fun EmojiKeyboardLayout(
     accentColor: Color,
     bottomPaddingDp: Int = 0,
     modifier: Modifier = Modifier,
+    onHapticFeedback: (() -> Unit)? = null,
+) {
+    var faces by remember { mutableStateOf(false) }
+    Column(modifier.fillMaxSize().background(backgroundColor)) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolTab("Emoji", !faces, { faces = false }, Modifier.testTag("expression-emoji"))
+            ToolTab("顔文字", faces, { faces = true }, Modifier.testTag("expression-kaomoji"))
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (faces) KaomojiKeyboard(onEmojiSelect, Modifier.padding(bottom = bottomPaddingDp.dp))
+            else EmojiContent(onEmojiSelect, onImageEmojiSelect, onBack, backgroundColor, textColor,
+                accentColor, bottomPaddingDp, Modifier.fillMaxSize(), onHapticFeedback)
+        }
+    }
+}
+
+@Composable
+private fun EmojiContent(
+    onEmojiSelect: (String) -> Unit,
+    onImageEmojiSelect: ((String) -> Unit)? = null,
+    onBack: () -> Unit,
+    backgroundColor: Color,
+    textColor: Color,
+    accentColor: Color,
+    bottomPaddingDp: Int = 0,
+    modifier: Modifier = Modifier,
     /** 分类 tab 切换的振动钩子（emoji 点击/删除经 onEmojiSelect 由调用方统一振动）。 */
     onHapticFeedback: (() -> Unit)? = null,
 ) {

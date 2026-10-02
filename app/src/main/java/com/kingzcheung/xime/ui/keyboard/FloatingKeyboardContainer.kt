@@ -91,6 +91,9 @@ internal fun FloatingKeyboardContainer(
     onCardPositioned: (left: Int, top: Int, right: Int, bottom: Int) -> Unit = { _: Int, _: Int, _: Int, _: Int -> },
     fixedWidthDp: Int = 0,
     fixedOffsetX: Int = 0,
+    resolvedWidthDp: Int = 0,
+    aspectLimits: KeyboardAspectLimits = KeyboardAspectLimits.Letters,
+    letterDefaults: LetterKeyboardDefaults? = null,
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -101,7 +104,8 @@ internal fun FloatingKeyboardContainer(
     if (!isFloatingMode) {
         if (previewRect == null) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                val width = resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), fixedWidthDp).dp.coerceAtMost(maxWidth)
+                val width = (resolvedWidthDp.takeIf { it > 0 }
+                    ?: resolvedFixedKeyboardWidth(maxWidth.value.roundToInt(), fixedWidthDp)).dp.coerceAtMost(maxWidth)
                 val travel = ((maxWidth - width) / 2f).value
                 Box(Modifier.align(Alignment.TopCenter)
                     .absoluteOffset(x = fixedOffsetX.toFloat().coerceIn(-travel, travel).dp)
@@ -157,7 +161,7 @@ internal fun FloatingKeyboardContainer(
         // 宿主在悬浮模式下可以是整屏；卡片高度必须来自键盘内容高度，而不是 BoxWithConstraints.maxHeight。
         val normalRect = floatingCardRect(
             maxWidth.value * density.density, maxHeight.value * density.density,
-            maxWidth.value * scaleFactor * density.density,
+            (resolvedWidthDp.takeIf { it > 0 }?.toFloat() ?: (maxWidth.value * scaleFactor)) * density.density,
             (contentHeightDp.coerceAtLeast(1) + FLOATING_DRAG_BAR_HEIGHT_DP) * density.density,
             offsetX * density.density, offsetY * density.density,
             minOffsetY.coerceAtLeast(0) * density.density,
@@ -202,14 +206,22 @@ internal fun FloatingKeyboardContainer(
             val config = LocalConfiguration.current
             val restoredHeight = KeyboardHeightProfiles.fixed(
                 LocalContext.current, config.screenWidthDp > config.screenHeightDp
-            ).toFloat()
+            )
+            val savedDockWidth = com.kingzcheung.xime.settings.SettingsPreferences.getFixedWidthDp(LocalContext.current,
+                config.screenWidthDp > config.screenHeightDp)
+            val dockSize = protectKeyboardSize(maxWidth.value.roundToInt(),
+                savedDockWidth.takeIf { it > 0 } ?: maxWidth.value.roundToInt(), restoredHeight, 0, aspectLimits,
+                customSize = savedDockWidth > 0 || KeyboardHeightProfiles.hasSavedHeight(LocalContext.current,
+                    false, config.screenWidthDp > config.screenHeightDp),
+                letterDefaults = letterDefaults)
             val previewColor = MaterialTheme.colorScheme.primary
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .wrapContentSize(Alignment.BottomCenter, unbounded = true)
-                    .width(maxWidth * (scaleFactor + (1f - scaleFactor) * progress))
-                    .height(restoredHeight.dp)
+                    .width((normalRect.width / density.density +
+                        (dockSize.width - normalRect.width / density.density) * progress).dp)
+                    .height(dockSize.height.dp)
                     .offset(x = (offsetX * (1f - progress)).dp, y = (-minimumY).dp)
                     .background(previewColor.copy(alpha = 0.12f * progress), RoundedCornerShape(16.dp))
                     .border(2.dp, Brush.horizontalGradient(listOf(

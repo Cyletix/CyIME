@@ -8,7 +8,7 @@ engine:
   segmentors: [abc_segmentor]
   translators: [table_translator]
 speller:
-  alphabet: "23456789"
+  alphabet: "0123456789"
   algebra: []
 translator:
   dictionary: cyime_t9_english

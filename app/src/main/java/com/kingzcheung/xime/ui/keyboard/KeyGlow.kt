@@ -28,6 +28,7 @@ import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
 
 internal const val KEY_GLOW_DURATION_MS = 500
+internal const val KEY_CAP_DURATION_MS = 235
 
 private data class GlowSquare(val x: Float, val y: Float, val side: Float, val angle: Float, val spin: Float)
 
@@ -39,38 +40,52 @@ internal fun Modifier.keyGlow(
     particleOffset: androidx.compose.ui.unit.DpOffset = androidx.compose.ui.unit.DpOffset.Zero,
 ): Modifier = composed {
     val paintedCap = cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current, materialLevel)
-    if (!LocalKeyboardInputPreferences.current.keyGlowEnabled) return@composed this.then(paintedCap)
+    val preferences = LocalKeyboardInputPreferences.current
+    val glowEnabled = preferences.keyGlowEnabled
+    val motionEnabled = preferences.keyAnimationEnabled && animateCap
+    if (!glowEnabled && !motionEnabled) return@composed this.then(paintedCap)
     // One coherent colour per press, as in the reference; overlapping squares
     // vary in brightness instead of mixing three unrelated theme colours.
-    var color by remember { mutableStateOf(glowPalette.first()) }
-    val elapsed = remember { Animatable(1f) }
+    var color by remember(glowEnabled, motionEnabled) { mutableStateOf(glowPalette.first()) }
+    val elapsed = remember(glowEnabled, motionEnabled) { Animatable(1f) }
     val scope = rememberCoroutineScope()
-    var animation by remember { mutableStateOf<Job?>(null) }
-    var particles by remember { mutableStateOf(emptyList<GlowSquare>()) }
-    this.pointerInput(Unit) {
+    var animation by remember(glowEnabled, motionEnabled) { mutableStateOf<Job?>(null) }
+    var particles by remember(glowEnabled, motionEnabled) { mutableStateOf(emptyList<GlowSquare>()) }
+    DisposableEffect(glowEnabled, motionEnabled) {
+        onDispose { animation?.cancel() }
+    }
+    val observed = this.pointerInput(glowEnabled, motionEnabled) {
         awaitEachGesture {
             // 只旁观 DOWN，因此同一帧内按下/松开也不会丢失动画；不干扰拂动和长按。
             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             animation?.cancel()
-            color = glowPalette[Random.nextInt(glowPalette.size)]
-            particles = List(4) { index ->
-                GlowSquare(0.2f + (index % 2) * 0.6f + (Random.nextFloat() - 0.5f) * 0.25f,
-                    0.15f + (index / 2) * 0.7f + (Random.nextFloat() - 0.5f) * 0.25f,
-                    0.85f + Random.nextFloat() * 0.50f,
-                    Random.nextFloat() * 60f - 30f, Random.nextFloat() * 100f - 50f)
+            if (glowEnabled) {
+                color = glowPalette[Random.nextInt(glowPalette.size)]
+                particles = List(4) { index ->
+                    GlowSquare(0.2f + (index % 2) * 0.6f + (Random.nextFloat() - 0.5f) * 0.25f,
+                        0.15f + (index / 2) * 0.7f + (Random.nextFloat() - 0.5f) * 0.25f,
+                        0.85f + Random.nextFloat() * 0.50f,
+                        Random.nextFloat() * 60f - 30f, Random.nextFloat() * 100f - 50f)
+                }
             }
             animation = scope.launch {
                 elapsed.snapTo(0f)
                 // This is only the clock. Scale, travel and opacity each have their own
                 // continuous nonlinear curve below; none waits at an intermediate state.
-                elapsed.animateTo(1f, tween(KEY_GLOW_DURATION_MS, easing = LinearEasing))
+                val duration = if (glowEnabled) KEY_GLOW_DURATION_MS else KEY_CAP_DURATION_MS
+                // Keep the original cap curve; motion-only stops its clock after cap recovery.
+                elapsed.animateTo(duration.toFloat() / KEY_GLOW_DURATION_MS, tween(duration, easing = LinearEasing))
             }
         }
-    }.graphicsLayer {
-        val scale = if (animateCap) keyGlowScale(elapsed.value) else 1f
+    }
+    val animatedCap = if (motionEnabled) Modifier.graphicsLayer {
+        val scale = keyGlowScale(elapsed.value)
         scaleX = scale
         scaleY = scale
-    }.then(paintedCap).drawWithCache {
+    } else Modifier
+    val painted = observed.then(animatedCap).then(paintedCap)
+    if (!glowEnabled) return@composed painted
+    painted.drawWithCache {
         // A direction sector owns a disc-sized hit target, but its particles use one key's size.
         val lightSize = particleSize?.let { Size(it.width.toPx(), it.height.toPx()) } ?: size
         val lightOrigin = Offset((size.width - lightSize.width) / 2 + particleOffset.x.toPx(),

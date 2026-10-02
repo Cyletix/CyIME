@@ -13,6 +13,4 @@ internal object QwjrtkLayout {
             base[new]?.let { new to it.copy(swipeUp = base[old]?.swipeUp) }
         }.toMap()
 
-    fun appendToEnabled(enabled: List<String>, available: Set<String>): List<String> =
-        if ("rime_ice" in enabled && ID in available) (enabled + ID).distinct() else enabled
 }

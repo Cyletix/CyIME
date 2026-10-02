@@ -86,7 +86,7 @@ class SettingsSecondaryLayoutGateTest {
             }
         }
         rule.onNodeWithText("按键音效").assertIsDisplayed()
-        rule.onAllNodesWithText("按键光效").assertCountEquals(0)
+        rule.onAllNodesWithText("按键视觉效果").assertCountEquals(0)
         rule.runOnIdle { page.value = 1 }
         rule.onNodeWithText("候选词").assertIsDisplayed()
         rule.onAllNodesWithText("键盘底部样式").assertCountEquals(0)

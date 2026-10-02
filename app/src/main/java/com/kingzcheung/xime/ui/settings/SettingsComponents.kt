@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -894,7 +895,11 @@ fun KeyboardThemeCard(
     previewDark: Boolean? = null,
     previewAspectRatio: Float = 1.75f,
 ) {
+    val glass = com.kingzcheung.xime.settings.FrostedGlassPreferences.read(androidx.compose.ui.platform.LocalContext.current)
+        .copy(enabled = theme.id == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID)
     val kbColors = KeysConfigHelper.getKeyboardColors()
+    val selectionColor = MaterialTheme.colorScheme.primary
+    val swatchColor = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) theme.accentDark else theme.accentLight
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
     val globalKeyBgLight = KeyboardThemes.getKeyBgColorOverride(theme.id, false)
         ?: longToColor(kbColors.keyBgColor)
@@ -911,7 +916,7 @@ fun KeyboardThemeCard(
                     if (isSelected) {
                         Modifier.border(
                             width = 2.dp,
-                            color = theme.accentLight,
+                            color = selectionColor,
                             shape = RoundedCornerShape(12.dp)
                         )
                     } else {
@@ -933,6 +938,7 @@ fun KeyboardThemeCard(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
+                        glass = glass,
                         keyboardBackground = theme.keyboardBackground,
                         isDark = false,
                         fallbackBg = theme.keyboardBgLight,
@@ -948,6 +954,7 @@ fun KeyboardThemeCard(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
+                        glass = glass,
                         keyboardBackground = theme.keyboardBackground,
                         isDark = true,
                         fallbackBg = theme.keyboardBgDark,
@@ -973,14 +980,14 @@ fun KeyboardThemeCard(
                 modifier = Modifier
                     .size(10.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(theme.accentLight)
+                    .background(swatchColor)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = title ?: theme.name,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) theme.accentLight else MaterialTheme.colorScheme.onSurface
+                color = if (isSelected) selectionColor else MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -989,6 +996,7 @@ fun KeyboardThemeCard(
 @Composable
 private fun ThemeHalfPreview(
     modifier: Modifier = Modifier,
+    glass: com.kingzcheung.xime.settings.FrostedGlassConfig,
     keyboardBackground: BackgroundConfig?,
     isDark: Boolean,
     fallbackBg: Color,
@@ -1008,7 +1016,7 @@ private fun ThemeHalfPreview(
     Box(
         modifier = modifier
             .clip(shape)
-            .keyboardBackground(keyboardBackground, isDark, fallbackBg)
+            .keyboardBackground(keyboardBackground, isDark, fallbackBg, glass)
             .padding(4.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -1048,11 +1056,11 @@ private fun ThemeHalfPreview(
                                 .weight(if (isSpace) 3f else 1f)
                                 .fillMaxHeight()
                                 .clip(RoundedCornerShape(1.5.dp))
-                                .background(when {
+                                .background(com.kingzcheung.xime.ui.keyboard.frostedKeyColor(when {
                                     !isLeft && rowIndex == 2 && keyIndex == 1 -> enterKeyColor
                                     isSpecial -> specialKeyColor
                                     else -> keyColor
-                                })
+                                }, if (isDark) Color.White else Color.Black, glass))
                         )
                     }
                 }

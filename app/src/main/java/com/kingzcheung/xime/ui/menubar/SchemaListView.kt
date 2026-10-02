@@ -187,7 +187,7 @@ private fun SchemaGridItem(
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = schema?.name ?: "添加布局",
+            text = schema?.selectionLabel ?: "添加布局",
             color = if (isSelected) accentColor else textColor,
             fontSize = 12.sp,
             lineHeight = 14.sp,

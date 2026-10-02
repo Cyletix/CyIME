@@ -8,7 +8,7 @@ import org.junit.Test
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import android.os.Handler
@@ -29,8 +29,16 @@ class T9LongInputBenchmarkTest {
         val schema = engine.getCurrentSchema()
         val ascii = engine.isAsciiMode()
         val code = repeatedToLength("746928374625938472635927483629")
-        val controller = T9InputController(engine)
+        // Match XimeInputMethodService: a dedicated serialized key dispatcher,
+        // not the standalone controller's shared Dispatchers.Default fallback.
+        val worker = java.util.concurrent.Executors.newSingleThreadExecutor { task ->
+            Thread(task, "key-process-test").apply { isDaemon = true }
+        }.asCoroutineDispatcher()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val queue = InputCommandQueue(scope, worker)
+        val controller = T9InputController(engine, inputCommands = queue)
         val samples = JSONArray()
+        val deleteSamples = mutableListOf<Double>()
         val main = Handler(Looper.getMainLooper())
         var beatTime = SystemClock.elapsedRealtime()
         var maxMainGap = 0L
@@ -71,7 +79,9 @@ class T9LongInputBenchmarkTest {
             val repeatDelete = object : Runnable {
                 override fun run() {
                     hold.dispatch {
+                        val pressed = SystemClock.elapsedRealtimeNanos()
                         controller.onDeleted { result ->
+                            deleteSamples += (SystemClock.elapsedRealtimeNanos() - pressed) / 1e6
                             assertEquals(T9InputController.DeleteResult.DELETED, result)
                             val length = controller.inputBuffer.length
                             assertEquals(previousLength - 1, length)
@@ -93,12 +103,21 @@ class T9LongInputBenchmarkTest {
             assertEquals("", engine.getInput())
             val report = JSONObject().put("keyToEngineCompleteMs", samples)
                 .put("heldDeleteTotalMs", SystemClock.elapsedRealtime() - deleteStarted)
+                .put("deleteToEngineCompleteMs", JSONArray(deleteSamples))
                 .put("maxMainHeartbeatGapMs", maxMainGap)
                 .put("scope", "production controller FIFO and Main heartbeat; not actual display frames")
             File(context.getExternalFilesDir(null), "t9-long-queue.json").writeText(report.toString())
+            val typing = (0 until samples.length()).map { samples.getDouble(it) }.sorted()
+            assertTrue("typing P95 must not accumulate a queue: $typing", typing[(typing.size * .95).toInt()] < 100)
+            assertTrue("a queued key must complete within 200 ms: $typing", typing.last() < 200)
+            assertEquals(code.length, deleteSamples.size)
+            val deleteP95 = deleteSamples.sorted()[(deleteSamples.size * .95).toInt()]
+            assertTrue("held delete P95 must fit 70 ms repeat interval: $deleteP95 ms", deleteP95 < 35)
+            assertTrue("held delete must not accumulate a queue: $report",
+                report.getLong("heldDeleteTotalMs") < (code.length - 1) * 70 + 500)
         } finally {
             main.removeCallbacks(beat)
-            drain(); controller.close()
+            drain(); controller.close(); queue.close(); worker.close(); scope.cancel()
             engine.clearQueuedT9Composition()
             engine.switchSchema(schema); engine.setOption("ascii_mode", ascii)
         }
@@ -111,8 +130,9 @@ class T9LongInputBenchmarkTest {
         val schema = engine.getCurrentSchema()
         val ascii = engine.isAsciiMode()
         val samples = JSONArray()
+        val deleteSamples = mutableListOf<Double>()
         val candidates = JSONArray()
-        val prefixCandidates = mutableMapOf<Pair<String, Int>, List<String>>()
+        val prefixCandidates = mutableMapOf<Pair<String, Int>, List<List<String>>>()
         val label = InstrumentationRegistry.getArguments().getString("sampleLabel", "sample")!!
             .replace(Regex("[^a-zA-Z0-9.-]"), "_")
         val output = File(context.getExternalFilesDir(null), "t9-long-$label.json")
@@ -120,17 +140,16 @@ class T9LongInputBenchmarkTest {
             val start = SystemClock.elapsedRealtimeNanos()
             block()
             val ms = (SystemClock.elapsedRealtimeNanos() - start) / 1e6
+            if (action == "delete") deleteSamples += ms
             samples.put(JSONObject().put("case", case).put("action", action)
                 .put("length", length).put("ms", ms))
             Log.i("T9LongBenchmark", "$case $action $length: $ms ms")
-            output.writeText(samples.toString())
-            val visible = engine.getAllCandidates(20).map { "${it.text}|${it.comment}" }
+            val visible = engine.inspectCandidates(20).map { it.toList() }
             if (action == "key") prefixCandidates[case to length] = visible
             else if (length > 0) assertEquals("$case prefix $length must not depend on typing vs backspace",
                 prefixCandidates[case to length], visible)
             candidates.put(JSONObject().put("case", case).put("action", action).put("length", length)
                 .put("candidates", JSONArray(visible)))
-            File(context.getExternalFilesDir(null), "t9-long-$label-candidates.json").writeText(candidates.toString())
         }
         try {
             assertTrue(engine.switchSchema("t9_pinyin"))
@@ -141,6 +160,9 @@ class T9LongInputBenchmarkTest {
                 "sentence" to repeatedToLength("9642633464942649869464748723294"),
                 "separators" to repeatedToLength("964'263'346'494'264'986'"),
             )) {
+                val onlyCase = InstrumentationRegistry.getArguments().getString("case")
+                if (onlyCase != null && onlyCase != name) continue
+                deleteSamples.clear()
                 engine.clearQueuedT9Composition()
                 code.forEachIndexed { index, digit ->
                     record(name, "key", index + 1) {
@@ -154,8 +176,18 @@ class T9LongInputBenchmarkTest {
                     }
                     assertEquals(code.take(length), engine.getInput())
                 }
+                val keyTimes = (0 until samples.length()).map { samples.getJSONObject(it) }
+                    .filter { it.getString("case") == name && it.getString("action") == "key" }.map { it.getDouble("ms") }.sorted()
+                assertTrue("$name typing P95 must stay below 70 ms: $keyTimes", keyTimes[(keyTimes.size * .95).toInt()] < 70)
+                assertTrue("$name typing must not freeze a key for 120 ms: $keyTimes", keyTimes.last() < 120)
+                val deleteP95 = deleteSamples.sorted()[(deleteSamples.size * .95).toInt()]
+                assertTrue("$name backspace P95 must stay below 25 ms: $deleteP95 ms", deleteP95 < 25)
+                assertTrue("$name backspace must fit repeat interval: ${deleteSamples.maxOrNull()} ms",
+                    deleteSamples.all { it < 70 })
             }
         } finally {
+            output.writeText(samples.toString())
+            File(context.getExternalFilesDir(null), "t9-long-$label-candidates.json").writeText(candidates.toString())
             engine.clearQueuedT9Composition()
             engine.switchSchema(schema)
             engine.setOption("ascii_mode", ascii)

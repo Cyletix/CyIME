@@ -60,6 +60,17 @@ internal fun Modifier.materialSurface(style: VisualStyle, radius: Dp, level: Mat
                 lineTo(size.width, size.height * .28f)
                 close()
             }
+            // Directional reflection and fading rim, cached once per size. Text remains unblurred.
+            val glassReflection = Brush.linearGradient(
+                listOf(Color.White.copy(alpha = if (dark) .10f else .35f), Color.Transparent,
+                    palette.accent.copy(alpha = .035f), Color.White.copy(alpha = .06f)),
+                Offset.Zero, Offset(size.width, size.height),
+            )
+            val glassRim = Brush.linearGradient(
+                listOf(Color.White.copy(alpha = if (dark) .42f else .85f),
+                    edge.copy(alpha = .06f), edge.copy(alpha = .18f), Color.White.copy(alpha = .24f)),
+                Offset.Zero, Offset(size.width, size.height),
+            )
             onDrawWithContent {
                 if (bounds.width > 0 && bounds.height > 0) clipPath(path) {
                     if (recipe.shade > 0f) drawPath(path, Color.Black.copy(alpha = recipe.shade * if (dark) 1f else .35f))
@@ -69,7 +80,10 @@ internal fun Modifier.materialSurface(style: VisualStyle, radius: Dp, level: Mat
                     if (recipe.depth > 0f) drawRect(depth, topLeft = Offset(0f, size.height * .60f), size = Size(size.width, size.height * .40f))
                     if (recipe.facet > 0f) drawPath(facet, palette.accent.copy(alpha = recipe.facet * if (dark) 1f else .7f))
                     if (recipe.glow > 0) drawPath(path, palette.accent.copy(alpha = recipe.glow), style = Stroke(3f * density))
-                    if (recipe.border > 0f) drawPath(path, edge.copy(alpha = recipe.border), style = Stroke(density))
+                    if (style == VisualStyle.GLASS) {
+                        drawPath(path, glassReflection)
+                        drawPath(path, glassRim, style = Stroke(density))
+                    } else if (recipe.border > 0f) drawPath(path, edge.copy(alpha = recipe.border), style = Stroke(density))
                 }
                 drawContent()
             }

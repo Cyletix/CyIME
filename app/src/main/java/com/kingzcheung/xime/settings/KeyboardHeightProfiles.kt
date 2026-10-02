@@ -33,6 +33,13 @@ internal object KeyboardHeightProfiles {
     fun selected(context: Context, floating: Boolean, landscape: Boolean, hostHeightDp: Int): Int =
         if (floating) floating(context, landscape, hostHeightDp) else fixed(context, landscape)
 
+    fun hasSavedHeight(context: Context, floating: Boolean, landscape: Boolean): Boolean {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        if (floating) return prefs.getInt(floatingKey(landscape), 0) > 0
+        return prefs.getInt(fixedKey(landscape), 0) > 0 ||
+            (landscape && prefs.getInt(fixedKey(false), 0) > 0)
+    }
+
     /** 只有确认才调用。悬浮确认绝不写 keyboard_height_dp*。 */
     fun save(
         context: Context,

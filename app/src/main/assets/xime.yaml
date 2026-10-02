@@ -20,8 +20,8 @@ style:
   # 浅色/深色模式的配色，deep 为降级后备
   # 可选值：内置主题 id、color_schemes 中定义的 id、或 dynamic（Material You 动态配色，随壁纸取色，仅 Android 12+ 生效）
   color_scheme:
-    light: soft_blue
-    dark: soft_blue
+    light: pure_black
+    dark: "" # 默认沿用当前所选配色；可在自定义配置中指定独立深色主题
   # 显示模式：0=浅色, 1=深色（默认）, 2=跟随系统
   dark_mode: 1
 
@@ -389,8 +389,10 @@ keyboard:
   #                       26 键 4.5 / 14 键 5 / 九宫格·数字·笔画 6
   # spacing_y:          纵向总缝覆盖值（dp）；不设置（或写 2）表示用布局策略默认：
   #                       26 键 5.5 / 14 键 6 / 九宫格·数字·笔画 6
-  # 说明：总缝 = 相邻两个键帽之间的可见间隙（两侧各一半）；实际会随格尺寸在
-  #       0.85x~1.20x 之间有限缩放，并被各布局的上下限封顶（见 KeyVisualPolicy.kt）。
+  # 说明：总缝 = 相邻两个键帽之间的可见间隙（两侧各一半）；宽度从手机参考格增至
+  #       两倍时，平滑加大到 26 键 12/11、14 键 10/12、九键 12/12 dp。
+  #       小悬浮可缩至基准的 0.85 倍；矮/窄键格最多留 20% 作缝。
+  #       上述缩放只针对默认间距；显式覆盖值仍按所填总缝使用（见 KeyVisualPolicy.kt）。
   #       触摸区域始终是整格，不会因为缝变大而变小。
   # 各键盘可单独覆盖（可选），键盘名：qwerty / t9 / number / stroke / symbol / japanese_kana
   # 例如：t9: { spacing_x: 8, spacing_y: 8 }

@@ -8,8 +8,7 @@ import org.junit.Test
 /**
  * 键帽视觉策略的纯函数账目：手机 / 14 键 / 九宫格 / 平板 / 悬浮各档的 gutter、缝、缩放。
  *
- * 期望值按 [KeyVisualPolicy] 与 [keyVisualMetrics] 的定义手算；
- * 真机观感微调只改 KeyVisualPolicy.kt 里的常数，本用例随之更新。
+ * 手机基准、宽度响应及矮键帽留白边界；截图观感仍需要真机验收。
  */
 class KeyVisualPolicyTest {
     private val tolerance = 0.01f
@@ -43,9 +42,9 @@ class KeyVisualPolicyTest {
         val m = keyVisualMetrics(KeyVisualPolicy.Qwerty, 800f, 420f, columns = 10f)
         // 内容宽被 10 × (62 + 4.5) 限制 → 66.5dp/格，多出的宽度全部变成左右 gutter
         assertEquals(67.5f, m.gutterX, tolerance)
-        assertEquals(2.49f, m.insetX!!, tolerance)
-        assertEquals(3.05f, m.insetY!!, tolerance)
-        assertEquals(1.11f, m.scale, tolerance)
+        assertEquals(5.75f, m.insetX!!, tolerance)
+        assertEquals(5.32f, m.insetY!!, tolerance)
+        assertEquals(1.93f, m.scale, tolerance)
         assertTrue("键帽宽度不超过 62dp：${m.capShortEdge}", m.capShortEdge <= 62f)
     }
 
@@ -60,11 +59,40 @@ class KeyVisualPolicyTest {
     @Test fun nestedScopeWithoutGutterKeepsRealCellWidth() {
         // 与 KeyboardKeySpacingScope(applyGutter = false) 同参：不设键宽上限、不设 gutter 下限
         val policy = KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f)
-        // columns=5、420×280：格 84×93.3，按 60dp 参考格缩放封顶 1.2
+        // columns=5、420×280：格 84×93.3，宽键达到上限，但不把内容宽度收窄。
         val m = keyVisualMetrics(policy, 420f, 280f, columns = 5f, rows = 3f, verticalInsetDp = 0f)
         assertEquals(0f, m.gutterX, tolerance)
-        assertEquals(1.2f, m.scale, tolerance)
-        assertEquals(2.7f, m.insetX!!, tolerance)
+        assertEquals(2f, m.scale, tolerance)
+        assertEquals(6f, m.insetX!!, tolerance)
+    }
+
+    @Test fun wideningKeyboardAloneIncreasesBothGapsForLettersAndNineKey() {
+        for ((policy, columns) in listOf(KeyVisualPolicy.Qwerty to 10f, KeyVisualPolicy.T9 to (5f * 3f / 3.4f))) {
+            val phone = keyVisualMetrics(policy, 360f, 300f, columns)
+            val tablet = keyVisualMetrics(policy, 680f, 300f, columns)
+            // 高度不变也应明显拉开间距，回归此前被短边卡住的平板横屏情形。
+            assertTrue("wider keyboard horizontal gap", tablet.insetX!! > phone.insetX!! * 1.5f)
+            assertTrue("wider keyboard vertical gap", tablet.insetY!! > phone.insetY!! * 1.5f)
+            assertTrue("visible tablet gap", tablet.insetX * 2f >= 11f)
+            assertTrue("tablet row gap", tablet.insetY * 2f >= 10f)
+        }
+    }
+
+    @Test fun shrinkingTheActualFloatingKeyboardRestoresCompactGaps() {
+        val large = keyVisualMetrics(KeyVisualPolicy.T9, 680f, 340f, 4.41f, allowShrink = true)
+        val small = keyVisualMetrics(KeyVisualPolicy.T9, 280f, 180f, 4.41f, allowShrink = true)
+        assertTrue(large.insetX!! > small.insetX!! * 1.8f)
+        assertTrue(large.insetY!! > small.insetY!! * 1.8f)
+        assertTrue(small.insetX * 2f < 6f)
+    }
+
+    @Test fun wideButShortKeyboardPreservesAtLeastEightyPercentOfKeyHeight() {
+        for (height in listOf(64f, 120f, 180f)) {
+            val m = keyVisualMetrics(KeyVisualPolicy.Qwerty, 800f, height, 10f)
+            val cellHeight = (height - 8f) / 4f
+            assertTrue("row gap at height $height", m.insetY!! * 2f <= cellHeight * 0.2f + tolerance)
+            assertTrue("visible keycap at height $height", m.capShortEdge >= cellHeight * 0.8f - tolerance)
+        }
     }
 
     @Test fun invalidBoundsFallBackToDeclaredPadding() {

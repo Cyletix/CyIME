@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +74,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Constraints
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
+import com.kingzcheung.xime.ui.keyboard.clipboardPanelExpandGesture
+import com.kingzcheung.xime.ui.keyboard.ToolIcon
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentPaste
 import kotlin.math.max
 
 @Composable
@@ -94,7 +99,24 @@ fun ClipboardView(
     onQuickSendEditItem: ((Long, String, String) -> Unit)? = null,
     onPullRemote: (() -> Unit)? = null,
     pullRemoteAvailable: Boolean = false,
+    onImageSelect: ((com.kingzcheung.xime.clipboard.ClipboardImage) -> Unit)? = null,
+    onImageShare: ((com.kingzcheung.xime.clipboard.ClipboardImage, String?) -> Unit)? = null,
+    onSystemImagePaste: (() -> Unit)? = null,
+    imagesExpanded: Boolean = false,
+    onExpandImages: (() -> Unit)? = null,
+    onCollapseImages: (() -> Unit)? = null,
 ) {
+    if (selectedTab != 1) {
+        ConnectedClipboardBoard(clipboardItems, selectedTab == 2, imagesExpanded,
+            onBack = { onBack?.invoke() }, onQuickSend = { onClipboardTabChange?.invoke(1) },
+            onSelectText = onSelectItem, onRemoveText = viewModel::removeClipboardItems,
+            onAddQuick = viewModel::addToQuickSend, onSplit = onSplitWords,
+            onImageSelect = { onImageSelect?.invoke(it) }, onImageShare = { image, pkg -> onImageShare?.invoke(image, pkg) },
+            onSystemPaste = { onSystemImagePaste?.invoke() },
+            onPullRemote = if (pullRemoteAvailable) onPullRemote else null,
+            modifier = modifier.padding(bottom = bottomPaddingDp.dp))
+        return
+    }
     // 卡片/格子背景：与菜单项背景一致（keyBgColor，浅色纯白、深色跟随 keyboard.colors）
     val itemBgColor = keyBgColor
     val textColor = keyTextColor
@@ -122,208 +144,23 @@ fun ClipboardView(
 
     Box(modifier.fillMaxSize().background(backgroundColor)) {
     Column(Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = if (isLandscape) 50.dp else 8.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .height(maxOf(28.dp, with(LocalDensity.current) { 18.sp.toDp() } + 4.dp))
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(iconButtonContainer)
-                    .padding(2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxHeight(),
-                    horizontalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(if (selectedTab == 0) accentColor else Color.Transparent)
-                            .clickable { onClipboardTabChange?.invoke(0) }
-                            .padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "剪贴板",
-                            color = if (selectedTab == 0) Color.White else textColor,
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp,
-                            fontWeight = if (selectedTab == 0) FontWeight.Medium else FontWeight.Normal
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(if (selectedTab == 1) accentColor else Color.Transparent)
-                            .clickable { onClipboardTabChange?.invoke(1) }
-                            .padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "快捷发送",
-                            color = if (selectedTab == 1) Color.White else textColor,
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp,
-                            fontWeight = if (selectedTab == 1) FontWeight.Medium else FontWeight.Normal
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            if (selectedTab == 0) {
-                if (isMultiSelect) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(iconButtonContainer)
-                            .clickable { exitMultiSelect() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "退出多选",
-                            tint = accentColor,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                } else {
-                    // 剪贴板同步已启用（配置+启用插件）时，提供主动拉取按钮
-                    if (pullRemoteAvailable && onPullRemote != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(iconButtonContainer)
-                                .clickable(onClick = onPullRemote),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.TwoTone.Sync,
-                                contentDescription = "拉取远端剪贴板",
-                                tint = accentColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    if (clipboardItems.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(iconButtonContainer)
-                                .clickable { showClearConfirm = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteSweep,
-                                contentDescription = "清空剪贴板",
-                                tint = accentColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (selectedTab == 1 && onQuickSendAddClick != null) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(iconButtonContainer)
-                        .clickable(onClick = onQuickSendAddClick),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "添加快捷发送",
-                        tint = accentColor,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
+        Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture().padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            ToolIcon(Icons.AutoMirrored.Filled.ArrowBack, "返回键盘", { onBack?.invoke() })
+            Text("快捷发送", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            ToolIcon(Icons.Default.ContentPaste, "剪贴板", { onClipboardTabChange?.invoke(0) })
+            onQuickSendAddClick?.let { ToolIcon(Icons.Default.Add, "添加快捷发送", it) }
         }
-
-        val pagerState = rememberPagerState(
-            initialPage = selectedTab,
-            pageCount = { 2 }
-        )
-
-        LaunchedEffect(selectedTab) {
-            pagerState.animateScrollToPage(selectedTab)
-        }
-
-        LaunchedEffect(pagerState.currentPage) {
-            if (pagerState.currentPage != selectedTab) {
-                onClipboardTabChange?.invoke(pagerState.currentPage)
-            }
-        }
-
-        // 列表区容器：网格与长按操作菜单/清空确认覆盖层共用同一受限高度区域，
-        // 覆盖层高度因此随键盘高度变化，不会再画到列表区（屏幕）之外。
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize()
-        ) { page ->
-            if (page == 0) {
-                ClipboardTabContent(
-                    items = clipboardItems,
-                    itemBgColor = itemBgColor,
-                    textColor = textColor,
-                    subTextColor = subTextColor,
-                    accentColor = accentColor,
-                    onSelect = onSelectItem,
-                    onRemove = { id -> viewModel.removeClipboardItem(id) },
-                    onAddToQuickSend = { id -> viewModel.addToQuickSend(id) },
-                    onSplitWords = onSplitWords,
-                    onLongPressItem = { item, isLeftColumn ->
-                        menuAnchor = MenuAnchor(item, isLeftColumn, tab = 0)
-                    },
-                    isMultiSelect = isMultiSelect,
-                    selectedIds = selectedIds,
-                    onToggleSelect = { id ->
-                        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
-                    },
-                    onExitMultiSelect = { exitMultiSelect() }
-                )
-            } else {
-                QuickSendTabContent(
-                    items = quickSendItems,
-                    itemBgColor = itemBgColor,
-                    textColor = textColor,
-                    subTextColor = subTextColor,
-                    accentColor = accentColor,
-                    viewModel = viewModel,
-                    onSelect = onSelectItem,
-                    onQuickSendAddClick = onQuickSendAddClick,
-                    onQuickSendEditItem = onQuickSendEditItem,
-                    onLongPressItem = { item, isLeftColumn ->
-                        menuAnchor = MenuAnchor(item, isLeftColumn, tab = 1)
-                    }
-                )
-            }
-        }
-
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            QuickSendTabContent(
+                items = quickSendItems, itemBgColor = itemBgColor, textColor = textColor,
+                subTextColor = subTextColor, accentColor = accentColor, viewModel = viewModel,
+                onSelect = onSelectItem, onQuickSendAddClick = onQuickSendAddClick,
+                onQuickSendEditItem = onQuickSendEditItem,
+                onLongPressItem = { item, isLeftColumn -> menuAnchor = MenuAnchor(item, isLeftColumn, tab = 1) }
+            )
         menuAnchor?.let { anchor ->
             val menuItems = if (anchor.tab == 0) {
                 listOf(

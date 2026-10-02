@@ -85,7 +85,34 @@ object RimeConfigHelper {
         return enabled.isNotEmpty() && enabled.all { it in available } && engine.getCurrentSchema().isNotBlank()
     }
 
-    suspend fun initializeRimeDataAsync(context: Context): Pair<String, String> = assetInitializationMutex.withLock {
+    /** Apply the selected supplemental dictionaries through the same serialized deployment path. */
+    suspend fun applyCellDictionaries(context: Context): Boolean = preparationMutex.withLock {
+        val manager = com.kingzcheung.xime.settings.CellDictionaryManager
+        val store = manager.store(context)
+        val selected = store.read().selected
+        preparedInProcess = false
+        val (user, shared) = initializeRimeDataAsync(context, restoreCellDictionaries = false)
+        val engine = RimeEngine.getInstance()
+        engine.initialize(user, shared)
+        synchronized(deploymentLock) {
+            store.activate(selected) { ids ->
+                val bindings = manager.prepare(context, ids)
+                // Recreate the live session, as ordinary incremental maintenance retains loaded tables.
+                // Native compilation still reuses unchanged dictionaries by checksum.
+                val usable = engine.deploy() && hasRequiredBuildArtifacts(context) && liveSchemasReady(context) &&
+                    manager.verify(context, bindings)
+                SettingsPreferences.setDeploymentDone(context, usable)
+                check(usable) { "词库编译失败，已保留待应用选择" }
+                storeDeploymentHash(context)
+                preparedInProcess = true
+            }
+        }
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        prefs.edit().putLong(DEPLOYMENT_REVISION, prefs.getLong(DEPLOYMENT_REVISION, 0L) + 1L).apply()
+        true
+    }
+
+    suspend fun initializeRimeDataAsync(context: Context, restoreCellDictionaries: Boolean = true): Pair<String, String> = assetInitializationMutex.withLock {
         val rimeDir = File(context.filesDir, "rime")
         
         // 迁移旧目录结构 (rime/shared/ + rime/user/) → 单一 rime/ 目录
@@ -114,6 +141,7 @@ object RimeConfigHelper {
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         // 为所有启用方案打个人词库补丁
         PersonalDictManager.ensureSchemaPacks(context)
+        if (restoreCellDictionaries) com.kingzcheung.xime.settings.CellDictionaryManager.prepare(context)
         // 内置资源发生替换时已失效旧编译缓存；其它配置变动仍由 ensureDeployment 增量处理。
 
         Pair(rimeDir.absolutePath, rimeDir.absolutePath)
@@ -294,6 +322,7 @@ object RimeConfigHelper {
         val rimeDir = File(context.filesDir, "rime")
         val digest = java.security.MessageDigest.getInstance("SHA-256")
 
+        fileUpdateDigest(digest, File(rimeDir, ".cyime-bundled-revision"))
         val enabledSchemas = SchemaManager.getEnabledSchemas(context)
         for (schemaId in enabledSchemas.sorted()) {
             val schemaFile = File(rimeDir, "$schemaId.schema.yaml")

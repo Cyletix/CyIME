@@ -1,16 +1,16 @@
 package com.kingzcheung.xime.model
 
 import android.content.Context
-import com.kingzcheung.xime.settings.SettingsPreferences
-import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.SpeechModelCatalog
 import org.json.JSONArray
 
 /** Offline edition: install on IO, then activate a usable local configuration once.
  * User changes/deletions after setup are preserved, including on subsequent upgrades. */
 object BundledModelInstaller {
-    val modelIds = setOf("ochwpro", "predictive-text-base", SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.SENSEVOICE)
+    val modelIds = setOf("ochwpro", DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE,
+        SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.SENSEVOICE)
     suspend fun install(context: Context) {
+        DeviceDefaults.initialize(context)
         val prefs = context.getSharedPreferences("bundled_models", Context.MODE_PRIVATE)
         val manifest = context.assets.open("bundled-models/manifest.json").bufferedReader().use { JSONArray(it.readText()) }
         val entries = (0 until manifest.length()).map { manifest.getJSONObject(it) }
@@ -18,7 +18,7 @@ object BundledModelInstaller {
             "内置模型清单与应用不匹配"
         }
         for (entry in entries.sortedBy { when (it.getString("id")) {
-            "ochwpro" -> 0; "predictive-text-base" -> 1; SpeechModelCatalog.ZIPFORMER -> 2; else -> 3
+            "ochwpro" -> 0; DeviceDefaults.predictionModel(context) -> 1; SpeechModelCatalog.ZIPFORMER -> 2; else -> 3
         } }) {
             val id = entry.getString("id")
             val version = entry.getString("version")
@@ -28,22 +28,11 @@ object BundledModelInstaller {
         }
         if (!prefs.getBoolean("defaults_applied", false)) {
             check(modelIds.all { ModelManager.isModelReady(context, it) })
-            // Activation defaults are shared with the standard edition. Never overwrite a
-            // setting changed while bundled files were still being installed.
-            val high = DeviceDefaults.supportsRefinement(context)
-            if (!context.getSharedPreferences("asr_model", Context.MODE_PRIVATE).contains("selected_model")) {
-                AsrModelManager(context).setModel(if (high) SpeechModelCatalog.ZIPFORMER_TWO_PASS else SpeechModelCatalog.ZIPFORMER)
-            }
-            if (!SettingsPreferences.getPrefsPublic(context).contains("key_glow_enabled")) {
-                SettingsPreferences.getPrefsPublic(context).edit().putBoolean("key_glow_enabled", high).apply()
-            }
+            // Both editions use the same saved first-run defaults. Copying files never selects models.
             check(prefs.edit().putBoolean("defaults_applied", true).commit())
         }
         if (prefs.getInt("edition_profile", 0) < 2) {
-            // Upgrade only the old bundled defaults; retain explicit alternative model choices.
-            if (SettingsPreferences.getPredictionSelectedModel(context) == "predictive-text-small") {
-                SettingsPreferences.setPredictionSelectedModel(context, "predictive-text-base")
-            }
+            // Legacy small selections cannot be distinguished from manual choices. Preserve them.
             check(prefs.edit().putInt("edition_profile", 2).commit())
         }
     }

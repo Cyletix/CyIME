@@ -74,7 +74,9 @@ fun EditKeyboardLayout(
         LocalKeyCornerRadius provides keyCornerRadius,
         LocalEditorKeyShadow provides EditorKeyShadow(shadowEnabled, shadowElevation, shadowShapeRadius),
     ) {
-        Column(bodyModifier.fillMaxSize().background(backgroundColor).padding(horizontal = 2.dp)) {
+        Column(bodyModifier.fillMaxSize()
+            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else backgroundColor)
+            .padding(horizontal = 2.dp)) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val cellWidth = maxWidth / 5
                 val cellHeight = maxHeight / 3
@@ -110,7 +112,8 @@ fun EditKeyboardLayout(
                 val padMetrics = metricsFor(padDiameter)
                 val inset = (padMetrics.insetX ?: 2f).dp
                 val glyphScale = KeyboardKeyMetrics.contentScale(cellWidth.value * .92f, padDiameter.value / 3 * .92f)
-                val padColor = androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f)
+                val padColor = frostedKeyColor(androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f),
+                    textColor, LocalKeyboardInputPreferences.current.frostedGlass)
                 @Composable
                 fun key(command: String, keyModifier: Modifier, cutout: Shape? = null,
                     offsetX: Dp = 0.dp, offsetY: Dp = 0.dp, compact: Boolean = false) {
@@ -286,8 +289,9 @@ internal fun EditorActionKey(
     var pressed by remember { mutableStateOf(false) }
     val shadow = LocalEditorKeyShadow.current
     val density = LocalDensity.current
-    val shadowModifier = remember(shadow, density, background, plain) {
-        if (shadow.enabled && !plain) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadow, density, background, plain, frostedGlass.enabled) {
+        if (shadow.enabled && !plain && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadow.elevation.toPx() }
             val cornerPx = with(density) { shadow.shapeRadius.toPx() }
             val color = crispShadowColor(background)
@@ -327,8 +331,13 @@ internal fun EditorActionKey(
         .keyGlow(Modifier.then(if (visualShape != null) Modifier.clip(visualShape) else Modifier)
         .then(shadowModifier)
         .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-        .background(if (pressed && !LocalKeyboardInputPreferences.current.keyGlowEnabled) foreground.copy(alpha = 0.18f) else background),
-            animateCap = !plain, particleSize = glowSize,
+        .background(frostedKeyColor(
+            if (plain && pressed) foreground.copy(alpha = 0.18f) else background, foreground, frostedGlass,
+            legacyStateColor = if (pressed && !LocalKeyboardInputPreferences.current.keyGlowEnabled) foreground.copy(alpha = 0.18f) else background,
+            pressed = pressed,
+            opacityScale = if (!plain) 1f else if (pressed) 0.18f else 0f,
+        )),
+            particleSize = glowSize,
             particleOffset = if (plain) androidx.compose.ui.unit.DpOffset(contentOffsetX, contentOffsetY) else androidx.compose.ui.unit.DpOffset.Zero), contentAlignment = Alignment.Center) {
         val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let {
             if (compact) minOf(it, 1.15f,

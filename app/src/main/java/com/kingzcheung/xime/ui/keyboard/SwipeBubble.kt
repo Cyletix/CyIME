@@ -194,7 +194,7 @@ fun rememberSwipeBubbleDrawData(
             swipeState.longPressItems.size
         else
             maxOf(swipeState.longPressItems.size, 3)
-        cellMin * keyWidthPx
+        KeyboardKeyMetrics.longPressMenuWidthPx(keyWidthPx, cellMin, keyboardWidth, screenMarginPx)
     } else {
         maxOf(textPaint.measureText(displayText!!) + with(density) { 20.dp.toPx() } * bubbleScale, minBodyWidthPx)
     }

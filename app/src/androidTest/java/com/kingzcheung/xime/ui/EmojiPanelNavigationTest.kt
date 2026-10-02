@@ -33,13 +33,16 @@ class EmojiPanelNavigationTest {
         } }
     }
 
-    @Test fun builtinEmojiStartsAtTheTopWithoutASingleGroupTab() {
+    @Test fun builtinEmojiStartsBelowExpressionSelectorWithoutASingleGroupTab() {
         show(com.kingzcheung.xime.data.EmojiData.categories)
         rule.onNodeWithTag("emoji-groups").assertDoesNotExist()
         val panel = rule.onNodeWithTag("emoji-panel").fetchSemanticsNode().boundsInRoot
+        val selector = rule.onNodeWithTag("expression-emoji").fetchSemanticsNode().boundsInRoot
         val pages = rule.onNodeWithTag("emoji-pages").fetchSemanticsNode().boundsInRoot
-        org.junit.Assert.assertEquals(panel.top, pages.top, 1f)
-        rule.onNodeWithText("😀").performClick()
+        org.junit.Assert.assertTrue(selector.top >= panel.top)
+        org.junit.Assert.assertTrue(pages.top >= selector.bottom)
+        org.junit.Assert.assertTrue(pages.bottom <= panel.bottom)
+        rule.onAllNodesWithText("😀").onLast().performClick()
         rule.waitForIdle()
         val bitmap = rule.onNodeWithTag("emoji-panel").captureToImage().asAndroidBitmap()
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext

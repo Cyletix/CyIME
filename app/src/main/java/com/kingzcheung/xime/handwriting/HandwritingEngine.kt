@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.handwriting
 
+import com.kingzcheung.xime.settings.InputLanguage
+
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -33,7 +35,8 @@ object HandwritingEngine {
     @Volatile
     private var lastReinitAttemptMs = 0L
 
-    fun initialize(context: Context): Boolean {
+    fun initialize(context: Context, language: InputLanguage = InputLanguage.CHINESE): Boolean {
+        if (!HandwritingLanguages.supports(language)) return false
         if (initialized && inferenceClient?.isBound() == true) return true
 
         val ctx = context.applicationContext
@@ -93,7 +96,8 @@ object HandwritingEngine {
     fun isInitialized(): Boolean = initialized
 
     /** 手写模型是否可用（含旧版 filesDir 根目录模型迁移后检查）。 */
-    fun hasModel(context: Context): Boolean {
+    fun hasModel(context: Context, language: InputLanguage = InputLanguage.CHINESE): Boolean {
+        if (!HandwritingLanguages.supports(language)) return false
         ModelStorage.migrateLegacyForModel(context, "ochwpro")
         val modelDir = ModelStorage.getModelDir(context, "ochwpro")
         return File(modelDir, "ochwpro.onnx").exists() && File(modelDir, "char_index.json").exists()
@@ -101,8 +105,10 @@ object HandwritingEngine {
 
     fun predict(
         strokes: List<List<Pair<Float, Float>>>,
-        topK: Int = DEFAULT_TOP_K
+        topK: Int = DEFAULT_TOP_K,
+        language: InputLanguage = InputLanguage.CHINESE,
     ): List<HandwritingCandidate> {
+        if (!HandwritingLanguages.supports(language)) return emptyList()
         if (strokes.isEmpty()) return emptyList()
         if (!ensureEngineReady()) return emptyList()
         val client = inferenceClient ?: return emptyList()

@@ -1,0 +1,3523 @@
+{
+  "fixture_version": 1,
+  "id": "daily_chat_20261003",
+  "source_label": "API生成模拟测试聊天",
+  "source_text": "两个朋友的日常聊天记录（微信口吻，按时间段分，约 1100 字）：\n早上 07:12 小周：早，你今天怎么起这么早？ 老陈：别提了，六点半闹钟一响我就醒了，翻来覆去睡不着。 小周：你这作息是真的健康，我闹钟按了五遍，差点睡过头。 老陈：吃了没？ 小周：啃了个面包，对付一口。你呢？ 老陈：楼下买了俩包子一碗豆浆，八块钱，还算实惠。\n中午 11:48 小周：中午吃啥？食堂还是点外卖？ 老陈：食堂吧，外卖翻来覆去就那几家，早吃腻了。 小周：行，十二点楼下等你，别磨叽。 老陈：知道了，我把手里这点活儿收个尾。 小周：你那张表做完了？我昨天弄到半夜，眼睛都花了。 老陈：差不多了，剩最后两列，下午再核一遍数。 小周：记得核，上回就因为一个小数点，被领导念了半个钟头。 老陈：那可不，这回我盯得死死的。\n中午 12:40 老陈：今天食堂居然有糖醋排骨，我打了满满一盘。 小周：我看半天，最后还是要了碗面，没什么胃口。 老陈：是不是又熬夜了？ 小周：昨晚刷视频刷到一点半，后悔死了，今天整个人都是懵的。 老陈：少刷点，早睡比啥都强。说着容易做着难，我也一样。\n下午 15:20 小周：会开完了？ 老陈：刚散，开了四十分钟，二十分钟都在等投影连上。 小周：这很常见，我早习惯了。 老陈：会上还临时加了两个需求，说是下周就要。 小周：又加？那这周又别想准点下班了。 老陈：走一步看一步吧，先把能做的做了。\n下午 17:05 小周：今天风挺大，出门记得套件外套。 老陈：知道了，我妈早上也这么跟我说。 小周：当妈的都这样。 老陈：下班一起走吗？我这边六点差不多能收工。 小周：我尽量，要是拖到七点你就先走，别等我。 老陈：行，微信上说。\n傍晚 18:50 老陈：我出来了，在楼门口。 小周：等我五分钟，刚存上文件。 老陈：不急，我顺手买了瓶水，给你也带了一瓶。 小周：谢了啊，回头请你喝奶茶。 老陈：这话你说过三回了。\n",
+  "source_sha256_utf8": "3106d14b8b71270da0c47ca1eebb27b2f2f4ffd79686da114003b0b99b92782e",
+  "description": "用户提供的聊天原文，按连续汉字片段分组；保留所有介绍、时间段标题及说话人。",
+  "input_contract": {
+    "language": "zh-Hans",
+    "scheme": "full_pinyin",
+    "layout": "t9",
+    "keymap": {
+      "2": "abc",
+      "3": "def",
+      "4": "ghi",
+      "5": "jkl",
+      "6": "mno",
+      "7": "pqrs",
+      "8": "tuv",
+      "9": "wxyz"
+    },
+    "pinyin": "无声调，每个汉字一个完整拼音音节；不省略声母、韵母；活儿按 huo er 输入。",
+    "case_boundary": "按原文的非汉字字符分段。每个 case 为独立连续输入单元，标点、空格、数字和时间符号不送入中文解码器。",
+    "source_offsets": "Python Unicode code point offsets, start inclusive, end exclusive.",
+    "body_filter": "is_body=true 仅包含聊天正文；false 为介绍、标题或说话人，仍需另行报告覆盖。",
+    "simulation_limit": "此文件仅定义输入和期望文字，不宣称每字或整句直出，不代表真机验收。"
+  },
+  "pronunciation_review": {
+    "generator": "pypinyin 0.55.0 lazy_pinyin, followed by manual contextual review of every case",
+    "manual_overrides": [
+      {
+        "case_id": "c013",
+        "text": "翻来覆去睡不着",
+        "character_index": 6,
+        "character": "着",
+        "generated": "zhe",
+        "expected": "zhao",
+        "reason": "睡不着表示不能入睡，着读 zhao。"
+      }
+    ],
+    "reviewed_contexts": [
+      {
+        "characters": "着",
+        "contexts": [
+          "翻来覆去睡不着 → zhao",
+          "说着容易做着难 → zhe / zhe"
+        ]
+      },
+      {
+        "characters": "还",
+        "contexts": [
+          "还算实惠 → hai",
+          "食堂还是点外卖 → hai",
+          "最后还是要了碗面 → hai",
+          "会上还临时加了两个需求 → hai"
+        ]
+      },
+      {
+        "characters": "数",
+        "contexts": [
+          "下午再核一遍数 → shu",
+          "上回就因为一个小数点 → shu"
+        ]
+      },
+      {
+        "characters": "得",
+        "contexts": [
+          "记得核 → de",
+          "这回我盯得死死的 → de",
+          "出门记得套件外套 → de"
+        ]
+      },
+      {
+        "characters": "俩行磨弄差核强都当尽",
+        "contexts": [
+          "俩包子 → lia",
+          "行 → xing",
+          "别磨叽 → mo ji",
+          "弄到半夜 → nong",
+          "差点 / 差不多 → cha",
+          "核一遍数 / 记得核 → he",
+          "比啥都强 → qiang",
+          "都 → dou",
+          "当妈 → dang",
+          "我尽量 → jin liang"
+        ]
+      },
+      {
+        "characters": "儿",
+        "contexts": [
+          "活儿 → huo er；每字完整拼音输入，未采用儿化简写。"
+        ]
+      }
+    ]
+  },
+  "counts": {
+    "cases": 130,
+    "han_characters": 594,
+    "digit_keypresses": 1823,
+    "body_cases": 83,
+    "body_han_characters": 488,
+    "body_digit_keypresses": 1447,
+    "utterances": 36,
+    "by_role": {
+      "introduction": {
+        "cases": 5,
+        "han_characters": 22
+      },
+      "heading": {
+        "cases": 6,
+        "han_characters": 12
+      },
+      "speaker": {
+        "cases": 36,
+        "han_characters": 72
+      },
+      "body": {
+        "cases": 83,
+        "han_characters": 488
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "c001",
+      "text": "两个朋友的日常聊天记录",
+      "pinyin": [
+        "liang",
+        "ge",
+        "peng",
+        "you",
+        "de",
+        "ri",
+        "chang",
+        "liao",
+        "tian",
+        "ji",
+        "lu"
+      ],
+      "keys": "54264437364968337424264542684265458",
+      "syllable_keys": [
+        "54264",
+        "43",
+        "7364",
+        "968",
+        "33",
+        "74",
+        "24264",
+        "5426",
+        "8426",
+        "54",
+        "58"
+      ],
+      "is_body": false,
+      "role": "introduction",
+      "time": null,
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 1,
+      "source_start": 0,
+      "source_end": 11
+    },
+    {
+      "id": "c002",
+      "text": "微信口吻",
+      "pinyin": [
+        "wei",
+        "xin",
+        "kou",
+        "wen"
+      ],
+      "keys": "934946568936",
+      "syllable_keys": [
+        "934",
+        "946",
+        "568",
+        "936"
+      ],
+      "is_body": false,
+      "role": "introduction",
+      "time": null,
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 1,
+      "source_start": 12,
+      "source_end": 16
+    },
+    {
+      "id": "c003",
+      "text": "按时间段分",
+      "pinyin": [
+        "an",
+        "shi",
+        "jian",
+        "duan",
+        "fen"
+      ],
+      "keys": "2674454263826336",
+      "syllable_keys": [
+        "26",
+        "744",
+        "5426",
+        "3826",
+        "336"
+      ],
+      "is_body": false,
+      "role": "introduction",
+      "time": null,
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 1,
+      "source_start": 17,
+      "source_end": 22
+    },
+    {
+      "id": "c004",
+      "text": "约",
+      "pinyin": [
+        "yue"
+      ],
+      "keys": "983",
+      "syllable_keys": [
+        "983"
+      ],
+      "is_body": false,
+      "role": "introduction",
+      "time": null,
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 1,
+      "source_start": 23,
+      "source_end": 24
+    },
+    {
+      "id": "c005",
+      "text": "字",
+      "pinyin": [
+        "zi"
+      ],
+      "keys": "94",
+      "syllable_keys": [
+        "94"
+      ],
+      "is_body": false,
+      "role": "introduction",
+      "time": null,
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 1,
+      "source_start": 30,
+      "source_end": 31
+    },
+    {
+      "id": "c006",
+      "text": "早上",
+      "pinyin": [
+        "zao",
+        "shang"
+      ],
+      "keys": "92674264",
+      "syllable_keys": [
+        "926",
+        "74264"
+      ],
+      "is_body": false,
+      "role": "heading",
+      "time": "07:12",
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 2,
+      "source_start": 34,
+      "source_end": 36
+    },
+    {
+      "id": "c007",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u01",
+      "source_line": 2,
+      "source_start": 43,
+      "source_end": 45
+    },
+    {
+      "id": "c008",
+      "text": "早",
+      "pinyin": [
+        "zao"
+      ],
+      "keys": "926",
+      "syllable_keys": [
+        "926"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u01",
+      "source_line": 2,
+      "source_start": 46,
+      "source_end": 47
+    },
+    {
+      "id": "c009",
+      "text": "你今天怎么起这么早",
+      "pinyin": [
+        "ni",
+        "jin",
+        "tian",
+        "zen",
+        "me",
+        "qi",
+        "zhe",
+        "me",
+        "zao"
+      ],
+      "keys": "645468426936637494363926",
+      "syllable_keys": [
+        "64",
+        "546",
+        "8426",
+        "936",
+        "63",
+        "74",
+        "943",
+        "63",
+        "926"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u01",
+      "source_line": 2,
+      "source_start": 48,
+      "source_end": 57
+    },
+    {
+      "id": "c010",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u02",
+      "source_line": 2,
+      "source_start": 59,
+      "source_end": 61
+    },
+    {
+      "id": "c011",
+      "text": "别提了",
+      "pinyin": [
+        "bie",
+        "ti",
+        "le"
+      ],
+      "keys": "2438453",
+      "syllable_keys": [
+        "243",
+        "84",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u02",
+      "source_line": 2,
+      "source_start": 62,
+      "source_end": 65
+    },
+    {
+      "id": "c012",
+      "text": "六点半闹钟一响我就醒了",
+      "pinyin": [
+        "liu",
+        "dian",
+        "ban",
+        "nao",
+        "zhong",
+        "yi",
+        "xiang",
+        "wo",
+        "jiu",
+        "xing",
+        "le"
+      ],
+      "keys": "548342622662694664949426496548946453",
+      "syllable_keys": [
+        "548",
+        "3426",
+        "226",
+        "626",
+        "94664",
+        "94",
+        "94264",
+        "96",
+        "548",
+        "9464",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u02",
+      "source_line": 2,
+      "source_start": 66,
+      "source_end": 77
+    },
+    {
+      "id": "c013",
+      "text": "翻来覆去睡不着",
+      "pinyin": [
+        "fan",
+        "lai",
+        "fu",
+        "qu",
+        "shui",
+        "bu",
+        "zhao"
+      ],
+      "keys": "32652438787484289426",
+      "syllable_keys": [
+        "326",
+        "524",
+        "38",
+        "78",
+        "7484",
+        "28",
+        "9426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u02",
+      "source_line": 2,
+      "source_start": 78,
+      "source_end": 85
+    },
+    {
+      "id": "c014",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u03",
+      "source_line": 2,
+      "source_start": 87,
+      "source_end": 89
+    },
+    {
+      "id": "c015",
+      "text": "你这作息是真的健康",
+      "pinyin": [
+        "ni",
+        "zhe",
+        "zuo",
+        "xi",
+        "shi",
+        "zhen",
+        "de",
+        "jian",
+        "kang"
+      ],
+      "keys": "649439869474494363354265264",
+      "syllable_keys": [
+        "64",
+        "943",
+        "986",
+        "94",
+        "744",
+        "9436",
+        "33",
+        "5426",
+        "5264"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u03",
+      "source_line": 2,
+      "source_start": 90,
+      "source_end": 99
+    },
+    {
+      "id": "c016",
+      "text": "我闹钟按了五遍",
+      "pinyin": [
+        "wo",
+        "nao",
+        "zhong",
+        "an",
+        "le",
+        "wu",
+        "bian"
+      ],
+      "keys": "96626946642653982426",
+      "syllable_keys": [
+        "96",
+        "626",
+        "94664",
+        "26",
+        "53",
+        "98",
+        "2426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u03",
+      "source_line": 2,
+      "source_start": 100,
+      "source_end": 107
+    },
+    {
+      "id": "c017",
+      "text": "差点睡过头",
+      "pinyin": [
+        "cha",
+        "dian",
+        "shui",
+        "guo",
+        "tou"
+      ],
+      "keys": "24234267484486868",
+      "syllable_keys": [
+        "242",
+        "3426",
+        "7484",
+        "486",
+        "868"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u03",
+      "source_line": 2,
+      "source_start": 108,
+      "source_end": 113
+    },
+    {
+      "id": "c018",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u04",
+      "source_line": 2,
+      "source_start": 115,
+      "source_end": 117
+    },
+    {
+      "id": "c019",
+      "text": "吃了没",
+      "pinyin": [
+        "chi",
+        "le",
+        "mei"
+      ],
+      "keys": "24453634",
+      "syllable_keys": [
+        "244",
+        "53",
+        "634"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u04",
+      "source_line": 2,
+      "source_start": 118,
+      "source_end": 121
+    },
+    {
+      "id": "c020",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u05",
+      "source_line": 2,
+      "source_start": 123,
+      "source_end": 125
+    },
+    {
+      "id": "c021",
+      "text": "啃了个面包",
+      "pinyin": [
+        "ken",
+        "le",
+        "ge",
+        "mian",
+        "bao"
+      ],
+      "keys": "53653436426226",
+      "syllable_keys": [
+        "536",
+        "53",
+        "43",
+        "6426",
+        "226"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u05",
+      "source_line": 2,
+      "source_start": 126,
+      "source_end": 131
+    },
+    {
+      "id": "c022",
+      "text": "对付一口",
+      "pinyin": [
+        "dui",
+        "fu",
+        "yi",
+        "kou"
+      ],
+      "keys": "3843894568",
+      "syllable_keys": [
+        "384",
+        "38",
+        "94",
+        "568"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u05",
+      "source_line": 2,
+      "source_start": 132,
+      "source_end": 136
+    },
+    {
+      "id": "c023",
+      "text": "你呢",
+      "pinyin": [
+        "ni",
+        "ne"
+      ],
+      "keys": "6463",
+      "syllable_keys": [
+        "64",
+        "63"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "小周",
+      "utterance_id": "u05",
+      "source_line": 2,
+      "source_start": 137,
+      "source_end": 139
+    },
+    {
+      "id": "c024",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u06",
+      "source_line": 2,
+      "source_start": 141,
+      "source_end": 143
+    },
+    {
+      "id": "c025",
+      "text": "楼下买了俩包子一碗豆浆",
+      "pinyin": [
+        "lou",
+        "xia",
+        "mai",
+        "le",
+        "lia",
+        "bao",
+        "zi",
+        "yi",
+        "wan",
+        "dou",
+        "jiang"
+      ],
+      "keys": "56894262453542226949492636854264",
+      "syllable_keys": [
+        "568",
+        "942",
+        "624",
+        "53",
+        "542",
+        "226",
+        "94",
+        "94",
+        "926",
+        "368",
+        "54264"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u06",
+      "source_line": 2,
+      "source_start": 144,
+      "source_end": 155
+    },
+    {
+      "id": "c026",
+      "text": "八块钱",
+      "pinyin": [
+        "ba",
+        "kuai",
+        "qian"
+      ],
+      "keys": "2258247426",
+      "syllable_keys": [
+        "22",
+        "5824",
+        "7426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u06",
+      "source_line": 2,
+      "source_start": 156,
+      "source_end": 159
+    },
+    {
+      "id": "c027",
+      "text": "还算实惠",
+      "pinyin": [
+        "hai",
+        "suan",
+        "shi",
+        "hui"
+      ],
+      "keys": "4247826744484",
+      "syllable_keys": [
+        "424",
+        "7826",
+        "744",
+        "484"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "07:12",
+      "speaker": "老陈",
+      "utterance_id": "u06",
+      "source_line": 2,
+      "source_start": 160,
+      "source_end": 164
+    },
+    {
+      "id": "c028",
+      "text": "中午",
+      "pinyin": [
+        "zhong",
+        "wu"
+      ],
+      "keys": "9466498",
+      "syllable_keys": [
+        "94664",
+        "98"
+      ],
+      "is_body": false,
+      "role": "heading",
+      "time": "11:48",
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 3,
+      "source_start": 166,
+      "source_end": 168
+    },
+    {
+      "id": "c029",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u07",
+      "source_line": 3,
+      "source_start": 175,
+      "source_end": 177
+    },
+    {
+      "id": "c030",
+      "text": "中午吃啥",
+      "pinyin": [
+        "zhong",
+        "wu",
+        "chi",
+        "sha"
+      ],
+      "keys": "9466498244742",
+      "syllable_keys": [
+        "94664",
+        "98",
+        "244",
+        "742"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u07",
+      "source_line": 3,
+      "source_start": 178,
+      "source_end": 182
+    },
+    {
+      "id": "c031",
+      "text": "食堂还是点外卖",
+      "pinyin": [
+        "shi",
+        "tang",
+        "hai",
+        "shi",
+        "dian",
+        "wai",
+        "mai"
+      ],
+      "keys": "74482644247443426924624",
+      "syllable_keys": [
+        "744",
+        "8264",
+        "424",
+        "744",
+        "3426",
+        "924",
+        "624"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u07",
+      "source_line": 3,
+      "source_start": 183,
+      "source_end": 190
+    },
+    {
+      "id": "c032",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u08",
+      "source_line": 3,
+      "source_start": 192,
+      "source_end": 194
+    },
+    {
+      "id": "c033",
+      "text": "食堂吧",
+      "pinyin": [
+        "shi",
+        "tang",
+        "ba"
+      ],
+      "keys": "744826422",
+      "syllable_keys": [
+        "744",
+        "8264",
+        "22"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u08",
+      "source_line": 3,
+      "source_start": 195,
+      "source_end": 198
+    },
+    {
+      "id": "c034",
+      "text": "外卖翻来覆去就那几家",
+      "pinyin": [
+        "wai",
+        "mai",
+        "fan",
+        "lai",
+        "fu",
+        "qu",
+        "jiu",
+        "na",
+        "ji",
+        "jia"
+      ],
+      "keys": "92462432652438785486254542",
+      "syllable_keys": [
+        "924",
+        "624",
+        "326",
+        "524",
+        "38",
+        "78",
+        "548",
+        "62",
+        "54",
+        "542"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u08",
+      "source_line": 3,
+      "source_start": 199,
+      "source_end": 209
+    },
+    {
+      "id": "c035",
+      "text": "早吃腻了",
+      "pinyin": [
+        "zao",
+        "chi",
+        "ni",
+        "le"
+      ],
+      "keys": "9262446453",
+      "syllable_keys": [
+        "926",
+        "244",
+        "64",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u08",
+      "source_line": 3,
+      "source_start": 210,
+      "source_end": 214
+    },
+    {
+      "id": "c036",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u09",
+      "source_line": 3,
+      "source_start": 216,
+      "source_end": 218
+    },
+    {
+      "id": "c037",
+      "text": "行",
+      "pinyin": [
+        "xing"
+      ],
+      "keys": "9464",
+      "syllable_keys": [
+        "9464"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u09",
+      "source_line": 3,
+      "source_start": 219,
+      "source_end": 220
+    },
+    {
+      "id": "c038",
+      "text": "十二点楼下等你",
+      "pinyin": [
+        "shi",
+        "er",
+        "dian",
+        "lou",
+        "xia",
+        "deng",
+        "ni"
+      ],
+      "keys": "744373426568942336464",
+      "syllable_keys": [
+        "744",
+        "37",
+        "3426",
+        "568",
+        "942",
+        "3364",
+        "64"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u09",
+      "source_line": 3,
+      "source_start": 221,
+      "source_end": 228
+    },
+    {
+      "id": "c039",
+      "text": "别磨叽",
+      "pinyin": [
+        "bie",
+        "mo",
+        "ji"
+      ],
+      "keys": "2436654",
+      "syllable_keys": [
+        "243",
+        "66",
+        "54"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u09",
+      "source_line": 3,
+      "source_start": 229,
+      "source_end": 232
+    },
+    {
+      "id": "c040",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u10",
+      "source_line": 3,
+      "source_start": 234,
+      "source_end": 236
+    },
+    {
+      "id": "c041",
+      "text": "知道了",
+      "pinyin": [
+        "zhi",
+        "dao",
+        "le"
+      ],
+      "keys": "94432653",
+      "syllable_keys": [
+        "944",
+        "326",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u10",
+      "source_line": 3,
+      "source_start": 237,
+      "source_end": 240
+    },
+    {
+      "id": "c042",
+      "text": "我把手里这点活儿收个尾",
+      "pinyin": [
+        "wo",
+        "ba",
+        "shou",
+        "li",
+        "zhe",
+        "dian",
+        "huo",
+        "er",
+        "shou",
+        "ge",
+        "wei"
+      ],
+      "keys": "9622746854943342648637746843934",
+      "syllable_keys": [
+        "96",
+        "22",
+        "7468",
+        "54",
+        "943",
+        "3426",
+        "486",
+        "37",
+        "7468",
+        "43",
+        "934"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u10",
+      "source_line": 3,
+      "source_start": 241,
+      "source_end": 252
+    },
+    {
+      "id": "c043",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u11",
+      "source_line": 3,
+      "source_start": 254,
+      "source_end": 256
+    },
+    {
+      "id": "c044",
+      "text": "你那张表做完了",
+      "pinyin": [
+        "ni",
+        "na",
+        "zhang",
+        "biao",
+        "zuo",
+        "wan",
+        "le"
+      ],
+      "keys": "646294264242698692653",
+      "syllable_keys": [
+        "64",
+        "62",
+        "94264",
+        "2426",
+        "986",
+        "926",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u11",
+      "source_line": 3,
+      "source_start": 257,
+      "source_end": 264
+    },
+    {
+      "id": "c045",
+      "text": "我昨天弄到半夜",
+      "pinyin": [
+        "wo",
+        "zuo",
+        "tian",
+        "nong",
+        "dao",
+        "ban",
+        "ye"
+      ],
+      "keys": "969868426666432622693",
+      "syllable_keys": [
+        "96",
+        "986",
+        "8426",
+        "6664",
+        "326",
+        "226",
+        "93"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u11",
+      "source_line": 3,
+      "source_start": 265,
+      "source_end": 272
+    },
+    {
+      "id": "c046",
+      "text": "眼睛都花了",
+      "pinyin": [
+        "yan",
+        "jing",
+        "dou",
+        "hua",
+        "le"
+      ],
+      "keys": "926546436848253",
+      "syllable_keys": [
+        "926",
+        "5464",
+        "368",
+        "482",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u11",
+      "source_line": 3,
+      "source_start": 273,
+      "source_end": 278
+    },
+    {
+      "id": "c047",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u12",
+      "source_line": 3,
+      "source_start": 280,
+      "source_end": 282
+    },
+    {
+      "id": "c048",
+      "text": "差不多了",
+      "pinyin": [
+        "cha",
+        "bu",
+        "duo",
+        "le"
+      ],
+      "keys": "2422838653",
+      "syllable_keys": [
+        "242",
+        "28",
+        "386",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u12",
+      "source_line": 3,
+      "source_start": 283,
+      "source_end": 287
+    },
+    {
+      "id": "c049",
+      "text": "剩最后两列",
+      "pinyin": [
+        "sheng",
+        "zui",
+        "hou",
+        "liang",
+        "lie"
+      ],
+      "keys": "7436498446854264543",
+      "syllable_keys": [
+        "74364",
+        "984",
+        "468",
+        "54264",
+        "543"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u12",
+      "source_line": 3,
+      "source_start": 288,
+      "source_end": 293
+    },
+    {
+      "id": "c050",
+      "text": "下午再核一遍数",
+      "pinyin": [
+        "xia",
+        "wu",
+        "zai",
+        "he",
+        "yi",
+        "bian",
+        "shu"
+      ],
+      "keys": "9429892443942426748",
+      "syllable_keys": [
+        "942",
+        "98",
+        "924",
+        "43",
+        "94",
+        "2426",
+        "748"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u12",
+      "source_line": 3,
+      "source_start": 294,
+      "source_end": 301
+    },
+    {
+      "id": "c051",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u13",
+      "source_line": 3,
+      "source_start": 303,
+      "source_end": 305
+    },
+    {
+      "id": "c052",
+      "text": "记得核",
+      "pinyin": [
+        "ji",
+        "de",
+        "he"
+      ],
+      "keys": "543343",
+      "syllable_keys": [
+        "54",
+        "33",
+        "43"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u13",
+      "source_line": 3,
+      "source_start": 306,
+      "source_end": 309
+    },
+    {
+      "id": "c053",
+      "text": "上回就因为一个小数点",
+      "pinyin": [
+        "shang",
+        "hui",
+        "jiu",
+        "yin",
+        "wei",
+        "yi",
+        "ge",
+        "xiao",
+        "shu",
+        "dian"
+      ],
+      "keys": "74264484548946934944394267483426",
+      "syllable_keys": [
+        "74264",
+        "484",
+        "548",
+        "946",
+        "934",
+        "94",
+        "43",
+        "9426",
+        "748",
+        "3426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u13",
+      "source_line": 3,
+      "source_start": 310,
+      "source_end": 320
+    },
+    {
+      "id": "c054",
+      "text": "被领导念了半个钟头",
+      "pinyin": [
+        "bei",
+        "ling",
+        "dao",
+        "nian",
+        "le",
+        "ban",
+        "ge",
+        "zhong",
+        "tou"
+      ],
+      "keys": "23454643266426532264394664868",
+      "syllable_keys": [
+        "234",
+        "5464",
+        "326",
+        "6426",
+        "53",
+        "226",
+        "43",
+        "94664",
+        "868"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "小周",
+      "utterance_id": "u13",
+      "source_line": 3,
+      "source_start": 321,
+      "source_end": 330
+    },
+    {
+      "id": "c055",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u14",
+      "source_line": 3,
+      "source_start": 332,
+      "source_end": 334
+    },
+    {
+      "id": "c056",
+      "text": "那可不",
+      "pinyin": [
+        "na",
+        "ke",
+        "bu"
+      ],
+      "keys": "625328",
+      "syllable_keys": [
+        "62",
+        "53",
+        "28"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u14",
+      "source_line": 3,
+      "source_start": 335,
+      "source_end": 338
+    },
+    {
+      "id": "c057",
+      "text": "这回我盯得死死的",
+      "pinyin": [
+        "zhe",
+        "hui",
+        "wo",
+        "ding",
+        "de",
+        "si",
+        "si",
+        "de"
+      ],
+      "keys": "94348496346433747433",
+      "syllable_keys": [
+        "943",
+        "484",
+        "96",
+        "3464",
+        "33",
+        "74",
+        "74",
+        "33"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "11:48",
+      "speaker": "老陈",
+      "utterance_id": "u14",
+      "source_line": 3,
+      "source_start": 339,
+      "source_end": 347
+    },
+    {
+      "id": "c058",
+      "text": "中午",
+      "pinyin": [
+        "zhong",
+        "wu"
+      ],
+      "keys": "9466498",
+      "syllable_keys": [
+        "94664",
+        "98"
+      ],
+      "is_body": false,
+      "role": "heading",
+      "time": "12:40",
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 4,
+      "source_start": 349,
+      "source_end": 351
+    },
+    {
+      "id": "c059",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u15",
+      "source_line": 4,
+      "source_start": 358,
+      "source_end": 360
+    },
+    {
+      "id": "c060",
+      "text": "今天食堂居然有糖醋排骨",
+      "pinyin": [
+        "jin",
+        "tian",
+        "shi",
+        "tang",
+        "ju",
+        "ran",
+        "you",
+        "tang",
+        "cu",
+        "pai",
+        "gu"
+      ],
+      "keys": "546842674482645872696882642872448",
+      "syllable_keys": [
+        "546",
+        "8426",
+        "744",
+        "8264",
+        "58",
+        "726",
+        "968",
+        "8264",
+        "28",
+        "724",
+        "48"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u15",
+      "source_line": 4,
+      "source_start": 361,
+      "source_end": 372
+    },
+    {
+      "id": "c061",
+      "text": "我打了满满一盘",
+      "pinyin": [
+        "wo",
+        "da",
+        "le",
+        "man",
+        "man",
+        "yi",
+        "pan"
+      ],
+      "keys": "96325362662694726",
+      "syllable_keys": [
+        "96",
+        "32",
+        "53",
+        "626",
+        "626",
+        "94",
+        "726"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u15",
+      "source_line": 4,
+      "source_start": 373,
+      "source_end": 380
+    },
+    {
+      "id": "c062",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u16",
+      "source_line": 4,
+      "source_start": 382,
+      "source_end": 384
+    },
+    {
+      "id": "c063",
+      "text": "我看半天",
+      "pinyin": [
+        "wo",
+        "kan",
+        "ban",
+        "tian"
+      ],
+      "keys": "965262268426",
+      "syllable_keys": [
+        "96",
+        "526",
+        "226",
+        "8426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u16",
+      "source_line": 4,
+      "source_start": 385,
+      "source_end": 389
+    },
+    {
+      "id": "c064",
+      "text": "最后还是要了碗面",
+      "pinyin": [
+        "zui",
+        "hou",
+        "hai",
+        "shi",
+        "yao",
+        "le",
+        "wan",
+        "mian"
+      ],
+      "keys": "984468424744926539266426",
+      "syllable_keys": [
+        "984",
+        "468",
+        "424",
+        "744",
+        "926",
+        "53",
+        "926",
+        "6426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u16",
+      "source_line": 4,
+      "source_start": 390,
+      "source_end": 398
+    },
+    {
+      "id": "c065",
+      "text": "没什么胃口",
+      "pinyin": [
+        "mei",
+        "shen",
+        "me",
+        "wei",
+        "kou"
+      ],
+      "keys": "634743663934568",
+      "syllable_keys": [
+        "634",
+        "7436",
+        "63",
+        "934",
+        "568"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u16",
+      "source_line": 4,
+      "source_start": 399,
+      "source_end": 404
+    },
+    {
+      "id": "c066",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u17",
+      "source_line": 4,
+      "source_start": 406,
+      "source_end": 408
+    },
+    {
+      "id": "c067",
+      "text": "是不是又熬夜了",
+      "pinyin": [
+        "shi",
+        "bu",
+        "shi",
+        "you",
+        "ao",
+        "ye",
+        "le"
+      ],
+      "keys": "74428744968269353",
+      "syllable_keys": [
+        "744",
+        "28",
+        "744",
+        "968",
+        "26",
+        "93",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u17",
+      "source_line": 4,
+      "source_start": 409,
+      "source_end": 416
+    },
+    {
+      "id": "c068",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u18",
+      "source_line": 4,
+      "source_start": 418,
+      "source_end": 420
+    },
+    {
+      "id": "c069",
+      "text": "昨晚刷视频刷到一点半",
+      "pinyin": [
+        "zuo",
+        "wan",
+        "shua",
+        "shi",
+        "pin",
+        "shua",
+        "dao",
+        "yi",
+        "dian",
+        "ban"
+      ],
+      "keys": "98692674827447467482326943426226",
+      "syllable_keys": [
+        "986",
+        "926",
+        "7482",
+        "744",
+        "746",
+        "7482",
+        "326",
+        "94",
+        "3426",
+        "226"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u18",
+      "source_line": 4,
+      "source_start": 421,
+      "source_end": 431
+    },
+    {
+      "id": "c070",
+      "text": "后悔死了",
+      "pinyin": [
+        "hou",
+        "hui",
+        "si",
+        "le"
+      ],
+      "keys": "4684847453",
+      "syllable_keys": [
+        "468",
+        "484",
+        "74",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u18",
+      "source_line": 4,
+      "source_start": 432,
+      "source_end": 436
+    },
+    {
+      "id": "c071",
+      "text": "今天整个人都是懵的",
+      "pinyin": [
+        "jin",
+        "tian",
+        "zheng",
+        "ge",
+        "ren",
+        "dou",
+        "shi",
+        "meng",
+        "de"
+      ],
+      "keys": "54684269436443736368744636433",
+      "syllable_keys": [
+        "546",
+        "8426",
+        "94364",
+        "43",
+        "736",
+        "368",
+        "744",
+        "6364",
+        "33"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "小周",
+      "utterance_id": "u18",
+      "source_line": 4,
+      "source_start": 437,
+      "source_end": 446
+    },
+    {
+      "id": "c072",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u19",
+      "source_line": 4,
+      "source_start": 448,
+      "source_end": 450
+    },
+    {
+      "id": "c073",
+      "text": "少刷点",
+      "pinyin": [
+        "shao",
+        "shua",
+        "dian"
+      ],
+      "keys": "742674823426",
+      "syllable_keys": [
+        "7426",
+        "7482",
+        "3426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u19",
+      "source_line": 4,
+      "source_start": 451,
+      "source_end": 454
+    },
+    {
+      "id": "c074",
+      "text": "早睡比啥都强",
+      "pinyin": [
+        "zao",
+        "shui",
+        "bi",
+        "sha",
+        "dou",
+        "qiang"
+      ],
+      "keys": "92674842474236874264",
+      "syllable_keys": [
+        "926",
+        "7484",
+        "24",
+        "742",
+        "368",
+        "74264"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u19",
+      "source_line": 4,
+      "source_start": 455,
+      "source_end": 461
+    },
+    {
+      "id": "c075",
+      "text": "说着容易做着难",
+      "pinyin": [
+        "shuo",
+        "zhe",
+        "rong",
+        "yi",
+        "zuo",
+        "zhe",
+        "nan"
+      ],
+      "keys": "7486943766494986943626",
+      "syllable_keys": [
+        "7486",
+        "943",
+        "7664",
+        "94",
+        "986",
+        "943",
+        "626"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u19",
+      "source_line": 4,
+      "source_start": 462,
+      "source_end": 469
+    },
+    {
+      "id": "c076",
+      "text": "我也一样",
+      "pinyin": [
+        "wo",
+        "ye",
+        "yi",
+        "yang"
+      ],
+      "keys": "9693949264",
+      "syllable_keys": [
+        "96",
+        "93",
+        "94",
+        "9264"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "12:40",
+      "speaker": "老陈",
+      "utterance_id": "u19",
+      "source_line": 4,
+      "source_start": 470,
+      "source_end": 474
+    },
+    {
+      "id": "c077",
+      "text": "下午",
+      "pinyin": [
+        "xia",
+        "wu"
+      ],
+      "keys": "94298",
+      "syllable_keys": [
+        "942",
+        "98"
+      ],
+      "is_body": false,
+      "role": "heading",
+      "time": "15:20",
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 5,
+      "source_start": 476,
+      "source_end": 478
+    },
+    {
+      "id": "c078",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u20",
+      "source_line": 5,
+      "source_start": 485,
+      "source_end": 487
+    },
+    {
+      "id": "c079",
+      "text": "会开完了",
+      "pinyin": [
+        "hui",
+        "kai",
+        "wan",
+        "le"
+      ],
+      "keys": "48452492653",
+      "syllable_keys": [
+        "484",
+        "524",
+        "926",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u20",
+      "source_line": 5,
+      "source_start": 488,
+      "source_end": 492
+    },
+    {
+      "id": "c080",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u21",
+      "source_line": 5,
+      "source_start": 494,
+      "source_end": 496
+    },
+    {
+      "id": "c081",
+      "text": "刚散",
+      "pinyin": [
+        "gang",
+        "san"
+      ],
+      "keys": "4264726",
+      "syllable_keys": [
+        "4264",
+        "726"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u21",
+      "source_line": 5,
+      "source_start": 497,
+      "source_end": 499
+    },
+    {
+      "id": "c082",
+      "text": "开了四十分钟",
+      "pinyin": [
+        "kai",
+        "le",
+        "si",
+        "shi",
+        "fen",
+        "zhong"
+      ],
+      "keys": "524537474433694664",
+      "syllable_keys": [
+        "524",
+        "53",
+        "74",
+        "744",
+        "336",
+        "94664"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u21",
+      "source_line": 5,
+      "source_start": 500,
+      "source_end": 506
+    },
+    {
+      "id": "c083",
+      "text": "二十分钟都在等投影连上",
+      "pinyin": [
+        "er",
+        "shi",
+        "fen",
+        "zhong",
+        "dou",
+        "zai",
+        "deng",
+        "tou",
+        "ying",
+        "lian",
+        "shang"
+      ],
+      "keys": "377443369466436892433648689464542674264",
+      "syllable_keys": [
+        "37",
+        "744",
+        "336",
+        "94664",
+        "368",
+        "924",
+        "3364",
+        "868",
+        "9464",
+        "5426",
+        "74264"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u21",
+      "source_line": 5,
+      "source_start": 507,
+      "source_end": 518
+    },
+    {
+      "id": "c084",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u22",
+      "source_line": 5,
+      "source_start": 520,
+      "source_end": 522
+    },
+    {
+      "id": "c085",
+      "text": "这很常见",
+      "pinyin": [
+        "zhe",
+        "hen",
+        "chang",
+        "jian"
+      ],
+      "keys": "943436242645426",
+      "syllable_keys": [
+        "943",
+        "436",
+        "24264",
+        "5426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u22",
+      "source_line": 5,
+      "source_start": 523,
+      "source_end": 527
+    },
+    {
+      "id": "c086",
+      "text": "我早习惯了",
+      "pinyin": [
+        "wo",
+        "zao",
+        "xi",
+        "guan",
+        "le"
+      ],
+      "keys": "9692694482653",
+      "syllable_keys": [
+        "96",
+        "926",
+        "94",
+        "4826",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u22",
+      "source_line": 5,
+      "source_start": 528,
+      "source_end": 533
+    },
+    {
+      "id": "c087",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u23",
+      "source_line": 5,
+      "source_start": 535,
+      "source_end": 537
+    },
+    {
+      "id": "c088",
+      "text": "会上还临时加了两个需求",
+      "pinyin": [
+        "hui",
+        "shang",
+        "hai",
+        "lin",
+        "shi",
+        "jia",
+        "le",
+        "liang",
+        "ge",
+        "xu",
+        "qiu"
+      ],
+      "keys": "4847426442454674454253542644398748",
+      "syllable_keys": [
+        "484",
+        "74264",
+        "424",
+        "546",
+        "744",
+        "542",
+        "53",
+        "54264",
+        "43",
+        "98",
+        "748"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u23",
+      "source_line": 5,
+      "source_start": 538,
+      "source_end": 549
+    },
+    {
+      "id": "c089",
+      "text": "说是下周就要",
+      "pinyin": [
+        "shuo",
+        "shi",
+        "xia",
+        "zhou",
+        "jiu",
+        "yao"
+      ],
+      "keys": "74867449429468548926",
+      "syllable_keys": [
+        "7486",
+        "744",
+        "942",
+        "9468",
+        "548",
+        "926"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u23",
+      "source_line": 5,
+      "source_start": 550,
+      "source_end": 556
+    },
+    {
+      "id": "c090",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u24",
+      "source_line": 5,
+      "source_start": 558,
+      "source_end": 560
+    },
+    {
+      "id": "c091",
+      "text": "又加",
+      "pinyin": [
+        "you",
+        "jia"
+      ],
+      "keys": "968542",
+      "syllable_keys": [
+        "968",
+        "542"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u24",
+      "source_line": 5,
+      "source_start": 561,
+      "source_end": 563
+    },
+    {
+      "id": "c092",
+      "text": "那这周又别想准点下班了",
+      "pinyin": [
+        "na",
+        "zhe",
+        "zhou",
+        "you",
+        "bie",
+        "xiang",
+        "zhun",
+        "dian",
+        "xia",
+        "ban",
+        "le"
+      ],
+      "keys": "629439468968243942649486342694222653",
+      "syllable_keys": [
+        "62",
+        "943",
+        "9468",
+        "968",
+        "243",
+        "94264",
+        "9486",
+        "3426",
+        "942",
+        "226",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "小周",
+      "utterance_id": "u24",
+      "source_line": 5,
+      "source_start": 564,
+      "source_end": 575
+    },
+    {
+      "id": "c093",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u25",
+      "source_line": 5,
+      "source_start": 577,
+      "source_end": 579
+    },
+    {
+      "id": "c094",
+      "text": "走一步看一步吧",
+      "pinyin": [
+        "zou",
+        "yi",
+        "bu",
+        "kan",
+        "yi",
+        "bu",
+        "ba"
+      ],
+      "keys": "9689428526942822",
+      "syllable_keys": [
+        "968",
+        "94",
+        "28",
+        "526",
+        "94",
+        "28",
+        "22"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u25",
+      "source_line": 5,
+      "source_start": 580,
+      "source_end": 587
+    },
+    {
+      "id": "c095",
+      "text": "先把能做的做了",
+      "pinyin": [
+        "xian",
+        "ba",
+        "neng",
+        "zuo",
+        "de",
+        "zuo",
+        "le"
+      ],
+      "keys": "94262263649863398653",
+      "syllable_keys": [
+        "9426",
+        "22",
+        "6364",
+        "986",
+        "33",
+        "986",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "15:20",
+      "speaker": "老陈",
+      "utterance_id": "u25",
+      "source_line": 5,
+      "source_start": 588,
+      "source_end": 595
+    },
+    {
+      "id": "c096",
+      "text": "下午",
+      "pinyin": [
+        "xia",
+        "wu"
+      ],
+      "keys": "94298",
+      "syllable_keys": [
+        "942",
+        "98"
+      ],
+      "is_body": false,
+      "role": "heading",
+      "time": "17:05",
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 6,
+      "source_start": 597,
+      "source_end": 599
+    },
+    {
+      "id": "c097",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u26",
+      "source_line": 6,
+      "source_start": 606,
+      "source_end": 608
+    },
+    {
+      "id": "c098",
+      "text": "今天风挺大",
+      "pinyin": [
+        "jin",
+        "tian",
+        "feng",
+        "ting",
+        "da"
+      ],
+      "keys": "54684263364846432",
+      "syllable_keys": [
+        "546",
+        "8426",
+        "3364",
+        "8464",
+        "32"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u26",
+      "source_line": 6,
+      "source_start": 609,
+      "source_end": 614
+    },
+    {
+      "id": "c099",
+      "text": "出门记得套件外套",
+      "pinyin": [
+        "chu",
+        "men",
+        "ji",
+        "de",
+        "tao",
+        "jian",
+        "wai",
+        "tao"
+      ],
+      "keys": "24863654338265426924826",
+      "syllable_keys": [
+        "248",
+        "636",
+        "54",
+        "33",
+        "826",
+        "5426",
+        "924",
+        "826"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u26",
+      "source_line": 6,
+      "source_start": 615,
+      "source_end": 623
+    },
+    {
+      "id": "c100",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u27",
+      "source_line": 6,
+      "source_start": 625,
+      "source_end": 627
+    },
+    {
+      "id": "c101",
+      "text": "知道了",
+      "pinyin": [
+        "zhi",
+        "dao",
+        "le"
+      ],
+      "keys": "94432653",
+      "syllable_keys": [
+        "944",
+        "326",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u27",
+      "source_line": 6,
+      "source_start": 628,
+      "source_end": 631
+    },
+    {
+      "id": "c102",
+      "text": "我妈早上也这么跟我说",
+      "pinyin": [
+        "wo",
+        "ma",
+        "zao",
+        "shang",
+        "ye",
+        "zhe",
+        "me",
+        "gen",
+        "wo",
+        "shuo"
+      ],
+      "keys": "9662926742649394363436967486",
+      "syllable_keys": [
+        "96",
+        "62",
+        "926",
+        "74264",
+        "93",
+        "943",
+        "63",
+        "436",
+        "96",
+        "7486"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u27",
+      "source_line": 6,
+      "source_start": 632,
+      "source_end": 642
+    },
+    {
+      "id": "c103",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u28",
+      "source_line": 6,
+      "source_start": 644,
+      "source_end": 646
+    },
+    {
+      "id": "c104",
+      "text": "当妈的都这样",
+      "pinyin": [
+        "dang",
+        "ma",
+        "de",
+        "dou",
+        "zhe",
+        "yang"
+      ],
+      "keys": "326462333689439264",
+      "syllable_keys": [
+        "3264",
+        "62",
+        "33",
+        "368",
+        "943",
+        "9264"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u28",
+      "source_line": 6,
+      "source_start": 647,
+      "source_end": 653
+    },
+    {
+      "id": "c105",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u29",
+      "source_line": 6,
+      "source_start": 655,
+      "source_end": 657
+    },
+    {
+      "id": "c106",
+      "text": "下班一起走吗",
+      "pinyin": [
+        "xia",
+        "ban",
+        "yi",
+        "qi",
+        "zou",
+        "ma"
+      ],
+      "keys": "942226947496862",
+      "syllable_keys": [
+        "942",
+        "226",
+        "94",
+        "74",
+        "968",
+        "62"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u29",
+      "source_line": 6,
+      "source_start": 658,
+      "source_end": 664
+    },
+    {
+      "id": "c107",
+      "text": "我这边六点差不多能收工",
+      "pinyin": [
+        "wo",
+        "zhe",
+        "bian",
+        "liu",
+        "dian",
+        "cha",
+        "bu",
+        "duo",
+        "neng",
+        "shou",
+        "gong"
+      ],
+      "keys": "969432426548342624228386636474684664",
+      "syllable_keys": [
+        "96",
+        "943",
+        "2426",
+        "548",
+        "3426",
+        "242",
+        "28",
+        "386",
+        "6364",
+        "7468",
+        "4664"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u29",
+      "source_line": 6,
+      "source_start": 665,
+      "source_end": 676
+    },
+    {
+      "id": "c108",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u30",
+      "source_line": 6,
+      "source_start": 678,
+      "source_end": 680
+    },
+    {
+      "id": "c109",
+      "text": "我尽量",
+      "pinyin": [
+        "wo",
+        "jin",
+        "liang"
+      ],
+      "keys": "9654654264",
+      "syllable_keys": [
+        "96",
+        "546",
+        "54264"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u30",
+      "source_line": 6,
+      "source_start": 681,
+      "source_end": 684
+    },
+    {
+      "id": "c110",
+      "text": "要是拖到七点你就先走",
+      "pinyin": [
+        "yao",
+        "shi",
+        "tuo",
+        "dao",
+        "qi",
+        "dian",
+        "ni",
+        "jiu",
+        "xian",
+        "zou"
+      ],
+      "keys": "926744886326743426645489426968",
+      "syllable_keys": [
+        "926",
+        "744",
+        "886",
+        "326",
+        "74",
+        "3426",
+        "64",
+        "548",
+        "9426",
+        "968"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u30",
+      "source_line": 6,
+      "source_start": 685,
+      "source_end": 695
+    },
+    {
+      "id": "c111",
+      "text": "别等我",
+      "pinyin": [
+        "bie",
+        "deng",
+        "wo"
+      ],
+      "keys": "243336496",
+      "syllable_keys": [
+        "243",
+        "3364",
+        "96"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "小周",
+      "utterance_id": "u30",
+      "source_line": 6,
+      "source_start": 696,
+      "source_end": 699
+    },
+    {
+      "id": "c112",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u31",
+      "source_line": 6,
+      "source_start": 701,
+      "source_end": 703
+    },
+    {
+      "id": "c113",
+      "text": "行",
+      "pinyin": [
+        "xing"
+      ],
+      "keys": "9464",
+      "syllable_keys": [
+        "9464"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u31",
+      "source_line": 6,
+      "source_start": 704,
+      "source_end": 705
+    },
+    {
+      "id": "c114",
+      "text": "微信上说",
+      "pinyin": [
+        "wei",
+        "xin",
+        "shang",
+        "shuo"
+      ],
+      "keys": "934946742647486",
+      "syllable_keys": [
+        "934",
+        "946",
+        "74264",
+        "7486"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "17:05",
+      "speaker": "老陈",
+      "utterance_id": "u31",
+      "source_line": 6,
+      "source_start": 706,
+      "source_end": 710
+    },
+    {
+      "id": "c115",
+      "text": "傍晚",
+      "pinyin": [
+        "bang",
+        "wan"
+      ],
+      "keys": "2264926",
+      "syllable_keys": [
+        "2264",
+        "926"
+      ],
+      "is_body": false,
+      "role": "heading",
+      "time": "18:50",
+      "speaker": null,
+      "utterance_id": null,
+      "source_line": 7,
+      "source_start": 712,
+      "source_end": 714
+    },
+    {
+      "id": "c116",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u32",
+      "source_line": 7,
+      "source_start": 721,
+      "source_end": 723
+    },
+    {
+      "id": "c117",
+      "text": "我出来了",
+      "pinyin": [
+        "wo",
+        "chu",
+        "lai",
+        "le"
+      ],
+      "keys": "9624852453",
+      "syllable_keys": [
+        "96",
+        "248",
+        "524",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u32",
+      "source_line": 7,
+      "source_start": 724,
+      "source_end": 728
+    },
+    {
+      "id": "c118",
+      "text": "在楼门口",
+      "pinyin": [
+        "zai",
+        "lou",
+        "men",
+        "kou"
+      ],
+      "keys": "924568636568",
+      "syllable_keys": [
+        "924",
+        "568",
+        "636",
+        "568"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u32",
+      "source_line": 7,
+      "source_start": 729,
+      "source_end": 733
+    },
+    {
+      "id": "c119",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "18:50",
+      "speaker": "小周",
+      "utterance_id": "u33",
+      "source_line": 7,
+      "source_start": 735,
+      "source_end": 737
+    },
+    {
+      "id": "c120",
+      "text": "等我五分钟",
+      "pinyin": [
+        "deng",
+        "wo",
+        "wu",
+        "fen",
+        "zhong"
+      ],
+      "keys": "3364969833694664",
+      "syllable_keys": [
+        "3364",
+        "96",
+        "98",
+        "336",
+        "94664"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "小周",
+      "utterance_id": "u33",
+      "source_line": 7,
+      "source_start": 738,
+      "source_end": 743
+    },
+    {
+      "id": "c121",
+      "text": "刚存上文件",
+      "pinyin": [
+        "gang",
+        "cun",
+        "shang",
+        "wen",
+        "jian"
+      ],
+      "keys": "4264286742649365426",
+      "syllable_keys": [
+        "4264",
+        "286",
+        "74264",
+        "936",
+        "5426"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "小周",
+      "utterance_id": "u33",
+      "source_line": 7,
+      "source_start": 744,
+      "source_end": 749
+    },
+    {
+      "id": "c122",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u34",
+      "source_line": 7,
+      "source_start": 751,
+      "source_end": 753
+    },
+    {
+      "id": "c123",
+      "text": "不急",
+      "pinyin": [
+        "bu",
+        "ji"
+      ],
+      "keys": "2854",
+      "syllable_keys": [
+        "28",
+        "54"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u34",
+      "source_line": 7,
+      "source_start": 754,
+      "source_end": 756
+    },
+    {
+      "id": "c124",
+      "text": "我顺手买了瓶水",
+      "pinyin": [
+        "wo",
+        "shun",
+        "shou",
+        "mai",
+        "le",
+        "ping",
+        "shui"
+      ],
+      "keys": "96748674686245374647484",
+      "syllable_keys": [
+        "96",
+        "7486",
+        "7468",
+        "624",
+        "53",
+        "7464",
+        "7484"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u34",
+      "source_line": 7,
+      "source_start": 757,
+      "source_end": 764
+    },
+    {
+      "id": "c125",
+      "text": "给你也带了一瓶",
+      "pinyin": [
+        "gei",
+        "ni",
+        "ye",
+        "dai",
+        "le",
+        "yi",
+        "ping"
+      ],
+      "keys": "434649332453947464",
+      "syllable_keys": [
+        "434",
+        "64",
+        "93",
+        "324",
+        "53",
+        "94",
+        "7464"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u34",
+      "source_line": 7,
+      "source_start": 765,
+      "source_end": 772
+    },
+    {
+      "id": "c126",
+      "text": "小周",
+      "pinyin": [
+        "xiao",
+        "zhou"
+      ],
+      "keys": "94269468",
+      "syllable_keys": [
+        "9426",
+        "9468"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "18:50",
+      "speaker": "小周",
+      "utterance_id": "u35",
+      "source_line": 7,
+      "source_start": 774,
+      "source_end": 776
+    },
+    {
+      "id": "c127",
+      "text": "谢了啊",
+      "pinyin": [
+        "xie",
+        "le",
+        "a"
+      ],
+      "keys": "943532",
+      "syllable_keys": [
+        "943",
+        "53",
+        "2"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "小周",
+      "utterance_id": "u35",
+      "source_line": 7,
+      "source_start": 777,
+      "source_end": 780
+    },
+    {
+      "id": "c128",
+      "text": "回头请你喝奶茶",
+      "pinyin": [
+        "hui",
+        "tou",
+        "qing",
+        "ni",
+        "he",
+        "nai",
+        "cha"
+      ],
+      "keys": "48486874646443624242",
+      "syllable_keys": [
+        "484",
+        "868",
+        "7464",
+        "64",
+        "43",
+        "624",
+        "242"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "小周",
+      "utterance_id": "u35",
+      "source_line": 7,
+      "source_start": 781,
+      "source_end": 788
+    },
+    {
+      "id": "c129",
+      "text": "老陈",
+      "pinyin": [
+        "lao",
+        "chen"
+      ],
+      "keys": "5262436",
+      "syllable_keys": [
+        "526",
+        "2436"
+      ],
+      "is_body": false,
+      "role": "speaker",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u36",
+      "source_line": 7,
+      "source_start": 790,
+      "source_end": 792
+    },
+    {
+      "id": "c130",
+      "text": "这话你说过三回了",
+      "pinyin": [
+        "zhe",
+        "hua",
+        "ni",
+        "shuo",
+        "guo",
+        "san",
+        "hui",
+        "le"
+      ],
+      "keys": "94348264748648672648453",
+      "syllable_keys": [
+        "943",
+        "482",
+        "64",
+        "7486",
+        "486",
+        "726",
+        "484",
+        "53"
+      ],
+      "is_body": true,
+      "role": "body",
+      "time": "18:50",
+      "speaker": "老陈",
+      "utterance_id": "u36",
+      "source_line": 7,
+      "source_start": 793,
+      "source_end": 801
+    }
+  ]
+}

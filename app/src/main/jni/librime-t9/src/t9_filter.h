@@ -2,6 +2,7 @@
 #define RIME_T9_FILTER_H_
 
 #include <string>
+#include "t9_suppression.h"
 
 #ifndef T9_ALGO_ONLY_BUILD
 #include <rime/filter.h>
@@ -67,7 +68,9 @@ public:
     T9Translation(an<Translation> translation,
                    char auto_delim,
                    char manual_delim,
-                   bool convert_preedit);
+                   bool convert_preedit,
+                   std::shared_ptr<T9SuppressionStore> suppression,
+                   std::string schema);
     bool Next() override;
     an<Candidate> Peek() override { return cand_; }
 
@@ -83,6 +86,8 @@ private:
     char manual_delim_;
     // false（isDisplayOriginalPreedit: true）时透传 preedit，仅缓存 Phrase 码供调频。
     bool convert_preedit_ = false;
+    std::shared_ptr<T9SuppressionStore> suppression_;
+    std::string schema_;
 };
 
 class T9Filter : public Filter {
@@ -92,6 +97,8 @@ public:
                            CandidateList* candidates) override;
 private:
     bool convert_preedit_ = false;
+    std::shared_ptr<T9SuppressionStore> suppression_;
+    std::string schema_;
     char auto_delimiter_ = ' ';
     char manual_delimiter_ = '\'';
 };

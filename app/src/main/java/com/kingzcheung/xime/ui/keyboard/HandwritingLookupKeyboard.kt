@@ -56,6 +56,11 @@ fun HandwritingLookupKeyboard(
     clearSignal: Int,
     modifier: Modifier = Modifier,
 ) {
+    val language = uiState.inputProfile.language
+    if (!com.kingzcheung.xime.handwriting.HandwritingLanguages.supports(language)) {
+        HandwritingUnavailable(language, modifier, onExit)
+        return
+    }
     KeyboardKeySpacingScope(modifier, columns = 6f) { bodyModifier ->
     val strokes = remember { mutableStateListOf<List<StrokePoint>>() }
     val inkColor = rememberHandwritingInk(keyboardBgColor)
@@ -71,7 +76,7 @@ fun HandwritingLookupKeyboard(
     val recognizer = remember { OverlappedHandwritingRecognizer() }
     var recognizeJob by remember { mutableStateOf<Job?>(null) }
 
-    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context) } }
+    LaunchedEffect(language) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context, language) } }
 
     /** 视觉消失调度：450ms 后 gonePrefix 推进到 target（笔画数据保留，渲染层跳过）。 */
     fun scheduleGone(target: Int) {
@@ -120,7 +125,8 @@ fun HandwritingLookupKeyboard(
             val pairs = window.map { stroke -> stroke.map { Pair(it.x, it.y) } }
             val gaps = HandwritingStrokeFx.windowGaps(window)
             val result = withContext(Dispatchers.Default) {
-                recognizer.recognize(pairs, gaps)
+                recognizer.recognize(pairs, gaps,
+                    predictFn = { points, topK -> HandwritingEngine.predict(points, topK, language) })
             }
             if (!isActive) return@launch
             if (result.segments.isNotEmpty()) {

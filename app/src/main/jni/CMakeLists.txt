@@ -4,6 +4,11 @@ project(kime VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# AGP invokes Ninja directly; bound its compiler and linker jobs too.
+set_property(GLOBAL PROPERTY JOB_POOLS cyime_compile=2 cyime_link=1)
+set(CMAKE_JOB_POOL_COMPILE cyime_compile)
+set(CMAKE_JOB_POOL_LINK cyime_link)
+
 # F-Droid 可复现构建：AGP 对 release 变体使用 RelWithDebInfo（-O2 -g -DNDEBUG），
 # 其中的 -g 会把绝对源码路径嵌入 .so 的调试信息，不同构建环境路径不同
 # 导致产物不一致。此处统一去掉 -g，使 native 产物与源码路径无关。
@@ -169,6 +174,9 @@ set_target_properties(onnxruntime PROPERTIES
     IMPORTED_LOCATION "${ONNXRUNTIME_DIR}/lib/${ANDROID_ABI}/libonnxruntime.so"
     INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_DIR}/include"
 )
+target_link_libraries(rime_jni onnxruntime)
+target_link_libraries(rime-static "$<LINK_ONLY:onnxruntime>")
+target_include_directories(rime-t9-objs PRIVATE "${ONNXRUNTIME_DIR}/include")
 
 add_library(onnx_env SHARED
     onnx_env.cc
