@@ -305,7 +305,7 @@ fun CandidateBar(
         modifier = modifier
             .fillMaxWidth()
             .height(44.dp)
-            .background(visuals.backgroundColor)
+            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else visuals.backgroundColor)
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center,
     ) {

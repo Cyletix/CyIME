@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,11 +33,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kingzcheung.xime.settings.BackgroundConfig
+import com.kingzcheung.xime.ui.theme.keyboardBackground
 import com.kingzcheung.xime.viewmodel.KeyEffectSettingsViewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +81,77 @@ fun KeyEffectSettingsContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                SettingsSection(title = "磨砂玻璃", content = {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("启用磨砂玻璃", style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    "模糊键盘背景，文字保持清晰；图片或渐变背景效果更明显",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = uiState.frostedGlass.enabled,
+                                onCheckedChange = viewModel::setFrostedGlassEnabled,
+                            )
+                        }
+                        if (uiState.frostedGlass.enabled) {
+                            FrostedGlassSlider(
+                                label = "模糊强度",
+                                valueLabel = "${uiState.frostedGlass.blurRadiusDp.roundToInt()} dp",
+                                value = uiState.frostedGlass.blurRadiusDp,
+                                valueRange = 0f..40f,
+                                onValueChange = { viewModel.setFrostedGlassBlurRadius(it.roundToInt().toFloat()) },
+                            )
+                            FrostedGlassSlider(
+                                label = "背景遮罩不透明度",
+                                valueLabel = "${(uiState.frostedGlass.backgroundOpacity * 100).roundToInt()}%",
+                                value = uiState.frostedGlass.backgroundOpacity,
+                                onValueChange = { viewModel.setFrostedGlassBackgroundOpacity((it * 100).roundToInt() / 100f) },
+                            )
+                            FrostedGlassSlider(
+                                label = "按键不透明度",
+                                valueLabel = "${(uiState.frostedGlass.keyOpacity * 100).roundToInt()}%",
+                                value = uiState.frostedGlass.keyOpacity,
+                                onValueChange = { viewModel.setFrostedGlassKeyOpacity((it * 100).roundToInt() / 100f) },
+                            )
+                            Text(
+                                "遮罩越低，背景图越明显；按键 0% 透明、100% 不透明。模糊强度为 0 时保留原背景细节",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text("效果预览", style = MaterialTheme.typography.labelMedium)
+                        CompositionLocalProvider(
+                            LocalKeyboardInputPreferences provides rememberKeyboardInputPreferences()
+                                .copy(frostedGlass = uiState.frostedGlass),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF252628))
+                                    .keyboardBackground(
+                                        background = BackgroundConfig(
+                                            type = "gradient",
+                                            colors = listOf(0x252628L, 0x475552L, 0x87985EL, 0x20272CL),
+                                            angle = 25,
+                                        ),
+                                        isDark = true,
+                                        fallbackColor = Color(0xFF252628),
+                                        frostedGlass = uiState.frostedGlass,
+                                    )
+                                    .padding(8.dp).height(64.dp),
+                            ) {
+                                listOf("A", "あ", "123", "空格").forEach { label ->
+                                    KeyButton(label, {}, Color(0xFF686B66), Color.White, Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                })
+            }
             item {
                 SettingsSection(title = "按键光效", content = {
                     Column(Modifier.padding(16.dp)) {
@@ -366,5 +445,27 @@ fun KeyEffectSettingsContent(
                 })
             }
         }
+    }
+}
+
+@Composable
+private fun FrostedGlassSlider(
+    label: String,
+    valueLabel: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+) {
+    Column {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(valueLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            modifier = Modifier.semantics { contentDescription = label },
+        )
     }
 }

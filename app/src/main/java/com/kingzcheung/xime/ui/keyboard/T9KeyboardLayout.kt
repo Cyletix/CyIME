@@ -387,8 +387,9 @@ private fun T9KeyboardContent(
     }
 
     val density = LocalDensity.current
-    val candidateShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val candidateShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(keyBackgroundColor)
@@ -422,7 +423,7 @@ private fun T9KeyboardContent(
                     .padding(scaledKeyVisualPadding())
                     .then(candidateShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                    .background(keyBackgroundColor)
+                    .background(frostedKeyColor(keyBackgroundColor, keyTextColor, frostedGlass))
             ) {
                 val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
                 val currentFirstOptions = controller.firstOptions
@@ -820,7 +821,10 @@ private fun CandidateItem(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else Color.Transparent)
+            .background(if (isPressed) frostedKeyColor(
+                backgroundColor, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
+                legacyStateColor = backgroundColor.copy(alpha = 0.7f), pressed = true,
+            ) else Color.Transparent)
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -922,8 +926,9 @@ private fun ResetKey(
     val currentOnPress by rememberUpdatedState(onPress)
     val density = LocalDensity.current
     val shape = RoundedCornerShape(shadowShapeRadius)
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -952,7 +957,11 @@ private fun ResetKey(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)), contentAlignment = Alignment.Center
+            .background(frostedKeyColor(
+                backgroundColor, textColor, frostedGlass,
+                legacyStateColor = if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
+                pressed = isPressed,
+            ))), contentAlignment = Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val hintSize = 9f * adaptiveHintScale(contentScale)

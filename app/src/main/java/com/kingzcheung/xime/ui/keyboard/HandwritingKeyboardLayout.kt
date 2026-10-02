@@ -70,6 +70,7 @@ fun HandwritingKeyboardLayout(
     val newCharacter by rememberUpdatedState(onNewCharacter)
     val result by rememberUpdatedState(onRecognition)
     val feedback by rememberUpdatedState(onButtonFeedback)
+    val functionRowBackground = if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else panelBackgroundColor
     val pauseMs by rememberUpdatedState((LocalKeyboardInputPreferences.current.handwritingPauseSeconds * 1000).toLong())
     val recognitionMutex = remember { Mutex() }
     val session = remember(scope, sessionKey) {
@@ -144,7 +145,7 @@ fun HandwritingKeyboardLayout(
             }
             if (expanded) Box(Modifier.fillMaxWidth().background(panelBackgroundColor)) { expandedCandidateBar() }
             if (expanded) {
-                Row(Modifier.fillMaxWidth().height(footerHeight).background(panelBackgroundColor)
+                Row(Modifier.fillMaxWidth().height(footerHeight).background(functionRowBackground)
                     .testTag("handwriting-symbol-row")) {
                     listOf("；", "：", "！", "？", "，", "。").forEach { action ->
                         HandwritingFunctionKey(action, { press(action) }, keyBackgroundColor, keyTextColor,
@@ -154,7 +155,7 @@ fun HandwritingKeyboardLayout(
                         specialKeyTextColor, Modifier.width(functionKeyWidth).fillMaxHeight(), onClear = { press("clear_all") })
                 }
             }
-            Row(Modifier.fillMaxWidth().height(footerHeight).background(panelBackgroundColor)
+            Row(Modifier.fillMaxWidth().height(footerHeight).background(functionRowBackground)
                 .testTag("handwriting-bottom-row")) {
                 val keys = listOf("symbol", "number", "space",
                     if (expanded) "collapse" else "expand", "ime_switch", "enter")
@@ -194,7 +195,10 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
     }
     BoxWithConstraints(modifier.clickable(onClick = onClick).semantics { contentDescription = label }
         .testTag("handwriting-key:$action")
-        .padding(scaledKeyVisualPadding(PaddingValues(2.dp))).keyGlow(Modifier.clip(RoundedCornerShape(LocalKeyCornerRadius.current)).background(keyBackground)), contentAlignment = Alignment.Center) {
+        .padding(scaledKeyVisualPadding(PaddingValues(2.dp)))
+        .keyGlow(Modifier.clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+            .background(frostedKeyColor(keyBackground, keyForeground, LocalKeyboardInputPreferences.current.frostedGlass))),
+        contentAlignment = Alignment.Center) {
         val icon = when (action) {
             "delete" -> Icons.AutoMirrored.Filled.Backspace
             "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn
