@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.settings.SchemaInfo
 import com.kingzcheung.xime.settings.SettingsPreferences
 
@@ -30,6 +32,7 @@ data class KeyboardInputPreferences(
     val splitKeyboardEnabled: Boolean = false,
     val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
     val neighborCorrection: Boolean = true,
+    val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
 ) {
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
@@ -44,6 +47,7 @@ data class KeyboardInputPreferences(
                 ?: SpaceHoldAction.CURSOR
             return KeyboardInputPreferences(
                 keyGlowEnabled = prefs.getBoolean("key_glow_enabled", false),
+                frostedGlass = FrostedGlassPreferences.read(context),
                 showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
                 splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
                 spaceHold = hold,
@@ -102,7 +106,7 @@ fun rememberKeyboardInputPreferences(): KeyboardInputPreferences {
         val relevantKeys = setOf("key_glow_enabled", SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
             SettingsPreferences.KEY_SPLIT_KEYBOARD,
             "space_hold_action", "cursor_gesture_mode", "neighbor_correction", "cursor_step_dp", "key_text_scale", "fixed_symbols",
-            "handwriting_pause_seconds", "handwriting_pause_seconds_v2")
+            "handwriting_pause_seconds", "handwriting_pause_seconds_v2") + FrostedGlassPreferences.keys
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == null || key in relevantKeys) settings = KeyboardInputPreferences.read(context)
         }

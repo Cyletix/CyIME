@@ -20,6 +20,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.kingzcheung.xime.settings.BackgroundConfig
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -72,7 +74,11 @@ fun Modifier.keyboardBackground(
     background: BackgroundConfig?,
     isDark: Boolean,
     fallbackColor: Color = Color(0xFFE3E4E8),
+    frostedGlass: FrostedGlassConfig = rememberKeyboardInputPreferences().frostedGlass,
 ): Modifier {
+    if (frostedGlass.enabled) {
+        return frostedGlassBackground(background, isDark, fallbackColor, frostedGlass)
+    }
     if (background == null) return this.then(Modifier.background(fallbackColor))
 
     when (background.type) {

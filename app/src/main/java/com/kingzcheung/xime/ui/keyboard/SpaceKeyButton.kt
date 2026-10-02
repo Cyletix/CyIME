@@ -65,8 +65,9 @@ fun SpaceKeyButton(
     val density = LocalDensity.current
     var pressed by remember { mutableStateOf(false) }
     var cursorActive by remember { mutableStateOf(false) }
-    val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) Modifier.drawBehind {
+    val frostedGlass = settings.frostedGlass
+    val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) Modifier.drawBehind {
             drawRoundRect(crispShadowColor(backgroundColor), topLeft = Offset(0f, shadowElevation.toPx()),
                 size = size, cornerRadius = CornerRadius(shadowShapeRadius.toPx()))
         } else Modifier
@@ -141,7 +142,11 @@ fun SpaceKeyButton(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)),
+            .background(frostedKeyColor(
+                backgroundColor, textColor, frostedGlass,
+                legacyStateColor = if (pressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
+                pressed = pressed,
+            ))),
         contentAlignment = Alignment.Center
     ) {
         val iconSize = keyIconSizeDp(maxWidth.value, maxHeight.value)

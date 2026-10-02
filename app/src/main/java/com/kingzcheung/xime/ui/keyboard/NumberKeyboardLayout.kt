@@ -269,8 +269,9 @@ private fun NumberSymbolKey(
         bottomEnd = if (isLast) cornerRadius else 0.dp
     )
     val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -289,7 +290,11 @@ private fun NumberSymbolKey(
             .fillMaxWidth()
             .then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .background(frostedKeyColor(
+                backgroundColor, textColor, frostedGlass,
+                legacyStateColor = if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor,
+                pressed = isPressed,
+            ))
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
