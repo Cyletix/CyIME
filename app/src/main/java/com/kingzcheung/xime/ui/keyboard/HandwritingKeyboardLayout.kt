@@ -70,7 +70,7 @@ fun HandwritingKeyboardLayout(
     val newCharacter by rememberUpdatedState(onNewCharacter)
     val result by rememberUpdatedState(onRecognition)
     val feedback by rememberUpdatedState(onButtonFeedback)
-    val functionRowBackground = if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else panelBackgroundColor
+    val functionRowBackground = if (!expanded && LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else panelBackgroundColor
     val pauseMs by rememberUpdatedState((LocalKeyboardInputPreferences.current.handwritingPauseSeconds * 1000).toLong())
     val recognitionMutex = remember { Mutex() }
     val session = remember(scope, sessionKey) {
