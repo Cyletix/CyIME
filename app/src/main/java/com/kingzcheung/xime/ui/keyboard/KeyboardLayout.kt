@@ -968,7 +968,8 @@ private fun DummyKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(backgroundColor)
+            .background(frostedKeyColor(backgroundColor, Color.White,
+                LocalKeyboardInputPreferences.current.frostedGlass, opacityScale = 0.5f))
     )
 }
 
@@ -1130,8 +1131,9 @@ private fun ShiftCapsKeyButton(
     val currentKey by rememberUpdatedState(onKeyPress)
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -1211,12 +1213,14 @@ private fun ShiftCapsKeyButton(
             .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
-            .background(
-                if (isPressed) darkenColor(backgroundColor, 0.1f)
+            .background(frostedKeyColor(
+                backgroundColor, iconColor, frostedGlass,
+                legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.1f)
                 else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
                 else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
-                else backgroundColor
-            ),
+                else backgroundColor,
+                pressed = isPressed, highlighted = shiftMode != ShiftMode.OFF,
+            )),
         contentAlignment = Alignment.Center
     ) {
         val painter = when (shiftMode) {

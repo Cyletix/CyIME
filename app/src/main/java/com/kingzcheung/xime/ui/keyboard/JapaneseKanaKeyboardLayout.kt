@@ -66,7 +66,8 @@ fun JapaneseKanaKeyboardLayout(
         LocalKeyCornerRadius provides keyCornerRadius,
         LocalKeyVisualPadding provides PaddingValues(horizontal = (keySpacingX ?: 2.dp), vertical = (keySpacingY ?: 2.dp)),
     ) {
-        Row(bodyModifier.fillMaxSize().background(keyboardBackgroundColor)
+        Row(bodyModifier.fillMaxSize()
+            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else keyboardBackgroundColor)
             .padding(bottom = bottomPaddingDp.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 val convert = KanaChoice("変換", "japanese_convert")
@@ -150,8 +151,9 @@ internal fun KanaFlickButton(
     var direction by remember { mutableStateOf(KanaFlickDirection.TAP) }
     val density = LocalDensity.current
     val suppressCursorMove = LocalSuppressCursorMove.current
-    val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, background) {
-        if (shadowEnabled) Modifier.drawBehind {
+    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, background, frostedGlass.enabled) {
+        if (shadowEnabled && !frostedGlass.enabled) Modifier.drawBehind {
             drawRoundRect(crispShadowColor(background), topLeft = Offset(0f, shadowElevation.toPx()),
                 size = size, cornerRadius = CornerRadius(shadowShapeRadius.toPx()))
         } else Modifier
@@ -202,7 +204,11 @@ internal fun KanaFlickButton(
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background)),
+            .background(frostedKeyColor(
+                background, foreground, frostedGlass,
+                legacyStateColor = if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background,
+                pressed = pressed,
+            ))),
         contentAlignment = Alignment.Center,
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)

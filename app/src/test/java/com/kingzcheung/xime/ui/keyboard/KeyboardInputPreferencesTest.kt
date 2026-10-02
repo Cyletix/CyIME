@@ -2,6 +2,8 @@ package com.kingzcheung.xime.ui.keyboard
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.settings.SettingsPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -63,6 +65,16 @@ class KeyboardInputPreferencesTest {
         values[SettingsPreferences.KEY_SHOW_PRESS_BUBBLE] = true
         assertEquals(true, KeyboardInputPreferences.read(context).keyGlowEnabled)
         assertEquals(true, KeyboardInputPreferences.read(context).showPressBubble)
+    }
+
+    @Test fun `frosted glass is opt in and survives unrelated input preference saves`() {
+        assertEquals(FrostedGlassConfig(), KeyboardInputPreferences.read(context).frostedGlass)
+        val effect = FrostedGlassConfig(true, 18f, 0.7f, 0.3f)
+        FrostedGlassPreferences.save(context, effect)
+        assertEquals(effect, KeyboardInputPreferences.read(context).frostedGlass)
+        KeyboardInputPreferences(spaceHold = SpaceHoldAction.REPEAT).save(context)
+        assertEquals(effect, KeyboardInputPreferences.read(context).frostedGlass)
+        assertEquals(false, KeyboardInputPreferences.read(context).keyGlowEnabled)
     }
 
     @Test

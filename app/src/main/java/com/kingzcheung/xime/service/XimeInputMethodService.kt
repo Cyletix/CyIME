@@ -1222,6 +1222,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             setContent {
                 val cand = candidateState.value
                 val state = uiState.value
+                val frostedGlass = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().frostedGlass
+                // 材质透明度分别应用于背景和键帽，文字不再随整层透明度变淡。
+                val keyboardLayerOpacity = if (frostedGlass.enabled) 1f else state.keyboardOpacity
                 val page by keyboardViewModel.page.collectAsState(com.kingzcheung.xime.keyboard.KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL))
                 val isHandwritingMode = (page as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
                 val handwritingExpanded = state.handwritingExpanded && isHandwritingMode && !state.showKeyboardResize
@@ -1350,7 +1353,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     .fillMaxWidth()
                                     .height(activeBottomDp.dp)
                                     .align(androidx.compose.ui.Alignment.BottomCenter)
-                                    .graphicsLayer { alpha = state.keyboardOpacity }
+                                    .graphicsLayer { alpha = keyboardLayerOpacity }
                                     .keyboardBackground(rootTheme.keyboardBackground, isDark, keyboardBgColor)
                             )
                         }
@@ -1580,7 +1583,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 // 悬浮透明度在卡片本身处理，宿主不再强制创建键盘大小的离屏缓冲。
                                 modifier = if (state.isFloatingMode || state.showKeyboardResize) Modifier
                                     else Modifier.graphicsLayer {
-                                        alpha = state.keyboardOpacity
+                                        alpha = keyboardLayerOpacity
                                         compositingStrategy = CompositingStrategy.Offscreen
                                     },
                                 // 非按键交互（符号/表情面板、菜单栏、候选栏按钮）的振动，

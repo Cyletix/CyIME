@@ -284,13 +284,14 @@ fun KeyboardView(
     // 预览矩形直接使用 KeyboardView 根容器的本地坐标；真实卡片、边框、命中共用这一份 Rect。
     val resizeActive = resizeOverlay != null
     val resizeControlDensity = LocalDensity.current
+    val inputPreferences = rememberKeyboardInputPreferences()
+    val keyboardLayerOpacity = if (inputPreferences.frostedGlass.enabled) 1f else state.keyboardOpacity
     val previewModifier = if (resizeOverlay != null) Modifier.graphicsLayer {
-        alpha = state.keyboardOpacity
+        alpha = keyboardLayerOpacity
         compositingStrategy = CompositingStrategy.Offscreen
     } else Modifier
     // Compose background and keys into the same layer before applying opacity.
     val contentModifier = if (state.handwritingExpanded) previewModifier else previewModifier.keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
-    val inputPreferences = rememberKeyboardInputPreferences()
     var cursorControlActive by remember { mutableStateOf(false) }
     CompositionLocalProvider(
         LocalKeyboardExplicitWidth provides (!state.isFloatingMode && (state.fixedWidthDp > 0 || resizeActive)),
@@ -386,7 +387,7 @@ fun KeyboardView(
 
     FloatingKeyboardContainer(
         isFloatingMode = state.isFloatingMode,
-        opacity = if (resizeOverlay != null) 1f else state.keyboardOpacity,
+        opacity = if (resizeOverlay != null) 1f else keyboardLayerOpacity,
         scaleFactor = floatScaleFactor,
         // KeyButton already fits text to the actual key bounds; do not shrink it again against the tablet screen.
         fontScaleFactor = 1f,
