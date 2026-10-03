@@ -75,7 +75,7 @@ fun EditKeyboardLayout(
         LocalEditorKeyShadow provides EditorKeyShadow(shadowEnabled, shadowElevation, shadowShapeRadius),
     ) {
         Column(bodyModifier.fillMaxSize()
-            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else backgroundColor)
+            .keyboardPanelBackground(backgroundColor)
             .padding(horizontal = 2.dp)) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val cellWidth = maxWidth / 5

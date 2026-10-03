@@ -217,7 +217,8 @@ fun ThemeSettingsContent(
                 onApply = { glass ->
                     changeAppearance(context, onThemeChanged) {
                         if (theme.id == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID) {
-                            com.kingzcheung.xime.settings.FrostedGlassPreferences.save(context, glass.copy(enabled = true))
+                            com.kingzcheung.xime.settings.FrostedGlassPreferences.saveProfiles(context, glass.copy(
+                                light = glass.light.copy(enabled = true), dark = glass.dark.copy(enabled = true)))
                         }
                         viewModel.setColorTheme(theme.id)
                         previewTheme = null

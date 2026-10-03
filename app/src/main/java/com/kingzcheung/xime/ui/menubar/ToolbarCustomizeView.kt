@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.menubar
 
+import com.kingzcheung.xime.ui.keyboard.keyboardPanelBackground
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -74,7 +75,7 @@ fun ToolbarCustomizeView(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(backgroundColor),
+            .keyboardPanelBackground(backgroundColor),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(

@@ -20,9 +20,9 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 internal fun KeyboardPanelReveal(
     visible: Boolean,
     modifier: Modifier = Modifier,
+    visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false) },
     content: @Composable () -> Unit,
 ) {
-    val visibility = remember { MutableTransitionState(false) }
     visibility.targetState = visible
     val transition = updateTransition(visibility, label = "keyboard-panel")
     val fraction by transition.animateFloat(

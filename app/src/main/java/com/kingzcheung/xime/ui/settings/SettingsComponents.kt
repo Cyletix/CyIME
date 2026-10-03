@@ -895,8 +895,8 @@ fun KeyboardThemeCard(
     previewDark: Boolean? = null,
     previewAspectRatio: Float = 1.75f,
 ) {
-    val glass = com.kingzcheung.xime.settings.FrostedGlassPreferences.read(androidx.compose.ui.platform.LocalContext.current)
-        .copy(enabled = theme.id == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID)
+    val glass = com.kingzcheung.xime.settings.FrostedGlassPreferences.readProfiles(androidx.compose.ui.platform.LocalContext.current)
+    val glassEnabled = theme.id == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val selectionColor = MaterialTheme.colorScheme.primary
     val swatchColor = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) theme.accentDark else theme.accentLight
@@ -938,7 +938,7 @@ fun KeyboardThemeCard(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
-                        glass = glass,
+                        glass = glass.light.copy(enabled = glassEnabled),
                         keyboardBackground = theme.keyboardBackground,
                         isDark = false,
                         fallbackBg = theme.keyboardBgLight,
@@ -954,7 +954,7 @@ fun KeyboardThemeCard(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
-                        glass = glass,
+                        glass = glass.dark.copy(enabled = glassEnabled),
                         keyboardBackground = theme.keyboardBackground,
                         isDark = true,
                         fallbackBg = theme.keyboardBgDark,

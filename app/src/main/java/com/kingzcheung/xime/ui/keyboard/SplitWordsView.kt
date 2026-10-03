@@ -89,7 +89,7 @@ fun SplitWordsView(
         if (pos < 0) selectedIndices.add(-(pos + 1), index)
     }
 
-    BoxWithConstraints(modifier.fillMaxWidth().background(backgroundColor)) {
+    BoxWithConstraints(modifier.fillMaxWidth().keyboardPanelBackground(backgroundColor)) {
     val compactActions = maxWidth < 420.dp
     Column(Modifier.fillMaxSize()) {
         // 导航区

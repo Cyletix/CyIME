@@ -13,9 +13,9 @@ import kotlin.math.roundToInt
 
 /** Edits a preview draft, never writes preferences before Apply. */
 @Composable
-internal fun FrostedThemeControls(config: FrostedGlassConfig, onChange: (FrostedGlassConfig) -> Unit) {
+internal fun FrostedThemeControls(config: FrostedGlassConfig, isDark: Boolean, onChange: (FrostedGlassConfig) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("玻璃效果", style = MaterialTheme.typography.titleMedium)
+        Text(if (isDark) "深色玻璃效果" else "浅色玻璃效果", style = MaterialTheme.typography.titleMedium)
         GlassSlider("模糊强度", "${config.blurRadiusDp.roundToInt()} dp", config.blurRadiusDp, 0f..40f) {
             onChange(config.copy(blurRadiusDp = it.roundToInt().toFloat()))
         }
@@ -25,7 +25,7 @@ internal fun FrostedThemeControls(config: FrostedGlassConfig, onChange: (Frosted
         GlassSlider("按键不透明度", "${(config.keyOpacity * 100).roundToInt()}%", config.keyOpacity) {
             onChange(config.copy(keyOpacity = (it * 100).roundToInt() / 100f))
         }
-        Text("左右滑动预览浅色与深色；应用后保存。模糊作用于键盘背景，文字保持清晰。",
+        Text("浅色与深色分别调整，随明暗模式自动切换；点应用同时保存两组。模糊作用于键盘背景，文字保持清晰。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

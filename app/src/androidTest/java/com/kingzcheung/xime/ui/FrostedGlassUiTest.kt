@@ -4,6 +4,7 @@ import android.content.ContextWrapper
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -147,6 +148,56 @@ class FrostedGlassUiTest {
         save("07-key-transparent", transparent)
         save("08-key-opaque", opaque)
         save("09-key-disabled", disabled)
+    }
+
+    @Test
+    fun floatingBackdropMatchesKeyboardTintAndPreservesTransparencyAndText() {
+        var dark by mutableStateOf(true)
+        var config by mutableStateOf(FrostedGlassConfig(enabled = true, blurRadiusDp = 0f, backgroundOpacity = 0.55f))
+        // Equal gradient endpoints avoid interpolation/cropping differences between hosts.
+        val base = 0xFF9CACCC.toInt()
+        val host = 0xFF173E52.toInt()
+        val background = BackgroundConfig(type = "gradient", colors = listOf(0x9CACCCL, 0x9CACCCL))
+        rule.setContent {
+            CompositionLocalProvider(LocalContext provides context, LocalDensity provides Density(1f)) {
+                Column {
+                    Box(Modifier.size(320.dp, 100.dp).testTag("keyboard-glass")
+                        .keyboardBackground(background, dark, Color.Black, config))
+                    Box(Modifier.size(320.dp, 100.dp).background(Color(host)).testTag("floating-glass")) {
+                        Box(Modifier.size(320.dp, 100.dp)
+                            .keyboardBackground(background, dark, Color.Black, config, translucentSurface = true),
+                            contentAlignment = Alignment.Center) {
+                            Text("Aa", color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+        fun blend(foreground: Int, backdrop: Int, alpha: Float): Int {
+            fun channel(shift: Int): Int = (((foreground ushr shift and 255) * alpha) +
+                ((backdrop ushr shift and 255) * (1f - alpha))).toInt()
+            return android.graphics.Color.rgb(channel(16), channel(8), channel(0))
+        }
+        val darkTint = blend(android.graphics.Color.BLACK, base, 0.55f)
+        awaitImage("keyboard-glass") { colorDistance(sample(it), darkTint) <= 2 }
+        val darkFloating = awaitImage("floating-glass") {
+            colorDistance(sample(it), blend(darkTint, host, 0.55f)) <= 2
+        }
+        save("10-floating-dark-matches-keyboard", darkFloating)
+        rule.runOnIdle { dark = false }
+        val lightTint = blend(android.graphics.Color.WHITE, base, 0.55f)
+        awaitImage("keyboard-glass") { colorDistance(sample(it), lightTint) <= 2 }
+        val lightFloating = awaitImage("floating-glass") {
+            colorDistance(sample(it), blend(lightTint, host, 0.55f)) <= 2
+        }
+        assertSameWhiteForeground(darkFloating, lightFloating)
+        save("11-floating-light-matches-keyboard", lightFloating)
+        rule.runOnIdle { dark = true; config = config.copy(backgroundOpacity = 1f) }
+        awaitImage("floating-glass") { sample(it) == android.graphics.Color.BLACK }
+        rule.runOnIdle { config = config.copy(backgroundOpacity = 0f) }
+        val transparent = awaitImage("floating-glass") { sample(it) == host }
+        assertSameWhiteForeground(darkFloating, transparent)
+        save("12-floating-transparent-opaque-text", transparent)
     }
 
     private fun snapshot(tag: String): Bitmap = rule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()

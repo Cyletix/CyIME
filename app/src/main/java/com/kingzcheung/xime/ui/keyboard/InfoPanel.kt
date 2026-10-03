@@ -74,7 +74,7 @@ fun InfoPanel(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxSize()
-            .background(backgroundColor)
+            .keyboardPanelBackground(backgroundColor)
             .padding(bottom = bottomPaddingDp.dp)
     ) {
         // 导航区：关闭按钮 + 标题
