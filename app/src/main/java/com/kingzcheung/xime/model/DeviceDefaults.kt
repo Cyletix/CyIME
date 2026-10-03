@@ -50,8 +50,15 @@ object DeviceDefaults {
     fun predictionModel(context: Context): String = SettingsPreferences.getPrefsPublic(context)
         .getString(PREDICTION, DeviceModelProfiles.BASE) ?: DeviceModelProfiles.BASE
 
-    fun voiceModel(context: Context): String = SettingsPreferences.getPrefsPublic(context)
-        .getString(VOICE, SpeechModelCatalog.ZIPFORMER) ?: SpeechModelCatalog.ZIPFORMER
+    fun voiceModel(context: Context): String {
+        val initial = SettingsPreferences.getPrefsPublic(context).getString(VOICE, null)
+        // This key stores an automatic recommendation. Explicit selections live in asr_model
+        // and take priority in AsrModelManager, including a deliberate Zipformer selection.
+        return when (initial) {
+            null, SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_TWO_PASS -> SpeechModelCatalog.TWO_PASS
+            else -> initial
+        }
+    }
 
     fun supportsRefinement(lowRam: Boolean, memoryBytes: Long, cores: Int): Boolean =
         !lowRam && memoryBytes >= 6L * 1024 * 1024 * 1024 && cores >= 4

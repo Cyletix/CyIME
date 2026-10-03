@@ -31,7 +31,7 @@ class RuntimePreferencesTest {
         assertEquals(RuntimeRequest(AnimationLevel.OFF, PreferenceOrigin.CURRENT_DEFAULT), requests.animation)
         assertEquals(RuntimeRequest(false, PreferenceOrigin.CURRENT_DEFAULT), requests.keyGlow)
         assertEquals(RuntimeRequest(true, PreferenceOrigin.CURRENT_DEFAULT), requests.neuralPrediction)
-        assertEquals(RuntimeRequest(false, PreferenceOrigin.CURRENT_DEFAULT), requests.voiceCorrection)
+        assertEquals(RuntimeRequest(true, PreferenceOrigin.CURRENT_DEFAULT), requests.voiceCorrection)
     }
 
     @Test fun `legacy values even equal to defaults retain unknown provenance`() {

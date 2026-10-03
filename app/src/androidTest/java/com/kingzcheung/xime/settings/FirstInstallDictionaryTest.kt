@@ -15,10 +15,10 @@ class FirstInstallDictionaryTest {
         // Catalog metadata is needed to inspect models already installed by an earlier run.
         runBlocking { manager.loadFromRemote(context) }
         while (android.os.SystemClock.elapsedRealtime() < deadline &&
-            listOf("ochwpro", "zipformer-zh-int8").any { !manager.isModelDownloaded(context, it) }) {
+            listOf("ochwpro", "paraformer-zh-en-int8", "sensevoice-multilingual-int8").any { !manager.isModelDownloaded(context, it) }) {
             Thread.sleep(500)
         }
-        for (id in listOf("ochwpro", "zipformer-zh-int8")) assertTrue("default model $id", manager.isModelDownloaded(context, id))
+        for (id in listOf("ochwpro", "paraformer-zh-en-int8", "sensevoice-multilingual-int8")) assertTrue("default model $id", manager.isModelDownloaded(context, id))
     }
 
     @Test fun bundledWordsWorkWithoutUserDictionaryOrPrediction() = runBlocking {
@@ -34,7 +34,8 @@ class FirstInstallDictionaryTest {
             "rime_ice" to listOf("zenme" to "怎么", "zenm" to "怎么", "dazi" to "打字"),
             "t9_pinyin" to listOf("93663" to "怎么", "3294" to "打字"),
             "pinyin_14jian" to listOf("zebme" to "怎么"),
-            "double_pinyin_flypy" to listOf("zfme" to "怎么"))
+            "double_pinyin_flypy" to listOf("zfme" to "怎么"),
+            "double_pinyin_flypy_14jian" to listOf("zdme" to "怎么", "bugc" to "你好", "ceuu" to "测试", "zfme" to "怎么"))
         for ((schema, cases) in samples) {
             assertTrue(engine.switchSchema(schema))
             engine.setOption("ascii_mode", false)

@@ -2,7 +2,7 @@ package com.kingzcheung.xime.speech
 
 /** One primary recognizer, optionally followed by SenseVoice. Existing stored IDs remain valid. */
 internal object SpeechModelSelection {
-    val primaryIds = listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
+    val primaryIds = listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.ZIPFORMER)
 
     fun primary(mode: String): String = when (mode) {
         SpeechModelCatalog.ZIPFORMER_TWO_PASS -> SpeechModelCatalog.ZIPFORMER
