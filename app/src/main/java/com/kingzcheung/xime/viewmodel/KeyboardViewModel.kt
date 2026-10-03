@@ -58,6 +58,8 @@ data class KeyboardUiState(
     val darkMode: Int = 2,
     val themeId: String = com.kingzcheung.xime.ui.theme.PureBlackTheme.ID,
     val handwritingExpanded: Boolean = false,
+    val handwritingControlsWidthDp: Int = 0,
+    val handwritingControlsOffsetX: Int = 0,
     val clipboardImagesExpanded: Boolean = false,
     val keyboardHeightDp: Int = 0,
     val keyboardBottomPaddingDp: Int = 0,
