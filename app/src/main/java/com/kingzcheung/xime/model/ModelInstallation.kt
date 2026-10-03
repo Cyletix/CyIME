@@ -43,8 +43,18 @@ internal class ModelInstallGuard {
     ): Boolean {
         if (generation != deletionGeneration || !isStillRequested()) return false
         installDownloadedModel(staging, destination)
-        completionRevision++
         onInstalled()
+        completionRevision++
+        return true
+    }
+
+    /** Retry a verified cache through the same cancellation/deletion boundary as a download. */
+    @Synchronized fun applyExisting(
+        generation: Long, isStillRequested: () -> Boolean = { true }, onInstalled: () -> Unit,
+    ): Boolean {
+        if (generation != deletionGeneration || !isStillRequested()) return false
+        onInstalled()
+        completionRevision++
         return true
     }
 

@@ -115,7 +115,8 @@ object ModelManager {
     }
 
     fun getModelStorageDir(context: Context, model: ModelInfo): File? {
-        // 统一规则：所有模型一律存 filesDir/models/<id>/
+        // A downloaded candidate cache is not installed until Rime can actually read it.
+        if (model.category == ModelCategory.CANDIDATE) return CandidateModelAssets.existingDirectory(context, model)
         return ModelStorage.getModelDir(context, model.id)
     }
 
@@ -186,7 +187,8 @@ object ModelManager {
             val target = version ?: model.resolvedVersion()
             val installed = MarketVersionStore.getModelVersion(context, model.id)
             if (guard.completionRevision != completionBeforeRequest && target != null &&
-                installed == target.version && hasDownloadedModelFiles(ModelStorage.getModelDir(context, model.id), target)) {
+                installed == target.version && hasDownloadedModelFiles(ModelStorage.getModelDir(context, model.id), target) &&
+                (model.category != ModelCategory.CANDIDATE || isModelDownloaded(context, model))) {
                 _downloadStates.update { it + (model.id to ModelDownloadState.Complete) }
                 onProgress(ModelDownloadState.Complete)
                 return@withLock
@@ -195,6 +197,20 @@ object ModelManager {
             _downloadStates.update { it + (model.id to starting) }
             onProgress(starting)
             try {
+                if (model.category == ModelCategory.CANDIDATE && target != null &&
+                    runCatching { validateDownloadedModel(ModelStorage.getModelDir(context, model.id), target) }.isSuccess) {
+                    // A previous runtime conflict must not force another large network download.
+                    val applied = guard.applyExisting(generation,
+                        isStillRequested = { !onlyIfDefaultPending || DefaultModelInstaller.isPendingDefault(context, model.id) }) {
+                        CandidateModelAssets.installDownloaded(context, model, target)
+                        MarketVersionStore.setModelVersion(context, model.id, target.version)
+                    }
+                    val state = if (applied) ModelDownloadState.Complete else ModelDownloadState.Idle
+                    _downloadStates.update { it + (model.id to state) }
+                    if (applied) notifyInstalledModelsChanged()
+                    onProgress(state)
+                    return@withLock
+                }
                 ModelDownloader.downloadModel(context, model, { state ->
                     _downloadStates.update { it + (model.id to state) }
                     if (state is ModelDownloadState.Complete) notifyInstalledModelsChanged()
@@ -202,6 +218,9 @@ object ModelManager {
                 }, version, install = { staging, destination ->
                     guard.install(generation, staging, destination,
                         isStillRequested = { !onlyIfDefaultPending || DefaultModelInstaller.isPendingDefault(context, model.id) }) {
+                        if (model.category == ModelCategory.CANDIDATE && target != null) {
+                            CandidateModelAssets.installDownloaded(context, model, target)
+                        }
                         if (target != null) MarketVersionStore.setModelVersion(context, model.id, target.version)
                     }
                 })
@@ -211,6 +230,10 @@ object ModelManager {
                         states + (model.id to ModelDownloadState.Idle) else states
                 }
                 throw cancelled
+            } catch (error: Exception) {
+                val state = ModelDownloadState.Error(error.message ?: "模型安装失败")
+                _downloadStates.update { it + (model.id to state) }
+                onProgress(state)
             }
         }
     }
@@ -223,7 +246,9 @@ object ModelManager {
     fun deleteModel(context: Context, model: ModelInfo): Boolean {
         val guard = installGuards.getOrPut(model.id) { ModelInstallGuard() }
         return guard.delete {
-            val dir = getModelStorageDir(context, model) ?: return@delete false
+            if (model.category == ModelCategory.CANDIDATE && !CandidateModelAssets.removeRuntimeCopy(context, model)) return@delete false
+            val dir = if (model.category == ModelCategory.CANDIDATE) ModelStorage.getModelDir(context, model.id)
+                else getModelStorageDir(context, model) ?: return@delete false
             val version = installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id))
                 ?: model.resolvedVersion()
             var success = true

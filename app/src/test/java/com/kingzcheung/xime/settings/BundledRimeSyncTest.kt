@@ -46,4 +46,24 @@ class BundledRimeSyncTest {
         File(target, "core.dict.yaml").delete()
         assertTrue(BundledRimeSync.install(target, backups, manifest("new")) { "new".byteInputStream() })
     }
+
+    @Test fun lightweightEditionKeepsPreviouslyInstalledEnhancementModels() {
+        val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
+        val grammar = "wanxiang-lts-zh-hans.gram"
+        val scorer = "t9_sentence.onnx"
+        val previous = manifest("schema") + manifest("grammar", grammar) + manifest("scorer", scorer)
+        BundledRimeSync.install(target, backups, previous) {
+            when (it.substringAfterLast('/')) {
+                grammar -> "grammar"
+                scorer -> "scorer"
+                else -> "schema"
+            }.byteInputStream()
+        }
+        assertTrue(BundledRimeSync.install(target, backups, manifest("updated schema")) {
+            "updated schema".byteInputStream()
+        })
+        assertEquals("grammar", File(target, grammar).readText())
+        assertEquals("scorer", File(target, scorer).readText())
+        assertEquals("updated schema", File(target, "core.dict.yaml").readText())
+    }
 }

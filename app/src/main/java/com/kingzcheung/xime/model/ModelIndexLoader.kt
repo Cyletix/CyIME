@@ -130,6 +130,7 @@ object ModelIndexLoader {
 
     private fun parseCategory(category: String): ModelCategory {
         return when (category.lowercase()) {
+            "candidate" -> ModelCategory.CANDIDATE
             "prediction" -> ModelCategory.PREDICTION
             "asr" -> ModelCategory.ASR
             "handwriting" -> ModelCategory.HANDWRITING
