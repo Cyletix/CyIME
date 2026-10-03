@@ -774,8 +774,9 @@ fun KeyboardView(
             )
 
             }
-            val clipboardToolOpen = (page as? KeyboardPage.Overlay)?.route is OverlayRoute.Clipboard
-            if ((!state.handwritingExpanded || candidatePageExpanded) && !clipboardToolOpen) renderCandidateBar()
+            // Every tool panel keeps the shared navigation in the reserved 44dp top slot.
+            // This also applies when opening clipboard from expanded handwriting.
+            if (page is KeyboardPage.Overlay || !state.handwritingExpanded || candidatePageExpanded) renderCandidateBar()
 
             val renderExpandedCandidates: @Composable () -> Unit = {
                 // 候选展开页：候选栏的在位展开态（顶部即真实候选栏，实时跟随编码/删除变化）。
