@@ -49,7 +49,6 @@ android {
     }
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/japanese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/chinese-assets").get().asFile)
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/t9-grammar").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/rime-manifest").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/speech-assets").get().asFile)
     compileSdk = 36
@@ -70,8 +69,8 @@ android {
         // 按发布批次定号：兼容修复升 PATCH，兼容功能升 MINOR 并归零 PATCH。
         // 不兼容变更升 MAJOR；日常编辑不逐次升号。完整规则见 docs/packaging.md。
         // versionCode 是独立递增的交付序号；同批普通版与内置版共用。
-        versionCode = 20261057
-        versionName = "1.5.0"
+        versionCode = 20261071
+        versionName = "1.6.0"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -159,6 +158,11 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
+    }
+    // The lightweight edition downloads optional sentence scoring on demand.
+    // Keep vocabulary and licenses; both editions offer the large grammar separately.
+    if (providers.gradleProperty("bundleModels").orNull != "true") {
+        androidResources.ignoreAssetsPatterns.add("t9_sentence.onnx")
     }
     ndkVersion = "29.0.14206865"
 

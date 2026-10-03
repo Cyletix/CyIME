@@ -182,6 +182,9 @@ fun KeyboardLayoutScreen(
             }
 
             is KeyboardLayoutState.Number -> {
+                val isJapaneseKana = !uiState.isAsciiMode &&
+                    uiState.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD
+                val spacing = kbKey.spacingFor(if (isJapaneseKana) "japanese_kana" else "number")
                 NumberKeyboardLayout(
                     onKeyPress = onKeyPress,
                     keyBackgroundColor = keyBgColor,
@@ -193,12 +196,13 @@ fun KeyboardLayoutScreen(
                     shadowElevation = kbShadow.elevation.dp,
                     shadowShapeRadius = kbShadow.shapeRadius.dp,
                     keyCornerRadius = kbKey.cornerRadius.dp,
-                    keySpacingX = kbKey.spacingFor("number").first?.dp,
-                    keySpacingY = kbKey.spacingFor("number").second?.dp,
+                    keySpacingX = spacing.first?.dp,
+                    keySpacingY = spacing.second?.dp,
                     modifier = modifier,
                     onKeyPressDown = callbacks.onKeyPressDown,
                     isFloatingMode = uiState.isFloatingMode,
                     specialKeyTextColor = specialKeyTextColor,
+                    isJapaneseKana = isJapaneseKana,
                 )
             }
 

@@ -449,32 +449,20 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 }
             }
             is KeyboardDispatchAction.ShowOverlay -> {
-                Triple(KeyboardViewState.Overlay(action.route, action.backStack, current), KeyboardPage.Overlay(action.route, action.backStack, _page.value), _keyboardState.value)
+                showOverlay(action.route, action.backStack)
+                return
             }
             is KeyboardDispatchAction.CloseOverlay -> {
-                val behind = (current as? KeyboardViewState.Overlay)?.behind ?: current
-                val behindPage = (_page.value as? KeyboardPage.Overlay)?.behind ?: _page.value
-                Triple(behind, behindPage, _keyboardState.value)
+                closeOverlay()
+                return
             }
             is KeyboardDispatchAction.PushOverlay -> {
-                val ov = current as? KeyboardViewState.Overlay ?: return
-                val ovPage = _page.value as? KeyboardPage.Overlay ?: return
-                Triple(
-                    KeyboardViewState.Overlay(action.route, ov.backStack + ov.route, ov.behind),
-                    KeyboardPage.Overlay(action.route, ovPage.backStack + ovPage.route, ovPage.behind),
-                    _keyboardState.value
-                )
+                pushOverlay(action.route)
+                return
             }
             is KeyboardDispatchAction.PopOverlay -> {
-                val ov = current as? KeyboardViewState.Overlay ?: return
-                val ovPage = _page.value as? KeyboardPage.Overlay ?: return
-                if (ov.backStack.isEmpty()) return
-                val prevRoute = ov.backStack.last()
-                Triple(
-                    KeyboardViewState.Overlay(prevRoute, ov.backStack.dropLast(1), ov.behind),
-                    KeyboardPage.Overlay(prevRoute, ovPage.backStack.dropLast(1), ovPage.behind),
-                    _keyboardState.value
-                )
+                popOverlay()
+                return
             }
         }
         if (newPage is KeyboardPage.Main) _savedKbStateBeforePanel = null
@@ -626,11 +614,13 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     /** Level 3: 打开覆盖页面，可从任意页面进入 */
     fun showOverlay(route: OverlayRoute, initialBackStack: List<OverlayRoute> = emptyList()) {
-        // Symbols and numbers are peers, not a back stack. Keep the text destination.
-        if (route == OverlayRoute.Symbol) returnToTextKeyboard()
+        // Keep the current input surface in place while the tool reveals over it.
+        // Symbols still return to text, but only when leaving the symbol panel.
         val current = _page.value
         val behind = if (current is KeyboardPage.Overlay) current.behind else current
-        _page.value = KeyboardPage.Overlay(route, initialBackStack, behind)
+        _page.value = KeyboardPage.Overlay(route, initialBackStack, behind,
+            returnToTextOnClose = route == OverlayRoute.Symbol ||
+                (current as? KeyboardPage.Overlay)?.returnToTextOnClose == true)
         _syncViewState()
     }
 
@@ -646,7 +636,8 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         if (current is KeyboardPage.Overlay) {
             _page.value = current.copy(
                 route = route,
-                backStack = current.backStack + current.route
+                backStack = current.backStack + current.route,
+                returnToTextOnClose = current.returnToTextOnClose || route == OverlayRoute.Symbol,
             )
             _syncViewState()
         }
@@ -669,6 +660,10 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     fun closeOverlay() {
         val current = _page.value
         if (current is KeyboardPage.Overlay) {
+            if (current.returnToTextOnClose) {
+                returnToTextKeyboard()
+                return
+            }
             _page.value = current.behind
             _syncViewState()
         }

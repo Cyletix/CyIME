@@ -272,7 +272,7 @@ fun SettingsMainContent(
             item {
                 SettingsSection(title = "方案与词库", content = {
                     SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "语言管理",
-                        subtitle = "语言、输入方案、键盘布局", onClick = onNavigateToLanguages, showArrow = true)
+                        subtitle = "语言、输入方案、键盘布局、切换方式", onClick = onNavigateToLanguages, showArrow = true)
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 56.dp),
                         thickness = 0.5.dp,
