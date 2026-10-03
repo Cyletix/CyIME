@@ -44,18 +44,28 @@ internal fun keyCodeToKey(keyCode: Int, isShifted: Boolean): String? {
         KeyEvent.KEYCODE_7 -> "7"
         KeyEvent.KEYCODE_8 -> "8"
         KeyEvent.KEYCODE_9 -> "9"
-        KeyEvent.KEYCODE_COMMA -> ","
-        KeyEvent.KEYCODE_PERIOD -> "."
-        KeyEvent.KEYCODE_MINUS -> "-"
-        KeyEvent.KEYCODE_EQUALS -> "="
+        KeyEvent.KEYCODE_COMMA -> if (isShifted) "<" else ","
+        KeyEvent.KEYCODE_PERIOD -> if (isShifted) ">" else "."
+        KeyEvent.KEYCODE_MINUS -> if (isShifted) "_" else "-"
+        KeyEvent.KEYCODE_EQUALS -> if (isShifted) "+" else "="
         KeyEvent.KEYCODE_SLASH -> "/"
         KeyEvent.KEYCODE_BACKSLASH -> "\\"
         KeyEvent.KEYCODE_SEMICOLON -> ";"
         KeyEvent.KEYCODE_APOSTROPHE -> "'"
-        KeyEvent.KEYCODE_LEFT_BRACKET -> "["
-        KeyEvent.KEYCODE_RIGHT_BRACKET -> "]"
+        KeyEvent.KEYCODE_LEFT_BRACKET -> if (isShifted) "{" else "["
+        KeyEvent.KEYCODE_RIGHT_BRACKET -> if (isShifted) "}" else "]"
         KeyEvent.KEYCODE_GRAVE -> "`"
         KeyEvent.KEYCODE_TAB -> "\t"
         else -> null
+    }
+}
+
+/** Paging shortcuts belong to the active candidate list; modifier chords keep their normal meaning. */
+internal fun hardwareCandidatePageDirection(keyCode: Int, hasInput: Boolean, modified: Boolean): Int {
+    if (!hasInput || modified) return 0
+    return when (keyCode) {
+        KeyEvent.KEYCODE_MINUS, KeyEvent.KEYCODE_LEFT_BRACKET, KeyEvent.KEYCODE_COMMA -> -1
+        KeyEvent.KEYCODE_EQUALS, KeyEvent.KEYCODE_RIGHT_BRACKET, KeyEvent.KEYCODE_PERIOD -> 1
+        else -> 0
     }
 }

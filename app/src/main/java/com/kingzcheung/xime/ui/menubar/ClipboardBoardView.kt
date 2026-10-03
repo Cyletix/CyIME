@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.focused
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -90,8 +92,48 @@ internal fun ClipboardBoardView(
     val all = remember(textItems, images, pins) { clipboardCards(textItems, images, ClipboardFilter.ALL, pins) }
     val cards = remember(all, filter) { all.filter { clipboardMatches(it, filter) } }
     val expansion = LocalClipboardPanelExpansion.current
+    val keyboard = LocalClipboardKeyboardNavigation.current
+    var focusedKey by remember(keyboard?.active, filter) { mutableStateOf<String?>(null) }
+    val focused = focusedKey?.takeIf { key -> cards.any { it.key == key } } ?: cards.firstOrNull()?.key
+    val gridState = rememberLazyStaggeredGridState()
+    DisposableEffect(keyboard) { onDispose { keyboard?.attach(null) } }
     BoxWithConstraints(modifier.fillMaxSize().background(colors.surface).testTag("clipboard-board")) {
         val columns = clipboardColumnCount(maxWidth.value)
+        val groups = listOf("固定" to cards.filter { it.key in pins }, "最近记录" to cards.filterNot { it.key in pins })
+        val gridKeys = buildList {
+            if (failure != null) add("failure")
+            groups.forEach { (title, group) -> if (group.isNotEmpty()) {
+                add("section:$title"); addAll(group.map { it.key })
+            } }
+        }
+        LaunchedEffect(focused, keyboard?.active, gridKeys) {
+            if (keyboard?.active == true) {
+                val index = gridKeys.indexOf(focused)
+                val visible = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == focused }
+                if (index >= 0 && (visible == null || visible.offset.y < gridState.layoutInfo.viewportStartOffset ||
+                    visible.offset.y + visible.size.height > gridState.layoutInfo.viewportEndOffset)) gridState.scrollToItem(index)
+            }
+        }
+        SideEffect {
+            keyboard?.attach { action ->
+                if (!menu && !selecting && itemMenu == null && deleting == null) {
+                    if (action == ClipboardNavigation.CONFIRM) {
+                        cards.firstOrNull { it.key == (focusedKey ?: focused) }?.let { card ->
+                            when (card) {
+                                is ClipboardCard.Text -> onSelectText(card.item.text)
+                                is ClipboardCard.Image -> onSelectImage(card.item)
+                            }
+                            keyboard.close()
+                        }
+                    } else {
+                        focusedKey = nextClipboardKey(cards.map { it.key }, focusedKey ?: focused, action, columns,
+                            gridState.layoutInfo.visibleItemsInfo.map { ClipboardCell(it.key.toString(),
+                                it.offset.x, it.offset.y, it.size.width, it.size.height) })
+                    }
+                }
+            }
+        }
+
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 ToolIcon(if (selecting) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
@@ -116,6 +158,7 @@ internal fun ClipboardBoardView(
                 }
             }
             LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.weight(1f).fillMaxWidth().testTag("clipboard-records"),
+                state = gridState,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp), verticalItemSpacing = 10.dp) {
                 if (failure != null) item(span = StaggeredGridItemSpan.FullLine) {
@@ -131,18 +174,20 @@ internal fun ClipboardBoardView(
                     Text("暂无${if (filter == ClipboardFilter.ALL) "剪贴板记录" else filter.label}，复制后会显示在这里。",
                         Modifier.padding(vertical = 24.dp), color = colors.onSurfaceVariant, fontSize = 14.sp)
                 }
-                val groups = listOf("固定" to cards.filter { it.key in pins }, "最近记录" to cards.filterNot { it.key in pins })
                 groups.forEach { (title, group) ->
                     if (group.isNotEmpty()) item(key = "section:$title", span = StaggeredGridItemSpan.FullLine) {
                         Text(title, color = colors.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                     items(group, key = { it.key }) { card ->
                         val chosen = card.key in selected
+                        val keyboardFocused = keyboard?.active == true && card.key == focused
                         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                            .background(if (chosen) colors.secondaryContainer else colors.surfaceContainerHigh)
-                            .border(if (chosen) 2.dp else 1.dp, if (chosen) colors.primary else colors.outlineVariant, RoundedCornerShape(18.dp))
+                            .background(if (chosen || keyboardFocused) colors.secondaryContainer else colors.surfaceContainerHigh)
+                            .border(if (chosen || keyboardFocused) 2.dp else 1.dp, if (chosen || keyboardFocused) colors.primary else colors.outlineVariant, RoundedCornerShape(18.dp))
+                            .semantics { this.focused = keyboardFocused }
                             .testTag("clipboard-card:${card.key}").combinedClickable(
                                 onClick = {
+                                    focusedKey = card.key
                                     if (selecting) selected = if (chosen) selected - card.key else selected + card.key
                                     else when (card) {
                                         is ClipboardCard.Text -> onSelectText(card.item.text)
@@ -152,7 +197,7 @@ internal fun ClipboardBoardView(
                             when (card) {
                                 is ClipboardCard.Text -> Text(card.item.text,
                                     Modifier.fillMaxWidth().heightIn(min = 80.dp).padding(16.dp),
-                                    color = if (chosen) colors.onSecondaryContainer else colors.onSurface,
+                                    color = if (chosen || keyboardFocused) colors.onSecondaryContainer else colors.onSurface,
                                     fontSize = 16.sp, lineHeight = 23.sp, maxLines = if (expanded) 8 else 4, overflow = TextOverflow.Ellipsis)
                                 is ClipboardCard.Image -> {
                                     var aspect by remember(card.item.uri) { mutableFloatStateOf(.8f) }

@@ -170,4 +170,11 @@ class HardwareCursorAnchorTest {
         assertNull(resolveHardwareCursorAnchor(info))
         verify(info, never()).getCharacterBounds(0)
     }
+    @Test fun `zero marker is not a caret and can use valid character geometry`() {
+        val info = editor(end = 42)
+        marker(info, 0f, 0f, 0f, 0)
+        assertNull(resolveHardwareCursorAnchor(info))
+        character(info, 42, 110f, 120f, 130f, 144f)
+        assertEquals(HardwareCursorAnchor(110f, 120f, 110f, 144f), resolveHardwareCursorAnchor(info))
+    }
 }

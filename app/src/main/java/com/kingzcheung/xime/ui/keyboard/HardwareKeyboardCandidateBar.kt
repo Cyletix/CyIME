@@ -1,24 +1,22 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import android.graphics.Rect
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -37,11 +35,18 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import com.kingzcheung.xime.settings.SettingsPreferences
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -53,7 +58,6 @@ import com.kingzcheung.xime.service.HardwareCursorAnchor
 
 private const val MAX_VISIBLE_CANDIDATES = 10
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HardwareKeyboardCandidateBar(
     inputText: String,
@@ -70,18 +74,35 @@ fun HardwareKeyboardCandidateBar(
     onCandidateSelect: ((Int) -> Unit)? = null,
     onBoundsChanged: (Rect?) -> Unit = {},
     avoidBoundsInWindow: Rect? = null,
+    preeditBackgroundColor: Color = cardBackgroundColor,
+    comments: List<String> = emptyList(),
+    onPrevious: (() -> Unit)? = null,
+    onNext: (() -> Unit)? = null,
+    surface: (@Composable () -> Modifier)? = null,
+    bottomDocked: Boolean = false,
+    onPreeditBoundsChanged: (Rect?) -> Unit = {},
 ) {
     val reportBounds by rememberUpdatedState(onBoundsChanged)
+    val reportPreeditBounds by rememberUpdatedState(onPreeditBoundsChanged)
     if (candidates.isEmpty() && inputText.isEmpty() && preeditText.isEmpty()) {
-        LaunchedEffect(Unit) { reportBounds(null) }
+        LaunchedEffect(Unit) { reportBounds(null); reportPreeditBounds(null) }
         return
     }
     DisposableEffect(Unit) {
-        onDispose { reportBounds(null) }
+        onDispose { reportBounds(null); reportPreeditBounds(null) }
     }
 
     val density = LocalDensity.current
+    val context = LocalContext.current
+    val fontSize = SettingsPreferences.getCandidateTextSize(context).sp
+    val measurer = rememberTextMeasurer()
+    val visuals = CandidateBarVisuals(cardBackgroundColor, candidateTextColor, Color.Transparent,
+        activeColor, selectedTextColor, preeditBackgroundColor = preeditBackgroundColor)
+    val showCandidates = !bottomDocked && candidates.isNotEmpty()
+    LaunchedEffect(showCandidates) { if (!showCandidates) reportBounds(null) }
+
     val displayText = if (preeditText.isNotEmpty()) preeditText else inputText
+    LaunchedEffect(displayText) { if (displayText.isEmpty()) reportPreeditBounds(null) }
 
     val view = LocalView.current
     val viewLoc = remember { IntArray(2) }
@@ -99,13 +120,13 @@ fun HardwareKeyboardCandidateBar(
         // Use the actual host and measured card, including split-window origins.
         // The insertion marker is already in screen pixels; zero is a valid position.
         val marginPx = with(density) { 8.dp.roundToPx() }
-        val maxCardWidth = (maxWidth - 16.dp).coerceIn(1.dp, 420.dp)
+        val maxCardWidth = (maxWidth - 16.dp).coerceIn(1.dp, 560.dp)
         val maxCardHeight = (maxHeight - 16.dp).coerceAtLeast(1.dp)
         view.getLocationOnScreen(viewLoc)
         val origin = (hostPositionInRoot ?: IntOffset.Zero) + IntOffset(viewLoc[0], viewLoc[1])
         val placement = hardwareCandidatePosition(
             constraints.maxWidth, constraints.maxHeight, cardSize.width, cardSize.height,
-            cursorAnchor.takeIf { hostPositionInRoot != null }, origin.x, origin.y,
+            cursorAnchor.takeIf { hostPositionInRoot != null && !bottomDocked }, origin.x, origin.y,
             marginPx, with(density) { 8.dp.roundToPx() },
             avoidBounds = hostPositionInWindow?.let { hostOrigin ->
                 avoidBoundsInWindow?.let { excluded ->
@@ -116,85 +137,83 @@ fun HardwareKeyboardCandidateBar(
                 }
             },
         )
-        Box(
-            modifier = Modifier
-                .absoluteOffset { IntOffset(placement.x, placement.y) }
-                .widthIn(min = minOf(160.dp, maxCardWidth), max = maxCardWidth)
-                .heightIn(max = maxCardHeight)
-                .shadow(12.dp, RoundedCornerShape(8.dp))
-                .clip(RoundedCornerShape(8.dp))
-                .background(cardBackgroundColor)
-                .testTag("hardware-candidate-card")
-                .onSizeChanged { cardSize = it }
-                .onGloballyPositioned { coordinates ->
-                    val bounds = coordinates.boundsInWindow()
-                    reportBounds(Rect(floor(bounds.left).toInt(), floor(bounds.top).toInt(),
-                        ceil(bounds.right).toInt(), ceil(bounds.bottom).toInt()))
-                }
-        ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp)
-                    .widthIn(max = (maxCardWidth - 24.dp).coerceAtLeast(1.dp))
-            ) {
-                if (displayText.isNotEmpty()) {
-                    Text(
-                        text = displayText,
-                        fontSize = 13.sp,
-                        color = activeColor,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                }
-
-                if (candidates.isNotEmpty()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        candidates.take(MAX_VISIBLE_CANDIDATES).forEachIndexed { index, candidate ->
-                            val isActive = index == highlightIndex
-                            val label = (index + 1) % 10
-                            val labelText = if (index == 9) "0" else "$label"
-                            Column(
-                                modifier = Modifier.testTag("hardware-candidate-$index")
-                                    .then(if (onCandidateSelect != null) Modifier.clickable {
-                                        onCandidateSelect(index)
-                                    } else Modifier)
-                                    .padding(horizontal = 2.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = "$labelText $candidate",
-                                    fontSize = 15.sp,
-                                    color = if (isActive) selectedTextColor else candidateTextColor,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1,
-                                    fontFamily = AppFonts.candidateFontFamily
-                                )
-                            }
-                        }
-                    }
+        val textWidth = candidates.take(MAX_VISIBLE_CANDIDATES).mapIndexed { index, text ->
+            measurer.measure(AnnotatedString("${(index + 1) % 10} $text"),
+                TextStyle(fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily), softWrap = false).size.width
+        }.sum()
+        val contentWidth = (with(density) { textWidth.toDp() } + (12 * candidates.size + 104).dp)
+            .coerceIn(minOf(160.dp, maxCardWidth), maxCardWidth)
+        val preeditWidth = with(density) {
+            measurer.measure(AnnotatedString(displayText), TextStyle(fontSize = PreeditStyle.FontSize),
+                softWrap = false).size.width.toDp() + 16.dp
+        }.coerceIn(24.dp, maxCardWidth.coerceAtLeast(24.dp)).coerceAtMost(maxCardWidth)
+        val groupWidth = if (showCandidates) maxOf(contentWidth, preeditWidth) else preeditWidth
+        val dockBounds = if (bottomDocked) hostPositionInWindow?.let { originInWindow ->
+            avoidBoundsInWindow?.let { IntOffset(it.left - originInWindow.x, it.top - originInWindow.y) }
+        } else null
+        val x = dockBounds?.x?.coerceIn(marginPx, maxOf(marginPx, constraints.maxWidth - cardSize.width - marginPx)) ?: placement.x
+        val y = dockBounds?.let { (it.y - cardSize.height - marginPx).coerceAtLeast(marginPx) } ?: placement.y
+        // This group has no painted background or pointer handler. Each visible surface reports
+        // its own touch region, leaving the gap and the rest of the editor usable.
+        Column(Modifier.absoluteOffset { IntOffset(x, y) }.width(groupWidth)
+            .heightIn(max = maxCardHeight).onSizeChanged { cardSize = it },
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (displayText.isNotEmpty()) {
+                val shape = RoundedCornerShape(10.dp)
+                Box(Modifier.width(preeditWidth).shadow(4.dp, shape).clip(shape)
+                    .then(surface?.invoke() ?: Modifier.background(preeditBackgroundColor))
+                    .border(1.dp, candidateTextColor.copy(alpha = 0.28f), shape)
+                    .testTag("hardware-preedit-card")
+                    .onGloballyPositioned { reportPreeditBounds(it.boundsInWindow().toAndroidBounds()) }) {
+                    PreeditLabel(displayText, visuals.copy(preeditBackgroundColor = Color.Transparent),
+                        modifier = Modifier.fillMaxWidth())
                 }
             }
-
-            if (hasNextPage || hasPrevPage) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 8.dp, bottom = 6.dp)
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        if (hasPrevPage) {
-                            Text("◀", fontSize = 10.sp, color = candidateTextColor.copy(alpha = 0.5f))
-                        }
-                        if (hasNextPage) {
-                            Text("▶", fontSize = 10.sp, color = candidateTextColor.copy(alpha = 0.5f))
-                        }
-                    }
+            if (showCandidates) {
+                val shape = RoundedCornerShape(24.dp)
+                Box(Modifier.width(contentWidth).shadow(8.dp, shape).clip(shape)
+                    .then(surface?.invoke() ?: Modifier.background(cardBackgroundColor))
+                    .border(1.dp, candidateTextColor.copy(alpha = 0.28f), shape)
+                    .testTag("hardware-candidate-card")
+                    .onGloballyPositioned { reportBounds(it.boundsInWindow().toAndroidBounds()) }
+                    .padding(horizontal = 6.dp, vertical = 4.dp)) {
+                    HardwareCandidateRow(candidates, comments, highlightIndex, hasPrevPage, hasNextPage,
+                        visuals, onCandidateSelect, onPrevious, onNext)
                 }
+            }
+        }
+    }
+}
+
+private fun androidx.compose.ui.geometry.Rect.toAndroidBounds() = Rect(
+    floor(left).toInt(), floor(top).toInt(), ceil(right).toInt(), ceil(bottom).toInt())
+
+/** The exact same single-row renderer is used beside the caret and inside the dock. */
+@Composable
+internal fun HardwareCandidateRow(
+    candidates: List<String>, comments: List<String>, highlightIndex: Int,
+    hasPrevPage: Boolean, hasNextPage: Boolean, visuals: CandidateBarVisuals,
+    onCandidateSelect: ((Int) -> Unit)?, onPrevious: (() -> Unit)?, onNext: (() -> Unit)?,
+) {
+    val context = LocalContext.current
+    val shownComments = if (SettingsPreferences.showCandidateComments(context)) comments else emptyList()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        FixedCandidateStrip(candidates.take(MAX_VISIBLE_CANDIDATES), comments = shownComments,
+            visuals = visuals,
+            callbacks = CandidateBarCallbacks(onCandidateSelect = { onCandidateSelect?.invoke(it) }),
+            fontSize = SettingsPreferences.getCandidateTextSize(context).sp,
+            highlightIndex = highlightIndex, showNumberLabels = true, itemSpacing = 8.dp,
+            modifier = Modifier.weight(1f).padding(vertical = 4.dp))
+        if (onPrevious != null && (hasPrevPage || highlightIndex > 0)) {
+            KeyboardToolbarButton(onPrevious, Color.Transparent,
+                modifier = Modifier.testTag("hardware-candidate-previous")) {
+                Icon(Icons.Default.ChevronLeft, "上一候选", tint = visuals.textColor)
+            }
+        }
+        if (onNext != null && (hasNextPage || highlightIndex < candidates.lastIndex)) {
+            KeyboardToolbarButton(onNext, Color.Transparent,
+                modifier = Modifier.testTag("hardware-candidate-next")) {
+                Icon(Icons.Default.ChevronRight, "下一候选", tint = visuals.textColor)
             }
         }
     }

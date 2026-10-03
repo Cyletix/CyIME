@@ -60,6 +60,8 @@ data class InputUIState(
     val floatingOffsetX: Int = 0,
     val floatingOffsetY: Int = 0,
     /** Current editor's cursor in screen pixels; null until it reports a usable anchor. */
+    val hardwareOptions: com.kingzcheung.xime.settings.HardwareKeyboardOptions = com.kingzcheung.xime.settings.HardwareKeyboardOptions(),
+    val editorBounds: HardwareCursorAnchor? = null,
     val cursorAnchor: HardwareCursorAnchor? = null,
     val showQuickSendForm: Boolean = false,
     val quickSendFormFocused: Boolean = false,

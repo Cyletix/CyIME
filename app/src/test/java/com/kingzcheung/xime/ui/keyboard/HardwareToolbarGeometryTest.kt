@@ -10,9 +10,9 @@ class HardwareToolbarGeometryTest {
         assertEquals(HardwareToolbarOffset(334f, 536f), geometry.offset(HardwareToolbarPosition()))
     }
 
-    @Test fun releaseSnapsToThreeHorizontalDocksAndKeepsVerticalTravel() {
+    @Test fun releaseOnlySnapsNearEdgesOrCenterAndKeepsFreeTravel() {
         val geometry = hardwareToolbarGeometry(900, 600, 232, 56, 8)
-        for ((fraction, dock) in listOf(0.05f to 0f, 0.24f to 0f, 0.3f to 0.5f, 0.7f to 0.5f, 0.76f to 1f, 0.98f to 1f)) {
+        for ((fraction, dock) in listOf(0.03f to 0f, 0.24f to 0.24f, 0.49f to 0.5f, 0.7f to 0.7f, 0.76f to 0.76f, 0.98f to 1f)) {
             val offset = geometry.offset(HardwareToolbarPosition(fraction, 0.35f))
             val result = geometry.positionAt(offset.x, offset.y, HardwareToolbarPosition())
             assertEquals(dock, result.xFraction, 0.0001f)
@@ -66,5 +66,44 @@ class HardwareToolbarGeometryTest {
         assertEquals(HardwareToolbarMode.KEYBOARD_ONLY, hardwareToolbarMode(183f))
         assertEquals(HardwareToolbarMode.KEYBOARD_ONLY, hardwareToolbarMode(48f))
         assertEquals(HardwareToolbarMode.KEYBOARD_ONLY, hardwareToolbarMode(0f))
+    }
+    @org.junit.Test fun editorAvoidanceMovesOnlyWhenNeededAndStaysInsideHost() {
+        val g = hardwareToolbarGeometry(800, 600, 232, 56, 8)
+        val start = g.offset(HardwareToolbarPosition())
+        val far = HardwareCandidateExclusion(10, 10, 100, 50)
+        org.junit.Assert.assertEquals(start, avoidHardwareEditor(g, start, 232, 56, far, 12))
+        val editor = HardwareCandidateExclusion(250, 500, 550, 590)
+        val moved = avoidHardwareEditor(g, start, 232, 56, editor, 12)
+        org.junit.Assert.assertTrue(moved.y + 56 <= editor.top - 12)
+        org.junit.Assert.assertTrue(moved.x in g.minX..g.maxX && moved.y in g.minY..g.maxY)
+        org.junit.Assert.assertEquals(start, g.offset(HardwareToolbarPosition()))
+        val covered = avoidHardwareEditor(g, start, 232, 56, HardwareCandidateExclusion(0, 0, 800, 600), 12)
+        org.junit.Assert.assertTrue(covered.x in g.minX..g.maxX && covered.y in g.minY..g.maxY)
+    }
+
+    @Test fun bottomDockWinsAtCornersButDoesNotCaptureFreeTravel() {
+        val geometry = hardwareToolbarGeometry(900, 600, 232, 56, 8)
+        for (x in listOf(geometry.minX, 300f, geometry.maxX)) {
+            assertEquals(HardwareToolbarPosition(), geometry.positionAt(x, geometry.maxY - 20f, HardwareToolbarPosition()))
+        }
+        val free = geometry.positionAt(200f, geometry.maxY - 40f, HardwareToolbarPosition())
+        assertTrue(!free.isBottomDocked(true))
+        assertTrue(free.xFraction > 0f && free.xFraction < 1f)
+        val unsnapped = geometry.positionAt(200f, geometry.maxY - 1f, HardwareToolbarPosition(), snapX = false)
+        assertTrue(unsnapped.yFraction < 1f)
+        assertTrue(!HardwareToolbarPosition().isBottomDocked(false))
+    }
+
+    @Test fun bottomStripFitsPortraitLandscapeAndSplitHosts() {
+        for (width in listOf(336, 600, 1400)) {
+            val stripWidth = minOf(720, width - 16)
+            val geometry = hardwareToolbarGeometry(width, 500, stripWidth, 56, 8)
+            val offset = geometry.offset(HardwareToolbarPosition())
+            assertEquals(width / 2f, offset.x + stripWidth / 2f, 0.01f)
+            assertEquals(492f, offset.y + 56f, 0.01f)
+            assertTrue(offset.x >= 8 && offset.x + stripWidth <= width - 8)
+            val released = geometry.positionAt(offset.x, offset.y - 100f, HardwareToolbarPosition())
+            assertTrue(!released.isBottomDocked(true))
+        }
     }
 }

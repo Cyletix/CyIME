@@ -52,6 +52,7 @@ internal fun Modifier.frostedGlassBackground(
     isDark: Boolean,
     fallbackColor: Color,
     config: FrostedGlassConfig,
+    translucentSurface: Boolean = false,
 ): Modifier {
     val context = LocalContext.current.applicationContext
     val density = LocalDensity.current.density
@@ -68,12 +69,14 @@ internal fun Modifier.frostedGlassBackground(
 
     var targetSize by remember { mutableStateOf(IntSize.Zero) }
     var blurredImage by remember(background, isDark, fallbackColor) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(background, isDark, fallbackColor, sourceImage, targetSize, density, normalized.blurRadiusDp) {
-        if (targetSize.width <= 0 || targetSize.height <= 0) return@LaunchedEffect
+    // Floating capsules resize during docking; keep their backdrop cache stable throughout.
+    val renderSize = if (translucentSurface) IntSize(512, 256) else targetSize
+    LaunchedEffect(background, isDark, fallbackColor, sourceImage, renderSize, density, normalized.blurRadiusDp) {
+        if (renderSize.width <= 0 || renderSize.height <= 0) return@LaunchedEffect
         blurredImage = withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
             renderFrostedBackground(
-                background, isDark, fallbackColor.toArgb(), sourceImage, targetSize,
+                background, isDark, fallbackColor.toArgb(), sourceImage, renderSize,
                 normalized.blurRadiusDp * density,
                 checkCancelled = { coroutineContext.ensureActive() },
             ).asImageBitmap()
@@ -83,16 +86,19 @@ internal fun Modifier.frostedGlassBackground(
     // This replaces a theme image's overlayAlpha; applying both would double-darken it.
     val tint = (if (isDark) Color.Black else Color.White).copy(alpha = normalized.backgroundOpacity)
     return onSizeChanged { targetSize = it }.drawWithContent {
-        drawRect(fallbackColor.copy(alpha = 1f))
+        // Only the backdrop is translucent; never fade candidate text or buttons.
+        val opacity = if (translucentSurface) normalized.backgroundOpacity else 1f
+        if (!translucentSurface || blurredImage == null) drawRect(fallbackColor.copy(alpha = opacity))
         blurredImage?.let { image ->
             drawImage(
                 image,
                 dstOffset = IntOffset.Zero,
                 dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
                 filterQuality = FilterQuality.Medium,
+                alpha = opacity,
             )
         }
-        drawRect(tint)
+        if (!translucentSurface) drawRect(tint)
         drawContent()
     }
 }

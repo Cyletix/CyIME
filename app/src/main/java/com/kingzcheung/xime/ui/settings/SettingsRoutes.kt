@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui.settings
 
 object SettingsRoutes {
+    const val HardwareKeyboard = "hardware_keyboard"
     const val Main = "main"
     const val Schema = "schema"
     const val Market = "market"

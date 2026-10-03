@@ -2,6 +2,7 @@ package com.kingzcheung.xime.service
 
 import kotlinx.coroutines.flow.combine
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 
 import android.content.Intent
@@ -121,6 +122,10 @@ import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
+import com.kingzcheung.xime.ui.theme.visualMaterial
+import com.kingzcheung.xime.ui.keyboard.isBottomDocked
+import com.kingzcheung.xime.ui.keyboard.HardwareCandidateRow
+import com.kingzcheung.xime.ui.keyboard.CandidateBarVisuals
 import kotlin.math.roundToInt
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.theme.XimeTheme
@@ -128,6 +133,7 @@ import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.util.PreeditMergeHelper
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.keyboard.ActionExecutor
+import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.keyboard.ToolbarButtonItem
 import com.kingzcheung.xime.plugin.core.api.PluginResultItem
@@ -259,6 +265,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private val hardwareToolbarPosition = mutableStateOf(HardwareToolbarPosition())
     private val hardwareToolbarBounds = mutableStateOf<android.graphics.Rect?>(null)
     private var hardwareCandidateBounds: android.graphics.Rect? = null
+    private var hardwarePreeditBounds: android.graphics.Rect? = null
     /** 当前输入框是否受限（密码/终端/NO_SUGGESTIONS，见 EditorInfoClassifier）。
      *  主线程写（onStartInput）、key-processing 线程读（英文联想短路），volatile 保证可见性。 */
     @Volatile
@@ -339,7 +346,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /** 硬件键盘在展开态按 DPAD_DOWN/UP：展开页滚动一屏（经事件流驱动 UI） */
-    private fun expandedPageScroll(direction: Int) {
+    internal fun expandedPageScroll(direction: Int) {
         keyboardViewModel.requestExpandedPageScroll(direction)
     }
     
@@ -493,6 +500,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun registerSharedPrefsListener() {
         val prefs = SettingsPreferences.getPrefsPublic(this)
         sharedPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key?.startsWith(com.kingzcheung.xime.settings.HardwareKeyboardPreferences.PREFIX) == true) {
+                uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
+            }
             when (key) {
                 RimeConfigHelper.DEPLOYMENT_REVISION, com.kingzcheung.xime.settings.LanguagePreferences.KEY -> {
                     val pending = rimeInitializationJob
@@ -1298,6 +1308,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 材质透明度分别应用于背景和键帽，文字不再随整层透明度变淡。
                 val keyboardLayerOpacity = if (frostedGlass.enabled) 1f else state.keyboardOpacity
                 val page by keyboardViewModel.page.collectAsState(com.kingzcheung.xime.keyboard.KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL))
+                LaunchedEffect(page) {
+                    if ((page as? KeyboardPage.Overlay)?.route !is OverlayRoute.Clipboard && clipboardKeyboard.active) {
+                        clipboardKeyboard.reset()
+                        clipboardRestoreCompact = false
+                    }
+                }
                 val isHandwritingMode = (page as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
                 val handwritingExpanded = state.handwritingExpanded && isHandwritingMode && !state.showKeyboardResize
                 val clipboardPanelOpen = clipboardPanelCanExpand(page, state.showKeyboardResize, state.isCompact)
@@ -1396,36 +1412,61 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 else if (state.isCompact) HARDWARE_CANDIDATE_BAR_HEIGHT
                                 else effectiveKeyboardHeight + overlayPanelExtra
                         }
-                        val kbColors = KeysConfigHelper.getKeyboardColors()
-                        val longToColor: (Long) -> androidx.compose.ui.graphics.Color = { if (it == 0L)  { androidx.compose.ui.graphics.Color(0xE61E1E1E) } else if (it > 0xFFFFFF) { androidx.compose.ui.graphics.Color(it) } else { androidx.compose.ui.graphics.Color(0xFF000000 or it) } }
                         val isDark = isDarkTheme
-                        val cardBg = if (isDark) longToColor(com.kingzcheung.xime.settings.KeyboardColorsConfig.FALLBACK_BG_DARK) else longToColor(com.kingzcheung.xime.settings.KeyboardColorsConfig.FALLBACK_BG_LIGHT)
-                        val candidateTextCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getCandidateTextColorOverride(state.themeId, isDark)
-                            ?: if (isDark) longToColor(kbColors.candidateTextColorDark) else longToColor(kbColors.candidateTextColor)
-                        val accentCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getAccentColor(state.themeId, isDark)
-                        val selectedTextCol = com.kingzcheung.xime.ui.theme.KeyboardThemes.getCandidateSelectedTextColor(state.themeId, isDark)
+                        val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
+                        val cardBg = hardwarePalette.background
                         val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
                         val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
                         if (state.isCompact) {
-                          Box(Modifier.fillMaxSize().padding(bottom = activeBottomDp.dp)) {
+                          androidx.compose.runtime.CompositionLocalProvider(
+                              com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
+                                  com.kingzcheung.xime.ui.theme.MaterialPalette(cardBg, hardwarePalette.accent)) {
+                          androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = activeBottomDp.dp)) {
+                            val bottomDocked = hardwareToolbarPosition.value.isBottomDocked(state.hardwareOptions.dockAtEdge) && maxWidth >= 336.dp
+                            val glass = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().frostedGlass
+                            val hardwareSurface: @Composable () -> Modifier = {
+                                Modifier.keyboardBackground(rootTheme.keyboardBackground, isDark, cardBg,
+                                    frostedGlass = glass, translucentSurface = true)
+                                    .visualMaterial(if (glass.enabled) com.kingzcheung.xime.ui.theme.VisualStyle.GLASS
+                                        else com.kingzcheung.xime.ui.theme.VisualStyles.current, 24.dp)
+                            }
+                            val selectHardwareCandidate: (Int) -> Unit = { index ->
+                                if (cand.hasSameSelectionSource(candidateState.value)) {
+                                    keyRouter.selectCandidate(index); highlightIndex.intValue = 0
+                                }
+                            }
+                            val previousHardwareCandidate: () -> Unit = {
+                                if (cand.hasSameSelectionSource(candidateState.value)) {
+                                    if (highlightIndex.intValue > 0) highlightIndex.intValue--
+                                    else if (cand.hasPrevPage) keyRouter.pageUp()
+                                }
+                            }
+                            val nextHardwareCandidate: () -> Unit = {
+                                if (cand.hasSameSelectionSource(candidateState.value)) {
+                                    if (highlightIndex.intValue < cand.candidates.lastIndex) highlightIndex.intValue++
+                                    else if (cand.hasNextPage) { keyRouter.pageDown(); highlightIndex.intValue = 0 }
+                                }
+                            }
                             HardwareKeyboardCandidateBar(
                                 inputText = cand.inputText,
                                 preeditText = cand.preeditText,
                                 candidates = cand.candidates,
                                 hasNextPage = cand.hasNextPage,
                                 hasPrevPage = cand.hasPrevPage,
-                                cursorAnchor = state.cursorAnchor,
+                                cursorAnchor = state.cursorAnchor.takeIf { state.hardwareOptions.followCursor },
                                 highlightIndex = highlightIndex.intValue,
                                 cardBackgroundColor = cardBg,
-                                candidateTextColor = candidateTextCol,
-                                activeColor = accentCol,
-                                selectedTextColor = selectedTextCol,
-                                onCandidateSelect = { index ->
-                                    if (cand.hasSameSelectionSource(candidateState.value)) {
-                                        keyRouter.selectCandidate(index)
-                                        highlightIndex.intValue = 0
-                                    }
-                                },
+                                candidateTextColor = hardwarePalette.candidateText,
+                                activeColor = hardwarePalette.accent,
+                                selectedTextColor = hardwarePalette.selectedText,
+                                preeditBackgroundColor = hardwarePalette.key,
+                                comments = cand.candidateComments,
+                                onPrevious = previousHardwareCandidate,
+                                onNext = nextHardwareCandidate,
+                                onCandidateSelect = selectHardwareCandidate,
+                                bottomDocked = bottomDocked,
+                                surface = hardwareSurface,
+                                onPreeditBoundsChanged = { updateHardwarePreeditBounds(it) },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = false, it) },
                                 avoidBoundsInWindow = hardwareToolbarBounds.value,
                             )
@@ -1433,16 +1474,32 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onShowKeyboard = { showScreenKeyboardFromHardware() },
                                 onEmoji = { showScreenKeyboardFromHardware(OverlayRoute.Emoji) },
                                 onClipboard = { showScreenKeyboardFromHardware(OverlayRoute.Clipboard()) },
-                                onSwitchInputMethod = {
-                                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                                    imm.showInputMethodPicker()
-                                },
+                                onSwitchLanguage = { switchHardwareLanguage() },
+                                languageActions = com.kingzcheung.xime.ui.keyboard.KeyboardInputActions(
+                                    schemas = com.kingzcheung.xime.settings.InputModes.available(state.schemas),
+                                    currentInputModeId = com.kingzcheung.xime.settings.InputModes.selectedId(state.currentSchemaId, state.isAsciiMode),
+                                    onSwitchSchema = { id -> if (inputReadiness.ticket() != null) schemaController.switchSchema(id) },
+                                ),
+                                cursorAnchor = state.cursorAnchor,
+                                editorBounds = state.editorBounds,
+                                avoidEditor = state.hardwareOptions.avoidEditor,
+                                dockAtEdge = state.hardwareOptions.dockAtEdge,
                                 backgroundColor = cardBg,
-                                contentColor = accentCol,
+                                surface = hardwareSurface,
+                                bottomDocked = bottomDocked,
+                                bottomCandidateContent = {
+                                    HardwareCandidateRow(cand.candidates, cand.candidateComments, highlightIndex.intValue,
+                                        cand.hasPrevPage, cand.hasNextPage,
+                                        CandidateBarVisuals(cardBg, hardwarePalette.candidateText, Color.Transparent,
+                                            hardwarePalette.accent, hardwarePalette.selectedText),
+                                        selectHardwareCandidate, previousHardwareCandidate, nextHardwareCandidate)
+                                },
+                                contentColor = hardwarePalette.candidateText,
                                 position = hardwareToolbarPosition.value,
                                 onPositionChange = { hardwareToolbarPosition.value = it },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = true, it) },
                             )
+                          }
                           }
                         } else {
                         // 非浮动：背景与键盘内容同区域，贴底覆盖键盘内容高度 + 底部导航栏留白，
@@ -1475,6 +1532,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             }
                         ) {
                         CompositionLocalProvider(
+                            com.kingzcheung.xime.clipboard.LocalClipboardKeyboardNavigation provides clipboardKeyboard,
                             LocalStretchFactor provides state.stretchFactor,
                             LocalClipboardPanelExpansion provides clipboardExpansion,
                         ) {
@@ -1944,6 +2002,52 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         window.window?.decorView?.requestApplyInsets()
     }
 
+    private val hardwareLanguageShortcuts = HardwareLanguageShortcuts()
+    private var clipboardRestoreCompact = false
+    private var microphoneRestoreCompact = false
+    private val clipboardNavigationKeys = mutableSetOf<Int>()
+    private val clipboardKeyboard = com.kingzcheung.xime.clipboard.ClipboardKeyboardNavigation {
+        keyboardViewModel.closeOverlay()
+        if (clipboardRestoreCompact) collapseScreenKeyboardToHardwareToolbar()
+        clipboardRestoreCompact = false
+    }
+
+    private fun handleHardwareTool(tool: HardwareToolShortcut) {
+        when (tool) {
+            HardwareToolShortcut.PUNCTUATION -> {
+                if (inputReadiness.ticket() != null) sessionController.togglePunctuationWidth(notifyAscii = true)
+            }
+            HardwareToolShortcut.CLIPBOARD -> {
+                val route = (keyboardViewModel.page.value as? KeyboardPage.Overlay)?.route
+                if (route is OverlayRoute.Clipboard) clipboardKeyboard.close()
+                else {
+                    clipboardRestoreCompact = uiState.value.isCompact
+                    clipboardKeyboard.open()
+                    showScreenKeyboardFromHardware(OverlayRoute.Clipboard())
+                }
+            }
+            HardwareToolShortcut.MICROPHONE -> {
+                if (uiState.value.isVoiceMode) {
+                    endVoiceSession()
+                    if (microphoneRestoreCompact) collapseScreenKeyboardToHardwareToolbar()
+                    microphoneRestoreCompact = false
+                } else if (!uiState.value.isSttEnabled) {
+                    android.widget.Toast.makeText(this, "请先在设置中启用语音输入", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    microphoneRestoreCompact = uiState.value.isCompact
+                    if (microphoneRestoreCompact) showScreenKeyboardFromHardware()
+                    keyboardCallbacks?.onVoiceStickyToggle?.invoke()
+                }
+            }
+        }
+    }
+
+    private var hardwareCursorImmediateOnly = false
+    private fun switchHardwareLanguage() {
+        keyboardViewModel.resetShift()
+        keyRouter.handleKeyPress("ime_switch", uiState.value.isAsciiMode)
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         cancelVerificationCodeInput()
         if (keyCode == KeyEvent.KEYCODE_BACK &&
@@ -1953,7 +2057,53 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return true
         }
         val e = event ?: return super.onKeyDown(keyCode, event)
-        if (hasHardwareKeyboard && candidateState.value.candidates.isNotEmpty()) {
+        if (hasHardwareKeyboard) {
+            val shortcut = hardwareLanguageShortcuts.down(keyCode, e.eventTime, e.repeatCount,
+                e.isCtrlPressed, e.isAltPressed, e.isMetaPressed, e.isShiftPressed, uiState.value.hardwareOptions)
+            if (shortcut.switchLanguage) switchHardwareLanguage()
+            shortcut.tool?.let { handleHardwareTool(it) }
+            if (shortcut.consume) return true
+            if (e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return super.onKeyDown(keyCode, event)
+            val clipboardRoute = (keyboardViewModel.page.value as? KeyboardPage.Overlay)?.route as? OverlayRoute.Clipboard
+            val clipboardOpen = clipboardRoute != null && clipboardRoute.tab != 1
+            if (clipboardKeyboard.active && !clipboardOpen) clipboardKeyboard.reset()
+            if (clipboardNavigationKeys.contains(keyCode) && e.repeatCount > 0 && !clipboardOpen) return true
+            if (clipboardOpen && clipboardKeyboard.active) {
+                val action = when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT -> com.kingzcheung.xime.clipboard.ClipboardNavigation.LEFT
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> com.kingzcheung.xime.clipboard.ClipboardNavigation.RIGHT
+                    KeyEvent.KEYCODE_DPAD_UP -> com.kingzcheung.xime.clipboard.ClipboardNavigation.UP
+                    KeyEvent.KEYCODE_DPAD_DOWN -> com.kingzcheung.xime.clipboard.ClipboardNavigation.DOWN
+                    KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> com.kingzcheung.xime.clipboard.ClipboardNavigation.CONFIRM
+                    KeyEvent.KEYCODE_ESCAPE -> com.kingzcheung.xime.clipboard.ClipboardNavigation.CANCEL
+                    else -> null
+                }
+                if (action != null) {
+                    clipboardNavigationKeys += keyCode
+                    if (e.repeatCount == 0 || action !in listOf(com.kingzcheung.xime.clipboard.ClipboardNavigation.CONFIRM,
+                            com.kingzcheung.xime.clipboard.ClipboardNavigation.CANCEL)) clipboardKeyboard.dispatch(action)
+                    return true
+                }
+            }
+            // Enter uses the same FIFO raw-input commit as the on-screen return key.
+            if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                keyRouter.handleKeyPress("enter", e.isShiftPressed)
+                return true
+            }
+        }
+        val composing = candidateState.value
+        val pageDirection = hardwareCandidatePageDirection(keyCode, hasInput = true,
+            modified = e.isCtrlPressed || e.isAltPressed || e.isMetaPressed)
+        if (hasHardwareKeyboard && pageDirection != 0) {
+            val symbol = keyCodeToKey(keyCode, e.isShiftPressed)
+            if (symbol != null) {
+                // Check composition inside the FIFO queue, after preceding letters/commits.
+                // UI candidates may still be empty during rapid physical input.
+                keyRouter.handleKeyPress(symbol, e.isShiftPressed, hardwarePageDirection = pageDirection)
+                return true
+            }
+        }
+        if (hasHardwareKeyboard && composing.candidates.isNotEmpty()) {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (keyboardViewModel.candidatePageExpanded.value) {
@@ -1976,7 +2126,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     highlightIndex.intValue = (highlightIndex.intValue - 1).coerceAtLeast(0)
                     return true
                 }
-                KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_ENTER -> {
+                KeyEvent.KEYCODE_SPACE -> {
                     if (candidateState.value.candidates.isNotEmpty()) {
                         keyRouter.selectCandidate(highlightIndex.intValue)
                         highlightIndex.intValue = 0
@@ -2005,6 +2155,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        val clipboardConsumed = clipboardNavigationKeys.remove(keyCode)
+        if (hasHardwareKeyboard && event != null) {
+            val shortcut = hardwareLanguageShortcuts.up(keyCode, event.eventTime, event.isCanceled, uiState.value.hardwareOptions)
+            if (shortcut.switchLanguage) switchHardwareLanguage()
+            if (shortcut.consume || clipboardConsumed) return true
+            if ((keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) &&
+                !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) return true
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.handwritingExpanded) {
             if (event?.isCanceled != true) uiState.value = uiState.value.copy(handwritingExpanded = false)
             return true
@@ -2069,9 +2227,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        hardwareLanguageShortcuts.reset()
+        clipboardKeyboard.reset()
+        clipboardNavigationKeys.clear()
+        clipboardRestoreCompact = false
+        microphoneRestoreCompact = false
+        uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
         // A hardware keyboard can switch editors without starting the soft input view.
         // Never keep the previous editor's position while waiting for this connection.
-        uiState.value = uiState.value.copy(cursorAnchor = null)
+        uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
         hardwareKeyboardDisplay = hardwareKeyboardDisplay.withConnection(
             resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS)
         applyCompactMode()
@@ -2298,7 +2462,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         attribute?.let { updateEnterKeyText(it) }
     }
     
-    private val highlightIndex = mutableIntStateOf(0)
+    internal val highlightIndex = mutableIntStateOf(0)
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
@@ -2312,28 +2476,47 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private fun requestHardwareCursorUpdates() {
+        hardwareCursorImmediateOnly = false
+        val connection = currentInputConnection ?: return
         if (!hasHardwareKeyboard) {
-            try { currentInputConnection?.requestCursorUpdates(0) } catch (_: Exception) { }
+            try { connection.requestCursorUpdates(0) } catch (_: Exception) { }
             return
         }
-        try {
-            val accepted = currentInputConnection?.requestCursorUpdates(
-                InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
-            ) == true
-            if (!accepted) uiState.value = uiState.value.copy(cursorAnchor = null)
-            debugLog("Hardware cursor updates accepted=$accepted")
-        } catch (e: Exception) {
-            uiState.value = uiState.value.copy(cursorAnchor = null)
-            FileLogger.e(TAG, "Cannot request hardware cursor updates", e)
+        val mode = InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
+        fun request(flags: Int, filtered: Boolean = false): Boolean = try {
+            if (filtered && Build.VERSION.SDK_INT >= 33) connection.requestCursorUpdates(flags,
+                InputConnection.CURSOR_UPDATE_FILTER_INSERTION_MARKER or InputConnection.CURSOR_UPDATE_FILTER_CHARACTER_BOUNDS or
+                    InputConnection.CURSOR_UPDATE_FILTER_EDITOR_BOUNDS)
+            else connection.requestCursorUpdates(flags)
+        } catch (_: Exception) { false }
+        val acceptedMode = when {
+            Build.VERSION.SDK_INT >= 33 && request(mode, filtered = true) -> mode
+            request(mode) -> mode
+            request(InputConnection.CURSOR_UPDATE_MONITOR) -> InputConnection.CURSOR_UPDATE_MONITOR
+            request(InputConnection.CURSOR_UPDATE_IMMEDIATE) -> InputConnection.CURSOR_UPDATE_IMMEDIATE
+            else -> 0
+        }
+        hardwareCursorImmediateOnly = acceptedMode == InputConnection.CURSOR_UPDATE_IMMEDIATE
+        if (acceptedMode == 0) uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
+        debugLog("Hardware cursor request package=${currentInputEditorInfo?.packageName} mode=$acceptedMode")
+    }
+
+    override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        if (hasHardwareKeyboard && hardwareCursorImmediateOnly) {
+            try { currentInputConnection?.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE) } catch (_: Exception) { }
         }
     }
 
     override fun onUpdateCursorAnchorInfo(info: CursorAnchorInfo) {
         if (!hasHardwareKeyboard) return
         try {
-            uiState.value = uiState.value.copy(cursorAnchor = resolveHardwareCursorAnchor(info))
+            val anchor = resolveHardwareCursorAnchor(info)
+            uiState.value = uiState.value.copy(cursorAnchor = anchor, editorBounds = resolveHardwareEditorBounds(info))
+            debugLog("Hardware cursor anchor=$anchor markerFlags=${info.insertionMarkerFlags}")
         } catch (e: Exception) {
-            uiState.value = uiState.value.copy(cursorAnchor = null)
+            uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
             FileLogger.e(TAG, "onUpdateCursorAnchorInfo failed", e)
         }
     }
@@ -2353,7 +2536,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         currentResolvedKeyboardSize = null
         clearHardwareSurfaceBounds()
-        uiState.value = uiState.value.copy(cursorAnchor = null)
+        uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
         hardwareKeyboardDisplay = hardwareKeyboardDisplay.withConnection(
             newConfig.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS)
         super.onConfigurationChanged(newConfig)
@@ -2483,6 +2666,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun clearHardwareSurfaceBounds() {
         hardwareToolbarBounds.value = null
         hardwareCandidateBounds = null
+        hardwarePreeditBounds = null
+    }
+
+    private fun updateHardwarePreeditBounds(bounds: android.graphics.Rect?) {
+        val next = bounds?.takeIf { uiState.value.isCompact && !it.isEmpty }?.let { android.graphics.Rect(it) }
+        if (hardwarePreeditBounds == next) return
+        hardwarePreeditBounds = next
+        if (::keyboardContainer.isInitialized) keyboardContainer.requestLayout()
     }
 
     private fun updateHardwareSurfaceBounds(toolbar: Boolean, bounds: android.graphics.Rect?) {
@@ -2530,11 +2721,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onFinishInput() {
+        hardwareLanguageShortcuts.reset()
+        clipboardKeyboard.reset()
+        clipboardNavigationKeys.clear()
+        clipboardRestoreCompact = false
+        microphoneRestoreCompact = false
+        hardwareCursorImmediateOnly = false
         clearHardwareSurfaceBounds()
         if (hasHardwareKeyboard) {
             try { currentInputConnection?.requestCursorUpdates(0) } catch (_: Exception) { }
         }
-        uiState.value = uiState.value.copy(cursorAnchor = null)
+        uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
         super.onFinishInput()
         if (::clipboardManager.isInitialized) clipboardManager.images.dismissPreview()
         runtimeObserver?.stop()
@@ -2583,6 +2780,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowShown() {
         super.onWindowShown()
+        requestHardwareCursorUpdates()
         startRuntimeObservation()
         // 键盘弹出时对比系统取色与缓存的动态主题色，壁纸取色变化则重建主题并热更新 UI。
         // 每次弹出只做两次资源读取对比，取色未变时零成本。
@@ -2844,9 +3042,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             outInsets.visibleTopInsets = height
             outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
             outInsets.touchableRegion.setEmpty()
-            // Union the two islands, never their bounding rectangle: the transparent
+            // Union visible surfaces, never their bounding rectangle: the transparent
             // area between the toolbar and caret must keep passing touches to the app.
             hardwareToolbarBounds.value?.let { outInsets.touchableRegion.op(it, android.graphics.Region.Op.UNION) }
+            hardwarePreeditBounds?.let { outInsets.touchableRegion.op(it, android.graphics.Region.Op.UNION) }
             hardwareCandidateBounds?.let { outInsets.touchableRegion.op(it, android.graphics.Region.Op.UNION) }
             return
         } else if (state.isFloatingMode) {

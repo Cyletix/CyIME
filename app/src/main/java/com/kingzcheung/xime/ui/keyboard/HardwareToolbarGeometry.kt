@@ -3,6 +3,9 @@ package com.kingzcheung.xime.ui.keyboard
 /** Fractions of the currently available travel, retained across editors and rotations. */
 internal data class HardwareToolbarPosition(val xFraction: Float = 0.5f, val yFraction: Float = 1f)
 
+/** Bottom docking wins over side docking at the two lower corners. */
+internal fun HardwareToolbarPosition.isBottomDocked(enabled: Boolean) = enabled && yFraction == 1f
+
 internal data class HardwareToolbarOffset(val x: Float, val y: Float)
 
 internal enum class HardwareToolbarMode { FULL, COMPACT, KEYBOARD_ONLY }
@@ -18,6 +21,7 @@ internal data class HardwareToolbarGeometry(
     val maxX: Float,
     val minY: Float,
     val maxY: Float,
+    val snapDistancePx: Float = 32f,
 ) {
     fun offset(position: HardwareToolbarPosition): HardwareToolbarOffset = HardwareToolbarOffset(
         minX + (maxX - minX) * fraction(position.xFraction, 0.5f),
@@ -40,13 +44,16 @@ internal data class HardwareToolbarGeometry(
             else fraction(previous.xFraction, 0.5f)
         val yFraction = if (maxY > minY) (bounded.y - minY) / (maxY - minY)
             else fraction(previous.yFraction, 1f)
+        val bottom = snapX && maxY > minY && maxY - bounded.y <= minOf(snapDistancePx, (maxY - minY) * 0.2f)
         return HardwareToolbarPosition(
-            if (snapX) when {
-                xFraction < 0.25f -> 0f
-                xFraction > 0.75f -> 1f
-                else -> 0.5f
+            if (bottom) 0.5f else if (snapX) when {
+                maxX <= minX -> xFraction
+                bounded.x - minX <= minOf(snapDistancePx, (maxX - minX) * 0.2f) -> 0f
+                maxX - bounded.x <= minOf(snapDistancePx, (maxX - minX) * 0.2f) -> 1f
+                kotlin.math.abs(bounded.x - (minX + maxX) / 2) <= snapDistancePx / 2 -> 0.5f
+                else -> xFraction
             } else xFraction,
-            yFraction,
+            if (bottom) 1f else yFraction,
         )
     }
 
@@ -68,5 +75,25 @@ internal fun hardwareToolbarGeometry(
     }
     val (minX, maxX) = range(viewWidth, toolbarWidth)
     val (minY, maxY) = range(viewHeight, toolbarHeight)
-    return HardwareToolbarGeometry(minX, maxX, minY, maxY)
+    return HardwareToolbarGeometry(minX, maxX, minY, maxY, marginPx.coerceAtLeast(1) * 4f)
+}
+
+/** Relocate only on overlap, without overwriting the user's saved position. */
+internal fun avoidHardwareEditor(
+    geometry: HardwareToolbarGeometry, preferred: HardwareToolbarOffset,
+    width: Int, height: Int, excluded: HardwareCandidateExclusion?, gap: Int,
+): HardwareToolbarOffset {
+    if (excluded == null || excluded.right <= excluded.left || excluded.bottom <= excluded.top) return preferred
+    val left = excluded.left.toFloat() - gap
+    val top = excluded.top.toFloat() - gap
+    val right = excluded.right.toFloat() + gap
+    val bottom = excluded.bottom.toFloat() + gap
+    fun overlap(p: HardwareToolbarOffset) = (minOf(p.x + width, right) - maxOf(p.x, left)).coerceAtLeast(0f) *
+        (minOf(p.y + height, bottom) - maxOf(p.y, top)).coerceAtLeast(0f)
+    if (overlap(preferred) == 0f) return preferred
+    return listOf(preferred, geometry.constrain(preferred.x, top - height),
+        geometry.constrain(preferred.x, bottom), geometry.constrain(left - width, preferred.y),
+        geometry.constrain(right, preferred.y)).minWith(compareBy<HardwareToolbarOffset> { overlap(it) }.thenBy {
+            val dx = it.x - preferred.x; val dy = it.y - preferred.y; dx * dx + dy * dy
+        })
 }

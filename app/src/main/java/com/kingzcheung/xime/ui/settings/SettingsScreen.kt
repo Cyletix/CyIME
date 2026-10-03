@@ -63,6 +63,7 @@ fun SettingsScreen(
     ) {
         composable(SettingsRoutes.Main) {
             SettingsMainContent(
+                onNavigateToHardwareKeyboard = { navController.navigate(SettingsRoutes.HardwareKeyboard) },
                 onNavigateToLanguages = { navController.navigate("languages") },
                 onNavigateToSchema = { navController.navigate(SettingsRoutes.Schema) },
                 onNavigateToMarket = { navController.navigate(SettingsRoutes.Market) },
@@ -79,6 +80,7 @@ fun SettingsScreen(
                 onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) }
             )
         }
+        composable(SettingsRoutes.HardwareKeyboard) { HardwareKeyboardSettingsContent { navController.popBackStack() } }
         composable("languages") { LanguageSettingsContent(onBack = { navController.popBackStack() }) }
         composable(SettingsRoutes.Schema) {
             SchemaSettingsContent(

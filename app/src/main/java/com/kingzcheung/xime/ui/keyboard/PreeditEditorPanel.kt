@@ -118,4 +118,4 @@ internal object PreeditStyle {
 }
 
 internal fun Modifier.preeditSurface(color: Color): Modifier = height(PreeditStyle.SurfaceHeight)
-    .clip(RoundedCornerShape(4.dp)).background(color.copy(alpha = 0.62f)).padding(horizontal = 8.dp)
+    .clip(RoundedCornerShape(4.dp)).background(color.copy(alpha = color.alpha * 0.62f)).padding(horizontal = 8.dp)

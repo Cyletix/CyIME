@@ -90,6 +90,7 @@ fun SettingsMainContent(
     onNavigateToAbout: () -> Unit,
     onNavigateToClipboardSync: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
+    onNavigateToHardwareKeyboard: () -> Unit = {},
     onNavigateToLanguages: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -160,6 +161,8 @@ fun SettingsMainContent(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
+                    SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "物理键盘",
+                        subtitle = "语言切换快捷键、候选跟随与浮条", onClick = onNavigateToHardwareKeyboard)
                     var testText by remember { mutableStateOf("") }
                     var isFocused by remember { mutableStateOf(false) }
                     val editorVisibility = remember { BringIntoViewRequester() }
@@ -269,7 +272,7 @@ fun SettingsMainContent(
             item {
                 SettingsSection(title = "方案与词库", content = {
                     SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "语言管理",
-                        subtitle = "选择需要的语言，自动准备输入方案", onClick = onNavigateToLanguages, showArrow = true)
+                        subtitle = "语言、输入方案、键盘布局", onClick = onNavigateToLanguages, showArrow = true)
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 56.dp),
                         thickness = 0.5.dp,
@@ -277,8 +280,8 @@ fun SettingsMainContent(
                     )
                     SettingsItem(
                         icon = Icons.TwoTone.KeyboardAlt,
-                        title = "输入方案",
-                        subtitle = "管理输入方案",
+                        title = "输入资源",
+                        subtitle = "下载、导入和启停方案资源",
                         onClick = onNavigateToSchema,
                         showArrow = true
                     )
