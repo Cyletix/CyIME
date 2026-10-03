@@ -416,7 +416,7 @@ private fun T9KeyboardContent(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .weight(0.8f),
+                .weight(0.8f).testTag("t9-left-rail"),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             BoxWithConstraints(
@@ -458,7 +458,7 @@ private fun T9KeyboardContent(
                         val isSelected = option != null &&
                             controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
                             controller.selectedOption == option && controller.isSelectedOptionInCurrentCandidates()
-                        CandidateItem(
+                        T9CandidateItem(
                             text = item,
                             preserveWidth = !showCandidates && customSymbols != null,
                             onClick = {
@@ -671,7 +671,7 @@ private fun T9KeyboardContent(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .weight(0.8f),
+                .weight(0.8f).testTag("t9-right-rail"),
         ) {
             SwipeableIconKeyButton(
                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
@@ -820,7 +820,7 @@ private fun T9DigitKey(
 // ─── 子组件 ───────────────────────────────────────────────────────────
 
 @Composable
-private fun CandidateItem(
+internal fun T9CandidateItem(
     text: String,
     onClick: () -> Unit,
     onPress: (() -> Unit)?,

@@ -249,7 +249,9 @@ fun CandidateBar(
             showLeftIcon = true
         }
         is CandidateBarState.ChineseCandidates -> {
-            val taken = s.candidates.take(20)
+            // Expanded candidates share this rail. Keep a hardware-selected item
+            // beyond the usual first page available to the fixed strip's viewport.
+            val taken = s.candidates.take(maxOf(20, s.highlightIndex + 1))
             // 候选栏按设置的"每页候选词数"显示引擎当前页，可左右滑动查看放不下的候选
             displayCandidates = taken
             displayComments = s.comments
@@ -260,7 +262,7 @@ fun CandidateBar(
         }
         is CandidateBarState.AssociationOnly -> {
             displayCandidates = emptyList()
-            displayAssociation = s.candidates.take(PredictionManager.MAX_ASSOCIATION_COUNT)
+            displayAssociation = s.candidates.take(maxOf(PredictionManager.MAX_ASSOCIATION_COUNT, s.highlightIndex + 1))
             hasAnyMore = s.hasMore
             showLeftIcon = false
             displayComments = s.comments
@@ -292,8 +294,10 @@ fun CandidateBar(
         else -> true
     }
 
-    LaunchedEffect(displayCandidates) {
-        candidateListState.scrollToItem(0)
+    val associationHighlight = (state as? CandidateBarState.AssociationOnly)?.highlightIndex
+        ?.takeIf { it in displayAssociation.indices }
+    LaunchedEffect(displayCandidates, displayAssociation, associationHighlight) {
+        candidateListState.scrollToItem(associationHighlight ?: 0)
     }
 
     // Keep this animation outside the conditional button branches so changing pages
@@ -311,7 +315,8 @@ fun CandidateBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (state is CandidateBarState.ClipboardDisplay) Modifier.heightIn(min = 44.dp) else Modifier.height(44.dp))
+            .then(if (state is CandidateBarState.ClipboardDisplay) Modifier.heightIn(min = 44.dp)
+                else Modifier.height(44.dp))
             .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else visuals.backgroundColor)
             .visualMaterial(VisualStyles.current, 0.dp, level = if (state is CandidateBarState.Idle) com.kingzcheung.xime.ui.theme.MaterialLevel.FLOATING else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE)
             .padding(horizontal = horizontalPadding),
@@ -466,7 +471,8 @@ fun CandidateBar(
                         selectedTextColor = visuals.selectedTextColor,
                         fontSize = candidateTextSize.sp,
                         candidateFontFamily = candidateFontFamily,
-                        commentFontFamily = commentFontFamily
+                        commentFontFamily = commentFontFamily,
+                        modifier = Modifier.testTag("bar-association:$index"),
                     )
                 }
             }
@@ -572,7 +578,8 @@ private fun ToolbarActionButton(
         }
     }
     Box(
-        Modifier.size(40.dp).clip(CircleShape)
+        Modifier.size(40.dp)
+            .clip(CircleShape)
             .background(if (action.active) visuals.accentColor.copy(alpha = 0.28f)
                 else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha.value)
                 else Color(0xFFE0E0E0).copy(alpha = pressAlpha.value))
@@ -710,6 +717,19 @@ internal fun VerificationCodeActions(code: String, visuals: CandidateBarVisuals,
     }
 }
 
+/** Use the exact same explicit primary style for rendering and width measurement. */
+internal fun candidatePrimaryTextStyle(
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontFamily: androidx.compose.ui.text.font.FontFamily,
+    isSelected: Boolean,
+) = TextStyle(
+    fontSize = fontSize,
+    fontFamily = fontFamily,
+    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+    lineHeight = (fontSize.value * 1.35f).sp,
+    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CandidateItem(
@@ -729,7 +749,7 @@ fun CandidateItem(
 ) {
     Row(
         modifier = modifier
-            .height(with(LocalDensity.current) { (fontSize.value * 1.35f).sp.toDp() } + 4.dp)
+            .height(candidateItemHeight(fontSize))
             .clip(RoundedCornerShape(5.dp))
             .background(
                 if (isSelected) accentColor.copy(alpha = 0.2f)
@@ -751,8 +771,7 @@ fun CandidateItem(
             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1,
             fontFamily = candidateFontFamily,
-            style = TextStyle(lineHeight = (fontSize.value * 1.35f).sp,
-                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)),
+            style = candidatePrimaryTextStyle(fontSize, candidateFontFamily, isSelected),
             overflow = TextOverflow.Ellipsis,
         )
         if (comment.isNotEmpty()) {
@@ -769,6 +788,11 @@ fun CandidateItem(
         }
     }
 }
+
+/** Reserve the same text height before asynchronous candidates arrive. */
+@Composable
+internal fun candidateItemHeight(fontSize: androidx.compose.ui.unit.TextUnit): androidx.compose.ui.unit.Dp =
+    with(LocalDensity.current) { (fontSize.value * 1.35f).sp.toDp() } + 4.dp
 
 /** 收起时向上、展开时向下；沿用工具栏的同一按钮与图标。 */
 @Composable
@@ -819,7 +843,15 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
 /** Shared by the screen keyboard preview and the hardware caret surface. */
 @Composable
 internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)? = null,
-    modifier: Modifier = Modifier) {
+    modifier: Modifier = Modifier, followTextTail: Boolean = false) {
+    val scrollState = rememberScrollState()
+    // The input preview must expose newly typed syllables once it reaches the available width.
+    // A manual scroll remains untouched until the text or viewport changes.
+    LaunchedEffect(text, followTextTail, scrollState.maxValue) {
+        if (followTextTail && scrollState.maxValue != Int.MAX_VALUE) {
+            scrollState.scrollTo(scrollState.maxValue)
+        }
+    }
     val background = if (visuals.preeditBackgroundColor != Color.Unspecified) visuals.preeditBackgroundColor
         else if (visuals.textColor.luminance() > 0.5f) Color(0xFF2D2F31) else Color(0xFFFAFAFA)
     Box(modifier.preeditSurface(background)
@@ -829,7 +861,7 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
         contentAlignment = Alignment.CenterStart) {
         Text(if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text,
             color = visuals.textColor.copy(alpha = 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
-            softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
+            softWrap = false, modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
     }
 }
 
@@ -848,23 +880,25 @@ internal fun FixedCandidateStrip(
 ) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
+    val inheritedTextStyle = LocalTextStyle.current
     BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")) {
         val panelWidth = maxWidth
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
         val viewport = remember(candidates, comments) { CandidateStripViewport() }
-        val visibleIndices = remember(viewport, all, comments, focused, fontSize, density, measurer, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
+        val visibleIndices = remember(viewport, all, comments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
             candidateWindow(all.size, focused, constraints.maxWidth, with(density) { itemSpacing.roundToPx() },
                 windowStart = viewport.firstIndex) { index ->
                 val text = if (showNumberLabels && index < candidates.size) "${(index + 1) % 10} ${all[index]}" else all[index]
-                val primary = measurer.measure(AnnotatedString(text), TextStyle(
-                    fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily,
-                    fontWeight = if (index == focused) FontWeight.Medium else FontWeight.Normal), softWrap = false).size.width
+                val primary = measurer.measure(AnnotatedString(text),
+                    candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == focused),
+                    softWrap = false).size.width
                 val comment = comments.getOrElse(index) { "" }
                 val secondary = if (comment.isEmpty()) 0 else measurer.measure(AnnotatedString(comment),
-                    TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
-                        fontFamily = AppFonts.commentFontFamily), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
-                primary + secondary + with(density) { 8.dp.roundToPx() }
+                    inheritedTextStyle.merge(TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
+                        fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily)), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
+                // Padding rounds each side independently at fractional device densities.
+                primary + secondary + with(density) { 2 * 4.dp.roundToPx() }
             }
         }
         androidx.compose.runtime.SideEffect {

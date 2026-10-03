@@ -26,17 +26,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,6 +48,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
@@ -101,12 +103,6 @@ data class CandidatePageState(
     val singleCharFilter: Boolean = false,
     /** 左栏符号列表（九键/笔画复刻各自键盘左栏的 side_symbols）；空=通用快捷符号 */
     val railSymbols: List<String> = emptyList(),
-    /** 九键侧栏按本面板宽度对齐键盘，不按设备屏幕宽度计算。 */
-    val matchT9Rail: Boolean = false,
-    val leftRailHorizontalInsetDp: Float = 2f,
-    /** 左栏垂直缩进 dp（九键对齐其左栏面板 keySpacingY，默认 6=原 Row 垂直边距，
-     *  保证展开/收起切换时左栏顶部位置不跳跃） */
-    val leftRailInsetDp: Int = 6,
     /** 左栏音节拼音候选（九键输入/选择态复刻，与键盘左栏同源）；非空时优先于 railSymbols */
     val railPinyinOptions: List<String> = emptyList(),
     /** 拼音候选项选中索引（九键 SELECTION 态），-1 无选中 */
@@ -114,6 +110,8 @@ data class CandidatePageState(
     /** 拼音选中胶囊强调色（对齐九键 CandidateItem）；Unspecified 时用 textColor 兜底 */
     val railAccentColor: Color = Color.Unspecified,
     val enterKeyText: String = "回车",
+    val matchT9Geometry: Boolean = false,
+    val floating: Boolean = false,
 )
 
 /**
@@ -170,9 +168,32 @@ fun CandidatePage(
     modifier: Modifier = Modifier,
     pageScrollEvents: Flow<Int>? = null,
     onHapticFeedback: (() -> Unit)? = null,
-    shadowEnabled: Boolean = true,
-    shadowElevation: Dp = 1.dp,
-    shadowShapeRadius: Dp = 8.dp,
+) {
+    if (!state.matchT9Geometry) {
+        CandidatePageContent(state, callbacks, modifier, pageScrollEvents, onHapticFeedback)
+        return
+    }
+    val spacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig().spacingFor("t9")
+    Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor)) {
+        KeyboardKeySpacingScope(Modifier.weight(1f).fillMaxWidth(), columns = 5f * 3f / 3.4f,
+            policy = KeyVisualPolicy.T9, allowShrink = state.floating, applyGutter = true) { body ->
+            CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(
+                horizontal = spacing.first?.dp ?: 2.dp, vertical = spacing.second?.dp ?: 2.dp)) {
+                CandidatePageContent(state.copy(bottomPaddingDp = 0), callbacks,
+                    body.padding(bottom = 8.dp), pageScrollEvents, onHapticFeedback)
+            }
+        }
+        Spacer(Modifier.height(state.bottomPaddingDp.dp))
+    }
+}
+
+@Composable
+private fun CandidatePageContent(
+    state: CandidatePageState,
+    callbacks: CandidatePageCallbacks,
+    modifier: Modifier = Modifier,
+    pageScrollEvents: Flow<Int>? = null,
+    onHapticFeedback: (() -> Unit)? = null,
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape =
@@ -206,35 +227,29 @@ fun CandidatePage(
         pageScrollEvents?.collect { direction -> scrollPage(direction) }
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val resolvedRailWidth = if (state.matchT9Rail) {
-            ((maxWidth - 12.dp) * 0.16f - state.leftRailHorizontalInsetDp.dp * 2f)
-                .coerceIn(32.dp, maxOf(32.dp, maxWidth * 0.24f))
-        } else leftRailWidth
-        val railFontSize = t9CandidateMetrics(
-            resolvedRailWidth.value, (maxHeight.value - state.bottomPaddingDp) * .75f,
-            LocalDensity.current.fontScale, LocalKeyboardInputPreferences.current.keyTextScale,
-            keyContentScale(resolvedRailWidth.value, maxHeight.value / 4f),
-        ).fontSizeSp.sp
-        val railWidthModifier = Modifier.fillMaxHeight().width(resolvedRailWidth).testTag("candidate-left-rail")
-        Column(
-            modifier = Modifier.fillMaxSize()
-                .background(state.backgroundColor)
-        ) {
+    Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor)) {
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            val t9 = state.matchT9Geometry
+            val compactRail = t9 || isLandscape || maxHeight < 226.dp
+            val leftWidth = if (t9) maxWidth * (0.8f / 5f) else leftRailWidth
+            val rightWidth = if (t9) maxWidth * (0.8f / 5f) else rightRailWidth
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    // 垂直边距下放各栏：左栏用 leftRailInsetDp（九键对其键盘左栏面板的
-                    // keySpacingY 缩进，切换展开/收起时左栏不跳位），中/右栏保持 6dp 原视觉
-                    .padding(horizontal = 8.dp)
+                    .fillMaxSize()
+                    .padding(horizontal = if (t9) 0.dp else 8.dp)
             ) {
                 // ── 左栏：九键为音节拼音候选（输入/选择态）或 side_symbols（空闲态，
                 // 连体键——首尾圆角、中间直角，对齐数字键盘左栏）+ 候选/单字切换（下）。
                 // 条目 ≤4 均分填满；>4 最多显示 4 条、LazyColumn 滚动（对齐九键左栏）──
+                if (t9) {
+                    T9ExpandedLeftRail(state, callbacks, railItems, keyBg,
+                        Modifier.width(leftWidth).fillMaxHeight().testTag("candidate-left-rail"))
+                } else {
                 Column(
-                    modifier = railWidthModifier
-                        .padding(vertical = state.leftRailInsetDp.dp),
+                    modifier = Modifier.fillMaxHeight()
+                        .width(leftRailWidth)
+                        .testTag("candidate-left-rail")
+                        .padding(vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     var railListHeightPx by remember { mutableIntStateOf(0) }
@@ -242,6 +257,7 @@ fun CandidatePage(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(3f)
+                            .testTag("expanded-pinyin-options")
                             .onSizeChanged { railListHeightPx = it.height }
                     ) {
                         if (railItems.size <= 4) {
@@ -260,7 +276,6 @@ fun CandidatePage(
                                     isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
                                     accentColor = state.railAccentColor,
                                     isPinyin = isPinyinRail,
-                                    pinyinFontSize = railFontSize
                                 )
                             }
                         } else {
@@ -284,7 +299,6 @@ fun CandidatePage(
                                         isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
                                         accentColor = state.railAccentColor,
                                         isPinyin = isPinyinRail,
-                                    pinyinFontSize = railFontSize
                                     )
                                 }
                             }
@@ -295,7 +309,7 @@ fun CandidatePage(
                         keyBg = if (state.singleCharFilter) state.textColor.copy(alpha = 0.28f) else keyBg,
                         textColor = state.textColor,
                         opacityScale = if (state.singleCharFilter) 0.28f else 1f,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).testTag("expanded-filter-key")
                     ) {
                         // 显示当前模式：候选（全部）/ 单字（筛选中，高亮底色）
                         Text(
@@ -317,6 +331,7 @@ fun CandidatePage(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
 
+                }
                 // ── 中间：候选行分组列表（LazyColumn 只渲染可见行），联想词在末尾
                 // 随内容一并滚动 ──
                 BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
@@ -387,71 +402,71 @@ fun CandidatePage(
 
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(if (t9) 0.dp else 8.dp))
 
                 // ── 右栏：退格 / 上一页 / 下一页 / 回车 ──
-                // 按实际面板高度等分，最低高度仍完整保留四个按键。
-                val railKeyModifier = Modifier.weight(1f)
+                // 保留原始方块与间隔；只有矮浮窗放不下时才按可用高度等分。
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(rightRailWidth)
-                        .padding(vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .width(rightWidth)
+                        .testTag("candidate-right-rail")
+                        .padding(vertical = if (t9) 0.dp else 6.dp),
+                    verticalArrangement = if (t9) Arrangement.spacedBy(0.dp) else if (compactRail) Arrangement.spacedBy(4.dp)
+                        else Arrangement.spacedBy(10.dp, Alignment.CenterVertically)
                 ) {
-                    SwipeableIconKeyButton(
-                        icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                        onClick = { callbacks.onDelete?.invoke() },
-                        onLongClick = callbacks.onDelete,
-                        onPress = { callbacks.onKeyPressDown?.invoke("delete") },
-                        onRelease = { callbacks.onKeyRelease?.invoke("delete") },
-                        swipeText = "清空",
-                        onSwipe = callbacks.onClearComposition,
-                        swipeUpLabel = "上滑清空",
-                        swipeDownLabel = "下滑撤回",
-                        onSwipeUp = callbacks.onClear,
-                        onSwipeDown = callbacks.onUndoClear,
-                        onSwipeLeft = callbacks.onClearComposition,
-                        backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
-                        iconColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
-                        modifier = railKeyModifier.semantics { contentDescription = "退格" }
-                            .testTag("expanded-delete-key"),
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    )
-                    CandidatePagingButton(
-                        onClick = { onHapticFeedback?.invoke(); scrollPage(-1) },
-                        enabled = listState.canScrollBackward,
-                        previous = true, foreground = state.textColor, modifier = railKeyModifier,
-                    )
-                    CandidatePagingButton(
-                        onClick = { onHapticFeedback?.invoke(); scrollPage(1) },
-                        enabled = listState.canScrollForward,
-                        previous = false, foreground = state.textColor, modifier = railKeyModifier,
-                    )
-                    ActionKeyButton(
-                        text = state.enterKeyText,
-                        onClick = { callbacks.onEnter?.invoke() },
-                        backgroundColor = keyBg,
-                        textColor = state.textColor,
-                        modifier = railKeyModifier.testTag("expanded-enter-key"),
-                        onPress = { callbacks.onKeyPressDown?.invoke("enter") },
-                        onRelease = { callbacks.onKeyRelease?.invoke("enter") },
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    )
+                    val railKeyModifier = if (compactRail) Modifier.weight(1f) else Modifier.size(46.dp)
+                    CompositionLocalProvider(
+                        LocalKeyCornerRadius provides if (t9) LocalKeyCornerRadius.current else 14.dp,
+                        LocalKeyVisualPadding provides if (t9) LocalKeyVisualPadding.current else PaddingValues(0.dp),
+                        LocalKeyboardKeyVisualMetrics provides if (t9) LocalKeyboardKeyVisualMetrics.current else KeyVisualMetrics.Unspecified,
+                        LocalKeyboardKeyContentScale provides if (t9) LocalKeyboardKeyContentScale.current else 1f,
+                    ) {
+                        SwipeableIconKeyButton(
+                            icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
+                            onClick = { callbacks.onDelete?.invoke() },
+                            onLongClick = callbacks.onDelete,
+                            onPress = { callbacks.onKeyPressDown?.invoke("delete") },
+                            onRelease = { callbacks.onKeyRelease?.invoke("delete") },
+                            onSwipe = callbacks.onClearComposition,
+                            onSwipeUp = callbacks.onClear,
+                            onSwipeDown = callbacks.onUndoClear,
+                            onSwipeLeft = callbacks.onClearComposition,
+                            backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
+                            iconColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
+                            modifier = railKeyModifier.semantics { contentDescription = "退格" }
+                                .testTag("expanded-delete-key"),
+                            shadowEnabled = false,
+                            visualPadding = if (t9) null else PaddingValues(0.dp),
+                        )
+                        CandidatePagingButton(
+                            onClick = { onHapticFeedback?.invoke(); scrollPage(-1) },
+                            enabled = listState.canScrollBackward,
+                            previous = true, keyBg = keyBg, foreground = state.textColor, matchT9 = t9,
+                            modifier = railKeyModifier.testTag("expanded-page-previous"),
+                        )
+                        CandidatePagingButton(
+                            onClick = { onHapticFeedback?.invoke(); scrollPage(1) },
+                            enabled = listState.canScrollForward,
+                            previous = false, keyBg = keyBg, foreground = state.textColor, matchT9 = t9,
+                            modifier = railKeyModifier.testTag("expanded-page-next"),
+                        )
+                        ActionKeyButton(
+                            text = state.enterKeyText,
+                            onClick = { callbacks.onEnter?.invoke() },
+                            backgroundColor = keyBg,
+                            textColor = state.textColor,
+                            modifier = railKeyModifier.testTag("expanded-enter-key"),
+                            onPress = { callbacks.onKeyPressDown?.invoke("enter") },
+                            onRelease = { callbacks.onKeyRelease?.invoke("enter") },
+                            shadowEnabled = false,
+                        )
+                    }
                 }
             }
 
-            // 底部留白
-            Spacer(
-                modifier = Modifier.height(
-                    state.bottomPaddingDp.dp
-                )
-            )
         }
+        Spacer(Modifier.height(state.bottomPaddingDp.dp))
     }
 }
 
@@ -692,7 +707,6 @@ private fun CandidateRailSymbolKey(
     isSelected: Boolean = false,
     accentColor: Color = Color.Unspecified,
     isPinyin: Boolean = false,
-    pinyinFontSize: androidx.compose.ui.unit.TextUnit = 15.sp,
 ) {
     val cornerRadius = LocalKeyCornerRadius.current
     val shape = RoundedCornerShape(
@@ -708,6 +722,10 @@ private fun CandidateRailSymbolKey(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                onClick { onClick(); true }
+            }
             .clip(shape)
             .background(frostedKeyColor(
                 keyBg, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
@@ -731,7 +749,7 @@ private fun CandidateRailSymbolKey(
                 Text(
                     text = text,
                     color = pillColor,
-                    fontSize = pinyinFontSize,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     fontFamily = AppFonts.candidateFontFamily
@@ -741,7 +759,7 @@ private fun CandidateRailSymbolKey(
             Text(
                 text = text,
                 color = textColor,
-                fontSize = if (isPinyin) pinyinFontSize else 16.sp,
+                fontSize = if (isPinyin) 13.sp else 16.sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 fontFamily = AppFonts.candidateFontFamily
@@ -766,7 +784,11 @@ private fun RailKey(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                if (enabled) onClick { onClick(); true } else disabled()
+            }
+            .clip(RoundedCornerShape(14.dp))
             .background(frostedKeyColor(
                 keyBg, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
                 legacyStateColor = when {
@@ -777,7 +799,7 @@ private fun RailKey(
                 pressed = isPressed,
                 opacityScale = opacityScale * if (enabled) 1f else 0.4f,
             ))
-            .visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current)
+            .visualMaterial(VisualStyles.current, 14.dp)
             .tolerantClick(
                 enabled = enabled,
                 showRipple = false,
@@ -789,20 +811,64 @@ private fun RailKey(
     )
 }
 
-/** Original circular paging glyph; the surrounding rail still owns alignment and touch size. */
+/** 原始上下翻页方块，底色沿用当前主题。 */
 @Composable
 private fun CandidatePagingButton(
-    onClick: () -> Unit, enabled: Boolean, previous: Boolean, foreground: Color,
+    onClick: () -> Unit, enabled: Boolean, previous: Boolean, keyBg: Color, foreground: Color,
     modifier: Modifier,
+    matchT9: Boolean = false,
 ) {
-    Box(modifier.fillMaxWidth().tolerantClick(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center) {
-        Box(Modifier.size(28.dp).clip(CircleShape)
-            .background(foreground.copy(alpha = if (!enabled) .10f else if (previous) .50f else .25f)),
-            contentAlignment = Alignment.Center) {
-            Icon(if (previous) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = if (previous) "上一页" else "下一页",
-                tint = foreground.copy(alpha = if (enabled) 1f else .3f), modifier = Modifier.size(20.dp))
+    if (matchT9) {
+        SwipeableIconKeyButton(
+            icon = rememberVectorPainter(if (previous) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown),
+            onClick = { if (enabled) onClick() },
+            backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
+            iconColor = (LocalFunctionKeyColors.current?.foreground ?: foreground).copy(alpha = if (enabled) 1f else .3f),
+            modifier = modifier.semantics {
+                contentDescription = if (previous) "上一页" else "下一页"
+                if (!enabled) disabled()
+            }, shadowEnabled = false,
+        )
+        return
+    }
+    RailKey(onClick, keyBg, foreground, modifier, enabled) {
+        Icon(if (previous) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            contentDescription = if (previous) "上一页" else "下一页",
+            tint = foreground.copy(alpha = if (enabled) 1f else .3f), modifier = Modifier.size(20.dp))
+    }
+}
+
+/** Same three-row list and bottom key as the T9 body, using its actual cap metrics. */
+@Composable
+private fun T9ExpandedLeftRail(state: CandidatePageState, callbacks: CandidatePageCallbacks,
+    items: List<String>, keyBg: Color, modifier: Modifier) {
+    Column(modifier) {
+        BoxWithConstraints(Modifier.weight(3f).fillMaxWidth().padding(scaledKeyVisualPadding())
+            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+            .background(frostedKeyColor(keyBg, state.textColor, LocalKeyboardInputPreferences.current.frostedGlass))) {
+            val metrics = t9CandidateMetrics(maxWidth.value, maxHeight.value, LocalDensity.current.fontScale,
+                LocalKeyboardInputPreferences.current.keyTextScale, keyContentScale(maxWidth.value, maxHeight.value / 4f))
+            val sample = androidx.compose.ui.text.rememberTextMeasurer().measure("shuang",
+                TextStyle(fontSize = metrics.fontSizeSp.sp, fontFamily = AppFonts.candidateFontFamily),
+                maxLines = 1, softWrap = false)
+            val textWidth = with(LocalDensity.current) { (maxWidth - 8.dp).toPx() }.coerceAtLeast(1f)
+            val font = (metrics.fontSizeSp * minOf(1f, textWidth / sample.size.width.coerceAtLeast(1))).sp
+            LazyColumn(Modifier.fillMaxSize().testTag("expanded-pinyin-options")) {
+                itemsIndexed(items) { index, item ->
+                    T9CandidateItem(text = item, onClick = {
+                        if (state.railPinyinOptions.isNotEmpty()) callbacks.onRailPinyinSelect?.invoke(index)
+                        else callbacks.onCommitText?.invoke(item)
+                    }, onPress = { callbacks.onKeyPressDown?.invoke(item) }, textColor = state.textColor,
+                        backgroundColor = keyBg, accentColor = state.railAccentColor,
+                        fontSize = font, isSelected = index == state.railSelectedPinyinIndex,
+                        modifier = Modifier.fillMaxWidth().height(metrics.rowHeightDp.dp))
+                }
+            }
         }
+        KeyButton(text = if (state.singleCharFilter) "单字" else "候选",
+            onClick = { callbacks.onToggleSingleCharFilter?.invoke() },
+            backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
+            textColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
+            modifier = Modifier.weight(1f).fillMaxWidth().testTag("expanded-filter-key"), shadowEnabled = false)
     }
 }

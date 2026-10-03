@@ -117,5 +117,5 @@ internal object PreeditStyle {
     val SurfaceHeight = 32.dp
 }
 
-internal fun Modifier.preeditSurface(color: Color): Modifier = height(PreeditStyle.SurfaceHeight)
+internal fun Modifier.preeditSurface(color: Color): Modifier = heightIn(min = PreeditStyle.SurfaceHeight)
     .clip(RoundedCornerShape(4.dp)).background(color.copy(alpha = color.alpha * 0.62f)).padding(horizontal = 8.dp)
