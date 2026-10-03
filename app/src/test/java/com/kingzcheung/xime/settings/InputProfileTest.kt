@@ -53,6 +53,20 @@ class InputProfileTest {
         assertEquals(EngineProfile.Direct, InputProfiles.current("rime_ice", true).engineProfile)
     }
 
+    @Test fun `Xiaohe fourteen key is a real double pinyin combination in both selectors`() {
+        val id = "double_pinyin_flypy_14jian"
+        val entries = listOf("pinyin_14jian", "double_pinyin_flypy", id).map(::entry)
+        assertEquals(InputLanguage.CHINESE, entry(id).profile.language)
+        assertEquals(InputScheme.DOUBLE_PINYIN, entry(id).profile.scheme)
+        assertEquals(InputLayout.MERGED14, entry(id).profile.layout)
+        assertEquals(EngineProfile.Rime(id), entry(id).profile.engineProfile)
+        assertEquals(id, InputProfileSelection.changeScheme(entries, entry("pinyin_14jian"), InputScheme.DOUBLE_PINYIN)?.schemaId)
+        assertEquals(id, InputProfileSelection.changeLayout(entries, entry("double_pinyin_flypy"), InputLayout.MERGED14.id)?.schemaId)
+        assertEquals("double_pinyin_flypy", InputProfileSelection.changeLayout(entries, entry(id), InputLayout.QWERTY.id)?.schemaId)
+        assertEquals("pinyin_14jian", InputProfileSelection.changeScheme(entries, entry(id), InputScheme.PINYIN)?.schemaId)
+        assertNull(InputProfileSelection.changeLayout(entries.filterNot { it.schemaId == id }, entry("double_pinyin_flypy"), InputLayout.MERGED14.id))
+    }
+
     @Test fun `handwriting keeps language and does not invent a foreign recognizer`() {
         for (id in listOf("rime_ice", "japanese", InputModes.ENGLISH)) {
             val keys = entry(id).profile
@@ -96,6 +110,8 @@ class InputProfileTest {
         whenever(assets.open("xime.custom.yaml")).thenThrow(IOException("absent"))
         val context = mock<Context>()
         whenever(context.filesDir).thenReturn(files)
+        whenever(context.getSharedPreferences("kime_settings", Context.MODE_PRIVATE))
+            .thenReturn(mock<android.content.SharedPreferences>())
         whenever(context.assets).thenReturn(assets)
         KeysConfigHelper.loadConfig(context)
         assertTrue(isT9Schema("rime_ice"))
@@ -119,6 +135,8 @@ class InputProfileTest {
         val source = File(rime, "my_romaji.schema.yaml")
         val context = mock<Context>()
         whenever(context.filesDir).thenReturn(files)
+        whenever(context.getSharedPreferences("kime_settings", Context.MODE_PRIVATE))
+            .thenReturn(mock<android.content.SharedPreferences>())
         source.writeText("schema:\n  schema_id: my_romaji\n  name: 自定义日语\n  language: ja\n  input_scheme: romaji\n")
         val installed = SchemaManager.discoverSchemas(context)
         assertEquals(InputLanguage.JAPANESE, InputLanguage.forSchema("my_romaji"))

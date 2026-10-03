@@ -16,6 +16,12 @@ import com.kingzcheung.xime.settings.SchemaConfigHelper
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.settings.InputMode
+import com.kingzcheung.xime.settings.InputModes
+import com.kingzcheung.xime.settings.InputProfileSelection
+import com.kingzcheung.xime.settings.LanguagePreferences
+import com.kingzcheung.xime.settings.LanguageSwitchPreferences
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.util.FileLogger
 import java.io.File
@@ -39,11 +45,36 @@ internal fun settingsActivityIntent(context: android.content.Context, route: Str
  * 共享状态通过 service 引用访问。
  */
 internal class ImeSchemaController(private val service: XimeInputMethodService) {
-    internal suspend fun switchInputMethod(): Boolean {
-        // The native fallback must stay in ASCII when its language is disabled.
-        if (service.rimeEngine.isAsciiMode() &&
-            com.kingzcheung.xime.settings.InputModes.languageOf(service.rimeEngine.getCurrentSchema(), service.uiState.value.schemas) !in
-            com.kingzcheung.xime.settings.LanguagePreferences.enabled(service)) return false
+    private fun currentLanguage(): InputLanguage = if (service.rimeEngine.isAsciiMode()) InputLanguage.ENGLISH
+        else InputModes.languageOf(service.rimeEngine.getCurrentSchema(), service.uiState.value.schemas)
+
+    internal suspend fun switchInputMethod(targetLanguage: InputLanguage? = null,
+        useLanguageKeyPreference: Boolean = false,
+        languageSwitchMode: com.kingzcheung.xime.settings.LanguageSwitchMode? = null): Boolean {
+        val fromLanguage = currentLanguage()
+        val currentSchema = service.rimeEngine.getCurrentSchema()
+        val nativeLanguage = InputModes.languageOf(currentSchema, service.uiState.value.schemas)
+        val entries = InputModes.available(service.uiState.value.schemas)
+        val enabled = LanguagePreferences.enabled(service)
+        val available = (entries.filter { it.profile.mode == InputMode.KEYBOARD }.map { it.profile.language } +
+            listOfNotNull(nativeLanguage.takeIf { currentSchema.isNotBlank() })).filter { it in enabled }.toSet()
+        // Schema-options retain explicit ASCII behavior. The language key reads its preference;
+        // physical shortcuts may override this one request without changing that preference.
+        val target = targetLanguage ?: if (useLanguageKeyPreference)
+            LanguageSwitchPreferences.target(fromLanguage, nativeLanguage, LanguageSwitchPreferences.forRequest(
+                LanguageSwitchPreferences.read(service), languageSwitchMode),
+                InputModes.languageOrder(service), available)
+        else if (service.rimeEngine.isAsciiMode()) nativeLanguage else InputLanguage.ENGLISH
+        if (target == null || target !in available) return false
+        val targetSchema = if (target == InputLanguage.ENGLISH) currentSchema else {
+            val selected = InputModes.selectedProfiles(service)[target]
+                ?: InputModes.rememberedModes(service, entries)[target]
+            InputProfileSelection.preferred(entries, target, selected, currentSchema)?.schemaId
+                ?: currentSchema.takeIf { nativeLanguage == target }
+                ?: return false
+        }
+        val changesSchema = targetSchema != currentSchema
+        if (changesSchema && service.japaneseInputController.commit() && service.keyRouter.hasPendingCandidateCommit) return false
         val candState = service.candidateState.value
         val pendingEnglish = candState.pendingEnglishText
         FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: start, pendingEnglish='${if (pendingEnglish.isEmpty()) '-' else pendingEnglish}', isComposing=${candState.isComposing}, candidates=${candState.candidates.size}")
@@ -59,7 +90,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         } else if (candState.isComposing) {
             if (candState.candidates.isNotEmpty()) {
                 service.keyRouter.selectCandidateAsync(0)
-            } else {
+            } else if (!changesSchema) {
                 val input = candState.inputText
                 if (input.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
@@ -69,37 +100,37 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 }
             }
         }
-        // 由 ImeKeyRouter 在 key-processing 线程调用：toggleAsciiMode 阻塞等待 rimeLock
-        // （部署/维护持锁时排队，完成后自动切换），不静默失败、不阻塞主线程。
-        // 仅在 session 创建失败（引擎真正不可用）时返回 false。
-        if (!service.rimeEngine.isAsciiMode()) {
-            val id = service.rimeEngine.getCurrentSchema()
-            com.kingzcheung.xime.settings.InputModes.rememberMode(service, id,
-                com.kingzcheung.xime.settings.InputModes.languageOf(id, service.uiState.value.schemas))
-        }
-        // Returning from English must honor the combination saved in language settings.
-        // This runs in the existing FIFO after pending composition is dealt with.
-        if (service.rimeEngine.isAsciiMode()) {
-            val current = service.rimeEngine.getCurrentSchema()
-            val language = com.kingzcheung.xime.settings.InputModes.languageOf(current, service.uiState.value.schemas)
-            val selected = com.kingzcheung.xime.settings.InputProfileSelection.preferred(service.uiState.value.schemas,
-                language, com.kingzcheung.xime.settings.InputModes.selectedProfiles(service)[language], current)
-            if (selected != null && selected.schemaId != current) {
-                applyPageSizeSetting(selected.schemaId)
-                if (!service.rimeEngine.switchSchema(selected.schemaId)) {
-                    withContext(Dispatchers.Main) { Toast.makeText(service, "所选方案尚未就绪，请检查输入资源", Toast.LENGTH_SHORT).show() }
-                    return false
-                }
-                service.rimeEngine.setOption("ascii_mode", true)
+        if (changesSchema) {
+            // Selecting a first T9/native candidate may only consume a prefix. Preserve the
+            // complete remaining preview before replacing its engine, using the normal checked
+            // commit path; a rejected editor commit must leave the original language intact.
+            if (service.keyRouter.hasPendingCandidateCommit) return false
+            val partial = service.t9PartialSegments.joinToString("") { it.text }
+            val remainder = service.rimeEngine.conversionPreview().ifEmpty { service.rimeEngine.getInput() }
+            if (partial.isNotEmpty() || remainder.isNotEmpty()) {
+                service.keyRouter.commitSelectedText(partial + remainder)
+                if (service.keyRouter.hasPendingCandidateCommit) return false
             }
         }
-        val t0 = System.nanoTime()
-        if (!service.rimeEngine.toggleAsciiMode()) {
-            FileLogger.e(XimeInputMethodService.TAG, "switchInputMethod: toggleAsciiMode FAILED (engine unavailable)")
-            Toast.makeText(service, "输入法引擎不可用，请稍后再试", Toast.LENGTH_SHORT).show()
+        // All engine changes remain in the key-processing FIFO, including native-language pairs.
+        if (fromLanguage != InputLanguage.ENGLISH) {
+            InputModes.rememberMode(service, currentSchema, nativeLanguage)
+        }
+        if (changesSchema) {
+            applyPageSizeSetting(targetSchema)
+            if (!service.rimeEngine.switchSchema(targetSchema)) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(service, "所选方案尚未就绪，请检查输入资源", Toast.LENGTH_SHORT).show()
+                }
+                return false
+            }
+        }
+        val targetAscii = target == InputLanguage.ENGLISH
+        if (service.rimeEngine.isAsciiMode() != targetAscii && !service.rimeEngine.toggleAsciiMode()) {
+            FileLogger.e(XimeInputMethodService.TAG, "switchInputMethod: engine unavailable")
+            withContext(Dispatchers.Main) { Toast.makeText(service, "输入法引擎不可用，请稍后再试", Toast.LENGTH_SHORT).show() }
             return false
         }
-        FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: toggleAsciiMode ok, took ${(System.nanoTime() - t0) / 1_000_000}ms, rime ascii=${service.rimeEngine.isAsciiMode()}, thread=${Thread.currentThread().name}")
         if (!service.rimeEngine.isAsciiMode()) {
             // 回到中文/日文：按用户的「全角／半角」选择回写标点宽度。
             // 过去只恢复 full_shape（且取自 user.yaml），与菜单显示用的是两套状态，
@@ -114,6 +145,20 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: rime ascii=$ascii, ui before=${service.uiState.value.isAsciiMode}")
             service.uiState.value = service.uiState.value.copy(isAsciiMode = ascii,
                 currentSchemaId = service.rimeEngine.getCurrentSchema())
+            if (changesSchema) {
+                com.kingzcheung.xime.handwriting.HandwritingEngine.release()
+                val model = service.keyboardViewModel
+                model.discardTemporaryHandwriting()
+                model.asciiStateMachine.reset()
+                model.switchMain(com.kingzcheung.xime.keyboard.MainType.FULL)
+                // All pending text was accepted above. Reset only the old T9 display/selection
+                // state here, never queue an engine clear after the new schema is installed.
+                service.keyboardCallbacks?.onT9CompositionCleared?.invoke()
+                service.t9PartialSegments.clear()
+                service.uiState.value = service.uiState.value.copy(
+                    t9RightCandidateSelectedCount = 0, t9SelectedCandidatePinyin = "")
+                service.sessionController.updateSchemaName()
+            }
             SettingsPreferences.setCurrentSchema(service, service.rimeEngine.getCurrentSchema(),
                 com.kingzcheung.xime.settings.InputModes.languageOf(service.rimeEngine.getCurrentSchema(), service.uiState.value.schemas))
             service.updateUI()
@@ -124,6 +169,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(ascii, schemaId)
             )
         }
+        if (changesSchema) service.japaneseInputController.cancel()
         return true
     }
     
@@ -359,11 +405,12 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             return
         }
         val language = service.uiState.value.inputProfile.language
-        if (!com.kingzcheung.xime.handwriting.HandwritingLanguages.supports(language)) {
+        val recognitionLanguage = com.kingzcheung.xime.handwriting.HandwritingLanguages.recognitionLanguageForKeyboard(language)
+        if (recognitionLanguage == null) {
             Toast.makeText(service, com.kingzcheung.xime.handwriting.HandwritingLanguages.unavailableMessage(language), Toast.LENGTH_SHORT).show()
             return
         }
-        if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service)) {
+        if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service, recognitionLanguage)) {
             Toast.makeText(service, "请先下载手写模型", Toast.LENGTH_SHORT).show()
             service.startActivity(android.content.Intent(service, com.kingzcheung.xime.MainActivity::class.java).apply {
                 flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
@@ -377,7 +424,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     internal fun switchSchema(schemaId: String) {
         if (schemaId == com.kingzcheung.xime.settings.InputModes.ENGLISH) {
             service.keyRouter.postRimeJob {
-                if (!service.rimeEngine.isAsciiMode() && !switchInputMethod()) return@postRimeJob
+                if (!service.rimeEngine.isAsciiMode() && !switchInputMethod(targetLanguage = InputLanguage.ENGLISH)) return@postRimeJob
                 val engineSchema = service.rimeEngine.getCurrentSchema()
                 service.sessionController.persistSchemaOption("ascii_mode", true)
                 withContext(Dispatchers.Main) {
@@ -426,6 +473,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         // 显式选择语言方案与普通按键串行，成功后一次性更新引擎、页面和模式记忆。
         service.keyRouter.postRimeJob {
             try {
+                val targetLanguage = InputModes.languageOf(schemaId, service.uiState.value.schemas)
+                if (targetLanguage !in LanguagePreferences.enabled(service)) return@postRimeJob
                 applyPageSizeSetting(schemaId)
                 if (!service.rimeEngine.switchSchema(schemaId)) {
                     withContext(Dispatchers.Main) {

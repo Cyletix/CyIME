@@ -142,6 +142,20 @@ class MainActivity : ComponentActivity() {
             var wizardToSettings by remember { mutableStateOf(false) }
             var darkMode by remember { mutableIntStateOf(SettingsPreferences.getEffectiveDarkMode(context)) }
             var keyboardTheme by remember { mutableStateOf(SettingsPreferences.getKeyboardTheme(context)) }
+
+            // Theme changes can also come from the IME while this activity stays
+            // open. Its existing composition must follow the same saved choice.
+            DisposableEffect(context) {
+                val preferences = SettingsPreferences.getPrefsPublic(context)
+                val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key == null || key == "keyboard_theme" || key == "dark_mode") {
+                        darkMode = SettingsPreferences.getEffectiveDarkMode(context)
+                        keyboardTheme = SettingsPreferences.getKeyboardTheme(context)
+                    }
+                }
+                preferences.registerOnSharedPreferenceChangeListener(listener)
+                onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+            }
             
             val isDarkTheme = when (darkMode) {
                 2 -> isSystemInDarkTheme()
@@ -152,7 +166,7 @@ class MainActivity : ComponentActivity() {
             XimeTheme(darkTheme = isDarkTheme, themeId = keyboardTheme) {
                 val view = LocalView.current
                 if (!view.isInEditMode) {
-                    DisposableEffect(darkMode) {
+                    DisposableEffect(isDarkTheme) {
                         val window = (view.context as? ComponentActivity)?.window
                         if (window != null) {
                             val controller = WindowInsetsControllerCompat(window, view)

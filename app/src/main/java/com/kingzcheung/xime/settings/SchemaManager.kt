@@ -338,7 +338,8 @@ object SchemaManager {
 
             // 至少启用一个新方案，避免 RimeEngine 因 schema_list 为空而挂起。
             // 更新已安装方案时（switchEnabled=false）不强制切换启用列表，保留用户现有方案。
-            val firstSchema = newIds.firstOrNull()
+            val firstSchema = CuratedRimeSchemes.preferredSchema(packageId, targetSchemaIds)
+                ?: newIds.firstOrNull()
                 ?: targetFiles.firstOrNull { it.endsWith(".schema.yaml") }
                     ?.removeSuffix(".schema.yaml")
             if (firstSchema != null && switchEnabled) {

@@ -90,8 +90,10 @@ object XimeIndexSource {
                     if (result != null) return@withContext Result.success(result)
                 }
                 // 全部镜像都失败
-                val lastUrl = mirrors.lastOrNull() ?: "未知"
-                Result.failure(IOException("无法连接到方案市场（已尝试 ${mirrors.size} 个镜像）"))
+                Result.success(SchemesFetch(
+                    CuratedRimeSchemes.merge(emptyList()).map { XimeIndexParser.toItem(it, appVersion) },
+                    "CyIME 内置目录（远程索引暂不可用）",
+                ))
             } catch (e: Exception) {
                 Log.e(TAG, "fetchSchemes failed", e)
                 Result.failure(e)
@@ -108,7 +110,7 @@ object XimeIndexSource {
         try {
             val text = fetchTextSingle(base, repoPath) ?: return null
             val direct = XimeIndexParser.parseDirectIndex(text)
-            val schemes = direct.schemas.distinctBy { it.id }
+            val schemes = CuratedRimeSchemes.merge(direct.schemas)
                 .map { XimeIndexParser.toItem(it, appVersion) }
             Log.i(TAG, "tryFetchFromBase $host: 获取到 ${schemes.size} 个方案（扁平索引）")
 

@@ -7,7 +7,7 @@ import org.json.JSONObject
 
 /** 统一中文词库；标准 Rime ID 不变，现有市场版本和个人补丁优先。 */
 object ChineseSchemas {
-    val ids = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", QwjrtkLayout.ID, Cyletix10Layout.ID)
+    val ids = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "double_pinyin_flypy_14jian", QwjrtkLayout.ID, Cyletix10Layout.ID)
     private const val ADDED = "cyime_chinese_defaults_v1"
 
     private const val MAX_MIGRATION_FILE_BYTES = 256 * 1024L
@@ -51,6 +51,7 @@ object ChineseSchemas {
             }
             // 许可随 APK 分发，不作为 Rime 配置安装。
             if (relative.endsWith(".md") || relative == "LICENSE") return
+            if (com.kingzcheung.xime.model.CandidateModelAssets.isDisabledAsset(context, relative)) return
             val destination = File(target, relative)
             var replacement: ByteArray? = null
             if (destination.exists()) {
