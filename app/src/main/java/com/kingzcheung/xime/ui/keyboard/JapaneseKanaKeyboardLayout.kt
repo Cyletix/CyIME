@@ -59,6 +59,7 @@ fun JapaneseKanaKeyboardLayout(
     bottomPaddingDp: Int = 0,
     hasKanaInput: Boolean = false,
     isFloatingMode: Boolean = false,
+    numberMode: Boolean = false,
 ) {
     KeyboardKeySpacingScope(modifier, columns = 5f, verticalInset = bottomPaddingDp.dp,
         policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
@@ -70,44 +71,66 @@ fun JapaneseKanaKeyboardLayout(
             .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else keyboardBackgroundColor)
             .padding(bottom = bottomPaddingDp.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                val convert = KanaChoice("変換", "japanese_convert")
-                val undo = KanaChoice("↶", "japanese_undo")
-                KanaFlickButton(KanaFlickKey(listOf(convert, undo, undo, undo, undo)),
+                val utilityKey = if (numberMode) {
+                    KanaFlickKey(listOf("+", "-", "*", "/", "=").map { KanaChoice(it, it) })
+                } else {
+                    val convert = KanaChoice("変換", "japanese_convert")
+                    val undo = KanaChoice("↶", "japanese_undo")
+                    KanaFlickKey(listOf(convert, undo, undo, undo, undo))
+                }
+                KanaFlickButton(utilityKey,
                     { if (it is JapaneseKanaAction.Input) onKeyPress(it.romaji) }, specialKeyBackgroundColor, specialKeyTextColor,
-                    Modifier.weight(1f).testTag("kana-convert"), onPress = { onKeyPressDown?.invoke("japanese_convert") },
+                    Modifier.weight(1f).testTag(if (numberMode) "kana-operators" else "kana-convert"),
+                    onPress = { onKeyPressDown?.invoke(utilityKey.center.romaji) },
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
                 SwipeableIconKeyButton(icon = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft),
                     onClick = { onKeyPress("japanese_left") }, onLongClick = { onKeyPressDown?.invoke("japanese_left"); onKeyPress("japanese_left") },
                     backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor, modifier = Modifier.weight(1f).testTag("kana-left"),
                     onPress = { onKeyPressDown?.invoke("japanese_left") }, shadowEnabled = shadowEnabled)
-                KeyButton("123", { onKeyPress("mode_change_number") }, specialKeyBackgroundColor, specialKeyTextColor,
-                    Modifier.weight(1f).testTag("kana-number"), onPress = { onKeyPressDown?.invoke("number") }, fontSize = KeyboardKeyMetrics.LabelSize, shadowEnabled = shadowEnabled)
-                KeyButton("記号", { onKeyPress("symbol") }, specialKeyBackgroundColor, specialKeyTextColor,
-                    Modifier.weight(1f).testTag("kana-symbol"), fontSize = KeyboardKeyMetrics.LabelSize, onPress = { onKeyPressDown?.invoke("symbol") }, shadowEnabled = shadowEnabled)
+                // Mode names are UI labels, not literals affected by full-/half-width input.
+                CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
+                    KeyButton(if (numberMode) "あいう" else "123", { onKeyPress(if (numberMode) "abc" else "mode_change_number") }, specialKeyBackgroundColor, specialKeyTextColor,
+                        Modifier.weight(1f).testTag("kana-number"), onPress = { onKeyPressDown?.invoke("number") }, fontSize = 16.sp, shadowEnabled = shadowEnabled)
+                    KeyButton("!@#", { onKeyPress("symbol") }, specialKeyBackgroundColor, specialKeyTextColor,
+                        Modifier.weight(1f).testTag("kana-symbol"), fontSize = 16.sp, onPress = { onKeyPressDown?.invoke("symbol") }, shadowEnabled = shadowEnabled)
+                }
             }
             Column(Modifier.weight(3f).fillMaxHeight()) {
                 for (row in 0..2) Row(Modifier.weight(1f).fillMaxWidth()) {
                     for (column in 0..2) {
-                        val key = japaneseKanaKeys[row * 3 + column]
-                        KanaFlickButton(key, onKanaAction, keyBackgroundColor, keyTextColor,
-                            Modifier.weight(1f).testTag("kana-key:${key.center.romaji}"),
-                            onPress = { onKeyPressDown?.invoke(key.center.label) },
-                            shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                        if (numberMode) {
+                            val digit = (row * 3 + column + 1).toString()
+                            KeyButton(digit, { onKeyPress(digit) }, keyBackgroundColor, keyTextColor,
+                                Modifier.weight(1f).testTag("kana-digit:$digit"), onPress = { onKeyPressDown?.invoke(digit) },
+                                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                        } else {
+                            val key = japaneseKanaKeys[row * 3 + column]
+                            KanaFlickButton(key, onKanaAction, keyBackgroundColor, keyTextColor,
+                                Modifier.weight(1f).testTag("kana-key:${key.center.romaji}"),
+                                onPress = { onKeyPressDown?.invoke(key.center.label) },
+                                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                        }
                     }
                 }
                 Row(Modifier.weight(1f).fillMaxWidth()) {
-                    if (hasKanaInput) KeyButton("小゛゜", { onKanaAction(JapaneseKanaAction.Modify) }, specialKeyBackgroundColor, specialKeyTextColor,
+                    if (numberMode) KeyButton(".", { onKeyPress(".") }, keyBackgroundColor, keyTextColor,
+                        Modifier.weight(1f).testTag("kana-decimal"), onPress = { onKeyPressDown?.invoke(".") },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                    else if (hasKanaInput) KeyButton("小゛゜", { onKanaAction(JapaneseKanaAction.Modify) }, specialKeyBackgroundColor, specialKeyTextColor,
                         Modifier.weight(1f).testTag("kana-modifier"), onPress = { onKeyPressDown?.invoke("japanese_modify") }, fontSize = KeyboardKeyMetrics.LabelSize,
                         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
                     else KanaFlickButton(japaneseKanaKeys.last(), onKanaAction, keyBackgroundColor, keyTextColor,
                         Modifier.weight(1f).testTag("kana-punctuation"), onPress = { onKeyPressDown?.invoke("symbol") },
                         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
-                    KanaFlickButton(japaneseKanaKeys[9], onKanaAction, keyBackgroundColor, keyTextColor,
+                    if (numberMode) KeyButton("0", { onKeyPress("0") }, keyBackgroundColor, keyTextColor,
+                        Modifier.weight(1f).testTag("kana-digit:0"), onPress = { onKeyPressDown?.invoke("0") },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                    else KanaFlickButton(japaneseKanaKeys[9], onKanaAction, keyBackgroundColor, keyTextColor,
                         Modifier.weight(1f).testTag("kana-key:wa"), onPress = { onKeyPressDown?.invoke("wa") },
                         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
                     LanguageKeyButton(icon = rememberVectorPainter(Icons.Default.Language), onClick = { onKeyPress("ime_switch") },
                         backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).testTag("kana-language"),
                         onPress = { onKeyPressDown?.invoke("ime_switch") }, shadowEnabled = shadowEnabled)
                 }
             }

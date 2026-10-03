@@ -67,7 +67,32 @@ fun NumberKeyboardLayout(
     onKeyPressDown: ((String) -> Unit)? = null,
     isFloatingMode: Boolean = false,
     specialKeyTextColor: Color = Color.White,
+    isJapaneseKana: Boolean = false,
 ) {
+    if (isJapaneseKana) {
+        CompositionLocalProvider(LocalKeyboardPunctuation provides LocalKeyboardPunctuation.current?.copy(numberPanel = true)) {
+            JapaneseKanaKeyboardLayout(
+                onKanaAction = { if (it is JapaneseKanaAction.Input) onKeyPress(it.romaji) },
+                onKeyPress = onKeyPress,
+                keyBackgroundColor = keyBackgroundColor,
+                keyTextColor = keyTextColor,
+                specialKeyBackgroundColor = specialKeyBackgroundColor,
+                specialKeyTextColor = specialKeyTextColor,
+                keyboardBackgroundColor = keyboardBackgroundColor,
+                modifier = modifier,
+                onKeyPressDown = onKeyPressDown,
+                shadowEnabled = shadowEnabled,
+                shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius,
+                keyCornerRadius = keyCornerRadius,
+                keySpacingX = keySpacingX,
+                keySpacingY = keySpacingY,
+                isFloatingMode = isFloatingMode,
+                numberMode = true,
+            )
+        }
+        return
+    }
     KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f,
         policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
 
