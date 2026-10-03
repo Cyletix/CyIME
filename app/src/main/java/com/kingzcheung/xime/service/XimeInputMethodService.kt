@@ -365,7 +365,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         serviceScope = serviceScope,
         onPredictionResult = { candidates ->
             candidateState.value = candidateState.value.copy(
-                associationCandidates = if (isChineseMode && canPredictAfter(predictionManager.lastCommittedText)) candidates else emptyList()
+                associationCandidates = if (isChineseMode && !candidateState.value.isComposing &&
+                    candidateState.value.inputText.isEmpty() && canPredictAfter(predictionManager.lastCommittedText)) candidates else emptyList()
             )
         },
     )
@@ -1501,7 +1502,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 onNext = nextHardwareCandidate.takeUnless { hardwareCandidates.association },
                                 onCandidateSelect = selectHardwareCandidate,
                                 bottomDocked = bottomDocked,
-                                showNumberLabels = !hardwareCandidates.association,
+                                showNumberLabels = true,
                                 surface = hardwareSurface,
                                 onPreeditBoundsChanged = { updateHardwarePreeditBounds(it) },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = false, it) },
@@ -1535,7 +1536,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         selectHardwareCandidate,
                                         previousHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         nextHardwareCandidate.takeUnless { hardwareCandidates.association },
-                                        showNumberLabels = !hardwareCandidates.association)
+                                        showNumberLabels = true)
                                   }
                                 },
                                 showCandidatesWhenFloating = hardwareCandidates.association,
@@ -2145,20 +2146,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // not yet show their candidates, and associations are candidates too.
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
                 keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
-                keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ESCAPE ||
+                keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
+                hardwareCandidateDigitIndex(keyCode, e.isShiftPressed) != null) {
                 if (keyRouter.handleHardwareCandidateKey(keyCode, e)) {
                     hardwareCandidateNavigationKeys += keyCode
                     return true
                 }
                 return super.onKeyDown(keyCode, event)
             }
-            // Enter uses the same FIFO raw-input commit as the on-screen return key.
-            if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
-                keyRouter.handleKeyPress("enter", e.isShiftPressed)
-                return true
-            }
         }
-        val composing = candidateState.value
         val pagingKey = hardwareCandidatePageDirection(keyCode, hasInput = true,
             modified = e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) != 0
         if (hasHardwareKeyboard && pagingKey) {
@@ -2178,20 +2175,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     keyRouter.handleKeyPress(symbol, e.isShiftPressed, hardwarePageDirection = pageDirection)
                 }
                 return true
-            }
-        }
-        if (hasHardwareKeyboard && composing.candidates.isNotEmpty()) {
-            when (keyCode) {
-                KeyEvent.KEYCODE_1 -> { keyRouter.selectCandidate(0); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_2 -> { keyRouter.selectCandidate(1); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_3 -> { keyRouter.selectCandidate(2); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_4 -> { keyRouter.selectCandidate(3); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_5 -> { keyRouter.selectCandidate(4); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_6 -> { keyRouter.selectCandidate(5); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_7 -> { keyRouter.selectCandidate(6); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_8 -> { keyRouter.selectCandidate(7); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_9 -> { keyRouter.selectCandidate(8); keyRouter.resetHardwareCandidateSelection(); return true }
-                KeyEvent.KEYCODE_0 -> { keyRouter.selectCandidate(9); keyRouter.resetHardwareCandidateSelection(); return true }
             }
         }
         val isShifted = e.isShiftPressed
@@ -2563,6 +2546,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        val current = candidateState.value
+        if (!current.isComposing && current.inputText.isEmpty() &&
+            (predictionManager.hasPendingPrediction || current.associationCandidates.isNotEmpty())) {
+            val before = runCatching { currentInputConnection?.getTextBeforeCursor(maxOf(25, current.pendingEnglishText.length), 0)?.toString() }.getOrNull()
+            val contextChanged = before != null && if (current.pendingEnglishText.isNotEmpty())
+                !before.endsWith(current.pendingEnglishText) else !predictionManager.matchesCommittedContext(before)
+            if (newSelStart != newSelEnd || contextChanged) {
+                predictionManager.invalidatePendingPredictions()
+                before?.let(predictionManager::replaceCommittedText)
+                candidateState.value = current.copy(associationCandidates = emptyList(), pendingEnglishText = "")
+                keyRouter.resetHardwareCandidateSelection()
+            }
+        }
         if (hasHardwareKeyboard && hardwareCursorImmediateOnly) {
             try { currentInputConnection?.requestCursorUpdates(InputConnection.CURSOR_UPDATE_IMMEDIATE) } catch (_: Exception) { }
         }
@@ -3246,9 +3242,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         return commitTextAndPredict(text, false)
     }
 
-    private fun commitTextAndPredict(text: String, isPaste: Boolean): TextCommitResult {
+    internal fun commitTextAndPredict(text: String, isPaste: Boolean, allowPrediction: Boolean = true): TextCommitResult {
         val result = commitTextSilently(text, isPaste)
-        if (result != TextCommitResult.ACCEPTED_HOST) return result
+        if (result != TextCommitResult.ACCEPTED_HOST || !allowPrediction) return result
         if (!canPredictAfter(text)) {
             predictionManager.invalidatePendingPredictions()
             candidateState.value = candidateState.value.copy(associationCandidates = emptyList(), pendingEnglishText = "")
@@ -3257,9 +3253,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (isChineseMode) {
             val predictionAdmission = inputReadiness.ticket()
             val predictionEditor = uiState.value.inputSessionId
+            val predictionRevision = predictionManager.requestRevision
             mainHandler.post {
                 if (predictionAdmission != null && inputReadiness.accepts(predictionAdmission) &&
-                    uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode) {
+                    uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode &&
+                    predictionManager.requestRevision == predictionRevision) {
                     getPredictionFromPlugin(predictionManager.lastCommittedText)
                 }
             }
@@ -3335,7 +3333,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (isSensitive) return TextCommitResult.ACCEPTED_HOST
         pluginEvents.onTextCommitted(text, isPaste)
         if (isChineseMode) {
-            predictionManager.appendCommittedText(text)
+            val before = runCatching { connection.getTextBeforeCursor(25, 0)?.toString() }.getOrNull()
+            if (before != null) predictionManager.replaceCommittedText(before)
+            else predictionManager.appendCommittedText(text)
             predictionManager.recordInput(text)
         }
         return TextCommitResult.ACCEPTED_HOST

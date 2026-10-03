@@ -22,6 +22,7 @@ internal class LatestPrediction(
     /** Zero means no pending request; the generation keeps stale completions from clearing a newer request. */
     val pendingRequest: StateFlow<Long> = pendingGeneration.asStateFlow()
     val isPending: Boolean get() = pendingGeneration.value != 0L
+    val revision: Long get() = generation
     private var nextAllowed = 0L
 
     @Synchronized fun invalidate(): Boolean {

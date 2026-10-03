@@ -8,6 +8,20 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LatestPredictionTest {
+    @Test fun invalidationAlsoExpiresARequestPostedBeforeInferenceStarted() = runTest {
+        val output = mutableListOf<String>()
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { output += it })
+        val postedRevision = worker.revision
+        worker.invalidate() // Space/Enter/new typing before a Main-handler prediction post runs.
+        if (worker.revision == postedRevision) worker.submit("stale")
+        advanceTimeBy(300); runCurrent()
+        assertTrue(output.isEmpty())
+        assertFalse(worker.isPending)
+        worker.submit("current")
+        advanceTimeBy(300); runCurrent()
+        assertEquals(listOf("current"), output)
+    }
+
     @Test fun pendingPredictionIsVisibleDuringDebounceAndConsumedOnce() = runTest {
         val output = mutableListOf<String>()
         val worker = LatestPrediction(backgroundScope, { listOf(it) }, { output += it })

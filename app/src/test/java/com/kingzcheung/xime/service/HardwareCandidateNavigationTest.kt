@@ -29,24 +29,64 @@ class HardwareCandidateNavigationTest {
         }
     }
 
-    @Test fun ordinaryEnglishSpaceKeepsTypingBehaviorAndNavigatedSpaceChoosesCompletion() {
+    @Test fun englishSpaceNeverChoosesCompletionAfterNavigation() {
         val navigation = HardwareCandidateNavigation()
         val source = snapshot(CandidateState(pendingEnglishText = "tes",
             associationCandidates = listOf("test", "testing", "tests")), english = true)
-        assertEquals(HardwareCandidateDecision.DefaultSpace, navigation.decide(HardwareCandidateKey.SPACE, source, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, source, false))
         assertEquals(HardwareCandidateDecision.Highlight(1), navigation.decide(HardwareCandidateKey.RIGHT, source, false))
-        assertEquals(HardwareCandidateDecision.Confirm(1, true), navigation.decide(HardwareCandidateKey.SPACE, source, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, source, false))
         repeat(8) { navigation.decide(HardwareCandidateKey.RIGHT, source, false) }
         assertEquals(2, navigation.selectedIndex(source))
-        assertEquals(HardwareCandidateDecision.Confirm(2, true), navigation.decide(HardwareCandidateKey.SPACE, source, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, source, false))
     }
 
-    @Test fun chineseSuggestionsUseExplicitSelectionWithoutOverridingTheOrdinarySpaceSetting() {
+    @Test fun chineseSuggestionSpaceNeverSelectsEvenAfterNavigation() {
         val navigation = HardwareCandidateNavigation()
         val source = snapshot(CandidateState(associationCandidates = listOf("世界", "朋友", "大家")))
-        assertEquals(HardwareCandidateDecision.DefaultSpace, navigation.decide(HardwareCandidateKey.SPACE, source, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, source, false))
         navigation.decide(HardwareCandidateKey.RIGHT, source, false)
-        assertEquals(HardwareCandidateDecision.Confirm(1, true), navigation.decide(HardwareCandidateKey.SPACE, source, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, source, false))
+    }
+
+    @Test fun enterAlwaysPreservesRawCompositionOrEditorAction() {
+        val navigation = HardwareCandidateNavigation()
+        assertEquals(HardwareCandidateDecision.DefaultInput,
+            navigation.decide(HardwareCandidateKey.ENTER, snapshot(), true))
+        val suggestions = snapshot(CandidateState(associationCandidates = listOf("世界", "朋友")))
+        assertEquals(HardwareCandidateDecision.DefaultInput,
+            navigation.decide(HardwareCandidateKey.ENTER, suggestions, false))
+        navigation.decide(HardwareCandidateKey.RIGHT, suggestions, false)
+        assertEquals(HardwareCandidateDecision.DefaultInput,
+            navigation.decide(HardwareCandidateKey.ENTER, suggestions, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput,
+            navigation.decide(HardwareCandidateKey.ENTER, suggestions.copy(predictionPending = true), false))
+        assertEquals(HardwareCandidateDecision.DefaultInput,
+            navigation.decide(HardwareCandidateKey.ENTER, suggestions.copy(associationLimit = 0), false))
+        val english = snapshot(CandidateState(pendingEnglishText = "hel", associationCandidates = listOf("hello")), true)
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.ENTER, english, false))
+        navigation.decide(HardwareCandidateKey.RIGHT, english, false)
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.ENTER, english, false))
+    }
+
+    @Test fun numberSelectionUsesTheSameVisibleListForEverySource() {
+        for (source in listOf(snapshot(),
+            snapshot(CandidateState(associationCandidates = listOf("世界", "朋友", "大家"))),
+            snapshot(CandidateState(pendingEnglishText = "tes", associationCandidates = listOf("test", "testing")), true))) {
+            val navigation = HardwareCandidateNavigation()
+            for (index in source.words.indices) {
+                assertEquals(HardwareCandidateDecision.Confirm(index, source.presentation.association),
+                    navigation.decide(HardwareCandidateKey.DIGIT, source, !source.presentation.association, digitIndex = index))
+            }
+            assertEquals(if (source.presentation.association) HardwareCandidateDecision.DefaultInput else HardwareCandidateDecision.Consume,
+                navigation.decide(HardwareCandidateKey.DIGIT, source, false, digitIndex = 9))
+        }
+        val navigation = HardwareCandidateNavigation()
+        val suggestions = snapshot(CandidateState(associationCandidates = listOf("旧词")))
+        for (source in listOf(snapshot(CandidateState()), suggestions.copy(predictionPending = true), suggestions.copy(associationLimit = 0))) {
+            assertEquals(HardwareCandidateDecision.DefaultInput,
+                navigation.decide(HardwareCandidateKey.DIGIT, source, false, digitIndex = 0))
+        }
     }
 
     @Test fun pendingPredictionNeverNavigatesOrConfirmsOldWords() {
@@ -55,7 +95,7 @@ class HardwareCandidateNavigationTest {
         navigation.decide(HardwareCandidateKey.RIGHT, source, false)
         val waiting = source.copy(predictionPending = true)
         assertEquals(HardwareCandidateDecision.Host, navigation.decide(HardwareCandidateKey.RIGHT, waiting, false))
-        assertEquals(HardwareCandidateDecision.DefaultSpace, navigation.decide(HardwareCandidateKey.SPACE, waiting, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, waiting, false))
         assertNull(navigation.selectedIndex(source))
         assertEquals(HardwareCandidateDecision.Cancel, navigation.decide(HardwareCandidateKey.CANCEL, waiting, false))
     }
@@ -67,7 +107,7 @@ class HardwareCandidateNavigationTest {
             val waiting = source.copy(predictionPending = true)
             navigation.decide(HardwareCandidateKey.RIGHT, waiting, !source.english)
             assertEquals(1, navigation.selectedIndex(source))
-            assertEquals(HardwareCandidateDecision.Confirm(1, source.presentation.association),
+            assertEquals(if (source.presentation.association) HardwareCandidateDecision.DefaultInput else HardwareCandidateDecision.Confirm(1, false),
                 navigation.decide(HardwareCandidateKey.SPACE, source, !source.english))
         }
     }
@@ -78,7 +118,7 @@ class HardwareCandidateNavigationTest {
         for (key in listOf(HardwareCandidateKey.LEFT, HardwareCandidateKey.RIGHT,
             HardwareCandidateKey.UP, HardwareCandidateKey.DOWN, HardwareCandidateKey.SPACE)) {
             assertEquals(HardwareCandidateDecision.Consume, navigation.decide(key, emptyUi, true))
-            assertEquals(if (key == HardwareCandidateKey.SPACE) HardwareCandidateDecision.DefaultSpace else HardwareCandidateDecision.Host,
+            assertEquals(if (key == HardwareCandidateKey.SPACE) HardwareCandidateDecision.DefaultInput else HardwareCandidateDecision.Host,
                 navigation.decide(key, emptyUi, null))
             assertEquals(HardwareCandidateDecision.Consume, navigation.decide(key, snapshot(), null))
         }
@@ -112,7 +152,7 @@ class HardwareCandidateNavigationTest {
         )) {
             val navigation = HardwareCandidateNavigation()
             navigation.decide(HardwareCandidateKey.RIGHT, source, false)
-            assertEquals(HardwareCandidateDecision.DefaultSpace, navigation.decide(HardwareCandidateKey.SPACE, changed, false))
+            assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, changed, false))
         }
     }
 
@@ -163,7 +203,7 @@ class HardwareCandidateNavigationTest {
         for (key in listOf(HardwareCandidateKey.LEFT, HardwareCandidateKey.RIGHT, HardwareCandidateKey.UP, HardwareCandidateKey.DOWN)) {
             assertEquals(HardwareCandidateDecision.Host, navigation.decide(key, hidden, false))
         }
-        assertEquals(HardwareCandidateDecision.DefaultSpace, navigation.decide(HardwareCandidateKey.SPACE, hidden, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, hidden, false))
         assertEquals(HardwareCandidateDecision.Cancel, navigation.decide(HardwareCandidateKey.CANCEL, hidden, false))
     }
 
@@ -175,7 +215,7 @@ class HardwareCandidateNavigationTest {
         assertEquals(full.words, full.presentation.words)
         repeat(4) { navigation.decide(HardwareCandidateKey.RIGHT, full, false) }
         assertEquals(4, navigation.selectedIndex(full))
-        assertEquals(HardwareCandidateDecision.Confirm(4, true), navigation.decide(HardwareCandidateKey.SPACE, full, false))
+        assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, full, false))
         assertNull(navigation.selectedIndex(full.copy(associationLimit = 3)))
     }
 
