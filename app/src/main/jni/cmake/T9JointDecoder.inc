@@ -82,6 +82,13 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
   const auto& syllables = syllabifier_->syllable_graph();
   const size_t total = syllables.interpreted_length;
   if (!total) return false;
+  const auto& input = syllabifier_->input();
+  const bool single_t9_key = input.size() == 1 &&
+                             input.front() >= '2' && input.front() <= '9';
+  // A first key is still ambiguous between several initials and a complete
+  // vowel. Soften only the extra sentence-level abbreviation cost; dictionary
+  // credibility and the full-spelling candidate pool keep their normal role.
+  const double spelling_penalty = t9_spelling_penalty_ * (single_t9_key ? 0.75 : 1.0);
   const string preceding = translator_->GetPrecedingText(start_);
   T9JointCache* cache = nullptr;
   // Rebuild native objects with this query's syllabifier/spans. Neither Menu
@@ -259,7 +266,7 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
           // paths cannot enter a full beam; equal scores still reach tie-breaks.
           // Discourage over-segmentation and penalize abbreviated/fuzzy spans.
           score -= t9_word_penalty_;
-          score -= t9_spelling_penalty_ * std::max(0.0,
+          score -= spelling_penalty * std::max(0.0,
               static_cast<double>(end.first - start.first) - entry->quality_len);
           if (target.size() >= t9_sentence_beam_ && score < target.back()->score) continue;
           auto line = New<T9Line>();
