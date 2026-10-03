@@ -289,6 +289,56 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals("你好手动", editor.toString())
     }
 
+    @Test fun `switching to English while finishing retains the Chinese final exactly once`() {
+        startToolbar()
+        onPartial("你好")
+        handler.finishRecognition()
+        assertEquals(1, posted.size)
+        currentState = currentState.copy(isAsciiMode = true)
+        handler.onInputLanguageChanged()
+        assertEquals(1, posted.size)
+        assertEquals(RecognitionState.PROCESSING, currentState.voiceRecognitionState)
+        assertEquals(0, voiceCompleteCount)
+        verify(mockManager, never()).cancelRecognition()
+
+        onResult("你好世界句号")
+        assertEquals("你好世界。", editor.toString())
+        assertTrue(posted.isEmpty())
+        repeat(2) { onResult("你好世界句号") }
+        runTimeouts()
+        assertEquals("你好世界。", editor.toString())
+        verify(mockInputConnection).commitText("世界。", 1)
+        verify(mockInputConnection, times(2)).commitText(any(), anyInt())
+        verify(mockManager).startRecognition(InputLanguage.CHINESE)
+        verify(mockManager, times(1)).startRecognition(any())
+        verify(mockManager).stopRecognition()
+        assertEquals(1, recordingStoppedCount)
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `manual correction after a finishing language toggle still rejects the pending final`() {
+        startToolbar()
+        onPartial("泥好")
+        handler.finishRecognition()
+        currentState = currentState.copy(isAsciiMode = true)
+        handler.onInputLanguageChanged()
+        assertEquals(1, posted.size)
+
+        handler.abandonPendingOnManualInput()
+        editor.replace(0, editor.length, "你好（手动修改）")
+        org.mockito.Mockito.clearInvocations(mockInputConnection)
+        assertTrue(posted.isEmpty())
+        onPartial("泥好世界")
+        repeat(2) { onResult("泥好世界句号") }
+        runTimeouts()
+        assertEquals("你好（手动修改）", editor.toString())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+        verify(mockInputConnection, never()).setComposingText(any(), anyInt())
+        verify(mockManager).stopRecognition()
+        assertEquals(1, recordingStoppedCount)
+    }
+
     @Test fun `toolbar streams partial and sentence results before stop without duplicates`() {
         startToolbar()
         onPartial("你好")
@@ -458,15 +508,23 @@ class VoiceRecognitionHandlerFinishTest {
         verify(mockInputConnection, never()).setComposingText(any(), anyInt())
     }
 
-    @Test fun `recognition receives product language including English ASCII projection`() {
+    @Test fun `Japanese English Japanese keyboard switches keep the Japanese recording`() {
         currentState = currentState.copy(currentSchemaId = "japanese", isAsciiMode = false)
-        handler.startRecognition()
-        verify(mockManager).startRecognition(InputLanguage.JAPANESE)
+        startToolbar()
+        onPartial("句号")
         currentState = currentState.copy(isAsciiMode = true)
         handler.onInputLanguageChanged()
-        verify(mockManager).cancelRecognition()
-        handler.startRecognition()
-        verify(mockManager).startRecognition(InputLanguage.ENGLISH)
+        onPartial("句号，問題")
+        assertEquals("句号 問題", editor.toString())
+        currentState = currentState.copy(isAsciiMode = false)
+        handler.onInputLanguageChanged()
+        onPartial("句号，問題，続く")
+        assertEquals("句号 問題 続く", editor.toString())
+        assertRecordingContinuesIn(InputLanguage.JAPANESE)
+        handler.finishRecognition()
+        onResult("句号，問題，続く。")
+        assertEquals("句号 問題 続く", editor.toString())
+        assertEquals(1, voiceCompleteCount)
     }
 
     @Test fun `language change in same editor rejects pending voice text and final timeout`() {
@@ -480,13 +538,134 @@ class VoiceRecognitionHandlerFinishTest {
         verify(mockManager).cancelRecognition()
     }
 
-    @Test fun `late callback checks language even before change observer runs`() {
+    @Test fun `same language pair accepts callbacks before its keyboard observer runs`() {
         startToolbar()
         currentState = currentState.copy(isAsciiMode = true)
-        onPartial("不应进入英文会话")
-        onResult("不应提交")
-        assertEquals("", editor.toString())
+        onState(RecognitionState.LISTENING)
+        onPartial("继续句号")
+        assertEquals("继续。", editor.toString())
+        onResult("继续句号")
+        assertEquals("继续。", editor.toString())
+        handler.onInputLanguageChanged()
+        assertRecordingContinuesIn(InputLanguage.CHINESE)
+    }
+
+    private fun assertRecordingContinuesIn(language: InputLanguage) {
+        verify(mockManager).startRecognition(language)
+        verify(mockManager, times(1)).startRecognition(any())
+        verify(mockManager, never()).cancelRecognition()
+        verify(mockManager, never()).stopRecognition()
+        assertEquals(RecognitionState.LISTENING, currentState.voiceRecognitionState)
+        assertEquals(0, voiceCompleteCount)
+    }
+
+    @Test fun `Chinese English Chinese keyboard switches keep Chinese normalization and one recording`() {
+        startToolbar()
+        onPartial("结果")
+        currentState = currentState.copy(isAsciiMode = true)
+        handler.onInputLanguageChanged()
+        onPartial("结果逗号")
+        assertEquals("结果，", editor.toString())
+        currentState = currentState.copy(isAsciiMode = false)
+        handler.onInputLanguageChanged()
+        onPartial("结果逗号完成")
+        assertEquals("结果，完成", editor.toString())
+        assertRecordingContinuesIn(InputLanguage.CHINESE)
+        handler.finishRecognition()
+        onResult("结果逗号完成句号")
+        assertEquals("结果，完成。", editor.toString())
+        verify(mockManager).stopRecognition()
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `English Chinese English keyboard switches retain the English recording language`() {
+        currentState = currentState.copy(isAsciiMode = true)
+        startToolbar()
+        onPartial("hello")
+        currentState = currentState.copy(isAsciiMode = false)
+        handler.onInputLanguageChanged()
+        onPartial("hello句号")
+        assertEquals("hello句号", editor.toString())
+        currentState = currentState.copy(isAsciiMode = true)
+        handler.onInputLanguageChanged()
+        onPartial("hello句号 world")
+        assertEquals("hello句号 world", editor.toString())
+        assertRecordingContinuesIn(InputLanguage.ENGLISH)
+        handler.finishRecognition()
+        onResult("hello句号 world!")
+        assertEquals("hello句号 world", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `a different native language rejects callbacks before its observer runs`() {
+        startToolbar()
+        onPartial("已有文字")
+        org.mockito.Mockito.clearInvocations(mockInputConnection)
+        currentState = currentState.copy(currentSchemaId = "japanese", isAsciiMode = false)
+        onPartial("旧中文增量")
+        onResult("旧中文最终结果")
+        handler.onInputLanguageChanged()
+        assertEquals("已有文字", editor.toString())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
         verify(mockManager).cancelRecognition()
+        verify(mockManager, times(1)).startRecognition(any())
+    }
+
+    @Test fun `changing native language while ASCII remains English cancels the old recording`() {
+        currentState = currentState.copy(isAsciiMode = true)
+        startToolbar()
+        onPartial("existing")
+        org.mockito.Mockito.clearInvocations(mockInputConnection)
+        currentState = currentState.copy(currentSchemaId = "japanese", isAsciiMode = true)
+        assertEquals(InputLanguage.ENGLISH, currentState.inputProfile.language)
+        handler.onInputLanguageChanged()
+        onPartial("existing stale")
+        onResult("existing stale final")
+        assertEquals("existing", editor.toString())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+        verify(mockManager).cancelRecognition()
+        verify(mockManager).startRecognition(InputLanguage.ENGLISH)
+        verify(mockManager, times(1)).startRecognition(any())
+    }
+
+    @Test fun `ASCII native language changes are detected by callbacks before the observer`() {
+        currentState = currentState.copy(isAsciiMode = true)
+        startToolbar()
+        onPartial("existing")
+        org.mockito.Mockito.clearInvocations(mockInputConnection)
+        currentState = currentState.copy(currentSchemaId = "japanese", isAsciiMode = true)
+        assertEquals(InputLanguage.ENGLISH, currentState.inputProfile.language)
+        onPartial("existing stale")
+        onResult("existing stale final")
+        handler.onInputLanguageChanged()
+        assertEquals("existing", editor.toString())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+        verify(mockManager).cancelRecognition()
+        verify(mockManager, times(1)).startRecognition(any())
+    }
+
+    @Test fun `manual correction during English keyboard input survives later Chinese voice increments`() {
+        startToolbar()
+        onPartial("泥好")
+        currentState = currentState.copy(isAsciiMode = true)
+        handler.onInputLanguageChanged()
+        handler.abandonPendingOnManualInput()
+        editor.replace(0, editor.length, "你好")
+        onPartial("泥好世界")
+        assertEquals("你好世界", editor.toString())
+        currentState = currentState.copy(isAsciiMode = false)
+        handler.onInputLanguageChanged()
+        onPartial("泥好世界继续")
+        assertEquals("你好世界继续", editor.toString())
+        assertRecordingContinuesIn(InputLanguage.CHINESE)
+        handler.finishRecognition()
+        onResult("泥好世界继续")
+        assertEquals("你好世界继续", editor.toString())
+        verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
+        assertEquals(1, voiceCompleteCount)
     }
 
     @Test fun `changing layout within the same language keeps the voice session`() {

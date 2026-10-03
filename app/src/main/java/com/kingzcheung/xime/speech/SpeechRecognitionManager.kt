@@ -14,6 +14,10 @@ import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.util.FileLogger
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SpeechRecognitionManager(
     private val context: Context,
@@ -30,7 +34,7 @@ class SpeechRecognitionManager(
         private const val BUFFER_SIZE_SECONDS = 0.1f
         private const val SPEECH_THRESHOLD = 25
 
-        /** 停止时等待录音线程退出的超时：覆盖 backend.stop() 同步等待最终结果的耗时。 */
+        /** 每次后端调用的停止兜底；等待上一段收尾不占用本段定稿时间。 */
         private const val JOIN_TIMEOUT_MS = 8000L
 
         /**
@@ -42,8 +46,7 @@ class SpeechRecognitionManager(
     }
 
     private var backend: AsrBackend? = null
-    private var recordingThread: RecordingThread? = null
-    private var pendingRecognitionLanguage: InputLanguage? = null
+    @Volatile private var recordingThread: RecordingThread? = null
     @Volatile private var released = false
     @Volatile private var recognitionLanguage = InputLanguage.CHINESE
 
@@ -57,7 +60,8 @@ class SpeechRecognitionManager(
         pendingReleaseSession = -1
         // 主线程只取引用；release() 含跨进程 IPC/断连，放后台线程执行
         val b = synchronized(preloadLock) {
-            if (session != -1 && sessionId == session) {
+            if (session != -1 && sessionId == session && recordingThread == null &&
+                !SettingsPreferences.isSttKeepEngineAlive(context)) {
                 val tmp = backend
                 backend = null
                 tmp
@@ -100,13 +104,6 @@ class SpeechRecognitionManager(
             errorCallback?.invoke(if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请先选择输入语言"
                 else "当前在线语音插件尚未声明${language.displayName}支持，请使用本地多语言模型", true)
             setState(RecognitionState.ERROR)
-            return
-        }
-        if (recordingThread != null) {
-            // The previous backend still owns its stop/cancel call. Do not let it stop a new session.
-            pendingRecognitionLanguage = language
-            synchronized(preloadLock) { sessionId++ }
-            setState(RecognitionState.PROCESSING)
             return
         }
         recognitionLanguage = language
@@ -165,7 +162,6 @@ class SpeechRecognitionManager(
         if (released || loadingCancelled) return
         val currentBackend = synchronized(preloadLock) { backend } ?: return
         synchronized(preloadLock) { sessionId++ }
-        bindSessionCallbacks(currentBackend, sessionId)
 
         // 新会话复用后端：取消上一次会话遗留的延迟释放
         mainHandler.removeCallbacks(pendingBackendRelease)
@@ -179,7 +175,9 @@ class SpeechRecognitionManager(
         }
         mainHandler.removeCallbacks(preStartTimeoutRunnable)
 
-        recordingThread = RecordingThread(currentBackend, preStarted, sessionId, recognitionLanguage)
+        // Capture can resume while the previous result is finishing. Backend ownership remains
+        // serialized, so an old stop/cancel can never terminate the new recognition session.
+        recordingThread = RecordingThread(currentBackend, preStarted, sessionId, recognitionLanguage, recordingThread)
         recordingThread!!.start()
     }
 
@@ -199,7 +197,6 @@ class SpeechRecognitionManager(
     }
 
     fun stopRecognition() {
-        pendingRecognitionLanguage = null
         loadingCancelled = true
         cancelPreStart()
         Log.d(TAG, "Stopping recognition")
@@ -216,32 +213,11 @@ class SpeechRecognitionManager(
         }
         if (thread.stopRequested) return
         thread.stopRequested = true
-        val session = synchronized(preloadLock) { sessionId }
-        // 不能 interrupt：录音线程可能正阻塞在 backend.stop() 同步等待最终结果
-        // （本地 stopAsr 的 runBlocking），中断会吞掉最终文本；forceStopAudio 释放
-        // AudioRecord 使 read() 返回错误、循环自然退出后执行 stop()
+        // End capture immediately, but let delivery drain captured PCM and finish normally.
         thread.forceStopAudio()
-        Thread {
-            try {
-                // join 超时兜底：录音线程若卡在 Lua 调用中（最坏 CALL_TIMEOUT_MS=180s），
-                // 不能让后端释放无限期阻塞（否则 WebSocket 与麦克风一直占着）
-                thread.join(JOIN_TIMEOUT_MS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-            if (thread.isAlive) {
-                // 卡死兜底：标记中断，尽快从可中断调用中退出
-                thread.interrupt()
-            }
-            scheduleBackendRelease(session)
-            mainHandler.post {
-                if (session == sessionId) setState(RecognitionState.IDLE)
-            }
-        }.start()
     }
 
     fun cancelRecognition() {
-        pendingRecognitionLanguage = null
         // Invalidate callbacks immediately, including results already posted to the UI thread.
         synchronized(preloadLock) { sessionId++ }
         loadingCancelled = true
@@ -261,23 +237,8 @@ class SpeechRecognitionManager(
         thread.cancelRequested = true
         if (thread.stopRequested) return
         thread.stopRequested = true
-        val session = synchronized(preloadLock) { sessionId }
-        // Release capture immediately; backend cancellation runs on the recording thread.
+        // Release capture immediately; cancellation remains on the backend's owning worker.
         thread.forceStopAudio()
-        Thread {
-            try {
-                thread.join(JOIN_TIMEOUT_MS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-            if (thread.isAlive) {
-                thread.interrupt()
-            }
-            scheduleBackendRelease(session)
-            mainHandler.post {
-                if (session == sessionId) setState(RecognitionState.IDLE)
-            }
-        }.start()
     }
 
     fun getState(): RecognitionState = currentState
@@ -345,7 +306,9 @@ class SpeechRecognitionManager(
         }
         if (b != null) {
             // release() 含跨进程 IPC，放到后台线程执行，避免阻塞主线程（onDestroy 等场景）
+            val lastRecording = recordingThread
             Thread {
+                lastRecording?.awaitBackendFinished()
                 b.release()
             }.start()
         }
@@ -370,7 +333,7 @@ class SpeechRecognitionManager(
                 onResult = {}, onPartialResult = {}, onStateChange = {},
                 onError = { error -> Log.w(TAG, "Speech warmup: $error") }
             )
-            if (!created.initialize()) return false
+            if (!created.initialize(recognitionLanguage)) return false
             synchronized(preloadLock) {
                 if (released) return false
                 backend = created
@@ -440,35 +403,131 @@ class SpeechRecognitionManager(
         preStarted: AudioRecord? = null,
         private val session: Int,
         private val language: InputLanguage,
+        private val previousRecording: RecordingThread?,
     ) : Thread("AsrRecording") {
 
         private val spectrumAnalyzer = SpectrumAnalyzer()
+        private val requestedAt = System.nanoTime()
 
-        /**
-         * 停止请求标志：不能只依赖线程中断标志停止循环。
-         *
-         * processAudioChunk 会经 LuaScriptRuntime.runGuarded 的 FutureTask.get 执行，
-         * FutureTask.awaitDone 内部用 Thread.interrupted() 检查中断状态并**清除中断标志**，
-         * 随后 LuaScriptRuntime.call 吞掉 InterruptedException 正常返回 NIL——
-         * 于是中断标志被消费后 while (!interrupted()) 永远为真，录音线程无法停止，
-         * stopRecognition 的 join() 永不返回，后端（WebSocket）与麦克风一直后台占用。
-         */
+        // Capture stops independently of delivery: normal stop drains PCM, cancel discards it.
+        // Explicit flags also survive backend/plugin calls that consume thread interrupts.
         @Volatile
         var stopRequested = false
         @Volatile var cancelRequested = false
 
         // Own the pre-started microphone before Thread.start(): stop may arrive before run().
         private val microphone = RecordingAudioOwner(preStarted)
+        private val audioQueue = ArrayBlockingQueue<ByteArray>(100) // At most 10 s / 320 KB of PCM.
+        private val backendFinished = CountDownLatch(1)
+        @Volatile private var captureEnded = false
+        @Volatile private var deliveryThread: Thread? = null
+        @Volatile private var backendOperationStartedAt = 0L
+        private val shutdownWatched = AtomicBoolean()
+
+        private fun watchShutdown() {
+            if (!shutdownWatched.compareAndSet(false, true)) return
+            Thread({
+                while (!backendFinished.await(250, TimeUnit.MILLISECONDS)) {
+                    val started = backendOperationStartedAt
+                    if (started != 0L && System.nanoTime() - started >= TimeUnit.MILLISECONDS.toNanos(JOIN_TIMEOUT_MS)) {
+                        // Interrupt the actual model/IPC owner, never advertise it as free early.
+                        deliveryThread?.interrupt()
+                        break
+                    }
+                }
+            }, "AsrShutdownWatch").start()
+        }
+
+        fun awaitBackendFinished() {
+            var interrupted = false
+            while (true) try {
+                backendFinished.await()
+                break
+            } catch (_: InterruptedException) {
+                interrupted = true
+            }
+            if (interrupted) Thread.currentThread().interrupt()
+        }
+
+        private fun enqueue(chunk: ByteArray) {
+            if (!audioQueue.offer(chunk)) error("语音引擎准备时间过长，已停止录音，请重试")
+        }
+
+        private fun reportFailure(error: Exception, duringDelivery: Boolean = false) {
+            if (!cancelRequested && !released && (duringDelivery || !stopRequested)) mainHandler.post {
+                if (!released && session == sessionId) {
+                    errorCallback?.invoke("录音已停止：${error.message.orEmpty()}", true)
+                    setState(RecognitionState.ERROR)
+                }
+            }
+        }
+
+        /** Only this worker touches the backend; the microphone never waits for model/IPC work. */
+        private fun deliverAudio() {
+            var attempted = false
+            try {
+                while (previousRecording?.backendFinished?.await(50, TimeUnit.MILLISECONDS) == false) {
+                    if (cancelRequested || released) return
+                }
+                if (cancelRequested || released) return
+                bindSessionCallbacks(currentBackend, session) { !cancelRequested }
+                attempted = true
+                backendOperationStartedAt = System.nanoTime()
+                check(currentBackend.start(language)) { "启动语音引擎失败" }
+                backendOperationStartedAt = 0L
+                FileLogger.i(TAG, "ASR backend ready session=$session elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestedAt)}")
+                while (!cancelRequested && !released) {
+                    val chunk = audioQueue.poll(50, TimeUnit.MILLISECONDS)
+                    if (chunk != null) {
+                        backendOperationStartedAt = System.nanoTime()
+                        currentBackend.processAudioChunk(chunk)
+                        backendOperationStartedAt = 0L
+                    }
+                    else if (captureEnded && audioQueue.isEmpty()) break
+                }
+            } catch (error: Exception) {
+                reportFailure(error, duringDelivery = true)
+                cancelRequested = true
+                forceStopAudio()
+            } finally {
+                if (attempted) try {
+                    backendOperationStartedAt = System.nanoTime()
+                    if (cancelRequested || released) currentBackend.cancel() else currentBackend.stop()
+                } catch (error: Exception) {
+                    Log.w(TAG, "Speech backend stop failed after microphone release", error)
+                    reportFailure(error, duringDelivery = true)
+                }
+                // A cancelled queued recording still represents its predecessor's ownership.
+                // A third immediate start must not jump past the original unfinished stop.
+                if (!attempted) previousRecording?.awaitBackendFinished()
+                backendOperationStartedAt = 0L
+                audioQueue.clear()
+                backendFinished.countDown()
+                completeRecording()
+            }
+        }
+
+        private fun completeRecording() {
+            mainHandler.post {
+                if (recordingThread === this) {
+                    recordingThread = null
+                    if (!released) {
+                        if (currentState != RecognitionState.ERROR) setState(RecognitionState.IDLE)
+                        scheduleBackendRelease(sessionId)
+                    }
+                }
+            }
+        }
 
         override fun run() {
-            var backendAttempted = false
+            var deliveryStarted = false
             try {
                 val audioRecord = microphone.acquire { createAudioRecord() }
                     ?: if (stopRequested) return else error("无法启动录音")
-                if (stopRequested) return
-                backendAttempted = true
-                check(currentBackend.start(language)) { "启动语音引擎失败" }
                 if (stopRequested || !microphone.start()) return
+                FileLogger.i(TAG, "Microphone ready session=$session elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestedAt)}")
+                deliveryThread = Thread(::deliverAudio, "AsrAudioDelivery").also { it.start() }
+                deliveryStarted = true
                 mainHandler.post {
                     if (!released && !stopRequested && recordingThread === this) setState(RecognitionState.LISTENING)
                 }
@@ -509,48 +568,38 @@ class SpeechRecognitionManager(
                             if (preSpeechBuffer.size >= maxPreSpeechChunks) {
                                 speechDetected = true
                                 while (preSpeechBuffer.isNotEmpty()) {
-                                    currentBackend.processAudioChunk(preSpeechBuffer.removeFirst())
+                                    enqueue(preSpeechBuffer.removeFirst())
                                 }
                             } else if (isSpeech(chunk)) {
                                 speechDetected = true
                                 // 把语音前缓冲的块按顺序送入 ASR，保证开头不丢失
                                 while (preSpeechBuffer.isNotEmpty()) {
-                                    currentBackend.processAudioChunk(preSpeechBuffer.removeFirst())
+                                    enqueue(preSpeechBuffer.removeFirst())
                                 }
                             }
                         } else {
-                            currentBackend.processAudioChunk(chunk)
+                            enqueue(chunk)
                         }
                     } else if (nread < 0) {
                         break
                     }
                 }
             } catch (error: Exception) {
-                if (!stopRequested) mainHandler.post {
-                    if (!released && session == sessionId) {
-                        errorCallback?.invoke("录音已停止：${error.message.orEmpty()}", false)
-                        setState(RecognitionState.ERROR)
-                    }
-                }
+                reportFailure(error)
+                cancelRequested = true
             } finally {
-                // Release capture BEFORE slow/throwing model or network shutdown.
+                stopRequested = true
                 microphone.close()
-                if (backendAttempted) try {
-                    if (cancelRequested) currentBackend.cancel() else currentBackend.stop()
-                } catch (error: Exception) {
-                    Log.w(TAG, "Speech backend stop failed after microphone release", error)
-                }
-                mainHandler.post {
-                    if (recordingThread === this) {
-                        recordingThread = null
-                        val pending = pendingRecognitionLanguage
-                        pendingRecognitionLanguage = null
-                        if (!released && pending != null) startRecognition(pending)
-                        else if (!released) {
-                            if (cancelRequested) setState(RecognitionState.IDLE)
-                            scheduleBackendRelease(sessionId)
-                        }
-                    }
+                captureEnded = true
+                watchShutdown()
+                if (deliveryStarted) {
+                    // A timed-out join must not advertise the backend as free while native work
+                    // still owns it. Cancellation already releases capture and discards queued PCM.
+                    awaitBackendFinished()
+                } else {
+                    previousRecording?.awaitBackendFinished()
+                    backendFinished.countDown()
+                    completeRecording()
                 }
                 Log.d(TAG, "Recognition thread ended; microphone released")
             }
@@ -559,6 +608,7 @@ class SpeechRecognitionManager(
         fun forceStopAudio() {
             stopRequested = true
             microphone.close()
+            watchShutdown()
         }
 
         private fun isSpeech(chunk: ByteArray): Boolean {
@@ -580,12 +630,12 @@ class SpeechRecognitionManager(
         }
     }
 
-    private fun bindSessionCallbacks(currentBackend: AsrBackend, token: Int) {
+    private fun bindSessionCallbacks(currentBackend: AsrBackend, token: Int, acceptsCallback: () -> Boolean) {
         currentBackend.setCallbacks(
-            onResult = { text -> postForSession(token) { resultCallback?.invoke(text) } },
-            onPartialResult = { text -> postForSession(token) { partialResultCallback?.invoke(text) } },
-            onStateChange = { state -> postForSession(token) { setState(state) } },
-            onError = { error -> postForSession(token) { errorCallback?.invoke(error, true) } },
+            onResult = { text -> postForSession(token) { if (acceptsCallback()) resultCallback?.invoke(text) } },
+            onPartialResult = { text -> postForSession(token) { if (acceptsCallback()) partialResultCallback?.invoke(text) } },
+            onStateChange = { state -> postForSession(token) { if (acceptsCallback()) setState(state) } },
+            onError = { error -> postForSession(token) { if (acceptsCallback()) errorCallback?.invoke(error, true) } },
         )
     }
 }

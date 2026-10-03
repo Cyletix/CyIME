@@ -34,6 +34,8 @@ internal class LocalSpeechSession(
     private val ended = mutableMapOf<Long, SpeechBoundary>()
     private val abandoned = AtomicBoolean(false)
     private val failed = AtomicBoolean(false)
+    private val resetLock = Any()
+    private var resetComplete = false
     private var accepting = true
     private var previous = ""
     private var segmentSamples = 0
@@ -152,7 +154,14 @@ internal class LocalSpeechSession(
     fun awaitIdle() {
         while (!audio.awaitTermination(1, TimeUnit.SECONDS)) { }
         while (!refinement.awaitTermination(1, TimeUnit.SECONDS)) { }
-        engine.reset()
+        // More than one retirement/start waiter may observe termination. A later waiter
+        // must neither reset the next session nor leave before the first reset completes.
+        synchronized(resetLock) {
+            if (!resetComplete) {
+                engine.reset()
+                resetComplete = true
+            }
+        }
     }
     val isIdle: Boolean get() = audio.isTerminated && refinement.isTerminated
 }
