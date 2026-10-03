@@ -71,7 +71,7 @@ class AsrModelManager(private val context: Context) {
         val fromIndex = ModelManager.getModelsByCategory(ModelCategory.ASR)
             .map { toAsrModelInfo(it) }
         return (fromIndex + SpeechModelCatalog.models.map(::toAsrModelInfo) + DEFAULT_MODEL)
-            .distinctBy { it.id }.sortedBy { listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE).indexOf(it.id).let { order -> if (order < 0) Int.MAX_VALUE else order } }
+            .distinctBy { it.id }.sortedBy { listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.ZIPFORMER).indexOf(it.id).let { order -> if (order < 0) Int.MAX_VALUE else order } }
     }
 
     fun isModelReady(): Boolean = try { selection().ready } catch (_: Exception) { false }

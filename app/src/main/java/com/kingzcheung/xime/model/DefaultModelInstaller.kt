@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** 首次打开应用时安装默认模型；与市场共用下载器、版本和目录，不另建模型副本。 */
 object DefaultModelInstaller {
-    internal val modelIds = setOf("ochwpro", SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.SENSEVOICE,
+    internal val modelIds = setOf("ochwpro", SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE,
         DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE)
     private val started = AtomicBoolean(false)
     private val observingNetwork = AtomicBoolean(false)
@@ -93,7 +93,7 @@ object DefaultModelInstaller {
                         if (complete && ModelManager.isModelDownloaded(app, model)) {
                             // 完成后不再自动补回，用户在模型中心删除模型也是有效选择。
                             markHandled(app, id)
-                            if (id == "zipformer-zh-int8") {
+                            if (id == SpeechModelCatalog.PARAFORMER) {
                                 val settings = SettingsPreferences.getPrefsPublic(app)
                                 // 只为尚未选择语音后端的新用户设置本地默认值。
                                 val editor = settings.edit()

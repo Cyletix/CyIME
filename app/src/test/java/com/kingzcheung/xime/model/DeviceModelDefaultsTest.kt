@@ -60,6 +60,18 @@ class DeviceModelDefaultsTest {
         }
     }
 
+    @Test fun automaticZipformerDefaultsMigrateButExplicitSelectionsRemain() {
+        for (old in listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_TWO_PASS)) {
+            val stores = Stores()
+            stores.values()["device_default_voice_model"] = old
+            stores.values()[DeviceDefaults.VERSION] = 1
+            assertEquals(SpeechModelCatalog.TWO_PASS, AsrModelManager(stores.context).getSelectedModelId())
+            AsrModelManager(stores.context).setModel(old)
+            DeviceDefaults.initialize(stores.context) { error("must not re-probe") }
+            assertEquals(old, AsrModelManager(stores.context).getSelectedModelId())
+        }
+    }
+
     @Test fun memoryAndFrequencyBoundariesSelectConcreteModels() {
         val cases = listOf(
             device(4 * gib - 1) to DeviceModelTier.LIGHT,
@@ -75,7 +87,7 @@ class DeviceModelDefaultsTest {
             val profile = DeviceModelProfiles.choose(hardware)
             assertEquals(hardware.toString(), tier, profile.tier)
             assertEquals(if (tier == DeviceModelTier.LIGHT) DeviceModelProfiles.SMALL else DeviceModelProfiles.BASE, profile.predictionModel)
-            assertEquals(if (tier == DeviceModelTier.ENHANCED) SpeechModelCatalog.ZIPFORMER_TWO_PASS else SpeechModelCatalog.ZIPFORMER, profile.voiceModel)
+            assertEquals(SpeechModelCatalog.TWO_PASS, profile.voiceModel)
         }
     }
 
@@ -101,8 +113,7 @@ class DeviceModelDefaultsTest {
             assertEquals(hardware.maxCpuKHz, stores.values()["device_initial_max_cpu_khz"])
             assertFalse(stores.values().containsKey("prediction_selected_model"))
             assertFalse(stores.values("asr_model").containsKey("selected_model"))
-            val expected = setOf("ochwpro", profile.predictionModel, SpeechModelCatalog.ZIPFORMER) +
-                if (profile.tier == DeviceModelTier.ENHANCED) setOf(SpeechModelCatalog.SENSEVOICE) else emptySet()
+            val expected = setOf("ochwpro", profile.predictionModel, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
             assertEquals(expected, DefaultModelInstaller.requestedModelIds(context).toSet())
         }
     }
@@ -143,7 +154,7 @@ class DeviceModelDefaultsTest {
             DeviceDefaults.initialize(stores.context) { error("existing installation must not re-probe") }
             assertEquals("PRESERVED", stores.values()[DeviceDefaults.TIER])
             assertEquals(DeviceModelProfiles.BASE, SettingsPreferences.getPredictionSelectedModel(stores.context))
-            assertEquals(SpeechModelCatalog.ZIPFORMER, AsrModelManager(stores.context).getSelectedModelId())
+            assertEquals(SpeechModelCatalog.TWO_PASS, AsrModelManager(stores.context).getSelectedModelId())
         }
         val stores = Stores()
         SettingsPreferences.setPredictionSelectedModel(stores.context, DeviceModelProfiles.SMALL)
@@ -161,7 +172,7 @@ class DeviceModelDefaultsTest {
         assertTrue(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
         AsrModelManager(stores.context).setRefinementEnabled(false)
         assertFalse(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
-        assertTrue(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.ZIPFORMER))
+        assertTrue(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.PARAFORMER))
     }
 
     @Test fun disabledOrOnlineFeaturesDoNotAutoDownloadTheirModels() {

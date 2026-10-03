@@ -27,6 +27,6 @@ object DeviceModelProfiles {
             else -> DeviceModelTier.STANDARD
         }
         return DeviceModelProfile(tier, if (tier == DeviceModelTier.LIGHT) SMALL else BASE,
-            if (tier == DeviceModelTier.ENHANCED) SpeechModelCatalog.ZIPFORMER_TWO_PASS else SpeechModelCatalog.ZIPFORMER)
+            SpeechModelCatalog.TWO_PASS)
     }
 }
