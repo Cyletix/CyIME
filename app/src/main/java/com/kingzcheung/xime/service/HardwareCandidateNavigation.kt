@@ -2,7 +2,7 @@ package com.kingzcheung.xime.service
 
 import com.kingzcheung.xime.settings.InputProfile
 
-internal enum class HardwareCandidateKey { LEFT, RIGHT, UP, DOWN, SPACE, CANCEL }
+internal enum class HardwareCandidateKey { LEFT, RIGHT, UP, DOWN, SPACE, ENTER, DIGIT, CANCEL }
 
 /** A hardware selection belongs to one editor, language and displayed candidate source. */
 internal data class HardwareCandidateSnapshot(
@@ -78,7 +78,7 @@ internal sealed interface HardwareCandidateDecision {
     data object Cancel : HardwareCandidateDecision
     data object Consume : HardwareCandidateDecision
     data object Host : HardwareCandidateDecision
-    data object DefaultSpace : HardwareCandidateDecision
+    data object DefaultInput : HardwareCandidateDecision
 }
 
 /** Keeps display navigation separate from engine selection and ordinary English spacing. */
@@ -107,6 +107,7 @@ internal class HardwareCandidateNavigation {
         snapshot: HardwareCandidateSnapshot,
         engineHasInput: Boolean?,
         pageAtBoundary: Boolean = false,
+        digitIndex: Int? = null,
     ): HardwareCandidateDecision {
         val index = selectedIndex(snapshot)
         if (index == null) clear()
@@ -120,6 +121,17 @@ internal class HardwareCandidateNavigation {
             return if (hasInput) HardwareCandidateDecision.Cancel else HardwareCandidateDecision.Host
         }
         if (engineHasInput == null && uiHasComposition) return HardwareCandidateDecision.Consume
+        // Enter during composition keeps the established raw-input/reading commit.
+        if (key == HardwareCandidateKey.ENTER) return HardwareCandidateDecision.DefaultInput
+        if (key == HardwareCandidateKey.DIGIT) {
+            return when {
+                snapshot.words.isEmpty() -> HardwareCandidateDecision.DefaultInput
+                digitIndex != null && digitIndex in snapshot.words.indices ->
+                    HardwareCandidateDecision.Confirm(digitIndex, snapshot.presentation.association)
+                snapshot.presentation.association -> HardwareCandidateDecision.DefaultInput
+                else -> HardwareCandidateDecision.Consume
+            }
+        }
         val vertical = key == HardwareCandidateKey.UP || key == HardwareCandidateKey.DOWN
         val direction = if (key == HardwareCandidateKey.LEFT || key == HardwareCandidateKey.UP) -1 else 1
         if (vertical && !snapshot.presentation.association) {
@@ -132,11 +144,9 @@ internal class HardwareCandidateNavigation {
         }
         if (snapshot.words.isNotEmpty()) {
             if (key == HardwareCandidateKey.SPACE) {
-                // A regular English space is still a space. Only an explicit navigation
-                // selects a suggestion; native composition always confirms its highlighted word.
-                return if (!snapshot.presentation.association || index != null) {
-                    HardwareCandidateDecision.Confirm(index ?: 0, snapshot.presentation.association)
-                } else HardwareCandidateDecision.DefaultSpace
+                // Suggestions are number/click-only. A separator must never insert predicted text.
+                return if (snapshot.presentation.association) HardwareCandidateDecision.DefaultInput
+                    else HardwareCandidateDecision.Confirm(index ?: 0, false)
             }
             if (pageAtBoundary && !snapshot.presentation.association &&
                 ((direction < 0 && (index ?: 0) == 0 && snapshot.presentation.hasPreviousPage) ||
@@ -151,7 +161,7 @@ internal class HardwareCandidateNavigation {
         if (hasComposition) {
             return HardwareCandidateDecision.Consume
         }
-        return if (key == HardwareCandidateKey.SPACE) HardwareCandidateDecision.DefaultSpace
+        return if (key == HardwareCandidateKey.SPACE || key == HardwareCandidateKey.ENTER) HardwareCandidateDecision.DefaultInput
             else HardwareCandidateDecision.Host
     }
 }

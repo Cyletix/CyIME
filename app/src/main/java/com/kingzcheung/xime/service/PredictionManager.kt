@@ -43,6 +43,7 @@ class PredictionManager(
     }, deliver = onPredictionResult)
 
     val hasPendingPrediction: Boolean get() = latest.isPending
+    val requestRevision: Long get() = latest.revision
     val pendingRequest: StateFlow<Long> get() = latest.pendingRequest
 
     fun invalidatePendingPredictions(): Boolean = latest.invalidate()
@@ -63,6 +64,13 @@ class PredictionManager(
         _lastCommittedText = (_lastCommittedText + text).takeLast(MAX_CONTEXT_LENGTH)
     }
     
+    fun replaceCommittedText(text: String) {
+        _lastCommittedText = text.takeLast(MAX_CONTEXT_LENGTH)
+    }
+
+    fun matchesCommittedContext(textBeforeCursor: String): Boolean =
+        textBeforeCursor.takeLast(MAX_CONTEXT_LENGTH) == _lastCommittedText
+
     fun clearCommittedText() {
         _lastCommittedText = ""
     }

@@ -100,54 +100,7 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onAssociationSelect = { index ->
                 service.feedbackManager.performKeyPressEffect(view = view)
-                val cs = service.candidateState.value
-                val adjustedCandidates = if (cs.pendingEnglishText.isNotEmpty() && cs.englishReplaceSupported) {
-                    listOf(cs.pendingEnglishText) + cs.associationCandidates
-                } else {
-                    cs.associationCandidates
-                }
-                if (index >= 0 && index < adjustedCandidates.size) {
-                    val text = adjustedCandidates[index]
-                    val pendingEnglish = cs.pendingEnglishText
-                    if (pendingEnglish.isNotEmpty()) {
-                        // 英文直接上屏模式：编码已逐字落盘，选中候选词时需回删屏上编码再提交候选词。
-                        // 第 0 项即当前已键入文本本身（上屏确认），无需替换。
-                        if (index == 0 && text == pendingEnglish) {
-                            service.candidateState.value = service.candidateState.value.copy(
-                                pendingEnglishText = "",
-                                associationCandidates = emptyList()
-                            )
-                        } else {
-                            // 内部编辑器（快捷发送/工具面板）与宿主 InputConnection 统一走
-                            // service 层重定向，避免编码回删/替换作用到错误的屏上文本。
-                            var replaced = service.replaceBeforeCursor(pendingEnglish, text)
-                            if (!replaced) {
-                                // 光标位置与编码不对应（用户移动过光标）：放弃替换，
-                                // 候选词降级为直接追加上屏，避免误删用户文本。
-                                service.commitText(text)
-                            }
-                            FileLogger.d(
-                                XimeInputMethodService.TAG,
-                                "english candidate replace: replaced=$replaced, expected=${pendingEnglish.length} chars"
-                            )
-                            service.candidateState.value = service.candidateState.value.copy(
-                                pendingEnglishText = "",
-                                associationCandidates = emptyList()
-                            )
-                        }
-                    } else {
-                        // 单次联想模式（仅中文模式——英文 commitText 不触发推理，
-                        // 否则抑制标志会悬挂并吞掉下次切回中文后的首轮推理）：
-                        // 联想候选上屏前先置抑制标志——commitText 触发的下一轮自动推理
-                        // 被跳过并清空联想候选（只推理一次）。
-                        // 连续联想模式：不抑制，commitText 自动推理新联想（一直上屏一直推理）。
-                        if (!service.uiState.value.isAsciiMode && SettingsPreferences.isSingleAssociationMode(service)) {
-                            service.predictionManager.suppressNextPredictionOnce()
-                        }
-                        service.commitText(text)
-                        service.updateUI()
-                    }
-                }
+                service.keyRouter.selectAssociation(index)
             },
             onClearAssociation = {
                 // 清空英文联想候选，并结束英文输入态：pendingEnglish 清空后，

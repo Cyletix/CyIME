@@ -35,16 +35,16 @@ internal fun keyCodeToKey(keyCode: Int, isShifted: Boolean): String? {
         KeyEvent.KEYCODE_SPACE -> "space"
         KeyEvent.KEYCODE_ENTER -> "enter"
         KeyEvent.KEYCODE_DEL -> "delete"
-        KeyEvent.KEYCODE_0 -> "0"
-        KeyEvent.KEYCODE_1 -> "1"
-        KeyEvent.KEYCODE_2 -> "2"
-        KeyEvent.KEYCODE_3 -> "3"
-        KeyEvent.KEYCODE_4 -> "4"
-        KeyEvent.KEYCODE_5 -> "5"
-        KeyEvent.KEYCODE_6 -> "6"
-        KeyEvent.KEYCODE_7 -> "7"
-        KeyEvent.KEYCODE_8 -> "8"
-        KeyEvent.KEYCODE_9 -> "9"
+        KeyEvent.KEYCODE_0 -> if (isShifted) ")" else "0"
+        KeyEvent.KEYCODE_1 -> if (isShifted) "!" else "1"
+        KeyEvent.KEYCODE_2 -> if (isShifted) "@" else "2"
+        KeyEvent.KEYCODE_3 -> if (isShifted) "#" else "3"
+        KeyEvent.KEYCODE_4 -> if (isShifted) "$" else "4"
+        KeyEvent.KEYCODE_5 -> if (isShifted) "%" else "5"
+        KeyEvent.KEYCODE_6 -> if (isShifted) "^" else "6"
+        KeyEvent.KEYCODE_7 -> if (isShifted) "&" else "7"
+        KeyEvent.KEYCODE_8 -> if (isShifted) "*" else "8"
+        KeyEvent.KEYCODE_9 -> if (isShifted) "(" else "9"
         KeyEvent.KEYCODE_COMMA -> if (isShifted) "<" else ","
         KeyEvent.KEYCODE_PERIOD -> if (isShifted) ">" else "."
         KeyEvent.KEYCODE_MINUS -> if (isShifted) "_" else "-"
@@ -77,5 +77,15 @@ internal fun hardwareCandidatePageDirection(
         KeyEvent.KEYCODE_COMMA -> if (options.pageCommaPeriod) -1 else 0
         KeyEvent.KEYCODE_PERIOD -> if (options.pageCommaPeriod) 1 else 0
         else -> 0
+    }
+}
+
+/** Only unshifted number-row keys select numbered candidates. */
+internal fun hardwareCandidateDigitIndex(keyCode: Int, shifted: Boolean): Int? {
+    if (shifted) return null
+    return when (keyCode) {
+        in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_1
+        KeyEvent.KEYCODE_0 -> 9
+        else -> null
     }
 }
