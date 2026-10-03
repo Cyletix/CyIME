@@ -1116,6 +1116,8 @@ fun KeyboardView(
                             onUnsupportedExit = { viewModel.showOverlay(OverlayRoute.SchemaList) },
                             unsupportedExitLabel = "选择输入方案",
                             expanded = state.handwritingExpanded,
+                            expandedControlsWidthDp = state.handwritingControlsWidthDp,
+                            expandedControlsOffsetX = state.handwritingControlsOffsetX,
                             expandedCandidateBar = renderCandidateBar,
                             panelBackgroundColor = keyboardBgColor,
                             sessionKey = state.inputSessionId,

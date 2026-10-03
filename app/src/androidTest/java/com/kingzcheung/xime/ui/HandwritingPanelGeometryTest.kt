@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
@@ -79,5 +80,41 @@ class HandwritingPanelGeometryTest {
         rule.onNodeWithTag("handwriting-key:collapse").performClick()
         rule.onNodeWithTag("handwriting-key:number").assertExists()
         assertEquals(original, rule.onNodeWithTag("handwriting-canvas").fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test fun fullscreenInkRetainsTheSavedFooterWidthAndHorizontalPosition() {
+        val offset = mutableStateOf(-200)
+        val width = mutableStateOf(360)
+        rule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(1f)) {
+                MaterialTheme { Box(Modifier.requiredSize(800.dp, 600.dp)) {
+                    HandwritingKeyboardLayout(expanded = true, bottomPaddingDp = 0,
+                        expandedControlsWidthDp = width.value, expandedControlsOffsetX = offset.value,
+                        modifier = Modifier.fillMaxSize(), expandedCandidateBar = {
+                            Box(Modifier.fillMaxWidth().height(44.dp).testTag("handwriting-test-candidates"))
+                        })
+                } }
+            }
+        }
+        for (x in listOf(-200, 0, 200, 1000)) {
+            rule.runOnIdle { offset.value = x }
+            rule.waitForIdle()
+            val canvas = rule.onNodeWithTag("handwriting-canvas").fetchSemanticsNode().boundsInRoot
+            val footer = rule.onNodeWithTag("handwriting-controls").fetchSemanticsNode().boundsInRoot
+            assertEquals(352f, footer.width, 1f)
+            assertEquals(canvas.center.x + x.coerceIn(-220, 220), footer.center.x, 1f)
+            assertTrue(canvas.width > footer.width * 2)
+            for (tag in listOf("handwriting-test-candidates", "handwriting-symbol-row", "handwriting-bottom-row")) {
+                val row = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+                assertEquals(footer.left, row.left, 1f); assertEquals(footer.right, row.right, 1f)
+            }
+            rule.onNodeWithTag("handwriting-key:collapse").assertIsDisplayed()
+        }
+        rule.runOnIdle { width.value = 1200 }
+        rule.waitForIdle()
+        val canvas = rule.onNodeWithTag("handwriting-canvas").fetchSemanticsNode().boundsInRoot
+        val footer = rule.onNodeWithTag("handwriting-controls").fetchSemanticsNode().boundsInRoot
+        assertEquals(canvas.left, footer.left, 1f); assertEquals(canvas.right, footer.right, 1f)
     }
 }

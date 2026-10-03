@@ -77,6 +77,8 @@ fun HandwritingKeyboardLayout(
     sessionKey: Long = 0,
     specialKeyTextColor: Color = Color.White,
     expanded: Boolean = false,
+    expandedControlsWidthDp: Int = 0,
+    expandedControlsOffsetX: Int = 0,
     panelBackgroundColor: Color = Color.Transparent,
     expandedCandidateBar: @Composable () -> Unit = {},
     language: InputLanguage = InputLanguage.CHINESE,
@@ -129,7 +131,12 @@ fun HandwritingKeyboardLayout(
     BoxWithConstraints(bodyModifier.fillMaxSize().testTag("handwriting-panel")
         .padding(start = 4.dp, end = 4.dp, bottom = (4 + bottomPaddingDp).dp)) {
         // Bound function-key width on wide panels; extra width belongs to writing and space.
-        val functionKeyWidth = (maxWidth / 7.5f).coerceAtMost(104.dp)
+        // Fullscreen applies to ink only. Keep the footer in the user's normal keyboard bounds.
+        val controlsWidth = if (expanded && expandedControlsWidthDp > 0)
+            (expandedControlsWidthDp.dp - 8.dp).coerceIn(1.dp, maxWidth.coerceAtLeast(1.dp)) else maxWidth
+        val travel = ((maxWidth - controlsWidth) / 2).value.coerceAtLeast(0f)
+        val controlsOffset = if (expanded) expandedControlsOffsetX.toFloat().coerceIn(-travel, travel).dp else 0.dp
+        val functionKeyWidth = (controlsWidth / 7.5f).coerceAtMost(104.dp)
         val footerHeight = if (expanded) 52.dp.coerceAtMost(maxHeight / 3) else maxHeight / 5
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
@@ -169,6 +176,9 @@ fun HandwritingKeyboardLayout(
                     }
                 }
             }
+            Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.align(Alignment.TopCenter).absoluteOffset(x = controlsOffset).width(controlsWidth)
+                .testTag("handwriting-controls")) {
             if (expanded) Box(Modifier.fillMaxWidth().background(panelBackgroundColor)) { expandedCandidateBar() }
             if (expanded) {
                 Row(Modifier.fillMaxWidth().height(footerHeight).background(functionRowBackground)
@@ -192,6 +202,8 @@ fun HandwritingKeyboardLayout(
                         if (special) specialKeyTextColor else keyTextColor,
                         (if (action == "space") Modifier.weight(1f) else Modifier.width(functionKeyWidth)).fillMaxHeight())
                 }
+            }
+            } // constrained controls
             }
         }
     }

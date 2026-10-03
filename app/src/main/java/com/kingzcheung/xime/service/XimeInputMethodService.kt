@@ -1566,6 +1566,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     darkMode = state.darkMode,
                                     themeId = state.themeId,
                                     handwritingExpanded = handwritingExpanded,
+                                    handwritingControlsWidthDp = protectedSize.width,
+                                    handwritingControlsOffsetX = if (state.isFloatingMode) state.floatingOffsetX else protectedSize.offsetX,
                                     keyboardHeightDp = effectiveKeyboardHeight,
                                     keyboardWidthDp = if (handwritingExpanded) screenWidthDp else protectedSize.width,
                                     keyboardBottomPaddingDp = contentBottomPaddingDp,
