@@ -42,4 +42,23 @@ internal fun clipboardCards(text: List<ClipboardItem>, images: List<ClipboardIma
         .distinctBy { it.key }.filter { clipboardMatches(it, filter) }
         .sortedWith(compareByDescending<ClipboardCard> { it.key in pinned }.thenByDescending { it.timestamp })
 
+/** Text pins live in Room; the board preferences retain only image identities. */
+internal fun clipboardPinnedKeys(text: List<ClipboardItem>, storedPins: Set<String>,
+    pendingTextPins: Map<Long, Boolean> = emptyMap()): Set<String> = buildSet {
+    addAll(storedPins.filter { it.startsWith("image:") })
+    text.forEach { item ->
+        if (pendingTextPins[item.id] ?: item.isPinned) add("text:${item.id}")
+    }
+}
+
+/** Keep immediate feedback until the observed database state acknowledges the change. */
+internal fun pendingClipboardTextPins(text: List<ClipboardItem>, pending: Map<Long, Boolean>): Map<Long, Boolean> {
+    val stored = text.associate { it.id to it.isPinned }
+    return pending.filter { (id, pinned) -> id in stored && stored[id] != pinned }
+}
+
+internal fun legacyClipboardTextPinIds(storedPins: Set<String>): Set<Long> = storedPins
+    .filter { it.startsWith("text:") }.mapNotNull { it.removePrefix("text:").toLongOrNull() }
+    .filter { it > 0 }.toSet()
+
 internal fun clipboardColumnCount(widthDp: Float): Int = (widthDp / 160f).toInt().coerceIn(1, 5)

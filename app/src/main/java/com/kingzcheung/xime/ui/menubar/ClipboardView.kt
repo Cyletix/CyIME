@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.menubar
 
+import com.kingzcheung.xime.ui.keyboard.keyboardPanelBackground
+import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.frostedKeyColor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -142,7 +145,7 @@ fun ClipboardView(
         selectedIds = emptySet()
     }
 
-    Box(modifier.fillMaxSize().background(backgroundColor)) {
+    Box(modifier.fillMaxSize().keyboardPanelBackground(backgroundColor)) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
@@ -499,12 +502,17 @@ fun LongPressMenuOverlay(
     textColor: Color,
     onDismiss: () -> Unit,
     menuItems: List<LongPressMenuEntry>,
+    preview: (@Composable () -> Unit)? = null,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    val cardColor = frostedKeyColor(contentBgColor, textColor, LocalKeyboardInputPreferences.current.frostedGlass)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().testTag("clipboard-item-menu")) {
+        val menuWidth = (104.dp * LocalDensity.current.fontScale.coerceAtLeast(1f))
+            .coerceAtLeast(maxWidth / 3).coerceAtMost(maxWidth / 2)
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(backgroundColor)
+                .keyboardPanelBackground(backgroundColor)
+                .testTag("clipboard-item-menu-dismiss")
                 .clickable(onClick = onDismiss)
         )
 
@@ -517,33 +525,33 @@ fun LongPressMenuOverlay(
         ) {
             Box(
                 modifier = Modifier
-                    .weight(if (isLeftColumn) 2f else 1f)
+                    .then(if (isLeftColumn) Modifier.weight(1f) else Modifier.width(menuWidth))
                     .fillMaxHeight(),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLeftColumn) {
-                    ContentCard(
+                    if (preview != null) preview() else ContentCard(
                         text = text,
-                        bgColor = contentBgColor,
+                        bgColor = cardColor,
                         textColor = textColor
                     )
                 } else {
-                    MenuCard(menuItems = menuItems, cardBgColor = contentBgColor, onDismiss = onDismiss)
+                    MenuCard(menuItems = menuItems, cardBgColor = cardColor, onDismiss = onDismiss)
                 }
             }
 
             Box(
                 modifier = Modifier
-                    .weight(if (isLeftColumn) 1f else 2f)
+                    .then(if (isLeftColumn) Modifier.width(menuWidth) else Modifier.weight(1f))
                     .fillMaxHeight(),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLeftColumn) {
-                    MenuCard(menuItems = menuItems, cardBgColor = contentBgColor, onDismiss = onDismiss)
+                    MenuCard(menuItems = menuItems, cardBgColor = cardColor, onDismiss = onDismiss)
                 } else {
-                    ContentCard(
+                    if (preview != null) preview() else ContentCard(
                         text = text,
-                        bgColor = contentBgColor,
+                        bgColor = cardColor,
                         textColor = textColor
                     )
                 }
@@ -559,7 +567,7 @@ private fun ContentCard(
     textColor: Color,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("clipboard-item-preview"),
         shape = RoundedCornerShape(8.dp),
         color = bgColor
     ) {
@@ -587,7 +595,7 @@ private fun MenuCard(
     // 操作菜单：高度随内容自适应并被列表区高度约束，超出时整卡可滚动，
     // 保证「删除」等最后一项在任何键盘高度下都能点到
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("clipboard-item-actions"),
         shape = RoundedCornerShape(12.dp),
         color = cardBgColor
     ) {
@@ -629,7 +637,8 @@ fun LongPressMenuItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 11.dp),
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -638,7 +647,7 @@ fun LongPressMenuItem(
             tint = tint,
             modifier = Modifier.size(18.dp)
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = label,
             color = tint,

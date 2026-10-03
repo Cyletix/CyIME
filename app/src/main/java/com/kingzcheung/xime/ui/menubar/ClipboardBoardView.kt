@@ -2,24 +2,30 @@ package com.kingzcheung.xime.ui.menubar
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.focused
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -29,6 +35,10 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import coil.compose.AsyncImage
 import com.kingzcheung.xime.clipboard.*
 import com.kingzcheung.xime.ui.keyboard.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+
+private data class ClipboardItemMenuAnchor(val card: ClipboardCard, val isLeftColumn: Boolean)
 
 @Composable
 internal fun ConnectedClipboardBoard(
@@ -44,18 +54,46 @@ internal fun ConnectedClipboardBoard(
     val images by store.images.collectAsState()
     val failure by store.pasteFailure.collectAsState()
     val photoAccess by store.photoAccess.collectAsState()
-    var pins by remember { mutableStateOf(prefs.getStringSet("pins", emptySet()).orEmpty().toSet()) }
+    var storedPins by remember { mutableStateOf(prefs.getStringSet("pins", emptySet()).orEmpty().toSet()) }
+    var pendingTextPins by remember { mutableStateOf(emptyMap<Long, Boolean>()) }
+    var pendingPinJobs by remember { mutableStateOf(emptyMap<Long, Job>()) }
+    val scope = rememberCoroutineScope()
+    val pins = clipboardPinnedKeys(textItems, storedPins, pendingTextPins)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { store.refresh() }
     LaunchedEffect(Unit) { store.refresh() }
+    LaunchedEffect(textItems, pendingPinJobs) {
+        val inFlight = pendingTextPins.filterKeys { it in pendingPinJobs }
+        val completed = pendingTextPins.filterKeys { it !in pendingPinJobs }
+        pendingTextPins = inFlight + pendingClipboardTextPins(textItems, completed)
+    }
     ClipboardBoardView(textItems, images, initialImages, expanded, pins, photoAccess, failure,
         onBack, onQuickSend, onSelectText, onImageSelect, onSplit, onAddQuick,
         onPinsChange = { updated ->
-            pins = updated
-            prefs.edit().putStringSet("pins", updated).apply()
+            val changedTextPins = ((pins - updated) + (updated - pins)).mapNotNull { key ->
+                key.takeIf { it.startsWith("text:") }?.removePrefix("text:")?.toLongOrNull()
+                    ?.let { id -> id to (key in updated) }
+            }.toMap()
+            pendingTextPins = pendingTextPins + changedTextPins
+            storedPins = updated.filterTo(mutableSetOf()) { it.startsWith("image:") }
+            synchronized(prefs) {
+                val unmigratedTextPins = prefs.getStringSet("pins", emptySet()).orEmpty()
+                    .filterTo(mutableSetOf()) { it.startsWith("text:") }
+                prefs.edit().putStringSet("pins", storedPins + unmigratedTextPins).apply()
+            }
             val manager = ClipboardManager.getInstance(context)
-            textItems.forEach { item ->
-                val pinned = "text:${item.id}" in updated
-                if (item.isPinned != pinned) manager.setClipboardPinned(item.id, pinned)
+            changedTextPins.forEach { (id, pinned) ->
+                val job = manager.setClipboardPinned(id, pinned)
+                pendingPinJobs = pendingPinJobs + (id to job)
+                scope.launch {
+                    job.join()
+                    if (pendingPinJobs[id] === job) {
+                        if (job.isCancelled) {
+                            pendingTextPins = pendingTextPins - id
+                            Toast.makeText(context, "无法保存固定状态，请重试", Toast.LENGTH_SHORT).show()
+                        }
+                        pendingPinJobs = pendingPinJobs - id
+                    }
+                }
             }
         },
         onRemove = { cards ->
@@ -87,7 +125,7 @@ internal fun ClipboardBoardView(
     var menu by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var selecting by remember { mutableStateOf(false) }
-    var itemMenu by remember { mutableStateOf<ClipboardCard?>(null) }
+    var itemMenu by remember { mutableStateOf<ClipboardItemMenuAnchor?>(null) }
     var deleting by remember { mutableStateOf<List<ClipboardCard>?>(null) }
     val all = remember(textItems, images, pins) { clipboardCards(textItems, images, ClipboardFilter.ALL, pins) }
     val cards = remember(all, filter) { all.filter { clipboardMatches(it, filter) } }
@@ -96,15 +134,14 @@ internal fun ClipboardBoardView(
     var focusedKey by remember(keyboard?.active, filter) { mutableStateOf<String?>(null) }
     val focused = focusedKey?.takeIf { key -> cards.any { it.key == key } } ?: cards.firstOrNull()?.key
     val gridState = rememberLazyStaggeredGridState()
+    LaunchedEffect(filter) { gridState.scrollToItem(0) }
     DisposableEffect(keyboard) { onDispose { keyboard?.attach(null) } }
-    BoxWithConstraints(modifier.fillMaxSize().background(colors.surface).testTag("clipboard-board")) {
+    BoxWithConstraints(modifier.fillMaxSize().keyboardPanelBackground(colors.surface).testTag("clipboard-board")) {
+        val boardWidthPx = constraints.maxWidth
         val columns = clipboardColumnCount(maxWidth.value)
-        val groups = listOf("固定" to cards.filter { it.key in pins }, "最近记录" to cards.filterNot { it.key in pins })
         val gridKeys = buildList {
             if (failure != null) add("failure")
-            groups.forEach { (title, group) -> if (group.isNotEmpty()) {
-                add("section:$title"); addAll(group.map { it.key })
-            } }
+            addAll(cards.map { it.key })
         }
         LaunchedEffect(focused, keyboard?.active, gridKeys) {
             if (keyboard?.active == true) {
@@ -135,55 +172,65 @@ internal fun ClipboardBoardView(
         }
 
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ToolIcon(if (selecting) Icons.Default.Close else Icons.AutoMirrored.Filled.ArrowBack,
-                    if (selecting) "退出多选" else "返回键盘", { if (selecting) { selecting = false; selected = emptySet() } else onBack() })
-                Text(if (selecting) "已选 ${selected.size}" else "剪贴板", color = colors.onSurface,
-                    fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().heightIn(min = 24.dp).clipboardPanelExpandGesture()
+                .testTag("clipboard-controls").padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically) {
                 if (selecting) {
-                    ToolIcon(Icons.Default.PushPin, "固定所选", { onPinsChange(pins + selected); selecting = false; selected = emptySet() }, "clipboard-pin")
-                    ToolIcon(Icons.Default.DeleteOutline, "删除所选", { deleting = all.filter { it.key in selected } }, "clipboard-delete")
+                    CompactClipboardAction(Icons.Default.Close, "退出多选", {
+                        selecting = false
+                        selected = emptySet()
+                    }, "clipboard-exit-selection")
+                    Text("已选 ${selected.size}", color = colors.onSurface,
+                        fontSize = 13.sp, lineHeight = 18.sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    CompactClipboardAction(Icons.Default.PushPin, "固定所选", {
+                        onPinsChange(pins + selected)
+                        selecting = false
+                        selected = emptySet()
+                    }, "clipboard-pin")
+                    CompactClipboardAction(Icons.Default.DeleteOutline, "删除所选",
+                        { deleting = all.filter { it.key in selected } }, "clipboard-delete")
                 } else {
-                    ToolIcon(if (expanded) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
-                        if (expanded) "收起" else "展开", { expansion?.setExpanded(!expanded) }, "clipboard-expand")
-                    ToolIcon(Icons.Default.MoreHoriz, "更多操作", { menu = !menu }, "clipboard-more")
-                }
-            }
-            HorizontalDivider(color = colors.outlineVariant)
-            Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture().horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ClipboardFilter.entries.forEach { item ->
-                    ToolTab(item.label, filter == item, { filter = item }, Modifier.testTag("clipboard-filter:${item.name}"))
-                }
-            }
-            LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.weight(1f).fillMaxWidth().testTag("clipboard-records"),
-                state = gridState,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp), verticalItemSpacing = 10.dp) {
-                if (failure != null) item(span = StaggeredGridItemSpan.FullLine) {
-                    Column(Modifier.clip(RoundedCornerShape(16.dp)).background(colors.surfaceContainerHigh).padding(12.dp)) {
-                        Text("此输入框未接受图片，可尝试系统粘贴或分享。", color = colors.onSurface, fontSize = 14.sp)
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ToolTab("系统粘贴", false, onSystemPaste, Modifier.testTag("images-system-paste"))
-                            ToolTab("分享图片", false, { onShare(failure.image, failure.packageName) }, Modifier.testTag("images-share"))
+                    Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        ClipboardFilter.entries.forEach { item ->
+                            CompactClipboardFilter(item.label, filter == item, { filter = item },
+                                Modifier.testTag("clipboard-filter:${item.name}"))
                         }
                     }
+                    CompactClipboardAction(if (expanded) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                        if (expanded) "收起" else "展开", { expansion?.setExpanded(!expanded) }, "clipboard-expand")
+                    CompactClipboardAction(Icons.Default.MoreHoriz, "更多操作", { menu = !menu }, "clipboard-more")
                 }
-                if (cards.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
-                    Text("暂无${if (filter == ClipboardFilter.ALL) "剪贴板记录" else filter.label}，复制后会显示在这里。",
-                        Modifier.padding(vertical = 24.dp), color = colors.onSurfaceVariant, fontSize = 14.sp)
-                }
-                groups.forEach { (title, group) ->
-                    if (group.isNotEmpty()) item(key = "section:$title", span = StaggeredGridItemSpan.FullLine) {
-                        Text(title, color = colors.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+            Box(Modifier.weight(1f).fillMaxWidth().testTag("clipboard-records-region")
+                .clipboardCategorySwipe(!selecting && !menu && itemMenu == null && deleting == null) { delta ->
+                    filter = filter.afterSwipe(delta)
+                }) {
+                LazyVerticalStaggeredGrid(StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize().testTag("clipboard-records"),
+                    state = gridState,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalItemSpacing = 6.dp) {
+                    if (failure != null) item(key = "failure", span = StaggeredGridItemSpan.FullLine) {
+                        Column(Modifier.clip(RoundedCornerShape(16.dp)).background(colors.surfaceContainerHigh).padding(12.dp)) {
+                            Text("此输入框未接受图片，可尝试系统粘贴或分享。", color = colors.onSurface, fontSize = 14.sp)
+                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ToolTab("系统粘贴", false, onSystemPaste, Modifier.testTag("images-system-paste"))
+                                ToolTab("分享图片", false, { onShare(failure.image, failure.packageName) }, Modifier.testTag("images-share"))
+                            }
+                        }
                     }
-                    items(group, key = { it.key }) { card ->
+                    if (cards.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
+                        Text("暂无${if (filter == ClipboardFilter.ALL) "剪贴板记录" else filter.label}，复制后会显示在这里。",
+                            Modifier.padding(vertical = 24.dp), color = colors.onSurfaceVariant, fontSize = 14.sp)
+                    }
+                    items(cards, key = { it.key }) { card ->
                         val chosen = card.key in selected
+                        val pinned = card.key in pins
                         val keyboardFocused = keyboard?.active == true && card.key == focused
-                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                             .background(if (chosen || keyboardFocused) colors.secondaryContainer else colors.surfaceContainerHigh)
-                            .border(if (chosen || keyboardFocused) 2.dp else 1.dp, if (chosen || keyboardFocused) colors.primary else colors.outlineVariant, RoundedCornerShape(18.dp))
+                            .border(if (chosen || keyboardFocused) 2.dp else 1.dp, if (chosen || keyboardFocused) colors.primary else colors.outlineVariant, RoundedCornerShape(12.dp))
                             .semantics { this.focused = keyboardFocused }
                             .testTag("clipboard-card:${card.key}").combinedClickable(
                                 onClick = {
@@ -193,10 +240,17 @@ internal fun ClipboardBoardView(
                                         is ClipboardCard.Text -> onSelectText(card.item.text)
                                         is ClipboardCard.Image -> onSelectImage(card.item)
                                     }
-                                }, onLongClick = { itemMenu = card }, onLongClickLabel = "更多操作")) {
+                                }, onLongClick = {
+                                    val cell = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == card.key }
+                                    val isLeft = cell == null || cell.offset.x + cell.size.width / 2 <= boardWidthPx / 2
+                                    itemMenu = ClipboardItemMenuAnchor(card, isLeft)
+                                }, onLongClickLabel = "更多操作")) {
                             when (card) {
                                 is ClipboardCard.Text -> Text(card.item.text,
-                                    Modifier.fillMaxWidth().heightIn(min = 80.dp).padding(16.dp),
+                                    Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(
+                                        start = if (chosen) 26.dp else 8.dp,
+                                        end = if (pinned) 26.dp else 8.dp,
+                                        top = 8.dp, bottom = 8.dp),
                                     color = if (chosen || keyboardFocused) colors.onSecondaryContainer else colors.onSurface,
                                     fontSize = 16.sp, lineHeight = 23.sp, maxLines = if (expanded) 8 else 4, overflow = TextOverflow.Ellipsis)
                                 is ClipboardCard.Image -> {
@@ -208,12 +262,53 @@ internal fun ClipboardBoardView(
                                         }, modifier = Modifier.fillMaxWidth().aspectRatio(aspect))
                                 }
                             }
-                            if (chosen || card.key in pins) Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                                Icon(if (chosen) Icons.Default.Check else Icons.Default.PushPin, if (chosen) "已选" else "已固定",
-                                    Modifier.size(16.dp), tint = colors.onSurfaceVariant)
+                            if (pinned) {
+                                ClipboardCardBadge(Icons.Default.Lock, "已固定",
+                                    Modifier.align(Alignment.TopEnd).padding(4.dp), "clipboard-pin:${card.key}")
+                            }
+                            if (chosen) {
+                                ClipboardCardBadge(Icons.Default.Check, "已选",
+                                    Modifier.align(Alignment.TopStart).padding(4.dp), "clipboard-selected:${card.key}")
                             }
                         }
                     }
+                }
+                itemMenu?.let { anchor ->
+                    val card = anchor.card
+                    val actions = buildList {
+                        add(LongPressMenuEntry(Icons.Default.PushPin, if (card.key in pins) "取消固定" else "固定") {
+                            onPinsChange(if (card.key in pins) pins - card.key else pins + card.key)
+                        })
+                        if (card is ClipboardCard.Text) {
+                            add(LongPressMenuEntry(Icons.Default.ContentCut, "分词") { onSplit(card.item.text, card.item.id) })
+                            add(LongPressMenuEntry(Icons.Outlined.StarBorder, "快捷") { onAddQuick(card.item.id) })
+                        }
+                        add(LongPressMenuEntry(Icons.Default.DoneAll, "多选") {
+                            selecting = true
+                            selected = setOf(card.key)
+                        })
+                        add(LongPressMenuEntry(Icons.Default.DeleteOutline, "删除", colors.error) { deleting = listOf(card) })
+                    }
+                    LongPressMenuOverlay(
+                        text = (card as? ClipboardCard.Text)?.item?.text.orEmpty(),
+                        isLeftColumn = anchor.isLeftColumn,
+                        backgroundColor = colors.surface,
+                        contentBgColor = colors.surfaceContainerHigh,
+                        textColor = colors.onSurface,
+                        onDismiss = { itemMenu = null },
+                        menuItems = actions,
+                        preview = if (card is ClipboardCard.Image) ({
+                            Surface(
+                                Modifier.fillMaxWidth().heightIn(max = 240.dp).testTag("clipboard-item-preview"),
+                                shape = RoundedCornerShape(8.dp),
+                                color = frostedKeyColor(colors.surfaceContainerHigh, colors.onSurface,
+                                    LocalKeyboardInputPreferences.current.frostedGlass),
+                            ) {
+                                AsyncImage(card.item.uri, card.item.label, contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp, max = 240.dp).padding(10.dp))
+                            }
+                        }) else null,
+                    )
                 }
             }
         }
@@ -226,21 +321,6 @@ internal fun ClipboardBoardView(
             onPullRemote?.let { action -> TextButton({ menu = false; action() }) { Text("同步") } }
             TextButton({ deleting = all.filterNot { it.key in pins }; menu = false }, Modifier.testTag("clipboard-clear")) { Text("清空未固定") }
             TextButton({ menu = false }) { Text("取消") }
-        }
-        itemMenu?.let { card ->
-            BoardActionOverlay({ itemMenu = null }) {
-                Text("记录操作", color = colors.onSurface, fontSize = 18.sp)
-                TextButton({ onPinsChange(if (card.key in pins) pins - card.key else pins + card.key); itemMenu = null }) {
-                    Text(if (card.key in pins) "取消固定" else "固定")
-                }
-                if (card is ClipboardCard.Text) {
-                    TextButton({ itemMenu = null; onSplit(card.item.text, card.item.id) }) { Text("分词") }
-                    TextButton({ onAddQuick(card.item.id); itemMenu = null }) { Text("加入快捷发送") }
-                }
-                TextButton({ selecting = true; selected = setOf(card.key); itemMenu = null }) { Text("多选") }
-                TextButton({ deleting = listOf(card); itemMenu = null }) { Text("删除", color = colors.error) }
-                TextButton({ itemMenu = null }) { Text("取消") }
-            }
         }
         deleting?.let { records ->
             BoardActionOverlay({ deleting = null }) {
@@ -255,10 +335,51 @@ internal fun ClipboardBoardView(
 }
 
 @Composable
+private fun CompactClipboardFilter(label: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    val bringIntoView = remember { BringIntoViewRequester() }
+    LaunchedEffect(isSelected) { if (isSelected) bringIntoView.bringIntoView() }
+    Box(modifier.bringIntoViewRequester(bringIntoView).heightIn(min = 20.dp).clip(RoundedCornerShape(6.dp))
+        .background(if (isSelected) frostedKeyColor(colors.secondaryContainer, colors.onSurface, glass) else Color.Transparent)
+        .semantics { selected = isSelected }
+        .clickable(role = Role.Tab, onClick = onClick)
+        .padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+        Text(label, color = if (isSelected) colors.onSecondaryContainer else colors.onSurfaceVariant,
+            fontSize = 13.sp, lineHeight = 18.sp, fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+            maxLines = 1)
+    }
+}
+
+@Composable
+private fun CompactClipboardAction(icon: ImageVector, description: String, onClick: () -> Unit, tag: String) {
+    Box(Modifier.size(width = 28.dp, height = 20.dp).clip(RoundedCornerShape(6.dp))
+        .testTag(tag).clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(icon, description, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ClipboardCardBadge(icon: ImageVector, description: String, modifier: Modifier, tag: String) {
+    val colors = MaterialTheme.colorScheme
+    Box(modifier.clip(RoundedCornerShape(4.dp))
+        .background(frostedKeyColor(colors.surfaceContainerHigh, colors.onSurface,
+            LocalKeyboardInputPreferences.current.frostedGlass)).padding(2.dp)) {
+        Icon(icon, description, Modifier.size(16.dp).testTag(tag), tint = colors.onSurface)
+    }
+}
+
+@Composable
 private fun BoxScope.BoardActionOverlay(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Box(Modifier.matchParentSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = .4f)).clickable(onClick = onDismiss))
+    val colors = MaterialTheme.colorScheme
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    Box(Modifier.matchParentSize().background(colors.scrim.copy(alpha = .4f)).clickable(onClick = onDismiss))
     Surface(Modifier.align(Alignment.Center).padding(12.dp).widthIn(max = 360.dp).fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), content = content)
+        shape = RoundedCornerShape(22.dp),
+        color = if (glass.enabled) Color.Transparent else colors.surfaceContainerHigh,
+        tonalElevation = 0.dp) {
+        Column(Modifier
+            .then(if (glass.enabled) Modifier.keyboardPanelBackground(colors.surface, glass) else Modifier)
+            .verticalScroll(rememberScrollState()).padding(16.dp), content = content)
     }
 }
