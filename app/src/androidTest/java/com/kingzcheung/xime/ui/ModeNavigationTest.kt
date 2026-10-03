@@ -226,16 +226,16 @@ class ModeNavigationTest {
 
     @Test fun japaneseFlickKeepsItsKeysAndOpensCommonSymbolsInOneTap() {
         mount("japanese_kana")
-        val symbolBounds = rule.onNodeWithText("記号").fetchSemanticsNode().boundsInRoot
+        val symbolBounds = rule.onNodeWithText("!@#").fetchSemanticsNode().boundsInRoot
         val numbersBounds = rule.onNodeWithText("123").fetchSemanticsNode().boundsInRoot
-        rule.onNodeWithText("記号").performTouchInput { click() }
+        rule.onNodeWithText("!@#").performTouchInput { click() }
         rule.onNodeWithText("常用").assertIsDisplayed()
         rule.onNodeWithText("、").assertIsDisplayed()
         rule.onNodeWithText("ー").assertIsDisplayed()
         rule.onNodeWithText("符号").assertDoesNotExist()
         label(1, "あいう")
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput { click() }
-        same(symbolBounds, rule.onNodeWithText("記号").fetchSemanticsNode().boundsInRoot)
+        same(symbolBounds, rule.onNodeWithText("!@#").fetchSemanticsNode().boundsInRoot)
         same(numbersBounds, rule.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
         rule.runOnIdle { assertTrue(keys.isEmpty()) }
         save("japanese-flick")
