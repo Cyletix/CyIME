@@ -48,6 +48,17 @@ class HandwritingToggleTest {
         assertEquals(KeyboardLayoutState.T9Pinyin, vm.keyboardState.value)
     }
 
+    @Test fun englishHandwritingReturnSurvivesEnglishEngineRefresh() {
+        val vm = model()
+        vm.setKeyboardState(KeyboardLayoutState.English)
+        vm.enterTemporaryHandwriting()
+        vm.dispatch(KeyboardDispatchAction.AsciiModeChanged(true, "japanese"))
+        assertEquals(KeyboardPage.Main(MainType.HANDWRITING), vm.page.value)
+        assertTrue(vm.exitTemporaryHandwriting())
+        assertEquals(KeyboardLayoutState.English, vm.keyboardState.value)
+        assertEquals(KeyboardPage.Main(MainType.FULL), vm.page.value)
+    }
+
     @Test fun handwritingOpenedFromToolOverlayReturnsToKeyboard() {
         for (route in listOf(OverlayRoute.Clipboard(0), OverlayRoute.Edit)) {
             val vm = model()

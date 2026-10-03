@@ -22,10 +22,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.handwriting.HandwritingCandidate
 import com.kingzcheung.xime.handwriting.HandwritingEngine
+import com.kingzcheung.xime.handwriting.HandwritingLanguages
 import com.kingzcheung.xime.handwriting.HandwritingStrokeFx
 import com.kingzcheung.xime.handwriting.OverlappedHandwritingRecognizer
 import com.kingzcheung.xime.handwriting.StrokePoint
@@ -57,10 +59,13 @@ fun HandwritingLookupKeyboard(
     modifier: Modifier = Modifier,
 ) {
     val language = uiState.inputProfile.language
-    if (!com.kingzcheung.xime.handwriting.HandwritingLanguages.supports(language)) {
+    val recognitionLanguage = HandwritingLanguages.recognitionLanguageForKeyboard(language)
+    if (recognitionLanguage == null) {
         HandwritingUnavailable(language, modifier, onExit)
         return
     }
+    // A cleared board or a different typing session must own fresh ink, jobs and recognizer cache.
+    key(uiState.inputSessionId, language, clearSignal) {
     KeyboardKeySpacingScope(modifier, columns = 6f) { bodyModifier ->
     val strokes = remember { mutableStateListOf<List<StrokePoint>>() }
     val inkColor = rememberHandwritingInk(keyboardBgColor)
@@ -76,7 +81,7 @@ fun HandwritingLookupKeyboard(
     val recognizer = remember { OverlappedHandwritingRecognizer() }
     var recognizeJob by remember { mutableStateOf<Job?>(null) }
 
-    LaunchedEffect(language) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context, language) } }
+    LaunchedEffect(language) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context, recognitionLanguage) } }
 
     /** 视觉消失调度：450ms 后 gonePrefix 推进到 target（笔画数据保留，渲染层跳过）。 */
     fun scheduleGone(target: Int) {
@@ -103,15 +108,6 @@ fun HandwritingLookupKeyboard(
             }
         }
     }
-    LaunchedEffect(clearSignal) {
-        strokes.clear()
-        fadingPrefix = 0
-        gonePrefix = 0
-        settledCount = 0
-        dragVersion++
-        recognizer.reset()
-    }
-
     /**
      * 叠写识别调度（与主手写键盘同源）：DP 切分 + 笔间间隔时间偏置。
      * 查词上报最后一段候选（正在写的字）；前面段（已完成字，需存在换字停顿）
@@ -126,7 +122,7 @@ fun HandwritingLookupKeyboard(
             val gaps = HandwritingStrokeFx.windowGaps(window)
             val result = withContext(Dispatchers.Default) {
                 recognizer.recognize(pairs, gaps,
-                    predictFn = { points, topK -> HandwritingEngine.predict(points, topK, language) })
+                    predictFn = { points, topK -> HandwritingEngine.predict(points, topK, recognitionLanguage) })
             }
             if (!isActive) return@launch
             if (result.segments.isNotEmpty()) {
@@ -159,6 +155,7 @@ fun HandwritingLookupKeyboard(
     ) {
         Box(Modifier
             .fillMaxSize()
+            .testTag("handwriting-lookup-canvas")
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -216,6 +213,9 @@ fun HandwritingLookupKeyboard(
             }
         }
 
+        if (language != recognitionLanguage) Text("中文手写", color = keyTextColor.copy(alpha = 0.6f),
+            modifier = Modifier.align(Alignment.TopStart).padding(12.dp).testTag("handwriting-language"))
+
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(3f).fillMaxWidth())
             Row(
@@ -229,6 +229,7 @@ fun HandwritingLookupKeyboard(
                 ActionKeyButton("回车", { onKeyPress("enter") }, specialKeyBgColor, keyTextColor, Modifier.weight(1f), onPress = { onButtonFeedback?.invoke("enter") }, shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
             }
         }
+    }
     }
     }
 }
