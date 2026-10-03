@@ -132,8 +132,12 @@ object RimeConfigHelper {
         copyAssetsToRimeDir(context, rimeDir)
         com.kingzcheung.xime.settings.BundledRimeSync.install(
             rimeDir, File(context.filesDir, "rime-upgrade-backups"),
-            context.assets.open("rime-bundled-manifest.tsv").bufferedReader().use { it.readText() },
+            com.kingzcheung.xime.model.CandidateModelAssets.filterBundledManifest(context,
+                context.assets.open("rime-bundled-manifest.tsv").bufferedReader().use { it.readText() }),
         ) { context.assets.open(it) }
+        // Optional downloads become available at the normal engine initialization boundary.
+        // Never restart or replay an active editor merely because a model download finished.
+        com.kingzcheung.xime.model.CandidateModelAssets.installAvailable(context)
         com.kingzcheung.xime.settings.ChineseSchemas.installOptionalLayoutSchemas(context, rimeDir)
         check(installing.delete()) { "Cannot finish bundled asset installation" }
         com.kingzcheung.xime.settings.CustomKeyboardLayouts.enableMeasuredCorrection(context)

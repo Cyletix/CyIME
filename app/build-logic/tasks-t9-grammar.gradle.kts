@@ -49,4 +49,5 @@ val prepareT9Grammar by tasks.registering {
         cached.copyTo(File(output, grammarName), overwrite = true)
     }
 }
-tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareT9Grammar) }
+// Kept as an explicit preparation task for native replay/development. The grammar
+// is an optional download in both APK editions, not a prerequisite for packaging.

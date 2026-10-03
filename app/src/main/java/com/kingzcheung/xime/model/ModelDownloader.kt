@@ -20,6 +20,17 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
+/** GitHub's immutable release-asset endpoint otherwise returns JSON rather than model bytes. */
+internal fun modelDownloadRequest(url: String): Request.Builder {
+    val builder = Request.Builder().url(url)
+    val parsed = builder.build().url
+    if (parsed.host == "api.github.com" &&
+        Regex("/repos/[^/]+/[^/]+/releases/assets/[0-9]+").matches(parsed.encodedPath)) {
+        builder.header("Accept", "application/octet-stream")
+    }
+    return builder
+}
+
 object ModelDownloader {
 
     private const val TAG = "ModelDownloader"
@@ -101,7 +112,7 @@ object ModelDownloader {
         targetFile: File,
         onProgress: (Float) -> Unit = {}
     ) {
-        val request = Request.Builder().url(url).build()
+        val request = modelDownloadRequest(url).build()
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
@@ -249,7 +260,7 @@ object ModelDownloader {
         val target = version ?: modelInfo.resolvedVersion()
         val url = target?.archiveUrl ?: target?.files?.firstOrNull()?.downloadUrl ?: return -1
         return try {
-            val request = Request.Builder().head().url(url).build()
+            val request = modelDownloadRequest(url).head().build()
             val response = client.newCall(request).execute()
             response.body?.contentLength() ?: -1
         } catch (e: Exception) {

@@ -440,6 +440,7 @@ private fun ModelsMarketTab(
 
     val categories = listOf(
         null to "全部",
+        ModelCategory.CANDIDATE to "候选增强",
         ModelCategory.PREDICTION to "联想",
         ModelCategory.HANDWRITING to "手写",
         ModelCategory.ASR to "语音",
@@ -1668,11 +1669,9 @@ private fun ModelVersionDownloadButton(
         }
 
         downloadState is ModelDownloadState.Error -> {
-            Text(
-                "下载失败",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
+            TextButton(onClick = onDownload) {
+                Text("重试", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
         }
 
         item.isDownloaded -> Text(
@@ -1781,6 +1780,7 @@ private fun schemeCategoryColors(tag: String?): Pair<Color, Color> {
 private fun modelCategoryColors(category: ModelCategory): Pair<Color, Color> {
     val scheme = MaterialTheme.colorScheme
     return when (category) {
+        ModelCategory.CANDIDATE -> scheme.primaryContainer to scheme.onPrimaryContainer
         ModelCategory.PREDICTION ->
             scheme.primaryContainer to scheme.onPrimaryContainer
         ModelCategory.HANDWRITING ->
@@ -1793,6 +1793,7 @@ private fun modelCategoryColors(category: ModelCategory): Pair<Color, Color> {
 }
 
 private fun modelCategoryIcon(category: ModelCategory): ImageVector = when (category) {
+    ModelCategory.CANDIDATE -> Icons.Default.AutoAwesome
     ModelCategory.PREDICTION -> Icons.Default.AutoAwesome
     ModelCategory.ASR -> Icons.Default.GraphicEq
     ModelCategory.HANDWRITING -> Icons.Outlined.Gesture
@@ -1831,6 +1832,7 @@ private fun pluginCategoryLabel(pluginType: String): String = when (pluginType) 
 }
 
 internal fun modelCategoryLabel(category: ModelCategory): String = when (category) {
+    ModelCategory.CANDIDATE -> "候选增强"
     ModelCategory.PREDICTION -> "联想"
     ModelCategory.ASR -> "语音"
     ModelCategory.HANDWRITING -> "手写"

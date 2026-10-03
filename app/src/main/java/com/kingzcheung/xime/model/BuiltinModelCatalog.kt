@@ -2,7 +2,7 @@ package com.kingzcheung.xime.model
 
 /** Versioned local catalog: downloads go directly to model publishers, without a market request. */
 object BuiltinModelCatalog {
-    val models = com.kingzcheung.xime.speech.SpeechModelCatalog.models + listOf(
+    val models = com.kingzcheung.xime.speech.SpeechModelCatalog.models + CandidateModelCatalog.models + listOf(
         ModelInfo("ochwpro", "手写模型", "本地手写识别模型。", ModelCategory.HANDWRITING,
             versions = listOf(ModelVersion(version = "v1.0", size = "6.7 MB",
                 files = listOf(

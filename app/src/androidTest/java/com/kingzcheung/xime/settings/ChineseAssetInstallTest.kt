@@ -41,6 +41,11 @@ class ChineseAssetInstallTest {
 
     @Test fun repeatedInstallRetainsMarketDictionaryAndRepairsOnlyMissingResources() {
         ChineseSchemas.installAssets(context, target)
+        val flypy14 = SchemaManager.discoverSchemas(context).first { it.schemaId == "double_pinyin_flypy_14jian" }
+        assertEquals(InputScheme.DOUBLE_PINYIN, flypy14.scheme)
+        assertEquals(InputLanguage.CHINESE, flypy14.language)
+        assertTrue(CyimeInputDefaults.visibleSchema(flypy14.schemaId, setOf(flypy14.schemaId)))
+        assertEquals(InputLayout.MERGED14, InputProfiles.describe(flypy14.schemaId).layout)
         val dictionary = File(target, "cn_dicts/tencent.dict.yaml")
         val market = "# personal dictionary replacement\n"
         dictionary.writeText(market)

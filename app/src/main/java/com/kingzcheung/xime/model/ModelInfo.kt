@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.model
 
 enum class ModelCategory {
+    CANDIDATE,
     PREDICTION,
     ASR,
     HANDWRITING,
