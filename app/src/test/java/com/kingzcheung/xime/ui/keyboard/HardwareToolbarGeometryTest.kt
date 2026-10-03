@@ -5,6 +5,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HardwareToolbarGeometryTest {
+    @Test fun candidateRoutingUsesTheSameVisibleSurfaceAsTheToolbar() {
+        for (width in listOf(336f, 600f, 1400f)) {
+            assertTrue(hardwareToolbarCanShowCandidates(width, 600f, HardwareToolbarPosition(), true))
+            assertTrue(hardwareToolbarCanShowCandidates(width, 600f, HardwareToolbarPosition(.5f, .4f), true))
+            for (side in listOf(0f, 1f)) {
+                assertTrue(!hardwareToolbarCanShowCandidates(width, 600f, HardwareToolbarPosition(side, .4f), true))
+                assertTrue(hardwareToolbarCanShowCandidates(width, 600f, HardwareToolbarPosition(side, 1f), true))
+                assertTrue(hardwareToolbarCanShowCandidates(width, 600f, HardwareToolbarPosition(side, .4f), false))
+            }
+        }
+        assertTrue(!hardwareToolbarCanShowCandidates(335f, 600f, HardwareToolbarPosition(), true))
+    }
     @Test fun defaultIsBottomCenteredWithinRealHost() {
         val geometry = hardwareToolbarGeometry(900, 600, 232, 56, 8)
         assertEquals(HardwareToolbarOffset(334f, 536f), geometry.offset(HardwareToolbarPosition()))

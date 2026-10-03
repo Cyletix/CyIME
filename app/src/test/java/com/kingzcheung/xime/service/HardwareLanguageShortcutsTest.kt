@@ -13,7 +13,7 @@ class HardwareLanguageShortcutsTest {
         s.down(key, time, repeat, ctrl, alt, meta, shifted, settings)
     @Test fun ctrlSpaceFiresOnceUntilRelease() {
         assertTrue(down(KEYCODE_SPACE, ctrl = true).switchLanguage)
-        assertEquals(HardwareShortcutResult(true, false), down(KEYCODE_SPACE, repeat = 1, ctrl = true))
+        assertEquals(HardwareShortcutResult(consume = true), down(KEYCODE_SPACE, repeat = 1, ctrl = true))
         assertTrue(s.up(KEYCODE_SPACE, 300, false, options).consume)
         assertTrue(down(KEYCODE_SPACE, ctrl = true).switchLanguage)
     }

@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.service
 
 import android.view.KeyEvent
+import com.kingzcheung.xime.settings.HardwareKeyboardOptions
 
 /** 物理键码 → 输入法按键名。 */
 internal fun keyCodeToKey(keyCode: Int, isShifted: Boolean): String? {
@@ -60,12 +61,21 @@ internal fun keyCodeToKey(keyCode: Int, isShifted: Boolean): String? {
     }
 }
 
-/** Paging shortcuts belong to the active candidate list; modifier chords keep their normal meaning. */
-internal fun hardwareCandidatePageDirection(keyCode: Int, hasInput: Boolean, modified: Boolean): Int {
+/** Paging reserves selected physical key pairs; [modified] excludes Shift so < and > share , and . */
+internal fun hardwareCandidatePageDirection(
+    keyCode: Int,
+    hasInput: Boolean,
+    modified: Boolean,
+    options: HardwareKeyboardOptions = HardwareKeyboardOptions(),
+): Int {
     if (!hasInput || modified) return 0
     return when (keyCode) {
-        KeyEvent.KEYCODE_MINUS, KeyEvent.KEYCODE_LEFT_BRACKET, KeyEvent.KEYCODE_COMMA -> -1
-        KeyEvent.KEYCODE_EQUALS, KeyEvent.KEYCODE_RIGHT_BRACKET, KeyEvent.KEYCODE_PERIOD -> 1
+        KeyEvent.KEYCODE_MINUS -> if (options.pageMinusEquals) -1 else 0
+        KeyEvent.KEYCODE_EQUALS -> if (options.pageMinusEquals) 1 else 0
+        KeyEvent.KEYCODE_LEFT_BRACKET -> if (options.pageBrackets) -1 else 0
+        KeyEvent.KEYCODE_RIGHT_BRACKET -> if (options.pageBrackets) 1 else 0
+        KeyEvent.KEYCODE_COMMA -> if (options.pageCommaPeriod) -1 else 0
+        KeyEvent.KEYCODE_PERIOD -> if (options.pageCommaPeriod) 1 else 0
         else -> 0
     }
 }

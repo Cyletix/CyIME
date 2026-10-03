@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.service
 
 import com.kingzcheung.xime.keyboard.HANDWRITING_SCHEMA_ID
+import com.kingzcheung.xime.keyboard.underlyingPage
 import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.rime.buildT9DisplayState
@@ -170,7 +171,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     }
 
     /** 在输入框模式向编辑器写入编码文本。 */
-    private fun showInputBoxComposition(ic: android.view.inputmethod.InputConnection, displayText: String) {
+    private fun showInputBoxComposition(ic: android.view.inputmethod.InputConnection?, displayText: String) {
+        // Android may detach the editor while a queued candidate snapshot is being delivered.
+        if (ic == null) return
         // 第二参数为 1：光标相对编码起始偏移 1 个字符，使光标落在编码末尾，
         // 避免传 displayText.length 时被 AOSP 钳制到整段文本末尾（光标跑到最右边）。
         // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
@@ -300,7 +303,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         val context = service
         service.serviceScope.launch(Dispatchers.IO) {
             val page = service.keyboardViewModel.page.value
-            val isHandwritingMode = (page as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
+            val isHandwritingMode = (page.underlyingPage() as? com.kingzcheung.xime.keyboard.KeyboardPage.Main)?.type == com.kingzcheung.xime.keyboard.MainType.HANDWRITING
             val engineSchemaId = service.rimeEngine.getCurrentSchema()
             // session 未就绪时 getCurrentSchema() 返回空串：用持久化方案兜底，
             // 避免空值覆盖已正确的 currentSchemaId/schemaName 导致键盘退化为全键盘

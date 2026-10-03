@@ -1,22 +1,19 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import android.graphics.Rect
-import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
@@ -39,7 +35,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.material3.Icon
@@ -57,6 +52,7 @@ import kotlin.math.floor
 import com.kingzcheung.xime.service.HardwareCursorAnchor
 
 private const val MAX_VISIBLE_CANDIDATES = 10
+internal val HardwareCandidateCornerRadius = 8.dp
 
 @Composable
 fun HardwareKeyboardCandidateBar(
@@ -81,6 +77,7 @@ fun HardwareKeyboardCandidateBar(
     surface: (@Composable () -> Modifier)? = null,
     bottomDocked: Boolean = false,
     onPreeditBoundsChanged: (Rect?) -> Unit = {},
+    showNumberLabels: Boolean = true,
 ) {
     val reportBounds by rememberUpdatedState(onBoundsChanged)
     val reportPreeditBounds by rememberUpdatedState(onPreeditBoundsChanged)
@@ -139,15 +136,10 @@ fun HardwareKeyboardCandidateBar(
         )
         val textWidth = candidates.take(MAX_VISIBLE_CANDIDATES).mapIndexed { index, text ->
             measurer.measure(AnnotatedString("${(index + 1) % 10} $text"),
-                TextStyle(fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily), softWrap = false).size.width
+                candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == highlightIndex), softWrap = false).size.width
         }.sum()
         val contentWidth = (with(density) { textWidth.toDp() } + (12 * candidates.size + 104).dp)
             .coerceIn(minOf(160.dp, maxCardWidth), maxCardWidth)
-        val preeditWidth = with(density) {
-            measurer.measure(AnnotatedString(displayText), TextStyle(fontSize = PreeditStyle.FontSize),
-                softWrap = false).size.width.toDp() + 16.dp
-        }.coerceIn(24.dp, maxCardWidth.coerceAtLeast(24.dp)).coerceAtMost(maxCardWidth)
-        val groupWidth = if (showCandidates) maxOf(contentWidth, preeditWidth) else preeditWidth
         val dockBounds = if (bottomDocked) hostPositionInWindow?.let { originInWindow ->
             avoidBoundsInWindow?.let { IntOffset(it.left - originInWindow.x, it.top - originInWindow.y) }
         } else null
@@ -155,30 +147,31 @@ fun HardwareKeyboardCandidateBar(
         val y = dockBounds?.let { (it.y - cardSize.height - marginPx).coerceAtLeast(marginPx) } ?: placement.y
         // This group has no painted background or pointer handler. Each visible surface reports
         // its own touch region, leaving the gap and the rest of the editor usable.
-        Column(Modifier.absoluteOffset { IntOffset(x, y) }.width(groupWidth)
+        Column(Modifier.absoluteOffset { IntOffset(x, y) }.widthIn(max = maxCardWidth)
             .heightIn(max = maxCardHeight).onSizeChanged { cardSize = it },
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (displayText.isNotEmpty()) {
-                val shape = RoundedCornerShape(10.dp)
-                Box(Modifier.width(preeditWidth).shadow(4.dp, shape).clip(shape)
+                val shape = RoundedCornerShape(4.dp)
+                // Let the displayed text and its real padding determine the width. A second
+                // text measurement can disagree with font resolution or pixel-rounded padding.
+                Box(Modifier.widthIn(min = minOf(24.dp, maxCardWidth), max = maxCardWidth)
+                    .clip(shape)
                     .then(surface?.invoke() ?: Modifier.background(preeditBackgroundColor))
-                    .border(1.dp, candidateTextColor.copy(alpha = 0.28f), shape)
                     .testTag("hardware-preedit-card")
                     .onGloballyPositioned { reportPreeditBounds(it.boundsInWindow().toAndroidBounds()) }) {
                     PreeditLabel(displayText, visuals.copy(preeditBackgroundColor = Color.Transparent),
-                        modifier = Modifier.fillMaxWidth())
+                        followTextTail = true)
                 }
             }
             if (showCandidates) {
-                val shape = RoundedCornerShape(24.dp)
-                Box(Modifier.width(contentWidth).shadow(8.dp, shape).clip(shape)
+                val shape = RoundedCornerShape(HardwareCandidateCornerRadius)
+                Box(Modifier.width(contentWidth).clip(shape)
                     .then(surface?.invoke() ?: Modifier.background(cardBackgroundColor))
-                    .border(1.dp, candidateTextColor.copy(alpha = 0.28f), shape)
                     .testTag("hardware-candidate-card")
                     .onGloballyPositioned { reportBounds(it.boundsInWindow().toAndroidBounds()) }
                     .padding(horizontal = 6.dp, vertical = 4.dp)) {
                     HardwareCandidateRow(candidates, comments, highlightIndex, hasPrevPage, hasNextPage,
-                        visuals, onCandidateSelect, onPrevious, onNext)
+                        visuals, onCandidateSelect, onPrevious, onNext, showNumberLabels)
                 }
             }
         }
@@ -190,10 +183,16 @@ private fun androidx.compose.ui.geometry.Rect.toAndroidBounds() = Rect(
 
 /** The exact same single-row renderer is used beside the caret and inside the dock. */
 @Composable
+internal fun hardwareCandidateRowHeight(): androidx.compose.ui.unit.Dp =
+    (candidateItemHeight(SettingsPreferences.getCandidateTextSize(LocalContext.current).sp) + 8.dp)
+        .coerceAtLeast(48.dp)
+
+@Composable
 internal fun HardwareCandidateRow(
     candidates: List<String>, comments: List<String>, highlightIndex: Int,
     hasPrevPage: Boolean, hasNextPage: Boolean, visuals: CandidateBarVisuals,
     onCandidateSelect: ((Int) -> Unit)?, onPrevious: (() -> Unit)?, onNext: (() -> Unit)?,
+    showNumberLabels: Boolean = true,
 ) {
     val context = LocalContext.current
     val shownComments = if (SettingsPreferences.showCandidateComments(context)) comments else emptyList()
@@ -202,15 +201,15 @@ internal fun HardwareCandidateRow(
             visuals = visuals,
             callbacks = CandidateBarCallbacks(onCandidateSelect = { onCandidateSelect?.invoke(it) }),
             fontSize = SettingsPreferences.getCandidateTextSize(context).sp,
-            highlightIndex = highlightIndex, showNumberLabels = true, itemSpacing = 8.dp,
+            highlightIndex = highlightIndex, showNumberLabels = showNumberLabels, itemSpacing = 8.dp,
             modifier = Modifier.weight(1f).padding(vertical = 4.dp))
-        if (onPrevious != null && (hasPrevPage || highlightIndex > 0)) {
+        if (candidates.isNotEmpty() && onPrevious != null && (hasPrevPage || highlightIndex > 0)) {
             KeyboardToolbarButton(onPrevious, Color.Transparent,
                 modifier = Modifier.testTag("hardware-candidate-previous")) {
                 Icon(Icons.Default.ChevronLeft, "上一候选", tint = visuals.textColor)
             }
         }
-        if (onNext != null && (hasNextPage || highlightIndex < candidates.lastIndex)) {
+        if (candidates.isNotEmpty() && onNext != null && (hasNextPage || highlightIndex < candidates.lastIndex)) {
             KeyboardToolbarButton(onNext, Color.Transparent,
                 modifier = Modifier.testTag("hardware-candidate-next")) {
                 Icon(Icons.Default.ChevronRight, "下一候选", tint = visuals.textColor)
