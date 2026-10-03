@@ -13,6 +13,8 @@ interface AsrBackend {
     )
     
     fun initialize(): Boolean
+    /** Local warmup uses the same language as the upcoming recording; legacy plugins ignore it. */
+    fun initialize(language: InputLanguage): Boolean = initialize()
     fun start(): Boolean
     /** Legacy online plugins have no language contract; preserve Chinese and reject unverified routing. */
     fun start(language: InputLanguage): Boolean {

@@ -55,22 +55,27 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
         }
     }
 
-    override fun initialize(): Boolean {
+    override fun initialize(): Boolean = initialize(InputLanguage.CHINESE)
+
+    @Synchronized
+    override fun initialize(language: InputLanguage): Boolean {
         return try {
             val ok = runBlocking { client.ensureBound() }
             if (!ok) {
                 FileLogger.e(TAG, "Failed to bind AsrInferenceService")
                 return false
             }
-            initialized = true
             syncKeepAlive()
+            // AsrSupport may hand the manager an already-warmed backend. Re-registering it
+            // must not start/stop another session or replace its language-specific model.
+            if (initialized) return true
+            initialized = true
             // 预热模型：绑定后立即创建模型句柄并驻留，避免首次语音时
             // 1s 模型加载导致开头音频（如"你觉得"）在录音缓冲中被丢弃
             try {
                 val modelManager = AsrModelManager(context)
-                if (modelManager.isModelReady()) {
-                    val modelId = modelManager.getSelectedModelId()
-                    runBlocking { client.startAsr(modelId, asrCallback) }
+                val selection = modelManager.selectionForLanguage(language)
+                if (runBlocking { client.startAsr(selection.mode, asrCallback, language) }) {
                     runBlocking { client.stopAsr() }
                 }
             } catch (e: Exception) {

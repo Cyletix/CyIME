@@ -5,46 +5,32 @@ import android.content.Intent
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.LocalSpeechSession
+import com.kingzcheung.xime.speech.ResidentSpeechSessionOwner
 import com.kingzcheung.xime.speech.SherpaSpeechEngine
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.settings.InputLanguage
+import java.util.concurrent.atomic.AtomicLong
 
 /** Model weights and both decode workers live in :asr, never on the keyboard UI thread. */
 class AsrInferenceService : Service() {
     private val lock = Any()
     private val idleHandler = Handler(Looper.getMainLooper())
-    private var engine: SherpaSpeechEngine? = null
-    private var loadedKey: String? = null
-    private var session: LocalSpeechSession? = null
+    private val sessions = ResidentSpeechSessionOwner()
     private var keepAlive = false
-    private val retiring = java.util.concurrent.atomic.AtomicInteger()
-    @Volatile private var generation = 0L
-    private val idleRelease = Runnable { synchronized(lock) { if (session == null) releaseEngine() } }
+    private val generation = AtomicLong()
+    private val idleRelease = Runnable {
+        synchronized(lock) { if (!keepAlive) sessions.release(onlyIfIdle = true) }
+    }
 
     private fun scheduleRelease() {
-        idleHandler.removeCallbacks(idleRelease)
-        if (!keepAlive) idleHandler.postDelayed(idleRelease, 60_000)
-    }
-    private fun retireSession(cancel: Boolean) {
-        val old = session ?: return
-        session = null
-        if (cancel) old.cancel()
-        if (old.isIdle) {
-            old.awaitIdle()
-        } else {
-            // Native inference is not interruptible. Its weights are released only after both
-            // owning workers exit; a new session can never reuse a recognizer still decoding.
-            val retired = engine
-            engine = null
-            loadedKey = null
-            retiring.incrementAndGet()
-            Thread { try { old.awaitIdle(); retired?.close() } finally { retiring.decrementAndGet() } }
-                .apply { isDaemon = true }.start()
+        synchronized(lock) {
+            idleHandler.removeCallbacks(idleRelease)
+            if (!keepAlive && sessions.isIdle) idleHandler.postDelayed(idleRelease, 60_000)
         }
     }
-    private fun releaseEngine() { engine?.close(); engine = null; loadedKey = null }
 
     private val binder = object : IInferenceAsrService.Stub() {
         override fun startAsr(modelId: String, callback: IInferenceAsrCallback): Boolean =
@@ -57,52 +43,69 @@ class AsrInferenceService : Service() {
             }
             return startSession(modelId, language, callback)
         }
-        private fun startSession(modelId: String, language: InputLanguage?, callback: IInferenceAsrCallback): Boolean = synchronized(lock) {
+        private fun startSession(modelId: String, language: InputLanguage?, callback: IInferenceAsrCallback): Boolean {
             idleHandler.removeCallbacks(idleRelease)
-            generation++
-            retireSession(true)
-            val token = generation
-            try {
-                check(retiring.get() == 0) { "上一段语音仍在收尾，请稍后重试" }
+            val token = generation.incrementAndGet()
+            val startedAt = SystemClock.elapsedRealtime()
+            var constructed = false
+            var modelLoadMs = 0L
+            return try {
                 val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, language)
                 check(selection.ready) { "所选语音模型尚未完整下载" }
-                if (loadedKey != selection.key) {
-                    releaseEngine()
-                    engine = SherpaSpeechEngine(this@AsrInferenceService, selection)
-                    loadedKey = selection.key
-                }
-                session = LocalSpeechSession(checkNotNull(engine),
-                    onText = { text -> if (generation == token) try { callback.onPartialResult(text) } catch (_: Exception) { } },
-                    onError = { message -> if (generation == token) try { callback.onError(message) } catch (_: Exception) { } })
-                true
+                val selectedAt = SystemClock.elapsedRealtime()
+                val ready = sessions.start(selection.key,
+                    createEngine = {
+                        constructed = true
+                        val loadingAt = SystemClock.elapsedRealtime()
+                        try { SherpaSpeechEngine(this@AsrInferenceService, selection) }
+                        finally { modelLoadMs = SystemClock.elapsedRealtime() - loadingAt }
+                    },
+                    createSession = { engine -> LocalSpeechSession(engine,
+                        onText = { text -> if (generation.get() == token) try { callback.onPartialResult(text) } catch (_: Exception) { } },
+                        onError = { message -> if (generation.get() == token) try { callback.onError(message) } catch (_: Exception) { } }) },
+                    isActive = { generation.get() == token })
+                val readyAt = SystemClock.elapsedRealtime()
+                val modelState = if (constructed) "loaded" else if (ready) "resident" else "superseded"
+                FileLogger.i("AsrInferenceService", "start ready=$ready model=$modelState " +
+                    "selectionMs=${selectedAt - startedAt} modelMs=$modelLoadMs " +
+                    "sessionWaitMs=${readyAt - selectedAt - modelLoadMs} totalMs=${readyAt - startedAt}")
+                if (!ready) scheduleRelease()
+                ready
             } catch (e: Exception) {
                 FileLogger.e("AsrInferenceService", "startAsr failed", e)
-                callback.onError(e.message ?: "离线语音模型加载失败")
+                if (generation.get() == token) callback.onError(e.message ?: "离线语音模型加载失败")
                 scheduleRelease()
                 false
             } catch (e: LinkageError) {
-                callback.onError("识别运行库无法加载：${e.message}")
+                if (generation.get() == token) callback.onError("识别运行库无法加载：${e.message}")
+                scheduleRelease()
                 false
             }
         }
         override fun pushAsrAudio(audioData: ByteArray) {
-            synchronized(lock) { session }?.acceptPcm(audioData)
+            sessions.acceptPcm(audioData)
         }
-        override fun stopAsr(): String = synchronized(lock) {
-            val current = session ?: return@synchronized ""
-            try { current.finish() }
-            finally { generation++; retireSession(false); scheduleRelease() }
+        override fun stopAsr(): String {
+            val token = generation.get()
+            return sessions.finish {
+                generation.compareAndSet(token, token + 1)
+                scheduleRelease()
+            } ?: ""
         }
-        override fun cancelAsr() = synchronized(lock) {
-            generation++; retireSession(true); scheduleRelease()
+        override fun cancelAsr() {
+            generation.incrementAndGet()
+            sessions.cancel()
+            scheduleRelease()
         }
-        override fun releaseAsr() = synchronized(lock) {
-            generation++; idleHandler.removeCallbacks(idleRelease); retireSession(true); releaseEngine()
+        override fun releaseAsr() {
+            generation.incrementAndGet()
+            idleHandler.removeCallbacks(idleRelease)
+            sessions.release()
         }
         override fun setKeepModelAlive(keep: Boolean) = synchronized(lock) {
             keepAlive = keep
             idleHandler.removeCallbacks(idleRelease)
-            if (!keep && session == null) scheduleRelease()
+            if (!keep && sessions.isIdle) scheduleRelease()
         }
     }
     override fun onBind(intent: Intent): IBinder = binder

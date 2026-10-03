@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.speech
 
 import android.content.Context
+import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.util.FileLogger
 
 /**
@@ -18,27 +19,21 @@ internal object AsrSupport {
     @Volatile
     private var warmBackend: OfflineAsrBackend? = null
 
-    /** 返回本地后端。若已预热则复用常驻实例，否则临时创建（模型未就绪时由调用方处理）。 */
-    fun create(context: Context): AsrBackend? {
-        val resident = warmBackend
-        if (resident != null) {
-            return resident
-        }
-        return OfflineAsrBackend(context)
+    /** 初始化前先登记同一个后端，预热与首次录音无论谁先到都不会创建第二个。 */
+    fun create(context: Context): AsrBackend? = synchronized(this) {
+        warmBackend ?: OfflineAsrBackend(context.applicationContext).also { warmBackend = it }
     }
 
     fun getLocalName(): String? = "本地离线语音"
 
     /** 加载本地模型并保持 :asr 服务常驻，直到 [releaseModel]。 */
-    fun warmup(context: Context) {
+    fun warmup(context: Context, language: InputLanguage = InputLanguage.CHINESE) {
         synchronized(this) {
-            if (warmBackend != null) return
-            val backend = OfflineAsrBackend(context.applicationContext)
-            if (!backend.initialize()) {
+            val backend = warmBackend ?: OfflineAsrBackend(context.applicationContext).also { warmBackend = it }
+            if (!backend.initialize(language)) {
                 FileLogger.e(TAG, "warmup failed")
                 return
             }
-            warmBackend = backend
             FileLogger.i(TAG, "offline ASR model warmed up and resident")
         }
     }

@@ -1,6 +1,9 @@
 package com.kingzcheung.xime.speech
 
 import android.content.Context
+import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.settings.InputModes
+import com.kingzcheung.xime.settings.SettingsPreferences
 
 /**
  * ASR 后端工厂。优先使用本地 sherpa-onnx 离线后端（[AsrSupport]），
@@ -13,7 +16,10 @@ object AsrBackendFactory {
     fun getLocalName(): String? = AsrSupport.getLocalName()
 
     /** 预热本地模型并保持常驻（打开"本地识别"开关时调用）。 */
-    fun warmup(context: Context) = AsrSupport.warmup(context)
+    fun warmup(context: Context, language: InputLanguage =
+        InputModes.languageOf(SettingsPreferences.getCurrentSchema(context))) {
+        if (language != InputLanguage.UNSPECIFIED) AsrSupport.warmup(context, language)
+    }
 
     /** 卸载常驻模型（关闭"本地识别"开关时调用）。 */
     fun releaseModel() = AsrSupport.releaseModel()

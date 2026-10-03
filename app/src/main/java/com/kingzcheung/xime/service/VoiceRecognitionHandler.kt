@@ -12,9 +12,6 @@ import com.kingzcheung.xime.speech.RecognitionState
 import com.kingzcheung.xime.speech.SpeechRecognitionManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.InputLanguage
-import com.kingzcheung.xime.speech.SpeechLanguages
-import com.kingzcheung.xime.speech.SpeechModelSelection
-import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.util.FileLogger
 
 class VoiceRecognitionHandler(
@@ -81,16 +78,20 @@ class VoiceRecognitionHandler(
         onStateChanged(getState().copy(voicePluginName = providerName))
         FileLogger.i(TAG, "STT provider: $providerName")
 
-        // 若"使用本地模型"开关已开启，启动时即加载模型并常驻，
-        // 保证语音时绝不现场加载模型（避免丢开头音频）。
-        // 注意：keep-alive 预热也走这里（AsrSupport.warmup 注册常驻后端），
-        // 不要再走 manager.preload——那会经 AsrSupport.create 造一个临时后端，
-        // 与本 warmup 并发时双重绑定 :asr、双重加载模型（日志曾见两次 initialize）
-        if (SettingsPreferences.isSttUseLocal(context) &&
-            AsrBackendFactory.getLocalName() != null
-        ) {
+        // 预热当前语言并由 AsrSupport 保留后端；正式录音复用同一实例。
+        // 之后切语言/模型或服务进程被回收时，录音启动仍会核对实际配置。
+        warmupForInitialLanguage()
+    }
+
+    private var initialWarmupPending = true
+
+    private fun warmupForInitialLanguage() {
+        val language = getState().inputProfile.language
+        if (initialWarmupPending && language != InputLanguage.UNSPECIFIED &&
+            SettingsPreferences.isSttUseLocal(context) && AsrBackendFactory.getLocalName() != null) {
+            initialWarmupPending = false
             Thread {
-                AsrBackendFactory.warmup(context)
+                AsrBackendFactory.warmup(context, language)
             }.start()
         }
     }
@@ -126,7 +127,8 @@ class VoiceRecognitionHandler(
             return
         }
 
-        val language = getState().inputProfile.language
+        val languages = getState().voiceKeyboardLanguages
+        val language = languages.language
         if (inputLanguage != null && inputLanguage != language) endInputSession()
         // 上一次会话若还在收尾等待中（快速再次开始），直接废弃收尾状态
         finishing = false
@@ -134,11 +136,8 @@ class VoiceRecognitionHandler(
         suppressDuplicateFinal = false
         sessionAbandoned = false
         inputSession = getState().inputSessionId
-        inputLanguage = language
+        inputLanguages = languages
         toolbarSession = getState().voiceSticky
-        val preferred = AsrModelManager(context).getSelectedModelId()
-        requiresLocalFinal = SettingsPreferences.isSttUseLocal(context) &&
-            SpeechLanguages.supports(preferred, language) && SpeechModelSelection.hasCorrection(preferred)
         toolbarText.reset()
         toolbarSentencePrefix = null
         lastToolbarFinal = ""
@@ -198,20 +197,22 @@ class VoiceRecognitionHandler(
     }
 
     private var inputSession: Long? = null
-    private var inputLanguage: InputLanguage? = null
+    private var inputLanguages: VoiceKeyboardLanguages? = null
+    // Result normalization and the backend keep the language chosen when recording started.
+    private val inputLanguage: InputLanguage? get() = inputLanguages?.language
 
-    /** Called when the product language changes, even within the same editor session. */
+    /** English/native keyboard switches are editing actions within the same voice session. */
     fun onInputLanguageChanged() {
-        cancelPreStart()
-        if (inputLanguage != null && inputLanguage != getState().inputProfile.language && !sessionAbandoned) {
-            endInputSession()
-            onVoiceComplete()
-        }
+        if (inputLanguages == null || sessionAbandoned) cancelPreStart()
+        else acceptsInputSession()
+        // Rime may publish the first valid profile after speech initialization finishes.
+        warmupForInitialLanguage()
     }
 
     private fun acceptsInputSession(): Boolean {
-        if ((inputSession == null || inputSession == getState().inputSessionId) &&
-            (inputLanguage == null || inputLanguage == getState().inputProfile.language)) return true
+        val state = getState()
+        if ((inputSession == null || inputSession == state.inputSessionId) &&
+            (inputLanguages?.accepts(state.voiceKeyboardLanguages) != false)) return true
         // restartInput 也可能不经 onFinishInput；不允许旧录音继续作用于新会话。
         if (!sessionAbandoned) {
             abandonSession()
@@ -223,7 +224,6 @@ class VoiceRecognitionHandler(
     }
 
     private var toolbarSession = false
-    private var requiresLocalFinal = false
     private val toolbarText = StreamingVoiceText()
     private var lastToolbarFinal = ""
     private var toolbarSentencePrefix: String? = null
@@ -317,16 +317,10 @@ class VoiceRecognitionHandler(
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         Log.d(TAG, "finish timeout: committing partial result as fallback")
         // 超时未收到最终结果：提交已收到的部分结果兜底（会话已丢弃时内部直接跳过）
-        if (requiresLocalFinal) {
-            // Transport watchdog only: normal local stop returns a confirmed snapshot before this.
-            // Never turn Paraformer's bilingual Japanese preview into an accepted final.
-            getInputConnection()?.let { ic ->
-                if (toolbarSession) toolbarText.update(ic, "")
-                else { ic.setComposingText("", 1); ic.finishComposingText() }
-            }
-            lastPartialText = ""
-            suppressDuplicateFinal = true
-        } else commitPendingOnRelease()
+        // A transport timeout is not an empty recognition result. Preserve the visible
+        // partial; the recognizer language was already validated at session start.
+        // commitPendingOnRelease also rejects late finals after this fallback.
+        commitPendingOnRelease()
         onVoiceComplete()
     }
 
