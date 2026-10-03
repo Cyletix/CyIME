@@ -121,7 +121,7 @@ private fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boole
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(if (id == null) "自定义中文布局" else "编辑布局") },
+                title = { Text(if (id == null) "自定义布局" else "编辑布局") },
                 navigationIcon = {
                     IconButton(onClick = { back() }, enabled = !busy) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -136,7 +136,8 @@ private fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boole
     Column(Modifier.fillMaxSize().padding(paddingValues).imePadding().verticalScroll(rememberScrollState())
         .padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (id == null) {
-            Text("基于中文26键，保留词库、数字上滑和功能键。")
+            com.kingzcheung.xime.ui.settings.QwertySymbolEditor()
+            Text("中文按键布局：调整字母排列，保留词库和功能键。")
             Button(onClick = { edit(CustomKeyboardLayout.fresh()) }, enabled = !busy) { Text("新建布局") }
             layouts.forEach { layout ->
                 OutlinedCard(Modifier.fillMaxWidth()) {

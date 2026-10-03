@@ -59,6 +59,8 @@ class KeysConfigLayoutReloadTest {
         val context = mock<Context>()
         whenever(context.assets).thenReturn(assets)
         whenever(context.filesDir).thenReturn(filesDir)
+        whenever(context.getSharedPreferences("kime_settings", Context.MODE_PRIVATE))
+            .thenReturn(mock<android.content.SharedPreferences>())
 
         KeysConfigHelper.loadConfig(context)
 

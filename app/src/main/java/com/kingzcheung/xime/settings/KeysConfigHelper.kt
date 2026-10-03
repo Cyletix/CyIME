@@ -749,9 +749,19 @@ object KeysConfigHelper {
         return config
     }
     
+    private var symbolOverridesZh: Map<String, String> = emptyMap()
+    private var symbolOverridesEn: Map<String, String> = emptyMap()
+    private var symbolCustomZh: Map<String, KeyGestureConfig> = emptyMap()
+    private var symbolCustomEn: Map<String, KeyGestureConfig> = emptyMap()
+
     private fun loadXimeConfig(context: Context) {
         try {
             CustomKeyboardLayouts.load(context)
+            symbolOverridesZh = QwertySwipeSymbols.load(context, false)
+            symbolOverridesEn = QwertySwipeSymbols.load(context, true)
+            val symbolCustomText = readCustomText(context)
+            symbolCustomZh = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty") } ?: emptyMap()
+            symbolCustomEn = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty_en") } ?: emptyMap()
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
             _keyGestureConfigZhBase = parsed?.first ?: emptyMap()
@@ -1605,13 +1615,34 @@ object KeysConfigHelper {
      *  键 id 为键面标签：一/丨/丿/丶/乛、*、分词、，、英。 */
     fun getStrokeKeyGesture(key: String): KeyGestureConfig? = _strokeGestureConfigs[key]
 
+    internal fun qwertySymbolEditorValues(context: Context, english: Boolean): Map<String, String> {
+        val overrides = QwertySwipeSymbols.load(context, english)
+        val custom = if (english) symbolCustomEn else symbolCustomZh
+        return buildMap {
+            for (key in QwertySwipeSymbols.keys.map(Char::toString)) {
+                val gesture = QwertySwipeSymbols.apply(key, null, overrides, custom[key])!!
+                put("up.$key", gesture.swipeUp!!.value.ifEmpty { gesture.swipeUp.label })
+                put("down.$key", gesture.swipeDown!!.value.ifEmpty { gesture.swipeDown.label })
+            }
+        }
+    }
+
     /** 获取某个按键的手势配置。 */
-    fun getKeyGesture(key: String): KeyGestureConfig? = keyGestureConfig[key.lowercase()]
+    fun getKeyGesture(key: String): KeyGestureConfig? = getKeyGesture(key, false)
 
     /** 根据输入模式获取某个按键的手势配置。 */
     fun getKeyGesture(key: String, isAsciiMode: Boolean): KeyGestureConfig? {
         val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        return config[key.lowercase()]
+        val normalized = key.lowercase()
+        val profile = InputProfiles.current(_activeSchemaId, isAsciiMode)
+        if (profile.layout.kind != LayoutKind.ALPHABETIC ||
+            profile.language !in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)) return config[normalized]
+        // Rearranged custom layouts bind digits to physical positions. Keep those
+        // generated gestures unless the user explicitly edits a symbol in the panel.
+        val customGesture = (if (isAsciiMode) symbolCustomEn else symbolCustomZh)[normalized]
+            ?: config[normalized].takeIf { !isAsciiMode && CustomKeyboardLayouts.find(_activeSchemaId) != null }
+        return QwertySwipeSymbols.apply(normalized, config[normalized],
+            if (isAsciiMode) symbolOverridesEn else symbolOverridesZh, customGesture)
     }
 
     fun getKeyDisplayLabel(key: String, isAsciiMode: Boolean = false, isShifted: Boolean = false): String {
@@ -1631,8 +1662,7 @@ object KeysConfigHelper {
 
     /** 获取某个按键指定手势的显示标签。 */
     fun getGestureLabel(key: String, gesture: String, isAsciiMode: Boolean = false): String? {
-        val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        val kc = config[key.lowercase()] ?: return null
+        val kc = getKeyGesture(key, isAsciiMode) ?: return null
         return when (gesture) {
             "tap" -> kc.tap?.label
             "swipe_up" -> kc.swipeUp?.label
@@ -1647,65 +1677,60 @@ object KeysConfigHelper {
     fun getConfig(): KeysConfig = config
     
     fun getSwipeUpText(key: String, isAsciiMode: Boolean = false): String? {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        val gesture = configMap[key.lowercase()]?.swipeUp
+        val gesture = getKeyGesture(key, isAsciiMode)?.swipeUp
         if (gesture != null) {
             if (gesture.value.isNotEmpty()) return gesture.value
             if (gesture.label.isNotEmpty()) return gesture.label
+            return ""
         }
         return config.swipeUp[key.lowercase()]
     }
 
     fun getSwipeUpAction(key: String, isAsciiMode: Boolean = false): GestureAction? {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        return configMap[key.lowercase()]?.swipeUp?.action
+        return getKeyGesture(key, isAsciiMode)?.swipeUp?.action
     }
 
     /** 获取上滑显示文本（优先 label，fallback value） */
     fun getSwipeUpLabel(key: String, isAsciiMode: Boolean = false): String? {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        val gesture = configMap[key.lowercase()]?.swipeUp
+        val gesture = getKeyGesture(key, isAsciiMode)?.swipeUp
         if (gesture != null) {
             if (gesture.label.isNotEmpty()) return gesture.label
             if (gesture.value.isNotEmpty()) return gesture.value
+            return ""
         }
         return config.swipeUp[key.lowercase()]
     }
 
     /** 获取上滑提交值（优先 value，fallback label） */
     fun getSwipeUpCommitValue(key: String, isAsciiMode: Boolean = false): String? {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        val gesture = configMap[key.lowercase()]?.swipeUp
+        val gesture = getKeyGesture(key, isAsciiMode)?.swipeUp
         if (gesture != null) {
             if (gesture.value.isNotEmpty()) return gesture.value
             if (gesture.label.isNotEmpty()) return gesture.label
+            return ""
         }
         return config.swipeUp[key.lowercase()]
     }
     
     fun getSwipeDownEnglishText(key: String, isAsciiMode: Boolean = false): String? {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        val fromYaml = configMap[key.lowercase()]?.swipeDown?.label
-        if (fromYaml != null && fromYaml.isNotEmpty()) return fromYaml
+        val fromYaml = getKeyGesture(key, isAsciiMode)?.swipeDown?.label
+        if (fromYaml != null) return fromYaml
         return config.swipeDownEnglish[key.lowercase()]
     }
 
     /** 获取下滑动作类型 */
     fun getSwipeDownAction(key: String, isAsciiMode: Boolean = false): GestureAction? {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        return configMap[key.lowercase()]?.swipeDown?.action
+        return getKeyGesture(key, isAsciiMode)?.swipeDown?.action
     }
 
     /** 获取下滑显示位置：key（按键上）或 bubble（气泡） */
     fun getSwipeDownDisplay(key: String, isAsciiMode: Boolean = false): DisplayMode {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        return configMap[key.lowercase()]?.swipeDown?.display ?: DisplayMode.BOTH
+        return getKeyGesture(key, isAsciiMode)?.swipeDown?.display ?: DisplayMode.BOTH
     }
 
     /** 获取上滑显示位置：key（按键上）或 bubble（气泡） */
     fun getSwipeUpDisplay(key: String, isAsciiMode: Boolean = false): DisplayMode {
-        val configMap = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
-        return configMap[key.lowercase()]?.swipeUp?.display ?: DisplayMode.BOTH
+        return getKeyGesture(key, isAsciiMode)?.swipeUp?.display ?: DisplayMode.BOTH
     }
 
     private fun getDefaultSwipeUp(): Map<String, String> = mapOf(
