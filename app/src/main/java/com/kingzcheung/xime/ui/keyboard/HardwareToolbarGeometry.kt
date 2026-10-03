@@ -6,6 +6,20 @@ internal data class HardwareToolbarPosition(val xFraction: Float = 0.5f, val yFr
 /** Bottom docking wins over side docking at the two lower corners. */
 internal fun HardwareToolbarPosition.isBottomDocked(enabled: Boolean) = enabled && yFraction == 1f
 
+/** Shared by rendering and key routing: hidden suggestions must never capture arrow keys. */
+internal fun hardwareToolbarIsVertical(
+    widthDp: Float, heightDp: Float, position: HardwareToolbarPosition, dockAtEdge: Boolean,
+): Boolean {
+    val usableWidth = if (widthDp >= 104f) widthDp - 16f else widthDp
+    val bottomDocked = position.isBottomDocked(dockAtEdge) && widthDp >= 336f
+    return !bottomDocked && dockAtEdge && (position.xFraction == 0f || position.xFraction == 1f) &&
+        heightDp >= 248f && usableWidth >= 88f
+}
+
+internal fun hardwareToolbarCanShowCandidates(
+    widthDp: Float, heightDp: Float, position: HardwareToolbarPosition, dockAtEdge: Boolean,
+): Boolean = widthDp >= 336f && !hardwareToolbarIsVertical(widthDp, heightDp, position, dockAtEdge)
+
 internal data class HardwareToolbarOffset(val x: Float, val y: Float)
 
 internal enum class HardwareToolbarMode { FULL, COMPACT, KEYBOARD_ONLY }

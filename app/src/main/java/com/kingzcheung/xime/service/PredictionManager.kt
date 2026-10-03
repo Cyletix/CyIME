@@ -10,6 +10,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -42,6 +43,7 @@ class PredictionManager(
     }, deliver = onPredictionResult)
 
     val hasPendingPrediction: Boolean get() = latest.isPending
+    val pendingRequest: StateFlow<Long> get() = latest.pendingRequest
 
     fun invalidatePendingPredictions(): Boolean = latest.invalidate()
 

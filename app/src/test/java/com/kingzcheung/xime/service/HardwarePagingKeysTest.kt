@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.service
 
 import android.view.KeyEvent
+import com.kingzcheung.xime.settings.HardwareKeyboardOptions
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -27,5 +28,39 @@ class HardwarePagingKeysTest {
     @Test fun controlAltAndMetaChordsAreNotPagingCommands() {
         (previous + next).forEach { assertEquals(0, hardwareCandidatePageDirection(it, true, modified = true)) }
         assertEquals(0, hardwareCandidatePageDirection(KeyEvent.KEYCODE_A, true, false))
+    }
+
+    @Test fun groupsCanBeSelectedIndependentlyInAllEightCombinations() {
+        for (mask in 0..7) {
+            val options = HardwareKeyboardOptions(
+                pageMinusEquals = mask and 1 != 0,
+                pageBrackets = mask and 2 != 0,
+                pageCommaPeriod = mask and 4 != 0,
+            )
+            for (group in previous.indices) {
+                val enabled = mask and (1 shl group) != 0
+                assertEquals("previous group $group mask $mask", if (enabled) -1 else 0,
+                    hardwareCandidatePageDirection(previous[group], true, false, options))
+                assertEquals("next group $group mask $mask", if (enabled) 1 else 0,
+                    hardwareCandidatePageDirection(next[group], true, false, options))
+                for (key in listOf(previous[group], next[group])) {
+                    assertEquals(0, hardwareCandidatePageDirection(key, false, false, options))
+                    assertEquals(0, hardwareCandidatePageDirection(key, true, true, options))
+                }
+            }
+        }
+    }
+
+    @Test fun angleBracketsFollowTheCommaPeriodChoiceAndKeepLiteralText() {
+        // Shift changes the symbol, not the physical key's paging group.
+        for ((key, direction, symbol) in listOf(
+            Triple(KeyEvent.KEYCODE_COMMA, -1, "<"),
+            Triple(KeyEvent.KEYCODE_PERIOD, 1, ">"),
+        )) {
+            assertEquals(symbol, keyCodeToKey(key, true))
+            assertEquals(direction, hardwareCandidatePageDirection(key, true, false))
+            assertEquals(0, hardwareCandidatePageDirection(key, true, false,
+                HardwareKeyboardOptions(pageCommaPeriod = false)))
+        }
     }
 }

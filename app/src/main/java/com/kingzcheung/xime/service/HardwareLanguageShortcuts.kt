@@ -2,11 +2,14 @@ package com.kingzcheung.xime.service
 
 import android.view.KeyEvent
 import com.kingzcheung.xime.settings.HardwareKeyboardOptions
+import com.kingzcheung.xime.settings.LanguageSwitchMode
 
 internal enum class HardwareToolShortcut { PUNCTUATION, CLIPBOARD, MICROPHONE }
 
-internal data class HardwareShortcutResult(val consume: Boolean = false, val switchLanguage: Boolean = false,
-    val tool: HardwareToolShortcut? = null)
+internal data class HardwareShortcutResult(val consume: Boolean = false, val switchMode: LanguageSwitchMode? = null,
+    val tool: HardwareToolShortcut? = null) {
+    val switchLanguage: Boolean get() = switchMode != null
+}
 
 /** Stateful so holding Space cannot toggle repeatedly, and Shift chords never toggle on release. */
 internal class HardwareLanguageShortcuts {
@@ -40,7 +43,8 @@ internal class HardwareLanguageShortcuts {
         }
         if (key == KeyEvent.KEYCODE_SPACE && ctrl && !alt && !meta && !shifted && options.ctrlSpace) {
             held += key
-            return HardwareShortcutResult(consume = true, switchLanguage = repeat == 0)
+            return HardwareShortcutResult(consume = true,
+                switchMode = LanguageSwitchMode.CYCLE.takeIf { repeat == 0 })
         }
         return HardwareShortcutResult()
     }
@@ -49,6 +53,6 @@ internal class HardwareLanguageShortcuts {
         val consumed = held.remove(key)
         val switch = key == shift && !shiftUsed && !canceled && options.shiftTap && time - shiftDownAt in 0..500
         if (key == shift) shift = null
-        return HardwareShortcutResult(consumed, switch)
+        return HardwareShortcutResult(consumed, LanguageSwitchMode.CURRENT_ENGLISH.takeIf { switch })
     }
 }

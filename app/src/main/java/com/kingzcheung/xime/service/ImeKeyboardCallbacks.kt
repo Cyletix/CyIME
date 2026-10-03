@@ -248,14 +248,6 @@ internal fun rememberImeKeyboardCallbacks(
             onSettings = { service.schemaController.openSettings() },
             onSettingsPage = { service.schemaController.openSettings(it) },
             onSwitchSchema = { schemaId -> if (service.inputReadiness.ticket() != null) service.schemaController.switchSchema(schemaId) },
-            onReorderSchemas = { ids ->
-                val schemas = service.uiState.value.schemas
-                val visibleIds = schemas.map { it.schemaId }
-                if (com.kingzcheung.xime.settings.InputModes.saveReorderedModes(service, visibleIds, visibleIds, ids)) {
-                    service.uiState.value = service.uiState.value.copy(
-                        schemas = com.kingzcheung.xime.settings.InputModes.ordered(service, schemas))
-                }
-            },
             onHandwritingExpand = { expanded -> service.uiState.value = service.uiState.value.copy(handwritingExpanded = expanded) },
             onHandwritingToggle = { service.schemaController.toggleHandwriting() },
             onToggleSchemaSwitch = { sw -> service.sessionController.toggleSchemaSwitch(sw) },

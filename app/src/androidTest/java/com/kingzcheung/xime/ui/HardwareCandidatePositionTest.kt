@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -19,11 +20,18 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import com.kingzcheung.xime.service.HardwareCursorAnchor
 import com.kingzcheung.xime.ui.keyboard.HardwareKeyboardCandidateBar
 import org.junit.Assert.assertEquals
@@ -225,4 +233,82 @@ class HardwareCandidatePositionTest {
         rule.waitForIdle()
         assertNull(preeditBounds)
     }
+    @Test fun preeditFitsFractionalPaddingAndLargeSystemFontWithoutClipping() {
+        val fontScale = mutableStateOf(1f)
+        rule.setContent {
+            CompositionLocalProvider(
+                // Each 8dp side rounds to 10px here; measuring the combined 16dp gives 19px.
+                LocalDensity provides Density(1.1875f, fontScale.value),
+                LocalTextStyle provides TextStyle(fontFamily = FontFamily.Monospace,
+                    fontSize = 18.sp, lineHeight = 30.sp, letterSpacing = 1.1.sp),
+            ) {
+                Box(Modifier.size(420.dp, 300.dp)) {
+                    HardwareKeyboardCandidateBar("jingjiu", "jing jiu", emptyList(),
+                        false, false, null, 0, Color.Black, Color.White, Color.Blue)
+                }
+            }
+        }
+        for (scale in listOf(1f, 2.2f)) {
+            rule.runOnIdle { fontScale.value = scale }
+            rule.waitForIdle()
+            val label = rule.onNodeWithTag("candidate-preedit-text", true)
+            val scroll = label.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+            val layouts = mutableListOf<TextLayoutResult>()
+            label.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            val layout = layouts.single()
+            val card = rule.onNodeWithTag("hardware-preedit-card", true).fetchSemanticsNode().boundsInRoot
+            assertEquals("A short preedit must fit entirely, including rounded padding", 0f, scroll.maxValue(), 0f)
+            assertEquals("jing jiu".length, layout.getLineEnd(0))
+            assertTrue(!layout.isLineEllipsized(0))
+            assertTrue("The preedit surface must grow for large system text", card.height >= layout.size.height)
+        }
+    }
+
+    @Test fun longPreeditFollowsNewTextAndCanScrollBackToTheBeginning() {
+        val text = mutableStateOf("wo men zheng zai ce shi chang pin yin ".repeat(8))
+        val width = mutableStateOf(280.dp)
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                MaterialTheme {
+                    Box(Modifier.size(width.value, 260.dp)) {
+                        HardwareKeyboardCandidateBar(text.value, text.value, emptyList(),
+                            false, false, null, 0, Color.Black, Color.White, Color.Blue)
+                    }
+                }
+            }
+        }
+        fun assertTailIsVisible() {
+            rule.waitForIdle()
+            val label = rule.onNodeWithTag("candidate-preedit-text", true)
+            val scroll = label.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+            assertTrue(scroll.maxValue() > 0f)
+            assertEquals("New syllables must be scrolled into view", scroll.maxValue(), scroll.value(), 1f)
+            val layouts = mutableListOf<TextLayoutResult>()
+            label.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertEquals(text.value.length, layouts.single().getLineEnd(0))
+            assertTrue(!layouts.single().isLineEllipsized(0))
+            val card = rule.onNodeWithTag("hardware-preedit-card", true).fetchSemanticsNode().boundsInRoot
+            val host = rule.onNodeWithTag("hardware-candidate-host", true).fetchSemanticsNode().boundsInRoot
+            assertTrue(card.left >= host.left + 8f && card.right <= host.right - 8f)
+        }
+        assertTailIsVisible()
+        rule.onNodeWithTag("candidate-preedit-text", true)
+            .performSemanticsAction(SemanticsActions.ScrollBy) { it(-100_000f, 0f) }
+        rule.waitForIdle()
+        val start = rule.onNodeWithTag("candidate-preedit-text", true)
+            .fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+        assertEquals("Earlier syllables must remain reachable", 0f, start.value(), 1f)
+        rule.runOnIdle { text.value += "zui hou" }
+        assertTailIsVisible()
+        rule.runOnIdle { width.value = 200.dp }
+        assertTailIsVisible()
+        rule.runOnIdle { text.value = "ni hao" }
+        rule.waitForIdle()
+        val short = rule.onNodeWithTag("candidate-preedit-text", true)
+            .fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+        assertEquals(0f, short.maxValue(), 0f)
+        assertEquals(0f, short.value(), 0f)
+        assertTrue(rule.onNodeWithTag("hardware-preedit-card", true).fetchSemanticsNode().boundsInRoot.width < 150f)
+    }
+
 }

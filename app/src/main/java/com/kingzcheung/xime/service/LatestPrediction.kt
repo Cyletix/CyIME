@@ -1,6 +1,10 @@
 package com.kingzcheung.xime.service
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -14,13 +18,15 @@ internal class LatestPrediction(
     private val gate = Mutex()
     private var job: Job? = null
     @Volatile private var generation = 0L
-    private val pendingGeneration = java.util.concurrent.atomic.AtomicLong(0)
-    val isPending: Boolean get() = pendingGeneration.get() != 0L
+    private val pendingGeneration = MutableStateFlow(0L)
+    /** Zero means no pending request; the generation keeps stale completions from clearing a newer request. */
+    val pendingRequest: StateFlow<Long> = pendingGeneration.asStateFlow()
+    val isPending: Boolean get() = pendingGeneration.value != 0L
     private var nextAllowed = 0L
 
     @Synchronized fun invalidate(): Boolean {
         generation++
-        val pending = pendingGeneration.getAndSet(0L) != 0L
+        val pending = pendingGeneration.getAndUpdate { 0L } != 0L
         job?.cancel(); job = null
         return pending
     }
@@ -28,7 +34,7 @@ internal class LatestPrediction(
     @Synchronized fun submit(text: String) {
         invalidate()
         val request = generation
-        pendingGeneration.set(request)
+        pendingGeneration.value = request
         job = scope.launch {
             try {
                 delay(160) // Let a burst settle before starting expensive native inference.

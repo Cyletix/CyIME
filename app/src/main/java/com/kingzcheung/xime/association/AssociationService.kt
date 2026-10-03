@@ -2,31 +2,40 @@ package com.kingzcheung.xime.association
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 object AssociationService {
     private const val TAG = "AssociationService"
     
-    private var trieEngine: TrieAssociationEngine? = null
-    private var isInitialized = false
+    @Volatile private var trieEngine: TrieAssociationEngine? = null
+    @Volatile private var isInitialized = false
+    private val initializationMutex = Mutex()
     
     suspend fun initialize(context: Context): Boolean = withContext(Dispatchers.IO) {
         if (isInitialized) {
             return@withContext true
         }
         
-        try {
-            trieEngine = TrieAssociationEngine.getInstance()
-            val trieInit = trieEngine!!.initialize(context)
-            
-            isInitialized = trieInit
-            Log.i(TAG, "Association service initialized: trie=$trieInit")
-            
-            isInitialized
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize association service", e)
-            false
+        initializationMutex.withLock {
+            if (isInitialized) return@withLock true
+
+            try {
+                val engine = TrieAssociationEngine.getInstance()
+                val trieInit = engine.initialize(context)
+                if (trieInit) trieEngine = engine
+                isInitialized = trieInit
+                Log.i(TAG, "Association service initialized: trie=$trieInit")
+                trieInit
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize association service", e)
+                false
+            }
         }
     }
     
@@ -42,27 +51,33 @@ object AssociationService {
         
         try {
             val candidates = if (isAsciiMode) {
-                getEnglishAssociations(inputText, topK)
+                getEnglishAssociations(context, inputText, topK)
             } else {
                 getChineseAssociations(context, inputText, topK)
             }
             
             candidates.map { it.text }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get associations", e)
             emptyList()
         }
     }
     
-    private suspend fun getEnglishAssociations(prefix: String, topK: Int): List<AssociationCandidate> {
-        if (trieEngine == null || !trieEngine!!.isInitialized()) {
-            Log.w(TAG, "Trie engine not initialized for English associations")
+    private suspend fun getEnglishAssociations(
+        context: Context,
+        prefix: String,
+        topK: Int
+    ): List<AssociationCandidate> {
+        // A first keystroke can precede PredictionManager's background warm-up.
+        // Await that same IO initialization so it can still produce suggestions.
+        if (!initialize(context)) {
+            Log.w(TAG, "Trie engine could not initialize for English associations")
             return emptyList()
         }
-        
-        val candidates = trieEngine!!.predict(prefix, topK)
-        
-        return candidates
+
+        return trieEngine?.predict(prefix, topK).orEmpty()
     }
     
     private suspend fun getChineseAssociations(

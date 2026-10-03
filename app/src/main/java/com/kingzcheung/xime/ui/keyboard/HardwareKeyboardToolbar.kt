@@ -36,20 +36,20 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -57,6 +57,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -66,7 +67,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlin.math.floor
 import kotlin.math.ceil
@@ -92,6 +95,9 @@ internal fun HardwareKeyboardToolbar(
     surface: (@Composable () -> Modifier)? = null,
     bottomDocked: Boolean = false,
     bottomCandidateContent: (@Composable () -> Unit)? = null,
+    showCandidatesWhenFloating: Boolean = false,
+    candidatesPending: Boolean = false,
+    languageLabel: String = "中",
 ) {
     val currentBoundsCallback by rememberUpdatedState(onBoundsChanged)
     val currentPositionCallback by rememberUpdatedState(onPositionChange)
@@ -99,34 +105,55 @@ internal fun HardwareKeyboardToolbar(
     DisposableEffect(Unit) { onDispose { currentBoundsCallback(null) } }
 
     var hostScreenOrigin by remember { mutableStateOf(Offset.Zero) }
-    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { hostScreenOrigin = it.positionOnScreen() }) {
+    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { hostScreenOrigin = it.positionOnScreen() },
+        contentAlignment = AbsoluteAlignment.TopLeft) {
         val viewportHeight = maxHeight
         val density = LocalDensity.current
         // Keep normal margins when possible; do not shrink a 48dp recovery key merely for margins.
         val usableWidth = if (maxWidth >= 104.dp) maxWidth - 16.dp else maxWidth
-        val vertical = !bottomDocked && dockAtEdge && (position.xFraction == 0f || position.xFraction == 1f) && maxHeight >= 248.dp && usableWidth >= 88.dp
+        val vertical = hardwareToolbarIsVertical(maxWidth.value, maxHeight.value, position, dockAtEdge)
         val mode = if (vertical) HardwareToolbarMode.FULL else hardwareToolbarMode(usableWidth.value)
-        val hasHandle = usableWidth >= 88.dp
-        var expanded by remember(mode) { mutableStateOf(false) }
-        val padding = if (hasHandle) 4.dp else 0.dp
+        // Current language and keyboard recovery remain direct actions at every width.
+        // The whole surface already drags; the narrow form does not need a separate handle.
+        val essentialStacked = mode == HardwareToolbarMode.KEYBOARD_ONLY && usableWidth < 96.dp
+        val hasHandle = mode != HardwareToolbarMode.KEYBOARD_ONLY && usableWidth >= 88.dp
+        val padding = if (hasHandle || (mode == HardwareToolbarMode.KEYBOARD_ONLY && usableWidth >= 104.dp)) 4.dp else 0.dp
         val buttonSize = minOf(48.dp, usableWidth).coerceAtLeast(0.dp)
         val horizontalWidth = when (mode) {
             HardwareToolbarMode.FULL -> 232.dp
             HardwareToolbarMode.COMPACT -> 184.dp
-            HardwareToolbarMode.KEYBOARD_ONLY -> if (hasHandle) 88.dp else buttonSize
+            HardwareToolbarMode.KEYBOARD_ONLY -> if (essentialStacked) buttonSize else buttonSize * 2 + padding * 2
         }
-        val targetWidth = if (bottomDocked) minOf(720.dp, usableWidth) else if (vertical) 56.dp else horizontalWidth
+        val showCandidateContent = bottomDocked || showCandidatesWhenFloating
+        // A free toolbar only reserves space for its own suggestions. Composition
+        // candidates live in the separate caret window. While a replacement request
+        // is running, retain the previous width without keeping stale clickable words.
+        var reservedCandidateSpace by remember { mutableStateOf(false) }
+        val floatingCandidateSpace = showCandidatesWhenFloating &&
+            (bottomCandidateContent != null || (candidatesPending && reservedCandidateSpace))
+        val showCandidateStrip = hardwareToolbarCanShowCandidates(maxWidth.value, maxHeight.value, position, dockAtEdge) &&
+            (bottomDocked || floatingCandidateSpace)
+        SideEffect { reservedCandidateSpace = showCandidateStrip }
+        val candidateRowHeight = hardwareCandidateRowHeight()
+        val targetWidth = if (showCandidateStrip) minOf(720.dp, usableWidth) else if (vertical) 56.dp else horizontalWidth
         val toolbarWidth by animateDpAsState(targetWidth, tween(220), label = "hardware-dock-width")
-        val expectedHeight = if (vertical) horizontalWidth else buttonSize + padding * 2 + if ((mode == HardwareToolbarMode.COMPACT || bottomDocked) && expanded) 48.dp else 0.dp
+        val expectedHeight = if (vertical) horizontalWidth
+            else if (essentialStacked) buttonSize * 2 + padding * 2
+            else if (showCandidateStrip) candidateRowHeight + padding * 2
+            else buttonSize + padding * 2 + if (mode == HardwareToolbarMode.COMPACT) 48.dp else 0.dp
         var measuredSize by remember(maxWidth, maxHeight, density) {
             mutableStateOf(with(density) { IntSize(toolbarWidth.roundToPx(), minOf(expectedHeight, maxHeight).roundToPx()) })
         }
+        val renderedWidthPx = with(density) { toolbarWidth.roundToPx() }
         val geometry = with(density) {
-            hardwareToolbarGeometry(maxWidth.roundToPx(), maxHeight.roundToPx(), measuredSize.width, measuredSize.height, 8.dp.roundToPx())
+            // Reserve the incoming row before its size animation reports a new height.
+            // Otherwise a bottom-positioned capsule expands below the touchable host.
+            val reservedHeight = maxOf(measuredSize.height, expectedHeight.roundToPx()).coerceAtMost(maxHeight.roundToPx())
+            hardwareToolbarGeometry(maxWidth.roundToPx(), maxHeight.roundToPx(), renderedWidthPx, reservedHeight, 8.dp.roundToPx())
         }
         val currentGeometry by rememberUpdatedState(geometry)
         var dragging by remember { mutableStateOf<HardwareToolbarOffset?>(null) }
-        val shape = RoundedCornerShape(28.dp)
+        val shape = RoundedCornerShape(HardwareCandidateCornerRadius)
         val languageMenuActive = LocalSuppressCursorMove.current
         val touchSlop = LocalViewConfiguration.current.touchSlop
         val gap = with(density) { 12.dp.roundToPx() }
@@ -137,11 +164,12 @@ internal fun HardwareKeyboardToolbar(
             (it.left - hostScreenOrigin.x).roundToInt(), (it.top - hostScreenOrigin.y).roundToInt(),
             (it.right - hostScreenOrigin.x).roundToInt(), (it.bottom - hostScreenOrigin.y).roundToInt()) }
         val resting = if (avoidEditor && !bottomDocked) avoidHardwareEditor(geometry, geometry.offset(position),
-            measuredSize.width, measuredSize.height, exclusion, gap) else geometry.offset(position)
+            renderedWidthPx, measuredSize.height, exclusion, gap) else geometry.offset(position)
         val animatedOffset by animateOffsetAsState(
             targetValue = (dragging ?: resting).let { Offset(it.x, it.y) },
             animationSpec = if (dragging != null) snap() else tween(220), label = "hardware-dock-position")
-        val displayedOffset = dragging ?: HardwareToolbarOffset(animatedOffset.x, animatedOffset.y)
+        val displayedOffset = dragging?.let { geometry.constrain(it.x, it.y) }
+            ?: geometry.constrain(animatedOffset.x, animatedOffset.y)
         val currentResting by rememberUpdatedState(displayedOffset)
         val currentDock by rememberUpdatedState(dockAtEdge)
         var gestureOrigin by remember { mutableStateOf<HardwareToolbarOffset?>(null) }
@@ -185,6 +213,8 @@ internal fun HardwareKeyboardToolbar(
                     } finally { dragging = null; gestureOrigin = null }
                 }
             }) {
+        // Language is the physical rightmost action even when the host uses RTL layout.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Column(
             Modifier.absoluteOffset {
                 val origin = gestureOrigin ?: displayedOffset
@@ -198,47 +228,49 @@ internal fun HardwareKeyboardToolbar(
                     val bounds = coordinates.boundsInWindow()
                     currentBoundsCallback(Rect(floor(bounds.left).toInt(), floor(bounds.top).toInt(), ceil(bounds.right).toInt(), ceil(bounds.bottom).toInt()))
                 }
-                .shadow(8.dp, shape).clip(shape).then(surface?.invoke() ?: Modifier.background(backgroundColor))
-                .border(1.dp, contentColor.copy(alpha = 0.45f), shape)
+                .clip(shape).then(surface?.invoke() ?: Modifier.background(backgroundColor))
                 .testTag("hardware-keyboard-toolbar").padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val auxiliaryActions: @Composable () -> Unit = {
+                HardwareToolbarAction(Icons.Default.EmojiEmotions, "表情", "hardware-toolbar-emoji", contentColor, onClick = onEmoji)
+                HardwareToolbarAction(Icons.Default.ContentPaste, "剪贴板", "hardware-toolbar-clipboard", contentColor, onClick = onClipboard)
+            }
             val actions: @Composable () -> Unit = {
                 if (hasHandle) Box(
                     Modifier.width(if (vertical) buttonSize else 32.dp).height(if (vertical) 32.dp else buttonSize),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Default.DragIndicator, null, tint = contentColor, modifier = Modifier.size(20.dp)) }
                 HardwareToolbarAction(Icons.Default.Keyboard, "展开屏幕键盘", "hardware-toolbar-keyboard", contentColor, buttonSize, onShowKeyboard)
-                if (mode != HardwareToolbarMode.KEYBOARD_ONLY) {
-                    HardwareToolbarAction(Icons.Default.EmojiEmotions, "表情", "hardware-toolbar-emoji", contentColor, onClick = onEmoji)
-                    if (mode == HardwareToolbarMode.FULL) {
-                        HardwareToolbarAction(Icons.Default.ContentPaste, "剪贴板", "hardware-toolbar-clipboard", contentColor, onClick = onClipboard)
-                        HardwareToolbarLanguageKey(contentColor, languageActions, onSwitchLanguage)
-                    } else {
-                        HardwareToolbarAction(Icons.Default.MoreHoriz, if (expanded) "收起工具" else "更多工具", "hardware-toolbar-more", contentColor) { expanded = !expanded }
-                    }
-                }
+                if (mode == HardwareToolbarMode.FULL) auxiliaryActions()
+                HardwareToolbarLanguageKey(contentColor, languageActions, languageLabel, onSwitchLanguage, buttonSize)
             }
-            if (bottomDocked && bottomCandidateContent != null) {
-                Row(Modifier.width((toolbarWidth - padding * 2).coerceAtLeast(0.dp)),
+            if (showCandidateStrip) {
+                Row(Modifier.width((toolbarWidth - padding * 2).coerceAtLeast(0.dp)).height(candidateRowHeight),
                     verticalAlignment = Alignment.CenterVertically) {
-                    HardwareToolbarLanguageKey(contentColor, languageActions, onSwitchLanguage)
-                    Box(Modifier.weight(1f).testTag("hardware-docked-candidates")) { bottomCandidateContent() }
+                    Box(Modifier.weight(1f).testTag("hardware-docked-candidates")) {
+                        if (showCandidateContent) bottomCandidateContent?.invoke()
+                    }
                     HardwareToolbarAction(Icons.Default.Keyboard, "展开屏幕键盘", "hardware-toolbar-keyboard", contentColor, onClick = onShowKeyboard)
-                    HardwareToolbarAction(Icons.Default.MoreHoriz, if (expanded) "收起工具" else "更多工具", "hardware-toolbar-more", contentColor) { expanded = !expanded }
+                    auxiliaryActions()
+                    HardwareToolbarLanguageKey(contentColor, languageActions, languageLabel, onSwitchLanguage)
                 }
             }
-            else if (vertical) Column(horizontalAlignment = Alignment.CenterHorizontally) { actions() }
-            else Row(verticalAlignment = Alignment.CenterVertically) { actions() }
-            if ((mode == HardwareToolbarMode.COMPACT || bottomDocked) && expanded) {
-                // Inline overflow stays inside the same measured touch region and never covers recovery.
-                Row(horizontalArrangement = Arrangement.Center) {
-                    HardwareToolbarAction(Icons.Default.ContentPaste, "剪贴板", "hardware-toolbar-clipboard", contentColor) { expanded = false; onClipboard() }
-                    if (bottomDocked) HardwareToolbarAction(Icons.Default.EmojiEmotions, "表情", "hardware-toolbar-emoji", contentColor) { expanded = false; onEmoji() }
-                    else HardwareToolbarLanguageKey(contentColor, languageActions, onSwitchLanguage)
+            else if (vertical || essentialStacked) Column(horizontalAlignment = Alignment.CenterHorizontally) { actions() }
+            else Row(Modifier.width((toolbarWidth - padding * 2).coerceAtLeast(0.dp)),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically) { actions() }
+            if (mode == HardwareToolbarMode.COMPACT) {
+                // Narrow windows retain direct access without an overflow toggle or smaller keys.
+                Row(
+                    Modifier.width((toolbarWidth - padding * 2).coerceAtLeast(0.dp)).height(48.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    auxiliaryActions()
                 }
             }
         }
+        } // fixed action direction
         } // stationary gesture receiver
         val displayed = displayedOffset
         val dockTarget = geometry.positionAt(displayed.x, displayed.y, position)
@@ -248,7 +280,7 @@ internal fun HardwareKeyboardToolbar(
         if (dragging != null && (previewBottom || previewSide)) {
             // Preview is a separate drawing-only layer; release performs the animated resize.
             val pw = if (previewBottom) minOf(720.dp, usableWidth) else 56.dp
-            val ph = if (previewBottom) 56.dp else horizontalWidth
+            val ph = if (previewBottom) candidateRowHeight + 8.dp else horizontalWidth
             val previewGeometry = hardwareToolbarGeometry(constraints.maxWidth, constraints.maxHeight,
                 with(density) { pw.roundToPx() }, with(density) { ph.roundToPx() }, with(density) { 8.dp.roundToPx() })
             val preview = previewGeometry.offset(dockTarget)
@@ -276,11 +308,13 @@ private fun HardwareToolbarAction(
 }
 
 @Composable
-private fun HardwareToolbarLanguageKey(color: Color, actions: KeyboardInputActions, onClick: () -> Unit) {
+private fun HardwareToolbarLanguageKey(color: Color, actions: KeyboardInputActions, label: String, onClick: () -> Unit, size: Dp = 48.dp) {
     androidx.compose.runtime.CompositionLocalProvider(LocalKeyboardInputActions provides actions) {
-        Box(Modifier.size(48.dp).semantics(mergeDescendants = true) {}.testTag("hardware-toolbar-language")) {
+        Box(Modifier.size(size).semantics(mergeDescendants = true) {
+            contentDescription = "当前语言：$label，点按切换，长按选择语言"
+        }.testTag("hardware-toolbar-language")) {
             LanguageKeyButton(onClick = onClick, backgroundColor = Color.Transparent, textColor = color,
-                shadowEnabled = false, shadowShapeRadius = 24.dp)
+                languageLabel = label, fontSize = 18.sp, shadowEnabled = false, shadowShapeRadius = 24.dp)
         }
     }
 }
