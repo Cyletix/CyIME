@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileInputStream
@@ -127,6 +129,9 @@ class ClipboardManager private constructor(private val context: Context) {
     private val database = ClipboardDatabase.getInstance(context)
     private val dao = database.clipboardDao()
     private val scope = ClipboardDatabase.scope()
+    private val clipboardPinsReady = CompletableDeferred<Unit>()
+    private val clipboardPinWriter = ClipboardPinWriter(scope, clipboardPinsReady, dao::setClipboardPinned,
+        onFailure = { Log.e(TAG, "Could not save clipboard pin state", it) })
 
     private val _clipboardItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val clipboardItems: StateFlow<List<ClipboardItem>> = _clipboardItems.asStateFlow()
@@ -156,8 +161,26 @@ class ClipboardManager private constructor(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     init {
-        migrateLegacyData()
+        val boardPrefs = context.getSharedPreferences("clipboard_board", Context.MODE_PRIVATE)
+        val savedPins = boardPrefs.getStringSet("pins", emptySet()).orEmpty().toSet()
+        val legacyMigration = migrateLegacyData()
         scope.launch {
+            legacyMigration.join()
+            try {
+                // Earlier boards kept text pins separately from the Room retention flag.
+                // Import those positive marks once, before exposing the text list to the UI.
+                check(!prefs.contains(KEY_CLIPBOARD_ITEMS) && !prefs.contains(KEY_QUICK_SEND_ITEMS))
+                migrateClipboardTextPins(savedPins, { dao.setClipboardPinned(it, true) }) {
+                    synchronized(boardPrefs) {
+                        val currentPins = boardPrefs.getStringSet("pins", emptySet()).orEmpty()
+                        check(boardPrefs.edit().putStringSet("pins", currentPins.filterNot { it.startsWith("text:") }.toSet()).commit())
+                    }
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Could not migrate clipboard pin state; keeping the old markers for retry", error)
+            } finally {
+                clipboardPinsReady.complete(Unit)
+            }
             dao.observeAll().collect { entries ->
                 _clipboardItems.value = entries.map { it.toClipboardItem() }
                 updateRecentItems()
@@ -175,34 +198,30 @@ class ClipboardManager private constructor(private val context: Context) {
      * 将旧版 SharedPreferences 中的剪贴板/快捷发送数据一次性迁移到 Room。
      * 幂等：prefs 无数据时直接返回；迁移成功后删除 prefs 键，避免重复迁移。
      */
-    fun migrateLegacyData() {
+    fun migrateLegacyData(): Job = scope.launch {
         val legacyClipboard = prefs.getString(KEY_CLIPBOARD_ITEMS, null)
         val legacyQuickSend = prefs.getString(KEY_QUICK_SEND_ITEMS, null)
-        if (legacyClipboard == null && legacyQuickSend == null) return
-        scope.launch {
-            try {
-                val entries = mutableListOf<ClipboardEntry>()
-                legacyClipboard?.let { str ->
-                    deserializeItems(str).forEach { item ->
-                        entries.add(item.toEntry())
-                    }
+        if (legacyClipboard == null && legacyQuickSend == null) return@launch
+        try {
+            val entries = mutableListOf<ClipboardEntry>()
+            legacyClipboard?.let { str ->
+                deserializeItems(str).forEach { item ->
+                    entries.add(item.toEntry())
                 }
-                legacyQuickSend?.let { str ->
-                    deserializeItems(str).forEach { item ->
-                        entries.add(item.toEntry())
-                    }
-                }
-                if (entries.isNotEmpty()) {
-                    dao.insertAll(entries)
-                }
-                prefs.edit()
-                    .remove(KEY_CLIPBOARD_ITEMS)
-                    .remove(KEY_QUICK_SEND_ITEMS)
-                    .apply()
-                Log.i(TAG, "Migrated ${entries.size} legacy clipboard items to Room")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to migrate legacy clipboard items", e)
             }
+            legacyQuickSend?.let { str ->
+                deserializeItems(str).forEach { item ->
+                    entries.add(item.toEntry())
+                }
+            }
+            if (entries.isNotEmpty()) dao.insertAll(entries)
+            prefs.edit()
+                .remove(KEY_CLIPBOARD_ITEMS)
+                .remove(KEY_QUICK_SEND_ITEMS)
+                .apply()
+            Log.i(TAG, "Migrated ${entries.size} legacy clipboard items to Room")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to migrate legacy clipboard items", e)
         }
     }
 
@@ -353,9 +372,7 @@ class ClipboardManager private constructor(private val context: Context) {
         }
     }
 
-    fun setClipboardPinned(id: Long, pinned: Boolean) {
-        scope.launch { dao.setClipboardPinned(id, pinned) }
-    }
+    fun setClipboardPinned(id: Long, pinned: Boolean): Job = clipboardPinWriter.set(id, pinned)
 
     fun updateQuickSendItem(id: Long, newText: String, newCode: String = ""): Boolean {
         if (newText.isBlank()) return false
