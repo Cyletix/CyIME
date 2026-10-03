@@ -25,6 +25,10 @@ class KeyboardInputPreferencesTest {
     fun setUp() {
         whenever(context.getSharedPreferences(any(), any())).thenReturn(prefs)
         whenever(prefs.edit()).thenReturn(editor)
+        whenever(prefs.contains(any())).thenAnswer { values.containsKey(it.getArgument<String>(0)) }
+        whenever(prefs.getInt(any(), any())).thenAnswer {
+            values[it.getArgument<String>(0)] as? Int ?: it.getArgument<Int>(1)
+        }
         whenever(prefs.getString(any(), anyOrNull())).thenAnswer {
             values[it.getArgument<String>(0)] as? String ?: it.getArgument<String?>(1)
         }
@@ -53,6 +57,8 @@ class KeyboardInputPreferencesTest {
     fun `existing installs default to cursor hold and usable sensitivity`() {
         val settings = KeyboardInputPreferences.read(context)
         assertEquals(SpaceHoldAction.CURSOR, settings.spaceHold)
+        assertEquals(0.2f, settings.cursorHoldSeconds, 0f)
+        assertEquals(200L, settings.spaceHoldDelayMs)
         assertEquals(10f, settings.cursorStepDp, 0f)
         assertEquals(1.15f, settings.keyTextScale, 0f)
         assertEquals(0.5f, settings.handwritingPauseSeconds, 0f)
@@ -78,6 +84,19 @@ class KeyboardInputPreferencesTest {
         assertEquals(false, KeyboardInputPreferences.read(context).keyGlowEnabled)
     }
 
+    @Test fun `rendered appearance chooses its own glass controls despite saved display mode`() {
+        values["dark_mode"] = 0
+        val dark = FrostedGlassConfig(true, 15f, 0.77f, 0.21f)
+        val light = FrostedGlassConfig(true, 11f, 0.24f, 0.84f)
+        FrostedGlassPreferences.save(context, dark, true)
+        FrostedGlassPreferences.save(context, light, false)
+        assertEquals(dark, KeyboardInputPreferences.read(context, true).frostedGlass)
+        assertEquals(light, KeyboardInputPreferences.read(context, false).frostedGlass)
+        values["dark_mode"] = 1
+        assertEquals(light, KeyboardInputPreferences.read(context, false).frostedGlass)
+        assertEquals(dark, KeyboardInputPreferences.read(context).frostedGlass)
+    }
+
     @Test
     fun `saved input preferences can be read without restarting the app`() {
         val changed = KeyboardInputPreferences(SpaceHoldAction.REPEAT, 6f, 1.4f, "…\n→")
@@ -86,6 +105,36 @@ class KeyboardInputPreferencesTest {
         changed.copy(spaceHold = SpaceHoldAction.CURSOR, cursorStepDp = 24f).save(context)
         assertEquals(SpaceHoldAction.CURSOR, KeyboardInputPreferences.read(context).spaceHold)
         assertEquals(24f, KeyboardInputPreferences.read(context).cursorStepDp, 0f)
+    }
+
+    @Test fun `cursor hold delay persists tenths normalizes invalid values and leaves other actions unchanged`() {
+        for (tenth in 1..10) {
+            val seconds = tenth / 10f
+            KeyboardInputPreferences(cursorHoldSeconds = seconds).save(context)
+            val restored = KeyboardInputPreferences.read(context)
+            assertEquals(seconds, restored.cursorHoldSeconds, 0f)
+            assertEquals(tenth * 100L, restored.spaceHoldDelayMs)
+            for (action in listOf(SpaceHoldAction.REPEAT, SpaceHoldAction.VOICE_TOGGLE)) {
+                assertEquals(300L, restored.copy(spaceHold = action, cursorGesture = CursorGestureMode.NONE).spaceHoldDelayMs)
+                assertEquals("Space cursor override uses its configured delay", tenth * 100L,
+                    restored.copy(spaceHold = action, cursorGesture = CursorGestureMode.SPACE).spaceHoldDelayMs)
+            }
+        }
+        val invalid = listOf(
+            Float.NaN to 0.2f,
+            Float.POSITIVE_INFINITY to 0.2f,
+            Float.NEGATIVE_INFINITY to 0.2f,
+            -1f to 0.1f,
+            9f to 1f,
+            0.26f to 0.3f,
+        )
+        for ((stored, expected) in invalid) {
+            values["cursor_hold_seconds"] = stored
+            assertEquals("Read normalizes $stored", expected, KeyboardInputPreferences.read(context).cursorHoldSeconds, 0f)
+            KeyboardInputPreferences(cursorHoldSeconds = stored).save(context)
+            assertEquals("Save normalizes $stored", expected, values["cursor_hold_seconds"] as Float, 0f)
+            assertEquals(expected, KeyboardInputPreferences.read(context).cursorHoldSeconds, 0f)
+        }
     }
 
     @Test

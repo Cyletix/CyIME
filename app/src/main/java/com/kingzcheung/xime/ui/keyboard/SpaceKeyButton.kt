@@ -74,7 +74,7 @@ fun SpaceKeyButton(
     }
     BoxWithConstraints(
         modifier.fillMaxSize().testTag("space-key")
-            .pointerInput(holdAction, settings.cursorStepDp) {
+            .pointerInput(holdAction, settings.cursorStepDp, settings.spaceHoldDelayMs) {
                 val step = settings.cursorStepDp.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown()
