@@ -2,7 +2,7 @@
 
 最新正式发布为 **[1.4.0 / 20261049](https://github.com/Cyletix/CyIME/releases/tag/1.4.0)**（2026-10-03），普通版和内置 5 个模型的老人包均从 main 的 `dd342aa1` 构建，签名、版本与 GitHub 资产哈希已核对；详见 [发布回执](1.4.0.md)。本批已正式发布，后续不得覆盖此版本安装包，下一批按实际改动判断版本，versionCode 至少 20261050。
 
-平板 SM-X800 最近实际安装为 **1.4.0 / 20261048**，旧外观尺寸已备份重置，未清个人数据；见 [透明玻璃整合交付](development/glass-integration-delivery.md)。本次发布没有再次安装设备，手机 SM-S9180 最近确认仍为 20261039。功能验收保持 TODO 原状态；版本元数据以 `app/build.gradle.kts` 为唯一来源。
+平板 SM-X800 最近实际安装为 **1.4.1 Release / 20261055**，包含物理键盘浮条、语言/方案/布局选择与剪贴板工具栏累计修复，保留应用数据；签名与 1.4.0 一致，设备实际 APK 哈希已核对，见 [集成交付记录](development/integration-delivery-2026-10-03.md)。50～55 已用于源码产物，下一份不同源码交付至少 20261056。本包尚未上传 GitHub Release；此前旧外观尺寸备份重置见 [透明玻璃整合交付](development/glass-integration-delivery.md)。手机 SM-S9180 最近确认仍为 20261039，本轮未连接、未安装。功能验收保持 TODO 原状态；版本元数据以 `app/build.gradle.kts` 为唯一来源。
 
 ## 版本如何确定
 
