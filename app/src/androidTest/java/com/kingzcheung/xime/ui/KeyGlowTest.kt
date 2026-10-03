@@ -259,12 +259,15 @@ class KeyGlowTest {
         val sizes = listOf("kana-convert", "kana-number", "kana-symbol", "kana-key:a", "kana-key:wa", "kana-delete", "kana-space", "kana-enter")
             .map { rule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot }
         sizes.forEach { assertEquals(sizes[0].width, it.width, 1f); assertEquals(sizes[0].height, it.height, 1f) }
-        val fontSizes = listOf("変換", "123", "記号", "あ", "わ").map { label ->
+        val fontSizes = listOf("変換", "123", "!@#", "あ", "わ").map { label ->
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             rule.onNodeWithText(label).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
             layouts.single().layoutInput.style.fontSize.value
         }
-        fontSizes.forEach { assertEquals(fontSizes[0], it, 0.1f) }
+        listOf(fontSizes[3], fontSizes[4]).forEach { assertEquals(fontSizes[0], it, 0.1f) }
+        assertEquals("Mode labels share a compact size", fontSizes[1], fontSizes[2], 0.1f)
+        assertTrue("Mode labels remain smaller than the kana keys", fontSizes[1] < fontSizes[0])
+        assertTrue("Mode labels must remain readable", fontSizes[1] >= fontSizes[0] * .8f)
         rule.onNodeWithText("、").assertExists()
         rule.onNodeWithText("。").assertDoesNotExist()
         rule.onNodeWithText("？").assertDoesNotExist()

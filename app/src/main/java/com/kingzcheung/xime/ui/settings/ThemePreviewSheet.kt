@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.listSaver
 import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassProfiles
 import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.ui.theme.TransparentGlassTheme
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,10 +43,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +60,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -67,6 +72,7 @@ import com.kingzcheung.xime.ui.keyboard.crispShadowColor
 import com.kingzcheung.xime.ui.theme.KeyboardColorScheme
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
+import kotlinx.coroutines.launch
 
 private val QWERTY_ROW0 = listOf("Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P")
 private val QWERTY_ROW1 = listOf("A", "S", "D", "F", "G", "H", "J", "K", "L")
@@ -76,14 +82,22 @@ private val QWERTY_ROW2 = listOf("Z", "X", "C", "V", "B", "N", "M")
 @Composable
 fun ThemePreviewSheet(
     theme: KeyboardColorScheme,
-    onApply: (FrostedGlassConfig) -> Unit,
+    onApply: (FrostedGlassProfiles) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val glassEnabled = theme.id == TransparentGlassTheme.ID
     var glass by rememberSaveable(theme.id, stateSaver = listSaver(
-        save = { listOf(it.blurRadiusDp, it.backgroundOpacity, it.keyOpacity) },
-        restore = { FrostedGlassConfig(theme.id == TransparentGlassTheme.ID, it[0], it[1], it[2]) },
-    )) { mutableStateOf(FrostedGlassPreferences.read(context).copy(enabled = theme.id == TransparentGlassTheme.ID)) }
+        save = { listOf(it.light.blurRadiusDp, it.light.backgroundOpacity, it.light.keyOpacity,
+            it.dark.blurRadiusDp, it.dark.backgroundOpacity, it.dark.keyOpacity) },
+        restore = { FrostedGlassProfiles(
+            light = FrostedGlassConfig(glassEnabled, it[0], it[1], it[2]),
+            dark = FrostedGlassConfig(glassEnabled, it[3], it[4], it[5]),
+        ) },
+    )) { mutableStateOf(FrostedGlassPreferences.readProfiles(context).let {
+        it.copy(light = it.light.copy(enabled = glassEnabled), dark = it.dark.copy(enabled = glassEnabled))
+    }) }
+    val pagerState = rememberPagerState(pageCount = { PREVIEW_PAGES.size })
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -106,12 +120,13 @@ fun ThemePreviewSheet(
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
-            CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = glass)) {
-                ThemePreviewPager(theme = theme)
-            }
-            if (glass.enabled) {
+            ThemePreviewPager(theme = theme, glass = glass, pagerState = pagerState)
+            if (glassEnabled) {
                 Spacer(Modifier.height(16.dp))
-                FrostedThemeControls(glass) { glass = it }
+                val isDark = PREVIEW_PAGES[pagerState.currentPage].isDark
+                FrostedThemeControls(glass.forAppearance(isDark), isDark) {
+                    glass = if (isDark) glass.copy(dark = it) else glass.copy(light = it)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -153,10 +168,23 @@ private val PREVIEW_PAGES = listOf(
 @Composable
 private fun ThemePreviewPager(
     theme: KeyboardColorScheme,
+    glass: FrostedGlassProfiles,
+    pagerState: PagerState,
 ) {
-    val pagerState = rememberPagerState(pageCount = { PREVIEW_PAGES.size })
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            PREVIEW_PAGES.forEachIndexed { index, preview ->
+                TextButton(onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    modifier = Modifier.testTag(if (preview.isDark) "theme-preview-dark" else "theme-preview-light")) {
+                    Text(preview.label,
+                        fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal,
+                        color = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
@@ -168,13 +196,16 @@ private fun ThemePreviewPager(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                ThemeKeyboardPreview(
-                    theme = theme,
-                    isDark = preview.isDark,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 2.dp),
-                )
+                CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(
+                    frostedGlass = glass.forAppearance(preview.isDark))) {
+                    ThemeKeyboardPreview(
+                        theme = theme,
+                        isDark = preview.isDark,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 2.dp),
+                    )
+                }
             }
         }
 

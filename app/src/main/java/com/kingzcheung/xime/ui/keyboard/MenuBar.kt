@@ -126,7 +126,7 @@ fun MenuBar(
         else state.schemaSwitches.firstOrNull { it.name == "full_shape" }
     val options = state.schemaSwitches.filter { it.name != "ascii_mode" && it.name != "full_shape" && it.name != "ascii_punct" }
     if (showOptions) {
-        Column(modifier.fillMaxSize().background(state.backgroundColor)
+        Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor)
             .padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().height(44.dp).clickable { showOptions = false },
                 verticalAlignment = Alignment.CenterVertically) {
@@ -169,7 +169,7 @@ fun MenuBar(
         MenuItem(rememberVectorPainter(Icons.TwoTone.Mic), "语音转文本", { callbacks.onSettingsPage(SettingsRoutes.SpeechToText) }),
     ) + (if (options.isNotEmpty()) listOf(MenuItem(schemaIcon, "输入选项", { showOptions = true })) else emptyList())
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
-        modifier.fillMaxWidth().background(state.backgroundColor), preferSinglePage = true) { item, cellModifier ->
+        modifier.fillMaxWidth().keyboardPanelBackground(state.backgroundColor), preferSinglePage = true) { item, cellModifier ->
         MenuItemButton(item, itemBgColor, textColor,
             cellModifier.testTag("menu-item:${item.id}"), isLandscape)
     }

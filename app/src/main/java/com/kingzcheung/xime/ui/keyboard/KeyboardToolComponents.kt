@@ -19,13 +19,23 @@ import androidx.compose.ui.unit.sp
 
 /** Shared tool typography and touch targets; selected colors always come as a semantic pair. */
 @Composable
-internal fun ToolTab(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ToolTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
     val colors = MaterialTheme.colorScheme
-    Box(modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(22.dp))
-        .background(if (selected) colors.secondaryContainer else colors.surfaceContainer)
+    val fill = if (selected) colors.secondaryContainer else colors.surfaceContainer
+    val foreground = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant
+    Box(modifier.heightIn(min = if (compact) 40.dp else 44.dp)
+        .clip(RoundedCornerShape(if (compact) 8.dp else 22.dp))
+        .background(if (compact) frostedKeyColor(fill, foreground,
+            LocalKeyboardInputPreferences.current.frostedGlass) else fill)
         .semantics { this.selected = selected }.clickable(onClick = onClick)
-        .padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-        Text(label, color = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
+        .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = if (compact) 6.dp else 10.dp), contentAlignment = Alignment.Center) {
+        Text(label, color = foreground,
             fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }

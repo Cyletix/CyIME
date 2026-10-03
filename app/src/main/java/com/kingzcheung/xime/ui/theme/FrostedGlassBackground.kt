@@ -85,20 +85,35 @@ internal fun Modifier.frostedGlassBackground(
 
     // This replaces a theme image's overlayAlpha; applying both would double-darken it.
     val tint = (if (isDark) Color.Black else Color.White).copy(alpha = normalized.backgroundOpacity)
+    val surfacePaint = remember { androidx.compose.ui.graphics.Paint() }
     return onSizeChanged { targetSize = it }.drawWithContent {
-        // Only the backdrop is translucent; never fade candidate text or buttons.
+        // Build the same tinted material for every host, then fade the completed
+        // backdrop as one layer. Fading the raw light gradient without its dark
+        // tint made physical-keyboard windows look white next to a dark keyboard.
         val opacity = if (translucentSurface) normalized.backgroundOpacity else 1f
-        if (!translucentSurface || blurredImage == null) drawRect(fallbackColor.copy(alpha = opacity))
-        blurredImage?.let { image ->
-            drawImage(
-                image,
-                dstOffset = IntOffset.Zero,
-                dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
-                filterQuality = FilterQuality.Medium,
-                alpha = opacity,
-            )
+        if (opacity > 0f) {
+            if (translucentSurface) {
+                surfacePaint.alpha = opacity
+                drawContext.canvas.saveLayer(
+                    androidx.compose.ui.geometry.Rect(androidx.compose.ui.geometry.Offset.Zero, size),
+                    surfacePaint,
+                )
+            }
+            try {
+                drawRect(fallbackColor)
+                blurredImage?.let { image ->
+                    drawImage(
+                        image,
+                        dstOffset = IntOffset.Zero,
+                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                        filterQuality = FilterQuality.Medium,
+                    )
+                }
+                drawRect(tint)
+            } finally {
+                if (translucentSurface) drawContext.canvas.restore()
+            }
         }
-        if (!translucentSurface) drawRect(tint)
         drawContent()
     }
 }
