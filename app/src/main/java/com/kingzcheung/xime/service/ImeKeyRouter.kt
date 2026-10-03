@@ -118,22 +118,22 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
-    internal fun handleKeyPress(key: String, isShifted: Boolean) {
+    internal fun handleKeyPress(key: String, isShifted: Boolean, hardwarePageDirection: Int = 0) {
         if (hasPendingCandidateCommit) return
         val inherited = InputCommandOwner.current.get()
         if (inherited != null) {
             inherited.requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
-            routeKeyPress(key, isShifted)
+            routeKeyPress(key, isShifted, hardwarePageDirection)
             return
         }
         check(android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
             "Only a direct Main input entry may create command ownership"
         }
         val admission = service.inputReadiness.ticket() ?: return
-        commandOwner(admission).runInline { routeKeyPress(key, isShifted) }
+        commandOwner(admission).runInline { routeKeyPress(key, isShifted, hardwarePageDirection) }
     }
 
-    private fun routeKeyPress(key: String, isShifted: Boolean) {
+    private fun routeKeyPress(key: String, isShifted: Boolean, hardwarePageDirection: Int) {
         // 空键无任何按键语义，且下游 Rime 路由按 key[0] 取码（key.lowercase()[0]），
         // 空串会越界崩溃（2026-09-14 真机实证：滑动手势 commit 值为空时触发）。
         if (key.isEmpty()) return
@@ -295,6 +295,20 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.inputCommands.submit(InputCommandOwner.requireOwner().context()) command@{
             InputCommandOwner.requireOwner().requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
             if (!service.inputReadiness.accepts(admission) || hasPendingCandidateCommit) return@command
+            if (hardwarePageDirection != 0 &&
+                (service.rimeEngine.compositionActiveForDeletion() != false || service.t9PartialSegments.isNotEmpty())) {
+                // Consume even at either boundary or when decoding has no candidates yet.
+                // Never turn a reserved paging key into punctuation in an unfinished composition.
+                if (service.keyboardViewModel.candidatePageExpanded.value) {
+                    withEditor { service.expandedPageScroll(hardwarePageDirection) }
+                } else {
+                    if (hardwarePageDirection > 0 && service.rimeEngine.hasNextPage()) service.rimeEngine.pageDown()
+                    else if (hardwarePageDirection < 0 && service.rimeEngine.hasPrevPage()) service.rimeEngine.pageUp()
+                    withEditor { service.updateUI() }
+                }
+                withEditor { service.highlightIndex.intValue = 0 }
+                return@command
+            }
             val geometry = letterNeighbors
             service.rimeEngine.setNeighborMap(if (geometry.first == service.uiState.value.currentSchemaId) geometry.second else "")
             if (service.japaneseInputController.handleKey(key)) return@command

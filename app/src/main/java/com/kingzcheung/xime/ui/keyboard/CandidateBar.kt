@@ -807,22 +807,29 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
             }
         }
     }
-    val background = if (visuals.preeditBackgroundColor != Color.Unspecified) visuals.preeditBackgroundColor
-        else if (visuals.textColor.luminance() > 0.5f) Color(0xFF2D2F31) else Color(0xFFFAFAFA)
     Popup(popupPositionProvider = positionProvider,
         properties = PopupProperties(focusable = false, dismissOnBackPress = false,
             dismissOnClickOutside = false, clippingEnabled = true)) {
-        Box(Modifier.widthIn(max = screenWidth - 16.dp)
+        PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
             .height(44.dp).padding(vertical = 6.dp)
-            .preeditSurface(background)
-            .testTag("candidate-preedit")
-            .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
-                onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
-            contentAlignment = Alignment.CenterStart) {
-            Text(if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text,
-                color = visuals.textColor.copy(alpha = 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
-                softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
-        }
+        )
+    }
+}
+
+/** Shared by the screen keyboard preview and the hardware caret surface. */
+@Composable
+internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)? = null,
+    modifier: Modifier = Modifier) {
+    val background = if (visuals.preeditBackgroundColor != Color.Unspecified) visuals.preeditBackgroundColor
+        else if (visuals.textColor.luminance() > 0.5f) Color(0xFF2D2F31) else Color(0xFFFAFAFA)
+    Box(modifier.preeditSurface(background)
+        .testTag("candidate-preedit")
+        .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
+            onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
+        contentAlignment = Alignment.CenterStart) {
+        Text(if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text,
+            color = visuals.textColor.copy(alpha = 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
+            softWrap = false, modifier = Modifier.horizontalScroll(rememberScrollState()))
     }
 }
 
@@ -836,6 +843,8 @@ internal fun FixedCandidateStrip(
     callbacks: CandidateBarCallbacks, fontSize: androidx.compose.ui.unit.TextUnit,
     modifier: Modifier = Modifier,
     highlightIndex: Int = 0,
+    showNumberLabels: Boolean = false,
+    itemSpacing: androidx.compose.ui.unit.Dp = 4.dp,
 ) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -844,10 +853,10 @@ internal fun FixedCandidateStrip(
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
         val viewport = remember(candidates, comments) { CandidateStripViewport() }
-        val visibleIndices = remember(viewport, all, comments, focused, fontSize, density, measurer, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
-            candidateWindow(all.size, focused, constraints.maxWidth, with(density) { 4.dp.roundToPx() },
+        val visibleIndices = remember(viewport, all, comments, focused, fontSize, density, measurer, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
+            candidateWindow(all.size, focused, constraints.maxWidth, with(density) { itemSpacing.roundToPx() },
                 windowStart = viewport.firstIndex) { index ->
-                val text = all[index]
+                val text = if (showNumberLabels && index < candidates.size) "${(index + 1) % 10} ${all[index]}" else all[index]
                 val primary = measurer.measure(AnnotatedString(text), TextStyle(
                     fontSize = fontSize, fontFamily = AppFonts.candidateFontFamily,
                     fontWeight = if (index == focused) FontWeight.Medium else FontWeight.Normal), softWrap = false).size.width
@@ -866,9 +875,9 @@ internal fun FixedCandidateStrip(
             callbacks.onVisibleAssociationsChanged?.invoke(visibleIndices.filter { it >= candidates.size }
                 .map { all[it] })
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
             visibleIndices.forEach { index ->
-                CandidateItem(all[index], index, {
+                CandidateItem(if (showNumberLabels && index < candidates.size) "${(index + 1) % 10} ${all[index]}" else all[index], index, {
                     if (index < candidates.size) callbacks.onCandidateSelect(index)
                     else callbacks.onAssociationSelect?.invoke(index - candidates.size)
                 }, visuals.textColor,

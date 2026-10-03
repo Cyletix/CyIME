@@ -72,10 +72,10 @@ class HardwareCandidatePositionTest {
         }
         move(50f, 60f, 80f)
         assertEquals(host.left + 50f, card().left, 1f)
-        assertEquals(host.top + 88f, card().top, 1f)
+        assertEquals(host.top + 88f, rule.onNodeWithTag("hardware-preedit-card", true).fetchSemanticsNode().boundsInRoot.top, 1f)
         move(90f, 120f, 140f)
         assertEquals(host.left + 90f, card().left, 1f)
-        assertEquals(host.top + 148f, card().top, 1f)
+        assertEquals(host.top + 148f, rule.onNodeWithTag("hardware-preedit-card", true).fetchSemanticsNode().boundsInRoot.top, 1f)
         move(host.width - 5f, host.height - 30f, host.height - 10f)
         assertEquals(host.right - 8f, card().right, 1f)
         assertTrue(card().bottom <= host.bottom - 38f + 1f)
@@ -121,7 +121,7 @@ class HardwareCandidatePositionTest {
         val offsetY = hostWindowBounds.top - host.top
         assertEquals(Rect(floor(card.left + offsetX).toInt(), floor(card.top + offsetY).toInt(),
             ceil(card.right + offsetX).toInt(), ceil(card.bottom + offsetY).toInt()), reportedBounds)
-        rule.onNodeWithTag("hardware-candidate-1", true).performClick()
+        rule.onNodeWithTag("bar-candidate:1", true).performClick()
         rule.runOnIdle { assertEquals(1, selectedIndex) }
         // The full-screen placement host must not absorb touches outside its card.
         rule.onNodeWithTag("underlying-editor", true).performTouchInput { click(Offset(10f, 10f)) }
@@ -168,5 +168,61 @@ class HardwareCandidatePositionTest {
             assertTrue(!Rect.intersects(toolbar, candidate))
             assertTrue(candidate.bottom <= toolbar.top - 8)
         }
+    }
+
+    @Test fun hardwareCandidatesUseOneSharedRowAndFollowHighlightWindow() {
+        val highlight = mutableStateOf(0)
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                Box(Modifier.size(500.dp, 400.dp)) {
+                    HardwareKeyboardCandidateBar("nihao", "ni hao", List(10) { "很长的候选词$it" },
+                        true, false, null, highlight.value, Color.Black, Color.White, Color.Blue)
+                }
+            }
+        }
+        rule.waitForIdle()
+        val first = rule.onNodeWithTag("bar-candidate:0", true).fetchSemanticsNode().boundsInRoot
+        val second = rule.onNodeWithTag("bar-candidate:1", true).fetchSemanticsNode().boundsInRoot
+        assertEquals(first.top, second.top, 1f)
+        assertEquals(first.bottom, second.bottom, 1f)
+        val before = rule.onNodeWithTag("hardware-candidate-card", true).fetchSemanticsNode().boundsInRoot.height
+        rule.runOnIdle { highlight.value = 9 }
+        rule.waitForIdle()
+        val last = rule.onNodeWithTag("bar-candidate:9", true).fetchSemanticsNode().boundsInRoot
+        val card = rule.onNodeWithTag("hardware-candidate-card", true).fetchSemanticsNode().boundsInRoot
+        assertTrue(last.left >= card.left && last.right <= card.right)
+        assertEquals(before, card.height, 1f)
+    }
+
+    @Test fun preeditFitsTextAndRemainsSeparateWhenCandidatesDock() {
+        val text = mutableStateOf("ce")
+        val docked = mutableStateOf(false)
+        var preeditBounds: Rect? = null
+        var candidateBounds: Rect? = null
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                Box(Modifier.size(600.dp, 420.dp)) {
+                    HardwareKeyboardCandidateBar(text.value, text.value, listOf("测试", "侧视"),
+                        false, false, null, 0, Color.Black, Color.White, Color.Blue,
+                        bottomDocked = docked.value, avoidBoundsInWindow = Rect(8, 356, 592, 412),
+                        onBoundsChanged = { candidateBounds = it }, onPreeditBoundsChanged = { preeditBounds = it })
+                }
+            }
+        }
+        rule.waitForIdle()
+        val short = requireNotNull(preeditBounds).width()
+        assertTrue(short < requireNotNull(candidateBounds).width())
+        assertTrue(requireNotNull(preeditBounds).bottom < requireNotNull(candidateBounds).top)
+        rule.runOnIdle { text.value = "ce shi shu ru" }
+        rule.waitForIdle()
+        assertTrue(requireNotNull(preeditBounds).width() > short)
+        rule.runOnIdle { docked.value = true }
+        rule.waitForIdle()
+        rule.onNodeWithTag("hardware-candidate-card", true).assertDoesNotExist()
+        assertNull(candidateBounds)
+        assertNotNull(preeditBounds)
+        rule.runOnIdle { text.value = "" }
+        rule.waitForIdle()
+        assertNull(preeditBounds)
     }
 }

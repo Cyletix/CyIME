@@ -75,9 +75,10 @@ fun Modifier.keyboardBackground(
     isDark: Boolean,
     fallbackColor: Color = Color(0xFFE3E4E8),
     frostedGlass: FrostedGlassConfig = rememberKeyboardInputPreferences().frostedGlass,
+    translucentSurface: Boolean = false,
 ): Modifier {
     if (frostedGlass.enabled) {
-        return frostedGlassBackground(background, isDark, fallbackColor, frostedGlass)
+        return frostedGlassBackground(background, isDark, fallbackColor, frostedGlass, translucentSurface)
     }
     if (background == null) return this.then(Modifier.background(fallbackColor))
 

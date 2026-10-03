@@ -391,20 +391,29 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
     }
 
+    /** Share the punctuation preference and serialize the shortcut with typed keys. */
+    internal fun togglePunctuationWidth(notifyAscii: Boolean = false) {
+        service.keyRouter.postRimeJob {
+            if (service.uiState.value.isAsciiMode) {
+                if (notifyAscii) withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(service, "英文模式使用半角标点", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                return@postRimeJob
+            }
+            val full = !service.textCommit.isFullWidthPunctuation()
+            SettingsPreferences.setPunctuationFullWidth(service, full)
+            applyPunctuationWidth(asciiMode = false)
+            service.updateUI()
+            refreshSchemaSwitches()
+        }
+    }
+
     /** 菜单栏方案开关点击：切换引擎选项并刷新状态。 */
     internal fun toggleSchemaSwitch(sw: com.kingzcheung.xime.viewmodel.SchemaSwitchUiState) {
+        if (sw.name == "full_shape" || sw.name == "ascii_punct") { togglePunctuationWidth(); return }
         service.serviceScope.launch(service.keyProcessingDispatcher) {
             if (sw.name == "ascii_mode") {
                 service.schemaController.switchInputMethod()
-            } else if (sw.name == "full_shape" || sw.name == "ascii_punct") {
-                // 英文（ASCII）模式标点固定半角，全角/半角对它不生效：入口已隐藏，这里再兜底，
-                // 不让英文下的点击悄悄改掉用户的中文宽度选择。
-                if (service.uiState.value.isAsciiMode) return@launch
-                val full = !service.textCommit.isFullWidthPunctuation()
-                SettingsPreferences.setPunctuationFullWidth(service, full)
-                // 用户选择是唯一权威：把同一份选择写回引擎，避免"菜单显示半角、实际输出全角"。
-                applyPunctuationWidth(asciiMode = false)
-                service.updateUI()
             } else if (sw.name.isNotEmpty()) {
                 val newValue = !service.rimeEngine.getOption(sw.name)
                 service.rimeEngine.setOption(sw.name, newValue)

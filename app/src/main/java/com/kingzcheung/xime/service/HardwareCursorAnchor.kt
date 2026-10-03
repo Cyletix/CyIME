@@ -13,7 +13,7 @@ internal fun resolveHardwareCursorAnchor(info: CursorAnchorInfo): HardwareCursor
             flags and CursorAnchorInfo.FLAG_HAS_VISIBLE_REGION == 0
 
     fun toScreen(x: Float, top: Float, bottom: Float): HardwareCursorAnchor? {
-        if (!x.isFinite() || !top.isFinite() || !bottom.isFinite() || bottom < top) return null
+        if (!x.isFinite() || !top.isFinite() || !bottom.isFinite() || bottom <= top) return null
         val points = floatArrayOf(x, top, x, bottom)
         info.matrix.mapPoints(points)
         if (points.any { !it.isFinite() }) return null
@@ -38,7 +38,7 @@ internal fun resolveHardwareCursorAnchor(info: CursorAnchorInfo): HardwareCursor
     val markerTop = info.insertionMarkerTop
     val markerBottom = info.insertionMarkerBottom
     if (markerX.isInfinite() || markerTop.isInfinite() || markerBottom.isInfinite()) return null
-    if (markerX.isFinite() && markerTop.isFinite() && markerBottom.isFinite()) {
+    if (markerX.isFinite() && markerTop.isFinite() && markerBottom.isFinite() && markerBottom != markerTop) {
         return toScreen(markerX, markerTop, markerBottom)
     }
 
@@ -52,4 +52,15 @@ internal fun resolveHardwareCursorAnchor(info: CursorAnchorInfo): HardwareCursor
     val previous = caret - 1
     val bounds = info.getCharacterBounds(previous) ?: return null
     return characterCaret(bounds, info.getCharacterBoundsFlags(previous), trailing = true)
+}
+
+/** Bounds belong to the editor's coordinate system, not the IME window. */
+internal fun resolveHardwareEditorBounds(info: CursorAnchorInfo): HardwareCursorAnchor? {
+    if (android.os.Build.VERSION.SDK_INT < 33) return null
+    val local = info.editorBoundsInfo?.editorBounds ?: return null
+    val screen = RectF(local)
+    info.matrix.mapRect(screen)
+    if (!screen.left.isFinite() || !screen.top.isFinite() || !screen.right.isFinite() || !screen.bottom.isFinite() ||
+        screen.right <= screen.left || screen.bottom <= screen.top) return null
+    return HardwareCursorAnchor(screen.left, screen.top, screen.right, screen.bottom)
 }
