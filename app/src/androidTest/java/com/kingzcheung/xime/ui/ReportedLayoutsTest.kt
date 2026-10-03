@@ -86,7 +86,7 @@ class ReportedLayoutsTest {
             InputModes.saveLanguageOrder(context, listOf("zh", "ja", "en"))
             rule.setContent { MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) {
                 SchemaListView(listOf(SchemaInfo("rime_ice", "中文26键", "", "", ""), SchemaInfo("t9_pinyin", "中文九键", "", "", "")),
-                    "rime_ice", Color(0xFF191D25), Color(0xFFB1C9F5), Color.White, Color(0xFF303540), {}, onReorderSchemas = {},
+                    "rime_ice", Color(0xFF191D25), Color(0xFFB1C9F5), Color.White, Color(0xFF303540), {},
                     modifier = Modifier.size(360.dp, 260.dp).testTag("modes-preview"))
             } }
             save("modes-preview", "chinese-mode-order.png")

@@ -54,6 +54,7 @@ sealed interface CandidateBarState {
             smsVerificationCode: String? = null,
             clipboardImage: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
             highlightIndex: Int = 0,
+            hardwareHighlightIndex: Int? = null,
         ): CandidateBarState {
             val hasCandidates = candidates.isNotEmpty()
             val hasAssociations = associationCandidates.isNotEmpty()
@@ -71,12 +72,13 @@ sealed interface CandidateBarState {
                         preeditText = preeditText,
                         hasMore = hasCandidates && hasNextPage,
                         associationCandidates = associationCandidates,
-                        highlightIndex = highlightIndex,
+                        highlightIndex = hardwareHighlightIndex ?: highlightIndex,
                     )
                 !isComposing && !hasInput && hasAssociations && !hasCandidates ->
                     AssociationOnly(
                         candidates = associationCandidates,
                         hasMore = hasNextPage,
+                        highlightIndex = hardwareHighlightIndex ?: -1,
                     )
                 hasCandidates || hasInput ->
                     ChineseCandidates(
@@ -85,6 +87,7 @@ sealed interface CandidateBarState {
                         inputText = inputText,
                         preeditText = preeditText,
                         hasMore = hasCandidates && hasNextPage,
+                        highlightIndex = hardwareHighlightIndex ?: highlightIndex,
                     )
                 else -> Idle
             }

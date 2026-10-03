@@ -2,11 +2,16 @@ package com.kingzcheung.xime.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -17,6 +22,36 @@ import org.junit.Rule
 import org.junit.Test
 class FixedCandidateStripTest {
  @get:Rule val rule=createComposeRule()
+ @Test fun numberedCandidatesRespectInheritedSpacingWithoutClippingLastWord() {
+  var width by mutableStateOf(220.dp)
+  var scale by mutableStateOf(1f)
+  var density by mutableStateOf(1f)
+  val words=listOf("测试","侧视","侧室","策士","测","侧","册","策","厕")
+  rule.setContent { MaterialTheme {
+   CompositionLocalProvider(LocalDensity provides Density(density,scale),
+    LocalTextStyle provides LocalTextStyle.current.copy(letterSpacing=2.sp)) {
+    FixedCandidateStrip(words,comments=List(words.size){"ce"},
+     visuals=CandidateBarVisuals(Color.Black,Color.White,Color.Gray),
+     callbacks=CandidateBarCallbacks(onCandidateSelect={}), fontSize=19.sp,
+     showNumberLabels=true,itemSpacing=8.dp,modifier=Modifier.width(width))
+   }
+  } }
+  for ((nextWidth,nextScale,nextDensity) in listOf(Triple(220.dp,1f,1f),Triple(340.dp,1f,1f),Triple(220.dp,1.3f,1.4f))) {
+   rule.runOnIdle { width=nextWidth;scale=nextScale;density=nextDensity }
+   val nodes=rule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult),true)
+   assertTrue(nodes.fetchSemanticsNodes().isNotEmpty())
+   repeat(nodes.fetchSemanticsNodes().size) { index ->
+    val layouts=mutableListOf<TextLayoutResult>()
+    nodes[index].performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+    layouts.forEach { layout ->
+     val detail="${layout.layoutInput.text}, size=${layout.size}, intrinsic=${layout.multiParagraph.maxIntrinsicWidth}, paragraph=${layout.multiParagraph.width}, lineRight=${layout.getLineRight(0)}, density=$nextDensity, scale=$nextScale"
+     assertFalse("A visible word must not be ellipsized: $detail",layout.isLineEllipsized(0))
+     assertEquals("All characters must remain visible: $detail",layout.layoutInput.text.length,layout.getLineEnd(0))
+     assertTrue("Actual text must fit its bounds: $detail",layout.getLineRight(0)<=layout.size.width+0.5f)
+    }
+   }
+  }
+ }
  @Test fun mixedScriptsSameHeightAndOverflowIsNotRendered() {
   var visible: List<String> = emptyList()
   var selected = -1

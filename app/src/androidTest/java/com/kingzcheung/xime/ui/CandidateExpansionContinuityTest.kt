@@ -48,6 +48,7 @@ class CandidateExpansionContinuityTest {
             expandedCandidates = words.map { com.kingzcheung.xime.rime.RimeCandidate(it, "") },
         ))
         var selected = -1
+        var panelWidth by mutableStateOf(360.dp)
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 MaterialTheme {
@@ -55,12 +56,39 @@ class CandidateExpansionContinuityTest {
                         KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {},
                             isCandidateSnapshotCurrent = { it.hasSameSelectionSource(candidates.value) },
                             onGlobalCandidateSelect = { selected = it }),
-                        modifier = Modifier.size(360.dp, 240.dp).testTag("candidate-test-keyboard"), candidateState = candidates)
+                        modifier = Modifier.size(panelWidth, 240.dp).testTag("candidate-test-keyboard"), candidateState = candidates)
                 }
             }
         }
-        val delete = rule.onNodeWithTag("t9-delete-key").fetchSemanticsNode().boundsInRoot
+        var delete = androidx.compose.ui.geometry.Rect.Zero
+        for (width in listOf(360.dp, 760.dp, 1100.dp)) {
+        rule.runOnIdle { vm.setCandidatePageExpanded(false); panelWidth = width }
+        delete = rule.onNodeWithTag("t9-delete-key").fetchSemanticsNode().boundsInRoot
+        val mainLeft = rule.onNodeWithTag("t9-left-rail").fetchSemanticsNode().boundsInRoot
+        val mainRight = rule.onNodeWithTag("t9-right-rail").fetchSemanticsNode().boundsInRoot
+        val mainPinyin = rule.onNodeWithTag("t9-pinyin-options").fetchSemanticsNode().boundsInRoot
         rule.runOnIdle { vm.setCandidatePageExpanded(true) }
+        val expandedLeft = rule.onNodeWithTag("candidate-left-rail").fetchSemanticsNode().boundsInRoot
+        val expandedRight = rule.onNodeWithTag("candidate-right-rail").fetchSemanticsNode().boundsInRoot
+        val expandedPinyin = rule.onNodeWithTag("expanded-pinyin-options").fetchSemanticsNode().boundsInRoot
+        fun sameBounds(expected: androidx.compose.ui.geometry.Rect, actual: androidx.compose.ui.geometry.Rect) {
+            assertEquals(expected.left, actual.left, 1f)
+            assertEquals(expected.top, actual.top, 1f)
+            assertEquals(expected.right, actual.right, 1f)
+            assertEquals(expected.bottom, actual.bottom, 1f)
+        }
+        sameBounds(mainLeft, expandedLeft)
+        sameBounds(mainRight, expandedRight)
+        sameBounds(mainPinyin, expandedPinyin)
+        val controls = listOf("expanded-delete-key", "expanded-page-previous", "expanded-page-next", "expanded-enter-key")
+        controls.forEachIndexed { index, tag ->
+            val box = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+            assertEquals(delete.width, box.width, 1f)
+            assertEquals(delete.height, box.height, 1f)
+            assertEquals(delete.left, box.left, 1f)
+            assertEquals(delete.top + index * delete.height, box.top, 1f)
+        }
+        }
         rule.onNodeWithTag("expanded-candidates").assertIsDisplayed()
         // The restored page uses the entire keyboard body, including the former bottom row.
         val list = rule.onNodeWithTag("expanded-candidates").fetchSemanticsNode().boundsInRoot
