@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {validate,iconSvg,sceneSvg,optics,kotlinTokens,styles,levels,themePalette,toolbarMarkSvg} from './renderer.mjs';
+import {validate,iconSvg,sceneSvg,optics,kotlinTokens,styles,levels,themePalette,toolbarMarkSvg,androidVector,launcherBareVector} from './renderer.mjs';
 import {compile} from './compile.mjs';
 const c=JSON.parse(await readFile(new URL('./design.json',import.meta.url),'utf8'));
 const resources=JSON.parse(await readFile(new URL('./android-resources.json',import.meta.url),'utf8'));
@@ -15,6 +15,36 @@ const iconPaletteHashes={
  frost:'e9c3733d5e1bee91b35b1261b95cd47fb4761300948dc992f4c24a6be108eab2'
 };
 test('Android outputs match current shared source',async()=>{await compile(c,true)});
+test('launcher resources keep upgrade aliases and select framed or trimmed artwork',async()=>{
+ const manifest=await readFile(new URL('../../app/src/main/AndroidManifest.xml',import.meta.url),'utf8');
+ const aliases=[...manifest.matchAll(/<activity-alias\b[\s\S]*?<\/activity-alias>/g)].map(m=>m[0]);
+ assert.equal(aliases.length,10);
+ assert.equal(aliases.filter(s=>s.includes('android:enabled="true"')).length,1);
+ for(const style of ['original',...styles]) for(const bare of [false,true]) {
+  const name='com.kingzcheung.xime.launcher.Icon'+style[0].toUpperCase()+style.slice(1)+(bare?'Bare':'');
+  const alias=aliases.find(s=>s.includes(`android:name="${name}"`));
+  assert.ok(alias,name);
+  const asset=style==='original'?'facet':style;
+  assert.ok(alias.includes(bare?`@drawable/cyime_launcher_bare_${asset}`:`@mipmap/cyime_launcher_${asset}`));
+  assert.ok(alias.includes('android:targetActivity="com.kingzcheung.xime.MainActivity"'));
+  if(!bare) {
+   const xml=await readFile(new URL(`../../app/src/main/res/mipmap-anydpi-v26/cyime_launcher_${asset}.xml`,import.meta.url),'utf8');
+   assert.match(xml,/<adaptive-icon/);
+   assert.ok(xml.includes(`@drawable/cyime_mark_${asset}`));
+   assert.match(xml,/<background android:drawable="@drawable\/cyime_launcher_background_(dark|light)"/);
+  }
+ }
+});
+test('bare launcher trims margins while preserving artwork and keyboard canvas',()=>{
+ for(const style of styles) {
+  const original=androidVector(c,style), bare=launcherBareVector(c,style);
+  assert.match(original,/viewportWidth="1024"/);
+  assert.match(bare,/viewportWidth="672"/);
+  assert.match(bare,/translateX="-176" android:translateY="-160"/);
+  assert.deepEqual([...bare.matchAll(/<path[\s\S]*?<\/path>/g)].map(m=>m[0]),
+    [...original.matchAll(/<path[\s\S]*?<\/path>/g)].map(m=>m[0]));
+ }
+});
 test('four distinct material recipes scale by level without regaining an inner rim',()=>{
  validate(c);
  const fields=['shade','tint','top','topReach','border','depth','facet','matte','glow'];

@@ -12,6 +12,9 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 object IconAppearance {
     const val KEY_STYLE = "cyime_icon_style"
     const val KEY_LINKED = "cyime_icon_linked"
+    const val KEY_FRAMED = "cyime_icon_framed"
+    var framed by mutableStateOf(true)
+        private set
     var selected by mutableStateOf(VisualStyle.ORIGINAL)
         private set
     var linked by mutableStateOf(true)
@@ -21,6 +24,7 @@ object IconAppearance {
     fun reload(context: Context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         linked = prefs.getBoolean(KEY_LINKED, true)
+        framed = prefs.getBoolean(KEY_FRAMED, true)
         selected = VisualStyle.fromId(prefs.getString(KEY_STYLE, SettingsPreferences.getVisualStyle(context).id))
     }
 
@@ -51,17 +55,26 @@ object IconAppearance {
         linked = value
         prefs.edit().putBoolean(KEY_LINKED, value).putString(KEY_STYLE, icon.id).apply()
     }
+
+    fun setFramed(context: Context, value: Boolean) {
+        reload(context)
+        LauncherIcons.apply(context, effective, value)
+        framed = value
+        SettingsPreferences.getPrefsPublic(context).edit().putBoolean(KEY_FRAMED, value).apply()
+    }
 }
 
 object LauncherIcons {
-    fun component(context: Context, style: VisualStyle) = ComponentName(context.packageName,
-        "com.kingzcheung.xime.launcher.Icon" + style.id.replaceFirstChar { it.uppercaseChar() })
+    fun component(context: Context, style: VisualStyle, framed: Boolean = IconAppearance.framed) = ComponentName(context.packageName,
+        "com.kingzcheung.xime.launcher.Icon" + style.id.replaceFirstChar { it.uppercaseChar() } + if (framed) "" else "Bare")
 
-    fun apply(context: Context, style: VisualStyle) {
+    fun apply(context: Context, style: VisualStyle, framed: Boolean = IconAppearance.framed) {
         val pm = context.packageManager
-        val target = component(context, style)
-        val changes = VisualStyle.entries.map { candidate ->
-            component(context, candidate) to if (candidate == style) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        val target = component(context, style, framed)
+        val changes = VisualStyle.entries.flatMap { candidate -> listOf(true, false).map { withFrame ->
+            val name = component(context, candidate, withFrame)
+            name to if (name == target) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        }
         }.filter { (name, state) -> pm.getComponentEnabledSetting(name) != state }
         if (changes.isEmpty()) return
         if (Build.VERSION.SDK_INT >= 33) {

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/cyime_launcher_background_dark" />
+    <foreground android:drawable="@drawable/cyime_mark_glass" />
+    <monochrome android:drawable="@drawable/cyime_mark_glass" />
+</adaptive-icon>
