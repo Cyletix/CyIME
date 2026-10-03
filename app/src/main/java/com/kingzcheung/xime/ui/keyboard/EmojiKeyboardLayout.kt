@@ -7,6 +7,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -71,7 +72,7 @@ fun EmojiKeyboardLayout(
     onHapticFeedback: (() -> Unit)? = null,
 ) {
     var faces by remember { mutableStateOf(false) }
-    Column(modifier.fillMaxSize().background(backgroundColor)) {
+    Column(modifier.fillMaxSize().keyboardPanelBackground(backgroundColor)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ToolTab("Emoji", !faces, { faces = false }, Modifier.testTag("expression-emoji"))
@@ -170,7 +171,7 @@ private fun EmojiContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(backgroundColor)
+            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else backgroundColor)
     ) {
         // With no plugins there is only one group; its lone tab wastes a full row.
         if (pluginGroupEntries.isNotEmpty()) Box(
@@ -302,7 +303,7 @@ private fun EmojiContent(
             modifier = Modifier.testTag("emoji-pages")
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = if (isLandscape) 50.dp else 4.dp)
+                .padding(horizontal = 4.dp)
                 .padding(bottom = 4.dp)
         ) { pageIndex ->
             val category = if (pageIndex < displayBuiltinCategories.size) {
@@ -311,7 +312,9 @@ private fun EmojiContent(
                 pluginCategories[pageIndex - displayBuiltinCategories.size]
             }
 
-            val emojiColumns = if (isLandscape) 15 else 8
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+            val grid = symbolGridGeometry(maxWidth.value, maxHeight.value)
+            val emojiColumns = grid.columns
             if (category.isPlugin && category.emojiItems != null) {
                 val hasImages = category.emojiItems.any { it.imageUrl != null }
                 val defaultCols = if (hasImages) 6 else emojiColumns
@@ -414,7 +417,8 @@ private fun EmojiContent(
                                         )
                                         onEmojiSelect(emoji)
                                     },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f).height(grid.rowHeightDp.dp),
+                                    cellHeightDp = grid.rowHeightDp
                                 )
                             }
                             repeat(emojiColumns - rowEmojis.size) {
@@ -426,12 +430,13 @@ private fun EmojiContent(
             }
         }
 
+        }
         // 底部：子分类 Tab 或留空 + 删除按钮
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(44.dp)
-                .padding(horizontal = if (isLandscape) 50.dp else 4.dp, vertical = 0.dp),
+                .padding(horizontal = 4.dp, vertical = 0.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -547,11 +552,12 @@ fun EmojiCategoryTab(
 fun EmojiButton(
     emoji: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cellHeightDp: Float? = null,
 ) {
     Box(
         modifier = modifier
-            .aspectRatio(1f)
+            .then(if (cellHeightDp == null) Modifier.aspectRatio(1f) else Modifier)
             .clip(RoundedCornerShape(4.dp))
             .tolerantClick(onClick = onClick)
             .keyGlow(Modifier.clip(RoundedCornerShape(4.dp))),
@@ -559,7 +565,7 @@ fun EmojiButton(
     ) {
         Text(
             text = emoji,
-            fontSize = 22.sp,
+            fontSize = (cellHeightDp?.let { (it * 0.45f).coerceIn(22f, 36f) } ?: 22f).sp,
             textAlign = TextAlign.Center
         )
     }

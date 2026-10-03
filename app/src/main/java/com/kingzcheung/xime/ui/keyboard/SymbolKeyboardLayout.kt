@@ -10,22 +10,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.CompositionLocalProvider
@@ -41,10 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -53,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.data.RecentUsageStore
 import com.kingzcheung.xime.data.SymbolCategory
 import com.kingzcheung.xime.data.SymbolData
+import com.kingzcheung.xime.settings.KeysConfigHelper
 import kotlinx.coroutines.launch
 
 @Composable
@@ -74,6 +73,7 @@ fun SymbolKeyboardLayout(
     specialKeyBackgroundColor: Color = accentColor,
     specialKeyTextColor: Color = textColor,
     onSelectExact: (String) -> Unit = onSelect,
+    isFloatingMode: Boolean = false,
 ) {
     val context = LocalContext.current
     // 常用在首屏；最近使用（LRU）作为紧邻分类，点击符号时置顶记录
@@ -81,10 +81,14 @@ fun SymbolKeyboardLayout(
         mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_SYMBOLS))
     }
     val textLabel = LocalTextModeLabel.current
-    val displayCategories = remember(recentSymbols, textLabel) {
+    val japanese = LocalKeyboardPunctuation.current?.japanese == true
+    val displayCategories = remember(recentSymbols, textLabel, japanese) {
         listOf(SymbolCategory(name = "常用", id = "common", symbols = commonSymbolsFor(textLabel)),
             SymbolCategory(name = "最近", id = "recentSymbols", symbols = recentSymbols)) +
-            SymbolData.categories
+            SymbolData.categories.map { category ->
+                if (japanese && category.id == "punctuationSymbols") category.copy(name = "全")
+                else category
+            }
     }
     val scope = rememberCoroutineScope()
 
@@ -94,12 +98,16 @@ fun SymbolKeyboardLayout(
     )
 
     KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp),
-        policy = KeyVisualPolicy.Qwerty, applyGutter = true) { bodyModifier ->
-    CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(2.dp)) {
+        policy = KeyVisualPolicy.Qwerty, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
+    val keySpacing = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
+    CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(
+        horizontal = keySpacing.first?.dp ?: 2.dp,
+        vertical = keySpacing.second?.dp ?: 2.dp,
+    )) {
     Column(
         modifier = bodyModifier
             .fillMaxWidth()
-            .background(backgroundColor)
+            .keyboardPanelBackground(backgroundColor)
             .padding(bottom = 8.dp)
     ) {
         // 内容区：符号网格 + HorizontalPager
@@ -109,13 +117,16 @@ fun SymbolKeyboardLayout(
                 .weight(3f)
                 .padding(bottom = 4.dp)
         ) {
-            val columns = (maxWidth.value / 48f).toInt().coerceIn(6, 15)
+            val grid = symbolGridGeometry(maxWidth.value, maxHeight.value)
+            val columns = grid.columns
+            val symbolFontSize = (20f * keyContentScale(maxWidth.value / columns, grid.rowHeightDp)).sp
             // 符号网格自成一格：按网格自身格宽算度量（不套主体键宽上限/gutter）
             val gridMetrics = keyVisualMetrics(
                 policy = KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE, minGutter = 0f),
                 availableWidthDp = maxWidth.value,
-                availableHeightDp = maxHeight.value,
+                availableHeightDp = grid.rowHeightDp * 3f,
                 columns = columns.toFloat(),
+                rows = 3f, verticalInsetDp = 0f,
             )
             CompositionLocalProvider(LocalKeyboardKeyVisualMetrics provides gridMetrics) {
             HorizontalPager(
@@ -158,7 +169,8 @@ fun SymbolKeyboardLayout(
                                         )
                                         if (preserveWidth) onSelectExact(symbol) else onSelect(symbol)
                                     },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).height(grid.rowHeightDp.dp).testTag("symbol-key:$symbol"),
+                                    fontSize = symbolFontSize,
                                     textColor = textColor,
                                     backgroundColor = keyBgColor,
                                 )
@@ -174,7 +186,8 @@ fun SymbolKeyboardLayout(
 
         }
 
-        // 左侧双槽位与文本/数字键盘同位；右侧仍是分类和删除。
+        // 和标准 26 键共用底栏权重；分类只占余下空间，不挤压两侧入口。
+        val bottom = QwertyBottomRowWeights.Standard
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -188,33 +201,41 @@ fun SymbolKeyboardLayout(
                     onKeyPress = { action -> if (action == "abc") onBack() else onNumber() },
                     onKeyPressDown = { onHapticFeedback?.invoke() },
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
-                    modifier = Modifier.weight(LocalModeSlotWeight.current),
+                    modifier = Modifier.weight(bottom.mode),
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
                     shadowShapeRadius = shadowShapeRadius,
                 )
             }
-            Row(
+            BoxWithConstraints(
                 modifier = Modifier
-                    .weight(4.2f - 2 * LocalModeSlotWeight.current)
+                    .weight(bottom.total - 2 * bottom.mode - bottom.enter)
                     .fillMaxHeight()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.Start
+                    .testTag("symbol-category-strip"),
+                contentAlignment = Alignment.CenterStart,
             ) {
-                displayCategories.forEachIndexed { index, category ->
-                    SymbolCategoryTab(
-                        name = category.name,
-                        isSelected = index == pagerState.currentPage,
-                        onClick = {
-                            onHapticFeedback?.invoke()
-                            scope.launch { pagerState.animateScrollToPage(index) }
-                        },
-                        backgroundColor = keyBgColor,
-                        textColor = textColor,
-                        selectedBackgroundColor = accentColor.copy(alpha = 0.24f),
-                        modifier = Modifier.testTag("symbol-category:${category.id}"),
-                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius
-                    )
+                // 高键盘中分类不无限放大；窄窗口仍保留可读宽度，通过滚动访问其余分类。
+                val tabHeight = minOf(maxHeight, 72.dp)
+                val tabWidth = (tabHeight * 1.1f).coerceIn(48.dp, 88.dp)
+                val categoryColor = lerp(keyBgColor, textColor, 0.07f)
+                Row(
+                    Modifier.fillMaxWidth().height(tabHeight).horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    displayCategories.forEachIndexed { index, category ->
+                        SymbolCategoryTab(
+                            name = category.name,
+                            isSelected = index == pagerState.currentPage,
+                            onClick = {
+                                onHapticFeedback?.invoke()
+                                scope.launch { pagerState.animateScrollToPage(index) }
+                            },
+                            backgroundColor = categoryColor,
+                            textColor = textColor,
+                            selectedBackgroundColor = lerp(categoryColor, accentColor, 0.24f),
+                            modifier = Modifier.width(tabWidth).fillMaxHeight()
+                                .testTag("symbol-category:${category.id}"),
+                        )
+                    }
                 }
             }
 
@@ -223,7 +244,7 @@ fun SymbolKeyboardLayout(
                 onClick = { onSelect("delete") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(0.8f).testTag("symbol-delete"),
+                modifier = Modifier.weight(bottom.enter).testTag("symbol-delete"),
                 fontSize = 12.sp
             )
         }
@@ -241,28 +262,26 @@ private fun SymbolButton(
     textColor: Color = Color.Unspecified,
     backgroundColor: Color,
     preserveWidth: Boolean = false,
+    fontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     Box(
         modifier = modifier
-            .aspectRatio(1f)
             .tolerantClick(
                 showRipple = false,
                 interactionSource = interactionSource,
                 onClick = onClick
             )
             .padding(scaledKeyVisualPadding())
-            .keyGlow(Modifier.clip(RoundedCornerShape(8.dp))
-                .background(
-                    if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)
-                    else backgroundColor
-                )),
+            .keyGlow(Modifier.clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+                .background(frostedKeyColor(backgroundColor, textColor,
+                    LocalKeyboardInputPreferences.current.frostedGlass, pressed = isPressed))),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = if (preserveWidth) symbol else punctuationKeyLabel(symbol),
-            fontSize = 16.sp,
+            fontSize = fontSize,
             textAlign = TextAlign.Center,
             color = textColor,
             fontFamily = AppFonts.keyFontFamily
@@ -279,19 +298,28 @@ private fun SymbolCategoryTab(
     textColor: Color,
     selectedBackgroundColor: Color,
     modifier: Modifier = Modifier,
-    shadowEnabled: Boolean,
-    shadowElevation: Dp,
-    shadowShapeRadius: Dp,
 ) {
-    // Share the mode keys' full row height, visual insets and adaptive typography.
-    KeyButton(
-        text = name,
-        onClick = onClick,
-        backgroundColor = if (isSelected) selectedBackgroundColor else backgroundColor,
-        textColor = textColor,
-        fontSize = 16.sp,
-        modifier = modifier.width(56.dp).fillMaxHeight().semantics { selected = isSelected },
-        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-        shadowShapeRadius = shadowShapeRadius,
-    )
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val fill = if (isSelected) selectedBackgroundColor else backgroundColor
+    Box(
+        modifier = modifier.padding(scaledKeyVisualPadding())
+            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+            .semantics(mergeDescendants = true) {
+                selected = isSelected
+                role = Role.Tab
+                onClick { onClick(); true }
+            }
+            .tolerantClick(interactionSource = interactionSource, onClick = onClick)
+            .keyGlow(Modifier.background(frostedKeyColor(
+                fill, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
+                pressed = pressed, highlighted = isSelected,
+            )))
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(name, color = if (isSelected) textColor else textColor.copy(alpha = 0.65f),
+            fontSize = 16.sp, maxLines = 1, textAlign = TextAlign.Center,
+            fontFamily = AppFonts.keyFontFamily)
+    }
 }

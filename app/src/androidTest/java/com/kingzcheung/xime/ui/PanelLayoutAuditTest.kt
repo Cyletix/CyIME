@@ -55,7 +55,7 @@ class PanelLayoutAuditTest {
                         KeyboardView(vm, KeyboardUiState(isDarkTheme = true, schemas = schemas,
                             clipboardItems = (1..8).map { ClipboardItem(it.toLong(), "复制内容 $it") },
                             quickSendItems = listOf(ClipboardItem(9, "常用短语")), toolPanelTitle = "插件面板"),
-                            KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}, onReorderSchemas = {}),
+                            KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
                             modifier = Modifier.size(width.dp, height.dp).graphicsLayer { alpha = 0.5f }.testTag("audit-keyboard"))
                     }
                 }
