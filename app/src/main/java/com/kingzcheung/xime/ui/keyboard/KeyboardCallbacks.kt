@@ -58,7 +58,6 @@ data class KeyboardCallbacks(
     val onSettings: (() -> Unit)? = null,
     val onSettingsPage: ((String) -> Unit)? = null,
     val onSwitchSchema: ((String) -> Unit)? = null,
-    val onReorderSchemas: ((List<String>) -> Unit)? = null,
     val onHandwritingExpand: ((Boolean) -> Unit)? = null,
     val onHandwritingToggle: (() -> Unit)? = null,
     val onToggleSchemaSwitch: ((SchemaSwitchUiState) -> Unit)? = null,
