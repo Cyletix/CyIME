@@ -1,0 +1,372 @@
+{
+  "fixture_version": 1,
+  "id": "t9_text",
+  "source_label": "Supplied text",
+  "source_text": "的。大。发。额。不。了。是。我。你。他。有。中。人。和。安。哦。爱。嗯。觉得。你的。",
+  "source_sha256_utf8": "a4ad544f8fb659705b33b4aba50b684e473a0cf98c33278a48a69fa367297fe7",
+  "input_contract": {
+    "language": "zh-Hans",
+    "scheme": "full_pinyin",
+    "layout": "t9",
+    "keymap": {
+      "2": "abc",
+      "3": "def",
+      "4": "ghi",
+      "5": "jkl",
+      "6": "mno",
+      "7": "pqrs",
+      "8": "tuv",
+      "9": "wxyz"
+    },
+    "pinyin": "One full canonical toneless pinyin syllable per Han character; ü is v.",
+    "case_boundary": "Every contiguous Han span is an independent composition; all other characters remain source literals.",
+    "source_offsets": "Python Unicode code point offsets, start inclusive, end exclusive.",
+    "body_filter": "All generated cases default to body; heading/speaker classification requires explicit editing.",
+    "simulation_limit": "Input fixture only; pronunciation, candidate language quality and keyboard UI acceptance are not certified."
+  },
+  "pronunciation_review": {
+    "review_status": "provided",
+    "generator": "explicit one-syllable-per-Han readings",
+    "overrides": []
+  },
+  "cases": [
+    {
+      "id": "c001",
+      "text": "的",
+      "pinyin": [
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 0,
+      "source_end": 1,
+      "source_line": 1,
+      "keys": "33",
+      "syllable_keys": [
+        "33"
+      ]
+    },
+    {
+      "id": "c002",
+      "text": "大",
+      "pinyin": [
+        "da"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 2,
+      "source_end": 3,
+      "source_line": 1,
+      "keys": "32",
+      "syllable_keys": [
+        "32"
+      ]
+    },
+    {
+      "id": "c003",
+      "text": "发",
+      "pinyin": [
+        "fa"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 4,
+      "source_end": 5,
+      "source_line": 1,
+      "keys": "32",
+      "syllable_keys": [
+        "32"
+      ]
+    },
+    {
+      "id": "c004",
+      "text": "额",
+      "pinyin": [
+        "e"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 6,
+      "source_end": 7,
+      "source_line": 1,
+      "keys": "3",
+      "syllable_keys": [
+        "3"
+      ]
+    },
+    {
+      "id": "c005",
+      "text": "不",
+      "pinyin": [
+        "bu"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 8,
+      "source_end": 9,
+      "source_line": 1,
+      "keys": "28",
+      "syllable_keys": [
+        "28"
+      ]
+    },
+    {
+      "id": "c006",
+      "text": "了",
+      "pinyin": [
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 10,
+      "source_end": 11,
+      "source_line": 1,
+      "keys": "53",
+      "syllable_keys": [
+        "53"
+      ]
+    },
+    {
+      "id": "c007",
+      "text": "是",
+      "pinyin": [
+        "shi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 12,
+      "source_end": 13,
+      "source_line": 1,
+      "keys": "744",
+      "syllable_keys": [
+        "744"
+      ]
+    },
+    {
+      "id": "c008",
+      "text": "我",
+      "pinyin": [
+        "wo"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 14,
+      "source_end": 15,
+      "source_line": 1,
+      "keys": "96",
+      "syllable_keys": [
+        "96"
+      ]
+    },
+    {
+      "id": "c009",
+      "text": "你",
+      "pinyin": [
+        "ni"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 16,
+      "source_end": 17,
+      "source_line": 1,
+      "keys": "64",
+      "syllable_keys": [
+        "64"
+      ]
+    },
+    {
+      "id": "c010",
+      "text": "他",
+      "pinyin": [
+        "ta"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 18,
+      "source_end": 19,
+      "source_line": 1,
+      "keys": "82",
+      "syllable_keys": [
+        "82"
+      ]
+    },
+    {
+      "id": "c011",
+      "text": "有",
+      "pinyin": [
+        "you"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 20,
+      "source_end": 21,
+      "source_line": 1,
+      "keys": "968",
+      "syllable_keys": [
+        "968"
+      ]
+    },
+    {
+      "id": "c012",
+      "text": "中",
+      "pinyin": [
+        "zhong"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 22,
+      "source_end": 23,
+      "source_line": 1,
+      "keys": "94664",
+      "syllable_keys": [
+        "94664"
+      ]
+    },
+    {
+      "id": "c013",
+      "text": "人",
+      "pinyin": [
+        "ren"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 24,
+      "source_end": 25,
+      "source_line": 1,
+      "keys": "736",
+      "syllable_keys": [
+        "736"
+      ]
+    },
+    {
+      "id": "c014",
+      "text": "和",
+      "pinyin": [
+        "he"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 26,
+      "source_end": 27,
+      "source_line": 1,
+      "keys": "43",
+      "syllable_keys": [
+        "43"
+      ]
+    },
+    {
+      "id": "c015",
+      "text": "安",
+      "pinyin": [
+        "an"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 28,
+      "source_end": 29,
+      "source_line": 1,
+      "keys": "26",
+      "syllable_keys": [
+        "26"
+      ]
+    },
+    {
+      "id": "c016",
+      "text": "哦",
+      "pinyin": [
+        "o"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 30,
+      "source_end": 31,
+      "source_line": 1,
+      "keys": "6",
+      "syllable_keys": [
+        "6"
+      ]
+    },
+    {
+      "id": "c017",
+      "text": "爱",
+      "pinyin": [
+        "ai"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 32,
+      "source_end": 33,
+      "source_line": 1,
+      "keys": "24",
+      "syllable_keys": [
+        "24"
+      ]
+    },
+    {
+      "id": "c018",
+      "text": "嗯",
+      "pinyin": [
+        "en"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 34,
+      "source_end": 35,
+      "source_line": 1,
+      "keys": "36",
+      "syllable_keys": [
+        "36"
+      ]
+    },
+    {
+      "id": "c019",
+      "text": "觉得",
+      "pinyin": [
+        "jue",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 36,
+      "source_end": 38,
+      "source_line": 1,
+      "keys": "58333",
+      "syllable_keys": [
+        "583",
+        "33"
+      ]
+    },
+    {
+      "id": "c020",
+      "text": "你的",
+      "pinyin": [
+        "ni",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 39,
+      "source_end": 41,
+      "source_line": 1,
+      "keys": "6433",
+      "syllable_keys": [
+        "64",
+        "33"
+      ]
+    }
+  ],
+  "counts": {
+    "cases": 20,
+    "han_characters": 22,
+    "digit_keypresses": 49,
+    "body_cases": 20,
+    "body_han_characters": 22,
+    "body_digit_keypresses": 49,
+    "by_role": {
+      "body": {
+        "cases": 20,
+        "han_characters": 22
+      }
+    }
+  }
+}
