@@ -1,209 +1,124 @@
 package com.kingzcheung.xime.ui.menubar
 
-import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
-import com.kingzcheung.xime.ui.keyboard.isT9Schema
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.twotone.Gesture
-import androidx.compose.material.icons.twotone.KeyboardAlt
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import com.kingzcheung.xime.R
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.text.style.TextOverflow
-import com.kingzcheung.xime.ui.keyboard.KeyboardPanelGrid
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.kingzcheung.xime.settings.SchemaInfo
+import com.kingzcheung.xime.settings.*
 
-// The add action is presentation-only: never include it in schema switching or saved order.
-private data class SchemaPanelItem(val schema: SchemaInfo?)
-
+/** The toolbar edits the active language's combination. Language switching belongs to the globe. */
 @Composable
 fun SchemaListView(
-    schemas: List<SchemaInfo>,
-    currentSchemaId: String,
-    backgroundColor: Color,
-    accentColor: Color,
-    keyTextColor: Color,
-    keyBgColor: Color,
-    onSelectSchema: (String) -> Unit,
-    onBack: (() -> Unit)? = null,
+    schemas: List<SchemaInfo>, currentSchemaId: String,
+    backgroundColor: Color, accentColor: Color, keyTextColor: Color, keyBgColor: Color,
+    onSelectSchema: (String) -> Unit, onBack: (() -> Unit)? = null,
     onReorderSchemas: ((List<String>) -> Unit)? = null,
-    modifier: Modifier = Modifier,
-    orderableSchemas: List<SchemaInfo> = schemas,
+    modifier: Modifier = Modifier, orderableSchemas: List<SchemaInfo> = schemas,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var editingLanguages by remember { mutableStateOf(false) }
-    var languageOrder by remember { mutableStateOf(com.kingzcheung.xime.settings.InputModes.languageOrder(context)) }
-    var editingOrder by remember(com.kingzcheung.xime.settings.InputModes.languageOf(currentSchemaId, schemas)) { mutableStateOf(false) }
-    // 功能 item 背景：与键盘按键背景一致（keyBgColor，浅色纯白、深色跟随 keyboard.colors）
-    val isChinese = com.kingzcheung.xime.settings.InputModes.languageOf(currentSchemaId, schemas) == com.kingzcheung.xime.settings.InputLanguage.CHINESE
-    val panelItems = schemas.map { SchemaPanelItem(it) } + if (isChinese) listOf(SchemaPanelItem(null)) else emptyList()
-    val itemBgColor = keyBgColor
-    val textColor = keyTextColor
-    val subTextColor = keyTextColor.copy(alpha = 0.65f)
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(backgroundColor),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        run {
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(if (editingLanguages) "语言顺序" else if (editingOrder) "模式顺序" else
-                    "${com.kingzcheung.xime.settings.InputModes.languageOf(currentSchemaId, schemas).displayName}输入模式", color = textColor, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                TextButton(onClick = {
-                    if (!editingLanguages) languageOrder = com.kingzcheung.xime.settings.InputModes.languageOrder(context)
-                    editingLanguages = !editingLanguages
-                    editingOrder = false
-                },
-                    modifier = Modifier.testTag("language-order-button")) {
-                    Text(if (editingLanguages) "完成" else "语言顺序", color = accentColor)
+    val context = LocalContext.current
+    val all = InputModes.available((schemas + orderableSchemas).distinctBy { it.schemaId })
+        .filter { it.profile.mode == InputMode.KEYBOARD }
+    // Never silently show the first entry as current while the live session is still loading.
+    val current = all.firstOrNull { it.schemaId == currentSchemaId }
+    val entries = all.filter { current != null && it.profile.language == current.profile.language }
+    var layoutId by remember(currentSchemaId, current?.profile) { mutableStateOf(current?.profile?.layout?.id) }
+    var draftId by remember(currentSchemaId, current?.profile) { mutableStateOf(current?.schemaId) }
+    val selected = entries.firstOrNull { it.schemaId == draftId && it.profile.layout.id == layoutId }
+    val layouts = entries.map { it.profile.layout }.distinctBy { it.id }
+    val schemes = entries.filter { it.profile.layout.id == layoutId }
+    var editingOrder by remember { mutableStateOf(false) }
+    var more by remember { mutableStateOf(false) }
+    Column(modifier.fillMaxWidth().background(backgroundColor).testTag("input-profile-panel")) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(if (editingOrder) "组合顺序" else "输入方案", Modifier.weight(1f),
+                color = keyTextColor, style = MaterialTheme.typography.titleSmall)
+            if (editingOrder) TextButton(onClick = { editingOrder = false }) { Text("完成", color = keyTextColor) }
+            else if ((onReorderSchemas != null && orderableSchemas.size > 1) || current?.profile?.language == InputLanguage.CHINESE) Box {
+                IconButton(onClick = { more = true }, modifier = Modifier.testTag("profile-more")) {
+                    Icon(Icons.Default.MoreVert, "更多选项", tint = keyTextColor)
                 }
-                if (!editingLanguages && onReorderSchemas != null && orderableSchemas.size > 1) TextButton(onClick = { editingOrder = !editingOrder }) {
-                    Text(if (editingOrder) "完成" else "模式顺序", color = accentColor)
+                DropdownMenu(more, { more = false }, containerColor = keyBgColor) {
+                    if (onReorderSchemas != null && orderableSchemas.size > 1) DropdownMenuItem(
+                        text = { Text("组合顺序", color = keyTextColor) }, onClick = { more = false; editingOrder = true })
+                    if (current?.profile?.language == InputLanguage.CHINESE) DropdownMenuItem(
+                        text = { Text("添加自定义布局", color = keyTextColor) }, modifier = Modifier.testTag("add-layout-tile"),
+                        onClick = {
+                            more = false
+                            context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
+                                .putExtra("create_layout", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        })
                 }
             }
-        }
-        if (editingLanguages) {
-            InputModeOrderEditor(languageOrder.map { SchemaInfo(it.id, it.displayName, "", "", "") }, { ids ->
-                com.kingzcheung.xime.settings.InputModes.saveLanguageOrder(context, ids)
-                languageOrder = com.kingzcheung.xime.settings.InputModes.languageOrder(context)
-            }, keyBgColor, textColor, accentColor, Modifier.fillMaxWidth().weight(1f))
-            return@Column
         }
         if (editingOrder && onReorderSchemas != null) {
-            InputModeOrderEditor(orderableSchemas, onReorderSchemas, keyBgColor, textColor, accentColor,
+            InputModeOrderEditor(orderableSchemas, onReorderSchemas, keyBgColor, keyTextColor, accentColor,
                 Modifier.fillMaxWidth().weight(1f))
-            return@Column
-        }
-
-        if (panelItems.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text("没有可用的输入方案", color = subTextColor, fontSize = 13.sp)
-            }
-        } else {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                KeyboardPanelGrid(panelItems, isLandscape, textColor, "schema-pages",
-                    Modifier.fillMaxWidth().fillMaxHeight(), compactCards = true) { item, cellModifier ->
-                    val schema = item.schema
-                    SchemaGridItem(schema, schema?.schemaId == currentSchemaId, itemBgColor, textColor,
-                        accentColor = accentColor, onSelect = {
-                            if (schema != null) onSelectSchema(schema.schemaId)
-                            else context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
-                                .putExtra("create_layout", true).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                        },
-                        modifier = cellModifier.testTag(if (schema == null) "add-layout-tile" else "schema-tile:${schema.schemaId}"), isLandscape = isLandscape)
+        } else if (current != null) {
+            Row(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(0.42f).fillMaxHeight().verticalScroll(rememberScrollState()).testTag("profile-layout-list")) {
+                    Text("键盘布局", Modifier.padding(8.dp), color = keyTextColor, style = MaterialTheme.typography.labelMedium)
+                    layouts.forEach { layout ->
+                        ProfileListItem(layout.displayName, layout.id == layoutId, "panel-layout:${layout.id}",
+                            keyBgColor, keyTextColor, accentColor) {
+                            val previous = selected
+                            layoutId = layout.id
+                            // Preserve encoding if a compatible layout exists. Otherwise ask for a scheme;
+                            // merely touching a layout must not silently switch encoding or language.
+                            draftId = previous?.let { InputProfileSelection.changeLayout(entries, it, layout.id)?.schemaId }
+                        }
+                    }
+                }
+                VerticalDivider(Modifier.fillMaxHeight(), color = keyTextColor.copy(alpha = 0.15f))
+                Column(Modifier.weight(0.58f).fillMaxHeight().verticalScroll(rememberScrollState()).testTag("profile-scheme-list")) {
+                    Text("输入方案", Modifier.padding(8.dp), color = keyTextColor, style = MaterialTheme.typography.labelMedium)
+                    schemes.forEach { entry ->
+                        val hasVariants = schemes.count { it.profile.scheme == entry.profile.scheme } > 1
+                        ProfileListItem(if (hasVariants) entry.name else entry.profile.scheme.displayName,
+                            entry.schemaId == selected?.schemaId, "panel-scheme:${entry.schemaId}",
+                            keyBgColor, keyTextColor, accentColor) { draftId = entry.schemaId }
+                    }
                 }
             }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { onBack?.invoke() }) { Text("取消", color = keyTextColor) }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = { selected?.let { onSelectSchema(it.schemaId) } }, enabled = selected != null,
+                    modifier = Modifier.testTag("apply-input-profile"),
+                    colors = ButtonDefaults.buttonColors(containerColor = keyBgColor, contentColor = keyTextColor)) { Text("使用") }
+            }
+        } else {
+            Text("正在读取当前方案…", Modifier.padding(16.dp), color = keyTextColor)
         }
     }
 }
 
 @Composable
-private fun SchemaGridItem(
-    schema: SchemaInfo?,
-    isSelected: Boolean,
-    bgColor: Color,
-    textColor: Color,
-    subTextColor: Color = textColor,
-    accentColor: Color,
-    layoutHint: String? = null,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier,
-    isLandscape: Boolean = false
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) androidx.compose.ui.graphics.lerp(bgColor, accentColor, 0.18f) else bgColor)
-            .semantics { selected = isSelected }
-            .clickable { onSelect() }
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        when {
-            schema == null -> Icon(
-                imageVector = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
-                contentDescription = null, tint = textColor, modifier = Modifier.size(24.dp))
-            isHandwritingSchema(schema.schemaId) ->
-                Icon(
-                    imageVector = Icons.TwoTone.Gesture,
-                    contentDescription = schema.name,
-                    tint = if (isSelected) accentColor else textColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            isT9Schema(schema.schemaId) ->
-                Icon(
-                    painter = painterResource(R.drawable.keyboard_t9),
-                    contentDescription = schema.name,
-                    tint = if (isSelected) accentColor else textColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            else ->
-                Icon(
-                    imageVector = Icons.TwoTone.KeyboardAlt,
-                    contentDescription = schema.name,
-                    tint = if (isSelected) accentColor else textColor,
-                    modifier = Modifier.size(24.dp)
-                )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = schema?.selectionLabel ?: "添加布局",
-            color = if (isSelected) accentColor else textColor,
-            fontSize = 12.sp,
-            lineHeight = 14.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (layoutHint != null) {
-            Text(
-                text = layoutHint,
-                color = if (isSelected) accentColor.copy(alpha = 0.7f) else subTextColor,
-                fontSize = 8.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
+private fun ProfileListItem(label: String, chosen: Boolean, tag: String, bg: Color, fg: Color, accent: Color, onClick: () -> Unit) {
+    Surface(Modifier.fillMaxWidth().padding(bottom = 4.dp), shape = RoundedCornerShape(10.dp),
+        color = if (chosen) bg else Color.Transparent) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).testTag(tag).semantics { selected = chosen }
+            .clickable(role = Role.RadioButton, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(label, Modifier.weight(1f), color = fg, style = MaterialTheme.typography.bodyMedium)
+            if (chosen) Icon(Icons.Default.Check, null, Modifier.padding(start = 4.dp).size(16.dp), tint = accent)
         }
     }
 }

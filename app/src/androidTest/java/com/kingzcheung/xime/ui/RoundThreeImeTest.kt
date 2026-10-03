@@ -181,7 +181,7 @@ class RoundThreeImeTest {
 
             assertTrue("本回归需先安装市场手写模型", com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(context))
             val toolbarTop = rule.onNodeWithContentDescription("手写").fetchSemanticsNode().positionOnScreen.y
-            val stableToolbarLabels = listOf("输入模式", "表情", "编辑", "剪贴板", "手写", "语音")
+            val stableToolbarLabels = listOf("输入方案", "表情", "编辑", "剪贴板", "手写", "语音")
             val beforeHandwritingToolbar = stableToolbarLabels.map {
                 rule.onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot
             }
@@ -394,9 +394,10 @@ class RoundThreeImeTest {
             rule.onNodeWithTag("keyboard-overlay").assertDoesNotExist()
 
             // 真实服务回调保存顺序，关闭重开后仍显示同一顺序。
-            rule.onNodeWithContentDescription("输入模式").performClick()
+            rule.onNodeWithContentDescription("输入方案").performClick()
             rule.onAllNodesWithContentDescription("返回").assertCountEquals(1)
-            rule.onNodeWithText("模式顺序").performClick()
+            rule.onNodeWithTag("profile-more").performClick()
+            rule.onNodeWithText("组合顺序").performClick()
             val englishCard = rule.onNodeWithTag("input-mode-order:${com.kingzcheung.xime.settings.InputModes.ENGLISH}")
                 .performScrollTo()
             val englishCenter = englishCard.fetchSemanticsNode().boundsInRoot.center
@@ -416,7 +417,7 @@ class RoundThreeImeTest {
             assertTrue("英文可调整位置而不被移除", savedOrder.indexOf(com.kingzcheung.xime.settings.InputModes.ENGLISH) < savedOrder.indexOf("t9_pinyin"))
             screenshot("toolbar-mode-order")
             rule.onNodeWithText("完成").performClick()
-            rule.onNodeWithText("模式顺序").assertIsDisplayed()
+            rule.onNodeWithTag("profile-more").assertIsDisplayed()
             screenshot("toolbar-schema-single-back")
             rule.onNodeWithContentDescription("返回").performClick()
             rule.onNodeWithTag("keyboard-overlay").assertDoesNotExist()

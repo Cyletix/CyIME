@@ -157,4 +157,21 @@ class InputProfileTest {
         assertEquals("rime_ice", InputProfileSelection.preferred(entries, InputLanguage.CHINESE, "deleted", "rime_ice")?.schemaId)
         assertEquals("拼音 · 九键", entry("t9_pinyin").profile.summary)
     }
+
+    @Test fun `layout choices are unique and backend variants stay separate`() {
+        val entries = listOf("rime_ice", "pinyin_simp", "t9_pinyin", "pinyin_14jian", "double_pinyin_flypy", "japanese", "handwriting").map(::entry)
+        assertEquals(listOf(InputScheme.PINYIN, InputScheme.DOUBLE_PINYIN), InputProfileSelection.schemes(entries, InputLanguage.CHINESE))
+        assertEquals(listOf(InputLayout.QWERTY, InputLayout.T9, InputLayout.MERGED14), InputProfileSelection.layouts(entries, entry("rime_ice")))
+        assertEquals(listOf("rime_ice", "pinyin_simp"), InputProfileSelection.variants(entries, entry("pinyin_simp")).map { it.schemaId })
+        assertEquals("pinyin_simp", InputProfileSelection.changeLayout(entries, entry("pinyin_simp"), InputLayout.QWERTY.id)?.schemaId)
+        assertEquals("pinyin_simp", InputProfileSelection.changeScheme(entries, entry("pinyin_simp"), InputScheme.PINYIN)?.schemaId)
+    }
+
+    @Test fun `changing layout preserves scheme and language and refuses imaginary combinations`() {
+        val entries = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "japanese", "japanese_kana").map(::entry)
+        assertEquals("t9_pinyin", InputProfileSelection.changeLayout(entries, entry("rime_ice"), InputLayout.T9.id)?.schemaId)
+        assertNull(InputProfileSelection.changeLayout(entries, entry("double_pinyin_flypy"), InputLayout.T9.id))
+        assertNull(InputProfileSelection.changeLayout(entries, entry("japanese"), InputLayout.KANA.id))
+        assertEquals(listOf(InputLayout.QWERTY), InputProfileSelection.layouts(entries, entry("japanese")))
+    }
 }

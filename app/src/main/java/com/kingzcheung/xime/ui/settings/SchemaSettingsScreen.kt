@@ -442,7 +442,7 @@ fun SchemaSettingsContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("输入配置") },
+                title = { Text("输入资源") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
