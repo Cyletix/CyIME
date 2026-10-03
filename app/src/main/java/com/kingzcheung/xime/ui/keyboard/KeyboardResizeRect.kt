@@ -233,31 +233,6 @@ internal fun resizeCornerArcs(frame: ResizeRect, radiusPx: Float): List<ResizeCo
 }
 
 /**
- * 四角对角线提示：每个角内侧沿 45° 的一小段线（↖ ↗ ↙ ↘）。
- *
- * 只做视觉提示，触摸热区仍由 [resizeHandleAt] 的边带决定，二者互不影响。
- * 长度取 10~14dp，inset 与顶/侧手柄一致，避免压在卡片的圆角描边上。
- */
-internal fun resizeCornerDiagonals(
-    frame: ResizeRect,
-    lengthPx: Float,
-    insetPx: Float,
-): List<Pair<Offset, Offset>> {
-    val length = lengthPx.coerceAtLeast(0f)
-    val inset = insetPx.coerceAtLeast(0f)
-    return listOf(
-        Offset(frame.left + inset, frame.top + inset) to
-            Offset(frame.left + inset + length, frame.top + inset + length),
-        Offset(frame.right - inset, frame.top + inset) to
-            Offset(frame.right - inset - length, frame.top + inset + length),
-        Offset(frame.left + inset, frame.bottom - inset) to
-            Offset(frame.left + inset + length, frame.bottom - inset - length),
-        Offset(frame.right - inset, frame.bottom - inset) to
-            Offset(frame.right - inset - length, frame.bottom - inset - length),
-    )
-}
-
-/**
  * 矩形 → 服务状态（悬浮卡片）。
  *
  * 卡片按「底部居中 + 水平偏移」渲染，所以：

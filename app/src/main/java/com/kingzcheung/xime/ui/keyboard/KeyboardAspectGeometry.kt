@@ -16,10 +16,16 @@ internal data class KeyboardAspectLimits(val min: Float, val max: Float) {
         val Letters = KeyboardAspectLimits(1.375f, 2.4f)
         // Keypads have fewer, deliberately wider buttons, including side actions.
         val Keypad = KeyboardAspectLimits(0.9f, 2f)
-        fun forLayout(kind: LayoutKind) = when (kind) {
-            LayoutKind.T9, LayoutKind.KANA_KEYPAD, LayoutKind.STROKE_KEYPAD,
+        // T9's three centre columns occupy 3.4 of the total five weight units.
+        val T9 = KeyboardAspectLimits((5f * 3f / 3.4f) / 4f * 0.8f,
+            (5f * 3f / 3.4f) / 4f * 1.8f)
+        fun forLayout(kind: LayoutKind, split: Boolean = false): KeyboardAspectLimits = when (kind) {
+            LayoutKind.T9 -> T9
+            LayoutKind.KANA_KEYPAD, LayoutKind.STROKE_KEYPAD,
             LayoutKind.NUMBER, LayoutKind.HANDWRITING -> Keypad
-            LayoutKind.ALPHABETIC, LayoutKind.MERGED -> Letters
+            // The actual split layout reserves 10% for its centre gap.
+            LayoutKind.ALPHABETIC -> if (split) KeyboardAspectLimits(Letters.min / 0.9f, Letters.max / 0.9f) else Letters
+            LayoutKind.MERGED -> Letters
         }
     }
 }
@@ -42,7 +48,8 @@ internal fun protectKeyboardSize(
     val height = requestedHeight.coerceAtLeast(1)
         .coerceAtMost(bounds.maxHeight(available.toFloat()).toInt().coerceAtLeast(1))
     val minWidth = kotlin.math.ceil(bounds.minWidth(height.toFloat())).toInt().coerceIn(1, available)
-    val maxWidth = bounds.maxWidth(height.toFloat()).toInt().coerceIn(minWidth, available)
+    // Preferred proportions choose defaults; explicit full-width sizes are valid on every layout.
+    val maxWidth = if (customSize) available else bounds.maxWidth(height.toFloat()).toInt().coerceIn(minWidth, available)
     val width = requestedWidth.coerceAtLeast(1).coerceIn(minWidth, maxWidth)
     val repaired = abs(width - requestedWidth) > 1 || abs(height - requestedHeight) > 1
     val travel = (available - width) / 2
@@ -61,6 +68,7 @@ internal fun ResizeRect.hasKeyboardAspect(limits: KeyboardAspectLimits, density:
  * The curve starts flat, so small nearby drags retain the original feel. Opposite edges stay put. */
 internal fun ResizeRect.resistKeyboardAspectDrag(
     proposed: ResizeRect, limits: KeyboardAspectLimits, density: Float, extraHeight: Float,
+    availableWidth: Float? = null,
 ): ResizeRect {
     fun distance(rect: ResizeRect): Float {
         val bodyWidth = (rect.width / density - 16f).coerceAtLeast(1f)
@@ -98,7 +106,10 @@ internal fun ResizeRect.resistKeyboardAspectDrag(
         }
         resisted = resisted.advance(step * factor)
     }
-    val extremes = limits.extremes
+    val extremes = limits.extremes.let { safety ->
+        if (availableWidth == null) safety else safety.copy(max = maxOf(safety.max,
+            (availableWidth / density - 16f) / ((resisted.height - extraHeight) / density - 60f).coerceAtLeast(1f)))
+    }
     if (resisted.hasKeyboardAspect(extremes, density, extraHeight)) return resisted
     if (!hasKeyboardAspect(extremes, density, extraHeight)) return this
     fun at(t: Float) = ResizeRect(left + (resisted.left - left) * t,
@@ -111,4 +122,28 @@ internal fun ResizeRect.resistKeyboardAspectDrag(
         if (at(mid).hasKeyboardAspect(extremes, density, extraHeight)) low = mid else high = mid
     }
     return at(low)
+}
+
+/** Map the whole gesture from its original frame, not from previously resisted output.
+ * A smooth edge approach pays back the accumulated lag so the viewport boundary is reachable. */
+internal fun ResizeRect.resizeWithReachableWidth(
+    raw: ResizeRect, handle: ResizeHandle, bounds: ResizeRect,
+    limits: KeyboardAspectLimits, density: Float, extraHeight: Float,
+): ResizeRect {
+    val resisted = resistKeyboardAspectDrag(raw, limits, density, extraHeight, bounds.width)
+    fun assist(start: Float, target: Float, limit: Float, shown: Float): Float {
+        val travel = limit - start
+        if (abs(travel) < 1f) return shown
+        val progress = ((target - start) / travel).coerceIn(0f, 1f)
+        val t = ((progress - 0.7f) / 0.3f).coerceIn(0f, 1f)
+        val blend = t * t * (3f - 2f * t)
+        return shown + (target - shown) * blend
+    }
+    return when (handle) {
+        ResizeHandle.LEFT, ResizeHandle.TOP_LEFT, ResizeHandle.BOTTOM_LEFT ->
+            resisted.copy(left = assist(left, raw.left, bounds.left, resisted.left))
+        ResizeHandle.RIGHT, ResizeHandle.TOP_RIGHT, ResizeHandle.BOTTOM_RIGHT ->
+            resisted.copy(right = assist(right, raw.right, bounds.right, resisted.right))
+        else -> resisted
+    }
 }

@@ -347,7 +347,7 @@ private fun DragBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(FLOATING_DRAG_BAR_HEIGHT_DP.dp)
-            .background(backgroundColor)
+            .keyboardPanelBackground(backgroundColor)
             .testTag("floating-drag-bar")
             .pointerInput(Unit) {
                 detectDragGestures(
