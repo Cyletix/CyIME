@@ -40,6 +40,8 @@ class CyimeResearchPresetTest {
         val context = mock<Context>()
         whenever(context.assets).thenReturn(assets)
         whenever(context.filesDir).thenReturn(filesDir)
+        whenever(context.getSharedPreferences("kime_settings", Context.MODE_PRIVATE))
+            .thenReturn(mock<android.content.SharedPreferences>())
         KeysConfigHelper.loadConfig(context)
         assertEquals("qwyrd;lkup", KeysConfigHelper.getKeyRows(true)[0].joinToString(""))
         assertEquals("qwertyuiop", KeysConfigHelper.getKeyRows(false)[0].joinToString(""))

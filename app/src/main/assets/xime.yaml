@@ -528,7 +528,7 @@ keyboard:
   #
   # 拼音 14 键：qw/er/ty/ui/op、as/df/gh/jk/l、zx/cv/bn/m（对应方案 pinyin_14jian）
   qwerty_14:
-    schemas: [pinyin_14jian]
+    schemas: [pinyin_14jian, double_pinyin_flypy_14jian]
     button_layout: standard
     layout:
       rows:

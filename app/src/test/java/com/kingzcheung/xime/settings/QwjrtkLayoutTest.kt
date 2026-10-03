@@ -43,6 +43,8 @@ class QwjrtkLayoutTest {
         val context = mock<Context>()
         whenever(context.assets).thenReturn(assets)
         whenever(context.filesDir).thenReturn(tmp.newFolder("files"))
+        whenever(context.getSharedPreferences("kime_settings", Context.MODE_PRIVATE))
+            .thenReturn(mock<android.content.SharedPreferences>())
         try {
             KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
             KeysConfigHelper.loadConfig(context)

@@ -255,6 +255,26 @@ class KeyboardMergedLayoutTest {
     }
 
     @Test
+    fun `14 key Xiaohe keeps the pinned two stroke algebra before merging and has its own prism`() {
+        val id = "double_pinyin_flypy_14jian"
+        val text = repoFile("src/main/assets/rime_chinese/$id.schema.yaml").readText()
+        val original = repoFile("build/generated/chinese-assets/rime_ice/double_pinyin_flypy.schema.yaml").readText()
+        fun algebra(source: String): List<String> = source.substringAfter("\nspeller:")
+            .substringAfter("  algebra:").lineSequence()
+            .takeWhile { it.isBlank() || it.startsWith(" ") || it.startsWith("#") }
+            .map { it.substringBefore(" #").trim() }.filter { it.startsWith("- ") }.toList()
+        val rules = algebra(text)
+        assertEquals(algebra(original), rules.dropLast(2))
+        assertEquals("- derive/(.*)/\\U$1/", rules[rules.lastIndex - 1])
+        val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_14")!!
+        assertEquals(representativeMap(rows), xlitMap(text))
+        assertTrue(text.contains("schema_id: $id"))
+        assertTrue(text.contains("dictionary: rime_ice"))
+        assertTrue(text.contains("prism: $id"))
+        assertEquals("qwerty_14", KeysConfigHelper.parseSchemaBindingsYamlText(ximeYamlText())[id])
+    }
+
+    @Test
     fun `17键前端分组与 Rime xlit 映射一致`() {
         val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_17")
             ?: error("xime.yaml 缺少 qwerty_17 rows")
