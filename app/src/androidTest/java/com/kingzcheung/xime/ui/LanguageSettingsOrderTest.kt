@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui
 
+import androidx.compose.ui.test.assertIsSelected
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.layout.Box
@@ -111,7 +112,7 @@ class LanguageSettingsOrderTest {
         rule.onNodeWithTag("language-toggle:ja").assertIsEnabled()
     }
 
-    @Test fun languageManagementAndKeyboardMenuShareOnePersistedOrder() {
+    @Test fun languageManagementOrderSurvivesOpeningSchemePanel() {
         val context = isolatedContext()
         SettingsPreferences.getPrefsPublic(context).edit()
             .putStringSet(LanguagePreferences.KEY, setOf("zh", "ja", "en")).commit()
@@ -134,10 +135,6 @@ class LanguageSettingsOrderTest {
             val tops = ids.map { rule.onNodeWithTag("language-$it").fetchSemanticsNode().boundsInRoot.top }
             assertTrue("语言管理排列应为 $ids: $tops", tops.zipWithNext().all { (a, b) -> a < b })
         }
-        fun assertKeyboardOrder(ids: List<String>) {
-            val tops = ids.map { rule.onNodeWithTag("input-mode-order:$it").fetchSemanticsNode().boundsInRoot.top }
-            assertTrue("键盘语言顺序应为 $ids: $tops", tops.zipWithNext().all { (a, b) -> a < b })
-        }
         assertManagementOrder(listOf("en", "ja", "zh"))
         rule.onAllNodesWithText("顺序 1").assertCountEquals(0)
         rule.onAllNodesWithTag("language-order-up:zh").assertCountEquals(0)
@@ -146,13 +143,11 @@ class LanguageSettingsOrderTest {
         assertEquals(InputLanguage.entries.toSet(), LanguagePreferences.enabled(context))
 
         rule.runOnIdle { showSettings.value = false }
-        rule.onNodeWithTag("language-order-button").performClick()
-        assertKeyboardOrder(listOf("en", "zh", "ja"))
-        dragCardOver("input-mode-order:zh", "input-mode-order:en")
-        assertEquals(listOf("zh", "en", "ja"), InputModes.languageOrder(context).map { it.id })
-
+        rule.onAllNodesWithTag("profile-language").assertCountEquals(0)
+        rule.onNodeWithTag("panel-scheme:rime_ice").assertIsSelected()
+        assertEquals(listOf("en", "zh", "ja"), InputModes.languageOrder(context).map { it.id })
         rule.runOnIdle { showSettings.value = true }
-        assertManagementOrder(listOf("zh", "en", "ja"))
+        assertManagementOrder(listOf("en", "zh", "ja"))
     }
 
     @Test fun narrowLargeTextKeepsWholeCardDragUsable() {

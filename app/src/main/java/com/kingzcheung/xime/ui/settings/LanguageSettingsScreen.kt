@@ -1,22 +1,19 @@
 package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -40,6 +37,7 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
     var languages by remember { mutableStateOf(LanguagePreferences.enabled(context)) }
     var orderedLanguages by remember { mutableStateOf(InputModes.languageOrder(context)) }
     var saving by remember { mutableStateOf(false) }
+    var expandedLanguage by remember { mutableStateOf<InputLanguage?>(orderedLanguages.firstOrNull()) }
     var message by remember { mutableStateOf("") }
     val profilesModel: com.kingzcheung.xime.viewmodel.SchemaSettingsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val profilesState by profilesModel.uiState.collectAsState()
@@ -64,13 +62,16 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
         LazyColumn(Modifier.fillMaxSize().padding(padding)
             .padding(horizontal = 16.dp, vertical = 8.dp),
             state = dragOrder.list, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item { Text("先选择语言，再分别选择输入方案和键盘布局。这里保存的组合用于下次切换到该语言；只列出已启用的组合。长按语言卡片可排序。",
+            item { Text("点开语言，分别设置输入方案和键盘布局；下次切换到该语言时使用。长按可调整语言顺序。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(dragOrder.order + InputLanguage.supported.filterNot { it in languages }.map { it.id }, key = { it }) { id ->
                 val language = InputLanguage.entries.first { it.id == id }
                 val checked = language in languages
                 val canChange = language != InputLanguage.ENGLISH && !saving
+                val selected = InputProfileSelection.preferred(availableProfiles, language,
+                    remembered[language], profilesState.currentSchema)
+                val expanded = checked && expandedLanguage == language
                 Surface(modifier = Modifier.fillMaxWidth().testTag("language-drag:${language.id}")
                     .then(dragOrderItem(dragOrder, id, checked && orderedLanguages.size > 1 && !saving)),
                     shape = RoundedCornerShape(12.dp),
@@ -80,34 +81,37 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
                     Column(Modifier.fillMaxWidth().testTag("language-${language.id}")
                         .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)) {
                         Row(Modifier.fillMaxWidth().heightIn(min = 72.dp)
-                            .toggleable(checked, enabled = canChange, role = Role.Switch) { selected ->
+                            .clickable(enabled = checked) { expandedLanguage = if (expanded) null else language }
+                            .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(language.displayName, style = MaterialTheme.typography.titleMedium)
+                                Text(if (!checked) "未启用" else selected?.profile?.summary ?: "正在准备可用组合",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (checked) IconButton(onClick = { expandedLanguage = if (expanded) null else language },
+                                modifier = Modifier.testTag("language-expand:${language.id}")) {
+                                Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    if (expanded) "收起${language.displayName}设置" else "展开${language.displayName}设置")
+                            }
+                            Switch(checked, enabled = canChange, modifier = Modifier.testTag("language-toggle:${language.id}"),
+                                onCheckedChange = { enabled ->
                                 scope.launch {
                                     saving = true
                                     try {
-                                        withContext(Dispatchers.IO) { LanguagePreferences.save(context, language, selected) }
+                                        withContext(Dispatchers.IO) { LanguagePreferences.save(context, language, enabled) }
                                         languages = LanguagePreferences.enabled(context)
                                         orderedLanguages = InputModes.languageOrder(context)
                                         profilesModel.refresh()
-                                        message = if (selected) "已开启，输入方案会在后台自动准备" else "已关闭，已下载词库保留"
+                                        if (enabled) expandedLanguage = language
+                                        message = if (enabled) "已开启，输入方案会在后台自动准备" else "已关闭，已下载词库保留"
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                                     catch (error: Exception) { message = error.message ?: "保存失败，请稍后再试" }
                                     finally { saving = false }
                                 }
-                            }.testTag("language-toggle:${language.id}").padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                                Text(language.displayName, style = MaterialTheme.typography.bodyLarge)
-                                Text(when (language) {
-                                    InputLanguage.CHINESE -> "输入方案：拼音、双拼、五笔；布局按方案选择"
-                                    InputLanguage.JAPANESE -> "输入方案：罗马字、假名；布局按方案选择"
-                                    InputLanguage.ENGLISH -> "输入方案：直接输入；布局：26键"
-                                    InputLanguage.UNSPECIFIED -> "导入配置未声明语言"
-                                }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(checked, onCheckedChange = null, enabled = canChange)
+                            })
                         }
-                        val selected = InputProfileSelection.preferred(availableProfiles, language,
-                            remembered[language], profilesState.currentSchema)
-                        if (checked && selected != null) InputProfileSelectors(availableProfiles, selected) { entry ->
+                        if (expanded && selected != null) InputProfileSelectors(availableProfiles, selected,
+                            Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) { entry ->
                             InputModes.selectProfile(context, entry)
                             remembered = remembered + (language to entry.schemaId)
                             message = "已保存：${language.displayName} · ${entry.profile.summary}，下次切换到该语言时使用"

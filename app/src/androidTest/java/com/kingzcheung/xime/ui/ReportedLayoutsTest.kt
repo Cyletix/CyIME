@@ -76,7 +76,7 @@ class ReportedLayoutsTest {
         rule.runOnIdle { assertEquals(listOf("0"), committed); assertTrue(composition.isEmpty()) }
         save("t9-preview", "t9-zero.png")
     }
-    @Test fun languageOrderEntryPersistsAndDoesNotChangeModeOrder() {
+    @Test fun schemePanelDoesNotExposeOrChangeLanguageOrder() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val saved = prefs.getString("input_language_order", null)
@@ -90,21 +90,12 @@ class ReportedLayoutsTest {
                     modifier = Modifier.size(360.dp, 260.dp).testTag("modes-preview"))
             } }
             save("modes-preview", "chinese-mode-order.png")
-            rule.onNodeWithTag("language-order-button").performClick()
-            val english = rule.onNodeWithTag("input-mode-order:en")
-            val englishCenter = english.fetchSemanticsNode().boundsInRoot.center
-            val japaneseCenter = rule.onNodeWithTag("input-mode-order:ja").fetchSemanticsNode().boundsInRoot.center
-            rule.mainClock.autoAdvance = false
-            try {
-                english.performTouchInput { down(center) }
-                rule.mainClock.advanceTimeBy(700)
-                english.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(0f, japaneseCenter.y - englishCenter.y)); up() }
-            } finally { rule.mainClock.autoAdvance = true }
-            rule.waitForIdle()
-            assertEquals(listOf("zh", "en", "ja"), InputModes.languageOrder(context).map { it.id })
-            save("modes-preview", "language-order.png")
-            rule.onNodeWithText("完成").performClick()
-            rule.onNodeWithTag("schema-tile:rime_ice").assertExists()
+            rule.onAllNodesWithTag("profile-language").assertCountEquals(0)
+            rule.onNodeWithTag("profile-layout-list").assertIsDisplayed()
+            rule.onNodeWithTag("panel-scheme:rime_ice").assertIsSelected()
+            rule.onNodeWithTag("panel-layout:t9").performScrollTo().performClick()
+            rule.onNodeWithTag("panel-scheme:t9_pinyin").assertIsSelected()
+            assertEquals(listOf("zh", "ja", "en"), InputModes.languageOrder(context).map { it.id })
         } finally { prefs.edit().also {
             if (saved == null) it.remove("input_language_order") else it.putString("input_language_order", saved)
             if (savedLanguages == null) it.remove(com.kingzcheung.xime.settings.LanguagePreferences.KEY)

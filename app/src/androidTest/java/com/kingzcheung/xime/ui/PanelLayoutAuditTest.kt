@@ -85,9 +85,8 @@ class PanelLayoutAuditTest {
                 if (delete.top - panel.top > 3f || panel.right - delete.right > 5f) issues += "编辑回格未贴右上角"
             }
             if (route == OverlayRoute.SchemaList) {
-                val tiles = rule.onAllNodes(hasTestTag("schema-tile:mode0") or hasTestTag("schema-tile:mode1") or
-                    hasTestTag("schema-tile:mode2") or hasTestTag("schema-tile:mode3")).fetchSemanticsNodes().map { it.boundsInRoot }
-                tiles.forEachIndexed { n, a -> tiles.drop(n + 1).forEach { b -> if (a.overlaps(b)) issues += "方案卡片重叠" } }
+                val apply = rule.onNodeWithTag("apply-input-profile").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                if (apply.top < panel.top || apply.bottom > panel.bottom) issues += "组合确认按钮超出面板"
             }
             save("panel-$width-$index")
             issues += rule.geometryIssues("audit-keyboard").map { "$route $width x $height font=$font: $it" }

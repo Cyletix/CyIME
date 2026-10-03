@@ -77,6 +77,22 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             com.kingzcheung.xime.settings.InputModes.rememberMode(service, id,
                 com.kingzcheung.xime.settings.InputModes.languageOf(id, service.uiState.value.schemas))
         }
+        // Returning from English must honor the combination saved in language settings.
+        // This runs in the existing FIFO after pending composition is dealt with.
+        if (service.rimeEngine.isAsciiMode()) {
+            val current = service.rimeEngine.getCurrentSchema()
+            val language = com.kingzcheung.xime.settings.InputModes.languageOf(current, service.uiState.value.schemas)
+            val selected = com.kingzcheung.xime.settings.InputProfileSelection.preferred(service.uiState.value.schemas,
+                language, com.kingzcheung.xime.settings.InputModes.selectedProfiles(service)[language], current)
+            if (selected != null && selected.schemaId != current) {
+                applyPageSizeSetting(selected.schemaId)
+                if (!service.rimeEngine.switchSchema(selected.schemaId)) {
+                    withContext(Dispatchers.Main) { Toast.makeText(service, "所选方案尚未就绪，请检查输入资源", Toast.LENGTH_SHORT).show() }
+                    return false
+                }
+                service.rimeEngine.setOption("ascii_mode", true)
+            }
+        }
         val t0 = System.nanoTime()
         if (!service.rimeEngine.toggleAsciiMode()) {
             FileLogger.e(XimeInputMethodService.TAG, "switchInputMethod: toggleAsciiMode FAILED (engine unavailable)")
@@ -96,7 +112,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             // 不依赖 updateUI 链路异步回写，避免键盘 UI 与 rime 状态脱钩。
             val ascii = service.rimeEngine.isAsciiMode()
             FileLogger.i(XimeInputMethodService.TAG, "switchInputMethod: rime ascii=$ascii, ui before=${service.uiState.value.isAsciiMode}")
-            service.uiState.value = service.uiState.value.copy(isAsciiMode = ascii)
+            service.uiState.value = service.uiState.value.copy(isAsciiMode = ascii,
+                currentSchemaId = service.rimeEngine.getCurrentSchema())
+            SettingsPreferences.setCurrentSchema(service, service.rimeEngine.getCurrentSchema(),
+                com.kingzcheung.xime.settings.InputModes.languageOf(service.rimeEngine.getCurrentSchema(), service.uiState.value.schemas))
             service.updateUI()
             // 主线程直接权威下发键盘布局切换（与 rime 状态一致），
             // 不依赖 Compose LaunchedEffect 侦测 uiState 后再异步 dispatch（部分机型调度延迟导致 UI 不更新）。

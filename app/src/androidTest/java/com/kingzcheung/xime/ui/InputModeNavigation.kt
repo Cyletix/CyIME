@@ -27,21 +27,19 @@ internal fun ComposeTestRule.chooseModeThroughLanguageAndPanel(id: String) {
     }
     waitForIdle()
     if (id != InputModes.ENGLISH && engine.getCurrentSchema() != id) {
-        onNodeWithContentDescription("输入模式").performClick()
+        onNodeWithContentDescription("输入方案").performClick()
         try {
-            waitUntil(5000) { onAllNodesWithTag("schema-pages", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+            waitUntil(5000) { onAllNodesWithTag("input-profile-panel", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         } catch (failure: Throwable) {
             onAllNodes(isRoot()).fetchSemanticsNodes().indices.forEach { index ->
                 println("MODE_NAVIGATION_ROOT $index " + onAllNodes(isRoot()).get(index).printToString())
             }
             throw failure
         }
-        val choice = onNodeWithTag("schema-tile:$id")
-        var pages = 0
-        while (!choice.isDisplayed() && pages++ < 12) {
-            onNodeWithTag("schema-pages", useUnmergedTree = true).performTouchInput { swipeLeft() }
-        }
-        choice.assertIsDisplayed().performClick()
+        val profile = com.kingzcheung.xime.settings.InputProfiles.current(id)
+        onNodeWithTag("panel-layout:${profile.layout.id}").performScrollTo().performClick()
+        onNodeWithTag("panel-scheme:$id").performScrollTo().performClick()
+        onNodeWithTag("apply-input-profile").performClick()
         waitUntil(10_000) { engine.getCurrentSchema() == id && !engine.isAsciiMode() }
     }
     waitForIdle()
