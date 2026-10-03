@@ -43,6 +43,28 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SettingsSection(title = "桌面图标底板") {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        listOf(true, false).forEach { framed ->
+                            val selected = IconAppearance.framed == framed
+                            val shape = RoundedCornerShape(12.dp)
+                            Column(Modifier.weight(1f).testTag("icon-frame-$framed")
+                                .semantics { this.selected = selected }
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh, shape)
+                                .border(if (selected) 2.dp else 1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = if (selected) 1f else .25f), shape)
+                                .clickable { changeAppearance(context, onChanged) { IconAppearance.setFramed(context, framed) } }
+                                .padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                LauncherIconPreview(IconAppearance.effective, framed, Modifier.size(64.dp))
+                                Text(if (framed) "带底板" else "无底板", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                    }
+                    Text("带底板与系统桌面图标大小、外框统一；无底板突出图案。此选项只影响桌面图标，部分桌面仍会自动加底。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             SettingsSection(title = "图标联动") {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -72,7 +94,7 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
                                     .border(if (selected) 2.dp else 1.dp, palette.primary.copy(alpha = if (selected) 1f else .25f), shape)
                                     .clickable { changeAppearance(context, onChanged) { IconAppearance.setIconStyle(context, style) } }
                                     .padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CyimeGeneratedIcon(style, Modifier.fillMaxWidth().aspectRatio(1f), background = true)
+                                    LauncherIconPreview(style, IconAppearance.framed, Modifier.size(72.dp))
                                     Text(style.title + if (selected) " · 已选" else "", color = palette.onSurface,
                                         style = MaterialTheme.typography.labelLarge)
                                 }

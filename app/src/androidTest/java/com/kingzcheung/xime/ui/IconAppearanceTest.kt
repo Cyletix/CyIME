@@ -31,10 +31,10 @@ class IconAppearanceTest {
 
     private fun preserve(block: () -> Unit) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        val saved = prefs.all.filterKeys { it == SettingsPreferences.KEY_VISUAL_STYLE || it == IconAppearance.KEY_STYLE || it == IconAppearance.KEY_LINKED }
+        val saved = prefs.all.filterKeys { it == SettingsPreferences.KEY_VISUAL_STYLE || it == IconAppearance.KEY_STYLE || it == IconAppearance.KEY_LINKED || it == IconAppearance.KEY_FRAMED }
         try { block() } finally {
             rule.runOnIdle {
-                val edit = prefs.edit().remove(SettingsPreferences.KEY_VISUAL_STYLE).remove(IconAppearance.KEY_STYLE).remove(IconAppearance.KEY_LINKED)
+                val edit = prefs.edit().remove(SettingsPreferences.KEY_VISUAL_STYLE).remove(IconAppearance.KEY_STYLE).remove(IconAppearance.KEY_LINKED).remove(IconAppearance.KEY_FRAMED)
                 saved.forEach { (k,v) -> when(v) { is String -> edit.putString(k,v); is Boolean -> edit.putBoolean(k,v) } }
                 edit.commit(); KeyboardThemes.reload(context); LauncherIcons.apply(context, IconAppearance.effective)
             }
@@ -49,28 +49,32 @@ class IconAppearanceTest {
             IconAppearance.setIconStyle(context, VisualStyle.NEON)
             assertEquals(VisualStyle.NEON, SettingsPreferences.getVisualStyle(context))
             IconAppearance.setLinked(context, false)
+            IconAppearance.setFramed(context, false)
             IconAppearance.setIconStyle(context, VisualStyle.FROST)
             SettingsPreferences.setVisualStyle(context, VisualStyle.FACET)
             KeyboardThemes.reload(context)
             assertEquals(VisualStyle.FROST, IconAppearance.effective)
+            assertFalse(IconAppearance.framed)
             assertEquals(VisualStyle.FACET, VisualStyles.current)
             IconAppearance.setLinked(context, true)
             assertEquals(VisualStyle.FACET, IconAppearance.effective)
         }
     }
 
-    @Test fun allFiveLauncherChoicesKeepExactlyOneEntryAndMainActivityEnabled() = preserve {
+    @Test fun allTenLauncherChoicesKeepExactlyOneEntryAndMainActivityEnabled() = preserve {
         rule.runOnIdle {
             IconAppearance.setLinked(context, false)
+            for (framed in listOf(true, false)) {
+            IconAppearance.setFramed(context, framed)
             VisualStyle.entries.forEach { style ->
                 IconAppearance.setIconStyle(context, style)
                 val entries = context.packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(context.packageName), 0)
                 assertEquals(1, entries.size)
                 assertEquals(LauncherIcons.component(context, style).className, entries.single().activityInfo.name)
-                val expectedIcon = "cyime_mark_" + if (style == VisualStyle.ORIGINAL) "facet" else style.id
-                assertEquals(expectedIcon, context.resources.getResourceEntryName(entries.single().activityInfo.icon))
+                assertEquals(launcherIconResource(style, framed), entries.single().activityInfo.icon)
                 assertNotNull(entries.single().loadIcon(context.packageManager))
                 assertTrue(context.packageManager.getActivityInfo(ComponentName(context.packageName, "com.kingzcheung.xime.MainActivity"), 0).enabled)
+            }
             }
         }
     }
@@ -83,8 +87,10 @@ class IconAppearanceTest {
             } }
         } }
         rule.runOnIdle { IconAppearance.setLinked(context, true) }
-        rule.onNodeWithTag("icon-link").performClick()
-        rule.onNodeWithTag("icon-style-glass").performClick().assertIsSelected()
+        rule.onNodeWithTag("icon-frame-false").performClick().assertIsSelected()
+        rule.onNodeWithTag("icon-frame-true").performClick().assertIsSelected()
+        rule.onNodeWithTag("icon-link").performScrollTo().performClick()
+        rule.onNodeWithTag("icon-style-glass").performScrollTo().performClick().assertIsSelected()
         rule.assertGeometry("icon-settings", "reference icon settings")
         File(context.getExternalFilesDir(null), "icon-settings.png").outputStream().use {
             rule.onNodeWithTag("icon-settings").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)
@@ -109,6 +115,25 @@ class IconAppearanceTest {
                     (edge until bitmap.height - edge).any { y -> android.graphics.Color.alpha(bitmap.getPixel(x, y)) > 0 }
                 })
                 File(context.getExternalFilesDir(null), "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                bitmap.recycle()
+            }
+        }
+    }
+
+    @Test fun launcherResourcesFillTheirCanvasWithoutShrinkingTheKeyboardMark() {
+        VisualStyle.entries.forEach { style ->
+            for (framed in listOf(true, false)) {
+                val bitmap = renderLauncherIcon(context, style, framed)
+                val points = (0 until bitmap.width).filter { x ->
+                    (0 until bitmap.height).any { y -> android.graphics.Color.alpha(bitmap.getPixel(x, y)) > 32 }
+                }
+                val width = points.last() - points.first() + 1
+                assertTrue("$style / $framed must fill the launcher slot", width >= bitmap.width * .78f)
+                if (framed) {
+                    assertEquals(255, android.graphics.Color.alpha(bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)))
+                } else {
+                    assertEquals(0, android.graphics.Color.alpha(bitmap.getPixel(0, 0)))
+                }
                 bitmap.recycle()
             }
         }

@@ -1,12 +1,13 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {validate,androidVector,kotlinTokens,styles} from './renderer.mjs';
+import {validate,androidVector,launcherBareVector,kotlinTokens,styles} from './renderer.mjs';
 export const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 export async function compile(config,check=false) {
   validate(config);
   const outputs = new Map([[path.join(root,'app/src/main/java/com/kingzcheung/xime/ui/theme/MaterialRecipes.kt'),kotlinTokens(config)]]);
   for(const s of styles) outputs.set(path.join(root,`app/src/main/res/drawable/cyime_mark_${s}.xml`),androidVector(config,s));
+  for(const s of styles) outputs.set(path.join(root,`app/src/main/res/drawable/cyime_launcher_bare_${s}.xml`),launcherBareVector(config,s));
   for(const [file,content] of outputs){if(check){if(await readFile(file,'utf8')!==content)throw Error(`过期生成文件：${file}`);}else await writeFile(file,content,'utf8');}
   return [...outputs.keys()];
 }
