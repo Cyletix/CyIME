@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.kingzcheung.xime.ui.keyboard.normalizeHandwritingPause
+import com.kingzcheung.xime.ui.keyboard.normalizeCursorHoldSeconds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +53,13 @@ internal fun InputExperienceSettings() {
                         label = { Text(mode.label) })
                 }
             }
-            Text("长按空格 0.1 秒后滑动，松手不输入空格。两种移动方式互斥。", style = MaterialTheme.typography.bodySmall)
+            Text("空格长按触发：${"%.1f".format(settings.cursorHoldSeconds)} 秒")
+            Slider(value = settings.cursorHoldSeconds, modifier = Modifier.testTag("cursor-hold-slider"),
+                enabled = settings.cursorGesture == CursorGestureMode.SPACE,
+                onValueChange = { settings = settings.copy(cursorHoldSeconds = normalizeCursorHoldSeconds(it)) },
+                onValueChangeFinished = { settings.save(context) }, valueRange = 0.1f..1f, steps = 8)
+            Text("默认 0.2 秒，每档 0.1 秒；按住达到时长后滑动，松手不输入空格。仅用于长按空格移动光标。",
+                style = MaterialTheme.typography.bodySmall)
             Text("空格键其他长按行为", style = MaterialTheme.typography.titleSmall)
             Text(if (settings.cursorGesture == CursorGestureMode.SPACE) "当前用于移动光标，以下功能暂停，选择其他移动方式后恢复。"
                 else "长按 0.3 秒触发；语音再次长按结束，也可用工具栏麦克风结束。", style = MaterialTheme.typography.bodySmall)

@@ -8,7 +8,7 @@ class CursorGesturePolicyTest {
         for (gesture in CursorGestureMode.entries) for (hold in SpaceHoldAction.entries) {
             val prefs = KeyboardInputPreferences(spaceHold = hold, cursorGesture = gesture)
             assertEquals(gesture == CursorGestureMode.SPACE, prefs.effectiveSpaceHold == SpaceHoldAction.CURSOR)
-            assertEquals(if (gesture == CursorGestureMode.SPACE) 100L else 300L, prefs.spaceHoldDelayMs)
+            assertEquals(if (gesture == CursorGestureMode.SPACE) 200L else 300L, prefs.spaceHoldDelayMs)
             if (gesture != CursorGestureMode.SPACE && hold != SpaceHoldAction.CURSOR) assertEquals(hold, prefs.effectiveSpaceHold)
         }
     }

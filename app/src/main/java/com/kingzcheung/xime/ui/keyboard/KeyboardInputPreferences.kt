@@ -4,6 +4,7 @@ import kotlin.math.roundToInt
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.settings.FrostedGlassPreferences
@@ -13,6 +14,9 @@ import com.kingzcheung.xime.settings.KeyEffectPreferences
 
 internal fun normalizeHandwritingPause(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.5f).coerceIn(0.1f, 2.5f) * 10).roundToInt() / 10f
+
+internal fun normalizeCursorHoldSeconds(value: Float): Float =
+    ((value.takeIf { it.isFinite() } ?: 0.2f).coerceIn(0.1f, 1f) * 10).roundToInt() / 10f
 
 enum class SpaceHoldAction(val label: String) {
     CURSOR("移动光标"), REPEAT("连续空格"), VOICE_TOGGLE("语音开关")
@@ -36,12 +40,14 @@ data class KeyboardInputPreferences(
     val neighborCorrection: Boolean = true,
     val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
     val symbolInputMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
+    val cursorHoldSeconds: Float = 0.2f,
 ) {
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
-    val spaceHoldDelayMs: Long get() = if (effectiveSpaceHold == SpaceHoldAction.CURSOR) 100L else 300L
+    val spaceHoldDelayMs: Long get() = if (effectiveSpaceHold == SpaceHoldAction.CURSOR)
+        (normalizeCursorHoldSeconds(cursorHoldSeconds) * 1000).roundToInt().toLong() else 300L
     companion object {
-        fun read(context: Context): KeyboardInputPreferences {
+        fun read(context: Context, isDark: Boolean = FrostedGlassPreferences.isDark(context)): KeyboardInputPreferences {
             val prefs = SettingsPreferences.getPrefsPublic(context)
             val legacyPause = prefs.getFloat("handwriting_pause_seconds", 0.5f)
             // 本轮将旧的一秒默认值迁移为半秒；其他已设时长保留。
@@ -51,13 +57,14 @@ data class KeyboardInputPreferences(
             return KeyboardInputPreferences(
                 keyGlowEnabled = KeyEffectPreferences.glowEnabled(prefs),
                 keyAnimationEnabled = KeyEffectPreferences.animationEnabled(prefs),
-                frostedGlass = FrostedGlassPreferences.read(context),
+                frostedGlass = FrostedGlassPreferences.read(context, isDark),
                 showPressBubble = SettingsPreferences.shouldShowPressBubble(context),
                 splitKeyboardEnabled = SettingsPreferences.isSplitKeyboardEnabled(context),
                 spaceHold = hold,
                 cursorGesture = CursorGestureMode.entries.firstOrNull { it.name == prefs.getString("cursor_gesture_mode", null) }
                     ?: if (hold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,
+                cursorHoldSeconds = normalizeCursorHoldSeconds(prefs.getFloat("cursor_hold_seconds", 0.2f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 symbolInputMode = SymbolInputMode.entries.firstOrNull {
                     it.name == prefs.getString("symbol_input_mode", null)
@@ -73,6 +80,7 @@ data class KeyboardInputPreferences(
         SettingsPreferences.getPrefsPublic(context).edit()
             .putString("space_hold_action", spaceHold.name)
             .putString("cursor_gesture_mode", cursorGesture.name)
+            .putFloat("cursor_hold_seconds", normalizeCursorHoldSeconds(cursorHoldSeconds))
             .putBoolean("neighbor_correction", neighborCorrection)
             .putString("symbol_input_mode", symbolInputMode.name)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
@@ -106,17 +114,19 @@ val LocalKeyboardInputPreferences = staticCompositionLocalOf { KeyboardInputPref
 val LocalKeyboardInputActions = staticCompositionLocalOf { KeyboardInputActions() }
 
 @Composable
-fun rememberKeyboardInputPreferences(): KeyboardInputPreferences {
+fun rememberKeyboardInputPreferences(isDark: Boolean? = null): KeyboardInputPreferences {
     val context = LocalContext.current
-    var settings by remember(context) { mutableStateOf(KeyboardInputPreferences.read(context)) }
-    DisposableEffect(context) {
+    val systemAppearance = LocalConfiguration.current.uiMode
+    fun readSettings() = KeyboardInputPreferences.read(context, isDark ?: FrostedGlassPreferences.isDark(context))
+    var settings by remember(context, isDark, systemAppearance) { mutableStateOf(readSettings()) }
+    DisposableEffect(context, isDark, systemAppearance) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val relevantKeys = setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
             SettingsPreferences.KEY_SPLIT_KEYBOARD,
-            "space_hold_action", "cursor_gesture_mode", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols",
+            "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols",
             "handwriting_pause_seconds", "handwriting_pause_seconds_v2") + FrostedGlassPreferences.keys
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == null || key in relevantKeys) settings = KeyboardInputPreferences.read(context)
+            if (key == null || key in relevantKeys) settings = readSettings()
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }

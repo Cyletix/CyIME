@@ -31,6 +31,7 @@ class SpaceKeyGestureTest {
     private var density = 1f
     private val moves = mutableListOf<Int>()
     private val rows = mutableListOf<Int>()
+    private val cursorHoldSeconds = mutableStateOf(0.2f)
 
     private fun setKey(mode: SpaceHoldAction = SpaceHoldAction.CURSOR, voiceSticky: Boolean = false,
         cursor: CursorGestureMode = if (mode == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE) {
@@ -38,7 +39,8 @@ class SpaceKeyGestureTest {
             density = LocalDensity.current.density
             var cursorActive by remember { mutableStateOf(false) }
             CompositionLocalProvider(
-                LocalKeyboardInputPreferences provides KeyboardInputPreferences(spaceHold = mode, cursorGesture = cursor, cursorStepDp = 10f),
+                LocalKeyboardInputPreferences provides KeyboardInputPreferences(spaceHold = mode, cursorGesture = cursor,
+                    cursorStepDp = 10f, cursorHoldSeconds = cursorHoldSeconds.value),
                 LocalKeyboardInputActions provides KeyboardInputActions(onCursorMove = { moves += it }, onCursorMoveVertical = { rows += it }, onCursorModeChange = { cursorActive = it },
                     onVoiceToggle = { voices++ }, isVoiceMode = voiceSticky, voiceSticky = voiceSticky),
             ) {
@@ -65,7 +67,13 @@ class SpaceKeyGestureTest {
 
     @Test fun tapProducesOneSpace() {
         setKey()
-        rule.onNodeWithTag("space").performTouchInput { down(center); up() }
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("space").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(176L)
+        rule.onNodeWithTag("cursor-control-overlay").assertDoesNotExist()
+        rule.onNodeWithTag("space").performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(320L)
+        rule.onNodeWithTag("cursor-control-overlay").assertDoesNotExist()
         rule.runOnIdle { assertEquals(1, spaces); assertTrue(moves.isEmpty()); assertEquals(0, voices) }
     }
 
@@ -76,11 +84,11 @@ class SpaceKeyGestureTest {
         rule.onNodeWithText("长按语音").assertDoesNotExist()
     }
 
-    @Test fun holdArmsAt100msAndSmallMovesAccumulateWithoutVoiceOrSpace() {
+    @Test fun holdArmsAt200msAndSmallMovesAccumulateWithoutVoiceOrSpace() {
         setKey()
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("space").performTouchInput { down(center) }
-        rule.mainClock.advanceTimeBy(80L)
+        rule.mainClock.advanceTimeBy(176L)
         rule.onNodeWithTag("cursor-control-overlay").assertDoesNotExist()
         rule.mainClock.advanceTimeBy(48L)
         rule.onNodeWithTag("cursor-control-overlay").assertExists()
@@ -92,6 +100,43 @@ class SpaceKeyGestureTest {
             up()
         }
         rule.runOnIdle { assertEquals(listOf(1, -1), moves); assertEquals(0, spaces); assertEquals(0, voices) }
+    }
+
+    @Test fun changingDelayOnTheDisplayedKeyTakesEffectOnTheNextPress() {
+        setKey()
+        val key = rule.onNodeWithTag("space")
+        val originalNodeId = key.fetchSemanticsNode().id
+        rule.mainClock.autoAdvance = false
+        key.performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(224L)
+        rule.onNodeWithTag("cursor-control-overlay").assertExists()
+        key.performTouchInput { up() }
+
+        rule.runOnIdle { cursorHoldSeconds.value = 0.5f }
+        rule.mainClock.advanceTimeByFrame()
+        assertEquals("Preference changes must update the existing key", originalNodeId, key.fetchSemanticsNode().id)
+        key.performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(320L)
+        rule.onNodeWithTag("cursor-control-overlay").assertDoesNotExist()
+        key.performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(240L)
+        rule.runOnIdle { assertEquals(1, spaces) }
+        rule.onNodeWithTag("cursor-control-overlay").assertDoesNotExist()
+
+        key.performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(528L)
+        rule.onNodeWithTag("cursor-control-overlay").assertExists()
+        key.performTouchInput { up() }
+        rule.runOnIdle { cursorHoldSeconds.value = 0.1f }
+        rule.mainClock.advanceTimeByFrame()
+        assertEquals(originalNodeId, key.fetchSemanticsNode().id)
+        key.performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(80L)
+        rule.onNodeWithTag("cursor-control-overlay").assertDoesNotExist()
+        rule.mainClock.advanceTimeBy(48L)
+        rule.onNodeWithTag("cursor-control-overlay").assertExists()
+        key.performTouchInput { up() }
+        rule.runOnIdle { assertEquals(1, spaces); assertTrue(moves.isEmpty()); assertEquals(0, voices) }
     }
 
     @Test fun releasingHeldSpaceWithoutMovingDoesNotInsert() {
