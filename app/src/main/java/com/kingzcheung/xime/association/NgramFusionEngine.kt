@@ -42,7 +42,7 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
         context: String
     ): List<AssociationCandidate> {
         if (!isInitialized) {
-            return modelCandidates
+            return normalizeModelCandidates(modelCandidates)
         }
         
         val userCandidates = userNgramCache.getUserCandidates(context, 10)
@@ -50,9 +50,8 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
         val allCandidates = mutableMapOf<String, Float>()
         
         baseModel?.predict(context, 10)?.forEach { allCandidates[it.text] = it.score }
-        modelCandidates.forEach { candidate ->
-            val modelScore = normalizeModelScore(candidate.score)
-            allCandidates[candidate.text] = modelScore
+        normalizeModelCandidates(modelCandidates).forEach { candidate ->
+            allCandidates[candidate.text] = candidate.score
         }
         userNgramCache.profileCandidates(context).forEach { candidate ->
             allCandidates[candidate.text] = maxOf(allCandidates[candidate.text] ?: 0f, candidate.score)
@@ -72,14 +71,6 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
         return allCandidates.map { (word, score) ->
             AssociationCandidate(word, score)
         }.sortedByDescending { it.score }
-    }
-    
-    private fun normalizeModelScore(score: Float): Float {
-        return when {
-            score > 0 -> (score / 100f).coerceIn(0f, 1f)
-            score < 0 -> (kotlin.math.exp((score / 10f).toDouble()).toFloat()).coerceIn(0f, 1f)
-            else -> 0.5f
-        }
     }
     
     suspend fun saveCache() {

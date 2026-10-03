@@ -107,3 +107,10 @@ class NgramTrie {
         return count
     }
 }
+
+/** Prefer the most specific observed context; only back off when it has no observations. */
+internal fun predictLearnedContinuation(bigrams: NgramTrie, trigrams: NgramTrie, tokens: List<String>): List<Pair<String, Float>> {
+    if (tokens.isEmpty()) return emptyList()
+    val longer = if (tokens.size >= 2) trigrams.next(tokens.takeLast(2)) else emptyList()
+    return longer.ifEmpty { bigrams.next(tokens.takeLast(1)) }
+}

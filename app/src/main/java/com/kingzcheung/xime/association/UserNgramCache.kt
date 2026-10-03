@@ -68,11 +68,8 @@ class UserNgramCache(context: Context) {
     fun getUserCandidates(context: String, topK: Int = 5): List<Pair<String, Float>> = synchronized(stateLock) {
         val tokens = tokenize(context)
         if (tokens.isEmpty()) return@synchronized emptyList()
-        val results = bigramTrie.next(tokens.takeLast(1)).toMap().toMutableMap()
-        if (tokens.size >= 2) trigramTrie.next(tokens.takeLast(2)).forEach { (text, score) ->
-            results[text] = maxOf(results[text] ?: 0f, score)
-        }
-        results.entries.sortedByDescending { it.value }.take(topK).map { it.key to it.value }
+        val results = predictLearnedContinuation(bigramTrie, trigramTrie, tokens)
+        results.sortedByDescending { it.second }.take(topK)
     }
 
     fun profileCandidates(context: String): List<AssociationCandidate> = synchronized(stateLock) { profileIndex.predict(context) }
