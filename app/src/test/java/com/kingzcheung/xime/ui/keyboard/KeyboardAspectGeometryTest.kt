@@ -37,7 +37,62 @@ class KeyboardAspectGeometryTest {
         assertEquals(ProtectedKeyboardSize(1000, 350, 80), custom)
         assertTrue(protectKeyboardSize(1600, 1000, 350, 80, letters).width < custom.width)
         val extreme = protectKeyboardSize(2000, 1900, 250, 0, letters, customSize = true)
-        assertTrue(extreme.width <= letters.extremes.maxWidth(extreme.height.toFloat()))
+        assertEquals(1900, extreme.width)
+    }
+
+    @Test fun everyLayoutCanReachBothWindowEdgesAndKeepSavedFullWidth() {
+        val layouts = listOf(letters, KeyboardAspectLimits.forLayout(
+            com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC, true), KeyboardAspectLimits.T9)
+        for (limits in layouts) for (density in listOf(1f, 2.5f)) {
+            val bounds = ResizeRect(0f, 0f, 1600f * density, 900f * density)
+            var start = ResizeRect(400f * density, 400f * density, 1000f * density, 750f * density)
+            for (handle in listOf(ResizeHandle.RIGHT, ResizeHandle.LEFT)) {
+                val raw = if (handle == ResizeHandle.RIGHT) start.copy(right = bounds.right)
+                    else start.copy(left = bounds.left)
+                val result = start.resizeWithReachableWidth(raw, handle, bounds, limits, density, 0f)
+                assertEquals(raw, result)
+                start = result
+            }
+            val saved = protectKeyboardSize(1600, 1600, 350, 0, limits, customSize = true)
+            assertEquals(1600, saved.width)
+            assertEquals(saved, protectKeyboardSize(1600, saved.width, saved.height,
+                saved.offsetX, limits, customSize = true))
+        }
+    }
+
+    @Test fun edgeApproachIsContinuousMonotonicAndReversible() {
+        val bounds = ResizeRect(0f, 0f, 1600f, 900f)
+        val start = ResizeRect(0f, 400f, 600f, 750f)
+        for (limits in listOf(letters, KeyboardAspectLimits.T9)) {
+            var previous = start
+            for (x in 601..1600) {
+                val raw = start.copy(right = x.toFloat())
+                val result = start.resizeWithReachableWidth(raw, ResizeHandle.RIGHT, bounds, limits, 1f, 0f)
+                assertTrue(result.right >= previous.right)
+                assertTrue("No sudden jumps: $previous -> $result", result.right - previous.right < 10f)
+                assertEquals(start.left, result.left, 0f)
+                assertEquals(start.height, result.height, 0f)
+                previous = result
+            }
+            assertEquals(bounds.right, previous.right, 0f)
+            assertEquals(start, start.resizeWithReachableWidth(start, ResizeHandle.RIGHT, bounds, limits, 1f, 0f))
+        }
+    }
+
+    @Test fun splitGapChangesResistanceWithoutChangingT9WhenSplitPreferenceIsEnabled() {
+        val kind = com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC
+        val split = KeyboardAspectLimits.forLayout(kind, true)
+        assertTrue(split.max > letters.max)
+        assertEquals(KeyboardAspectLimits.T9, KeyboardAspectLimits.forLayout(
+            com.kingzcheung.xime.settings.LayoutKind.T9, true))
+        val start = ResizeRect(0f, 0f, 700f, 350f)
+        val raw = start.copy(right = 950f)
+        val bounds = ResizeRect(0f, 0f, 1600f, 900f)
+        val fullResult = start.resizeWithReachableWidth(raw, ResizeHandle.RIGHT, bounds, letters, 1f, 0f)
+        val splitResult = start.resizeWithReachableWidth(raw, ResizeHandle.RIGHT, bounds, split, 1f, 0f)
+        val t9Result = start.resizeWithReachableWidth(raw, ResizeHandle.RIGHT, bounds, KeyboardAspectLimits.T9, 1f, 0f)
+        assertTrue(splitResult.right > fullResult.right)
+        assertTrue(t9Result.right < fullResult.right)
     }
 
     @Test fun nearbyDragIsUnchangedAndCanCrossThePreferredBoundary() {

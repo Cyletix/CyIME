@@ -24,7 +24,7 @@ import java.io.File
 class TabletKeySizingTest {
     @get:Rule val rule = createComposeRule()
 
-    @Test fun tabletKanaAndFunctionLabelsUseTheSameLargerScale() = checkLayout(760, 420, 1f, true)
+    @Test fun tabletLabelsScaleTogetherWithCompactModeKeys() = checkLayout(760, 420, 1f, true)
     @Test fun phoneKanaAndFunctionLabelsRetainTheirNormalProportions() = checkLayout(360, 240, 1f, false)
     @Test fun smallFloatingLayoutWithLargeSystemFontRemainsReadableAndUnclipped() = checkLayout(280, 200, 1.3f, false)
 
@@ -39,7 +39,7 @@ class TabletKeySizingTest {
                 }
             }
         }
-        val labels = listOf("変換", "123", "記号", "あ", "わ")
+        val labels = listOf("変換", "123", "!@#", "あ", "わ")
         val sizes = labels.map { label ->
             val results = mutableListOf<TextLayoutResult>()
             rule.onNodeWithText(label, useUnmergedTree = true)
@@ -48,7 +48,9 @@ class TabletKeySizingTest {
             assertFalse("$label overflow at $width x $height: ${layout.size}, width=${layout.didOverflowWidth}, height=${layout.didOverflowHeight}, paragraph=${layout.multiParagraph.width}x${layout.multiParagraph.height}, constraints=${layout.layoutInput.constraints}, style=${layout.layoutInput.style}", layout.hasVisualOverflow)
             layout.layoutInput.style.fontSize.value
         }
-        sizes.forEach { assertEquals(sizes.first(), it, 0.1f) }
+        listOf(sizes[3], sizes[4]).forEach { assertEquals(sizes.first(), it, 0.1f) }
+        assertEquals("Mode labels share a compact size", sizes[1], sizes[2], 0.1f)
+        assertTrue("Mode labels are compact without becoming tiny", sizes[1] in sizes[0] * .8f..sizes[0])
         if (tablet) assertTrue("tablet labels remain phone sized: $sizes", sizes.first() >= 24f)
         else assertTrue("phone/floating labels enlarged unexpectedly: $sizes", sizes.first() <= 18f)
         val cells = listOf("kana-convert", "kana-number", "kana-symbol", "kana-key:a", "kana-key:wa", "kana-delete", "kana-space", "kana-enter")

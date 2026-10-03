@@ -173,17 +173,21 @@ internal fun KeyboardResizeOverlay(
                 .drawBehind {
                     val stroke = 2.dp.toPx()
                     val tabThickness = 4.dp.toPx()
-                    // 线和四边手柄共用内侧中心线，避免原先外框、短条、对角线互相分离。
+                    // 描边和四边手柄共用内侧中心线。
                     val handleInset = 8.dp.toPx()
                     val tabLength = 34.dp.toPx().coerceAtMost(frame.width / 4f)
                     val rectSize = Size(frame.width.coerceAtLeast(1f), frame.height.coerceAtLeast(1f))
 
                     // 正常面板与调节态共用用户选择的底部轮廓；悬浮始终保留四角圆角。
-                    translate(frame.left, frame.top) {
-                        drawOutline(
-                            panelShape.createOutline(rectSize, layoutDirection, this),
-                            color = surfaceColor.copy(alpha = 0.88f),
-                        )
+                    // Glass already has its own backdrop in the live keyboard preview.
+                    // Keep the dimming and resize handles without painting over that material.
+                    if (!frostedGlassEnabled) {
+                        translate(frame.left, frame.top) {
+                            drawOutline(
+                                panelShape.createOutline(rectSize, layoutDirection, this),
+                                color = surfaceColor.copy(alpha = 0.88f),
+                            )
+                        }
                     }
                     val innerLeft = frame.left + handleInset
                     val innerTop = frame.top + handleInset
@@ -220,11 +224,6 @@ internal fun KeyboardResizeOverlay(
                             drawArc(accentColor, arc.startAngle, 90f, useCenter = false,
                                 topLeft = arc.topLeft, size = Size(cornerRadius * 2, cornerRadius * 2),
                                 style = Stroke(tabThickness, cap = StrokeCap.Round))
-                        }
-                    resizeCornerDiagonals(frame, lengthPx = 12.dp.toPx(), insetPx = 14.dp.toPx())
-                        .forEach { (start, end) ->
-                            drawLine(accentColor, start, end, strokeWidth = tabThickness,
-                                cap = StrokeCap.Round)
                         }
                     val sideLength = tabLength.coerceAtMost(frame.height / 4f)
                     fun verticalHandle(x: Float) {
@@ -291,8 +290,11 @@ internal fun KeyboardResizeOverlay(
                             minOf(stableBounds.width, maxWidthDp.toFloat() * density.density)
                         } else gestureRect.width
                         val aspect = session.aspectLimits
+                        val squareSpacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig()
+                            .spacingFor(session.squareSnap?.section ?: "qwerty")
 
                         var workingRect = gestureRect
+                        var rawResizeRect = gestureRect
                         val fixedMove = FixedKeyboardMoveGesture(gestureRect, stableBounds, 12.dp.toPx())
                         var workingPadding = session.bottomPaddingDp.toFloat()
                         var didDrag = false
@@ -300,7 +302,7 @@ internal fun KeyboardResizeOverlay(
                         fun applyDelta(amount: Offset) {
                             didDrag = true
                             if (gestureFloating) {
-                                val proposed = workingRect.dragBy(
+                                val proposed = rawResizeRect.dragBy(
                                     handle = dragEdge,
                                     dx = amount.x,
                                     dy = amount.y,
@@ -310,8 +312,12 @@ internal fun KeyboardResizeOverlay(
                                     maxWidth = maxWidthPx,
                                     maxHeight = screenMaxHeightPx,
                                 )
-                                workingRect = workingRect.resistKeyboardAspectDrag(proposed, aspect,
-                                    density.density, dragBarDp * density.density)
+                                rawResizeRect = proposed
+                                workingRect = if (dragEdge == ResizeHandle.NONE) proposed else
+                                    gestureRect.resizeWithReachableWidth(proposed, dragEdge, stableBounds, aspect,
+                                        density.density, dragBarDp * density.density)
+                                        .snapSquareKeys(dragEdge, session.squareSnap, stableBounds, density.density,
+                                            dragBarDp * density.density, true, squareSpacing)
                                 dragRect = workingRect
                                 currentOnPreviewRectChange(workingRect)
                                 currentWidthDp = (workingRect.width / density.density)
@@ -325,7 +331,7 @@ internal fun KeyboardResizeOverlay(
                                             ResizeHandle.BOTTOM_RIGHT -> ResizeHandle.RIGHT
                                             else -> dragEdge
                                         }
-                                        val proposed = workingRect.dragBy(
+                                        val proposed = rawResizeRect.dragBy(
                                             handle = edge,
                                             dx = amount.x,
                                             dy = amount.y,
@@ -335,12 +341,14 @@ internal fun KeyboardResizeOverlay(
                                             maxWidth = stableBounds.width,
                                             maxHeight = screenMaxHeightPx,
                                         )
-                                        workingRect = workingRect.resistKeyboardAspectDrag(proposed, aspect,
+                                        rawResizeRect = proposed
+                                        workingRect = gestureRect.resizeWithReachableWidth(proposed, edge, stableBounds, aspect,
                                             density.density, workingPadding * density.density)
+                                            .snapSquareKeys(edge, session.squareSnap, stableBounds, density.density,
+                                                workingPadding * density.density, false, squareSpacing)
                                         val snapped = workingRect.snapFixedEdgeToCenter(edge, stableBounds,
                                             floatingResizeMinWidthDp(availableWidthDp) * density.density, 12.dp.toPx())
-                                            .takeIf { it.hasKeyboardAspect(aspect.extremes, density.density, workingPadding * density.density) }
-                                            ?: workingRect
+
                                         dragRect = snapped
                                         currentOnPreviewRectChange(snapped)
                                         currentHeightDp = workingRect.height / density.density - workingPadding
@@ -700,6 +708,7 @@ internal fun KeyboardResizeOverlay(
 /** 调节会话唯一预览矩形；真实键盘、边框、命中全部使用它。 */
 internal data class KeyboardResizePreviewState(
     val aspectLimits: KeyboardAspectLimits = KeyboardAspectLimits.Letters,
+    val squareSnap: KeyboardSquareSnap? = null,
     val rect: ResizeRect? = null,
     val initialRect: ResizeRect? = null,
     val onRectChange: (ResizeRect) -> Unit = {},

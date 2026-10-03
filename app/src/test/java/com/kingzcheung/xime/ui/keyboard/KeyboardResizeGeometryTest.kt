@@ -376,21 +376,6 @@ class KeyboardResizeGeometryTest {
         assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeHeightBounds(200, landscape = true).last)
     }
 
-    @Test
-    fun `四角对角线提示在角内侧且只做视觉`() {
-        val frame = ResizeRect(100f, 50f, 900f, 450f)
-        val lines = resizeCornerDiagonals(frame, lengthPx = 24f, insetPx = 12f)
-        assertEquals(4, lines.size)
-        // ↖ 与 ↘ 沿角平分线向内，端点到角点距离相同
-        assertEquals(Offset(112f, 62f), lines[0].first)
-        assertEquals(Offset(136f, 86f), lines[0].second)
-        assertEquals(Offset(888f, 62f), lines[1].first)
-        assertEquals(Offset(864f, 86f), lines[1].second)
-        assertEquals(Offset(112f, 438f), lines[2].first)
-        assertEquals(Offset(136f, 414f), lines[2].second)
-        assertEquals(Offset(888f, 438f), lines[3].first)
-        assertEquals(Offset(864f, 414f), lines[3].second)
-    }
     @Test fun phoneFloatingWidthCanShrinkWhileTabletKeepsUsableMinimum() {
         for (width in listOf(320, 360, 393, 412)) {
             val bounds = keyboardWidthBounds(width)
