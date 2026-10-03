@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -126,6 +127,7 @@ fun LanguageKeyButton(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    languageLabel: String? = null,
 ) {
     val actions = LocalKeyboardInputActions.current
     val context = LocalContext.current
@@ -235,7 +237,8 @@ fun LanguageKeyButton(
             }
     ) {
         SwipeableKeyButton(
-            text = "语言切换", icon = rememberVectorPainter(Icons.Default.Language), onClick = onClick,
+            text = languageLabel ?: "语言切换",
+            icon = if (languageLabel == null) rememberVectorPainter(Icons.Default.Language) else null, onClick = onClick,
             backgroundColor = backgroundColor,
             textColor = if (icon != null) iconColor else textColor,
             modifier = Modifier.fillMaxSize().testTag("language-key-control"), layoutMode = ButtonLayout.STANDARD,
@@ -271,12 +274,18 @@ fun LanguageKeyButton(
             ) {
                 // Popup owns a separate view; retain the keyboard density and font scale.
                 androidx.compose.runtime.CompositionLocalProvider(LocalDensity provides density) {
+                val menuBackground = MaterialTheme.colorScheme.surface
+                val menuGlass = rememberKeyboardInputPreferences(menuBackground.luminance() < 0.5f).frostedGlass
                 Surface(
-                    shape = RoundedCornerShape(16.dp), tonalElevation = 6.dp, shadowElevation = 8.dp,
+                    shape = RoundedCornerShape(16.dp), tonalElevation = if (menuGlass.enabled) 0.dp else 6.dp, shadowElevation = 8.dp,
+                    color = if (menuGlass.enabled) Color.Transparent else menuBackground,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.width(with(density) { menuGeometry.bounds.width.toDp() })
                         .height(with(density) { menuGeometry.bounds.height.toDp() }).testTag("language-menu"),
                 ) {
-                    Column(Modifier.visualMaterial(VisualStyles.current, 16.dp, MaterialLevel.FLOATING).padding(6.dp)) {
+                    Column(Modifier.keyboardPanelBackground(menuBackground, menuGlass)
+                        .visualMaterial(if (menuGlass.enabled) com.kingzcheung.xime.ui.theme.VisualStyle.GLASS
+                            else VisualStyles.current, 16.dp, MaterialLevel.FLOATING).padding(6.dp)) {
                         Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
                             Text("语言", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
                         }

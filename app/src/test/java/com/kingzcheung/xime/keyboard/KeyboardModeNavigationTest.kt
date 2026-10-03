@@ -35,4 +35,21 @@ class KeyboardModeNavigationTest {
             for (page in listOf(text, number, symbol, tool)) assertEquals(main, page.textMainType())
         }
     }
+
+    @Test fun toolsKeepTheExactUnderlyingInputSurfaceIncludingNumberAndHandwriting() {
+        val surfaces = MainType.entries.map { KeyboardPage.Main(it) } +
+            PanelType.entries.map { KeyboardPage.Panel(it, MainType.HANDWRITING) }
+        val routes = listOf(OverlayRoute.Menu, OverlayRoute.SchemaList, OverlayRoute.Clipboard(),
+            OverlayRoute.Emoji, OverlayRoute.Symbol, OverlayRoute.Edit, OverlayRoute.SplitWords("文字"),
+            OverlayRoute.ToolbarCustomize, OverlayRoute.ToolPanel)
+        for (surface in surfaces) {
+            assertSame(surface, surface.underlyingPage())
+            for (route in routes) {
+                val overlay = KeyboardPage.Overlay(route, emptyList(), surface)
+                val nested = KeyboardPage.Overlay(OverlayRoute.Menu, listOf(route), overlay)
+                assertSame(surface, overlay.underlyingPage())
+                assertSame(surface, nested.underlyingPage())
+            }
+        }
+    }
 }

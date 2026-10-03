@@ -74,7 +74,7 @@ object InputProfiles {
     @Volatile private var installed: Map<String, InputProfile> = emptyMap()
     private val pinyinIds = setOf("rime_ice", "pinyin_simp", "luna_pinyin", "luna_pinyin_simp",
         "luna_pinyin_fluency", "t9", "t9_pinyin", "pinyin_14jian", "pinyin_17jian", "pinyin_18jian")
-    private val doublePinyinIds = setOf("double_pinyin", "double_pinyin_flypy", "double_pinyin_abc",
+    private val doublePinyinIds = setOf("double_pinyin", "double_pinyin_flypy", "double_pinyin_flypy_14jian", "double_pinyin_abc",
         "double_pinyin_mspy", "double_pinyin_sogou", "double_pinyin_ziguang", "double_pinyin_pyjj")
     private val wubiIds = setOf("wubi86", "wubi86_trad", "wubi98")
     private val wubiPinyinIds = setOf("wubi86_pinyin", "wubi86_trad_pinyin")
@@ -128,7 +128,7 @@ object InputProfiles {
         }
         val layout = when {
             id == "t9_pinyin" || id == "t9" -> InputLayout.T9
-            id == "pinyin_14jian" -> InputLayout.MERGED14
+            id == "pinyin_14jian" || id == "double_pinyin_flypy_14jian" -> InputLayout.MERGED14
             id == "pinyin_17jian" -> InputLayout("qwerty_17", "17键", LayoutKind.MERGED)
             id == "pinyin_18jian" -> InputLayout("qwerty_18", "18键", LayoutKind.MERGED)
             id == "japanese_kana" -> InputLayout.KANA

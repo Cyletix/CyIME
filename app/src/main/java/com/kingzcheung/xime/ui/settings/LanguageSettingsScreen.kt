@@ -59,7 +59,7 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) }
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding)
+        LazyColumn(Modifier.fillMaxSize().testTag("language-settings-list").padding(padding)
             .padding(horizontal = 16.dp, vertical = 8.dp),
             state = dragOrder.list, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Text("点开语言，分别设置输入方案和键盘布局；下次切换到该语言时使用。长按可调整语言顺序。",
@@ -118,6 +118,9 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
                         }
                     }
                 }
+            }
+            item(key = "language-key-switch") {
+                LanguageKeySwitchSettings(availableProfiles, orderedLanguages, profilesState.currentSchema)
             }
             item { if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             item { Spacer(Modifier.height(16.dp)) }

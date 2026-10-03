@@ -9,6 +9,9 @@ sealed interface KeyboardPage {
         val route: OverlayRoute,
         val backStack: List<OverlayRoute>,
         val behind: KeyboardPage,
+        // Symbols return to text even if another tool is opened before the overlay closes.
+        // Keep that destination separate from the surface drawn beneath the reveal.
+        val returnToTextOnClose: Boolean = false,
     ) : KeyboardPage {
         val isLeaf: Boolean get() = backStack.isEmpty()
     }

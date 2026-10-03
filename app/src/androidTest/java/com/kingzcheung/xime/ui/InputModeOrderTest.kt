@@ -98,49 +98,31 @@ class InputModeOrderTest {
             englishEnabled = true, reordered = listOf("t9_pinyin", InputModes.ENGLISH, InputModes.ENGLISH)))
     }
 
-    @Test fun dragOrderPersistsAndSurvivesReenteringAndAnotherMove() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val prefs = SettingsPreferences.getPrefsPublic(context)
-        val saved = prefs.getString("input_mode_order", null)
-        val initial = listOf(SchemaInfo("t9", "拼音", "", "", ""), SchemaInfo("japanese", "日语", "", "", ""))
-        InputModes.saveOrder(context, listOf("t9", "rime_ice", "japanese", InputModes.ENGLISH))
-        var modes by mutableStateOf(InputModes.ordered(context, initial))
-        fun drag(fromTag: String, toTag: String) {
-            val source = rule.onNodeWithTag(fromTag)
-            val from = source.fetchSemanticsNode().boundsInRoot
-            val to = rule.onNodeWithTag(toTag).fetchSemanticsNode().boundsInRoot
-            rule.mainClock.autoAdvance = false
-            try {
-                source.performTouchInput { down(Offset(20f, center.y)) }
-                rule.mainClock.advanceTimeBy(700)
-                source.performTouchInput { moveBy(Offset(0f, to.center.y - from.center.y)); up() }
-            } finally { rule.mainClock.autoAdvance = true }
-            rule.waitForIdle()
+    @Test fun schemeManagementDoesNotExposeOrRewriteCombinationOrder() {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext
+        val namespace = "scheme-management-${System.nanoTime()}"
+        val context = object : ContextWrapper(app) {
+            override fun getSharedPreferences(name: String, mode: Int) =
+                app.getSharedPreferences("$namespace-$name", mode)
         }
-        try {
-            rule.setContent { MaterialTheme {
-                SchemaListView(schemas = modes, currentSchemaId = "t9", backgroundColor = Color.White,
-                    accentColor = Color.Blue, keyTextColor = Color.Black, keyBgColor = Color.LightGray,
-                    onSelectSchema = {}, onReorderSchemas = { ids ->
-                        val visibleIds = modes.map { it.schemaId }
-                        InputModes.saveReorderedModes(context, visibleIds, visibleIds, ids)
-                        modes = InputModes.ordered(context, initial)
-                    }, modifier = Modifier.size(360.dp, 250.dp))
+        val initial = listOf(SchemaInfo("t9_pinyin", "拼音", "", "", ""), SchemaInfo("japanese", "日语", "", "", ""))
+        InputModes.saveOrder(context, listOf("t9_pinyin", "rime_ice", "japanese", InputModes.ENGLISH))
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        val saved = prefs.getString(InputModes.ORDER_KEY, null)
+        rule.setContent {
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides context) { MaterialTheme {
+                SchemaListView(InputModes.ordered(context, initial), "t9_pinyin", Color.White,
+                    Color.Blue, Color.Black, Color.LightGray, {}, modifier = Modifier.size(360.dp, 250.dp))
             } }
+        }
+        repeat(2) {
             rule.onNodeWithTag("profile-more").performClick()
-            rule.onNodeWithText("组合顺序").performClick()
-            rule.onAllNodesWithContentDescription("上移英文").assertCountEquals(0)
-            drag("input-mode-order:t9", "input-mode-order:japanese")
-            assertEquals(listOf("japanese", "t9", InputModes.ENGLISH), InputModes.ordered(context, initial).map { it.schemaId })
-            drag("input-mode-order:${InputModes.ENGLISH}", "input-mode-order:t9")
-            assertEquals(listOf("japanese", InputModes.ENGLISH, "t9"), InputModes.ordered(context, initial).map { it.schemaId })
-            assertEquals("rime_ice", prefs.getString(InputModes.ORDER_KEY, "").orEmpty().lines()[1])
-            rule.onNodeWithText("完成").performClick()
-            rule.onNodeWithTag("profile-more").performClick()
-            rule.onNodeWithText("组合顺序").performClick()
-            val english = rule.onNodeWithTag("input-mode-order:__xime_english").fetchSemanticsNode().boundsInRoot
-            val t9 = rule.onNodeWithTag("input-mode-order:t9").fetchSemanticsNode().boundsInRoot
-            assertTrue(english.top < t9.top)
-        } finally { prefs.edit().also { if (saved == null) it.remove("input_mode_order") else it.putString("input_mode_order", saved) }.commit() }
+            rule.onNodeWithText("组合顺序").assertDoesNotExist()
+            rule.onNodeWithTag("profile-edit-order").assertDoesNotExist()
+            rule.onNodeWithTag("add-layout-tile").assertIsDisplayed()
+            rule.onNodeWithTag("profile-management-back").performClick()
+            rule.onNodeWithTag("panel-scheme:t9_pinyin").assertIsSelected()
+        }
+        assertEquals(saved, prefs.getString(InputModes.ORDER_KEY, null))
     }
 }

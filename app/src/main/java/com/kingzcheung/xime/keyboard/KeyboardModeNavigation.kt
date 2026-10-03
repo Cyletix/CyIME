@@ -22,6 +22,12 @@ fun KeyboardPage.textMainType(): MainType = when (this) {
     is KeyboardPage.Overlay -> behind.textMainType()
 }
 
+/** Tool overlays cover an input surface without replacing it or ending its input mode. */
+fun KeyboardPage.underlyingPage(): KeyboardPage = when (this) {
+    is KeyboardPage.Overlay -> behind.underlyingPage()
+    else -> this
+}
+
 /** First page contains everyday punctuation; specialist categories remain available. */
 fun commonSymbolsFor(textLabel: String): List<String> = when (textLabel) {
     "ABC" -> listOf(".", ",", "?", "!", "'", "\"", ":", ";", "-", "_", "/", "\\",
