@@ -85,7 +85,8 @@ fun HandwritingKeyboardLayout(
     onUnsupportedExit: () -> Unit = {},
     unsupportedExitLabel: String = "返回键盘",
 ) {
-    if (!HandwritingLanguages.supports(language)) {
+    val recognitionLanguage = HandwritingLanguages.recognitionLanguageForKeyboard(language)
+    if (recognitionLanguage == null) {
         HandwritingUnavailable(language, modifier, onUnsupportedExit, unsupportedExitLabel)
         return
     }
@@ -97,7 +98,7 @@ fun HandwritingKeyboardLayout(
     val newCharacter by rememberUpdatedState(onNewCharacter)
     val result by rememberUpdatedState(onRecognition)
     val feedback by rememberUpdatedState(onButtonFeedback)
-    val functionRowBackground = if (!expanded && LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else panelBackgroundColor
+    val functionRowBackground = if (expanded || LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else panelBackgroundColor
     val pauseMs by rememberUpdatedState((LocalKeyboardInputPreferences.current.handwritingPauseSeconds * 1000).toLong())
     val recognitionMutex = remember { Mutex() }
     val session = remember(scope, sessionKey, language) {
@@ -108,7 +109,7 @@ fun HandwritingKeyboardLayout(
                 withContext(Dispatchers.Default) {
                     OverlappedHandwritingRecognizer().recognize(
                         strokes.map { stroke -> stroke.map { it.x to it.y } }, gaps,
-                        predictFn = { points, topK -> HandwritingEngine.predict(points, topK, language) },
+                        predictFn = { points, topK -> HandwritingEngine.predict(points, topK, recognitionLanguage) },
                     ).segments
                 }
             }
@@ -118,7 +119,7 @@ fun HandwritingKeyboardLayout(
     val modelDownloaded by remember {
         ModelManager.downloadStates.map { it["ochwpro"] is ModelDownloadState.Complete }.distinctUntilChanged()
     }.collectAsState(ModelManager.downloadStates.value["ochwpro"] is ModelDownloadState.Complete)
-    LaunchedEffect(modelDownloaded, language) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context, language) } }
+    LaunchedEffect(modelDownloaded, language) { withContext(Dispatchers.IO) { HandwritingEngine.initialize(context, recognitionLanguage) } }
     LaunchedEffect(clearSignal, session) { session.clear() }
     DisposableEffect(session) { onDispose { session.clear() } }
 
@@ -166,6 +167,8 @@ fun HandwritingKeyboardLayout(
                 }) {
                 renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), inkColor, transparentPaper = expanded)
             }
+            if (language != recognitionLanguage) Text("中文手写", color = keyTextColor.copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.TopStart).padding(12.dp).testTag("handwriting-language"))
                 }
                 if (!expanded) Column(Modifier.width(functionKeyWidth).fillMaxHeight().testTag("handwriting-side-keys")) {
                     listOf("delete", "？", "，", "。").forEach { action ->
@@ -178,8 +181,10 @@ fun HandwritingKeyboardLayout(
             }
             Box(Modifier.fillMaxWidth()) {
             Column(Modifier.align(Alignment.TopCenter).absoluteOffset(x = controlsOffset).width(controlsWidth)
+                // Fullscreen ink stays transparent; only the saved footer bounds receive the keyboard material.
+                .then(if (expanded) Modifier.keyboardPanelBackground(panelBackgroundColor) else Modifier)
                 .testTag("handwriting-controls")) {
-            if (expanded) Box(Modifier.fillMaxWidth().background(panelBackgroundColor)) { expandedCandidateBar() }
+            if (expanded) Box(Modifier.fillMaxWidth()) { expandedCandidateBar() }
             if (expanded) {
                 Row(Modifier.fillMaxWidth().height(footerHeight).background(functionRowBackground)
                     .testTag("handwriting-symbol-row")) {

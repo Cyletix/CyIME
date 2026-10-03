@@ -8,6 +8,14 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.verifyNoInteractions
 
 class HandwritingLanguagesTest {
+    @Test fun englishTypingExplicitlySelectsChineseHandwritingWithoutClaimingEnglishRecognition() {
+        assertEquals(InputLanguage.CHINESE, HandwritingLanguages.recognitionLanguageForKeyboard(InputLanguage.CHINESE))
+        assertEquals(InputLanguage.CHINESE, HandwritingLanguages.recognitionLanguageForKeyboard(InputLanguage.ENGLISH))
+        assertFalse(HandwritingLanguages.supports(InputLanguage.ENGLISH))
+        assertNull(HandwritingLanguages.recognitionLanguageForKeyboard(InputLanguage.JAPANESE))
+        assertNull(HandwritingLanguages.recognitionLanguageForKeyboard(InputLanguage.UNSPECIFIED))
+    }
+
     @Test fun unsupportedLanguageCannotLoadProbeOrInvokeTheChineseClassifier() {
         val context = mock<Context>()
         for (language in InputLanguage.entries.filter { it != InputLanguage.CHINESE }) {
