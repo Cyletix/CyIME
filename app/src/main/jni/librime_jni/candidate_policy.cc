@@ -34,48 +34,6 @@ std::vector<std::string> HanCharacters(const std::string& text) {
   return chars;
 }
 
-class PrefixPhrase : public Phrase {
- public:
-  explicit PrefixPhrase(const Phrase& source) : Phrase(source) {
-    // Retain the original syllabifier for caret movement and learning spans,
-    // while giving the shortened phrase an independent entry/code.
-    entry_ = New<DictEntry>(source.entry());
-    set_type("phrase_prefix");
-  }
-  DictEntry& mutable_entry() { return *entry_; }
-};
-
-an<Candidate> EncodedPrefix(const an<Candidate>& candidate) {
-  auto phrase = As<Phrase>(Candidate::GetGenuineCandidate(candidate));
-  if (!phrase || !phrase->is_predicitve_match()) return candidate;
-  const auto chars = HanCharacters(phrase->text());
-  const auto matched = phrase->matching_code_size();
-  // Only one-Han-character-per-syllable Chinese phrases have this exact mapping.
-  // English, emoji, numbers and mixed-script custom phrases retain their identity.
-  if (chars.size() != phrase->code().size() || matched == 0 || matched >= chars.size())
-    return candidate;
-  auto prefix = New<PrefixPhrase>(*phrase);
-  auto& entry = prefix->mutable_entry();
-  entry.text.clear();
-  for (size_t i = 0; i < matched; ++i) entry.text += chars[i];
-  entry.code = phrase->matching_code();
-  entry.matching_code_size = 0;
-  entry.remaining_code_length = 0;
-  // Native comment contains full spelling. Keep precisely the selected code's
-  // syllables, so T9 consumption and subsequent learning cannot include suffixes.
-  const auto spelling_end = entry.comment.find_last_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
-  const auto suffix = spelling_end == std::string::npos ? std::string() : entry.comment.substr(spelling_end + 1);
-  std::istringstream words(entry.comment);
-  std::string spelling, part;
-  for (size_t i = 0; i < matched && words >> part; ++i) {
-    if (!spelling.empty()) spelling += ' ';
-    spelling += part;
-  }
-  entry.comment = spelling + suffix;
-  prefix->set_quality(candidate->quality());
-  return prefix;
-}
-
 std::vector<size_t> SyllableEnds(const an<Phrase>& phrase) {
   std::vector<size_t> ends;
   const auto spans = phrase->spans();
@@ -99,7 +57,7 @@ double SpellingCoverage(const an<Phrase>& phrase) {
 
 class PolicyTranslation : public Translation {
  public:
-  PolicyTranslation(an<Translation> source, size_t end, bool numeric) : source_(source), end_(end) {
+  PolicyTranslation(an<Translation> source, const std::string& input, bool numeric) : source_(source), end_(input.size()) {
     // Bound the work independently of dictionary size. This is native candidate
     // identity-preserving ordering, not a separate UI list with stale indices.
     for (size_t i = 0; i < 64 && !source_->exhausted(); ++i) {
@@ -152,6 +110,24 @@ class PolicyTranslation : public Translation {
         std::rotate(weaker, sentence, sentence + 1);
     }
     for (size_t i = 0; i < slots.size(); ++i) head_[slots[i]] = ranked[i].candidate;
+    // A whole English word should not lose to guessed Chinese abbreviations.
+    // Fully spelled Chinese (e.g. you -> 有) and explicit non-dictionary entries
+    // retain their native priority. No word list or fixed candidate is injected.
+    if (!numeric && !input.empty() && input.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") == std::string::npos) {
+      const auto exact = std::find_if(head_.begin(), head_.end(), [&](const auto& c) {
+        return c->start() == 0 && c->end() == end_ && c->text() == input && c->type() == "table";
+      });
+      if (exact != head_.end()) {
+        auto insertion = exact;
+        while (insertion != head_.begin()) {
+          auto previous = insertion - 1;
+          const auto phrase = As<Phrase>(Candidate::GetGenuineCandidate(*previous));
+          if (!phrase || HanCharacters(phrase->text()).empty() || SpellingCoverage(phrase) >= 1.0) break;
+          insertion = previous;
+        }
+        std::rotate(insertion, exact, exact + 1);
+      }
+    }
     Advance();
   }
   bool Next() override { current_.reset(); Advance(); return !exhausted(); }
@@ -159,7 +135,8 @@ class PolicyTranslation : public Translation {
  private:
   an<Candidate> Prepare(an<Candidate> cand) {
     if (!cand || hidden.count(cand->text())) return nullptr;
-    cand = EncodedPrefix(cand);
+    // Keep the engine's complete predictive word and identity. Trimming to the
+    // matched prefix discarded precisely the completion the user could select.
     if (hidden.count(cand->text()) || !seen_.insert(cand->text()).second) return nullptr;
     return cand;
   }
@@ -184,7 +161,7 @@ class CandidatePolicy : public Filter {
   an<Translation> Apply(an<Translation> source, CandidateList*) override {
     const auto& input = engine_->context()->input();
     const bool numeric = !input.empty() && input.find_first_not_of("23456789' ") == std::string::npos;
-    return New<PolicyTranslation>(source, input.size(), numeric);
+    return New<PolicyTranslation>(source, input, numeric);
   }
 };
 
