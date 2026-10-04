@@ -1397,20 +1397,20 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val navBarDp = activeBottomDp.dp
                 val hasNavBar = navBarDp > 0.dp
 
-                // 快捷发送 / 工具面板为"键盘上方的撑高面板"：显示时键盘总高增加面板高度（面板在键盘上方，
+                // 工具面板为"键盘上方的撑高面板"：显示时键盘总高增加面板高度（面板在键盘上方，
                 // 不遮键盘按键），同时容器物理高度同步变大（updateHeight）→ IME insets 由系统确定性重算，
                 // 关闭后容器还原，彻底避免 insets 残留与白色区域。
                 // Overlay 页面（menubar/剪贴板/emoji 等）全屏覆盖键盘内容区：激活期间撑高面板
                 // 不参与计算，否则 Overlay 页面会带上表单/工具面板的额外高度（容器整体被撑高）。
                 val isOverlayPage = page is com.kingzcheung.xime.keyboard.KeyboardPage.Overlay
-                val quickSendFormExtra = if (state.showQuickSendForm && !isOverlayPage) 200 else 0
+                // Clipboard editing uses a separate popup and does not resize the keyboard.
                 // 需与 ToolPanel.TOOL_PANEL_HEIGHT(170) 保持一致，否则容器比面板多/少一截，键盘被拉高。
                 // PASSIVE 纯展示面板走 Overlay 全屏覆盖（键盘窗口内容区），不撑高。
                 val toolPanelExtra = if (state.toolPanelVisible &&
                     state.toolPanelDisplay != "PASSIVE" &&
                     !isOverlayPage
                 ) 170 else 0
-                val overlayPanelExtra = quickSendFormExtra + toolPanelExtra
+                val overlayPanelExtra = toolPanelExtra
 
                 XimeTheme(darkTheme = isDarkTheme, themeId = state.themeId) {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -2108,6 +2108,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         cancelVerificationCodeInput()
+        if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE)) {
+            event?.startTracking()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK &&
             (keyboardViewModel.page.value is KeyboardPage.Overlay || keyboardCallbacks?.onDismissPreeditEditor != null ||
                 uiState.value.showKeyboardResize || uiState.value.handwritingExpanded ||
@@ -2127,7 +2131,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 return super.onKeyDown(keyCode, event)
             }
             val clipboardRoute = (keyboardViewModel.page.value as? KeyboardPage.Overlay)?.route as? OverlayRoute.Clipboard
-            val clipboardOpen = clipboardRoute != null && clipboardRoute.tab != 1
+            val clipboardOpen = clipboardRoute != null
             if (clipboardKeyboard.active && !clipboardOpen) clipboardKeyboard.reset()
             if (clipboardNavigationKeys.contains(keyCode) && e.repeatCount > 0 && !clipboardOpen) return true
             if (clipboardOpen && clipboardKeyboard.active) {
@@ -2192,6 +2196,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE)) {
+            if (event?.isCanceled != true) keyboardCallbacks?.onHideQuickSendForm?.invoke()
+            return true
+        }
         val clipboardConsumed = clipboardNavigationKeys.remove(keyCode)
         val candidateConsumed = hardwareCandidateNavigationKeys.remove(keyCode)
         if (candidateConsumed) keyRouter.releaseHardwareCandidateKey(keyCode)
@@ -3193,13 +3201,20 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     /**
-     * 粘贴性质上屏（键盘剪贴板点选/编辑面板提交）：与 [commitText] 相同的上屏与
-     * 联想行为，但 text_committed 事件带 is_paste 标记——事件语义是"文本上屏"
+     * 粘贴性质上屏：保留文本提交事件并带 is_paste 标记，但不触发打字联想。
+     * text_committed 事件语义是"文本上屏"
      * （照常投递给所有订阅插件），是否把粘贴计入打字量由插件自行决定
      * （typing-stats 过滤，用户反馈"一天一万多字"的主要来源即长文本粘贴）。
      */
     internal fun commitPastedText(text: String) {
         commitTextAndPredict(text, isPaste = true)
+    }
+
+    internal fun dismissPredictionsForPaste() {
+        predictionManager.invalidatePendingPredictions()
+        candidateState.value = candidateState.value.copy(
+            associationCandidates = emptyList(), pendingEnglishText = "",
+        )
     }
 
     private var verificationCodeJob: Job? = null
@@ -3248,8 +3263,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     internal fun commitTextAndPredict(text: String, isPaste: Boolean, allowPrediction: Boolean = true): TextCommitResult {
+        // Invalidate before delivery: a queued prediction or English completion must
+        // not reappear after a paste, including rejected/internal-editor pastes.
+        if (isPaste) dismissPredictionsForPaste()
         val result = commitTextSilently(text, isPaste)
-        if (result != TextCommitResult.ACCEPTED_HOST || !allowPrediction) return result
+        if (result != TextCommitResult.ACCEPTED_HOST || isPaste || !allowPrediction) return result
         if (!canPredictAfter(text)) {
             predictionManager.invalidatePendingPredictions()
             candidateState.value = candidateState.value.copy(associationCandidates = emptyList(), pendingEnglishText = "")
@@ -3341,7 +3359,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val before = runCatching { connection.getTextBeforeCursor(25, 0)?.toString() }.getOrNull()
             if (before != null) predictionManager.replaceCommittedText(before)
             else predictionManager.appendCommittedText(text)
-            predictionManager.recordInput(text)
+            if (!isPaste) predictionManager.recordInput(text)
         }
         return TextCommitResult.ACCEPTED_HOST
     }

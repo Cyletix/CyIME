@@ -626,7 +626,9 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     /** 同一工具栏图标再次点击，回到打开工具前的页面。 */
     fun toggleOverlay(route: OverlayRoute, initialBackStack: List<OverlayRoute> = emptyList()) {
-        if ((_page.value as? KeyboardPage.Overlay)?.route == route) closeOverlay()
+        val currentRoute = (_page.value as? KeyboardPage.Overlay)?.route
+        // Text, images and legacy pinned links are one clipboard tool, not separate toggles.
+        if (currentRoute == route || currentRoute is OverlayRoute.Clipboard && route is OverlayRoute.Clipboard) closeOverlay()
         else showOverlay(route, initialBackStack)
     }
 
@@ -714,12 +716,19 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addQuickSendText(text: String, code: String = "") {
-        clipboardManager.addQuickSendItem(text, code)
+        addPinnedText(text, code)
     }
 
     fun updateQuickSendItem(id: Long, text: String, code: String = "") {
-        clipboardManager.updateQuickSendItem(id, text, code)
+        updateClipboardItem(id, text, code)
     }
+
+    fun addPinnedText(text: String, code: String = "") {
+        clipboardManager.addPinnedText(text, code)
+    }
+
+    fun updateClipboardItem(id: Long, text: String, code: String? = null): Boolean =
+        clipboardManager.updateClipboardItem(id, text, code)
 
     fun removeQuickSendItem(id: Long) {
         clipboardManager.removeFromQuickSend(id)

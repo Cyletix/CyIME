@@ -17,7 +17,9 @@ internal data class ClipboardPanelBounds(val collapsed: Int, val expanded: Int) 
 internal fun clipboardPanelBounds(normal: Int, screen: Int, reserved: Int): ClipboardPanelBounds {
     val available = (screen - reserved.coerceAtLeast(0)).coerceAtLeast(1)
     val collapsed = normal.coerceIn(1, available)
-    return ClipboardPanelBounds(collapsed, maxOf(collapsed, available * 72 / 100))
+    // Target 80% of the screen, then clamp once for bars and the floating bottom offset.
+    val target = minOf(available, screen * 80 / 100)
+    return ClipboardPanelBounds(collapsed, maxOf(collapsed, target))
 }
 
 /** Use screen coordinates: resizing the IME moves the toolbar's local coordinate origin. */

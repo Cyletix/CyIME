@@ -27,7 +27,7 @@ class ClipboardManagerTest {
             ClipboardDatabase.getInstance(context).clipboardDao().deleteAll()
         }
         clipboardManager = ClipboardManager.getInstance(context)
-        awaitCondition({ clipboardManager.clipboardItems.value.isEmpty() })
+        awaitCondition({ clipboardManager.clipboardItems.value.isEmpty() && clipboardManager.quickSendItems.value.isEmpty() })
     }
 
     @After
@@ -201,7 +201,7 @@ class ClipboardManagerTest {
     }
 
     @Test
-    fun addToQuickSendAddsItemToQuickSendList() {
+    fun legacyAddToQuickSendPinsTheExistingRowWithoutCopyingIt() {
         clipboardManager.addItem("Quick text")
         awaitCondition({ clipboardManager.clipboardItems.value.isNotEmpty() })
         val itemId = clipboardManager.clipboardItems.value[0].id
@@ -212,8 +212,10 @@ class ClipboardManagerTest {
         val quickSendItems = clipboardManager.quickSendItems.value
         assertEquals(1, quickSendItems.size)
         assertEquals("Quick text", quickSendItems[0].text)
-        assertTrue("Quick send item should be marked", quickSendItems[0].isQuickSend)
-        assertTrue("Quick send item should be pinned", quickSendItems[0].isPinned)
+        assertFalse("No separate quick-send storage is created", quickSendItems[0].isQuickSend)
+        assertTrue("The existing record should be fixed", quickSendItems[0].isPinned)
+        assertEquals(itemId, quickSendItems[0].id)
+        assertEquals(1, clipboardManager.clipboardItems.value.size)
     }
 
     @Test
@@ -245,7 +247,7 @@ class ClipboardManagerTest {
     }
 
     @Test
-    fun removeItemsKeepsQuickSendIntact() {
+    fun removeItemsKeepsUnselectedFixedRecordsIntact() {
         clipboardManager.addItem("Shared text")
         awaitCondition({ clipboardManager.clipboardItems.value.isNotEmpty() })
         val itemId = clipboardManager.clipboardItems.value[0].id
@@ -253,21 +255,25 @@ class ClipboardManagerTest {
         awaitCondition({ clipboardManager.quickSendItems.value.isNotEmpty() })
         clipboardManager.addItem("Clipboard only")
         awaitCondition({ clipboardManager.clipboardItems.value.size == 2 })
-        val clipboardIds = clipboardManager.clipboardItems.value.map { it.id }
+        val clipboardIds = clipboardManager.clipboardItems.value.filterNot { it.isPinned }.map { it.id }
 
         clipboardManager.removeItems(clipboardIds)
 
-        awaitCondition({ clipboardManager.clipboardItems.value.isEmpty() })
+        awaitCondition({ clipboardManager.clipboardItems.value.size == 1 })
         assertEquals(
-            "Quick send items must survive clipboard batch delete",
+            "An unselected fixed record must survive batch deletion",
             1,
             clipboardManager.quickSendItems.value.size
         )
         assertEquals("Shared text", clipboardManager.quickSendItems.value[0].text)
+        assertEquals(itemId, clipboardManager.clipboardItems.value.single().id)
+
+        clipboardManager.removeItems(listOf(itemId))
+        awaitCondition({ clipboardManager.clipboardItems.value.isEmpty() && clipboardManager.quickSendItems.value.isEmpty() })
     }
 
     @Test
-    fun clearClipboardClearsOnlyClipboardItems() {
+    fun clearClipboardClearsOnlyUnfixedHistory() {
         clipboardManager.addItem("Clipboard A")
         awaitCondition({ clipboardManager.clipboardItems.value.isNotEmpty() })
         clipboardManager.addItem("Clipboard B")
@@ -277,13 +283,14 @@ class ClipboardManagerTest {
 
         clipboardManager.clearClipboard()
 
-        awaitCondition({ clipboardManager.clipboardItems.value.isEmpty() })
+        awaitCondition({ clipboardManager.clipboardItems.value.size == 1 })
         assertEquals(
-            "Quick send items must survive clipboard clear",
+            "Fixed records must survive history clearing",
             1,
             clipboardManager.quickSendItems.value.size
         )
         assertEquals("Quick A", clipboardManager.quickSendItems.value[0].text)
+        assertEquals("Quick A", clipboardManager.clipboardItems.value.single().text)
     }
 
     @Test
@@ -294,7 +301,10 @@ class ClipboardManagerTest {
         val quickSendItems = clipboardManager.quickSendItems.value
         assertEquals(1, quickSendItems.size)
         assertEquals("Direct quick", quickSendItems[0].text)
-        assertTrue("Item should be marked as quick send", quickSendItems[0].isQuickSend)
+        assertFalse("The compatibility method must not create legacy records", quickSendItems[0].isQuickSend)
+        assertTrue(quickSendItems[0].isPinned)
+        awaitCondition({ clipboardManager.clipboardItems.value.size == 1 })
+        assertEquals(quickSendItems[0].id, clipboardManager.clipboardItems.value.single().id)
     }
 
     @Test
@@ -368,8 +378,10 @@ class ClipboardManagerTest {
 
         awaitCondition({ clipboardManager.clipboardItems.value.size == 2 })
         val loaded = clipboardManager.clipboardItems.value
-        assertEquals("Test:::with|||special", loaded[0].text)
-        assertEquals("Normal text", loaded[1].text)
+        assertEquals(setOf("Test:::with|||special", "Normal text"), loaded.map { it.text }.toSet())
+        assertTrue(loaded.all { it.isPinned && !it.isQuickSend })
+        assertEquals(1000L, loaded.single { it.text == "Test:::with|||special" }.timestamp)
+        assertEquals(2000L, loaded.single { it.text == "Normal text" }.timestamp)
     }
 
     @Test

@@ -14,7 +14,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.draw.rotate
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -24,7 +23,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -109,7 +107,6 @@ import com.kingzcheung.xime.keyboard.PanelType
 import com.kingzcheung.xime.keyboard.ToolbarAction
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.speech.RecognitionState
-import kotlinx.coroutines.flow.collectLatest
 
 @Immutable
 data class CandidateBarVisuals(
@@ -555,9 +552,10 @@ fun CandidateBar(
 }
 
 @Composable
-private fun ToolbarActionButton(
+internal fun ToolbarActionButton(
     action: ToolbarAction, visuals: CandidateBarVisuals, tint: Color,
     amplitude: Float, voiceState: RecognitionState,
+    source: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
     val voiceActive = action.active && action.item.id == "voice"
     val pulse = if (voiceActive) {
@@ -566,23 +564,16 @@ private fun ToolbarActionButton(
             infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "microphoneGlow")
         value
     } else 0f
-    val source = remember { MutableInteractionSource() }
-    val pressAlpha = remember { Animatable(0f) }
-    LaunchedEffect(source) {
-        source.interactions.collectLatest { interaction ->
-            when (interaction) {
-                is PressInteraction.Press -> pressAlpha.snapTo(1f)
-                is PressInteraction.Release, is PressInteraction.Cancel -> pressAlpha.animateTo(0f, tween(300))
-                else -> Unit
-            }
-        }
-    }
+    val pressed by source.collectIsPressedAsState()
+    // Hover/focus events must not cancel a release fade and leave a permanent glow.
+    val pressAlpha by animateFloatAsState(if (pressed) 1f else 0f,
+        animationSpec = tween(if (pressed) 0 else 300), label = "toolbar-press")
     Box(
         Modifier.size(40.dp)
             .clip(CircleShape)
             .background(if (action.active) visuals.accentColor.copy(alpha = 0.28f)
-                else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha.value)
-                else Color(0xFFE0E0E0).copy(alpha = pressAlpha.value))
+                else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha)
+                else Color(0xFFE0E0E0).copy(alpha = pressAlpha))
             .drawBehind {
                 if (voiceActive) {
                     drawCircle(Brush.radialGradient(listOf(visuals.accentColor.copy(alpha = 0.55f), Color.Transparent)),

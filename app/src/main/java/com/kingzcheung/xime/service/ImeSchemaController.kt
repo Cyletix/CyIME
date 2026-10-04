@@ -370,7 +370,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             "select_all" -> ic.performContextMenuAction(android.R.id.selectAll)
             "copy" -> ic.performContextMenuAction(android.R.id.copy)
             "cut" -> ic.performContextMenuAction(android.R.id.cut)
-            "paste" -> ic.performContextMenuAction(android.R.id.paste)
+            "paste" -> {
+                service.dismissPredictionsForPaste()
+                ic.performContextMenuAction(android.R.id.paste)
+            }
             "select_begin" -> editCursor { editorCursor.beginSelection(it) }
             "select_end" -> editCursor(finishComposition = false) { editorCursor.endSelection(it) }
             "select_reset" -> editorCursor.resetSelection()

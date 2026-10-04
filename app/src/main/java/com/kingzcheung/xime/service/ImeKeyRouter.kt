@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.service
 
+import com.kingzcheung.xime.clipboard.ClipboardDraftSaveResult
+import com.kingzcheung.xime.clipboard.submitClipboardDraft
+
 import android.util.Log
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -338,13 +341,19 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val text = editText?.text?.toString() ?: ""
                     val code = codeEditText?.text?.toString()?.trim() ?: ""
                     val s = service.uiState.value
-                    val editingId = s.quickSendEditingItemId
-                    if (text.isNotBlank()) {
-                        if (editingId != null) {
-                            service.keyboardViewModel.updateQuickSendItem(editingId, text, code)
+                    val result = submitClipboardDraft(
+                        text, code, s.quickSendEditingItemId,
+                        add = service.keyboardViewModel::addPinnedText,
+                        update = service.keyboardViewModel::updateClipboardItem,
+                    )
+                    if (result != ClipboardDraftSaveResult.ACCEPTED) {
+                        if (editText != null) {
+                            editText.error = result.errorMessage
+                            editText.requestFocus()
                         } else {
-                            service.keyboardViewModel.addQuickSendText(text, code)
+                            android.widget.Toast.makeText(service, result.errorMessage, android.widget.Toast.LENGTH_SHORT).show()
                         }
+                        return
                     }
                     service.uiState.value = s.copy(
                         showQuickSendForm = false,
@@ -352,11 +361,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         quickSendCodeFocused = false,
                         quickSendEditingItemId = null,
                         quickSendEditingItemText = "",
-                        quickSendEditingItemCode = ""
+                        quickSendEditingItemCode = "",
+                        enterKeyText = "发送",
                     )
                     QuickSendFormEditTextHolder.editText = null
                     QuickSendFormCodeEditTextHolder.editText = null
-                    service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(1))
+                    service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
                     return
                 }
                 "delete" -> {

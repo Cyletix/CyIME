@@ -8,6 +8,9 @@ import com.kingzcheung.xime.util.InputLatencyTrace
 import androidx.compose.ui.platform.testTag
 
 import android.content.res.Configuration
+import com.kingzcheung.xime.clipboard.ClipboardDraftSaveResult
+import com.kingzcheung.xime.clipboard.submitClipboardDraft
+import com.kingzcheung.xime.service.QuickSendFormEditTextHolder
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -531,16 +534,21 @@ fun KeyboardView(
                     editingItemId = state.quickSendEditingItemId,
                     onClose = { text: String, code: String ->
                         android.util.Log.d("QuickSendForm", "onClose: textLen=${text.length}, editingId=${state.quickSendEditingItemId}, showForm=${state.showQuickSendForm}")
-                        if (text.isNotBlank()) {
-                            val editingId = state.quickSendEditingItemId
-                            if (editingId != null) {
-                                viewModel.updateQuickSendItem(editingId, text, code)
-                            } else {
-                                viewModel.addQuickSendText(text, code)
+                        val result = submitClipboardDraft(
+                            text, code, state.quickSendEditingItemId,
+                            add = viewModel::addPinnedText,
+                            update = viewModel::updateClipboardItem,
+                        )
+                        if (result == ClipboardDraftSaveResult.ACCEPTED) {
+                            callbacks.onHideQuickSendForm?.invoke()
+                        } else {
+                            QuickSendFormEditTextHolder.editText?.apply {
+                                error = result.errorMessage
+                                requestFocus()
                             }
                         }
-                        callbacks.onHideQuickSendForm?.invoke()
                     },
+                    onCancel = { callbacks.onHideQuickSendForm?.invoke() },
                     onFocusChange = { focused: Boolean ->
                         callbacks.onQuickSendFormFocusChange?.invoke(focused)
                     },
@@ -639,12 +647,12 @@ fun KeyboardView(
                         })
                     }
                     ToolbarAction(item, active = item is ToolbarButtonItem.Builtin && when (item.button) {
-                        ToolbarButton.EDIT -> (barPage as? KeyboardPage.Overlay)?.route == OverlayRoute.Edit
-                        ToolbarButton.EMOJI -> (barPage as? KeyboardPage.Overlay)?.route == OverlayRoute.Emoji
-                        ToolbarButton.CLIPBOARD -> (barPage as? KeyboardPage.Overlay)?.route == OverlayRoute.Clipboard(0)
-                        ToolbarButton.QUICK_PHRASE -> (barPage as? KeyboardPage.Overlay)?.route == OverlayRoute.Clipboard(1)
-                        ToolbarButton.SYMBOL -> (barPage as? KeyboardPage.Overlay)?.route == OverlayRoute.Symbol
-                        ToolbarButton.SCHEMA -> (barPage as? KeyboardPage.Overlay)?.route == OverlayRoute.SchemaList
+                        ToolbarButton.EDIT -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Edit
+                        ToolbarButton.EMOJI -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Emoji
+                        ToolbarButton.CLIPBOARD -> (page as? KeyboardPage.Overlay)?.route is OverlayRoute.Clipboard
+                        ToolbarButton.QUICK_PHRASE -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Clipboard(1)
+                        ToolbarButton.SYMBOL -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.Symbol
+                        ToolbarButton.SCHEMA -> (page as? KeyboardPage.Overlay)?.route == OverlayRoute.SchemaList
                         ToolbarButton.HANDWRITING_LOOKUP -> state.isHandwritingMode || viewModel.hasTemporaryHandwriting
                         ToolbarButton.VOICE -> state.voiceSticky
                         else -> false

@@ -93,7 +93,8 @@ class ClipboardBoardCompactTest {
                 records.width * records.height >= board.width * board.height * .8f)
             assertTrue("records cannot be covered by the controls", records.top >= controls.bottom - 1f)
             assertTrue("records must remain inside the keyboard surface", records.bottom <= board.bottom + 1f)
-            for (tag in listOf("clipboard-filter:ALL", "clipboard-expand", "clipboard-more")) {
+            rule.onNodeWithTag("clipboard-expand").assertDoesNotExist()
+            for (tag in listOf("clipboard-filter:ALL", "clipboard-more")) {
                 val item = rule.onNodeWithTag(tag).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                 assertEquals("$tag belongs to the same row", controls.center.y, item.center.y, 1f)
                 assertTrue("$tag must not create another row", item.top >= controls.top - 1f && item.bottom <= controls.bottom + 1f)
@@ -166,7 +167,7 @@ class ClipboardBoardCompactTest {
         rule.runOnIdle { assertTrue(pastedText.isEmpty()); assertTrue(pastedImages.isEmpty()) }
     }
 
-    @Test fun pinsLeadMixedRecordsByTimestampAndCornerLockDoesNotMakeCardsTaller() {
+    @Test fun pinsLeadMixedRecordsByTimestampAndCornerLockStaysInsideBoundedPreview() {
         showBoard()
         val textTag = "clipboard-card:text:${pinnedText.id}"
         val imageTag = "clipboard-card:${imageKey()}"
@@ -180,15 +181,19 @@ class ClipboardBoardCompactTest {
         rule.onNodeWithTag("clipboard-card:${imageKey()}").performClick()
         rule.runOnIdle { assertEquals(listOf(image), pastedImages) }
 
-        // Without pins this text is still in the first row, so a height difference cannot
-        // be hidden by moving the card offscreen in the staggered grid.
+        // Unpinning restores the normal history card. Re-pinning restores its bounded
+        // first-row preview; the lock remains an overlay rather than a separate footer.
         rule.runOnIdle { pins.value = emptySet() }
         rule.onNodeWithTag("clipboard-records").performScrollToNode(hasTestTag(textTag))
         val unpinnedHeight = bounds(textTag).height
         rule.runOnIdle { pins.value = setOf("text:${pinnedText.id}") }
         val repinned = bounds(textTag)
-        assertEquals("pin is an overlay, not an additional footer row", unpinnedHeight, repinned.height, 1f)
-        val lock = rule.onNodeWithTag("clipboard-pin:text:${pinnedText.id}", true)
+        assertTrue("ordinary history card remains readable", unpinnedHeight >= 48f)
+        assertTrue("pinned preview leaves room for recent history",
+            repinned.height <= bounds("clipboard-records-region").height * .35f + 1f)
+        assertTrue("large panels cannot inflate the pinned preview", repinned.height <= 113f)
+        val lock = rule.onNode(hasContentDescription("已固定") and
+            hasAnyAncestor(hasTestTag("clipboard-pin:text:${pinnedText.id}")), useUnmergedTree = true)
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue("small lock belongs inside the card", lock.width <= 18f && lock.height <= 18f)
         assertTrue("lock belongs in the upper trailing corner", lock.top >= repinned.top &&

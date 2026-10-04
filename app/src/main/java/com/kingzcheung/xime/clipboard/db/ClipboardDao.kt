@@ -13,14 +13,16 @@ interface ClipboardDao {
     @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<ClipboardEntry>>
 
-    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 1 ORDER BY timestamp DESC")
+    /** Compatibility feed for the existing plugin API: fixed text and its optional trigger code. */
+    @Query("SELECT * FROM clipboard_entries WHERE isPinned = 1 AND isQuickSend = 0 ORDER BY timestamp DESC")
     fun observeQuickSend(): Flow<List<ClipboardEntry>>
 
-    @Query("SELECT * FROM clipboard_entries WHERE text = :text AND isQuickSend = 0 LIMIT 1")
+    @Query("SELECT * FROM clipboard_entries WHERE text = :text AND isQuickSend = 0 ORDER BY isPinned ASC, timestamp DESC, id DESC LIMIT 1")
     suspend fun findByText(text: String): ClipboardEntry?
 
-    @Query("SELECT * FROM clipboard_entries WHERE text = :text AND isQuickSend = 1 LIMIT 1")
-    suspend fun findQuickSendByText(text: String): ClipboardEntry?
+    /** Atomic and idempotent; no deduplication may discard different codes on equal text. */
+    @Query("UPDATE clipboard_entries SET isPinned = 1, isQuickSend = 0 WHERE isQuickSend = 1")
+    suspend fun migrateQuickSendToPinned()
 
     @Query("SELECT * FROM clipboard_entries WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): ClipboardEntry?
@@ -45,32 +47,23 @@ interface ClipboardDao {
     @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND id = :id")
     suspend fun deleteClipboardById(id: Long)
 
-    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 1 AND id = :id")
-    suspend fun deleteQuickSendById(id: Long)
-
     @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND id IN (:ids)")
     suspend fun deleteClipboardByIds(ids: List<Long>)
 
-    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0")
+    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
     suspend fun clearAllClipboard()
 
-    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0")
+    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
     suspend fun clearUnpinned()
 
-    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0")
+    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
     suspend fun countUnpinned(): Int
 
-    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND id IN (SELECT id FROM clipboard_entries WHERE isPinned = 0 ORDER BY timestamp ASC LIMIT :limit)")
+    @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0 AND id IN (SELECT id FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0 ORDER BY timestamp ASC LIMIT :limit)")
     suspend fun trimUnpinned(limit: Int)
 
-    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 1 AND id IN (SELECT id FROM clipboard_entries WHERE isQuickSend = 1 ORDER BY timestamp ASC LIMIT :limit)")
-    suspend fun trimQuickSend(limit: Int)
-
-    @Query("UPDATE clipboard_entries SET text = :text, timestamp = :now WHERE id = :id")
-    suspend fun updateText(id: Long, text: String, now: Long)
-
-    @Query("UPDATE clipboard_entries SET text = :text, code = :code, timestamp = :now WHERE id = :id")
-    suspend fun updateQuickSendItem(id: Long, text: String, code: String, now: Long)
+    @Query("UPDATE clipboard_entries SET text = :text, code = COALESCE(:code, code), timestamp = :now WHERE id = :id AND isQuickSend = 0")
+    suspend fun updateClipboardItem(id: Long, text: String, code: String?, now: Long)
 
     @Query("UPDATE clipboard_entries SET consumed = 1 WHERE id = :id")
     suspend fun markConsumed(id: Long)
@@ -92,50 +85,6 @@ interface ClipboardDao {
         }
     }
 
-    @Transaction
-    suspend fun addQuickSend(sourceId: Long, now: Long, maxQuickSend: Int) {
-        val source = findById(sourceId) ?: return
-        val existing = findQuickSendByText(source.text)
-        if (existing != null) {
-            updateTimestamp(existing.id, now)
-        } else {
-            insert(
-                ClipboardEntry(
-                    text = source.text,
-                    timestamp = now,
-                    isPinned = true,
-                    isQuickSend = true
-                )
-            )
-        }
-        val count = countQuickSend()
-        if (count > maxQuickSend) {
-            trimQuickSend(count - maxQuickSend)
-        }
-    }
-
-    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isQuickSend = 1")
-    suspend fun countQuickSend(): Int
-
-    @Transaction
-    suspend fun insertQuickSend(text: String, code: String, now: Long, maxQuickSend: Int) {
-        val existing = findQuickSendByText(text)
-        if (existing != null) {
-            updateQuickSendItem(existing.id, text, code, now)
-        } else {
-            insert(
-                ClipboardEntry(
-                    text = text,
-                    code = code,
-                    timestamp = now,
-                    isPinned = true,
-                    isQuickSend = true
-                )
-            )
-        }
-        val count = countQuickSend()
-        if (count > maxQuickSend) {
-            trimQuickSend(count - maxQuickSend)
-        }
-    }
+    suspend fun insertPinnedText(text: String, code: String, now: Long): Long =
+        insert(ClipboardEntry(text = text, code = code, timestamp = now, isPinned = true))
 }

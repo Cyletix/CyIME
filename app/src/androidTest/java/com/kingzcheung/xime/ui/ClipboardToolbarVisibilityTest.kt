@@ -39,11 +39,16 @@ class ClipboardToolbarVisibilityTest {
             rule.runOnIdle { handwriting.value = expanded; vm.showOverlay(OverlayRoute.Clipboard(tab)) }
             val toolbar = rule.onNodeWithTag("toolbar-order-row").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             val panel = rule.onNodeWithTag("keyboard-overlay").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            rule.onNodeWithContentDescription("剪贴板").assertIsSelected()
             assertTrue("Clipboard must leave the shared toolbar visible", panel.top >= toolbar.bottom)
             rule.onNodeWithContentDescription("表情").performClick()
             rule.runOnIdle { assertEquals(OverlayRoute.Emoji, (vm.page.value as KeyboardPage.Overlay).route) }
             rule.onNodeWithContentDescription("返回").performClick()
             rule.runOnIdle { assertFalse(vm.page.value is KeyboardPage.Overlay) }
+            if (!expanded) rule.onNodeWithContentDescription("剪贴板").assertIsNotSelected()
+            rule.runOnIdle { vm.showOverlay(OverlayRoute.Clipboard(tab)) }
+            rule.onNodeWithContentDescription("剪贴板").performClick()
+            rule.runOnIdle { assertFalse("same tool closes from every category", vm.page.value is KeyboardPage.Overlay) }
         }
     }
 }

@@ -29,7 +29,7 @@ import android.content.ClipboardManager as AndroidClipboardManager
 data class ClipboardItem(
     val id: Long = 0,
     val text: String,
-    /** 快捷发送触发编码（如 dh），空 = 仅内容命中不参与编码匹配。 */
+    /** 固定内容的可选触发编码（如 dh），空 = 仅内容命中不参与编码匹配。 */
     val code: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val isPinned: Boolean = false,
@@ -42,7 +42,6 @@ class ClipboardManager private constructor(private val context: Context) {
     companion object {
         private const val TAG = "ClipboardManager"
         private const val MAX_ITEMS = 1000
-        private const val MAX_QUICK_SEND_ITEMS = 20
         private const val PREFS_NAME = "clipboard_prefs"
         private const val KEY_CLIPBOARD_ITEMS = "clipboard_items"
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
@@ -149,6 +148,7 @@ class ClipboardManager private constructor(private val context: Context) {
     }
 
     private val _quickSendItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
+    /** Existing plugin protocol name; the source is now the unified set of fixed text records. */
     val quickSendItems: StateFlow<List<ClipboardItem>> = _quickSendItems.asStateFlow()
 
     private val _recentItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
@@ -170,6 +170,8 @@ class ClipboardManager private constructor(private val context: Context) {
                 // Earlier boards kept text pins separately from the Room retention flag.
                 // Import those positive marks once, before exposing the text list to the UI.
                 check(!prefs.contains(KEY_CLIPBOARD_ITEMS) && !prefs.contains(KEY_QUICK_SEND_ITEMS))
+                // Room upgrades existing v3 databases; this also covers old records imported later.
+                dao.migrateQuickSendToPinned()
                 migrateClipboardTextPins(savedPins, { dao.setClipboardPinned(it, true) }) {
                     synchronized(boardPrefs) {
                         val currentPins = boardPrefs.getStringSet("pins", emptySet()).orEmpty()
@@ -187,6 +189,7 @@ class ClipboardManager private constructor(private val context: Context) {
             }
         }
         scope.launch {
+            clipboardPinsReady.await()
             dao.observeQuickSend().collect { entries ->
                 _quickSendItems.value = entries.map { it.toClipboardItem() }
             }
@@ -211,7 +214,7 @@ class ClipboardManager private constructor(private val context: Context) {
             }
             legacyQuickSend?.let { str ->
                 deserializeItems(str).forEach { item ->
-                    entries.add(item.toEntry())
+                    entries.add(item.toEntry(forcePinned = true))
                 }
             }
             if (entries.isNotEmpty()) dao.insertAll(entries)
@@ -267,13 +270,14 @@ class ClipboardManager private constructor(private val context: Context) {
         return this.replace("〈PIPE〉", "|||").replace("〈COLON〉", ":::")
     }
 
-    private fun ClipboardItem.toEntry(): ClipboardEntry {
+    private fun ClipboardItem.toEntry(forcePinned: Boolean = false): ClipboardEntry {
         return ClipboardEntry(
             id = 0,
             text = text,
+            code = code,
             timestamp = timestamp,
-            isPinned = isPinned,
-            isQuickSend = isQuickSend,
+            isPinned = forcePinned || isPinned || isQuickSend,
+            isQuickSend = false,
             consumed = consumed
         )
     }
@@ -301,6 +305,7 @@ class ClipboardManager private constructor(private val context: Context) {
     fun addItem(text: String) {
         if (text.isBlank()) return
         scope.launch {
+            clipboardPinsReady.await()
             dao.upsertAndTrim(text, System.currentTimeMillis(), MAX_ITEMS)
             _clipboardChanged.emit(
                 ClipboardItem(
@@ -317,7 +322,7 @@ class ClipboardManager private constructor(private val context: Context) {
         }
     }
 
-    /** 批量删除剪贴板条目（仅 isQuickSend = 0，不影响快捷发送）。 */
+    /** Explicit selection may delete fixed records too; it never affects unselected records. */
     fun removeItems(ids: List<Long>) {
         if (ids.isEmpty()) return
         scope.launch {
@@ -325,9 +330,10 @@ class ClipboardManager private constructor(private val context: Context) {
         }
     }
 
-    /** 清空剪贴板（仅 isQuickSend = 0，不影响快捷发送）。 */
+    /** Clear ordinary history while preserving every fixed record and its trigger code. */
     fun clearClipboard() {
         scope.launch {
+            clipboardPinsReady.await()
             dao.clearAllClipboard()
         }
     }
@@ -350,44 +356,49 @@ class ClipboardManager private constructor(private val context: Context) {
 
     fun clearAll() {
         scope.launch {
+            clipboardPinsReady.await()
             dao.clearUnpinned()
         }
     }
 
     fun addToQuickSend(id: Long) {
-        scope.launch {
-            dao.addQuickSend(id, System.currentTimeMillis(), MAX_QUICK_SEND_ITEMS)
-        }
+        setClipboardPinned(id, true)
     }
 
     fun removeFromQuickSend(id: Long) {
-        scope.launch {
-            dao.deleteQuickSendById(id)
-        }
+        removeItem(id)
     }
 
     fun togglePinQuickSend(id: Long) {
-        scope.launch {
-            dao.updateTimestamp(id, System.currentTimeMillis())
-        }
+        setClipboardPinned(id, true)
     }
 
     fun setClipboardPinned(id: Long, pinned: Boolean): Job = clipboardPinWriter.set(id, pinned)
 
     fun updateQuickSendItem(id: Long, newText: String, newCode: String = ""): Boolean {
+        return updateClipboardItem(id, newText, newCode)
+    }
+
+    /** Edit in place: preserve pin state and retain the code when it was not edited. */
+    fun updateClipboardItem(id: Long, newText: String, newCode: String? = null): Boolean {
         if (newText.isBlank()) return false
-        val index = _quickSendItems.value.indexOfFirst { it.id == id }
-        if (index < 0) return false
+        if (_clipboardItems.value.none { it.id == id }) return false
         scope.launch {
-            dao.updateQuickSendItem(id, newText, newCode.trim(), System.currentTimeMillis())
+            clipboardPinsReady.await()
+            dao.updateClipboardItem(id, newText, newCode?.trim(), System.currentTimeMillis())
         }
         return true
     }
 
     fun addQuickSendItem(text: String, code: String = "") {
+        addPinnedText(text, code)
+    }
+
+    fun addPinnedText(text: String, code: String = "") {
         if (text.isBlank()) return
         scope.launch {
-            dao.insertQuickSend(text, code.trim(), System.currentTimeMillis(), MAX_QUICK_SEND_ITEMS)
+            clipboardPinsReady.await()
+            dao.insertPinnedText(text, code.trim(), System.currentTimeMillis())
         }
     }
 

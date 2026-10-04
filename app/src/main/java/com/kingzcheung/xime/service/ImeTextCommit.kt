@@ -31,6 +31,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         val editor = service.currentInputEditorInfo ?: return null
         val session = service.uiState.value.inputSessionId
         if (service.uiState.value.quickSendFormFocused || service.uiState.value.toolPanelInputFocused) return null
+        service.dismissPredictionsForPaste()
         val cached = service.clipboardManager.images.prepare(image)
         if (service.uiState.value.inputSessionId != session || service.currentInputConnection !== connection) return null
         val uri = Uri.parse(cached.uri)
@@ -150,7 +151,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         }
         // 标记为已消费：候选栏/剪贴板点选上屏后不再重复出现在候选栏
         service.clipboardManager.markConsumed(text)
-        // 粘贴不计打字统计（不投 text_committed），联想照常
+        // 保留带 is_paste 的提交事件，不触发打字联想或学习。
         service.commitPastedText(text)
         // 已通过 InputConnection 完成粘贴，不再回写系统剪贴板触发一次新的复制通知。
     }

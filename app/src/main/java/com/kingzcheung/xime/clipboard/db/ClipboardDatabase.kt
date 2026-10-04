@@ -13,7 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 
 @Database(
     entities = [ClipboardEntry::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class ClipboardDatabase : RoomDatabase() {
@@ -40,6 +40,15 @@ abstract class ClipboardDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4：旧快捷发送原地成为固定记录，保留全部内容、编码及身份。 */
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.prepare(
+                    "UPDATE clipboard_entries SET isPinned = 1, isQuickSend = 0 WHERE isQuickSend = 1"
+                ).use { it.step() }
+            }
+        }
+
         @Volatile
         private var instance: ClipboardDatabase? = null
 
@@ -51,7 +60,7 @@ abstract class ClipboardDatabase : RoomDatabase() {
                 )
                     .setDriver(AndroidSQLiteDriver())
                     .setQueryCoroutineContext(Dispatchers.IO)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

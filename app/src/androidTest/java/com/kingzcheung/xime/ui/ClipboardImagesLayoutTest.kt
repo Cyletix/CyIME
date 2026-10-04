@@ -34,6 +34,35 @@ import java.io.File
 import java.util.UUID
 
 class ClipboardImagesLayoutTest {
+    @Test fun imageFailureNoticeStaysCompactAndCanBeDismissedWithoutRemovingRecords() {
+        val viewport = mutableStateOf(Viewport(800, 300, 1f))
+        val failure = mutableStateOf<ImagePasteFailure?>(ImagePasteFailure(image, "fixture"))
+        var shares = 0
+        rule.setContent {
+            val v = viewport.value
+            CompositionLocalProvider(LocalDensity provides Density(1f, v.font)) {
+                MaterialTheme {
+                    Box(Modifier.requiredSize(v.width.dp, v.height.dp)) {
+                        ClipboardBoardView(listOf(ClipboardItem(99, "保留记录", timestamp = 20)), emptyList(),
+                            false, false, emptySet(), false, failure.value,
+                            {}, {}, {}, {}, { _, _ -> }, {}, {}, {}, {}, {}, {},
+                            { _, _ -> shares++ }, null, onDismissFailure = { failure.value = null })
+                    }
+                }
+            }
+        }
+        for (v in listOf(Viewport(800, 300, 1f), Viewport(240, 300, 1.5f))) {
+            rule.runOnIdle { viewport.value = v; failure.value = ImagePasteFailure(image, "fixture") }
+            val notice = rule.onNodeWithTag("images-paste-notice").fetchSemanticsNode().boundsInRoot
+            assertTrue("notice width is bounded on tablets", notice.width <= 480f)
+            assertTrue("notice leaves room for records", notice.height <= if (v.font == 1f) 40f else 110f)
+            rule.onNodeWithTag("images-share").assertIsDisplayed().performClick()
+            rule.onNodeWithTag("images-dismiss-failure").assertIsDisplayed().performClick()
+            rule.onNodeWithTag("images-paste-notice").assertDoesNotExist()
+            rule.onNodeWithTag("clipboard-card:text:99").assertIsDisplayed()
+        }
+        assertEquals(2, shares)
+    }
     @get:Rule val rule = createComposeRule()
     private val image = ClipboardImage("content://fixture/image", "image/png", 1L)
     private data class Viewport(val width: Int, val height: Int, val font: Float)

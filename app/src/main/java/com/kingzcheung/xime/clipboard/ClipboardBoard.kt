@@ -62,3 +62,26 @@ internal fun legacyClipboardTextPinIds(storedPins: Set<String>): Set<Long> = sto
     .filter { it > 0 }.toSet()
 
 internal fun clipboardColumnCount(widthDp: Float): Int = (widthDp / 160f).toInt().coerceIn(1, 5)
+
+internal data class ClipboardBoardContent(
+    val pinned: List<ClipboardCard>,
+    val recent: List<ClipboardCard>,
+    val pinnedCount: Int,
+) {
+    val visible: List<ClipboardCard> get() = pinned + recent
+}
+
+/** Collapsing pins is presentation only: neither persistence nor recent history is truncated. */
+internal fun clipboardBoardContent(cards: List<ClipboardCard>, pins: Set<String>, columns: Int,
+    pinsExpanded: Boolean): ClipboardBoardContent {
+    val (fixed, recent) = cards.partition { it.key in pins }
+    return ClipboardBoardContent(
+        pinned = if (pinsExpanded) fixed else fixed.take(columns.coerceAtLeast(1)),
+        recent = recent,
+        pinnedCount = fixed.size,
+    )
+}
+
+/** A tall picture or long text must not turn the collapsed row into the whole panel. */
+internal fun clipboardPinnedPreviewHeight(recordsHeightDp: Float): Float =
+    (recordsHeightDp.coerceAtLeast(0f) * .35f).coerceAtMost(112f)

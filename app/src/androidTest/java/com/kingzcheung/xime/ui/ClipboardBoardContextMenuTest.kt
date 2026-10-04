@@ -45,7 +45,7 @@ class ClipboardBoardContextMenuTest {
     private val glassEnabled = mutableStateOf(true)
     private val pins = mutableStateOf(emptySet<String>())
     private var split: Pair<String, Long>? = null
-    private var quick: Long? = null
+    private var edited: Triple<Long, String, String>? = null
     private var removed = emptyList<ClipboardCard>()
 
     @Before fun createLoadableImage() {
@@ -92,8 +92,9 @@ class ClipboardBoardContextMenuTest {
         rule.runOnIdle { assertEquals(text.text to text.id, split) }
         rule.onNodeWithTag("clipboard-item-menu").assertDoesNotExist()
         open("text:12")
-        rule.onNodeWithText("快捷").performScrollTo().performClick()
-        rule.runOnIdle { assertEquals(text.id, quick) }
+        rule.onNodeWithText("快捷").assertDoesNotExist()
+        rule.onNodeWithText("编辑").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(Triple(text.id, text.text, text.code), edited) }
     }
 
     @Test fun imagePreviewUsesSameMenuAndPreservesPinAndDeleteActions() {
@@ -105,6 +106,7 @@ class ClipboardBoardContextMenuTest {
         assertTrue("right image preview stays to the right of its actions", actions.right <= preview.left)
         rule.onNodeWithText("分词").assertDoesNotExist()
         rule.onNodeWithText("快捷").assertDoesNotExist()
+        rule.onNodeWithText("编辑").assertDoesNotExist()
         rule.onNodeWithText("固定").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(setOf(key), pins.value) }
         open(key)
@@ -122,7 +124,7 @@ class ClipboardBoardContextMenuTest {
         showBoard(width = 240, height = 280, fontScale = 2f)
         open("text:12")
         val region = rule.onNodeWithTag("clipboard-records-region").fetchSemanticsNode().boundsInRoot
-        for (label in listOf("固定", "分词", "快捷", "多选", "删除")) {
+        for (label in listOf("固定", "分词", "编辑", "多选", "删除")) {
             val action = rule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
                 .fetchSemanticsNode().boundsInRoot
             assertTrue("$label extends above records", action.top >= region.top - 1f)
@@ -190,10 +192,11 @@ class ClipboardBoardContextMenuTest {
                             textItems = listOf(text), images = listOf(image), initialImages = false,
                             expanded = false, pins = pins.value, photoAccess = false, failure = null,
                             onBack = {}, onQuickSend = {}, onSelectText = {}, onSelectImage = {},
-                            onSplit = { value, id -> split = value to id }, onAddQuick = { quick = it },
+                            onSplit = { value, id -> split = value to id }, onAddQuick = {},
                             onPinsChange = { pins.value = it }, onRemove = { removed = it },
                             onPhotoAccess = {}, onPick = {}, onSystemPaste = {}, onShare = { _, _ -> },
                             onPullRemote = null,
+                            onEditText = { id, value, code -> edited = Triple(id, value, code) },
                         )
                     }
                 }
