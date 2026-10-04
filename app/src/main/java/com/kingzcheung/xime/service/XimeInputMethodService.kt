@@ -1412,10 +1412,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 ) 170 else 0
                 val overlayPanelExtra = toolPanelExtra
 
+                val isDark = isDarkTheme
+                val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
+                val cardBg = hardwarePalette.background
+                val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
+                val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
+                val contentHeight = if (state.showKeyboardResize) state.resizePreviewHeightDp else floatingCardContentHeight + overlayPanelExtra
                 XimeTheme(darkTheme = isDarkTheme, themeId = state.themeId) {
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    com.kingzcheung.xime.ui.theme.KeyboardBackdropHost(
+                        enabled = frostedGlass.enabled && !state.isCompact && !state.isFloatingMode && !roundedKeyboardBottom,
+                        background = rootTheme.keyboardBackground, isDark = isDark,
+                        fallback = cardBg, glass = frostedGlass,
+                        backdropHeight = (contentHeight + contentBottomPaddingDp + activeBottomDp).dp,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
                         // Sync FrameLayout height with Compose content height
-                        val contentHeight = if (state.showKeyboardResize) state.resizePreviewHeightDp else floatingCardContentHeight + overlayPanelExtra
                         val totalDp = if (handwritingExpanded || state.showKeyboardResize || state.isCompact || state.isFloatingMode) effectiveScreenH
                             else contentHeight + contentBottomPaddingDp + activeBottomDp
                         SideEffect {
@@ -1431,11 +1442,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 else if (state.isCompact) HARDWARE_CANDIDATE_BAR_HEIGHT
                                 else effectiveKeyboardHeight + overlayPanelExtra
                         }
-                        val isDark = isDarkTheme
-                        val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
-                        val cardBg = hardwarePalette.background
-                        val keyboardBgColor = com.kingzcheung.xime.ui.theme.KeyboardThemes.getKeyboardBackgroundColor(state.themeId, isDark)
-                        val rootTheme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getRenderingScheme(state.themeId)
                         if (state.isCompact) {
                           androidx.compose.runtime.CompositionLocalProvider(
                               com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
@@ -1554,8 +1560,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                           }
                           }
                         } else {
-                        // 非浮动：背景与键盘内容同区域，贴底覆盖键盘内容高度 + 底部导航栏留白，
-                        // 键盘内容通过 offset 上移 activeBottomDp 留出导航栏空间（对齐参考实现 bottomPaddingSpace）。
+                        // The navigation strip and keyboard sample one backdrop in window coordinates;
+                        // this strip draws only its own slice, never a separately fitted glass image.
+                        // 键盘内容通过 offset 上移 activeBottomDp 留出导航栏空间。
                         // 浮动模式：卡片由 KeyboardView 内部 FloatingKeyboardContainer 自绘背景与定位，此处不做背景/偏移。
                         if (!state.isFloatingMode && !roundedKeyboardBottom) {
                             Box(
