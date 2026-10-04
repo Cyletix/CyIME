@@ -29,10 +29,12 @@ class PluginSettingsNavigationTest {
         try {
             SettingsPreferences.setClipboardSyncEnabled(rule.activity, false)
             rule.setContent { XimeTheme { ClipboardSyncSettingsContent({}, { manages++ }, { installs++ }) } }
-            rule.onNodeWithText("安装插件").assertIsDisplayed().performClick()
-            rule.onNodeWithText("已安装插件").performClick()
+            rule.onNodeWithText("附近电脑").assertExists()
+            rule.onNodeWithText("安装插件").assertDoesNotExist()
+            rule.onNodeWithText("其他服务与旧版兼容连接").performScrollTo().performClick()
+            rule.onNodeWithText("管理其他同步服务").performScrollTo().performClick()
             rule.onNodeWithText("同步服务").assertExists()
-            assertEquals(1, installs)
+            assertEquals(0, installs)
             assertEquals(1, manages)
         } finally { SettingsPreferences.setClipboardSyncEnabled(rule.activity, original) }
     }

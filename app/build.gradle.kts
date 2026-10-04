@@ -14,6 +14,7 @@ apply(from = "build-logic/tasks-native.gradle.kts")
 apply(from = "build-logic/tasks-source-patches.gradle.kts")
 apply(from = "build-logic/tasks-speech.gradle.kts")
 apply(from = "build-logic/tasks-bundled-models.gradle.kts")
+apply(from = "build-logic/tasks-builtin-sync.gradle.kts")
 apply(from = "build-logic/tasks-plugin-dev.gradle.kts")
 apply(from = "build-logic/tasks-japanese.gradle.kts")
 apply(from = "build-logic/tasks-chinese.gradle.kts")
@@ -51,6 +52,7 @@ android {
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/chinese-assets").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/rime-manifest").get().asFile)
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/speech-assets").get().asFile)
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/builtin-sync-assets").get().asFile)
     compileSdk = 36
 
     // JVM 单测中未 mock 的 Android 框架方法（如 android.util.Log）返回默认值而非抛异常，

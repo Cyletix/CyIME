@@ -24,6 +24,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,7 +73,18 @@ fun ClipboardSyncSettingsContent(
     val clipboardPlugins = remember(installedPlugins) { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
 
     var selecting by remember { mutableStateOf(false) }
+    var advanced by remember { mutableStateOf(false) }
     var selectionError by remember { mutableStateOf<String?>(null) }
+    val pluginInstances by PluginManager.pluginInstancesFlow.collectAsState()
+    val windowsPeer by com.kingzcheung.xime.clipboard.sync.WindowsDevices.paired.collectAsState()
+    LaunchedEffect(pluginInstances, windowsPeer) {
+        enabled = SettingsPreferences.isClipboardSyncEnabled(context)
+        installedPlugins = ExtensionManager.getAllInstalledPlugins()
+        val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
+        val preferred = SettingsPreferences.getClipboardSyncPluginId(context)
+        activePlugin = available.firstOrNull { it.first == preferred } ?: available.firstOrNull()
+        selectedPluginId = activePlugin?.first.orEmpty()
+    }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         installedPlugins = ExtensionManager.getAllInstalledPlugins()
         val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
@@ -109,11 +122,13 @@ fun ClipboardSyncSettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             VerificationCodeSettings()
-            PluginSetupCard("剪贴板同步", onNavigateToPluginMarket, onNavigateToPlugins)
+            WindowsDevicesPanel()
+            androidx.compose.material3.TextButton(onClick = { advanced = !advanced }) { Text("其他服务与旧版兼容连接") }
+            if (advanced) {
             SettingsSection(title = "同步服务", content = {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     if (clipboardPlugins.isEmpty()) {
-                        Text("尚未安装剪贴板同步插件，请从上方安装。")
+                        Text("正在准备内置同步服务；若持续未出现，请重新打开应用并在插件管理中检查状态。")
                     }
                     clipboardPlugins.forEach { plugin ->
                         val isActive = plugin.id == activePlugin?.first
@@ -147,13 +162,15 @@ fun ClipboardSyncSettingsContent(
                     selectionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             })
-            activePlugin?.let { selected ->
+            activePlugin?.takeUnless { it.first == com.kingzcheung.xime.clipboard.sync.WindowsDevices.ID }?.let { selected ->
                 PluginConfigFormScreen(
                     pluginId = selected.first,
                     plugin = selected.second,
                     pluginName = installedPlugins.find { it.id == selected.first }?.name ?: selected.first,
                     onBack = {}, embedded = true
                 )
+            }
+            Button(onClick = onNavigateToPlugins) { Text("管理其他同步服务") }
             }
             SettingsSection(title = "同步开关", content = {
                 SettingsToggleItem(
@@ -163,7 +180,7 @@ fun ClipboardSyncSettingsContent(
                     checked = enabled,
                     onCheckedChange = { checked ->
                         if (checked && activePlugin == null) {
-                            selectionError = "请先安装并选择同步服务，再完成连接配置。"
+                            selectionError = "请先选择同步服务并完成连接配置。"
                         } else {
                             enabled = checked
                             SettingsPreferences.setClipboardSyncEnabled(context, checked)

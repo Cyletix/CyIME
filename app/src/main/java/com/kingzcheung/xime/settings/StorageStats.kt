@@ -19,7 +19,7 @@ import java.util.Locale
  * - schema_cache rime/build 编译产物 + rime/logs；清除后复位部署标记，
  *                下次启动 ensureDeployment 自动全量重建，词库/自定义配置不受影响
  * - clipboard    Room 数据库文件（clipboard.db*）；清除走 ClipboardManager 的
- *                剪贴板历史清空（保留快捷发送）
+ *                剪贴板历史清空（保留固定内容）
  * - models       filesDir/models 已下载模型；清除后需重新下载
  * - plugins      filesDir/plugins + plugin_icons；不就地清除（批量卸载会连配置
  *                丢失），由插件管理页逐个卸载，本页只统计并引导跳转
@@ -132,7 +132,7 @@ object StorageStats {
             Category(
                 id = ID_CLIPBOARD,
                 title = "剪贴板历史",
-                description = "本地剪贴板记录（不含快捷发送与置顶内容）",
+                description = "本地剪贴板记录（不含固定内容）",
                 sizeBytes = clipboardSize,
                 clearable = true,
             ),
@@ -173,7 +173,7 @@ object StorageStats {
             ID_MODELS -> clearModels(context)
             ID_SCHEMA_CACHE -> clearSchemaCache(context)
             ID_CLIPBOARD -> {
-                // 走引擎清空：保留快捷发送与置顶，回调通知各处刷新
+                // 走引擎清空：保留固定内容，回调通知各处刷新
                 ClipboardManager.getInstance(context).clearClipboard()
                 true
             }

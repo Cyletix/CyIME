@@ -64,7 +64,7 @@ function plugin.getSettingsSchema()
     return {
         {key = "serverUrl", label = "电脑地址", type = "text", required = true,
          placeholder = "http://192.168.1.50:18740",
-         helpText = "在 CyIME Windows 的手机互联中开启可信局域网连接，填写那里显示的地址。当前 HTTP 协议未加密，仅用于可信局域网。"},
+         helpText = "电脑设置 → 手机与电脑互联：关闭加密扫码连接，开启允许手机通过局域网连接并启动同步。填写显示的地址；当前 HTTP 未加密，仅用于可信局域网。"},
         {key = "pairingCode", label = "配对码", type = "secret", required = true,
          helpText = "填写电脑显示的配对码；用户名自动使用 cyime。保存后测试连接，再打开同步开关。"},
         {key = "testConnection", label = "测试电脑连接", type = "button"},
