@@ -128,7 +128,7 @@ object SettingsPreferences {
 
     private const val KEY_INSTALLED_MARKET_IDS = "installed_market_ids"
     private const val KEY_COMPACT_MODE = "compact_mode"
-    private const val KEY_SHOW_CANDIDATE_COMMENTS = "show_candidate_comments"
+    const val KEY_SHOW_CANDIDATE_COMMENTS = "show_candidate_comments"
     const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
     private const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     private const val KEY_PAGE_SIZE = "page_size"
@@ -145,6 +145,7 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_COMPACT_MODE, enabled).apply()
     }
 
+    /** true allows automatic width-based display; false always hides candidate annotations. */
     fun showCandidateComments(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_SHOW_CANDIDATE_COMMENTS, true)
     }

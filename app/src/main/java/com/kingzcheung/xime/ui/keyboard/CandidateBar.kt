@@ -205,7 +205,7 @@ fun CandidateBar(
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val showCompositionCancel = showCancelButton && state !is CandidateBarState.Idle && callbacks.onCancelInput != null
-    val showComments = SettingsPreferences.showCandidateComments(context)
+    val commentsAllowed = rememberCandidateCommentsAllowed()
     val inputTextLocation = SettingsPreferences.getInputTextLocation(context)
     val showInputBoxStyle = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX
     val candidateTextSize = SettingsPreferences.getCandidateTextSize(context)
@@ -403,74 +403,78 @@ fun CandidateBar(
             if (state is CandidateBarState.ChineseCandidates) {
                 FixedCandidateStrip(
                     candidates = displayCandidates, associations = displayAssociation,
-                    comments = if (showComments) displayComments else emptyList(),
+                    comments = displayComments,
                     visuals = visuals, callbacks = callbacks,
                     fontSize = candidateTextSize.sp,
                     modifier = Modifier.weight(1f),
                     highlightIndex = state.highlightIndex,
                 )
-            } else LazyRow(
-                modifier = if (state is CandidateBarState.Idle) Modifier else Modifier.weight(1f),
-                state = candidateListState,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                itemsIndexed(displayCandidates, key = { index, _ -> index }) { index, candidate ->
-                    CandidateItem(
-                        text = candidate,
-                        index = index,
-                        onClick = { callbacks.onCandidateSelect(index) },
-                        onLongClick = if (callbacks.onCandidateLongPress != null) {
-                            { callbacks.onCandidateLongPress(index) }
-                        } else null,
-                        textColor = visuals.textColor,
-                        comment = if (showComments) {
-                            when (val s = state) {
-                                is CandidateBarState.ChineseCandidates -> s.comments.getOrElse(index) { "" }
-                                is CandidateBarState.EnglishCandidates -> s.comments.getOrElse(index) { "" }
-                                else -> ""
-                            }
-                        } else "",
-                        isSelected = index == 0,
-                        accentColor = visuals.accentColor,
-                        selectedTextColor = visuals.selectedTextColor,
-                        fontSize = candidateTextSize.sp,
-                        candidateFontFamily = candidateFontFamily,
-                        commentFontFamily = commentFontFamily
-                    )
-                }
-
-                // 仅当左侧存在打字候选时才需要分隔线；纯联想态（无打字候选）下
-                // 该竖线会孤悬列表最左缘，属多余元素。
-                // 注意：分隔线在条件内，联想词 items 必须在条件外——纯联想态
-                // displayCandidates 为空，若一并包进条件会导致联想词整个不渲染。
-                if (displayCandidates.isNotEmpty() && displayAssociation.isNotEmpty()) {
-                    item(key = "divider") {
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(20.dp)
-                                .background(visuals.dividerColor.copy(alpha = 0.5f))
-                                .padding(horizontal = 4.dp)
+            } else if (state !is CandidateBarState.Idle) BoxWithConstraints(Modifier.weight(1f)) {
+                val showComments = candidateCommentsVisible(maxWidth.value, density.fontScale,
+                    candidateTextSize.toFloat(), commentsAllowed)
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    state = candidateListState,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    itemsIndexed(displayCandidates, key = { index, _ -> index }) { index, candidate ->
+                        CandidateItem(
+                            text = candidate,
+                            index = index,
+                            onClick = { callbacks.onCandidateSelect(index) },
+                            onLongClick = if (callbacks.onCandidateLongPress != null) {
+                                { callbacks.onCandidateLongPress(index) }
+                            } else null,
+                            textColor = visuals.textColor,
+                            comment = if (showComments) {
+                                when (val s = state) {
+                                    is CandidateBarState.ChineseCandidates -> s.comments.getOrElse(index) { "" }
+                                    is CandidateBarState.EnglishCandidates -> s.comments.getOrElse(index) { "" }
+                                    else -> ""
+                                }
+                            } else "",
+                            isSelected = index == 0,
+                            accentColor = visuals.accentColor,
+                            selectedTextColor = visuals.selectedTextColor,
+                            fontSize = candidateTextSize.sp,
+                            candidateFontFamily = candidateFontFamily,
+                            commentFontFamily = commentFontFamily
                         )
                     }
-                }
 
-                itemsIndexed(displayAssociation, key = { index, _ -> "assoc-$index" }) { index, candidate ->
-                    val assocState = state as? CandidateBarState.AssociationOnly
-                    CandidateItem(
-                        text = candidate,
-                        index = -1,
-                        onClick = { callbacks.onAssociationSelect?.invoke(index) },
-                        textColor = visuals.textColor,
-                        comment = displayComments.getOrElse(index) { "" },
-                        isSelected = assocState?.highlightIndex == index,
-                        accentColor = visuals.accentColor,
-                        selectedTextColor = visuals.selectedTextColor,
-                        fontSize = candidateTextSize.sp,
-                        candidateFontFamily = candidateFontFamily,
-                        commentFontFamily = commentFontFamily,
-                        modifier = Modifier.testTag("bar-association:$index"),
-                    )
+                    // 仅当左侧存在打字候选时才需要分隔线；纯联想态（无打字候选）下
+                    // 该竖线会孤悬列表最左缘，属多余元素。
+                    // 注意：分隔线在条件内，联想词 items 必须在条件外——纯联想态
+                    // displayCandidates 为空，若一并包进条件会导致联想词整个不渲染。
+                    if (displayCandidates.isNotEmpty() && displayAssociation.isNotEmpty()) {
+                        item(key = "divider") {
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(20.dp)
+                                    .background(visuals.dividerColor.copy(alpha = 0.5f))
+                                    .padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
+
+                    itemsIndexed(displayAssociation, key = { index, _ -> "assoc-$index" }) { index, candidate ->
+                        val assocState = state as? CandidateBarState.AssociationOnly
+                        CandidateItem(
+                            text = candidate,
+                            index = -1,
+                            onClick = { callbacks.onAssociationSelect?.invoke(index) },
+                            textColor = visuals.textColor,
+                            comment = if (showComments) displayComments.getOrElse(index) { "" } else "",
+                            isSelected = assocState?.highlightIndex == index,
+                            accentColor = visuals.accentColor,
+                            selectedTextColor = visuals.selectedTextColor,
+                            fontSize = candidateTextSize.sp,
+                            candidateFontFamily = candidateFontFamily,
+                            commentFontFamily = commentFontFamily,
+                            modifier = Modifier.testTag("bar-association:$index"),
+                        )
+                    }
                 }
             }
 
@@ -872,19 +876,22 @@ internal fun FixedCandidateStrip(
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val inheritedTextStyle = LocalTextStyle.current
+    val commentsAllowed = rememberCandidateCommentsAllowed()
     BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")) {
         val panelWidth = maxWidth
+        val shownComments = if (candidateCommentsVisible(maxWidth.value, density.fontScale,
+            fontSize.value, commentsAllowed)) comments else emptyList()
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
-        val viewport = remember(candidates, comments) { CandidateStripViewport() }
-        val visibleIndices = remember(viewport, all, comments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
+        val viewport = remember(candidates, shownComments) { CandidateStripViewport() }
+        val visibleIndices = remember(viewport, all, shownComments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
             candidateWindow(all.size, focused, constraints.maxWidth, with(density) { itemSpacing.roundToPx() },
                 windowStart = viewport.firstIndex) { index ->
                 val text = if (showNumberLabels && index < candidates.size) "${(index + 1) % 10} ${all[index]}" else all[index]
                 val primary = measurer.measure(AnnotatedString(text),
                     candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == focused),
                     softWrap = false).size.width
-                val comment = comments.getOrElse(index) { "" }
+                val comment = shownComments.getOrElse(index) { "" }
                 val secondary = if (comment.isEmpty()) 0 else measurer.measure(AnnotatedString(comment),
                     inheritedTextStyle.merge(TextStyle(fontSize = (fontSize.value * 11f / 19f).sp,
                         fontWeight = FontWeight.Normal, fontFamily = AppFonts.commentFontFamily)), softWrap = false).size.width + with(density) { 3.dp.roundToPx() }
@@ -906,7 +913,7 @@ internal fun FixedCandidateStrip(
                     if (index < candidates.size) callbacks.onCandidateSelect(index)
                     else callbacks.onAssociationSelect?.invoke(index - candidates.size)
                 }, visuals.textColor,
-                    comment = comments.getOrElse(index) { "" }, isSelected = index == focused,
+                    comment = shownComments.getOrElse(index) { "" }, isSelected = index == focused,
                     accentColor = visuals.accentColor, selectedTextColor = visuals.selectedTextColor,
                     fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
                     commentFontFamily = AppFonts.commentFontFamily,
