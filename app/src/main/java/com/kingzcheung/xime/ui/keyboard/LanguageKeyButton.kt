@@ -1,6 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -49,6 +52,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.LocalKeyboardPalette
 import com.kingzcheung.xime.ui.theme.MaterialLevel
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import androidx.compose.ui.platform.LocalContext
@@ -274,20 +278,37 @@ fun LanguageKeyButton(
             ) {
                 // Popup owns a separate view; retain the keyboard density and font scale.
                 androidx.compose.runtime.CompositionLocalProvider(LocalDensity provides density) {
-                val menuBackground = MaterialTheme.colorScheme.surface
+                val palette = LocalKeyboardPalette.current
+                val menuBackground = palette?.background ?: MaterialTheme.colorScheme.surface
                 val menuGlass = rememberKeyboardInputPreferences(menuBackground.luminance() < 0.5f).frostedGlass
+                val menuText = if (menuGlass.enabled) palette?.text ?: MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurface
+                val accent = palette?.accent ?: MaterialTheme.colorScheme.primary
+                // Use the keyboard's keycap material, not a solid primary fill (near-white in dark glass).
+                val selectedBackground = if (menuGlass.enabled) {
+                    val keyFill = frostedKeyColor(palette?.function ?: backgroundColor, menuText, menuGlass)
+                    lerp(keyFill, accent, 0.18f).copy(alpha = if (keyFill.alpha == 0f) 0f
+                        else keyFill.alpha + (1f - keyFill.alpha) * 0.1f)
+                } else MaterialTheme.colorScheme.primary
+                val selectedText = if (menuGlass.enabled) menuText else MaterialTheme.colorScheme.onPrimary
+                val secondaryText = if (menuGlass.enabled) menuText.copy(alpha = 0.72f)
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 Surface(
                     shape = RoundedCornerShape(16.dp), tonalElevation = if (menuGlass.enabled) 0.dp else 6.dp, shadowElevation = 8.dp,
-                    color = if (menuGlass.enabled) Color.Transparent else menuBackground,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    color = if (menuGlass.enabled) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    contentColor = menuText,
+                    border = if (menuGlass.enabled) BorderStroke(1.dp, menuText.copy(alpha = 0.14f)) else null,
                     modifier = Modifier.width(with(density) { menuGeometry.bounds.width.toDp() })
                         .height(with(density) { menuGeometry.bounds.height.toDp() }).testTag("language-menu"),
                 ) {
-                    Column(Modifier.keyboardPanelBackground(menuBackground, menuGlass)
-                        .visualMaterial(if (menuGlass.enabled) com.kingzcheung.xime.ui.theme.VisualStyle.GLASS
-                            else VisualStyles.current, 16.dp, MaterialLevel.FLOATING).padding(6.dp)) {
+                    Column(Modifier.keyboardPanelBackground(
+                        if (menuGlass.enabled) menuBackground else MaterialTheme.colorScheme.surface, menuGlass)
+                        // The keyboard backdrop already supplies glass; a second white sheen washes it out.
+                        .then(if (menuGlass.enabled) Modifier else Modifier.visualMaterial(
+                            VisualStyles.current, 16.dp, MaterialLevel.FLOATING)).padding(6.dp)) {
                         Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
-                            Text("语言", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                            Text("语言", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center,
+                                color = if (menuGlass.enabled) secondaryText else menuText)
                         }
                         Column(
                             Modifier.fillMaxWidth().height(with(density) { (menuGeometry.bounds.height - 40.dp.toPx()).coerceAtLeast(1f).toDp() })
@@ -308,26 +329,25 @@ fun LanguageKeyButton(
                                             contentDescription = "选择${schema.name}"
                                         }
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSelected)
-                                            MaterialTheme.colorScheme.primary else Color.Transparent)
+                                        .background(if (isSelected) selectedBackground else Color.Transparent)
+                                        .then(if (menuGlass.enabled && isSelected) Modifier.border(
+                                            1.dp, accent.copy(alpha = 0.32f), RoundedCornerShape(12.dp)) else Modifier)
                                         .padding(horizontal = 12.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
                                 ) {
                                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                         if (isSelected) Icon(Icons.Default.Check, contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            tint = selectedText,
                                             modifier = Modifier.align(Alignment.CenterStart).size(16.dp))
                                         Text(schema.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.padding(horizontal = 20.dp),
                                             style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
-                                            color = if (isSelected)
-                                                MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                                            color = if (isSelected) selectedText else menuText)
                                     }
                                     Text(modeName, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant)
+                                        color = if (isSelected && !menuGlass.enabled) selectedText else secondaryText)
                                 }
                             }
                         }
