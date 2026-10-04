@@ -14,7 +14,7 @@
 
 ## 构建与安装
 
-Release 构建成功（6 分 36 秒），轻量包已保留数据覆盖安装到 Samsung SM-X800（R52T800SKWZ）。设备实际 APK SHA256 与交付文件一致，设备回读版本为 1.7.1 / 20261075。未卸载、未清数据；未生成内置模型版，未发布 GitHub Release，未提交 Git。
+Release 构建成功（6 分 36 秒），轻量包已保留数据覆盖安装到 Samsung SM-X800（R52T800SKWZ）。设备实际 APK SHA256 与交付文件一致，设备回读版本为 1.7.1 / 20261075。未卸载、未清数据；未生成内置模型版；构建时尚未提交或发布，后续正式发布结果见下文。
 
 - APK：`D:/CyIME-Data/deliveries/1.7.1/20261075/CyIME-1.7.1-arm64-v8a.apk`，80,908,559 字节；包名 `com.cyletix.cyime`，ARM64 Release，原发布签名。
 - SHA256：`71da48087b5b227da6f4fb4711692d6bc4c5856d1834c0b4eee38cb7b363e3f7`。
@@ -22,8 +22,13 @@ Release 构建成功（6 分 36 秒），轻量包已保留数据覆盖安装到
 - 源码指纹：`419a89635490e5cc5f3203e3db269d3d006c1e9f3b8139e19e53ce97c6f33b22`，构建、安装和归档均一致；交付目录保存 950 个源码文件与 17 个子模块清单，以及源码状态、构建回执和安装状态。
 - 过程日志：`.codex-artifacts/delivery-1.7.1-20261075/delivery.log`。Todo 仅移除本次两项补修的未安装提示，未勾选；实际输入及视觉效果仍未验收。
 
-## GitHub 发布准备
+## GitHub 正式发布
 
-用户要求仅发布轻量版。已创建 Release 草稿（ID `402953090`，目标版本 `1.7.1`），仅上传 `CyIME-1.7.1-arm64-v8a.apk`；GitHub 返回的大小、SHA256 与本地交付及已安装 APK 一致。资产 ID `609571040`，状态 `uploaded`，未生成或上传内置模型版。
+用户已明确授权累计源码按功能提交、推送并公开发布。2026-10-04 10:08:37 UTC 正式发布 [CyIME 1.7.1](https://github.com/Cyletix/CyIME/releases/tag/1.7.1)，Release ID `402953090`，`draft=false`、`prerelease=false`，设为最新正式版。
 
-草稿：<https://github.com/Cyletix/CyIME/releases/tag/untagged-86f8e6e6fbcdbc24d44c>。发布说明保存于 `docs/1.7.1.md`。当前仍是草稿，尚未公开发布；累计源码未提交，现有发布入口要求已提交源码，需先取得 AGENTS.md 所要求的 Git 提交授权，再建立对应源码提交与版本标签。草稿当前 `target_commitish` 是构建基线 `3b3b5725ea74931cd9c1c3ba8ba00d25eeb0424d`，正式公开前必须改为包含累计源码的发布提交，不能把基线当成本次完整源码。
+- 累计修改拆为 16 个功能/交付提交，普通快进推送到 `main` 和 `codex/builtin-clipboard-sync`；未重写既有历史。
+- 源码标签 `1.7.1` 指向 `8969e6d98b19f1b3f50c400353ab5d303ab4ba9e`，与 Release 的目标提交一致。
+- 仅有一个安装包资产 `CyIME-1.7.1-arm64-v8a.apk`，资产 ID `609571040`；GitHub 返回的大小及 SHA256 与本地文件、已安装 APK 一致，未上传内置模型版。
+- 提交没有改变已构建的源码内容：逐项核对归档的 950 个文件、17 个子模块及其修改文件；使用独立临时索引重放根目录补丁和 CMake 的 T9 补丁，确认完全还原构建时引擎源码。librime-predict 的工作文件与固定上游提交一致，其本地索引状态不影响源码内容；未修改该子模块。
+- 构建回执保留当时的基线提交和源码指纹，没有伪造为提交后重新构建。归档目录新增 `publication-source-verification.json` 和 `github-release.json`，将实际 APK、构建快照与发布提交关联。
+- 用户反馈当前比例“差不多了”并要求发布；这不代表此前所有功能逐项验收，不替用户勾选 Todo。

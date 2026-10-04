@@ -1,8 +1,8 @@
 # 打包与安装
 
-当前交付版本为 **1.7.1 / 20261075**，按用户要求在上一份 1.7.0 验证包后升 PATCH，补修物理空格选词与键区上下留白/比例，保留此前全部累计改动。2026-10-04 已生成轻量正式包并保留数据覆盖安装到平板 SM-X800，版本及设备 APK 哈希核对一致；功能未验收，未发布 GitHub Release，本次未生成内置模型包。详见[交付记录](development/delivery-1.7.1-20261075.md)。版本以 `app/build.gradle.kts` 为唯一来源；默认语音继续为 Paraformer＋SenseVoice。
+当前交付版本为 **1.7.1 / 20261075**，按用户要求在上一份 1.7.0 验证包后升 PATCH，补修物理空格选词与键区上下留白/比例，保留此前全部累计改动。2026-10-04 已生成轻量正式包并保留数据覆盖安装到平板 SM-X800，版本及设备 APK 哈希核对一致；用户反馈当前比例可接受并授权发布，现已正式发布 [GitHub Release 1.7.1](https://github.com/Cyletix/CyIME/releases/tag/1.7.1)，仅含轻量包。其余功能未逐项真机验收，本次未生成内置模型包。详见[交付记录](development/delivery-1.7.1-20261075.md)。版本以 `app/build.gradle.kts` 为唯一来源；默认语音继续为 Paraformer＋SenseVoice。
 
-上一 GitHub 正式版为 **1.6.1 / 20261072**，不可覆盖同号产物。20261073～20261075 已用于累计源码交付，下一份不同源码的安装包至少使用 20261076，并在交付前核对远端及设备已用序号。打包源使用累计目录 `C:/Users/Administrator/.codex/worktrees/hardware-input-state/CyIME`，不能从较旧的 `D:/GitHub/CyIME` 主目录覆盖设备。
+当前 GitHub 正式版为 **1.7.1 / 20261075**（上一正式版为 1.6.1 / 20261072），源码标签指向 `8969e6d98b19f1b3f50c400353ab5d303ab4ba9e`，不可覆盖同号产物。20261073～20261075 已用于累计源码交付，下一份不同源码的安装包至少使用 20261076，并在交付前核对远端及设备已用序号。打包源使用累计目录 `C:/Users/Administrator/.codex/worktrees/hardware-input-state/CyIME`，不能从较旧的 `D:/GitHub/CyIME` 主目录覆盖设备。
 
 ## 历史交付记录
 
