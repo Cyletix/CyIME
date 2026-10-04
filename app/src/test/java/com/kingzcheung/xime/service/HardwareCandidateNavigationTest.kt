@@ -37,7 +37,7 @@ class HardwareCandidateNavigationTest {
         assertEquals(HardwareCandidateDecision.Highlight(1), navigation.decide(HardwareCandidateKey.RIGHT, source, false))
         assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, source, false))
         repeat(8) { navigation.decide(HardwareCandidateKey.RIGHT, source, false) }
-        assertEquals(2, navigation.selectedIndex(source))
+        assertEquals(3, navigation.selectedIndex(source))
         assertEquals(HardwareCandidateDecision.DefaultInput, navigation.decide(HardwareCandidateKey.SPACE, source, false))
     }
 
@@ -71,8 +71,7 @@ class HardwareCandidateNavigationTest {
 
     @Test fun numberSelectionUsesTheSameVisibleListForEverySource() {
         for (source in listOf(snapshot(),
-            snapshot(CandidateState(associationCandidates = listOf("世界", "朋友", "大家"))),
-            snapshot(CandidateState(pendingEnglishText = "tes", associationCandidates = listOf("test", "testing")), true))) {
+            snapshot(CandidateState(associationCandidates = listOf("世界", "朋友", "大家"))))) {
             val navigation = HardwareCandidateNavigation()
             for (index in source.words.indices) {
                 assertEquals(HardwareCandidateDecision.Confirm(index, source.presentation.association),
@@ -87,6 +86,32 @@ class HardwareCandidateNavigationTest {
             assertEquals(HardwareCandidateDecision.DefaultInput,
                 navigation.decide(HardwareCandidateKey.DIGIT, source, false, digitIndex = 0))
         }
+    }
+
+    @Test fun englishNumbersAreLiteralUntilTheUserExplicitlyNavigatesCandidates() {
+        val navigation = HardwareCandidateNavigation()
+        val source = snapshot(CandidateState(pendingEnglishText = "hello", associationCandidates = listOf("hello", "hellos")), true)
+        for (index in 0..9) assertEquals(HardwareCandidateDecision.DefaultInput,
+            navigation.decide(HardwareCandidateKey.DIGIT, source, false, digitIndex = index))
+        navigation.decide(HardwareCandidateKey.RIGHT, source, false)
+        assertEquals(HardwareCandidateDecision.Confirm(1, true), navigation.decide(HardwareCandidateKey.DIGIT, source, false, digitIndex = 1))
+        val nextWord = source.copy(state = source.state.copy(pendingEnglishText = "you"))
+        assertEquals(HardwareCandidateDecision.DefaultInput,
+            navigation.decide(HardwareCandidateKey.DIGIT, nextWord, false, digitIndex = 1))
+    }
+
+    @Test fun idleDigitsAreLiteralInEveryLanguageButUnfinishedDecodingKeepsOwnership() {
+        for (language in InputLanguage.entries) {
+            val source = snapshot(CandidateState(), language == InputLanguage.ENGLISH)
+                .copy(profile = profile.copy(language = language))
+            for (index in 0..9) {
+                assertEquals(HardwareCandidateDecision.DefaultInput,
+                    HardwareCandidateNavigation().decide(HardwareCandidateKey.DIGIT, source, false, digitIndex = index))
+            }
+        }
+        // The previous letter is already in the FIFO/engine, while its candidate UI is late.
+        assertEquals(HardwareCandidateDecision.Consume, HardwareCandidateNavigation().decide(
+            HardwareCandidateKey.DIGIT, snapshot(CandidateState()), true, digitIndex = 0))
     }
 
     @Test fun pendingPredictionNeverNavigatesOrConfirmsOldWords() {

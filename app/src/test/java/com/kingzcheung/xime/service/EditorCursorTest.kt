@@ -9,6 +9,54 @@ import org.mockito.Mockito.mockConstruction
 import org.mockito.kotlin.*
 
 class EditorCursorTest {
+    @Test fun `physical arrows clamp at all editor boundaries and never dispatch focus events`() {
+        val ic = editor(0, text = "a😀b\nnext")
+        val cursor = EditorCursor()
+        repeat(20) { cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_LEFT) }
+        verify(ic, atLeastOnce()).setSelection(0, 0)
+        repeat(20) { cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_RIGHT) }
+        verify(ic, atLeastOnce()).setSelection(9, 9)
+        repeat(20) { cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_DOWN) }
+        repeat(20) { cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_UP) }
+        verify(ic, never()).sendKeyEvent(any())
+        verify(ic, never()).setSelection(2, 2)
+    }
+
+    @Test fun `physical shift arrows preserve selection anchor and modifier navigation stays in editor`() {
+        val ic = editor(6, text = "hello world", normalized = true)
+        val cursor = EditorCursor()
+        cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_RIGHT, selecting = true, byWord = true)
+        verify(ic).setSelection(6, 11)
+        cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_LEFT, selecting = true)
+        verify(ic).setSelection(6, 10)
+        cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_LEFT, toBoundary = true)
+        verify(ic).setSelection(0, 0)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `physical arrows never fall back to focus navigation when selection is unsupported or refused`() {
+        for (ic in listOf(mock<InputConnection>(), editor(1))) {
+            doReturn(false).whenever(ic).setSelection(any(), any())
+            val cursor = EditorCursor()
+            for (key in listOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) {
+                assertEquals(false, cursor.movePhysical(ic, key))
+            }
+            verify(ic, never()).sendKeyEvent(any())
+        }
+    }
+
+    @Test fun `physical cursor uses surrounding text and reported absolute selection without extracted text`() {
+        val ic = editor(3, text = "abc😀def")
+        doReturn(null).whenever(ic).getExtractedText(any(), any())
+        val cursor = EditorCursor()
+        cursor.observeSelection(ic, 3, 3)
+        cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_RIGHT)
+        cursor.movePhysical(ic, KeyEvent.KEYCODE_DPAD_RIGHT)
+        verify(ic).setSelection(5, 5)
+        verify(ic).setSelection(6, 6)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
     // Android JVM stubs 不保存 KeyEvent 字段，直接核对真实构造参数和发送次数。
     private fun assertCancelKeyPair(ic: InputConnection, key: Int, cancel: () -> Unit) {
         val events = mutableListOf<List<Int>>()

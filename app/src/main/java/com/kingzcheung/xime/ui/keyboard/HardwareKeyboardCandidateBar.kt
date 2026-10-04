@@ -195,9 +195,8 @@ internal fun HardwareCandidateRow(
     showNumberLabels: Boolean = true,
 ) {
     val context = LocalContext.current
-    val shownComments = if (SettingsPreferences.showCandidateComments(context)) comments else emptyList()
     Row(verticalAlignment = Alignment.CenterVertically) {
-        FixedCandidateStrip(candidates.take(MAX_VISIBLE_CANDIDATES), comments = shownComments,
+        FixedCandidateStrip(candidates.take(MAX_VISIBLE_CANDIDATES), comments = comments,
             visuals = visuals,
             callbacks = CandidateBarCallbacks(onCandidateSelect = { onCandidateSelect?.invoke(it) }),
             fontSize = SettingsPreferences.getCandidateTextSize(context).sp,

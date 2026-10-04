@@ -49,17 +49,27 @@ internal fun keyCodeToKey(keyCode: Int, isShifted: Boolean): String? {
         KeyEvent.KEYCODE_PERIOD -> if (isShifted) ">" else "."
         KeyEvent.KEYCODE_MINUS -> if (isShifted) "_" else "-"
         KeyEvent.KEYCODE_EQUALS -> if (isShifted) "+" else "="
-        KeyEvent.KEYCODE_SLASH -> "/"
-        KeyEvent.KEYCODE_BACKSLASH -> "\\"
-        KeyEvent.KEYCODE_SEMICOLON -> ";"
-        KeyEvent.KEYCODE_APOSTROPHE -> "'"
+        KeyEvent.KEYCODE_SLASH -> if (isShifted) "?" else "/"
+        KeyEvent.KEYCODE_BACKSLASH -> if (isShifted) "|" else "\\"
+        KeyEvent.KEYCODE_SEMICOLON -> if (isShifted) ":" else ";"
+        KeyEvent.KEYCODE_APOSTROPHE -> if (isShifted) "\"" else "'"
         KeyEvent.KEYCODE_LEFT_BRACKET -> if (isShifted) "{" else "["
         KeyEvent.KEYCODE_RIGHT_BRACKET -> if (isShifted) "}" else "]"
-        KeyEvent.KEYCODE_GRAVE -> "`"
+        KeyEvent.KEYCODE_GRAVE -> if (isShifted) "~" else "`"
+        in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> (keyCode - KeyEvent.KEYCODE_NUMPAD_0).toString()
+        KeyEvent.KEYCODE_NUMPAD_DOT -> "."
+        KeyEvent.KEYCODE_NUMPAD_DIVIDE -> "/"
+        KeyEvent.KEYCODE_NUMPAD_MULTIPLY -> "*"
+        KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> "-"
+        KeyEvent.KEYCODE_NUMPAD_ADD -> "+"
+        KeyEvent.KEYCODE_NUMPAD_EQUALS -> "="
         KeyEvent.KEYCODE_TAB -> "\t"
         else -> null
     }
 }
+
+internal fun isHardwareArrow(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
 
 /** Paging reserves selected physical key pairs; [modified] excludes Shift so < and > share , and . */
 internal fun hardwareCandidatePageDirection(

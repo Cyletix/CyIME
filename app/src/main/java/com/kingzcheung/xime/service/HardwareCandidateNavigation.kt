@@ -12,7 +12,7 @@ internal data class HardwareCandidateSnapshot(
     val english: Boolean,
     val predictionPending: Boolean = false,
     val associationContext: String = "",
-    val associationLimit: Int = 3,
+    val associationLimit: Int = 10,
     val expanded: Boolean = false,
     val singleCharOnly: Boolean = false,
 ) {
@@ -79,6 +79,46 @@ internal sealed interface HardwareCandidateDecision {
     data object Consume : HardwareCandidateDecision
     data object Host : HardwareCandidateDecision
     data object DefaultInput : HardwareCandidateDecision
+    data object MoveCursor : HardwareCandidateDecision
+    data object LiteralSpace : HardwareCandidateDecision
+}
+
+/** Physical arrows belong to the editor, independent of candidate-window navigation. */
+internal fun physicalCandidateDecision(
+    key: HardwareCandidateKey,
+    snapshot: HardwareCandidateSnapshot,
+    engineHasInput: Boolean?,
+    digitIndex: Int? = null,
+): HardwareCandidateDecision = when (key) {
+    HardwareCandidateKey.CANCEL -> HardwareCandidateDecision.Cancel
+    HardwareCandidateKey.LEFT, HardwareCandidateKey.RIGHT,
+    HardwareCandidateKey.UP, HardwareCandidateKey.DOWN -> HardwareCandidateDecision.MoveCursor
+    HardwareCandidateKey.SPACE -> when {
+        snapshot.english || snapshot.state.pendingEnglishText.isNotEmpty() -> HardwareCandidateDecision.LiteralSpace
+        engineHasInput == true || snapshot.state.isComposing || snapshot.state.inputText.isNotEmpty() -> {
+            // Only post-commit suggestions are number/click-only. Space still
+            // confirms active composition, using the current FIFO snapshot.
+            if (engineHasInput == true && !snapshot.presentation.association &&
+                !snapshot.state.isShowingRecentClipboard && snapshot.words.isNotEmpty()) {
+                val index = if (snapshot.expandedGlobalIndices != null) 0
+                    else snapshot.state.spaceCandidateIndex(snapshot.profile)
+                HardwareCandidateDecision.Confirm(index, false)
+            } else {
+                // Missing/stale candidates must not turn Space into raw-letter Enter.
+                HardwareCandidateDecision.Consume
+            }
+        }
+        else -> HardwareCandidateDecision.LiteralSpace
+    }
+    HardwareCandidateKey.ENTER -> HardwareCandidateDecision.DefaultInput
+    HardwareCandidateKey.DIGIT -> when {
+        // An English completion must not steal the digits of hello123. Idle/pending
+        // predictions and unlabelled/out-of-range digits also remain literal input.
+        snapshot.english || snapshot.state.pendingEnglishText.isNotEmpty() -> HardwareCandidateDecision.DefaultInput
+        digitIndex !in snapshot.words.indices || snapshot.state.isShowingRecentClipboard -> HardwareCandidateDecision.DefaultInput
+        !snapshot.presentation.association && engineHasInput != true -> HardwareCandidateDecision.DefaultInput
+        else -> HardwareCandidateDecision.Confirm(digitIndex!!, snapshot.presentation.association)
+    }
 }
 
 /** Keeps display navigation separate from engine selection and ordinary English spacing. */
@@ -125,6 +165,10 @@ internal class HardwareCandidateNavigation {
         if (key == HardwareCandidateKey.ENTER) return HardwareCandidateDecision.DefaultInput
         if (key == HardwareCandidateKey.DIGIT) {
             return when {
+                // English is already in the editor. Digits extend that text (hello123),
+                // rather than replacing it with one of the completion suggestions.
+                (snapshot.english || state.pendingEnglishText.isNotEmpty()) && index == null -> HardwareCandidateDecision.DefaultInput
+                hasComposition && snapshot.words.isEmpty() -> HardwareCandidateDecision.Consume
                 snapshot.words.isEmpty() -> HardwareCandidateDecision.DefaultInput
                 digitIndex != null && digitIndex in snapshot.words.indices ->
                     HardwareCandidateDecision.Confirm(digitIndex, snapshot.presentation.association)

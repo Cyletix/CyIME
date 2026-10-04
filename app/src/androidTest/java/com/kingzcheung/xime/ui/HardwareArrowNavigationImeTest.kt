@@ -32,15 +32,15 @@ import java.io.File
 class HardwareArrowNavigationImeTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun nativePinyinArrowsUseVisibleSelectionInFloatingAndScreenKeyboard() = withIme("rime_ice") {
+    @Test fun nativePinyinNumbersSelectAndArrowsMoveEditorInBothSurfaces() = withIme("rime_ice") {
         verifyChineseNavigationInBothSurfaces()
     }
 
-    @Test fun physicalLettersWithT9LayoutUseVisibleSelectionInBothSurfaces() = withIme("t9_pinyin") {
+    @Test fun physicalLettersWithT9LayoutUseNumbersAndEditorArrowsInBothSurfaces() = withIme("t9_pinyin") {
         verifyChineseNavigationInBothSurfaces()
     }
 
-    @Test fun englishSuggestionsNavigateAndCancelInFloatingAndScreenKeyboard() = withIme("rime_ice") {
+    @Test fun englishSuggestionsNeverStealArrowsSpacesOrDigits() = withIme("rime_ice") {
         key("SHIFT_LEFT")
         rule.waitUntil(10_000) { engine.isAsciiMode() && languageIs("EN") }
         for (full in listOf(false, true)) {
@@ -48,37 +48,38 @@ class HardwareArrowNavigationImeTest {
             surface(full)
             key("H", "E", "L")
             rule.waitUntil(10_000) { document() == "before hel" && englishCompletion() != null }
-            val caret = selection()
-            val word = requireNotNull(englishCompletion())
-            key("DPAD_RIGHT")
-            rule.waitUntil(10_000) { selectedText(word) }
-            assertEquals("English highlighting must not move the host caret (full=$full)", caret, selection())
             key("DPAD_LEFT")
-            rule.waitUntil(10_000) { selectedText("hel") }
-            key("DPAD_RIGHT")
-            rule.waitUntil(10_000) { selectedText(word) }
+            rule.waitUntil(10_000) { selection() == (9 to 9) && englishCompletion() == null }
+            assertEquals("before hel", document())
             key("SPACE")
-            rule.waitUntil(10_000) { document() == "before $word" }
-            assertEquals("Only the highlighted completion replaces the pending prefix", "before $word", document())
-
-            resetEditor("before ")
-            surface(full)
-            key("H", "E", "L")
-            rule.waitUntil(10_000) { document() == "before hel" && englishCompletion() != null }
-            key("ESCAPE", "DPAD_LEFT")
-            rule.waitUntil(10_000) { selection() == (9 to 9) }
-            key("DPAD_RIGHT")
-            rule.waitUntil(10_000) { selection() == (10 to 10) }
-            assertEquals("Esc cancels suggestions without removing typed English", "before hel", document())
+            rule.waitUntil(10_000) { document() == "before he l" }
 
             resetEditor("before ")
             surface(full)
             key("H", "E", "L")
             rule.waitUntil(10_000) { document() == "before hel" }
+            key("1", "2", "3", "SPACE")
+            rule.waitUntil(10_000) { document() == "before hel123 " }
+            key("ESCAPE", "ESCAPE", "H", "E", "L")
+            rule.waitUntil(10_000) { document() == "before hel123 hel" }
+            assertTrue("Repeated Esc must not hide the input surface", has("hardware-keyboard-toolbar") || has("keyboard-underlay"))
             key("DEL", "DEL", "DEL", "DPAD_LEFT")
-            rule.waitUntil(10_000) { document() == "before " && selection() == (6 to 6) }
-            key("DPAD_RIGHT")
-            rule.waitUntil(10_000) { selection() == (7 to 7) }
+            rule.waitUntil(10_000) { document() == "before hel123 " && selection() == (13 to 13) }
+        }
+    }
+
+    @Test fun shiftPunctuationIsLiteralAndDoesNotSwitchLanguage() = withIme("rime_ice") {
+        for (english in listOf(false, true)) {
+            if (english) {
+                key("SHIFT_LEFT")
+                rule.waitUntil(10_000) { engine.isAsciiMode() && languageIs("EN") }
+            }
+            resetEditor("")
+            for (name in listOf("SLASH", "SEMICOLON", "APOSTROPHE", "BACKSLASH", "GRAVE")) {
+                shell("input keycombination KEYCODE_SHIFT_LEFT KEYCODE_$name")
+            }
+            rule.waitUntil(10_000) { document() == "?:\"|~" }
+            assertEquals(english, engine.isAsciiMode())
         }
     }
 
@@ -134,8 +135,7 @@ class HardwareArrowNavigationImeTest {
             .fetchSemanticsNodes().isNotEmpty()
         fun candidate(index: Int): String = rule.onNodeWithTag("bar-candidate:$index")
             .fetchSemanticsNode().config[SemanticsProperties.Text].first().text.removePrefix("${(index + 1) % 10} ")
-        // Right from the raw prefix chooses index 1 in both actual renderers.
-        // Do not accidentally read a later visible suggestion or another selected control.
+        // Read an actual completion, excluding the raw prefix item.
         fun englishCompletion(): String? = rule.onAllNodes(
             hasTestTag("bar-candidate:1") or hasTestTag("bar-association:1"))
             .fetchSemanticsNodes().mapNotNull { node ->
@@ -184,54 +184,44 @@ class HardwareArrowNavigationImeTest {
             for (full in listOf(false, true)) {
                 resetEditor(original, cursor)
                 surface(full)
-                // Batched input checks arrows after native processing, even before UI publication.
-                key("N", "I", "DPAD_RIGHT")
-                rule.waitUntil(15_000) { engine.getInput().isNotEmpty() && selected(1) }
-                assertEquals("Arrow focus must be visible without changing the host document", original, document())
-                assertEquals(cursor to cursor, selection())
+                key("N", "I")
+                rule.waitUntil(15_000) { engine.getInput().isNotEmpty() && has("bar-candidate:1") }
                 val selectedWord = candidate(1)
-                assertTrue("Use genuine Chinese engine candidates", selectedWord.any { it.code in 0x4E00..0x9FFF })
-                key("DPAD_LEFT")
-                rule.waitUntil(10_000) { selected(0) }
-                key("DPAD_RIGHT")
-                rule.waitUntil(10_000) { selected(1) }
-                key("SPACE")
+                assertTrue(selectedWord.any { it.code in 0x4E00..0x9FFF })
+                key("2")
                 val expected = original.substring(0, cursor) + selectedWord + original.substring(cursor)
                 rule.waitUntil(10_000) { engine.getInput().isEmpty() && document() == expected }
+                key("DPAD_LEFT")
+                val left = cursor + selectedWord.length - 1
+                rule.waitUntil(10_000) { selection() == (left to left) }
+                assertEquals("Cursor movement must preserve committed text", expected, document())
 
                 resetEditor(original, cursor)
                 surface(full)
-                key("N", "I")
-                rule.waitUntil(15_000) { engine.getInput().isNotEmpty() && has("bar-candidate:1") }
-                val input = engine.getInput()
-                assertFalse("Boundary fixture begins on the first candidate page", engine.hasPrevPage())
-                key("DPAD_UP", "DPAD_RIGHT")
-                rule.waitUntil(10_000) { selected(1) }
-                assertEquals("Up at the first candidate page must not move into the preceding text line", cursor to cursor, selection())
-                assertEquals(input, engine.getInput())
-                if (engine.hasNextPage()) {
-                    key("DPAD_DOWN")
-                    rule.waitUntil(10_000) { engine.hasPrevPage() }
-                    assertEquals("Candidate paging must not move the host caret down", cursor to cursor, selection())
-                    key("DPAD_UP")
-                    rule.waitUntil(10_000) { !engine.hasPrevPage() }
-                } else {
-                    key("DPAD_DOWN", "DPAD_LEFT")
-                    rule.waitUntil(10_000) { selected(0) }
-                    assertEquals("Down at the final candidate page must not move the host caret", cursor to cursor, selection())
-                }
-                assertEquals(original, document())
-                key("ESCAPE", "DPAD_LEFT")
-                rule.waitUntil(10_000) { engine.getInput().isEmpty() && selection() == (cursor - 1 to cursor - 1) }
-                key("DPAD_RIGHT")
-                rule.waitUntil(10_000) { selection() == (cursor to cursor) }
-                assertEquals("Cancelled pinyin must not be committed by cursor navigation", original, document())
+                key("N", "I", "DPAD_LEFT")
+                val rawExpected = original.substring(0, cursor) + "ni" + original.substring(cursor)
+                rule.waitUntil(10_000) { engine.getInput().isEmpty() && document() == rawExpected && selection() == (cursor + 1 to cursor + 1) }
+                key("DPAD_UP")
+                rule.waitUntil(10_000) { selection() == (4 to 4) }
 
-                key("N", "I")
-                rule.waitUntil(15_000) { engine.getInput().isNotEmpty() }
-                key("DEL", "DEL", "DPAD_LEFT")
-                rule.waitUntil(10_000) { engine.getInput().isEmpty() && selection() == (cursor - 1 to cursor - 1) }
-                assertEquals("Deleting the composition must preserve existing host text", original, document())
+                resetEditor(original, cursor)
+                surface(full)
+                key("N", "I", "ESCAPE", "ESCAPE", "N", "I")
+                rule.waitUntil(15_000) { engine.getInput().isNotEmpty() && has("bar-candidate:0") }
+                assertEquals("Esc cancels raw input and typing immediately restores visible candidates", original, document())
+                key("ESCAPE", "1", "2", "3")
+                val digits = original.substring(0, cursor) + "123" + original.substring(cursor)
+                rule.waitUntil(10_000) { document() == digits && engine.getInput().isEmpty() }
+
+                resetEditor(original, 0)
+                surface(full)
+                key("DPAD_LEFT", "DPAD_LEFT", "DPAD_UP", "DPAD_UP")
+                rule.waitForIdle()
+                assertEquals(0 to 0, selection())
+                rule.runOnUiThread { assertTrue("Arrows at text edges must not transfer focus", editor.hasFocus()) }
+                key("DPAD_DOWN")
+                rule.waitUntil(10_000) { selection() == (6 to 6) }
+                assertEquals(original, document())
             }
         }
     }
@@ -287,6 +277,7 @@ class HardwareArrowNavigationImeTest {
                         }
                         ready = true
                         addView(editor, LinearLayout.LayoutParams(-1, 280))
+                        addView(android.widget.Button(ctx).apply { text = "Focus must stay in the editor" })
                     }
                 }, modifier = Modifier.fillMaxSize())
             }

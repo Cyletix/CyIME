@@ -24,7 +24,7 @@ class HardwareCandidatePresentationTest {
     @Test fun englishUsesTheSameTypedWordAndCompletionIndicesAsScreenKeyboard() {
         val result = hardwareCandidatePresentation(CandidateState(pendingEnglishText = "tes",
             associationCandidates = listOf("test", "testing", "tests")), true)
-        assertEquals(listOf("tes", "test", "testing"), result.words)
+        assertEquals(listOf("tes", "test", "testing", "tests"), result.words)
         assertTrue(result.association)
         assertTrue(result.standaloneWords.isEmpty())
         assertFalse(result.hasNextPage)
@@ -55,5 +55,10 @@ class HardwareCandidatePresentationTest {
         assertEquals(listOf("你好", "世界", "朋友"), result.words)
         assertTrue(result.association)
         assertTrue(result.standaloneWords.isEmpty())
+    }
+
+    @Test fun horizontalSuggestionsIncludeTenSelectableWordsRatherThanThree() {
+        val words = (1..20).map { "词$it" }
+        assertEquals(words.take(10), hardwareCandidatePresentation(CandidateState(associationCandidates = words), false).words)
     }
 }
