@@ -282,6 +282,7 @@ fun KeyboardLayout(
 
 
     CompositionLocalProvider(
+        LocalFourteenKeyLayout provides fourteenKey,
         LocalLetterGeometry provides geometry,
         LocalCustomLayout provides if (isAsciiMode) null else com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId),
         LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
@@ -468,7 +469,7 @@ fun KeyboardLayout(
                                     val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
                                     val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
                                     val swipeUpKeyLabel =
-                                        if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else null
+                                        if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
                                     val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
                                     val swipeDownRaw =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
@@ -477,7 +478,7 @@ fun KeyboardLayout(
                                     val swipeDownAction = swipeDownRaw?.action
                                     val swipeDownValue = swipeDownRaw?.value
                                     val swipeDownDisplay = swipeDownRaw?.display ?: DisplayMode.BOTH
-                                    val swipeDownBubbleText = if (swipeDownDisplay != DisplayMode.KEY) swipeDownLabel else null
+                                    val swipeDownBubbleText = if (swipeDownDisplay != DisplayMode.KEY && swipeDownHintsEnabled) swipeDownLabel else null
                                     val longPressConfig =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
                                     val longPressDisplay = longPressConfig?.display ?: "key"
@@ -500,7 +501,7 @@ fun KeyboardLayout(
                                     val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
                                     val onPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
                                     val onRelease: (() -> Unit)? = remember(key, onKeyRelease) { { onKeyRelease?.invoke(key); Unit } }
-                                    val onSwipeDown = if (swipeDownAction != null && swipeDownLabel != null) {
+                                    val onSwipeDown = if (swipeDownAction != null && swipeDownAction != GestureAction.NONE && swipeDownLabel != null) {
                                         remember(key, onKeyPress, onGestureAction, onCommitText, swipeDownAction, swipeDownValue, swipeDownLabel) {
                                             val label = swipeDownLabel
                                             { _: String ->
@@ -530,7 +531,10 @@ fun KeyboardLayout(
 
                                     SwipeableKeyButton(
                                         layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
+                                        followSymbolSwipeDirection = true,
                                         text = displayText,
+                                        letterGroup = if (isShifted) key.uppercase() else key,
+                                        onLetterSelection = onKeyPress,
                                         onClick = onClick,
                                         backgroundColor = keyBackgroundColor,
                                         textColor = keyTextColor,
@@ -540,7 +544,7 @@ fun KeyboardLayout(
                                         symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
-                                        swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH)) swipeDownLabel else null,
+                                        swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && swipeDownHintsEnabled) swipeDownLabel else null,
                                         onSwipe = if (swipeUpCommitValue != null && swipeUpAction != GestureAction.NONE) { {
                     if (swipeUpAction == null || swipeUpAction == GestureAction.COMMIT) {
                         (onCommitText ?: onKeyPress)(swipeUpCommitValue)
@@ -708,6 +712,7 @@ fun KeyboardLayout(
                             } else {
                                 SwipeableKeyButton(
                                     layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
+                                    followSymbolSwipeDirection = true,
                                     text = k2TapLabel,
                                     onClick = k2OnClick,
                                     backgroundColor = keyBackgroundColor,
@@ -1025,7 +1030,7 @@ fun KeyboardRowWithConfig(
             val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
             val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
             val swipeUpKeyLabel =
-                if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else null
+                if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
             val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
             val swipeDownRaw = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
             val swipeDownLabel = swipeDownRaw?.label?.takeIf { it.isNotEmpty() }
@@ -1058,7 +1063,7 @@ fun KeyboardRowWithConfig(
             val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
             val onPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
             val onRelease: (() -> Unit)? = remember(key, onKeyRelease) { { onKeyRelease?.invoke(key); Unit } }
-            val onSwipeDown: ((String) -> Unit)? = if (swipeDownAction != null && swipeDownHintsEnabled && swipeDownLabel != null) {
+            val onSwipeDown: ((String) -> Unit)? = if (swipeDownAction != null && swipeDownAction != GestureAction.NONE && swipeDownLabel != null) {
                 remember(key, onKeyPress, onGestureAction, onCommitText, swipeDownAction, swipeDownValue, swipeDownLabel) {
                     val label = swipeDownLabel
                     { _: String ->
@@ -1087,7 +1092,10 @@ fun KeyboardRowWithConfig(
 
             SwipeableKeyButton(
                 layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
+                followSymbolSwipeDirection = true,
                 text = displayText,
+                letterGroup = if (isShifted) key.uppercase() else key,
+                onLetterSelection = onKeyPress,
                 onClick = onClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
@@ -1772,6 +1780,8 @@ private fun SplitKeyboardContent(
 fun SwipeableKeyButtonLandscape(
     text: String,
     onClick: () -> Unit,
+    letterGroup: String? = null,
+    onLetterSelection: ((String) -> Unit)? = null,
     backgroundColor: Color,
     textColor: Color,
     modifier: Modifier = Modifier,
@@ -1794,7 +1804,8 @@ fun SwipeableKeyButtonLandscape(
     shadowShapeRadius: Dp = 8.dp,
 ) {
 
-    SwipeableKeyButton(text = text, onClick = onClick, backgroundColor = backgroundColor,
+    SwipeableKeyButton(text = text, onClick = onClick, letterGroup = letterGroup, onLetterSelection = onLetterSelection, backgroundColor = backgroundColor,
+        followSymbolSwipeDirection = true,
         textColor = textColor, modifier = modifier, swipeText = swipeText, swipeDownText = swipeDownText,
         symbolInputText = symbolInputText,
         swipeUpKeyLabel = swipeUpKeyLabel, swipeDownKeyLabel = swipeDownKeyLabel,
@@ -1832,7 +1843,7 @@ fun CompactKeyboardRowWithConfig(
             val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
             val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
             val swipeUpKeyLabel =
-                if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else null
+                if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
             val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
             val swipeDownRaw = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
             val swipeDownLabel = swipeDownRaw?.label?.takeIf { it.isNotEmpty() }
@@ -1864,7 +1875,7 @@ fun CompactKeyboardRowWithConfig(
             val compactOnClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
             val compactOnPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
             val compactOnRelease: (() -> Unit)? = remember(key, onKeyRelease) { { onKeyRelease?.invoke(key); Unit } }
-            val compactOnSwipeDown: ((String) -> Unit)? = if (swipeDownAction != null && swipeDownHintsEnabled && swipeDownLabel != null) {
+            val compactOnSwipeDown: ((String) -> Unit)? = if (swipeDownAction != null && swipeDownAction != GestureAction.NONE && swipeDownLabel != null) {
                 remember(key, onKeyPress, onGestureAction, onCommitText, swipeDownAction, swipeDownValue, swipeDownLabel) {
                     val label = swipeDownLabel
                     { _: String ->
@@ -1893,6 +1904,8 @@ fun CompactKeyboardRowWithConfig(
 
             SwipeableKeyButtonLandscape(
                 text = compactDisplayText,
+                letterGroup = if (isShifted) key.uppercase() else key,
+                onLetterSelection = onKeyPress,
                 onClick = compactOnClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,

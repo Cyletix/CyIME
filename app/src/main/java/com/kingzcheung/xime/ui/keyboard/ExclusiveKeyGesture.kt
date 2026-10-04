@@ -23,6 +23,10 @@ internal data class KeyGestureActions(
     val onDown: ((String) -> Unit)? = null,
     val leftText: String? = null,
     val onLeft: (() -> Unit)? = null,
+    val rightText: String? = null,
+    val onRight: (() -> Unit)? = null,
+    val horizontalThresholdDp: Float = 50f,
+    val reserveHorizontalSwipe: Boolean = false,
     val longPressItems: List<String> = emptyList(),
     val longPressDrawableIds: List<Int> = emptyList(),
     val keyWidth: Float = 1f,
@@ -31,6 +35,13 @@ internal data class KeyGestureActions(
     val onLongPressFeedback: () -> Unit = {},
     val longPressTimeoutMillis: Long? = null,
     val blockUpSwipe: Boolean = false,
+    val blockDownSwipe: Boolean = false,
+    val inlineVerticalPreview: Boolean = false,
+    val inlineHorizontalPreview: Boolean = false,
+    val upPreviewText: String? = upText,
+    val downPreviewText: String? = downText,
+    val upPreviewFromTop: Boolean = true,
+    val downPreviewFromTop: Boolean = false,
 )
 
 internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
@@ -42,6 +53,7 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
     awaitEachGesture {
         val down = awaitFirstDown()
         val actions = currentActions()
+        val horizontalThreshold = actions.horizontalThresholdDp.dp.toPx()
         down.consume()
         actions.onPress()
         actions.onPreview(SwipeState(isPressed = true, pressedText = actions.text))
@@ -73,9 +85,11 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                 }
                 val up = dy < -swipeThreshold && abs(dy) > abs(dx) * 1.1f && actions.onUp != null
                 val downSwipe = dy > swipeThreshold && dy > abs(dx) * 1.1f && actions.onDown != null
-                val left = dx < -swipeThreshold && -dx > abs(dy) * 1.1f && actions.onLeft != null
+                val left = dx < -horizontalThreshold && -dx > abs(dy) * 1.1f && actions.onLeft != null
+                val right = dx > horizontalThreshold && dx > abs(dy) * 1.1f && actions.onRight != null
                 val blockedUp = actions.blockUpSwipe && dy < -swipeThreshold && abs(dy) > abs(dx) * 1.1f
-                crossedSwipeThreshold = crossedSwipeThreshold || up || downSwipe || left || blockedUp
+                val blockedDown = actions.blockDownSwipe && dy > swipeThreshold && dy > abs(dx) * 1.1f
+                crossedSwipeThreshold = crossedSwipeThreshold || up || downSwipe || left || right || blockedUp || blockedDown
                 if (longPressed && items.isNotEmpty()) {
                     val itemWidth = (actions.keyWidth / items.size).coerceAtLeast(1f)
                     selectedIndex = ((dx / itemWidth) + if (items.size > 1) 0.5f else 0f)
@@ -84,9 +98,19 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         longPressItems = items, selectedLongPressIndex = selectedIndex,
                         longPressDrawableIds = actions.longPressDrawableIds))
                 } else if (!longPressed) {
-                    val hint = if (up) actions.upText else if (downSwipe) actions.downText else if (left) actions.leftText else null
+                    val hint = if (up) actions.upText else if (downSwipe) actions.downText else if (left) actions.leftText else if (right) actions.rightText else null
                     actions.onPreview(SwipeState(isSwiping = hint != null, swipeText = hint,
-                        isSwipeDown = downSwipe, isPressed = !moved, pressedText = actions.text))
+                        isSwipeDown = downSwipe, isPressed = !moved, pressedText = actions.text,
+                        keyFlick = (if (actions.inlineVerticalPreview) keyFlickPreview(
+                            dx, dy, viewConfiguration.touchSlop, swipeThreshold,
+                            actions.upPreviewText.takeIf { actions.onUp != null && !actions.blockUpSwipe },
+                            actions.downPreviewText.takeIf { actions.onDown != null && !actions.blockDownSwipe },
+                            actions.upPreviewFromTop, actions.downPreviewFromTop,
+                        ) else null) ?: if (actions.inlineHorizontalPreview) horizontalKeyFlickPreview(
+                            dx, dy, viewConfiguration.touchSlop, horizontalThreshold,
+                            actions.leftText.takeIf { actions.onLeft != null },
+                            actions.rightText.takeIf { actions.onRight != null },
+                        ) else null))
                 }
                 if (!change.pressed) {
                     change.consume()
@@ -95,11 +119,15 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         up -> actions.onUp?.invoke(actions.upText.orEmpty())
                         downSwipe -> actions.onDown?.invoke(actions.downText.orEmpty())
                         left -> actions.onLeft?.invoke()
+                        right -> actions.onRight?.invoke()
                         !crossedSwipeThreshold && abs(dx) < horizontalCancelThreshold -> actions.onTap()
                     }
                     break
                 }
-                if (longPressed || crossedSwipeThreshold) change.consume()
+                // Reserve paired-letter drags before the whole-keyboard cursor's
+                // activation distance, even when the user sets a longer threshold.
+                if (longPressed || crossedSwipeThreshold || actions.reserveHorizontalSwipe &&
+                    abs(dx) > viewConfiguration.touchSlop && abs(dx) > abs(dy) * 1.1f) change.consume()
                 else {
                     // 父层光标/滚动手势可能在 Main 后半段消费；取消后不得补出普通字符。
                     val finalChange = awaitPointerEvent(PointerEventPass.Final)

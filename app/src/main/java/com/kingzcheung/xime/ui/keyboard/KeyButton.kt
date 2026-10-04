@@ -39,6 +39,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -104,6 +105,7 @@ data class SwipeState(
     val longPressItems: List<String> = emptyList(),
     val selectedLongPressIndex: Int = 0,
     val longPressDrawableIds: List<Int> = emptyList(),
+    val keyFlick: KeyFlickPreview? = null,
 )
 
 private val shadowColorCache = HashMap<Color, Color>()
@@ -150,6 +152,7 @@ fun KeyButton(
     shadowShapeRadius: Dp = 8.dp,
 ) {
     var isPressed by remember { mutableStateOf(false) }
+    var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     val density = LocalDensity.current
     val view = LocalView.current
     val keyFontFamily = AppFonts.keyFontFamily
@@ -159,7 +162,8 @@ fun KeyButton(
         onTap = onClick,
         onPress = { isPressed = true; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
-        onPreview = { onSwipeStateChange?.invoke(it) },
+        onPreview = { flickPreview = it.keyFlick; onSwipeStateChange?.invoke(it) },
+        inlineVerticalPreview = true,
         upText = swipeText,
         downText = swipeDownText,
         onUp = onSwipe,
@@ -211,7 +215,7 @@ fun KeyButton(
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor,
                 pressed = isPressed, highlighted = isHighlighted,
-            ))),
+            )).keyHeldHighlight(isPressed)),
         contentAlignment = Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
@@ -223,48 +227,54 @@ fun KeyButton(
                 ?: KeyboardKeyMetrics.LabelSize.value,
             maxWidth.value, maxHeight.value, density.fontScale,
             LocalKeyboardInputPreferences.current.keyTextScale)
-        Text(
-            text = punctuationKeyLabel(text),
-            modifier = Modifier.fillMaxWidth().offset(y = if (!swipeText.isNullOrEmpty() && maxHeight >= 40.dp) 2.dp else 0.dp),
-            color = textColor,
-            fontSize = labelSize.sp,
-            lineHeight = (labelSize * 1.2f).sp,
-            fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            fontFamily = keyFontFamily
-        )
-        
-        if (!swipeText.isNullOrEmpty() && swipeText != badgeText) {
-            val displayText = if (swipeText.length <= 4) swipeText else swipeText.take(4)
+        val keyHeight = maxHeight
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            alpha = 1f - (flickPreview?.progress ?: 0f)
+        }, contentAlignment = Alignment.Center) {
             Text(
-                text = punctuationKeyLabel(displayText),
-                color = textColor.copy(alpha = 0.5f),
-                fontSize = hintSize.sp,
-                lineHeight = (hintSize * 1.2f).sp,
-                fontWeight = FontWeight.Normal,
+                text = punctuationKeyLabel(text),
+                modifier = Modifier.fillMaxWidth().offset(y = if (!swipeText.isNullOrEmpty() && keyHeight >= 40.dp) 2.dp else 0.dp),
+                color = textColor,
+                fontSize = labelSize.sp,
+                lineHeight = (labelSize * 1.2f).sp,
+                fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 5.dp),
-                fontFamily = keyLabelFontFamily
+                fontFamily = keyFontFamily
             )
+
+            if (flickPreview?.fromTop != true && !swipeText.isNullOrEmpty() && swipeText != badgeText) {
+                val displayText = if (swipeText.length <= 4) swipeText else swipeText.take(4)
+                Text(
+                    text = punctuationKeyLabel(displayText),
+                    color = textColor.copy(alpha = 0.5f),
+                    fontSize = hintSize.sp,
+                    lineHeight = (hintSize * 1.2f).sp,
+                    fontWeight = FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 5.dp),
+                    fontFamily = keyLabelFontFamily
+                )
+            }
+
+            if (badgeText != null && !(flickPreview?.fromTop == true && flickPreview?.text == badgeText)) {
+                Text(
+                    text = badgeText,
+                    color = textColor.copy(alpha = 0.5f),
+                    fontSize = (10f * hintScale).sp,
+                    lineHeight = (12f * hintScale).sp,
+                    fontWeight = FontWeight.Normal,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 6.dp, end = 6.dp),
+                    fontFamily = keyLabelFontFamily
+                )
+            }
         }
-        
-        if (badgeText != null) {
-            Text(
-                text = badgeText,
-                color = textColor.copy(alpha = 0.5f),
-                fontSize = (10f * hintScale).sp,
-                lineHeight = (12f * hintScale).sp,
-                fontWeight = FontWeight.Normal,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 6.dp, end = 6.dp),
-                fontFamily = keyLabelFontFamily
-            )
-        }
+        flickPreview?.let { KeyFlickLabel(it, textColor, maxWidth.value, maxHeight.value, hintSize, labelSize) }
     }
 }
 
@@ -284,12 +294,16 @@ fun SwipeableKeyButton(
     swipeDownKeyLabel: String? = null,
     /** 上滑文本显示在按键上（气泡则为空，用于 display:bubble） */
     swipeUpKeyLabel: String? = null,
+    /** Letter layouts opt in to the user's top/bottom symbol gesture direction. */
+    followSymbolSwipeDirection: Boolean = false,
     /** Literal upper-hint input, independent of whether its visual hint is enabled. */
     symbolInputText: String? = null,
     onSwipe: ((String) -> Unit)? = null,
     onSwipeDown: ((String) -> Unit)? = null,
     onSwipeLeft: (() -> Unit)? = null,
     swipeLeftText: String? = null,
+    letterGroup: String? = null,
+    onLetterSelection: ((String) -> Unit)? = null,
     onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
     onPress: (() -> Unit)? = null,
     onRelease: (() -> Unit)? = null,
@@ -313,7 +327,11 @@ fun SwipeableKeyButton(
     val resolvedBackground = resolvedColors.first
     val resolvedText = resolvedColors.second
     val symbolInputMode = LocalKeyboardInputPreferences.current.symbolInputMode
+    val inputPreferences = LocalKeyboardInputPreferences.current
+    val letters = fourteenKeyLetters(letterGroup, LocalFourteenKeyLayout.current &&
+        inputPreferences.fourteenLetterSwipe && onLetterSelection != null)
     var isPressed by remember { mutableStateOf(false) }
+    var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     var buttonBounds by remember { mutableStateOf(Rect.Zero) }
 
     val view = LocalView.current
@@ -323,19 +341,29 @@ fun SwipeableKeyButton(
         onTap = onClick,
         onPress = { isPressed = true; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
-        onPreview = { onSwipeStateChange?.invoke(it, buttonBounds) },
+        onPreview = { flickPreview = it.keyFlick; onSwipeStateChange?.invoke(it, buttonBounds) },
+        inlineVerticalPreview = true,
         upText = swipeText,
         downText = swipeDownText,
+        upPreviewText = swipeUpKeyLabel?.takeIf { it.isNotEmpty() } ?: swipeText,
+        downPreviewText = swipeDownKeyLabel?.takeIf { it.isNotEmpty() } ?: swipeDownText,
         onUp = onSwipe,
         onDown = onSwipeDown,
         longPressItems = longPressItems.orEmpty(),
-        onLeft = onSwipeLeft,
-        leftText = swipeLeftText,
+        onLeft = letters?.let { { onLetterSelection?.invoke(it.first); Unit } } ?: onSwipeLeft,
+        leftText = letters?.first ?: swipeLeftText,
+        onRight = letters?.let { { onLetterSelection?.invoke(it.second); Unit } },
+        rightText = letters?.second,
+        horizontalThresholdDp = if (letters != null) normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp) else 50f,
+        reserveHorizontalSwipe = letters != null,
+        inlineHorizontalPreview = letters != null,
         longPressDrawableIds = longPressDrawableIds.orEmpty(),
         keyWidth = buttonBounds.width,
         onLongPressSelect = onLongPressSelect,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
-    ).withSymbolInput(symbolInputMode, symbolInputText))
+    ).withSymbolInput(symbolInputMode, symbolInputText).let {
+        if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
+    })
 
     val shiftTargets = LocalShiftSlideTargets.current
     val shiftToken = remember { Any() }
@@ -402,155 +430,159 @@ fun SwipeableKeyButton(
             LocalKeyboardInputPreferences.current.keyTextScale)
         val hintScale = adaptiveHintScale(contentScale)
         val effectiveSwipeFontSize = (swipeFontSize.value * hintScale).sp
-        // 缩窄/矮键盘中仍将提示留在键帽内，不能只按常规行高使用固定偏移。
-        val hintHeightDp = with(LocalDensity.current) { effectiveSwipeFontSize.toDp().value * 1.2f }
-        val hintOffset = adaptiveHintOffsetDp(contentScale)
-            .coerceAtMost(((maxHeight.value - hintHeightDp) / 2f - 2f).coerceAtLeast(0f)).dp
-
         val compactIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, 16f).dp
-        if (layoutMode == ButtonLayout.COMPACT) {
-            Box(modifier = Modifier.fillMaxSize()) {
+        val mainIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value).dp
+        val keyHeight = maxHeight
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            alpha = 1f - (flickPreview?.progress ?: 0f)
+        }, contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center) {
+            if (layoutMode == ButtonLayout.COMPACT) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (icon != null) {
+                        Icon(
+                            painter = icon,
+                            contentDescription = text,
+                            tint = resolvedText,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(top = 2.dp, start = 4.dp)
+                                .size(compactIconSize)
+                        )
+                    } else {
+                        Text(
+                            text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent, textColor),
+                            color = resolvedText,
+                            fontSize = labelSize.sp,
+                            fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
+                            textAlign = TextAlign.Start,
+                            maxLines = 1,
+                            lineHeight = (labelSize * 1.2f).sp,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(top = 2.dp, start = 4.dp),
+                            fontFamily = keyFontFamily
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .fillMaxHeight()
+                            .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 2.dp),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        val swipeUpHint = swipeUpKeyLabel ?: swipeText
+                        if (flickPreview?.fromTop != true && !swipeUpHint.isNullOrEmpty()) {
+                            val displayText = if (swipeUpHint.length <= 2) swipeUpHint else swipeUpHint.take(2)
+                            Text(
+                                text = punctuationKeyLabel(displayText),
+                                color = resolvedText.copy(alpha = 0.6f),
+                                fontSize = effectiveSwipeFontSize,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.End,
+                                maxLines = 1,
+                                lineHeight = 1.sp
+                            )
+                        }
+
+                        val swipeDownHint = swipeDownKeyLabel
+                        if (flickPreview?.fromTop != false && !swipeDownHint.isNullOrEmpty()) {
+                            val hasChinese = swipeDownHint.any { it in '\u4e00'..'\u9fff' || it in '\u3400'..'\u4dbf' || it in '\uf900'..'\ufaff' }
+                            val adjustedFontSize = if (hasChinese && effectiveSwipeFontSize > 6.sp) (effectiveSwipeFontSize.value * 0.85f).sp else effectiveSwipeFontSize
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.BottomStart
+                            ) {
+                                val displayText = if (swipeDownHint.length <= 12) swipeDownHint else swipeDownHint.take(12)
+                                Text(
+                                    text = punctuationKeyLabel(displayText),
+                                    color = resolvedText.copy(alpha = 0.7f),
+                                    fontSize = adjustedFontSize,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Start,
+                                    maxLines = 3,
+                                    lineHeight = adjustedFontSize,
+                                    fontFamily = keyLabelFontFamily
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
                 if (icon != null) {
                     Icon(
                         painter = icon,
                         contentDescription = text,
                         tint = resolvedText,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(top = 2.dp, start = 4.dp)
-                            .size(compactIconSize)
+                        modifier = Modifier.size(mainIconSize)
                     )
                 } else {
                     Text(
                         text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent, textColor),
+                        modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && keyHeight >= 40.dp) 2.dp else 0.dp),
                         color = resolvedText,
                         fontSize = labelSize.sp,
-                        fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
-                        textAlign = TextAlign.Start,
-                        maxLines = 1,
                         lineHeight = (labelSize * 1.2f).sp,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(top = 2.dp, start = 4.dp),
+                        fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
                         fontFamily = keyFontFamily
                     )
                 }
 
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .fillMaxHeight()
-                        .padding(top = 4.dp, end = 4.dp, bottom = 2.dp),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    val swipeUpHint = swipeUpKeyLabel ?: swipeText
-                    if (!swipeUpHint.isNullOrEmpty()) {
-                        val displayText = if (swipeUpHint.length <= 2) swipeUpHint else swipeUpHint.take(2)
-                        Text(
-                            text = punctuationKeyLabel(displayText),
-                            color = resolvedText.copy(alpha = 0.6f),
-                            fontSize = effectiveSwipeFontSize,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.End,
-                            maxLines = 1,
-                            lineHeight = 1.sp
-                        )
-                    }
+                // 上滑提示与角标文字相同（如九键/笔画上滑输入键面数字）时不再重复渲染提示，
+                // 角标已表达该信息；swipeText 状态保持非空，上滑触发与气泡不受影响。
+                if (flickPreview?.fromTop != true && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && (swipeUpKeyLabel ?: swipeText) != badgeText) {
+                    val keyLabel = (swipeUpKeyLabel ?: swipeText)!!
+                    val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
+                    Text(
+                        text = punctuationKeyLabel(displayText),
+                        color = resolvedText.copy(alpha = 0.6f),
+                        fontSize = effectiveSwipeFontSize,
+                        lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 5.dp),
+                        fontFamily = keyLabelFontFamily
+                    )
+                }
 
-                    val swipeDownHint = swipeDownKeyLabel
-                    if (!swipeDownHint.isNullOrEmpty()) {
-                        val hasChinese = swipeDownHint.any { it in '\u4e00'..'\u9fff' || it in '\u3400'..'\u4dbf' || it in '\uf900'..'\ufaff' }
-                        val adjustedFontSize = if (hasChinese && effectiveSwipeFontSize > 6.sp) (effectiveSwipeFontSize.value * 0.85f).sp else effectiveSwipeFontSize
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.BottomEnd
-                        ) {
-                            val displayText = if (swipeDownHint.length <= 12) swipeDownHint else swipeDownHint.take(12)
-                            Text(
-                                text = punctuationKeyLabel(displayText),
-                                color = resolvedText.copy(alpha = 0.7f),
-                                fontSize = adjustedFontSize,
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Right,
-                                maxLines = 3,
-                                lineHeight = adjustedFontSize,
-                                fontFamily = keyLabelFontFamily
-                            )
-                        }
-                    }
+                if (flickPreview?.fromTop != false && !swipeDownKeyLabel.isNullOrEmpty()) {
+                    val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
+                    Text(
+                        text = punctuationKeyLabel(displayText),
+                        color = resolvedText.copy(alpha = 0.5f),
+                        fontSize = effectiveSwipeFontSize,
+                        lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
+                        fontWeight = FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 5.dp, bottom = 2.dp),
+                        fontFamily = keyLabelFontFamily
+                    )
+                }
+
+                if (badgeText != null && !(flickPreview?.fromTop == true && flickPreview?.text == badgeText)) {
+                    Text(
+                        text = badgeText,
+                        color = resolvedText.copy(alpha = 0.5f),
+                        fontSize = (10f * hintScale).sp,
+                        fontWeight = FontWeight.Normal,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        lineHeight = 1.sp,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 6.dp, end = 6.dp)
+                    )
                 }
             }
-        } else {
-            if (icon != null) {
-                Icon(
-                    painter = icon,
-                    contentDescription = text,
-                    tint = resolvedText,
-                    modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value).dp)
-                )
-            } else {
-                Text(
-                    text = customLayoutLabel(customLayout, punctuationKeyLabel(text), resolvedBackground, customAccent, textColor),
-                    modifier = Modifier.fillMaxWidth().offset(y = if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && maxHeight >= 40.dp) 2.dp else 0.dp),
-                    color = resolvedText,
-                    fontSize = labelSize.sp,
-                    lineHeight = (labelSize * 1.2f).sp,
-                    fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    fontFamily = keyFontFamily
-                )
-            }
-
-            // 上滑提示与角标文字相同（如九键/笔画上滑输入键面数字）时不再重复渲染提示，
-            // 角标已表达该信息；swipeText 状态保持非空，上滑触发与气泡不受影响。
-            if (!(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && (swipeUpKeyLabel ?: swipeText) != badgeText) {
-                val keyLabel = (swipeUpKeyLabel ?: swipeText)!!
-                val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
-                Text(
-                    text = punctuationKeyLabel(displayText),
-                    color = resolvedText.copy(alpha = 0.6f),
-                    fontSize = effectiveSwipeFontSize,
-                    lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 5.dp),
-                    fontFamily = keyLabelFontFamily
-                )
-            }
-
-            if (!swipeDownKeyLabel.isNullOrEmpty()) {
-                val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
-                Text(
-                    text = punctuationKeyLabel(displayText),
-                    color = resolvedText.copy(alpha = 0.5f),
-                    fontSize = effectiveSwipeFontSize,
-                    lineHeight = (effectiveSwipeFontSize.value * 1.2f).sp,
-                    fontWeight = FontWeight.Normal,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    modifier = Modifier.offset(y = hintOffset),
-                    fontFamily = keyLabelFontFamily
-                )
-            }
-
-            if (badgeText != null) {
-                Text(
-                    text = badgeText,
-                    color = resolvedText.copy(alpha = 0.5f),
-                    fontSize = (10f * hintScale).sp,
-                    fontWeight = FontWeight.Normal,
-                    textAlign = TextAlign.End,
-                    maxLines = 1,
-                    lineHeight = 1.sp,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 6.dp, end = 6.dp)
-                )
-            }
+        }
+        flickPreview?.let {
+            KeyFlickLabel(it, resolvedText, maxWidth.value, maxHeight.value, effectiveSwipeFontSize.value, labelSize)
         }
     }
 }
@@ -736,9 +768,11 @@ fun SwipeableIconKeyButton(
     val currentOnSwipeDown by rememberUpdatedState(onSwipeDown)
     val currentOnSwipeLeft by rememberUpdatedState(onSwipeLeft)
     val currentOnSwipeStateChange by rememberUpdatedState(onSwipeStateChange)
+    val currentSwipeText by rememberUpdatedState(swipeText)
     val currentSwipeUpLabel by rememberUpdatedState(swipeUpLabel)
     val currentSwipeDownLabel by rememberUpdatedState(swipeDownLabel)
     var isPressed by remember { mutableStateOf(false) }
+    var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     var buttonBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
     val keyLabelFontFamily = AppFonts.keyLabelFontFamily
     val density = LocalDensity.current
@@ -780,18 +814,18 @@ fun SwipeableIconKeyButton(
                 detectRepeatingKeyGestures {
                     RepeatingKeyActions(
                         onTap = { currentOnClick() },
-                        onPress = { currentOnPress?.invoke() },
-                        onRelease = { currentOnRelease?.invoke() },
+                        onPress = { isPressed = true; currentOnPress?.invoke() },
+                        onRelease = { isPressed = false; currentOnRelease?.invoke() },
                         onRepeat = currentOnLongClick?.let { { currentOnLongClick?.invoke(); Unit } },
                         onUp = (currentOnSwipeUp ?: currentOnSwipe)?.let {
                             { (currentOnSwipeUp ?: currentOnSwipe)?.invoke(); Unit }
                         },
                         onDown = currentOnSwipeDown?.let { { currentOnSwipeDown?.invoke(); Unit } },
                         onLeft = currentOnSwipeLeft?.let { { currentOnSwipeLeft?.invoke(); Unit } },
-                        upLabel = currentSwipeUpLabel,
+                        upLabel = currentSwipeUpLabel ?: currentSwipeText,
                         downLabel = currentSwipeDownLabel,
                         onPreview = { state ->
-                            isPressed = state.isPressed
+                            flickPreview = state.keyFlick
                             currentOnSwipeStateChange?.invoke(state, buttonBounds)
                         },
                     )
@@ -809,19 +843,24 @@ fun SwipeableIconKeyButton(
                 else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
                 else backgroundColor,
                 pressed = isPressed, highlighted = isHighlighted,
-            )), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
+            )).keyHeldHighlight(isPressed), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
+        val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
+        val hintSize = 10f * adaptiveHintScale(contentScale)
+        val renderedIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, iconSize.value).dp
+        val hintOffset = KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale).dp
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            alpha = 1f - (flickPreview?.progress ?: 0f)
+        }, contentAlignment = Alignment.Center) {
         Icon(
             painter = icon,
             contentDescription = null,
             tint = iconColor,
-            modifier = Modifier.size(keyIconSizeDp(maxWidth.value, maxHeight.value, iconSize.value).dp)
+            modifier = Modifier.size(renderedIconSize)
         )
         
         if (!swipeText.isNullOrEmpty()) {
-            val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
-            val hintSize = 10f * adaptiveHintScale(contentScale)
             Text(
                 text = punctuationKeyLabel(swipeText),
                 color = iconColor.copy(alpha = 0.5f),
@@ -830,9 +869,15 @@ fun SwipeableIconKeyButton(
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                modifier = Modifier.offset(y = -KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale).dp),
+                modifier = Modifier.offset(y = -hintOffset),
                 fontFamily = keyLabelFontFamily
             )
+        }
+        }
+        flickPreview?.let {
+            val labelSize = keyLabelSizeSp(it.text, KeyboardKeyMetrics.LabelSize.value,
+                maxWidth.value, maxHeight.value, density.fontScale)
+            KeyFlickLabel(it, iconColor, maxWidth.value, maxHeight.value, hintSize, labelSize)
         }
     }
 }

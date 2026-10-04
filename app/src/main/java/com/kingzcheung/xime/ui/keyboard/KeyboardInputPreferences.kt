@@ -40,7 +40,10 @@ data class KeyboardInputPreferences(
     val neighborCorrection: Boolean = true,
     val frostedGlass: FrostedGlassConfig = FrostedGlassConfig(),
     val symbolInputMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
+    val reverseSymbolSwipe: Boolean = false,
     val cursorHoldSeconds: Float = 0.2f,
+    val fourteenLetterSwipe: Boolean = true,
+    val fourteenLetterSwipeDp: Float = 24f,
 ) {
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
@@ -66,9 +69,12 @@ data class KeyboardInputPreferences(
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,
                 cursorHoldSeconds = normalizeCursorHoldSeconds(prefs.getFloat("cursor_hold_seconds", 0.2f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
+                fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
+                fourteenLetterSwipeDp = normalizeLetterSwipeDistance(prefs.getFloat("fourteen_letter_swipe_dp", 24f)),
                 symbolInputMode = SymbolInputMode.entries.firstOrNull {
                     it.name == prefs.getString("symbol_input_mode", null)
                 } ?: SymbolInputMode.SWIPE_UP,
+                reverseSymbolSwipe = prefs.getBoolean("reverse_symbol_swipe", false),
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
                 fixedSymbols = prefs.getString("fixed_symbols", "").orEmpty(),
@@ -82,7 +88,10 @@ data class KeyboardInputPreferences(
             .putString("cursor_gesture_mode", cursorGesture.name)
             .putFloat("cursor_hold_seconds", normalizeCursorHoldSeconds(cursorHoldSeconds))
             .putBoolean("neighbor_correction", neighborCorrection)
+            .putBoolean("fourteen_letter_swipe", fourteenLetterSwipe)
+            .putFloat("fourteen_letter_swipe_dp", normalizeLetterSwipeDistance(fourteenLetterSwipeDp))
             .putString("symbol_input_mode", symbolInputMode.name)
+            .putBoolean("reverse_symbol_swipe", reverseSymbolSwipe)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
@@ -124,6 +133,7 @@ fun rememberKeyboardInputPreferences(isDark: Boolean? = null): KeyboardInputPref
         val relevantKeys = setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
             SettingsPreferences.KEY_SPLIT_KEYBOARD,
             "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols",
+            "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe",
             "handwriting_pause_seconds", "handwriting_pause_seconds_v2") + FrostedGlassPreferences.keys
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == null || key in relevantKeys) settings = readSettings()

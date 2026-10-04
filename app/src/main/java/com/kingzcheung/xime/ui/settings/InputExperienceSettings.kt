@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import com.kingzcheung.xime.ui.keyboard.normalizeHandwritingPause
 import com.kingzcheung.xime.ui.keyboard.normalizeCursorHoldSeconds
@@ -20,16 +21,8 @@ internal fun InputExperienceSettings() {
     val context = LocalContext.current
     val saved = rememberKeyboardInputPreferences()
     var settings by remember(saved) { mutableStateOf(saved) }
-    SettingsSection(title = "基础输入", content = {
+    SettingsSection(title = "共通输入", content = {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("26 键邻键纠错", style = MaterialTheme.typography.titleSmall)
-                Switch(checked = settings.neighborCorrection, onCheckedChange = {
-                    settings = settings.copy(neighborCorrection = it); settings.save(context)
-                })
-            }
-            Text("中文全拼按当前键位补充相邻字母误触的候选，保留原输入；不用于九键、双拼或合并键。", style = MaterialTheme.typography.bodySmall)
-            HorizontalDivider()
             Text("按键角标的符号和数字", style = MaterialTheme.typography.titleSmall)
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SymbolInputMode.entries.forEach { mode ->
@@ -40,9 +33,24 @@ internal fun InputExperienceSettings() {
                 }
             }
             Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
-                "按住满 0.3 秒立即输入角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。"
-                else "上滑后松手输入角标，原有长按菜单保持不变。",
+                "按住满 0.3 秒立即输入上方角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。"
+                else "滑动时在原键内预览，松手输入；26 / 14 键的方向可在下方反转，原有长按菜单保持不变。",
                 style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("反转上下滑方向", style = MaterialTheme.typography.titleSmall)
+                    Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
+                        "26 / 14 键：上方符号使用长按；下方符号${if (settings.reverseSymbolSwipe) "下拉" else "上拉"}输入。"
+                        else if (settings.reverseSymbolSwipe)
+                        "26 / 14 键：上拉输入上方符号，下拉输入下方符号。"
+                        else "26 / 14 键：下拉输入上方符号，上拉输入下方符号。",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = settings.reverseSymbolSwipe,
+                    modifier = Modifier.testTag("reverse-symbol-swipe"), onCheckedChange = {
+                        settings = settings.copy(reverseSymbolSwipe = it); settings.save(context)
+                    })
+            }
             HorizontalDivider()
             Text("滑动移动光标", style = MaterialTheme.typography.titleSmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -87,20 +95,6 @@ internal fun InputExperienceSettings() {
             Text("a b c  A B C  拼音", fontSize = (16f * settings.keyTextScale).sp)
             Slider(value = settings.keyTextScale, onValueChange = { settings = settings.copy(keyTextScale = it) },
                 onValueChangeFinished = { settings.save(context) }, valueRange = 0.8f..1.6f, steps = 15)
-            HorizontalDivider()
-            Text("固定栏快捷符号", style = MaterialTheme.typography.titleSmall)
-            Text("每行一个符号或短语，用于九键、笔画及常用符号键盘。留空使用方案默认值。", style = MaterialTheme.typography.bodySmall)
-            OutlinedTextField(value = settings.fixedSymbols,
-                onValueChange = { settings = settings.copy(fixedSymbols = it) },
-                modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 6,
-                label = { Text("快捷符号") })
-            TextButton(onClick = {
-                settings = settings.copy(fixedSymbols = listOf("，", "。", "？", "！", "、", "：", "；", "…", "（", "）", "@", "#", "/", "-").joinToString("\n"))
-            }) { Text("填入常用符号") }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { settings.save(context) }) { Text("保存符号") }
-                TextButton(onClick = { settings = settings.copy(fixedSymbols = ""); settings.save(context) }) { Text("恢复默认") }
-            }
         }
     })
 }

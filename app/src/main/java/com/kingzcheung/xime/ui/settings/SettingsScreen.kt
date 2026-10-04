@@ -192,8 +192,14 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.LayoutDisplay) {
             LayoutDisplaySettingsContent(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenLayout = { navController.navigate(it) },
             )
+        }
+        LayoutInputCategory.entries.forEach { category ->
+            composable(category.route) {
+                LayoutInputSettingsContent(category, onBack = { navController.popBackStack() })
+            }
         }
         composable(SettingsRoutes.SmartPrediction) {
             SmartPredictionSettingsContent(

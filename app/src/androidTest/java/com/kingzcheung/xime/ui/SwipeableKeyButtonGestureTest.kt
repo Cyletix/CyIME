@@ -6,6 +6,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -20,6 +22,7 @@ import com.kingzcheung.xime.ui.keyboard.SwipeableKeyButton
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
+import com.kingzcheung.xime.settings.ButtonLayout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -48,6 +51,10 @@ class SwipeableKeyButtonGestureTest {
         leftEnabled: Boolean = false,
         symbolMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
         hideUpperHint: Boolean = false,
+        letterDirections: Boolean = false,
+        reverseSymbols: Boolean = false,
+        keyOnlyLowerHint: Boolean = false,
+        layout: ButtonLayout = ButtonLayout.STANDARD,
     ): Events {
         val events = Events()
         rule.setContent {
@@ -72,7 +79,7 @@ class SwipeableKeyButtonGestureTest {
                 }
             } else Modifier
             CompositionLocalProvider(LocalKeyboardInputPreferences provides
-                KeyboardInputPreferences(symbolInputMode = symbolMode)) {
+                KeyboardInputPreferences(symbolInputMode = symbolMode, reverseSymbolSwipe = reverseSymbols)) {
             Box(Modifier.size(200.dp).then(parentInput)) {
                 SwipeableKeyButton(
                     text = "q",
@@ -80,11 +87,14 @@ class SwipeableKeyButtonGestureTest {
                     backgroundColor = Color.White,
                     textColor = Color.Black,
                     modifier = Modifier.testTag("key"),
+                    layoutMode = layout,
+                    followSymbolSwipeDirection = letterDirections,
                     swipeText = if (hideUpperHint) null else "1",
                     symbolInputText = "1",
-                    swipeDownText = "!",
+                    swipeDownText = if (keyOnlyLowerHint) null else "!",
+                    swipeDownKeyLabel = "!",
                     onSwipe = { events.commits += "up:$it" },
-                    onSwipeDown = { events.commits += "down:$it" },
+                    onSwipeDown = { events.commits += "down:!" },
                     onSwipeLeft = if (leftEnabled) ({ events.commits += "previous" }) else null,
                     swipeLeftText = if (leftEnabled) "上一项" else null,
                     onPress = { events.presses++ },
@@ -98,6 +108,80 @@ class SwipeableKeyButtonGestureTest {
             }
         }
         return events
+    }
+
+    @Test fun heldKeyRemainsTintedAfterThePressPulseAndClearsOnRelease() {
+        val events = setKey(letterDirections = true)
+        val key = rule.onNodeWithTag("key")
+        fun color(): Color {
+            val pixels = key.captureToImage().toPixelMap()
+            return pixels[pixels.width / 4, pixels.height * 3 / 4]
+        }
+        rule.mainClock.autoAdvance = false
+        val resting = color()
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 75f * events.density)) }
+        rule.mainClock.advanceTimeBy(1000)
+        val held = color()
+        assertTrue("The held key must remain distinct after its short animation", resting != held)
+        rule.mainClock.advanceTimeBy(1000)
+        assertEquals("Holding still must produce a stable highlight", held, color())
+        assertTrue(events.commits.isEmpty())
+        key.performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(1000)
+        assertEquals(resting, color())
+        assertEquals(listOf("up:1"), events.commits)
+    }
+
+    @Test fun defaultLetterFlickMovesUpperHintIntoSameKeyAndCommitsOnlyOnRelease() {
+        val events = setKey(letterDirections = true)
+        val key = rule.onNodeWithTag("key")
+        val bounds = key.fetchSemanticsNode().boundsInRoot
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 30f * events.density)) }
+        rule.runOnIdle {
+            assertTrue(events.commits.isEmpty())
+            assertEquals("1", events.state.keyFlick?.text)
+            assertTrue(events.state.keyFlick!!.fromTop)
+            assertTrue(events.state.keyFlick!!.progress in 0f..0.99f)
+        }
+        val previewBounds = rule.onNodeWithTag("key-flick-preview").fetchSemanticsNode().boundsInRoot
+        assertTrue(previewBounds.left >= bounds.left && previewBounds.right <= bounds.right)
+        assertTrue(previewBounds.top >= bounds.top && previewBounds.bottom <= bounds.bottom)
+        assertEquals(bounds, key.fetchSemanticsNode().boundsInRoot)
+        key.performTouchInput { moveTo(center + Offset(0f, 75f * events.density)); up() }
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits); assertEquals(SwipeState(), events.state) }
+    }
+
+    @Test fun compactKeyOnlyLowerHintPullsUpAndBacktrackingCancelsWithoutTap() {
+        val events = setKey(letterDirections = true, keyOnlyLowerHint = true, layout = ButtonLayout.COMPACT)
+        val key = rule.onNodeWithTag("key")
+        key.performTouchInput { down(center); moveTo(center - Offset(0f, 75f * events.density)) }
+        rule.runOnIdle {
+            assertEquals("!", events.state.keyFlick?.text)
+            assertFalse(events.state.keyFlick!!.fromTop)
+            assertTrue(events.commits.isEmpty())
+        }
+        key.performTouchInput { moveTo(center); up() }
+        rule.runOnIdle { assertTrue(events.commits.isEmpty()); assertEquals(SwipeState(), events.state) }
+        key.performTouchInput { down(center); moveTo(center - Offset(0f, 75f * events.density)); up() }
+        rule.runOnIdle { assertEquals(listOf("down:!"), events.commits) }
+    }
+
+    @Test fun reversedLetterFlickKeepsLegacyDirectionWithInKeyPreview() {
+        val events = setKey(letterDirections = true, reverseSymbols = true)
+        rule.onNodeWithTag("key").performTouchInput { down(center); moveTo(center - Offset(0f, 75f * events.density)) }
+        rule.runOnIdle { assertEquals("1", events.state.keyFlick?.text); assertTrue(events.state.keyFlick!!.fromTop) }
+        rule.onNodeWithTag("key").performTouchInput { up() }
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+    }
+
+    @Test fun defaultLetterLongPressBlocksDownwardTopSymbolAndKeepsUpwardBottomSymbol() {
+        val events = setKey(letterDirections = true, symbolMode = SymbolInputMode.LONG_PRESS)
+        val key = rule.onNodeWithTag("key")
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 75f * events.density)); up() }
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 75f * events.density)); moveTo(center); up() }
+        rule.runOnIdle { assertTrue(events.commits.isEmpty()) }
+        key.performTouchInput { down(center); moveTo(center - Offset(0f, 75f * events.density)); up() }
+        rule.runOnIdle { assertEquals(listOf("down:!"), events.commits) }
     }
 
     @Test fun symbolHoldCommitsAtThreeHundredMillisecondsBeforeReleaseAndNeverRepeats() {

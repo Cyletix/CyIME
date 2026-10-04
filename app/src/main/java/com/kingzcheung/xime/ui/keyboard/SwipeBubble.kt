@@ -97,6 +97,13 @@ class SwipeBubbleController(
     }
 
     fun update(newState: SwipeState, bounds: Rect) {
+        // A vertical flick is rendered inside its key, including below the commit
+        // threshold. Clear an existing tap bubble immediately instead of delaying it.
+        if (newState.keyFlick != null) {
+            dispose()
+            if (state != SwipeState()) state = SwipeState()
+            return
+        }
         // 默认关闭时，普通按下/抬起不能让整个键盘重组或启动延迟协程。
         // 拂动/长按是选择反馈，仍需显示；退出这些反馈时只清一次状态。
         if (!showPressBubble && !newState.isSwiping && !newState.isLongPress) {
@@ -146,6 +153,7 @@ fun rememberSwipeBubbleDrawData(
 ): BubbleDrawData? {
     val context = LocalContext.current
     val showPressBubble = LocalKeyboardInputPreferences.current.showPressBubble
+    if (swipeState.keyFlick != null) return null
     if (!swipeState.isSwiping && !(showPressBubble && swipeState.isPressed) && !swipeState.isLongPress) return null
 
     val isLongPressMode = swipeState.isLongPress && swipeState.longPressItems.isNotEmpty()
