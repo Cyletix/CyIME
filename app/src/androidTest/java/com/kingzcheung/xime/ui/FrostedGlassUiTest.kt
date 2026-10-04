@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +40,7 @@ import com.kingzcheung.xime.ui.keyboard.KeyButton
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.theme.keyboardBackground
+import com.kingzcheung.xime.ui.theme.KeyboardBackdropHost
 import java.io.File
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
@@ -52,6 +56,51 @@ class FrostedGlassUiTest {
         object : ContextWrapper(InstrumentationRegistry.getInstrumentation().targetContext) {
             override fun getSharedPreferences(name: String, mode: Int) = preferences.getSharedPreferences()
         }
+    }
+
+    @Test fun keyboardAndNavigationReconstructOneGradientWhileNarrowMarginsStayTransparent() {
+        var dark by mutableStateOf(true)
+        var narrow by mutableStateOf(false)
+        val glass = FrostedGlassConfig(enabled = true, blurRadiusDp = 10f, backgroundOpacity = 0.2f)
+        val background = BackgroundConfig(type = "gradient", angle = 90,
+            colors = listOf(0x214D8AL, 0xD38650L, 0x346A48L), colorsDark = listOf(0x6739A0L, 0xB58745L, 0x134958L))
+        rule.setContent {
+            CompositionLocalProvider(LocalContext provides context, LocalDensity provides Density(1f)) {
+                Column {
+                    KeyboardBackdropHost(true, background, dark, Color.Black, glass, 200.dp,
+                        Modifier.size(320.dp, 200.dp).background(Color.Magenta).testTag("joined-glass")) {
+                        Box(Modifier.align(Alignment.TopCenter).width(if (narrow) 160.dp else 320.dp).height(160.dp)
+                            .keyboardBackground(background, dark, Color.Black, glass))
+                        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(40.dp)
+                            .keyboardBackground(background, dark, Color.Black, glass))
+                    }
+                    Box(Modifier.size(320.dp, 200.dp).testTag("whole-glass")
+                        .keyboardBackground(background, dark, Color.Black, glass))
+                }
+            }
+        }
+        fun awaitJoined() {
+            awaitImage("whole-glass") { colorDistance(it.getPixel(160, 20), android.graphics.Color.BLACK) > 30 }
+            awaitImage("joined-glass") { joined ->
+                val whole = snapshot("whole-glass")
+                (8 until 192 step 8).all { y ->
+                    colorDistance(joined.getPixel(160, y), whole.getPixel(160, y)) <= 2
+                }
+            }
+            val joined = snapshot("joined-glass")
+            val whole = snapshot("whole-glass")
+            for (y in 150..170) for (x in 85..234 step 13) {
+                assertTrue("same texture on both sides of nav seam ($x,$y)",
+                    colorDistance(joined.getPixel(x, y), whole.getPixel(x, y)) <= 2)
+            }
+        }
+        awaitJoined()
+        rule.runOnIdle { narrow = true }
+        awaitJoined()
+        assertEquals("shared image must not paint outside keyboard", android.graphics.Color.MAGENTA,
+            snapshot("joined-glass").getPixel(10, 70))
+        rule.runOnIdle { dark = false }
+        awaitJoined()
     }
 
     @Test
