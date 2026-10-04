@@ -868,11 +868,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (enabled.isEmpty()) return
             val preferredId = SettingsPreferences.getClipboardSyncPluginId(this)
             val selected = enabled.firstOrNull { it.first == preferredId } ?: enabled.first()
+            val nativeWindows = selected.first == com.kingzcheung.xime.clipboard.sync.WindowsDevices.ID
             // 能力声明校验：未声明同步协议的插件不启动（manifest.capabilities.clipboard_sync.protocols）
             val syncCapabilities = ExtensionManager.getAllInstalledPlugins()
                 .firstOrNull { it.id == selected.first }
                 ?.capabilities?.clipboardSync
-            if (syncCapabilities?.protocols.isNullOrEmpty()) {
+            if (!nativeWindows && syncCapabilities?.protocols.isNullOrEmpty()) {
                 FileLogger.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
                 return
             }
@@ -882,10 +883,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 clipboardManager,
                 plugin,
                 pluginId = selected.first,
-                foregroundPollIntervalMs = syncCapabilities?.foregroundPollIntervalMs ?: 0,
-                maxTextBytes = syncCapabilities?.maxTextBytes ?: 0,
+                foregroundPollIntervalMs = if (nativeWindows) 2000 else syncCapabilities?.foregroundPollIntervalMs ?: 0,
+                maxTextBytes = if (nativeWindows) 65536 else syncCapabilities?.maxTextBytes ?: 0,
             )
             clipboardSyncBridge?.start()
+            if (nativeWindows) com.kingzcheung.xime.clipboard.sync.WindowsDevices.start()
             clipboardSyncBridge?.setKeyboardVisible(isInputViewShown)
             uiState.value = uiState.value.copy(clipboardSyncEnabled = true)
             Log.d(TAG, "Clipboard sync started: ${selected.first}")
@@ -895,6 +897,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private fun stopClipboardSync() {
+        if (clipboardSyncBridge?.pluginId == com.kingzcheung.xime.clipboard.sync.WindowsDevices.ID) {
+            com.kingzcheung.xime.clipboard.sync.WindowsDevices.stop()
+        }
         clipboardSyncBridge?.release()
         clipboardSyncBridge = null
         uiState.value = uiState.value.copy(clipboardSyncEnabled = false)

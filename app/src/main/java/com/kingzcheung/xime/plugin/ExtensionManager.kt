@@ -259,7 +259,8 @@ object ExtensionManager {
     }
 
     fun getEnabledClipboardSyncPlugins(context: Context): List<Pair<String, ClipboardSyncPlugin>> {
-        return getClipboardSyncPlugins().mapNotNull { plugin ->
+        val native = com.kingzcheung.xime.clipboard.sync.WindowsDevices
+        return (if (native.paired.value != null) listOf(native.ID to native.transport) else emptyList()) + getClipboardSyncPlugins().mapNotNull { plugin ->
             val pluginId = getPluginId(plugin)
             if (pluginId.isNotEmpty() && SettingsPreferences.isPluginEnabled(context, pluginId)) {
                 Pair(pluginId, plugin)

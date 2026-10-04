@@ -96,7 +96,12 @@ class XimeApplication : Application(), ImageLoaderFactory {
         PluginManager.clipboardHostApiFactory = { _ ->
             com.kingzcheung.xime.plugin.ClipboardHostApiImpl(this)
         }
+        com.kingzcheung.xime.clipboard.sync.WindowsDevices.initialize(this)
         PluginManager.initialize(this) {
+            // Available offline in Release too. Preserve existing installs and configuration.
+            if (!PluginManager.installPluginFromAssets(
+                "builtin-plugins/windows-clipboard.xipk", forceOverwrite = false
+            )) Log.e("XimeApplication", "内置 Windows 剪贴板同步初始化失败")
             if (isDebug) {
                 PluginManager.installPluginsFromAssetsForDebug("plugins")
             }
