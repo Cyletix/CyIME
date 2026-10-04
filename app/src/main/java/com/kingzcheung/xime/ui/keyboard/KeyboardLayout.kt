@@ -450,6 +450,8 @@ fun KeyboardLayout(
                                 onKeyPressDown = onKeyPressDown,
                                 backgroundColor = specialKeyBackgroundColor,
                                 iconColor = specialKeyTextColor,
+                                accentColor = KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme),
+                                panelColor = keyboardBackgroundColor,
                                 modifier = Modifier
                                     .weight(letterSideKeyWeight)
                                     .fillMaxHeight(),
@@ -1149,6 +1151,8 @@ private fun ShiftCapsKeyButton(
     onKeyPressDown: ((String) -> Unit)?,
     backgroundColor: Color,
     iconColor: Color,
+    accentColor: Color,
+    panelColor: Color,
     modifier: Modifier = Modifier,
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
@@ -1188,6 +1192,13 @@ private fun ShiftCapsKeyButton(
             blue = (color.blue * (1 - factor)).coerceIn(0f, 1f),
             alpha = color.alpha)
     }
+
+    val colors = shiftKeyColors(backgroundColor, iconColor, accentColor, panelColor,
+        frostedGlass, shiftMode, isPressed,
+        legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.1f)
+        else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
+        else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
+        else backgroundColor)
 
     Box(
         modifier = modifier
@@ -1245,14 +1256,7 @@ private fun ShiftCapsKeyButton(
             .padding(scaledKeyVisualPadding())
             .then(shadowModifier)
             .clip(keyClipShape)
-            .background(frostedKeyColor(
-                backgroundColor, iconColor, frostedGlass,
-                legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.1f)
-                else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
-                else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
-                else backgroundColor,
-                pressed = isPressed, highlighted = shiftMode != ShiftMode.OFF,
-            )).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
+            .background(colors.background).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
         val painter = when (shiftMode) {
@@ -1262,7 +1266,7 @@ private fun ShiftCapsKeyButton(
         Icon(
             painter = painter,
             contentDescription = null,
-            tint = iconColor,
+            tint = colors.foreground,
             modifier = Modifier.size(20.dp)
         )
 
@@ -1273,7 +1277,7 @@ private fun ShiftCapsKeyButton(
                     .padding(3.dp)
                     .size(6.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(iconColor)
+                    .background(colors.foreground)
             )
         }
     }
@@ -1467,6 +1471,8 @@ private fun SplitKeyboardContent(
                     onKeyPressDown = onKeyPressDown,
                     backgroundColor = specialKeyBackgroundColor,
                     iconColor = specialKeyTextColor,
+                    accentColor = KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme),
+                    panelColor = keyboardBackgroundColor,
                     modifier = Modifier.weight(1.2f),
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
