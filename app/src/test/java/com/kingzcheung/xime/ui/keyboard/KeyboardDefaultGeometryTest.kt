@@ -5,12 +5,12 @@ import org.junit.Test
 
 class KeyboardDefaultGeometryTest {
     private fun caps(size: ProtectedKeyboardSize, defaults: LetterKeyboardDefaults): Pair<Float, Float> {
-        val metrics = keyVisualMetrics(KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE),
-            size.width.toFloat(), size.height - 44f, 10f, allowShrink = defaults.floating)
-            .withAppliedGutter(size.width.toFloat(), 10f, 8f, true)
+        val metrics = keyboardGridMetrics(KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE),
+            size.width.toFloat(), size.height - 44f, 10f, allowShrink = defaults.floating,
+            growthSpacing = defaults.spacingX to defaults.spacingY)
         val gapX = defaults.spacingX?.takeUnless { it == 2f } ?: (metrics.insetX!! * 2)
         val gapY = defaults.spacingY?.takeUnless { it == 2f } ?: (metrics.insetY!! * 2)
-        return metrics.cellWidthDp - gapX to (size.height - 52f) / 4f - gapY
+        return metrics.cellWidthDp - gapX to metrics.cellHeightDp - gapY - metrics.extraInsetY * 2f
     }
 
     @Test fun portraitTabletUsesFullAvailableWidthAndSquareLetterCaps() {
@@ -20,7 +20,7 @@ class KeyboardDefaultGeometryTest {
         assertEquals(934, size.width)
         assertEquals(0, size.offsetX)
         assertEquals(width, height, 0.15f)
-        assertTrue(size.height in 410..420)
+        assertTrue(size.height in 400..420)
     }
 
     @Test fun narrowPhonesKeepUsableHeightInsteadOfTinySquareKeys() {

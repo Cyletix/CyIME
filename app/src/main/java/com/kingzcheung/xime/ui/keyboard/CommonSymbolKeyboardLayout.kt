@@ -85,7 +85,8 @@ fun CommonSymbolKeyboardLayout(
     initialAsciiMode: Boolean? = null,
 ) {
     KeyboardKeySpacingScope(modifier, policy = KeyVisualPolicy.Qwerty,
-        allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
+        allowShrink = isFloatingMode, applyGutter = true,
+        growthSpacing = keySpacingX?.value to keySpacingY?.value) { bodyModifier ->
     var localAsciiMode by remember(initialAsciiMode) { mutableStateOf(initialAsciiMode ?: isAsciiMode) }
 
     val configuration = LocalConfiguration.current

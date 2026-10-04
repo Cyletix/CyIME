@@ -147,7 +147,19 @@ class KeySpacingGeometryTest {
             val root = rule.onNodeWithTag("actual-grid", true)
             val origin = root.fetchSemanticsNode().boundsInRoot.topLeft
             val bitmap = root.captureToImage().asAndroidBitmap()
-            val cellHeight = (size.second - if (current.schema == "japanese_kana") 0 else 8) / 4f
+            val keypad = current.schema == "t9_pinyin" || current.schema == "japanese_kana"
+            val policy = if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty
+            val columns = when (current.schema) {
+                "t9_pinyin" -> 5f * 3f / 3.4f
+                "japanese_kana" -> 5f
+                else -> 10f
+            }
+            val spacing = if (keypad) null to null else KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
+            val expected = keyboardGridMetrics(policy, size.first.toFloat(), size.second.toFloat(), columns,
+                verticalInsetDp = if (current.schema == "japanese_kana") 0f else 8f,
+                widthFraction = if (current.split) 0.9f else 1f,
+                allowShrink = current.schema == "t9_pinyin", growthSpacing = spacing)
+            val cellHeight = expected.cellHeightDp
             // Text spans the keycap width. Measure its painted vertical extent from the screenshot,
             // so this catches extra row gaps, not just the formula used by production code.
             fun cap(label: String, row: Int): Rect {
@@ -157,7 +169,8 @@ class KeySpacingGeometryTest {
                 val right = text.right.toInt() - 1
                 val colors = (left until right).map { bitmap.getPixel(it, text.center.y.toInt()) }
                 val background = colors.groupingBy { it }.eachCount().maxBy { it.value }.key
-                val paintedRows = ((row * cellHeight).roundToInt() until ((row + 1) * cellHeight).roundToInt()).filter { y ->
+                val paintedRows = ((expected.topSpaceDp + row * cellHeight).roundToInt() until
+                    (expected.topSpaceDp + (row + 1) * cellHeight).roundToInt()).filter { y ->
                     (left until right).count { bitmap.getPixel(it, y) == background } > (right - left) * 0.05f
                 }
                 return Rect(text.left, paintedRows.first().toFloat(), text.right, paintedRows.last() + 1f)
@@ -166,14 +179,8 @@ class KeySpacingGeometryTest {
             val gx = b.left - a.right; val gy = below.top - a.bottom
             val cellWidth = a.width + gx
             // 截图测量检查真实布局接入度量，宽度响应本身由 JVM 回归约束。
-            val policy = when (current.schema) {
-                "pinyin_14jian" -> KeyVisualPolicy.FourteenKey
-                "t9_pinyin", "japanese_kana" -> KeyVisualPolicy.T9
-                else -> KeyVisualPolicy.Qwerty
-            }
-            val expected = cellMetrics(policy, cellWidth, cellHeight, current.schema == "t9_pinyin")
-            val expectedX = expected.insetX!! * 2f
-            val expectedY = expected.insetY!! * 2f
+            val expectedX = resolvedVisualGap(spacing.first, expected.insetX!!)
+            val expectedY = resolvedVisualGap(spacing.second, expected.insetY!!) + expected.extraInsetY * 2f
             val note = "${current.schema} ascii=${current.ascii} split=${current.split} $size gap=($gx,$gy) " +
                 "expected=($expectedX,$expectedY) cell=($cellWidth,$cellHeight)"
             report.appendLine(note)

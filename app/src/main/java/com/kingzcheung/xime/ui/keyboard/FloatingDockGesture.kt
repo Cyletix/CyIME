@@ -18,6 +18,11 @@ internal fun floatingDockEdge(
 internal const val FLOATING_DOCK_DURATION_MILLIS = 500L
 internal const val FLOATING_DRAG_BAR_HEIGHT_DP = 28
 
+/** 移动条覆盖键帽以下的完整空白，卡片本身仍只额外预留原来的 28dp。 */
+internal fun floatingDragAreaHeightDp(contentPaddingDp: Int, keyClearanceDp: Float, totalHeightDp: Float): Float =
+    (FLOATING_DRAG_BAR_HEIGHT_DP + contentPaddingDp.coerceAtLeast(0) + keyClearanceDp.coerceAtLeast(0f))
+        .coerceAtMost(totalHeightDp.coerceAtLeast(0f))
+
 /** 持续贴底半秒完成恢复预览，只有正常松手才能确认。 */
 internal class FloatingDockGesture(private val holdMillis: Long = FLOATING_DOCK_DURATION_MILLIS) {
     private var dragging = false

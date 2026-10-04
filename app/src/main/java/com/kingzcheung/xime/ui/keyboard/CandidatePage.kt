@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -111,6 +112,7 @@ data class CandidatePageState(
     val railAccentColor: Color = Color.Unspecified,
     val enterKeyText: String = "回车",
     val matchT9Geometry: Boolean = false,
+    val qwertyGeometry: CandidateQwertyGeometry? = null,
     val floating: Boolean = false,
 )
 
@@ -169,18 +171,24 @@ fun CandidatePage(
     pageScrollEvents: Flow<Int>? = null,
     onHapticFeedback: (() -> Unit)? = null,
 ) {
-    if (!state.matchT9Geometry) {
+    val qwerty = state.qwertyGeometry
+    if (!state.matchT9Geometry && qwerty == null) {
         CandidatePageContent(state, callbacks, modifier, pageScrollEvents, onHapticFeedback)
         return
     }
-    val spacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig().spacingFor("t9")
+    val spacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig()
+        .spacingFor(if (qwerty != null) "qwerty" else "t9")
     Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor)) {
-        KeyboardKeySpacingScope(Modifier.weight(1f).fillMaxWidth(), columns = 5f * 3f / 3.4f,
-            policy = KeyVisualPolicy.T9, allowShrink = state.floating, applyGutter = true) { body ->
+        KeyboardKeySpacingScope(Modifier.weight(1f).fillMaxWidth(), columns = qwerty?.columns ?: (5f * 3f / 3.4f),
+            widthFraction = qwerty?.widthFraction ?: 1f,
+            policy = if (qwerty != null) KeyVisualPolicy.Qwerty else KeyVisualPolicy.T9,
+            allowShrink = state.floating, applyGutter = true,
+            growthSpacing = spacing) { body ->
             CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(
                 horizontal = spacing.first?.dp ?: 2.dp, vertical = spacing.second?.dp ?: 2.dp)) {
                 CandidatePageContent(state.copy(bottomPaddingDp = 0), callbacks,
-                    body.padding(bottom = 8.dp), pageScrollEvents, onHapticFeedback)
+                    body.padding(start = (qwerty?.innerInsetDp ?: 0f).dp,
+                        end = (qwerty?.innerInsetDp ?: 0f).dp, bottom = 8.dp), pageScrollEvents, onHapticFeedback)
             }
         }
         Spacer(Modifier.height(state.bottomPaddingDp.dp))
@@ -230,19 +238,26 @@ private fun CandidatePageContent(
     Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor)) {
         BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             val t9 = state.matchT9Geometry
-            val compactRail = t9 || isLandscape || maxHeight < 226.dp
-            val leftWidth = if (t9) maxWidth * (0.8f / 5f) else leftRailWidth
-            val rightWidth = if (t9) maxWidth * (0.8f / 5f) else rightRailWidth
+            val qwerty = state.qwertyGeometry
+            val matchKeyboard = t9 || qwerty != null
+            val compactRail = matchKeyboard || isLandscape || maxHeight < 226.dp
+            val leftWidth = qwerty?.let { maxWidth * it.modeFraction }
+                ?: if (t9) maxWidth * (0.8f / 5f) else leftRailWidth
+            val deleteWidth = qwerty?.deleteWidth(maxWidth.value)?.dp
+            val enterWidth = qwerty?.let { maxWidth * it.enterFraction }
+            val rightWidth = qwerty?.let {
+                maxOf(maxWidth * it.enterFraction, it.deleteWidth(maxWidth.value).dp + it.deleteEndInsetDp.dp)
+            } ?: if (t9) maxWidth * (0.8f / 5f) else rightRailWidth
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = if (t9) 0.dp else 8.dp)
+                    .padding(horizontal = if (matchKeyboard) 0.dp else 8.dp)
             ) {
                 // ── 左栏：九键为音节拼音候选（输入/选择态）或 side_symbols（空闲态，
                 // 连体键——首尾圆角、中间直角，对齐数字键盘左栏）+ 候选/单字切换（下）。
                 // 条目 ≤4 均分填满；>4 最多显示 4 条、LazyColumn 滚动（对齐九键左栏）──
-                if (t9) {
-                    T9ExpandedLeftRail(state, callbacks, railItems, keyBg,
+                if (matchKeyboard) {
+                    SizedExpandedLeftRail(state, callbacks, railItems, keyBg,
                         Modifier.width(leftWidth).fillMaxHeight().testTag("candidate-left-rail"))
                 } else {
                 Column(
@@ -402,25 +417,26 @@ private fun CandidatePageContent(
 
                 }
 
-                Spacer(modifier = Modifier.width(if (t9) 0.dp else 8.dp))
+                Spacer(modifier = Modifier.width(if (matchKeyboard) 0.dp else 8.dp))
 
                 // ── 右栏：退格 / 上一页 / 下一页 / 回车 ──
-                // 保留原始方块与间隔；只有矮浮窗放不下时才按可用高度等分。
+                // Typing layouts reuse their four row cells and visual spacing, including tall keyboards.
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(rightWidth)
                         .testTag("candidate-right-rail")
-                        .padding(vertical = if (t9) 0.dp else 6.dp),
-                    verticalArrangement = if (t9) Arrangement.spacedBy(0.dp) else if (compactRail) Arrangement.spacedBy(4.dp)
+                        .padding(vertical = if (matchKeyboard) 0.dp else 6.dp),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = if (matchKeyboard) Arrangement.spacedBy(0.dp) else if (compactRail) Arrangement.spacedBy(4.dp)
                         else Arrangement.spacedBy(10.dp, Alignment.CenterVertically)
                 ) {
                     val railKeyModifier = if (compactRail) Modifier.weight(1f) else Modifier.size(46.dp)
                     CompositionLocalProvider(
-                        LocalKeyCornerRadius provides if (t9) LocalKeyCornerRadius.current else 14.dp,
-                        LocalKeyVisualPadding provides if (t9) LocalKeyVisualPadding.current else PaddingValues(0.dp),
-                        LocalKeyboardKeyVisualMetrics provides if (t9) LocalKeyboardKeyVisualMetrics.current else KeyVisualMetrics.Unspecified,
-                        LocalKeyboardKeyContentScale provides if (t9) LocalKeyboardKeyContentScale.current else 1f,
+                        LocalKeyCornerRadius provides if (matchKeyboard) LocalKeyCornerRadius.current else 14.dp,
+                        LocalKeyVisualPadding provides if (matchKeyboard) LocalKeyVisualPadding.current else PaddingValues(0.dp),
+                        LocalKeyboardKeyVisualMetrics provides if (matchKeyboard) LocalKeyboardKeyVisualMetrics.current else KeyVisualMetrics.Unspecified,
+                        LocalKeyboardKeyContentScale provides if (matchKeyboard) LocalKeyboardKeyContentScale.current else 1f,
                     ) {
                         SwipeableIconKeyButton(
                             icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
@@ -432,23 +448,27 @@ private fun CandidatePageContent(
                             onSwipeUp = callbacks.onClear,
                             onSwipeDown = callbacks.onUndoClear,
                             onSwipeLeft = callbacks.onClearComposition,
+                            swipeUpLabel = "清空",
+                            swipeDownLabel = "撤回",
                             backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
                             iconColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
-                            modifier = railKeyModifier.semantics { contentDescription = "退格" }
+                            modifier = railKeyModifier.then(if (deleteWidth != null) Modifier.width(deleteWidth)
+                                .offset(x = -(qwerty?.deleteEndInsetDp ?: 0f).dp) else Modifier)
+                                .semantics { contentDescription = "退格" }
                                 .testTag("expanded-delete-key"),
                             shadowEnabled = false,
-                            visualPadding = if (t9) null else PaddingValues(0.dp),
+                            visualPadding = if (matchKeyboard) null else PaddingValues(0.dp),
                         )
                         CandidatePagingButton(
                             onClick = { onHapticFeedback?.invoke(); scrollPage(-1) },
                             enabled = listState.canScrollBackward,
-                            previous = true, keyBg = keyBg, foreground = state.textColor, matchT9 = t9,
+                            previous = true, keyBg = keyBg, foreground = state.textColor, matchKeyboard = matchKeyboard,
                             modifier = railKeyModifier.testTag("expanded-page-previous"),
                         )
                         CandidatePagingButton(
                             onClick = { onHapticFeedback?.invoke(); scrollPage(1) },
                             enabled = listState.canScrollForward,
-                            previous = false, keyBg = keyBg, foreground = state.textColor, matchT9 = t9,
+                            previous = false, keyBg = keyBg, foreground = state.textColor, matchKeyboard = matchKeyboard,
                             modifier = railKeyModifier.testTag("expanded-page-next"),
                         )
                         ActionKeyButton(
@@ -456,7 +476,8 @@ private fun CandidatePageContent(
                             onClick = { callbacks.onEnter?.invoke() },
                             backgroundColor = keyBg,
                             textColor = state.textColor,
-                            modifier = railKeyModifier.testTag("expanded-enter-key"),
+                            modifier = railKeyModifier.then(if (enterWidth != null) Modifier.width(enterWidth) else Modifier)
+                                .testTag("expanded-enter-key"),
                             onPress = { callbacks.onKeyPressDown?.invoke("enter") },
                             onRelease = { callbacks.onKeyRelease?.invoke("enter") },
                             shadowEnabled = false,
@@ -777,6 +798,8 @@ private fun RailKey(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     opacityScale: Float = 1f,
+    cornerRadius: Dp = 14.dp,
+    visualPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable BoxScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -788,7 +811,12 @@ private fun RailKey(
                 role = Role.Button
                 if (enabled) onClick { onClick(); true } else disabled()
             }
-            .clip(RoundedCornerShape(14.dp))
+            .tolerantClick(
+                enabled = enabled, showRipple = false,
+                interactionSource = interactionSource, onClick = onClick,
+            )
+            .padding(visualPadding)
+            .clip(RoundedCornerShape(cornerRadius))
             .background(frostedKeyColor(
                 keyBg, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
                 legacyStateColor = when {
@@ -799,13 +827,7 @@ private fun RailKey(
                 pressed = isPressed,
                 opacityScale = opacityScale * if (enabled) 1f else 0.4f,
             ))
-            .visualMaterial(VisualStyles.current, 14.dp)
-            .tolerantClick(
-                enabled = enabled,
-                showRipple = false,
-                interactionSource = interactionSource,
-                onClick = onClick
-            ),
+            .visualMaterial(VisualStyles.current, cornerRadius),
         contentAlignment = Alignment.Center,
         content = content
     )
@@ -816,19 +838,22 @@ private fun RailKey(
 private fun CandidatePagingButton(
     onClick: () -> Unit, enabled: Boolean, previous: Boolean, keyBg: Color, foreground: Color,
     modifier: Modifier,
-    matchT9: Boolean = false,
+    matchKeyboard: Boolean = false,
 ) {
-    if (matchT9) {
-        SwipeableIconKeyButton(
-            icon = rememberVectorPainter(if (previous) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown),
-            onClick = { if (enabled) onClick() },
-            backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
-            iconColor = (LocalFunctionKeyColors.current?.foreground ?: foreground).copy(alpha = if (enabled) 1f else .3f),
-            modifier = modifier.semantics {
-                contentDescription = if (previous) "上一页" else "下一页"
-                if (!enabled) disabled()
-            }, shadowEnabled = false,
-        )
+    if (matchKeyboard) {
+        BoxWithConstraints(modifier.semantics(mergeDescendants = true) { if (!enabled) disabled() }) {
+            val padding = scaledKeyVisualPadding()
+            val capHeight = (maxHeight - padding.calculateTopPadding() - padding.calculateBottomPadding()).coerceAtLeast(0.dp)
+            val radius = minOf(14.dp * keyContentScale(maxWidth.value, capHeight.value), minOf(maxWidth, capHeight) * .3f)
+            val iconSize = keyIconSizeDp(maxWidth.value, capHeight.value, 20f).dp
+            RailKey(onClick, keyBg, foreground, Modifier.fillMaxSize(), enabled,
+                cornerRadius = radius, visualPadding = padding) {
+                Icon(if (previous) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (previous) "上一页" else "下一页",
+                    tint = foreground.copy(alpha = if (enabled) 1f else .3f),
+                    modifier = Modifier.size(iconSize))
+            }
+        }
         return
     }
     RailKey(onClick, keyBg, foreground, modifier, enabled) {
@@ -838,9 +863,9 @@ private fun CandidatePagingButton(
     }
 }
 
-/** Same three-row list and bottom key as the T9 body, using its actual cap metrics. */
+/** Same three-row list and bottom key cell as the underlying typing layout. */
 @Composable
-private fun T9ExpandedLeftRail(state: CandidatePageState, callbacks: CandidatePageCallbacks,
+private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: CandidatePageCallbacks,
     items: List<String>, keyBg: Color, modifier: Modifier) {
     Column(modifier) {
         BoxWithConstraints(Modifier.weight(3f).fillMaxWidth().padding(scaledKeyVisualPadding())

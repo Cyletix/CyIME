@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.HorizontalSplit
@@ -146,6 +147,9 @@ internal fun KeyboardResizeOverlay(
         var dragRect by remember(floatingMode, maxWidth, maxHeight) { mutableStateOf<ResizeRect?>(null) }
         var dragEdge by remember { mutableStateOf(ResizeHandle.NONE) }
         val frame = dragRect ?: previewState.rect ?: viewRect
+        val dragAreaHeightDp = floatingDragAreaHeightDp(previewState.bottomPaddingDp,
+            previewState.floatingBottomClearanceDp, frame.height / density.density)
+        val dragAreaHeightPx = dragAreaHeightDp * density.density
         val currentPreviewRect by rememberUpdatedState(previewState.rect)
         val currentInitialPreviewRect by rememberUpdatedState(previewState.initialRect)
         val currentOnPreviewRectChange by rememberUpdatedState(previewState.onRectChange)
@@ -182,11 +186,14 @@ internal fun KeyboardResizeOverlay(
                     // Glass already has its own backdrop in the live keyboard preview.
                     // Keep the dimming and resize handles without painting over that material.
                     if (!frostedGlassEnabled) {
-                        translate(frame.left, frame.top) {
-                            drawOutline(
-                                panelShape.createOutline(rectSize, layoutDirection, this),
-                                color = surfaceColor.copy(alpha = 0.88f),
-                            )
+                        // 底部只显示真实移动条，不能被调节态的面板涂层盖住。
+                        clipRect(bottom = if (floatingMode) frame.bottom - dragAreaHeightPx else size.height) {
+                            translate(frame.left, frame.top) {
+                                drawOutline(
+                                    panelShape.createOutline(rectSize, layoutDirection, this),
+                                    color = surfaceColor.copy(alpha = 0.88f),
+                                )
+                            }
                         }
                     }
                     val innerLeft = frame.left + handleInset
@@ -236,16 +243,6 @@ internal fun KeyboardResizeOverlay(
                     }
                     verticalHandle(innerLeft)
                     verticalHandle(innerRight)
-                    if (floatingMode) {
-                        val barHeight = 5.dp.toPx()
-                        drawRoundRect(
-                            color = onSurfaceColor.copy(alpha = 0.6f),
-                            topLeft = Offset(frame.centerX - frame.width * 0.18f,
-                                frame.bottom - FLOATING_DRAG_BAR_HEIGHT_DP.dp.toPx() + 8.dp.toPx() - barHeight / 2f),
-                            size = Size(frame.width * 0.36f, barHeight),
-                            cornerRadius = CornerRadius(barHeight),
-                        )
-                    }
                 }
                 .pointerInput(floatingMode, isLandscape, maxWidth, maxHeight) {
                     awaitEachGesture {
@@ -401,7 +398,7 @@ internal fun KeyboardResizeOverlay(
         // 控件直接占用键盘框内的可用区域；没有第二层小卡片/底板/描边。
         // 顶部工具栏、左右拖边及底部永久移动条均留出命中空间。
         val controls = resizeControlsRect(frame, density.density, floatingMode,
-            FLOATING_DRAG_BAR_HEIGHT_DP * density.density)
+            dragAreaHeightPx)
         val controlsWidthDp = with(density) { controls.width.toDp() }
         val controlsHeightDp = with(density) { controls.height.toDp() }
         // 滑条和操作共用宽度；宽屏不拉长按钮，窄屏仍避开两侧拖动热区。
@@ -672,13 +669,12 @@ internal fun KeyboardResizeOverlay(
             }
         }
         if (floatingMode) {
-            val dragBarHeightPx = FLOATING_DRAG_BAR_HEIGHT_DP * density.density
             Box(
                 modifier = Modifier
                     .absoluteOffset {
-                        IntOffset((frame.left + RESIZE_CORNER_HIT_DP.dp.toPx()).roundToInt(), (frame.bottom - dragBarHeightPx).roundToInt())
+                        IntOffset((frame.left + RESIZE_CORNER_HIT_DP.dp.toPx()).roundToInt(), (frame.bottom - dragAreaHeightPx).roundToInt())
                     }
-                    .size(with(density) { (frame.width.toDp() - (RESIZE_CORNER_HIT_DP * 2).dp).coerceAtLeast(1.dp) }, FLOATING_DRAG_BAR_HEIGHT_DP.dp)
+                    .size(with(density) { (frame.width.toDp() - (RESIZE_CORNER_HIT_DP * 2).dp).coerceAtLeast(1.dp) }, dragAreaHeightDp.dp)
                     .zIndex(1f)
                     .testTag("keyboard-resize-move-bar")
                     .semantics { contentDescription = "拖动移动键盘，不改变尺寸" }
@@ -716,6 +712,7 @@ internal data class KeyboardResizePreviewState(
     val fixedHeightRange: IntRange? = null,
     val fixedBottomInsetDp: Int = 0,
     val bottomPaddingDp: Int = 0,
+    val floatingBottomClearanceDp: Float = 0f,
     val initialBottomPaddingDp: Int = 0,
     val onBottomPaddingChange: (Int) -> Unit = {},
     val onDragEnd: () -> Unit = {},

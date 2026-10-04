@@ -13,7 +13,9 @@ class KeyboardSquareSnapTest {
             val extra = if (floating) 24f * density else 16f * density
             val bounds = ResizeRect(0f, 0f, 2000f * density, 1600f * density)
             val spacing = 6f to 10f
-            val seed = ResizeRect(300f * density, 300f * density, 1000f * density, 600f * density)
+            // Snap against the actual edge-aligned cap, not an old phone-height cap.
+            val width = if (g.keypad) 240f else if (g.split) 580f else 520f
+            val seed = ResizeRect(300f * density, 300f * density, (300f + width) * density, 600f * density)
             var low = 60f * density + extra
             var high = 1000f * density + extra
             repeat(24) {
@@ -22,6 +24,8 @@ class KeyboardSquareSnapTest {
                     low = mid else high = mid
             }
             val square = seed.copy(bottom = seed.top + (low + high) / 2f)
+            assertEquals("fixture must contain a real square point", 0f,
+                g.capDifference(square, density, extra, floating, spacing), 0.001f)
             for (handle in listOf(ResizeHandle.LEFT, ResizeHandle.RIGHT, ResizeHandle.TOP, ResizeHandle.BOTTOM,
                 ResizeHandle.TOP_LEFT, ResizeHandle.BOTTOM_RIGHT)) {
                 fun offset(d: Float) = when (handle) {
@@ -48,5 +52,13 @@ class KeyboardSquareSnapTest {
         val r = ResizeRect(100f, 100f, 800f, 500f)
         assertEquals(r, r.snapSquareKeys(ResizeHandle.NONE, KeyboardSquareSnap(10f, false, false),
             ResizeRect(0f, 0f, 1600f, 1200f), 1f, 0f, false, null to null))
+    }
+
+    @Test fun aTallGridFarPastSquareDoesNotFalselySnapToSquare() {
+        val rect = ResizeRect(100f, 100f, 1000f, 800f)
+        val geometry = KeyboardSquareSnap(10f, false, false)
+        assertTrue(geometry.capDifference(rect, 1f, 0f, false, null to null) < 0f)
+        assertEquals(rect, rect.snapSquareKeys(ResizeHandle.BOTTOM, geometry,
+            ResizeRect(0f, 0f, 1200f, 1200f), 1f, 0f, false, null to null))
     }
 }

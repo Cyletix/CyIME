@@ -60,6 +60,9 @@ internal data class KeyVisualPolicy(
         /** 很矮/窄的键格至少保留 80% 给键帽，避免扩大间隙挤掉文字。 */
         const val MaxGapFraction = 0.2f
 
+        /** Keep the phone baseline; automatic row-gap growth is half its original rate. */
+        const val RowGapGrowth = 0.5f
+
         /** 悬浮键盘保留的 gutter：不套用手机 8dp 下限，允许整体缩小。 */
         const val FloatingGutter = 4f
 
@@ -82,6 +85,10 @@ internal data class KeyVisualMetrics(
     val capShortEdge: Float,
     /** 实际内容留白后的单位格宽，供标准字母行共用列尺寸。 */
     val cellWidthDp: Float = 0f,
+    val cellHeightDp: Float = 0f,
+    val extraInsetY: Float = 0f,
+    val topSpaceDp: Float = 0f,
+    val bottomSpaceDp: Float = 0f,
 ) {
     companion object {
         /** 无策略上下文：保持声明值。 */
@@ -167,5 +174,65 @@ internal fun keyVisualMetrics(
         scale = scale,
         capShortEdge = minOf(cellWidth - gapX, cellHeight - gapY).coerceAtLeast(1f),
         cellWidthDp = cellWidth,
+        cellHeightDp = cellHeight,
     )
 }
+
+/** The existing minimum panel includes a 44dp toolbar. This is a baseline, not a cap. */
+internal const val MINIMUM_KEY_BODY_HEIGHT_DP = FLOATING_RESIZE_MIN_HEIGHT_DP - 44f
+
+/** Resolve the same edge-aligned grid for typing, symbols, candidates and live resizing.
+ * Row gaps depend on actual cell width, never on surplus panel height. The renderer
+ * fills the chosen body height; no hidden top/bottom spacers squeeze the keycaps.
+ */
+internal fun keyboardGridMetrics(
+    policy: KeyVisualPolicy,
+    availableWidthDp: Float,
+    availableHeightDp: Float,
+    columns: Float,
+    rows: Float = 4f,
+    horizontalInsetDp: Float = 8f,
+    verticalInsetDp: Float = 8f,
+    widthFraction: Float = 1f,
+    allowShrink: Boolean = false,
+    applyGutter: Boolean = true,
+    growthSpacing: Pair<Float?, Float?>? = null,
+): KeyVisualMetrics {
+    // Preserve the existing horizontal gaps while resizing only the height.
+    // This reference is used for gap measurement, never as a cap-height limit.
+    val spacingHeight = if (growthSpacing != null)
+        minOf(availableHeightDp, MINIMUM_KEY_BODY_HEIGHT_DP) else availableHeightDp
+    val placed = keyVisualMetrics(policy, availableWidthDp * widthFraction, spacingHeight,
+        columns, rows, verticalInsetDp, allowShrink).withAppliedGutter(
+        availableWidthDp, columns, horizontalInsetDp, applyGutter, widthFraction)
+    if (growthSpacing == null || placed.insetX == null || placed.insetY == null) return placed
+    // Floating's proposed gutter can be raised by the renderer. Derive gaps from the
+    // actual remaining width, so equal-sized docked/floating caps have equal geometry.
+    val metrics = keyVisualMetrics(policy.copy(minGutter = 0f, maxKeyWidth = Float.MAX_VALUE),
+        placed.cellWidthDp * columns, spacingHeight, columns, rows, verticalInsetDp, allowShrink)
+        .copy(gutterX = placed.gutterX,
+            cellHeightDp = ((availableHeightDp - verticalInsetDp) / rows).coerceAtLeast(1f))
+    if (metrics.insetX == null || metrics.insetY == null) return placed
+
+    val gapX = resolvedVisualGap(growthSpacing.first, metrics.insetX)
+    val gapY = resolvedVisualGap(growthSpacing.second, metrics.insetY)
+    val capWidth = (metrics.cellWidthDp - gapX).coerceAtLeast(1f)
+    val automaticGap = growthSpacing.second == null || growthSpacing.second == KeyVisualPolicy.DeclaredDefaultGap
+    // Width-only growth preserves phone spacing and halves the tablet increment.
+    // Short panels may still shrink the gap so that at least 80% remains a keycap.
+    val widthScale = (metrics.cellWidthDp / policy.referenceCellWidth)
+        .coerceIn(if (allowShrink) KeyVisualPolicy.ScaleMin else 1f, KeyVisualPolicy.ScaleMax)
+    val widthGap = if (widthScale <= 1f) policy.gapY * widthScale
+        else policy.gapY + (policy.maxGapY - policy.gapY) * (widthScale - 1f) * KeyVisualPolicy.RowGapGrowth
+    val compactGap = if (automaticGap)
+        widthGap.coerceIn(policy.minGapY, policy.maxGapY)
+            .coerceAtMost(metrics.cellHeightDp * KeyVisualPolicy.MaxGapFraction)
+        else gapY
+    return metrics.copy(
+        insetY = if (automaticGap) compactGap / 2f else metrics.insetY,
+        capShortEdge = minOf(capWidth, (metrics.cellHeightDp - compactGap).coerceAtLeast(1f)),
+    )
+}
+
+internal fun resolvedVisualGap(explicit: Float?, inset: Float): Float =
+    explicit?.takeUnless { it == KeyVisualPolicy.DeclaredDefaultGap } ?: (inset * 2f)

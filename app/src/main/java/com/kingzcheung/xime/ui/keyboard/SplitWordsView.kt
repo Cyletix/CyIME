@@ -132,7 +132,7 @@ fun SplitWordsView(
                 onClick = {
                     val text = selectedIndices.joinToString("") { splitParts[it] }
                     if (text.isNotEmpty()) {
-                        viewModel.addQuickSendText(text)
+                        viewModel.addPinnedText(text)
                         onNavigateToQuickSend?.invoke()
                     }
                 }
@@ -144,7 +144,7 @@ fun SplitWordsView(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(if (compactActions) "快捷" else "添加到快捷发送", color = accentColor, fontSize = 13.sp, maxLines = 1)
+                Text(if (compactActions) "固定" else "固定选中文字", color = accentColor, fontSize = 13.sp, maxLines = 1)
             }
             TextButton(enabled = selectedText.isNotEmpty(), onClick = {
                 onConfirmText(selectedText)

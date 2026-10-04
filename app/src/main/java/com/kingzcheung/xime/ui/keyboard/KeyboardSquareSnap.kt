@@ -13,13 +13,11 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
         val fraction = if (split) 0.9f else 1f
         val policy = (if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty)
             .copy(maxKeyWidth = Float.MAX_VALUE)
-        val metrics = keyVisualMetrics(policy, width * fraction, bodyHeight, columns,
-            allowShrink = floating).withAppliedGutter(width, columns, 8f, true, fraction)
-        fun gap(explicit: Float?, inset: Float?) = explicit
-            ?.takeUnless { it == KeyVisualPolicy.DeclaredDefaultGap } ?: ((inset ?: 0f) * 2f)
+        val metrics = keyboardGridMetrics(policy, width, bodyHeight, columns,
+            allowShrink = floating, widthFraction = fraction, growthSpacing = spacing)
         val cellWidth = metrics.cellWidthDp - if (split) 8f * fraction / columns else 0f
-        return cellWidth - gap(spacing.first, metrics.insetX) -
-            ((bodyHeight - 8f) / 4f - gap(spacing.second, metrics.insetY))
+        return cellWidth - resolvedVisualGap(spacing.first, metrics.insetX ?: 0f) -
+            (metrics.cellHeightDp - resolvedVisualGap(spacing.second, metrics.insetY ?: 0f) - 2f * metrics.extraInsetY)
     }
 
     companion object {
