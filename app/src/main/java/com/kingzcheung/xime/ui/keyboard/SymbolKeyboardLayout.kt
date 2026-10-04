@@ -40,6 +40,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.onClick
@@ -97,9 +99,10 @@ fun SymbolKeyboardLayout(
         pageCount = { displayCategories.size }
     )
 
-    KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp),
-        policy = KeyVisualPolicy.Qwerty, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
     val keySpacing = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
+    KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp),
+        policy = KeyVisualPolicy.Qwerty, allowShrink = isFloatingMode, applyGutter = true,
+        growthSpacing = keySpacing) { bodyModifier ->
     CompositionLocalProvider(LocalKeyVisualPadding provides PaddingValues(
         horizontal = keySpacing.first?.dp ?: 2.dp,
         vertical = keySpacing.second?.dp ?: 2.dp,
@@ -239,13 +242,18 @@ fun SymbolKeyboardLayout(
                 }
             }
 
-            ActionKeyButton(
-                text = "删除",
+            SwipeableIconKeyButton(
+                icon = androidx.compose.ui.graphics.vector.rememberVectorPainter(
+                    androidx.compose.material.icons.Icons.AutoMirrored.Filled.Backspace),
                 onClick = { onSelect("delete") },
+                onLongClick = { onSelect("delete") },
                 backgroundColor = specialKeyBackgroundColor,
-                textColor = specialKeyTextColor,
-                modifier = Modifier.weight(bottom.enter).testTag("symbol-delete"),
-                fontSize = 12.sp
+                iconColor = specialKeyTextColor,
+                modifier = Modifier.weight(bottom.enter).testTag("symbol-delete")
+                    .semantics { contentDescription = "删除" },
+                shadowEnabled = shadowEnabled,
+                shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius,
             )
         }
 
