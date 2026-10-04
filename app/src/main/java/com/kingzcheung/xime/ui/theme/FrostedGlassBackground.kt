@@ -22,9 +22,15 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.kingzcheung.xime.settings.BackgroundConfig
@@ -54,34 +60,30 @@ internal fun Modifier.frostedGlassBackground(
     config: FrostedGlassConfig,
     translucentSurface: Boolean = false,
 ): Modifier {
-    val context = LocalContext.current.applicationContext
-    val density = LocalDensity.current.density
-    val normalized = config.normalized()
-    val source = if (background?.type == "image") {
-        if (isDark) background.srcDark ?: background.src else background.src
-    } else null
-    var sourceImage by remember(source) { mutableStateOf<FrostedSourceImage?>(null) }
-    LaunchedEffect(context, source) {
-        sourceImage = source?.takeIf { it.isNotBlank() }?.let {
-            withContext(Dispatchers.IO) { decodeFrostedImage(context, it) }
+    // Embedded keyboard surfaces sample the same window-space image. Popup windows
+    // have their own coordinate origin and must keep their independent backdrop.
+    val shared = LocalSharedKeyboardBackdrop.current
+    if (!translucentSurface && shared != null && LocalView.current.rootView === shared.windowRoot) {
+        var origin by remember { mutableStateOf(Offset.Zero) }
+        return onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
+            drawRect(shared.fallback)
+            shared.image?.takeIf { shared.frame.size.width > 0 && shared.frame.size.height > 0 }?.let { image ->
+                val offset = shared.frame.offsetIn(origin)
+                clipRect {
+                    translate(offset.x, offset.y) {
+                        drawImage(image, dstSize = shared.frame.size, filterQuality = FilterQuality.Medium)
+                    }
+                }
+            }
+            drawRect(shared.tint)
+            drawContent()
         }
     }
-
+    val normalized = config.normalized()
     var targetSize by remember { mutableStateOf(IntSize.Zero) }
-    var blurredImage by remember(background, isDark, fallbackColor) { mutableStateOf<ImageBitmap?>(null) }
     // Floating capsules resize during docking; keep their backdrop cache stable throughout.
     val renderSize = if (translucentSurface) IntSize(512, 256) else targetSize
-    LaunchedEffect(background, isDark, fallbackColor, sourceImage, renderSize, density, normalized.blurRadiusDp) {
-        if (renderSize.width <= 0 || renderSize.height <= 0) return@LaunchedEffect
-        blurredImage = withContext(Dispatchers.Default) {
-            val coroutineContext = currentCoroutineContext()
-            renderFrostedBackground(
-                background, isDark, fallbackColor.toArgb(), sourceImage, renderSize,
-                normalized.blurRadiusDp * density,
-                checkCancelled = { coroutineContext.ensureActive() },
-            ).asImageBitmap()
-        }
-    }
+    val blurredImage = rememberFrostedBackgroundImage(background, isDark, fallbackColor, normalized, renderSize)
 
     // This replaces a theme image's overlayAlpha; applying both would double-darken it.
     val tint = (if (isDark) Color.Black else Color.White).copy(alpha = normalized.backgroundOpacity)
@@ -116,6 +118,43 @@ internal fun Modifier.frostedGlassBackground(
         }
         drawContent()
     }
+}
+
+@Composable
+internal fun rememberFrostedBackgroundImage(
+    background: BackgroundConfig?,
+    isDark: Boolean,
+    fallbackColor: Color,
+    config: FrostedGlassConfig,
+    renderSize: IntSize,
+): ImageBitmap? {
+    val context = LocalContext.current.applicationContext
+    val density = LocalDensity.current.density
+    val normalized = config.normalized()
+    val source = if (background?.type == "image") {
+        if (isDark) background.srcDark ?: background.src else background.src
+    } else null
+    var sourceImage by remember(source) { mutableStateOf<FrostedSourceImage?>(null) }
+    LaunchedEffect(context, source) {
+        sourceImage = source?.takeIf { it.isNotBlank() }?.let {
+            withContext(Dispatchers.IO) { decodeFrostedImage(context, it) }
+        }
+    }
+
+    var blurredImage by remember(background, isDark, fallbackColor) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(background, isDark, fallbackColor, sourceImage, renderSize, density, normalized.blurRadiusDp) {
+        if (renderSize.width <= 0 || renderSize.height <= 0) return@LaunchedEffect
+        blurredImage = withContext(Dispatchers.Default) {
+            val coroutineContext = currentCoroutineContext()
+            renderFrostedBackground(
+                background, isDark, fallbackColor.toArgb(), sourceImage, renderSize,
+                normalized.blurRadiusDp * density,
+                checkCancelled = { coroutineContext.ensureActive() },
+            ).asImageBitmap()
+        }
+    }
+
+    return blurredImage
 }
 
 private data class FrostedSourceImage(val bitmap: Bitmap, val originalWidth: Int, val originalHeight: Int)
