@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.*
+import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -18,6 +20,11 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun QwertySymbolEditor() {
     val context = LocalContext.current
+    val inputSettings = rememberKeyboardInputPreferences()
+    val reverseSwipe = inputSettings.reverseSymbolSwipe
+    val topGesture = if (inputSettings.symbolInputMode == SymbolInputMode.LONG_PRESS) "长按"
+        else if (reverseSwipe) "上拉" else "下拉"
+    val bottomGesture = if (reverseSwipe) "下拉" else "上拉"
     val scope = rememberCoroutineScope()
     var english by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf("q") }
@@ -53,7 +60,8 @@ internal fun QwertySymbolEditor() {
                 FilterChip(selected = english, onClick = { changeLanguage(true) }, enabled = !busy,
                     label = { Text("英文26键") })
             }
-            Text("点选字母修改符号，上方为上拉、下方为下拉；留空关闭该方向。", style = MaterialTheme.typography.bodySmall)
+            Text("点选字母修改符号：${topGesture}输入上方、${bottomGesture}输入下方；留空关闭该符号。",
+                style = MaterialTheme.typography.bodySmall)
             QwertySwipeSymbols.rows.forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     if (row.length < 10) Spacer(Modifier.weight((10 - row.length) / 2f))
@@ -76,7 +84,7 @@ internal fun QwertySymbolEditor() {
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("up" to "上拉", "down" to "下拉").forEach { (direction, label) ->
+                listOf("up" to "上方（$topGesture）", "down" to "下方（$bottomGesture）").forEach { (direction, label) ->
                     val id = "$direction.$selected"
                     OutlinedTextField(value = values[id].orEmpty(), onValueChange = { value ->
                         values = values + (id to value); dirty = true; message = ""
@@ -84,6 +92,17 @@ internal fun QwertySymbolEditor() {
                         enabled = loaded && !busy, modifier = Modifier.weight(1f))
                 }
             }
+            OutlinedButton(enabled = loaded && !busy, modifier = Modifier.fillMaxWidth(), onClick = {
+                val before = values
+                values = before.toMutableMap().apply {
+                    for (key in QwertySwipeSymbols.keys) {
+                        put("up.$key", before["down.$key"].orEmpty())
+                        put("down.$key", before["up.$key"].orEmpty())
+                    }
+                }
+                dirty = true
+                message = "已交换当前语言全部字母键的上下方符号，保存后生效"
+            }) { Text("交换上下拉配置") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(enabled = loaded && !busy, onClick = {
                     values = buildMap {

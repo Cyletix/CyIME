@@ -20,6 +20,43 @@ import org.junit.Test
 class SwipeableIconKeyButtonTest {
     @get:Rule val rule = createComposeRule()
 
+    @Test fun verticalActionsPreviewInsideTheHeldKeyAndCommitOnlyOnRelease() {
+        var clears = 0
+        var undo = 0
+        var density = 1f
+        rule.setContent {
+            density = LocalDensity.current.density
+            Box(Modifier.size(240.dp)) {
+                SwipeableIconKeyButton(ColorPainter(Color.Black), onClick = {},
+                    onSwipeUp = { clears++ }, onSwipeDown = { undo++ },
+                    swipeUpLabel = "上滑清空", swipeDownLabel = "下滑撤回",
+                    backgroundColor = Color.Gray, iconColor = Color.White,
+                    modifier = Modifier.testTag("delete"), shadowEnabled = false)
+            }
+        }
+        rule.mainClock.autoAdvance = false
+        val key = rule.onNodeWithTag("delete")
+        val bounds = key.fetchSemanticsNode().boundsInRoot
+        key.performTouchInput { down(center); moveTo(center - Offset(0f, 65f * density)) }
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("key-flick-preview").assertTextEquals("清空")
+        key.performTouchInput { moveTo(center - Offset(0f, 95f * density)) }
+        rule.mainClock.advanceTimeBy(1000)
+        rule.onNodeWithTag("key-flick-preview").assertTextEquals("清空")
+        assertEquals(bounds, key.fetchSemanticsNode().boundsInRoot)
+        assertEquals(0, clears)
+        key.performTouchInput { up() }
+        rule.mainClock.advanceTimeByFrame()
+        assertEquals(1, clears)
+        rule.onNodeWithTag("key-flick-preview").assertDoesNotExist()
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 95f * density)) }
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("key-flick-preview").assertTextEquals("撤回")
+        key.performTouchInput { moveTo(center); up() }
+        rule.mainClock.advanceTimeByFrame()
+        assertEquals(0, undo)
+    }
+
     @Test fun movementBeforeAndDuringHoldDoesNotInterruptRepeat() {
         var deletes = 0
         var clears = 0

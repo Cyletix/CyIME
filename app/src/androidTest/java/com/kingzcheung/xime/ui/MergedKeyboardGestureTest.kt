@@ -11,8 +11,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.*
+import com.kingzcheung.xime.ui.keyboard.*
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.settings.KeysConfigHelper
@@ -68,7 +72,7 @@ class MergedKeyboardGestureTest {
         val key = rule.onNodeWithText("qw")
         key.performTouchInput {
             down(center)
-            moveTo(center - Offset(0f, 75f * density))
+            moveTo(center + Offset(0f, 75f * density))
         }
         rule.runOnIdle { assertTrue("preview must not submit either q or 1", commits.isEmpty()) }
         key.performTouchInput { up() }
@@ -77,13 +81,13 @@ class MergedKeyboardGestureTest {
         rule.runOnIdle { assertEquals(listOf("literal:1", "tap:q"), commits) }
         key.performTouchInput {
             down(center)
-            moveTo(center - Offset(0f, 75f * density))
+            moveTo(center + Offset(0f, 75f * density))
             moveTo(center)
             up()
         }
         key.performTouchInput {
             down(center)
-            moveTo(center - Offset(0f, 75f * density))
+            moveTo(center + Offset(0f, 75f * density))
             cancel()
         }
         rule.runOnIdle {
@@ -93,7 +97,7 @@ class MergedKeyboardGestureTest {
         }
         rule.onNodeWithText("er").performTouchInput {
             down(center)
-            moveTo(center - Offset(0f, 75f * density))
+            moveTo(center + Offset(0f, 75f * density))
             up()
         }
         rule.runOnIdle { assertEquals(listOf("literal:1", "tap:q", "literal:2"), commits) }
@@ -101,4 +105,40 @@ class MergedKeyboardGestureTest {
 
     @Test fun regularFourteenKeyRowCommitsOnlyTheChosenGesture() = verifyFourteenKeyRow(compact = false)
     @Test fun compactFourteenKeyRowCommitsOnlyTheChosenGesture() = verifyFourteenKeyRow(compact = true)
+
+    @Test fun leftRightLettersRespectToggleDistancePreviewAndCancellation() {
+        KeysConfigHelper.loadConfig(ApplicationProvider.getApplicationContext())
+        KeysConfigHelper.setActiveKeyboardSchema("pinyin_14jian")
+        val commits = mutableListOf<String>()
+        val settings = mutableStateOf(KeyboardInputPreferences())
+        var density = 1f
+        rule.setContent {
+            density = LocalDensity.current.density
+            CompositionLocalProvider(LocalFourteenKeyLayout provides true, LocalKeyboardInputPreferences provides settings.value) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    KeyboardRowWithConfig(listOf("qw", "er", "ty", "ui", "op"),
+                        onKeyPress = { commits += it }, config = KeyboardRowConfig(Color.White, Color.Black, shadowEnabled = false),
+                        isShifted = false, modifier = Modifier.width(350.dp).height(100.dp),
+                        onCommitText = { commits += "symbol:$it" })
+                }
+            }
+        }
+        val key = rule.onNodeWithText("qw")
+        key.performTouchInput { down(center); moveTo(center + Offset(30f * density, 0f)) }
+        rule.onNodeWithTag("key-flick-preview").assertTextEquals("w")
+        rule.runOnIdle { assertTrue(commits.isEmpty()) }
+        key.performTouchInput { up() }
+        rule.onNodeWithTag("key-flick-preview").assertDoesNotExist()
+        key.performTouchInput { down(center); moveTo(center - Offset(30f * density, 0f)); up() }
+        rule.runOnIdle { assertEquals(listOf("w", "q"), commits) }
+        key.performTouchInput { down(center); moveTo(center + Offset(40f * density, 0f)); moveTo(center); up() }
+        key.performTouchInput { down(center); moveTo(center + Offset(40f * density, 0f)); cancel() }
+        rule.runOnIdle { assertEquals(listOf("w", "q"), commits); settings.value = settings.value.copy(fourteenLetterSwipeDp = 48f) }
+        key.performTouchInput { down(center); moveTo(center + Offset(30f * density, 0f)); up() }
+        key.performTouchInput { down(center); moveTo(center + Offset(52f * density, 0f)); up() }
+        rule.runOnIdle { assertEquals(listOf("w", "q", "q", "w"), commits); settings.value = settings.value.copy(fourteenLetterSwipe = false) }
+        key.performTouchInput { down(center); moveTo(center + Offset(70f * density, 0f)); up() }
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 75f * density)); up() }
+        rule.runOnIdle { assertEquals(listOf("w", "q", "q", "w", "symbol:1"), commits) }
+    }
 }

@@ -13,6 +13,25 @@ import org.junit.Test
 class SwipeBubbleControllerTest {
     private val bounds = Rect(10f, 20f, 70f, 80f)
 
+    @Test fun inKeyFlickClearsTapBubbleImmediatelyAndLeavesMenusAvailable() = runTest {
+        for (tapBubble in listOf(false, true)) {
+            val controller = SwipeBubbleController(this, showPressBubble = tapBubble)
+            controller.update(SwipeState(isPressed = true, pressedText = "q"), bounds)
+            controller.update(SwipeState(), bounds)
+            controller.update(SwipeState(keyFlick = KeyFlickPreview("1", 0.2f, true)), bounds)
+            assertEquals(SwipeState(), controller.state)
+            controller.update(SwipeState(isSwiping = true, swipeText = "1",
+                keyFlick = KeyFlickPreview("1", 1f, true)), bounds)
+            assertEquals(SwipeState(), controller.state)
+            controller.update(SwipeState(), bounds)
+            controller.update(SwipeState(isLongPress = true, longPressItems = listOf("q", "Q")), bounds)
+            advanceTimeBy(100)
+            runCurrent()
+            assertTrue(controller.state.isLongPress)
+            controller.dispose()
+        }
+    }
+
     @Test fun disabledTapPreviewDoesNotPublishLayoutStateOrScheduleCleanup() = runTest {
         val controller = SwipeBubbleController(this)
         repeat(100) {

@@ -16,6 +16,29 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
 class KeyboardInputPreferencesTest {
+    @Test fun `symbol direction defaults to pulling into key and persists either habit`() {
+        assertEquals(false, KeyboardInputPreferences.read(context).reverseSymbolSwipe)
+        for (reversed in listOf(true, false)) {
+            val before = KeyboardInputPreferences.read(context)
+            before.copy(reverseSymbolSwipe = reversed).save(context)
+            val after = KeyboardInputPreferences.read(context)
+            assertEquals(reversed, after.reverseSymbolSwipe)
+            assertEquals(before, after.copy(reverseSymbolSwipe = before.reverseSymbolSwipe))
+        }
+    }
+    @Test fun `fourteen swipe preferences reload without changing shared cursor or symbol settings`() {
+        val previous = KeyboardInputPreferences.read(context)
+        assertEquals(true, previous.fourteenLetterSwipe)
+        assertEquals(24f, previous.fourteenLetterSwipeDp, 0f)
+        previous.copy(fourteenLetterSwipe = false, fourteenLetterSwipeDp = 51f).save(context)
+        val restored = KeyboardInputPreferences.read(context)
+        assertEquals(false, restored.fourteenLetterSwipe)
+        assertEquals(52f, restored.fourteenLetterSwipeDp, 0f)
+        assertEquals(previous.cursorGesture, restored.cursorGesture)
+        assertEquals(previous.symbolInputMode, restored.symbolInputMode)
+        assertEquals(previous.neighborCorrection, restored.neighborCorrection)
+    }
+
     private val context = mock<Context>()
     private val prefs = mock<SharedPreferences>()
     private val editor = mock<SharedPreferences.Editor>()

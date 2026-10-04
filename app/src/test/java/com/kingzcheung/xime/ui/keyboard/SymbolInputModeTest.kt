@@ -5,6 +5,58 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SymbolInputModeTest {
+    @Test fun `default pulls top on down and bottom on up without changing custom payloads`() {
+        val events = mutableListOf<String>()
+        val original = actions(events).copy(upText = "①", downText = "！？",
+            upPreviewText = "一", downPreviewText = "问号", onRight = { events += "right" })
+        val mapped = original.withSymbolSwipeDirection(reverse = false)
+        assertTrue(events.isEmpty())
+        assertEquals("一", mapped.downPreviewText)
+        assertTrue(mapped.downPreviewFromTop)
+        assertEquals("问号", mapped.upPreviewText)
+        assertFalse(mapped.upPreviewFromTop)
+        mapped.onDown?.invoke(mapped.downText.orEmpty())
+        mapped.onUp?.invoke(mapped.upText.orEmpty())
+        mapped.onLeft?.invoke()
+        mapped.onRight?.invoke()
+        mapped.onTap()
+        assertEquals(listOf("symbol:①", "down:！？", "previous", "right", "tap"), events)
+        assertEquals(original.longPressItems, mapped.longPressItems)
+    }
+
+    @Test fun `reverse keeps old direction and key only preview does not change committed payload`() {
+        val events = mutableListOf<String>()
+        val original = actions(events).copy(upText = "1", downText = null,
+            upPreviewText = "1", downPreviewText = "!")
+        assertSame(original, original.withSymbolSwipeDirection(reverse = true))
+        val mapped = original.withSymbolSwipeDirection(reverse = false)
+        assertEquals("!", mapped.upPreviewText)
+        assertNull(mapped.upText)
+        mapped.onUp?.invoke(mapped.upText.orEmpty())
+        assertEquals(listOf("down:"), events)
+    }
+
+    @Test fun `long press blocks the physical direction of the top slot in either habit`() {
+        for (reverse in listOf(false, true)) {
+            val events = mutableListOf<String>()
+            val mapped = actions(events).withSymbolInput(SymbolInputMode.LONG_PRESS, "2")
+                .withSymbolSwipeDirection(reverse)
+            if (reverse) { assertNull(mapped.onUp); assertTrue(mapped.blockUpSwipe); assertNotNull(mapped.onDown) }
+            else { assertNull(mapped.onDown); assertTrue(mapped.blockDownSwipe); assertNotNull(mapped.onUp) }
+            mapped.onLongPress?.invoke()
+            mapped.onRelease()
+            assertEquals(listOf("symbol:2"), events)
+        }
+    }
+
+    @Test fun `disabled symbol stays disabled after direction flip`() {
+        val original = actions(mutableListOf()).copy(onDown = null, downText = null, downPreviewText = null)
+        val mapped = original.withSymbolSwipeDirection(reverse = false)
+        assertNull(mapped.onUp)
+        assertNull(mapped.upPreviewText)
+        assertNotNull(mapped.onDown)
+    }
+
     private fun actions(events: MutableList<String>) = KeyGestureActions(
         text = "ABC", onTap = { events += "tap" }, onPress = {}, onRelease = {}, onPreview = {},
         onUp = { events += "symbol:$it" }, onDown = { events += "down:$it" },

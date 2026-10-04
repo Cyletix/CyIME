@@ -59,6 +59,14 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                 val up = vertical && dy < -actionDistance && actions.onUp != null
                 val downSwipe = vertical && dy > actionDistance && actions.onDown != null
                 val left = -dx > abs(dy) * 1.1f && dx < -actionDistance && actions.onLeft != null
+                val flick = keyFlickPreview(dx, dy, previewDistance, actionDistance,
+                    actions.upLabel?.removePrefix("上滑").takeIf { actions.onUp != null },
+                    actions.downLabel?.removePrefix("下滑").takeIf { actions.onDown != null })
+                    ?.let { it.copy(origin = if (dy < 0f) KeyFlickOrigin.TOP else KeyFlickOrigin.BOTTOM) }
+                if (flick != null) {
+                    repeat.stop()
+                    timer?.cancel()
+                }
                 if (abs(dx) > actionDistance || abs(dy) > actionDistance) {
                     crossed = true
                     repeat.stop()
@@ -70,7 +78,7 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                     else -> null
                 }
                 actions.onPreview(SwipeState(isPressed = !crossed, isSwiping = hint != null,
-                    swipeText = hint, isSwipeDown = dy > 0, isDanger = up || downSwipe))
+                    swipeText = hint, isSwipeDown = dy > 0, isDanger = up || downSwipe, keyFlick = flick))
                 change.consume()
                 if (!change.pressed) {
                     // Stop queued repetitions before committing a release action.

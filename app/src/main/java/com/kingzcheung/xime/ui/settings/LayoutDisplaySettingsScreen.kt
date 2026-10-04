@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Straighten
+import androidx.compose.material.icons.twotone.Keyboard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,7 +44,8 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LayoutDisplaySettingsContent(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenLayout: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -74,6 +76,15 @@ fun LayoutDisplaySettingsContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                SettingsSection(title = "各布局设置", content = {
+                    LayoutInputCategory.entries.forEachIndexed { index, category ->
+                        if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                        SettingsItem(Icons.TwoTone.Keyboard, category.title, category.description,
+                            onClick = { onOpenLayout(category.route) }, showArrow = true)
+                    }
+                })
+            }
             item {
                 SettingsSection(title = "候选词", content = {
                     val candidateTextSizePref = SettingsPreferences.getCandidateTextSize(context)
@@ -151,13 +162,13 @@ fun LayoutDisplaySettingsContent(
                     }
 
                     Text(
-                        text = "编码注释",
+                        text = "候选拼音与编码",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
                     )
                     Text(
-                        text = "在候选词旁显示对应的编码（如五笔字根）",
+                        text = "自动：候选区宽时显示拼音或编码，窄时隐藏，为候选词留出空间；也可始终隐藏",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 16.dp, bottom = 12.dp)
@@ -171,7 +182,7 @@ fun LayoutDisplaySettingsContent(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         CommentDisplayCard(
-                            title = "显示",
+                            title = "自动",
                             isSelected = showComments,
                             showComment = true,
                             onClick = {
@@ -313,12 +324,12 @@ fun LayoutDisplaySettingsContent(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "上滑提示",
+                                text = "上方角标提示",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "在按键上显示上滑符号提示",
+                                text = "显示按键上方的符号提示，滑动方向由共通输入设置决定",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -347,12 +358,12 @@ fun LayoutDisplaySettingsContent(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "下滑提示",
+                                text = "下方角标提示",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "在按键上显示下滑提示内容",
+                                text = "显示按键下方的提示内容，滑动方向由共通输入设置决定",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
