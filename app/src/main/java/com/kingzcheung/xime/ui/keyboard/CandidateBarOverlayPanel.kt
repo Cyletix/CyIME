@@ -39,6 +39,7 @@ fun CandidateBarOverlayPanel(
     title: String = "",
     titleColor: Color = closeButtonColor,
     modifier: Modifier = Modifier,
+    headerActions: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -88,6 +89,10 @@ fun CandidateBarOverlayPanel(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                 )
+            }
+            if (headerActions != null) {
+                Spacer(Modifier.weight(1f))
+                headerActions()
             }
         }
 

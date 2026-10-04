@@ -350,11 +350,14 @@ private fun CandidatePageContent(
                 // ── 中间：候选行分组列表（LazyColumn 只渲染可见行），联想词在末尾
                 // 随内容一并滚动 ──
                 BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                    val showComments = candidateCommentsVisible(maxWidth.value, LocalDensity.current.fontScale,
+                        18f, rememberCandidateCommentsAllowed())
                     val rowWidthUnits = with(LocalDensity.current) {
                         ExpandedCandidatePager.rowWidthUnits(maxWidth.toPx(), density * fontScale)
                     }
-                    val candidateRows = remember(state.candidates, rowWidthUnits) {
-                        val all = state.candidates.map { RimeCandidate(it.text, it.comment) }
+                    val candidateRows = remember(state.candidates, rowWidthUnits, showComments) {
+                        // Only layout measurements omit annotations; selection keeps the original entry.
+                        val all = state.candidates.map { RimeCandidate(it.text, if (showComments) it.comment else "") }
                         ExpandedCandidatePager.flowRows(all.indices.toList(), all, rowWidthUnits)
                             .map { row -> row.map { state.candidates[it] } }
                     }
@@ -377,6 +380,7 @@ private fun CandidatePageContent(
                                     if (colIndex > 0) FlexRowDivider(dividerColor)
                                     CandidatePageItem(
                                         entry = entry,
+                                        showComment = showComments,
                                         onClick = { callbacks.onCandidateSelect(entry) },
                                         onLongClick = { callbacks.onCandidateLongPress?.invoke(entry) },
                                         textColor = state.textColor,
@@ -503,8 +507,9 @@ private fun CandidatePageItem(
     textColor: Color,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    showComment: Boolean = false,
 ) {
-    val displayComment = entry.comment.replace("~", "")
+    val displayComment = if (showComment) entry.comment.replace("~", "") else ""
     val annotated = remember(entry.text, displayComment, textColor) {
         buildAnnotatedString {
             withStyle(
