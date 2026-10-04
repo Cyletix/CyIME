@@ -37,6 +37,30 @@ import org.junit.Test
 class SymbolNavigationTest {
     @get:Rule val rule = createComposeRule()
 
+    @Test fun symbolDeleteRepeatsWhileHeldAndStopsOnReleaseOrCancellation() {
+        val actions = mutableListOf<String>()
+        rule.setContent {
+            MaterialTheme {
+                SymbolKeyboardLayout(onSelect = { actions += it }, onBack = {}, onNumber = {},
+                    backgroundColor = Color.Black, textColor = Color.White,
+                    accentColor = Color.Blue, keyBgColor = Color.Gray, modifier = Modifier.size(360.dp, 260.dp))
+            }
+        }
+        rule.mainClock.autoAdvance = false
+        val key = rule.onNodeWithTag("symbol-delete", true)
+        for (cancelled in listOf(false, true)) {
+            val start = actions.size
+            key.performTouchInput { down(center) }
+            rule.mainClock.advanceTimeBy(750)
+            assertTrue(actions.size > start + 1)
+            key.performTouchInput { if (cancelled) cancel() else up() }
+            val stopped = actions.size
+            rule.mainClock.advanceTimeBy(200)
+            assertEquals(stopped, actions.size)
+            assertTrue(actions.all { it == "delete" })
+        }
+    }
+
     @Test fun returnStaysAtBottomLeftBeforeTheRecentCategoryStrip() {
         var returns = 0
         var numbers = 0
