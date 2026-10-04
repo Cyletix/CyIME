@@ -281,12 +281,13 @@ fun KeyboardLayout(
     )
 
 
+    val shiftSlideTargets = remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() }
     CompositionLocalProvider(
         LocalFourteenKeyLayout provides fourteenKey,
         LocalLetterGeometry provides geometry,
         LocalCustomLayout provides if (isAsciiMode) null else com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId),
         LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
-        LocalShiftSlideTargets provides remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() },
+        LocalShiftSlideTargets provides shiftSlideTargets,
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
         LocalEnterKeyColors provides KeyboardKeyColors(KeyboardThemes.getEnterKeyColor(uiState.themeId, uiState.isDarkTheme), specialKeyTextColor),
         LocalFunctionKeyColors provides KeyboardKeyColors(specialKeyBackgroundColor, specialKeyTextColor),
@@ -299,6 +300,7 @@ fun KeyboardLayout(
         modifier = bodyModifier
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
+                shiftSlideTargets.keyboardBounds = keyboardBounds
             }
             .drawWithContent {
                 drawContent()
@@ -907,6 +909,9 @@ fun KeyboardLayout(
             }
         }
 
+        ShiftSlideLine(shiftSlideTargets, { keyboardBounds.topLeft },
+            KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
+
         // 语音模式中央麦克风图标
         if (isVoiceMode && !isVoiceSticky) {
             Box(
@@ -1208,9 +1213,10 @@ private fun ShiftCapsKeyButton(
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (change.isConsumed) break
-                            dragged = dragged || (change.position - down.position).getDistance() > viewConfiguration.touchSlop
-                            val target = if (dragged) targets?.at(bounds.topLeft + change.position) else null
-                            targets?.hovered = target?.key
+                            val pointer = bounds.topLeft + change.position
+                            dragged = dragged || !bounds.contains(pointer) ||
+                                (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+                            val target = if (dragged) targets?.move(bounds, pointer) else null
                             change.consume()
                             if (!change.pressed) {
                                 released = true
@@ -1221,7 +1227,7 @@ private fun ShiftCapsKeyButton(
                         }
                     } finally {
                         val used = viewModel.endShiftHold()
-                        targets?.hovered = null
+                        targets?.clearDrag()
                         isPressed = false
                         suppressCursorMove.value = false
                         if (released && !dragged && !used && upTime - down.uptimeMillis < 350L) {
