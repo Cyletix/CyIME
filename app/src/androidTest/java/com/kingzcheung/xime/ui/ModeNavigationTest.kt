@@ -124,6 +124,47 @@ class ModeNavigationTest {
     }
     @Test fun shiftSlideTypesOneUppercaseAndReleases() = verifyShiftSlide(false)
     @Test fun splitShiftSlideCrossesTheGapAndReleases() = verifyShiftSlide(true)
+    @Test fun shiftDragWaitsForReleaseDespiteLongHoldAndVerticalMovement() {
+        mount("rime_ice", english = true)
+        val shift = rule.onNodeWithTag("shift-key")
+        val origin = shift.fetchSemanticsNode().boundsInRoot.topLeft
+        val p = rule.onNodeWithText("p").fetchSemanticsNode().boundsInRoot.center - origin
+        val a = rule.onNodeWithText("a").fetchSemanticsNode().boundsInRoot.center - origin
+        shift.performTouchInput { down(center); moveTo(p) }
+        rule.mainClock.advanceTimeBy(1000)
+        rule.runOnIdle { assertTrue(keys.isEmpty()); assertTrue(commits.isEmpty()) }
+        shift.performTouchInput { moveTo(a); moveTo(a + androidx.compose.ui.geometry.Offset(0f, -70f)) }
+        rule.mainClock.advanceTimeBy(1000)
+        rule.runOnIdle { assertTrue(keys.isEmpty()); assertTrue(commits.isEmpty()) }
+        shift.performTouchInput { moveTo(p); up() }
+        rule.runOnIdle { assertEquals(listOf("P"), keys); assertTrue(commits.isEmpty()); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+    }
+
+    @Test fun shiftDragReturningToShiftOrReleasedOutsideTypesNothingAndDoesNotToggle() {
+        mount("rime_ice", english = true)
+        val shift = rule.onNodeWithTag("shift-key")
+        val origin = shift.fetchSemanticsNode().boundsInRoot.topLeft
+        val p = rule.onNodeWithText("p").fetchSemanticsNode().boundsInRoot.center - origin
+        shift.performTouchInput { down(center); moveTo(p); moveTo(center); up() }
+        rule.runOnIdle { assertTrue(keys.isEmpty()); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+        shift.performTouchInput { down(center); moveTo(p); moveTo(androidx.compose.ui.geometry.Offset(-80f, -80f)); up() }
+        rule.runOnIdle { assertTrue(keys.isEmpty()); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+        shift.performTouchInput { down(center); moveTo(p); cancel() }
+        rule.onNodeWithText("a").performTouchInput { click() }
+        rule.runOnIdle { assertEquals(listOf("a"), keys); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+    }
+
+    @Test fun mergedShiftDragSelectsOnlyTheLetterUnderTheFinger() {
+        mount("pinyin_14jian")
+        val shift = rule.onNodeWithTag("shift-key")
+        val origin = shift.fetchSemanticsNode().boundsInRoot.topLeft
+        val qw = rule.onNodeWithText("qw").fetchSemanticsNode().boundsInRoot
+        val q = androidx.compose.ui.geometry.Offset(qw.left + qw.width * .25f, qw.center.y) - origin
+        val w = androidx.compose.ui.geometry.Offset(qw.left + qw.width * .75f, qw.center.y) - origin
+        shift.performTouchInput { down(center); moveTo(q); up() }
+        shift.performTouchInput { down(center); moveTo(w); up() }
+        rule.runOnIdle { assertEquals(listOf("Q", "W"), keys); assertEquals(ShiftMode.OFF, vm.shiftMode.value) }
+    }
     private fun verifyShiftSlide(split: Boolean) {
         mount("rime_ice", english = true, split = split, width = if (split) 1000 else 400)
         val key = rule.onNodeWithTag("shift-key")

@@ -367,17 +367,22 @@ fun SwipeableKeyButton(
 
     val shiftTargets = LocalShiftSlideTargets.current
     val shiftToken = remember { Any() }
-    val shiftLetter = text.lowercase().takeIf { it.length == 1 && it[0] in 'a'..'z' }
+    val maxShiftLetters = if (LocalFourteenKeyLayout.current) 2 else 1
+    val shiftLetters = (letterGroup ?: text).takeIf { group ->
+        group.length in 1..maxShiftLetters && group.all { it.lowercaseChar() in 'a'..'z' }
+    }
+    val currentLetterSelection by rememberUpdatedState(onLetterSelection)
     androidx.compose.runtime.DisposableEffect(shiftTargets, shiftToken) {
         onDispose { shiftTargets?.remove(shiftToken) }
     }
     androidx.compose.runtime.SideEffect {
-        if (shiftLetter != null) shiftTargets?.put(shiftToken, shiftLetter, buttonBounds) {
+        if (shiftLetters != null) shiftTargets?.put(shiftToken, shiftLetters, buttonBounds) { uppercase ->
             currentActions.onPress()
-            try { currentActions.onTap() } finally { currentActions.onRelease() }
+            try { currentLetterSelection?.invoke(uppercase) ?: currentActions.onTap() }
+            finally { currentActions.onRelease() }
         } else shiftTargets?.remove(shiftToken)
     }
-    val shiftHovered = shiftLetter != null && shiftTargets?.hovered == shiftLetter
+    val shiftHovered = shiftLetters != null && shiftTargets?.hovered?.bounds?.center?.let(buttonBounds::contains) == true
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, resolvedBackground, frostedGlass.enabled) {
@@ -419,7 +424,7 @@ fun SwipeableKeyButton(
                 else if (isHighlighted) resolvedBackground.copy(alpha = 0.8f)
                 else resolvedBackground,
                 pressed = isPressed || shiftHovered, highlighted = isHighlighted,
-            ))),
+            )).keyHeldHighlight(isPressed || shiftHovered)),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
