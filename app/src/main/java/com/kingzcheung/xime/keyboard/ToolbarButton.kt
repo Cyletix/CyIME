@@ -29,7 +29,7 @@ enum class ToolbarButton(
     EMOJI("emoji", "表情", Icons.TwoTone.EmojiEmotions),
     CLIPBOARD("clipboard", "剪贴板", Icons.AutoMirrored.TwoTone.Assignment),
     SCHEMA("schema", "输入方案", Icons.TwoTone.KeyboardAlt),
-    QUICK_PHRASE("quick_phrase", "快捷发送", Icons.TwoTone.Quickreply),
+    QUICK_PHRASE("quick_phrase", "固定内容", Icons.TwoTone.Quickreply),
     SYMBOL("symbol", "符号", Icons.TwoTone.Paid),
     // 保留已保存的旧 ID，悬浮模式统一在键盘调节中设置。
     FLOAT("float", "键盘调节", Icons.TwoTone.Tune),

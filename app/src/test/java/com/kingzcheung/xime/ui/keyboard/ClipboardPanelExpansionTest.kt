@@ -32,7 +32,9 @@ class ClipboardPanelExpansionTest {
     }
 
     @Test fun heightReservesBarsPaddingAndFloatingOffset() {
-        assertEquals(ClipboardPanelBounds(280, 576), clipboardPanelBounds(280, 800, 0))
+        assertEquals(ClipboardPanelBounds(280, 640), clipboardPanelBounds(280, 800, 0))
+        assertEquals(ClipboardPanelBounds(280, 640), clipboardPanelBounds(280, 800, 80))
+        assertEquals(ClipboardPanelBounds(280, 500), clipboardPanelBounds(280, 800, 300))
         assertEquals(ClipboardPanelBounds(270, 270), clipboardPanelBounds(280, 300, 30))
         for (screen in listOf(240, 360, 800, 1280)) for (normal in listOf(180, 280, 500)) {
             for (reserved in listOf(0, 24, 80, 160)) {
@@ -45,7 +47,7 @@ class ClipboardPanelExpansionTest {
 
     @Test fun tinyAndInvalidAvailableSpaceNeverCreatesReversedBounds() {
         assertEquals(ClipboardPanelBounds(1, 1), clipboardPanelBounds(0, 0, 10))
-        assertEquals(ClipboardPanelBounds(100, 216), clipboardPanelBounds(100, 300, -20))
+        assertEquals(ClipboardPanelBounds(100, 240), clipboardPanelBounds(100, 300, -20))
         assertFalse(ClipboardPanelBounds(270, 270).shouldExpand(270f))
     }
 
@@ -96,7 +98,7 @@ class ClipboardPanelExpansionTest {
         panel.dispose()
     }
 
-    @Test fun buttonExpansionInterpolatesAndCanBeInterruptedByTheFinger() = runTest {
+    @Test fun expansionAnimationInterpolatesAndCanBeInterruptedByTheFinger() = runTest {
         val clock = BroadcastFrameClock()
         val scope = CoroutineScope(backgroundScope.coroutineContext + clock)
         val panel = ClipboardPanelExpansion(ClipboardPanelBounds(200, 500), scope) {}

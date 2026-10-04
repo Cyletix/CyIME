@@ -3,12 +3,8 @@ package com.kingzcheung.xime.ui.menubar
 import com.kingzcheung.xime.ui.keyboard.keyboardPanelBackground
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.frostedKeyColor
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,28 +21,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCut
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.twotone.Sync
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,18 +31,12 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -77,10 +48,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Constraints
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
-import com.kingzcheung.xime.ui.keyboard.clipboardPanelExpandGesture
-import com.kingzcheung.xime.ui.keyboard.ToolIcon
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentPaste
 import kotlin.math.max
 
 @Composable
@@ -109,200 +76,18 @@ fun ClipboardView(
     onExpandImages: (() -> Unit)? = null,
     onCollapseImages: (() -> Unit)? = null,
 ) {
-    if (selectedTab != 1) {
-        ConnectedClipboardBoard(clipboardItems, selectedTab == 2, imagesExpanded,
-            onBack = { onBack?.invoke() }, onQuickSend = { onClipboardTabChange?.invoke(1) },
-            onSelectText = onSelectItem, onRemoveText = viewModel::removeClipboardItems,
-            onAddQuick = viewModel::addToQuickSend, onSplit = onSplitWords,
-            onImageSelect = { onImageSelect?.invoke(it) }, onImageShare = { image, pkg -> onImageShare?.invoke(image, pkg) },
-            onSystemPaste = { onSystemImagePaste?.invoke() },
-            onPullRemote = if (pullRemoteAvailable) onPullRemote else null,
-            modifier = modifier.padding(bottom = bottomPaddingDp.dp))
-        return
-    }
-    // 卡片/格子背景：与菜单项背景一致（keyBgColor，浅色纯白、深色跟随 keyboard.colors）
-    val itemBgColor = keyBgColor
-    val textColor = keyTextColor
-    val subTextColor = keyTextColor.copy(alpha = 0.65f)
-    val accentColor = MaterialTheme.colorScheme.primary
-    // 图标按钮容器色：surface 与 primary 的混合色调（带种子色但不过于强烈）
-    val iconButtonContainer = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.primary,
-        0.35f
-    )
-    val configuration = LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-
-    var menuAnchor by remember { mutableStateOf<MenuAnchor?>(null) }
-    var isMultiSelect by remember { mutableStateOf(false) }
-    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var showClearConfirm by remember { mutableStateOf(false) }
-
-    fun exitMultiSelect() {
-        isMultiSelect = false
-        selectedIds = emptySet()
-    }
-
-    Box(modifier.fillMaxSize().keyboardPanelBackground(backgroundColor)) {
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture().padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            ToolIcon(Icons.AutoMirrored.Filled.ArrowBack, "返回键盘", { onBack?.invoke() })
-            Text("快捷发送", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-            ToolIcon(Icons.Default.ContentPaste, "剪贴板", { onClipboardTabChange?.invoke(0) })
-            onQuickSendAddClick?.let { ToolIcon(Icons.Default.Add, "添加快捷发送", it) }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            QuickSendTabContent(
-                items = quickSendItems, itemBgColor = itemBgColor, textColor = textColor,
-                subTextColor = subTextColor, accentColor = accentColor, viewModel = viewModel,
-                onSelect = onSelectItem, onQuickSendAddClick = onQuickSendAddClick,
-                onQuickSendEditItem = onQuickSendEditItem,
-                onLongPressItem = { item, isLeftColumn -> menuAnchor = MenuAnchor(item, isLeftColumn, tab = 1) }
-            )
-        menuAnchor?.let { anchor ->
-            val menuItems = if (anchor.tab == 0) {
-                listOf(
-                    LongPressMenuEntry(
-                        icon = Icons.Default.ContentCut,
-                        label = "拆词",
-                        onClick = {
-                            onSplitWords(anchor.item.text, anchor.item.id)
-                        }
-                    ),
-                    LongPressMenuEntry(
-                        icon = Icons.Outlined.StarBorder,
-                        label = "快捷",
-                        onClick = {
-                            viewModel.addToQuickSend(anchor.item.id)
-                        }
-                    ),
-                    LongPressMenuEntry(
-                        icon = Icons.Default.DoneAll,
-                        label = "多选",
-                        onClick = {
-                            isMultiSelect = true
-                            selectedIds = emptySet()
-                        }
-                    ),
-                    LongPressMenuEntry(
-                        icon = Icons.Default.Delete,
-                        label = "删除",
-                        tint = MaterialTheme.colorScheme.error,
-                        onClick = {
-                            viewModel.removeClipboardItem(anchor.item.id)
-                        }
-                    )
-                )
-            } else {
-                listOfNotNull(
-                    LongPressMenuEntry(
-                        icon = Icons.Filled.PushPin,
-                        label = "置顶",
-                        onClick = {
-                            viewModel.togglePinQuickSend(anchor.item.id)
-                        }
-                    ),
-                    onQuickSendEditItem?.let { edit ->
-                        LongPressMenuEntry(
-                            icon = Icons.Default.Create,
-                            label = "编辑",
-                            onClick = {
-                                edit(anchor.item.id, anchor.item.text, anchor.item.code)
-                            }
-                        )
-                    },
-                    LongPressMenuEntry(
-                        icon = Icons.Default.Delete,
-                        label = "删除",
-                        tint = MaterialTheme.colorScheme.error,
-                        onClick = {
-                            viewModel.removeQuickSendItem(anchor.item.id)
-                        }
-                    )
-                )
-            }
-            LongPressMenuOverlay(
-                text = anchor.item.text,
-                isLeftColumn = anchor.isLeftColumn,
-                backgroundColor = backgroundColor,
-                contentBgColor = itemBgColor,
-                textColor = textColor,
-                onDismiss = { menuAnchor = null },
-                menuItems = menuItems
-            )
-        }
-
-        } // 列表区容器
-
-        if (isMultiSelect) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "已选 ${selectedIds.size} 项",
-                    color = textColor,
-                    fontSize = 13.sp
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            if (selectedIds.isNotEmpty()) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        )
-                        .clickable(enabled = selectedIds.isNotEmpty()) {
-                            viewModel.removeClipboardItems(selectedIds.toList())
-                            exitMultiSelect()
-                        }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "删除",
-                            color = Color.White,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(if (isLandscape) 15.dp else bottomPaddingDp.dp))
-    }
-        if (showClearConfirm) {
-            ClearClipboardConfirmOverlay(
-                itemCount = clipboardItems.size,
-                backgroundColor = backgroundColor,
-                cardBgColor = itemBgColor,
-                textColor = textColor,
-                subTextColor = subTextColor,
-                onCancel = { showClearConfirm = false },
-                onConfirm = {
-                    showClearConfirm = false
-                    viewModel.clearClipboard()
-                }
-            )
-        }
-    }
+    // Old tab 1 bookmarks now open the same pinned clipboard records.
+    ConnectedClipboardBoard(clipboardItems, selectedTab == 2, imagesExpanded,
+        onBack = { onBack?.invoke() }, onQuickSend = {},
+        onSelectText = onSelectItem, onRemoveText = viewModel::removeClipboardItems,
+        onAddQuick = {}, onSplit = onSplitWords,
+        onImageSelect = { onImageSelect?.invoke(it) },
+        onImageShare = { image, pkg -> onImageShare?.invoke(image, pkg) },
+        onSystemPaste = { onSystemImagePaste?.invoke() },
+        onPullRemote = if (pullRemoteAvailable) onPullRemote else null,
+        onAddPinned = onQuickSendAddClick,
+        onEditText = onQuickSendEditItem,
+        modifier = modifier.padding(bottom = bottomPaddingDp.dp))
 }
 
 @Composable
@@ -383,115 +168,12 @@ internal fun ClearClipboardConfirmOverlay(
     }
 }
 
-internal data class MenuAnchor(
-    val item: ClipboardItem,
-    val isLeftColumn: Boolean,
-    val tab: Int
-)
-
 data class LongPressMenuEntry(
     val icon: ImageVector,
     val label: String,
     val tint: Color? = null,
     val onClick: () -> Unit
 )
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun ClipboardTabContent(
-    items: List<ClipboardItem>,
-    itemBgColor: Color,
-    textColor: Color,
-    subTextColor: Color,
-    accentColor: Color,
-    onSelect: (String) -> Unit,
-    onRemove: (Long) -> Unit,
-    onAddToQuickSend: (Long) -> Unit,
-    onSplitWords: (String, Long) -> Unit,
-    onLongPressItem: (ClipboardItem, Boolean) -> Unit,
-    isMultiSelect: Boolean = false,
-    selectedIds: Set<Long> = emptySet(),
-    onToggleSelect: (Long) -> Unit = {},
-    onExitMultiSelect: () -> Unit = {},
-) {
-    if (items.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "剪贴板为空",
-                color = subTextColor,
-                fontSize = 13.sp
-            )
-        }
-    } else {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
-                GridItemCard(
-                    text = item.text,
-                    highlighted = isMultiSelect && item.id in selectedIds,
-                    bgColor = itemBgColor,
-                    textColor = textColor,
-                    accentColor = accentColor,
-                    modifier = Modifier.height(62.dp),
-                    onClick = {
-                        if (isMultiSelect) onToggleSelect(item.id)
-                        else onSelect(item.text)
-                    },
-                    onLongClick = {
-                        if (isMultiSelect) onExitMultiSelect()
-                        else onLongPressItem(item, index % 2 == 0)
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun GridItemCard(
-    text: String,
-    highlighted: Boolean,
-    bgColor: Color,
-    textColor: Color,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(8.dp)
-    val bg = if (highlighted) accentColor.copy(alpha = 0.18f) else bgColor
-    Column(
-        modifier = modifier
-            .border(1.5.dp, if (highlighted) accentColor else Color.Transparent, shape)
-            .clip(shape)
-            .background(bg)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
-                onLongClickLabel = "更多操作"
-            )
-            .padding(horizontal = 10.dp, vertical = 9.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontSize = 14.sp,
-            lineHeight = 19.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
 
 @Composable
 fun LongPressMenuOverlay(

@@ -148,7 +148,9 @@ internal fun rememberImeKeyboardCallbacks(
             onClipboardImageSystemPaste = {
                 val failure = service.clipboardManager.images.pasteFailure.value
                 if (failure?.packageName == service.currentInputEditorInfo?.packageName) {
+                    service.dismissPredictionsForPaste()
                     val pasted = runCatching { service.currentInputConnection?.performContextMenuAction(android.R.id.paste) == true }.getOrDefault(false)
+                    if (pasted) service.clipboardManager.images.clearPasteFailure()
                     if (!pasted) android.widget.Toast.makeText(service, "此输入框不支持系统图片粘贴，请使用分享图片", android.widget.Toast.LENGTH_SHORT).show()
                 }
             },
@@ -443,10 +445,10 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendEditingItemCode = "",
                     enterKeyText = "确定",
                 )
-                // 撑高由 SideEffect 驱动：uiState 变化 → Compose 内容高度变化 →
-                // updateHeight 改容器物理高度 → relayout → onComputeInsets 自动重算。
+                // The floating editor reuses IME input without adding height to the keyboard.
             },
             onQuickSendEditItem = { id, text, code ->
+                service.closeToolPanel()
                 // 同 onShowQuickSendForm：编辑入口在剪贴板面板内，先退出 Overlay 防表单被盖
                 service.keyboardViewModel.closeOverlay()
                 service.uiState.value = service.uiState.value.copy(
@@ -458,10 +460,6 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendEditingItemCode = code,
                     enterKeyText = "确定",
                 )
-                QuickSendFormEditTextHolder.editText?.let { et ->
-                    et.setText(text)
-                    et.setSelection(text.length)
-                }
             },
             onHideQuickSendForm = {
                 android.util.Log.d("QuickSendForm", "onHideQuickSendForm invoked")
@@ -476,9 +474,7 @@ internal fun rememberImeKeyboardCallbacks(
                 )
                 QuickSendFormEditTextHolder.editText = null
                 QuickSendFormCodeEditTextHolder.editText = null
-                service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(1))
-                // insets 恢复由 SideEffect 驱动：表单收起 → 容器物理高度还原 →
-                // relayout → onComputeInsets 自动重算，无需强制触发。
+                service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
             },
             onQuickSendFormFocusChange = { focused: Boolean ->
                 // 聚焦时回车键为"确定"；失焦不改文案——表单仍显示，回车保持"确定"
