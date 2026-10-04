@@ -12,6 +12,20 @@ import org.junit.Test
  * 两边一起动（看起来像整体缩放），而且调节框由屏幕宽度和偏移另算，和真实卡片边界对不上。
  */
 class KeyboardResizeGeometryTest {
+    @Test fun floatingControlsLeaveTheWholeBottomBlankFreeAtLargeHeightsAndPadding() {
+        for (density in listOf(1f, 1.875f, 3f)) for (height in listOf(256f, 448f, 900f))
+            for (padding in listOf(0, 18, 100)) {
+                val metrics = keyboardGridMetrics(KeyVisualPolicy.Qwerty, 360f, height - 72f - padding,
+                    columns = 10f, growthSpacing = null to null, allowShrink = true)
+                val keyBlank = 8f + metrics.bottomSpaceDp + metrics.extraInsetY + (metrics.insetY ?: 0f)
+                val area = floatingDragAreaHeightDp(padding, keyBlank, height)
+                val frame = ResizeRect(0f, 0f, 360f * density, height * density)
+                val controls = resizeControlsRect(frame, density, true, area * density)
+                assertTrue("controls overlap the bottom movement area", controls.bottom <= frame.bottom - area * density)
+                assertTrue("controls must remain usable", controls.height > 40f * density)
+            }
+    }
+
     @Test fun largerCornerTargetsDoNotStealStraightEdgesOrMiddle() {
         for (density in listOf(1f, 1.875f, 3f)) for (floating in listOf(false, true)) {
             val frame = ResizeRect(50f * density, 80f * density, 410f * density, 420f * density)

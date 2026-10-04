@@ -47,6 +47,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.keyboard.KeyboardInputPage
 import com.kingzcheung.xime.util.SubcharHelper
+import com.kingzcheung.xime.settings.InputProfile
+import com.kingzcheung.xime.settings.LayoutKind
+
+/** A keypad's number page inherits the text page's geometry settings. */
+internal fun numberKeyboardSpacingSection(profile: InputProfile, ascii: Boolean): String = when {
+    !ascii && profile.layout.kind == LayoutKind.KANA_KEYPAD -> "japanese_kana"
+    !ascii && profile.layout.kind == LayoutKind.T9 -> "t9"
+    else -> "number"
+}
 
 /** Numeric keypad; slot one opens symbols, slot two returns to the original text mode. */
 @Composable
@@ -94,7 +103,8 @@ fun NumberKeyboardLayout(
         return
     }
     KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f,
-        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
+        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true,
+        growthSpacing = keySpacingX?.value to keySpacingY?.value) { bodyModifier ->
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
@@ -149,7 +159,7 @@ fun NumberKeyboardLayout(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+                    .padding(bottom = 8.dp),
             ) {
                 NumberRows(
                     onKeyPress = onKeyPress,
@@ -223,7 +233,7 @@ private fun NumberRows(
                 SwipeableIconKeyButton(
                     icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
                     onClick = { onKeyPress("delete") }, backgroundColor = specialKeyBackgroundColor,
-                    iconColor = specialKeyTextColor, modifier = Modifier.weight(1f),
+                    iconColor = specialKeyTextColor, modifier = Modifier.weight(1f).testTag("number-delete-key"),
                     swipeText = "清空", onSwipe = { onKeyPress("clear_composition") },
                     onLongClick = { onKeyPress("delete") }, onPress = { onKeyPressDown?.invoke("delete") },
                     swipeUpLabel = "上滑清空", swipeDownLabel = "下滑撤回",

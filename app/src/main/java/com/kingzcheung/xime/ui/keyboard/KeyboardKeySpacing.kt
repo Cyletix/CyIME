@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -17,6 +20,9 @@ import androidx.compose.ui.unit.dp
 
 /** 用户明确调整过固定宽度后，按实际宽度排键，不再自动收回屏幕中央。 */
 internal val LocalKeyboardExplicitWidth = staticCompositionLocalOf { false }
+
+/** 主键区底排键帽下方的留白；只调整移动条，不参与键区尺寸计算。 */
+internal val LocalFloatingBottomClearance = staticCompositionLocalOf<MutableFloatState?> { null }
 
 /**
  * 当前键盘体的视觉度量（由布局策略算出）。
@@ -46,6 +52,8 @@ internal fun KeyboardKeySpacingScope(
     policy: KeyVisualPolicy = KeyVisualPolicy.Qwerty,
     allowShrink: Boolean = false,
     applyGutter: Boolean = false,
+    /** Four-row typing grids opt in with their existing X/Y spacing overrides. */
+    growthSpacing: Pair<Float?, Float?>? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     BoxWithConstraints(modifier) {
@@ -56,28 +64,38 @@ internal fun KeyboardKeySpacingScope(
             LocalKeyboardExplicitWidth.current -> policy.copy(maxKeyWidth = Float.MAX_VALUE)
             else -> policy
         }
-        val metrics = keyVisualMetrics(
+        val metrics = keyboardGridMetrics(
             policy = effectivePolicy,
-            availableWidthDp = maxWidth.value * widthFraction,
+            availableWidthDp = maxWidth.value,
             availableHeightDp = maxHeight.value,
             columns = columns,
             rows = rows,
             verticalInsetDp = verticalInset.value,
             allowShrink = allowShrink,
-        ).withAppliedGutter(
-            availableWidthDp = maxWidth.value,
-            columns = columns,
             horizontalInsetDp = horizontalInset.value,
             applyGutter = applyGutter,
             widthFraction = widthFraction,
+            growthSpacing = growthSpacing,
         )
+        val bottomClearance = LocalFloatingBottomClearance.current
+        if (bottomClearance != null && growthSpacing != null) {
+            val clearance = verticalInset.value + metrics.bottomSpaceDp + metrics.extraInsetY +
+                resolvedVisualGap(growthSpacing.second, metrics.insetY ?: 0f) / 2f
+            SideEffect { bottomClearance.floatValue = clearance }
+            DisposableEffect(bottomClearance) {
+                onDispose { bottomClearance.floatValue = 0f }
+            }
+        }
         CompositionLocalProvider(
+            // 符号页等嵌套网格不能覆盖整张键盘的底部留白。
+            LocalFloatingBottomClearance provides null,
             LocalKeyboardKeyVisualMetrics provides metrics,
             LocalKeyboardKeyContentScale provides KeyboardKeyMetrics.contentScale(metrics.capShortEdge, metrics.capShortEdge),
         ) {
             // 调用方声明的 horizontalInset 只作为 gutter 下限（历史参数：曾经只是公式预留）
             val gutter = metrics.gutterX
-            content(Modifier.fillMaxSize().padding(start = gutter.dp, end = gutter.dp))
+            content(Modifier.fillMaxSize().padding(start = gutter.dp, end = gutter.dp,
+                top = metrics.topSpaceDp.dp, bottom = metrics.bottomSpaceDp.dp))
         }
     }
 }
@@ -96,9 +114,9 @@ internal fun scaledKeyVisualPadding(padding: PaddingValues = LocalKeyVisualPaddi
     return remember(padding, metrics, direction) {
         PaddingValues(
             start = resolvedKeyInset(padding.calculateStartPadding(direction), metrics.insetX),
-            top = resolvedKeyInset(padding.calculateTopPadding(), metrics.insetY),
+            top = resolvedKeyInset(padding.calculateTopPadding(), metrics.insetY) + metrics.extraInsetY.dp,
             end = resolvedKeyInset(padding.calculateEndPadding(direction), metrics.insetX),
-            bottom = resolvedKeyInset(padding.calculateBottomPadding(), metrics.insetY),
+            bottom = resolvedKeyInset(padding.calculateBottomPadding(), metrics.insetY) + metrics.extraInsetY.dp,
         )
     }
 }

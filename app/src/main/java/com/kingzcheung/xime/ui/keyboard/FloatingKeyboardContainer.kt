@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,7 +38,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -85,19 +85,22 @@ internal fun FloatingKeyboardContainer(
     onDragEnd: () -> Unit,
     onDock: () -> Unit = {},
     /** 调节模式中的唯一预览矩形；非空时直接决定真实卡片最终位置与尺寸。 */
-    previewRect: ResizeRect? = null,
-    /** 拖动时只变换图层；卡片内容保留上次松手时的测量尺寸。 */
-    previewTransformRect: State<ResizeRect>? = null,
+    previewRectState: State<ResizeRect>? = null,
     onCardPositioned: (left: Int, top: Int, right: Int, bottom: Int) -> Unit = { _: Int, _: Int, _: Int, _: Int -> },
     fixedWidthDp: Int = 0,
     fixedOffsetX: Int = 0,
     resolvedWidthDp: Int = 0,
     aspectLimits: KeyboardAspectLimits = KeyboardAspectLimits.Letters,
     letterDefaults: LetterKeyboardDefaults? = null,
+    bottomContentPaddingDp: Int = 0,
+    bottomKeyClearance: State<Float>? = null,
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val fixedCardShape = keyboardPanelShape(false, rememberRoundedKeyboardBottom())
+    // Read here so pointer updates remeasure the card without recomposing KeyboardView.
+    // Keys, toolbar and the resize frame now use the same geometry before release.
+    val previewRect = previewRectState?.value
 
     // 调节模式下固定键盘也放进稳定的全屏宿主里，previewRect 直接决定它的真实区域。
     // 这样控制面板可以放在键盘外面，边框也不会因为宿主高度变化而漂移。
@@ -127,7 +130,6 @@ internal fun FloatingKeyboardContainer(
                         .align(Alignment.TopStart)
                         .absoluteOffset { IntOffset(previewRect.left.roundToInt(), previewRect.top.roundToInt()) }
                         .size(previewWidth, previewHeight)
-                        .then(resizePreviewTransform(previewRect, previewTransformRect))
                         .clip(fixedCardShape)
                         .testTag("fixed-keyboard-resize-preview")
                         .onGloballyPositioned { coords ->
@@ -141,9 +143,8 @@ internal fun FloatingKeyboardContainer(
                             )
                         }
                 ) {
-                    // Window bounds change every preview frame; the menu host would recompose every key.
-                    if (previewTransformRect == null) LanguageMenuPanel { keyboardContent() }
-                    else keyboardContent()
+                    // Resize controls own input; keep the menu host out of the live preview.
+                    keyboardContent()
                 }
             }
         }
@@ -168,6 +169,8 @@ internal fun FloatingKeyboardContainer(
         )
         val cardRect = previewRect ?: normalRect
         val cardTotalHeight = with(density) { cardRect.height.toDp() }
+        val dragAreaHeight = floatingDragAreaHeightDp(bottomContentPaddingDp,
+            bottomKeyClearance?.value ?: 0f, cardTotalHeight.value).dp
         val horizontalTravel = ((maxWidth.value - normalRect.width / density.density) / 2f).coerceAtLeast(0f)
         val minimumY = minOffsetY.coerceIn(0, maxHeight.value.roundToInt()).toFloat()
         val maxOffsetY = (maxHeight.value - cardTotalHeight.value).coerceAtLeast(minimumY)
@@ -237,7 +240,6 @@ internal fun FloatingKeyboardContainer(
             .align(Alignment.TopStart)
             .absoluteOffset { IntOffset(cardRect.left.roundToInt(), cardRect.top.roundToInt()) }
             .size(with(density) { cardRect.width.toDp() }, with(density) { cardRect.height.toDp() })
-            .then(if (previewRect != null) resizePreviewTransform(previewRect, previewTransformRect) else Modifier)
         Box(
             modifier = cardPlacement
                 .clip(FloatingKeyboardCardShape)
@@ -262,78 +264,67 @@ internal fun FloatingKeyboardContainer(
                     CompositionLocalProvider(
                         LocalDensity provides Density(density = density.density, fontScale = density.fontScale * fontScaleFactor)
                     ) {
-                        // The resize overlay owns input while the card is being transformed.
-                        if (previewRect != null && previewTransformRect != null) keyboardContent()
+                        // The resize overlay owns input while the card is being measured.
+                        if (previewRect != null) keyboardContent()
                         else LanguageMenuPanel { keyboardContent() }
                     }
                 }
-                DragBar(
-                    backgroundColor = backgroundColor,
-                    onDragStart = {
-                        dockEpoch++
-                        dockReady = false
-                        dragX = safeOffsetX
-                        dragY = safeOffsetY
-                        dragEdge = positionedEdge
-                        dockGesture.start(dragEdge, 0L)
-                        isDragging = true
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        val dxDp = with(density) { dragAmount.x.toDp().value }
-                        val dyDp = with(density) { dragAmount.y.toDp().value }
-                        dragX = (dragX + dxDp).coerceIn(-horizontalTravel, horizontalTravel)
-                        dragY = (dragY - dyDp).coerceIn(minimumY, maxOffsetY)
-                        val nextEdge = floatingDockEdge(dragX.roundToInt().toFloat(), dragY.roundToInt().toFloat(),
-                            horizontalTravel, maxOffsetY, minOffsetY.toFloat())
-                        if (nextEdge != dragEdge) {
-                            // MOVE 与 UP 可能早于下一帧重组；必须在触摸回调中立即撤销准备态。
-                            dragEdge = nextEdge
-                            dockEpoch++
-                            dockReady = false
-                            dockGesture.update(nextEdge, 0L)
-                        }
-                        onDrag(dxDp, -dyDp)
-                    },
-                    onDragEnd = {
-                        val restore = dockReady && dockGesture.release(dragEdge, FLOATING_DOCK_DURATION_MILLIS)
-                        dockGesture.cancel()
-                        dockEpoch++
-                        isDragging = false
-                        dockReady = false
-                        onDragEnd()
-                        if (restore) onDock()
-                    },
-                    onDragCancel = {
-                        dockGesture.cancel()
-                        dockEpoch++
-                        isDragging = false
-                        dockReady = false
-                        onDragEnd()
-                    },
-                )
+                Spacer(Modifier.fillMaxWidth().height(FLOATING_DRAG_BAR_HEIGHT_DP.dp)
+                    .keyboardPanelBackground(backgroundColor))
             }
+            DragBar(
+                modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
+                onDragStart = {
+                    dockEpoch++
+                    dockReady = false
+                    dragX = safeOffsetX
+                    dragY = safeOffsetY
+                    dragEdge = positionedEdge
+                    dockGesture.start(dragEdge, 0L)
+                    isDragging = true
+                },
+                onDrag = { change, dragAmount ->
+                    change.consume()
+                    val dxDp = with(density) { dragAmount.x.toDp().value }
+                    val dyDp = with(density) { dragAmount.y.toDp().value }
+                    dragX = (dragX + dxDp).coerceIn(-horizontalTravel, horizontalTravel)
+                    dragY = (dragY - dyDp).coerceIn(minimumY, maxOffsetY)
+                    val nextEdge = floatingDockEdge(dragX.roundToInt().toFloat(), dragY.roundToInt().toFloat(),
+                        horizontalTravel, maxOffsetY, minOffsetY.toFloat())
+                    if (nextEdge != dragEdge) {
+                        // MOVE 与 UP 可能早于下一帧重组；必须在触摸回调中立即撤销准备态。
+                        dragEdge = nextEdge
+                        dockEpoch++
+                        dockReady = false
+                        dockGesture.update(nextEdge, 0L)
+                    }
+                    onDrag(dxDp, -dyDp)
+                },
+                onDragEnd = {
+                    val restore = dockReady && dockGesture.release(dragEdge, FLOATING_DOCK_DURATION_MILLIS)
+                    dockGesture.cancel()
+                    dockEpoch++
+                    isDragging = false
+                    dockReady = false
+                    onDragEnd()
+                    if (restore) onDock()
+                },
+                onDragCancel = {
+                    dockGesture.cancel()
+                    dockEpoch++
+                    isDragging = false
+                    dockReady = false
+                    onDragEnd()
+                },
+            )
         }
 
     }
 }
 
-private fun resizePreviewTransform(
-    layoutRect: ResizeRect,
-    visualRect: State<ResizeRect>?,
-): Modifier = if (visualRect == null) Modifier else Modifier.graphicsLayer {
-    // Snapshot state is read by the layer, not composition or measure.
-    val target = visualRect.value
-    transformOrigin = TransformOrigin(0f, 0f)
-    scaleX = target.width / layoutRect.width.coerceAtLeast(1f)
-    scaleY = target.height / layoutRect.height.coerceAtLeast(1f)
-    translationX = target.left - layoutRect.left
-    translationY = target.top - layoutRect.top
-}
-
 @Composable
 private fun DragBar(
-    backgroundColor: Color,
+    modifier: Modifier,
     onDragStart: () -> Unit,
     onDrag: (change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -344,10 +335,8 @@ private fun DragBar(
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val currentOnDragCancel by rememberUpdatedState(onDragCancel)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(FLOATING_DRAG_BAR_HEIGHT_DP.dp)
-            .keyboardPanelBackground(backgroundColor)
             .testTag("floating-drag-bar")
             .pointerInput(Unit) {
                 detectDragGestures(
@@ -364,7 +353,8 @@ private fun DragBar(
                 .fillMaxWidth(0.36f)
                 .height(5.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(Color.White.copy(alpha = 0.6f))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                .testTag("floating-drag-indicator")
         )
     }
 }

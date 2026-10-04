@@ -259,7 +259,9 @@ fun KeyboardView(
     // Compose background and keys into the same layer before applying opacity.
     val contentModifier = if (state.handwritingExpanded) previewModifier else previewModifier.keyboardBackground(themeScheme.keyboardBackground, state.isDarkTheme, keyboardBgColor)
     var cursorControlActive by remember { mutableStateOf(false) }
+    val floatingBottomClearance = remember(state.isFloatingMode) { mutableFloatStateOf(0f) }
     CompositionLocalProvider(
+        LocalFloatingBottomClearance provides if (state.isFloatingMode) floatingBottomClearance else null,
         com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
             com.kingzcheung.xime.ui.theme.MaterialPalette(keyboardBgColor, accentColor),
         LocalKeyboardExplicitWidth provides (state.keyboardWidthDp > 0 || (!state.isFloatingMode && (state.fixedWidthDp > 0 || resizeActive))),
@@ -338,12 +340,8 @@ fun KeyboardView(
         val initialPadding = remember(sessionKey) { state.keyboardBottomPaddingDp }
         val resizePreviewRect = remember(sessionKey) { mutableStateOf(initialPreviewRect) }
         val previewPaddingDp = remember(sessionKey) { mutableIntStateOf(initialPadding) }
-        var layoutPreviewRect by remember(sessionKey) { mutableStateOf(initialPreviewRect) }
-        var layoutPaddingDp by remember(sessionKey) { mutableIntStateOf(initialPadding) }
-        // Drag events only update the visual rect. Reflow all keys once on release.
-        val activePreviewRect = if (resizeActive) layoutPreviewRect else null
         val renderedBottomPaddingDp = if (resizeActive && !state.isFloatingMode)
-            layoutPaddingDp else state.keyboardBottomPaddingDp
+            previewPaddingDp.intValue else state.keyboardBottomPaddingDp
 
     FloatingKeyboardContainer(
         isFloatingMode = state.isFloatingMode,
@@ -356,6 +354,8 @@ fun KeyboardView(
         minOffsetY = state.floatingMinOffsetY,
         availableHeightDp = state.floatingScreenHeightDp,
         contentHeightDp = state.keyboardHeightDp,
+        bottomContentPaddingDp = renderedBottomPaddingDp,
+        bottomKeyClearance = floatingBottomClearance,
         fixedWidthDp = state.fixedWidthDp,
         fixedOffsetX = state.fixedOffsetX,
         resolvedWidthDp = state.keyboardWidthDp,
@@ -367,8 +367,7 @@ fun KeyboardView(
         onDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
-        previewRect = activePreviewRect,
-        previewTransformRect = if (resizeActive) resizePreviewRect else null,
+        previewRectState = if (resizeActive) resizePreviewRect else null,
         onCardPositioned = onCardPositioned,
     ) {
         Box(modifier = Modifier.fillMaxSize().then(contentModifier)) {
@@ -826,6 +825,23 @@ fun KeyboardView(
                         remainingCandidates(entries, visibleBarCandidates)
                     }
                 }
+                val candidateQwerty = remember(configVersion, keyboardState, state.inputProfile,
+                    inputPreferences.splitKeyboardEnabled, underlyingPage) {
+                    val ascii = keyboardState is KeyboardLayoutState.English
+                    val usesQwerty = underlyingPage == KeyboardPage.Main(MainType.FULL) &&
+                        (ascii || keyboardState is KeyboardLayoutState.Chinese &&
+                            state.inputProfile.layout.kind in setOf(
+                                com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC,
+                                com.kingzcheung.xime.settings.LayoutKind.MERGED))
+                    if (!usesQwerty) null else {
+                        val custom = if (ascii) null else
+                            com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(state.currentSchemaId)
+                        candidateQwertyGeometry(custom?.typingRows() ?: KeysConfigHelper.getKeyRows(ascii),
+                            fourteenKey = !ascii && state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14,
+                            custom = custom != null,
+                            split = inputPreferences.splitKeyboardEnabled && supportsSplitKeyboard(state.currentSchemaId, ascii))
+                    }
+                }
                 CandidatePage(
                     state = CandidatePageState(
                         candidates = expandedEntries,
@@ -841,7 +857,8 @@ fun KeyboardView(
                         railSelectedPinyinIndex = railSelectedPinyinIndex,
                         railAccentColor = accentColor,
                         enterKeyText = state.enterKeyText,
-                        matchT9Geometry = state.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.T9,
+                        matchT9Geometry = isT9Layout,
+                        qwertyGeometry = candidateQwerty,
                         floating = state.isFloatingMode,
                     ),
                     callbacks = CandidatePageCallbacks(
@@ -1207,7 +1224,7 @@ fun KeyboardView(
                 val panelType = (underlyingPage as KeyboardPage.Panel).type
                 val japaneseNumberPage = !state.isAsciiMode &&
                     state.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD
-                val numberSpacing = kbKey.spacingFor(if (japaneseNumberPage) "japanese_kana" else "number")
+                val numberSpacing = kbKey.spacingFor(numberKeyboardSpacingSection(state.inputProfile, state.isAsciiMode))
                 when (panelType) {
                     PanelType.NUMBER -> NumberKeyboardLayout(
                         onKeyPress = { key ->
@@ -1639,10 +1656,7 @@ fun KeyboardView(
                 else ResizeRect(0f, 0f, hostWidthPx,
                     (hostHeightPx - fixedBottomInsetDp * resizeControlDensity.density).coerceAtLeast(1f)),
             initialBottomPaddingDp = initialPadding,
-            onDragEnd = {
-                layoutPreviewRect = resizePreviewRect.value
-                layoutPaddingDp = previewPaddingDp.intValue
-            },
+            bottomKeyClearance = floatingBottomClearance,
             density = resizeControlDensity,
             aspectLimits = KeyboardAspectLimits.forLayout(state.inputProfile.layout.kind, inputPreferences.splitKeyboardEnabled),
             squareSnap = KeyboardSquareSnap.forLayout(state.inputProfile.layout.kind, inputPreferences.splitKeyboardEnabled),
@@ -1662,13 +1676,13 @@ private fun KeyboardResizeControlsHost(
     fixedBottomInsetDp: Int,
     bounds: ResizeRect,
     initialBottomPaddingDp: Int,
-    onDragEnd: () -> Unit,
+    bottomKeyClearance: State<Float>,
     density: androidx.compose.ui.unit.Density,
     aspectLimits: KeyboardAspectLimits,
     squareSnap: KeyboardSquareSnap?,
     controls: @Composable () -> Unit,
 ) {
-    // Keep reads of the rapidly changing preview state inside this small overlay subtree.
+    // The controls and measured keyboard share one live rectangle.
     val session = KeyboardResizePreviewState(
         rect = previewRect.value,
         initialRect = initialRect,
@@ -1677,9 +1691,9 @@ private fun KeyboardResizeControlsHost(
         fixedHeightRange = fixedHeightRange,
         fixedBottomInsetDp = fixedBottomInsetDp,
         bottomPaddingDp = previewPaddingDp.intValue,
+        floatingBottomClearanceDp = bottomKeyClearance.value,
         initialBottomPaddingDp = initialBottomPaddingDp,
         onBottomPaddingChange = { previewPaddingDp.intValue = it },
-        onDragEnd = onDragEnd,
         aspectLimits = aspectLimits,
         squareSnap = squareSnap,
     )

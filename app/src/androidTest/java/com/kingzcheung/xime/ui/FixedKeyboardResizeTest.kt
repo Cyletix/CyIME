@@ -94,34 +94,45 @@ class FixedKeyboardResizeTest {
         }
     }
 
-    @Test fun dragPreviewDoesNotRemeasureKeyboardUntilRelease() {
+    @Test fun dragPreviewRemeasuresBeforeReleaseAndKeepsToolbarHeight() {
         val initial = ResizeRect(0f, 200f, 360f, 540f)
         val visual = mutableStateOf(initial)
-        var settled by mutableStateOf(initial)
+        var floating by mutableStateOf(false)
         var measures = 0
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 Box(Modifier.size(360.dp, 540.dp)) {
-                    FloatingKeyboardContainer(false, 1f, offsetX = 0, offsetY = 0,
-                        contentHeightDp = 340, previewRect = settled, previewTransformRect = visual,
+                    FloatingKeyboardContainer(floating, 1f, offsetX = 0, offsetY = 0,
+                        contentHeightDp = 340, previewRectState = visual,
                         onDrag = { _, _ -> }, onDragEnd = {}) {
-                        Box(Modifier.fillMaxSize().layout { measurable, constraints ->
+                        Column(Modifier.fillMaxSize().layout { measurable, constraints ->
                             measures++
                             val child = measurable.measure(constraints)
                             layout(child.width, child.height) { child.place(0, 0) }
-                        })
+                        }) {
+                            Box(Modifier.fillMaxWidth().height(44.dp).testTag("live-toolbar"))
+                            repeat(4) { row -> Box(Modifier.fillMaxWidth().weight(1f).testTag("live-row-$row")) }
+                        }
                     }
                 }
             }
         }
-        var baseline = 0
-        rule.runOnIdle { baseline = measures }
-        repeat(10) { step ->
-            rule.runOnIdle { visual.value = ResizeRect(0f, 200f - step * 4f, 360f, 540f) }
+        for (mode in listOf(false, true)) {
+            rule.runOnIdle { floating = mode; visual.value = initial }
+            rule.waitForIdle()
+            var baseline = 0
+            rule.runOnIdle { baseline = measures }
+            val oldRowHeight = rule.onNodeWithTag("live-row-0").fetchSemanticsNode().boundsInRoot.height
+            repeat(10) { step ->
+                rule.runOnIdle { visual.value = ResizeRect(0f, 196f - step * 4f, 360f - step * 2f, 540f) }
+                rule.waitForIdle()
+                assertEquals(44f, rule.onNodeWithTag("live-toolbar").fetchSemanticsNode().boundsInRoot.height, 1f)
+            }
+            rule.runOnIdle { assertTrue("each held drag must remeasure", measures > baseline) }
+            val newRow = rule.onNodeWithTag("live-row-0").fetchSemanticsNode().boundsInRoot
+            assertTrue(newRow.height > oldRowHeight)
+            assertEquals(visual.value.width, newRow.width, 1f)
         }
-        rule.runOnIdle { assertEquals(baseline, measures) }
-        rule.runOnIdle { settled = visual.value }
-        rule.runOnIdle { assertTrue(measures > baseline) }
     }
 
     @Test fun narrowedCardLeavesBothGuttersTransparentAndReportsItsActualBounds() {
@@ -169,7 +180,7 @@ class FixedKeyboardResizeTest {
                             contentHeightDp = 340, fixedWidthDp = geometry?.widthDp ?: 0,
                             fixedOffsetX = geometry?.horizontalOffsetDp ?: 0,
                             onDrag = { _, _ -> }, onDragEnd = {},
-                            previewRect = if (resizing) rect else null) {
+                            previewRectState = if (resizing) rememberUpdatedState(rect) else null) {
                             Box(Modifier.fillMaxSize().testTag("fixed-content"))
                         }
                         if (resizing) CompositionLocalProvider(LocalKeyboardResizePreviewState provides

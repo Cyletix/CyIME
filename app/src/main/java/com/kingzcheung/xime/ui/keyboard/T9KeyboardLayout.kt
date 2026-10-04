@@ -124,7 +124,8 @@ fun T9KeyboardLayout(
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
 ) {
     KeyboardKeySpacingScope(modifier, columns = 5f * 3f / 3.4f,
-        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true) { bodyModifier ->
+        policy = KeyVisualPolicy.T9, allowShrink = isFloatingMode, applyGutter = true,
+        growthSpacing = keySpacingX?.value to keySpacingY?.value) { bodyModifier ->
     val controller = t9Controller
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -683,8 +684,8 @@ private fun T9KeyboardContent(
                 swipeText = if (compactMode) null else "清空",
                 onSwipe = { onKeyPress("clear_composition") },
                 onPress = { onKeyPressDown?.invoke("delete") },
-                swipeUpLabel = if (compactMode) null else "上滑清空",
-                swipeDownLabel = if (compactMode) null else "下滑撤回",
+                swipeUpLabel = "上滑清空",
+                swipeDownLabel = "下滑撤回",
                 onSwipeUp = { onKeyPress("clear_all") },
                 onSwipeDown = { onKeyPress("undo_clear") },
                 onSwipeLeft = { onKeyPress("clear_composition") },

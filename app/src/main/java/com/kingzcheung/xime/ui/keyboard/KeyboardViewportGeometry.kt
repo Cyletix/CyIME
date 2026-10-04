@@ -59,6 +59,6 @@ internal fun resizeControlsRect(
     val top = ((if (floating) RESIZE_CORNER_HIT_DP else 62f) * scale).coerceAtMost(frame.height / 4f)
     val bottom = maxOf(RESIZE_CORNER_HIT_DP * scale,
         if (floating) dragBarHeightPx + 8f * scale else 26f * scale)
-        .coerceAtMost(frame.height / 4f)
+        .coerceAtMost(if (floating) (frame.height - top).coerceAtLeast(0f) else frame.height / 4f)
     return ResizeRect(frame.left + side, frame.top + top, frame.right - side, frame.bottom - bottom)
 }

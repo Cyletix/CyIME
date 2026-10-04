@@ -130,16 +130,16 @@ fun KeyboardLayout(
         callbacks.onLetterNeighbors?.invoke(uiState.currentSchemaId, "")
         onDispose { }
     }
-    // 合并键布局使用自身的参考格宽，避免把手机宽键误当作平板键。
-    val mergedSection = remember(cfgVer, uiState.currentSchemaId) {
-        KeysConfigHelper.mergedSectionForSchema(uiState.currentSchemaId)
-    }
+    // Shared physical frame and bottom-row spacing for 14/26 keys. The paired
+    // alphabet keys still occupy their own five-column rows inside that frame.
+    val fourteenKey = !isAsciiMode && uiState.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14
     KeyboardKeySpacingScope(modifier,
-        columns = keyRows.firstOrNull()?.size?.toFloat() ?: 10f,
+        columns = if (fourteenKey) 10f else keyRows.firstOrNull()?.size?.toFloat() ?: 10f,
         widthFraction = if (splitKeyboard) 0.9f else 1f,
-        policy = if (mergedSection == "qwerty_14") KeyVisualPolicy.FourteenKey else KeyVisualPolicy.Qwerty,
+        policy = KeyVisualPolicy.Qwerty,
         allowShrink = uiState.isFloatingMode,
         applyGutter = true,
+        growthSpacing = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty"),
     ) { bodyModifier ->
     val letterRowGeometry = standardLetterRowGeometry(
         keyRows = keyRows,
@@ -594,7 +594,7 @@ fun KeyboardLayout(
                     }
 
                     // 26键底行：逗号与地球等宽，逗号右缘不超过上一行 X 键右缘。
-                    val bottom = if (keyRows.firstOrNull()?.size == 10) QwertyBottomRowWeights.Standard else QwertyBottomRowWeights.Legacy
+                    val bottom = if (fourteenKey || keyRows.firstOrNull()?.size == 10) QwertyBottomRowWeights.Standard else QwertyBottomRowWeights.Legacy
                     // 第四行（控制行）
                     Row(
                         modifier = Modifier
@@ -692,7 +692,7 @@ fun KeyboardLayout(
                                     onClick = k2OnClick,
                                     backgroundColor = specialKeyBackgroundColor,
                                     iconColor = specialKeyTextColor,
-                                    modifier = Modifier.weight(bottom.punctuation),
+                                    modifier = Modifier.weight(bottom.punctuation).testTag("qwerty-punctuation-key"),
                                     onPress = { onKeyPressDown?.invoke(k2TapValue) },
                                     onRelease = { onKeyRelease?.invoke(k2TapValue) },
                                     swipeText = k2SwipeUpLabel,
@@ -712,7 +712,7 @@ fun KeyboardLayout(
                                     onClick = k2OnClick,
                                     backgroundColor = keyBackgroundColor,
                                     textColor = keyTextColor,
-                                    modifier = Modifier.weight(bottom.punctuation),
+                                    modifier = Modifier.weight(bottom.punctuation).testTag("qwerty-punctuation-key"),
                                     swipeText = k2SwipeUpLabel,
                                     symbolInputText = symbolInputValue(k2SwipeUpCommitValue, k2SwipeUpRaw?.action),
                                     swipeDownText = k2SwipeDownBubbleText,
@@ -1609,7 +1609,7 @@ private fun SplitKeyboardContent(
                     iconColor = specialKeyTextColor,
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight().semantics { contentDescription = "删除" },
+                        .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
                     onLongClick = { onKeyPress("delete") },
                     onPress = { onKeyPressDown?.invoke("delete") },
                     onRelease = { onKeyRelease?.invoke("delete") },
@@ -1752,7 +1752,7 @@ private fun SplitKeyboardContent(
                     onClick = { onKeyPress("enter") },
                     backgroundColor = specialKeyBackgroundColor,
                     textColor = specialKeyTextColor,
-                    modifier = Modifier.weight(1.2f),
+                    modifier = Modifier.weight(1.2f).testTag("qwerty-enter-key"),
                     onPress = { onKeyPressDown?.invoke("enter") },
                     onRelease = { onKeyRelease?.invoke("enter") },
                     shadowEnabled = shadowEnabled,

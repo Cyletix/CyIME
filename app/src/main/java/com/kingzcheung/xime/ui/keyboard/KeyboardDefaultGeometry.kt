@@ -51,8 +51,8 @@ internal fun defaultLetterKeyboardSize(
         var capWidth = cellWidth
         // Gap Y is capped by the row height. Solve the same metrics used by rendering.
         repeat(6) {
-            val metrics = keyVisualMetrics(policy, width, rowHeight * 4f + 8f, 10f,
-                allowShrink = defaults.floating)
+            val metrics = keyboardGridMetrics(policy, width, rowHeight * 4f + 8f, 10f,
+                allowShrink = defaults.floating, growthSpacing = defaults.spacingX to defaults.spacingY)
             val gapX = defaults.spacingX?.takeUnless { it == KeyVisualPolicy.DeclaredDefaultGap }
                 ?: ((metrics.insetX ?: 0f) * 2f)
             val gapY = defaults.spacingY?.takeUnless { it == KeyVisualPolicy.DeclaredDefaultGap }
