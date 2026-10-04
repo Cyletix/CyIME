@@ -423,6 +423,31 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             }
             val geometry = letterNeighbors
             service.rimeEngine.setNeighborMap(if (geometry.first == service.uiState.value.currentSchemaId) geometry.second else "")
+            val english = service.uiState.value.let {
+                it.isAsciiMode || it.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
+            }
+            if (english && key.length == 1 && (key[0] in 'a'..'z' || key[0] in 'A'..'Z')) {
+                val pending = withEditor {
+                    val next = commitEnglishLetter(service.candidateState.value, key, isShifted,
+                        service.supportsEnglishCandidateReplace()) {
+                        service.commitTextAndPredict(it, isPaste = false, allowPrediction = false).accepted
+                    }
+                    if (next != null) service.candidateState.value = next
+                    next?.pendingEnglishText
+                }
+                if (pending != null && !service.isSecretEditor() && service.supportsEnglishCandidateReplace()) {
+                    service.serviceScope.launch(InputCommandOwner.requireOwner().context()) {
+                        val words = service.predictionManager.getEnglishAssociations(pending)
+                        withEditor {
+                            val current = service.candidateState.value
+                            if (current.pendingEnglishText == pending && service.uiState.value.isAsciiMode) {
+                                service.candidateState.value = current.copy(associationCandidates = words)
+                            }
+                        }
+                    }
+                }
+                return@command
+            }
             if (service.japaneseInputController.handleKey(key)) return@command
             val state = service.uiState.value
             val candState = service.candidateState.value
