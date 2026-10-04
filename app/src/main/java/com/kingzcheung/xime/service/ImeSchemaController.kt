@@ -348,6 +348,27 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
 
     internal fun moveEditorCursorVertical(steps: Int) = editCursor { editorCursor.moveVertical(it, steps) }
 
+    internal fun observeEditorSelection(start: Int, end: Int) {
+        service.currentInputConnection?.let { editorCursor.observeSelection(it, start, end) }
+    }
+
+    /** Main thread, called inside the existing key FIFO; never enqueue a second cursor job. */
+    internal fun moveHardwareCursor(event: KeyEvent) {
+        val state = service.uiState.value
+        val internalEditor = when {
+            state.quickSendFormFocused && state.quickSendCodeFocused -> QuickSendFormCodeEditTextHolder.editText
+            state.quickSendFormFocused -> QuickSendFormEditTextHolder.editText
+            state.toolPanelInputFocused -> ToolPanelEditTextHolder.editText
+            else -> null
+        }
+        val ic = if (state.quickSendFormFocused || state.toolPanelInputFocused) {
+            internalEditor?.onCreateInputConnection(android.view.inputmethod.EditorInfo()) ?: return
+        } else service.currentInputConnection ?: return
+        if (internalEditor != null) editorCursor.observeSelection(ic, internalEditor.selectionStart, internalEditor.selectionEnd)
+        editorCursor.movePhysical(ic, event.keyCode, event.isShiftPressed,
+            byWord = event.isCtrlPressed, toBoundary = event.isAltPressed || event.isMetaPressed)
+    }
+
     internal fun moveEditorCursor(steps: Int, onStep: () -> Unit = {}) =
         editCursor { editorCursor.moveWithFeedback(it, steps, onStep) }
 

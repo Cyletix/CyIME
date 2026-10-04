@@ -35,9 +35,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             cancelRejectedCommit()
             return true
         }
-        // Do not claim an event that the input FIFO cannot admit. Android must still
-        // be able to move the editor cursor while the engine is starting/redeploying.
-        if (service.inputReadiness.ticket() == null) return false
+        if (service.inputReadiness.ticket() == null) {
+            // Editor navigation does not require a decoder. Esc must never become
+            // an Android window-dismiss key, even while the engine is starting.
+            if (isHardwareArrow(keyCode)) {
+                service.schemaController.moveHardwareCursor(event)
+                return true
+            }
+            return keyCode == KeyEvent.KEYCODE_ESCAPE
+        }
         val key = when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> "hardware_candidate_left"
             KeyEvent.KEYCODE_DPAD_RIGHT -> "hardware_candidate_right"
@@ -64,7 +70,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         postRimeJob { hardwareNavigation.releasePress(key) }
     }
 
-    /** Candidate-window arrow buttons use the same ordered selection as physical arrows. */
+    /** Touch arrow buttons navigate candidates; physical arrows always edit the text. */
     internal fun moveHardwareCandidate(direction: Int) {
         val code = if (direction < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
         postRimeJob {
@@ -398,10 +404,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (!service.inputReadiness.accepts(admission) || hasPendingCandidateCommit) return@command
             if (hardwareEvent != null) {
                 if (processHardwareCandidateKey(hardwareEvent)) return@command
+                if (hardwareCandidateDigitIndex(hardwareEvent.keyCode, hardwareEvent.isShiftPressed) != null) {
+                    // DefaultInput here means no numbered candidate owns this digit.
+                    // Never send it back into the active T9 decoder as a new spelling.
+                    commitHardwareLiteral(key)
+                    return@command
+                }
+                if (key.length == 1 && (hardwareEvent.isShiftPressed && !key[0].isLetter() ||
+                        hardwareEvent.keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_EQUALS)) {
+                    commitHardwareLiteral(key)
+                    return@command
+                }
             } else {
                 hardwareNavigation.clear()
             }
-            if (hardwareEvent == null && key.length == 1) {
+            if (key.length == 1) {
                 withEditor {
                     service.predictionManager.invalidatePendingPredictions()
                     service.candidateState.value = service.candidateState.value.copy(associationCandidates = emptyList())
@@ -1006,7 +1023,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
-    /** Returns false only when Space should keep the ordinary on-screen-key behavior. */
+    /** Returns false when the key should continue through ordinary input handling. */
     private suspend fun processHardwareCandidateKey(event: KeyEvent, pageAtBoundary: Boolean = false): Boolean {
         val key = when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> HardwareCandidateKey.LEFT
@@ -1019,8 +1036,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             else -> if (hardwareCandidateDigitIndex(event.keyCode, event.isShiftPressed) != null)
                 HardwareCandidateKey.DIGIT else return false
         }
-        val arrow = key == HardwareCandidateKey.LEFT || key == HardwareCandidateKey.RIGHT ||
-            key == HardwareCandidateKey.UP || key == HardwareCandidateKey.DOWN
         hardwareNavigation.startPress(key, repeat = event.repeatCount > 0)
 
         // This read waits for the engine lock and never consumes commit text. In
@@ -1055,8 +1070,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val engineHasInput = composition
             ?.takeIf { service.rimeEngine.isCandidateRevisionCurrent(it.engineRevision) }
             ?.let { it.input.isNotEmpty() || service.t9PartialSegments.isNotEmpty() }
-        val decision = hardwareNavigation.decide(key, snapshot, engineHasInput, pageAtBoundary,
-            digitIndex = hardwareCandidateDigitIndex(event.keyCode, event.isShiftPressed))
+        val digitIndex = hardwareCandidateDigitIndex(event.keyCode, event.isShiftPressed)
+        val decision = if (pageAtBoundary) hardwareNavigation.decide(key, snapshot, engineHasInput,
+            pageAtBoundary = true, digitIndex = digitIndex)
+        else physicalCandidateDecision(key, snapshot, engineHasInput, digitIndex)
         if (com.kingzcheung.xime.BuildConfig.DEBUG) {
             Log.d("HardwareNavigation", "key=$key decision=$decision engineInput=$engineHasInput " +
                 "words=${snapshot.words.size} compact=${service.uiState.value.isCompact} " +
@@ -1064,6 +1081,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
         if (decision != HardwareCandidateDecision.Host) hardwareNavigation.retainPress(key)
         when (decision) {
+            HardwareCandidateDecision.MoveCursor -> {
+                if (commitHardwareLiteral("")) {
+                    withEditor { service.schemaController.moveHardwareCursor(event) }
+                }
+            }
+            HardwareCandidateDecision.LiteralSpace -> commitHardwareLiteral(" ")
             is HardwareCandidateDecision.Highlight -> withEditor { publishHardwareCandidateSelection() }
             is HardwareCandidateDecision.Page -> {
                 if (snapshot.expanded) {
@@ -1106,24 +1129,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     service.maybeCollapseCandidatePage()
                 }
             }
-            HardwareCandidateDecision.Host -> {
-                if (!arrow || !hardwareNavigation.ownsPress(key)) {
-                    withEditor {
-                        if (arrow) {
-                            // Moving in the editor invalidates the word context, including a
-                            // pending result and suggestions hidden by a narrow/vertical bar.
-                            service.predictionManager.invalidatePendingPredictions()
-                            val current = service.candidateState.value
-                            service.candidateState.value = current.copy(associationCandidates = emptyList(),
-                                pendingEnglishText = "")
-                            hardwareNavigation.clear()
-                            publishHardwareCandidateSelection()
-                        }
-                        service.currentInputConnection?.sendKeyEvent(event)
-                        service.currentInputConnection?.sendKeyEvent(KeyEvent.changeAction(event, KeyEvent.ACTION_UP))
-                    }
-                }
-            }
+            // A touch candidate-arrow with no candidates has nothing to navigate.
+            HardwareCandidateDecision.Host -> Unit
             HardwareCandidateDecision.Consume -> Unit
             HardwareCandidateDecision.DefaultInput -> {
                 if (!snapshot.state.isComposing && snapshot.state.inputText.isEmpty()) {
@@ -1136,6 +1143,37 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
                 return false
             }
+        }
+        return true
+    }
+
+    /** Finish unfinished raw input without choosing a word; clear only after acceptance. */
+    private suspend fun commitHardwareLiteral(suffix: String): Boolean {
+        val state = service.candidateState.value
+        val composition = service.rimeEngine.readQueuedComposition()
+        val hasComposition = composition?.input?.isNotEmpty() == true || state.isComposing ||
+            state.inputText.isNotEmpty() || service.t9PartialSegments.isNotEmpty()
+        if (hasComposition && composition == null) return false
+        val t9 = isT9Schema(service.uiState.value.currentSchemaId)
+        // Read the current engine result, not a previous UI frame: rapid typing
+        // followed by a shifted symbol must not drop the last letters.
+        val preedit = if (t9) com.kingzcheung.xime.rime.buildT9DisplayState(
+            service.t9PartialSegments.map { it.text }, composition?.preedit.orEmpty(),
+            composition?.input.orEmpty(), emptyList(), emptyList()).displayText
+        else composition?.preedit.orEmpty()
+        val raw = if (hasComposition) rawCompositionCommitText(composition?.input.orEmpty(), preedit, t9) else ""
+        val text = raw + suffix
+        if (text.isNotEmpty() && !withEditor { service.commitTextAndPredict(text, false, allowPrediction = false).accepted }) return false
+        if (text.isNotEmpty()) withEditor {
+            if (!service.uiState.value.quickSendFormFocused && !service.uiState.value.toolPanelInputFocused)
+                service.finishComposingInputBoxKeepingText()
+        }
+        service.japaneseInputController.handleKey("clear_composition")
+        clearInputStateForKeys()
+        withEditor {
+            hardwareNavigation.clear()
+            publishHardwareCandidateSelection()
+            service.maybeCollapseCandidatePage()
         }
         return true
     }
@@ -1567,7 +1605,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             inputText = "",
             preeditText = "",
             isComposing = false,
-            isShowingRecentClipboard = false
+            isShowingRecentClipboard = false,
+            candidateActions = emptyList(),
+            expandedCandidates = emptyList(),
+            expandedCandidatesLoaded = false,
+            hasNextPage = false,
+            hasPrevPage = false,
+            candidateFocus = null
         )
         if (SettingsPreferences.getInputTextLocation(service) ==
             SettingsPreferences.INPUT_TEXT_INPUT_BOX

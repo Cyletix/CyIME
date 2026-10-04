@@ -17,7 +17,7 @@ internal fun hardwareCandidatePresentation(
     state: CandidateState,
     english: Boolean,
     predictionPending: Boolean = false,
-    associationLimit: Int = 3,
+    associationLimit: Int = 10,
 ): HardwareCandidatePresentation {
     if (!english && (state.isComposing || state.inputText.isNotEmpty())) {
         return HardwareCandidatePresentation(state.candidates, state.candidateComments,

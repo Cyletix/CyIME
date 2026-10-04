@@ -11,6 +11,14 @@ internal class EditorCursor {
     private var connection: InputConnection? = null
     private var anchor: Int? = null
     private var active: Int? = null
+    private var reportedStart: Int? = null
+    private var reportedEnd: Int? = null
+
+    fun observeSelection(ic: InputConnection, start: Int, end: Int) {
+        bind(ic)
+        reportedStart = start.takeIf { it >= 0 }
+        reportedEnd = end.takeIf { it >= 0 }
+    }
 
     fun beginSelection(ic: InputConnection) {
         bind(ic)
@@ -40,11 +48,42 @@ internal class EditorCursor {
         resetSelection()
     }
 
+    // Some web editors omit ExtractedText but expose absolute selection updates and
+    // surrounding text. Use those instead of sending DPAD focus-navigation events.
+    private fun surroundingSnapshot(ic: InputConnection): ExtractedText? {
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            val surrounding = runCatching { ic.getSurroundingText(4096, 4096, 0) }.getOrNull()
+            if (surrounding != null && surrounding.offset >= 0 &&
+                surrounding.selectionStart in 0..surrounding.text.length &&
+                surrounding.selectionEnd in 0..surrounding.text.length) {
+                return ExtractedText().apply {
+                    text = surrounding.text
+                    startOffset = surrounding.offset
+                    selectionStart = surrounding.selectionStart
+                    selectionEnd = surrounding.selectionEnd
+                }
+            }
+        }
+        val start = reportedStart ?: return null
+        val end = reportedEnd ?: return null
+        return runCatching {
+            val before = ic.getTextBeforeCursor(4096, 0) ?: return null
+            val after = ic.getTextAfterCursor(4096, 0) ?: return null
+            val selected = if (start == end) "" else ic.getSelectedText(0)?.toString() ?: return null
+            if (selected.length != abs(end - start) || before.length > minOf(start, end)) return null
+            ExtractedText().apply {
+                text = before.toString() + selected + after
+                startOffset = minOf(start, end) - before.length
+                selectionStart = start - startOffset
+                selectionEnd = end - startOffset
+            }
+        }.getOrNull()
+    }
     private fun snapshot(ic: InputConnection): ExtractedText? =
         runCatching { ic.getExtractedText(ExtractedTextRequest(), 0) }.getOrNull()?.takeIf {
             val length = it.text?.length ?: return@takeIf false
             it.startOffset >= 0 && it.selectionStart in 0..length && it.selectionEnd in 0..length
-        }
+        } ?: surroundingSnapshot(ic)
 
     private fun syncSelection(extracted: ExtractedText) {
         val start = extracted.startOffset + extracted.selectionStart
@@ -60,6 +99,8 @@ internal class EditorCursor {
     private fun setSelection(ic: InputConnection, target: Int, selecting: Boolean): Boolean {
         val start = if (selecting) anchor ?: target else target
         if (!runCatching { ic.setSelection(start, target) }.getOrDefault(false)) return false
+        reportedStart = start
+        reportedEnd = target
         if (selecting) { anchor = start; active = target }
         return true
     }
@@ -68,6 +109,8 @@ internal class EditorCursor {
         if (connection !== ic) {
             connection = ic
             resetSelection()
+            reportedStart = null
+            reportedEnd = null
         }
     }
 
@@ -79,7 +122,7 @@ internal class EditorCursor {
         }
     }
 
-    fun move(ic: InputConnection, steps: Int, selecting: Boolean = false): Boolean {
+    fun move(ic: InputConnection, steps: Int, selecting: Boolean = false, allowKeyEventFallback: Boolean = true): Boolean {
         if (steps == 0) return false
         bind(ic)
         if (!selecting) resetSelection()
@@ -103,6 +146,7 @@ internal class EditorCursor {
             if (target != null && setSelection(ic, target, selecting))
                 return target != extracted.startOffset + from || collapsed
         }
+        if (!allowKeyEventFallback) return false
         val key = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
         var moved = false
         repeat(abs(steps)) {
@@ -116,6 +160,31 @@ internal class EditorCursor {
             moved = sendDirection(ic, key, selecting) || moved
         }
         return moved
+    }
+
+    /** Never dispatch an arrow to the host: at document edges Android can move focus. */
+    fun movePhysical(ic: InputConnection, keyCode: Int, selecting: Boolean = false,
+        byWord: Boolean = false, toBoundary: Boolean = false): Boolean {
+        val backwards = keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_UP
+        val horizontal = keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+        val direction = if (backwards) -1 else 1
+        if (!byWord && !toBoundary) return if (horizontal) move(ic, direction, selecting, allowKeyEventFallback = false)
+            else moveVertical(ic, direction, selecting)
+        bind(ic)
+        if (!selecting) resetSelection()
+        val extracted = snapshot(ic) ?: return false
+        if (selecting) syncSelection(extracted)
+        val position = if (selecting) active!! - extracted.startOffset else extracted.selectionEnd
+        val target = if (horizontal && byWord && !toBoundary) {
+            val words = java.text.BreakIterator.getWordInstance().apply { setText(extracted.text.toString()) }
+            var next = if (backwards) words.preceding(position) else words.following(position)
+            while (next != java.text.BreakIterator.DONE && next > 0 && next < extracted.text.length &&
+                (if (backwards) extracted.text[next] else extracted.text[next - 1]).isWhitespace()) {
+                next = if (backwards) words.preceding(next) else words.following(next)
+            }
+            if (next == java.text.BreakIterator.DONE) { if (backwards) 0 else extracted.text.length } else next
+        } else paragraphBoundary(extracted.text, position, !backwards)
+        return setSelection(ic, extracted.startOffset + target, selecting) && target != position
     }
 
     private fun extendedHorizontalTarget(ic: InputConnection, extracted: ExtractedText, from: Int, steps: Int): Int? {

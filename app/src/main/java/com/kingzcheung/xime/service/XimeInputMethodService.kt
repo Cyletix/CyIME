@@ -271,7 +271,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (!uiState.value.isCompact) return PredictionManager.MAX_ASSOCIATION_COUNT + 1
         return if (com.kingzcheung.xime.ui.keyboard.hardwareToolbarCanShowCandidates(
                 hardwareViewportWidthDp, hardwareViewportHeightDp, hardwareToolbarPosition.value,
-                uiState.value.hardwareOptions.dockAtEdge)) 3 else 0
+                uiState.value.hardwareOptions.dockAtEdge)) 10 else 0
     }
     private val hardwareToolbarBounds = mutableStateOf<android.graphics.Rect?>(null)
     private var hardwareCandidateBounds: android.graphics.Rect? = null
@@ -1541,7 +1541,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         selectHardwareCandidate,
                                         previousHardwareCandidate.takeUnless { hardwareCandidates.association },
                                         nextHardwareCandidate.takeUnless { hardwareCandidates.association },
-                                        showNumberLabels = true)
+                                        showNumberLabels = !hardwareEnglish)
                                   }
                                 },
                                 showCandidatesWhenFloating = hardwareCandidates.association,
@@ -2127,7 +2127,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             shortcut.tool?.let { handleHardwareTool(it) }
             if (shortcut.consume) return true
             val continuingCandidatePress = e.repeatCount > 0 && hardwareCandidateNavigationKeys.contains(keyCode)
-            if ((e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) && !continuingCandidatePress) {
+            if ((e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) && !continuingCandidatePress && !isHardwareArrow(keyCode)) {
                 return super.onKeyDown(keyCode, event)
             }
             val clipboardRoute = (keyboardViewModel.page.value as? KeyboardPage.Overlay)?.route as? OverlayRoute.Clipboard
@@ -2151,8 +2151,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     return true
                 }
             }
-            // Resolve navigation after earlier letters in the input FIFO. The UI may
-            // not yet show their candidates, and associations are candidates too.
+            // Typing after a dismissed input view must restore its surface without
+            // requiring the user to refocus the editor. Esc itself stays inside IME.
+            if (!isInputViewShown && currentInputConnection != null &&
+                (keyCodeToKey(keyCode, e.isShiftPressed) != null || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+                requestShowSelf(0)
+            }
+            // Resolve cursor/candidate actions after earlier letters in the same FIFO.
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
                 keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
                 keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ESCAPE ||
@@ -2189,7 +2194,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val isShifted = e.isShiftPressed
         val key = keyCodeToKey(keyCode, isShifted)
         if (key != null) {
-            keyRouter.handleKeyPress(key, isShifted)
+            keyRouter.handleKeyPress(key, isShifted, hardwareEvent = if (hasHardwareKeyboard) KeyEvent(e) else null)
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -2306,6 +2311,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             restoreAfterVoiceFinish()
         }
         schemaController.resetEditorSelection()
+        schemaController.observeEditorSelection(attribute?.initialSelStart ?: -1, attribute?.initialSelEnd ?: -1)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         loadDarkModePreference()
 
@@ -2559,6 +2565,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        schemaController.observeEditorSelection(newSelStart, newSelEnd)
         val current = candidateState.value
         if (!current.isComposing && current.inputText.isEmpty() &&
             (predictionManager.hasPendingPrediction || current.associationCandidates.isNotEmpty())) {
