@@ -1,0 +1,40 @@
+# CyIME 方案商店目录。App 依次从 xime.yaml 的 xime_index.base_urls 读取本文件。
+# 只收录在 CyIME 上核对过的 Rime 方案；每个下载项都要写 sha256，App 下载后校验。
+# appVersion 写 CyIME 自己的版本要求（如 ">=1.12.0"），留空表示不限。
+index_version: 1
+updated_at: "2026-10-12"
+schemas:
+  - id: wubi86
+    name: "五笔86（Rime 官方）"
+    author: "Rime / 王永民"
+    description: "Rime 官方五笔86，支持拼音反查；仅下载本方案和词库，基础依赖已随 CyIME 提供。"
+    tags: ["五笔", "形码", "拼音"]
+    dependencies: ["pinyin_simp", "symbols"]
+    homepage: "https://github.com/rime/rime-wubi"
+    license: "LGPL-3.0"
+    currentVersion: "152a0d3"
+    versions:
+      - version: "152a0d3"
+        changelog: "固定 Rime 官方提交；仅下载五笔86方案和词库，不带其他方案或应用设置。"
+        downloadUrl:
+          - url: "https://raw.githubusercontent.com/rime/rime-wubi/152a0d3f3efe40cae216d1e3b338242446848d07/wubi86.schema.yaml"
+            sha256: "cdb5aac1a9aa071552d5fdffdfe5a6618b429b19358b8b1e003130e835d5a166"
+            size: "0.0015 MB"
+          - url: "https://raw.githubusercontent.com/rime/rime-wubi/152a0d3f3efe40cae216d1e3b338242446848d07/wubi86.dict.yaml"
+            sha256: "f833d86b72341fe82e069a425b6625f29ef85f1bc0f34f6fb7975fe514888b5a"
+            size: "2.18 MB"
+  - id: wubi98
+    name: "五笔98"
+    author: "Rime / 王永民"
+    description: "五笔98字形方案，支持繁体字；独立方案和词库。"
+    tags: ["五笔", "形码", "繁体"]
+    dependencies: ["pinyin_simp", "symbols"]
+    homepage: "https://github.com/cz-archive/rime-wubi98"
+    license: "GPL-3.0"
+    currentVersion: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        downloadUrl:
+          - url: "https://github.com/cz-archive/rime-wubi98/archive/refs/tags/1.0.0.tar.gz"
+            sha256: "7d105524b81373c7fef0cbfd197fa3c236bcb4264b1935c5e384bacb10fece53"
+            size: "0.88 MB"

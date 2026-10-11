@@ -1,0 +1,5 @@
+# CyIME 插件商店目录。插件包（.xipk）放在 GitHub Release，这里登记地址和 sha256。
+# 仓库 plugins/ 下的源码打包、核对后再登记；目前尚未上架任何插件。
+index_version: 1
+updated_at: "2026-10-12"
+plugins: []
