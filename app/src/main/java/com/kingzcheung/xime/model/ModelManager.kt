@@ -267,6 +267,21 @@ object ModelManager {
         }
     }
 
+    /** 只删 models/ 里的下载副本，不碰 rime/ 里正在用的同名文件；用于被另一档替代的模型。 */
+    internal fun deleteStoredDownload(context: Context, model: ModelInfo): Boolean {
+        val guard = installGuards.getOrPut(model.id) { ModelInstallGuard() }
+        return guard.delete {
+            val dir = ModelStorage.getModelDir(context, model.id)
+            val success = !dir.exists() || dir.deleteRecursively()
+            if (success) {
+                MarketVersionStore.removeModelVersion(context, model.id)
+                notifyInstalledModelsChanged()
+                _downloadStates.update { it + (model.id to ModelDownloadState.Idle) }
+            }
+            success
+        }
+    }
+
     fun deleteModel(context: Context, id: String): Boolean {
         val model = getModel(id) ?: return false
         return deleteModel(context, model)

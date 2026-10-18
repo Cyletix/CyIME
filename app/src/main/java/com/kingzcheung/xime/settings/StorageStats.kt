@@ -6,6 +6,9 @@ import com.kingzcheung.xime.model.ModelManager
 import com.kingzcheung.xime.settings.SchemaManifestManager.BUILTIN_PACKAGE_ID
 import com.kingzcheung.xime.util.FileLogger
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.attribute.BasicFileAttributes
 
 /**
  * 存储空间分类统计与清除（设置 → 关于 → 存储空间）。
@@ -21,7 +24,13 @@ import java.io.File
  * - plugins      filesDir/plugins + plugin_icons；不就地清除（批量卸载会连配置
  *                丢失），由插件管理页逐个卸载，本页只统计并引导跳转
  * - schemas      rime 其余数据（方案/用户词库/自定义配置），只统计不清除
- * - other        filesDir 其余数据（用户配置索引、联想 ngram 缓存等），只统计
+ * - ocr_models   no_backup 里从安装包解出的文字识别模型，只统计
+ * - speaker      字幕模式识别说话人用的声纹，只统计
+ * - external     Android/data 下的外部目录（语音调校录音、个人手写模型等），只统计
+ * - other        应用数据目录其余部分（配置、数据库等），只统计
+ *
+ * 各类目按顺序统计，同一文件的硬链接（如九键词组模型同时在 models/ 和 rime/）只计入先出现的类目，
+ * 总数与系统设置里的应用数据对得上。
  */
 object StorageStats {
 
@@ -33,6 +42,9 @@ object StorageStats {
     const val ID_PLUGINS = "plugins"
     const val ID_SCHEMAS = "schemas"
     const val ID_MARKET_PACKAGES = "market_packages"
+    const val ID_OCR_MODELS = "ocr_models"
+    const val ID_SPEAKER = "speaker"
+    const val ID_EXTERNAL = "external"
     const val ID_OTHER = "other"
 
     /** 统计类目（只读信息；清除能力见 [clearCategory]）。 */
@@ -56,6 +68,9 @@ object StorageStats {
     fun pluginsDir(context: Context): File = File(context.filesDir, "plugins")
     fun pluginIconsDir(context: Context): File = File(context.filesDir, "plugin_icons")
     fun logsDir(context: Context): File = File(context.filesDir, "logs")
+    /** 旧版本的语音模型目录；新版首次使用时迁到 models/，没迁走的残留也算模型。 */
+    fun legacyAsrModelsDir(context: Context): File = File(context.filesDir, "asr_models")
+    fun speakerDir(context: Context): File = File(context.filesDir, "speaker")
 
     /** 方案市场下载包目录（与 rime/ 同级；builtin 子目录为内置方案包，不可清除）。 */
     fun marketDir(context: Context): File = File(context.filesDir, "market")
@@ -69,31 +84,47 @@ object StorageStats {
     // ── 统计 ──
 
     /** 递归统计目录大小；目录不存在返回 0。 */
-    fun directorySize(dir: File?): Long {
-        if (dir == null || !dir.exists()) return 0
-        if (dir.isFile) return dir.length()
-        return dir.listFiles()?.sumOf { directorySize(it) } ?: 0L
+    fun directorySize(dir: File?): Long = SizeCounter().count(dir)
+
+    /** 跨多次统计记住已经算过的文件和目录：硬链接和重叠目录只计一次，不跟随符号链接。 */
+    class SizeCounter {
+        private val seen = HashSet<Any>()
+
+        fun count(file: File?): Long {
+            if (file == null) return 0
+            val attributes = runCatching {
+                Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+            }.getOrNull() ?: return 0
+            if (attributes.isSymbolicLink) return 0
+            // Unix 上 fileKey 是设备号 + inode，硬链接相同；拿不到时退回路径。
+            if (!seen.add(attributes.fileKey() ?: file.absoluteFile.normalize().path)) return 0
+            if (attributes.isDirectory) return file.listFiles()?.sumOf { count(it) } ?: 0L
+            return attributes.size()
+        }
     }
 
     /** 汇总各类目占用（IO 耗时，须在后台线程调用）。 */
     fun collectCategories(context: Context): List<Category> {
-        val modelsSize = directorySize(modelsDir(context))
-        val rimeSize = directorySize(rimeDir(context))
-        val buildSize = directorySize(rimeBuildDir(context)) + directorySize(rimeLogsDir(context))
-        val pluginsSize = directorySize(pluginsDir(context)) + directorySize(pluginIconsDir(context))
-        val marketSize = directorySize(marketDir(context))
-        val clipboardSize = clipboardDbFiles(context).sumOf { it.length() }
-        val logsSize = directorySize(logsDir(context))
-        val cacheSize = directorySize(context.cacheDir)
-
-        val accounted = modelsSize + rimeSize + pluginsSize + marketSize + clipboardSize + logsSize
-        val otherSize = (directorySize(context.filesDir) - accounted).coerceAtLeast(0L)
+        val counter = SizeCounter()
+        // 顺序决定硬链接归属：模型在前，rime/ 里指向同一份模型的链接不再计入方案。
+        val modelsSize = counter.count(modelsDir(context)) + counter.count(legacyAsrModelsDir(context))
+        val ocrSize = counter.count(context.noBackupFilesDir)
+        val speakerSize = counter.count(speakerDir(context))
+        val buildSize = counter.count(rimeBuildDir(context)) + counter.count(rimeLogsDir(context))
+        val schemasSize = counter.count(rimeDir(context))
+        val pluginsSize = counter.count(pluginsDir(context)) + counter.count(pluginIconsDir(context))
+        val marketSize = counter.count(marketDir(context))
+        val clipboardSize = clipboardDbFiles(context).sumOf { counter.count(it) }
+        val logsSize = counter.count(logsDir(context))
+        val cacheSize = counter.count(context.cacheDir) + counter.count(context.externalCacheDir)
+        val externalSize = counter.count(context.getExternalFilesDir(null))
+        val otherSize = counter.count(context.dataDir)
 
         return listOf(
             Category(
                 id = ID_MODELS,
                 title = "离线模型",
-                description = "联想 / 手写 / 语音识别模型，清除后需重新下载",
+                description = "联想 / 手写 / 语音识别模型（含旧版本目录），清除后需重新下载",
                 sizeBytes = modelsSize,
                 clearable = true,
             ),
@@ -108,7 +139,7 @@ object StorageStats {
                 id = ID_SCHEMAS,
                 title = "方案与词库",
                 description = "已安装方案、用户词库与自定义配置，暂不支持一键清理",
-                sizeBytes = (rimeSize - buildSize).coerceAtLeast(0L),
+                sizeBytes = schemasSize,
                 clearable = false,
             ),
             Category(
@@ -148,9 +179,30 @@ object StorageStats {
                 clearable = true,
             ),
             Category(
+                id = ID_OCR_MODELS,
+                title = "文字识别模型",
+                description = "从安装包解出的文字识别模型，使用文字识别时自动准备",
+                sizeBytes = ocrSize,
+                clearable = false,
+            ),
+            Category(
+                id = ID_SPEAKER,
+                title = "说话人声纹",
+                description = "字幕模式区分说话人用的声音特征",
+                sizeBytes = speakerSize,
+                clearable = false,
+            ),
+            Category(
+                id = ID_EXTERNAL,
+                title = "外部目录数据",
+                description = "Android/data 下的语音调校录音、个人手写模型与训练样本等，卸载时一并删除",
+                sizeBytes = externalSize,
+                clearable = false,
+            ),
+            Category(
                 id = ID_OTHER,
                 title = "其他数据",
-                description = "用户配置索引、联想词频缓存等",
+                description = "设置、用户配置索引、联想词频缓存、数据库等",
                 sizeBytes = otherSize,
                 clearable = false,
             ),
@@ -204,6 +256,7 @@ object StorageStats {
         modelsDir(context).listFiles()?.forEach { dir ->
             if (!dir.deleteRecursively()) ok = false
         }
+        if (!legacyAsrModelsDir(context).deleteRecursively()) ok = false
         return ok
     }
 
