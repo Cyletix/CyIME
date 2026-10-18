@@ -93,7 +93,11 @@ class ClipboardGridStabilityTest {
             rule.onNodeWithTag("clipboard-recent-toggle").performClick()
             rule.waitForIdle()
             rule.onNodeWithTag("clipboard-records").performScrollToKey("image:${hiddenRecent.uri}")
-            rule.onNodeWithTag(imageTag(hiddenRecent)).assertIsDisplayed()
+            rule.waitForIdle()
+            val region = relativeBounds("clipboard-records-region")
+            val shown = relativeBounds(imageTag(hiddenRecent))
+            assertTrue("opened older picture is on screen: $shown in $region (width $boardWidth)",
+                shown.bottom > region.top && shown.top < region.bottom)
             rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
             rule.onNodeWithTag("clipboard-recent-toggle").performClick()
             rule.waitForIdle()

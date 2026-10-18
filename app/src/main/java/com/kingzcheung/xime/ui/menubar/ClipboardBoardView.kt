@@ -179,9 +179,19 @@ internal fun ClipboardBoardView(
     LaunchedEffect(filter) { gridState.scrollToItem(0) }
     // Bumped when opening older copies should scroll to where they start, below the pins.
     var revealOlder by remember { mutableStateOf(0) }
+    val foldScope = rememberCoroutineScope()
+    // Folding first scrolls back so the 更早的记录 divider stays in view; set by the grid below.
+    val olderDividerIndex = remember { intArrayOf(-1) }
     fun changeRecentExpansion(value: Boolean, reveal: Boolean = true) {
-        recentExpanded = value
-        if (value && reveal) revealOlder++
+        if (value) {
+            recentExpanded = true
+            if (reveal) revealOlder++
+        } else foldScope.launch {
+            // Scroll before removing rows: reading deep in older copies, folding lands on the divider.
+            val start = olderDividerIndex[0]
+            if (start >= 0 && gridState.firstVisibleItemIndex > start) gridState.scrollToItem(start)
+            recentExpanded = false
+        }
     }
     LaunchedEffect(cards) {
         selected = selected.intersect(cards.mapTo(mutableSetOf()) { it.key })
@@ -214,7 +224,7 @@ internal fun ClipboardBoardView(
                 addAll(content.recent.map { it.key })
                 if (content.recent.isNotEmpty() && content.pinned.isNotEmpty()) add("pins-end")
                 addAll(content.pinned.map { it.key })
-                if (content.older.isNotEmpty()) add("older-start")
+                if (content.recentCollapsible) add("older-start")
                 addAll(content.older.map { it.key })
             }
         }
@@ -222,6 +232,7 @@ internal fun ClipboardBoardView(
             val start = gridKeys.indexOf("older-start")
             if (revealOlder > 0 && start >= 0) gridState.animateScrollToItem(start)
         }
+        SideEffect { olderDividerIndex[0] = gridKeys.indexOf("older-start") }
         LaunchedEffect(focused, keyboard?.active, gridKeys) {
             if (keyboard?.active == true) {
                 val index = gridKeys.indexOf(focused)
@@ -340,7 +351,7 @@ internal fun ClipboardBoardView(
                         }
                     }
                     if (content.recentCollapsible) {
-                        RecentFoldToggle(recentActuallyExpanded, content.hiddenRecent, compactControls) {
+                        RecentFoldToggle(recentActuallyExpanded, content.olderCount, compactControls) {
                             changeRecentExpansion(!recentExpanded)
                         }
                     }
@@ -411,15 +422,15 @@ internal fun ClipboardBoardView(
                     records(content.recent, fixedRecords = false)
                     if (content.recent.isNotEmpty() && content.pinned.isNotEmpty()) {
                         item(key = "pins-end", span = StaggeredGridItemSpan.FullLine) {
-                            RecordsDivider(Icons.Default.Lock, "已固定", colors.onSurface,
+                            RecordsDivider(Icons.Default.Lock, "已固定 ${content.pinned.size} 条", colors.onSurface,
                                 Modifier.animateItem().testTag("clipboard-pins-divider"))
                         }
                     }
                     records(content.pinned, fixedRecords = true)
-                    if (content.older.isNotEmpty()) {
+                    if (content.recentCollapsible) {
                         item(key = "older-start", span = StaggeredGridItemSpan.FullLine) {
-                            RecordsDivider(Icons.Default.History, "更早的记录", colors.onSurface,
-                                Modifier.animateItem().testTag("clipboard-older-divider"))
+                            OlderRecordsDivider(recentActuallyExpanded, content.olderCount, colors.onSurface,
+                                Modifier.animateItem()) { changeRecentExpansion(!recentExpanded) }
                         }
                     }
                     records(content.older, fixedRecords = false)
@@ -621,23 +632,52 @@ private fun RecordsDivider(icon: ImageVector, label: String, content: Color, mod
 }
 
 /**
- * 工具栏右上角的“更多 N 条 ⌄ / 收起 ⌃”：主题主色实心胶囊，固定在工具栏里不随列表滚动，
- * 展开很多旧记录后也能一下收起。
+ * 固定内容之后的“🕘 更早的记录 · N 条”分隔线，右侧的主色胶囊写明动作：
+ * “展开更早的 N 条 ⌄”/“收起更早的记录 ⌃”。整条线都可点，只折叠更早的记录，最近一行和固定内容不受影响。
+ */
+@Composable
+private fun OlderRecordsDivider(expanded: Boolean, count: Int, content: Color, modifier: Modifier, onToggle: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val line = content.copy(alpha = .22f)
+    val tint = content.copy(alpha = .78f)
+    Row(modifier.fillMaxWidth().heightIn(min = 36.dp).testTag("clipboard-older-divider")
+        .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
+        .clickable(role = Role.Button, onClickLabel = if (expanded) "收起更早的记录" else "展开更早的 $count 条记录",
+            onClick = onToggle),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.History, null, Modifier.padding(start = 4.dp, end = 4.dp).size(14.dp), tint = tint)
+        Text("更早的记录 · $count 条", color = tint, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        HorizontalDivider(Modifier.weight(1f).padding(horizontal = 8.dp), thickness = .5.dp, color = line)
+        Row(Modifier.clip(RoundedCornerShape(50))
+            .background(colors.primary) // Solid even under glass: the action must stay legible.
+            .testTag("clipboard-older-toggle")
+            .padding(start = 10.dp, end = 6.dp, top = 3.dp, bottom = 3.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(if (expanded) "收起更早的记录" else "展开更早的 $count 条", color = colors.onPrimary,
+                fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null,
+                Modifier.size(18.dp), tint = colors.onPrimary)
+        }
+    }
+}
+
+/**
+ * 工具栏右上角的同一个开关：“更早 N 条 ⌄ / 收起更早 ⌃”，固定在工具栏里不随列表滚动，
+ * 展开很多更早的记录后不用翻回去也能收起。只作用于更早的记录。
  */
 @Composable
 private fun RecentFoldToggle(expanded: Boolean, hidden: Int, compact: Boolean, onToggle: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val glass = LocalKeyboardInputPreferences.current.frostedGlass
     Row(Modifier.padding(horizontal = 2.dp).heightIn(min = PanelCategoryHeight)
         .clip(RoundedCornerShape(50))
-        .background(frostedKeyColor(colors.primary, colors.onSurface, glass))
+        .background(colors.primary) // Solid even under glass: the action must stay legible.
         .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
         .clickable(role = Role.Button,
             onClickLabel = if (expanded) "收起更早的记录" else "显示更早的 $hidden 条记录", onClick = onToggle)
         .testTag("clipboard-recent-toggle")
         .padding(start = 10.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(if (expanded) "收起" else if (compact) "+$hidden" else "更多 $hidden 条",
+        Text(if (expanded) (if (compact) "收起更早" else "收起更早的记录") else if (compact) "更早 $hidden" else "更早 $hidden 条",
             color = colors.onPrimary, fontSize = 13.sp, lineHeight = 18.sp,
             fontWeight = FontWeight.Medium, maxLines = 1)
         Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null,
