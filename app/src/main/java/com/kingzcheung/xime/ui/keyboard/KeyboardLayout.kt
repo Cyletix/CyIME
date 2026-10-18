@@ -616,7 +616,7 @@ fun KeyboardLayout(
                                                 gesture.action!!,
                                                 gesture.value.ifEmpty { selectedLabel })
                                         } else {
-                                            (onCommitText ?: onKeyPress)(selectedLabel)
+                                            commitLongPressChoice(selectedLabel, onCommitText, onKeyPress)
                                         }
                                         Unit
                                     } }
@@ -990,7 +990,7 @@ fun KeyboardLayout(
                                     if (gesture != null && gesture.action != GestureAction.COMMIT) {
                                         onGestureAction.invoke(gesture.action!!, gesture.value.ifEmpty { selectedLabel })
                                     } else {
-                                        (onCommitText ?: onKeyPress)(selectedLabel)
+                                        commitLongPressChoice(selectedLabel, onCommitText, onKeyPress)
                                     }
                                     Unit
                                 }
@@ -1267,7 +1267,7 @@ fun KeyboardRowWithConfig(
                         gesture.action!!,
                         gesture.value.ifEmpty { selectedLabel })
                 } else {
-                    (onCommitText ?: onKeyPress)(selectedLabel)
+                    commitLongPressChoice(selectedLabel, onCommitText, onKeyPress)
                 }
                 Unit
             } }
@@ -1567,7 +1567,7 @@ fun CompactKeyboardRowWithConfig(
                         gesture.action!!,
                         gesture.value.ifEmpty { selectedLabel })
                 } else {
-                    (onCommitText ?: onKeyPress)(selectedLabel)
+                    commitLongPressChoice(selectedLabel, onCommitText, onKeyPress)
                 }
                 Unit
             } }
@@ -1635,4 +1635,12 @@ private fun SpaceKey(
         onRelease = { onKeyRelease?.invoke("space") }, isVoiceMode = isVoiceMode,
         voiceSticky = voiceSticky, isSttEnabled = isSttEnabled, onVoiceModeChange = onVoiceModeChange,
         shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+}
+
+/**
+ * 长按菜单选中的小写字母当作点按：拼音组词中接到编码后面，不先上屏首选（h + 长按 g 不再变成「和g」）。
+ * 其他字符（大写、变音字母、符号）照旧直接上屏。
+ */
+internal fun commitLongPressChoice(label: String, onCommitText: ((String) -> Unit)?, onKeyPress: (String) -> Unit) {
+    if (label.length == 1 && label[0] in 'a'..'z') onKeyPress(label) else (onCommitText ?: onKeyPress)(label)
 }
