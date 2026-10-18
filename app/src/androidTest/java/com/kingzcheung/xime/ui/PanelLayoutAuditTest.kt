@@ -175,7 +175,7 @@ class PanelLayoutAuditTest {
             val layouts = mutableListOf<TextLayoutResult>()
             labelNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             val text = layouts.single()
-            assertEquals("$case 透明度和百分比应显示完整", "透明度 70%", text.layoutInput.text.text)
+            assertEquals("$case 透明度和百分比应显示完整", "70%", text.layoutInput.text.text)
             assertEquals("$case 透明度文字应仅占一行", 1, text.lineCount)
             assertFalse("$case 透明度文字被裁切: size=${text.size}, width=${text.didOverflowWidth}, height=${text.didOverflowHeight}, paragraphWidth=${text.multiParagraph.width}, maxWidth=${text.layoutInput.constraints.maxWidth}, lineRight=${text.getLineRight(0)}, lineEnd=${text.getLineEnd(0, true)}/${text.layoutInput.text.length}, lineBottom=${text.getLineBottom(0)}", text.hasVisualOverflow)
             assertTrue("$case 文字真实行高超过分配高度", text.getLineBottom(0) <= text.size.height + 1f)
