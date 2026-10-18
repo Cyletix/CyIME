@@ -64,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -229,6 +230,17 @@ fun KeyboardView(
     val accentColor = palette.accent
     val themeScheme = KeyboardThemes.getRenderingScheme(state.themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(state.themeId, state.isDarkTheme)
+    // 悬浮拖动条颜色：键盘背景（渐变取各色平均，纯色取本色）与按键文字色各半，始终不透明。
+    val floatingDragIndicatorColor = remember(themeScheme, state.isDarkTheme, keyboardBgColor, keyTextColor) {
+        val bg = themeScheme.keyboardBackground
+        val hexes = if (bg != null && bg.type == "gradient") (if (state.isDarkTheme) bg.colorsDark ?: bg.colors else bg.colors) else null
+        val base = if (!hexes.isNullOrEmpty()) {
+            val colors = hexes.map { Color(0xFF000000 or it) }
+            Color(colors.map { it.red }.average().toFloat(), colors.map { it.green }.average().toFloat(),
+                colors.map { it.blue }.average().toFloat())
+        } else keyboardBgColor.copy(alpha = 1f)
+        lerp(base, keyTextColor.copy(alpha = 1f), 0.5f)
+    }
     val specialKeyBgColor = palette.function
     val specialKeyTextColor = palette.functionText
     val candidateTextColor = palette.candidateText
@@ -384,6 +396,7 @@ fun KeyboardView(
         resolvedWidthDp = state.keyboardWidthDp,
         dockTarget = dockTarget,
         backgroundColor = keyboardBgColor,
+        dragIndicatorColor = floatingDragIndicatorColor,
         onDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },

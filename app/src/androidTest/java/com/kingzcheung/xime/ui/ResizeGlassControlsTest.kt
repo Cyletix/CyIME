@@ -124,7 +124,8 @@ class ResizeGlassControlsTest {
         fun assertDirectEditor() {
             rule.onNodeWithTag("keyboard-opacity-slider").assertIsDisplayed().assertIsEnabled()
             rule.onNodeWithTag("keyboard-opacity-actions").assertIsDisplayed()
-            rule.onNodeWithTag("keyboard-opacity-overlay-label").assertDoesNotExist()
+            // 「透明度 N%」现在常驻滑条左边，直接拖动时也显示。
+            rule.onNodeWithTag("keyboard-opacity-overlay-label", useUnmergedTree = true).assertIsDisplayed()
             rule.onNodeWithTag("keyboard-resize-frame").assertDoesNotExist()
             rule.onNodeWithTag("keyboard-resize-actions").assertDoesNotExist()
             rule.onNodeWithTag("keyboard-resize-move-bar").assertDoesNotExist()
