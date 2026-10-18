@@ -33,6 +33,23 @@ class CaptionActivity : ComponentActivity() {
         else Toast.makeText(this, "没有麦克风权限就听不到，请在手机设置里允许", Toast.LENGTH_LONG).show()
     }
 
+    /**
+     * Glass themes: like the keyboard over another app, the page shows what is behind it (the
+     * wallpaper), blurred with the keyboard's own blur radius. Without this the "glass" panels sat
+     * on a flat backstop and looked solid grey.
+     */
+    private fun applyGlass() {
+        val glass = com.kingzcheung.xime.settings.FrostedGlassPreferences.read(this)
+        if (!glass.enabled) return
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+        val radius = (glass.blurRadiusDp * resources.displayMetrics.density).toInt()
+        if (radius <= 0) return
+        if (android.os.Build.VERSION.SDK_INT >= 31 && windowManager.isCrossWindowBlurEnabled) window.setBackgroundBlurRadius(radius)
+        else if (com.kingzcheung.xime.ui.theme.SamsungWindowBlur.isAvailable)
+            window.decorView.post { com.kingzcheung.xime.ui.theme.SamsungWindowBlur.apply(window.decorView, radius, 0f) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -44,6 +61,7 @@ class CaptionActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        applyGlass()
         controller = CaptionController(this)
         setContent { CaptionScreen(controller, onExit = { finish() }) }
     }

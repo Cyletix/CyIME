@@ -106,7 +106,10 @@ fun CaptionScreen(controller: CaptionController, onExit: () -> Unit) {
     com.kingzcheung.xime.ui.theme.XimeTheme(darkTheme = dark, themeId = com.kingzcheung.xime.settings.SettingsPreferences.getKeyboardTheme(context)) {
         // 再套一层：颜色全部换成键盘主题（键帽、回车键、文字、玻璃透明度），对话框里也一样。
         CaptionThemed(dark) {
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface) {
+            // 玻璃主题时整页不铺不透明底，让窗口后面的（模糊）壁纸透出来，面板和气泡才是真的半透明。
+            val glass = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(dark).frostedGlass.enabled
+            Surface(Modifier.fillMaxSize(), color = if (glass) Color.Transparent else MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface) {
                 Box(Modifier.fillMaxSize().captionPageBackground()) { CaptionPage(controller, onExit) }
             }
         }
@@ -137,6 +140,8 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
             androidx.compose.foundation.layout.WindowInsetsSides.Bottom))
         .padding(horizontal = CaptionStyle.Edge, vertical = 8.dp)
     val banners: @Composable () -> Unit = {
+        if (!controller.streamingReady) ModelBanner("没有实时出字模型：要等对方说完一句才整句出字", "下载实时出字模型（226 MB）",
+            controller.streamingDownload) { controller.downloadStreaming() }
         if (!controller.refinementReady) ModelBanner("没有 SenseVoice 校正：字幕没有标点、错字多", "下载 SenseVoice（228 MB）",
             controller.refinementDownload) { controller.downloadRefinement() }
         if (!controller.callCaptionEnabled) {
@@ -167,21 +172,16 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
     }
 
     if (sideRail) Row(pageInsets, horizontalArrangement = Arrangement.spacedBy(CaptionStyle.Gap)) {
-        transcript(Modifier.weight(1f).fillMaxHeight())
-        Column(Modifier.width(300.dp).fillMaxHeight().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            CaptionPanel(Modifier.fillMaxWidth()) {
-                RailControls(controller, onExit = { confirmExit = true })
-                StatusRow(controller, volumeWidth = 56.dp)
+        // 字幕占左边几乎整个屏幕：提示条限高、底下一条状态和声音丝带。
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.fillMaxWidth().heightIn(max = (configuration.screenHeightDp * .3f).dp).verticalScroll(rememberScrollState())) {
+                banners()
             }
-            CaptionPanel(Modifier.fillMaxWidth(), padding = 10.dp) {
-                ribbon(24.dp)
-                CaptionButton("快捷回复", Modifier.fillMaxWidth(), icon = Icons.Rounded.Forum,
-                    emphasis = CaptionEmphasis.Primary) { replying = true }
-                CaptionButton("请再说一遍", Modifier.fillMaxWidth(), icon = Icons.Rounded.Replay) { flipped = "请再说一遍" }
-            }
-            banners()
+            transcript(Modifier.weight(1f).fillMaxWidth())
+            RailStatus(controller) { ribbon(it) }
         }
+        // 右边一条窄栏（约屏宽一成）：五个按钮竖排，图标在上字在下，每个仍有老人好按的高度。
+        SlimRail(controller, onExit = { confirmExit = true }, onReply = { replying = true }, onRepeat = { flipped = "请再说一遍" })
     } else Column(pageInsets, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // 顶部一块玻璃面板：三个大按钮 + 状态与音量，按钮同高同宽同间距。
         CaptionPanel(Modifier.fillMaxWidth()) {
@@ -245,33 +245,53 @@ private fun TopControls(controller: CaptionController, onExit: () -> Unit) {
 
 /** 横屏侧栏：同样三个按钮，竖着排、等宽。 */
 @Composable
-private fun RailControls(controller: CaptionController, onExit: () -> Unit) {
-    // 一排三个、图标在上：侧栏高度只够放下这一排加底部两个大按钮。
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val each = Modifier.weight(1f)
+private fun SlimRail(controller: CaptionController, onExit: () -> Unit, onReply: () -> Unit, onRepeat: () -> Unit) {
+    Column(Modifier.width(RAIL_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val each = Modifier.fillMaxWidth().weight(1f)
         CaptionButton("字号" + CaptionController.FONT_LABEL[controller.fontLevel], each, icon = Icons.Rounded.FormatSize,
-            height = 72.dp, fontSize = 16.sp, stacked = true) { controller.cycleFont() }
+            height = RAIL_BUTTON, fontSize = 15.sp, stacked = true) { controller.cycleFont() }
         when (controller.status) {
-            CaptionController.Status.Listening, CaptionController.Status.Starting -> CaptionButton("暂停", each, icon = Icons.Rounded.Pause,
-                height = 72.dp, fontSize = 16.sp, stacked = true) { controller.pause() }
             CaptionController.Status.Paused -> CaptionButton("继续", each, icon = Icons.Rounded.PlayArrow, emphasis = CaptionEmphasis.Primary,
-                height = 72.dp, fontSize = 16.sp, stacked = true) { controller.resume() }
-            else -> {}
+                height = RAIL_BUTTON, fontSize = 15.sp, stacked = true) { controller.resume() }
+            else -> CaptionButton("暂停", each, icon = Icons.Rounded.Pause,
+                height = RAIL_BUTTON, fontSize = 15.sp, stacked = true) { controller.pause() }
         }
-        CaptionButton("退出", each, icon = Icons.Rounded.Close, height = 72.dp, fontSize = 16.sp, stacked = true, onClick = onExit)
+        CaptionButton("快捷回复", each, icon = Icons.Rounded.Forum, emphasis = CaptionEmphasis.Primary,
+            height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onReply)
+        CaptionButton("再说一遍", each, icon = Icons.Rounded.Replay, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onRepeat)
+        CaptionButton("退出", each, icon = Icons.Rounded.Close, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onExit)
     }
+}
+
+/** Landscape status: one line under the captions, the sound ribbon taking the rest of it. */
+@Composable
+private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -> Unit) {
+    val (dotColor, text) = statusOf(controller)
+    Row(Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(12.dp).clip(CircleShape).background(dotColor))
+        Spacer(Modifier.width(8.dp))
+        Text(text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 280.dp))
+        Spacer(Modifier.width(12.dp))
+        Box(Modifier.weight(1f)) { ribbon(24.dp) }
+    }
+}
+
+private val RAIL_WIDTH = 104.dp
+private val RAIL_BUTTON = 56.dp
+
+@Composable
+private fun statusOf(controller: CaptionController) = when {
+    controller.micMuted -> MaterialTheme.colorScheme.error to "手机的麦克风被关了，请家人看一下"
+    controller.status == CaptionController.Status.Listening -> MaterialTheme.colorScheme.primary to "正在听 · 只记字，不录音"
+    controller.status == CaptionController.Status.Starting -> MaterialTheme.colorScheme.tertiary to controller.message.ifEmpty { "正在准备…" }
+    controller.status == CaptionController.Status.Paused -> MaterialTheme.colorScheme.outline to "已暂停"
+    controller.status == CaptionController.Status.Error -> MaterialTheme.colorScheme.error to controller.message
+    else -> MaterialTheme.colorScheme.outline to ""
 }
 
 @Composable
 private fun StatusRow(controller: CaptionController, volumeWidth: Dp = 96.dp) {
-    val (dotColor, text) = when {
-        controller.micMuted -> MaterialTheme.colorScheme.error to "手机的麦克风被关了，请家人看一下"
-        controller.status == CaptionController.Status.Listening -> MaterialTheme.colorScheme.primary to "正在听 · 只记字，不录音"
-        controller.status == CaptionController.Status.Starting -> MaterialTheme.colorScheme.tertiary to controller.message.ifEmpty { "正在准备…" }
-        controller.status == CaptionController.Status.Paused -> MaterialTheme.colorScheme.outline to "已暂停"
-        controller.status == CaptionController.Status.Error -> MaterialTheme.colorScheme.error to controller.message
-        else -> MaterialTheme.colorScheme.outline to ""
-    }
+    val (dotColor, text) = statusOf(controller)
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(14.dp).clip(CircleShape).background(dotColor))
         Spacer(Modifier.width(10.dp))
@@ -292,7 +312,8 @@ private fun ModelBanner(message: String, action: String, state: ModelDownloadSta
     // Same container as the settings pages (surfaceContainerLow, 12 dp, visual material).
     Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         BoxWithConstraints(Modifier.visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED).padding(16.dp)) {
-            val narrow = maxWidth < 560.dp
+            // 横屏窄栏旁的字幕区也约 530 dp 宽：仍放一行，免得按钮被限高区裁掉。
+            val narrow = maxWidth < 440.dp
             val text: @Composable () -> Unit = {
                 Text(message, style = MaterialTheme.typography.bodyLarge, fontSize = 18.sp)
                 when (state) {
@@ -433,7 +454,7 @@ private fun LoadingOverlay(message: String) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(300); visible = true }
     if (!visible) return
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface.copy(alpha = .97f)).clickable(
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface.copy(alpha = 1f)).clickable(
         interactionSource = remember { MutableInteractionSource() }, indication = null) {}, contentAlignment = Alignment.Center) {
         Column(Modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("正在加载语音模型", style = MaterialTheme.typography.titleMedium)
@@ -566,7 +587,8 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
     fun say(phrase: String) { text = phrase; controller.addReply(phrase) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // 比例：给对方看的大字卡片占剩下的全部高度；其余都是统一的 52 dp 小一号按钮，放在玻璃面板里。
-        Column(Modifier.fillMaxSize().captionPageBackground()
+        // 不透明底：玻璃主题下页面本身是透的，回话页不能透出后面的字幕。
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).captionPageBackground()
             .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
             .padding(horizontal = CaptionStyle.Edge, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

@@ -342,6 +342,8 @@ internal const val SPLIT_BASE = 1L shl 40
  * it returns far fewer characters than the streaming pass heard, it dropped speech: keep the preview.
  */
 internal fun chooseFinal(preview: String, refined: String): String {
+    // Captions are Chinese only: a second pass in another script (kana, Hangul…) never replaces the Mandarin preview.
+    if (com.kingzcheung.xime.speech.hasForeignScript(refined)) return preview
     fun count(text: String) = text.count { it.isLetterOrDigit() }
     val heard = count(preview)
     return if (heard >= 4 && count(refined) * 2 < heard) preview else refined

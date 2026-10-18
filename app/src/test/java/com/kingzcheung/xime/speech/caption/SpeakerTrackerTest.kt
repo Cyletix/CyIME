@@ -106,6 +106,22 @@ class SpeakerTrackerTest {
         assertEquals(1, t.settle().size)
     }
 
+    @Test fun `a voice marked as me is remembered and takes the holder's next sentences`() {
+        val t = SpeakerTracker()
+        speak(t, 0, 4, 0.0); speak(t, 4000, 4, 2.0)
+        val labels = t.addSegment(1, 0, 3800) + t.addSegment(2, 4300, 7800)
+        val holder = labels.first { it.segmentId == 1L }.speakerId
+        val print = t.markSelf(holder)!!
+        assertTrue(SpeakerTracker.SELF in t.speakerIds && holder !in t.speakerIds)
+        // Next session: only the remembered print is known; the holder speaking again goes to SELF.
+        val next = SpeakerTracker()
+        next.seedSelf(print)
+        speak(next, 0, 4, 0.05); speak(next, 4000, 4, 2.0)
+        val again = next.addSegment(1, 0, 3800) + next.addSegment(2, 4300, 7800)
+        assertEquals(SpeakerTracker.SELF, again.first { it.segmentId == 1L }.speakerId)
+        assertNotEquals(SpeakerTracker.SELF, again.first { it.segmentId == 2L }.speakerId)
+    }
+
     @Test fun `two pass keeps the preview when SenseVoice drops most of the speech`() {
         assertEquals("明天上午我来接你去医院", chooseFinal("明天上午我来接你去医院", "明天。"))
         assertEquals("明天上午我来接你，去医院。", chooseFinal("明天上午我来接你去医院", "明天上午我来接你，去医院。"))

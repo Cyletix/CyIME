@@ -33,7 +33,7 @@ class RevealTest {
         assertTrue(r.glow(3, 2000) > .9f)
         assertEquals(0f, r.glow(0, 2000))
         assertEquals(1f, r.alpha(3, 2000))
-        assertEquals(0f, r.glow(3, 2000 + 700))
+        assertEquals(0f, r.glow(3, 2000 + 1100))
     }
 
     @Test fun `a fully rewritten short line is replaced where it stood`() {

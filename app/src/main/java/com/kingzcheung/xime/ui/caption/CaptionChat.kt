@@ -80,7 +80,9 @@ private fun messages(controller: CaptionController): List<Turn> {
         if (line.text.isEmpty()) continue
         val who = line.speakerId?.let { id -> controller.speakers.firstOrNull { it.id == id } }
         if (who?.ignored == true) continue
-        val same = current.isNotEmpty() && speaker?.id == who?.id && line.wallMs - lastEnd < MESSAGE_GAP_MS &&
+        // 自己写的回复每句一条：连点两句不能拼成“好的是”。
+        val same = current.isNotEmpty() && speaker?.id == who?.id && who?.id != CaptionController.REPLY_SPEAKER &&
+            line.wallMs - lastEnd < MESSAGE_GAP_MS &&
             current.sumOf { it.text.length } + line.text.length <= MESSAGE_MAX_CHARS
         if (!same) { flush(); speaker = who }
         current.add(line)
@@ -168,7 +170,10 @@ internal fun CaptionChat(controller: CaptionController, fontSp: Int, onSpeakerTa
                 items(turns.size, key = { turns[it].key }) { index ->
                     val turn = turns[index]
                     val mine = turn.speaker?.id == CaptionController.REPLY_SPEAKER
-                    Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
+                    // A new message slides in and the ones above move up smoothly instead of jumping.
+                    Box(Modifier.fillMaxWidth().animateItem(fadeInSpec = androidx.compose.animation.core.tween(320),
+                        placementSpec = androidx.compose.animation.core.tween(360, easing = androidx.compose.animation.core.FastOutSlowInEasing)),
+                        contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
                         Message(turn, mine, fontSp, Modifier.widthIn(max = bubbleMax), onSpeakerTap, onMessageLongPress)
                     }
                 }

@@ -108,6 +108,8 @@ class CaptionInferenceClient(context: Context) {
     fun setSpeakerNamed(speakerId: Int, named: Boolean) { try { requireService().setSpeakerNamed(speakerId, named) } catch (_: Exception) { } }
     fun setStrictness(level: Int) { try { requireService().setStrictness(level) } catch (_: Exception) { } }
     fun resetSpeakers() { try { requireService().resetSpeakers() } catch (_: Exception) { } }
+    fun markSelf(speakerId: Int) { try { requireService().markSelf(speakerId) } catch (_: Exception) { } }
+    fun forgetSelf() { try { requireService().forgetSelf() } catch (_: Exception) { } }
 
     companion object { private const val TAG = "CaptionInferenceClient" }
 }
