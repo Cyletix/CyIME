@@ -213,8 +213,8 @@ class KeyboardResizeGeometryTest {
         }
         // 平板横屏（SM-X800 约 625dp 高）：最低 237dp，不是 1.14.27 的 509dp。
         assertEquals(237, keyboardHeightBounds(625, true).first)
-        // 横屏固定高度首次启动回退用的参考档就是 45% 档：平板横屏屏高 904dp → 407dp（原因：新增 capLandscapeFixedHeightOnce 依赖它）。
-        assertEquals(407, fixedReferenceHeightDp(904))
+        // 横屏固定高度首次启动回退用的参考档就是 45% 档：横屏屏高 905dp → 407dp（capLandscapeFixedHeightOnce 依赖它）。
+        assertEquals(407, fixedReferenceHeightDp(905))
         assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, fixedReferenceHeightDp(400))
         assertEquals(367, keyboardHeightBounds(915, false).first)
         for (width in listOf(320, 800, 1400)) {

@@ -252,9 +252,11 @@ class ResizeControlsContrastTest {
         assertEquals("opaque control interior inherited keyboard transparency", 0, changedInteriorPixels)
         val image = button.captureToImage().toPixelMap()
         val panelPixel = image[image.width / 2, 5]
-        // Light and dark themes can place the outline on either side of the fill's luminance.
+        // 按钮现在是主题实心色、无描边：顶边中点和内部必须是同一种颜色。
         val border = image[image.width / 2, 0]
-        assertTrue("mode button border missing", kotlin.math.abs(border.red - panelPixel.red) > 0.15f)
+        assertTrue("mode button must be a solid fill without an outline",
+            kotlin.math.abs(border.red - panelPixel.red) < 0.06f && kotlin.math.abs(border.green - panelPixel.green) < 0.06f &&
+                kotlin.math.abs(border.blue - panelPixel.blue) < 0.06f)
         val reset = rule.onNodeWithContentDescription("重置").fetchSemanticsNode().boundsInRoot
         val mode = button.fetchSemanticsNode().boundsInRoot
         val confirm = rule.onNodeWithContentDescription("确认").fetchSemanticsNode().boundsInRoot
@@ -269,8 +271,10 @@ class ResizeControlsContrastTest {
         assertEquals(actions.left, opacityPanel.left, 1f)
         assertTrue("tablet action buttons must not stretch across the screen", reset.width <= 140f)
         assertEquals(controls.center.x, opacityPanel.center.x, 1f)
-        assertEquals(slider.center.x, opacityLabel.center.x, 1f)
-        assertTrue("opacity label must sit on the progress bar", opacityLabel.top >= slider.top && opacityLabel.bottom <= slider.bottom)
+        // 「透明度 N%」在滑条左边、同一条中线上，不再盖在进度条上。
+        assertTrue("opacity label must sit left of the slider", opacityLabel.right <= slider.left + 1f &&
+            opacityLabel.left >= opacityPanel.left)
+        assertEquals(slider.center.y, opacityLabel.center.y, 1f)
         assertTrue(slider.bottom <= reset.top)
         assertTrue(reset.right < mode.left && mode.right < confirm.left)
         assertEquals(reset.center.y, mode.center.y, 1f)
