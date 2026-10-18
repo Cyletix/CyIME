@@ -19,6 +19,8 @@ class ClipboardBoardContentTest {
         assertEquals(fixed, content.pinned)
         assertEquals(recent.take(2 * ClipboardRecentRows), content.recent)
         assertEquals(20, content.recentCount)
+        assertEquals("the toggle names exactly the older copies it folds", 20 - 2 * ClipboardRecentRows, content.olderCount)
+        assertEquals(content.olderCount, clipboardBoardContent(cards, pins, 2, recentExpanded = true).olderCount)
         assertTrue(content.recentCollapsible)
         assertEquals(recent.take(2 * ClipboardRecentRows).map { it.key } + fixed.map { it.key }, content.visible.map { it.key })
         assertEquals("Presentation must not mutate stored history", 25, cards.size)

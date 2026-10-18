@@ -32,7 +32,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** 多余的最近记录折叠，分隔线“🔒 已固定 … 更多 N 条 ⌄”后紧跟固定内容，点线展开/收起最近记录。深浅色、玻璃开关都截图。 */
+/** 最近一行、“🔒 已固定 N 条”和固定内容不受折叠影响；只有“更早的记录”由其分隔线或工具栏展开/收起。深浅色、玻璃开关都截图。 */
 class ClipboardPinsFoldArrowTest {
     @get:Rule val rule = createComposeRule()
 
@@ -64,20 +64,27 @@ class ClipboardPinsFoldArrowTest {
             rule.runOnIdle { dark = d; glass = g }
             rule.waitForIdle()
             val name = "${if (d) "dark" else "light"}-${if (g) "glass" else "plain"}"
-            rule.onNodeWithText("更多 8 条", useUnmergedTree = true).assertIsDisplayed()
+            rule.onNodeWithText("更早 8 条", useUnmergedTree = true).assertIsDisplayed()
+            rule.onNodeWithText("已固定 3 条", useUnmergedTree = true).assertIsDisplayed()
             rule.onNodeWithTag("clipboard-card:text:11").assertIsDisplayed()
             rule.onNodeWithTag("clipboard-card:text:13").assertDoesNotExist()
             rule.onNodeWithTag("clipboard-card:text:1").assertIsDisplayed()
+            rule.onNodeWithTag("clipboard-records").performScrollToKey("older-start")
+            rule.onNodeWithText("展开更早的 8 条", useUnmergedTree = true).assertIsDisplayed()
             save("$name-collapsed")
-            rule.onNodeWithTag("clipboard-recent-toggle").performClick()
+            // The divider itself opens the older copies; pins stay where they were.
+            rule.onNodeWithTag("clipboard-older-divider").performClick()
             rule.waitForIdle()
-            rule.onNodeWithText("收起", useUnmergedTree = true).assertExists()
+            // Both the divider and the toolbar name the same action.
+            rule.onAllNodesWithText("收起更早的记录", useUnmergedTree = true).assertCountEquals(2)
             rule.onNodeWithTag("clipboard-records").performScrollToKey("text:20")
             save("$name-expanded")
-            rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
+            // Folding from deep in the older copies keeps the divider in view.
             rule.onNodeWithTag("clipboard-recent-toggle").performClick()
             rule.waitForIdle()
             rule.onNodeWithTag("clipboard-card:text:13").assertDoesNotExist()
+            rule.onNodeWithTag("clipboard-older-divider").assertIsDisplayed()
+            rule.onNodeWithTag("clipboard-card:text:1").assertExists()
             rule.onNodeWithTag("clipboard-records").performScrollToIndex(0)
         }
     }

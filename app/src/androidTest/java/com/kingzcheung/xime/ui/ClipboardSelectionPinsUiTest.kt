@@ -190,7 +190,7 @@ class ClipboardSelectionPinsUiTest {
         val recent = rule.onNodeWithTag("clipboard-card:text:1000").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue("Recent copy leads the board", recent.top - region.top < 12f)
         rule.onNodeWithTag("clipboard-card:text:${1000 + shown}").assertDoesNotExist()
-        rule.onNodeWithText(if (width >= 360) "更多 ${40 - shown} 条" else "+${40 - shown}", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithText(if (width >= 360) "更早 ${40 - shown} 条" else "更早 ${40 - shown}", useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
         val divider = rule.onNodeWithTag("clipboard-pins-divider").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         rule.onNodeWithTag("clipboard-records").performScrollToKey("text:1")

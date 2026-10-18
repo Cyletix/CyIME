@@ -81,6 +81,8 @@ internal data class ClipboardBoardContent(
     /** Newest copies, then pins, then any opened older copies: opening never pushes the pins down. */
     val visible: List<ClipboardCard> get() = recent + pinned + older
     val hiddenRecent: Int get() = recentCount - recent.size - older.size
+    /** Older copies after the newest row, whether folded or open; this is what the toggle acts on. */
+    val olderCount: Int get() = recentCount - recent.size
 }
 
 /** Rows of newest copies kept above the pins, so the pins stay within reach. */
