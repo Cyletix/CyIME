@@ -65,6 +65,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -943,12 +944,19 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val margin = with(density) { 4.dp.roundToPx() }
     val gap = with(density) { 2.dp.roundToPx() }
-    val positionProvider = remember(margin, gap) {
+    // 宿主报了光标位置时气泡从光标处开始（换成本窗口坐标），不再固定在键盘左边盖住已上屏的字。
+    val caret by com.kingzcheung.xime.service.SoftCaretAnchor.anchor
+    val view = LocalView.current
+    val positionProvider = remember(margin, gap, caret, view) {
         object : PopupPositionProvider {
             override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
                 layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+                val caretX = caret?.let { anchor ->
+                    val origin = IntArray(2).also { view.rootView.getLocationOnScreen(it) }
+                    (anchor.left - origin[0]).roundToInt()
+                }
                 return IntOffset(
-                    anchorBounds.left.coerceIn(margin,
+                    (caretX ?: anchorBounds.left).coerceIn(margin,
                         (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)),
                     (anchorBounds.top - popupContentSize.height - gap).coerceIn(0,
                         (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
