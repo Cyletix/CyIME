@@ -378,4 +378,69 @@ class HardwareCandidateNavigationTest {
             assertEquals(HardwareCandidateDecision.Consume, decision)
         } finally { queue.close() }
     }
+
+    private val pinyin26 = InputProfile(InputLanguage.CHINESE, InputScheme.PINYIN, InputLayout.QWERTY,
+        EngineProfile.Rime("installed-backend"))
+    private val twentyCandidates = CandidateState(inputText = "shi", isComposing = true,
+        candidates = (1..20).map { "候选$it" }, hasNextPage = true, engineRevision = 7L)
+
+    // 有意与 Windows 不同：空格不跟随工具栏高亮，上屏后的联想永远不被空格选中（见 physicalCandidateDecision）。
+    @Test fun physicalSpaceKeepsTheDefaultCandidateAndNeverPicksSuggestions() {
+        val source = HardwareCandidateSnapshot(1, pinyin26, composition, false)
+        assertEquals(HardwareCandidateDecision.Confirm(0, false),
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, source, true))
+        val suggestions = HardwareCandidateSnapshot(1, pinyin26, CandidateState(associationCandidates = listOf("世界", "朋友")), false)
+        assertEquals(HardwareCandidateDecision.LiteralSpace,
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, suggestions, false))
+    }
+
+    @Test fun toolbarShowsAnEngineLongerThanTenAsWindows() {
+        val navigation = HardwareCandidateNavigation()
+        assertEquals(0, navigation.windowStart(twentyCandidates))
+        val first = HardwareCandidateSnapshot(1, pinyin26, twentyCandidates, false)
+        assertEquals((1..10).map { "候选$it" }, first.words)
+        assertTrue(first.presentation.hasNextPage)
+        assertFalse(first.presentation.hasPreviousPage)
+        assertTrue(navigation.moveWindow(twentyCandidates, 1))
+        val second = first.copy(windowStart = navigation.windowStart(twentyCandidates))
+        assertEquals((11..20).map { "候选$it" }, second.words)
+        assertTrue(second.presentation.hasPreviousPage)
+        // The engine still has a next page: the window cannot pass the end of this page by itself.
+        assertTrue(second.presentation.hasNextPage)
+        assertFalse(navigation.moveWindow(twentyCandidates, 1))
+        assertTrue(navigation.moveWindow(twentyCandidates, -1))
+        assertEquals(0, navigation.windowStart(twentyCandidates))
+        assertFalse(navigation.moveWindow(twentyCandidates, -1))
+        // A page that fits needs no window.
+        assertFalse(navigation.moveWindow(composition, 1))
+        assertEquals(composition.candidates, HardwareCandidateSnapshot(1, pinyin26, composition, false).words)
+    }
+
+    @Test fun pagingBackOpensTheLastWindowOnlyForTheSameInput() {
+        val navigation = HardwareCandidateNavigation()
+        navigation.enginePaged(twentyCandidates, -1)
+        // The old page is still on screen until the engine publishes the previous one.
+        assertEquals(0, navigation.windowStart(twentyCandidates))
+        val previousPage = twentyCandidates.copy(candidates = (21..40).map { "候选$it" }, engineRevision = 8L)
+        assertEquals(10, navigation.windowStart(previousPage))
+        assertEquals(10, navigation.windowStart(previousPage))
+        navigation.enginePaged(previousPage, -1)
+        val typedOn = previousPage.copy(inputText = "shij", engineRevision = 9L)
+        assertEquals(0, navigation.windowStart(typedOn))
+        navigation.enginePaged(previousPage, 1)
+        assertEquals(0, navigation.windowStart(previousPage.copy(engineRevision = 10L)))
+    }
+
+    @Test fun windowedSelectionMapsVisiblePositionsToTheEnginePage() {
+        val navigation = HardwareCandidateNavigation()
+        navigation.moveWindow(twentyCandidates, 1)
+        val source = HardwareCandidateSnapshot(1, pinyin26, twentyCandidates, false,
+            windowStart = navigation.windowStart(twentyCandidates))
+        assertEquals(HardwareCandidateDecision.Confirm(2, false),
+            physicalCandidateDecision(HardwareCandidateKey.DIGIT, source, true, digitIndex = 2))
+        assertEquals(12, source.windowStart + 2)
+        assertEquals("候选13", source.words[2])
+        assertEquals(HardwareCandidateDecision.Confirm(0, false),
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, source, true))
+    }
 }

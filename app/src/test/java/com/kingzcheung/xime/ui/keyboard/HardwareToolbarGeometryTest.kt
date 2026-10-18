@@ -93,10 +93,22 @@ class HardwareToolbarGeometryTest {
         org.junit.Assert.assertTrue(covered.x in g.minX..g.maxX && covered.y in g.minY..g.maxY)
     }
 
-    @Test fun bottomDockWinsAtCornersButDoesNotCaptureFreeTravel() {
+    @Test fun bottomDockOnlyNearTheBottomCentreAndCornersStayOnTheSides() {
         val geometry = hardwareToolbarGeometry(900, 600, 232, 56, 8)
-        for (x in listOf(geometry.minX, 300f, geometry.maxX)) {
+        val middle = (geometry.minX + geometry.maxX) / 2
+        for (x in listOf(middle - 30f, middle, middle + 30f)) {
             assertEquals(HardwareToolbarPosition(), geometry.positionAt(x, geometry.maxY - 20f, HardwareToolbarPosition()))
+            assertEquals(HardwareToolbarPosition(), geometry.positionAt(x, geometry.maxY, HardwareToolbarPosition()))
+        }
+        // Lower corners dock to the side, the rest of the bottom edge stays where it was dropped.
+        for ((x, dock) in listOf(geometry.minX to 0f, geometry.maxX to 1f, 150f to null, middle - 60f to null)) {
+            for (y in listOf(geometry.maxY - 20f, geometry.maxY)) {
+                val result = geometry.positionAt(x, y, HardwareToolbarPosition())
+                assertTrue(!result.isBottomDocked(true))
+                if (dock != null) assertEquals(dock, result.xFraction, 0f)
+                else assertTrue(result.xFraction > 0f && result.xFraction < 1f && result.xFraction != 0.5f)
+                assertTrue(result.yFraction > 0.9f)
+            }
         }
         val free = geometry.positionAt(200f, geometry.maxY - 40f, HardwareToolbarPosition())
         assertTrue(!free.isBottomDocked(true))
@@ -117,5 +129,12 @@ class HardwareToolbarGeometryTest {
             val released = geometry.positionAt(offset.x, offset.y - 100f, HardwareToolbarPosition())
             assertTrue(!released.isBottomDocked(true))
         }
+    }
+
+    @Test
+    fun phonePortraitStripFoldsAuxiliaryActionsButTabletKeepsThem() {
+        // S23 Ultra 竖屏 411dp 去掉边距约 395dp；平板竖屏条宽取上限 720dp。
+        assertTrue(hardwareCandidateStripIsCompact(395f))
+        assertTrue(!hardwareCandidateStripIsCompact(720f))
     }
 }

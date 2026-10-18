@@ -11,7 +11,20 @@ internal data class HardwareCandidatePresentation(
     // Suggestions belong to the draggable toolbar. Only active composition uses
     // the separate caret-following candidate window.
     val standaloneWords: List<String> get() = if (association) emptyList() else words
+
+    /**
+     * The physical-keyboard toolbar numbers at most [HARDWARE_PAGE_SIZE] candidates. A longer engine
+     * page is shown as consecutive windows; paging moves through them before turning the engine page.
+     */
+    fun window(start: Int): HardwareCandidatePresentation =
+        if (association || (start == 0 && words.size <= HARDWARE_PAGE_SIZE)) this
+        else copy(words = words.drop(start).take(HARDWARE_PAGE_SIZE),
+            comments = comments.drop(start).take(HARDWARE_PAGE_SIZE),
+            hasPreviousPage = start > 0 || hasPreviousPage,
+            hasNextPage = start + HARDWARE_PAGE_SIZE < words.size || hasNextPage)
 }
+
+internal const val HARDWARE_PAGE_SIZE = 10
 
 internal fun hardwareCandidatePresentation(
     state: CandidateState,

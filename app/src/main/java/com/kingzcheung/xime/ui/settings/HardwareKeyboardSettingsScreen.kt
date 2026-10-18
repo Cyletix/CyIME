@@ -51,6 +51,8 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             HardwareOption("候选跟随光标", "应用提供光标位置时生效；否则显示在底部", options.followCursor) { save("follow_cursor", it) }
             HardwareOption("自动避开输入区域", "有位置数据时避让输入框；大文档优先避让光标附近", options.avoidEditor) { save("avoid_editor", it) }
             HardwareOption("靠边停靠", "左右边缘变为竖条，底部变为候选长条，拖近时显示蓝色轮廓", options.dockAtEdge) { save("dock_edge", it) }
+            HardwareOption("底边使用三星式通栏", "吸附到底边时改为贴住屏幕底部的整宽候选栏，九个候选带 1–9 编号；默认关闭，保持原来的底部长条",
+                options.bottomBar) { save("bottom_bar", it) }
             Text("浮条任意位置均可拖动；点按图标执行操作。长按语言键选择语言。", style = MaterialTheme.typography.bodyMedium)
         }
     }

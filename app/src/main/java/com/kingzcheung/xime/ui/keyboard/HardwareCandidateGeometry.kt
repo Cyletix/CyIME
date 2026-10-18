@@ -90,3 +90,35 @@ internal fun hardwareCandidatePosition(
         preferredY.coerceIn(yRange.first.toDouble(), yRange.last.toDouble()).roundToInt(),
     ))
 }
+
+/**
+ * 拼音/候选浮卡盖住正在输入的那一行时，只上下挪到这一行之外，不跟着光标横向走；
+ * 两边都放得下时取离原位置近的，并尽量不压工具条。[caretLine] 与 [toolbar] 都是宿主内坐标。
+ */
+internal fun avoidHardwareCaretLine(
+    preferred: HardwareCandidatePosition,
+    cardWidth: Int,
+    cardHeight: Int,
+    viewHeight: Int,
+    caretLine: HardwareCandidateExclusion?,
+    toolbar: HardwareCandidateExclusion?,
+    marginPx: Int,
+    gapPx: Int,
+): HardwareCandidatePosition {
+    if (caretLine == null || caretLine.bottom <= caretLine.top || cardWidth <= 0 || cardHeight <= 0) return preferred
+    fun overlap(p: HardwareCandidatePosition, r: HardwareCandidateExclusion?, gap: Int): Long {
+        if (r == null || r.right <= r.left || r.bottom <= r.top) return 0L
+        val w = (minOf(p.x.toLong() + cardWidth, r.right.toLong() + gap) - maxOf(p.x.toLong(), r.left.toLong() - gap)).coerceAtLeast(0)
+        val h = (minOf(p.y.toLong() + cardHeight, r.bottom.toLong() + gap) - maxOf(p.y.toLong(), r.top.toLong() - gap)).coerceAtLeast(0)
+        return w * h
+    }
+    val gap = gapPx.coerceAtLeast(0)
+    if (overlap(preferred, caretLine, gap) == 0L) return preferred
+    val end = (viewHeight - cardHeight).coerceAtLeast(0)
+    val margin = marginPx.coerceAtLeast(0).coerceAtMost(end / 2)
+    fun at(y: Int) = HardwareCandidatePosition(preferred.x, y.coerceIn(margin, end - margin))
+    return listOf(preferred, at(caretLine.top - gap - cardHeight), at(caretLine.bottom + gap))
+        .minWith(compareBy<HardwareCandidatePosition> { overlap(it, caretLine, gap) }
+            .thenBy { overlap(it, toolbar, 0) }
+            .thenBy { kotlin.math.abs(it.y - preferred.y) })
+}
