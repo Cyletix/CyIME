@@ -29,7 +29,7 @@ internal fun ToolbarButton.gestureOn(prefs: KeyboardInputPreferences): Boolean =
 
 /** 同一含义的全部存储键（旧键随新键一起写，保持读取兼容）。 */
 internal fun ToolbarButton.gestureKeys(): List<String> = when (this) {
-    ToolbarButton.GLIDE -> listOf("glide_typing")
+    ToolbarButton.GLIDE -> listOf("glide_typing_v2", "glide_typing")
     ToolbarButton.T9_FLICK -> listOf("t9_flick_letters")
     ToolbarButton.FOURTEEN_SWIPE -> listOf("fourteen_letter_swipe")
     ToolbarButton.KANA_HINTS -> listOf("kana_direction_hints")
