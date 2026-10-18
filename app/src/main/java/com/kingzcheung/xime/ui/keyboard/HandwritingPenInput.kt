@@ -43,6 +43,9 @@ internal fun Modifier.handwritingInk(
     presence: StylusPresence,
     eraserRadiusPx: Float,
     onErased: () -> Unit = {},
+    /** 笔在板上移动：是否在擦、速度（px/ms）；笔抬起时回调 [onPenLifted]。手指不回调。 */
+    onPenMotion: (erasing: Boolean, speed: Float) -> Unit = { _, _ -> },
+    onPenLifted: () -> Unit = {},
 ): Modifier = this
     .pointerInput(presence) {
         // 只观察不消费：悬停事件也要记下笔的存在。
@@ -60,6 +63,15 @@ internal fun Modifier.handwritingInk(
             var token = -1
             var erasing = false
             var lastErase: StrokePoint? = null
+            var lastPressure = first.pressure
+
+            fun samples(change: PointerInputChange) = change.strokePoints(lastPressure).also { lastPressure = change.pressure }
+
+            fun reportMotion(change: PointerInputChange) {
+                if (!change.type.isPen()) return
+                val dt = (change.uptimeMillis - change.previousUptimeMillis).coerceAtLeast(1L)
+                onPenMotion(erasing, (change.position - change.previousPosition).getDistance() / dt)
+            }
 
             fun erase(points: List<StrokePoint>) {
                 if (points.isEmpty()) return
@@ -73,13 +85,15 @@ internal fun Modifier.handwritingInk(
                 if (presence.rejectsTouch(change.type, change.uptimeMillis)) return
                 active = change.id
                 erasing = isErasing(change.type, event.motionEvent?.buttonState ?: 0)
-                val point = change.strokePoints().last()
+                lastPressure = change.pressure
+                val point = samples(change).last()
                 lastErase = null
                 if (erasing) erase(listOf(point)) else token = session.begin(point)
             }
 
             fun stopWriting(cancelled: Boolean) {
                 if (active != null && !erasing) session.end(token, cancelled)
+                if (active != null) onPenLifted()
                 active = null
             }
 
@@ -98,7 +112,8 @@ internal fun Modifier.handwritingInk(
                         event.changes.firstOrNull { it.changedToDown() }?.let { start(it, event) }
                     }
                     event.changes.firstOrNull { it.id == active }?.let { change ->
-                        val points = change.strokePoints().filter(::inside)
+                        val points = samples(change).filter(::inside)
+                        if (change.pressed) reportMotion(change)
                         if (erasing) erase(points) else session.moveAll(token, points)
                         if (!change.pressed) stopWriting(cancelled = false)
                     }
@@ -111,10 +126,16 @@ internal fun Modifier.handwritingInk(
         }
     }
 
-/** 当前点之前还有一帧内的高频中间点；时间换算到与 [StrokePoint] 相同的墙钟。 */
-private fun PointerInputChange.strokePoints(): List<StrokePoint> {
+/**
+ * 当前点之前还有一帧内的高频中间点；时间换算到与 [StrokePoint] 相同的墙钟。
+ * 中间点没有单独的压感，从上一帧压感线性过渡到当前压感。
+ */
+private fun PointerInputChange.strokePoints(previousPressure: Float): List<StrokePoint> {
     val offset = System.currentTimeMillis() - uptimeMillis
     val pen = type.isPen()
-    return historical.map { StrokePoint(it.position.x, it.position.y, it.uptimeMillis + offset, pen) } +
-        StrokePoint(position.x, position.y, uptimeMillis + offset, pen)
+    val steps = historical.size + 1
+    return historical.mapIndexed { i, h ->
+        val p = previousPressure + (pressure - previousPressure) * (i + 1) / steps
+        StrokePoint(h.position.x, h.position.y, h.uptimeMillis + offset, pen, if (pen) p else 1f)
+    } + StrokePoint(position.x, position.y, uptimeMillis + offset, pen, if (pen) pressure else 1f)
 }

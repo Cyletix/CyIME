@@ -16,12 +16,16 @@ import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import com.kingzcheung.xime.handwriting.SPenSounds
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -131,6 +135,11 @@ fun HandwritingKeyboardLayout(
     val recognitionMutex = remember { Mutex() }
     val stylusPresence = remember { StylusPresence() }
     val eraserRadiusPx = with(LocalDensity.current) { com.kingzcheung.xime.handwriting.PenEraser.Radius.toPx() }
+    // 三星设备上用系统自带的 S Pen 书写/橡皮声，满音量对应约 1 dp/ms 的笔速。
+    val penSoundFullSpeed = with(LocalDensity.current) { 1.dp.toPx() }
+    val penSounds = remember(context) { SPenSounds(context.applicationContext) }
+    LaunchedEffect(penSounds) { withContext(Dispatchers.IO) { penSounds.load() } }
+    DisposableEffect(penSounds) { onDispose { penSounds.release() } }
     // 公式模式：只有电脑上训练的公式模型包放到了设备上才显示开关（见 FormulaRecognizer）
     val formulaPrefs = remember(context) { context.getSharedPreferences("handwriting", android.content.Context.MODE_PRIVATE) }
     val formulaAvailable = remember(context) { FormulaRecognizer.isAvailable(context) }
@@ -216,17 +225,19 @@ fun HandwritingKeyboardLayout(
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 Box(Modifier.weight(1f).fillMaxHeight()) {
-            // 公式模式在画板顶上留一条预览栏（开关时才变，写字过程中画板大小不变）
-            val previewHeight = 52.dp
-            if (formulaActive) Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(previewHeight)
+            // 公式预览只是叠在画板顶部的显示内容，放在画布下层：整块区域都能落笔，笔迹画在预览之上。
+            if (formulaActive) Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(52.dp)
                 .padding(horizontal = 96.dp).testTag("handwriting-formula-preview"), contentAlignment = Alignment.Center) {
                 if (session.hasInk && formulaPreview.isNotEmpty())
-                    com.kingzcheung.xime.ui.settings.KatexView(formulaPreview, Modifier.fillMaxSize(), color = keyTextColor)
+                    com.kingzcheung.xime.ui.settings.KatexView(formulaPreview, Modifier.fillMaxSize(), color = keyTextColor.copy(alpha = 0.7f))
                 else Text("写完停笔，这里显示公式预览", color = keyTextColor.copy(alpha = 0.4f), fontSize = 12.sp)
             }
-            Canvas(Modifier.fillMaxSize().padding(top = if (formulaActive) previewHeight else 0.dp).clipToBounds().testTag("handwriting-canvas")
+            Canvas(Modifier.fillMaxSize().clipToBounds().testTag("handwriting-canvas")
                 .semantics { contentDescription = "手写区域"; stateDescription = session.phase.description }
-                .handwritingInk(session, stylusPresence, eraserRadiusPx, onErased = { feedback?.invoke("handwriting_erase") })) {
+                .handwritingInk(session, stylusPresence, eraserRadiusPx,
+                    onErased = { if (!penSounds.active) feedback?.invoke("handwriting_erase") },
+                    onPenMotion = { erasing, speed -> penSounds.onMotion(erasing, speed, penSoundFullSpeed) },
+                    onPenLifted = { penSounds.stop() })) {
                 renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), inkColor, transparentPaper = expanded, penColor = penInkColor)
             }
             if (language != recognitionLanguage || templateScript != null) Text(when {
@@ -236,7 +247,9 @@ fun HandwritingKeyboardLayout(
                     else -> "中文手写"
                 }, color = keyTextColor.copy(alpha = 0.6f),
                 modifier = Modifier.align(Alignment.TopStart).padding(12.dp).testTag("handwriting-language"))
-            if (formulaAvailable) TextButton(
+            // 公式开关是浮在画板右上角的实心小按钮，不用对钩：开启时强调色填满、文字在黑白里取反差大的；
+            // 关闭时用主题功能键的底色（强制不透明）和文字色，不加描边。
+            if (formulaAvailable) Surface(
                 onClick = {
                     session.clear()
                     keyAction("clear_composition")
@@ -245,11 +258,16 @@ fun HandwritingKeyboardLayout(
                     formulaPrefs.edit().putBoolean("formula_mode", formulaMode).apply()
                     if (!formulaMode) FormulaRecognizer.release()
                 },
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).testTag("handwriting-formula-toggle")
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("handwriting-formula-toggle")
                     .semantics { stateDescription = if (formulaMode) "公式模式已开" else "公式模式已关" },
+                shape = RoundedCornerShape(50),
+                color = if (formulaMode) MaterialTheme.colorScheme.primary.copy(alpha = 1f) else specialKeyBackgroundColor.copy(alpha = 1f),
+                contentColor = if (formulaMode) {
+                    if (MaterialTheme.colorScheme.primary.luminance() > 0.179f) Color.Black else Color.White
+                } else specialKeyTextColor,
+                shadowElevation = if (formulaMode) 2.dp else 0.dp,
             ) {
-                Text(if (formulaMode) "公式 ✓" else "公式",
-                    color = if (formulaMode) MaterialTheme.colorScheme.primary else keyTextColor.copy(alpha = 0.6f))
+                Text("公式", fontSize = 14.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
             }
                 }
                 if (!expanded) Column(Modifier.width(functionKeyWidth).fillMaxHeight().testTag("handwriting-side-keys")) {
