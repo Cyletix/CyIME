@@ -27,4 +27,8 @@ interface ICaptionService {
     void markSelf(int speakerId);
     /** 忘掉“我”的声音 */
     void forgetSelf();
+    /** 永久记住这个人的声音和名字（只存本机）；返回记住后的说话人编号，失败为 -1 */
+    int rememberSpeaker(int speakerId, String name);
+    /** 忘掉记住的人 */
+    void forgetSpeaker(int knownId);
 }

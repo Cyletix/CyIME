@@ -12,6 +12,7 @@ import com.kingzcheung.xime.speech.ResidentSpeechSessionOwner
 import com.kingzcheung.xime.speech.SherpaSpeechEngine
 import com.kingzcheung.xime.speech.SpeechBoundary
 import com.kingzcheung.xime.speech.SpeechTuningRecorder
+import com.kingzcheung.xime.speech.caption.KnownVoices
 import com.kingzcheung.xime.speech.caption.CaptionSpeechSession
 import com.kingzcheung.xime.speech.caption.EmbeddingSource
 import com.kingzcheung.xime.speech.caption.SpeakerTracker
@@ -74,6 +75,10 @@ class AsrInferenceService : Service() {
             stream.inputFinished()
             return if (extractor.isReady(stream)) extractor.compute(stream) else null
         } finally { stream.release() }
+    }
+
+    private fun seedKnownVoices() {
+        for (voice in KnownVoices.list(this)) KnownVoices.print(this, voice.id)?.let { speakerTracker.seedKnown(voice.id, it) }
     }
 
     /** The holder's voiceprint: 192 floats in app-private storage, never backed up or uploaded. */
@@ -246,6 +251,7 @@ class AsrInferenceService : Service() {
                 val tracker = if (speakerModelPath.isNotEmpty() && java.io.File(speakerModelPath).isFile) {
                     loadSpeakerModel(speakerModelPath)
                     readSelfPrint()?.let(speakerTracker::seedSelf)
+                    seedKnownVoices()
                     speakerTracker
                 } else null
                 val listener = object : CaptionSpeechSession.Listener {
@@ -295,7 +301,15 @@ class AsrInferenceService : Service() {
         override fun setSpeakerIgnored(speakerId: Int, ignored: Boolean) = speakerTracker.setIgnored(speakerId, ignored)
         override fun setSpeakerNamed(speakerId: Int, named: Boolean) = speakerTracker.setNamed(speakerId, named)
         override fun setStrictness(level: Int) = speakerTracker.setStrictness(level)
-        override fun resetSpeakers() { speakerTracker.reset(); readSelfPrint()?.let(speakerTracker::seedSelf) }
+        override fun resetSpeakers() { speakerTracker.reset(); readSelfPrint()?.let(speakerTracker::seedSelf); seedKnownVoices() }
+        override fun rememberSpeaker(speakerId: Int, name: String): Int {
+            val context = this@AsrInferenceService
+            val id = if (KnownVoices.isKnown(speakerId)) speakerId else KnownVoices.nextId(context)
+            val print = speakerTracker.remember(speakerId, id) ?: return -1
+            KnownVoices.save(context, id, name, print)
+            return id
+        }
+        override fun forgetSpeaker(knownId: Int) { speakerTracker.forget(knownId); KnownVoices.remove(this@AsrInferenceService, knownId) }
         override fun markSelf(speakerId: Int) { speakerTracker.markSelf(speakerId)?.let(::writeSelfPrint) }
         override fun forgetSelf() { speakerTracker.forgetSelf(); selfPrintFile().delete() }
     }

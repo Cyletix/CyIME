@@ -18,6 +18,7 @@ import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.SpeechModelCatalog
 import com.kingzcheung.xime.speech.caption.CaptionRecorder
 import com.kingzcheung.xime.speech.caption.CaptionSpectrum
+import com.kingzcheung.xime.speech.caption.KnownVoices
 import com.kingzcheung.xime.speech.caption.CaptionTranscript
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
@@ -252,20 +253,85 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         return letters.length <= 1 && letters.none { it.code > 0x2e80 }
     }
 
+    /** Names of the people whose voices are remembered on this phone (written by the :asr process). */
+    private val knownNames = HashMap<Int, String>().apply { KnownVoices.list(app).forEach { put(it.id, it.name) } }
+
     private fun ensureSpeaker(id: Int): SpeakerUi =
-        speakers.firstOrNull { it.id == id } ?: SpeakerUi(id, if (id <= SINGLE_SPEAKER) 0 else nextOrdinal++).also { speakers.add(it) }
+        speakers.firstOrNull { it.id == id } ?: SpeakerUi(id, if (id <= SINGLE_SPEAKER) 0 else nextOrdinal++).also { speaker ->
+            knownNames[id]?.let { speaker.name = it; speaker.named = true }
+            speakers.add(speaker)
+        }
+
+    fun isRemembered(speakerId: Int) = KnownVoices.isKnown(speakerId)
 
     private fun trimHistory() {
         while (segments.size > MAX_LINES) { val old = segments.removeAt(0); transcript.remove(old.id) }
     }
 
     // ---- user actions ----
-    fun rename(speakerId: Int, name: String) {
+    /**
+     * Names a voice. With [remember] the name and voiceprint are kept on this phone, so later sessions
+     * recognise the person by name from their first words; the row moves to the remembered id.
+     */
+    fun rename(speakerId: Int, name: String, remember: Boolean = false) {
         val speaker = ensureSpeaker(speakerId)
         speaker.name = name
         speaker.named = true
         speaker.ignored = false
-        io.execute { client.setSpeakerNamed(speakerId, true); client.setSpeakerIgnored(speakerId, false) }
+        io.execute {
+            client.setSpeakerNamed(speakerId, true); client.setSpeakerIgnored(speakerId, false)
+            if (!remember) return@execute
+            val id = client.rememberSpeaker(speakerId, name)
+            main.post {
+                if (id <= 0) { message = "没能记住这个声音：他说的话还太少，多说几句再试"; return@post }
+                knownNames[id] = name
+                if (id != speakerId) {
+                    transcript.mergeSpeakers(speakerId, id)
+                    for (segment in segments) if (segment.speakerId == speakerId) { segment.speakerId = id; segment.confident = true }
+                    speakers.removeAll { it.id == speakerId }
+                }
+                ensureSpeaker(id).let { it.name = name; it.named = true }
+            }
+        }
+    }
+
+    /** Stops recognising a remembered person; their voiceprint is deleted from the phone. */
+    fun forgetVoice(speakerId: Int) {
+        if (!KnownVoices.isKnown(speakerId)) return
+        knownNames.remove(speakerId)
+        io.execute { client.forgetSpeaker(speakerId) }
+    }
+
+    /**
+     * Saves this session's captions as text in Downloads: one line per sentence, "说话人  时间  内容".
+     * Returns where it went, or null when there is nothing to save or the write failed.
+     */
+    fun saveTranscript(): String? {
+        val clock = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+        val lines = segments.filter { line -> line.text.isNotEmpty() && speakers.none { it.id == line.speakerId && it.ignored } }
+            .map { line ->
+                val who = speakers.firstOrNull { it.id == line.speakerId }?.name ?: "说话的人"
+                "$who  ${clock.format(java.util.Date(line.wallMs))}  ${line.text}"
+            }
+        if (lines.isEmpty()) return null
+        val name = "字幕_" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.getDefault()).format(java.util.Date()) + ".txt"
+        val bytes = lines.joinToString("\n", postfix = "\n").toByteArray()
+        return runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
+                }
+                val uri = checkNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
+                checkNotNull(app.contentResolver.openOutputStream(uri)).use { it.write(bytes) }
+                "下载/$name"
+            } else {
+                // Android 9 has no Downloads collection without storage permission: keep it in the app's own folder.
+                val dir = checkNotNull(app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS))
+                java.io.File(dir, name).writeBytes(bytes)
+                java.io.File(dir, name).absolutePath
+            }
+        }.onFailure { FileLogger.e(TAG, "save transcript failed", it) }.getOrNull()
     }
 
     /** "That voice is this person": the picked speaker keeps its name, the other row disappears. */
@@ -426,7 +492,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
             "听不清" to listOf("请再说一遍", "说慢一点", "大声一点", "写下来给我看", "我听不见，请看手机", "请对着手机说", "我没听懂"),
             "生活" to listOf("我饿了，想吃饭", "我渴了，想喝水", "我想睡觉", "我要上厕所", "我冷", "我热", "我累了，想歇一会儿",
                 "我想出去走走", "帮我开灯", "帮我关电视", "我想洗澡", "我想换衣服"),
-            "家人" to listOf("我想见儿子", "我想见女儿", "我想孩子们了", "帮我给家里打个电话", "孩子什么时候来？", "你们吃饭了吗？", "路上小心"),
+            "家人" to listOf("我想见儿子", "我想见女儿", "我想见孙子", "我想见孙女", "我想孩子们了", "帮我给家里打个电话", "孩子什么时候来？", "你们吃饭了吗？", "路上小心"),
             "身体" to listOf("我不舒服", "我头疼", "我头晕", "胸口难受", "喘不上气", "我摔倒了", "我肚子疼", "该吃药了吗？", "帮我量一下血压"),
         )
         const val EMERGENCY_TEXT = "请马上帮我打120！"

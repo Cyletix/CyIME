@@ -110,6 +110,8 @@ class CaptionInferenceClient(context: Context) {
     fun resetSpeakers() { try { requireService().resetSpeakers() } catch (_: Exception) { } }
     fun markSelf(speakerId: Int) { try { requireService().markSelf(speakerId) } catch (_: Exception) { } }
     fun forgetSelf() { try { requireService().forgetSelf() } catch (_: Exception) { } }
+    fun rememberSpeaker(speakerId: Int, name: String): Int = try { requireService().rememberSpeaker(speakerId, name) } catch (_: Exception) { -1 }
+    fun forgetSpeaker(knownId: Int) { try { requireService().forgetSpeaker(knownId) } catch (_: Exception) { } }
 
     companion object { private const val TAG = "CaptionInferenceClient" }
 }

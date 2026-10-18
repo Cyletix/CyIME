@@ -1,7 +1,9 @@
 package com.kingzcheung.xime.ui.caption
 
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FormatSize
@@ -123,6 +125,7 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
     var reassignTurn by remember { mutableStateOf<Turn?>(null) }
     var confirmExit by remember { mutableStateOf(false) }
     var replying by remember { mutableStateOf(false) }
+    var writing by remember { mutableStateOf(false) }
     var flipped by remember { mutableStateOf<String?>(null) }
 
     // The navigation bar stays (with its back button); bottom buttons sit above it and the
@@ -139,6 +142,13 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
         .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.systemGestures.only(
             androidx.compose.foundation.layout.WindowInsetsSides.Bottom))
         .padding(horizontal = CaptionStyle.Edge, vertical = 8.dp)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // 保存本次字幕：说话人、时间、内容，存到手机的“下载”里。
+    val save: () -> Unit = {
+        val where = controller.saveTranscript()
+        android.widget.Toast.makeText(context, if (where != null) "字幕已保存到 $where" else "还没有字幕可以保存",
+            android.widget.Toast.LENGTH_LONG).show()
+    }
     val banners: @Composable () -> Unit = {
         if (!controller.streamingReady) ModelBanner("没有实时出字模型：要等对方说完一句才整句出字", "下载实时出字模型（226 MB）",
             controller.streamingDownload) { controller.downloadStreaming() }
@@ -179,23 +189,25 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
             }
             transcript(Modifier.weight(1f).fillMaxWidth())
             RailStatus(controller) { ribbon(it) }
+            // 横屏快捷回复：字幕下面一条矮横排（分组一行、常用的话一行，左右滑），字幕仍占大半屏。
+            if (replying) ReplyStrip(controller, onShow = { flipped = it }, onWrite = { replying = false; writing = true },
+                onClose = { replying = false })
         }
         // 右边一条窄栏（约屏宽一成）：五个按钮竖排，图标在上字在下，每个仍有老人好按的高度。
-        SlimRail(controller, onExit = { confirmExit = true }, onReply = { replying = true }, onRepeat = { flipped = "请再说一遍" })
+        SlimRail(controller, onSave = save, onExit = { confirmExit = true }, onReply = { replying = true }, onRepeat = { flipped = "请再说一遍" })
     } else Column(pageInsets, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // 顶部一块玻璃面板：三个大按钮 + 状态与音量，按钮同高同宽同间距。
         CaptionPanel(Modifier.fillMaxWidth()) {
-            TopControls(controller, onExit = { confirmExit = true })
-            StatusRow(controller)
+            TopControls(controller, onSave = save, onExit = { confirmExit = true })
         }
         // 提示条最多占屏高约三成，多了就在这一块里滚动：字幕区和底部按钮永远留得住。
         Column(Modifier.fillMaxWidth().heightIn(max = (configuration.screenHeightDp * .3f).dp).verticalScroll(rememberScrollState())) {
             banners()
         }
         transcript(Modifier.weight(1f).fillMaxWidth())
-        // 底部悬浮玻璃操作条：声音丝带单独一条，在按钮上方，不压文字也不压按钮。
+        // 横竖屏同一条规则：只有一个声音指示（状态 + 声音丝带），在字幕下面单独一行，不放进按钮面板。
+        RailStatus(controller) { ribbon(it) }
         CaptionPanel(Modifier.fillMaxWidth(), padding = 10.dp) {
-            ribbon(if (configuration.screenHeightDp < 480) 24.dp else 36.dp)
             BottomButtons(onReply = { replying = true }, onRepeat = { flipped = "请再说一遍" })
         }
     }
@@ -207,7 +219,9 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
         ReassignDialog(turn, controller, onDismiss = { reassignTurn = null })
     }
     if (confirmExit) BigChoiceDialog("真的退出字幕吗？", "退出", "继续听", onYes = { confirmExit = false; controller.exit(); onExit() }, onNo = { confirmExit = false })
-    if (replying) ReplyDialog(controller, fontSp, onDismiss = { replying = false })
+    if (replying && !sideRail) ReplyDialog(controller, fontSp, onDismiss = { replying = false })
+    // 横屏要自己写字：要弹出键盘，才打开整页回话。
+    if (writing) ReplyDialog(controller, fontSp, onDismiss = { writing = false })
     flipped?.let { text -> FlippedCard(text) { flipped = null } }
 }
 
@@ -220,32 +234,30 @@ internal fun BigButton(text: String, modifier: Modifier = Modifier, outlined: Bo
 }
 
 @Composable
-private fun TopControls(controller: CaptionController, onExit: () -> Unit) {
+private fun TopControls(controller: CaptionController, onSave: () -> Unit, onExit: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        // Phone width: three equal buttons fill the row; tablet: font on the left, pause/exit on the right.
+        // Phone width: four equal buttons, icon above the word; tablet: font on the left, the rest on the right.
         val narrow = maxWidth < 600.dp
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (narrow) 8.dp else CaptionStyle.Gap)) {
-            // 手机三个按钮等宽铺满；平板字号在左，暂停/退出在右，宽度一致。
-            val share = if (narrow) Modifier.weight(1f) else Modifier.width(180.dp)
-            // 手机上三个按钮各约 100 dp：字号按钮不放图标，文字写全“字号特大”。
-            if (narrow) CaptionButton("字号" + CaptionController.FONT_LABEL[controller.fontLevel], share, fontSize = 18.sp) { controller.cycleFont() }
-            else BigButton("字号 " + CaptionController.FONT_LABEL[controller.fontLevel], share, outlined = true,
-                icon = Icons.Rounded.FormatSize) { controller.cycleFont() }
+            val share = if (narrow) Modifier.weight(1f) else Modifier.width(160.dp)
+            @Composable fun button(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, emphasis: CaptionEmphasis = CaptionEmphasis.Normal, onClick: () -> Unit) =
+                if (narrow) CaptionButton(text, share, icon = icon, emphasis = emphasis, height = 64.dp, fontSize = 15.sp, stacked = true, onClick = onClick)
+                else CaptionButton(text, share, icon = icon, emphasis = emphasis, onClick = onClick)
+            button("字号" + CaptionController.FONT_LABEL[controller.fontLevel], Icons.Rounded.FormatSize) { controller.cycleFont() }
             if (!narrow) Spacer(Modifier.weight(1f))
             when (controller.status) {
-                CaptionController.Status.Listening, CaptionController.Status.Starting -> BigButton("暂停", share, outlined = true,
-                    icon = Icons.Rounded.Pause) { controller.pause() }
-                CaptionController.Status.Paused -> BigButton("继续", share, icon = Icons.Rounded.PlayArrow) { controller.resume() }
-                else -> {}
+                CaptionController.Status.Paused -> button("继续", Icons.Rounded.PlayArrow, CaptionEmphasis.Primary) { controller.resume() }
+                else -> button("暂停", Icons.Rounded.Pause) { controller.pause() }
             }
-            BigButton("退出", share, outlined = true, icon = Icons.Rounded.Close, onClick = onExit)
+            button("保存", Icons.Rounded.Save, onClick = onSave)
+            button("退出", Icons.Rounded.Close, onClick = onExit)
         }
     }
 }
 
 /** 横屏侧栏：同样三个按钮，竖着排、等宽。 */
 @Composable
-private fun SlimRail(controller: CaptionController, onExit: () -> Unit, onReply: () -> Unit, onRepeat: () -> Unit) {
+private fun SlimRail(controller: CaptionController, onSave: () -> Unit, onExit: () -> Unit, onReply: () -> Unit, onRepeat: () -> Unit) {
     Column(Modifier.width(RAIL_WIDTH).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val each = Modifier.fillMaxWidth().weight(1f)
         CaptionButton("字号" + CaptionController.FONT_LABEL[controller.fontLevel], each, icon = Icons.Rounded.FormatSize,
@@ -259,6 +271,7 @@ private fun SlimRail(controller: CaptionController, onExit: () -> Unit, onReply:
         CaptionButton("快捷回复", each, icon = Icons.Rounded.Forum, emphasis = CaptionEmphasis.Primary,
             height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onReply)
         CaptionButton("再说一遍", each, icon = Icons.Rounded.Replay, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onRepeat)
+        CaptionButton("保存", each, icon = Icons.Rounded.Save, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onSave)
         CaptionButton("退出", each, icon = Icons.Rounded.Close, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onExit)
     }
 }
@@ -277,7 +290,7 @@ private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -
 }
 
 private val RAIL_WIDTH = 104.dp
-private val RAIL_BUTTON = 56.dp
+private val RAIL_BUTTON = 48.dp
 
 @Composable
 private fun statusOf(controller: CaptionController) = when {
@@ -287,24 +300,6 @@ private fun statusOf(controller: CaptionController) = when {
     controller.status == CaptionController.Status.Paused -> MaterialTheme.colorScheme.outline to "已暂停"
     controller.status == CaptionController.Status.Error -> MaterialTheme.colorScheme.error to controller.message
     else -> MaterialTheme.colorScheme.outline to ""
-}
-
-@Composable
-private fun StatusRow(controller: CaptionController, volumeWidth: Dp = 96.dp) {
-    val (dotColor, text) = statusOf(controller)
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(14.dp).clip(CircleShape).background(dotColor))
-        Spacer(Modifier.width(10.dp))
-        // 状态允许两行，不再被截成“…”。
-        Text(text, fontSize = 18.sp, lineHeight = 22.sp, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.width(12.dp))
-        // Volume bar: the reader sees that the phone hears something and whether it is loud enough.
-        val level = controller.amplitude.coerceIn(0f, 1f)
-        Box(Modifier.width(volumeWidth).height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = .12f))) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(level).clip(RoundedCornerShape(5.dp))
-                .background(if (level < .03f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary))
-        }
-    }
 }
 
 @Composable
@@ -485,33 +480,48 @@ private fun ErrorOverlay(message: String, onRestart: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SpeakerMenu(speaker: SpeakerUi, controller: CaptionController, onDismiss: () -> Unit) {
-    var typing by remember { mutableStateOf(false) }
-    var custom by remember { mutableStateOf("") }
+    var custom by remember { mutableStateOf(if (speaker.named) speaker.name else "") }
+    // 起了名字就默认记住声音（只存在这部手机里），下次打开字幕直接认出来。
+    var remember by remember { mutableStateOf(true) }
     val others = controller.speakers.filter { it.id != speaker.id && it.id != CaptionController.REPLY_SPEAKER }
+    fun name(value: String) { controller.rename(speaker.id, value, remember); onDismiss() }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(.9f).padding(16.dp), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // 横屏高度不够时整页可滚动，确认按钮永远够得着。
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("这是谁？", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                // 自己写名字：一个真正的输入框，“确认”在同一排，和下面的名字标签一眼分得开。
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(custom, { custom = it }, Modifier.weight(1f), singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 24.sp),
+                        placeholder = { Text("写名字，比如：大孙子", fontSize = 20.sp) },
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (custom.isNotBlank()) name(custom.trim()) }),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done))
+                    CaptionButton("确认", emphasis = CaptionEmphasis.Primary, onClick = { if (custom.isNotBlank()) name(custom.trim()) })
+                }
+                Text("或者点一个：", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     // Existing names first: picking one means "same person", and the rows merge.
                     for (other in others.filter { it.named && !it.ignored }) {
                         BigButton(other.name) { controller.mergeInto(speaker.id, other.id); onDismiss() }
                     }
-                    for (name in CaptionController.PRESET_NAMES) {
-                        if (others.any { it.name == name && it.named }) continue
-                        BigButton(name, outlined = true) { controller.rename(speaker.id, if (name == "这是我") "我" else name); onDismiss() }
+                    for (preset in CaptionController.PRESET_NAMES) {
+                        if (others.any { it.name == preset && it.named }) continue
+                        BigButton(preset, outlined = true) { name(if (preset == "这是我") "我" else preset) }
                     }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     BigButton("这是电视", outlined = true) { controller.markTelevision(speaker.id); onDismiss() }
-                    BigButton("输入名字", outlined = true) { typing = true }
                 }
-                if (typing) {
-                    OutlinedTextField(custom, { custom = it }, Modifier.fillMaxWidth(), singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 24.sp), placeholder = { Text("名字", fontSize = 24.sp) })
-                    BigButton("好了") { if (custom.isNotBlank()) { controller.rename(speaker.id, custom.trim()); onDismiss() } }
+                // 整行开关（设置页同一写法）：标题 + 一行说明 + 右侧开关。
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("记住这个人的声音", fontSize = 20.sp, fontWeight = FontWeight.Medium)
+                        Text("下次打开字幕自动认出来；声音特征只存在这部手机里", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    androidx.compose.material3.Switch(remember, { remember = it })
                 }
-                Spacer(Modifier.height(4.dp))
+                if (controller.isRemembered(speaker.id)) {
+                    BigButton("忘掉这个人的声音", Modifier.fillMaxWidth(), outlined = true) { controller.forgetVoice(speaker.id); onDismiss() }
+                }
                 BigButton("关闭", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
             }
         }
@@ -559,7 +569,49 @@ private fun FlippedCard(text: String, onDismiss: () -> Unit) {
         Box(Modifier.fillMaxSize().captionPageBackground().combinedClickableNoRipple(onDismiss), contentAlignment = Alignment.Center) {
             Text(text, fontSize = 64.sp, lineHeight = 80.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.graphicsLayer { rotationZ = 180f }.padding(32.dp))
-            Text("点一下关闭", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp))
+            Text("对方看到的是：$text　点一下关闭", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp))
+        }
+    }
+}
+
+/**
+ * Landscape quick replies: a low strip under the captions so they stay in view. Top line: the groups
+ * (underlined words, clearly not phrases), "自己写" and the emergency button; second line: the phrases
+ * of the chosen group, swiped sideways. A tapped phrase is kept in the conversation and shown big,
+ * turned towards the other person, with an upright line saying what they see.
+ */
+@Composable
+private fun ReplyStrip(controller: CaptionController, onShow: (String) -> Unit, onWrite: () -> Unit, onClose: () -> Unit) {
+    var group by remember { mutableStateOf(0) }
+    val groups = CaptionController.PHRASE_GROUPS
+    fun say(phrase: String) { controller.addReply(phrase); onShow(phrase) }
+    val underline = MaterialTheme.colorScheme.onSurface
+    CaptionPanel(Modifier.fillMaxWidth(), padding = 8.dp) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                groups.forEachIndexed { index, (title, _) ->
+                    val selected = index == group
+                    Text(title, fontSize = 19.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { group = index }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .drawWithContent {
+                                drawContent()
+                                if (selected) drawRect(underline,
+                                    topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - 3.dp.toPx()),
+                                    size = androidx.compose.ui.geometry.Size(size.width, 3.dp.toPx()))
+                            })
+                }
+            }
+            CaptionButton("自己写", height = 44.dp, fontSize = 17.sp, onClick = onWrite)
+            CaptionButton("紧急：打120", icon = Icons.Rounded.Warning, emphasis = CaptionEmphasis.Danger, height = 44.dp, fontSize = 17.sp) {
+                say(CaptionController.EMERGENCY_TEXT)
+            }
+            CaptionButton("收起", height = 44.dp, fontSize = 17.sp, onClick = onClose)
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (phrase in groups[group].second) CaptionButton(phrase, height = 52.dp, fontSize = 19.sp) { say(phrase) }
         }
     }
 }
