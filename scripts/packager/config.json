@@ -1,0 +1,42 @@
+{
+  "modelsDir": "D:/CyIME-Data/models",
+  "resourceTag": "models",
+  "presets": {
+    "装到我的设备": {
+      "build_type": "release",
+      "offline_models": false,
+      "t9_model": "t9_ngram-model-v3-ls-tri.c3.lm",
+      "exclude_dicts": [],
+      "install": true,
+      "push_banks": true
+    },
+    "轻量发布包": {
+      "build_type": "release",
+      "offline_models": false,
+      "t9_model": null,
+      "exclude_dicts": [],
+      "install": false
+    },
+    "离线完整版": {
+      "build_type": "release",
+      "offline_models": true,
+      "t9_model": "t9_ngram-model-v3-ls-tri.c3.lm",
+      "exclude_dicts": [],
+      "install": false
+    }
+  },
+  "presetAliases": {
+    "日常测试包": "装到我的设备"
+  },
+  "modelNotes": {
+    "ochwpro": "MIT：可以分发，需附带原许可声明",
+    "predictive-text-base": "CC BY-NC-SA：只能非商业使用，须署名",
+    "predictive-text-small": "Apache-2.0",
+    "paraformer-zh-en-int8": "Apache-2.0（转换自阿里达摩院 Paraformer，需署名）",
+    "sensevoice-multilingual-int8": "许可未标明（原版为 FunASR 模型协议，需署名，未逐条核对）"
+  },
+  "handwritingBanks": {
+    "dir": "D:/CyIME-Data/handwriting_training/banks",
+    "deviceDir": "/sdcard/Android/data/com.cyletix.cyime/files/handwriting_training"
+  }
+}

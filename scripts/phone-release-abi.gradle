@@ -2,6 +2,10 @@
 gradle.beforeProject { p ->
     if (p.path == ':app') p.afterEvaluate {
         p.android.defaultConfig.ndk.abiFilters.clear()
+        // Limit native compilation too: androidTest otherwise builds every ABI.
+        // ndk.abiFilters conflicts with the existing split APK filters in AGP.
+        p.android.defaultConfig.externalNativeBuild.cmake.abiFilters.clear()
+        p.android.defaultConfig.externalNativeBuild.cmake.abiFilters.add('arm64-v8a')
         p.android.splits.abi.reset()
         p.android.splits.abi.include('arm64-v8a')
         p.android.splits.abi.universalApk = false

@@ -35,3 +35,7 @@
 -processkotlinnullchecks remove
 # Kotlin configuration fields are read by sherpa-onnx JNI.
 -keep class com.k2fsa.sherpa.onnx.** { *; }
+
+# OCR native bindings construct these classes and access their members by name.
+-keep class ai.onnxruntime.** { *; }
+-keep class org.opencv.** { *; }
