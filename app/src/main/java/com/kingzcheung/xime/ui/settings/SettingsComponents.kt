@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,7 +84,10 @@ fun SettingsItem(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    showArrow: Boolean = false
+    showArrow: Boolean = false,
+    /** 右侧状态小字，如「已设置」「未连接」或当前主题名；[statusTone] 决定颜色。 */
+    status: String? = null,
+    statusTone: SettingsStatusTone = SettingsStatusTone.NEUTRAL,
 ) {
     Row(
         modifier = Modifier
@@ -120,6 +124,11 @@ fun SettingsItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        if (status != null) {
+            Spacer(Modifier.width(12.dp))
+            Text(status, style = MaterialTheme.typography.labelMedium, color = statusTone.color(),
+                maxLines = 1, modifier = Modifier.testTag("settings-status:$title"))
+        }
         if (showArrow) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -127,6 +136,19 @@ fun SettingsItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+enum class SettingsStatusTone { OK, WARNING, NEUTRAL }
+
+/** 绿色和提醒色按页面底色深浅取不同明度，浅色、深色与半透明玻璃底上都看得清。 */
+@Composable
+private fun SettingsStatusTone.color(): Color {
+    val dark = MaterialTheme.colorScheme.surface.luminance() < .5f
+    return when (this) {
+        SettingsStatusTone.OK -> if (dark) Color(0xFF81C995) else Color(0xFF1E8E3E)
+        SettingsStatusTone.WARNING -> MaterialTheme.colorScheme.error
+        SettingsStatusTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 }
 
