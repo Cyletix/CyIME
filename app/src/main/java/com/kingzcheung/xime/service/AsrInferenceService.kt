@@ -223,7 +223,9 @@ class AsrInferenceService : Service() {
             val token = captionGeneration.incrementAndGet()
             val owner = callback.asBinder()
             return try {
-                val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, null)
+                // Captions transcribe the Chinese people around the user. SenseVoice's automatic
+                // language detection turned accented Mandarin into Japanese, so captions always decode Chinese.
+                val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, null).copy(recognitionLanguage = "zh")
                 check(selection.ready) { "所选语音模型尚未完整下载" }
                 val tracker = if (speakerModelPath.isNotEmpty() && java.io.File(speakerModelPath).isFile) {
                     loadSpeakerModel(speakerModelPath); speakerTracker
