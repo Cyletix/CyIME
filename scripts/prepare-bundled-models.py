@@ -9,7 +9,8 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-INCLUDED = {'ochwpro', 'predictive-text-small', 'predictive-text-base', 'paraformer-zh-en-int8', 'sensevoice-multilingual-int8'}
+INCLUDED = {'ochwpro', 'predictive-text-small', 'predictive-text-base', 'paraformer-zh-en-int8', 'sensevoice-multilingual-int8',
+            'speaker-campplus-zh'}  # the elder package must tell speakers apart without a download (elder-pack-spec.md)
 
 def digest(path):
     with path.open('rb') as stream:
