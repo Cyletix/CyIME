@@ -14,9 +14,9 @@ object BuiltinModelCatalog {
                     ModelFile("ochwpro.onnx", "https://www.modelscope.cn/models/bikeand/ochwpro/resolve/master/ochwpro.onnx", "eb04d62a314c7d7bac4e34d6ce0c24137474d30ff94b929115a621385420ce13", 7001270L),
                     ModelFile("char_index.json", "https://www.modelscope.cn/models/bikeand/ochwpro/resolve/master/char_index.json", "171cf2ac23731428ac9dd28f64be82dece5f66a0ca3d674ffb3b567b51532176", 51317L),
                 )))),
-        // 公式手写（LaTeX）：tools/handwriting_training 训练，只用公开的 MathWriting 2024（CC BY-NC-SA 4.0），
-        // 不含用户样本；日语、英文手写的“边写边学”也用它算特征。许可见 Release 的 NOTICE-formula-handwriting.txt。
-        ModelInfo("handwriting-formula", "公式手写模型", "手写数学公式，识别成 LaTeX；日语、英文手写的边写边学也需要它。用 Google 公开的 MathWriting 数据集训练，按 CC BY-NC-SA 4.0 分发，仅限非商业使用。", ModelCategory.HANDWRITING,
+        // 公式手写（LaTeX）：tools/handwriting_training 训练，只用公开的 MathWriting 2024，不含用户样本；
+        // 日语、英文手写的“边写边学”也用它算特征。
+        ModelInfo("handwriting-formula", "公式手写模型", "手写数学公式，识别成 LaTeX；日语、英文手写的边写边学也需要它。", ModelCategory.HANDWRITING,
             versions = listOf(ModelVersion(version = "v1", size = "32.4 MB",
                 files = listOf(
                     ModelFile("formula_encoder.onnx", RELEASE + "formula-handwriting-v1-encoder.onnx", "c2c55f14e8d3bc892c7f86ec9b237e54f46997300550a5c76501c54b7344b6dd", 21137800L),
