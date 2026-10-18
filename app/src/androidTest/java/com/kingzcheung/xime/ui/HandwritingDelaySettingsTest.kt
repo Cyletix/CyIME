@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.settings.InputExperienceSettings
+import com.kingzcheung.xime.ui.settings.InputExperiencePart
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -21,7 +22,7 @@ class HandwritingDelaySettingsTest {
         val saved = keys.associateWith { prefs.all[it] }
         try {
             prefs.edit().remove(keys[0]).remove(keys[1]).commit()
-            rule.setContent { MaterialTheme { InputExperienceSettings() } }
+            rule.setContent { MaterialTheme { InputExperienceSettings(setOf(InputExperiencePart.HANDWRITING)) } }
             rule.onNodeWithText("手写停顿识别：0.5 秒").assertIsDisplayed()
             rule.onNodeWithTag("handwriting-pause-slider").performSemanticsAction(SemanticsActions.SetProgress) { it(0.7f) }
             rule.onNodeWithText("手写停顿识别：0.7 秒").assertIsDisplayed()

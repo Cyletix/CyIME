@@ -92,4 +92,47 @@ class HandwritingToggleTest {
         assertEquals("选过英文后不能被旧数字面板记忆拉回九键", KeyboardLayoutState.English, vm.keyboardState.value)
     }
 
+    @Test fun clipboardExitsHandwritingFromEveryEntryAndReturnsToOriginalLayout() {
+        for (temporary in listOf(true, false)) for (nested in listOf(true, false)) {
+            val vm = model()
+            vm.setKeyboardState(KeyboardLayoutState.T9Pinyin)
+            if (temporary) vm.enterTemporaryHandwriting() else vm.switchMain(MainType.HANDWRITING)
+            if (nested) {
+                vm.showOverlay(OverlayRoute.Menu)
+                vm.pushOverlay(OverlayRoute.Clipboard())
+            } else vm.toggleOverlay(OverlayRoute.Clipboard())
+            val clipboard = vm.page.value as KeyboardPage.Overlay
+            assertEquals(OverlayRoute.Clipboard(), clipboard.route)
+            assertEquals(KeyboardPage.Main(MainType.FULL), clipboard.behind)
+            assertFalse(vm.hasTemporaryHandwriting)
+            vm.closeOverlay()
+            assertEquals(KeyboardPage.Main(MainType.FULL), vm.page.value)
+            assertEquals(KeyboardLayoutState.T9Pinyin, vm.keyboardState.value)
+        }
+    }
+
+    @Test fun otherToolsStillKeepHandwritingAndClipboardKeepsVoice() {
+        for (route in listOf(OverlayRoute.Emoji, OverlayRoute.SchemaList, OverlayRoute.Edit)) {
+            val vm = model()
+            vm.enterTemporaryHandwriting()
+            vm.showOverlay(route)
+            assertEquals(KeyboardPage.Main(MainType.HANDWRITING), (vm.page.value as KeyboardPage.Overlay).behind)
+        }
+        val vm = model()
+        vm.switchMain(MainType.VOICE)
+        vm.showOverlay(OverlayRoute.Clipboard())
+        assertEquals(KeyboardPage.Main(MainType.VOICE), (vm.page.value as KeyboardPage.Overlay).behind)
+    }
+
+    @Test fun delayedEnginePreparationCannotRestoreHandwritingUnderClipboard() {
+        val vm = model()
+        vm.setKeyboardState(KeyboardLayoutState.T9Pinyin)
+        vm.showOverlay(OverlayRoute.Clipboard())
+        vm.applyPreparedEditorKeyboard(false, "rime_ice", true, false, false)
+        val clipboard = vm.page.value as KeyboardPage.Overlay
+        assertEquals(OverlayRoute.Clipboard(), clipboard.route)
+        assertEquals(KeyboardPage.Main(MainType.FULL), clipboard.behind)
+        assertEquals(KeyboardLayoutState.T9Pinyin, vm.keyboardState.value)
+    }
+
 }

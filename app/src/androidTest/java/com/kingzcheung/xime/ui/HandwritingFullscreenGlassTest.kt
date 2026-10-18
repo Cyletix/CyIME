@@ -77,7 +77,7 @@ class HandwritingFullscreenGlassTest {
                         }
                         // Exact same-size material: catch solid covers on any footer row,
                         // not just a modifier that exists somewhere in the composition.
-                        Box(Modifier.requiredSize(232.dp, 148.dp)
+                        Box(Modifier.requiredSize(224.dp, 148.dp)
                             .keyboardPanelBackground(background).testTag("handwriting-glass-reference"))
                     }
                 }
@@ -93,7 +93,7 @@ class HandwritingFullscreenGlassTest {
                 val footer = awaitImage("handwriting-controls") { image ->
                     listOf(1, 50, 105).all { y -> distance(image.getPixel(0, y), reference.getPixel(0, y)) <= 2 }
                 }
-                assertEquals(232, footer.width)
+                assertEquals(224, footer.width)
                 assertEquals(148, footer.height)
 
                 val paper = rule.onNodeWithTag("handwriting-canvas").fetchSemanticsNode().boundsInRoot

@@ -29,6 +29,9 @@ fun handwritingInk(preferred: Color, background: Color): Color {
     return lerp(opaque, target, high)
 }
 
+/** S Pen 笔迹蓝（取自用户截图的实际笔迹色）；浅色纸面按对比度自动加深。 */
+val SPenInkBlue = Color(0xFF2289E9)
+
 /** Full-screen paper is transparent; its unknown host receives a narrow translucent separation layer. */
 @Composable
 internal fun rememberHandwritingInk(background: Color): Color {
@@ -36,4 +39,10 @@ internal fun rememberHandwritingInk(background: Color): Color {
     val accent = palette?.accent ?: MaterialTheme.colorScheme.primary
     val surface = background.compositeOver(palette?.background ?: MaterialTheme.colorScheme.surface)
     return remember(accent, surface) { handwritingInk(accent, surface) }
+}
+
+@Composable
+internal fun rememberSPenInk(background: Color): Color {
+    val surface = background.compositeOver(LocalKeyboardPalette.current?.background ?: MaterialTheme.colorScheme.surface)
+    return remember(surface) { handwritingInk(SPenInkBlue, surface) }
 }

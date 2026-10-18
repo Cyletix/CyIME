@@ -1,6 +1,14 @@
 package com.kingzcheung.xime.ui
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.view.View
+import android.view.ViewGroup
+import android.view.inspector.WindowInspector
+import com.kingzcheung.xime.service.XimeInputMethodService
+import com.kingzcheung.xime.keyboard.KeyboardPage
+import com.kingzcheung.xime.keyboard.MainType
+import com.kingzcheung.xime.keyboard.OverlayRoute
 import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.view.KeyEvent
@@ -38,7 +46,7 @@ import org.junit.Test
 class HandwritingOverlayImeTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun toolsKeepFullscreenHandwritingAndItsHostInsetsUntilBackLeavesTheTool() = runBlocking {
+    @Test fun fullscreenMotionKeepsHostInsetsButClipboardExitsHandwriting() = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         assertTrue("Install the handwriting model before this real-IME check", HandwritingEngine.hasModel(context))
@@ -97,41 +105,81 @@ class HandwritingOverlayImeTest {
                     view.hint = "全屏手写菜单测试"
                 } }, modifier = Modifier.fillMaxWidth().height(80.dp))
             }
+            rule.waitUntil(10_000) { editor.hasWindowFocus() }
             rule.runOnUiThread {
                 editor.requestFocus()
-                imm.showSoftInput(editor, InputMethodManager.SHOW_FORCED)
+                imm.restartInput(editor)
+                imm.showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT)
             }
-            rule.waitUntil(30_000) { has("keyboard-underlay") || has("hardware-toolbar-keyboard") }
-            if (!has("keyboard-underlay")) rule.onNodeWithTag("hardware-toolbar-keyboard").performClick()
-            rule.waitUntil(30_000) { has("keyboard-underlay") }
-            rule.onNodeWithContentDescription("手写").performClick()
-            rule.onNodeWithTag("handwriting-key:expand").assertExists()
-            val normalFooter = rule.onNodeWithTag("handwriting-controls").fetchSemanticsNode().size
-            rule.onNodeWithTag("handwriting-key:expand").performClick()
+            var service: XimeInputMethodService? = null
+            rule.waitUntil(30_000) {
+                rule.runOnUiThread { service = WindowInspector.getGlobalWindowViews().firstNotNullOfOrNull(::findService) }
+                service?.keyboardCallbacks != null && (service?.currentEffectiveKeyboardHeight ?: 0) > 0
+            }
+            val actualIme = checkNotNull(service)
+            rule.waitUntil(30_000) { actualIme.inputReadiness.ticket() != null && !actualIme.uiState.value.isDeploying }
+            android.os.SystemClock.sleep(300)
+            val callbacks = checkNotNull(actualIme.keyboardCallbacks)
+            rule.runOnUiThread { callbacks.onHandwritingToggle!!.invoke() }
+            rule.waitUntil(10_000) { actualIme.keyboardViewModel.page.value == KeyboardPage.Main(MainType.HANDWRITING) }
             rule.waitForIdle()
-            val expandedBody = rule.onNodeWithTag("keyboard-underlay").fetchSemanticsNode().size
-            val expandedFooter = rule.onNodeWithTag("handwriting-controls").fetchSemanticsNode().size
-            val inset = hostInset()
-            assertTrue("Host must retain the normal keyboard reservation", inset > 0)
-            assertEquals(normalFooter.width, expandedFooter.width)
-
-            for (tool in listOf("剪贴板", "表情", "输入方案")) {
-                rule.onNodeWithContentDescription(tool).performClick()
-                rule.waitForIdle()
-                assertTrue("$tool must open its overlay", has("keyboard-overlay"))
-                assertEquals("$tool must not collapse the actual service window", expandedBody,
-                    rule.onNodeWithTag("keyboard-underlay").fetchSemanticsNode().size)
-                assertEquals("$tool must not change the host's reserved area", inset, hostInset())
-                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-                rule.waitUntil(10_000) { !has("keyboard-overlay") }
-                rule.onNodeWithTag("handwriting-key:collapse").assertExists()
-                assertEquals(expandedFooter, rule.onNodeWithTag("handwriting-controls").fetchSemanticsNode().size)
-                assertEquals(expandedBody, rule.onNodeWithTag("keyboard-underlay").fetchSemanticsNode().size)
+            android.os.SystemClock.sleep(200)
+            saveScreen(context, "handwriting-normal-live")
+            val normalHeight = actualIme.currentEffectiveKeyboardHeight
+            val normalInset = hostInset()
+            fun sampleHeight(): List<Int> {
+                val heights = mutableListOf<Int>()
+                repeat(45) {
+                    rule.mainClock.advanceTimeByFrame()
+                    rule.runOnUiThread { heights += actualIme.currentEffectiveKeyboardHeight }
+                    android.os.SystemClock.sleep(10)
+                }
+                return heights
             }
-            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-            rule.waitUntil(10_000) { has("handwriting-key:expand") }
-            assertEquals(normalFooter, rule.onNodeWithTag("handwriting-controls").fetchSemanticsNode().size)
-            rule.runOnUiThread { assertEquals("", editor.text.toString()) }
+            rule.runOnUiThread { callbacks.onHandwritingExpand!!.invoke(true) }
+            val opening = sampleHeight()
+            val expandedHeight = actualIme.currentEffectiveKeyboardHeight
+            assertTrue("Fullscreen grows: normal=$normalHeight full=$expandedHeight heights=$opening page=${actualIme.keyboardViewModel.page.value} requested=${actualIme.uiState.value.handwritingExpanded} compact=${actualIme.uiState.value.isCompact} resize=${actualIme.uiState.value.showKeyboardResize}", expandedHeight > normalHeight * 1.5)
+            assertTrue("Actual service must render intermediate heights: $opening", opening.any { it > normalHeight && it < expandedHeight })
+            assertTrue("Host inset must remain normal: $normalInset -> ${hostInset()}", kotlin.math.abs(normalInset - hostInset()) <= 3)
+            saveScreen(context, "handwriting-fullscreen-live")
+            for (tool in listOf(OverlayRoute.Emoji, OverlayRoute.SchemaList)) {
+                rule.runOnUiThread { actualIme.keyboardViewModel.showOverlay(tool) }
+                android.os.SystemClock.sleep(300)
+                assertEquals(expandedHeight, actualIme.currentEffectiveKeyboardHeight)
+                rule.runOnUiThread { actualIme.keyboardViewModel.closeOverlay() }
+            }
+            rule.runOnUiThread { callbacks.onHandwritingExpand!!.invoke(false) }
+            val closing = sampleHeight()
+            assertTrue("Closing also passes through intermediate heights: $closing", closing.any { it > normalHeight && it < expandedHeight })
+            assertEquals(normalHeight, actualIme.currentEffectiveKeyboardHeight)
+            saveScreen(context, "handwriting-normal-live")
+            rule.runOnUiThread { callbacks.onHandwritingExpand!!.invoke(true) }
+            sampleHeight()
+            // Voice is an independent overlay flag. Changing these two pages must never clear it.
+            val previousVoice = actualIme.uiState.value.isVoiceMode
+            try {
+                rule.runOnUiThread {
+                    actualIme.uiState.value = actualIme.uiState.value.copy(isVoiceMode = true)
+                    actualIme.keyboardViewModel.showOverlay(OverlayRoute.Clipboard())
+                }
+                sampleHeight()
+                assertEquals(normalHeight, actualIme.currentEffectiveKeyboardHeight)
+                val clipboard = actualIme.keyboardViewModel.page.value as KeyboardPage.Overlay
+                assertEquals(KeyboardPage.Main(MainType.FULL), clipboard.behind)
+                assertTrue(actualIme.uiState.value.isVoiceMode)
+                assertTrue(!actualIme.uiState.value.handwritingExpanded)
+            } finally {
+                rule.runOnUiThread { actualIme.uiState.value = actualIme.uiState.value.copy(isVoiceMode = previousVoice) }
+            }
+            android.os.SystemClock.sleep(250)
+            saveScreen(context, "handwriting-to-clipboard-live")
+            rule.runOnUiThread {
+                actualIme.keyboardViewModel.closeOverlay()
+                assertEquals(KeyboardPage.Main(MainType.FULL), actualIme.keyboardViewModel.page.value)
+                assertEquals("", editor.text.toString())
+            }
+
         } finally {
             if (editorReady) rule.runOnUiThread {
                 imm.hideSoftInputFromWindow(editor.windowToken, 0)
@@ -153,6 +201,25 @@ class HandwritingOverlayImeTest {
             if (!previousIme.isNullOrBlank()) shell("ime set $previousIme")
             if (!enabledBefore) shell("ime disable $ime")
         }
+    }
+
+    private fun findService(view: View): XimeInputMethodService? {
+        var current: Context? = view.context
+        while (current != null) {
+            if (current is XimeInputMethodService) return current
+            current = (current as? ContextWrapper)?.baseContext?.takeUnless { it === current }
+        }
+        if (view is ViewGroup) for (i in 0 until view.childCount) findService(view.getChildAt(i))?.let { return it }
+        return null
+    }
+
+    private fun saveScreen(context: Context, name: String) {
+        val image = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        val dir = java.io.File(context.cacheDir, "ui-verification").apply { mkdirs() }
+        java.io.File(dir, "$name.png").outputStream().use {
+            image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        image.recycle()
     }
 
     private fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(

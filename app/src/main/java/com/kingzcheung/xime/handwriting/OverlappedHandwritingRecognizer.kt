@@ -32,6 +32,8 @@ class OverlappedHandwritingRecognizer(
         val startStroke: Int,
         val strokeCount: Int,
         val candidates: List<HandwritingCandidate>,
+        /** 公式模式：整段笔迹重新识别的结果，替换掉之前未上屏的候选，而不是接在后面。 */
+        val replacesPending: Boolean = false,
     )
 
     /**

@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.kingzcheung.xime.handwriting.OverlappedHandwritingRecognizer.Segment
+import com.kingzcheung.xime.handwriting.PenEraser
 import com.kingzcheung.xime.handwriting.StrokePoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +25,8 @@ internal class HandwritingInputSession(
     private val onNewCharacter: () -> Unit,
     private val onRecognition: (List<Segment>) -> Unit,
     private val onKey: (String) -> Unit,
+    /** 公式模式：识别后笔迹留在板上，接着写会连同前面的笔迹整段重新识别；删除键撤掉最后一笔。 */
+    private val keepInk: () -> Boolean = { false },
 ) {
     var strokes: List<List<StrokePoint>> by mutableStateOf(emptyList())
         private set
@@ -51,10 +54,29 @@ internal class HandwritingInputSession(
         return token
     }
 
-    fun move(token: Int, point: StrokePoint) {
-        if (token == revision && phase == HandwritingPhase.WRITING && currentStroke.lastOrNull() != point) {
-            currentStroke = currentStroke + point
-        }
+    fun move(token: Int, point: StrokePoint) = moveAll(token, listOf(point))
+
+    /** 一帧内的全部采样点（含笔的高频中间点）一次追加，避免逐点复制整条笔画。 */
+    fun moveAll(token: Int, points: List<StrokePoint>) {
+        if (token != revision || phase != HandwritingPhase.WRITING || points.isEmpty()) return
+        var last = currentStroke.lastOrNull()
+        val added = points.filter { p -> (p.x != last?.x || p.y != last?.y).also { if (it) last = p } }
+        if (added.isNotEmpty()) currentStroke = currentStroke + added
+    }
+
+    /**
+     * 笔尾橡皮或按住笔侧键划过：擦掉碰到的整条笔画，剩余笔迹重新等待识别。返回是否擦到。
+     * [from] 为上一帧最后一个橡皮点，橡皮轨迹按线段连起来判断（见 PenEraser），快速划过不漏擦。
+     */
+    fun erase(points: List<StrokePoint>, radius: Float, from: StrokePoint? = null): Boolean {
+        if (strokes.isEmpty() || points.isEmpty()) return false
+        val path = if (from != null) listOf(from) + points else points
+        val kept = strokes.filterNot { stroke -> stroke.touchedBy(path, radius) }
+        if (kept.size == strokes.size) return false
+        invalidate()
+        strokes = kept
+        if (kept.isNotEmpty()) schedule(pauseMillis()) else phase = HandwritingPhase.IDLE
+        return true
     }
 
     fun end(token: Int, cancelled: Boolean = false) {
@@ -73,7 +95,20 @@ internal class HandwritingInputSession(
 
     fun press(action: String) {
         when {
-            action in setOf("delete", "clear_all", "clear_composition") && hasInk -> clear()
+            action == "delete" && keepInk() && strokes.isNotEmpty() -> {
+                invalidate()
+                strokes = strokes.dropLast(1)
+                currentStroke = emptyList()
+                if (strokes.isNotEmpty()) schedule(pauseMillis()) else {
+                    phase = HandwritingPhase.IDLE
+                    onKey("clear_composition")
+                }
+            }
+            action in setOf("delete", "clear_all", "clear_composition") && hasInk -> {
+                val wasKept = keepInk()
+                clear()
+                if (wasKept) onKey("clear_composition")
+            }
             action in setOf("symbol", "number", "ime_switch") -> {
                 clear()
                 onKey(action)
@@ -96,6 +131,18 @@ internal class HandwritingInputSession(
         }
     }
 
+    /** 笔画与橡皮轨迹都按线段判断，稀疏的快速笔画、快速划过的橡皮中间也能擦到。 */
+    private fun List<StrokePoint>.touchedBy(path: List<StrokePoint>, radius: Float): Boolean {
+        val stroke = this
+        if (path.size == 1) {
+            val q = path[0]
+            return PenEraser.hits(stroke.size, { stroke[it].x }, { stroke[it].y }, q.x, q.y, q.x, q.y, radius)
+        }
+        return path.zipWithNext().any { (a, b) ->
+            PenEraser.hits(stroke.size, { stroke[it].x }, { stroke[it].y }, a.x, a.y, b.x, b.y, radius)
+        }
+    }
+
     private fun schedule(waitMs: Long, after: String? = null) {
         val token = invalidate()
         if (after != null) pendingKeys += after
@@ -115,7 +162,7 @@ internal class HandwritingInputSession(
             // 删除、切换面板、继续落笔及退出均会使旧推理结果失效。
             if (token != revision) return@launch
             if (segments.isNotEmpty()) {
-                strokes = emptyList()
+                if (!keepInk()) strokes = emptyList()
                 phase = HandwritingPhase.CANDIDATES
                 onRecognition(segments)
             } else phase = HandwritingPhase.NO_RESULT

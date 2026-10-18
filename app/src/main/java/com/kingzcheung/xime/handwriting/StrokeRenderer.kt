@@ -17,10 +17,13 @@ fun DrawScope.renderStrokes(
     currentStroke: List<StrokePoint>,
     color: Color,
     transparentPaper: Boolean = false,
+    penColor: Color = color,
 ) {
     val width = 3.5.dp.toPx()
-    strokes.forEach { drawPenStroke(it, color, width, transparentPaper) }
-    drawPenStroke(currentStroke, color, width, transparentPaper)
+    // 手写笔的笔画用 S Pen 蓝色，手指书写保持主题墨色。
+    fun inkOf(stroke: List<StrokePoint>) = if (stroke.firstOrNull()?.pen == true) penColor else color
+    strokes.forEach { drawPenStroke(it, inkOf(it), width, transparentPaper) }
+    drawPenStroke(currentStroke, inkOf(currentStroke), width, transparentPaper)
 }
 
 private fun DrawScope.drawPenStroke(points: List<StrokePoint>, color: Color, width: Float, transparentPaper: Boolean) {
