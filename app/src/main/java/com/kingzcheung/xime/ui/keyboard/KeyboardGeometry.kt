@@ -11,6 +11,9 @@ import kotlin.math.roundToInt
 internal const val FLOATING_RESIZE_MIN_WIDTH_DP = 400
 internal const val FLOATING_RESIZE_MIN_HEIGHT_DP = 228
 
+/** 工具栏高度（dp），键盘总高 = 工具栏 + 按键区。 */
+internal const val KEYBOARD_TOOLBAR_HEIGHT_DP = 44
+
 /**
  * 悬浮调节专用高度范围。
  *
@@ -40,6 +43,25 @@ internal fun floatingResizeMinWidthDp(availableWidthDp: Int): Int =
 internal fun floatingResizeMinHeightDp(availableHeightDp: Int): Int =
     minOf(FLOATING_RESIZE_MIN_HEIGHT_DP, availableHeightDp.coerceAtLeast(1))
 
+/** 悬浮键盘为了落到方形按键点可以低到的绝对下限（含工具栏，不含拖条）。 */
+internal const val FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP = 160
+
+/**
+ * 悬浮下限不能把方形按键吸附点挡在范围外：手机上 26 键全宽时方形点约 202dp，
+ * 低于默认下限 228dp。方形点在下限之下时，下限降到方形点下方一点，
+ * 让吸附带能够到它；再低不去，默认和重置仍用 [floatingResizeMinHeightDp]。
+ */
+internal fun squareAwareFloatingMinHeightDp(floorDp: Int, squareContentHeightDp: Float?): Int {
+    if (squareContentHeightDp == null || squareContentHeightDp >= floorDp) return floorDp
+    return (squareContentHeightDp - 2f).toInt().coerceIn(FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP.coerceAtMost(floorDp), floorDp)
+}
+
+/** 已保存或拖出的悬浮高度的合法范围：下限放到绝对下限，上限同 [floatingResizeHeightBounds]。 */
+internal fun floatingStoredHeightBounds(hostHeightDp: Int, landscape: Boolean): IntRange {
+    val bounds = floatingResizeHeightBounds(hostHeightDp, landscape)
+    return FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP.coerceAtMost(bounds.first)..bounds.last
+}
+
 /** 悬浮键盘允许的最大高宽比。只限制畸形，不强制等比缩放。 */
 internal fun floatingResizeMaxAspect(landscape: Boolean): Float = if (landscape) 0.95f else 1.35f
 
@@ -47,8 +69,11 @@ internal fun floatingResizeMaxAspect(landscape: Boolean): Float = if (landscape)
 internal fun keyboardHeightBounds(screenHeight: Int, landscape: Boolean, navInset: Int = 24): IntRange {
     val max = if (landscape) (screenHeight - navInset - FLOATING_DRAG_BAR_HEIGHT_DP - 24).coerceAtLeast(160)
         else (screenHeight * 45 / 100).coerceAtLeast(228)
-    // 固定与悬浮共享面板下限，不能随平板屏幕高度放大最小值。
-    val min = FLOATING_RESIZE_MIN_HEIGHT_DP.coerceAtMost(max)
+    // 固定键盘的最低档只比"屏高 45% 这一档"矮一个工具栏（用户 2026-10-18 要求），
+    // 按键区高度和那一档一样。横屏的上限是近乎整屏高，不能拿它来算最低档，
+    // 否则平板横屏最低档会撑满屏（1.14.27 的教训）；最低不低于悬浮共用的面板下限。
+    val reference = (screenHeight * 45 / 100).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP).coerceAtMost(max)
+    val min = (reference - KEYBOARD_TOOLBAR_HEIGHT_DP).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP.coerceAtMost(max))
     return min..max
 }
 
