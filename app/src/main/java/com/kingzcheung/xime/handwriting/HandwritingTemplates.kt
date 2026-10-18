@@ -93,11 +93,13 @@ object HandwritingTemplates {
      * 训练样本文件见 TrainingSampleStore（files/handwriting_training/samples.jsonl）。
      */
     fun importTrainingSamples(context: Context, script: Script): Int {
-        val file = File(File(context.filesDir, "handwriting_training"), "samples.jsonl")
-        if (!file.isFile || !FormulaRecognizer.isAvailable(context)) return 0
+        // 内部样本之外，也读外部私有目录里的 samples.jsonl：清除数据后可用 adb 把电脑上的导出备份推回来。
+        val files = listOf(File(File(context.filesDir, "handwriting_training"), "samples.jsonl"),
+            File(com.kingzcheung.xime.handwriting.training.PromptBankFile.dir(context), "samples.jsonl")).filter { it.isFile }
+        if (files.isEmpty() || !FormulaRecognizer.isAvailable(context)) return 0
         val known = synchronized(this) { entries(context, script).map { it.source }.toHashSet() }
         var added = 0
-        file.forEachLine(Charsets.UTF_8) { line ->
+        for (file in files) file.forEachLine(Charsets.UTF_8) { line ->
             if (line.isBlank()) return@forEachLine
             val o = runCatching { JSONObject(line) }.getOrNull() ?: return@forEachLine
             if (o.optString("type") !in script.sampleTypes) return@forEachLine
@@ -107,6 +109,7 @@ object HandwritingTemplates {
             val strokes = parseStrokes(o.optJSONArray("strokes")) ?: return@forEachLine
             val vec = FormulaRecognizer.embed(context, strokes) ?: return@forEachLine
             add(context, script, label, vec, id, persist = false)
+            known += id
             added++
         }
         if (added > 0) save(context, script)
