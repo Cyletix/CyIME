@@ -486,7 +486,7 @@ internal fun rememberImeKeyboardCallbacks(
                     quickSendEditingItemId = null,
                     quickSendEditingItemText = "",
                     quickSendEditingItemCode = "",
-                    enterKeyText = "发送",
+                    enterKeyText = service.editorEnterKeyText(),
                 )
                 QuickSendFormEditTextHolder.editText = null
                 QuickSendFormCodeEditTextHolder.editText = null
@@ -494,7 +494,7 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onQuickSendFormFocusChange = { focused: Boolean ->
                 // Draft text always uses a newline key; focus changes never submit the form.
-                // 关闭表单时由 onHideQuickSendForm / onWindowHidden 统一还原"发送"。
+                // 关闭表单时由 onHideQuickSendForm / onWindowHidden 统一还原回车键。
                 val s = service.uiState.value
                 service.uiState.value = if (focused) {
                     // 文本框抢回焦点：编码焦点清除，按键输入回到文本框
