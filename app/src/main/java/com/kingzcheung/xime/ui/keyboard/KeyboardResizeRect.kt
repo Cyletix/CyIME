@@ -77,9 +77,14 @@ internal class FixedKeyboardMoveGesture(
     // Even a nearly full-width keyboard must still be movable all the way to either edge.
     private val snapDistance = snapDistancePx.coerceIn(0f, (bounds.width - raw.width).coerceAtLeast(0f) / 4f)
 
+    /** 上一次移动是否被居中吸住（用于吸附振动）。 */
+    var snapped = false
+        private set
+
     fun move(dx: Float): ResizeRect {
         raw = raw.translated(dx, 0f).coerceInside(bounds)
         val toCenter = bounds.centerX - raw.centerX
+        snapped = kotlin.math.abs(toCenter) <= snapDistance && kotlin.math.abs(toCenter) > 0.01f
         return if (kotlin.math.abs(toCenter) <= snapDistance) raw.translated(toCenter, 0f) else raw
     }
 }
@@ -172,6 +177,31 @@ internal enum class ResizeHandle {
 
 internal const val RESIZE_EDGE_HIT_DP = 26f
 internal const val RESIZE_CORNER_HIT_DP = 36f
+
+/** 调节框的线宽（dp）：描边、四边短条与四角圆弧、短条长度、圆角半径。 */
+internal data class ResizeFrameStyle(
+    val strokeDp: Float,
+    val handleThicknessDp: Float,
+    val handleLengthDp: Float,
+    val cornerRadiusDp: Float,
+) {
+    /** 描边与手柄中心线离键盘外沿的距离：手柄整条留在键盘内，且不越出 [RESIZE_EDGE_HIT_DP] 命中带。 */
+    val insetDp: Float get() = maxOf(8f, handleThicknessDp / 2f + 3f)
+}
+
+/**
+ * 边框粗细与屏幕最短边成正比（以 400dp 为 1 倍）：手机约 1 倍，
+ * 平板（约 800–950dp）约 2–2.4 倍，线条占屏幕的比例在大小屏上一致。
+ */
+internal fun resizeFrameStyle(smallestScreenWidthDp: Int): ResizeFrameStyle {
+    val scale = (smallestScreenWidthDp / 400f).coerceIn(0.85f, 2.4f)
+    return ResizeFrameStyle(
+        strokeDp = 3.5f * scale,
+        handleThicknessDp = 9f * scale,
+        handleLengthDp = 56f * scale,
+        cornerRadiusDp = (16f * scale).coerceAtMost(28f),
+    )
+}
 
 /**
  * 手柄命中：只认正在绘制的那一个矩形（[frame]）的边带，

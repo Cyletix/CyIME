@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui
 
 import android.app.Application
+import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
@@ -8,10 +9,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -21,6 +25,9 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.kingzcheung.xime.SharedPreferencesTestRule
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.ui.keyboard.*
 import com.kingzcheung.xime.viewmodel.*
 import org.junit.Assert.*
@@ -30,6 +37,7 @@ import java.io.File
 
 class ResizeControlsContrastTest {
     @get:Rule val rule = createComposeRule()
+    @get:Rule val preferences = SharedPreferencesTestRule()
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
     @Test fun phoneControlsRemainOpaqueWhileKeyboardOpacityChanges() = checkControls(360, 300, false, 1f)
@@ -68,6 +76,127 @@ class ResizeControlsContrastTest {
         assertEquals("keys and toolbar must receive one shared opacity", 0, incorrect)
     }
 
+    @Test fun floatingPreviewAndConfirmedCardShareOneOpacityIncludingBottomBackground() {
+        val context = object : ContextWrapper(app) {
+            override fun getSharedPreferences(name: String, mode: Int) = preferences.getSharedPreferences()
+        }
+        FrostedGlassPreferences.save(context, FrostedGlassConfig(enabled = false), true)
+        val vm = KeyboardViewModel(app)
+        var opacity by mutableFloatStateOf(1f)
+        var resizing by mutableStateOf(true)
+        rule.setContent {
+            val config = Configuration(LocalConfiguration.current).apply { screenWidthDp = 400; screenHeightDp = 700 }
+            CompositionLocalProvider(LocalContext provides context, LocalConfiguration provides config,
+                LocalDensity provides Density(1f)) {
+                MaterialTheme {
+                    Box(Modifier.size(400.dp, 400.dp).background(Color.White).testTag("floating-opacity-root")) {
+                        val controls: (@Composable () -> Unit)? = if (resizing) {
+                            {
+                                KeyboardResizeOverlay(260, 260, 0, true, initialWidthDp = 360,
+                                    initialOpacity = opacity, onHeightChange = {}, onBottomPaddingChange = {},
+                                    onOpacityChange = { opacity = it }, onReset = {},
+                                    onConfirm = { _, _, _, value -> opacity = value; resizing = false }, onCancel = {})
+                            }
+                        } else null
+                        KeyboardView(vm, KeyboardUiState(isDarkTheme = true, isFloatingMode = true,
+                            keyboardOpacity = opacity, keyboardHeightDp = 260, keyboardWidthDp = 360,
+                            floatingWidthDp = 360, floatingOffsetY = 24, floatingMinOffsetY = 12,
+                            floatingScreenHeightDp = 700),
+                            KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
+                            modifier = Modifier.fillMaxSize(), resizeOverlay = controls)
+                    }
+                }
+            }
+        }
+        rule.onNodeWithTag("keyboard-opacity-overlay-label").performTouchInput { click() }
+        rule.onNodeWithTag("floating-drag-indicator").assertDoesNotExist()
+        val root = rule.onNodeWithTag("floating-opacity-root")
+        val origin = root.fetchSemanticsNode().boundsInRoot.topLeft
+        fun localBounds(tag: String) = rule.onNodeWithTag(tag, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.translate(-origin.x, -origin.y)
+        val card = localBounds("floating-keyboard-card")
+        val body = localBounds("keyboard-underlay")
+        val excludedControls = listOf(localBounds("keyboard-resize-opacity-panel"), localBounds("keyboard-opacity-actions"))
+        val opacityButtons = listOf("返回", "完成").map { label ->
+            label to rule.onNodeWithText(label).fetchSemanticsNode().boundsInRoot.translate(-origin.x, -origin.y)
+        }
+        val regions = listOf(
+            "toolbar" to Rect(card.left + 24f, card.top + 3f, card.right - 24f, body.top - 2f),
+            "body" to Rect(card.left + 24f, body.top + 2f, card.right - 24f,
+                card.bottom - FLOATING_DRAG_BAR_HEIGHT_DP - 2f),
+            "bottom background" to Rect(card.left + 24f, card.bottom - FLOATING_DRAG_BAR_HEIGHT_DP + 2f,
+                card.right - 24f, card.bottom - 2f),
+        )
+        val opaque = root.captureToImage().asAndroidBitmap()
+        rule.onNodeWithTag("keyboard-opacity-slider").performTouchInput {
+            swipe(Offset(width * .25f, centerY), Offset(width * .72f, centerY), durationMillis = 250)
+        }
+        rule.waitForIdle()
+        val chosenOpacity = opacity
+        assertTrue("real drag must change the card opacity", chosenOpacity in .3f..0.8f)
+        assertEquals(card, localBounds("floating-keyboard-card"))
+        val preview = root.captureToImage().asAndroidBitmap()
+        saveBitmap("floating-opacity-opaque", opaque)
+        saveBitmap("floating-opacity-preview", preview)
+        for ((label, bounds) in opacityButtons) {
+            // Compare the filled interior, excluding only the rounded transparent corners.
+            // Bare TextButtons reveal the changing key letters here and fail this check.
+            val inset = minOf(24f, bounds.width / 3f).toInt()
+            var checkedPixels = 0
+            var changedChannels = 0
+            for (y in bounds.top.toInt() + 3 until bounds.bottom.toInt() - 3) {
+                for (x in bounds.left.toInt() + inset until bounds.right.toInt() - inset) {
+                    checkedPixels++
+                    for (shift in listOf(0, 8, 16)) {
+                        val before = (opaque.getPixel(x, y) shr shift) and 255
+                        val after = (preview.getPixel(x, y) shr shift) and 255
+                        if (kotlin.math.abs(before - after) > 1) changedChannels++
+                    }
+                }
+            }
+            assertTrue("$label must expose a real button interior", checkedPixels > 100)
+            assertEquals("$label must cover the underlying key letters with an opaque theme surface", 0, changedChannels)
+        }
+        fun covered(x: Int, y: Int, bounds: List<Rect>) = bounds.any {
+            x >= it.left - 2f && x < it.right + 2f && y >= it.top - 2f && y < it.bottom + 2f
+        }
+        for ((name, area) in regions) {
+            var changedPixels = 0
+            var incorrectChannels = 0
+            for (y in area.top.toInt() until area.bottom.toInt()) for (x in area.left.toInt() until area.right.toInt()) {
+                if (covered(x, y, excludedControls)) continue
+                val before = opaque.getPixel(x, y)
+                val after = preview.getPixel(x, y)
+                if ((0..2).any { ((before shr (it * 8)) and 255) < 180 }) changedPixels++
+                for (shift in listOf(0, 8, 16)) {
+                    val expected = 255 * (1f - chosenOpacity) + ((before shr shift) and 255) * chosenOpacity
+                    if (kotlin.math.abs(((after shr shift) and 255) - expected) > 3f) incorrectChannels++
+                }
+            }
+            assertTrue("$name must have actual dark pixels to validate alpha", changedPixels > 100)
+            assertEquals("$name must receive exactly one shared opacity in preview", 0, incorrectChannels)
+        }
+        rule.onNodeWithText("完成").performClick()
+        rule.onNodeWithTag("floating-drag-indicator").assertIsDisplayed()
+        assertEquals("confirmation must retain the card rectangle", card, localBounds("floating-keyboard-card"))
+        assertEquals("confirmation must retain the content rectangle", body, localBounds("keyboard-underlay"))
+        val confirmed = root.captureToImage().asAndroidBitmap()
+        saveBitmap("floating-opacity-confirmed", confirmed)
+        val excludedAfter = excludedControls + localBounds("floating-drag-indicator")
+        for ((name, area) in regions) {
+            var incorrectChannels = 0
+            for (y in area.top.toInt() until area.bottom.toInt()) for (x in area.left.toInt() until area.right.toInt()) {
+                if (covered(x, y, excludedAfter)) continue
+                for (shift in listOf(0, 8, 16)) {
+                    val previewChannel = (preview.getPixel(x, y) shr shift) and 255
+                    val finalChannel = (confirmed.getPixel(x, y) shr shift) and 255
+                    if (kotlin.math.abs(previewChannel - finalChannel) > 3) incorrectChannels++
+                }
+            }
+            assertEquals("$name opacity must not jump when leaving preview", 0, incorrectChannels)
+        }
+    }
+
     private fun checkControls(width: Int, height: Int, floating: Boolean, font: Float) {
         val vm = KeyboardViewModel(app)
         val opacity = mutableFloatStateOf(1f)
@@ -102,6 +231,8 @@ class ResizeControlsContrastTest {
         val button = rule.onNodeWithTag("keyboard-resize-floating-button")
         val before = button.captureToImage().asAndroidBitmap()
         rule.onNodeWithTag("keyboard-opacity-slider").performSemanticsAction(SemanticsActions.SetProgress) { it(0.7f) }
+        save("resize-opacity-editing-$width-$height-$floating")
+        rule.onNodeWithText("返回").performClick()
         rule.waitForIdle()
         val after = button.captureToImage().asAndroidBitmap()
         // Save the complete layout before assertions so a failure always has visual evidence.

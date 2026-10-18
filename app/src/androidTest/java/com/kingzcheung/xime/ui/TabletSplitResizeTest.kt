@@ -143,7 +143,7 @@ class TabletSplitResizeTest {
         }
         rule.onNodeWithTag("keyboard-resize-split-button", useUnmergedTree = true).performClick()
         rule.runOnIdle { assertTrue(SettingsPreferences.isSplitKeyboardEnabled(context)); assertEquals(0, closes) }
-        rule.onNodeWithText("完整").assertIsDisplayed()
+        rule.onNodeWithTag("keyboard-resize-split-button", useUnmergedTree = true).assertIsSelected()
         save("resize-narrow-split-controls", "resize-test-root")
         val root = rule.onNodeWithTag("resize-test-root", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val floating = rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -155,7 +155,7 @@ class TabletSplitResizeTest {
         assertTrue(panel.bottom <= floating.top)
         assertTrue(floating.bottom < split.top)
         assertTrue(split.bottom <= root.bottom)
-        for (label in listOf("完整", "悬浮", "透明度 0%")) {
+        for (label in listOf("分体", "悬浮", "透明度 0%")) {
             val layout = textLayout(label)
             val details = "$label: size=${layout.size}, paragraph=${layout.multiParagraph.width}x${layout.multiParagraph.height}, " +
                 "width=${layout.didOverflowWidth}, height=${layout.didOverflowHeight}, lines=${layout.lineCount}, " +
