@@ -2,6 +2,8 @@ package com.kingzcheung.xime.gloss
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import android.view.KeyEvent
+import com.kingzcheung.xime.service.shiftedCandidateOffset
 import org.junit.Test
 import java.nio.ByteBuffer
 
@@ -52,5 +54,62 @@ class CandidateGlossaryTest {
         assertEquals(listOf("ni hao", "ni hao"),
             CandidateGlossary.annotate(listOf("你好", "拟好"), listOf("ni hao", "ni hao")))
         assertEquals("ni hao", CandidateGlossary.annotate("你好", "ni hao"))
+    }
+
+    private val shiftTable get() = table("你好" to "hello", "电脑" to "computer", "computer" to "电脑",
+        "苹果" to "apple", "东西" to "a long description that got cut…")
+
+    @Test
+    fun `shift-held selection commits the English of a Chinese candidate`() {
+        assertEquals("hello", CandidateGlossary.englishFor(shiftTable, "你好"))
+        assertEquals("computer", CandidateGlossary.englishFor(shiftTable, "电脑"))
+    }
+
+    @Test
+    fun `candidates without a complete English word keep committing Chinese`() {
+        assertNull(CandidateGlossary.englishFor(shiftTable, "拟好"))          // 词典里没有
+        assertNull(CandidateGlossary.englishFor(shiftTable, "computer"))      // 本身就是英文
+        assertNull(CandidateGlossary.englishFor(shiftTable, "东西"))          // 释义被截断，不是完整英文
+    }
+
+    @Test
+    fun `loaded glossary shows nothing instead of falling back to pinyin`() {
+        assertEquals(listOf("hello", "", "电脑", ""),
+            CandidateGlossary.annotate(shiftTable, listOf("你好", "拟好", "computer", "nih"),
+                listOf("ni hao", "ni hao", "", "ni h")))
+    }
+
+    @Test
+    fun `holding shift swaps Chinese and English only where English exists`() {
+        val (words, notes) = CandidateGlossary.swapped(shiftTable,
+            listOf("你好", "拟好", "computer", "东西"), listOf("ni hao", "ni hao", "", "dong xi"))
+        assertEquals(listOf("hello", "拟好", "computer", "东西"), words)
+        assertEquals(listOf("你好", "", "电脑", "a long description that got cut…"), notes)
+    }
+
+    @Test
+    fun `physical shift with a digit or space picks the same candidate as without shift`() {
+        assertEquals(0, shiftedCandidateOffset(KeyEvent.KEYCODE_1) { 7 })
+        assertEquals(8, shiftedCandidateOffset(KeyEvent.KEYCODE_9) { 7 })
+        assertEquals(9, shiftedCandidateOffset(KeyEvent.KEYCODE_0) { 7 })
+        assertEquals(7, shiftedCandidateOffset(KeyEvent.KEYCODE_SPACE) { 7 })
+        assertNull(shiftedCandidateOffset(KeyEvent.KEYCODE_A) { 7 })
+    }
+
+    @Test
+    fun `long-pressing the T9 next key counts as holding shift`() {
+        try {
+            assertEquals(false, CandidateGlossary.swapHeld(screenShiftHeld = false))
+            CandidateGlossary.t9NextHeld.value = true
+            assertEquals(true, CandidateGlossary.swapHeld(screenShiftHeld = false))
+            CandidateGlossary.t9NextHeld.value = false
+            CandidateGlossary.physicalShiftHeld.value = true
+            assertEquals(true, CandidateGlossary.swapHeld(screenShiftHeld = false))
+            CandidateGlossary.physicalShiftHeld.value = false
+            assertEquals(true, CandidateGlossary.swapHeld(screenShiftHeld = true))
+        } finally {
+            CandidateGlossary.t9NextHeld.value = false
+            CandidateGlossary.physicalShiftHeld.value = false
+        }
     }
 }

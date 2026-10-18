@@ -714,17 +714,34 @@ private fun T9KeyboardContent(
                 compactMode = compactMode,
             )
             val nextCandidate = candidateState.value.usesT9CandidateNavigation(uiState.inputProfile)
+            // 长按“下一项”代替 Shift：长按一次切到中英对调（松手保持），点候选上屏英文后或再长按一次恢复；
+            // 长按那次松手不切下一项。编码结束（上屏或清空）时也恢复。
+            var glossHoldUsed by remember { mutableStateOf(false) }
+            androidx.compose.runtime.LaunchedEffect(nextCandidate) {
+                if (!nextCandidate) com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = false
+            }
+            // 读 revision 让词典加载完成后重组到这里。
+            val glossHoldEnabled = nextCandidate && com.kingzcheung.xime.gloss.CandidateGlossary.revision
+                .let { com.kingzcheung.xime.gloss.CandidateGlossary.isLoaded }
             NineKeyButton(
                 digit = "", letters = if (nextCandidate) "下一项" else "0",
                 icon = if (nextCandidate) rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowRight) else null,
                 onClick = {
-                    if (nextCandidate) {
+                    if (glossHoldUsed) glossHoldUsed = false
+                    else if (nextCandidate) {
                         callbacks.onDismissPreeditEditor?.invoke()
                         callbacks.onNextCandidate(candidateState.value)
                     } else commitDirect("0")
                 },
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                modifier = Modifier.weight(1f).testTag("t9-zero-key"),
+                modifier = Modifier.weight(1f).testTag("t9-zero-key").glossHold(glossHoldEnabled,
+                    onDown = { glossHoldUsed = false }) { holding ->
+                    if (holding) {
+                        glossHoldUsed = true
+                        val swap = com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld
+                        swap.value = !swap.value
+                    }
+                },
                 onSwipeLeft = if (nextCandidate) ({
                     callbacks.onDismissPreeditEditor?.invoke()
                     callbacks.onPreviousCandidate(candidateState.value)
