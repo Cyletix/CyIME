@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.HorizontalSplit
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -71,7 +72,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -89,11 +92,13 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun KeyboardResizeOverlay(
     initialHeightDp: Int,
@@ -221,10 +226,21 @@ internal fun KeyboardResizeOverlay(
                 .drawBehind {
                     if (editingOpacity) return@drawBehind
                     val stroke = frameStyle.strokeDp.dp.toPx()
-                    val tabThickness = frameStyle.handleThicknessDp.dp.toPx()
-                    // 描边和四边手柄共用内侧中心线。
-                    val handleInset = frameStyle.insetDp.dp.toPx()
-                    val tabLength = frameStyle.handleLengthDp.dp.toPx().coerceAtMost(frame.width / 4f)
+                    val pillThickness = frameStyle.handleThicknessDp.dp.toPx()
+                    val bracketThickness = frameStyle.bracketThicknessDp.dp.toPx()
+                    val edgeGap = 8.dp.toPx()
+                    val bracketLeg = frameStyle.cornerLegDp.dp.toPx()
+                        .coerceAtMost(minOf(frame.width, frame.height) / 4f)
+                    // 边框线往里收半个把手厚度（按拖动放大后算）：括号和短条骑在线上，外沿正好与键盘外沿齐平。
+                    val inset = maxOf(pillThickness, bracketThickness) * RESIZE_HANDLE_ACTIVE_SCALE / 2f
+                    val lineLeft = frame.left + inset
+                    val lineTop = frame.top + inset
+                    val lineRight = frame.right - inset
+                    val lineBottom = frame.bottom - inset
+                    val pillLength = frameStyle.handleLengthDp.dp.toPx()
+                        .coerceAtMost((frame.width - 2f * (bracketLeg + edgeGap)).coerceAtLeast(pillThickness))
+                    val sidePillLength = frameStyle.handleLengthDp.dp.toPx()
+                        .coerceAtMost((frame.height - 2f * (bracketLeg + edgeGap)).coerceAtLeast(pillThickness))
                     val rectSize = Size(frame.width.coerceAtLeast(1f), frame.height.coerceAtLeast(1f))
 
                     // 正常面板与调节态共用用户选择的底部轮廓；悬浮始终保留四角圆角。
@@ -235,69 +251,59 @@ internal fun KeyboardResizeOverlay(
                         clipRect(bottom = if (floatingMode) frame.bottom - dragAreaHeightPx else size.height) {
                             clipRect(splitInnerLeft, frame.top, splitInnerRight, frame.bottom, ClipOp.Difference) {
                                 translate(frame.left, frame.top) {
-                                    drawOutline(
-                                        panelShape.createOutline(rectSize, layoutDirection, this),
-                                        color = surfaceColor.copy(alpha = 0.88f),
-                                    )
+                                    val outline = panelShape.createOutline(rectSize, layoutDirection, this)
+                                    // 键盘压暗但仍看得见，再罩一层淡淡的主题强调色，和边框同色。
+                                    drawOutline(outline, color = surfaceColor.copy(alpha = 0.72f))
+                                    drawOutline(outline, color = accentColor.copy(alpha = 0.08f))
                                 }
                             }
                         }
                     }
-                    val innerLeft = frame.left + handleInset
-                    val innerTop = frame.top + handleInset
-                    val innerRight = frame.right - handleInset
-                    val innerBottom = frame.bottom - handleInset
-                    val innerSize = Size(
-                        (innerRight - innerLeft).coerceAtLeast(1f),
-                        (innerBottom - innerTop).coerceAtLeast(1f),
-                    )
-                    val cornerRadius = frameStyle.cornerRadiusDp.dp.toPx().coerceAtMost(minOf(innerSize.width, innerSize.height) / 2f)
-                    drawRoundRect(
-                        color = accentColor.copy(alpha = 0.78f),
-                        topLeft = Offset(innerLeft, innerTop),
-                        size = innerSize,
-                        cornerRadius = CornerRadius(cornerRadius),
+                    // 1. 一圈细线：直角矩形框住整块键盘（面板的圆角留在框里面），像选框一样。
+                    drawRect(
+                        color = accentColor.copy(alpha = 0.85f),
+                        topLeft = Offset(lineLeft, lineTop),
+                        size = Size((lineRight - lineLeft).coerceAtLeast(1f), (lineBottom - lineTop).coerceAtLeast(1f)),
                         style = Stroke(stroke),
                     )
-                    // 强调四边的拖动位置，同时保持短条与整圈圆弧描边相接。
-                    fun horizontalHandle(y: Float) {
-                        drawRoundRect(
-                            color = accentColor,
-                            topLeft = Offset(
-                                frame.centerX - tabLength / 2f,
-                                y - tabThickness / 2f,
-                            ),
-                            size = Size(tabLength, tabThickness),
-                            cornerRadius = CornerRadius(tabThickness),
-                        )
-                    }
-                    horizontalHandle(innerTop)
-                    horizontalHandle(innerBottom)
-                    resizeCornerArcs(ResizeRect(innerLeft, innerTop, innerRight, innerBottom), cornerRadius)
-                        .forEach { arc ->
-                            drawArc(accentColor, arc.startAngle, 90f, useCenter = false,
-                                topLeft = arc.topLeft, size = Size(cornerRadius * 2, cornerRadius * 2),
-                                style = Stroke(tabThickness, cap = StrokeCap.Round))
+                    // 正在拖的把手放大一点，其余保持原样。
+                    fun emphasis(vararg handles: ResizeHandle) = if (dragEdge in handles) RESIZE_HANDLE_ACTIVE_SCALE else 1f
+                    // 2. 四角：L 形括号骑在边框线的角上，两端圆头、角上直角。
+                    fun bracket(lineX: Float, lineY: Float, dirX: Float, dirY: Float, grow: Float) {
+                        val leg = bracketLeg * grow
+                        val path = Path().apply {
+                            moveTo(lineX + dirX * leg, lineY)
+                            lineTo(lineX, lineY)
+                            lineTo(lineX, lineY + dirY * leg)
                         }
-                    val sideLength = tabLength.coerceAtMost(frame.height / 4f)
-                    fun verticalHandle(x: Float) {
-                        drawRoundRect(
-                            color = accentColor,
-                            topLeft = Offset(x - tabThickness / 2f, frame.centerY - sideLength / 2f),
-                            size = Size(tabThickness, sideLength),
-                            cornerRadius = CornerRadius(tabThickness),
-                        )
+                        drawPath(path, accentColor, style = Stroke(bracketThickness * grow,
+                            cap = StrokeCap.Round, join = StrokeJoin.Miter))
                     }
+                    // 3. 四边中点：短条骑在边框线上。
+                    fun pill(center: Offset, horizontal: Boolean, grow: Float) {
+                        val thickness = pillThickness * grow
+                        val length = (if (horizontal) pillLength else sidePillLength) * grow
+                        val pillSize = if (horizontal) Size(length, thickness) else Size(thickness, length)
+                        drawRoundRect(accentColor, Offset(center.x - pillSize.width / 2f, center.y - pillSize.height / 2f),
+                            pillSize, CornerRadius(thickness / 2f))
+                    }
+                    pill(Offset(frame.centerX, lineTop), true, emphasis(ResizeHandle.TOP))
+                    // 悬浮键盘的底边中段是移动条，不是缩放把手；固定键盘的底边调底部留白。
+                    if (!floatingMode) pill(Offset(frame.centerX, lineBottom), true, emphasis(ResizeHandle.BOTTOM))
                     if (splitGapPx > 0f) {
                         // 分体：外侧贴边不可拖，改为拖内侧两条竖边对称调整中缝。
                         listOf(splitInnerLeft, splitInnerRight).forEach { x ->
-                            drawLine(accentColor.copy(alpha = 0.78f), Offset(x, innerTop), Offset(x, innerBottom), stroke)
-                            verticalHandle(x)
+                            drawLine(accentColor.copy(alpha = 0.85f), Offset(x, lineTop), Offset(x, lineBottom), stroke)
+                            pill(Offset(x, frame.centerY), false, 1f)
                         }
                     } else {
-                        verticalHandle(innerLeft)
-                        verticalHandle(innerRight)
+                        pill(Offset(lineLeft, frame.centerY), false, emphasis(ResizeHandle.LEFT))
+                        pill(Offset(lineRight, frame.centerY), false, emphasis(ResizeHandle.RIGHT))
                     }
+                    bracket(lineLeft, lineTop, 1f, 1f, emphasis(ResizeHandle.TOP_LEFT))
+                    bracket(lineRight, lineTop, -1f, 1f, emphasis(ResizeHandle.TOP_RIGHT))
+                    bracket(lineLeft, lineBottom, 1f, -1f, emphasis(ResizeHandle.BOTTOM_LEFT))
+                    bracket(lineRight, lineBottom, -1f, -1f, emphasis(ResizeHandle.BOTTOM_RIGHT))
                 }
                 .pointerInput(editingOpacity, floatingMode, isLandscape, maxWidth, maxHeight, splitActive) {
                     awaitEachGesture {
@@ -583,6 +589,11 @@ internal fun KeyboardResizeOverlay(
                             .border(1.dp, outlineVariantColor, RoundedCornerShape(10.dp))),
                     contentAlignment = Alignment.Center,
                 ) {
+                    val sliderColors = SliderDefaults.colors(
+                        thumbColor = accentColor,
+                        activeTrackColor = accentColor,
+                        inactiveTrackColor = inactiveTrackColor,
+                    )
                     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides opacityHeight) {
                         Slider(
                             value = 1f - opacity,
@@ -593,11 +604,15 @@ internal fun KeyboardResizeOverlay(
                             },
                             valueRange = 0f..0.7f,
                             interactionSource = opacityInteraction,
-                            colors = SliderDefaults.colors(
-                                thumbColor = accentColor,
-                                activeTrackColor = accentColor,
-                                inactiveTrackColor = inactiveTrackColor,
-                            ),
+                            colors = sliderColors,
+                            // 圆形滑块：默认的竖条滑块会和中间的百分比标签撞在一起。
+                            thumb = {
+                                SliderDefaults.Thumb(
+                                    interactionSource = opacityInteraction,
+                                    colors = sliderColors,
+                                    thumbSize = DpSize(20.dp, 20.dp),
+                                )
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(opacityHeight)
@@ -793,11 +808,13 @@ internal fun KeyboardResizeOverlay(
             }
         }
         if (!editingOpacity && !floatingMode) {
-            val stripHeight = 26.dp
+            // 提示字贴在底边把手上方，不压住把手，也不被键盘底沿裁掉。
+            val stripHeight = 18.dp
+            val handleClearance = (frameStyle.handleThicknessDp + 4f).dp
             Box(Modifier.absoluteOffset {
-                IntOffset(frame.left.roundToInt(), (frame.bottom - stripHeight.toPx()).roundToInt())
+                IntOffset(frame.left.roundToInt(), (frame.bottom - handleClearance.toPx() - stripHeight.toPx()).roundToInt())
             }.size(with(density) { frame.width.toDp() }, stripHeight)
-                .testTag("keyboard-resize-padding-bar"), contentAlignment = Alignment.TopCenter) {
+                .testTag("keyboard-resize-padding-bar"), contentAlignment = Alignment.Center) {
                 Text("上下拖动调节底部留白", color = onSurfaceColor.copy(alpha = 0.7f), fontSize = 10.sp)
             }
         }
@@ -846,8 +863,21 @@ internal fun KeyboardResizeOverlay(
                         }
                     }
                 }, contentAlignment = Alignment.Center) {
-                Text(if (centered || edgeCentered) "$alignmentLabel · 左右拖动" else "左右拖动移动键盘",
-                    color = onSurfaceColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // 位置不变，样子按设计图：圆角小标签，移动图标 + 文字，描边用强调色。
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(surfaceColor.copy(alpha = 0.92f))
+                        .border(1.dp, accentColor.copy(alpha = 0.7f), RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.OpenWith, contentDescription = null, tint = accentColor,
+                        modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(if (centered || edgeCentered) "$alignmentLabel · 左右拖动" else "左右拖动移动键盘",
+                        color = onSurfaceColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
         if (!editingOpacity && floatingMode) {

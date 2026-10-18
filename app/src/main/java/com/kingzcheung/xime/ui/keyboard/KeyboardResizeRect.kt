@@ -178,30 +178,40 @@ internal enum class ResizeHandle {
 internal const val RESIZE_EDGE_HIT_DP = 26f
 internal const val RESIZE_CORNER_HIT_DP = 36f
 
-/** 调节框的线宽（dp）：描边、四边短条与四角圆弧、短条长度、圆角半径。 */
+/**
+ * 调节框样式（dp），照用户给的设计图：一圈细线像选框一样框住键盘，四角是 L 形括号，
+ * 四边中点是短条，括号和短条都骑在线上，外沿与键盘外沿齐平。
+ */
 internal data class ResizeFrameStyle(
     val strokeDp: Float,
+    /** 四边短条粗细。 */
     val handleThicknessDp: Float,
+    /** 四边短条长度。 */
     val handleLengthDp: Float,
-    val cornerRadiusDp: Float,
-) {
-    /** 描边与手柄中心线离键盘外沿的距离：手柄整条留在键盘内，且不越出 [RESIZE_EDGE_HIT_DP] 命中带。 */
-    val insetDp: Float get() = maxOf(8f, handleThicknessDp / 2f + 3f)
-}
+    /** 四角括号线宽。 */
+    val bracketThicknessDp: Float,
+    /** 四角括号两条臂的长度。 */
+    val cornerLegDp: Float,
+)
 
 /**
- * 边框粗细与屏幕最短边成正比（以 400dp 为 1 倍）：手机约 1 倍，
- * 平板（约 800–950dp）约 2–2.4 倍，线条占屏幕的比例在大小屏上一致。
+ * 粗细与屏幕最短边成正比（400dp 为 1 倍，上限 2 倍）：手机约 1 倍、平板约 2 倍，
+ * 线条和把手占屏幕的比例在大小屏上一致。短条和括号放大 [RESIZE_HANDLE_ACTIVE_SCALE] 倍仍在
+ * [RESIZE_EDGE_HIT_DP] 边带内；括号两臂落在 [RESIZE_CORNER_HIT_DP] 角区附近。
  */
 internal fun resizeFrameStyle(smallestScreenWidthDp: Int): ResizeFrameStyle {
-    val scale = (smallestScreenWidthDp / 400f).coerceIn(0.85f, 2.4f)
+    val scale = (smallestScreenWidthDp / 400f).coerceIn(0.85f, 2f)
     return ResizeFrameStyle(
-        strokeDp = 3.5f * scale,
-        handleThicknessDp = 9f * scale,
-        handleLengthDp = 56f * scale,
-        cornerRadiusDp = (16f * scale).coerceAtMost(28f),
+        strokeDp = 2f * scale,
+        handleThicknessDp = 5f * scale,
+        handleLengthDp = 36f * scale,
+        bracketThicknessDp = 4f * scale,
+        cornerLegDp = 20f * scale,
     )
 }
+
+/** 拖动中的把手放大倍数。 */
+internal const val RESIZE_HANDLE_ACTIVE_SCALE = 1.25f
 
 /**
  * 手柄命中：只认正在绘制的那一个矩形（[frame]）的边带，
