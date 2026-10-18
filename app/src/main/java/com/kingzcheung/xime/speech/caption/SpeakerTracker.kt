@@ -224,6 +224,29 @@ internal class SpeakerTracker(strictness: Int = 1) {
     }
 
     @Synchronized fun setIgnored(speakerId: Int, ignored: Boolean) { speakers[speakerId]?.ignored = ignored }
+
+    /**
+     * The phone holder's own voice, remembered between sessions so call captions can leave it out.
+     * It matches with the ignored slack, so near matches of the holder go to it rather than to a new person.
+     */
+    @Synchronized fun seedSelf(print: FloatArray) {
+        val self = speakers[SELF] ?: Speaker(SELF).also { speakers[SELF] = it }
+        self.ignored = true
+        self.add(normalized(print))
+    }
+
+    /** "This voice is me": [from] becomes the holder's voice. Returns the holder's voiceprint to keep. */
+    @Synchronized fun markSelf(from: Int): FloatArray? {
+        val source = speakers[from] ?: return speakers[SELF]?.centroid
+        if (from != SELF) {
+            val self = speakers[SELF] ?: Speaker(SELF).also { speakers[SELF] = it }
+            moveAll(source, self)
+            self.ignored = true
+        }
+        return speakers[SELF]?.centroid
+    }
+
+    @Synchronized fun forgetSelf() { speakers.remove(SELF)?.let { self -> for (w in windows) if (w.speaker == self.id) w.speaker = -1 } }
     @Synchronized fun setNamed(speakerId: Int, named: Boolean) { speakers[speakerId]?.named = named }
 
     @Synchronized fun reset() {
@@ -234,6 +257,8 @@ internal class SpeakerTracker(strictness: Int = 1) {
     private fun newSpeaker(print: FloatArray): Speaker = Speaker(nextId++).also { it.add(print); speakers[it.id] = it }
 
     companion object {
+        /** The phone holder (see [seedSelf]); far above any automatic number. */
+        const val SELF = 999
         const val WINDOW_MS = 2000L
         const val HOP_MS = 1000L
         const val MAX_PRINTS = 30

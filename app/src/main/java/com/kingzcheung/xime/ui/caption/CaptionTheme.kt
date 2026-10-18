@@ -56,6 +56,8 @@ internal fun CaptionThemed(dark: Boolean, content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = scheme, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes, content = content)
 }
 
+private const val CAPTION_MIN_OPACITY = .75f
+
 /** 玻璃键盘后面“透出来”的东西：字幕页后面没有别的应用，用一块和深浅色一致的中性底代替。 */
 internal fun captionBackstop(dark: Boolean) = if (dark) Color(0xFF0E0F12) else Color(0xFFF2F3F5)
 
@@ -70,8 +72,13 @@ internal fun Modifier.captionPageBackground(): Modifier {
     val themeId = remember { SettingsPreferences.getKeyboardTheme(context) }
     val palette = LocalKeyboardPalette.current
     val fallback = palette?.background?.copy(alpha = 1f) ?: MaterialTheme.colorScheme.surface
-    val glass = rememberKeyboardInputPreferences(dark).frostedGlass
-    return background(captionBackstop(dark)).keyboardBackground(KeyboardThemes.getRenderingScheme(themeId).keyboardBackground,
+    val raw = rememberKeyboardInputPreferences(dark).frostedGlass
+    // Glass: the blurred wallpaper behind the window is the backstop, as the app behind is for the keyboard.
+    // Unlike a keyboard strip, captions are read for a long time over whatever wallpaper the phone has:
+    // the page keeps at least 75% of its own colour so a dark wallpaper never swallows dark text (light
+    // glass defaults to 20%, measured unreadable on the emulator 2026-10-18).
+    val glass = if (raw.enabled) raw.copy(backgroundOpacity = maxOf(raw.backgroundOpacity, CAPTION_MIN_OPACITY)) else raw
+    return (if (glass.enabled) this else background(captionBackstop(dark))).keyboardBackground(KeyboardThemes.getRenderingScheme(themeId).keyboardBackground,
         dark, fallback, glass)
 }
 

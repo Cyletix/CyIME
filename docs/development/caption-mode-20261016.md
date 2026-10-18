@@ -123,3 +123,12 @@
 - 用户要求：字幕模式下语音没加载好时，显示和键盘一样的加载等待界面。
 - `CaptionScreen.kt` 新增 `LoadingOverlay`：照键盘“正在加载词库”页（标题、180 dp 细进度条、当前状态、说明一行，不透明底、挡触摸），只在会话 Starting（绑定 :asr、加载模型）时盖住字幕区，等待超过 300 ms 才出现；顶部和底部按钮不被盖住。
 - :app:compileDebugKotlin 通过；未打包、未上机，外观未核对。
+
+## 微信通话实测反馈整改（2026-10-18，已编译、模拟器截图，未打包）
+- 通话声音：普通应用录不到通话（下行和 VOICE_COMMUNICATION 回放都要系统权限 CAPTURE_AUDIO_OUTPUT），只能免提加麦克风。通话字幕条改为 Compose（`CallCaptionBar.kt`）：只在通话路由是内置扬声器时录音，听筒时提示“开免提”，耳机或蓝牙时提示“改用免提”；点说话人名字可选“是我，不显示”，拿手机的人的声纹存本机 `files/speaker/self.f32`（:asr 进程，`SpeakerTracker.seedSelf/markSelf/forgetSelf`），以后通话自动不显示。未实测通话。
+- 日语：手机实际为 1.14.2/20261187（两次中文锁定之前）。电脑用同一 SenseVoice 测 FLEURS 普通话 0.5–0.9 s 电话音质短句：auto 最高 44/189 出假名，zh 0/756。`AsrModelManager.selection` 改为中文和未指定一律 zh（日语、英文仍 auto 共用引擎）；`keepChinese`/字幕 `chooseFinal` 拦所有非中文文字（`DialectCorrection.hasForeignScript`），退回 Paraformer 文字。
+- Paraformer：字幕缺实时出字模型时提示下载（226 MB），下完自动重启会话。
+- 节奏：每字 320 ms 淡入，约 7 字/秒，积压时最多 16 字/秒，积压超 60 字才以 30 字/秒追；校正字从半透明淡入、只带三成强调色（1000 ms）。竖屏新消息 animateItem 平滑上移；自己写的回复每句一条。
+- 横屏：右侧 300 dp 面板改为 104 dp 窄栏五个竖排按钮，状态和声音丝带移到字幕下方一行；提示条窄屏阈值 440 dp（横屏一行放下）。
+- 玻璃：字幕页窗口透明并显示壁纸，按键盘模糊半径模糊（API 31 跨窗口模糊或三星接口）；页面底色至少 75% 不透明（浅色玻璃默认 20% 在深色壁纸上看不清，模拟器实测）；快捷回复页加不透明底。
+- 单测：speech.* + ui.caption.* 126 个，123 过；3 个失败（SpeechSegmentationTest 两个、SpeechRecognitionLanguageSessionTest 一个）换回 HEAD 原版同样失败，为原有问题。模拟器截图见 D:/CyIME-Data/tmp/caption-shots（模拟器无模型、无麦克风，未显示真实识别）。

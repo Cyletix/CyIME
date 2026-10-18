@@ -18,6 +18,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     override val maxSegmentMs get() = if (japanese) 20000 else super.maxSegmentMs
     override val minimumPauseMs get() = if (japanese) 1000 else super.minimumPauseMs
     override val hasRollingPreview get() = japanese
+    override val lockedChinese get() = selection.recognitionLanguage == "zh"
     // Quiet speech validated by VAD must not be vetoed by a recent louder phrase's RMS.
     override val useEnergyPause get() = !japanese && !paraformer
     override val resetDetectorOnPause get() = paraformer

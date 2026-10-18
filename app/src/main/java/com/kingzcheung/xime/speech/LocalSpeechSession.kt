@@ -25,6 +25,8 @@ internal interface LocalSpeechEngine : AutoCloseable {
     fun refine(samples: FloatArray): String
     /** Captions keep punctuation and the event label; dictation keeps using [refine]. */
     fun refineRich(samples: FloatArray): RichTranscript = RichTranscript(refine(samples))
+    /** Decoding is pinned to Chinese: a second pass that still comes back as kana is rejected. */
+    val lockedChinese: Boolean get() = false
     fun reset()
     /**
      * 语音内存阶梯第一级：只释放第二遍识别器、保留流式模型。下次停顿定稿时再加载。
@@ -32,6 +34,17 @@ internal interface LocalSpeechEngine : AutoCloseable {
      */
     fun releaseRefinement(): Boolean = false
 }
+
+/** Text in a script Chinese speech never produces (kana, Hangul, Thai, Cyrillic…); one rule shared with dialect correction. */
+internal fun hasForeignScript(text: String): Boolean = DialectCorrection.hasForeignScript(text)
+
+/**
+ * Hard guard for Chinese speech: SenseVoice (and any later correction model) can still answer in
+ * another script on short, phone-quality Mandarin. Such a result is dropped and the streaming text
+ * (or nothing) stays.
+ */
+internal fun keepChinese(preview: String, refined: String, locked: Boolean): String =
+    if (locked && hasForeignScript(refined)) preview else refined
 
 /** Second-pass result before text cleanup: [event] is the model's <|…|> label or empty. */
 internal class RichTranscript(val text: String, val language: String = "", val event: String = "",
@@ -134,7 +147,8 @@ internal class LocalSpeechSession(
         synchronized(outputLock) { ended[id] = boundary }
         onRegion(id, samples.size, boundary)
         previewAudio.clear()
-        if (engine.isStreaming) publish(id, engine.finishStream(), boundary, confirmed = !engine.hasRefinement)
+        val preview = if (engine.isStreaming) engine.finishStream() else ""
+        if (engine.isStreaming) publish(id, preview, boundary, confirmed = !engine.hasRefinement)
         if (engine.hasRefinement || !engine.isStreaming) {
             synchronized(outputLock) { pending.add(id) }
             val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(engine.decodeTimeoutMs)
@@ -143,7 +157,7 @@ internal class LocalSpeechSession(
                     if (abandoned.get()) return@execute
                     try {
                         check(System.nanoTime() < deadline) { "离线识别积压" }
-                        val text = engine.refine(samples)
+                        val text = keepChinese(preview, engine.refine(samples), engine.lockedChinese)
                         check(System.nanoTime() < deadline) { "离线识别超时" }
                         synchronized(outputLock) { pending.remove(id); publish(id, text, boundary, confirmed = true) }
                     } catch (e: Exception) {

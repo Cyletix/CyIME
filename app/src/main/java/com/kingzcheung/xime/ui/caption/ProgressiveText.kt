@@ -24,12 +24,20 @@ import androidx.compose.ui.unit.TextUnit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
-/** New characters fade in over this long (ASRInput: 140 ms). */
-private const val FADE_MS = 140L
-/** A character corrected in place glows in the accent colour and settles back over this long (ASRInput: 650 ms). */
-private const val CORRECTION_MS = 650L
-private const val MIN_RATE = 14f // characters per second, ASRInput's automatic default
-private const val MAX_RATE = 40f
+/**
+ * Elder pacing (user test on a WeChat call, 2026-10-18): ASRInput's 140 ms / 14–40 characters per
+ * second was far faster than an elderly reader. Each character now fades in over 320 ms at an even
+ * reading pace of about 7 per second, speeding up gently only as text piles up so the captions
+ * never fall far behind a fast talker.
+ */
+private const val FADE_MS = 320L
+/** A character rewritten by the second pass fades from half strength with a faint accent tint, instead of flashing. */
+private const val CORRECTION_MS = 1000L
+private const val MIN_RATE = 7f // characters per second
+private const val MAX_RATE = 16f
+/** More than this many characters waiting (about ten seconds of speech): catch up faster. */
+private const val CATCH_UP_BACKLOG = 60
+private const val CATCH_UP_RATE = 30f
 /** Text older than this is shown whole: a reader coming back to the page is not made to wait. */
 private const val STALE_MS = 15_000L
 
@@ -125,7 +133,8 @@ internal fun RevealTicker(controller: CaptionController) {
                 backlog += line.reveal.backlog
             }
             val line = next ?: continue
-            delay((1000f / (backlog * 4f).coerceIn(MIN_RATE, MAX_RATE)).toLong())
+            val rate = if (backlog > CATCH_UP_BACKLOG) CATCH_UP_RATE else (6f + backlog * .5f).coerceIn(MIN_RATE, MAX_RATE)
+            delay((1000f / rate).toLong())
             line.reveal.step(System.currentTimeMillis())
         }
     }
@@ -151,7 +160,9 @@ internal fun ProgressiveText(segments: List<SegmentUi>, fontSize: TextUnit, line
             val reveal = line.reveal
             val count = minOf(reveal.shown, line.text.length)
             for (i in 0 until count) {
-                val c = lerp(color, accent, reveal.glow(i, now)).copy(alpha = color.alpha * reveal.alpha(i, now))
+                val glow = reveal.glow(i, now)
+                // Corrected characters morph in: half strength rising to full, with only a faint accent tint.
+                val c = lerp(color, accent, glow * .3f).copy(alpha = color.alpha * reveal.alpha(i, now) * (1f - glow * .5f))
                 withStyle(SpanStyle(color = c)) { append(line.text[i]) }
             }
             // Keep reading order: nothing from a later sentence before this one is out.

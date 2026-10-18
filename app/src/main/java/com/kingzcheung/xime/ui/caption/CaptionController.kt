@@ -32,13 +32,14 @@ import java.util.concurrent.Executors
 class SpeakerUi(val id: Int, val ordinal: Int) {
     var name by mutableStateOf(when (id) {
         CaptionController.REPLY_SPEAKER -> "我（写）"
+        CaptionController.SELF_SPEAKER -> "我（拿手机的人）"
         CaptionController.SINGLE_SPEAKER -> "说话的人"
         else -> "第 $ordinal 个人"
     })
     var named by mutableStateOf(false)
     var ignored by mutableStateOf(false)
     val colorIndex: Int get() = when (id) {
-        CaptionController.REPLY_SPEAKER -> 7
+        CaptionController.REPLY_SPEAKER, CaptionController.SELF_SPEAKER -> 7
         CaptionController.SINGLE_SPEAKER -> 1
         else -> (ordinal - 1).mod(7)
     }
@@ -126,7 +127,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         io.execute {
             val result = runCatching {
                 val mode = captionMode()
-                main.post { refinementReady = usesSenseVoice(mode) }
+                main.post { refinementReady = usesSenseVoice(mode); streamingReady = mode != SpeechModelCatalog.SENSEVOICE }
                 val speakerPath = speakerModelFile()?.absolutePath.orEmpty()
                 check(client.bind()) { "无法连接语音服务" }
                 check(client.start(mode, speakerPath, sessionListener(epoch))) { "语音模型启动失败" }
@@ -276,6 +277,22 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         io.execute { client.mergeSpeakers(from, into) }
     }
 
+    /** "这是我": the holder's voice. Remembered on this phone; call captions leave it out from now on. */
+    fun markSelf(speakerId: Int) {
+        if (speakerId != SELF_SPEAKER) {
+            transcript.mergeSpeakers(speakerId, SELF_SPEAKER)
+            for (segment in segments) if (segment.speakerId == speakerId) { segment.speakerId = SELF_SPEAKER; segment.confident = true }
+            speakers.removeAll { it.id == speakerId }
+        }
+        ensureSpeaker(SELF_SPEAKER)
+        io.execute { client.markSelf(speakerId) }
+    }
+
+    fun forgetSelf() {
+        speakers.firstOrNull { it.id == SELF_SPEAKER }?.let { it.name = "第 ${nextOrdinal++} 个人" }
+        io.execute { client.forgetSelf() }
+    }
+
     fun markTelevision(speakerId: Int) {
         val speaker = ensureSpeaker(speakerId)
         speaker.ignored = true
@@ -333,6 +350,26 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     var refinementReady by mutableStateOf(true); private set
     var refinementDownload by mutableStateOf<ModelDownloadState>(ModelDownloadState.Idle); private set
 
+    /**
+     * Paraformer is on disk: words appear while the person is still speaking. SenseVoice alone
+     * waits for each pause and then drops a whole sentence at once, too fast for an elder to read.
+     */
+    var streamingReady by mutableStateOf(true); private set
+    var streamingDownload by mutableStateOf<ModelDownloadState>(ModelDownloadState.Idle); private set
+
+    fun downloadStreaming() {
+        if (streamingDownload is ModelDownloadState.Downloading) return
+        streamingDownload = ModelDownloadState.Downloading(0f, 0, -1)
+        scope.launch {
+            ModelManager.downloadModel(app, SpeechModelCatalog.PARAFORMER) { state ->
+                main.post {
+                    streamingDownload = state
+                    if (state is ModelDownloadState.Complete && (status == Status.Listening || status == Status.Starting)) { pause(); start() }
+                }
+            }
+        }
+    }
+
     fun downloadRefinement() {
         if (refinementDownload is ModelDownloadState.Downloading) return
         refinementDownload = ModelDownloadState.Downloading(0f, 0, -1)
@@ -371,6 +408,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     companion object {
         private const val TAG = "Caption"
         const val REPLY_SPEAKER = -1
+        /** The phone holder's remembered voice (same id as the :asr tracker). */
+        const val SELF_SPEAKER = com.kingzcheung.xime.speech.caption.SpeakerTracker.SELF
         /** Without a speaker model every line goes to this single unnamed speaker. */
         const val SINGLE_SPEAKER = 0
         /** Above every id a session uses, including pieces split at a change of voice (SPLIT_BASE = 2^40). */

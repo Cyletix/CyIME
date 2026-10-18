@@ -76,6 +76,22 @@ class AsrInferenceService : Service() {
         } finally { stream.release() }
     }
 
+    /** The holder's voiceprint: 192 floats in app-private storage, never backed up or uploaded. */
+    private fun selfPrintFile() = java.io.File(java.io.File(filesDir, "speaker").apply { mkdirs() }, "self.f32")
+    private fun readSelfPrint(): FloatArray? = runCatching {
+        val bytes = selfPrintFile().takeIf { it.isFile }?.readBytes() ?: return null
+        val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        FloatArray(bytes.size / 4) { buffer.float }
+    }.getOrNull()
+    private fun writeSelfPrint(print: FloatArray) {
+        val buffer = java.nio.ByteBuffer.allocate(print.size * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        print.forEach(buffer::putFloat)
+        val file = selfPrintFile()
+        val temp = java.io.File(file.parentFile, "self.f32.tmp")
+        temp.writeBytes(buffer.array())
+        temp.renameTo(file)
+    }
+
     private fun loadSpeakerModel(path: String) = synchronized(lock) {
         if (speakerModelPath == path && speakerExtractor != null) return@synchronized
         releaseSpeakerModel()
@@ -228,7 +244,9 @@ class AsrInferenceService : Service() {
                 val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, null).copy(recognitionLanguage = "zh")
                 check(selection.ready) { "所选语音模型尚未完整下载" }
                 val tracker = if (speakerModelPath.isNotEmpty() && java.io.File(speakerModelPath).isFile) {
-                    loadSpeakerModel(speakerModelPath); speakerTracker
+                    loadSpeakerModel(speakerModelPath)
+                    readSelfPrint()?.let(speakerTracker::seedSelf)
+                    speakerTracker
                 } else null
                 val listener = object : CaptionSpeechSession.Listener {
                     override fun onSegment(id: Long, text: String, startMs: Long, endMs: Long, boundary: SpeechBoundary, confirmed: Boolean, event: String) {
@@ -277,7 +295,9 @@ class AsrInferenceService : Service() {
         override fun setSpeakerIgnored(speakerId: Int, ignored: Boolean) = speakerTracker.setIgnored(speakerId, ignored)
         override fun setSpeakerNamed(speakerId: Int, named: Boolean) = speakerTracker.setNamed(speakerId, named)
         override fun setStrictness(level: Int) = speakerTracker.setStrictness(level)
-        override fun resetSpeakers() = speakerTracker.reset()
+        override fun resetSpeakers() { speakerTracker.reset(); readSelfPrint()?.let(speakerTracker::seedSelf) }
+        override fun markSelf(speakerId: Int) { speakerTracker.markSelf(speakerId)?.let(::writeSelfPrint) }
+        override fun forgetSelf() { speakerTracker.forgetSelf(); selfPrintFile().delete() }
     }
     /**
      * 系统缺内存时按阶梯提前释放：先卸 SenseVoice 第二遍，内存很紧或进程进了后台列表再全部卸掉。

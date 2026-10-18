@@ -21,6 +21,10 @@ interface ICaptionService {
     void setSpeakerNamed(int speakerId, boolean named);
     /** 0 宽松 / 1 标准 / 2 严格 */
     void setStrictness(int level);
-    /** 清空所有自动分出的声音（用户退出字幕时） */
+    /** 清空所有自动分出的声音（用户退出字幕时）；记住的“我”的声音保留 */
     void resetSpeakers();
+    /** “这是我”：这个声音是拿手机的人，记在本机，通话字幕以后不显示它 */
+    void markSelf(int speakerId);
+    /** 忘掉“我”的声音 */
+    void forgetSelf();
 }
