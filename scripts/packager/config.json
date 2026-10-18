@@ -4,6 +4,7 @@
   "presets": {
     "装到我的设备": {
       "build_type": "release",
+      "dev_tools": true,
       "offline_models": false,
       "t9_model": "@best_private",
       "exclude_dicts": [],

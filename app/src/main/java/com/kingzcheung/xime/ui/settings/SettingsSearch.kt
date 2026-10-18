@@ -101,7 +101,10 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("手写停顿识别", "$ld › 手写与数字键盘", layoutPage("handwriting"), "手写 停顿 识别 延迟 时长"),
         SettingsSearchEntry("手写公式两边的标记", "$ld › 手写与数字键盘", layoutPage("handwriting"), "公式 latex 美元 数学"),
         SettingsSearchEntry("数字框自动数字键盘", "$ld › 手写与数字键盘", layoutPage("handwriting"), "数字 验证码 号码 电话 数字键盘"),
-    )
+    ).filter {
+        // The developer-only handwriting training page is hidden in public, elder and friend packages.
+        it.target != SettingsRoutes.HandwritingTraining || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
+    }
 }
 
 /** 去空格、小写后匹配；标题命中排最前，其次说法和路径。 */

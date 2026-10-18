@@ -283,7 +283,8 @@ class BuildOptions(SimpleNamespace):
     DEFAULTS = dict(build_type="release", offline_models=False, offline_ids=(), t9_model=None, exclude_dicts=(),
                     install=True, push_banks=False, serial="", rebuild=False, bump="none", publish=False,
                     latest=False, prerelease=False, notes="", yes=False, dry_run=False, check=False,
-                    audience="")  # "elder" / "friend": a bundled-model package checked against its spec
+                    audience="",  # "elder" / "friend": a bundled-model package checked against its spec
+                    dev_tools=False)  # developer-only features (handwriting training); only 装到我的设备
 
     def __init__(self, **values):
         merged = dict(self.DEFAULTS)
@@ -389,7 +390,8 @@ class Packager(ad.Delivery):
                 "excludedDicts": list(self.p.exclude_dicts),
                 # Only present for a partial offline edition, so earlier build records stay valid.
                 **({"offlineIds": list(self.p.offline_ids)} if self.p.offline_ids else {}),
-                **({"audience": self.p.audience} if self.p.audience else {})}
+                **({"audience": self.p.audience} if self.p.audience else {}),
+                **({"devTools": True} if self.p.dev_tools else {})}
 
     def variant_id(self) -> str:
         return hashlib.sha256(json.dumps(self.variant(), sort_keys=True).encode()).hexdigest()[:12]
@@ -495,6 +497,10 @@ class Packager(ad.Delivery):
             args.append("-PcyimeIgnoreAssets=" + ":".join(f"cell_{i}.dict.yaml" for i in self.p.exclude_dicts))
         if self.p.audience == "elder":
             args.append("-PelderEdition=true")
+        if self.p.dev_tools:
+            if self.p.audience or self.p.publish:
+                raise DeliveryError("开发者功能（手写训练）只能出现在“装到我的设备”，老人包、朋友包和公开版都不带。")
+            args.append("-PdevTools=true")
         return args
 
     def build_parameters(self) -> str:
