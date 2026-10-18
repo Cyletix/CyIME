@@ -15,15 +15,21 @@ class KeyboardResizeGeometryTest {
     @Test fun resizeFrameThicknessScalesWithScreenAndStaysInsideItsInset() {
         val phone = resizeFrameStyle(400)
         val tablet = resizeFrameStyle(800)
-        assertEquals(9f, phone.handleThicknessDp, 0.01f)
+        assertEquals(5f, phone.handleThicknessDp, 0.01f)
+        assertEquals(4f, phone.bracketThicknessDp, 0.01f)
+        assertEquals(20f, phone.cornerLegDp, 0.01f)
         // 粗细与屏幕最短边成正比：两倍屏宽即两倍粗。
         assertEquals(2f, tablet.handleThicknessDp / phone.handleThicknessDp, 0.01f)
         assertEquals(2f, tablet.strokeDp / phone.strokeDp, 0.01f)
+        assertEquals(2f, tablet.bracketThicknessDp / phone.bracketThicknessDp, 0.01f)
+        assertEquals(2f, tablet.cornerLegDp / phone.cornerLegDp, 0.01f)
         for (width in listOf(320, 411, 800, 934, 4000)) {
             val style = resizeFrameStyle(width)
-            // 手柄整条留在键盘内，且全部落在边缘命中带里。
-            assertTrue(style.insetDp - style.handleThicknessDp / 2f > 0f)
-            assertTrue(style.insetDp + style.handleThicknessDp / 2f <= RESIZE_EDGE_HIT_DP)
+            // 把手骑在贴边的线上：放大后整条仍在边带里，括号两臂不超出角区太多。
+            assertTrue(style.strokeDp < style.handleThicknessDp)
+            assertTrue(style.handleThicknessDp * RESIZE_HANDLE_ACTIVE_SCALE <= RESIZE_EDGE_HIT_DP)
+            assertTrue(style.bracketThicknessDp * RESIZE_HANDLE_ACTIVE_SCALE <= RESIZE_EDGE_HIT_DP)
+            assertTrue(style.cornerLegDp <= RESIZE_CORNER_HIT_DP * RESIZE_HANDLE_ACTIVE_SCALE)
         }
     }
 
