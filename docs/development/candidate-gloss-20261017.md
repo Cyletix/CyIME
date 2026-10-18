@@ -40,5 +40,5 @@ python -I tools/dictionaries/glossary/build_glossary.py --ecdict ecdict.csv --ce
 
 - 随机测试发现 几号 → heroin、在教 → be a believer、话 → dialect。原因：CC-CEDICT 的俚语义项（"(slang) heroin"）被去掉标签后照用；收了大量罕见词组（在教 是宗教义，候选里由 在+教 拼出）；读音和义项都不按常用排（没 取了 mo4 “drowned”，告诉 取了 “press charges”，年 吃到异体字 秊 的 “grain”）。
 - 生成脚本按原因修：语域／粗口／字面直译义项不用；多字词只收 Rime 词库权重 ≥ 500 的词，且只用 Rime 最常用读音对应的条目；义项用 ECDICT 反查挑选；单字从严；繁简同形字不吃别的繁体字形的条目。抽查 Rime 最常用 300 字、800 词，错释义基本消失，剩下的是首义偏书面（心里 → chest 一类）。
-- v2：中文 1.99 万条（v1 18.3 万），文件 1,547,732 字节，sha256 `4492a6b05b19918d9a3fd631ad04ad3eaa08e8a4e1c9b8bba370c0806429061c`。App 改读 `cyime_gloss-v2.tsv`，已选释义且只有 v1 的设备会自动下载 v2 并删掉 v1。v2 尚待上传 Release。
+- v2：中文 1.99 万条（v1 18.3 万），文件 1,547,732 字节，sha256 `4492a6b05b19918d9a3fd631ad04ad3eaa08e8a4e1c9b8bba370c0806429061c`。App 改读 `cyime_gloss-v2.tsv`，已选释义且只有 v1 的设备会自动下载 v2 并删掉 v1。10-19 用户同意后上传 Release `models`（`cyime_gloss-v2.tsv`），`NOTICE-models.txt` 第 5 节改为 v2 并加哈希；公开地址重新下载 sha256 一致。
 
