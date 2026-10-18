@@ -1,4 +1,4 @@
-"""Build a private SQLite learning corpus from local Codex and Cline chats.
+"""Build a private SQLite learning corpus from local Codex, Cline and Claude Code chats.
 
 Only human-authored user messages are accepted by the source-specific parsers.
 Raw text stays in SQLite; the JSONL export contains cleaned learning text.
@@ -14,16 +14,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from chat_corpus_cline import iter_cline_messages
+from chat_corpus_claude import iter_claude_messages
 from chat_corpus_codex import iter_codex_messages
 from chat_corpus_terms import clean_learning_text, count_words
 
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 CREATE TABLE messages (
     id INTEGER PRIMARY KEY,
-    platform TEXT NOT NULL CHECK (platform IN ('codex', 'cline')),
+    platform TEXT NOT NULL CHECK (platform IN ('codex', 'cline', 'claude')),
     source_variant TEXT NOT NULL,
     session_id TEXT NOT NULL,
     message_id TEXT NOT NULL,
@@ -37,6 +38,7 @@ CREATE TABLE messages (
 CREATE INDEX messages_platform_time ON messages (platform, timestamp);
 CREATE VIEW codex_user_messages AS SELECT * FROM messages WHERE platform = 'codex';
 CREATE VIEW cline_user_messages AS SELECT * FROM messages WHERE platform = 'cline';
+CREATE VIEW claude_user_messages AS SELECT * FROM messages WHERE platform = 'claude';
 CREATE TABLE message_terms (
     message_id INTEGER NOT NULL REFERENCES messages(id),
     kind TEXT NOT NULL CHECK (kind IN ('han', 'latin')),
@@ -45,7 +47,7 @@ CREATE TABLE message_terms (
     PRIMARY KEY (message_id, kind, term)
 );
 CREATE TABLE word_frequency (
-    platform TEXT NOT NULL CHECK (platform IN ('all', 'codex', 'cline')),
+    platform TEXT NOT NULL CHECK (platform IN ('all', 'codex', 'cline', 'claude')),
     kind TEXT NOT NULL CHECK (kind IN ('han', 'latin')),
     term TEXT NOT NULL,
     occurrences INTEGER NOT NULL,
@@ -70,7 +72,7 @@ def checked_message(record):
     required = ("platform", "source_variant", "session_id", "message_id", "text", "source_path")
     if any(not isinstance(record.get(key), str) or not record[key] for key in required):
         raise ValueError("extractor returned an incomplete message")
-    if record["platform"] not in {"codex", "cline"}:
+    if record["platform"] not in {"codex", "cline", "claude"}:
         raise ValueError("extractor returned an unknown platform")
     timestamp = record.get("timestamp")
     if timestamp is not None and not isinstance(timestamp, str):
@@ -121,7 +123,7 @@ def aggregate_frequencies(connection):
     connection.execute(
         """INSERT INTO word_frequency
            SELECT 'all', kind, term, SUM(occurrences), SUM(message_count)
-           FROM word_frequency WHERE platform IN ('codex', 'cline')
+           FROM word_frequency WHERE platform IN ('codex', 'cline', 'claude')
            GROUP BY kind, term"""
     )
 
@@ -168,7 +170,7 @@ def build_corpus(user_home, output, minimum=2, force=False):
     if any(path.exists() for path in temp_paths):
         raise FileExistsError("temporary corpus output already exists")
 
-    stats = {"codex_messages": 0, "cline_messages": 0,
+    stats = {"codex_messages": 0, "cline_messages": 0, "claude_messages": 0,
              "duplicate_records": 0, "empty_records": 0,
              "messages_without_terms": 0}
     connection = None
@@ -178,6 +180,7 @@ def build_corpus(user_home, output, minimum=2, force=False):
         with connection:
             insert_messages(connection, iter_codex_messages(user_home / ".codex"), stats)
             insert_messages(connection, iter_cline_messages(user_home), stats)
+            insert_messages(connection, iter_claude_messages(user_home), stats)
             if stats["codex_messages"] == 0 or stats["cline_messages"] == 0:
                 raise ValueError("both Codex and Cline human user messages are required")
             aggregate_frequencies(connection)
@@ -210,7 +213,7 @@ def build_corpus(user_home, output, minimum=2, force=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--user-home", type=Path, default=Path.home(),
-                        help="Windows user profile containing .codex and .cline")
+                        help="Windows user profile containing .codex, .cline and .claude")
     parser.add_argument("--output", type=Path, required=True,
                         help="SQLite output outside the repository and OneDrive")
     parser.add_argument("--min-export-count", type=int, default=2)

@@ -25,6 +25,7 @@ class ChatCorpusTest(unittest.TestCase):
                 result = chat_corpus.build_corpus(home, output, minimum=1)
             self.assertEqual(result["codex_messages"], 1)
             self.assertEqual(result["cline_messages"], 1)
+            self.assertEqual(result["claude_messages"], 0)  # the temporary profile has no .claude
             self.assertEqual(result["duplicate_records"], 1)
             with closing(sqlite3.connect(output)) as connection:
                 self.assertEqual(connection.execute("PRAGMA integrity_check").fetchone()[0], "ok")
