@@ -2194,9 +2194,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val height = if (preview && state.resizePreviewHeightDp > 0) state.resizePreviewHeightDp else
             if (reset) SettingsPreferences.getDefaultKeyboardHeightDp(this, landscape)
             else KeyboardHeightProfiles.selected(this, floating, landscape, hostHeightDp)
-        // 悬浮：已存或预览中的高度可以低到方形吸附点（默认高度已在 KeyboardHeightProfiles 里按默认下限夹过）。
         val heightBounds = if (floating)
-            com.kingzcheung.xime.ui.keyboard.floatingStoredHeightBounds(hostHeightDp, landscape)
+            com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds(hostHeightDp, landscape)
             else KeyboardHeightProfiles.fixedBounds(this, landscape)
         val savedWidth = if (reset) 0 else if (floating)
             (state.resizePreviewWidthDp.takeIf { preview && it > 0 } ?: state.floatingWidthDp)
