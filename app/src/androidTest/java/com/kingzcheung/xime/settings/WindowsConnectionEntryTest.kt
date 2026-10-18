@@ -76,4 +76,33 @@ class WindowsConnectionEntryTest {
         rule.onNodeWithTag("windows-pairing-code").assertDoesNotExist()
         rule.onNodeWithTag("windows-confirm-pairing").assertDoesNotExist()
     }
+
+    @Test fun severalSavedDevicesStayListedAndScanAddsAnother() {
+        val home = WindowsPeer("home", "家里电脑", "https://192.168.2.101:18740", "a".repeat(64))
+        val office = WindowsPeer("office", "公司电脑", "https://10.0.0.5:18740", "b".repeat(64))
+        val tablet = WindowsPeer("tablet", "我的平板", "https://192.168.2.120:18741", "c".repeat(64))
+        var used: WindowsPeer? = null
+        var forgotten: WindowsPeer? = null
+        rule.setContent {
+            MaterialTheme {
+                Surface(Modifier.width(400.dp).testTag("saved-devices-page")) {
+                    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+                        WindowsDevicesPanelContent("已连接 家里电脑", home, emptyList(), true, null, null,
+                            {}, {}, {}, { forgotten = it }, {}, {},
+                            saved = listOf(home, office, tablet), reachable = mapOf("home" to true, "office" to false),
+                            onUse = { used = it })
+                    }
+                }
+            }
+        }
+        rule.onNodeWithText("扫码添加另一台设备").assertIsDisplayed()
+        rule.onNodeWithText("正在同步").assertIsDisplayed()
+        rule.onNodeWithText("不在当前网络").assertIsDisplayed()
+        listOf("home", "office", "tablet").forEach { rule.onNodeWithTag("windows-saved:$it").assertExists() }
+        saveUiEvidence("windows-saved-devices", rule.onNodeWithTag("saved-devices-page"))
+        rule.onAllNodesWithText("改用")[0].performClick()
+        rule.runOnIdle { assertEquals("office", used?.id) }
+        rule.onAllNodesWithText("取消配对")[2].performClick()
+        rule.runOnIdle { assertEquals("tablet", forgotten?.id) }
+    }
 }
