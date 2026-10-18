@@ -1235,7 +1235,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             toolPanelDisplay = null,
             toolPanelUiNodes = null,
             toolPanelLoading = false,
-            enterKeyText = "发送",
+            enterKeyText = editorEnterKeyText(),
         )
         ToolPanelEditTextHolder.editText = null
     }
@@ -3063,6 +3063,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private fun updateEnterKeyText(editorInfo: EditorInfo) {
+        uiState.value = uiState.value.copy(enterKeyText = enterKeyTextFor(editorInfo))
+    }
+
+    /**
+     * 关掉工具面板、快捷发送表单后回车键回到当前输入框自己的样子。原来写死“发送”，
+     * 切悬浮会顺带关工具面板，同一个输入框的 ↵ 就变成了发送箭头。
+     */
+    internal fun editorEnterKeyText(): String = currentInputEditorInfo?.let(::enterKeyTextFor) ?: "发送"
+
+    private fun enterKeyTextFor(editorInfo: EditorInfo): String {
         val imeOptions = editorInfo.imeOptions
         val action = imeOptions and EditorInfo.IME_MASK_ACTION
         val noEnterAction = imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0
@@ -3075,7 +3085,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             action == EditorInfo.IME_ACTION_DONE -> "完成"
             else -> "换行"
         }
-        uiState.value = uiState.value.copy(enterKeyText = enterText)
+        return enterText
     }
 
     override fun onFinishInput() {
