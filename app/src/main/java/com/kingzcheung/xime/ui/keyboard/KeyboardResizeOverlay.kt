@@ -3,6 +3,7 @@ package com.kingzcheung.xime.ui.keyboard
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -614,12 +615,12 @@ internal fun KeyboardResizeOverlay(
                             valueRange = 0f..0.7f,
                             interactionSource = opacityInteraction,
                             colors = sliderColors,
-                            // 自己画的固定竖条滑块：4dp×44dp 圆头，按住、拖动都不变形。
+                            // 按设计图：圆形滑块，自己画，按住、拖动都不变形。
                             thumb = {
                                 Box(
                                     Modifier
-                                        .size(4.dp, 44.dp)
-                                        .clip(RoundedCornerShape(50))
+                                        .size(18.dp)
+                                        .clip(CircleShape)
                                         .background(accentColor)
                                         .testTag("keyboard-opacity-thumb"),
                                 )
@@ -851,20 +852,22 @@ internal fun KeyboardResizeOverlay(
                 }
             }
         }
-        // 顶边「拖动移动」胶囊，按设计图：功能键实心色、四向箭头 + 文字，无描边。
+        // 顶边「拖动移动」胶囊，按设计图：键盘底色实心、强调色细描边、强调色四向箭头 + 文字。
+        val pillFill = (palette?.background ?: MaterialTheme.colorScheme.surface).copy(alpha = 1f)
         @Composable
         fun MovePill() {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(functionColor)
+                    .background(pillFill)
+                    .border(1.dp, accentColor, RoundedCornerShape(50))
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.OpenWith, contentDescription = null, tint = functionTextColor.copy(alpha = 1f),
+                Icon(Icons.Default.OpenWith, contentDescription = null, tint = accentColor,
                     modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(5.dp))
-                Text("拖动移动", color = functionTextColor.copy(alpha = 1f), fontSize = 11.sp, maxLines = 1, softWrap = false)
+                Text("拖动移动", color = onSurfaceColor, fontSize = 11.sp, maxLines = 1, softWrap = false)
             }
         }
         val floatingMoveGesture = Modifier.pointerInput(floatingMode) {
