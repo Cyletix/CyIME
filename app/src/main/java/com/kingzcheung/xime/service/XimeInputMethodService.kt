@@ -2809,7 +2809,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         hardwareCursorImmediateOnly = false
         val connection = currentInputConnection ?: return
         if (!hasHardwareKeyboard) {
-            try { connection.requestCursorUpdates(0) } catch (_: Exception) { }
+            // 屏幕键盘也跟踪光标，只用来摆编码悬浮气泡（见 SoftCaretAnchor）。
+            val accepted = try {
+                connection.requestCursorUpdates(InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE)
+            } catch (_: Exception) { false }
+            if (!accepted) SoftCaretAnchor.anchor.value = null
             return
         }
         val mode = InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
@@ -2854,7 +2858,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onUpdateCursorAnchorInfo(info: CursorAnchorInfo) {
-        if (!hasHardwareKeyboard) return
+        if (!hasHardwareKeyboard) {
+            SoftCaretAnchor.anchor.value = try { resolveHardwareCursorAnchor(info) } catch (_: Exception) { null }
+            return
+        }
         try {
             val anchor = resolveHardwareCursorAnchor(info)
             uiState.value = uiState.value.copy(cursorAnchor = anchor, editorBounds = resolveHardwareEditorBounds(info))
@@ -3107,9 +3114,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         microphoneRestoreCompact = false
         hardwareCursorImmediateOnly = false
         clearHardwareSurfaceBounds()
-        if (hasHardwareKeyboard) {
-            try { currentInputConnection?.requestCursorUpdates(0) } catch (_: Exception) { }
-        }
+        try { currentInputConnection?.requestCursorUpdates(0) } catch (_: Exception) { }
+        SoftCaretAnchor.anchor.value = null
         uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
         discardInlinePinyinBeforeFrameworkFinish()
         super.onFinishInput()
