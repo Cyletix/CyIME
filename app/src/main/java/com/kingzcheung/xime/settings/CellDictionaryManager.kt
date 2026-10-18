@@ -45,6 +45,17 @@ object CellDictionaryManager {
         })
     }
 
+    /** Copy bundled dictionaries into the store before the applied set is prepared for Rime. */
+    fun syncBuiltins(context: Context) {
+        val store = store(context)
+        CellDictionaryCatalog.builtins.forEach { builtin ->
+            // The packager can leave a built-in dictionary out of an APK; skip it instead of failing deployment.
+            val stream = try { context.assets.open(builtin.asset) } catch (_: java.io.FileNotFoundException) { return@forEach }
+            val text = stream.bufferedReader().use { it.readText() }
+            store.installBuiltin(builtin, text)
+        }
+    }
+
     fun prepare(context: Context, ids: Set<String> = store(context).read().applied): List<CellDictionaryRime.Binding> =
         CellDictionaryRime.prepare(SchemaManager.getRimeDir(context), store(context),
             SchemaManager.discoverSchemas(context), ids)

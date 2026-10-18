@@ -85,7 +85,7 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
                             .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f).padding(end = 12.dp)) {
                                 Text(language.displayName, style = MaterialTheme.typography.titleMedium)
-                                Text(if (!checked) "未启用" else selected?.profile?.summary ?: "正在准备可用组合",
+                                Text(if (!checked) "未启用" else selected?.selectionLabel ?: "正在准备可用组合",
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (checked) IconButton(onClick = { expandedLanguage = if (expanded) null else language },
@@ -114,7 +114,7 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
                             Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) { entry ->
                             InputModes.selectProfile(context, entry)
                             remembered = remembered + (language to entry.schemaId)
-                            message = "已保存：${language.displayName} · ${entry.profile.summary}，下次切换到该语言时使用"
+                            message = "已保存：${language.displayName} · ${entry.selectionLabel}，下次切换到该语言时使用"
                         }
                     }
                 }

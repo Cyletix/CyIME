@@ -39,8 +39,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.kingzcheung.xime.ui.common.CompactDropdownMenu
+import com.kingzcheung.xime.ui.common.CompactMenuRow
+import com.kingzcheung.xime.ui.common.CompactMenuDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -453,78 +454,46 @@ fun SchemaSettingsContent(
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "更多")
                         }
-                        DropdownMenu(
+                        CompactDropdownMenu(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
-                            offset = DpOffset(0.dp, 4.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            offset = DpOffset(0.dp, 4.dp)
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("方案市场") },
+                            CompactMenuRow(
+                                label = "方案市场", icon = Icons.TwoTone.Storefront,
                                 onClick = {
                                     showMenu = false
                                     onNavigateToMarket()
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.TwoTone.Storefront, null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp))
                                 }
                             )
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                            )
-                            DropdownMenuItem(
-                                text = { Text("浏览器导入") },
+                            CompactMenuDivider()
+                            CompactMenuRow(
+                                label = "浏览器导入", icon = Icons.TwoTone.Computer,
                                 onClick = {
                                     showMenu = false
                                     requireImportWarning { showWirelessSheet = true }
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.TwoTone.Computer, null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp))
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text("网络导入") },
+                            CompactMenuRow(
+                                label = "网络导入", icon = Icons.TwoTone.CloudDownload,
                                 onClick = {
                                     showMenu = false
                                     requireImportWarning { showUrlDialog = true }
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.TwoTone.CloudDownload, null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp))
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text("从文件选择") },
+                            CompactMenuRow(
+                                label = "从文件选择", icon = Icons.TwoTone.DriveFolderUpload,
                                 onClick = {
                                     showMenu = false
                                     requireImportWarning { importLauncher.launch(arrayOf("*/*")) }
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.TwoTone.DriveFolderUpload, null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp))
                                 }
                             )
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                            )
-                            DropdownMenuItem(
-                                text = { Text("文件管理器") },
+                            CompactMenuDivider()
+                            CompactMenuRow(
+                                label = "文件管理器", icon = Icons.Default.FolderOpen,
                                 onClick = {
                                     showMenu = false
                                     onNavigateToRimeFileBrowser()
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.FolderOpen, null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp))
                                 }
                             )
                         }
@@ -778,7 +747,7 @@ internal fun SchemaToggleItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = schema.name,
+                        text = schema.toSchemaInfo().resourceLabel,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,

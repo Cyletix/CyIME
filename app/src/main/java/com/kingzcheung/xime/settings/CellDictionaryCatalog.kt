@@ -7,7 +7,16 @@ data class CellDictionaryOffer(val sourceId: Int, val name: String, val category
     val downloadUrl: String get() = "https://pinyin.sogou.com/d/dict/download_cell.php?id=$sourceId&name=$id"
 }
 
+/** Dictionaries shipped in the APK (assets/cell_dictionaries/cell_<id>.dict.yaml), enabled by default. */
+data class BuiltinCellDictionary(val id: String, val name: String, val category: String, val sourceUrl: String) {
+    val asset: String get() = "cell_dictionaries/cell_$id.dict.yaml"
+}
+
 object CellDictionaryCatalog {
+    const val BUILTIN_CATEGORY = "内置词库"
+    val builtins = listOf(
+        BuiltinCellDictionary("builtin_arknights", "明日方舟", BUILTIN_CATEGORY, "https://wiki.arkrec.com/"),
+    )
     const val SOURCE_URL = "https://pinyin.sogou.com/dict/"
     val offers = listOf(
         CellDictionaryOffer(807, "全国省市区县地名", "城市信息大全", 2595, 77674),

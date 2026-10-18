@@ -29,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.twotone.LibraryBooks
+import androidx.compose.material.icons.twotone.Gesture
+import androidx.compose.material.icons.twotone.Speed
 import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.twotone.Backup
 import androidx.compose.material.icons.twotone.Ballot
@@ -85,15 +87,18 @@ fun SettingsMainContent(
     onNavigateToDictionary: () -> Unit,
     onNavigateToPlugins: () -> Unit,
     onNavigateToModelLocal: () -> Unit = {},
+    onNavigateToHandwritingTraining: () -> Unit = {},
     onNavigateToSmartPrediction: () -> Unit,
     onNavigateToSpeechToText: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToClipboardSync: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToHardwareKeyboard: () -> Unit = {},
-    onNavigateToLanguages: () -> Unit = {}
+    onNavigateToLanguages: () -> Unit = {},
+    onNavigateToRoute: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
+    var searchQuery by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val imeBottomDp = with(density) { imeBottomPx.toDp() }
@@ -130,6 +135,14 @@ fun SettingsMainContent(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item { SettingsSearchField(searchQuery, { searchQuery = it }) }
+            if (searchQuery.isNotBlank()) item {
+                SettingsSearchResults(searchQuery) { entry ->
+                    if (entry.target == SEARCH_TARGET_CUSTOM_LAYOUT) {
+                        context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java))
+                    } else onNavigateToRoute(entry.target)
+                }
+            }
             item {
                 SettingsSection(title = "输入法", content = {
                     SettingsItem(
@@ -266,6 +279,18 @@ fun SettingsMainContent(
                         onClick = onNavigateToLayoutDisplay,
                         showArrow = true
                     )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.Speed,
+                        title = "性能与省电",
+                        subtitle = "高配、中配、低配一键切换，语音模型占用内存",
+                        onClick = { onNavigateToRoute(SettingsRoutes.Performance) },
+                        showArrow = true
+                    )
                 })
             }
 
@@ -292,8 +317,8 @@ fun SettingsMainContent(
                     )
                     SettingsItem(
                         icon = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
-                        title = "自定义布局",
-                        subtitle = "创建、编辑和管理按键布局",
+                        title = "布局管理",
+                        subtitle = "26键符号、自定义按键布局",
                         onClick = { context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
                         showArrow = true
                     )
@@ -372,8 +397,20 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.Straighten,
                         title = "模型管理",
-                        subtitle = "管理语音、手写和联想使用的本地模型",
+                        subtitle = "查看识字、语音、手写和联想的本地模型",
                         onClick = onNavigateToModelLocal,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.Gesture,
+                        title = "手写训练模式",
+                        subtitle = "按题写假名、字母、符号和公式，收集样本导出给电脑训练",
+                        onClick = onNavigateToHandwritingTraining,
                         showArrow = true
                     )
                 })
@@ -383,8 +420,8 @@ fun SettingsMainContent(
                 SettingsSection(                title = "同步与备份", content = {
                     SettingsItem(
                         icon = Icons.TwoTone.Backup,
-                        title = "云备份",
-                        subtitle = "通过备份插件将配置备份到云端并恢复",
+                        title = "备份与恢复",
+                        subtitle = "把设置导出为本地文件，或从备份文件恢复",
                         onClick = onNavigateToBackup,
                         showArrow = true
                     )

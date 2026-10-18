@@ -61,7 +61,9 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                     SettingsPreferences.getCurrentSchema(context),
                 )
             }
-            val sorted = allSchemas.sortedByDescending { it.schemaId in enabledSchemas }
+            // 组合配置（如 14 键小鹤双拼）跟随方案与布局自动启用，不单列。
+            val sorted = allSchemas.filterNot { it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.companions }
+                .sortedByDescending { it.schemaId in enabledSchemas }
             _uiState.update {
                 it.copy(
                     allSchemas = sorted,

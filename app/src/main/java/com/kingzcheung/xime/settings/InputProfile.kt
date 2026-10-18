@@ -70,6 +70,20 @@ data class InputProfile(
 
 /** The only product ↔ built-in backend mapping. No file IO, deployment, or preference writes. */
 object InputProfiles {
+    /** Display samples are backend metadata; unknown double-pinyin variants must not borrow Flypy codes. */
+    fun schemePreview(profile: InputProfile): String = when (profile.scheme) {
+        InputScheme.PINYIN -> "pin'yin"
+        InputScheme.DOUBLE_PINYIN -> when ((profile.engineProfile as? EngineProfile.Rime)?.schemaId) {
+            "double_pinyin_flypy", "double_pinyin_flypy_14jian" -> "xn'he'ul'pb"
+            else -> "双拼编码"
+        }
+        InputScheme.ROMAJI -> "romaji"
+        InputScheme.KANA -> "かな"
+        InputScheme.DIRECT -> "abc"
+        InputScheme.STROKE -> "一丨丿丶乛"
+        InputScheme.WUBI, InputScheme.WUBI_PINYIN -> "字根编码"
+        InputScheme.EXTERNAL -> "自定义编码"
+    }
     private val descriptions = java.util.concurrent.ConcurrentHashMap<String, InputProfile>()
     @Volatile private var installed: Map<String, InputProfile> = emptyMap()
     private val pinyinIds = setOf("rime_ice", "pinyin_simp", "luna_pinyin", "luna_pinyin_simp",

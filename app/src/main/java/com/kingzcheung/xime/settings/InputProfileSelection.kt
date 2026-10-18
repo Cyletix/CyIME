@@ -20,6 +20,18 @@ object InputProfileSelection {
         .filter { it.profile.language == language && it.profile.mode == InputMode.KEYBOARD }
         .map { it.profile.scheme }.distinct()
 
+    /** Concrete installed choices, retaining variant names rather than a generic "双拼" option. */
+    fun schemeEntries(entries: List<SchemaInfo>, current: SchemaInfo): List<SchemaInfo> =
+        schemes(entries, current.profile.language).flatMap { scheme ->
+            val group = entries.filter { it.profile.language == current.profile.language &&
+                it.profile.scheme == scheme && it.profile.mode == InputMode.KEYBOARD }
+            val compatible = group.filter { it.profile.layout.id == current.profile.layout.id }
+            if (compatible.isNotEmpty()) compatible else {
+                val fallbackLayout = changeScheme(entries, current, scheme)?.profile?.layout?.id
+                group.filter { it.profile.layout.id == fallbackLayout }
+            }
+        }.distinctBy { it.schemaId }
+
     fun layouts(entries: List<SchemaInfo>, current: SchemaInfo): List<InputLayout> = entries
         .filter { it.profile.language == current.profile.language && it.profile.scheme == current.profile.scheme &&
             it.profile.mode == InputMode.KEYBOARD }

@@ -46,7 +46,7 @@ data class PluginsFetch(
  */
 object XimeIndexSource {
     private const val TAG = "XimeIndexSource"
-    private val defaultBaseUrls = listOf("https://index.ximei.me/")
+    private val defaultBaseUrls = CYIME_STORE_BASE_URLS
 
     private var baseUrls: List<String> = defaultBaseUrls
     private var mirrors: List<String> = buildMirrors(defaultBaseUrls)
@@ -143,11 +143,10 @@ object XimeIndexSource {
                     val direct = XimeIndexParser.parsePluginsDirectIndex(text)
                     val plugins = direct.plugins.distinctBy { it.id }
                         .map { XimeIndexParser.toPluginItem(it, appVersion, installedVersions) }
-                    if (plugins.isNotEmpty()) {
-                        return@withContext Result.success(
-                            PluginsFetch(plugins, host, direct.updatedAt)
-                        )
-                    }
+                    // 目录能读到就算成功；CyIME 自己的商店暂未上架插件时列表为空是正常状态。
+                    return@withContext Result.success(
+                        PluginsFetch(plugins, host, direct.updatedAt)
+                    )
                 } catch (e: Exception) {
                     Log.w(TAG, "fetchPlugins $host failed: ${e.message}")
                 }

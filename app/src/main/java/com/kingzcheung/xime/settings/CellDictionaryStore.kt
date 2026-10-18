@@ -20,6 +20,8 @@ data class CellDictionaryState(
     val installed: List<InstalledCellDictionary> = emptyList(),
     val selected: Set<String> = emptySet(),
     val applied: Set<String> = emptySet(),
+    /** Built-ins enabled once by default; a later switch-off by the user is never reverted. */
+    val seeded: Set<String> = emptySet(),
 ) {
     val pending: Boolean get() = selected != applied
 }
@@ -54,7 +56,7 @@ class CellDictionaryStore(val directory: File) {
     }
 
     fun dictionaryFile(id: String): File {
-        require(id.matches(Regex("(sogou_[0-9]+|local_[a-f0-9]{24})"))) { "无效词库标识" }
+        require(id.matches(Regex("(sogou_[0-9]+|local_[a-f0-9]{24}|builtin_[a-z]+)"))) { "无效词库标识" }
         return File(directory, "cell_$id.dict.yaml")
     }
 
@@ -74,6 +76,24 @@ class CellDictionaryStore(val directory: File) {
         writeAtomic(dictionaryFile(id), ScelDictionary.toRime("cell_$id", parsed.entries))
         save(old.copy(installed = old.installed.filterNot { it.id == id } + entry))
         entry
+    }
+
+    /** Refresh a bundled dictionary from the APK; enable it once on first sight (default on). */
+    fun installBuiltin(builtin: BuiltinCellDictionary, text: String) = synchronized(lock) {
+        val old = read()
+        val hash = digest(text.toByteArray())
+        val count = text.substringAfter("\n...\n").lineSequence().count { it.contains('\t') }
+        val entry = InstalledCellDictionary(builtin.id, builtin.name, builtin.category, count,
+            sourceUrl = builtin.sourceUrl, sha256 = hash)
+        writeAtomic(dictionaryFile(builtin.id), text)
+        val first = builtin.id !in old.seeded
+        if (old.installed.firstOrNull { it.id == builtin.id } == entry && !first) return@synchronized
+        save(old.copy(
+            installed = old.installed.filterNot { it.id == builtin.id } + entry,
+            selected = if (first) old.selected + builtin.id else old.selected,
+            applied = if (first) old.applied + builtin.id else old.applied,
+            seeded = old.seeded + builtin.id,
+        ))
     }
 
     fun select(id: String, enabled: Boolean) = synchronized(lock) {

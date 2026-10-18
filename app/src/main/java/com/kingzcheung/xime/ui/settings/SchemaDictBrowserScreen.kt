@@ -23,8 +23,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.kingzcheung.xime.ui.common.CompactDropdownMenu
+import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,21 +97,14 @@ fun SchemaDictBrowserPanel() {
                         )
                     }
                 }
-                DropdownMenu(
+                CompactDropdownMenu(
                     expanded = showSchemaMenu,
                     onDismissRequest = { showSchemaMenu = false },
-                    offset = DpOffset(0.dp, 4.dp),
-                    shape = RoundedCornerShape(12.dp)
+                    offset = DpOffset(0.dp, 4.dp)
                 ) {
                     for (s in uiState.availableSchemas) {
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(s.name, style = MaterialTheme.typography.bodyMedium)
-                                    Text(s.schemaId, style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            },
+                        CompactMenuRow(
+                            label = s.name, supportingText = s.schemaId, selected = s.schemaId == uiState.selectedSchema,
                             onClick = {
                                 showSchemaMenu = false
                                 viewModel.selectSchema(s.schemaId)

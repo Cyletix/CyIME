@@ -2,7 +2,6 @@ package com.kingzcheung.xime.ui.settings
 
 import android.content.Context
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,7 +34,6 @@ internal fun changeAppearance(context: Context, onChanged: () -> Unit, change: (
 @Composable
 internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
-    BackHandler(onBack = onBack)
     Scaffold(containerColor = MaterialTheme.colorScheme.surface, topBar = {
         TopAppBar(title = { Text("图标设置") }, navigationIcon = {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }

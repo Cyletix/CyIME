@@ -892,7 +892,7 @@ object SchemaManager {
         val available = getRimeDir(context).listFiles().orEmpty().filter { it.name.endsWith(".schema.yaml") }
             .map { it.name.removeSuffix(".schema.yaml") }.toSet()
         // Rime 始终需要一个底层方案支撑固定英文模式；依赖方案不成为独立入口。
-        val normalized = CyimeInputDefaults.canonicalIds(requestedIds, available)
+        val normalized = CyimeInputDefaults.withCompanions(CyimeInputDefaults.canonicalIds(requestedIds, available), available)
         val schemaIds = normalized.ifEmpty { fallbackNativeSchema(available) }
         val customFile = getCustomYamlFile(context)
         if (!customFile.exists()) {

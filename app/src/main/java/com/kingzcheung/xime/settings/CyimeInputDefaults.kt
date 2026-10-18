@@ -6,6 +6,18 @@ object CyimeInputDefaults {
     val legacyDefaults = setOf("wubi86", "wubi86_pinyin", "wubi86_trad", "wubi86_trad_pinyin")
     val dependencies = setOf("cyime_t9_english", "melt_eng", "radical_pinyin", "numbers", "handwriting")
 
+    /**
+     * 方案 × 布局的组合配置：所需的方案和布局都启用时自动启用，不作为独立条目单独开关。
+     * 例如启用了小鹤双拼和 14 键，就同时提供 14 键小鹤双拼。
+     */
+    val companions = mapOf("double_pinyin_flypy_14jian" to setOf("double_pinyin_flypy", "pinyin_14jian"))
+
+    fun withCompanions(ids: List<String>, available: Set<String>): List<String> {
+        val base = ids.filterNot { it in companions }
+        val implied = companions.filter { (id, needs) -> id in available && needs.all { it in base } }.keys
+        return base + implied
+    }
+
     fun canonicalIds(ids: List<String>, available: Set<String>): List<String> = ids.mapNotNull { id ->
         when {
             id in dependencies || id == InputModes.ENGLISH -> null

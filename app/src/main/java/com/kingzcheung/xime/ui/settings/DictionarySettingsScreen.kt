@@ -28,8 +28,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.kingzcheung.xime.ui.common.CompactDropdownMenu
+import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -104,15 +104,14 @@ fun DictionarySettingsContent(
                         Text(schema?.name ?: uiState.selectedSchema, style = MaterialTheme.typography.bodyMedium)
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    DropdownMenu(
+                    CompactDropdownMenu(
                         expanded = showSchemaMenu,
                         onDismissRequest = { showSchemaMenu = false },
-                        offset = DpOffset(0.dp, 4.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        offset = DpOffset(0.dp, 4.dp)
                     ) {
                         for (s in uiState.availableSchemas) {
-                            DropdownMenuItem(
-                                text = { Text(s.name) },
+                            CompactMenuRow(
+                                label = s.name, selected = s.schemaId == uiState.selectedSchema,
                                 onClick = { showSchemaMenu = false; viewModel.selectSchema(s.schemaId) }
                             )
                         }
@@ -147,10 +146,8 @@ fun DictionarySettingsContent(
                 Spacer(modifier = Modifier.width(8.dp))
                 TabButton("方案词库", selected = selectedDictTab == 2, onClick = { selectedDictTab = 2 }, modifier = Modifier.weight(1f))
             }
-            if (uiState.selectedSchema == "t9_pinyin") {
-                TextButton(onClick = { selectedDictTab = 3 }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Text("管理不再推荐的候选")
-                }
+            TextButton(onClick = { selectedDictTab = 3 }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text("恢复以前屏蔽的候选")
             }
             when (selectedDictTab) {
                 0 -> CustomPhraseTabContent(viewModel = customPhraseVM, uiState = customPhraseState)

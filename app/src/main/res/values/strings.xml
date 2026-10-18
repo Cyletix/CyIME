@@ -4,4 +4,6 @@
     <string name="subtype_label_pinyin">拼音</string>
     <string name="keyboard_name">CyIME</string>
     <string name="ime_service_label">CyIME</string>
+    <string name="call_caption_service_label">CyIME 通话字幕</string>
+    <string name="call_caption_service_description">打电话、微信语音或视频时，在屏幕底部自动显示对方说的话（字幕），挂断后自动消失。需要开免提或外放。声音只在本机识别，不录音、不上传，也不读取屏幕内容。</string>
 </resources>
