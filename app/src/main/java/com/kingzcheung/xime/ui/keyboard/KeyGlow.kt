@@ -167,11 +167,14 @@ internal fun DrawScope.drawKeyGlowSquare(color: Color, center: Offset, side: Flo
     }
 }
 
-/** 强调色两侧 ±40° 的五个色相，统一成柔和高亮（Screen 混合下不刺眼，也不压过强提示色）。 */
-internal fun themedGlowPalette(accent: Color): List<Color> {
+/**
+ * 强调色两侧 ±40° 的五个色相，统一成柔和高亮（Screen 混合下不刺眼，也不压过强提示色）。
+ * 强调色接近灰（iOS 渐变/玻璃、黑白主题）时没有色相可跟，返回 null 用原来的七彩光，不再退成白光。
+ */
+internal fun themedGlowPalette(accent: Color): List<Color>? {
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(accent.toArgb(), hsv)
-    if (hsv[1] < .15f) return listOf(Color(0xFFE6ECF5), Color(0xFFF2EEE6), Color(0xFFE9E9F2), Color(0xFFEEF3EE))
+    if (hsv[1] < .15f) return null
     val saturation = hsv[1].coerceIn(.35f, .55f)
     return listOf(0f, -20f, 20f, -40f, 40f).map { shift ->
         Color(android.graphics.Color.HSVToColor(floatArrayOf((hsv[0] + shift + 360f) % 360f, saturation, .96f)))
