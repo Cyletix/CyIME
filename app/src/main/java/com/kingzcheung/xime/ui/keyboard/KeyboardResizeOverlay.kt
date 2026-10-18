@@ -90,6 +90,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -623,6 +626,23 @@ internal fun KeyboardResizeOverlay(
                                         .clip(CircleShape)
                                         .background(accentColor)
                                         .testTag("keyboard-opacity-thumb"),
+                                )
+                            },
+                            // 轨道也自己画：Material 默认在滑块两侧挖的是方形缺口，这里挖成比滑块大一圈（每边 3dp）的圆形透明缺口，拖动时也保持圆形。
+                            track = { sliderState ->
+                                val fraction = sliderState.coercedValueAsFraction
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(16.dp)
+                                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                        .drawBehind {
+                                            val radius = size.height / 2f
+                                            drawRoundRect(onSurfaceColor.copy(alpha = 0.22f), cornerRadius = CornerRadius(radius))
+                                            val thumbX = fraction * size.width
+                                            if (thumbX > 0f) drawRoundRect(accentColor, size = Size(thumbX, size.height), cornerRadius = CornerRadius(radius))
+                                            drawCircle(Color.Transparent, radius = 12.dp.toPx(), center = Offset(thumbX, radius), blendMode = BlendMode.Clear)
+                                        },
                                 )
                             },
                             modifier = Modifier
