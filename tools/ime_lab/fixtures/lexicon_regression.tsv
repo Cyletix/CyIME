@@ -1110,3 +1110,6 @@ init4-gzry	26	gzry	工作人员	1	corpus-initials	2026-10-18	lnP -10.73, ahead b
 init4-cbdl	26	cbdl	差不多了	1	corpus-initials	2026-10-18	lnP -10.74, ahead by 8.67
 init4-wmzb	26	wmzb	我们这边	1	corpus-initials	2026-10-18	lnP -10.74, ahead by 4.89
 init4-kyss	26	kyss	可以说是	1	corpus-initials	2026-10-18	lnP -10.74, ahead by 6.44
+user-tonghua	26	tonghua	通话	1	user	2026-10-18	首选曾是“童话”；聊天里通话更常用
+user-tonghua-t9	9	866482	通话	1	user	2026-10-18	同上，九键
+user-tonghua-win	win26	tonghua	通话	1	user	2026-10-18	同上，电脑版
