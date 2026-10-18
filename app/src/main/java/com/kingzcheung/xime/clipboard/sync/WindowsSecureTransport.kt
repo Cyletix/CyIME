@@ -13,11 +13,40 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 import org.json.JSONObject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Trust is scoped to one exact leaf certificate, checked during the TLS handshake. */
-class WindowsSecureTransport(private val peer: () -> WindowsPeer?) : ClipboardSyncPlugin {
+class WindowsSecureTransport internal constructor(
+    private val exchange: (WindowsPeer, String, JSONObject?, Boolean, String?) -> Pair<Int, JSONObject?>,
+    private val peer: () -> WindowsPeer?,
+) : ClipboardSyncPlugin {
+    constructor(peer: () -> WindowsPeer?) : this(Companion::request, peer)
     private var acceptedHash: String? = null
     private var identity: String? = null
+    var sendAllowed: Boolean = true
+        private set
+    var receiveAllowed: Boolean = true
+        private set
+    private var permissionIdentity: String? = null
+    private fun permissions(p: WindowsPeer, body: JSONObject?) {
+        if (body?.optInt("v") != 2) return
+        permissionIdentity = p.id + p.fingerprint + p.token
+        // Server directions are relative to the computer.
+        sendAllowed = body.optBoolean("receive_enabled", true)
+        receiveAllowed = body.optBoolean("send_enabled", true)
+    }
+    class SyncPaused : IllegalStateException("电脑已暂停此方向的剪贴板同步")
+    class TransferFailure(val status: Int) : IllegalStateException(when (status) {
+        401 -> "电脑已撤销配对，请重新连接"
+        403 -> "电脑已暂停此方向的剪贴板同步"
+        409 -> "电脑刚复制了新内容，稍后重试"
+        413 -> "文字过长，最多同步 64 KiB"
+        400, 415 -> "两端剪贴板格式不匹配，请更新 CyIME"
+        503 -> "电脑剪贴板正被占用，稍后重试"
+        else -> "电脑暂时无法同步（$status）"
+    })
     override fun onLoad(context: PluginContext) {}
     override fun onUnload() { acceptedHash = null }
     companion object {
@@ -33,7 +62,7 @@ class WindowsSecureTransport(private val peer: () -> WindowsPeer?) : ClipboardSy
                 }
             }
             val tls = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
-            val client = OkHttpClient.Builder().sslSocketFactory(tls.socketFactory, trust)
+            val client = OkHttpClient.Builder().proxy(java.net.Proxy.NO_PROXY).sslSocketFactory(tls.socketFactory, trust)
                 .hostnameVerifier { _, session ->
                     runCatching { ClipboardProfile.sha256Hex(session.peerCertificates[0].encoded) == pin }.getOrDefault(false)
                 }.followRedirects(false).followSslRedirects(false)
@@ -62,14 +91,19 @@ class WindowsSecureTransport(private val peer: () -> WindowsPeer?) : ClipboardSy
     private fun current(): WindowsPeer = requireNotNull(peer()) { "请先连接电脑" }.also {
         val key = it.id + it.fingerprint + it.token
         if (identity != key) { identity = key; acceptedHash = null }
+        if (permissionIdentity != key) { permissionIdentity = key; sendAllowed = true; receiveAllowed = true }
     }
     override suspend fun pull(): ClipboardProfile? {
         val p = current()
-        val (status, json) = request(p, "/api/clipboard", token = true, etag = acceptedHash)
+        val etag = acceptedHash
+        val (status, json) = withContext(Dispatchers.IO) {
+            exchange(p, "/api/clipboard", null, true, etag)
+        }
         check(peer() == p) { "连接已更改" }
+        if (status == 403 && json?.optBoolean("sync_paused") == true) { permissions(p, json); return null }
         if (status == 204) { acceptedHash = null; return null }
         if (status == 304) return null
-        check(status == 200) { "电脑同步失败（$status），401 表示配对已撤销" }
+        if (status != 200) throw TransferFailure(status)
         return WindowsPairingProtocol.profile(requireNotNull(json))
     }
     override suspend fun acknowledgePull(hash: String) { acceptedHash = hash }
@@ -78,10 +112,29 @@ class WindowsSecureTransport(private val peer: () -> WindowsPeer?) : ClipboardSy
         val json = JSONObject().put("type", "text").put("text", profile.text).put("hash", profile.hash)
             .put("size", profile.size).put("has_data", false).put("data_name", JSONObject.NULL).put("source", "CyIME-Android")
         WindowsPairingProtocol.profile(json)
-        val (status, response) = request(p, "/api/clipboard", json, token = true)
-        check(peer() == p && status == 200 && WindowsPairingProtocol.profile(requireNotNull(response)).hash == profile.hash)
+        val (status, response) = withContext(Dispatchers.IO) {
+            exchange(p, "/api/clipboard", json, true, null)
+        }
+        if (peer() == p && status == 403 && response?.optBoolean("sync_paused") == true) {
+            permissions(p, response); throw SyncPaused()
+        }
+        check(peer() == p) { "连接已更改" }
+        if (status != 200) throw TransferFailure(status)
+        check(WindowsPairingProtocol.profile(requireNotNull(response)).hash == profile.hash) { "电脑未确认收到相同文字" }
         acceptedHash = profile.hash
         return true
     }
-    override suspend fun testConnection(): String? = try { pull(); null } catch (e: Exception) { e.message ?: "无法连接电脑" }
+    override suspend fun testConnection(): String? = try {
+        val p = requireNotNull(peer()) { "请先连接电脑" }
+        val (status, body) = withContext(Dispatchers.IO) { exchange(p, "/api/status", null, true, null) }
+        check(peer() == p) { "连接已更改" }
+        check(status == 200 && body?.optInt("v") == 2) {
+            if (status == 404) "电脑端需要更新，当前版本没有连接状态接口"
+            else if (status == 401) "电脑已撤销配对，请重新连接"
+            else "电脑暂时无法连接（$status）"
+        }
+        permissions(p, body)
+        null
+    } catch (e: CancellationException) { throw e }
+    catch (e: Exception) { e.message ?: "无法连接电脑" }
 }

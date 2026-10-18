@@ -22,22 +22,42 @@ class ClipboardSyncSession(
     private val now: () -> Long,
     private val reportFailure: (Exception) -> Unit = {},
     private val maxTextBytes: Int = Int.MAX_VALUE,
+    private val allowPush: () -> Boolean = { true },
+    private val reportSuccess: () -> Unit = {},
 ) {
     private var pending: SyncClipboardSnapshot? = null
     private var lastObserved: SyncClipboardSnapshot? = null
     private var selfWritten: SyncClipboardSnapshot? = null
     private var generation = 0L
     private var active = true
-    private var retryDelay = 5_000L
+    // Push and pull share one backoff: an offline peer doubles the wait up to a day, not every few seconds.
+    private var retryDelay = FIRST_RETRY_MS
     private var retryAt = 0L
     private var pumping = false
     val hasPendingPush: Boolean get() = pending != null
+    /** Milliseconds until automatic network attempts resume; zero when not backing off. */
+    val retryInMs: Long get() = (retryAt - now()).coerceAtLeast(0L)
+
+    /** An explicit user refresh tries once now; a further failure keeps growing the backoff. */
+    fun retryNow() { retryAt = 0L }
+
+    private fun failed(error: Exception) {
+        retryAt = now() + retryDelay
+        retryDelay = (retryDelay * 2).coerceAtMost(MAX_RETRY_MS)
+        reportFailure(error)
+    }
+
+    private fun succeeded() {
+        retryAt = 0L; retryDelay = FIRST_RETRY_MS
+        reportSuccess()
+    }
 
     fun localChanged(snapshot: SyncClipboardSnapshot) {
         if (!active) return
         if (snapshot == lastObserved) return
         lastObserved = snapshot
         generation++
+        if (!allowPush()) { pending = null; return }
         if (snapshot.sensitive || snapshot.text.isNullOrBlank()) { pending = null; return }
         if (snapshot == selfWritten) { pending = null; return }
         selfWritten = null
@@ -52,6 +72,8 @@ class ClipboardSyncSession(
         pumping = true
         try {
             if (!active) return
+            // A receive-only connection must not get stuck retrying a forbidden upload.
+            if (!allowPush()) pending = null
             val copy = pending
             if (copy != null) {
                 if (clipboard.read() != copy) { pending = null }
@@ -68,22 +90,20 @@ class ClipboardSyncSession(
                         currentCoroutineContext().ensureActive()
                         if (!active) return
                         if (pending == copy) pending = null
-                        retryAt = 0; retryDelay = 5_000L
+                        succeeded()
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) {
-                        retryAt = now() + retryDelay
-                        retryDelay = (retryDelay * 2).coerceAtMost(30_000L)
-                        reportFailure(error)
+                        failed(error)
                         return
                     }
                 }
             }
-            if (pending != null || !shouldPull() || !active) return
+            if (pending != null || !shouldPull() || !active || now() < retryAt) return
             val before = clipboard.read()
             if (before.sensitive) return
             val requestGeneration = generation
             try {
-                val remote = plugin.pull() ?: return
+                val remote = plugin.pull() ?: run { succeeded(); return }
                 currentCoroutineContext().ensureActive()
                 if (!active || !shouldPull() || generation != requestGeneration || clipboard.read() != before) return
                 val bytes = remote.text.toByteArray(Charsets.UTF_8)
@@ -99,8 +119,12 @@ class ClipboardSyncSession(
                     if (pending == selfWritten) pending = null // Also tolerate synchronous host notifications.
                 }
                 plugin.acknowledgePull(remote.hash)
+                succeeded()
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { reportFailure(error) }
+            catch (error: Exception) { failed(error) }
         } finally { pumping = false }
     }
 }
+
+private const val FIRST_RETRY_MS = 5_000L
+private const val MAX_RETRY_MS = 24 * 60 * 60 * 1_000L
