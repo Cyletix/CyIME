@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -1852,8 +1853,10 @@ fun KeyboardView(
         val splitPitchDp = rememberCalibratedKeyPitchDp()
         val splitGapSetting = splitGapPreview.value
             ?: if (splitLandscape) inputPreferences.splitGapLandscape else inputPreferences.splitGapPortrait
+        // 只订阅预览矩形的宽度：纯移动时位置变、宽度不变，不让整个 KeyboardView 重算。
+        val resizePreviewWidthPx by remember(sessionKey) { derivedStateOf { resizePreviewRect.value.width } }
         val splitGapFraction = SplitKeyboardGeometry.resolvedGap(splitGapSetting,
-            resizePreviewRect.value.width / resizeControlDensity.density,
+            resizePreviewWidthPx / resizeControlDensity.density,
             SplitKeyboardGeometry.gutterDp(state.isFloatingMode), splitPitchDp)
         KeyboardResizeControlsHost(
             previewRect = resizePreviewRect,

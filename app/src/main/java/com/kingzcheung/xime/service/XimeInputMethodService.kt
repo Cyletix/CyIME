@@ -612,6 +612,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val fixedWidth = SettingsPreferences.getFixedWidthDp(this, isLandscape)
         val fixedOffset = SettingsPreferences.getFixedOffsetX(this, isLandscape)
         KeyboardHeightProfiles.migrateLegacy(this, isLandscape, effectiveH)
+        // 新版第一次启动时只做一次：横屏固定高度比 45% 档高的改回 45% 档（1.14.27 把它抬高过）。
+        KeyboardHeightProfiles.capLandscapeFixedHeightOnce(this,
+            minOf(resources.configuration.screenWidthDp, resources.configuration.screenHeightDp))
         val kbH = KeyboardHeightProfiles.selected(this, isFloatingMode, isLandscape, effectiveH)
         val minY = if (isFloatingMode) maxOf(
             tryGetVisibleNavBarHeightDp(this, window.window),
@@ -3549,24 +3552,30 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     keyboardContainer.width else decor.width
                 val hostHeight = if (::keyboardContainer.isInitialized && keyboardContainer.height > 0)
                     keyboardContainer.height else decor.height
-                val minimumBottom = maxOf(
-                    tryGetVisibleNavBarHeightDp(this@XimeInputMethodService, window.window) * density,
-                    bottomInsetPxState.value.toFloat(),
-                )
-                val fallbackSize = resolveKeyboardSize((hostWidth / density).roundToInt(),
-                    (hostHeight / density).roundToInt(), kotlin.math.ceil(minimumBottom / density).toInt(), state)
-                val fallback = com.kingzcheung.xime.ui.keyboard.floatingCardRect(
-                    hostWidth.toFloat(), hostHeight.toFloat(), fallbackSize.width * density,
-                    (if (currentFloatingCardHeightDp > 0) currentEffectiveKeyboardHeight
-                        else fallbackSize.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density,
-                    state.floatingOffsetX * density, state.floatingOffsetY * density, minimumBottom,
-                )
-                floatingCardBounds?.let { touchableRegion.set(it) } ?: touchableRegion.set(
-                    hostLocation[0] + fallback.left.roundToInt(),
-                    hostLocation[1] + fallback.top.roundToInt(),
-                    hostLocation[0] + fallback.right.roundToInt(),
-                    hostLocation[1] + fallback.bottom.roundToInt(),
-                )
+                // 卡片已测量到就直接用它；只有还没测到时才去算一次兜底尺寸（resolveKeyboardSize 不便宜）。
+                val measuredCard = floatingCardBounds
+                if (measuredCard != null) {
+                    touchableRegion.set(measuredCard)
+                } else {
+                    val minimumBottom = maxOf(
+                        tryGetVisibleNavBarHeightDp(this@XimeInputMethodService, window.window) * density,
+                        bottomInsetPxState.value.toFloat(),
+                    )
+                    val fallbackSize = resolveKeyboardSize((hostWidth / density).roundToInt(),
+                        (hostHeight / density).roundToInt(), kotlin.math.ceil(minimumBottom / density).toInt(), state)
+                    val fallback = com.kingzcheung.xime.ui.keyboard.floatingCardRect(
+                        hostWidth.toFloat(), hostHeight.toFloat(), fallbackSize.width * density,
+                        (if (currentFloatingCardHeightDp > 0) currentEffectiveKeyboardHeight
+                            else fallbackSize.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density,
+                        state.floatingOffsetX * density, state.floatingOffsetY * density, minimumBottom,
+                    )
+                    touchableRegion.set(
+                        hostLocation[0] + fallback.left.roundToInt(),
+                        hostLocation[1] + fallback.top.roundToInt(),
+                        hostLocation[0] + fallback.right.roundToInt(),
+                        hostLocation[1] + fallback.bottom.roundToInt(),
+                    )
+                }
                 floatingCardBounds?.let { card -> splitKeyboardGap.hole(card.bottom.toFloat()) }?.let {
                     touchableRegion.op(it.left.roundToInt(), it.top.roundToInt(),
                         it.right.roundToInt(), it.bottom.roundToInt(), android.graphics.Region.Op.DIFFERENCE)
