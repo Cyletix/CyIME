@@ -226,10 +226,14 @@ internal fun HapticModeIllustration(mode: String) {
         "disabled" -> "▮" to "不振动"
         else -> "⚙ → ▮" to "按系统触感设置"
     }
-    Text(mark, fontSize = 20.sp, color = if (mode == "disabled") muted else primary)
+    // 行高写明，不继承正文 24sp 行高；卡片高度按同样的行高算（见 [HAPTIC_CARD_TEXT_HEIGHT]）。
+    Text(mark, fontSize = 20.sp, lineHeight = 24.sp, color = if (mode == "disabled") muted else primary)
     Spacer(Modifier.height(4.dp))
-    Text(caption, fontSize = 12.sp, color = if (mode == "disabled") muted else primary, maxLines = 1)
+    Text(caption, fontSize = 12.sp, lineHeight = 16.sp, color = if (mode == "disabled") muted else primary, maxLines = 1)
 }
+
+/** [HapticModeIllustration] 两行文字的行高之和，随系统字号缩放。 */
+internal val HAPTIC_CARD_TEXT_HEIGHT = 40.sp
 
 /** 三行字母错位示意：按真实单位画出 10/9/7 键，突出 s 与 z 看是否对齐。 */
 @Composable

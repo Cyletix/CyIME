@@ -201,7 +201,8 @@ private fun ThemeSettingsPage(
             
             item {
                 Text(
-                    text = "柔和蓝在各设备使用相同配色。点击可预览。",
+                    text = "${(uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
+                        ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme)).name}在各设备使用相同配色。点击可预览。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)

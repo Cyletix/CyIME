@@ -195,8 +195,11 @@ fun SettingsMainContent(
                     var isFocused by remember { mutableStateOf(false) }
                     val editorVisibility = remember { BringIntoViewRequester() }
                     var editorSize by remember { mutableStateOf(IntSize.Zero) }
-                    LaunchedEffect(isFocused, imeBottomPx, editorSize) {
+                    // 清空（长按删除）会收起「清除」行、文字框变矮，列表随之回缩；等这一帧布局完成后
+                    // 再把试打框连同键盘高度一起请求进视野，试打框始终露在键盘上方。
+                    LaunchedEffect(isFocused, imeBottomPx, editorSize, testText.isEmpty()) {
                         if (isFocused && imeBottomPx > 0 && editorSize.height > 0) {
+                            androidx.compose.runtime.withFrameNanos { }
                             editorVisibility.bringIntoView(Rect(0f, 0f, editorSize.width.toFloat(),
                                 editorSize.height + imeBottomPx.toFloat()))
                         }

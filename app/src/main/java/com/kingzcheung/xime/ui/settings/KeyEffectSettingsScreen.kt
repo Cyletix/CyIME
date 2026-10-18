@@ -150,8 +150,12 @@ fun KeyEffectSettingsContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        // 卡片高度按字号算：图示两行文字 + 间距 + 卡片内外边距 + 下方标题，大字体下也不裁字。
+                        val hapticRowHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+                            HAPTIC_CARD_TEXT_HEIGHT.toDp() + MaterialTheme.typography.bodyMedium.lineHeight.toDp()
+                        } + 4.dp + 32.dp + 6.dp + 4.dp
                         Row(
-                            modifier = Modifier.fillMaxWidth().height(104.dp),
+                            modifier = Modifier.fillMaxWidth().height(maxOf(104.dp, hapticRowHeight)),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             listOf(
