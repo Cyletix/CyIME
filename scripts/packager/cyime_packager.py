@@ -36,6 +36,22 @@ _spec.loader.exec_module(ad)
 DeliveryError = ad.DeliveryError
 CONFIG_PATH = HERE / "config.json"
 T9_TARGET = "app/src/main/assets/rime_chinese/t9_ngram.lm"
+# The bundled-model (full) edition is the elder package; docs/development/elder-pack-spec.md is its checklist.
+ELDER_MODELS = {"ochwpro", "paraformer-zh-en-int8", "predictive-text-base", "predictive-text-small",
+                "sensevoice-multilingual-int8"}
+ELDER_T9_SHA256 = "11cee2cbd87f42cb"  # prefix of the public v3 model t9_ngram-model-v3-ls-tri.c3.lm
+ELDER_FORBIDDEN = re.compile(r"^assets/.*(rime_japanese/|jaroomaji|japanese|zipformer|_ja[-_./]|kana)", re.I)
+
+
+def elder_violations(names: list[str], t9_sha256: str | None) -> list[str]:
+    """What in an elder APK breaks the spec: Japanese assets, models outside the fixed set, a non-public T9 model."""
+    problems = sorted({n for n in names if ELDER_FORBIDDEN.search(n)})[:10]
+    models = {n.split("/")[2] for n in names if n.startswith("assets/bundled-models/") and n.count("/") >= 3}
+    if models != ELDER_MODELS:
+        problems.append(f"内置模型应为 {sorted(ELDER_MODELS)}，实际 {sorted(models)}")
+    if not (t9_sha256 or "").startswith(ELDER_T9_SHA256):
+        problems.append("九键模型不是公开 v3 模型（老人包不能带个人模型）")
+    return problems
 DICT_DIR = "app/src/main/assets/cell_dictionaries"
 PRIVATE_DIRS = (".codex-artifacts", ".git")
 ASSET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -463,6 +479,13 @@ class Packager(ad.Delivery):
             raise DeliveryError("安装包里的包名/版本和源码不一致。")
         if self.kind == "release" and "application-debuggable" in badging:
             raise DeliveryError("正式版不应是可调试包。")
+        if self.edition == "full":
+            import zipfile
+            with zipfile.ZipFile(path) as apk:
+                problems = elder_violations(apk.namelist(), self.staging.sha256 if self.model else None)
+            if problems:
+                raise DeliveryError("老人包不符合 docs/development/elder-pack-spec.md：" + "；".join(problems))
+            say("[VERIFY] 老人包检查通过：无日语资源，内置模型齐全，九键为公开 v3 模型。")
 
     def push_banks(self) -> str:
         """Copy the external handwriting-training banks to this device. Never fails the install:

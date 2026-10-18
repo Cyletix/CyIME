@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.model
 
 import android.content.Context
+import com.kingzcheung.xime.keyboard.ToolbarButton
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilities
 import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
 import com.kingzcheung.xime.runtime.adaptation.DeviceKeyEffectDefaults
@@ -49,15 +50,28 @@ object DeviceDefaults {
     }
 
     /**
-     * The bundled-model edition is the elder package: on a fresh install the toolbar also carries
-     * 字幕 and 拍照识别, and the separate 字幕 home-screen icon is on. Existing settings are never changed.
+     * The bundled-model edition is the elder package (docs/development/elder-pack-spec.md). Fresh
+     * installs only; existing settings are never changed:
+     * - 九键拼音 as the keyboard, with 手写 one tap away on the toolbar;
+     * - toolbar 语音、手写、字幕、拍照识别、表情、剪贴板、输入方式 (no cursor editing tools);
+     * - the separate 字幕 home-screen icon on;
+     * - larger candidates (24 sp) and a taller keyboard (40 % of the long screen side);
+     * - the high-contrast 黑白 theme, which is already the default.
      */
     private fun applyElderDefaults(context: Context) {
-        val toolbar = SettingsPreferences.getToolbarButtons(context) +
-            listOf(com.kingzcheung.xime.keyboard.ToolbarButton.CAPTION.id, com.kingzcheung.xime.keyboard.ToolbarButton.OCR.id)
-        SettingsPreferences.setToolbarButtons(context, toolbar)
+        SettingsPreferences.setToolbarButtons(context,
+            listOf(ToolbarButton.VOICE, ToolbarButton.HANDWRITING_LOOKUP, ToolbarButton.CAPTION, ToolbarButton.OCR,
+                ToolbarButton.EMOJI, ToolbarButton.CLIPBOARD, ToolbarButton.SCHEMA).map { it.id })
+        SettingsPreferences.setCurrentSchema(context, "t9_pinyin")
+        SettingsPreferences.setCandidateTextSize(context, ELDER_CANDIDATE_SP)
+        val config = context.resources.configuration
+        SettingsPreferences.setKeyboardHeightDp(context, maxOf(config.screenWidthDp, config.screenHeightDp) * ELDER_HEIGHT_PERCENT / 100)
+        SettingsPreferences.setKeyboardTheme(context, com.kingzcheung.xime.ui.theme.PureBlackTheme.ID)
         runCatching { com.kingzcheung.xime.ui.caption.CaptionLauncherIcon.setEnabled(context, true) }
     }
+
+    private const val ELDER_CANDIDATE_SP = 24
+    private const val ELDER_HEIGHT_PERCENT = 40
 
     fun predictionModel(context: Context): String = SettingsPreferences.getPrefsPublic(context)
         .getString(PREDICTION, DeviceModelProfiles.BASE) ?: DeviceModelProfiles.BASE
