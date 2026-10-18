@@ -22,8 +22,33 @@ fun DrawScope.renderStrokes(
     val width = 3.5.dp.toPx()
     // 手写笔的笔画用 S Pen 蓝色，手指书写保持主题墨色。
     fun inkOf(stroke: List<StrokePoint>) = if (stroke.firstOrNull()?.pen == true) penColor else color
-    strokes.forEach { drawPenStroke(it, inkOf(it), width, transparentPaper) }
-    drawPenStroke(currentStroke, inkOf(currentStroke), width, transparentPaper)
+    fun draw(stroke: List<StrokePoint>) =
+        if (stroke.firstOrNull()?.pen == true) drawSPenStroke(stroke, penColor, transparentPaper)
+        else drawPenStroke(stroke, inkOf(stroke), width, transparentPaper)
+    strokes.forEach(::draw)
+    draw(currentStroke)
+}
+
+/** 压感宽度：轻触细、重压粗，与三星键盘的 S Pen 笔迹一致。 */
+internal fun sPenWidthFactor(pressure: Float): Float = .45f + .85f * pressure.coerceIn(0f, 1f)
+
+/** S Pen 笔迹：实心不透明，按压感逐段变粗细，不加渐变、外沿或内高光。 */
+private fun DrawScope.drawSPenStroke(points: List<StrokePoint>, color: Color, transparentPaper: Boolean) {
+    if (points.isEmpty()) return
+    val base = 2.8.dp.toPx()
+    val solid = color.copy(alpha = 1f)
+    if (points.size == 1) {
+        drawCircle(solid, radius = base * sPenWidthFactor(points[0].pressure) / 2, center = Offset(points[0].x, points[0].y))
+        return
+    }
+    val separation = if (solid.luminance() > .35f) Color.Black else Color.White
+    for (pass in if (transparentPaper) 0..1 else 1..1) for (i in 1 until points.size) {
+        val a = points[i - 1]
+        val b = points[i]
+        val w = base * sPenWidthFactor((a.pressure + b.pressure) / 2)
+        drawLine(if (pass == 0) separation.copy(alpha = .55f) else solid, Offset(a.x, a.y), Offset(b.x, b.y),
+            strokeWidth = if (pass == 0) w + 1.dp.toPx() else w, cap = StrokeCap.Round)
+    }
 }
 
 private fun DrawScope.drawPenStroke(points: List<StrokePoint>, color: Color, width: Float, transparentPaper: Boolean) {
