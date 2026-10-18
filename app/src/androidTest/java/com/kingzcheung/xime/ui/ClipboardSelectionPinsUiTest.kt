@@ -115,14 +115,13 @@ class ClipboardSelectionPinsUiTest {
         }
     }
 
-    @Test fun selectAllRevealsFoldedRecentCopiesAndCanBeClearedWithoutDeleting() {
-        show(pinnedAndRecent(pinCount = 8, recentCount = 10))
-        rule.onNodeWithTag("clipboard-card:text:1009").assertDoesNotExist()
-        selectByLongPress(1000)
+    @Test fun selectAllRevealsCollapsedPinsAndCanBeClearedWithoutDeleting() {
+        show(pinnedAndRecent(pinCount = 8))
+        selectByLongPress(1)
         rule.onNodeWithTag("clipboard-select-all").performClick()
-        rule.onNodeWithText("已选 18").assertExists()
-        rule.onNodeWithTag("clipboard-records").performScrollToNode(hasTestTag("clipboard-card:text:1009"))
-        rule.onNodeWithTag("clipboard-card:text:1009").assertIsDisplayed().assertIsSelected()
+        rule.onNodeWithText("已选 9").assertExists()
+        rule.onNodeWithTag("clipboard-records").performScrollToNode(hasTestTag("clipboard-card:text:8"))
+        rule.onNodeWithTag("clipboard-card:text:8").assertIsDisplayed().assertIsSelected()
         rule.onNodeWithTag("clipboard-select-all").performClick()
         rule.onNodeWithText("已选 0").assertExists()
         rule.onNodeWithTag("clipboard-pin").assertIsNotEnabled()
@@ -147,15 +146,15 @@ class ClipboardSelectionPinsUiTest {
         }
     }
 
-    @Test fun phoneWidthFoldsExtraRecentCopiesAbovePins() = assertCollapsedLayout(360, 320)
+    @Test fun phoneWidthKeepsRecentCopyVisibleBelowOnePinnedRow() = assertCollapsedLayout(360, 320)
 
-    @Test fun narrowShortPanelFoldsExtraRecentCopiesAbovePins() = assertCollapsedLayout(240, 180)
+    @Test fun narrowShortPanelKeepsRecentCopyVisibleBelowOnePinnedRow() = assertCollapsedLayout(240, 180)
 
-    @Test fun tabletWidthFoldsExtraRecentCopiesAbovePins() = assertCollapsedLayout(1000, 320, dark = true)
+    @Test fun tabletWidthKeepsRecentCopyVisibleBelowOnePinnedRow() = assertCollapsedLayout(1000, 320, dark = true)
 
     @Test fun narrowPanelWithLargeFontsKeepsAllSelectionControlsAndCountInsideTheRow() {
         show(pinnedAndRecent(pinCount = 3), width = 240, height = 180, fontScale = 2f)
-        selectByLongPress(1000)
+        selectByLongPress(1)
         val controls = rule.onNodeWithTag("clipboard-controls").fetchSemanticsNode().boundsInRoot
         val board = rule.onNodeWithTag("clipboard-board").fetchSemanticsNode().boundsInRoot
         val tags = listOf("clipboard-exit-selection", "clipboard-select-all", "clipboard-pin", "clipboard-delete")
@@ -177,48 +176,44 @@ class ClipboardSelectionPinsUiTest {
         rule.onNodeWithTag("clipboard-exit-selection").performClick()
         val after = rule.onNodeWithTag("clipboard-card:text:1").fetchSemanticsNode().boundsInRoot.height
         val region = rule.onNodeWithTag("clipboard-records-region").fetchSemanticsNode().boundsInRoot
-        assertEquals("Selection state must not resize a pinned preview", before, after, 1f)
+        assertEquals("Selection state must not expand a single-row fixed area", before, after, 1f)
         assertTrue(after <= region.height * .35f + 1f)
         rule.onNodeWithTag("clipboard-card:text:1000").assertIsDisplayed()
-        rule.onNodeWithTag("clipboard-recent-toggle").assertDoesNotExist()
+        rule.onNodeWithTag("clipboard-pins-toggle").assertDoesNotExist()
     }
 
     private fun assertCollapsedLayout(width: Int, height: Int, dark: Boolean = false) {
-        show(pinnedAndRecent(pinCount = 3, recentCount = 40), width = width, height = height, dark = dark)
-        val shown = clipboardColumnCount(width.toFloat()) * ClipboardRecentRows
+        show(pinnedAndRecent(pinCount = 100), width = width, height = height, dark = dark)
+        val columns = clipboardColumnCount(width.toFloat())
         val region = rule.onNodeWithTag("clipboard-records-region").fetchSemanticsNode().boundsInRoot
+        val first = rule.onNodeWithTag("clipboard-card:text:1").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val last = rule.onNodeWithTag("clipboard-card:text:$columns").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val recent = rule.onNodeWithTag("clipboard-card:text:1000").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertTrue("Recent copy leads the board", recent.top - region.top < 12f)
-        rule.onNodeWithTag("clipboard-card:text:${1000 + shown}").assertDoesNotExist()
-        rule.onNodeWithText(if (width >= 360) "更多 ${40 - shown} 条" else "+${40 - shown}", useUnmergedTree = true).assertIsDisplayed()
-        rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
-        val divider = rule.onNodeWithTag("clipboard-pins-divider").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        rule.onNodeWithTag("clipboard-records").performScrollToKey("text:1")
-        val pin = rule.onNodeWithTag("clipboard-card:text:1").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertTrue("Pins follow the divider", pin.top >= divider.top)
-        rule.onNodeWithTag("clipboard-records").performScrollToKey("text:3")
-        rule.onNodeWithTag("clipboard-card:text:3").assertIsDisplayed()
+        assertEquals("Collapsed pins must occupy one row", first.top, last.top, 1f)
+        assertTrue("Recent item must start after the pinned row", recent.top >= first.bottom)
+        assertTrue("Recent copy must remain in the viewport", recent.top < region.bottom)
+        assertTrue("Pinned preview must be bounded", first.height <= region.height * .4f)
+        rule.onNodeWithTag("clipboard-card:text:${columns + 1}").assertDoesNotExist()
+        rule.onNodeWithTag("clipboard-pins-toggle").assertIsDisplayed()
     }
 
-    @Test fun collapsingRecentRemovesHiddenRecordsFromKeyboardNavigation() {
-        show(pinnedAndRecent(pinCount = 2, recentCount = 10), keyboardActive = true)
-        rule.onNodeWithTag("clipboard-card:text:1009").assertDoesNotExist()
-        rule.onNodeWithTag("clipboard-recent-toggle").performClick()
+    @Test fun collapsingPinsRemovesHiddenRecordsFromKeyboardNavigation() {
+        show(pinnedAndRecent(pinCount = 8), keyboardActive = true)
+        rule.onNodeWithTag("clipboard-pins-toggle").performClick()
+        rule.runOnIdle { keyboard.dispatch(ClipboardNavigation.DOWN) }
         rule.waitForIdle()
-        rule.onNodeWithTag("clipboard-older-divider").assertIsDisplayed()
-        rule.onNodeWithTag("clipboard-records").performScrollToKey("text:1009")
-        rule.onNodeWithTag("clipboard-card:text:1009").assertIsDisplayed()
-        // The toggle stays in the toolbar: collapsing needs no scrolling back from the oldest copy.
-        rule.onNodeWithTag("clipboard-recent-toggle").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("clipboard-card:text:3").assertIsFocused()
+        rule.onNodeWithTag("clipboard-pins-toggle").performClick()
         rule.waitForIdle()
-        rule.onNodeWithTag("clipboard-card:text:1009").assertDoesNotExist()
-        rule.onNodeWithTag("clipboard-records").performScrollToIndex(0)
+        rule.onNodeWithTag("clipboard-card:text:3").assertDoesNotExist()
+        rule.runOnIdle { keyboard.dispatch(ClipboardNavigation.DOWN) }
+        rule.waitForIdle()
         rule.onNodeWithTag("clipboard-card:text:1000").assertIsFocused()
         rule.runOnIdle { keyboard.dispatch(ClipboardNavigation.CONFIRM) }
         rule.runOnIdle { assertEquals("刚复制的内容", pasted) }
     }
 
-    private fun pinnedAndRecent(pinCount: Int, recentCount: Int = 1): List<ClipboardItem> =
+    private fun pinnedAndRecent(pinCount: Int): List<ClipboardItem> =
         List(pinCount) { index ->
             ClipboardItem(
                 (index + 1).toLong(),
@@ -226,8 +221,5 @@ class ClipboardSelectionPinsUiTest {
                 timestamp = (pinCount - index).toLong(),
                 isPinned = true,
             )
-        } + List(recentCount) { index ->
-            ClipboardItem(1000L + index, if (index == 0) "刚复制的内容" else "最近复制 $index",
-                timestamp = 10_000L - index)
-        }
+        } + ClipboardItem(1000, "刚复制的内容", timestamp = 1000)
 }
