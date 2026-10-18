@@ -32,13 +32,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** 多余的最近记录折叠，分隔线“🔒 已固定 … 更多 N 条 ⌄”后紧跟固定内容，点线展开/收起最近记录。深浅色、玻璃开关都截图。 */
+/** 折叠的固定内容：分隔线上有带箭头的“还有 N 条固定”，点线即可展开/收起。深浅色、玻璃开关都截图。 */
 class ClipboardPinsFoldArrowTest {
     @get:Rule val rule = createComposeRule()
 
     @Test fun dividerArrowExpandsAndCollapsesPins() {
-        val records = (1L..3L).map { ClipboardItem(it, "固定记录 $it", timestamp = 20 - it) }
-        val history = records + (11L..20L).map { ClipboardItem(it, "最近复制 $it", timestamp = 100 - it) }
+        val records = (1L..10L).map { ClipboardItem(it, "固定记录 $it", timestamp = 20 - it) }
+        val history = records + ClipboardItem(11L, "最近复制", timestamp = 1)
         var dark by mutableStateOf(true)
         var glass by mutableStateOf(false)
         rule.setContent {
@@ -64,21 +64,17 @@ class ClipboardPinsFoldArrowTest {
             rule.runOnIdle { dark = d; glass = g }
             rule.waitForIdle()
             val name = "${if (d) "dark" else "light"}-${if (g) "glass" else "plain"}"
-            rule.onNodeWithText("更多 8 条", useUnmergedTree = true).assertIsDisplayed()
-            rule.onNodeWithTag("clipboard-card:text:11").assertIsDisplayed()
-            rule.onNodeWithTag("clipboard-card:text:13").assertDoesNotExist()
-            rule.onNodeWithTag("clipboard-card:text:1").assertIsDisplayed()
+            rule.onNodeWithText("还有", substring = true, useUnmergedTree = true).assertIsDisplayed()
+            rule.onNodeWithTag("clipboard-card:text:10").assertDoesNotExist()
             save("$name-collapsed")
-            rule.onNodeWithTag("clipboard-recent-toggle").performClick()
+            rule.onNodeWithTag("clipboard-pins-divider").performClick()
             rule.waitForIdle()
-            rule.onNodeWithText("收起", useUnmergedTree = true).assertExists()
-            rule.onNodeWithTag("clipboard-records").performScrollToKey("text:20")
-            save("$name-expanded")
+            rule.onNodeWithText("收起固定", useUnmergedTree = true).assertExists()
             rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
-            rule.onNodeWithTag("clipboard-recent-toggle").performClick()
+            save("$name-expanded")
+            rule.onNodeWithTag("clipboard-pins-divider").performClick()
             rule.waitForIdle()
-            rule.onNodeWithTag("clipboard-card:text:13").assertDoesNotExist()
-            rule.onNodeWithTag("clipboard-records").performScrollToIndex(0)
+            rule.onNodeWithTag("clipboard-card:text:10").assertDoesNotExist()
         }
     }
 

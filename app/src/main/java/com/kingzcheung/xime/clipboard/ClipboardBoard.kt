@@ -68,40 +68,25 @@ internal fun clipboardColumnCount(widthDp: Float): Int = (widthDp / 160f).toInt(
 internal const val ClipboardThumbnailAspectRatio = .8f
 
 internal data class ClipboardBoardContent(
-    /** The newest copies, shown above the pins. */
-    val recent: List<ClipboardCard>,
     val pinned: List<ClipboardCard>,
-    /** Older copies, shown below the pins only after the toolbar toggle opens them. */
-    val older: List<ClipboardCard> = emptyList(),
-    /** All unpinned records in the category, including those folded away. */
-    val recentCount: Int,
-    /** Folding recent copies only makes room for pins; without pins below there is nothing to fold. */
-    val recentCollapsible: Boolean = false,
+    val recent: List<ClipboardCard>,
+    val pinnedCount: Int,
+    /** Folding pins only makes room for unpinned records; with none below there is nothing to fold. */
+    val pinsCollapsible: Boolean = false,
 ) {
-    /** Newest copies, then pins, then any opened older copies: opening never pushes the pins down. */
-    val visible: List<ClipboardCard> get() = recent + pinned + older
-    val hiddenRecent: Int get() = recentCount - recent.size - older.size
+    val visible: List<ClipboardCard> get() = pinned + recent
 }
 
-/** Rows of newest copies kept above the pins, so the pins stay within reach. */
-internal const val ClipboardRecentRows = 1
-
-/**
- * The newest [ClipboardRecentRows] rows of copies come first and pins always follow them.
- * Older copies are folded away, or listed after the pins when opened. Folding is
- * presentation only: neither persistence nor history is truncated.
- */
+/** Collapsing pins is presentation only: neither persistence nor recent history is truncated. */
 internal fun clipboardBoardContent(cards: List<ClipboardCard>, pins: Set<String>, columns: Int,
-    recentExpanded: Boolean): ClipboardBoardContent {
+    pinsExpanded: Boolean): ClipboardBoardContent {
     val (fixed, recent) = cards.partition { it.key in pins }
-    val limit = columns.coerceAtLeast(1) * ClipboardRecentRows
-    val collapsible = fixed.isNotEmpty() && recent.size > limit
+    val collapsible = fixed.size > columns.coerceAtLeast(1) && recent.isNotEmpty()
     return ClipboardBoardContent(
-        recent = if (collapsible) recent.take(limit) else recent,
-        pinned = fixed,
-        older = if (collapsible && recentExpanded) recent.drop(limit) else emptyList(),
-        recentCount = recent.size,
-        recentCollapsible = collapsible,
+        pinned = if (pinsExpanded || !collapsible) fixed else fixed.take(columns.coerceAtLeast(1)),
+        recent = recent,
+        pinnedCount = fixed.size,
+        pinsCollapsible = collapsible,
     )
 }
 

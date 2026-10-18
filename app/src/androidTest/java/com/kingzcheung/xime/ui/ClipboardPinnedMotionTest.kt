@@ -29,12 +29,12 @@ import org.junit.Test
 class ClipboardPinnedMotionTest {
     @get:Rule val rule = createComposeRule()
 
-    @Test fun foldedRecentRowsFadeInAndRemainPaintedDuringFadeOut() {
-        val pinned = (1L..2L).map { ClipboardItem(it, "固定记录 $it", timestamp = 1 - it) }
-        // Recent copies fold only when pins sit below them.
-        val history = pinned + (101L..108L).map {
-            ClipboardItem(it, "最近复制 $it\n第一行内容\n第二行内容", timestamp = 1000 - it)
+    @Test fun extraPinnedRowsFadeInAndRemainPaintedDuringFadeOut() {
+        val records = (1L..6L).map {
+            ClipboardItem(it, "固定记录 $it\n第一行内容\n第二行内容\n第三行内容", timestamp = 10 - it)
         }
+        // Pins fold only when unpinned history sits below them.
+        val history = records + ClipboardItem(7L, "最近复制", timestamp = 1)
         var pasted = 0
         rule.setContent {
             CompositionLocalProvider(
@@ -44,7 +44,7 @@ class ClipboardPinnedMotionTest {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     Box(Modifier.requiredSize(360.dp, 400.dp)) {
                         ClipboardBoardView(history, emptyList(), false, false,
-                            pinned.mapTo(mutableSetOf()) { "text:${it.id}" }, false, null,
+                            records.mapTo(mutableSetOf()) { "text:${it.id}" }, false, null,
                             onBack = {}, onQuickSend = {}, onSelectText = { pasted++ }, onSelectImage = {},
                             onSplit = { _, _ -> }, onAddQuick = {}, onPinsChange = {}, onRemove = {},
                             onPhotoAccess = {}, onPick = {}, onSystemPaste = {}, onShare = { _, _ -> },
@@ -55,27 +55,41 @@ class ClipboardPinnedMotionTest {
         }
         rule.waitForIdle()
         val controls = rule.onNodeWithTag("clipboard-controls").fetchSemanticsNode().boundsInRoot
-        capture("recent-collapsed.png")
-        rule.onNodeWithTag("clipboard-card:text:105").assertDoesNotExist()
-        rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
+        val collapsed = capture("pins-collapsed.png")
+        rule.onNodeWithTag("clipboard-card:text:3").assertDoesNotExist()
         rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag("clipboard-recent-toggle").performClick()
+        rule.onNodeWithTag("clipboard-pins-toggle").performClick()
         rule.mainClock.advanceTimeBy(80)
-        capture("recent-opening.png")
-        rule.onNodeWithTag("clipboard-card:text:105").assertExists()
+        val opening = capture("pins-opening.png")
         rule.mainClock.advanceTimeBy(320)
-        capture("recent-expanded.png")
+        val expanded = capture("pins-expanded.png")
+        val board = rule.onNodeWithTag("clipboard-board").fetchSemanticsNode().boundsInRoot
+        // Right column: the recent record slides down the left column while pins open.
+        val secondRow = rule.onNodeWithTag("clipboard-card:text:4").assertIsDisplayed()
+            .fetchSemanticsNode().boundsInRoot
+        // Sample blank card background, away from text, border, and rounded corners.
+        val x = (secondRow.left - board.left + 4f).roundToInt()
+        val y = (secondRow.center.y - board.top).roundToInt()
+        val emptyColor = collapsed.getPixel(x, y)
+        val fullColor = expanded.getPixel(x, y)
+        val openingColor = opening.getPixel(x, y)
+        assertTrue("fixture distinguishes empty background from a pinned card", distance(emptyColor, fullColor) > 12)
+        assertTrue("opening must show a partial fade rather than the final row immediately",
+            distance(openingColor, emptyColor) > 2 && distance(openingColor, fullColor) > 2)
         assertEquals(controls, rule.onNodeWithTag("clipboard-controls").fetchSemanticsNode().boundsInRoot)
-        rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
-        rule.onNodeWithTag("clipboard-recent-toggle").performClick()
-        rule.mainClock.advanceTimeBy(400)
-        rule.mainClock.autoAdvance = true
-        rule.waitForIdle()
-        capture("recent-collapsed-again.png")
-        rule.onNodeWithTag("clipboard-card:text:105").assertDoesNotExist()
-        rule.onNodeWithTag("clipboard-card:text:1").assertExists()
+        rule.onNodeWithTag("clipboard-pins-toggle").performClick()
+        rule.mainClock.advanceTimeBy(80)
+        val closing = capture("pins-closing.png")
+        val closingColor = closing.getPixel(x, y)
+        assertTrue("removed pin must remain painted during fade-out",
+            distance(closingColor, emptyColor) > 2 && distance(closingColor, fullColor) > 2)
+        rule.mainClock.advanceTimeBy(320)
+        val collapsedAgain = capture("pins-collapsed-again.png")
+        assertTrue("finished collapse removes the painted extra row", distance(emptyColor, collapsedAgain.getPixel(x, y)) <= 2)
+        rule.onNodeWithTag("clipboard-card:text:3").assertDoesNotExist()
         assertEquals(controls, rule.onNodeWithTag("clipboard-controls").fetchSemanticsNode().boundsInRoot)
         rule.runOnIdle { assertEquals("expansion must not paste any item", 0, pasted) }
+        rule.mainClock.autoAdvance = true
     }
 
     private fun distance(a: Int, b: Int): Int = maxOf(
@@ -87,7 +101,7 @@ class ClipboardPinnedMotionTest {
     private fun capture(name: String): Bitmap {
         val bitmap = rule.onNodeWithTag("clipboard-board").captureToImage().asAndroidBitmap()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val directory = File(checkNotNull(context.getExternalFilesDir(null)), "clipboard-recent-motion").apply { mkdirs() }
+        val directory = File(checkNotNull(context.getExternalFilesDir(null)), "clipboard-pinned-motion").apply { mkdirs() }
         File(directory, name).outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         return bitmap
     }

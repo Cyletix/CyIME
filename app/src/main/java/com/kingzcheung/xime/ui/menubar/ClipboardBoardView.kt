@@ -153,7 +153,7 @@ internal fun ClipboardBoardView(
     val deleteBounds = remember { arrayOf(Rect.Zero) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var selecting by remember { mutableStateOf(false) }
-    var recentExpanded by remember(initialImages) { mutableStateOf(false) }
+    var pinsExpanded by remember(initialImages) { mutableStateOf(false) }
     var itemMenu by remember { mutableStateOf<ClipboardItemMenuAnchor?>(null) }
     // Physical-keyboard focus inside an open record menu or confirmation, and its entries.
     var menuFocus by remember { mutableStateOf(0) }
@@ -164,6 +164,7 @@ internal fun ClipboardBoardView(
     val keyboard = LocalClipboardKeyboardNavigation.current
     var focusedKey by remember(keyboard?.active, filter) { mutableStateOf<String?>(null) }
     val gridState = rememberLazyStaggeredGridState()
+    val scope = rememberCoroutineScope()
     fun menuPosition(anchorInRoot: Rect, preferSide: Boolean): ClipboardMenuAnchor {
         val boardOrigin = boardCoordinates[0]?.boundsInRoot()?.topLeft ?: Offset.Zero
         val records = recordsCoordinates[0]?.boundsInRoot() ?: Rect.Zero
@@ -177,16 +178,20 @@ internal fun ClipboardBoardView(
         return ClipboardMenuAnchor(anchorInRoot.translate(-boardOrigin), visible, preferSide)
     }
     LaunchedEffect(filter) { gridState.scrollToItem(0) }
-    // Bumped when opening older copies should scroll to where they start, below the pins.
-    var revealOlder by remember { mutableStateOf(0) }
-    fun changeRecentExpansion(value: Boolean, reveal: Boolean = true) {
-        recentExpanded = value
-        if (value && reveal) revealOlder++
+    fun changePinsExpansion(value: Boolean) {
+        scope.launch {
+            // Reset the scroll anchor before changing the keyed rows. A scrollToItem
+            // after removal would reset the lazy item animator and discard fade-out.
+            if (gridState.firstVisibleItemIndex != 0 || gridState.firstVisibleItemScrollOffset != 0) {
+                gridState.scrollToItem(0)
+            }
+            pinsExpanded = value
+        }
     }
     LaunchedEffect(cards) {
         selected = selected.intersect(cards.mapTo(mutableSetOf()) { it.key })
     }
-    LaunchedEffect(all, filter, recentExpanded, failure) {
+    LaunchedEffect(all, filter, pinsExpanded, failure) {
         // Anchors capture the visible grid at opening time. A background copy/update
         // can move a surviving record too; do not keep an obsolete source rectangle.
         menu = false; itemMenu = null; deleting = null
@@ -201,26 +206,20 @@ internal fun ClipboardBoardView(
         }
         val columns = clipboardColumnCount(maxWidth.value)
         val compactControls = maxWidth.value / LocalDensity.current.fontScale < 360f
-        val content = remember(cards, pins, columns, recentExpanded) {
-            clipboardBoardContent(cards, pins, columns, recentExpanded)
+        val content = remember(cards, pins, columns, pinsExpanded) {
+            clipboardBoardContent(cards, pins, columns, pinsExpanded)
         }
-        val recentActuallyExpanded = recentExpanded && content.recentCollapsible
+        val pinsActuallyExpanded = pinsExpanded && content.pinsCollapsible
         val visibleCards = remember(content) { content.visible }
         val focused = focusedKey?.takeIf { key -> visibleCards.any { it.key == key } }
             ?: visibleCards.firstOrNull()?.key
         val gridKeys = remember(content, failure != null) {
             buildList {
                 if (failure != null) add("failure")
-                addAll(content.recent.map { it.key })
-                if (content.recent.isNotEmpty() && content.pinned.isNotEmpty()) add("pins-end")
                 addAll(content.pinned.map { it.key })
-                if (content.older.isNotEmpty()) add("older-start")
-                addAll(content.older.map { it.key })
+                if (content.pinned.isNotEmpty() && content.recent.isNotEmpty()) add("pins-end")
+                addAll(content.recent.map { it.key })
             }
-        }
-        LaunchedEffect(revealOlder) {
-            val start = gridKeys.indexOf("older-start")
-            if (revealOlder > 0 && start >= 0) gridState.animateScrollToItem(start)
         }
         LaunchedEffect(focused, keyboard?.active, gridKeys) {
             if (keyboard?.active == true) {
@@ -313,7 +312,7 @@ internal fun ClipboardBoardView(
                         if (allSelected) "取消全选" else "全选当前分类", {
                             selected = if (allSelected) emptySet() else cards.mapTo(mutableSetOf()) { it.key }
                             // Do not operate on invisible folded pins without making the selection inspectable.
-                            if (!allSelected) changeRecentExpansion(true, reveal = false)
+                            if (!allSelected) changePinsExpansion(true)
                         }, "clipboard-select-all", enabled = cards.isNotEmpty(),
                         label = if (compactControls) null else "全选")
                     Text("已选 ${selected.size}", color = colors.onSurface,
@@ -339,10 +338,11 @@ internal fun ClipboardBoardView(
                                 Modifier.testTag("clipboard-filter:${item.name}"))
                         }
                     }
-                    if (content.recentCollapsible) {
-                        RecentFoldToggle(recentActuallyExpanded, content.hiddenRecent, compactControls) {
-                            changeRecentExpansion(!recentExpanded)
-                        }
+                    if (content.pinsCollapsible) {
+                        CompactClipboardAction(if (pinsActuallyExpanded) Icons.Default.ExpandLess else Icons.Default.MoreHoriz,
+                            if (pinsActuallyExpanded) "收起固定内容" else "展开全部 ${content.pinnedCount} 条固定内容",
+                            { changePinsExpansion(!pinsExpanded) }, "clipboard-pins-toggle",
+                            label = if (compactControls) "${content.pinnedCount}" else "固定 ${content.pinnedCount}")
                     }
                     onAddPinned?.let {
                         CompactClipboardAction(Icons.Default.Add, "新增固定内容", it, "clipboard-add-pinned")
@@ -392,7 +392,7 @@ internal fun ClipboardBoardView(
                                 // grid so collapsing pins does not flash or replace recent history.
                                 modifier = Modifier.animateItem(
                                     fadeInSpec = keyboardPanelMotion(true),
-                                    placementSpec = keyboardPanelMotion(recentActuallyExpanded),
+                                    placementSpec = keyboardPanelMotion(pinsActuallyExpanded),
                                     fadeOutSpec = keyboardPanelMotion(false)),
                                 onClick = {
                                     focusedKey = card.key
@@ -408,21 +408,17 @@ internal fun ClipboardBoardView(
                                 })
                         }
                     }
-                    records(content.recent, fixedRecords = false)
-                    if (content.recent.isNotEmpty() && content.pinned.isNotEmpty()) {
-                        item(key = "pins-end", span = StaggeredGridItemSpan.FullLine) {
-                            RecordsDivider(Icons.Default.Lock, "已固定", colors.onSurface,
-                                Modifier.animateItem().testTag("clipboard-pins-divider"))
-                        }
-                    }
                     records(content.pinned, fixedRecords = true)
-                    if (content.older.isNotEmpty()) {
-                        item(key = "older-start", span = StaggeredGridItemSpan.FullLine) {
-                            RecordsDivider(Icons.Default.History, "更早的记录", colors.onSurface,
-                                Modifier.animateItem().testTag("clipboard-older-divider"))
+                    if (content.pinned.isNotEmpty() && content.recent.isNotEmpty()) {
+                        item(key = "pins-end", span = StaggeredGridItemSpan.FullLine) {
+                            val motion = Modifier.animateItem(placementSpec = keyboardPanelMotion(pinsActuallyExpanded))
+                            if (!content.pinsCollapsible) HorizontalDivider(motion.testTag("clipboard-pins-divider"), thickness = .5.dp,
+                                color = colors.onSurface.copy(alpha = .18f))
+                            else PinsFoldDivider(pinsActuallyExpanded, content.pinnedCount - content.pinned.size,
+                                colors.onSurface, motion) { changePinsExpansion(!pinsExpanded) }
                         }
                     }
-                    records(content.older, fixedRecords = false)
+                    records(content.recent, fixedRecords = false)
                 }
             }
         }
@@ -605,42 +601,34 @@ private fun ClipboardCardBadge(icon: ImageVector, description: String, modifier:
     }
 }
 
-/** 记录分组之间的分隔线：中间一个小图标加标签，如“🔒 已固定”“更早的记录”。 */
-@Composable
-private fun RecordsDivider(icon: ImageVector, label: String, content: Color, modifier: Modifier) {
+/**
+ * 固定内容折叠时，分隔线中间放一个带箭头的标签（“还有 N 条固定”），整条线都可点：
+ * 一眼能看出下面还有内容、这里可以展开；展开后箭头朝上，点一下收起。
+ */
+@androidx.compose.runtime.Composable
+private fun PinsFoldDivider(expanded: Boolean, hidden: Int, content: androidx.compose.ui.graphics.Color,
+    modifier: Modifier, onToggle: () -> Unit) {
     val line = content.copy(alpha = .22f)
-    val tint = content.copy(alpha = .78f)
-    Row(modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+    androidx.compose.foundation.layout.Row(
+        modifier.fillMaxWidth().heightIn(min = 32.dp).testTag("clipboard-pins-divider")
+            .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
+            .clickable(role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = if (expanded) "收起固定内容" else "展开固定内容", onClick = onToggle),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         HorizontalDivider(Modifier.weight(1f), thickness = .5.dp, color = line)
-        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.padding(end = 4.dp).size(14.dp), tint = tint)
-            Text(label, color = tint, style = MaterialTheme.typography.labelMedium)
+        androidx.compose.foundation.layout.Row(
+            Modifier.padding(horizontal = 8.dp).clip(RoundedCornerShape(50))
+                .border(.5.dp, line, RoundedCornerShape(50))
+                .padding(start = 10.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                .testTag("clipboard-pins-fold"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(if (expanded) "收起固定" else "还有 $hidden 条固定", color = content.copy(alpha = .78f),
+                style = MaterialTheme.typography.labelMedium)
+            Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null,
+                Modifier.size(18.dp), tint = content.copy(alpha = .78f))
         }
         HorizontalDivider(Modifier.weight(1f), thickness = .5.dp, color = line)
-    }
-}
-
-/**
- * 工具栏右上角的“更多 N 条 ⌄ / 收起 ⌃”：主题主色实心胶囊，固定在工具栏里不随列表滚动，
- * 展开很多旧记录后也能一下收起。
- */
-@Composable
-private fun RecentFoldToggle(expanded: Boolean, hidden: Int, compact: Boolean, onToggle: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val glass = LocalKeyboardInputPreferences.current.frostedGlass
-    Row(Modifier.padding(horizontal = 2.dp).heightIn(min = PanelCategoryHeight)
-        .clip(RoundedCornerShape(50))
-        .background(frostedKeyColor(colors.primary, colors.onSurface, glass))
-        .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
-        .clickable(role = Role.Button,
-            onClickLabel = if (expanded) "收起更早的记录" else "显示更早的 $hidden 条记录", onClick = onToggle)
-        .testTag("clipboard-recent-toggle")
-        .padding(start = 10.dp, end = 6.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Text(if (expanded) "收起" else if (compact) "+$hidden" else "更多 $hidden 条",
-            color = colors.onPrimary, fontSize = 13.sp, lineHeight = 18.sp,
-            fontWeight = FontWeight.Medium, maxLines = 1)
-        Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null,
-            Modifier.size(18.dp), tint = colors.onPrimary)
     }
 }

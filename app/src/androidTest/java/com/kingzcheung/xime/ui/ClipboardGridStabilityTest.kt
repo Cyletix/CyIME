@@ -26,7 +26,6 @@ import coil.size.Dimension
 import coil.size.Size
 import com.kingzcheung.xime.clipboard.ClipboardImage
 import com.kingzcheung.xime.clipboard.ClipboardItem
-import com.kingzcheung.xime.clipboard.ClipboardRecentRows
 import com.kingzcheung.xime.ui.keyboard.*
 import com.kingzcheung.xime.ui.menubar.ClipboardBoardView
 import java.io.File
@@ -63,11 +62,11 @@ class ClipboardGridStabilityTest {
         fixtureFiles.forEach { if (it.exists()) assertTrue(it.delete()) }
     }
 
-    @Test fun pinsFollowFoldedRecentPicturesWithOneBoundedPreviewHeight() {
+    @Test fun mixedPinsKeepFirstRowDimensionsAndExpansionAddsSpaceInsteadOfShrinkingCards() {
         createImageFixtures(80)
         decodeGate.complete(Unit)
         val text = (1L..6L).map { id ->
-            ClipboardItem(id, if (id % 2L == 1L) "短文 $id" else "很长的固定文字 $id，固定区不能把它换成另一种卡片。".repeat(12),
+            ClipboardItem(id, if (id % 2L == 1L) "短文 $id" else "很长的固定文字 $id，固定区展开不能把它换成另一种卡片。".repeat(12),
                 timestamp = 20_000L - id)
         }
         val pins = text.mapTo(mutableSetOf()) { "text:${it.id}" } + images.take(2).map { "image:${it.uri}" }
@@ -76,29 +75,38 @@ class ClipboardGridStabilityTest {
         rule.waitForIdle()
         for (boardWidth in listOf(360, 720)) {
             rule.runOnIdle { width.value = boardWidth }
-            rule.waitForIdle()
             val columns = boardWidth / 160
-            val shownRecent = images.drop(2).take(columns * ClipboardRecentRows)
-            val hiddenRecent = images.drop(2 + columns * ClipboardRecentRows).first()
-            rule.onNodeWithTag(imageTag(hiddenRecent)).assertDoesNotExist()
-            val slot = relativeBounds(imageTag(shownRecent.first())).height
-            assertTrue("previews remain readable and bounded", slot in 1f..112f)
-            (shownRecent.map { "clipboard-card:image:${it.uri}" } + pins.map { "clipboard-card:$it" }).forEach { tag ->
-                rule.onNodeWithTag("clipboard-records").performScrollToKey(tag.removePrefix("clipboard-card:"))
-                assertEquals("recent pictures and pins share one preview height: $tag", slot, relativeBounds(tag).height, 1f)
+            val firstRow = (1..columns).associate { "clipboard-card:text:$it" to relativeBounds("clipboard-card:text:$it") }
+            val collapsedDivider = relativeBounds("clipboard-pins-divider")
+            val collapsedPinHeight = firstRow.values.first().height
+            assertTrue("fixed previews remain readable and bounded", collapsedPinHeight in 1f..112f)
+            firstRow.values.forEach { assertEquals(collapsedPinHeight, it.height, 1f) }
+
+            rule.mainClock.autoAdvance = false
+            rule.onNodeWithTag("clipboard-pins-toggle").performClick()
+            for (time in listOf(32L, 64L, 96L, 240L)) {
+                rule.mainClock.advanceTimeBy(time)
+                firstRow.forEach { (tag, original) -> assertSameRect("pin expansion cannot resize or move $tag", original, relativeBounds(tag)) }
+            }
+            rule.mainClock.autoAdvance = true
+            rule.waitForIdle()
+            val expandedDivider = relativeBounds("clipboard-pins-divider")
+            assertTrue("expanded pins must occupy more space, never less", expandedDivider.top > collapsedDivider.top + collapsedPinHeight)
+            pins.forEach { key ->
+                assertEquals("all fixed records retain the same preview height: $key", collapsedPinHeight,
+                    relativeBounds("clipboard-card:$key").height, 1f)
             }
             saveEvidence("clipboard-stable-pins-$boardWidth.png")
 
-            rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
-            rule.onNodeWithTag("clipboard-recent-toggle").performClick()
+            rule.mainClock.autoAdvance = false
+            rule.onNodeWithTag("clipboard-pins-toggle").performClick()
+            for (time in listOf(32L, 64L, 180L)) {
+                rule.mainClock.advanceTimeBy(time)
+                firstRow.forEach { (tag, original) -> assertSameRect("pin collapse cannot resize or move $tag", original, relativeBounds(tag)) }
+            }
+            rule.mainClock.autoAdvance = true
             rule.waitForIdle()
-            rule.onNodeWithTag("clipboard-records").performScrollToKey("image:${hiddenRecent.uri}")
-            rule.onNodeWithTag(imageTag(hiddenRecent)).assertIsDisplayed()
-            rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
-            rule.onNodeWithTag("clipboard-recent-toggle").performClick()
-            rule.waitForIdle()
-            rule.onNodeWithTag(imageTag(hiddenRecent)).assertDoesNotExist()
-            rule.onNodeWithTag("clipboard-records").performScrollToIndex(0)
+            assertSameRect("collapsing restores the same fixed-area boundary", collapsedDivider, relativeBounds("clipboard-pins-divider"))
         }
     }
 
