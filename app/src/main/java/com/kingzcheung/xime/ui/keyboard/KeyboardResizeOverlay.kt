@@ -216,7 +216,7 @@ internal fun KeyboardResizeOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (editingOpacity) Color.Transparent else Color.Black.copy(alpha = 0.25f))
+                .background(if (editingOpacity) Color.Transparent else Color.Black.copy(alpha = 0.5f))
                 .testTag(if (editingOpacity) "keyboard-opacity-backdrop" else "keyboard-resize-frame")
                 .semantics { contentDescription = if (editingOpacity) "透明度调整" else "拖动边框调整大小，拖动内部移动悬浮键盘" }
                 .drawBehind {
