@@ -11,6 +11,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,6 +34,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.HorizontalSplit
@@ -49,6 +53,8 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -58,6 +64,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -70,10 +77,13 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -110,21 +120,43 @@ internal fun KeyboardResizeOverlay(
     onPositionDrag: ((Float, Float) -> Unit)? = null,
     onPositionDragEnd: (() -> Unit)? = null,
     defaultSize: ProtectedKeyboardSize? = null,
+    /** 吸附到特定位置时的振动；为空时用系统触感。 */
+    onSnapFeedback: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
+    val hostView = LocalView.current
+    val currentSnapFeedback by rememberUpdatedState(onSnapFeedback ?: {
+        hostView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+    })
     val roundedBottom = rememberRoundedKeyboardBottom()
     val frostedGlassEnabled = rememberKeyboardInputPreferences().frostedGlass.enabled
+    val opacityEditingState = LocalKeyboardResizeOpacityEditing.current ?: remember { mutableStateOf(false) }
+    var editingOpacity by opacityEditingState
+    val opacityInteraction = remember { MutableInteractionSource() }
+    val draggingOpacity by opacityInteraction.collectIsDraggedAsState()
+    val pressingOpacity by opacityInteraction.collectIsPressedAsState()
+    // 手指在滑条上时只留滑条本身，看到的就是真实透明效果；松手后再给出返回/完成。
+    val adjustingOpacity = draggingOpacity || pressingOpacity
+    LaunchedEffect(draggingOpacity) { if (draggingOpacity) editingOpacity = true }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val frameStyle = remember(configuration.smallestScreenWidthDp) {
+        resizeFrameStyle(configuration.smallestScreenWidthDp)
+    }
 
     var currentHeightDp by remember { mutableFloatStateOf(initialHeightDp.toFloat()) }
     var currentWidthDp by remember { mutableFloatStateOf(initialWidthDp.toFloat()) }
     var currentBottomPaddingDpState by remember { mutableFloatStateOf(currentBottomPaddingDp.toFloat()) }
     var floatingMode by remember(isFloatingMode) { mutableStateOf(isFloatingMode) }
     var splitMode by remember(isSplitKeyboard) { mutableStateOf(isSplitKeyboard) }
+    // 分体两半贴边：开启前的宽度留着，关闭分体时还原。
+    var rectBeforeSplit by remember { mutableStateOf<ResizeRect?>(null) }
+    val splitActive = splitMode && splitKeyboardSupported
     var opacity by remember { mutableFloatStateOf(initialOpacity.coerceIn(0.3f, 1f)) }
 
     if (LocalOnBackPressedDispatcherOwner.current != null) {
+        // The IME consumes system Back as cancellation of the entire resize transaction.
+        // Only the visible return button keeps the draft and returns to size controls.
         BackHandler(onBack = onCancel)
     }
 
@@ -132,15 +164,12 @@ internal fun KeyboardResizeOverlay(
     val currentOnReset by rememberUpdatedState(onReset)
     val currentOnPreviewOpacity by rememberUpdatedState(onOpacityChange)
 
+    var overlayOrigin by remember { mutableStateOf(Offset.Zero) }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {},
-            ),
+            .onGloballyPositioned { overlayOrigin = it.positionInWindow() },
     ) {
         val viewRect = viewRectOf(maxWidth.value * density.density, maxHeight.value * density.density)
         val previewState = LocalKeyboardResizePreviewState.current
@@ -155,31 +184,47 @@ internal fun KeyboardResizeOverlay(
         val currentOnPreviewRectChange by rememberUpdatedState(previewState.onRectChange)
         val currentViewRect by rememberUpdatedState(viewRect)
         val currentPreviewState by rememberUpdatedState(previewState)
+        fun splitGapFraction(rect: ResizeRect): Float = SplitKeyboardGeometry.resolvedGap(
+            previewState.splitGapFraction, rect.width / density.density,
+            SplitKeyboardGeometry.gutterDp(floatingMode), previewState.splitPitchDp)
+        // 中缝两条内侧竖边：优先用实际渲染出的中缝，测量前按居中对称估算。
+        val splitGapPx = if (splitActive) splitGapFraction(frame) * frame.width else 0f
+        val measuredHole = LocalSplitKeyboardGap.current?.hole(0f)?.takeIf { splitActive }
+        val splitInnerLeft = measuredHole?.let { it.left - overlayOrigin.x } ?: (frame.centerX - splitGapPx / 2f)
+        val splitInnerRight = measuredHole?.let { it.right - overlayOrigin.x } ?: (frame.centerX + splitGapPx / 2f)
+        val currentSplitEdges by rememberUpdatedState(splitInnerLeft to splitInnerRight)
+        val currentSplitGapFraction by rememberUpdatedState<(ResizeRect) -> Float>(::splitGapFraction)
 
-        val surfaceColor = MaterialTheme.colorScheme.surface
-        val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-        val outlineColor = MaterialTheme.colorScheme.outline
-        val inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
-        val accentColor = MaterialTheme.colorScheme.primary
-        // 透明度控件使用主题表面色和弱描边，始终与键盘预览保持对比。
-        val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+        // 调节界面的面板、按钮和滑条使用键盘本身的配色（键帽色、文字色、强调色），
+        // 与键盘设计一致；没有键盘配色时（预览、测试）退回 Material 主题色。
+        val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
+        val surfaceColor = palette?.key?.copy(alpha = 1f) ?: MaterialTheme.colorScheme.surface
+        val onSurfaceColor = palette?.text ?: MaterialTheme.colorScheme.onSurface
+        val outlineColor = palette?.text?.copy(alpha = .45f) ?: MaterialTheme.colorScheme.outline
+        val inactiveTrackColor = onSurfaceColor.copy(alpha = 0.22f)
+        val accentColor = palette?.accent ?: MaterialTheme.colorScheme.primary
+        // 透明度控件使用键帽色和弱描边，始终与键盘预览保持对比。
+        val outlineVariantColor = onSurfaceColor.copy(alpha = 0.18f)
         val panelShape = remember(floatingMode, roundedBottom) {
             keyboardPanelShape(floatingMode, roundedBottom)
         }
 
+        // This full-size pointer layer catches uncovered hits below the controls.
+        // Do not consume down events on their common parent: that cancels Slider drags.
         // 一层只负责暗背景、边框和手势。真实键盘由同一个 previewRect 驱动。
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.25f))
-                .testTag("keyboard-resize-frame")
-                .semantics { contentDescription = "拖动边框调整大小，拖动内部移动悬浮键盘" }
+                .background(if (editingOpacity) Color.Transparent else Color.Black.copy(alpha = 0.25f))
+                .testTag(if (editingOpacity) "keyboard-opacity-backdrop" else "keyboard-resize-frame")
+                .semantics { contentDescription = if (editingOpacity) "透明度调整" else "拖动边框调整大小，拖动内部移动悬浮键盘" }
                 .drawBehind {
-                    val stroke = 2.dp.toPx()
-                    val tabThickness = 4.dp.toPx()
+                    if (editingOpacity) return@drawBehind
+                    val stroke = frameStyle.strokeDp.dp.toPx()
+                    val tabThickness = frameStyle.handleThicknessDp.dp.toPx()
                     // 描边和四边手柄共用内侧中心线。
-                    val handleInset = 8.dp.toPx()
-                    val tabLength = 34.dp.toPx().coerceAtMost(frame.width / 4f)
+                    val handleInset = frameStyle.insetDp.dp.toPx()
+                    val tabLength = frameStyle.handleLengthDp.dp.toPx().coerceAtMost(frame.width / 4f)
                     val rectSize = Size(frame.width.coerceAtLeast(1f), frame.height.coerceAtLeast(1f))
 
                     // 正常面板与调节态共用用户选择的底部轮廓；悬浮始终保留四角圆角。
@@ -188,11 +233,13 @@ internal fun KeyboardResizeOverlay(
                     if (!frostedGlassEnabled) {
                         // 底部只显示真实移动条，不能被调节态的面板涂层盖住。
                         clipRect(bottom = if (floatingMode) frame.bottom - dragAreaHeightPx else size.height) {
-                            translate(frame.left, frame.top) {
-                                drawOutline(
-                                    panelShape.createOutline(rectSize, layoutDirection, this),
-                                    color = surfaceColor.copy(alpha = 0.88f),
-                                )
+                            clipRect(splitInnerLeft, frame.top, splitInnerRight, frame.bottom, ClipOp.Difference) {
+                                translate(frame.left, frame.top) {
+                                    drawOutline(
+                                        panelShape.createOutline(rectSize, layoutDirection, this),
+                                        color = surfaceColor.copy(alpha = 0.88f),
+                                    )
+                                }
                             }
                         }
                     }
@@ -204,7 +251,7 @@ internal fun KeyboardResizeOverlay(
                         (innerRight - innerLeft).coerceAtLeast(1f),
                         (innerBottom - innerTop).coerceAtLeast(1f),
                     )
-                    val cornerRadius = 14.dp.toPx().coerceAtMost(minOf(innerSize.width, innerSize.height) / 2f)
+                    val cornerRadius = frameStyle.cornerRadiusDp.dp.toPx().coerceAtMost(minOf(innerSize.width, innerSize.height) / 2f)
                     drawRoundRect(
                         color = accentColor.copy(alpha = 0.78f),
                         topLeft = Offset(innerLeft, innerTop),
@@ -241,25 +288,59 @@ internal fun KeyboardResizeOverlay(
                             cornerRadius = CornerRadius(tabThickness),
                         )
                     }
-                    verticalHandle(innerLeft)
-                    verticalHandle(innerRight)
+                    if (splitGapPx > 0f) {
+                        // 分体：外侧贴边不可拖，改为拖内侧两条竖边对称调整中缝。
+                        listOf(splitInnerLeft, splitInnerRight).forEach { x ->
+                            drawLine(accentColor.copy(alpha = 0.78f), Offset(x, innerTop), Offset(x, innerBottom), stroke)
+                            verticalHandle(x)
+                        }
+                    } else {
+                        verticalHandle(innerLeft)
+                        verticalHandle(innerRight)
+                    }
                 }
-                .pointerInput(floatingMode, isLandscape, maxWidth, maxHeight) {
+                .pointerInput(editingOpacity, floatingMode, isLandscape, maxWidth, maxHeight, splitActive) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
+                        if (editingOpacity) {
+                            down.consume()
+                            do {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            } while (event.changes.any { it.pressed })
+                            return@awaitEachGesture
+                        }
                         val hit = RESIZE_EDGE_HIT_DP.dp.toPx()
                         val cornerHit = RESIZE_CORNER_HIT_DP.dp.toPx()
                         val gestureViewRect = currentViewRect
                         val gestureRect = currentPreviewRect ?: dragRect ?: gestureViewRect
                         val gestureFloating = floatingMode && currentPreviewRect != null
                         dragEdge = resizeHandleAt(gestureRect, down.position, hit, gestureFloating, cornerHit)
+                        // 分体：内侧竖边优先；外侧贴边，左右边与四角只保留高度方向。
+                        var splitEdge = 0
+                        val splitStartGap = if (splitActive) currentSplitGapFraction(gestureRect) * gestureRect.width else 0f
+                        if (splitActive) {
+                            val (edgeLeft, edgeRight) = currentSplitEdges
+                            val toLeft = kotlin.math.abs(down.position.x - edgeLeft)
+                            val toRight = kotlin.math.abs(down.position.x - edgeRight)
+                            if (down.position.y in gestureRect.top..gestureRect.bottom && minOf(toLeft, toRight) <= hit) {
+                                splitEdge = if (toLeft <= toRight) -1 else 1
+                            }
+                            dragEdge = when (dragEdge) {
+                                ResizeHandle.LEFT, ResizeHandle.RIGHT -> ResizeHandle.NONE
+                                ResizeHandle.TOP_LEFT, ResizeHandle.TOP_RIGHT -> ResizeHandle.TOP
+                                ResizeHandle.BOTTOM_LEFT, ResizeHandle.BOTTOM_RIGHT -> ResizeHandle.BOTTOM
+                                else -> dragEdge
+                            }
+                            if (splitEdge != 0) dragEdge = ResizeHandle.NONE
+                        }
 
                         val session = currentPreviewState
                         val stableBounds = session.bounds ?: gestureViewRect
                         val fixedRange = session.fixedHeightRange ?:
                             keyboardHeightBounds(configuration.screenHeightDp, isLandscape)
                         // 框外不是移动区域；框内空白和底部拖条仍可移动，控件自己消费触摸。
-                        if (dragEdge == ResizeHandle.NONE &&
+                        if (dragEdge == ResizeHandle.NONE && splitEdge == 0 &&
                             (down.position.x < gestureRect.left || down.position.x > gestureRect.right ||
                                 down.position.y < gestureRect.top || down.position.y > gestureRect.bottom)) {
                             return@awaitEachGesture
@@ -295,9 +376,51 @@ internal fun KeyboardResizeOverlay(
                         val fixedMove = FixedKeyboardMoveGesture(gestureRect, stableBounds, 12.dp.toPx())
                         var workingPadding = session.bottomPaddingDp.toFloat()
                         var didDrag = false
+                        // 进入吸附位置振动一次；离开后再次进入才再振动。
+                        var engagedSnap: String? = null
+                        fun snapFeedback(target: String?) {
+                            if (target != null && target != engagedSnap) currentSnapFeedback()
+                            engagedSnap = target
+                        }
+                        // 中缝吸附点：自动缝宽（标定键距）和按键正方形的缝宽。
+                        val splitWidthDp = gestureRect.width / density.density
+                        val splitGutterDp = SplitKeyboardGeometry.gutterDp(floatingMode)
+                        val splitRange = SplitKeyboardGeometry.gapRange(splitWidthDp, splitGutterDp)
+                        val splitTargets = if (splitEdge == 0) emptyMap() else buildMap {
+                            put("split-default", SplitKeyboardGeometry.defaultGap(splitWidthDp, splitGutterDp, session.splitPitchDp))
+                            val extra = (if (gestureFloating) dragBarDp else session.bottomPaddingDp) * density.density
+                            fun difference(fraction: Float) = KeyboardSquareSnap(10f, true, false, fraction)
+                                .capDifference(gestureRect, density.density, extra, gestureFloating, squareSpacing)
+                            var low = splitRange.start
+                            var high = splitRange.endInclusive
+                            if (difference(low) >= 0f && difference(high) <= 0f) {
+                                repeat(24) {
+                                    val mid = (low + high) / 2f
+                                    if (difference(mid) > 0f) low = mid else high = mid
+                                }
+                                put("split-square", (low + high) / 2f)
+                            }
+                        }
+                        var splitDrag = 0f
+                        // Snap band grows with the keyboard: 6dp on phones, up to 16dp on tablets.
+                        val snapBandDp = (gestureRect.width / density.density * 0.012f).coerceIn(6f, 16f)
 
                         fun applyDelta(amount: Offset) {
                             didDrag = true
+                            if (splitEdge != 0) {
+                                splitDrag += amount.x
+                                val raw = (splitStartGap + 2f * splitEdge * splitDrag) / gestureRect.width
+                                var fraction = raw.coerceIn(splitRange.start, splitRange.endInclusive)
+                                // Past a limit the edge stops; drop the excess so reversing moves it at once.
+                                if (fraction != raw) splitDrag = (fraction * gestureRect.width - splitStartGap) / (2f * splitEdge)
+                                val tolerance = snapBandDp.dp.toPx() / gestureRect.width
+                                val target = splitTargets.entries.minByOrNull { kotlin.math.abs(it.value - fraction) }
+                                    ?.takeIf { kotlin.math.abs(it.value - fraction) <= tolerance }
+                                if (target != null) fraction = target.value
+                                snapFeedback(target?.key)
+                                session.onSplitGapChange(fraction)
+                                return
+                            }
                             if (gestureFloating) {
                                 val proposed = rawResizeRect.dragBy(
                                     handle = dragEdge,
@@ -310,11 +433,13 @@ internal fun KeyboardResizeOverlay(
                                     maxHeight = screenMaxHeightPx,
                                 )
                                 rawResizeRect = proposed
-                                workingRect = if (dragEdge == ResizeHandle.NONE) proposed else
+                                val reachable = if (dragEdge == ResizeHandle.NONE) proposed else
                                     gestureRect.resizeWithReachableWidth(proposed, dragEdge, stableBounds, aspect,
                                         density.density, dragBarDp * density.density)
-                                        .snapSquareKeys(dragEdge, session.squareSnap, stableBounds, density.density,
-                                            dragBarDp * density.density, true, squareSpacing)
+                                workingRect = if (dragEdge == ResizeHandle.NONE) proposed else
+                                    reachable.snapSquareKeys(dragEdge, session.squareSnap, stableBounds, density.density,
+                                            dragBarDp * density.density, true, squareSpacing, thresholdDp = snapBandDp)
+                                snapFeedback(if (workingRect != reachable) "square" else null)
                                 dragRect = workingRect
                                 currentOnPreviewRectChange(workingRect)
                                 currentWidthDp = (workingRect.width / density.density)
@@ -339,12 +464,18 @@ internal fun KeyboardResizeOverlay(
                                             maxHeight = screenMaxHeightPx,
                                         )
                                         rawResizeRect = proposed
-                                        workingRect = gestureRect.resizeWithReachableWidth(proposed, edge, stableBounds, aspect,
+                                        val reachable = gestureRect.resizeWithReachableWidth(proposed, edge, stableBounds, aspect,
                                             density.density, workingPadding * density.density)
+                                        workingRect = reachable
                                             .snapSquareKeys(edge, session.squareSnap, stableBounds, density.density,
-                                                workingPadding * density.density, false, squareSpacing)
+                                                workingPadding * density.density, false, squareSpacing, thresholdDp = snapBandDp)
                                         val snapped = workingRect.snapFixedEdgeToCenter(edge, stableBounds,
                                             floatingResizeMinWidthDp(availableWidthDp) * density.density, 12.dp.toPx())
+                                        snapFeedback(when {
+                                            snapped != workingRect -> "center"
+                                            workingRect != reachable -> "square"
+                                            else -> null
+                                        })
 
                                         dragRect = snapped
                                         currentOnPreviewRectChange(snapped)
@@ -369,6 +500,7 @@ internal fun KeyboardResizeOverlay(
                                     }
                                     ResizeHandle.NONE -> {
                                         workingRect = fixedMove.move(amount.x)
+                                        snapFeedback(if (fixedMove.snapped) "center" else null)
                                         dragRect = workingRect
                                         currentOnPreviewRectChange(workingRect)
                                     }
@@ -397,8 +529,11 @@ internal fun KeyboardResizeOverlay(
 
         // 控件直接占用键盘框内的可用区域；没有第二层小卡片/底板/描边。
         // 顶部工具栏、左右拖边及底部永久移动条均留出命中空间。
-        val controls = resizeControlsRect(frame, density.density, floatingMode,
+        val defaultControls = resizeControlsRect(frame, density.density, floatingMode,
             dragAreaHeightPx)
+        val handleHitPx = RESIZE_EDGE_HIT_DP * density.density
+        val controls = if (splitGapPx > 0f && splitInnerRight - splitInnerLeft - 2f * handleHitPx >= 240f * density.density)
+            defaultControls.copy(left = splitInnerLeft + handleHitPx, right = splitInnerRight - handleHitPx) else defaultControls
         val controlsWidthDp = with(density) { controls.width.toDp() }
         val controlsHeightDp = with(density) { controls.height.toDp() }
         // 滑条和操作共用宽度；宽屏不拉长按钮，窄屏仍避开两侧拖动热区。
@@ -406,6 +541,25 @@ internal fun KeyboardResizeOverlay(
         val buttonHeight = minOf(48f, (controlsHeightDp.value / 3f).coerceAtLeast(28f)).dp
         val opacityHeight = maxOf(buttonHeight, (24f * density.fontScale).dp)
         val showButtonLabels = contentWidthDp.value >= 288f * density.fontScale
+        fun confirmResize() {
+            val finalRect = currentPreviewRect ?: previewState.rect
+            if (floatingMode && finalRect != null) {
+                val geometry = finalRect.toGeometry(
+                    viewWidthPx = viewRect.width,
+                    viewHeightPx = viewRect.height,
+                    dragBarHeightPx = FLOATING_DRAG_BAR_HEIGHT_DP * density.density,
+                    density = density.density,
+                )
+                currentWidthDp = geometry.widthDp.toFloat()
+                currentHeightDp = geometry.heightDp.toFloat()
+                currentOnGeometryChange(geometry)
+            } else if (finalRect != null) {
+                currentHeightDp = finalRect.height / density.density - previewState.bottomPaddingDp
+                currentOnGeometryChange(finalRect.toGeometry(viewRect.width, viewRect.height, 0f, density.density))
+            }
+            if (splitActive) previewState.onSplitGapCommit()
+            onConfirm(currentHeightDp.roundToInt(), previewState.bottomPaddingDp, floatingMode, opacity)
+        }
         Box(
             modifier = Modifier
                 .absoluteOffset { IntOffset(controls.left.roundToInt(), controls.top.roundToInt()) }
@@ -424,19 +578,21 @@ internal fun KeyboardResizeOverlay(
                         .height(opacityHeight)
                         .testTag("keyboard-resize-opacity-panel")
                         .clip(RoundedCornerShape(10.dp))
-                        .background(surfaceColor.copy(alpha = 0.92f))
-                        .border(1.dp, outlineVariantColor, RoundedCornerShape(10.dp)),
+                        .then(if (adjustingOpacity) Modifier else Modifier
+                            .background(surfaceColor.copy(alpha = 0.92f))
+                            .border(1.dp, outlineVariantColor, RoundedCornerShape(10.dp))),
                     contentAlignment = Alignment.Center,
                 ) {
                     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides opacityHeight) {
                         Slider(
                             value = 1f - opacity,
-                            enabled = !frostedGlassEnabled,
                             onValueChange = {
+                                editingOpacity = true
                                 opacity = 1f - it
                                 currentOnPreviewOpacity(opacity)
                             },
                             valueRange = 0f..0.7f,
+                            interactionSource = opacityInteraction,
                             colors = SliderDefaults.colors(
                                 thumbColor = accentColor,
                                 activeTrackColor = accentColor,
@@ -446,16 +602,18 @@ internal fun KeyboardResizeOverlay(
                                 .fillMaxWidth()
                                 .height(opacityHeight)
                                 .padding(horizontal = 6.dp)
+                                .semantics { contentDescription = "键盘透明度" }
                                 .testTag("keyboard-opacity-slider"),
                         )
                     }
-                    Text(
-                        text = if (frostedGlassEnabled) "磨砂：独立透明度" else "透明度 ${((1f - opacity) * 100).roundToInt()}%",
+                    if (!editingOpacity) Text(
+                        text = "透明度 ${((1f - opacity) * 100).roundToInt()}%",
                         modifier = Modifier
                             .align(Alignment.Center)
                             .width(IntrinsicSize.Max)
                             .clip(RoundedCornerShape(6.dp))
                             .background(surfaceColor.copy(alpha = 0.92f))
+                            .clickable { editingOpacity = true }
                             .padding(horizontal = 2.dp)
                             .testTag("keyboard-opacity-overlay-label"),
                         color = onSurfaceColor,
@@ -473,18 +631,24 @@ internal fun KeyboardResizeOverlay(
                     enabled: Boolean = true,
                     text: String? = null,
                     description: String,
+                    // 非空即开关：文字始终是功能名，开启时反色填充，任何配色下都能一眼分辨。
+                    selected: Boolean? = null,
                     icon: @Composable () -> Unit,
                     onClick: () -> Unit,
                 ) {
+                    val on = selected == true
                     OutlinedButton(
                         onClick = onClick,
                         enabled = enabled,
-                        modifier = modifier.height(buttonHeight).semantics { contentDescription = description },
+                        modifier = modifier.height(buttonHeight).semantics {
+                            contentDescription = description
+                            if (selected != null) this.selected = selected
+                        },
                         shape = RoundedCornerShape(18.dp),
                         border = BorderStroke(1.dp, if (enabled) outlineColor else outlineColor.copy(alpha = 0.35f)),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = onSurfaceColor,
+                            containerColor = if (on) onSurfaceColor else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (on) surfaceColor else onSurfaceColor,
                             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             disabledContentColor = onSurfaceColor.copy(alpha = 0.35f),
                         ),
@@ -493,28 +657,42 @@ internal fun KeyboardResizeOverlay(
                         icon()
                         if (text != null && showButtonLabels) {
                             Spacer(Modifier.width(3.dp))
-                            Text(text, fontSize = 11.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                            // 文字只占剩余宽度：放不下时被裁掉，而不是把整组图标和文字挤出中心。
+                            Text(text, modifier = Modifier.weight(1f, fill = false), fontSize = 11.sp,
+                                maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
                         }
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().testTag("keyboard-resize-actions"),
+                if (editingOpacity) Row(
+                    modifier = Modifier.fillMaxWidth().alpha(if (adjustingOpacity) 0f else 1f)
+                        .testTag("keyboard-opacity-actions"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    EqualActionButton(modifier = Modifier.weight(1f), description = "返回",
+                        icon = { Text("返回") }, onClick = { editingOpacity = false })
+                    EqualActionButton(modifier = Modifier.weight(1f), description = "完成",
+                        icon = { Text("完成") }, onClick = ::confirmResize)
+                } else Row(
+                    modifier = Modifier.fillMaxWidth().alpha(if (adjustingOpacity) 0f else 1f)
+                        .testTag("keyboard-resize-actions"),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     EqualActionButton(
                         modifier = Modifier.weight(1f),
+                        text = "重置",
                         description = "重置",
                         icon = { Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(17.dp)) },
                     ) {
                         opacity = 1f
                         currentOnPreviewOpacity(opacity)
+                        if (splitActive) previewState.onSplitGapChange(-1f)
                         if (floatingMode) {
                             val initial = currentInitialPreviewRect ?: frame
                             if (defaultSize != null) {
                                 val bounds = previewState.bounds ?: viewRect
-                                val width = defaultSize.width * density.density
+                                val width = if (splitActive) bounds.width else defaultSize.width * density.density
                                 val totalHeight = (defaultSize.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density.density
                                 val reset = ResizeRect(bounds.centerX - width / 2f, initial.bottom - totalHeight,
                                     bounds.centerX + width / 2f, initial.bottom).coerceInside(bounds)
@@ -534,7 +712,7 @@ internal fun KeyboardResizeOverlay(
                             currentOnPreviewRectChange(fixedKeyboardRect(
                                 viewRect.width, viewRect.height, height * density.density, 0f,
                                 previewState.fixedBottomInsetDp * density.density,
-                                widthPx = size.width * density.density,
+                                widthPx = if (splitActive) viewRect.width else size.width * density.density,
                             ))
                             currentHeightDp = height.toFloat()
                         }
@@ -544,13 +722,14 @@ internal fun KeyboardResizeOverlay(
                     EqualActionButton(
                         modifier = Modifier.weight(1f).testTag("keyboard-resize-floating-button"),
                         enabled = onFloatingModeChange != null,
-                        text = if (floatingMode) "固定" else "悬浮",
+                        text = "悬浮",
                         description = "悬浮键盘",
+                        selected = floatingMode,
                         icon = {
                             Icon(
-                                if (floatingMode) Icons.Default.Keyboard else Icons.Default.OpenInNew,
+                                Icons.Default.OpenInNew,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(17.dp),
                             )
                         },
                     ) {
@@ -565,47 +744,37 @@ internal fun KeyboardResizeOverlay(
                     EqualActionButton(
                         modifier = Modifier.weight(1f).testTag("keyboard-resize-split-button"),
                         enabled = onSplitKeyboardChange != null && splitKeyboardSupported,
-                        text = if (splitMode) "完整" else "分体",
+                        text = "分体",
                         description = "分体键盘",
+                        selected = splitMode,
                         icon = {
                             Icon(
-                                if (splitMode) Icons.Default.Keyboard else Icons.Default.HorizontalSplit,
+                                Icons.Default.HorizontalSplit,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(17.dp),
                             )
                         },
                     ) {
                         splitMode = !splitMode
                         onSplitKeyboardChange?.invoke(splitMode)
+                        val current = currentPreviewRect ?: frame
+                        if (splitMode && splitKeyboardSupported) {
+                            val bounds = previewState.bounds ?: viewRect
+                            rectBeforeSplit = current
+                            currentOnPreviewRectChange(current.copy(left = bounds.left, right = bounds.right))
+                        } else if (!splitMode) {
+                            rectBeforeSplit?.let { currentOnPreviewRectChange(it.copy(top = current.top, bottom = current.bottom)) }
+                            rectBeforeSplit = null
+                        }
                     }
 
                     EqualActionButton(
                         modifier = Modifier.weight(1f),
+                        text = "确认",
                         description = "确认",
                         icon = { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(17.dp)) },
-                    ) {
-                        val finalRect = currentPreviewRect ?: previewState.rect
-                        if (floatingMode && finalRect != null) {
-                            val geometry = finalRect.toGeometry(
-                                viewWidthPx = viewRect.width,
-                                viewHeightPx = viewRect.height,
-                                dragBarHeightPx = FLOATING_DRAG_BAR_HEIGHT_DP * density.density,
-                                density = density.density,
-                            )
-                            currentWidthDp = geometry.widthDp.toFloat()
-                            currentHeightDp = geometry.heightDp.toFloat()
-                            currentOnGeometryChange(geometry)
-                        } else if (finalRect != null) {
-                            currentHeightDp = finalRect.height / density.density - previewState.bottomPaddingDp
-                            currentOnGeometryChange(finalRect.toGeometry(viewRect.width, viewRect.height, 0f, density.density))
-                        }
-                        onConfirm(
-                            currentHeightDp.roundToInt(),
-                            previewState.bottomPaddingDp,
-                            floatingMode,
-                            opacity,
-                        )
-                    }
+                        onClick = ::confirmResize,
+                    )
                 }
             }
         }
@@ -623,7 +792,7 @@ internal fun KeyboardResizeOverlay(
                 // 预览矩形是调节事务的唯一位置源；确认时统一保存，避免同时改宿主偏移。
             }
         }
-        if (!floatingMode) {
+        if (!editingOpacity && !floatingMode) {
             val stripHeight = 26.dp
             Box(Modifier.absoluteOffset {
                 IntOffset(frame.left.roundToInt(), (frame.bottom - stripHeight.toPx()).roundToInt())
@@ -632,7 +801,16 @@ internal fun KeyboardResizeOverlay(
                 Text("上下拖动调节底部留白", color = onSurfaceColor.copy(alpha = 0.7f), fontSize = 10.sp)
             }
         }
-        if (!floatingMode) {
+        if (!editingOpacity && splitGapPx > 0f) {
+            Box(Modifier.absoluteOffset {
+                IntOffset(frame.left.roundToInt(), (frame.top + (if (floatingMode) 4.dp else 28.dp).toPx()).roundToInt())
+            }.size(with(density) { frame.width.toDp() }, 28.dp)
+                .testTag("keyboard-resize-split-hint"), contentAlignment = Alignment.Center) {
+                Text("拖动内侧两条竖边，调整中间留空", color = onSurfaceColor, fontSize = 11.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (!editingOpacity && !floatingMode && splitGapPx <= 0f) {
             val centered = kotlin.math.abs(frame.centerX - viewRect.centerX) < 0.5f
             val edgeCentered = kotlin.math.abs(frame.left - viewRect.centerX) < 0.5f ||
                 kotlin.math.abs(frame.right - viewRect.centerX) < 0.5f
@@ -644,6 +822,7 @@ internal fun KeyboardResizeOverlay(
                 .semantics { stateDescription = alignmentLabel }
                 .pointerInput(floatingMode, maxWidth, maxHeight) {
                     var movement: FixedKeyboardMoveGesture? = null
+                    var moveSnapped = false
                     detectDragGestures(onDragStart = {
                         val base = currentPreviewRect ?: currentViewRect
                         movement = FixedKeyboardMoveGesture(base,
@@ -658,7 +837,10 @@ internal fun KeyboardResizeOverlay(
                         currentPreviewState.onDragEnd()
                     }) { change, amount ->
                         change.consume()
-                        movement?.move(amount.x)?.let { moved ->
+                        movement?.let { gesture ->
+                            val moved = gesture.move(amount.x)
+                            if (gesture.snapped && !moveSnapped) currentSnapFeedback()
+                            moveSnapped = gesture.snapped
                             dragRect = moved
                             currentOnPreviewRectChange(moved)
                         }
@@ -668,7 +850,7 @@ internal fun KeyboardResizeOverlay(
                     color = onSurfaceColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (floatingMode) {
+        if (!editingOpacity && floatingMode) {
             Box(
                 modifier = Modifier
                     .absoluteOffset {
@@ -716,9 +898,17 @@ internal data class KeyboardResizePreviewState(
     val initialBottomPaddingDp: Int = 0,
     val onBottomPaddingChange: (Int) -> Unit = {},
     val onDragEnd: () -> Unit = {},
+    /** 分体缝宽：本次调节的预览值或已保存值；null 表示自动。 */
+    val splitGapFraction: Float? = null,
+    val splitPitchDp: Float? = null,
+    val onSplitGapChange: (Float) -> Unit = {},
+    val onSplitGapCommit: () -> Unit = {},
 )
 
 internal val LocalKeyboardResizePreviewState = compositionLocalOf { KeyboardResizePreviewState() }
+
+/** Shares only the editor's visibility with the real floating drag bar; geometry stays unchanged. */
+internal val LocalKeyboardResizeOpacityEditing = compositionLocalOf<MutableState<Boolean>?> { null }
 
 // 兼容旧测试/调用方；新的 resize 不再依赖测量回读的 cardRect。
 internal val LocalKeyboardResizeCardRect = compositionLocalOf<ResizeRect?> { null }

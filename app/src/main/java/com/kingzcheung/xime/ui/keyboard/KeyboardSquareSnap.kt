@@ -3,26 +3,29 @@ package com.kingzcheung.xime.ui.keyboard
 import com.kingzcheung.xime.settings.LayoutKind
 
 /** Visual cap geometry, sharing the renderer's gutters and adaptive gaps. */
-internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, val keypad: Boolean) {
+internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, val keypad: Boolean,
+    /** 分体中缝占整张键盘宽度的比例。 */
+    val gapFraction: Float = 0.1f) {
     val section get() = if (keypad) "t9" else "qwerty"
 
     fun capDifference(rect: ResizeRect, density: Float, extra: Float,
         floating: Boolean, spacing: Pair<Float?, Float?>): Float {
         val width = rect.width / density
         val bodyHeight = (rect.height - extra) / density - 44f
-        val fraction = if (split) 0.9f else 1f
+        val fraction = if (split) SplitKeyboardGeometry.keyWidthFraction(width, gapFraction,
+            SplitKeyboardGeometry.gutterDp(floating)) else 1f
         val policy = (if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty)
             .copy(maxKeyWidth = Float.MAX_VALUE)
         val metrics = keyboardGridMetrics(policy, width, bodyHeight, columns,
             allowShrink = floating, widthFraction = fraction, growthSpacing = spacing)
-        val cellWidth = metrics.cellWidthDp - if (split) 8f * fraction / columns else 0f
+        val cellWidth = metrics.cellWidthDp
         return cellWidth - resolvedVisualGap(spacing.first, metrics.insetX ?: 0f) -
             (metrics.cellHeightDp - resolvedVisualGap(spacing.second, metrics.insetY ?: 0f) - 2f * metrics.extraInsetY)
     }
 
     companion object {
-        fun forLayout(kind: LayoutKind, split: Boolean): KeyboardSquareSnap? = when (kind) {
-            LayoutKind.ALPHABETIC -> KeyboardSquareSnap(10f, split, false)
+        fun forLayout(kind: LayoutKind, split: Boolean, gapFraction: Float = 0.1f): KeyboardSquareSnap? = when (kind) {
+            LayoutKind.ALPHABETIC -> KeyboardSquareSnap(10f, split, false, gapFraction)
             LayoutKind.T9 -> KeyboardSquareSnap(5f * 3f / 3.4f, false, true)
             else -> null
         }

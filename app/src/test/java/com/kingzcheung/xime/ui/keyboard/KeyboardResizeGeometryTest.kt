@@ -12,6 +12,21 @@ import org.junit.Test
  * 两边一起动（看起来像整体缩放），而且调节框由屏幕宽度和偏移另算，和真实卡片边界对不上。
  */
 class KeyboardResizeGeometryTest {
+    @Test fun resizeFrameThicknessScalesWithScreenAndStaysInsideItsInset() {
+        val phone = resizeFrameStyle(400)
+        val tablet = resizeFrameStyle(800)
+        assertEquals(9f, phone.handleThicknessDp, 0.01f)
+        // 粗细与屏幕最短边成正比：两倍屏宽即两倍粗。
+        assertEquals(2f, tablet.handleThicknessDp / phone.handleThicknessDp, 0.01f)
+        assertEquals(2f, tablet.strokeDp / phone.strokeDp, 0.01f)
+        for (width in listOf(320, 411, 800, 934, 4000)) {
+            val style = resizeFrameStyle(width)
+            // 手柄整条留在键盘内，且全部落在边缘命中带里。
+            assertTrue(style.insetDp - style.handleThicknessDp / 2f > 0f)
+            assertTrue(style.insetDp + style.handleThicknessDp / 2f <= RESIZE_EDGE_HIT_DP)
+        }
+    }
+
     @Test fun floatingControlsLeaveTheWholeBottomBlankFreeAtLargeHeightsAndPadding() {
         for (density in listOf(1f, 1.875f, 3f)) for (height in listOf(256f, 448f, 900f))
             for (padding in listOf(0, 18, 100)) {

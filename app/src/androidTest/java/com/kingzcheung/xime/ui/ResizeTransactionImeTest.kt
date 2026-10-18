@@ -155,7 +155,7 @@ class ResizeTransactionImeTest {
         rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()
         rule.onNodeWithTag("keyboard-opacity-slider", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.SetProgress) { it(0.6f) }
-        rule.onNodeWithContentDescription("确认").performClick()
+        rule.onNodeWithText("完成").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("keyboard-resize-frame", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
         assertTrue(SettingsPreferences.isFloatingMode(context, landscape))
         assertEquals(0.4f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
@@ -188,6 +188,7 @@ class ResizeTransactionImeTest {
             down(Offset(width / 2f, 4f)); moveBy(Offset(0f, -35f), 80); up()
         }
         rule.onNodeWithTag("keyboard-opacity-slider", useUnmergedTree = true).performSemanticsAction(SemanticsActions.SetProgress) { it(0.6f) }
+        rule.onNodeWithText("返回").performClick()
         rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()
         rule.onNodeWithTag("floating-keyboard-card", useUnmergedTree = true).assertExists()
         shell("input keyevent KEYCODE_BACK")
@@ -214,7 +215,7 @@ class ResizeTransactionImeTest {
         rule.runOnUiThread { editor.requestFocus(); inputMethodManager.showSoftInput(editor, InputMethodManager.SHOW_IMPLICIT) }
         rule.waitUntil(5000) { rule.onAllNodesWithTag("split-keyboard-gap").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithContentDescription("键盘调节").performClick()
-        rule.onNodeWithText("完整").assertIsDisplayed()
+        rule.onNodeWithTag("keyboard-resize-split-button", useUnmergedTree = true).assertIsSelected()
         shell("input keyevent KEYCODE_BACK")
         rule.waitUntil(5000) { rule.onAllNodesWithTag("keyboard-resize-split-button").fetchSemanticsNodes().isEmpty() }
         assertTrue("cancel a later transaction must preserve previously confirmed split", SettingsPreferences.isSplitKeyboardEnabled(context))
