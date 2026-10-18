@@ -136,7 +136,7 @@ index f363419f..fbb64f4c 100644
  
  template <class... Cs>
 diff --git a/src/rime/dict/dictionary.cc b/src/rime/dict/dictionary.cc
-index 1dc47f8f..18bfc9d3 100644
+index 1dc47f8f..1004b910 100644
 --- a/src/rime/dict/dictionary.cc
 +++ b/src/rime/dict/dictionary.cc
 @@ -58,7 +58,7 @@ struct Chunk {
@@ -148,49 +148,193 @@ index 1dc47f8f..18bfc9d3 100644
          credibility(cr),
          quality_len(q) {}
  
-@@ -242,9 +242,10 @@ static void lookup_table(Table* table,
+@@ -88,13 +88,18 @@ struct CodeMatch {
+   bool success;
+   size_t depth;
+   size_t end_pos;
++  // Spelling credit of the matched syllables beyond the 3-syllable index;
++  // accumulated only when the caller asks for it (credit_extra_spelling).
++  double quality_len = 0.0;
++  double credibility = 0.0;
+ };
+ 
+ CodeMatch match_extra_code(const table::Code* extra_code,
+                            size_t depth,
+                            const SyllableGraph& syll_graph,
+                            size_t current_pos,
+-                           bool predict_word) {
++                           bool predict_word,
++                           bool credit_extra_spelling) {
+   const CodeMatch kFailed{false, 0, 0};
+   if (!extra_code || depth >= extra_code->size)
+     return {true, depth, current_pos};
+@@ -114,10 +119,26 @@ CodeMatch match_extra_code(const table::Code* extra_code,
+   CodeMatch best_match = kFailed;
+   for (const SpellingProperties* props : spellings->second) {
+     CodeMatch match = match_extra_code(extra_code, depth + 1, syll_graph,
+-                                       props->end_pos, predict_word);
++                                       props->end_pos, predict_word,
++                                       credit_extra_spelling);
+     if (!match.success)
+       continue;
+-    if (match.end_pos > best_match.end_pos)
++    if (!credit_extra_spelling) {
++      if (match.end_pos > best_match.end_pos)
++        best_match = match;
++      continue;
++    }
++    // Credit a typed syllable as Table::Query credits the indexed ones: a
++    // full spelling adds its length, abbreviation/fuzzy/completion add none.
++    // Predicted (untyped) syllables return above and add nothing.
++    if (props->type == kNormalSpelling)
++      match.quality_len += static_cast<double>(props->end_pos - current_pos);
++    match.credibility += props->credibility;
++    if (!best_match.success || match.end_pos > best_match.end_pos ||
++        (match.end_pos == best_match.end_pos &&
++         (match.quality_len > best_match.quality_len ||
++          (match.quality_len == best_match.quality_len &&
++           match.credibility > best_match.credibility))))
+       best_match = match;
+   }
+   return best_match;
+@@ -136,9 +157,41 @@ void DictEntryIterator::AddChunk(dictionary::Chunk&& chunk) {
+ void DictEntryIterator::Sort() {
+   auto& chunks = query_result_->chunks;
+   // partial-sort remaining chunks, move best match to chunk_index_
++  if (!preferred_) {
++    std::partial_sort(chunks.begin() + chunk_index_,
++                      chunks.begin() + chunk_index_ + 1, chunks.end(),
++                      dictionary::compare_chunk_by_head_element);
++    return;
++  }
+   std::partial_sort(chunks.begin() + chunk_index_,
+                     chunks.begin() + chunk_index_ + 1, chunks.end(),
+-                    dictionary::compare_chunk_by_head_element);
++                    [this](const dictionary::Chunk& a, const dictionary::Chunk& b) {
++                      if (a.entries && a.cursor < a.size && b.entries && b.cursor < b.size &&
++                          a.is_exact_match() && b.is_exact_match()) {
++                        const bool x = preferred_(a.code), y = preferred_(b.code);
++                        if (x != y)
++                          return x;
++                      }
++                      return dictionary::compare_chunk_by_head_element(a, b);
++                    });
++}
++
++bool DictEntryIterator::PreferCodes(function<bool(const Code& code)> preferred) {
++  const auto& chunks = query_result_->chunks;
++  const bool any = std::any_of(chunks.begin() + chunk_index_, chunks.end(),
++      [&](const dictionary::Chunk& c) {
++        return c.entries && c.cursor < c.size && c.is_exact_match() && preferred(c.code);
++      });
++  if (!any || exhausted())
++    return any;
++  preferred_ = std::move(preferred);
++  Sort();
++  entry_.reset();
++  while (filter_ && !exhausted() && !filter_(Peek())) {
++    entry_.reset();
++    FindNextEntry();
++  }
++  return true;
+ }
+ 
+ void DictEntryIterator::AddFilter(DictEntryFilter filter) {
+@@ -242,9 +295,11 @@ static void lookup_table(Table* table,
                           size_t start_pos,
                           bool predict_word,
                           double initial_credibility,
 -                         size_t min_end_pos = 0) {
 +                         size_t min_end_pos = 0,
-+                         bool complete_short_prefix = false) {
++                         bool complete_short_prefix = false,
++                         bool credit_extra_spelling = false) {
    TableQueryResult result;
 -  if (!table->Query(syllable_graph, start_pos, &result, min_end_pos)) {
 +  if (!table->Query(syllable_graph, start_pos, &result, min_end_pos, complete_short_prefix)) {
      return;
    }
    // copy result
-@@ -320,7 +321,8 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
+@@ -256,14 +311,16 @@ static void lookup_table(Table* table,
+       if (a.extra_code()) {
+         do {
+           dictionary::CodeMatch match = dictionary::match_extra_code(
+-              a.extra_code(), 0, syllable_graph, end_pos, predict_word);
++              a.extra_code(), 0, syllable_graph, end_pos, predict_word,
++              credit_extra_spelling);
+           if (!match.success)
+             continue;
+           if (min_end_pos != 0 && match.end_pos < min_end_pos)
+             continue;
+           size_t matching_code_size = a.index_code().size() + match.depth;
+           (*collector)[match.end_pos].AddChunk(
+-              {table, a.code(), a.entry(), matching_code_size, cr, q});
++              {table, a.code(), a.entry(), matching_code_size,
++               cr + match.credibility, q + match.quality_len});
+         } while (a.Next());
+       } else {
+         (*collector)[end_pos].AddChunk({table, a, cr, q});
+@@ -278,7 +335,8 @@ static void collect_chunks(DictEntryCollector* collector,
+                            const SyllableGraph& syllable_graph,
+                            bool predict_word,
+                            double initial_credibility,
+-                           size_t min_end_pos) {
++                           size_t min_end_pos,
++                           bool credit_extra_spelling) {
+   for (auto& v : result) {
+     size_t end_pos = v.first;
+     for (TableAccessor& a : v.second) {
+@@ -287,14 +345,16 @@ static void collect_chunks(DictEntryCollector* collector,
+       if (a.extra_code()) {
+         do {
+           dictionary::CodeMatch match = dictionary::match_extra_code(
+-              a.extra_code(), 0, syllable_graph, end_pos, predict_word);
++              a.extra_code(), 0, syllable_graph, end_pos, predict_word,
++              credit_extra_spelling);
+           if (!match.success)
+             continue;
+           if (min_end_pos != 0 && match.end_pos < min_end_pos)
+             continue;
+           size_t matching_code_size = a.index_code().size() + match.depth;
+           (*collector)[match.end_pos].AddChunk(
+-              {table, a.code(), a.entry(), matching_code_size, cr, q});
++              {table, a.code(), a.entry(), matching_code_size,
++               cr + match.credibility, q + match.quality_len});
+         } while (a.Next());
+       } else {
+         (*collector)[end_pos].AddChunk({table, a, cr, q});
+@@ -320,7 +380,9 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
                                            const hash_set<string>* blacklist,
                                            bool predict_word,
                                            double initial_credibility,
 -                                          size_t min_end_pos) {
 +                                          size_t min_end_pos,
-+                                          bool complete_short_prefix) {
++                                          bool complete_short_prefix,
++                                          bool credit_extra_spelling) {
    if (!loaded())
      return nullptr;
    auto collector = New<DictEntryCollector>();
-@@ -328,7 +330,7 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
+@@ -328,7 +390,8 @@ an<DictEntryCollector> Dictionary::Lookup(const SyllableGraph& syllable_graph,
      if (!table->IsOpen())
        continue;
      lookup_table(table.get(), collector.get(), syllable_graph, start_pos,
 -                 predict_word, initial_credibility, min_end_pos);
-+                 predict_word, initial_credibility, min_end_pos, complete_short_prefix);
++                 predict_word, initial_credibility, min_end_pos, complete_short_prefix,
++                 credit_extra_spelling);
    }
    if (collector->empty())
      return nullptr;
-@@ -342,7 +344,8 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -342,7 +405,9 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
      const vector<size_t>& start_positions,
      const hash_set<string>* blacklist,
      bool predict_word,
 -    size_t min_end_pos) {
 +    size_t min_end_pos,
-+    size_t sentence_beam_width) {
++    size_t sentence_beam_width,
++    bool credit_extra_spelling) {
    map<int, an<DictEntryCollector>> result;
    if (!loaded() || start_positions.empty())
      return result;
-@@ -377,7 +380,7 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
+@@ -377,14 +442,14 @@ map<int, an<DictEntryCollector>> Dictionary::LookupAll(
        continue;
      map<int, TableQueryResult> per_start;
      if (!table->QueryMulti(syllable_graph, starts, &per_start, min_end_pos,
@@ -199,27 +343,57 @@ index 1dc47f8f..18bfc9d3 100644
        continue;
      for (auto& sv : per_start) {
        auto& collector = result[sv.first];
+       if (!collector)
+         collector = New<DictEntryCollector>();
+       collect_chunks(collector.get(), table.get(), sv.second, syllable_graph,
+-                     predict_word, 0.0, min_end_pos);
++                     predict_word, 0.0, min_end_pos, credit_extra_spelling);
+     }
+   }
+   for (auto it = result.begin(); it != result.end();) {
 diff --git a/src/rime/dict/dictionary.h b/src/rime/dict/dictionary.h
-index 8a854007..710e077f 100644
+index 8a854007..63c7aa91 100644
 --- a/src/rime/dict/dictionary.h
 +++ b/src/rime/dict/dictionary.h
-@@ -77,7 +77,8 @@ class Dictionary : public Class<Dictionary, const Ticket&> {
+@@ -35,6 +35,9 @@ class RIME_DLL DictEntryIterator : public DictEntryFilterBinder {
+   void AddChunk(dictionary::Chunk&& chunk);
+   void Sort();
+   void AddFilter(DictEntryFilter filter) override;
++  // Among exact matches, entries whose code satisfies `preferred` come first;
++  // weight order is kept within each group. Returns whether any entry does.
++  bool PreferCodes(function<bool(const Code& code)> preferred);
+   an<DictEntry> Peek();
+   bool Next();
+   bool Skip(size_t num_entries);
+@@ -49,6 +52,7 @@ class RIME_DLL DictEntryIterator : public DictEntryFilterBinder {
+   size_t chunk_index_ = 0;
+   an<DictEntry> entry_ = nullptr;
+   size_t entry_count_ = 0;
++  function<bool(const Code& code)> preferred_;
+ };
+ 
+ using DictEntryCollector = map<size_t, DictEntryIterator>;
+@@ -77,7 +81,11 @@ class Dictionary : public Class<Dictionary, const Ticket&> {
        const hash_set<string>* blacklist = nullptr,
        bool predict_word = false,
        double initial_credibility = 0.0,
 -      size_t min_end_pos = 0);
 +      size_t min_end_pos = 0,
-+      bool complete_short_prefix = false);
++      bool complete_short_prefix = false,
++      // T9 numeric input: credit typed syllables beyond the 3-syllable index
++      // (quality_len and credibility) like the indexed ones.
++      bool credit_extra_spelling = false);
    // 多起点查询：一次表查询覆盖全部 start（共享音节树 BFS），
    // 结果按 start 分组。与逐 start 调 Lookup 的结果等价，但把
    // T9 增量 compose 每键 O(N²) 的查询成本降为 O(N)。
-@@ -86,7 +87,8 @@ class Dictionary : public Class<Dictionary, const Ticket&> {
+@@ -86,7 +94,9 @@ class Dictionary : public Class<Dictionary, const Ticket&> {
        const vector<size_t>& start_positions,
        const hash_set<string>* blacklist = nullptr,
        bool predict_word = false,
 -      size_t min_end_pos = 0);
 +      size_t min_end_pos = 0,
-+      size_t sentence_beam_width = 0);
++      size_t sentence_beam_width = 0,
++      bool credit_extra_spelling = false);
    // if predictive is true, do an expand search with limit,
    // otherwise do an exact match.
    // return num of matching keys.
@@ -538,11 +712,68 @@ index 56d4eef1..6d057fe2 100644
    RIME_DLL string GetEntryText(const table::Entry& entry);
  
    uint32_t dict_file_checksum() const;
+diff --git a/src/rime/gear/memory.cc b/src/rime/gear/memory.cc
+index 9da80fa9..d6443783 100644
+--- a/src/rime/gear/memory.cc
++++ b/src/rime/gear/memory.cc
+@@ -128,6 +128,9 @@ bool Memory::ProcessSegmentOnCommit(CommitEntry& commit_entry,
+ void Memory::OnCommit(Context* ctx) {
+   if (!user_dict_ || user_dict_->readonly())
+     return;
++  // CyIME incognito: keep using the dictionary but never learn from commits.
++  if (ctx && ctx->get_option("_cyime_incognito"))
++    return;
+   StartSession();
+   CommitEntry commit_entry(this);
+   for (auto& seg : ctx->composition()) {
 diff --git a/src/rime/gear/script_translator.cc b/src/rime/gear/script_translator.cc
-index 99e45117..28d0355e 100644
+index 99e45117..29748906 100644
 --- a/src/rime/gear/script_translator.cc
 +++ b/src/rime/gear/script_translator.cc
-@@ -227,6 +227,7 @@ ScriptTranslator::ScriptTranslator(const Ticket& ticket)
+@@ -122,7 +122,7 @@ class ScriptSyllabifier : public PhraseSyllabifier {
+   size_t BuildSyllableGraph(Prism& prism);
+   string GetPreeditString(const Phrase& cand) const;
+   string GetOriginalSpelling(const Phrase& cand) const;
+-  bool IsCorrection(const Code& code, size_t code_length) const;
++  bool IsCorrection(const Code& code, size_t code_length, size_t start = 0) const;
+ 
+   const SyllableGraph& syllable_graph() const { return syllable_graph_; }
+   const string& input() const { return input_; }
+@@ -166,7 +166,7 @@ class ScriptTranslation : public Translation {
+   bool PrepareCandidate();
+   template <class QueryResult>
+   void EnrollEntries(map<int, DictEntryList>& entries_by_end_pos,
+-                     const an<QueryResult>& query_result);
++                     const an<QueryResult>& query_result, size_t start = 0);
+   WordGraph PrepareForMakingSentence(Dictionary* dict,
+                                      UserDictionary* user_dict);
+   // 增量：只查新桶（end > old_interpreted）追加进缓存的 inc->graph，
+@@ -175,6 +175,7 @@ class ScriptTranslation : public Translation {
+   void EnrollIncrementalBuckets(Dictionary* dict,
+                                 UserDictionary* user_dict,
+                                 size_t old_interpreted);
++  an<Sentence> MakeExactSentence(const WordGraph& graph);
+   an<Sentence> MakeSentence(Dictionary* dict, UserDictionary* user_dict);
+   deque<an<Sentence>> MakeSentences(Dictionary* dict,
+                                     UserDictionary* user_dict);
+@@ -188,6 +189,7 @@ class ScriptTranslation : public Translation {
+   an<DictEntryCollector> phrase_;
+   an<UserDictEntryCollector> user_phrase_;
+   deque<an<Sentence>> sentences_;
++  an<Sentence> exact_sentence_;
+ 
+   an<Phrase> candidate_ = nullptr;
+   size_t candidate_index_ = 0;
+@@ -210,6 +212,8 @@ class ScriptTranslation : public Translation {
+   bool enable_correction_;
+ };
+ 
++static bool IsT9NumericInput(const string& s);
++
+ // ScriptTranslator implementation
+ 
+ ScriptTranslator::ScriptTranslator(const Ticket& ticket)
+@@ -227,6 +231,7 @@ ScriptTranslator::ScriptTranslator(const Ticket& ticket)
                           &enable_word_completion_)) {
        enable_word_completion_ = enable_completion_;
      }
@@ -550,16 +781,102 @@ index 99e45117..28d0355e 100644
      config->GetInt(name_space_ + "/max_homophones", &max_homophones_);
      config->GetBool(name_space_ + "/incremental_compose",
                      &incremental_enabled_);
-@@ -508,7 +509,7 @@ bool ScriptTranslation::Evaluate(Dictionary* dict, UserDictionary* user_dict) {
+@@ -418,7 +423,7 @@ size_t ScriptSyllabifier::BuildSyllableGraph(Prism& prism) {
+ }
+ 
+ bool ScriptSyllabifier::IsCorrection(const Code& code,
+-                                     size_t code_length) const {
++                                     size_t code_length, size_t start) const {
+   vector<bool> path_attributes;
+   path_attributes.reserve(8);
+ 
+@@ -446,7 +451,7 @@ bool ScriptSyllabifier::IsCorrection(const Code& code,
+       // pop
+       [&](SyllabifyTask* task, size_t depth) { path_attributes.pop_back(); }};
+ 
+-  if (syllabify_dfs(&task, 0, 0)) {
++  if (syllabify_dfs(&task, 0, start)) {
+     for (bool is_correction : path_attributes) {
+       if (is_correction)
+         return true;
+@@ -508,7 +513,8 @@ bool ScriptTranslation::Evaluate(Dictionary* dict, UserDictionary* user_dict) {
      T9IncTimer pos0_timer("stage-eval-pos0");
      phrase_ =
          dict->Lookup(syllable_graph, 0, &translator_->blacklist(),
 -                     predict_word);
-+                     predict_word, 0.0, 0, translator_->complete_short_prefix());
++                     predict_word, 0.0, 0, translator_->complete_short_prefix(),
++                     IsT9NumericInput(syllabifier_->input()));
      if (user_dict) {
        const size_t kUnlimitedDepth = 0;
        const size_t kNumSyllablesToPredictWord = 4;
-@@ -761,16 +762,66 @@ static bool has_completion_edge(const SyllableGraph& graph) {
+@@ -525,6 +531,18 @@ bool ScriptTranslation::Evaluate(Dictionary* dict, UserDictionary* user_dict) {
+   if (user_phrase_)
+     user_phrase_iter_ = user_phrase_->rbegin();
+ 
++  // The typed letters already spell a whole phrase (zdky: 这都可以): list it
++  // before corrected spellings of the same length, which may weigh more, so
++  // neither they nor a sentence of frequent single characters displace it. Kept
++  // ahead of the corrector lambda so the joint decoder (inserted there) lists them likewise.
++  if (enable_correction_ && phrase_ && phrase_iter_ != phrase_->rend() &&
++      phrase_iter_->first == consumed && !phrase_iter_->second.exhausted() &&
++      syllabifier_->IsCorrection(phrase_iter_->second.Peek()->code, consumed)) {
++    phrase_iter_->second.PreferCodes([this, consumed](const Code& code) {
++      return !syllabifier_->IsCorrection(code, consumed);
++    });
++  }
++
+   auto is_correction_match = [&](auto& iter_pair, size_t len) {
+     if (iter_pair.first != len || iter_pair.second.exhausted())
+       return false;
+@@ -558,6 +576,15 @@ bool ScriptTranslation::Evaluate(Dictionary* dict, UserDictionary* user_dict) {
+     }
+   }
+ 
++  // A corrected learned phrase can win the general sentence beam even when
++  // every typed syllable is valid. Reserve the original-spelling sentence;
++  // keep corrected alternatives, so correction remains available for typos.
++  if (exact_sentence_) {
++    sentences_.erase(std::remove_if(sentences_.begin(), sentences_.end(),
++        [&](const auto& sentence) { return sentence->text() == exact_sentence_->text(); }),
++        sentences_.end());
++    sentences_.push_front(exact_sentence_);
++  }
+   return !CheckEmpty();
+ }
+ 
+@@ -733,16 +760,29 @@ bool ScriptTranslation::CheckEmpty() {
+ template <class QueryResult>
+ void ScriptTranslation::EnrollEntries(
+     map<int, DictEntryList>& entries_by_end_pos,
+-    const an<QueryResult>& query_result) {
++    const an<QueryResult>& query_result, size_t start) {
+   if (query_result) {
+     for (auto& y : *query_result) {
+       DictEntryList& homophones = entries_by_end_pos[y.first];
+-      while (homophones.size() < translator_->max_homophones() &&
++      const size_t limit = translator_->max_homophones();
++      // User entries may describe corrected spellings, not homophones of the
++      // original input. Do not let their early insertion consume the only slot
++      // before the system dictionary can offer an exact spelling at this span.
++      size_t enrolled = 0;
++      while ((enable_correction_ ? enrolled < limit : homophones.size() < limit) &&
+              !y.second.exhausted()) {
+         homophones.push_back(y.second.Peek());
++        ++enrolled;
+         if (!y.second.Next())
+           break;
+       }
++      if (enable_correction_) {
++        std::stable_partition(homophones.begin(), homophones.end(),
++            [&](const auto& entry) {
++              return !syllabifier_->IsCorrection(entry->code, y.first, start);
++            });
++        if (homophones.size() > limit) homophones.resize(limit);
++      }
+     }
+   }
+ }
+@@ -761,16 +801,66 @@ static bool has_completion_edge(const SyllableGraph& graph) {
  }
  
  // 九键输入特征：纯数字串（用于限定增量回退诊断日志的输出范围）
@@ -628,7 +945,7 @@ index 99e45117..28d0355e 100644
  bool ScriptTranslator::TryBeginIncremental(const string& input,
                                             UserDictionary* user_dict,
                                             size_t* old_interpreted) {
-@@ -806,7 +857,7 @@ bool ScriptTranslator::TryBeginIncremental(const string& input,
+@@ -806,7 +896,7 @@ bool ScriptTranslator::TryBeginIncremental(const string& input,
    if (miss) {
      // 仅诊断九键场景的回退（字母输入每键都会 miss，不打扰）；
      // glog 不进 logcat，用 android log 直出（tag 与 [TIMING] 一致）
@@ -637,7 +954,42 @@ index 99e45117..28d0355e 100644
        T9_INC_LOG("T9 incremental MISS (%s): '%s'", miss, input.c_str());
      return false;
    }
-@@ -851,7 +902,7 @@ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
+@@ -841,6 +931,34 @@ void ScriptTranslator::CommitIncremental(const string& input,
+     inc->lattice.reset();
+ }
+ 
++an<Sentence> ScriptTranslation::MakeExactSentence(const WordGraph& graph) {
++  if (!enable_correction_) return nullptr;
++  WordGraph exact_graph;
++  bool has_correction = false;
++  for (const auto& start : graph) {
++    for (const auto& end : start.second) {
++      for (const auto& entry : end.second) {
++        if (syllabifier_->IsCorrection(entry->code, end.first, start.first)) {
++          has_correction = true;
++        } else {
++          exact_graph[start.first][end.first].push_back(entry);
++        }
++      }
++    }
++  }
++  if (!has_correction) return nullptr;
++  // Reuse the dictionary lookups and their normal homophone cap. Only the
++  // sentence search is repeated, without corrected edges competing for its beam.
++  auto sentence = poet_->MakeSentence(exact_graph,
++      syllabifier_->syllable_graph().interpreted_length,
++      translator_->GetPrecedingText(start_));
++  if (sentence) {
++    sentence->Offset(start_);
++    sentence->set_syllabifier(syllabifier_);
++  }
++  return sentence;
++}
++
+ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
+                                              UserDictionary* user_dict) {
+   const auto& syllable_graph = syllabifier_->syllable_graph();
+@@ -851,7 +969,7 @@ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
    auto* inc = translator_->incremental_state();
    size_t old_interpreted = 0;
    const bool use_incremental =
@@ -646,7 +998,15 @@ index 99e45117..28d0355e 100644
        translator_->TryBeginIncremental(input, user_dict, &old_interpreted);
    // 本轮图含补全边时桶缓存只能作废（下一轮全量）
    const bool cacheable = !has_completion_edge(syllable_graph);
-@@ -915,7 +966,7 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
+@@ -883,6 +1001,7 @@ an<Sentence> ScriptTranslation::MakeSentence(Dictionary* dict,
+   }
+ 
+   WordGraph graph = PrepareForMakingSentence(dict, user_dict);
++  exact_sentence_ = MakeExactSentence(graph);
+   an<Sentence> sentence;
+   if (inc) {
+     if (cacheable) {
+@@ -915,7 +1034,7 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
    auto* inc = translator_->incremental_state();
    size_t old_interpreted = 0;
    const bool use_incremental =
@@ -655,7 +1015,15 @@ index 99e45117..28d0355e 100644
        translator_->TryBeginIncremental(input, user_dict, &old_interpreted);
    // 本轮图含补全边时桶缓存只能作废（下一轮全量）
    const bool cacheable = !has_completion_edge(syllable_graph);
-@@ -1011,7 +1062,8 @@ WordGraph ScriptTranslation::PrepareForMakingSentence(
+@@ -939,6 +1058,7 @@ deque<an<Sentence>> ScriptTranslation::MakeSentences(
+   }
+ 
+   WordGraph graph = PrepareForMakingSentence(dict, user_dict);
++  exact_sentence_ = MakeExactSentence(graph);
+   if (inc && cacheable)
+     inc->graph = std::move(graph);
+   if (inc)
+@@ -1011,24 +1131,42 @@ WordGraph ScriptTranslation::PrepareForMakingSentence(
      UserDictionary* user_dict) {
    const int kMaxSyllablesForUserPhraseQuery = 5;
    const auto& syllable_graph = syllabifier_->syllable_graph();
@@ -665,8 +1033,10 @@ index 99e45117..28d0355e 100644
    WordGraph result;
    if (user_dict) {
      for (const auto& x : syllable_graph.edges) {
-@@ -1020,15 +1072,32 @@ WordGraph ScriptTranslation::PrepareForMakingSentence(
-                                       kMaxSyllablesForUserPhraseQuery));
+       EnrollEntries(result[x.first],
+                     user_dict->Lookup(syllable_graph, x.first,
+-                                      kMaxSyllablesForUserPhraseQuery));
++                                      kMaxSyllablesForUserPhraseQuery), x.first);
      }
    }
 -  {
@@ -687,7 +1057,7 @@ index 99e45117..28d0355e 100644
 +        &translator_->blacklist(), false, 0, bounded_t9 ? kT9SentenceBeamWidth : 0);
      for (auto& kv : sys_buckets)
 -      EnrollEntries(result[kv.first], kv.second);
-+      EnrollEntries(bounded_t9 ? system_graph[kv.first] : result[kv.first], kv.second);
++      EnrollEntries(bounded_t9 ? system_graph[kv.first] : result[kv.first], kv.second, kv.first);
 +    translator_->RememberPrefixGraph(syllabifier_->input(), system_graph);
 +  }
 +  if (!bounded_t9) return result;
@@ -735,8 +1105,10 @@ index 28e4f3bf..5099d761 100644
    bool SaveCommitEntry(CommitEntry& commit_entry);
 @@ -80,6 +93,7 @@ class ScriptTranslator : public Translator,
    int max_homophones() const { return max_homophones_; }
-   int spelling_hints() const { return spelling_hints_; }
-   bool always_show_comments() const { return always_show_comments_; }
+-  int spelling_hints() const { return spelling_hints_; }
++  int spelling_hints() const { return candidate_comments() ? 100 : spelling_hints_; }
+-  bool always_show_comments() const { return always_show_comments_; }
++  bool always_show_comments() const { return candidate_comments() || always_show_comments_; }
 +  bool complete_short_prefix() const { return complete_short_prefix_; }
    bool enable_word_completion() const { return enable_word_completion_; }
    int max_word_length() const { return max_word_length_; }
@@ -757,3 +1129,101 @@ index 28e4f3bf..5099d761 100644
  };
  
  }  // namespace rime
+diff --git a/src/rime/gear/table_translator.cc b/src/rime/gear/table_translator.cc
+index 67bc2292..e917a348 100644
+--- a/src/rime/gear/table_translator.cc
++++ b/src/rime/gear/table_translator.cc
+@@ -76,6 +76,12 @@ an<Candidate> TableTranslation::Peek() {
+   bool is_user_phrase = PreferUserPhrase();
+   auto e = PreferredEntry(is_user_phrase);
+   string comment(is_constructed(e.get()) ? kUnitySymbol : e->comment);
++  // Exact table matches normally omit their code. Preserve annotations supplied
++  // by dictionaries and completion matches; do not fabricate missing suffixes.
++  if (comment.empty() && options_ && options_->candidate_comments() &&
++      e->remaining_code_length == 0) {
++    comment = input_;
++  }
+   if (options_) {
+     options_->comment_formatter().Apply(&comment);
+   }
+diff --git a/src/rime/gear/translator_commons.cc b/src/rime/gear/translator_commons.cc
+index 7fc0f272..0ec06237 100644
+--- a/src/rime/gear/translator_commons.cc
++++ b/src/rime/gear/translator_commons.cc
+@@ -7,6 +7,8 @@
+ #include <algorithm>
+ #include <boost/range/adaptor/reversed.hpp>
+ #include <rime/config.h>
++#include <rime/context.h>
++#include <rime/engine.h>
+ #include <rime/schema.h>
+ #include <rime/ticket.h>
+ #include <rime/gear/grammar.h>
+@@ -113,6 +115,7 @@ void Sentence::Offset(size_t offset) {
+ // TranslatorOptions
+ 
+ TranslatorOptions::TranslatorOptions(const Ticket& ticket) {
++  comments_engine_ = ticket.engine;
+   if (!ticket.schema)
+     return;
+   if (Config* config = ticket.schema->config()) {
+@@ -167,6 +170,11 @@ TranslatorOptions::TranslatorOptions(const Ticket& ticket) {
+   }
+ }
+ 
++bool TranslatorOptions::candidate_comments() const {
++  return comments_engine_ &&
++         comments_engine_->context()->get_option("_cyime_candidate_comments");
++}
++
+ bool TranslatorOptions::IsUserDictDisabledFor(const string& input) const {
+   if (user_dict_disabling_patterns_.empty())
+     return false;
+diff --git a/src/rime/gear/translator_commons.h b/src/rime/gear/translator_commons.h
+index 6217e5a7..9050377e 100644
+--- a/src/rime/gear/translator_commons.h
++++ b/src/rime/gear/translator_commons.h
+@@ -140,9 +140,13 @@ class Sentence : public Phrase {
+ 
+ struct Ticket;
+ 
++class Engine;
++
+ class TranslatorOptions {
+  public:
+   TranslatorOptions(const Ticket& ticket);
++  // The host requests annotation data; viewport preferences decide its visibility.
++  bool candidate_comments() const;
+   bool IsUserDictDisabledFor(const string& input) const;
+ 
+   const string& delimiters() const { return delimiters_; }
+@@ -170,6 +174,7 @@ class TranslatorOptions {
+   const hash_set<string>& blacklist() { return blacklist_; }
+ 
+  protected:
++  Engine* comments_engine_ = nullptr;
+   string delimiters_;
+   vector<string> tags_{"abc"};  // invariant: non-empty
+   bool contextual_suggestions_ = false;
+diff --git a/src/rime/dict/user_dictionary.cc b/src/rime/dict/user_dictionary.cc
+index 953c59cf..8cdcbaa7 100644
+--- a/src/rime/dict/user_dictionary.cc
++++ b/src/rime/dict/user_dictionary.cc
+@@ -237,10 +237,16 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
+     BOOST_SCOPE_EXIT_END
+     if (!TranslateCodeToString(state->code, &prefix))
+       continue;
++    bool typed_taken = false;
+     for (size_t i = 0; i < spelling.second.size(); ++i) {
+       auto props = spelling.second[i];
+-      if (i > 0 && props->type >= kAbbreviation)
++      // As upstream, later abbreviated spellings are skipped once one edge was looked up, but a
++      // neighbour-corrected edge listed first (ending elsewhere) must not hide the typed one:
++      // with correction on, zdky never found the learned 这都可以.
++      if (i > 0 && props->type >= kAbbreviation && typed_taken)
+         continue;
++      if (!props->is_correction)
++        typed_taken = true;
+       state->credibility.push_back(state->credibility.back() +
+                                    props->credibility);
+       size_t end_pos = props->end_pos;

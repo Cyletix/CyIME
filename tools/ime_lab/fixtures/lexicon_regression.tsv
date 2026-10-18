@@ -1,0 +1,1112 @@
+# CyIME 词库/排序回归用例。每个新报告先加一行再修。列：id 键盘(26/14/9/win26) 输入 期望(前缀!表示首选不能是它) 名次上限(期望须在前几位) 来源 日期 备注
+id	keyboard	input	expect	top_k	source	date	note
+user-zdky	26	zdky	这都可以	1	user	2026-10-17	曾出“在都可以”（邻键纠错把整词挤掉）
+user-14-zdky	14	ZDJT	!ZDJT	1	user	2026-10-18	14 键简拼只出大写字母
+user-14-Z	14	Z	!Z	1	user	2026-10-18	同上
+user-14-BUG	14	BUG	!不G	1	user	2026-10-18	同上
+user-win-c	win26	c	!C++	1	user	2026-10-18	Windows 单打 c 首选 C++
+found-hzp	26	hzp	化妆品	1	found	2026-10-17	邻键纠错曾出“或作品”
+found-zdh	26	zdh	自动化	1	found	2026-10-17	邻键纠错曾出“制度或”
+found-hyddj	26	hyddj	还要等多久	1	found	2026-10-17	邻键纠错曾出“活跃度等级”
+T9-001	9	3	的	1	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-002	9	5833	觉得	3	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-003	9	3242458	大概率	3	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-004	9	9692674264	我晚上	3	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-007	9	65	OK	20	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-008	9	77	QQ	20	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-010	9	645831316	你觉得呢	20	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-011	9	94294744	下意识	20	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-012	9	32942426	打一遍	3	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+T9-013	9	936848	问题太	20	tools/ime_lab/regression_cases.json	2026-10-03	1.3.20隔离模拟器真实引擎通过；未真机验收
+t9user-c001	9	9347436634849439264	为什么会这样	1	user (fixtures/user_reported_20261009.json)	2026-10-09	九键整句
+t9user-c002	9	9693289443269347436634849439264	我也不知道为什么会这样	1	user (fixtures/user_reported_20261009.json)	2026-10-09	九键整句
+t9user-c003	9	934743663484943926463	为什么会这样呢	1	user (fixtures/user_reported_20261009.json)	2026-10-09	九键整句
+t9user-c004	9	426583942692442694342653	感觉现在好一点了	1	user (fixtures/user_reported_20261009.json)	2026-10-09	九键整句
+t9user-c005	9	42694342653	好一点了	1	user (fixtures/user_reported_20261009.json)	2026-10-09	九键整句
+full-000	26	nichifanlema	你吃饭了吗	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-001	26	ncflm	你吃饭了吗	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-002	26	nixianzaizaina	你现在在哪	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-003	26	nxzzn	你现在在哪	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-004	26	jintianwanshangyoukongma	今天晚上有空吗	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-005	26	nidaojialemei	你到家了没	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-006	26	ndjlm	你到家了没	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-007	26	mingtianjidianchufa	明天几点出发	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-008	26	mtjdcf	明天几点出发	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-009	26	zhegezenmeyong	这个怎么用	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-010	26	zgzmy	这个怎么用	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-011	26	nijuedezenmeyang	你觉得怎么样	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-012	26	njdzmy	你觉得怎么样	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-013	26	tamendouqulema	他们都去了吗	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-014	26	tmdqlm	他们都去了吗	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-015	26	nanihailaibulai	那你还来不来	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-016	26	nnhlbl	那你还来不来	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-017	26	zhoumoyiqiqupashanba	周末一起去爬山吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-018	26	nishibushishengqile	你是不是生气了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-019	26	yaobuyaowoqujieni	要不要我去接你	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-020	26	zenmehaimeihuixiaoxi	怎么还没回消息	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-021	26	nizaiganshenmene	你在干什么呢	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-022	26	nzgsmn	你在干什么呢	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-023	26	tazenmeyebushuohua	他怎么也不说话	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-024	26	daodishisheishuode	到底是谁说的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-025	26	ddsssd	到底是谁说的	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-026	26	haiyaodengduojiu	还要等多久	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-027	26	hyddj	还要等多久	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-028	26	nengbunengpianyiyidian	能不能便宜一点	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-029	26	zhejianshinizhidaoma	这件事你知道吗	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-030	26	nishenmeshihouyoukong	你什么时候有空	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-031	26	nikandaowodexiaoxilema	你看到我的消息了吗	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-032	26	ninabianxiaxuelema	你那边下雪了吗	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-033	26	tamenzenmehaimeidao	他们怎么还没到	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-034	26	nihuibuhuizuofan	你会不会做饭	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-035	26	nhbhzf	你会不会做饭	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-036	26	nihaijidema	你还记得吗	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-037	26	nhjdm	你还记得吗	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-038	26	nabianzenmeyangle	那边怎么样了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-039	26	nbzmyl	那边怎么样了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-040	26	haojiubujianzuijinzenmeyang	好久不见最近怎么样	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-041	26	womenmingtianjidianzainajihe	我们明天几点在哪集合	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-042	26	haodewozhidaole	好的我知道了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-043	26	hdwzdl	好的我知道了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-044	26	meiwentibaozaiwoshenshang	没问题包在我身上	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-045	26	woyeshizhemexiangde	我也是这么想的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-046	26	najiuzheyangba	那就这样吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-047	26	njzyb	那就这样吧	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-048	26	womashangjiudao	我马上就到	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-049	26	wmsjd	我马上就到	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-050	26	buyonglexiexie	不用了谢谢	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-051	26	bylxx	不用了谢谢	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-052	26	suanlebushuole	算了不说了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-053	26	slbsl	算了不说了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-054	26	xingnajiumingtianjian	行那就明天见	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-055	26	xnjmtj	行那就明天见	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-056	26	wohaizailushang	我还在路上	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-057	26	whzls	我还在路上	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-058	26	wodouwanglezhehuishi	我都忘了这回事	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-059	26	nishuodedui	你说得对	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-060	26	nsdd	你说得对	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-061	26	woyebutaiqingchu	我也不太清楚	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-062	26	wybtqc	我也不太清楚	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-063	26	dengwoyixia	等我一下	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-064	26	dwyx	等我一下	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-065	26	gangcaizaikaihui	刚才在开会	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-066	26	gczkh	刚才在开会	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-067	26	woyijingdaole	我已经到了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-068	26	wyjdl	我已经到了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-069	26	meishinimangba	没事你忙吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-070	26	msnmb	没事你忙吧	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-071	26	zhendejiade	真的假的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-072	26	zdjd	真的假的	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-073	26	taihaole	太好了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-074	26	thl	太好了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-075	26	biedanxin	别担心	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-076	26	bdx	别担心	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-077	26	woxianshuile	我先睡了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-078	26	wxsl	我先睡了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-079	26	woxianzaijiuguoqu	我现在就过去	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-080	26	wxzjgq	我现在就过去	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-081	26	buhaoyisiwolaiwanle	不好意思我来晚了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-082	26	xiawusandianzaimenkoujian	下午三点在门口见	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-083	26	womenzaiditiezhandengni	我们在地铁站等你	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-084	26	mingtianzaoshangbadiankaihui	明天早上八点开会	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-085	26	wanshangyiqichihuoguo	晚上一起吃火锅	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-086	26	xiazhousanyaokaoshi	下周三要考试	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-087	26	xzsyks	下周三要考试	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-088	26	wozaigongsilouxia	我在公司楼下	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-089	26	wzgslx	我在公司楼下	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-090	26	cheyijingkaizoule	车已经开走了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-091	26	cyjkzl	车已经开走了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-092	26	waimianxiayule	外面下雨了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-093	26	wmxyl	外面下雨了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-094	26	jintiantebieleng	今天特别冷	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-095	26	jttbl	今天特别冷	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-096	26	kuaidaolehaiyouwufenzhong	快到了还有五分钟	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-097	26	jintiandehuiquxiaole	今天的会取消了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-098	26	tianqiyubaoshuomingtianyouyu	天气预报说明天有雨	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-099	26	zaoshanghao	早上好	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-100	26	zsh	早上好	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-101	26	wananla	晚安啦	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-102	26	wal	晚安啦	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-103	26	jintianhaoleia	今天好累啊	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-104	26	jthla	今天好累啊	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-105	26	woyoudianbushufu	我有点不舒服	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-106	26	wydbsf	我有点不舒服	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-107	26	xinqingbutaihao	心情不太好	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-108	26	xqbth	心情不太好	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-109	26	wozhendehenkaixin	我真的很开心	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-110	26	wzdhkx	我真的很开心	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-111	26	zheyetainanleba	这也太难了吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-112	26	zytnlb	这也太难了吧	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-113	26	xiaosiwole	笑死我了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-114	26	xswl	笑死我了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-115	26	youdianxiangjiale	有点想家了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-116	26	ydxjl	有点想家了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-117	26	woyehenxiangni	我也很想你	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-118	26	wyhxn	我也很想你	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-119	26	bietainanguole	别太难过了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-120	26	btngl	别太难过了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-121	26	zheshitingmafande	这事挺麻烦的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-122	26	zstmfd	这事挺麻烦的	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-123	26	xinkulezaodianxiuxi	辛苦了早点休息	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-124	26	shengrikuaile	生日快乐	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-125	26	srkl	生日快乐	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-126	26	wozuowanzuoleyigeqiguaidemeng	我昨晚做了一个奇怪的梦	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-127	26	wodasuanmingnianhuangongzuo	我打算明年换工作	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-128	26	womenxiacizaiyue	我们下次再约	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-129	26	wmxczy	我们下次再约	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-130	26	huitouzaishuoba	回头再说吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-131	26	htzsb	回头再说吧	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-132	26	woxiangqumaidiandongxi	我想去买点东西	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-133	26	denghuigeinidadianhua	等会给你打电话	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-134	26	chiwanfanjiuhuiqu	吃完饭就回去	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-135	26	cwfjhq	吃完饭就回去	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-136	26	womingtianqingjia	我明天请假	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-137	26	wmtqj	我明天请假	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-138	26	zhezhoumowoyaojiaban	这周末我要加班	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-139	26	womenkeyixiankankan	我们可以先看看	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-140	26	woquxigezao	我去洗个澡	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-141	26	wqxgz	我去洗个澡	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-142	26	yaoshimingtianxiayujiubuqule	要是明天下雨就不去了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-143	26	ruguoniyoushijiandehuajiuguolaiba	如果你有时间的话就过来吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-144	26	tayehuilaide	他也会来的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-145	26	tyhld	他也会来的	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-146	26	nawojiubuqule	那我就不去了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-147	26	nwjbql	那我就不去了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-148	26	dajiadouzaidengnine	大家都在等你呢	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-149	26	wohuijinkuaide	我会尽快的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-150	26	whjkd	我会尽快的	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-151	26	doushinidecuo	都是你的错	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-152	26	dsndc	都是你的错	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-153	26	najiuhao	那就好	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-154	26	njh	那就好	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-155	26	wojiuzhidaohuizheyang	我就知道会这样	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-156	26	haishinishuoba	还是你说吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-157	26	hsnsb	还是你说吧	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-158	26	zheyangyexing	这样也行	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-159	26	zyyx	这样也行	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-160	26	tahaizaishuijiaone	他还在睡觉呢	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-161	26	thzsjn	他还在睡觉呢	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-162	26	yebushibukeyi	也不是不可以	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-163	26	ybsbky	也不是不可以	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-164	26	zhegeyebucuo	这个也不错	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-165	26	zgybc	这个也不错	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-166	26	nihuixihuande	你会喜欢的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-167	26	nhxhd	你会喜欢的	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-168	26	jiuchayidiandian	就差一点点	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-169	26	jcydd	就差一点点	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-170	26	wozaixiangbanfa	我在想办法	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-171	26	wzxbf	我在想办法	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-172	26	zhemewanlehaibushui	这么晚了还不睡	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-173	26	niyezaodianshuiba	你也早点睡吧	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-174	26	nyzdsb	你也早点睡吧	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-175	26	jidedaisan	记得带伞	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-176	26	jdds	记得带伞	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-177	26	bangwonagekuaidi	帮我拿个快递	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-178	26	bwngkd	帮我拿个快递	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-179	26	shoujikuaimeidianle	手机快没电了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-180	26	sjkmdl	手机快没电了	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-181	26	fageweizhigeiwo	发个位置给我	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-182	26	fgwzgw	发个位置给我	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-183	26	wobayaoshiwangzaijialile	我把钥匙忘在家里了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-184	26	tashuotahuiwanyidiandao	他说他会晚一点到	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-185	26	zhegejiagehaikeyi	这个价格还可以	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-186	26	haizijintianfashaole	孩子今天发烧了	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-187	26	womarangwozaodianhuijia	我妈让我早点回家	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-188	26	wozaiwangshangkandaode	我在网上看到的	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-189	26	zhejiadiandecaihenhaochi	这家店的菜很好吃	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-190	26	biewanglejiaozuoye	别忘了交作业	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-sentence-191	26	bwljzy	别忘了交作业	1	fixtures/everyday_clauses_20261009.json 首字母	2026-10-17	
+full-192	26	wojuedezhegefanganbutaixing	我觉得这个方案不太行	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+full-193	26	zhegewentiwoyeyudaoguo	这个问题我也遇到过	1	fixtures/everyday_clauses_20261009.json 全拼	2026-10-17	
+abbr-word-194	26	jzm	江泽民	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-195	26	fdc	房地产	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-196	26	wgy	五个亿	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-197	26	ssgs	上市公司	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-198	26	ygbm	有关部门	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-199	26	dsz	董事长	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-200	26	esc	二手车	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-201	26	mhwz	门户网站	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-202	26	bxgs	保险公司	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-203	26	mtc	摩托车	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-204	26	scjj	市场经济	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-205	26	zds	指的是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-206	26	hgtk	宏观调控	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-207	26	zzld	在这里的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-208	26	ydqx	阅读权限	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-209	26	yxgs	有限公司	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-210	26	scj	市场价	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-211	26	wmwp	无门无派	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-212	26	hyj	会员价	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-213	26	gcz	过程中	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-214	26	xfz	消费者	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-215	26	zcsj	注册时间	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-216	26	jyb	进一步	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-217	26	fwq	服务器	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-218	26	jsj	计算机	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-219	26	lxr	联系人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-220	26	btd	不同的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-221	26	syg	是一个	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-222	26	wsm	为什么	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-223	26	gly	管理员	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-224	26	lxdh	联系电话	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-225	26	fbsj	发布时间	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-226	26	tmd	他们的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-227	26	pfm	平方米	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-228	26	jxl	进行了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-229	26	gxz	贡献值	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-230	26	tbs	特别是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-231	26	lhd	良好的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-232	26	bgs	办公室	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-233	26	hlw	互联网	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-234	26	qkx	情况下	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-235	26	xssl	新手上路	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-236	26	bjs	北京市	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-237	26	rmzf	人民政府	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-238	26	jky	就可以	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-239	26	gwy	国务院	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-240	26	tgl	提供了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-241	26	zxsj	在线时间	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-242	26	yky	也可以	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-243	26	hda	很大啊	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-244	26	cbs	出版社	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-245	26	zzg	在中国	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-246	26	zyd	重要的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-247	26	bzd	不知道	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-248	26	rmb	人民币	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-249	26	sjk	数据库	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-250	26	jcs	基础上	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-251	26	yly	越来越	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-252	26	fzr	负责人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-253	26	syz	是一种	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-254	26	dyc	第一次	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-255	26	ydy	一定要	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-256	26	wyh	委员会	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-257	26	fby	发表于	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-258	26	gxsj	更新时间	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-259	26	lxfs	联系方式	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-260	26	ygr	一个人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-261	26	dfm	等方面	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-262	26	sdh	收到后	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-263	26	bqsy	版权所有	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-264	26	zgbm	主管部门	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-265	26	ydz	阅读者	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-266	26	zzl	在这里	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-267	26	sbs	是不是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-268	26	gzry	工作人员	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-269	26	xgtp	相关图片	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-270	26	zzq	自治区	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-271	26	shs	上海市	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-272	26	czt	此主题	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-273	26	hmy	还没有	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-274	26	zys	主要是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-275	26	dsr	当事人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-276	26	sjs	实际上	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-277	26	bmy	并没有	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-278	26	szs	深圳市	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-279	26	dyg	第一个	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-280	26	yyg	有一个	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-281	26	tzz	投资者	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-282	26	zyq	在一起	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-283	26	sqfs	授权方式	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-284	26	dxs	大学生	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-285	26	fwn	范围内	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-286	26	yxd	有效的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-287	26	yxhj	运行环境	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-288	26	nky	你可以	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-289	26	ymy	也没有	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-290	26	hky	还可以	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-291	26	czxt	操作系统	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-292	26	yggd	有关规定	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-293	26	tcl	提出了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-294	26	syy	适用于	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-295	26	bbs	并不是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-296	26	shzy	社会主义	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-297	26	gds	广东省	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-298	26	cgd	成功的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-299	26	jlb	俱乐部	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-300	26	bys	毕业生	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-301	26	yhm	用户名	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-302	26	myg	每一个	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-303	26	zqd	正确的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-304	26	ybf	一部分	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-305	26	dbf	大部分	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-306	26	zjs	这就是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-307	26	jdd	巨大的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-308	26	dky	都可以	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-309	26	dzyj	电子邮件	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-310	26	jnl	近年来	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-311	26	ysm	有什么	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-312	26	wjd	我觉得	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-313	26	ebs	而不是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-314	26	jxs	经销商	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-315	26	xyy	下一页	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-316	26	zrbj	责任编辑	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-317	26	dzsw	电子商务	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-318	26	rwm	让我们	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-319	26	xxh	信息化	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-320	26	llq	浏览器	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-321	26	xxxx	详细信息	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-322	26	sjd	设计的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-323	26	scby	收藏本页	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-324	26	rmfy	人民法院	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-325	26	xzzg	行政主管	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-326	26	zxs	直辖市	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-327	26	sqr	申请人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-328	26	lyg	另一个	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-329	26	sjcx	数据查询	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-330	26	dmt	多媒体	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-331	26	hpd	好评度	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-332	26	fbrq	发布日期	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-333	26	xcl	形成了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-334	26	yxl	一系列	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-335	26	rjlb	软件类别	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-336	26	yjs	也就是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-337	26	bwz	本网站	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-338	26	gzs	广州市	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-339	26	gcs	工程师	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-340	26	dds	大多数	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-341	26	gnw	国内外	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-342	26	cxl	出现了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-343	26	gys	供应商	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-344	26	yzd	严重的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-345	26	szd	所在地	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-346	26	fdj	发动机	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-347	26	ygs	应该是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-348	26	qdl	取得了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-349	26	djs	点击数	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-350	26	lyfm	另一方面	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-351	26	yfm	一方面	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-352	26	kns	可能是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-353	26	ddl	得到了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-354	26	yrdw	用人单位	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-355	26	byd	必要的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-356	26	scs	市场上	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-357	26	jss	江苏省	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-358	26	wmj	我们将	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-359	26	zjl	总经理	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-360	26	zsx	真实性	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-361	26	blt	本论坛	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-362	26	fsd	发生的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-363	26	fgs	分公司	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-364	26	xjd	先进的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-365	26	yey	幼儿园	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-366	26	kfs	开发商	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-367	26	knh	可能会	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-368	26	dmy	都没有	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-369	26	sss	事实上	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-370	26	jll	建立了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-371	26	yjb	已经被	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-372	26	jjfa	解决方案	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-373	26	ydl	意大利	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-374	26	lxs	旅行社	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-375	26	szf	市政府	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-376	26	els	俄罗斯	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-377	26	jjfz	经济发展	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-378	26	ssyq	搜索引擎	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-379	26	syw	是因为	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-380	26	szg	是中国	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-381	26	jbs	基本上	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-382	26	yzbm	邮政编码	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-383	26	xzbm	行政部门	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-384	26	jdc	机动车	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-385	26	wgs	我公司	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-386	26	gjc	关键词	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-387	26	ghd	更好的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-388	26	sys	实验室	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-389	26	gzz	工作中	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-390	26	zbj	在北京	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-391	26	hfqy	合法权益	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-392	26	sgdb	三个代表	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-393	26	bwb	部委办	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-394	26	ywz	意味着	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-395	26	aqd	安全的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-396	26	sxl	实现了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-397	26	wls	无论是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-398	26	cdzr	承担责任	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-399	26	cffh	充分发挥	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-400	26	tsy	同时也	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-401	26	zmd	著名的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-402	26	cjbz	超级版主	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-403	26	qsn	青少年	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-404	26	zsd	自身的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-405	26	dst	电视台	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-406	26	aqsc	安全生产	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-407	26	bkn	不可能	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-408	26	qzd	群众的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-409	26	fyj	复印件	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-410	26	xzl	写字楼	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-411	26	xkz	许可证	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-412	26	wzly	文章来源	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-413	26	zcr	主持人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-414	26	zxqy	中小企业	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-415	26	zjq	这就去	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-416	26	ncp	农产品	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-417	26	det	第二天	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-418	26	wmky	我们可以	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-419	26	rlzy	人力资源	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-420	26	cjd	常见的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-421	26	xdh	现代化	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-422	26	yxq	有效期	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-423	26	zzyd	最重要的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-424	26	hdr	很多人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-425	26	djd	大家都	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-426	26	bjb	笔记本	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-427	26	wmy	万美元	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-428	26	zgr	中国人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-429	26	wzd	我知道	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-430	26	ggs	该公司	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-431	26	sds	山东省	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-432	26	glry	管理人员	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-433	26	jzl	竞争力	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-434	26	yyd	有一定	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-435	26	sms	什么是	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-436	26	zgwt	这个问题	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-437	26	yhz	用户组	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-438	26	jyz	经营者	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-439	26	jlj	据了解	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-440	26	syj	是一家	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-441	26	jqt	及其他	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-442	26	cjl	参加了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-443	26	gajg	公安机关	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-444	26	fsl	发生了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-445	26	zchy	注册会员	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-446	26	tsg	图书馆	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-447	26	zysx	重要思想	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-448	26	kys	可以说	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-449	26	xxw	信息网	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-450	26	yycx	应用程序	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-451	26	ybd	一般的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-452	26	wcl	完成了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-453	26	glbf	管理办法	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-454	26	ldgb	领导干部	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-455	26	kfq	开发区	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-456	26	xjys	县级以上	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-457	26	csd	城市的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-458	26	mgr	每个人	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-459	26	hjbh	环境保护	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-460	26	fbpl	发表评论	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-461	26	gjaq	国家安全	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-462	26	smyd	什么样的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-463	26	yxjc	以下简称	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-464	26	hld	合理的	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-465	26	lxdz	联系地址	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-466	26	ldz	劳动者	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-467	26	jdgl	监督管理	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-468	26	nhmy	您还没有	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-469	26	zscq	知识产权	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-470	26	lxwm	联系我们	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-471	26	ycw	已成为	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-472	26	ldxz	领导小组	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-473	26	gjz	关键字	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-474	26	bdb	不得不	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-475	26	gzjy	工作经验	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-476	26	llcs	浏览次数	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-477	26	jnd	加拿大	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-478	26	xjh	相结合	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-479	26	dqwz	当前位置	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-480	26	hry	很容易	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-481	26	dbq	对不起	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-482	26	yww	因为我	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-483	26	hzp	化妆品	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-484	26	xzjg	行政机关	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-485	26	zsy	之所以	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-486	26	zdh	自动化	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-487	26	cyl	采用了	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-488	26	shfw	售后服务	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-489	26	mzd	毛泽东	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-490	26	zsyg	这是一个	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-491	26	zfc	字符串	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-492	26	xzxk	行政许可	1	base.dict 常用词首字母	2026-10-17	
+abbr-word-493	26	jszc	技术支持	1	base.dict 常用词首字母	2026-10-17	
+probe-495	26	nihso	你好	1	纠错探针	2026-10-17	
+probe-496	26	nawentishi	那问题是	1	纠错探针	2026-10-17	
+probe-497	26	bawentishi	把问题是	1	纠错探针	2026-10-17	
+probe-498	26	nihao	你好	1	纠错探针	2026-10-17	
+chat-full-499	26	lianggepengyouderichangliaotianjilu	两个朋友的日常聊天记录	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-500	26	weixinkouwen	微信口吻	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-501	26	wxkw	微信口吻	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-502	26	anshijianduanfen	按时间段分	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-503	26	asjdf	按时间段分	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-504	26	zaoshang	早上	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-505	26	zs	早上	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-506	26	xiaozhou	小周	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-507	26	xz	小周	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-508	26	nijintianzenmeqizhemezao	你今天怎么起这么早	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-509	26	laochen	老陈	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-510	26	lc	老陈	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-511	26	bietile	别提了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-512	26	btl	别提了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-513	26	liudianbannaozhongyixiangwojiuxingle	六点半闹钟一响我就醒了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-514	26	fanlaifuqushuibuzhao	翻来覆去睡不着	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-517	26	nizhezuoxishizhendejiankang	你这作息是真的健康	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-518	26	wonaozhonganlewubian	我闹钟按了五遍	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-519	26	chadianshuiguotou	差点睡过头	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-520	26	cdsgt	差点睡过头	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-523	26	chilemei	吃了没	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-524	26	clm	吃了没	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-527	26	kenlegemianbao	啃了个面包	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-528	26	klgmb	啃了个面包	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-529	26	duifuyikou	对付一口	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-530	26	dfyk	对付一口	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-531	26	nine	你呢	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-532	26	nn	你呢	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-535	26	louxiamaileliabaoziyiwandoujiang	楼下买了俩包子一碗豆浆	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-536	26	bakuaiqian	八块钱	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-537	26	bkq	八块钱	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-538	26	haisuanshihui	还算实惠	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-539	26	hssh	还算实惠	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-540	26	zhongwu	中午	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-541	26	zw	中午	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-544	26	zhongwuchisha	中午吃啥	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-545	26	zwcs	中午吃啥	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-546	26	shitanghaishidianwaimai	食堂还是点外卖	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-549	26	shitangba	食堂吧	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-550	26	stb	食堂吧	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-551	26	waimaifanlaifuqujiunajijia	外卖翻来覆去就那几家	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-552	26	zaochinile	早吃腻了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-553	26	zcnl	早吃腻了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-556	26	shierdianlouxiadengni	十二点楼下等你	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-557	26	biemoji	别磨叽	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-558	26	bmj	别磨叽	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-561	26	zhidaole	知道了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-562	26	zdl	知道了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-563	26	wobashoulizhedianhuoershougewei	我把手里这点活儿收个尾	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-566	26	ninazhangbiaozuowanle	你那张表做完了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-567	26	wozuotiannongdaobanye	我昨天弄到半夜	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-568	26	yanjingdouhuale	眼睛都花了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-569	26	yjdhl	眼睛都花了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-572	26	chabuduole	差不多了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-573	26	cbdl	差不多了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-574	26	shengzuihoulianglie	剩最后两列	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-575	26	szhll	剩最后两列	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-576	26	xiawuzaiheyibianshu	下午再核一遍数	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-579	26	jidehe	记得核	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-580	26	jdh	记得核	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-581	26	shanghuijiuyinweiyigexiaoshudian	上回就因为一个小数点	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-582	26	beilingdaonianlebangezhongtou	被领导念了半个钟头	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-585	26	nakebu	那可不	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-586	26	nkb	那可不	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-587	26	zhehuiwodingdesiside	这回我盯得死死的	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-592	26	jintianshitangjuranyoutangcupaigu	今天食堂居然有糖醋排骨	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-593	26	wodalemanmanyipan	我打了满满一盘	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-596	26	wokanbantian	我看半天	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-597	26	wkbt	我看半天	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-598	26	zuihouhaishiyaolewanmian	最后还是要了碗面	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-599	26	meishenmeweikou	没什么胃口	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-600	26	msmwk	没什么胃口	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-603	26	shibushiyouaoyele	是不是又熬夜了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-606	26	zuowanshuashipinshuadaoyidianban	昨晚刷视频刷到一点半	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-607	26	houhuisile	后悔死了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-608	26	hhsl	后悔死了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-609	26	jintianzhenggerendoushimengde	今天整个人都是懵的	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-612	26	shaoshuadian	少刷点	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-613	26	ssd	少刷点	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-614	26	zaoshuibishadouqiang	早睡比啥都强	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-615	26	zsbsdq	早睡比啥都强	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-616	26	shuozherongyizuozhenan	说着容易做着难	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-617	26	woyeyiyang	我也一样	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-618	26	wyyy	我也一样	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-619	26	xiawu	下午	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-620	26	xw	下午	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-623	26	huikaiwanle	会开完了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-624	26	hkwl	会开完了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-627	26	gangsan	刚散	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-628	26	gs	刚散	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-629	26	kailesishifenzhong	开了四十分钟	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-630	26	klssfz	开了四十分钟	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-631	26	ershifenzhongdouzaidengtouyinglianshang	二十分钟都在等投影连上	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-634	26	zhehenchangjian	这很常见	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-635	26	zhcj	这很常见	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-636	26	wozaoxiguanle	我早习惯了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-637	26	wzxgl	我早习惯了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-640	26	huishanghailinshijialelianggexuqiu	会上还临时加了两个需求	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-641	26	shuoshixiazhoujiuyao	说是下周就要	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-642	26	ssxzjy	说是下周就要	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-645	26	youjia	又加	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-646	26	yj	又加	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-647	26	nazhezhouyoubiexiangzhundianxiabanle	那这周又别想准点下班了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-650	26	zouyibukanyibuba	走一步看一步吧	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-651	26	xianbanengzuodezuole	先把能做的做了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-656	26	jintianfengtingda	今天风挺大	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-657	26	jtftd	今天风挺大	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-658	26	chumenjidetaojianwaitao	出门记得套件外套	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-663	26	womazaoshangyezhemegenwoshuo	我妈早上也这么跟我说	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-666	26	dangmadedouzheyang	当妈的都这样	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-667	26	dmddzy	当妈的都这样	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-670	26	xiabanyiqizouma	下班一起走吗	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-671	26	xbyqzm	下班一起走吗	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-672	26	wozhebianliudianchabuduonengshougong	我这边六点差不多能收工	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-675	26	wojinliang	我尽量	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-676	26	wjl	我尽量	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-677	26	yaoshituodaoqidiannijiuxianzou	要是拖到七点你就先走	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-678	26	biedengwo	别等我	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-679	26	bdw	别等我	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-682	26	weixinshangshuo	微信上说	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-683	26	wxss	微信上说	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-684	26	bangwan	傍晚	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-685	26	bw	傍晚	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-688	26	wochulaile	我出来了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-689	26	wcll	我出来了	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-690	26	zailoumenkou	在楼门口	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-691	26	zlmk	在楼门口	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-694	26	dengwowufenzhong	等我五分钟	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-695	26	dwwfz	等我五分钟	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-696	26	gangcunshangwenjian	刚存上文件	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-697	26	gcswj	刚存上文件	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-700	26	buji	不急	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-701	26	bj	不急	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-702	26	woshunshoumailepingshui	我顺手买了瓶水	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-703	26	geiniyedaileyiping	给你也带了一瓶	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-706	26	xielea	谢了啊	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-abbr-707	26	xla	谢了啊	1	fixtures/daily_chat_20261003.json 首字母	2026-10-17	
+chat-full-708	26	huitouqingnihenaicha	回头请你喝奶茶	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+chat-full-711	26	zhehuanishuoguosanhuile	这话你说过三回了	1	fixtures/daily_chat_20261003.json 全拼	2026-10-17	
+init2-wm	26	wm	我们	1	corpus-initials	2026-10-18	lnP -5.60, ahead by 3.30
+init2-hh	26	hh	哈哈	1	corpus-initials	2026-10-18	lnP -6.16, ahead by 1.79
+init2-nm	26	nm	你们	1	corpus-initials	2026-10-18	lnP -6.44, ahead by 0.98
+init2-nd	26	nd	你的	1	corpus-initials	2026-10-18	lnP -6.53, ahead by 1.83
+init2-zg	26	zg	这个	1	corpus-initials	2026-10-18	lnP -6.54, ahead by 2.53
+init2-js	26	js	就是	1	corpus-initials	2026-10-18	lnP -6.56, ahead by 2.70
+init2-wd	26	wd	我的	1	corpus-initials	2026-10-18	lnP -6.57, ahead by 1.48
+init2-xz	26	xz	现在	1	corpus-initials	2026-10-18	lnP -6.57, ahead by 2.53
+init2-my	26	my	没有	1	corpus-initials	2026-10-18	lnP -6.59, ahead by 2.80
+init2-tm	26	tm	他们	1	corpus-initials	2026-10-18	lnP -6.66, ahead by 2.38
+init2-sm	26	sm	什么	1	corpus-initials	2026-10-18	lnP -6.69, ahead by 1.79
+init2-hs	26	hs	还是	1	corpus-initials	2026-10-18	lnP -6.70, ahead by 2.35
+init2-bs	26	bs	不是	1	corpus-initials	2026-10-18	lnP -6.74, ahead by 2.31
+init2-yg	26	yg	一个	1	corpus-initials	2026-10-18	lnP -6.75, ahead by 1.08
+init2-xx	26	xx	谢谢	1	corpus-initials	2026-10-18	lnP -6.77, ahead by 1.53
+init2-zd	26	zd	真的	1	corpus-initials	2026-10-18	lnP -6.79, ahead by 0.96
+init2-ky	26	ky	可以	1	corpus-initials	2026-10-18	lnP -6.83, ahead by 3.34
+init2-sd	26	sd	是的	1	corpus-initials	2026-10-18	lnP -6.93, ahead by 1.33
+init2-zj	26	zj	自己	1	corpus-initials	2026-10-18	lnP -6.99, ahead by 0.73
+init2-ws	26	ws	我是	1	corpus-initials	2026-10-18	lnP -6.99, ahead by 0.97
+init2-jt	26	jt	今天	1	corpus-initials	2026-10-18	lnP -6.99, ahead by 2.30
+init2-dr	26	dr	的人	1	corpus-initials	2026-10-18	lnP -7.00, ahead by 1.08
+init2-ns	26	ns	你是	1	corpus-initials	2026-10-18	lnP -7.01, ahead by 0.93
+init2-rg	26	rg	如果	1	corpus-initials	2026-10-18	lnP -7.03, ahead by 4.37
+init2-hd	26	hd	好的	1	corpus-initials	2026-10-18	lnP -7.04, ahead by 1.15
+init2-hy	26	hy	还有	1	corpus-initials	2026-10-18	lnP -7.07, ahead by 1.33
+init2-ng	26	ng	那个	1	corpus-initials	2026-10-18	lnP -7.10, ahead by 1.69
+init2-sy	26	sy	所以	1	corpus-initials	2026-10-18	lnP -7.17, ahead by 1.19
+init2-hb	26	hb	好吧	1	corpus-initials	2026-10-18	lnP -7.21, ahead by 1.70
+init2-gj	26	gj	感觉	1	corpus-initials	2026-10-18	lnP -7.24, ahead by 1.32
+init2-jy	26	jy	加油	1	corpus-initials	2026-10-18	lnP -7.25, ahead by 1.66
+init2-by	26	by	不要	1	corpus-initials	2026-10-18	lnP -7.29, ahead by 1.03
+init2-bg	26	bg	不过	1	corpus-initials	2026-10-18	lnP -7.30, ahead by 1.70
+init2-yw	26	yw	因为	1	corpus-initials	2026-10-18	lnP -7.36, ahead by 2.19
+init2-gw	26	gw	给我	1	corpus-initials	2026-10-18	lnP -7.37, ahead by 1.20
+init2-gn	26	gn	给你	1	corpus-initials	2026-10-18	lnP -7.40, ahead by 0.98
+init2-rh	26	rh	然后	1	corpus-initials	2026-10-18	lnP -7.43, ahead by 1.33
+init2-yj	26	yj	已经	1	corpus-initials	2026-10-18	lnP -7.47, ahead by 1.40
+init2-sa	26	sa	是啊	1	corpus-initials	2026-10-18	lnP -7.48, ahead by 3.21
+init2-xh	26	xh	喜欢	1	corpus-initials	2026-10-18	lnP -7.51, ahead by 1.72
+init2-yx	26	yx	一下	1	corpus-initials	2026-10-18	lnP -7.53, ahead by 0.83
+init2-wx	26	wx	我想	1	corpus-initials	2026-10-18	lnP -7.54, ahead by 2.29
+init2-ys	26	ys	也是	1	corpus-initials	2026-10-18	lnP -7.55, ahead by 1.10
+init2-dh	26	dh	的话	1	corpus-initials	2026-10-18	lnP -7.57, ahead by 1.12
+init2-xs	26	xs	先生	1	corpus-initials	2026-10-18	lnP -7.59, ahead by 1.58
+init2-wh	26	wh	我会	1	corpus-initials	2026-10-18	lnP -7.62, ahead by 1.02
+init2-ee	26	ee	嗯嗯	1	corpus-initials	2026-10-18	lnP -7.65, ahead by 4.98
+init2-yy	26	yy	一样	1	corpus-initials	2026-10-18	lnP -7.66, ahead by 1.14
+init2-wj	26	wj	我就	1	corpus-initials	2026-10-18	lnP -7.66, ahead by 0.71
+init2-rw	26	rw	让我	1	corpus-initials	2026-10-18	lnP -7.67, ahead by 1.65
+init2-hk	26	hk	好看	1	corpus-initials	2026-10-18	lnP -7.67, ahead by 1.50
+init2-wa	26	wa	晚安	1	corpus-initials	2026-10-18	lnP -7.71, ahead by 2.17
+init2-bn	26	bn	不能	1	corpus-initials	2026-10-18	lnP -7.74, ahead by 0.99
+init2-qs	26	qs	其实	1	corpus-initials	2026-10-18	lnP -7.79, ahead by 0.73
+init2-dx	26	dx	东西	1	corpus-initials	2026-10-18	lnP -7.81, ahead by 1.31
+init2-hx	26	hx	好像	1	corpus-initials	2026-10-18	lnP -7.82, ahead by 1.41
+init2-zl	26	zl	这里	1	corpus-initials	2026-10-18	lnP -7.83, ahead by 1.03
+init2-xw	26	xw	希望	1	corpus-initials	2026-10-18	lnP -7.84, ahead by 0.95
+init2-yh	26	yh	以后	1	corpus-initials	2026-10-18	lnP -7.84, ahead by 1.24
+init2-kn	26	kn	可能	1	corpus-initials	2026-10-18	lnP -7.87, ahead by 0.89
+init2-yz	26	yz	一直	1	corpus-initials	2026-10-18	lnP -7.89, ahead by 1.05
+init2-wz	26	wz	我在	1	corpus-initials	2026-10-18	lnP -7.89, ahead by 1.38
+init2-br	26	br	别人	1	corpus-initials	2026-10-18	lnP -7.92, ahead by 0.78
+init2-lm	26	lm	了吗	1	corpus-initials	2026-10-18	lnP -7.92, ahead by 0.73
+init2-eq	26	eq	而且	1	corpus-initials	2026-10-18	lnP -7.92, ahead by 3.84
+init2-zq	26	zq	之前	1	corpus-initials	2026-10-18	lnP -7.94, ahead by 1.87
+init2-td	26	td	他的	1	corpus-initials	2026-10-18	lnP -7.96, ahead by 0.73
+init2-hj	26	hj	回家	1	corpus-initials	2026-10-18	lnP -7.97, ahead by 1.16
+init2-ss	26	ss	是谁	1	corpus-initials	2026-10-18	lnP -7.98, ahead by 1.08
+init2-nn	26	nn	那你	1	corpus-initials	2026-10-18	lnP -8.00, ahead by 0.83
+init2-zx	26	zx	这些	1	corpus-initials	2026-10-18	lnP -8.00, ahead by 1.17
+init2-xc	26	xc	下次	1	corpus-initials	2026-10-18	lnP -8.01, ahead by 1.09
+init2-kk	26	kk	看看	1	corpus-initials	2026-10-18	lnP -8.03, ahead by 2.87
+init2-rj	26	rj	人家	1	corpus-initials	2026-10-18	lnP -8.05, ahead by 2.15
+init2-bc	26	bc	不错	1	corpus-initials	2026-10-18	lnP -8.05, ahead by 1.01
+init2-py	26	py	朋友	1	corpus-initials	2026-10-18	lnP -8.07, ahead by 1.70
+init2-yr	26	yr	有人	1	corpus-initials	2026-10-18	lnP -8.08, ahead by 1.93
+init2-kx	26	kx	开心	1	corpus-initials	2026-10-18	lnP -8.09, ahead by 1.04
+init2-zb	26	zb	准备	1	corpus-initials	2026-10-18	lnP -8.11, ahead by 0.79
+init2-hc	26	hc	好吃	1	corpus-initials	2026-10-18	lnP -8.12, ahead by 1.87
+init2-qd	26	qd	期待	1	corpus-initials	2026-10-18	lnP -8.14, ahead by 0.79
+init2-ka	26	ka	可爱	1	corpus-initials	2026-10-18	lnP -8.15, ahead by 2.74
+init2-mc	26	mc	没错	1	corpus-initials	2026-10-18	lnP -8.16, ahead by 0.70
+init2-df	26	df	地方	1	corpus-initials	2026-10-18	lnP -8.16, ahead by 1.48
+init2-ls	26	ls	老师	1	corpus-initials	2026-10-18	lnP -8.19, ahead by 1.18
+init2-hq	26	hq	回去	1	corpus-initials	2026-10-18	lnP -8.21, ahead by 2.06
+init2-gl	26	gl	过来	1	corpus-initials	2026-10-18	lnP -8.22, ahead by 0.78
+init2-sg	26	sg	是个	1	corpus-initials	2026-10-18	lnP -8.24, ahead by 1.28
+init2-jw	26	jw	今晚	1	corpus-initials	2026-10-18	lnP -8.24, ahead by 0.85
+init2-yt	26	yt	一天	1	corpus-initials	2026-10-18	lnP -8.26, ahead by 1.38
+init2-mm	26	mm	妈妈	1	corpus-initials	2026-10-18	lnP -8.26, ahead by 0.87
+init2-jj	26	jj	姐姐	1	corpus-initials	2026-10-18	lnP -8.27, ahead by 1.20
+init2-rn	26	rn	让你	1	corpus-initials	2026-10-18	lnP -8.28, ahead by 2.99
+init2-dj	26	dj	大家	1	corpus-initials	2026-10-18	lnP -8.29, ahead by 1.01
+init2-zt	26	zt	昨天	1	corpus-initials	2026-10-18	lnP -8.30, ahead by 1.42
+init2-tb	26	tb	特别	1	corpus-initials	2026-10-18	lnP -8.31, ahead by 2.60
+init2-yc	26	yc	一次	1	corpus-initials	2026-10-18	lnP -8.32, ahead by 1.51
+init2-zp	26	zp	照片	1	corpus-initials	2026-10-18	lnP -8.33, ahead by 1.74
+init2-wt	26	wt	问题	1	corpus-initials	2026-10-18	lnP -8.34, ahead by 2.00
+init2-cq	26	cq	出去	1	corpus-initials	2026-10-18	lnP -8.35, ahead by 1.07
+init2-tf	26	tf	头发	1	corpus-initials	2026-10-18	lnP -8.35, ahead by 2.59
+init2-gm	26	gm	干嘛	1	corpus-initials	2026-10-18	lnP -8.38, ahead by 1.31
+init2-yf	26	yf	衣服	1	corpus-initials	2026-10-18	lnP -8.38, ahead by 1.35
+init2-tt	26	tt	天天	1	corpus-initials	2026-10-18	lnP -8.39, ahead by 1.06
+init2-lk	26	lk	离开	1	corpus-initials	2026-10-18	lnP -8.39, ahead by 1.34
+init2-fz	26	fz	反正	1	corpus-initials	2026-10-18	lnP -8.39, ahead by 0.81
+init2-xf	26	xf	幸福	1	corpus-initials	2026-10-18	lnP -8.41, ahead by 0.98
+init2-ey	26	ey	而已	1	corpus-initials	2026-10-18	lnP -8.41, ahead by 2.16
+init2-sw	26	sw	是我	1	corpus-initials	2026-10-18	lnP -8.43, ahead by 0.83
+init2-cd	26	cd	吃的	1	corpus-initials	2026-10-18	lnP -8.43, ahead by 0.76
+init2-an	26	an	爱你	1	corpus-initials	2026-10-18	lnP -8.44, ahead by 1.84
+init2-fx	26	fx	发现	1	corpus-initials	2026-10-18	lnP -8.46, ahead by 1.08
+init2-cj	26	cj	超级	1	corpus-initials	2026-10-18	lnP -8.46, ahead by 1.06
+init2-yl	26	yl	原来	1	corpus-initials	2026-10-18	lnP -8.46, ahead by 1.03
+init2-sq	26	sq	事情	1	corpus-initials	2026-10-18	lnP -8.49, ahead by 0.94
+init2-lg	26	lg	两个	1	corpus-initials	2026-10-18	lnP -8.54, ahead by 0.93
+init2-jf	26	jf	减肥	1	corpus-initials	2026-10-18	lnP -8.55, ahead by 2.05
+init2-za	26	za	早安	1	corpus-initials	2026-10-18	lnP -8.56, ahead by 1.23
+init2-ha	26	ha	好啊	1	corpus-initials	2026-10-18	lnP -8.58, ahead by 1.91
+init2-xm	26	xm	羡慕	1	corpus-initials	2026-10-18	lnP -8.58, ahead by 0.85
+init2-hw	26	hw	和我	1	corpus-initials	2026-10-18	lnP -8.59, ahead by 1.38
+init2-mr	26	mr	没人	1	corpus-initials	2026-10-18	lnP -8.67, ahead by 1.48
+init2-md	26	md	买的	1	corpus-initials	2026-10-18	lnP -8.67, ahead by 1.10
+init2-sn	26	sn	是你	1	corpus-initials	2026-10-18	lnP -8.69, ahead by 0.73
+init2-fc	26	fc	非常	1	corpus-initials	2026-10-18	lnP -8.70, ahead by 1.78
+init2-nk	26	nk	你看	1	corpus-initials	2026-10-18	lnP -8.71, ahead by 1.63
+init2-gq	26	gq	过去	1	corpus-initials	2026-10-18	lnP -8.72, ahead by 0.74
+init2-hf	26	hf	回复	1	corpus-initials	2026-10-18	lnP -8.72, ahead by 1.64
+init2-qw	26	qw	请问	1	corpus-initials	2026-10-18	lnP -8.73, ahead by 1.17
+init2-kz	26	kz	看着	1	corpus-initials	2026-10-18	lnP -8.74, ahead by 0.83
+init2-ll	26	ll	来了	1	corpus-initials	2026-10-18	lnP -8.76, ahead by 1.11
+init2-tr	26	tr	突然	1	corpus-initials	2026-10-18	lnP -8.77, ahead by 2.03
+init2-cn	26	cn	才能	1	corpus-initials	2026-10-18	lnP -8.82, ahead by 1.80
+init2-cf	26	cf	吃饭	1	corpus-initials	2026-10-18	lnP -8.82, ahead by 1.12
+init2-nw	26	nw	那我	1	corpus-initials	2026-10-18	lnP -8.89, ahead by 1.39
+init2-cs	26	cs	才是	1	corpus-initials	2026-10-18	lnP -8.94, ahead by 0.82
+init2-ez	26	ez	儿子	1	corpus-initials	2026-10-18	lnP -8.95, ahead by 2.39
+init2-kj	26	kj	看见	1	corpus-initials	2026-10-18	lnP -8.96, ahead by 1.28
+init2-sc	26	sc	上次	1	corpus-initials	2026-10-18	lnP -8.98, ahead by 0.78
+init2-wb	26	wb	我不	1	corpus-initials	2026-10-18	lnP -8.98, ahead by 0.77
+init2-lh	26	lh	厉害	1	corpus-initials	2026-10-18	lnP -9.00, ahead by 0.80
+init2-la	26	la	了啊	1	corpus-initials	2026-10-18	lnP -9.02, ahead by 0.72
+init2-qt	26	qt	其他	1	corpus-initials	2026-10-18	lnP -9.03, ahead by 1.48
+init2-ze	26	ze	这儿	1	corpus-initials	2026-10-18	lnP -9.06, ahead by 2.25
+init2-rc	26	rc	如此	1	corpus-initials	2026-10-18	lnP -9.09, ahead by 0.89
+init2-ym	26	ym	也没	1	corpus-initials	2026-10-18	lnP -9.10, ahead by 0.84
+init2-hp	26	hp	害怕	1	corpus-initials	2026-10-18	lnP -9.11, ahead by 1.58
+init2-ta	26	ta	天啊	1	corpus-initials	2026-10-18	lnP -9.15, ahead by 2.15
+init2-st	26	st	身体	1	corpus-initials	2026-10-18	lnP -9.15, ahead by 0.80
+init2-tj	26	tj	推荐	1	corpus-initials	2026-10-18	lnP -9.16, ahead by 0.86
+init3-hhh	26	hhh	哈哈哈	1	corpus-initials	2026-10-18	lnP -6.74, ahead by 3.70
+init3-dsh	26	dsh	的时候	1	corpus-initials	2026-10-18	lnP -7.24, ahead by 2.00
+init3-wsm	26	wsm	为什么	1	corpus-initials	2026-10-18	lnP -7.27, ahead by 4.03
+init3-wjd	26	wjd	我觉得	1	corpus-initials	2026-10-18	lnP -7.53, ahead by 2.15
+init3-sbs	26	sbs	是不是	1	corpus-initials	2026-10-18	lnP -7.60, ahead by 3.88
+init3-bzd	26	bzd	不知道	1	corpus-initials	2026-10-18	lnP -7.63, ahead by 3.48
+init3-wys	26	wys	我也是	1	corpus-initials	2026-10-18	lnP -7.76, ahead by 2.94
+init3-wzd	26	wzd	我知道	1	corpus-initials	2026-10-18	lnP -7.88, ahead by 3.24
+init3-jzm	26	jzm	江泽民	1	corpus-initials	2026-10-18	lnP -7.98, ahead by 1.93
+init3-wxz	26	wxz	我现在	1	corpus-initials	2026-10-18	lnP -8.03, ahead by 4.15
+init3-dbq	26	dbq	对不起	1	corpus-initials	2026-10-18	lnP -8.08, ahead by 5.63
+init3-nzd	26	nzd	你知道	1	corpus-initials	2026-10-18	lnP -8.11, ahead by 2.51
+init3-ygr	26	ygr	一个人	1	corpus-initials	2026-10-18	lnP -8.14, ahead by 2.89
+init3-gsw	26	gsw	告诉我	1	corpus-initials	2026-10-18	lnP -8.17, ahead by 6.37
+init3-nky	26	nky	你可以	1	corpus-initials	2026-10-18	lnP -8.18, ahead by 2.97
+init3-ssm	26	ssm	是什么	1	corpus-initials	2026-10-18	lnP -8.24, ahead by 0.95
+init3-qad	26	qad	亲爱的	1	corpus-initials	2026-10-18	lnP -8.25, ahead by 9.67
+init3-zml	26	zml	怎么了	1	corpus-initials	2026-10-18	lnP -8.27, ahead by 3.42
+init3-wyj	26	wyj	我已经	1	corpus-initials	2026-10-18	lnP -8.28, ahead by 2.45
+init3-xxn	26	xxn	谢谢你	1	corpus-initials	2026-10-18	lnP -8.32, ahead by 1.41
+init3-ymy	26	ymy	有没有	1	corpus-initials	2026-10-18	lnP -8.33, ahead by 0.98
+init3-zzl	26	zzl	在这里	1	corpus-initials	2026-10-18	lnP -8.34, ahead by 3.30
+init3-zmy	26	zmy	怎么样	1	corpus-initials	2026-10-18	lnP -8.34, ahead by 3.31
+init3-nzm	26	nzm	你怎么	1	corpus-initials	2026-10-18	lnP -8.40, ahead by 1.70
+init3-wxh	26	wxh	我喜欢	1	corpus-initials	2026-10-18	lnP -8.46, ahead by 4.76
+init3-zjd	26	zjd	自己的	1	corpus-initials	2026-10-18	lnP -8.49, ahead by 1.95
+init3-nbs	26	nbs	你不是	1	corpus-initials	2026-10-18	lnP -8.49, ahead by 1.28
+init3-wzs	26	wzs	我只是	1	corpus-initials	2026-10-18	lnP -8.50, ahead by 2.24
+init3-zyq	26	zyq	在一起	1	corpus-initials	2026-10-18	lnP -8.51, ahead by 1.74
+init3-wky	26	wky	我可以	1	corpus-initials	2026-10-18	lnP -8.52, ahead by 3.94
+init3-wyx	26	wyx	我也想	1	corpus-initials	2026-10-18	lnP -8.52, ahead by 1.59
+init3-zmb	26	zmb	怎么办	1	corpus-initials	2026-10-18	lnP -8.53, ahead by 1.77
+init3-ysm	26	ysm	有什么	1	corpus-initials	2026-10-18	lnP -8.60, ahead by 2.30
+init3-zds	26	zds	真的是	1	corpus-initials	2026-10-18	lnP -8.61, ahead by 2.05
+init3-gsn	26	gsn	告诉你	1	corpus-initials	2026-10-18	lnP -8.62, ahead by 3.96
+init3-ydy	26	ydy	一定要	1	corpus-initials	2026-10-18	lnP -8.70, ahead by 2.58
+init3-wbs	26	wbs	我不是	1	corpus-initials	2026-10-18	lnP -8.73, ahead by 3.73
+init3-dmy	26	dmy	都没有	1	corpus-initials	2026-10-18	lnP -8.74, ahead by 2.70
+init3-nbn	26	nbn	能不能	1	corpus-initials	2026-10-18	lnP -8.74, ahead by 4.45
+init3-ygs	26	ygs	应该是	1	corpus-initials	2026-10-18	lnP -8.76, ahead by 2.38
+init3-jhl	26	jhl	就好了	1	corpus-initials	2026-10-18	lnP -8.77, ahead by 0.92
+init3-kql	26	kql	看起来	1	corpus-initials	2026-10-18	lnP -8.78, ahead by 2.92
+init3-yby	26	yby	要不要	1	corpus-initials	2026-10-18	lnP -8.79, ahead by 2.22
+init3-nxz	26	nxz	你现在	1	corpus-initials	2026-10-18	lnP -8.80, ahead by 2.97
+init3-bxh	26	bxh	不喜欢	1	corpus-initials	2026-10-18	lnP -8.80, ahead by 3.97
+init3-wyw	26	wyw	我以为	1	corpus-initials	2026-10-18	lnP -8.81, ahead by 4.19
+init3-wjs	26	wjs	我就是	1	corpus-initials	2026-10-18	lnP -8.82, ahead by 1.93
+init3-wzj	26	wzj	我自己	1	corpus-initials	2026-10-18	lnP -8.84, ahead by 1.82
+init3-msm	26	msm	没什么	1	corpus-initials	2026-10-18	lnP -8.84, ahead by 2.56
+init3-rwm	26	rwm	让我们	1	corpus-initials	2026-10-18	lnP -8.87, ahead by 8.92
+init3-dyc	26	dyc	第一次	1	corpus-initials	2026-10-18	lnP -8.87, ahead by 3.51
+init3-zyd	26	zyd	这样的	1	corpus-initials	2026-10-18	lnP -8.87, ahead by 1.36
+init3-hll	26	hll	回来了	1	corpus-initials	2026-10-18	lnP -8.87, ahead by 3.27
+init3-hmy	26	hmy	还没有	1	corpus-initials	2026-10-18	lnP -8.88, ahead by 2.72
+init3-yww	26	yww	因为我	1	corpus-initials	2026-10-18	lnP -8.88, ahead by 2.34
+init3-zjs	26	zjs	这就是	1	corpus-initials	2026-10-18	lnP -8.90, ahead by 0.73
+init3-mgx	26	mgx	没关系	1	corpus-initials	2026-10-18	lnP -8.90, ahead by 4.80
+init3-whs	26	whs	我还是	1	corpus-initials	2026-10-18	lnP -8.90, ahead by 3.41
+init3-djd	26	djd	大家都	1	corpus-initials	2026-10-18	lnP -8.91, ahead by 1.33
+init3-kns	26	kns	可能是	1	corpus-initials	2026-10-18	lnP -8.92, ahead by 5.14
+init3-nzj	26	nzj	你自己	1	corpus-initials	2026-10-18	lnP -8.93, ahead by 2.61
+init3-wbh	26	wbh	我不会	1	corpus-initials	2026-10-18	lnP -8.93, ahead by 4.38
+init3-wbx	26	wbx	我不想	1	corpus-initials	2026-10-18	lnP -8.95, ahead by 1.81
+init3-cbd	26	cbd	差不多	1	corpus-initials	2026-10-18	lnP -8.96, ahead by 2.50
+init3-bxd	26	bxd	必须的	1	corpus-initials	2026-10-18	lnP -8.96, ahead by 1.12
+init3-nys	26	nys	你也是	1	corpus-initials	2026-10-18	lnP -8.97, ahead by 1.45
+init3-njd	26	njd	你觉得	1	corpus-initials	2026-10-18	lnP -8.97, ahead by 3.25
+init3-ssh	26	ssh	啥时候	1	corpus-initials	2026-10-18	lnP -8.97, ahead by 0.87
+init3-jky	26	jky	就可以	1	corpus-initials	2026-10-18	lnP -8.97, ahead by 4.12
+init3-wyz	26	wyz	我一直	1	corpus-initials	2026-10-18	lnP -8.99, ahead by 1.43
+init3-mwt	26	mwt	没问题	1	corpus-initials	2026-10-18	lnP -8.99, ahead by 10.92
+init3-byy	26	byy	不一样	1	corpus-initials	2026-10-18	lnP -8.99, ahead by 1.37
+init3-gsm	26	gsm	干什么	1	corpus-initials	2026-10-18	lnP -9.00, ahead by 2.24
+init3-jzd	26	jzd	就知道	1	corpus-initials	2026-10-18	lnP -9.01, ahead by 2.86
+init3-zbs	26	zbs	这不是	1	corpus-initials	2026-10-18	lnP -9.04, ahead by 1.84
+init3-nzg	26	nzg	你这个	1	corpus-initials	2026-10-18	lnP -9.05, ahead by 3.26
+init3-nyg	26	nyg	你应该	1	corpus-initials	2026-10-18	lnP -9.05, ahead by 2.16
+init3-bkn	26	bkn	不可能	1	corpus-initials	2026-10-18	lnP -9.05, ahead by 5.43
+init3-ysh	26	ysh	有时候	1	corpus-initials	2026-10-18	lnP -9.06, ahead by 2.95
+init3-zms	26	zms	这么说	1	corpus-initials	2026-10-18	lnP -9.10, ahead by 0.88
+init3-zmd	26	zmd	这么多	1	corpus-initials	2026-10-18	lnP -9.12, ahead by 0.77
+init3-kdl	26	kdl	看到了	1	corpus-initials	2026-10-18	lnP -9.12, ahead by 2.67
+init3-yzz	26	yzz	一直在	1	corpus-initials	2026-10-18	lnP -9.13, ahead by 2.17
+init3-yyg	26	yyg	有一个	1	corpus-initials	2026-10-18	lnP -9.13, ahead by 2.17
+init3-hky	26	hky	还可以	1	corpus-initials	2026-10-18	lnP -9.13, ahead by 4.32
+init3-nmd	26	nmd	那么多	1	corpus-initials	2026-10-18	lnP -9.14, ahead by 1.11
+init3-wms	26	wms	我们是	1	corpus-initials	2026-10-18	lnP -9.14, ahead by 1.22
+init3-bxy	26	bxy	不需要	1	corpus-initials	2026-10-18	lnP -9.15, ahead by 2.28
+init3-ddf	26	ddf	的地方	1	corpus-initials	2026-10-18	lnP -9.15, ahead by 4.31
+init3-yjh	26	yjh	有机会	1	corpus-initials	2026-10-18	lnP -9.15, ahead by 0.90
+init3-ddh	26	ddh	打电话	1	corpus-initials	2026-10-18	lnP -9.16, ahead by 3.63
+init3-zsh	26	zsh	早上好	1	corpus-initials	2026-10-18	lnP -9.18, ahead by 1.64
+init3-thl	26	thl	太好了	1	corpus-initials	2026-10-18	lnP -9.19, ahead by 2.84
+init3-fdc	26	fdc	房地产	1	corpus-initials	2026-10-18	lnP -9.19, ahead by 3.32
+init3-wzm	26	wzm	我怎么	1	corpus-initials	2026-10-18	lnP -9.20, ahead by 1.48
+init3-wan	26	wan	我爱你	1	corpus-initials	2026-10-18	lnP -9.20, ahead by 4.03
+init3-wgn	26	wgn	我给你	1	corpus-initials	2026-10-18	lnP -9.21, ahead by 1.17
+init3-wmh	26	wmh	我们会	1	corpus-initials	2026-10-18	lnP -9.22, ahead by 3.76
+init3-mmd	26	mmd	么么哒	1	corpus-initials	2026-10-18	lnP -9.22, ahead by 1.70
+init3-yky	26	yky	也可以	1	corpus-initials	2026-10-18	lnP -9.22, ahead by 2.30
+init3-wbn	26	wbn	我不能	1	corpus-initials	2026-10-18	lnP -9.23, ahead by 0.72
+init3-kdn	26	kdn	看到你	1	corpus-initials	2026-10-18	lnP -9.23, ahead by 2.71
+init3-sms	26	sms	什么事	1	corpus-initials	2026-10-18	lnP -9.24, ahead by 0.74
+init3-wyy	26	wyy	我也要	1	corpus-initials	2026-10-18	lnP -9.25, ahead by 1.05
+init3-sbz	26	sbz	睡不着	1	corpus-initials	2026-10-18	lnP -9.28, ahead by 2.81
+init3-ywn	26	ywn	因为你	1	corpus-initials	2026-10-18	lnP -9.28, ahead by 1.37
+init3-bkx	26	bkx	不开心	1	corpus-initials	2026-10-18	lnP -9.29, ahead by 2.40
+init3-zsm	26	zsm	做什么	1	corpus-initials	2026-10-18	lnP -9.30, ahead by 1.71
+init3-wss	26	wss	我是说	1	corpus-initials	2026-10-18	lnP -9.30, ahead by 2.15
+init3-mgr	26	mgr	每个人	1	corpus-initials	2026-10-18	lnP -9.30, ahead by 1.46
+init3-xhn	26	xhn	喜欢你	1	corpus-initials	2026-10-18	lnP -9.30, ahead by 2.05
+init3-zze	26	zze	在这儿	1	corpus-initials	2026-10-18	lnP -9.32, ahead by 5.83
+init3-dky	26	dky	都可以	1	corpus-initials	2026-10-18	lnP -9.32, ahead by 3.45
+init3-ygy	26	ygy	一个月	1	corpus-initials	2026-10-18	lnP -9.32, ahead by 1.59
+init3-szd	26	szd	是真的	1	corpus-initials	2026-10-18	lnP -9.34, ahead by 1.11
+init3-zdh	26	zdh	真的很	1	corpus-initials	2026-10-18	lnP -9.34, ahead by 2.33
+init3-bmy	26	bmy	并没有	1	corpus-initials	2026-10-18	lnP -9.35, ahead by 2.14
+init3-yly	26	yly	越来越	1	corpus-initials	2026-10-18	lnP -9.36, ahead by 2.11
+init3-qnl	26	qnl	去哪里	1	corpus-initials	2026-10-18	lnP -9.36, ahead by 1.01
+init3-nsd	26	nsd	你说的	1	corpus-initials	2026-10-18	lnP -9.38, ahead by 2.99
+init3-mbf	26	mbf	没办法	1	corpus-initials	2026-10-18	lnP -9.38, ahead by 5.23
+init3-nxh	26	nxh	你喜欢	1	corpus-initials	2026-10-18	lnP -9.38, ahead by 5.01
+init3-ydh	26	ydh	一定会	1	corpus-initials	2026-10-18	lnP -9.39, ahead by 2.36
+init3-xzd	26	xzd	想知道	1	corpus-initials	2026-10-18	lnP -9.39, ahead by 1.30
+init3-hjl	26	hjl	回家了	1	corpus-initials	2026-10-18	lnP -9.40, ahead by 1.00
+init3-jzy	26	jzy	就这样	1	corpus-initials	2026-10-18	lnP -9.40, ahead by 1.64
+init3-zbd	26	zbd	找不到	1	corpus-initials	2026-10-18	lnP -9.40, ahead by 1.38
+init3-thd	26	thd	挺好的	1	corpus-initials	2026-10-18	lnP -9.42, ahead by 2.46
+init3-ysj	26	ysj	有时间	1	corpus-initials	2026-10-18	lnP -9.42, ahead by 1.56
+init3-nyj	26	nyj	你已经	1	corpus-initials	2026-10-18	lnP -9.43, ahead by 3.72
+init3-yds	26	yds	一定是	1	corpus-initials	2026-10-18	lnP -9.43, ahead by 1.01
+init3-zys	26	zys	主要是	1	corpus-initials	2026-10-18	lnP -9.43, ahead by 0.71
+init3-yqq	26	yqq	一起去	1	corpus-initials	2026-10-18	lnP -9.44, ahead by 4.43
+init3-wgj	26	wgj	我感觉	1	corpus-initials	2026-10-18	lnP -9.44, ahead by 1.37
+init3-nyw	26	nyw	你以为	1	corpus-initials	2026-10-18	lnP -9.44, ahead by 3.69
+init3-myr	26	myr	没有人	1	corpus-initials	2026-10-18	lnP -9.46, ahead by 3.78
+init3-nbh	26	nbh	你不会	1	corpus-initials	2026-10-18	lnP -9.48, ahead by 3.48
+init3-zjt	26	zjt	这几天	1	corpus-initials	2026-10-18	lnP -9.48, ahead by 3.62
+init3-lhl	26	lhl	厉害了	1	corpus-initials	2026-10-18	lnP -9.49, ahead by 2.17
+init3-dyx	26	dyx	等一下	1	corpus-initials	2026-10-18	lnP -9.50, ahead by 1.39
+init3-tdl	26	tdl	太多了	1	corpus-initials	2026-10-18	lnP -9.52, ahead by 1.24
+init3-fxl	26	fxl	发现了	1	corpus-initials	2026-10-18	lnP -9.52, ahead by 2.33
+init3-dxz	26	dxz	到现在	1	corpus-initials	2026-10-18	lnP -9.53, ahead by 1.34
+init3-wsh	26	wsh	晚上好	1	corpus-initials	2026-10-18	lnP -9.53, ahead by 3.89
+init3-nhs	26	nhs	你还是	1	corpus-initials	2026-10-18	lnP -9.55, ahead by 2.66
+init3-wrw	26	wrw	我认为	1	corpus-initials	2026-10-18	lnP -9.56, ahead by 3.05
+init3-hxs	26	hxs	好像是	1	corpus-initials	2026-10-18	lnP -9.57, ahead by 1.89
+init3-xsh	26	xsh	小时候	1	corpus-initials	2026-10-18	lnP -9.58, ahead by 2.50
+init3-syg	26	syg	是一个	1	corpus-initials	2026-10-18	lnP -9.58, ahead by 2.47
+init3-aaa	26	aaa	啊啊啊	1	corpus-initials	2026-10-18	lnP -9.58, ahead by 89.42
+init4-hhhh	26	hhhh	哈哈哈哈	1	corpus-initials	2026-10-18	lnP -7.59, ahead by 4.70
+init4-srkl	26	srkl	生日快乐	1	corpus-initials	2026-10-18	lnP -8.11, ahead by 90.89
+init4-smsh	26	smsh	什么时候	1	corpus-initials	2026-10-18	lnP -8.14, ahead by 11.75
+init4-wbzd	26	wbzd	我不知道	1	corpus-initials	2026-10-18	lnP -8.27, ahead by 4.37
+init4-xnkl	26	xnkl	新年快乐	1	corpus-initials	2026-10-18	lnP -8.63, ahead by 90.37
+init4-bhys	26	bhys	不好意思	1	corpus-initials	2026-10-18	lnP -8.95, ahead by 6.35
+init4-nsbs	26	nsbs	你是不是	1	corpus-initials	2026-10-18	lnP -8.97, ahead by 3.37
+init4-wsmy	26	wsmy	为什么要	1	corpus-initials	2026-10-18	lnP -9.01, ahead by 3.48
+init4-yyqx	26	yyqx	易烊千玺	1	corpus-initials	2026-10-18	lnP -9.03, ahead by 8.81
+init4-wsmb	26	wsmb	为什么不	1	corpus-initials	2026-10-18	lnP -9.21, ahead by 89.79
+init4-wyjd	26	wyjd	我也觉得	1	corpus-initials	2026-10-18	lnP -9.23, ahead by 9.95
+init4-wmky	26	wmky	我们可以	1	corpus-initials	2026-10-18	lnP -9.34, ahead by 89.66
+init4-nwsm	26	nwsm	你为什么	1	corpus-initials	2026-10-18	lnP -9.34, ahead by 2.15
+init4-wzdn	26	wzdn	我知道你	1	corpus-initials	2026-10-18	lnP -9.51, ahead by 2.80
+init4-zssm	26	zssm	这是什么	1	corpus-initials	2026-10-18	lnP -9.51, ahead by 2.81
+init4-zmhs	26	zmhs	怎么回事	1	corpus-initials	2026-10-18	lnP -9.53, ahead by 2.86
+init4-hjbj	26	hjbj	好久不见	1	corpus-initials	2026-10-18	lnP -9.54, ahead by 9.62
+init4-whyw	26	whyw	我还以为	1	corpus-initials	2026-10-18	lnP -9.56, ahead by 6.06
+init4-aaaa	26	aaaa	啊啊啊啊	1	corpus-initials	2026-10-18	lnP -9.59, ahead by 89.41
+init4-nzdm	26	nzdm	你知道吗	1	corpus-initials	2026-10-18	lnP -9.63, ahead by 7.38
+init4-jszy	26	jszy	就是这样	1	corpus-initials	2026-10-18	lnP -9.65, ahead by 4.04
+init4-smys	26	smys	什么意思	1	corpus-initials	2026-10-18	lnP -9.66, ahead by 1.82
+init4-dbzd	26	dbzd	都不知道	1	corpus-initials	2026-10-18	lnP -9.75, ahead by 6.76
+init4-wmyq	26	wmyq	我们一起	1	corpus-initials	2026-10-18	lnP -9.79, ahead by 3.24
+init4-wyxh	26	wyxh	我也喜欢	1	corpus-initials	2026-10-18	lnP -9.82, ahead by 10.15
+init4-zmkn	26	zmkn	怎么可能	1	corpus-initials	2026-10-18	lnP -9.82, ahead by 89.18
+init4-zbhl	26	zbhl	准备好了	1	corpus-initials	2026-10-18	lnP -9.84, ahead by 7.06
+init4-wbxh	26	wbxh	我不喜欢	1	corpus-initials	2026-10-18	lnP -9.89, ahead by 7.23
+init4-nbzd	26	nbzd	你不知道	1	corpus-initials	2026-10-18	lnP -9.91, ahead by 9.01
+init4-gxgx	26	gxgx	恭喜恭喜	1	corpus-initials	2026-10-18	lnP -9.92, ahead by 9.90
+init4-wygr	26	wygr	我一个人	1	corpus-initials	2026-10-18	lnP -9.95, ahead by 89.05
+init4-smyd	26	smyd	什么样的	1	corpus-initials	2026-10-18	lnP -9.99, ahead by 2.56
+init4-zsyg	26	zsyg	这是一个	1	corpus-initials	2026-10-18	lnP -10.00, ahead by 1.16
+init4-nmsb	26	nmsb	你没事吧	1	corpus-initials	2026-10-18	lnP -10.01, ahead by 8.85
+init4-zgwt	26	zgwt	这个问题	1	corpus-initials	2026-10-18	lnP -10.02, ahead by 3.73
+init4-zyaq	26	zyaq	注意安全	1	corpus-initials	2026-10-18	lnP -10.03, ahead by 4.83
+init4-wryh	26	wryh	微软雅黑	1	corpus-initials	2026-10-18	lnP -10.04, ahead by 9.53
+init4-nymy	26	nymy	你有没有	1	corpus-initials	2026-10-18	lnP -10.06, ahead by 2.94
+init4-wgsn	26	wgsn	我告诉你	1	corpus-initials	2026-10-18	lnP -10.06, ahead by 7.46
+init4-clmy	26	clmy	从来没有	1	corpus-initials	2026-10-18	lnP -10.07, ahead by 5.18
+init4-ybzd	26	ybzd	也不知道	1	corpus-initials	2026-10-18	lnP -10.07, ahead by 1.75
+init4-wmbx	26	wmbx	我们必须	1	corpus-initials	2026-10-18	lnP -10.07, ahead by 6.54
+init4-szyd	26	szyd	是这样的	1	corpus-initials	2026-10-18	lnP -10.08, ahead by 5.96
+init4-hhxx	26	hhxx	好好休息	1	corpus-initials	2026-10-18	lnP -10.09, ahead by 1.53
+init4-xhdr	26	xhdr	喜欢的人	1	corpus-initials	2026-10-18	lnP -10.09, ahead by 88.91
+init4-jkyl	26	jkyl	就可以了	1	corpus-initials	2026-10-18	lnP -10.11, ahead by 5.56
+init4-nzdd	26	nzdd	你知道的	1	corpus-initials	2026-10-18	lnP -10.11, ahead by 6.00
+init4-mysm	26	mysm	没有什么	1	corpus-initials	2026-10-18	lnP -10.11, ahead by 5.17
+init4-wsbs	26	wsbs	我是不是	1	corpus-initials	2026-10-18	lnP -10.12, ahead by 3.59
+init4-zzyd	26	zzyd	最重要的	1	corpus-initials	2026-10-18	lnP -10.13, ahead by 2.06
+init4-zswd	26	zswd	这是我的	1	corpus-initials	2026-10-18	lnP -10.14, ahead by 5.42
+init4-zmzm	26	zmzm	怎么这么	1	corpus-initials	2026-10-18	lnP -10.17, ahead by 7.46
+init4-wmyg	26	wmyg	我们应该	1	corpus-initials	2026-10-18	lnP -10.18, ahead by 4.86
+init4-wxzd	26	wxzd	我想知道	1	corpus-initials	2026-10-18	lnP -10.18, ahead by 2.50
+init4-ydsj	26	ydsj	一段时间	1	corpus-initials	2026-10-18	lnP -10.19, ahead by 2.07
+init4-zyst	26	zyst	注意身体	1	corpus-initials	2026-10-18	lnP -10.21, ahead by 3.95
+init4-wxhn	26	wxhn	我喜欢你	1	corpus-initials	2026-10-18	lnP -10.21, ahead by 1.93
+init4-whbq	26	whbq	我很抱歉	1	corpus-initials	2026-10-18	lnP -10.23, ahead by 9.72
+init4-nmlg	26	nmlg	你们两个	1	corpus-initials	2026-10-18	lnP -10.25, ahead by 9.48
+init4-dwls	26	dwls	对我来说	1	corpus-initials	2026-10-18	lnP -10.26, ahead by 88.74
+init4-jrkl	26	jrkl	节日快乐	1	corpus-initials	2026-10-18	lnP -10.27, ahead by 88.73
+init4-wzdl	26	wzdl	我知道了	1	corpus-initials	2026-10-18	lnP -10.29, ahead by 1.18
+init4-nznl	26	nznl	你在哪里	1	corpus-initials	2026-10-18	lnP -10.29, ahead by 88.71
+init4-bljs	26	bljs	本来就是	1	corpus-initials	2026-10-18	lnP -10.30, ahead by 8.57
+init4-nhhm	26	nhhm	你还好吗	1	corpus-initials	2026-10-18	lnP -10.30, ahead by 5.94
+init4-ssgs	26	ssgs	上市公司	1	corpus-initials	2026-10-18	lnP -10.31, ahead by 9.05
+init4-smdx	26	smdx	什么东西	1	corpus-initials	2026-10-18	lnP -10.31, ahead by 6.80
+init4-kxjh	26	kxjh	开心就好	1	corpus-initials	2026-10-18	lnP -10.31, ahead by 88.69
+init4-tkal	26	tkal	太可爱了	1	corpus-initials	2026-10-18	lnP -10.31, ahead by 88.69
+init4-wdpy	26	wdpy	我的朋友	1	corpus-initials	2026-10-18	lnP -10.34, ahead by 88.66
+init4-gswm	26	gswm	告诉我们	1	corpus-initials	2026-10-18	lnP -10.34, ahead by 88.66
+init4-gzmb	26	gzmb	该怎么办	1	corpus-initials	2026-10-18	lnP -10.34, ahead by 3.13
+init4-ygxs	26	ygxs	一个小时	1	corpus-initials	2026-10-18	lnP -10.35, ahead by 5.09
+init4-wkdl	26	wkdl	我看到了	1	corpus-initials	2026-10-18	lnP -10.35, ahead by 88.65
+init4-ljyx	26	ljyx	了解一下	1	corpus-initials	2026-10-18	lnP -10.35, ahead by 3.43
+init4-zzsm	26	zzsm	在做什么	1	corpus-initials	2026-10-18	lnP -10.35, ahead by 3.01
+init4-zlsm	26	zlsm	做了什么	1	corpus-initials	2026-10-18	lnP -10.36, ahead by 4.77
+init4-bgxx	26	bgxx	不敢相信	1	corpus-initials	2026-10-18	lnP -10.38, ahead by 2.47
+init4-zmyl	26	zmyl	怎么样了	1	corpus-initials	2026-10-18	lnP -10.38, ahead by 3.44
+init4-xzyj	26	xzyj	现在已经	1	corpus-initials	2026-10-18	lnP -10.38, ahead by 7.37
+init4-wmxx	26	wmxx	我们学校	1	corpus-initials	2026-10-18	lnP -10.39, ahead by 1.98
+init4-zgsj	26	zgsj	这个世界	1	corpus-initials	2026-10-18	lnP -10.40, ahead by 1.28
+init4-ygxq	26	ygxq	一个星期	1	corpus-initials	2026-10-18	lnP -10.41, ahead by 5.76
+init4-wmds	26	wmds	我们都是	1	corpus-initials	2026-10-18	lnP -10.42, ahead by 2.27
+init4-jtws	26	jtws	今天晚上	1	corpus-initials	2026-10-18	lnP -10.43, ahead by 6.72
+init4-nyky	26	nyky	你也可以	1	corpus-initials	2026-10-18	lnP -10.44, ahead by 4.76
+init4-hysm	26	hysm	还有什么	1	corpus-initials	2026-10-18	lnP -10.45, ahead by 2.38
+init4-nzml	26	nzml	你怎么了	1	corpus-initials	2026-10-18	lnP -10.45, ahead by 3.60
+init4-hbzd	26	hbzd	还不知道	1	corpus-initials	2026-10-18	lnP -10.46, ahead by 5.26
+init4-ztws	26	ztws	昨天晚上	1	corpus-initials	2026-10-18	lnP -10.46, ahead by 4.61
+init4-hyyg	26	hyyg	还有一个	1	corpus-initials	2026-10-18	lnP -10.49, ahead by 9.46
+init4-zwyg	26	zwyg	作为一个	1	corpus-initials	2026-10-18	lnP -10.49, ahead by 88.51
+init4-dnhl	26	dnhl	等你回来	1	corpus-initials	2026-10-18	lnP -10.50, ahead by 88.50
+init4-sdsd	26	sdsd	是的是的	1	corpus-initials	2026-10-18	lnP -10.50, ahead by 6.50
+init4-zgsh	26	zgsh	这个时候	1	corpus-initials	2026-10-18	lnP -10.52, ahead by 2.83
+init4-znhy	26	znhy	祝你好运	1	corpus-initials	2026-10-18	lnP -10.52, ahead by 3.75
+init4-smqk	26	smqk	什么情况	1	corpus-initials	2026-10-18	lnP -10.52, ahead by 3.79
+init4-ndmz	26	ndmz	你的名字	1	corpus-initials	2026-10-18	lnP -10.52, ahead by 3.61
+init4-zyyg	26	zyyg	只有一个	1	corpus-initials	2026-10-18	lnP -10.53, ahead by 1.00
+init4-ddhg	26	ddhg	打电话给	1	corpus-initials	2026-10-18	lnP -10.53, ahead by 88.47
+init4-syrd	26	syrd	所有人都	1	corpus-initials	2026-10-18	lnP -10.53, ahead by 1.74
+init4-kbky	26	kbky	可不可以	1	corpus-initials	2026-10-18	lnP -10.53, ahead by 3.20
+init4-wsmh	26	wsmh	为什么会	1	corpus-initials	2026-10-18	lnP -10.54, ahead by 88.46
+init4-yzds	26	yzds	一直都是	1	corpus-initials	2026-10-18	lnP -10.54, ahead by 4.40
+init4-fcgx	26	fcgx	非常感谢	1	corpus-initials	2026-10-18	lnP -10.55, ahead by 1.91
+init4-sdkl	26	sdkl	圣诞快乐	1	corpus-initials	2026-10-18	lnP -10.55, ahead by 3.46
+init4-zhyc	26	zhyc	最后一次	1	corpus-initials	2026-10-18	lnP -10.56, ahead by 2.54
+init4-nysm	26	nysm	你有什么	1	corpus-initials	2026-10-18	lnP -10.56, ahead by 2.21
+init4-ydyb	26	ydyb	一点也不	1	corpus-initials	2026-10-18	lnP -10.58, ahead by 2.22
+init4-nmzx	26	nmzx	你们这些	1	corpus-initials	2026-10-18	lnP -10.59, ahead by 88.41
+init4-wzxh	26	wzxh	我最喜欢	1	corpus-initials	2026-10-18	lnP -10.60, ahead by 1.84
+init4-hnyq	26	hnyq	和你一起	1	corpus-initials	2026-10-18	lnP -10.60, ahead by 8.65
+init4-zdjd	26	zdjd	真的假的	1	corpus-initials	2026-10-18	lnP -10.60, ahead by 5.00
+init4-zmdn	26	zmdn	这么多年	1	corpus-initials	2026-10-18	lnP -10.61, ahead by 9.33
+init4-tbxh	26	tbxh	特别喜欢	1	corpus-initials	2026-10-18	lnP -10.61, ahead by 1.46
+init4-ngsh	26	ngsh	那个时候	1	corpus-initials	2026-10-18	lnP -10.61, ahead by 5.68
+init4-szhd	26	szhd	是最好的	1	corpus-initials	2026-10-18	lnP -10.62, ahead by 9.27
+init4-ylsf	26	ylsf	一路顺风	1	corpus-initials	2026-10-18	lnP -10.62, ahead by 5.78
+init4-xqbh	26	xqbh	心情不好	1	corpus-initials	2026-10-18	lnP -10.62, ahead by 5.20
+init4-zgdf	26	zgdf	这个地方	1	corpus-initials	2026-10-18	lnP -10.62, ahead by 1.44
+init4-ndys	26	ndys	你的意思	1	corpus-initials	2026-10-18	lnP -10.63, ahead by 1.89
+init4-hwyy	26	hwyy	和我一样	1	corpus-initials	2026-10-18	lnP -10.63, ahead by 1.46
+init4-ygbm	26	ygbm	有关部门	1	corpus-initials	2026-10-18	lnP -10.63, ahead by 4.32
+init4-msms	26	msms	没事没事	1	corpus-initials	2026-10-18	lnP -10.63, ahead by 1.34
+init4-hbry	26	hbry	好不容易	1	corpus-initials	2026-10-18	lnP -10.63, ahead by 5.89
+init4-ylrc	26	ylrc	原来如此	1	corpus-initials	2026-10-18	lnP -10.64, ahead by 5.04
+init4-zhyg	26	zhyg	最后一个	1	corpus-initials	2026-10-18	lnP -10.65, ahead by 5.63
+init4-jsyw	26	jsyw	就是因为	1	corpus-initials	2026-10-18	lnP -10.65, ahead by 5.17
+init4-bydx	26	bydx	不用担心	1	corpus-initials	2026-10-18	lnP -10.65, ahead by 5.77
+init4-xswl	26	xswl	笑死我了	1	corpus-initials	2026-10-18	lnP -10.66, ahead by 0.75
+init4-wbmb	26	wbmb	我不明白	1	corpus-initials	2026-10-18	lnP -10.66, ahead by 88.34
+init4-kbcl	26	kbcl	看不出来	1	corpus-initials	2026-10-18	lnP -10.67, ahead by 2.66
+init4-drky	26	drky	当然可以	1	corpus-initials	2026-10-18	lnP -10.67, ahead by 88.33
+init4-ntmd	26	ntmd	你他妈的	1	corpus-initials	2026-10-18	lnP -10.68, ahead by 88.32
+init4-xwnn	26	xwnn	希望你能	1	corpus-initials	2026-10-18	lnP -10.68, ahead by 88.32
+init4-mymy	26	mymy	没有没有	1	corpus-initials	2026-10-18	lnP -10.68, ahead by 6.42
+init4-ndpy	26	ndpy	你的朋友	1	corpus-initials	2026-10-18	lnP -10.68, ahead by 88.32
+init4-wdmz	26	wdmz	我的名字	1	corpus-initials	2026-10-18	lnP -10.68, ahead by 7.42
+init4-whxh	26	whxh	我很喜欢	1	corpus-initials	2026-10-18	lnP -10.68, ahead by 88.32
+init4-ndbs	26	ndbs	难道不是	1	corpus-initials	2026-10-18	lnP -10.69, ahead by 2.96
+init4-ylyh	26	ylyh	越来越好	1	corpus-initials	2026-10-18	lnP -10.70, ahead by 3.73
+init4-jsng	26	jsng	就是那个	1	corpus-initials	2026-10-18	lnP -10.71, ahead by 5.27
+init4-wdyc	26	wdyc	我第一次	1	corpus-initials	2026-10-18	lnP -10.71, ahead by 9.24
+init4-myrh	26	myrh	没有任何	1	corpus-initials	2026-10-18	lnP -10.72, ahead by 0.82
+init4-jtzs	26	jtzs	今天早上	1	corpus-initials	2026-10-18	lnP -10.72, ahead by 4.50
+init4-syyd	26	syyd	是一样的	1	corpus-initials	2026-10-18	lnP -10.73, ahead by 4.35
+init4-gzry	26	gzry	工作人员	1	corpus-initials	2026-10-18	lnP -10.73, ahead by 3.72
+init4-cbdl	26	cbdl	差不多了	1	corpus-initials	2026-10-18	lnP -10.74, ahead by 8.67
+init4-wmzb	26	wmzb	我们这边	1	corpus-initials	2026-10-18	lnP -10.74, ahead by 4.89
+init4-kyss	26	kyss	可以说是	1	corpus-initials	2026-10-18	lnP -10.74, ahead by 6.44
