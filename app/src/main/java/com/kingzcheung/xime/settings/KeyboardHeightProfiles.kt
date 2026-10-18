@@ -2,6 +2,7 @@ package com.kingzcheung.xime.settings
 
 import android.content.Context
 import com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds
+import com.kingzcheung.xime.ui.keyboard.floatingStoredHeightBounds
 import com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds
 
 /** 固定键盘继续使用原有高度键；悬浮高度独立保存，横竖屏互不覆盖。 */
@@ -23,11 +24,11 @@ internal object KeyboardHeightProfiles {
             .coerceIn(fixedBounds(context, landscape))
 
     fun floating(context: Context, landscape: Boolean, hostHeightDp: Int): Int {
-        val bounds = floatingResizeHeightBounds(hostHeightDp, landscape)
         val stored = SettingsPreferences.getPrefsPublic(context).getInt(floatingKey(landscape), 0)
-        val height = stored.takeIf { it > 0 }
-            ?: SettingsPreferences.getDefaultKeyboardHeightDp(context, landscape)
-        return height.coerceIn(bounds)
+        // 已存高度可能是拖到方形吸附点的值，低于默认下限也要原样保留；默认值仍用默认范围。
+        if (stored > 0) return stored.coerceIn(floatingStoredHeightBounds(hostHeightDp, landscape))
+        return SettingsPreferences.getDefaultKeyboardHeightDp(context, landscape)
+            .coerceIn(floatingResizeHeightBounds(hostHeightDp, landscape))
     }
 
     fun selected(context: Context, floating: Boolean, landscape: Boolean, hostHeightDp: Int): Int =
@@ -49,7 +50,7 @@ internal object KeyboardHeightProfiles {
         hostHeightDp: Int,
     ): Int {
         val height = if (floating) {
-            heightDp.coerceIn(floatingResizeHeightBounds(hostHeightDp, landscape))
+            heightDp.coerceIn(floatingStoredHeightBounds(hostHeightDp, landscape))
         } else {
             heightDp.coerceIn(fixedBounds(context, landscape))
         }
