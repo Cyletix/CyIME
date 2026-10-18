@@ -1,0 +1,27 @@
+Offline OCR uses PP-OCRv5 mobile detection and recognition models by PaddlePaddle,
+distributed as ONNX by RapidAI/RapidOCR v3.9.2. Apache-2.0.
+https://github.com/PaddlePaddle/PaddleOCR
+https://github.com/RapidAI/RapidOCR/tree/v3.9.2
+Licenses: PaddleOCR-LICENSE, RapidOCR-LICENSE in this directory.
+
+Model source: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv5/
+det/ch_PP-OCRv5_det_mobile.onnx
+SHA256 4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae
+rec/ch_PP-OCRv5_rec_mobile.onnx
+SHA256 5825fc7ebf84ae7a412be049820b4d86d77620f204a041697b0494669b1742c5
+The character dictionary is extracted without changes from recognition model metadata.
+Models are unmodified. CyIME's Java preprocessing/postprocessing adapts the DB detection,
+perspective crop and CTC pipeline; it adds resolution/work bounds and text assembly.
+Source references:
+https://github.com/RapidAI/RapidOCR/tree/v3.9.2/python/rapidocr
+https://github.com/PaddlePaddle/PaddleOCR/tree/main/deploy/ppocr-android/ppocr-sdk
+
+OpenCV 4.12.0 Android (unmodified Maven AAR), Apache-2.0.
+https://github.com/opencv/opencv/tree/4.12.0
+License: OpenCV-LICENSE. OpenCV's bundled third-party code retains its upstream notices.
+ONNX Runtime Android 1.28.0 (unmodified), MIT; the runtime is shared with other
+native model consumers, while OCR sessions execute only in the separate :ocr process.
+https://github.com/microsoft/onnxruntime/tree/v1.28.0
+
+Old Tesseract/tessdata license files are retained as historical comparison documentation.
+Tesseract binaries and .traineddata files are no longer included in the application.
