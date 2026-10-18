@@ -19,6 +19,16 @@ if(T9_GRAMMAR_POS EQUAL -1)
   message(FATAL_ERROR "Octagram changed: review whole-word scoring")
 endif()
 string(REPLACE "${T9_GRAMMAR_ANCHOR}" "${T9_GRAMMAR_ANCHOR}\n      if (config_->full_word && match.length != word_query.size()) continue;" T9_GRAMMAR_CODE "${T9_GRAMMAR_CODE}")
+if(CYIME_T9_WORK_COUNTERS)
+  # Host replay only: count grammar queries and GramDb lookups (t9_lookup_trace.h).
+  t9_work_replace(T9_GRAMMAR_CODE "#include \"octagram.h\"" "#include \"octagram.h\"\n#include <t9_lookup_trace.h>" 1)
+  t9_work_replace(T9_GRAMMAR_CODE "                       bool is_rear) {" "                       bool is_rear) { T9_WORK_COUNT(grammar_queries);" 1)
+  t9_work_replace(T9_GRAMMAR_CODE "    int num_results = db_->Lookup(context_ptr, word_query, matches);"
+                  "    T9_WORK_COUNT(gram_lookups); int num_results = db_->Lookup(context_ptr, word_query, matches);" 1)
+  t9_work_replace(T9_GRAMMAR_CODE [=[db_->Lookup(word_query, "$", matches) > 0]=]
+                  [=[(T9_WORK_COUNT(gram_lookups), db_->Lookup(word_query, "$", matches)) > 0]=] 1)
+  target_include_directories(rime-octagram-objs PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
+endif()
 set(T9_GRAMMAR_COPY "${CMAKE_CURRENT_BINARY_DIR}/cyime-octagram.cc")
 file(CONFIGURE OUTPUT "${T9_GRAMMAR_COPY}" CONTENT "${T9_GRAMMAR_CODE}" @ONLY)
 get_target_property(T9_GRAMMAR_SOURCES rime-octagram-objs SOURCES)

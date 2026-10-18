@@ -1,5 +1,7 @@
 # 输入质量离线工具
 
+候选注释回归：`host_replay/CandidateCommentProbe.java` 使用同源 JNI，依次检查 26 键拼音、14 键拼音、两种小鹤双拼布局和五笔编码。与 `android_replay/RimeEngine.java` 一起编译；运行参数依次为主机构建的 `.so` 目录、**隔离测试资源目录**。资源必须先经当前 `prepareChineseDictionaries` 生成，使用副本，并在副本的 schema_list 启用上述五种方案；测试会部署该目录，禁止指向个人词库。验证的是最终经过过滤器的候选注释，不以 UI 开关或生成配置代替结果。本轮复现和证据见 [设置接线复查](../../docs/development/settings-connection-audit-20261004.md)。
+
 原有离线工具只使用 Python 标准库；`chat_corpus.py` 另外需要本机安装 `jieba`。新增 `lexicon_source.py collect` 会调用系统 Cline CLI，通过 DeepSeek API 联网生成词条，并消耗账户额度；其余离线处理命令不调用模型。先运行 `python -m unittest discover -s tools/ime_lab` 和 `python tools/ime_lab/ime_lab.py selftest`。
 
 - `ime_lab.py evaluate cases.json samples.jsonl output.json`：精确输入校验、TopK、类型验证和缺失项；延迟按用例与设备/构建/场景元数据分组。first-query 不等于进程冷启动。不能将引擎+Top100耗时称为端到端延迟。
@@ -7,6 +9,7 @@
 - `inspect_backup.py backup.bak inventory.json`：只读哈希/ZIP目录/数据库头，不解压、恢复或修改账户。
 - `neighbors.alternatives(text, keys)`：使用每个布局实际测得的按键矩形，限定一次替换、有距离惩罚、原输入首位、最多16个候选；当前仅离线实验，不改变正在使用的键盘。
 - `chat_corpus.py --user-home C:/Users/Administrator --output D:/CyIME-Data/corpora/codex-cline/chat_corpus.sqlite3`：从本地 Codex 会话与 Cline CLI、VS Code 扩展历史分别提取人工用户消息，合入一个 SQLite；同时导出清理后的 `*.learning.jsonl` 和 jieba 分词的 `*.word_frequency.tsv`。再次生成需指定新路径或加 `--force`。`messages` 保留原文及清理后文本，`codex_user_messages`、`cline_user_messages` 是分来源视图，`message_terms` 保留逐条词频，`word_frequency` 分来源及汇总统计出现次数和消息数。仅输出至少两个字的汉语词和至少两个字母的英文词；TSV 默认只列出现两次以上的词，完整统计仍在 SQLite 中。此数据只是本地学习语料，尚未导入 Rime 词典或用户词库。
+- `chat_corpus_claude.py`（2026-10-13 加入 `chat_corpus.py`，platform=`claude`）：从 `~/.claude/projects/*/*.jsonl` 只取人工输入的 `type=user` 记录（`userType=external`、非旁线），去掉工具结果、系统提醒、任务通知、续接摘要和协调转发，Projects 会话只取 `<wake>` 里 `from="human"` 的正文。`ngram/private_corpus.py learning.jsonl OUT_DIR` 再把清理后的文本切成汉字串，按会话切 9:1 训练／留出，只打印条数；输出必须在仓库和 OneDrive 之外。
 
 私有聊天、数据库、sender-ID 映射、统计产物放在仓库与 OneDrive 外。本轮指定备份的检查报告放在 D:/QQ-Transfer/cyime-private-analysis。字数/次数筛选不是匿名化。
 
@@ -86,3 +89,15 @@ $lexiconPython = 'D:/CyIME-Data/lexicon-generation/.venv/Scripts/python.exe'
 后续九键选词测试统一使用 `python tools/ime_lab/t9_replay.py run --output <新结果目录>`。默认直接在电脑本地编译／复用现有 Rime、T9、候选策略和模型，不连接平板或手机，不打包安装。支持 `prepare` 从文本与拼音建立夹具，`--baseline` / `compare` 比较每键首选、目标名次和已审定异常；详细口径、退出码和复现条件见 [固定回归流程](../../docs/development/t9-algorithm-regression.md)。
 
 调权与评分位置研究见[异常首选修复分析](../../docs/development/t9-weight-repair-study-2026-10-03.md)。`analyze_t9_weights.py` 对已保存候选做权重敏感性扫描；`probe_t9_scoring.py prepare/analyze` 配合 `host_replay/ScoreProbe.cc` 比较同一模型的四字评分位置；`host_replay/WeightExperiment.java` 用真实引擎检查独立配置副本的段末候选。这些诊断不替代完整逐键回归，也不自动修改生产配置。
+
+### 全拼纠错与个人学习回归
+
+`host_replay/PinyinCorrectionProbe.java` 使用同一生产 JNI，检查 `nawentishi` 等准确输入不会被邻键纠错挤走，同时检查正常学习词及 `nihso` 的纠错候选仍存在。每个按键都核对实际引擎输入，记录逐键候选，失败返回非零。
+
+在 Linux/WSL 中，与 `android_replay/RimeEngine.java` 一起用 javac 编译，运行：
+
+```text
+LD_LIBRARY_PATH=<同源引擎库目录> java -cp <class目录> PinyinCorrectionProbe <同源引擎库目录> <隔离用户目录> [learn或check] [已部署的共享资源目录]
+```
+
+资源目录须包含同源 `rime_ice` 及生成资源，可复用本机测试准备的隔离目录，**不能指向个人实际使用的词库**。未指定共享目录时从用户目录读取资源；指定共享目录后可用空白用户目录检查全新学习状态。`learn` 会模拟提交 30 次 `bawentishi`，以重现个人学习与纠错的竞争；`check` 或省略时只回放/取消，不提交学习。应先在空白学习状态运行，再在合成学习状态运行；比较旧/新引擎时须使用相同的合成学习快照，不能把重新学习产生的权重变化混进算法对照。扩展句子检查只约束开启纠错不能破坏这些准确拼音的首选，不证明任意句子的语言质量合格。

@@ -58,7 +58,7 @@ class T9CandidateNavigationTest {
     }
 
     @Test fun idleClipboardAssociationsEnglishAndOtherLayoutsKeepTheirExistingZeroBehavior() {
-        listOf(CandidateState(), CandidateState(associationCandidates = listOf("联想")),
+        listOf(CandidateState(),
             composing.copy(isComposing = false), composing.copy(inputText = ""),
             composing.copy(isShowingRecentClipboard = true), composing.copy(pendingEnglishText = "hello"))
             .forEach {
@@ -75,6 +75,20 @@ class T9CandidateNavigationTest {
                 assertEquals(0, focused.spaceCandidateIndex(it))
                 assertSame(focused, focused.retreatT9Candidate(it))
             }
+    }
+
+    @Test fun predictionArrowFocusesFirstThenCyclesAndNewResultsInvalidateFocus() {
+        val state = CandidateState(associationCandidates = listOf("世界", "朋友", "大家"))
+        assertTrue(state.usesT9CandidateNavigation(profile))
+        assertNull(state.focusedT9AssociationIndex)
+        val first = state.advanceT9Candidate(profile)
+        assertEquals(0, first.focusedT9AssociationIndex)
+        val second = first.advanceT9Candidate(profile)
+        assertEquals(1, second.spaceCandidateIndex(profile))
+        assertEquals(0, second.retreatT9Candidate(profile).focusedT9AssociationIndex)
+        assertNull(second.copy(associationCandidates = listOf("新词")).focusedT9AssociationIndex)
+        assertFalse(state.copy(pendingEnglishText = "hello").usesT9CandidateNavigation(profile))
+        assertFalse(CandidateState().usesT9CandidateNavigation(profile))
     }
 
     @Test fun identicalLabelsWithDifferentCommitActionsKeepTheirDisplayIndices() {

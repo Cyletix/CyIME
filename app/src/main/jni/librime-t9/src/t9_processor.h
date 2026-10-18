@@ -5,6 +5,7 @@
 #include <rime/component.h>
 #include <rime/dict/vocabulary.h>  // DictEntry / Code / SyllableId / Syllabary
 #include <optional>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -68,6 +69,15 @@ public:
     // C++ 构造 RIME 原生 DictEntry 写入（key 由 RIME 生成）；撤销段时 ForgetEntry 回滚。
     bool MemorizeEntry(const std::string& text, const std::string& pinyin);
     bool ForgetEntry(const std::string& text, const std::string& pinyin);
+
+    // ── 拂动固定字母 ──
+    // 拂动一个字母 = 这一位确定是该字母：按它所在的数字键追加到数字串，并记住该位置的
+    // 字母约束；候选过滤时只保留该位置拼音字母一致的候选。数字串为空时返回 false，
+    // 由上层按普通字母输入处理。
+    bool FixLetter(char letter);
+    bool HasLetterConstraints() const { return !letter_constraints_.empty(); }
+    // candidate 从 RIME input 的 rime_start 开始、拼音注释为 comment 时，是否满足全部字母约束。
+    bool MatchesLetterConstraints(size_t rime_start, const std::string& comment) const;
 
     // ── Phrase 码缓存（t9_filter 预存，右选调频捕获兜底）──
     // t9_filter 位于 filters 最前，此时候选尚为带调 Phrase；后续 lua filter 链
@@ -198,6 +208,7 @@ private:
     // 状态成员（对应 Kotlin T9InputController 的私有字段）
     // ════════════════════════════════════════
     T9Buffer input_buffer_;                              // §2.2 结构化输入模型
+    std::map<int, char> letter_constraints_;             // 拂动固定的字母：digit_sequence 位置 → 字母
     T9StateMachine state_machine_;                       // §3.2 三态状态机
     // 段模型（2026-08-06 起为回退唯一真相源）：输入操作双写
     // （Digit/LeftChoice/Separator/SyncRightCommit），backspace 全部走 T9UndoModel::Backspace。

@@ -26,7 +26,7 @@ an<Translation> T9EnglishTranslator::Query(const string& input, const Segment& s
   an<Translation> exact = New<EnglishLearningTranslation>(TableTranslator::Query(input, segment));
   // Bounded exact prefix lookups, never scan the word list or enumerate letter
   // combinations. Learned full codes naturally come back through the base query.
-  if (input.size() < 4 || input.size() > 64 ||
+  if (!digit_suffixes_ || input.size() < 4 || input.size() > 64 ||
       input.find_first_not_of("0123456789") != string::npos ||
       !segment.HasAnyTagIn(tags_)) return exact;
   auto suffixes = New<FifoTranslation>();

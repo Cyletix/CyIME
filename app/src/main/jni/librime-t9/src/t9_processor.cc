@@ -206,6 +206,8 @@ ProcessResult T9Processor::HandleDigitKey(char ch) {
     }
     undo_model_.DigitPressed(ch);  // 段模型双写
     input_buffer_ = input_buffer_.AddDigit(ch);
+    // 普通数字键没有字母约束；退格后重打同一位时清掉旧的拂动约束。
+    letter_constraints_.erase(static_cast<int>(input_buffer_.digit_sequence.size()) - 1);
     original_digit_sequence_ += ch;
     T9LOG(">> HandleDigitKey: original_digit_sequence_='%s' (after += '%c')",
           original_digit_sequence_.c_str(), ch);
@@ -708,9 +710,15 @@ T9SyllableCode T9Processor::FindPhraseCode(
     return {};
 }
 
+// 无痕（用户开关或敏感输入框）：不写用户词典；撤销与捕获清理照常进行，只是跳过落盘。
+static bool IncognitoActive(Engine* engine) {
+    return engine && engine->context() && engine->context()->get_option("_cyime_incognito");
+}
+
 bool T9Processor::WriteDictEntry(const std::string& text,
                                  const Code& code,
                                  int commits) {
+    if (IncognitoActive(engine_)) return true;
     if (!user_dict_ || !user_dict_->loaded() || user_dict_->readonly())
         return false;
     if (text.empty() || code.empty())
@@ -740,6 +748,42 @@ bool T9Processor::UpdateDictEntry(const std::string& text,
     if (!BuildEntryForPinyin(text, pinyin, &entry))
         return false;
     return WriteDictEntry(text, entry.code, commits);
+}
+
+bool T9Processor::FixLetter(char letter) {
+    if (letter >= 'A' && letter <= 'Z') letter = static_cast<char>(letter - 'A' + 'a');
+    if (letter < 'a' || letter > 'z') return false;
+    if (input_buffer_.is_empty() || state_machine_.is_idle()) return false;
+    static const char* kDigitOfLetter = "22233344455566677778889999";
+    const char digit = kDigitOfLetter[letter - 'a'];
+    HandleDigitKey(digit);
+    letter_constraints_[static_cast<int>(input_buffer_.digit_sequence.size()) - 1] = letter;
+    T9LOG(">> FixLetter: '%c' as digit %c at %zu", letter, digit, input_buffer_.digit_sequence.size() - 1);
+    return true;
+}
+
+bool T9Processor::MatchesLetterConstraints(size_t rime_start, const std::string& comment) const {
+    if (letter_constraints_.empty() || comment.empty()) return true;
+    // 候选覆盖的是 RIME input 里的未分配数字段；其前面的字符（已选拼音字母、分隔符）不算。
+    const std::string rime_input = engine_->context()->input();
+    const std::string unassigned = input_buffer_.unassigned();
+    const int unassigned_offset = static_cast<int>(input_buffer_.digit_sequence.size() - unassigned.size());
+    int digits_before = 0;
+    bool in_unassigned = false;
+    for (size_t i = 0; i < rime_start && i < rime_input.size(); ++i) {
+        if (rime_input[i] >= '0' && rime_input[i] <= '9') { ++digits_before; in_unassigned = true; }
+        else if (rime_input[i] != '\'' && rime_input[i] != ' ' && in_unassigned) return true;  // 不覆盖数字段，放行
+    }
+    if (rime_start < rime_input.size() && !(rime_input[rime_start] >= '0' && rime_input[rime_start] <= '9')) return true;
+    int j = 0;
+    for (char c : comment) {
+        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+        if (c < 'a' || c > 'z') continue;  // 分隔符、声调等
+        const auto it = letter_constraints_.find(unassigned_offset + digits_before + j);
+        if (it != letter_constraints_.end() && it->second != c) return false;
+        ++j;
+    }
+    return true;
 }
 
 bool T9Processor::MemorizeEntry(const std::string& text,
@@ -778,6 +822,7 @@ bool T9Processor::MemorizeEntry(const std::string& text,
                 DictEntry entry;
                 entry.text = part.text;
                 entry.custom_code = part.table_code;
+                if (IncognitoActive(engine_)) continue;
                 english_user_dict_->Load();
                 result = english_user_dict_->UpdateEntry(entry, 1) && result;
             }
@@ -1122,6 +1167,7 @@ void T9Processor::EnterIdle() {
     // 必须在 state_machine_ 之前清空 input_buffer_，否则 state sync 后
     // stale buffer 会导致后续 backspace 等操作在残留数据上处理。
     input_buffer_ = T9Buffer();
+    letter_constraints_.clear();
     T9LOG(">> EnterIdle: clearing original_digit_sequence_='%s', last_commit='%s'",
           original_digit_sequence_.c_str(),
           last_commit_digit_sequence_.c_str());

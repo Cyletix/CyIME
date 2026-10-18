@@ -1,0 +1,190 @@
+{
+  "fixture_version": 1,
+  "id": "t9_user_reported_20261009",
+  "source_label": "User-reported T9 failures (2026-10-09)",
+  "source_text": "为什么会这样\n我也不知道为什么会这样\n为什么会这样呢\n感觉现在好一点了\n好一点了\n",
+  "source_sha256_utf8": "58a0af038e0f4fac2e289b6b46f928740a13d3fbc3e71a50093a49a0c3a9836b",
+  "input_contract": {
+    "language": "zh-Hans",
+    "scheme": "full_pinyin",
+    "layout": "t9",
+    "keymap": {
+      "2": "abc",
+      "3": "def",
+      "4": "ghi",
+      "5": "jkl",
+      "6": "mno",
+      "7": "pqrs",
+      "8": "tuv",
+      "9": "wxyz"
+    },
+    "pinyin": "One full canonical toneless pinyin syllable per Han character; ü is v.",
+    "case_boundary": "Every contiguous Han span is an independent composition; all other characters remain source literals.",
+    "source_offsets": "Python Unicode code point offsets, start inclusive, end exclusive.",
+    "body_filter": "All generated cases default to body; heading/speaker classification requires explicit editing.",
+    "simulation_limit": "Input fixture only; pronunciation, candidate language quality and keyboard UI acceptance are not certified."
+  },
+  "pronunciation_review": {
+    "review_status": "provided",
+    "generator": "explicit one-syllable-per-Han readings",
+    "overrides": []
+  },
+  "cases": [
+    {
+      "id": "c001",
+      "text": "为什么会这样",
+      "pinyin": [
+        "wei",
+        "shen",
+        "me",
+        "hui",
+        "zhe",
+        "yang"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 0,
+      "source_end": 6,
+      "source_line": 1,
+      "keys": "9347436634849439264",
+      "syllable_keys": [
+        "934",
+        "7436",
+        "63",
+        "484",
+        "943",
+        "9264"
+      ]
+    },
+    {
+      "id": "c002",
+      "text": "我也不知道为什么会这样",
+      "pinyin": [
+        "wo",
+        "ye",
+        "bu",
+        "zhi",
+        "dao",
+        "wei",
+        "shen",
+        "me",
+        "hui",
+        "zhe",
+        "yang"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 7,
+      "source_end": 18,
+      "source_line": 2,
+      "keys": "9693289443269347436634849439264",
+      "syllable_keys": [
+        "96",
+        "93",
+        "28",
+        "944",
+        "326",
+        "934",
+        "7436",
+        "63",
+        "484",
+        "943",
+        "9264"
+      ]
+    },
+    {
+      "id": "c003",
+      "text": "为什么会这样呢",
+      "pinyin": [
+        "wei",
+        "shen",
+        "me",
+        "hui",
+        "zhe",
+        "yang",
+        "ne"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 19,
+      "source_end": 26,
+      "source_line": 3,
+      "keys": "934743663484943926463",
+      "syllable_keys": [
+        "934",
+        "7436",
+        "63",
+        "484",
+        "943",
+        "9264",
+        "63"
+      ]
+    },
+    {
+      "id": "c004",
+      "text": "感觉现在好一点了",
+      "pinyin": [
+        "gan",
+        "jue",
+        "xian",
+        "zai",
+        "hao",
+        "yi",
+        "dian",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 27,
+      "source_end": 35,
+      "source_line": 4,
+      "keys": "426583942692442694342653",
+      "syllable_keys": [
+        "426",
+        "583",
+        "9426",
+        "924",
+        "426",
+        "94",
+        "3426",
+        "53"
+      ]
+    },
+    {
+      "id": "c005",
+      "text": "好一点了",
+      "pinyin": [
+        "hao",
+        "yi",
+        "dian",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 36,
+      "source_end": 40,
+      "source_line": 5,
+      "keys": "42694342653",
+      "syllable_keys": [
+        "426",
+        "94",
+        "3426",
+        "53"
+      ]
+    }
+  ],
+  "counts": {
+    "cases": 5,
+    "han_characters": 36,
+    "digit_keypresses": 106,
+    "body_cases": 5,
+    "body_han_characters": 36,
+    "body_digit_keypresses": 106,
+    "by_role": {
+      "body": {
+        "cases": 5,
+        "han_characters": 36
+      }
+    }
+  }
+}

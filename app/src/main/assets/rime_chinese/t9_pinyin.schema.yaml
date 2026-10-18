@@ -11,11 +11,32 @@ t9:
   dictionary_beam: 16
   sentence_beam: 24
   result_budget: 12
+  # 整串的组句结果显示前几条（最多 display_sentences 条），后面接较短的词；0 为全部显示。
+  display_sentences: 1
+  # 改为 3 时，第 2、3 条整句只在 9 个键以上显示（短输入的备选整句会把“的”“觉得”挤出前四）。
+  # 2026-10-18 回放：长句目标进前五 85%→92%、首选不变，但连续打字逐键平均耗时 +1 ms 超出噪声带，
+  # 未过速度门禁，暂不开启（pinyin26-word-model-20261018.md）。
+  more_sentences_min_keys: 9
   spelling_penalty: 5.0
   word_penalty: 8.0
-  # Runs after a typing pause on a coalescing worker; never blocks key decoding.
-  sentence_model: t9_sentence
+  # 停顿后的长句模型重排已停用（2026-10-09 同语料回放：停顿后首选只多对 3/488 字，
+  # 同时拖慢逐键解码并在停顿后改动候选）。排序只依据词权与语法 n-gram；
+  # 恢复时在此加回 sentence_model: t9_sentence，并重跑九键回放与速度门禁。
   sentence_weight: 0.25
+  # 词组模型（tools/ime_lab/ngram）：存在 t9_ngram.lm 时，组句每个词的分数统一为
+  # ln P(词 | 前面的词)，取代词库权重、语法搭配与每词扣分；文件不存在时保持原算法。
+  ngram_model: t9_ngram
+  # 第一个词按“出现在句首的概率”打分，而不是总体词频（如“着”“么”很常见但几乎不在句首）。
+  ngram_sentence_start: true
+  # 句尾概率强度：整句排序时加上“在这里结束”的概率；打字途中不一定是句尾，强度由调参集确定，0 为不用。
+  ngram_eos_weight: 0
+  # 用户学习层占比 λ：词分数 = ln((1-λ)·P底座 + λ·P用户)，P用户取用户词库的上屏占比（近期选过的更高）；底座模型不被改写，0 为不学习。
+  ngram_user_weight: 0.05
+  # 词库先验 μ：语料里没见过的词库词（细胞词库、生僻词）按 ln((1-μ)·P拆字 + μ·P词库频率) 计分，
+  # 让“无精二”这类词首次也能排上；0 为不用。取值由调参集回放确定。
+  ngram_dictionary_prior: 0.02
+  # 同一串字有多种分词时（如“那你还”与“那你／还”），整串的概率是各种分词之和；false 时只取最好的一种。
+  ngram_merge_segmentations: false
   # 适应元书输入法的配置，是否显示 rime 中原始的预编辑文本，默认为 true
   # true: 对 preedit 不做处理，显示 rime 返回的原始 preedit 值。
   #       如果想通过 lua 自己调整 preedit 的显示，可以设置为 true。
@@ -166,3 +187,5 @@ t9_english:
   enable_user_dict: true
   initial_quality: 0.2
   comment_format: []
+  # 英文词后接剩余数字（steam42 这类）会挤掉中文候选，默认不生成。
+  digit_suffixes: false

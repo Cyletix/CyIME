@@ -181,20 +181,17 @@ class T9ReportedRegressionTest {
             // Check before engine destruction resets the scorer lifecycle.
             if (!baseline && InstrumentationRegistry.getArguments().getString("t9_cases", "").isEmpty())
                 assertEquals("grammar=ready;sentence=ready", engine.t9ScoringStatus())
-            // Negative feedback retains the exact native candidate objects/order;
-            // it neither tombstones component words nor teaches the next item.
+            // Long-press delete forgets learning only: a dictionary word without a learning
+            // record stays in place (result 2), and a stale revision is rejected (result 0).
             input("6364986743663")
-            val blocked = mutableListOf<String>()
-            repeat(3) {
+            run {
                 val before = snapshot().map { it[0] }
                 assertTrue(before.size > 4)
                 val revision = engine.readQueuedComposition()!!.engineRevision
-                assertTrue(engine.suppressCandidateAtRevision(0, revision, global = true))
-                assertFalse("stale suppression rejected", engine.suppressCandidateAtRevision(0, revision, global = true))
-                blocked += before.first()
+                assertEquals("no learning record to forget", 2, engine.forgetCandidateAtRevision(0, revision, global = true))
+                assertEquals("stale revision rejected", 0, engine.forgetCandidateAtRevision(0, revision, global = true))
                 val after = snapshot().map { it[0] }
-                assertEquals(before.drop(1), after.take(before.size - 1))
-                assertFalse(before.first() in after)
+                assertTrue("unlearned word is not hidden", before.first() in after)
                 assertEquals(after, engine.getAllCandidates(100).map { it.text })
             }
             engine.destroy()
@@ -203,13 +200,8 @@ class T9ReportedRegressionTest {
             assertTrue(engine.switchSchema("t9_pinyin"))
             engine.setOption("ascii_mode", false)
             input("6364986743663")
-            assertTrue("suppression survives restart", snapshot().none { it[0] in blocked })
-            assertTrue("persistent feedback management", engine.getSuppressedCandidates().containsAll(blocked))
-            blocked.forEach { assertTrue(engine.restoreSuppressedCandidate(it)) }
-            input("6364986743663")
-            assertTrue("suppression can be undone", blocked.all { text -> snapshot().any { it[0] == text } })
 
-            // Real native selection, both APIs, after a reorder and a suppression.
+            // Real native selection, both APIs, after a reorder.
             val selectedTexts = snapshot().take(5).map { it[0] }
             selectedTexts.forEach { text ->
                 input("6364986743663")

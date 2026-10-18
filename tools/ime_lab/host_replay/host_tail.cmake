@@ -7,7 +7,9 @@ set_target_properties(onnxruntime PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/onnxruntime/include")
 target_link_libraries(rime-static "$<LINK_ONLY:onnxruntime>")
 target_include_directories(rime-t9-objs PRIVATE "${CMAKE_SOURCE_DIR}/onnxruntime/include")
-add_library(rime_jni SHARED librime_jni/rime_jni.cc librime_jni/candidate_policy.cc)
+# host_replay_jni.cc adds host-only JNI entry points (work counters, preset user dictionary).
+add_library(rime_jni SHARED librime_jni/rime_jni.cc librime_jni/candidate_policy.cc
+  "${HOST_ADAPTER_DIR}/host_replay_jni.cc")
 target_compile_definitions(rime_jni PRIVATE RIME_JNI_VERBOSE_LOGGING=0)
 target_include_directories(rime_jni PRIVATE
   "${HOST_JNI_INCLUDE}" "${HOST_JNI_INCLUDE}/linux" "${HOST_ADAPTER_DIR}"

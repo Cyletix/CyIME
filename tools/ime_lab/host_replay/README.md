@@ -20,6 +20,18 @@ module is sufficient; the helper provides a local `javac` launcher for that
 module. Native compilation is limited to two jobs. No source algorithm is
 reimplemented in Python, and the model is never disabled to make a run pass.
 
+The host build configures `-DCYIME_T9_WORK_COUNTERS=ON` (Android leaves it off,
+so its generated sources are unchanged) and links `host_replay_jni.cc`, which
+exposes the per-key work counters from `librime-t9/src/t9_lookup_trace.h` and
+restores a preset `*.userdb.txt` snapshot through librime's `UserDictManager`
+before the session opens. `ChatReplay --host --user-dict FILE` uses both; an
+engine library without these entry points still replays, without `work` rows.
+`t9_host.py` runs the replay root under `<cache>/replay-roots/` (Linux
+filesystem, so timing is not dominated by drvfs page-in) and moves it to
+`native-run` afterwards; `--engine-from RUN` replays an earlier run's cached
+engine and resources so baseline and candidate runs can alternate in one timing
+session.
+
 `ChatReplayHostChecks.java` exercises host-only path/flag guards. The replay
 itself is shared with `../android_replay/ChatReplay.java` and invoked with
 `--host --resources ZIP`; every run requires a new data directory. Resource ZIPs
@@ -30,3 +42,21 @@ Build logs and artifacts live in the private cache, and each result directory
 retains build/source manifests as well as raw replay evidence. A successful
 build or replay does not claim that candidate quality passed; check quality and
 comparison exit codes separately.
+
+`MergedLetterProbe.java` additionally exercises full/double pinyin syllable
+selection against the production JNI and deployed prisms. Compile it together
+with `../android_replay/RimeEngine.java`; arguments are the built `library_dir`
+and a separate test user-resource directory with `rime_ice`, `pinyin_14jian`,
+`double_pinyin_flypy`, and `double_pinyin_flypy_14jian` enabled. Do not point it at
+an installed application's data. It confirms a partial Chinese candidate to
+check prefix preservation, so this is distinct from the no-selection T9 corpus
+protocol. It never commits a full input or adds training phrases.
+
+The probe covers grouped/exact letters, real `lo`/`luo` shared codes, `xian`
+versus `xi+an`, a chosen `ni` followed by `n`, reselecting the first unconfirmed
+syllable, raw/caret/confirmed-text preservation, stale selections, suffix edits,
+explicit delimiters, caret movement and clear/schema invalidation. Candidate
+pronunciation checks use actual Chinese dictionary syllable IDs, not displayed
+labels or another dictionary's English word IDs. This verifies one unconfirmed
+syllable constraint; it does not claim nine-key-style chaining of several
+syllable choices before selecting Chinese text.

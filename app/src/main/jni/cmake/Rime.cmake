@@ -54,6 +54,7 @@ option(CYIME_RIME_VERBOSE_TRACE "Trace every native dictionary lookup (slow)" OF
 if(CYIME_RIME_VERBOSE_TRACE)
   add_compile_definitions(CYIME_RIME_VERBOSE_TRACE=1)
 endif()
+include("${CMAKE_CURRENT_LIST_DIR}/T9WorkCounters.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/RimeDictionary.cmake")
 set(T9_CACHE_PATCH "${CMAKE_CURRENT_LIST_DIR}/T9DecodeCache.patch")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${T9_CACHE_PATCH}")

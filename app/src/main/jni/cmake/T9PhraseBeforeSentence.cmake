@@ -14,13 +14,17 @@ function(t9_replace old new)
   set(T9_SCRIPT_TRANSLATOR_CODE "${code}" PARENT_SCOPE)
 endfunction()
 
-t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>")
+t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octagram/src")
 t9_replace("double sentence_cutoff_threshold)" "double sentence_cutoff_threshold, Config* config)")
 t9_replace("this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_);"
            "this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_, engine_->schema()->config());")
 t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
+    // Text committed before the composition, set by the app (RimeEngine.setT9LeftContext);
+    // `context` is the engine context parameter added by PinyinSyllableSelection.cmake.
+    if (context) t9_left_context_ = context->get_property("cyime_left_context");
+    if (context) t9_neighbors_ = context->get_property("cyime_neighbors");
     if (config) {
       config->GetBool("t9/joint_decoder", &t9_joint_);
       config->GetBool("t9/decoded_cache", &t9_decoded_cache_);
@@ -35,18 +39,47 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
         budget("t9/dictionary_beam", t9_dictionary_beam_, 8, 64);
         budget("t9/sentence_beam", t9_sentence_beam_, 8, 128);
         budget("t9/result_budget", t9_result_budget_, 3, 64);
+        int display = static_cast<int>(t9_display_sentences_);
+        config->GetInt("t9/display_sentences", &display);
+        { int keys = 0; config->GetInt("t9/more_sentences_min_keys", &keys);
+          t9_more_sentences_min_keys_ = static_cast<size_t>(std::max(0, keys)); }
+        config->GetBool("t9/cache_with_correction", &t9_cache_with_correction_);
+        t9_display_sentences_ = static_cast<size_t>(std::max(0, display));
         config->GetDouble("t9/spelling_penalty", &t9_spelling_penalty_);
         config->GetDouble("t9/word_penalty", &t9_word_penalty_);
         config->GetString("t9/sentence_model", &t9_sentence_model_);
         config->GetDouble("t9/sentence_weight", &t9_sentence_weight_);
-        if (auto* component = Grammar::Require("grammar"))
-          t9_grammar_.reset(component->Create(config));
-        string language;
-        if (config->GetString("grammar/language", &language)) {
-          if (auto* component = dynamic_cast<OctagramComponent*>(Grammar::Require("grammar")))
-            t9_gram_db_ = component->GetDb(language);
+        string ngram_model;
+        if (config->GetString("t9/ngram_model", &ngram_model) && !ngram_model.empty()) {
+          // Not .bin: Rime cleanup moves *.bin in the user directory to trash.
+          const ResourceType type{"t9_ngram", "", ".lm"};
+          std::unique_ptr<ResourceResolver> resolver(Service::instance().CreateResourceResolver(type));
+          t9_ngram_ = T9NgramModel::Open(resolver->ResolvePath(ngram_model).string());
         }
-        T9SetGrammarStatus(t9_gram_db_ != nullptr);
+        config->GetDouble("t9/ngram_user_weight", &t9_ngram_user_weight_);
+        config->GetDouble("t9/ngram_dictionary_prior", &t9_ngram_dictionary_prior_);
+        config->GetBool("t9/ngram_sentence_start", &t9_ngram_sentence_start_);
+        config->GetDouble("t9/ngram_eos_weight", &t9_ngram_eos_weight_);
+        config->GetBool("t9/ngram_merge_segmentations", &t9_ngram_merge_segmentations_);
+        config->GetDouble("t9/correction_penalty", &t9_correction_penalty_);
+        config->GetBool("t9/prefer_user_entries", &t9_prefer_user_entries_);
+        { int whole = 0; config->GetInt("t9/whole_input_phrases", &whole); t9_whole_input_phrases_ = static_cast<size_t>(std::max(0, whole)); }
+        // 26-key uses the decoder only with the word model; without the model file it keeps
+        // the ordinary Rime phrase/sentence path rather than dictionary weights + word penalty.
+        bool requires_ngram = false;
+        config->GetBool("t9/joint_requires_ngram", &requires_ngram);
+        if (requires_ngram && !t9_ngram_) t9_joint_ = false;
+        // Without the word n-gram model, keep dictionary weight + grammar + word penalty.
+        if (!t9_ngram_) {
+          if (auto* component = Grammar::Require("grammar"))
+            t9_grammar_.reset(component->Create(config));
+          string language;
+          if (config->GetString("grammar/language", &language)) {
+            if (auto* component = dynamic_cast<OctagramComponent*>(Grammar::Require("grammar")))
+              t9_gram_db_ = component->GetDb(language);
+          }
+        }
+        T9SetGrammarStatus(t9_gram_db_ != nullptr || t9_ngram_ != nullptr);
       }
     }
     set_exhausted(true);
@@ -60,12 +93,26 @@ t9_replace("  bool CheckEmpty();" [=[
   size_t t9_dictionary_beam_ = 16;
   size_t t9_sentence_beam_ = 24;
   size_t t9_result_budget_ = 12;
+  size_t t9_display_sentences_ = 0;
   double t9_spelling_penalty_ = 5.0;
   double t9_word_penalty_ = 8.0;
+  size_t t9_whole_input_phrases_ = 0;
+  bool t9_prefer_user_entries_ = false;
+  double t9_correction_penalty_ = -4.605170185988091;  // log(0.01): Rime's corrected-syllable credibility
   double t9_sentence_weight_ = 0.25;
   string t9_sentence_model_;
   GramDb* t9_gram_db_ = nullptr;
   the<Grammar> t9_grammar_;
+  std::shared_ptr<const T9NgramModel> t9_ngram_;
+  double t9_ngram_user_weight_ = 0.05;
+  double t9_ngram_dictionary_prior_ = 0;
+  bool t9_ngram_sentence_start_ = false;
+  double t9_ngram_eos_weight_ = 0;
+  bool t9_ngram_merge_segmentations_ = false;
+  string t9_left_context_;
+  string t9_neighbors_;
+  size_t t9_more_sentences_min_keys_ = 0;
+  bool t9_cache_with_correction_ = false;
   bool PrepareJointCandidates(Dictionary* dict, UserDictionary* user_dict);
   bool CheckEmpty();]=])
 t9_replace("  auto is_correction_match =" [=[
@@ -81,6 +128,7 @@ t9_replace("#if defined(__ANDROID__)\n#include <android/log.h>\n#include <chrono
 file(READ "${T9_JOINT_DECODER}" T9_JOINT_CODE)
 t9_replace("// ScriptTranslator implementation" "${T9_JOINT_CODE}\n\n// ScriptTranslator implementation")
 
+include("${CMAKE_CURRENT_LIST_DIR}/PinyinSyllableSelection.cmake")
 set(T9_SCRIPT_TRANSLATOR_COPY "${CMAKE_CURRENT_BINARY_DIR}/cyime-script-translator.cc")
 file(CONFIGURE OUTPUT "${T9_SCRIPT_TRANSLATOR_COPY}" CONTENT "${T9_SCRIPT_TRANSLATOR_CODE}" @ONLY)
 get_target_property(T9_RIME_SOURCES rime-static SOURCES)
