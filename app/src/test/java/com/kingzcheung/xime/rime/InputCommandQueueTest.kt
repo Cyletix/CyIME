@@ -6,6 +6,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class InputCommandQueueTest {
+    @Test fun actionFailureIsReportedAndNextKeyStillRuns() = runBlocking {
+        val failures = mutableListOf<Throwable>()
+        val queue = InputCommandQueue(this, Dispatchers.Default, reportFailure = { failures += it })
+        var nextRan = false
+        try {
+            queue.submit { throw IllegalStateException("test editor failure") }
+            withTimeout(3000) { queue.submit { nextRan = true }.join() }
+            assertEquals(1, failures.size)
+            assertTrue(nextRan)
+            assertFalse(queue.hasPendingCommands)
+        } finally { queue.close() }
+    }
+
+    @Test fun brokenLatencyReporterCannotDisableTyping() = runBlocking {
+        val queue = InputCommandQueue(this, Dispatchers.Default, reportLatency = { _, _ -> error("diagnostic failed") })
+        var typed = 0
+        try {
+            val keys = (1..100).map { queue.submit { typed++ } }
+            withTimeout(3000) { keys.joinAll() }
+            assertEquals(100, typed)
+            assertFalse(queue.hasPendingCommands)
+        } finally { queue.close() }
+    }
+
     @Test fun nextKeyWaitsThroughSuspendedCommitAndNestedCleanup() = runBlocking {
         val queue = InputCommandQueue(this, Dispatchers.Default)
         val entered = CompletableDeferred<Unit>()

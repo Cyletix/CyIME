@@ -64,6 +64,7 @@ internal class JapaneseInputController(private val service: XimeInputMethodServi
         }
     }
     suspend fun cancel() { conversion = null; show() }
+    fun conversionPreview(): String? = current()?.preview
     suspend fun commit(index: Int? = null): Boolean {
         val active = current() ?: return false
         if (index != null) active.choose(index)

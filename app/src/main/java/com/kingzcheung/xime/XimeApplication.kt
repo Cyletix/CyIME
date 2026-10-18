@@ -49,9 +49,23 @@ class XimeApplication : Application(), ImageLoaderFactory {
         super.onCreate()
 
         FileLogger.init(this)
+        // 语音、联想、文字识别进程也记崩溃：以前只有主进程登记，模型进程闪退时日志里什么都没有。
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                FileLogger.e("CrashHandler", "Uncaught exception on thread: ${thread.name}", throwable)
+                FileLogger.flushNow()
+            } catch (_: Exception) {
+            }
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
         // Model services run in separate processes. They must not copy/deploy the
         // same Rime directory or load the keyboard/plugin runtime a second time.
-        if (android.os.Build.VERSION.SDK_INT >= 28 && getProcessName() != packageName) return
+        val processName = if (android.os.Build.VERSION.SDK_INT >= 28) getProcessName()
+        else (getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager)
+            .runningAppProcesses?.firstOrNull { it.pid == android.os.Process.myPid() }?.processName
+            ?: runCatching { java.io.File("/proc/self/cmdline").readText().substringBefore('\u0000') }.getOrNull()
+        if (processName != packageName) return
         com.kingzcheung.xime.model.DeviceDefaults.initialize(this)
         com.kingzcheung.xime.settings.LanguagePreferences.initialize(this)
         com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this)
@@ -63,15 +77,6 @@ class XimeApplication : Application(), ImageLoaderFactory {
             FileLogger.e(TAG, "Unable to synchronize launcher icon", e)
         }
         AppFonts.initialize(this)
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            try {
-                FileLogger.e("CrashHandler", "Uncaught exception on thread: ${thread.name}", throwable)
-                FileLogger.flushNow()
-            } catch (_: Exception) {
-            }
-            defaultHandler?.uncaughtException(thread, throwable)
-        }
 
         val isDebug = BuildConfig.DEBUG
         PluginManager.configStoreFactory =

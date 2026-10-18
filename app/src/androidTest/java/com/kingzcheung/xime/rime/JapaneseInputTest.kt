@@ -173,8 +173,9 @@ class JapaneseInputTest {
         assertReadingReturn(engine, "きや")
         assertNull("读音回车提交后不能再替换假名", composer.replacement(engine.getInput()))
         input("tu")
-        modify("du", "づ")
         modify("xtu", "っ")
+        modify("du", "づ")
+        modify("tu", "つ")
     }
 
     private fun assertReadingReturn(engine: RimeEngine, expectedReading: String) {

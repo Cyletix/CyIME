@@ -21,6 +21,17 @@ class InputTextPolicyTest {
         org.junit.Assert.assertEquals("\"\"''", punctuationWidth("“”‘’", false))
     }
 
+    // 2026-10-16：中文屏幕键盘的符号都是固定字符，全角／半角下都原样上屏。
+    @Test fun chineseKeyboardSymbolsAreFixedCharacters() {
+        for (full in listOf(true, false)) for (value in listOf(",", ".", "?", ":", ";", "<", ">", "[", "]", "\"", "'",
+            "，", "。", "？", "：", "；", "《", "》", "【", "】", "！", "（", "）", "～", "!", "@", "(", ")", "-", "`",
+            "、", "…", "—", "·", "¥")) {
+            assertEquals(value, keyboardLiteralWidth(value, full, false, chineseKeyboard = true))
+        }
+        // 实体键盘和英文仍走完整转换。
+        assertEquals("：（）", keyboardLiteralWidth(":()", true, false))
+    }
+
     @Test fun japaneseKeyboardSpacesAndDigitsFollowWidth() {
         assertEquals("　", keyboardLiteralWidth(" ", true, true))
         assertEquals(" ", keyboardLiteralWidth("　", false, true))
@@ -30,6 +41,14 @@ class InputTextPolicyTest {
         assertEquals("12.5+3", keyboardLiteralWidth("１２．５＋３", false, true, numberPanel = true))
         assertEquals("、。", keyboardLiteralWidth(",.", true, true))
         assertEquals("よy", keyboardLiteralWidth("よy", true, true))
+    }
+
+    // Regression (2026-10-11, second report): full-width space/digits/letters must stay typeable in Japanese.
+    @Test fun japaneseFullWidthLettersAndTheToggleStayAvailable() {
+        assertEquals("ＣｙＩＭＥ　１２", fullWidthLetters(keyboardLiteralWidth("CyIME 12", true, true)))
+        assertEquals("CyIME 12", keyboardLiteralWidth("CyIME 12", false, true))
+        org.junit.Assert.assertTrue("全角／半角 must be reachable from the default menu",
+            com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE in com.kingzcheung.xime.keyboard.ToolbarButton.DEFAULT_MENU)
     }
     @Test fun otherLanguagesKeepTheirSpaceAndNumericBehavior() {
         assertEquals(" ", keyboardLiteralWidth(" ", true, false))
@@ -49,4 +68,26 @@ class InputTextPolicyTest {
         assertEquals("-", keyboardLiteralWidth("－", false, false))
     }
 
+    @Test fun preeditCaretMarksThePinyinPositionOnlyWhenItMapsToTheInput() {
+        assertEquals("ni| hao", markPreeditCaret("ni hao", "nihao", 2, 0))
+        assertEquals("nih|ao", markPreeditCaret("nihao", "nihao", 3, 0))
+        assertEquals("|nihao", markPreeditCaret("nihao", "nihao", 0, 0))
+        assertEquals("你h|ao", markPreeditCaret("你hao", "nihao", 3, 2))
+        assertNull("caret at the end shows nothing", markPreeditCaret("ni hao", "nihao", 5, 0))
+        assertNull("double pinyin display does not map to the code", markPreeditCaret("ni hao", "nihk", 2, 0))
+        // 双拼：Rime 只转换光标前的编码，光标后原样显示，仍能标出位置。
+        assertEquals("ni|hk", markPreeditCaret("ni" + "hk", "nihk", 2, 0))
+        assertEquals("ni hao|ma", markPreeditCaret("ni hao" + "ma", "nihaoma", 5, 0))
+    }
+
+    @Test fun physicalArrowsStepOneLetterAndStopAtBothEnds() {
+        assertEquals(4, com.kingzcheung.xime.rime.compositionCaretStep("nihao", 5, 0, -1))
+        assertEquals(1, com.kingzcheung.xime.rime.compositionCaretStep("nihao", 0, 0, 1))
+        assertNull("no wrap at the start", com.kingzcheung.xime.rime.compositionCaretStep("nihao", 0, 0, -1))
+        assertNull("no wrap at the end", com.kingzcheung.xime.rime.compositionCaretStep("nihao", 5, 0, 1))
+        assertNull("confirmed text is not editable", com.kingzcheung.xime.rime.compositionCaretStep("nihao", 2, 2, -1))
+        // 手打分隔符两侧显示同一个光标位置，一步跨过。
+        assertEquals(1, com.kingzcheung.xime.rime.compositionCaretStep("ni'hao", 3, 0, -1))
+        assertEquals(4, com.kingzcheung.xime.rime.compositionCaretStep("ni'hao", 2, 0, 1))
+    }
 }

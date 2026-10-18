@@ -68,13 +68,27 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
             var text = session.text
             var caret = (selection ?: session.caret).coerceIn(0, text.length)
             val letters = when {
-                session.isT9 -> when (key) { "2" -> "abc"; "3" -> "def"; "4" -> "ghi"; "5" -> "jkl"; "6" -> "mno"; "7" -> "pqrs"; "8" -> "tuv"; "9" -> "wxyz"; else -> null }
                 com.kingzcheung.xime.settings.InputProfiles.describe(session.schemaId).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14 && key?.length == 1 ->
                     com.kingzcheung.xime.rime.merged14Groups.firstOrNull { it.first().toString() == key }
                 else -> null
             }
+            // A nine-key digit typed at the code caret is the same ambiguous key as one typed
+            // at the end: rebuild the editable code as plain keys, never a fixed letter.
+            // Backspace likewise removes the key before the caret, as it does at the end.
+            val t9Key = session.isT9 && replacement == null && selection == null &&
+                (key?.length == 1 && key[0] in '2'..'9' || key == "delete" && text.take(caret).any { it != '\'' })
             if (letters == null || replacement != null || selection != null) multiTap.reset()
-            if (letters != null && replacement == null && selection == null) {
+            if (t9Key) {
+                val keys = text.filter { it != '\'' }.map(::t9Digit).joinToString("")
+                val before = text.take(caret).count { it != '\'' }
+                if (key == "delete") {
+                    text = keys.removeRange(before - 1, before)
+                    caret = before - 1
+                } else {
+                    text = keys.take(before) + key + keys.drop(before)
+                    caret = before + 1
+                }
+            } else if (letters != null && replacement == null && selection == null) {
                 val edited = multiTap.press(text, caret, letters, eventTime)
                 text = edited.first; caret = edited.second
             } else if (replacement != null) {
@@ -115,16 +129,29 @@ internal class ImePreeditEditor(private val service: XimeInputMethodService) {
                 }
             }
             if (result == null) { withContext(Dispatchers.Main) { reply(null) }; return@enqueue }
+            if (t9Key) {
+                // Show the engine's reading of the plain keys, caret right after the new key.
+                val display = PinyinEditDisplay(text, result.preeditText.removePrefix(session.protectedText).trim(), true)
+                caret = display.displayOffset(caret)
+                text = display.text
+            }
             val next = session.copy(expectedInput = result.inputText, text = text, caret = caret,
                 t9RemainingDigits = if (session.isT9) engine.t9GetRemainingDigits() else "")
             liveSession = next
             withContext(Dispatchers.Main) {
                 if (!owner.isActive() || !isOwnerCurrent(session)) return@withContext
                 if (session.isT9) service.keyboardCallbacks?.onT9RefreshAfterPreeditEdit?.invoke()
-                service.sessionController.updateUIWithResult(result)
+                // Moving the code caret updates candidates only, never the host's
+                // composing region or selection. A real code edit still updates it.
+                service.sessionController.updateUIWithResult(result, updateInputBoxComposition = changed)
                 reply(next)
             }
         }
+    }
+
+    private fun t9Digit(c: Char): Char = when (c) {
+        in 'a'..'c' -> '2'; in 'd'..'f' -> '3'; in 'g'..'i' -> '4'; in 'j'..'l' -> '5'
+        in 'm'..'o' -> '6'; in 'p'..'s' -> '7'; in 't'..'v' -> '8'; in 'w'..'z' -> '9'; else -> c
     }
 
     private fun isOwnerCurrent(session: PinyinEditSession): Boolean = service.uiState.value.let {

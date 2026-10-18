@@ -316,7 +316,7 @@ Java_com_kingzcheung_xime_association_NativeOnnxEngine_nativePredict(
     std::lock_guard<std::mutex> lock(g_onnx_mutex);
 
     const OrtApi* api = OnnxGetApi();
-    if (!api || !g_session) {
+    if (!api || !g_session || top_k <= 0 || env->GetArrayLength(input_ids) == 0) {
         LOGE("ONNX Runtime not initialized");
         return nullptr;
     }
@@ -368,8 +368,14 @@ Java_com_kingzcheung_xime_association_NativeOnnxEngine_nativePredict(
         // results instead of crashing.
         LOGE("Run failed on NNAPI session: %s", api->GetErrorMessage(status));
         api->ReleaseStatus(status);
+        status = nullptr;
 
         OrtSession* fallback = OnnxEnsureCpuFallbackSession(api);
+        if (!fallback) {
+            api->ReleaseValue(input_tensor);
+            env->ReleaseLongArrayElements(input_ids, input_data, JNI_ABORT);
+            return nullptr;
+        }
         if (fallback) {
             status = api->Run(fallback, nullptr, input_names, (const OrtValue* const*)&input_tensor, 1,
                               output_names, 1, &output_tensor);
@@ -410,6 +416,15 @@ Java_com_kingzcheung_xime_association_NativeOnnxEngine_nativePredict(
         return nullptr;
     }
 
+    ONNXTensorElementDataType element_type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+    status = api->GetTensorElementType(output_info, &element_type);
+    if (status || element_type != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT || dims_count != 3) {
+        LOGE("Prediction model must output [batch, sequence, vocabulary]");
+        if (status) api->ReleaseStatus(status);
+        api->ReleaseTensorTypeAndShapeInfo(output_info);
+        api->ReleaseValue(output_tensor);
+        return nullptr;
+    }
     std::vector<int64_t> output_dims(dims_count);
     status = api->GetDimensions(output_info, output_dims.data(), dims_count);
     api->ReleaseTensorTypeAndShapeInfo(output_info);
@@ -421,7 +436,11 @@ Java_com_kingzcheung_xime_association_NativeOnnxEngine_nativePredict(
         return nullptr;
     }
 
-    LOGD("Output shape: [%ld, %ld, %ld]", (long)output_dims[0], (long)output_dims[1], (long)output_dims[2]);
+    if (output_dims[0] != 1 || output_dims[1] <= 0 || output_dims[2] <= 4) {
+        LOGE("Invalid prediction output dimensions");
+        api->ReleaseValue(output_tensor);
+        return nullptr;
+    }
 
     float* output_data = nullptr;
     status = api->GetTensorMutableData(output_tensor, (void**)&output_data);

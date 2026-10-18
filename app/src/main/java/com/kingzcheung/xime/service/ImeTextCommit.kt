@@ -151,6 +151,13 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         }
         // 标记为已消费：候选栏/剪贴板点选上屏后不再重复出现在候选栏
         service.clipboardManager.markConsumed(text)
+        if (service.clipboardManager.quickSendItems.value.any { it.text == text }) {
+            // 固定内容多是账号、密码等个人信息：照常上屏，但不发给插件提交事件，也不进联想上下文。
+            service.cancelVerificationCodeInput()
+            service.dismissPredictionsForPaste()
+            service.commitTextSilently(text, isPaste = true, isSensitive = true)
+            return
+        }
         // 保留带 is_paste 的提交事件，不触发打字联想或学习。
         service.commitPastedText(text)
         // 已通过 InputConnection 完成粘贴，不再回写系统剪贴板触发一次新的复制通知。
@@ -166,24 +173,43 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
      * 先结束当前候选，再提交字面内容；手势预览不走此入口。
      */
     internal fun isFullWidthPunctuation(): Boolean {
-        // 全角/半角只作用于中文与日文：英文（ASCII）模式始终输出半角标点
-        if (service.uiState.value.isAsciiMode) return false
-        return com.kingzcheung.xime.settings.SettingsPreferences.punctuationFullWidth(service,
-            !service.rimeEngine.getOption("ascii_punct"))
+        // 全角/半角只作用于中文与日文：英文（ASCII）模式始终输出半角标点。
+        // 日文的英数模式除外：全角英数、全角空格是日文输入的常用写法，跟随用户的选择。
+        if (service.uiState.value.isAsciiMode && !isJapaneseProfile()) return false
+        return punctuationWidthChoice()
     }
 
-    internal fun keyboardLiteral(text: String, numberPanel: Boolean = false, preserveWidth: Boolean = false): String =
-        keyboardLiteralWidth(text, isFullWidthPunctuation(),
-            service.uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.JAPANESE,
-            numberPanel, preserveWidth)
+    /** 用户的全角/半角选择本身，与当前是否在英文态无关；菜单与键面角标都按它显示。 */
+    internal fun punctuationWidthChoice(): Boolean =
+        com.kingzcheung.xime.settings.SettingsPreferences.punctuationFullWidth(service,
+            !service.rimeEngine.getOption("ascii_punct"))
 
-    internal fun commitLiteralText(text: String, preserveWidth: Boolean = false) {
+    internal fun isJapaneseProfile(): Boolean =
+        service.uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.JAPANESE
+
+    /** [hardware] 实体键盘符号保持完整的全角/半角转换；屏幕中文键盘的符号原样上屏。 */
+    internal fun keyboardLiteral(text: String, numberPanel: Boolean = false, preserveWidth: Boolean = false,
+        hardware: Boolean = false): String {
+        if (service.keyRouter.usesDirectFieldInput) return service.editorInputPolicy.field.typedLiteral(text)
+        val state = service.uiState.value
+        val chineseKeyboard = !hardware && !state.isAsciiMode &&
+            state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE
+        return keyboardLiteralWidth(text, isFullWidthPunctuation(),
+            state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.JAPANESE,
+            numberPanel, preserveWidth, chineseKeyboard)
+    }
+
+    internal fun commitLiteralText(text: String, preserveWidth: Boolean = false, hardware: Boolean = false) {
         if (text.isEmpty()) return
-        val literal = keyboardLiteral(text, preserveWidth = preserveWidth)
+        val literal = keyboardLiteral(text, preserveWidth = preserveWidth, hardware = hardware)
         service.voiceRecognitionHandler.abandonPendingOnManualInput()
         val owner = service.uiState.value.inputSessionId
         val submit: suspend () -> Unit = literal@ {
             if (owner != service.uiState.value.inputSessionId) return@literal
+            if (service.keyRouter.usesDirectFieldInput) {
+                service.keyRouter.commitDirectFieldLiteral(literal)
+                return@literal
+            }
             val engine = service.rimeEngine
             if (isT9Schema(service.uiState.value.currentSchemaId)) {
                 // 前驱九键已结束，但它的候选刷新在 Main 队列；先让这一帧同步落地。
@@ -191,83 +217,46 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 withContext(Dispatchers.Main) { Unit }
             }
             if (owner != service.uiState.value.inputSessionId) return@literal
-            // 日语已调整过的转换范围按当前预览提交，不能再次强制选择第一项。
-            val japaneseCommitted = service.japaneseInputController.commit()
-            if (owner != service.uiState.value.inputSessionId) return@literal
-            val state = service.uiState.value
-            val candidates = service.candidateState.value
-            val input = engine.getInput()
-            val isT9 = isT9Schema(state.currentSchemaId)
-            val hasComposition = input.isNotEmpty() || candidates.isComposing ||
-                service.t9PartialSegments.isNotEmpty()
-            var prefix = ""
-            if (hasComposition && !japaneseCommitted && candidates.pendingEnglishText.isEmpty()) {
-                val displayed = candidates.candidates.firstOrNull()
-                val action = candidates.candidateActions.firstOrNull()
-                if (isT9) {
-                    val partial = service.t9PartialSegments.joinToString("") { it.text }
-                    // 首候选可能只覆盖一部分数字码；完整转换预览保留它后面的未选编码。
-                    // 引擎已空时只提交 partial 全文，不能再次拼候选中的 partial。
-                    prefix = when {
-                        input.isEmpty() && partial.isNotEmpty() -> partial
-                        action?.isPluginCandidate == true -> partial + action.commitText
-                        else -> partial + engine.conversionPreview().ifEmpty {
-                            displayed ?: candidates.preeditText.ifEmpty { input }
-                        }
-                    }
-                } else if (action?.isPluginCandidate == true) {
-                    prefix = action.commitText
-                } else {
-                    // 部分选词可能不产生 commit，先保存包含余下编码的完整转换预览以免丢字。
-                    val preview = engine.conversionPreview().ifEmpty { input }
-                    val engineCandidates = engine.getCandidates().toList()
-                    val index = action?.engineIndex?.takeIf { it >= 0 }
-                        ?: displayed?.let { resolveRimeCandidateIndex(0, it, engineCandidates) }
-                        ?: 0
-                    prefix = if (engineCandidates.isNotEmpty() && engine.selectCandidate(index)) {
-                        val committed = engine.commit()
-                        if (committed.isEmpty()) preview else {
-                            // 引擎可能只提交前一段；结束本轮字面输入前保留尚未消费的后缀。
-                            val remaining = engine.getInput()
-                            committed + if (remaining.isEmpty()) "" else engine.conversionPreview().ifEmpty { remaining }
-                        }
-                    } else preview
-                }
-            }
-            // 在按键队列等锁清空；不能用 tryLock 的 clearComposition 静默跳过。
-            if (isT9) engine.clearQueuedT9Composition() else engine.clearQueuedComposition()
-            withContext(Dispatchers.Main) {
-                if (owner != service.uiState.value.inputSessionId) return@withContext
-                // commitText 保留内部快捷发送和工具输入框的焦点路由。
-                // 英文 pending 已经逐字上屏，只结束它的状态，绝不能再提交一遍。
-                if (prefix.isNotEmpty()) service.commitText(prefix)
-                service.t9PartialSegments.clear()
-                if (isT9) {
-                    // 引擎已在九键 FIFO 清空，仅重置本地显示，不得在队列末尾再清一次。
-                    service.keyboardCallbacks?.onT9CompositionCleared?.invoke()
-                    service.uiState.value = service.uiState.value.copy(
-                        t9RightCandidateSelectedCount = 0,
-                        t9SelectedCandidatePinyin = "",
-                    )
-                }
-                service.candidateState.value = service.candidateState.value.copy(
-                    inputText = "", preeditText = "", pendingEnglishText = "",
-                    candidates = emptyList(), candidateComments = emptyList(),
-                    associationCandidates = emptyList(), candidateActions = emptyList(),
-                    expandedCandidates = emptyList(), isComposing = false,
-                    isShowingRecentClipboard = false, hasNextPage = false, hasPrevPage = false,
-                )
-                service.commitText(literal)
-                service.updateUI()
-                service.maybeCollapseCandidatePage()
-                // 覆盖尚未送达的旧预编辑快照；取执行时引擎状态，不冻结空态覆盖下一键。
-                service.uiEventChannel.trySend { service.updateUI() }
-            }
+            commitCompositionAndLiteral(literal)
         }
         val t9Queue = if (isT9Schema(service.uiState.value.currentSchemaId) && !service.uiState.value.isAsciiMode) {
             service.keyboardCallbacks?.onT9RunLiteralInput
         } else null
         if (t9Queue != null) t9Queue(submit) else service.keyRouter.postRimeJob { submit() }
+    }
+
+    /** One editor transaction for prefix + literal, reused when leaving a typing panel. */
+    internal suspend fun commitCompositionAndLiteral(literal: String = ""): Boolean {
+        InputCommandOwner.requireOwner().validate()
+        if (service.keyRouter.usesDirectFieldInput) return service.keyRouter.commitDirectFieldLiteral(literal)
+        if (service.keyRouter.hasPendingCandidateCommit) return false
+        val engine = service.rimeEngine
+        val state = service.uiState.value
+        val candidates = service.candidateState.value
+        val input = engine.getInput()
+        val t9 = isT9Schema(engine.getCurrentSchema())
+        val partial = if (t9) service.t9PartialSegments.joinToString("") { it.text } else ""
+        val action = candidates.candidateActions.firstOrNull()
+        val prefix = when {
+            // English has already been delivered character by character.
+            candidates.pendingEnglishText.isNotEmpty() && input.isEmpty() -> ""
+            input.isEmpty() -> partial
+            else -> partial + (service.japaneseInputController.conversionPreview()
+                ?: if (action?.isPluginCandidate == true && !t9) action.commitText
+                else engine.conversionPreview().ifEmpty { input })
+        }
+        val text = prefix + literal
+        if (text.isEmpty()) return true
+        // Rejection retains the complete text and the original command owner for retry/cancel.
+        val result = service.keyRouter.commitPreparedText(text, t9)
+        withContext(Dispatchers.Main) {
+            InputCommandOwner.requireOwner().validate()
+            if (result.accepted) {
+                service.updateUI()
+                service.maybeCollapseCandidatePage()
+            }
+        }
+        return result.accepted
     }
 
     internal fun deleteClipboardChars(count: Int) {

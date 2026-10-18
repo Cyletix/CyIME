@@ -5,4 +5,5 @@ internal data class PendingCandidateCommit(
     val owner: InputCommandOwner,
     val text: String,
     val t9: Boolean,
+    val learnSelection: Boolean = true,
 )

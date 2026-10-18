@@ -4,6 +4,9 @@
 #include <rime_api.h>
 #include <rime/setup.h>
 #include <rime/dict/reverse_lookup_dictionary.h>
+#include <rime/dict/dictionary.h>
+#include <rime/dict/user_dictionary.h>
+#include <rime/ticket.h>
 #include <rime/service.h>
 #include <rime/schema.h>
 #include <rime/config/config_data.h>
@@ -12,6 +15,7 @@
 #include <rime/menu.h>
 #include <rime/gear/translator_commons.h>
 #include "candidate_policy.h"
+#include "pinyin_syllable_selection.h"
 #include "t9_processor.h"
 #include "t9_patch_utils.h"
 #include "t9_digit_userdict.h"
@@ -72,6 +76,8 @@ struct ProcessResult {
     std::string inputText;
     std::string preeditText;
     std::vector<std::pair<std::string, std::string>> candidates;
+    // 与 candidates 同序：该候选是用户以前打过的词（候选栏右上角标记）。
+    std::vector<bool> learned;
     bool isAsciiMode = false;
     bool hasNextPage = false;
     bool hasPrevPage = false;
@@ -86,6 +92,7 @@ struct CompositionResult {
     std::string preedit;
     std::string committedText;
     std::vector<std::pair<std::string, std::string>> candidates;
+    std::vector<bool> learned;
     bool isAsciiMode = false;
     bool hasNextPage = false;
     bool hasPrevPage = false;
@@ -160,6 +167,7 @@ public:
         session_id_ = rime->create_session();
         if (session_id_ != 0) {
             LOGI("Session created: %lu", (unsigned long)session_id_);
+            ensureCandidateComments();
             // 会话重建后的初始 Schema 可能读到部署产物里的旧 page_size
             //（方案自带/第三方为 PC 默认 5），重新对齐到 app 覆盖值
             reapplyPageSizeIfNeeded();
@@ -196,6 +204,7 @@ public:
             return false;
         }
         LOGD("processKey: keycode=%d, mask=%d", keycode, mask);
+        ensureCandidateComments();
         // Stop obsolete inference before decoding the next soft-key edit,
         // rather than letting it compete until the new candidate batch exists.
         if (mask == 0 && ((keycode >= '2' && keycode <= '9') || keycode == 0xff08))
@@ -217,9 +226,27 @@ public:
             return result;
         }
 
+        ensureCandidateComments();
         result.processed = rime->process_key(session_id_, keycode, mask);
         readCurrentState(result);
         return result;
+    }
+
+    // Both the legacy key entry and the batched key/snapshot entry must request
+    // annotations before decoding. UI visibility never changes engine output.
+    void ensureCandidateComments() {
+        if (!rime->get_option(session_id_, "_cyime_candidate_comments")) {
+            rime->set_option(session_id_, "_cyime_candidate_comments", true);
+        }
+        // Incognito is a transient option: a recreated session must regain it here too.
+        if ((rime->get_option(session_id_, "_cyime_incognito") != 0) != incognito_) {
+            rime->set_option(session_id_, "_cyime_incognito", incognito_ ? True : False);
+        }
+    }
+
+    void setIncognito(bool on) {
+        incognito_ = on;
+        if (rime && session_id_) rime->set_option(session_id_, "_cyime_incognito", on ? True : False);
     }
 
     ProcessResult readResult(bool processed) {
@@ -260,6 +287,7 @@ public:
                     comment ? comment : ""
                 ));
             }
+            result.learned = learnedMarks(context.menu.page_no * context.menu.page_size, context.menu.num_candidates);
         }
         result.hasNextPage = !context.menu.is_last_page;
         result.hasPrevPage = context.menu.page_no > 0;
@@ -343,6 +371,32 @@ public:
         if (rime && session_id_) rime->set_caret_pos(session_id_, static_cast<size_t>(std::max(0, caret)));
     }
 
+    std::vector<std::string> pinyinSyllableOptions() {
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->context()) return {};
+        auto dictionary = cyime::pinyin_selection::OpenDictionary(session->schema());
+        if (!dictionary) return {};
+        const auto options = cyime::pinyin_selection::Options(
+            session->context(), session->schema(), dictionary.get());
+        std::vector<std::string> result;
+        result.reserve(options.size());
+        for (const auto& option : options) {
+            result.push_back(std::to_string(option.syllable) + "\t" + option.pinyin + "\t" +
+                std::to_string(option.start) + "\t" + std::to_string(option.end) + "\t" +
+                (option.selected ? "1" : "0"));
+        }
+        return result;
+    }
+
+    bool selectPinyinSyllable(const std::string& expectedInput, const std::string& expectedSchema,
+                              int start, int end, int syllable) {
+        if (start < 0 || end <= start || syllable < 0) return false;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        return session && cyime::pinyin_selection::Select(session->context(), session->schema(),
+            expectedInput, expectedSchema, static_cast<size_t>(start),
+            static_cast<size_t>(end), static_cast<rime::SyllableId>(syllable));
+    }
+
     bool setInput(const char* input) {
         if (!rime || !session_id_) {
             LOGE("setInput: rime or session not available");
@@ -354,6 +408,7 @@ public:
             return true;
         }
         LOGD("setInput: '%s'", input);
+        ensureCandidateComments();
         return rime->set_input(session_id_, input);
     }
 
@@ -384,6 +439,7 @@ public:
                     comment ? comment : ""
                 ));
             }
+            result.learned = learnedMarks(context.menu.page_no * context.menu.page_size, context.menu.num_candidates);
             result.hasNextPage = !context.menu.is_last_page;
             result.hasPrevPage = context.menu.page_no > 0;
             rime->free_context(&context);
@@ -445,6 +501,29 @@ public:
             }
             rime->free_context(&context);
         }
+    }
+
+    // A candidate the user typed before: a whole dictionary entry (not a sentence assembled from
+    // several words) of two or more characters that the user dictionary has committed.
+    std::vector<bool> learnedMarks(size_t offset, size_t count) {
+        std::vector<bool> marks(count, false);
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || session->context()->composition().empty()) return marks;
+        auto menu = session->context()->composition().back().menu;
+        if (!menu) return marks;
+        for (size_t i = 0; i < count && offset + i < menu->candidate_count(); ++i) {
+            auto genuine = rime::Candidate::GetGenuineCandidate(menu->GetCandidateAt(offset + i));
+            const rime::DictEntry* entry = nullptr;
+            if (auto sentence = rime::As<rime::Sentence>(genuine)) {
+                if (sentence->components().size() == 1) entry = &sentence->components().front();
+            } else if (auto phrase = rime::As<rime::Phrase>(genuine)) {
+                entry = &phrase->entry();
+            }
+            size_t chars = 0;
+            if (entry) for (unsigned char c : entry->text) chars += (c & 0xC0) != 0x80;
+            marks[i] = entry && entry->commit_count > 0 && chars >= 2;
+        }
+        return marks;
     }
 
     // Diagnostic snapshot: preserve actual engine order, type and score, never infer from text.
@@ -552,29 +631,52 @@ public:
         return result;
     }
     
-    bool suppressCandidate(int index, bool global) {
-        if (!rime || !session_id_ || index < 0) return false;
+    // 长按删除 = 忘掉这条候选的学习记录（Rime 原生语义）：用户词库里把它标记为删除，
+    // 词库里本来就有的词回到原来的位置，自造词消失；以后再选它会重新学起来。
+    // 拼出来的整句没有自己的记录，改为忘掉句里学过的词。所有方案一致，不再屏蔽文字。
+    // 返回 0 失败、1 已忘掉、2 没有学习记录（排序不变）。
+    int forgetCandidate(int index, bool global) {
+        if (!rime || !session_id_ || index < 0) return 0;
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
-        if (!session) return false;
-        if (session->schema()->schema_id() != "t9_pinyin") {
-            return global ? deleteCandidateByGlobalIndex(index) : deleteCandidateOnCurrentPage(index);
-        }
+        if (!session) return 0;
         auto* context = session->context();
-        if (context->composition().empty()) return false;
+        if (!context || context->composition().empty()) return 0;
         auto& segment = context->composition().back();
-        if (!segment.menu) return false;
+        if (!segment.menu) return 0;
         const auto pageSize = std::max(1, session->schema()->page_size());
         const size_t nativeIndex = global ? static_cast<size_t>(index) :
             segment.selected_index / pageSize * pageSize + index;
         auto candidate = segment.menu->GetCandidateAt(nativeIndex);
-        if (!candidate) return false;
-        auto store = rime::GetT9SuppressionStore();
-        if (!store->Set(session->schema()->schema_id(), candidate->text(), true)) return false;
-        segment.menu->SuppressText(candidate->text());
-        segment.selected_index = 0;
-        // Read APIs now see the very same Menu and surviving Candidate objects.
-        // A composition refresh would regenerate and reorder the survivors.
-        return true;
+        if (!candidate) return 0;
+        auto genuine = rime::Candidate::GetGenuineCandidate(candidate);
+        auto phrase = rime::As<rime::Phrase>(genuine);
+        if (!phrase) return 2;  // symbols, dates and other generated candidates learn nothing
+        auto sentence = rime::As<rime::Sentence>(genuine);
+        if (sentence && sentence->components().size() > 1) {
+            std::vector<const rime::DictEntry*> learned;
+            for (const auto& component : sentence->components())
+                if (component.commit_count > 0) learned.push_back(&component);
+            if (learned.empty()) return 2;
+            // The same user dictionary the translator learns into (shared through the component pool).
+            auto* dictionaries = rime::Dictionary::Require("dictionary");
+            auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
+            if (!dictionaries || !userDictionaries) return 0;
+            const rime::Ticket ticket(session->schema(), "translator");
+            rime::the<rime::Dictionary> dictionary(dictionaries->Create(ticket));
+            rime::the<rime::UserDictionary> userDictionary(userDictionaries->Create(ticket));
+            if (!dictionary || !userDictionary || !dictionary->Load() || !userDictionary->Load() ||
+                userDictionary->readonly()) return 0;
+            userDictionary->Attach(dictionary->primary_table(), dictionary->prism());
+            bool forgotten = false;
+            for (const auto* entry : learned) forgotten = userDictionary->UpdateEntry(*entry, -1) || forgotten;
+            context->RefreshNonConfirmedComposition();
+            return forgotten ? 1 : 0;
+        }
+        const bool learned = (sentence ? sentence->components().front().commit_count
+                                       : phrase->entry().commit_count) > 0;
+        // Rime's own deletion: the owning translator marks the entry deleted and refreshes the menu.
+        if (!context->DeleteCandidate(nativeIndex)) return 0;
+        return learned ? 1 : 2;
     }
 
     bool reloadSessionAfterMaintenance() {
@@ -727,6 +829,7 @@ public:
             // Non-current schema configs are weakly cached. Apply to the new live schema
             // after select_schema, otherwise its bundled menu/page_size (often 5) wins.
             reapplyPageSizeIfNeeded();
+            ensureCandidateComments();
             // 验证切换是否成功
             char current_schema[256];
             if (rime->get_current_schema(session_id_, current_schema, sizeof(current_schema))) {
@@ -1007,6 +1110,12 @@ public:
         if (std::string(existing) != value) rime->set_property(session_id_, "cyime_neighbors", value);
     }
 
+    // 组词前已上屏的文字（"\x1e" + 文字），九键词组模型用作第一个词的上文；空串表示未知。
+    void setT9LeftContext(const std::string& value) {
+        if (!rime || !session_id_) return;
+        rime->set_property(session_id_, "cyime_left_context", value.c_str());
+    }
+
     Bool getOption(const char* option) {
         if (!rime || !session_id_) {
             LOGE("getOption: rime or session not available");
@@ -1132,6 +1241,7 @@ public:
 private:
     RimeApi* rime;
     RimeSessionId session_id_ = 0;
+    bool incognito_ = false;
     std::string user_data_dir_;
     std::string shared_data_dir_;
     bool initialized_ = false;
@@ -1154,7 +1264,7 @@ static void ensureJniCache(JNIEnv* env) {
         jclass cls = env->FindClass("com/kingzcheung/xime/rime/RimeCandidate");
         gRimeCandidateClass = (jclass)env->NewGlobalRef(cls);
         gRimeCandidateCtor = env->GetMethodID(gRimeCandidateClass, "<init>",
-            "(Ljava/lang/String;Ljava/lang/String;)V");
+            "(Ljava/lang/String;Ljava/lang/String;Z)V");
         env->DeleteLocalRef(cls);
     }
     if (!gRimeProcessResultClass) {
@@ -1283,7 +1393,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeProcessKeyAndGetResult(
     for (size_t i = 0; i < result.candidates.size(); ++i) {
         jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
         jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
-        jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment);
+        jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
+            static_cast<jboolean>(i < result.learned.size() && result.learned[i]));
         env->SetObjectArrayElement(candidateArray, i, candidate);
         env->DeleteLocalRef(text);
         env->DeleteLocalRef(comment);
@@ -1334,7 +1445,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetProcessResult(
     for (size_t i = 0; i < result.candidates.size(); ++i) {
         jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
         jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
-        jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment);
+        jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
+            static_cast<jboolean>(i < result.learned.size() && result.learned[i]));
         env->SetObjectArrayElement(candidateArray, i, candidate);
         env->DeleteLocalRef(text);
         env->DeleteLocalRef(comment);
@@ -1397,6 +1509,43 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetCaret(JNIEnv*, jobject, jint 
     Rime::Instance().setCaret(caret);
 }
 
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativePinyinSyllableOptions(JNIEnv* env, jobject) {
+    const auto values = Rime::Instance().pinyinSyllableOptions();
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (!stringClass) return nullptr;
+    auto result = env->NewObjectArray(values.size(), stringClass, nullptr);
+    if (result) {
+        for (size_t i = 0; i < values.size(); ++i) {
+            auto value = env->NewStringUTF(values[i].c_str());
+            if (!value) break;
+            env->SetObjectArrayElement(result, i, value);
+            env->DeleteLocalRef(value);
+            if (env->ExceptionCheck()) break;
+        }
+    }
+    env->DeleteLocalRef(stringClass);
+    return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSelectPinyinSyllable(
+        JNIEnv* env, jobject, jstring expectedInput, jstring expectedSchema,
+        jint start, jint end, jint syllableId) {
+    if (!expectedInput || !expectedSchema) return JNI_FALSE;
+    const char* input = env->GetStringUTFChars(expectedInput, nullptr);
+    if (!input) return JNI_FALSE;
+    const char* schema = env->GetStringUTFChars(expectedSchema, nullptr);
+    if (!schema) {
+        env->ReleaseStringUTFChars(expectedInput, input);
+        return JNI_FALSE;
+    }
+    const bool selected = Rime::Instance().selectPinyinSyllable(input, schema, start, end, syllableId);
+    env->ReleaseStringUTFChars(expectedSchema, schema);
+    env->ReleaseStringUTFChars(expectedInput, input);
+    return selected ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9ReplaceEditableSuffix(JNIEnv* env, jobject, jstring input) {
     auto processor = rime::T9ProcessorRequire();
@@ -1442,7 +1591,8 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetComposition(
     for (size_t i = 0; i < result.candidates.size(); ++i) {
         jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
         jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
-        jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment);
+        jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
+            static_cast<jboolean>(i < result.learned.size() && result.learned[i]));
         env->SetObjectArrayElement(candidateArray, i, candidate);
         env->DeleteLocalRef(text);
         env->DeleteLocalRef(comment);
@@ -1649,10 +1799,33 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeDeleteCandidateByGlobalIndex(
     return Rime::Instance().deleteCandidateByGlobalIndex(index) ? JNI_TRUE : JNI_FALSE;
 }
 
-JNIEXPORT jboolean JNICALL
-Java_com_kingzcheung_xime_rime_RimeEngine_nativeSuppressCandidate(
+JNIEXPORT jint JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeForgetCandidate(
     JNIEnv*, jobject, jint index, jboolean global) {
-    return Rime::Instance().suppressCandidate(index, global) ? JNI_TRUE : JNI_FALSE;
+    return Rime::Instance().forgetCandidate(index, global);
+}
+
+// 旧版本 26 键长按“屏蔽”的候选（cyime-hidden-candidates.txt），只供设置页恢复。
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetHiddenCandidates(JNIEnv* env, jobject) {
+    const auto words = cyime::HiddenCandidates();
+    auto strings = env->FindClass("java/lang/String");
+    auto result = env->NewObjectArray(words.size(), strings, nullptr);
+    for (size_t i = 0; i < words.size(); ++i) {
+        auto text = env->NewStringUTF(words[i].c_str());
+        env->SetObjectArrayElement(result, i, text);
+        env->DeleteLocalRef(text);
+    }
+    return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeRestoreHiddenCandidate(JNIEnv* env, jobject, jstring text) {
+    if (!text) return JNI_FALSE;
+    const char* chars = env->GetStringUTFChars(text, nullptr);
+    const bool result = cyime::RestoreCandidate(chars);
+    env->ReleaseStringUTFChars(text, chars);
+    return result ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -2249,6 +2422,16 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetOption(
     env->ReleaseStringUTFChars(option, option_ptr);
 }
 
+// 无痕：不从上屏学习（主翻译器与九键用户词典），已有词库照常使用
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetIncognito(
+    JNIEnv* env,
+    jobject thiz,
+    jboolean on
+) {
+    Rime::Instance().setIncognito(on == JNI_TRUE);
+}
+
 // 读取 Rime 选项
 JNIEXPORT void JNICALL
 Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetNeighborMap(JNIEnv* env, jobject, jstring value) {
@@ -2256,6 +2439,19 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetNeighborMap(JNIEnv* env, jobj
     if (!encoded) return;
     Rime::Instance().setNeighborMap(encoded);
     env->ReleaseStringUTFChars(value, encoded);
+}
+
+// 组词前已上屏的文字；null 表示未知（不提供上文）。
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeSetT9LeftContext(JNIEnv* env, jobject, jstring text) {
+    std::string value;
+    if (text) {
+        const char* chars = env->GetStringUTFChars(text, nullptr);
+        if (!chars) return;
+        value = std::string("\x1e") + chars;
+        env->ReleaseStringUTFChars(text, chars);
+    }
+    Rime::Instance().setT9LeftContext(value);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -2481,6 +2677,18 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9Forget(
     jstring pinyin
 ) {
     return T9DictUpdate(env, text, pinyin, false);
+}
+
+// 拂动固定字母：并入当前数字串并记住该位置的字母；数字串为空返回 false。
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9FixLetter(JNIEnv* env, jobject, jstring letter) {
+    rime::T9Processor* proc = rime::T9ProcessorRequire();
+    if (!proc || !letter) return JNI_FALSE;
+    const char* chars = env->GetStringUTFChars(letter, nullptr);
+    if (!chars) return JNI_FALSE;
+    const bool result = chars[0] != '\0' && proc->FixLetter(chars[0]);
+    env->ReleaseStringUTFChars(letter, chars);
+    return result ? JNI_TRUE : JNI_FALSE;
 }
 
 // 直接选择拼音（替代 SelectSyllable 的候选索引方式）
