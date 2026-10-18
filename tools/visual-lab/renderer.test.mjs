@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {validate,iconSvg,sceneSvg,optics,kotlinTokens,styles,levels,themePalette,toolbarMarkSvg,androidVector,launcherBareVector} from './renderer.mjs';
+import {validate,iconSvg,sceneSvg,optics,kotlinTokens,styles,levels,themePalette,toolbarMarkSvg,androidVector,launcherBareVector,markBounds} from './renderer.mjs';
 import {compile} from './compile.mjs';
 const c=JSON.parse(await readFile(new URL('./design.json',import.meta.url),'utf8'));
 const resources=JSON.parse(await readFile(new URL('./android-resources.json',import.meta.url),'utf8'));
@@ -18,7 +18,7 @@ test('Android outputs match current shared source',async()=>{await compile(c,tru
 test('launcher resources keep upgrade aliases and select framed or trimmed artwork',async()=>{
  const manifest=await readFile(new URL('../../app/src/main/AndroidManifest.xml',import.meta.url),'utf8');
  const aliases=[...manifest.matchAll(/<activity-alias\b[\s\S]*?<\/activity-alias>/g)].map(m=>m[0]);
- assert.equal(aliases.length,10);
+ assert.equal(aliases.length,11); // 10 launcher-icon aliases + the 字幕 desktop entry
  assert.equal(aliases.filter(s=>s.includes('android:enabled="true"')).length,1);
  for(const style of ['original',...styles]) for(const bare of [false,true]) {
   const name='com.kingzcheung.xime.launcher.Icon'+style[0].toUpperCase()+style.slice(1)+(bare?'Bare':'');
@@ -40,7 +40,10 @@ test('bare launcher trims margins while preserving artwork and keyboard canvas',
   const original=androidVector(c,style), bare=launcherBareVector(c,style);
   assert.match(original,/viewportWidth="1024"/);
   assert.match(bare,/viewportWidth="672"/);
-  assert.match(bare,/translateX="-176" android:translateY="-160"/);
+  // Both canvases centre the mark on its outline box: equal left/right and top/bottom margins.
+  const b=markBounds(c);
+  assert.match(bare,new RegExp(`translateX="${Math.round((336-b.cx)*100)/100}" android:translateY="${Math.round((336-b.cy)*100)/100}"`));
+  assert.match(original,new RegExp(`translateX="${Math.round((512-b.cx)*100)/100}" android:translateY="${Math.round((512-b.cy)*100)/100}"`));
   assert.deepEqual([...bare.matchAll(/<path[\s\S]*?<\/path>/g)].map(m=>m[0]),
     [...original.matchAll(/<path[\s\S]*?<\/path>/g)].map(m=>m[0]));
  }
