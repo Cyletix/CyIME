@@ -27,6 +27,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         pluginActions: List<CandidateAction> = emptyList(),
         t9PluginInjections: List<T9CandidateInjection> = emptyList(),
     ) {
+        if (suppressFieldComposition()) return
         val inputText = composition.input
         val codeInInputBox = SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX
         // 日语罗马音显示归一化：末尾未拼完的字母按按下的键显示（与 updateUIWithResult 同一出口规则）
@@ -130,6 +131,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             preeditText = displayText,
             candidates = displayCandidates,
             candidateComments = displayComments,
+            learnedCandidates = candidatesWithComments.filter { it.learned }.mapTo(HashSet()) { it.text },
             isComposing = isComposing,
             associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,
@@ -178,7 +180,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         // 避免传 displayText.length 时被 AOSP 钳制到整段文本末尾（光标跑到最右边）。
         // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
         // 否则该调用会在光标处插入空串，光标处有选中文字时等于删除选区。
-        service.markInputBoxComposing()
+        service.markInputBoxComposing(displayText)
         ic.beginBatchEdit()
         try {
             ic.setComposingText(displayText, 1)
@@ -190,7 +192,9 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     internal fun updateUIWithResult(
         result: com.kingzcheung.xime.rime.RimeProcessResult,
         pluginActions: List<CandidateAction> = emptyList(),
+        updateInputBoxComposition: Boolean = true,
     ) {
+        if (suppressFieldComposition()) return
         val isAsciiMode = result.isAsciiMode
         val candidatesWithComments = result.candidates
         // 日语罗马音显示归一化：末尾未拼完的字母按按下的键显示（引擎回显会给 っ / ん），
@@ -257,6 +261,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             preeditText = displayText,
             candidates = displayCandidates,
             candidateComments = displayComments,
+            learnedCandidates = candidatesWithComments.filter { it.learned }.mapTo(HashSet()) { it.text },
             isComposing = isComposing,
             associationCandidates = if ((isAsciiMode || !service.isChineseMode) && pendingEnglish.isEmpty()) emptyList() else service.candidateState.value.associationCandidates,
             isShowingRecentClipboard = false,
@@ -286,7 +291,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             }
         }
 
-        if (SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
+        if (updateInputBoxComposition &&
+            SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
             val ic = service.currentInputConnection
             if (isComposing && displayText.isNotEmpty()) {
                 showInputBoxComposition(ic, displayText)
@@ -357,7 +363,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     private fun loadSchemaSwitches(schemaId: String): List<com.kingzcheung.xime.viewmodel.SchemaSwitchUiState> {
         if (schemaId.isEmpty()) return emptyList()
         val defs = SchemaManager.getSchemaSwitches(service, schemaId)
-        val fullPunctuation = service.textCommit.isFullWidthPunctuation()
+        // 不能取英文态下恒为半角的值：切回中文不会重新读取，角标就会显示半角而实际上屏全角。
+        val fullPunctuation = service.textCommit.punctuationWidthChoice()
         // 全角/半角是标点宽度的唯一入口：方案里的 full_shape / half_shape / ascii_punct
         //（含 options 选项组）不再作为独立菜单项重复列出；引擎选项改由 applyPunctuationWidth 同步。
         val switches = defs.filterNot { isPunctuationWidthSwitch(it) }.map { def ->
@@ -384,7 +391,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     }
 
     /** 在引擎线程上刷新菜单栏方案开关状态。 */
-    private fun refreshSchemaSwitches() {
+    internal fun refreshSchemaSwitches() {
         service.serviceScope.launch(service.keyProcessingDispatcher) {
             val schemaId = service.rimeEngine.getCurrentSchema()
             val switches = loadSchemaSwitches(schemaId)
@@ -457,6 +464,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
 
     /** 将方案选项状态写入 librime user.yaml（var/option/<name>）。 */
     internal fun persistSchemaOption(name: String, value: Boolean) {
+        if (service.editorInputPolicy.scoped && name == "ascii_mode") return
         if (RimeEngine.isInitialized()) {
             service.rimeEngine.setUserConfigBool("var/option/$name", value)
         }
@@ -488,6 +496,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             service.rimeEngine.setOption("ascii_mode", true)
             persistSchemaOption("ascii_mode", true)
         }
+        service.editorInputPolicy.engineAsciiOverride()?.let { service.rimeEngine.setOption("ascii_mode", it) }
         applyPunctuationWidth(service.rimeEngine.isAsciiMode())
         val rimeAsciiAfter = service.rimeEngine.isAsciiMode()
         if (rimeAsciiBefore != rimeAsciiAfter) {
@@ -500,44 +509,17 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
      * 运行在 keyProcessingDispatcher 线程。
      */
     internal suspend fun commitFirstCandidateAndClearT9() {
-        val isT9 = isT9Schema(service.uiState.value.currentSchemaId)
-        if (!isT9) return
+        service.textCommit.commitCompositionAndLiteral()
+    }
 
-        val candState = service.candidateState.value
-        val candidates = candState.candidates
-
-        if (candidates.isNotEmpty()) {
-            if (service.rimeEngine.selectCandidate(0)) {
-                val committedText = service.rimeEngine.commit()
-                if (committedText.isNotEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        service.commitText(committedText)
-                    }
-                }
-            }
-        }
-
-        service.rimeEngine.clearQueuedT9Composition()
-
-        withContext(Dispatchers.Main) {
-            service.keyboardCallbacks?.onT9CompositionCleared?.invoke()
-            service.uiState.value = service.uiState.value.copy(
-                t9RightCandidateSelectedCount = 0,
-                t9SelectedCandidatePinyin = ""
-            )
-            service.t9PartialSegments.clear()
-            service.candidateState.value = service.candidateState.value.copy(
-                inputText = "",
-                preeditText = "",
-                candidates = emptyList(),
-                candidateComments = emptyList(),
-                isComposing = false,
-                associationCandidates = emptyList(),
-                hasNextPage = false,
-                hasPrevPage = false,
-                candidateActions = emptyList()
-            )
-        }
+    /** Late engine snapshots cannot reopen composition in a field that requires literal input. */
+    private fun suppressFieldComposition(): Boolean {
+        val state = service.uiState.value
+        if (!service.editorInputPolicy.directInput || state.quickSendFormFocused || state.toolPanelInputFocused) return false
+        service.uiState.value = state.copy(isAsciiMode = true)
+        val candidates = service.candidateState.value
+        if (!candidates.isShowingRecentClipboard) service.candidateState.value = CandidateState()
+        return true
     }
 
 }

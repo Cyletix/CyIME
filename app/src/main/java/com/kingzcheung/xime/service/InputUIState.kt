@@ -44,6 +44,8 @@ data class InputUIState(
     val voiceRecognitionState: RecognitionState = RecognitionState.IDLE,
     val voiceRecognizedText: String = "",
     val voiceAmplitude: Float = 0f,
+    /** 语音输入中把键盘收成底部悬浮条（仿 Gboard），语音继续听写。 */
+    val voiceCollapsed: Boolean = false,
     val stretchFactor: Float = 1f,
     val isDeploying: Boolean = false,
     val deploymentMessage: String = "",
@@ -53,6 +55,7 @@ data class InputUIState(
     val t9RightCandidateSelectedCount: Long = 0,
     val t9SelectedCandidatePinyin: String = "",
     val toolbarButtons: List<String> = ToolbarButton.DEFAULT_VISIBLE.map { it.id },
+    val menuButtons: List<String> = ToolbarButton.DEFAULT_MENU.map { it.id },
     /** 已启用插件声明的工具栏按钮（候选池）。渲染时与内置按钮合并，插件禁用/卸载后自动不显示。 */
     val toolbarPluginButtons: List<ToolbarButtonItem.Plugin> = emptyList(),
     val isCompact: Boolean = false,
@@ -64,6 +67,7 @@ data class InputUIState(
     val editorBounds: HardwareCursorAnchor? = null,
     val cursorAnchor: HardwareCursorAnchor? = null,
     val showQuickSendForm: Boolean = false,
+    val ocrDraft: Boolean = false,
     val quickSendFormFocused: Boolean = false,
     /** 快捷发送表单内焦点是否在"触发编码"输入框（false=在文本输入框）；决定按键输入路由目标。 */
     val quickSendCodeFocused: Boolean = false,

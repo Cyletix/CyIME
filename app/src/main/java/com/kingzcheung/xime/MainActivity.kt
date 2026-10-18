@@ -184,6 +184,7 @@ class MainActivity : ComponentActivity() {
                 val scrimHeight = if (navBarHeight > 0.dp) navBarHeight else 32.dp
 
                 Box(modifier = Modifier.fillMaxSize()) {
+                    com.kingzcheung.xime.ui.settings.SettingsWidthLimit {
                     if (showWizard) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             SetupWizardScreen(
@@ -212,6 +213,7 @@ class MainActivity : ComponentActivity() {
                                 keyboardTheme = SettingsPreferences.getKeyboardTheme(context)
                             }
                         )
+                    }
                     }
 
                     Box(

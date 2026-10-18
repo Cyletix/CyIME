@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -46,9 +48,15 @@
         <activity android:name="com.kingzcheung.xime.clipboard.ImageAccessActivity"
             android:exported="false" android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.kingzcheung.xime.ocr.DocumentOcrActivity"
+            android:exported="false" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <service android:name="com.kingzcheung.xime.ocr.OcrRecognitionService"
+            android:exported="false" android:process=":ocr" />
         <!-- 主Activity -->
         <activity
             android:name="com.kingzcheung.xime.MainActivity"
+            android:enableOnBackInvokedCallback="true"
             android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:theme="@style/Theme.Xime">
@@ -160,6 +168,31 @@
         </activity-alias>
 
         <activity android:name="com.kingzcheung.xime.CustomLayoutActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <!-- 整屏实时字幕：常亮、横竖屏切换不重建（老人页面不能因为转屏丢字幕） -->
+        <activity android:name="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:exported="false" android:launchMode="singleTask"
+            android:taskAffinity="com.kingzcheung.xime.caption" android:label="字幕"
+            android:icon="@mipmap/caption_launcher"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|fontScale|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Xime.Caption" />
+        <!-- 桌面上单独的“字幕”图标：默认关闭，在“语音转文本 → 字幕”里打开（CaptionLauncherIcon） -->
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncher"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <!-- 下拉快捷开关里的“字幕” -->
+        <service android:name="com.kingzcheung.xime.ui.caption.CaptionTileService"
+            android:exported="true" android:label="字幕" android:icon="@drawable/caption_launcher_foreground"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <!-- 输入法服务 -->
         <service
@@ -192,6 +225,18 @@
             android:process=":inference" />
         
         <!-- 离线语音识别服务（独立进程，模型推理不占用输入法进程内存） -->
+        <!-- 通话字幕：通话中只有无障碍服务能同时使用麦克风并在其他应用上方显示字幕 -->
+        <service
+            android:name="com.kingzcheung.xime.ui.caption.CallCaptionService"
+            android:exported="true"
+            android:label="@string/call_caption_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/call_caption_service" />
+        </service>
+
         <service
             android:name="com.kingzcheung.xime.service.AsrInferenceService"
             android:exported="false"

@@ -80,7 +80,7 @@ internal val merged14Groups = listOf("qw", "er", "ty", "ui", "op", "as", "df", "
 internal fun merged14Representative(c: Char): Char = merged14Groups.firstOrNull { c in it }?.first() ?: c
 
 /** Only substitute a dictionary reading when every entered key is accounted for. */
-internal fun groupRepresentative(c: Char, groups: List<String>): Char = groups.firstOrNull { c in it }?.first() ?: c
+internal fun groupRepresentative(c: Char, groups: List<String>): Char = groups.firstOrNull { c.lowercaseChar() in it }?.first() ?: c
 internal fun merged14Preedit(raw: String, preedit: String, spelling: String, groups: List<String> = merged14Groups): String {
     val reading = spelling.trim()
     if (reading.isEmpty() || reading.any { it !in 'a'..'z' && it != '\'' && !it.isWhitespace() && it != 'ü' }) return preedit

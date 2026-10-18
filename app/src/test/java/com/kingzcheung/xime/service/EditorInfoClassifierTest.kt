@@ -214,8 +214,8 @@ class EditorInfoClassifierTest {
     }
 
     @Test
-    fun `数字密码框不算数字框`() {
-        assertFalse(
+    fun `数字密码框使用数字键盘`() {
+        assertTrue(
             EditorInfoClassifier.isNumberEditor(
                 editorInfo(
                     InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD

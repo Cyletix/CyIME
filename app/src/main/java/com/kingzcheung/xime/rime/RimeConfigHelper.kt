@@ -138,6 +138,7 @@ object RimeConfigHelper {
         // Optional downloads become available at the normal engine initialization boundary.
         // Never restart or replay an active editor merely because a model download finished.
         com.kingzcheung.xime.model.CandidateModelAssets.installAvailable(context)
+        com.kingzcheung.xime.model.CandidateModelAssets.dropSupersededGrammar(context)
         com.kingzcheung.xime.settings.ChineseSchemas.installOptionalLayoutSchemas(context, rimeDir)
         check(installing.delete()) { "Cannot finish bundled asset installation" }
         com.kingzcheung.xime.settings.CustomKeyboardLayouts.enableMeasuredCorrection(context)
@@ -145,6 +146,12 @@ object RimeConfigHelper {
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         // 为所有启用方案打个人词库补丁
         PersonalDictManager.ensureSchemaPacks(context)
+        // 内置分类词库（如明日方舟）随 APK 更新，首次默认开启；失败不影响输入法启动。
+        try {
+            com.kingzcheung.xime.settings.CellDictionaryManager.syncBuiltins(context)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "Failed to sync built-in cell dictionaries", e)
+        }
         if (restoreCellDictionaries) com.kingzcheung.xime.settings.CellDictionaryManager.prepare(context)
         // 内置资源发生替换时已失效旧编译缓存；其它配置变动仍由 ensureDeployment 增量处理。
 

@@ -39,11 +39,9 @@ class RimeEngineLuaIntegrationTest {
     private fun safeCallIsModuleRegistered(moduleName: String): Boolean {
         return try {
             RimeEngine.isModuleRegistered(moduleName)
-        } catch (e: UnsatisfiedLinkError) {
-            false
-        } catch (e: ExceptionInInitializerError) {
-            false
-        } catch (e: NoClassDefFoundError) {
+        } catch (e: LinkageError) {
+            // Missing native dependencies are not a successful guard assertion.
+            org.junit.Assume.assumeNoException("需要 Android 原生引擎", e)
             false
         }
     }

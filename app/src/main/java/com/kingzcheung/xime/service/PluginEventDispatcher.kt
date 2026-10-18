@@ -40,7 +40,7 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
 
     /** 当前输入会话是否敏感输入框（密码类 / 不学习标记）。
      *  供 hotPath 插件能力（候选词变换）在发起请求前短路。 */
-    val isCurrentEditorSensitive: Boolean get() = sensitiveInput
+    val isCurrentEditorSensitive: Boolean get() = sensitiveInput || com.kingzcheung.xime.settings.IncognitoState.manual
 
     /** 新输入会话：刷新敏感标记并重置 composing 去重。 */
     fun onStartInput(attribute: EditorInfo?) {
@@ -53,7 +53,7 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
      * 空编码表示本轮输入结束）。
      */
     fun dispatchInputChanged(inputText: String) {
-        if (sensitiveInput) return
+        if (isCurrentEditorSensitive) return
         if (inputText == lastDispatchedInputText) return
         lastDispatchedInputText = inputText
         PluginManager.dispatchEvent(
@@ -71,7 +71,7 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
      * 计数器照常累计（维持单调差值基准），是否计入打字量由订阅插件按 is_paste 决定。
      */
     fun onTextCommitted(text: String, isPaste: Boolean = false) {
-        if (sensitiveInput) return
+        if (isCurrentEditorSensitive) return
         // 按 Unicode 代码点计数：emoji/生僻字（增补平面代理对）用户感知为 1 个字，
         // String.length 的 UTF-16 单元会把它们算成 2（"复制12个字统计13"的根源）
         sessionCommittedChars += text.codePointCount(0, text.length)
@@ -102,25 +102,6 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
         )
     }
 
-    /**
-     * 编辑器是否敏感：密码类输入框（文本/数字/网页密码）或宿主声明
-     * IME_FLAG_NO_PERSONALIZED_LEARNING。
-     */
-    private fun isSensitiveEditor(attribute: EditorInfo?): Boolean {
-        if (attribute == null) return false
-        val cls = attribute.inputType and InputType.TYPE_MASK_CLASS
-        val variation = attribute.inputType and InputType.TYPE_MASK_VARIATION
-        val isPassword = when (cls) {
-            InputType.TYPE_CLASS_TEXT -> variation in intArrayOf(
-                InputType.TYPE_TEXT_VARIATION_PASSWORD,
-                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
-                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
-            )
-            InputType.TYPE_CLASS_NUMBER ->
-                variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            else -> false
-        }
-        val noPersonalized = attribute.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING != 0
-        return isPassword || noPersonalized
-    }
+    private fun isSensitiveEditor(attribute: EditorInfo?): Boolean =
+        com.kingzcheung.xime.settings.IncognitoState.isSensitiveEditor(attribute)
 }

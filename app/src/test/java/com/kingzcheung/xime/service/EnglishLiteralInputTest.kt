@@ -9,7 +9,7 @@ class EnglishLiteralInputTest {
             var state = CandidateState(candidates = listOf("核力量哦"), isComposing = true, inputText = "old")
             val editor = StringBuilder()
             for (letter in word) {
-                state = requireNotNull(commitEnglishLetter(state, letter.toString(), letter.isUpperCase(), true) {
+                state = requireNotNull(commitEnglishLetter(state, letter.toString(), letter.isUpperCase(), { true }) {
                     editor.append(it); true
                 })
             }
@@ -20,9 +20,51 @@ class EnglishLiteralInputTest {
         }
     }
 
+    @Test fun letterRightAfterAGlidedWordStartsANewWordWithASpace() {
+        val glided = CandidateState(pendingEnglishText = "hello", glidedWord = "hello", associationCandidates = listOf("hero"))
+        val editor = StringBuilder("hello")
+        val next = requireNotNull(commitEnglishLetter(glided, "w", false, { true }, afterGlide = true) {
+            editor.append(it); true
+        })
+        assertEquals("hello w", editor.toString())
+        assertEquals("w", next.pendingEnglishText)
+        assertEquals("", next.glidedWord)
+        // 之后的字母照常接在新词后面，不再补空格。
+        val after = requireNotNull(commitEnglishLetter(next, "o", false, { true }) { editor.append(it); true })
+        assertEquals("hello wo", editor.toString())
+        assertEquals("wo", after.pendingEnglishText)
+    }
+
     @Test fun rejectedLetterDoesNotAdvanceThePendingWord() {
         val state = CandidateState(pendingEnglishText = "hell")
-        assertNull(commitEnglishLetter(state, "o", false, true) { false })
+        assertNull(commitEnglishLetter(state, "o", false, { error("Rejected input must not probe the editor") }) { false })
         assertEquals("hell", state.pendingEnglishText)
+    }
+
+    @Test fun letterIsDeliveredBeforeOptionalCompletionProbe() {
+        val events = mutableListOf<String>()
+        val next = commitEnglishLetter(CandidateState(), "a", false,
+            replaceSupported = { events += "probe"; false },
+            commit = { events += "commit:$it"; true })
+        assertEquals(listOf("commit:a", "probe"), events)
+        assertEquals("a", next?.pendingEnglishText)
+        assertEquals(false, next?.englishReplaceSupported)
+    }
+
+    @Test fun rapidLiteralInputDoesNotQueryTheHostPerLetter() {
+        val capability = EditorReadCapability()
+        val connection = Any()
+        var probes = 0
+        var state = CandidateState()
+        val editor = StringBuilder()
+        val text = "qwertyuiopasdfghjklzxcvbnm".repeat(20)
+        text.forEach { letter ->
+            state = requireNotNull(commitEnglishLetter(state, letter.toString(), false,
+                replaceSupported = { capability.supports(1L, connection) { probes++; true } },
+                commit = { editor.append(it); true }))
+        }
+        assertEquals(text, editor.toString())
+        assertEquals(text, state.pendingEnglishText)
+        assertEquals(1, probes)
     }
 }

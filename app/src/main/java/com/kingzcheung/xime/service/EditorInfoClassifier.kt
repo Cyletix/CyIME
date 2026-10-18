@@ -72,18 +72,13 @@ internal object EditorInfoClassifier {
     }
 
     /**
-     * 纯数字类输入框（数字/电话/日期时间，且非密码）：适合自动弹出数字键盘。
+     * 数字类输入框（包含数字密码、电话、日期时间）：适合自动弹出数字键盘。
      */
     fun isNumberEditor(info: EditorInfo?): Boolean {
         if (info == null) return false
         val inputType = info.inputType
         if (inputType == InputType.TYPE_NULL) return false
         val cls = inputType and InputType.TYPE_MASK_CLASS
-        if (cls == InputType.TYPE_CLASS_NUMBER &&
-            (inputType and InputType.TYPE_MASK_VARIATION) == InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        ) {
-            return false
-        }
         return cls == InputType.TYPE_CLASS_NUMBER ||
             cls == InputType.TYPE_CLASS_PHONE ||
             cls == InputType.TYPE_CLASS_DATETIME
