@@ -26,7 +26,10 @@ class KeyboardThemePaletteTest {
     }
 
     @Test fun lavenderAndOtherStaticThemesShareOneFunctionContainerRule() {
-        listOf("lavender_purple", "ocean_blue", "teal_cyan").forEach { id ->
+        // 10-18 旧主题每个色系恢复一套（如樱花粉黛）；未恢复的旧 id（海洋蔚蓝，蓝色由柔和蓝代表）仍回落到柔和蓝。
+        assertEquals("sakura_pink", KeyboardThemes.getThemeById("sakura_pink").id)
+        assertEquals(SoftBlueTheme.ID, KeyboardThemes.getThemeById("ocean_blue").id)
+        listOf("lavender_purple").forEach { id ->
             val theme = KeyboardThemes.getThemeById(id)
             assertEquals(id, theme.id)
             assertEquals(softDarkKeyContainer(theme.accentDark), theme.specialKeyDark)

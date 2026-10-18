@@ -45,14 +45,15 @@ internal fun softDarkKeyContainer(accent: Color): Color =
 object PureBlackTheme {
     const val ID = "pure_black"
 
+    // 按键与底色对比 ≥1.2（浅色）/≥1.5（深色），功能键比字母键更突出；数值见 tools/theme_audit.py。
     fun create() = SoftBlueTheme.create(ID, "黑白").copy(
-        keyboardBgLight = Color(0xFFF2F2F2), keyboardBgDark = Color.Black,
-        candidateBarBgLight = Color(0xFFF2F2F2), candidateBarBgDark = Color.Black,
-        surfaceLight = Color(0xFFF2F2F2), surfaceDark = Color.Black,
-        keyBgLight = Color.White, keyBgDark = Color(0xFF1C1C1C),
-        specialKeyLight = Color(0xFFDEDEDE), specialKeyDark = Color(0xFF353535),
+        keyboardBgLight = Color(0xFFE8E8EA), keyboardBgDark = Color.Black,
+        candidateBarBgLight = Color(0xFFE8E8EA), candidateBarBgDark = Color.Black,
+        surfaceLight = Color(0xFFE8E8EA), surfaceDark = Color.Black,
+        keyBgLight = Color.White, keyBgDark = Color(0xFF2C2C2E),
+        specialKeyLight = Color(0xFFD4D4D8), specialKeyDark = Color(0xFF48484A),
         specialKeyTextColorLight = Color(0xFF202020), specialKeyTextColorDark = Color.White,
-        enterKeyLight = Color(0xFFDEDEDE), enterKeyDark = Color(0xFF353535),
+        enterKeyLight = Color(0xFFD4D4D8), enterKeyDark = Color(0xFF48484A),
         keyTextColorLight = Color(0xFF202020), keyTextColorDark = Color.White,
         candidateTextColorLight = Color(0xFF454545), candidateTextColorDark = Color(0xFFE0E0E0),
         candidateSelectedTextColorLight = Color.Black, candidateSelectedTextColorDark = Color.White,
@@ -78,13 +79,13 @@ object SoftBlueTheme {
         primaryDark = Color(0xFFB4CAFA),
         primaryContainerLight = Color(0xFFDCE6FA),
         primaryContainerDark = Color(0xFF495A7D),
-        surfaceLight = Color(0xFFF4F6FA),
+        surfaceLight = Color(0xFFEAEEF5),
         surfaceDark = Color(0xFF191C22),
-        keyboardBgLight = Color(0xFFF4F6FA),
+        keyboardBgLight = Color(0xFFEAEEF5),
         keyboardBgDark = Color(0xFF191C22),
         keyBgLight = Color.White,
         keyBgDark = Color(0xFF2E323A),
-        candidateBarBgLight = Color(0xFFF4F6FA),
+        candidateBarBgLight = Color(0xFFEAEEF5),
         candidateBarBgDark = Color(0xFF191C22),
         keyTextColorLight = Color(0xFF20242C),
         keyTextColorDark = Color(0xFFE9EDF5),
@@ -110,9 +111,9 @@ object SoftLavenderTheme {
         id = "lavender_purple", name = "薰衣草紫",
         specialKeyLight = Color(0xFFE8DEF8), specialKeyDark = softDarkKeyContainer(Color(0xFFD0BCFF)),
         accentLight = Color(0xFF8F73E2), accentDark = Color(0xFFD0BCFF),
-        surfaceLight = Color(0xFFF7F4FA), surfaceDark = Color(0xFF211E28),
-        keyboardBgLight = Color(0xFFF7F4FA), keyboardBgDark = Color(0xFF211E28),
-        candidateBarBgLight = Color(0xFFF7F4FA), candidateBarBgDark = Color(0xFF211E28),
+        surfaceLight = Color(0xFFEEE8F4), surfaceDark = Color(0xFF211E28),
+        keyboardBgLight = Color(0xFFEEE8F4), keyboardBgDark = Color(0xFF211E28),
+        candidateBarBgLight = Color(0xFFEEE8F4), candidateBarBgDark = Color(0xFF211E28),
         keyBgLight = Color(0xFFFFFBFF), keyBgDark = Color(0xFF38333F),
         keyTextColorLight = Color(0xFF25212C), keyTextColorDark = Color(0xFFF0EAF5),
         candidateTextColorLight = Color(0xFF685191), candidateTextColorDark = Color(0xFFD0BCFF),
@@ -121,12 +122,25 @@ object SoftLavenderTheme {
     )
 }
 
-/** A complete theme; its material parameters are edited in the theme preview. */
+/** 固定 iOS 风格三色渐变；透明度与模糊独立于主题设置。保留原 ID 以沿用用户覆盖。 */
 object TransparentGlassTheme {
     const val ID = "transparent_glass"
+    private val originalGradient = listOf(0x9CACCCL, 0xD6BCC9L, 0x85BFBFL)
+    // The original renderer used a 20% white / 80% black wash. Bake the
+    // old appearance into this fixed theme, separately from live opacity.
+    private fun fixedBackground(dark: Boolean) = originalGradient.map { hex ->
+        fun channel(shift: Int): Long {
+            val value = (hex shr shift) and 255L
+            return if (dark) (value * 2 + 5) / 10 else (value * 8 + 255 * 2 + 5) / 10
+        }
+        (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+    }
     fun create() = PureBlackTheme.create().copy(
-        id = ID, name = "透明玻璃",
+        id = ID, name = "iOS 渐变",
+        // 深色渐变底上，字母键要亮出来、功能键压暗（与 iOS 深色键盘相同的层次）。
+        keyBgDark = Color(0xFF55555A),
+        specialKeyDark = Color(0xFF3A3A3C), enterKeyDark = Color(0xFF3A3A3C),
         keyboardBackground = com.kingzcheung.xime.settings.BackgroundConfig(
-            type = "gradient", angle = 135, colors = listOf(0x9CACCCL, 0xD6BCC9L, 0x85BFBFL)),
+            type = "gradient", angle = 135, colors = fixedBackground(false), colorsDark = fixedBackground(true)),
     )
 }

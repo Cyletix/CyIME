@@ -32,12 +32,22 @@ internal fun vowelColor(background: Color, accent: Color, foreground: Color): Co
     hsl[2] = if (background.luminance() < .3f) .72f else .35f
     return readable(Color.hsl(hsl[0], hsl[1], hsl[2]), background)
 }
-internal fun customLayoutKeyColors(layout: CustomKeyboardLayout?, text: String, background: Color, foreground: Color, accent: Color): Pair<Color, Color> {
+/**
+ * 玻璃键面的代表色：玻璃按主题文字方向把键帽统一提亮（浅字）或压暗（深字），
+ * 实际键面与这里的底色无关，文字对比改按这个代表色计算。
+ */
+internal fun customLayoutGlassSurface(foreground: Color): Color =
+    if (foreground.luminance() > .5f) Color(0xFF2C2C30) else Color(0xFFF4F4F6)
+
+/** [labelSurface]：文字实际所在的表面（玻璃下传 [customLayoutGlassSurface]），默认就是算出的按键底色。 */
+internal fun customLayoutKeyColors(layout: CustomKeyboardLayout?, text: String, background: Color, foreground: Color, accent: Color,
+    labelSurface: Color? = null): Pair<Color, Color> {
     val key = text.lowercase()
     if (layout == null || key !in layout.rows.flatten()) return background to foreground
     val emphasized = key.any { layout.isRed(it) }
     val bg = if (emphasized) lerp(background, accent, if (background.luminance() < .3f) .38f else .22f) else background
-    val fg = if (key.all { layout.isRed(it) }) vowelColor(bg, accent, foreground) else readable(foreground, bg)
+    val surface = labelSurface ?: bg
+    val fg = if (key.all { layout.isRed(it) }) vowelColor(surface, accent, foreground) else readable(foreground, surface)
     return bg to fg
 }
 internal fun customLayoutLabel(layout: CustomKeyboardLayout?, text: String, background: Color, accent: Color, foreground: Color): AnnotatedString = buildAnnotatedString {

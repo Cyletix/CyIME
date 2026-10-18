@@ -48,10 +48,24 @@ class ShiftKeyColorsTest {
                 }
     }
 
-    @Test fun `transparent user choice and non glass colors are preserved`() {
+    @Test fun `transparent glass remains transparent`() {
         for (mode in ShiftMode.entries) {
             assertEquals(0f, colors(mode, 0f).background.alpha, 0f)
-            assertEquals(Color.Red, colors(mode, enabled = false).background)
+        }
+    }
+
+    @Test fun `ordinary themes visibly distinguish off single and locked states`() {
+        for (dark in listOf(true, false)) for (accent in listOf(purple, Color.Gray, Color.Black, Color.White)) {
+            val off = colors(ShiftMode.OFF, dark = dark, accent = accent, enabled = false)
+            val single = colors(ShiftMode.SINGLE, dark = dark, accent = accent, enabled = false)
+            val caps = colors(ShiftMode.CAPS, dark = dark, accent = accent, enabled = false)
+            assertNotEquals(off.background, single.background)
+            assertNotEquals(single.background, caps.background)
+            for (active in listOf(single, caps)) {
+                val a = active.foreground.luminance()
+                val b = active.background.luminance()
+                assertTrue((maxOf(a,b) + .05f) / (minOf(a,b) + .05f) >= 3f)
+            }
         }
     }
 }
