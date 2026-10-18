@@ -23,4 +23,6 @@ object AsrBackendFactory {
 
     /** 卸载常驻模型（关闭"本地识别"开关时调用）。 */
     fun releaseModel() = AsrSupport.releaseModel()
+
+    fun updateRetention() = AsrSupport.updateRetention()
 }

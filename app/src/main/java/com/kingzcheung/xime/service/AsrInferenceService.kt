@@ -10,25 +10,96 @@ import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.LocalSpeechSession
 import com.kingzcheung.xime.speech.ResidentSpeechSessionOwner
 import com.kingzcheung.xime.speech.SherpaSpeechEngine
+import com.kingzcheung.xime.speech.SpeechBoundary
+import com.kingzcheung.xime.speech.SpeechTuningRecorder
+import com.kingzcheung.xime.speech.caption.CaptionSpeechSession
+import com.kingzcheung.xime.speech.caption.EmbeddingSource
+import com.kingzcheung.xime.speech.caption.SpeakerTracker
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.settings.InputLanguage
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /** Model weights and both decode workers live in :asr, never on the keyboard UI thread. */
 class AsrInferenceService : Service() {
+    companion object {
+        /** Bind with this action to get the live-caption contract instead of dictation. */
+        const val ACTION_CAPTION = "com.kingzcheung.xime.service.CAPTION"
+    }
     private val lock = Any()
     private val idleHandler = Handler(Looper.getMainLooper())
     private val sessions = ResidentSpeechSessionOwner()
     private var keepAlive = false
+    // 语音内存阶梯（毫秒，0 = 永不）：先卸 SenseVoice 第二遍，再卸全部。默认等于原来的 60 秒全部释放。
+    private var refinerIdleMs = 60_000L
+    private var engineIdleMs = 60_000L
+    @Volatile private var saveTuningAudio = false
+    // Opt-in only; keyed by the client's session binder, like pushed PCM.
+    private val recorders = ConcurrentHashMap<IBinder, SpeechTuningRecorder>()
     private val generation = AtomicLong()
+    // Captions and dictation share one engine slot; while a caption session owns it, dictation is refused.
+    @Volatile private var captionOwner: IBinder? = null
+    private val captionGeneration = AtomicLong()
+    private val speakerTracker = SpeakerTracker()
+    private val embeddingSource = EmbeddingSource { samples -> embed(samples) }
+    private var speakerExtractor: com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractor? = null
+    private var speakerModelPath: String? = null
     private val idleRelease = Runnable {
-        synchronized(lock) { if (!keepAlive) sessions.release(onlyIfIdle = true) }
+        synchronized(lock) {
+            if (!keepAlive && captionOwner == null) {
+                sessions.release(onlyIfIdle = true)
+                if (sessions.isIdle) releaseSpeakerModel()
+            }
+        }
+    }
+    // 字幕模式开着时自己要用 SenseVoice，不在阶梯里卸掉。
+    private val refinerRelease = Runnable {
+        synchronized(lock) {
+            if (captionOwner == null) sessions.releaseRefinementIfIdle {
+                FileLogger.i("AsrInferenceService", "idle ladder: second pass released, streaming model kept")
+            }
+        }
+    }
+
+    private fun cancelIdleRelease() {
+        idleHandler.removeCallbacks(idleRelease)
+        idleHandler.removeCallbacks(refinerRelease)
+    }
+
+    private fun embed(samples: FloatArray): FloatArray? {
+        val extractor = synchronized(lock) { speakerExtractor } ?: return null
+        val stream = extractor.createStream()
+        try {
+            stream.acceptWaveform(samples, 16000)
+            stream.inputFinished()
+            return if (extractor.isReady(stream)) extractor.compute(stream) else null
+        } finally { stream.release() }
+    }
+
+    private fun loadSpeakerModel(path: String) = synchronized(lock) {
+        if (speakerModelPath == path && speakerExtractor != null) return@synchronized
+        releaseSpeakerModel()
+        // No AssetManager: the model lives in filesDir, like the recognizers.
+        speakerExtractor = com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractor(
+            config = com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractorConfig(model = path, numThreads = 1))
+        speakerModelPath = path
+    }
+
+    private fun releaseSpeakerModel() = synchronized(lock) {
+        try { speakerExtractor?.release() } catch (_: Exception) { }
+        speakerExtractor = null
+        speakerModelPath = null
     }
 
     private fun scheduleRelease() {
         synchronized(lock) {
-            idleHandler.removeCallbacks(idleRelease)
-            if (!keepAlive && sessions.isIdle) idleHandler.postDelayed(idleRelease, 60_000)
+            cancelIdleRelease()
+            if (!sessions.isIdle) return
+            val engineMs = if (keepAlive) 0L else engineIdleMs
+            // 第一级只有早于全部释放时才有意义。
+            if (refinerIdleMs > 0 && (engineMs == 0L || refinerIdleMs < engineMs))
+                idleHandler.postDelayed(refinerRelease, refinerIdleMs)
+            if (engineMs > 0) idleHandler.postDelayed(idleRelease, engineMs)
         }
     }
 
@@ -44,14 +115,25 @@ class AsrInferenceService : Service() {
             return startSession(modelId, language, callback)
         }
         private fun startSession(modelId: String, language: InputLanguage?, callback: IInferenceAsrCallback): Boolean {
-            idleHandler.removeCallbacks(idleRelease)
+            if (captionOwner != null) {
+                try { callback.onError("字幕模式使用中，键盘语音暂不可用") } catch (_: Exception) { }
+                return false
+            }
+            cancelIdleRelease()
             val token = generation.incrementAndGet()
             val startedAt = SystemClock.elapsedRealtime()
             var constructed = false
             var modelLoadMs = 0L
+            recorders.remove(callback.asBinder())?.close("replaced", "")
             return try {
                 val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, language)
                 check(selection.ready) { "所选语音模型尚未完整下载" }
+                val recorder = if (saveTuningAudio) SpeechTuningRecorder(
+                    java.io.File(getExternalFilesDir(null) ?: filesDir, "speech_tuning"), mapOf(
+                        "mode" to selection.mode, "language" to (language?.id ?: ""),
+                        "device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+                        "app_version" to com.kingzcheung.xime.BuildConfig.VERSION_NAME,
+                    )).also { recorders[callback.asBinder()] = it } else null
                 val selectedAt = SystemClock.elapsedRealtime()
                 val ready = sessions.start(selection.key,
                     createEngine = {
@@ -61,18 +143,26 @@ class AsrInferenceService : Service() {
                         finally { modelLoadMs = SystemClock.elapsedRealtime() - loadingAt }
                     },
                     createSession = { engine -> LocalSpeechSession(engine,
-                        onText = { text -> if (generation.get() == token) try { callback.onPartialResult(text) } catch (_: Exception) { } },
-                        onError = { message -> if (generation.get() == token) try { callback.onError(message) } catch (_: Exception) { } }) },
-                    isActive = { generation.get() == token })
+                        onText = { text ->
+                            recorder?.text(text)
+                            if (generation.get() == token) try { callback.onPartialResult(text) } catch (_: Exception) { }
+                        },
+                        onError = { message ->
+                            recorder?.error(message)
+                            if (generation.get() == token) try { callback.onError(message) } catch (_: Exception) { }
+                        },
+                        onRegion = { id, samples, boundary -> recorder?.region(id, samples, boundary) }) },
+                    owner = callback.asBinder(), isActive = { generation.get() == token })
                 val readyAt = SystemClock.elapsedRealtime()
                 val modelState = if (constructed) "loaded" else if (ready) "resident" else "superseded"
                 FileLogger.i("AsrInferenceService", "start ready=$ready model=$modelState " +
                     "selectionMs=${selectedAt - startedAt} modelMs=$modelLoadMs " +
                     "sessionWaitMs=${readyAt - selectedAt - modelLoadMs} totalMs=${readyAt - startedAt}")
-                if (!ready) scheduleRelease()
+                if (!ready) { scheduleRelease(); recorders.remove(callback.asBinder())?.close("not_started", "") }
                 ready
             } catch (e: Exception) {
                 FileLogger.e("AsrInferenceService", "startAsr failed", e)
+                recorders.remove(callback.asBinder())?.close("start_failed", "")
                 if (generation.get() == token) callback.onError(e.message ?: "离线语音模型加载失败")
                 scheduleRelease()
                 false
@@ -82,35 +172,139 @@ class AsrInferenceService : Service() {
                 false
             }
         }
-        override fun pushAsrAudio(audioData: ByteArray) {
-            sessions.acceptPcm(audioData)
+        override fun pushAsrAudio(session: IBinder, audioData: ByteArray) {
+            sessions.acceptPcm(audioData, session)
+            recorders[session]?.audio(audioData)
         }
-        override fun stopAsr(): String {
+        override fun stopAsr(session: IBinder): String {
             val token = generation.get()
-            return sessions.finish {
+            FileLogger.d("AsrInferenceService", "stop generation=$token idle=${sessions.isIdle}")
+            val text = sessions.finish(session) {
                 generation.compareAndSet(token, token + 1)
                 scheduleRelease()
             } ?: ""
+            recorders.remove(session)?.close("stop", text)
+            return text
         }
-        override fun cancelAsr() {
-            generation.incrementAndGet()
-            sessions.cancel()
+        override fun cancelAsr(session: IBinder) {
+            FileLogger.d("AsrInferenceService", "cancel generation=${generation.get()} idle=${sessions.isIdle}")
+            val token = generation.get()
+            if (sessions.cancel(session)) generation.compareAndSet(token, token + 1)
+            recorders.remove(session)?.close("cancel", "")
             scheduleRelease()
         }
-        override fun releaseAsr() {
-            generation.incrementAndGet()
-            idleHandler.removeCallbacks(idleRelease)
-            sessions.release()
+        override fun releaseAsr(session: IBinder) {
+            FileLogger.d("AsrInferenceService", "release generation=${generation.get()} idle=${sessions.isIdle}")
+            val token = generation.get()
+            if (sessions.release(owner = session)) {
+                generation.compareAndSet(token, token + 1)
+                cancelIdleRelease()
+            }
+        }
+        override fun setSaveTuningAudio(enabled: Boolean) {
+            saveTuningAudio = enabled
         }
         override fun setKeepModelAlive(keep: Boolean) = synchronized(lock) {
             keepAlive = keep
-            idleHandler.removeCallbacks(idleRelease)
-            if (!keep && sessions.isIdle) scheduleRelease()
+            cancelIdleRelease()
+            if (sessions.isIdle) scheduleRelease()
+        }
+        override fun setIdleLadder(refinerIdleSeconds: Int, engineIdleSeconds: Int) = synchronized(lock) {
+            refinerIdleMs = refinerIdleSeconds.coerceAtLeast(0) * 1000L
+            engineIdleMs = engineIdleSeconds.coerceAtLeast(0) * 1000L
+            keepAlive = engineIdleMs == 0L
+            cancelIdleRelease()
+            if (sessions.isIdle) scheduleRelease()
         }
     }
-    override fun onBind(intent: Intent): IBinder = binder
+    private val captionBinder = object : ICaptionService.Stub() {
+        override fun start(modelId: String, speakerModelPath: String, callback: ICaptionCallback): Boolean {
+            cancelIdleRelease()
+            val token = captionGeneration.incrementAndGet()
+            val owner = callback.asBinder()
+            return try {
+                val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, null)
+                check(selection.ready) { "所选语音模型尚未完整下载" }
+                val tracker = if (speakerModelPath.isNotEmpty() && java.io.File(speakerModelPath).isFile) {
+                    loadSpeakerModel(speakerModelPath); speakerTracker
+                } else null
+                val listener = object : CaptionSpeechSession.Listener {
+                    override fun onSegment(id: Long, text: String, startMs: Long, endMs: Long, boundary: SpeechBoundary, confirmed: Boolean, event: String) {
+                        if (captionGeneration.get() == token) try { callback.onSegment(id, text, startMs, endMs, boundary.ordinal, confirmed, event) } catch (_: Exception) { }
+                    }
+                    override fun onSpeaker(id: Long, speakerId: Int, confident: Boolean) {
+                        if (captionGeneration.get() == token) try { callback.onSpeaker(id, speakerId, confident) } catch (_: Exception) { }
+                    }
+                    override fun onError(message: String) {
+                        if (captionGeneration.get() == token) try { callback.onError(message) } catch (_: Exception) { }
+                    }
+                }
+                val startedAt = SystemClock.elapsedRealtime()
+                val ready = sessions.start(selection.key,
+                    createEngine = { SherpaSpeechEngine(this@AsrInferenceService, selection) },
+                    createSession = { engine -> CaptionSpeechSession(engine, tracker, tracker?.let { embeddingSource }, listener) },
+                    owner = owner, isActive = { captionGeneration.get() == token })
+                FileLogger.i("AsrInferenceService", "caption start ready=$ready speaker=${tracker != null} totalMs=${SystemClock.elapsedRealtime() - startedAt}")
+                if (ready) {
+                    captionOwner = owner
+                    try { owner.linkToDeath({ if (captionOwner == owner) { captionOwner = null; sessions.cancel(owner); scheduleRelease() } }, 0) } catch (_: Exception) { }
+                } else scheduleRelease()
+                ready
+            } catch (e: Exception) {
+                FileLogger.e("AsrInferenceService", "caption start failed", e)
+                if (captionGeneration.get() == token) try { callback.onError(e.message ?: "离线语音模型加载失败") } catch (_: Exception) { }
+                scheduleRelease()
+                false
+            } catch (e: LinkageError) {
+                if (captionGeneration.get() == token) try { callback.onError("识别运行库无法加载：${e.message}") } catch (_: Exception) { }
+                scheduleRelease()
+                false
+            }
+        }
+        override fun push(session: IBinder, audioData: ByteArray) = sessions.acceptPcm(audioData, session)
+        override fun stop(session: IBinder) {
+            sessions.finish(session) { if (captionOwner == session) captionOwner = null; scheduleRelease() }
+        }
+        override fun cancel(session: IBinder) {
+            if (sessions.cancel(session)) captionGeneration.incrementAndGet()
+            if (captionOwner == session) captionOwner = null
+            scheduleRelease()
+        }
+        override fun mergeSpeakers(from: Int, into: Int): Boolean = speakerTracker.merge(from, into).isNotEmpty() || from in speakerTracker.speakerIds
+        override fun reassignSegment(segmentId: Long, speakerId: Int) = speakerTracker.reassign(segmentId, speakerId)
+        override fun setSpeakerIgnored(speakerId: Int, ignored: Boolean) = speakerTracker.setIgnored(speakerId, ignored)
+        override fun setSpeakerNamed(speakerId: Int, named: Boolean) = speakerTracker.setNamed(speakerId, named)
+        override fun setStrictness(level: Int) = speakerTracker.setStrictness(level)
+        override fun resetSpeakers() = speakerTracker.reset()
+    }
+    /**
+     * 系统缺内存时按阶梯提前释放：先卸 SenseVoice 第二遍，内存很紧或进程进了后台列表再全部卸掉。
+     * 正在说话或字幕模式开着时一律不动。
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        synchronized(lock) {
+            if (captionOwner != null || !sessions.isIdle) return
+            FileLogger.w("AsrInferenceService", "trim level=$level")
+            if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
+                sessions.releaseRefinementIfIdle()
+            if (level == android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+                level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+                cancelIdleRelease()
+                sessions.release(onlyIfIdle = true)
+                releaseSpeakerModel()
+            }
+        }
+    }
+
+    override fun onBind(intent: Intent): IBinder = if (intent.action == ACTION_CAPTION) captionBinder else binder
     override fun onDestroy() {
-        binder.releaseAsr()
+        generation.incrementAndGet()
+        captionGeneration.incrementAndGet()
+        captionOwner = null
+        cancelIdleRelease()
+        sessions.release()
+        releaseSpeakerModel()
         super.onDestroy()
     }
 }

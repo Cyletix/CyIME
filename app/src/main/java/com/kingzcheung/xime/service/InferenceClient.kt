@@ -14,7 +14,10 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-class InferenceClient(private val context: Context) {
+class InferenceClient(context: Context) {
+    // Shared model engines outlive one IME service instance. Binding through that
+    // service leaks its connection when Android recreates the input method.
+    private val context = context.applicationContext
 
     companion object {
         private const val TAG = "InferenceClient"
@@ -22,8 +25,8 @@ class InferenceClient(private val context: Context) {
         const val MODEL_HANDWRITING = "handwriting"
     }
 
-    private var service: IInferenceService? = null
-    private var bound = false
+    @Volatile private var service: IInferenceService? = null
+    @Volatile private var bound = false
 
     /** 服务进程死亡/绑定失效时通知宿主：宿主据此重置本地"已加载"假象实现自愈
      *  （AUTO_CREATE 会自动重启服务，但新进程里模型是空的，客户端标志必须跟着复位）。 */

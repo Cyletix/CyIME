@@ -77,27 +77,11 @@ class VoiceRecognitionHandler(
 
         onStateChanged(getState().copy(voicePluginName = providerName))
         FileLogger.i(TAG, "STT provider: $providerName")
-
-        // 预热当前语言并由 AsrSupport 保留后端；正式录音复用同一实例。
-        // 之后切语言/模型或服务进程被回收时，录音启动仍会核对实际配置。
-        warmupForInitialLanguage()
-    }
-
-    private var initialWarmupPending = true
-
-    private fun warmupForInitialLanguage() {
-        val language = getState().inputProfile.language
-        if (initialWarmupPending && language != InputLanguage.UNSPECIFIED &&
-            SettingsPreferences.isSttUseLocal(context) && AsrBackendFactory.getLocalName() != null) {
-            initialWarmupPending = false
-            Thread {
-                AsrBackendFactory.warmup(context, language)
-            }.start()
-        }
+        // 本地模型不随键盘预热：首次点麦克风时才按需加载（数百 MB），“保持引擎常驻”只保留用过的模型。
     }
 
     private val delayedPreStartRunnable = Runnable {
-        val language = getState().inputProfile.language
+        val language = getState().voiceKeyboardLanguages.recognitionLanguage
         if (::speechRecognitionManager.isInitialized && language != InputLanguage.UNSPECIFIED &&
             (language == InputLanguage.CHINESE || SettingsPreferences.isSttUseLocal(context))) {
             speechRecognitionManager.startPreStart()
@@ -128,7 +112,7 @@ class VoiceRecognitionHandler(
         }
 
         val languages = getState().voiceKeyboardLanguages
-        val language = languages.language
+        val language = languages.recognitionLanguage
         if (inputLanguage != null && inputLanguage != language) endInputSession()
         // 上一次会话若还在收尾等待中（快速再次开始），直接废弃收尾状态
         finishing = false
@@ -137,6 +121,7 @@ class VoiceRecognitionHandler(
         sessionAbandoned = false
         inputSession = getState().inputSessionId
         inputLanguages = languages
+        requestedRecordingLanguage = language
         toolbarSession = getState().voiceSticky
         toolbarText.reset()
         toolbarSentencePrefix = null
@@ -198,15 +183,24 @@ class VoiceRecognitionHandler(
 
     private var inputSession: Long? = null
     private var inputLanguages: VoiceKeyboardLanguages? = null
-    // Result normalization and the backend keep the language chosen when recording started.
-    private val inputLanguage: InputLanguage? get() = inputLanguages?.language
+    private var requestedRecordingLanguage: InputLanguage? = null
+    private val inputLanguage: InputLanguage? get() = inputLanguages?.recognitionLanguage
+    // Keep Chinese dictated-punctuation editing across its English keyboard side.
+    // This text convention must never select or constrain the acoustic recognizer.
+    private val normalizationLanguage: InputLanguage? get() = inputLanguages?.let {
+        if (it.nativeLanguage == InputLanguage.CHINESE) InputLanguage.CHINESE else it.recognitionLanguage
+    }
 
     /** English/native keyboard switches are editing actions within the same voice session. */
     fun onInputLanguageChanged() {
         if (inputLanguages == null || sessionAbandoned) cancelPreStart()
-        else acceptsInputSession()
-        // Rime may publish the first valid profile after speech initialization finishes.
-        warmupForInitialLanguage()
+        else if (acceptsInputSession() && !finishing) {
+            val next = getState().voiceKeyboardLanguages
+            if (requestedRecordingLanguage != next.language && ::speechRecognitionManager.isInitialized) {
+                speechRecognitionManager.switchRecognitionLanguage(next.recognitionLanguage)
+                requestedRecordingLanguage = next.recognitionLanguage
+            }
+        }
     }
 
     private fun acceptsInputSession(): Boolean {
@@ -305,7 +299,7 @@ class VoiceRecognitionHandler(
         onStateChanged(getState().copy(voiceRecognitionState = RecognitionState.PROCESSING))
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         mainHandler.postDelayed(finishTimeoutRunnable,
-            if (SettingsPreferences.isSttUseLocal(context)) 8500L else FINISH_TIMEOUT_MS)
+            if (SettingsPreferences.isSttUseLocal(context)) speechRecognitionManager.finishTimeoutMs + 500 else FINISH_TIMEOUT_MS)
         speechRecognitionManager.stopRecognition()
         if (toolbarSession) onRecordingStopped()
     }
@@ -351,7 +345,7 @@ class VoiceRecognitionHandler(
             return
         }
 
-        val cleanText = normalizeVoiceText(text, inputLanguage ?: getState().inputProfile.language)
+        val cleanText = normalizeVoiceText(text, normalizationLanguage ?: getState().inputProfile.language)
         if (toolbarSession) {
             // 部分引擎 stop 时重发上一句 final；没有新 partial 时只保留一次。
             if (cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：") &&
@@ -425,7 +419,7 @@ class VoiceRecognitionHandler(
     private fun handlePartialResult(text: String) {
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
-        val cleanText = normalizeVoiceText(text, inputLanguage ?: getState().inputProfile.language)
+        val cleanText = normalizeVoiceText(text, normalizationLanguage ?: getState().inputProfile.language)
         if (cleanText == lastPartialText) return
         lastPartialText = cleanText
         Log.d(TAG, "Speech result (partial): $cleanText")

@@ -41,6 +41,45 @@ class SpeechSegmentationTest {
         s.accept(FloatArray(16000 * 20)); s.finishInput()
         assertEquals(0, count)
     }
+
+    @Test fun `VAD approved quiet Paraformer speech is retained after a louder phrase`() {
+        val sent = mutableListOf<Float>()
+        val s = SpeechSegmenter(Detector(), 12000, { _, a -> sent.addAll(a.toList()) },
+            { _, _, _ -> }, useEnergyPause = false)
+        val loud = FloatArray(16000) { .1f }
+        val quiet = FloatArray(32000) { .00006f }
+        s.accept(loud); s.accept(FloatArray(16000)); s.accept(quiet); s.finishInput()
+        assertEquals(quiet.size, sent.count { it == .00006f })
+        assertEquals(loud.size, sent.count { it == .1f })
+    }
+
+    @Test fun `VAD only mode cannot open a silent region during trailing hangover`() {
+        val regions = mutableListOf<FloatArray>()
+        val detector = object : SpeechDetector {
+            override fun speech(frame: FloatArray) = true
+            override fun reset() {}
+        }
+        val s = SpeechSegmenter(detector, 1000, { _, _ -> }, { _, a, _ -> regions.add(a) },
+            useEnergyPause = false)
+        s.accept(FloatArray(94 * 512) { .1f }); s.accept(FloatArray(16000)); s.finishInput()
+        assertEquals(1, regions.size)
+    }
+
+    @Test fun `Paraformer clears detector history on real pauses but keeps it across forced cuts`() {
+        var resets = 0
+        val detector = object : SpeechDetector {
+            override fun speech(frame: FloatArray) = frame.any { it != 0f }
+            override fun reset() { resets++ }
+        }
+        val s = SpeechSegmenter(detector, 1000, { _, _ -> }, { _, _, _ -> },
+            useEnergyPause = false, resetDetectorOnPause = true)
+        s.accept(FloatArray(94 * 512) { .1f }) // 3 s forced cut
+        assertEquals(0, resets)
+        s.accept(FloatArray(16000) { .001f }); s.accept(FloatArray(16000))
+        assertEquals(1, resets)
+        s.finishInput()
+        assertEquals(2, resets)
+    }
     @Test fun `word boundaries and punctuation become one space without final punctuation`() {
         assertEquals("hello world 你好 再见", cleanSpeechText("<|zh|>hello world，你好。 再见！"))
     }

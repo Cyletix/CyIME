@@ -13,6 +13,52 @@ import org.mockito.kotlin.*
 
 /** Exercises the real backend lifecycle; only model storage and the remote IPC client are replaced. */
 class OfflineAsrStartupTest {
+    @Test fun timeoutTracksTheActualSessionModelAndReturnsToTheNormalLimit() {
+        withBackend({ language -> selection(if (language == InputLanguage.JAPANESE) SpeechModelCatalog.ZIPFORMER_JA else SpeechModelCatalog.PARAFORMER) }) { backend, _, _ ->
+            assertTrue(backend.prepareForRecording(InputLanguage.JAPANESE))
+            assertTrue(backend.start(InputLanguage.JAPANESE))
+            assertEquals(18000L, backend.finishTimeoutMs)
+            assertTrue(backend.start(InputLanguage.CHINESE))
+            assertEquals(8000L, backend.finishTimeoutMs)
+        }
+    }
+    @Test fun delayedManagerReleaseCannotStopOrDisableSharedBackend() {
+        withBackend({ selection(SpeechModelCatalog.PARAFORMER) }) { backend, client, _ ->
+            assertTrue(backend.prepareForRecording(InputLanguage.CHINESE))
+            assertTrue(backend.start(InputLanguage.CHINESE))
+            clearInvocations(client)
+            backend.release()
+            val pcm = ByteArray(3200)
+            backend.processAudioChunk(pcm)
+            verify(client).pushAsrAudio(pcm)
+            runBlocking { verify(client, never()).stopAsr() }
+            backend.stop()
+            runBlocking { verify(client).stopAsr() }
+        }
+    }
+
+    @Test fun unloadedBackendCannotResurrectAfterLocalSpeechIsDisabled() {
+        withBackend({ selection(SpeechModelCatalog.PARAFORMER) }) { backend, client, _ ->
+            backend.releaseModel()
+            assertFalse(backend.prepareForRecording(InputLanguage.CHINESE))
+            assertFalse(backend.initialize(InputLanguage.CHINESE))
+            assertFalse(backend.start(InputLanguage.CHINESE))
+            runBlocking { verify(client, never()).startAsr(any(), any(), anyOrNull()) }
+        }
+    }
+    @Test fun onDemandPreparationDoesNotBindOrWarmBeforeMicrophoneCapture() {
+        withBackend({ selection(SpeechModelCatalog.PARAFORMER) }) { backend, client, managers ->
+            assertTrue(backend.prepareForRecording(InputLanguage.CHINESE))
+            assertTrue(managers.constructed().isEmpty())
+            verifyNoInteractions(client)
+            assertTrue(backend.start(InputLanguage.CHINESE))
+            runBlocking {
+                verify(client).ensureBound()
+                verify(client).startAsr(eq(SpeechModelCatalog.PARAFORMER), any(), eq(InputLanguage.CHINESE))
+                verify(client, never()).stopAsr()
+            }
+        }
+    }
     private fun selection(mode: String): AsrModelManager.Selection = mock {
         on { this.mode } doReturn mode
     }

@@ -72,6 +72,7 @@ class VoiceRecognitionHandlerFinishTest {
         whenever(mockPrefs.getBoolean(any(), any<Boolean>())).thenAnswer { it.getArgument(1) }
         whenever(mockPrefs.getBoolean(eq(SettingsPreferences.KEY_STT_USE_LOCAL), any<Boolean>()))
             .thenReturn(true)
+        whenever(mockManager.finishTimeoutMs).thenReturn(8000L)
         whenever(mockMainHandler.postDelayed(any<Runnable>(), anyLong())).thenAnswer {
             posted.add(it.getArgument(0))
             true
@@ -110,6 +111,16 @@ class VoiceRecognitionHandlerFinishTest {
         val copy = posted.toList()
         posted.clear()
         copy.forEach { it.run() }
+    }
+
+    @Test fun japaneseFinalizationIsNotCutOffByTheOldUiDeadline() {
+        whenever(mockManager.finishTimeoutMs).thenReturn(18000L)
+        onPartial("今日は東京")
+        handler.finishRecognition()
+        verify(mockMainHandler).postDelayed(any<Runnable>(), eq(18500L))
+        onResult("今日は東京 明日は大阪")
+        assertTrue(posted.isEmpty())
+        assertEquals(1, voiceCompleteCount)
     }
 
     @Test
@@ -508,7 +519,7 @@ class VoiceRecognitionHandlerFinishTest {
         verify(mockInputConnection, never()).setComposingText(any(), anyInt())
     }
 
-    @Test fun `Japanese English Japanese keyboard switches keep the Japanese recording`() {
+    @Test fun `Japanese English Japanese switches request matching recognizers without ending recording`() {
         currentState = currentState.copy(currentSchemaId = "japanese", isAsciiMode = false)
         startToolbar()
         onPartial("句号")
@@ -521,6 +532,8 @@ class VoiceRecognitionHandlerFinishTest {
         onPartial("句号，問題，続く")
         assertEquals("句号 問題 続く", editor.toString())
         assertRecordingContinuesIn(InputLanguage.JAPANESE)
+        verify(mockManager).switchRecognitionLanguage(InputLanguage.ENGLISH)
+        verify(mockManager).switchRecognitionLanguage(InputLanguage.JAPANESE)
         handler.finishRecognition()
         onResult("句号，問題，続く。")
         assertEquals("句号 問題 続く", editor.toString())
@@ -578,23 +591,46 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals(1, voiceCompleteCount)
     }
 
-    @Test fun `English Chinese English keyboard switches retain the English recording language`() {
+    @Test fun `English side of Chinese pair starts English recognition and keeps one microphone`() {
         currentState = currentState.copy(isAsciiMode = true)
         startToolbar()
         onPartial("hello")
         currentState = currentState.copy(isAsciiMode = false)
         handler.onInputLanguageChanged()
         onPartial("hello句号")
-        assertEquals("hello句号", editor.toString())
+        assertEquals("hello。", editor.toString())
         currentState = currentState.copy(isAsciiMode = true)
         handler.onInputLanguageChanged()
         onPartial("hello句号 world")
-        assertEquals("hello句号 world", editor.toString())
+        assertEquals("hello。world", editor.toString())
         assertRecordingContinuesIn(InputLanguage.ENGLISH)
+        verify(mockManager).switchRecognitionLanguage(InputLanguage.CHINESE)
+        verify(mockManager).switchRecognitionLanguage(InputLanguage.ENGLISH)
         handler.finishRecognition()
         onResult("hello句号 world!")
-        assertEquals("hello句号 world", editor.toString())
+        assertEquals("hello。world", editor.toString())
         assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `English side of Japanese pair starts English model and switches both ways`() {
+        currentState = currentState.copy(currentSchemaId = "japanese", isAsciiMode = true)
+        startToolbar()
+        onPartial("hello")
+        repeat(4) {
+            currentState = currentState.copy(isAsciiMode = !currentState.isAsciiMode)
+            handler.onInputLanguageChanged()
+        }
+        onPartial("hello world")
+        assertEquals("hello world", editor.toString())
+        assertRecordingContinuesIn(InputLanguage.ENGLISH)
+        verify(mockManager, times(2)).switchRecognitionLanguage(InputLanguage.JAPANESE)
+        verify(mockManager, times(2)).switchRecognitionLanguage(InputLanguage.ENGLISH)
+    }
+
+    @Test fun `a standalone English profile still starts its English recognizer`() {
+        currentState = currentState.copy(currentSchemaId = "english", isAsciiMode = true)
+        startToolbar()
+        assertRecordingContinuesIn(InputLanguage.ENGLISH)
     }
 
     @Test fun `a different native language rejects callbacks before its observer runs`() {

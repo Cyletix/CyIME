@@ -4,6 +4,7 @@ import android.content.Context
 import com.kingzcheung.xime.service.AsrInferenceClient
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -19,9 +20,13 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
     }
 
     override val name: String get() = "本地离线语音"
+    @Volatile override var finishTimeoutMs: Long = 8000L
+        private set
 
     private val client = AsrInferenceClient(context)
     @Volatile private var initialized = false
+    @Volatile private var retired = false
+    @Volatile private var activeMode: String? = null
     private val sessionGeneration = java.util.concurrent.atomic.AtomicLong()
 
     private var resultCallback: ((String) -> Unit)? = null
@@ -57,8 +62,17 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
 
     override fun initialize(): Boolean = initialize(InputLanguage.CHINESE)
 
+    override fun prepareForRecording(language: InputLanguage): Boolean {
+        // Binding/loading happens in start(), on the audio delivery worker. The
+        // capture owner can already collect and queue the beginning of speech.
+        if (retired) return false
+        initialized = true
+        return true
+    }
+
     @Synchronized
     override fun initialize(language: InputLanguage): Boolean {
+        if (retired) return false
         return try {
             val ok = runBlocking { client.ensureBound() }
             if (!ok) {
@@ -91,16 +105,24 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
 
     override fun start(): Boolean = start(InputLanguage.CHINESE)
 
+    @Synchronized
     override fun start(language: InputLanguage): Boolean {
-        if (!initialized) return false
+        if (!initialized || retired) return false
         sessionGeneration.incrementAndGet()
         return try {
             val modelManager = AsrModelManager(context)
             val selection = modelManager.selectionForLanguage(language)
+            activeMode = selection.mode
+            finishTimeoutMs = if (SpeechModelCatalog.isJapaneseZipformer(selection.mode))
+                JapaneseZipformerDecoding.backendTimeoutMs else 8000L
             // 每次会话开始都重新 startAsr：服务端会重置语音会话并重设回调，
             // 否则 preload 预热时 stop() 清空的 callback 会导致 partial 结果丢失
-            syncKeepAlive()
-            runBlocking { client.startAsr(selection.mode, asrCallback, language) }
+            runBlocking {
+                if (!client.ensureBound()) return@runBlocking false
+                client.setKeepModelAlive(SettingsPreferences.isSttKeepEngineAlive(context))
+                client.setSaveTuningAudio(SettingsPreferences.isSttDebugRecord(context))
+                client.startAsr(selection.mode, asrCallback, language)
+            }
         } catch (e: InterruptedException) {
             // 快速取消竞态：stopRecognition/cancelRecognition 会 interrupt 录音线程，
             // 中断正好落在等待 :asr 绑定/模型加载的 runBlocking 上——属正常取消，不算错误，
@@ -120,6 +142,12 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
         client.pushAsrAudio(buffer)
     }
 
+    override fun canContinueIn(language: InputLanguage): Boolean {
+        val mode = activeMode ?: return false
+        return SpeechLanguages.supports(mode, language) &&
+            AsrModelManager(context).getSelectedModelId(language) == mode
+    }
+
     override fun stop() {
         if (!initialized) return
         val token = sessionGeneration.get()
@@ -132,7 +160,7 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
             ""
         } catch (e: Exception) {
             FileLogger.e(TAG, "stop failed", e)
-            ""
+            throw e
         }
         if (token == sessionGeneration.get()) {
             resultCallback?.invoke(text)
@@ -148,18 +176,16 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
     }
 
     override fun release() {
-        sessionGeneration.incrementAndGet()
-        // 语音会话结束：重置识别状态，但保持 :asr 服务绑定与模型常驻，
-        // 由 AsrSupport 统一管理（关闭开关时才真正卸载）
-        initialized = false
-        try {
-            runBlocking { client.stopAsr() }
-        } catch (_: Exception) {
-        }
+        // Managers stop/cancel on their owning delivery worker before releasing.
+        // AsrSupport shares this resident backend with a replacement IME manager:
+        // a delayed release from the old manager must not stop/reset its new session.
+        // Idle model eviction belongs to the service; explicit off uses releaseModel.
     }
 
     /** 完全释放：卸载模型并解绑服务。仅在关闭"本地识别"开关时调用。 */
+    @Synchronized
     fun releaseModel() {
+        retired = true
         initialized = false
         try {
             runBlocking { client.releaseAsr() }
@@ -175,7 +201,7 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
      * 把"保持引擎常驻"设置同步到 :asr 服务。每次绑定/会话开始都同步一次：
      * 用户中途切换设置后，下一个会话立即按新设置决定是否空闲释放模型。
      */
-    private fun syncKeepAlive() {
+    internal fun syncKeepAlive() {
         try {
             runBlocking {
                 client.setKeepModelAlive(

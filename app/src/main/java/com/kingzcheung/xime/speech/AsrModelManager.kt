@@ -36,18 +36,20 @@ class AsrModelManager(private val context: Context) {
         private fun toAsrModelInfo(info: com.kingzcheung.xime.model.ModelInfo): AsrModelInfo {
             val version = info.resolvedVersion()
             val fileNames = info.files.map { it.name }
+            val japanese = SpeechModelCatalog.isJapaneseZipformer(info.id)
+            val japaneseSuffix = if (info.id == SpeechModelCatalog.ZIPFORMER_JA_INT8) ".int8.onnx" else ".onnx"
             return AsrModelInfo(
                 id = info.id,
                 name = SpeechModelSelection.displayName(info.id) ?: info.name,
                 description = info.description,
-                language = when (info.id) { SpeechModelCatalog.SENSEVOICE -> "auto"; SpeechModelCatalog.PARAFORMER -> "zh-en"; else -> "zh" },
+                language = when (info.id) { SpeechModelCatalog.ZIPFORMER_JA, SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "ja"; SpeechModelCatalog.SENSEVOICE -> "auto"; SpeechModelCatalog.PARAFORMER -> "zh-en"; else -> "zh" },
                 size = version?.size ?: info.size,
                 downloadUrl = info.archiveUrl ?: "",
-                modelType = when (info.id) { SpeechModelCatalog.PARAFORMER -> "paraformer"; SpeechModelCatalog.SENSEVOICE -> "sensevoice"; else -> "transducer" },
+                modelType = when (info.id) { SpeechModelCatalog.ZIPFORMER_JA, SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "offline-transducer"; SpeechModelCatalog.PARAFORMER -> "paraformer"; SpeechModelCatalog.SENSEVOICE -> "sensevoice"; else -> "transducer" },
                 files = fileNames,
-                encoderFile = "encoder.int8.onnx",
-                decoderFile = if (info.id == SpeechModelCatalog.PARAFORMER) "decoder.int8.onnx" else "decoder.onnx",
-                joinerFile = "joiner.int8.onnx"
+                encoderFile = if (japanese) "encoder-epoch-99-avg-1$japaneseSuffix" else "encoder.int8.onnx",
+                decoderFile = if (japanese) "decoder-epoch-99-avg-1$japaneseSuffix" else if (info.id == SpeechModelCatalog.PARAFORMER) "decoder.int8.onnx" else "decoder.onnx",
+                joinerFile = if (japanese) "joiner-epoch-99-avg-1$japaneseSuffix" else "joiner.int8.onnx"
             )
         }
     }
@@ -70,8 +72,9 @@ class AsrModelManager(private val context: Context) {
     fun getAsrModels(): List<AsrModelInfo> {
         val fromIndex = ModelManager.getModelsByCategory(ModelCategory.ASR)
             .map { toAsrModelInfo(it) }
-        return (fromIndex + SpeechModelCatalog.models.map(::toAsrModelInfo) + DEFAULT_MODEL)
-            .distinctBy { it.id }.sortedBy { listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, SpeechModelCatalog.ZIPFORMER).indexOf(it.id).let { order -> if (order < 0) Int.MAX_VALUE else order } }
+        // The speech catalog is for recognizers only; a speaker (voiceprint) entry must never become a fake ASR model.
+        return (fromIndex + SpeechModelCatalog.models.filter { it.category == ModelCategory.ASR }.map(::toAsrModelInfo) + DEFAULT_MODEL)
+            .distinctBy { it.id }.sortedBy { SpeechModelSelection.primaryIds.indexOf(it.id).let { order -> if (order < 0) Int.MAX_VALUE else order } }
     }
 
     fun isModelReady(): Boolean = try { selection().ready } catch (_: Exception) { false }
@@ -93,7 +96,9 @@ class AsrModelManager(private val context: Context) {
         if (language != null) require(SpeechLanguages.supports(mode, language)) {
             "所选模型不支持${language.displayName}语音"
         }
-        val languageId = language?.id ?: "auto"
+        // SenseVoice performs language detection for multilingual speech. Keyboard language
+        // selects a compatible model; it must not force mixed English speech to Chinese/Japanese.
+        val languageId = "auto"
         fun dir(id: String): File {
             ModelStorage.migrateLegacyForModel(context, id)
             return ModelStorage.getModelDir(context, id)
@@ -112,8 +117,8 @@ class AsrModelManager(private val context: Context) {
 
     /** Called on the speech worker: model file checks/migration never enter the key path. */
     fun selectionForLanguage(language: InputLanguage): Selection {
-        val mode = SpeechLanguages.select(language, getSelectedModelId()) { selection(it, language).ready }
-        return selection(mode, language)
+        val mode = getSelectedModelId(language)
+        return selection(mode, language).also { check(it.ready) { "所选${language.displayName}语音模型尚未完整下载，请在模型管理中下载" } }
     }
 
     private val preferences get() = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
@@ -123,6 +128,42 @@ class AsrModelManager(private val context: Context) {
         val initial = com.kingzcheung.xime.model.DeviceDefaults.voiceModel(context)
         return preferences.getString("selected_model", initial) ?: initial
     }
+
+    /** Language choices are independent. Legacy global choices remain a read-only migration fallback. */
+    fun getSelectedModelId(language: InputLanguage): String {
+        require(language in InputLanguage.supported) { "当前方案未标注语言，请先选择输入语言" }
+        preferences.getString("selected_model_${language.id}", null)?.let { return it }
+        val legacy = getSelectedModelId()
+        if (SpeechLanguages.supports(legacy, language)) return withDefaultCorrection(legacy)
+        return runCatching { SpeechLanguages.select(language, legacy) { selection(it, language).ready } }.getOrElse {
+            when (language) {
+                InputLanguage.JAPANESE -> SpeechModelCatalog.ZIPFORMER_JA
+                InputLanguage.ENGLISH -> SpeechModelCatalog.PARAFORMER
+                else -> com.kingzcheung.xime.model.DeviceDefaults.voiceModel(context)
+            }
+        }
+    }
+
+    /**
+     * Unchosen Chinese/English default: Paraformer alone misrecognizes about one character in
+     * five (2026-10-07 FLEURS, 18% CER); once SenseVoice is downloaded, correct each pause with it.
+     * Any explicit per-language or legacy choice, including correction off, is kept.
+     */
+    private fun withDefaultCorrection(mode: String): String =
+        if (mode == SpeechModelCatalog.PARAFORMER && !preferences.contains("selected_model") &&
+            runCatching { selection(SpeechModelCatalog.TWO_PASS).ready }.getOrDefault(false)) SpeechModelCatalog.TWO_PASS
+        else mode
+
+    fun setModel(modelId: String, language: InputLanguage) {
+        require(SpeechLanguages.supports(modelId, language)) { "所选模型不支持${language.displayName}语音" }
+        preferences.edit().putString("selected_model_${language.id}", modelId).apply()
+    }
+
+    fun setFirstPassModel(modelId: String, language: InputLanguage) =
+        setModel(SpeechModelSelection.selectPrimary(getSelectedModelId(language), modelId), language)
+
+    fun setRefinementEnabled(enabled: Boolean, language: InputLanguage) =
+        setModel(SpeechModelSelection.withCorrection(getSelectedModelId(language), enabled), language)
 
     fun getFirstPassModelId(): String = SpeechModelSelection.primary(getSelectedModelId())
 
