@@ -40,13 +40,18 @@ object FormulaRecognizer {
     private var vocab: List<String> = emptyList()
     private var meta: Meta? = null
 
-    fun dir(context: Context): File = File(context.getExternalFilesDir(null) ?: context.filesDir, DIR)
+    /** 模型下载页里的公式手写模型 id（BuiltinModelCatalog），下载到 filesDir/models/<id>/。 */
+    const val MODEL_ID = "handwriting-formula"
+    private val FILES = listOf("formula_encoder.onnx", "formula_decoder.onnx", "formula_vocab.json", "formula_meta.json")
+
+    private fun complete(d: File) = FILES.all { File(d, it).isFile }
+
+    /** 优先用模型下载页下载的版本；没有时用 adb 推到外部私有目录 `handwriting_models/formula/` 的个人模型包。 */
+    fun dir(context: Context): File = com.kingzcheung.xime.model.ModelStorage.getModelDir(context, MODEL_ID).takeIf(::complete)
+        ?: File(context.getExternalFilesDir(null) ?: context.filesDir, DIR)
 
     /** 公式模型包是否已放到设备上。 */
-    fun isAvailable(context: Context): Boolean = dir(context).let { d ->
-        listOf("formula_encoder.onnx", "formula_decoder.onnx", "formula_vocab.json", "formula_meta.json")
-            .all { File(d, it).isFile }
-    }
+    fun isAvailable(context: Context): Boolean = complete(dir(context))
 
     @Synchronized
     fun ensureLoaded(context: Context): Boolean {
