@@ -586,14 +586,15 @@ internal fun KeyboardResizeOverlay(
                         .testTag("keyboard-resize-opacity-panel")
                         .clip(RoundedCornerShape(50))
                         .background(functionColor)
-                        .padding(start = 14.dp, end = 10.dp),
+                        // 右侧留半个面板高，竖条滑块拖到 100% 时不贴到圆头边上。
+                        .padding(start = 14.dp, end = opacityHeight / 2),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // 「透明度 N%」固定放在滑条左边，常显，拖动时数字实时变。
                     Text(
                         text = "透明度 ${((1f - opacity) * 100).roundToInt()}%",
                         modifier = Modifier
-                            .width(96.dp)
+                            .width((96f * density.fontScale).dp)
                             .clickable { editingOpacity = true }
                             .testTag("keyboard-opacity-overlay-label"),
                         color = functionTextColor,
@@ -606,7 +607,7 @@ internal fun KeyboardResizeOverlay(
                     val sliderColors = SliderDefaults.colors(
                         thumbColor = accentColor,
                         activeTrackColor = accentColor,
-                        inactiveTrackColor = functionTextColor.copy(alpha = 0.22f),
+                        inactiveTrackColor = onSurfaceColor.copy(alpha = 0.22f),
                     )
                     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides opacityHeight) {
                         Slider(
@@ -671,11 +672,11 @@ internal fun KeyboardResizeOverlay(
                             disabledContainerColor = functionColor,
                             disabledContentColor = content.copy(alpha = 0.35f),
                         ),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     ) {
                         icon()
                         if (text != null && showButtonLabels) {
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(3.dp))
                             // 文字只占剩余宽度：放不下时被裁掉，而不是把整组图标和文字挤出中心。
                             Text(text, modifier = Modifier.weight(1f, fill = false), fontSize = 14.sp,
                                 maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
@@ -819,7 +820,11 @@ internal fun KeyboardResizeOverlay(
                 IntOffset(frame.left.roundToInt(), (frame.bottom - handleClearance.toPx() - stripHeight.toPx()).roundToInt())
             }.size(with(density) { frame.width.toDp() }, stripHeight)
                 .testTag("keyboard-resize-padding-bar"), contentAlignment = Alignment.Center) {
-                Text("上下拖动调节底部留白", color = onSurfaceColor.copy(alpha = 0.7f), fontSize = 10.sp)
+                // 提示字放在功能键实心色的圆头小条上，不再是半透明裸字。
+                Box(Modifier.clip(RoundedCornerShape(50)).background(functionColor).padding(horizontal = 10.dp, vertical = 1.dp)) {
+                    Text("上下拖动调节底部留白", color = functionTextColor.copy(alpha = 1f), fontSize = 10.sp,
+                        maxLines = 1, softWrap = false)
+                }
             }
         }
         if (!editingOpacity && splitGapPx > 0f) {
@@ -827,8 +832,10 @@ internal fun KeyboardResizeOverlay(
                 IntOffset(frame.left.roundToInt(), (frame.top + (if (floatingMode) 4.dp else 28.dp).toPx()).roundToInt())
             }.size(with(density) { frame.width.toDp() }, 28.dp)
                 .testTag("keyboard-resize-split-hint"), contentAlignment = Alignment.Center) {
-                Text("拖动内侧两条竖边，调整中间留空", color = onSurfaceColor, fontSize = 11.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box(Modifier.clip(RoundedCornerShape(50)).background(functionColor).padding(horizontal = 12.dp, vertical = 3.dp)) {
+                    Text("拖动内侧两条竖边，调整中间留空", color = functionTextColor.copy(alpha = 1f), fontSize = 11.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
         if (!editingOpacity && !floatingMode && splitGapPx <= 0f) {

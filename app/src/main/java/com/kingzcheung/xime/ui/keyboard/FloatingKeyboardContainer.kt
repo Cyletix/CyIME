@@ -79,6 +79,8 @@ internal fun FloatingKeyboardContainer(
     /** 非调节态真实键盘内容高度；宿主可以是全屏，但卡片不能再拿宿主高度当自身高度。 */
     contentHeightDp: Int,
     backgroundColor: Color = Color.Transparent,
+    /** 拖动条颜色；KeyboardView 按主题背景与文字色算好传入，未传时按调色板折中。 */
+    dragIndicatorColor: Color? = null,
     onDrag: (dx: Float, dy: Float) -> Unit,
     onDragEnd: () -> Unit,
     onDock: () -> Unit = {},
@@ -96,7 +98,7 @@ internal fun FloatingKeyboardContainer(
     val density = LocalDensity.current
     val fixedCardShape = keyboardPanelShape(false, rememberRoundedKeyboardBottom())
     val dragPalette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
-    val dragIndicatorColor = if (dragPalette != null)
+    val dragIndicatorColor = dragIndicatorColor ?: if (dragPalette != null)
         lerp(dragPalette.background.copy(alpha = 1f), dragPalette.text.copy(alpha = 1f), 0.5f)
         else lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurface, 0.5f)
     // Read here so pointer updates remeasure the card without recomposing KeyboardView.
