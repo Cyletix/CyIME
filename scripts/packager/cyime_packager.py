@@ -53,6 +53,15 @@ def elder_violations(names: list[str], t9_sha256: str | None, best_sha256: str |
     return problems
 
 
+def ime_label_ok(manifest_tree: str) -> bool:
+    """The input method service carries the literal label "CyIME", so Settings never falls back to its class name."""
+    part = manifest_tree.split('XimeInputMethodService"', 1)
+    if len(part) < 2:
+        return False
+    service = manifest_tree[:len(part[0])].rsplit("E: service", 1)[-1] + part[1].split("E: ", 1)[0]
+    return bool(re.search(r'android:label\([^)]*\)="CyIME"', service))
+
+
 def friend_violations(names: list[str], t9_sha256: str | None, public_sha256: str | None,
                       private_sha256: str | None, manifest_tree: str) -> list[str]:
     """Friend package (docs/development/friend-pack-spec.md): normal app, all models bundled, public T9 model only."""
@@ -522,6 +531,9 @@ class Packager(ad.Delivery):
             raise DeliveryError("安装包里的包名/版本和源码不一致。")
         if self.kind == "release" and "application-debuggable" in badging:
             raise DeliveryError("正式版不应是可调试包。")
+        manifest = self.r.run([self.aapt, "dump", "xmltree", path, "AndroidManifest.xml"])
+        if not ime_label_ok(manifest):
+            raise DeliveryError("输入法服务没有写死的名字“CyIME”，系统设置可能显示成类名。")
         if self.p.audience in ("elder", "friend"):
             import zipfile
             with zipfile.ZipFile(path) as apk:
