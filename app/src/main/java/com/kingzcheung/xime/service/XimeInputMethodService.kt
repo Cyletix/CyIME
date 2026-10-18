@@ -612,9 +612,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val fixedWidth = SettingsPreferences.getFixedWidthDp(this, isLandscape)
         val fixedOffset = SettingsPreferences.getFixedOffsetX(this, isLandscape)
         KeyboardHeightProfiles.migrateLegacy(this, isLandscape, effectiveH)
-        // 新版第一次处于横屏时只做一次：横屏固定高度比 45% 档高的改回 45% 档（1.14.27 把它抬高过）。
-        // 这里在 onCreate 和 onConfigurationChanged 都会走到，屏高与固定档位同源取 configuration.screenHeightDp。
-        if (isLandscape) KeyboardHeightProfiles.capLandscapeFixedHeightOnce(this, screenH)
+        // 新版第一次启动时只做一次：把 1.14.26–1.14.27 规则留下的越界/偏高固定高度改回 1.14.25 的默认值。
+        KeyboardHeightProfiles.normalizeFixedHeightsOnce(this)
         val kbH = KeyboardHeightProfiles.selected(this, isFloatingMode, isLandscape, effectiveH)
         val minY = if (isFloatingMode) maxOf(
             tryGetVisibleNavBarHeightDp(this, window.window),
