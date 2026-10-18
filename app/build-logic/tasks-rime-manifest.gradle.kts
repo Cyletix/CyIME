@@ -7,8 +7,8 @@ val roots = listOf(
     "rime_japanese" to layout.buildDirectory.dir("generated/japanese-assets/rime_japanese").get().asFile,
     "rime_japanese" to file("src/main/assets/rime_japanese"),
 )
-// The elder package (bundled models) leaves the Japanese assets out of the APK, so out of the manifest too.
-val elder = providers.gradleProperty("bundleModels").orNull == "true"
+// The elder package leaves the Japanese assets out of the APK, so out of the manifest too.
+val elder = providers.gradleProperty("elderEdition").orNull == "true"
 val prepareRimeManifest by tasks.registering {
     dependsOn("prepareChineseDictionaries", "prepareJapaneseDictionaries")
     inputs.property("elder", elder)

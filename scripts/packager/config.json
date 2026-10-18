@@ -20,7 +20,16 @@
     "老人包": {
       "build_type": "release",
       "offline_models": true,
+      "audience": "elder",
       "t9_model": "@best_private",
+      "exclude_dicts": [],
+      "install": false
+    },
+    "朋友包": {
+      "build_type": "release",
+      "offline_models": true,
+      "audience": "friend",
+      "t9_model": "@best_public",
       "exclude_dicts": [],
       "install": false
     }

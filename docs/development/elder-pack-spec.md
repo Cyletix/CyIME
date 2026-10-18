@@ -12,7 +12,7 @@
 py -3 -B scripts\packager\cyime_packager.py build --preset 老人包 --bump patch
 ```
 
-预设在 `scripts/packager/config.json` 的“老人包”（旧名“离线完整版”仍指向它）：正式版、带离线模型（`-PbundleModels=true`，即 `BuildConfig.BUNDLED_MODELS`）、九键用当前最佳私人模型、只出包不安装，不发布。
+预设在 `scripts/packager/config.json` 的“老人包”（旧名“离线完整版”仍指向它）：正式版、带离线模型（`-PbundleModels=true`）、老人包开关（`audience: elder` → `-PelderEdition=true`，即 `BuildConfig.ELDER`；下面所有老人包专属行为都只认这个开关，带模型的朋友包不受影响）、九键用当前最佳私人模型、只出包不安装，不发布。
 
 “当前最佳／已淘汰”以 `/mnt/project-files/模型总览.md` 为准，电脑上的镜像是 `D:/CyIME-Data/models/model-status.json`（`best_private`、`best_public`、`retired`），两者由「Windows 自训模型攻坚」一起更新；打包器从镜像读取。
 

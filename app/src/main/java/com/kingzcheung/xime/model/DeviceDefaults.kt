@@ -46,11 +46,11 @@ object DeviceDefaults {
             editor.putString(TIER, "PRESERVED")
         }
         check(editor.putInt(VERSION, 1).commit()) { "无法保存设备模型默认配置" }
-        if (fresh && com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) applyElderDefaults(context)
+        if (fresh && com.kingzcheung.xime.BuildConfig.ELDER) applyElderDefaults(context)
     }
 
     /**
-     * The bundled-model edition is the elder package (docs/development/elder-pack-spec.md). Fresh
+     * The elder package (BuildConfig.ELDER, docs/development/elder-pack-spec.md). Fresh
      * installs only; existing settings are never changed:
      * - 九键拼音 as the keyboard, with 手写 one tap away on the toolbar;
      * - toolbar 语音、手写、字幕、拍照识别、表情、剪贴板、输入方式 (no cursor editing tools);
