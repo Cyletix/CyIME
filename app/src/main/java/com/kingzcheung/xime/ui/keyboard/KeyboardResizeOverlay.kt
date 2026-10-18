@@ -3,7 +3,6 @@ package com.kingzcheung.xime.ui.keyboard
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -256,8 +255,9 @@ internal fun KeyboardResizeOverlay(
                         drawPath(cardPath, accentColor, style = Stroke(stroke * 2f))
                         // 2. 四角角标：贴着卡片圆角的一段弧，沿两条直边各延伸 cornerLeg，圆头；直角处是 L。
                         fun corner(cornerX: Float, cornerY: Float, dirX: Float, dirY: Float, radius: Float, grow: Float) {
-                            val leg = bracketLeg * grow
-                            val r = radius.coerceAtMost(leg)
+                            // 四个角的臂长一致：直角（底边不圆）的角把圆角那段长度补到直臂上。
+                            val r = radius.coerceAtMost(bracketLeg * grow)
+                            val leg = (bracketLeg + (cornerRadius - r)) * grow
                             val path = Path().apply {
                                 moveTo(cornerX + dirX * (r + leg), cornerY)
                                 lineTo(cornerX + dirX * r, cornerY)
@@ -607,7 +607,7 @@ internal fun KeyboardResizeOverlay(
                     val sliderColors = SliderDefaults.colors(
                         thumbColor = accentColor,
                         activeTrackColor = accentColor,
-                        inactiveTrackColor = onSurfaceColor.copy(alpha = 0.22f),
+                        inactiveTrackColor = functionColor,
                     )
                     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides opacityHeight) {
                         Slider(
@@ -640,7 +640,8 @@ internal fun KeyboardResizeOverlay(
                                         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                                         .drawBehind {
                                             val radius = size.height / 2f
-                                            drawRoundRect(onSurfaceColor.copy(alpha = 0.22f), cornerRadius = CornerRadius(radius))
+                                            // 轨道实心（功能键色），底下按键的缝和角标不再透出来。
+                                            drawRoundRect(functionColor, cornerRadius = CornerRadius(radius))
                                             val thumbX = fraction * size.width
                                             if (thumbX > 0f) drawRoundRect(accentColor, size = Size(thumbX, size.height), cornerRadius = CornerRadius(radius))
                                             drawCircle(Color.Transparent, radius = 12.dp.toPx(), center = Offset(thumbX, radius), blendMode = BlendMode.Clear)
@@ -878,22 +879,20 @@ internal fun KeyboardResizeOverlay(
                 }
             }
         }
-        // 顶边「拖动移动」胶囊，按设计图：键盘底色实心、强调色细描边、强调色四向箭头 + 文字。
-        val pillFill = (palette?.background ?: MaterialTheme.colorScheme.surface).copy(alpha = 1f)
+        // 顶边「拖动移动」胶囊：和按钮一样的功能键实心色、无描边（用户 2026-10-19 要求），四向箭头 + 文字。
         @Composable
         fun MovePill() {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(pillFill)
-                    .border(1.dp, accentColor, RoundedCornerShape(50))
+                    .background(functionColor)
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.OpenWith, contentDescription = null, tint = accentColor,
+                Icon(Icons.Default.OpenWith, contentDescription = null, tint = functionTextColor.copy(alpha = 1f),
                     modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(5.dp))
-                Text("拖动移动", color = onSurfaceColor, fontSize = 11.sp, maxLines = 1, softWrap = false)
+                Text("拖动移动", color = functionTextColor.copy(alpha = 1f), fontSize = 11.sp, maxLines = 1, softWrap = false)
             }
         }
         val floatingMoveGesture = Modifier.pointerInput(floatingMode) {
