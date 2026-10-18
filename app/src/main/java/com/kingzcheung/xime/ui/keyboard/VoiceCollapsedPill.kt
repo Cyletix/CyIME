@@ -1,6 +1,15 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import android.graphics.Rect
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,6 +53,8 @@ import kotlin.math.floor
 @Composable
 internal fun VoiceCollapsedPill(
     listening: Boolean,
+    /** 实时麦克风峰值（0~1）；只在绘制阶段读取，音量变化不触发重组。 */
+    amplitude: () -> Float,
     languageLabel: String,
     languageActions: KeyboardInputActions,
     onSwitchLanguage: () -> Unit,
@@ -85,9 +96,26 @@ internal fun VoiceCollapsedPill(
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 HardwareToolbarAction(Icons.AutoMirrored.Filled.Backspace, "删除", "voice-pill-backspace", color, onClick = onBackspace)
-                HardwareToolbarAction(Icons.Default.Mic, if (listening) "停止语音输入" else "语音输入", "voice-pill-mic",
-                    color, active = listening, onClick = onMic)
+                VoicePillMic(listening, amplitude, color, accentColor, onMic)
             }
         }
+    }
+}
+
+/** 悬浮条麦克风：听写时用与工具栏相同的音量光圈（正圆、随音量放大）。 */
+@Composable
+private fun VoicePillMic(listening: Boolean, amplitude: () -> Float, color: Color, accentColor: Color, onClick: () -> Unit) {
+    val currentAmplitude by rememberUpdatedState(amplitude)
+    val level by animateFloatAsState(if (listening) microphoneLevel(currentAmplitude()) else 0f,
+        animationSpec = tween(100), label = "voice-pill-level")
+    Box(
+        Modifier.size(48.dp)
+            .then(if (listening) Modifier.microphoneLevelHalo({ level }, accentColor) else Modifier)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = if (listening) "停止语音输入" else "语音输入"; selected = listening }
+            .testTag("voice-pill-mic"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Default.Mic, null, tint = if (listening) accentColor else color, modifier = Modifier.size(22.dp))
     }
 }

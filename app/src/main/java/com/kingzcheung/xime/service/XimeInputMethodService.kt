@@ -1757,6 +1757,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             val pillEnglish = state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
                             com.kingzcheung.xime.ui.keyboard.VoiceCollapsedPill(
                                 listening = state.isVoiceMode,
+                                amplitude = { voiceAmplitudeState.floatValue },
                                 languageLabel = if (pillEnglish) "EN" else when (state.inputProfile.language) {
                                     com.kingzcheung.xime.settings.InputLanguage.CHINESE -> "中"
                                     com.kingzcheung.xime.settings.InputLanguage.JAPANESE -> "あ"
