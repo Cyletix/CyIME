@@ -12,7 +12,9 @@ class DeviceKeyEffectDefaultsTest {
             device.copy(totalMemoryBytes = 4 * gib - 1) to KeyEffectDefaults(false, false),
             device.copy(totalMemoryBytes = 4 * gib, processors = 4, maxCpuKHz = 1_800_000) to KeyEffectDefaults(true, false),
             device.copy(totalMemoryBytes = 6 * gib - 1) to KeyEffectDefaults(true, false),
-            device.copy(totalMemoryBytes = 6 * gib, maxCpuKHz = 2_200_000) to KeyEffectDefaults(true, true),
+            device.copy(totalMemoryBytes = 6 * gib, maxCpuKHz = 2_200_000) to KeyEffectDefaults(true, false),
+            device.copy(totalMemoryBytes = 8 * gib - 1, maxCpuKHz = 2_200_000) to KeyEffectDefaults(true, false),
+            device.copy(totalMemoryBytes = 8 * gib, maxCpuKHz = 2_200_000) to KeyEffectDefaults(true, true),
             device.copy(maxCpuKHz = 2_199_999) to KeyEffectDefaults(true, false),
             device.copy(maxCpuKHz = 1_799_999) to KeyEffectDefaults(false, false),
         )

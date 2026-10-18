@@ -166,10 +166,7 @@ fun SmartPredictionSettingsContent(
                             Switch(
                                 checked = uiState.isEnabled,
                                 onCheckedChange = { viewModel.setEnabled(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                                )
+                                colors = SwitchDefaults.colors()
                             )
                         }
                     }

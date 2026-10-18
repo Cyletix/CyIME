@@ -76,6 +76,7 @@ fun SpaceKeyButton(
         modifier.fillMaxSize().testTag("space-key")
             .pointerInput(holdAction, settings.cursorStepDp, settings.spaceHoldDelayMs) {
                 val step = settings.cursorStepDp.dp.toPx()
+                val tapTolerance = maxOf(viewConfiguration.touchSlop, 24.dp.toPx())
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     down.consume()
@@ -111,8 +112,10 @@ fun SpaceKeyButton(
                             lastX = change.position.x
                             val dy = change.position.y - lastY
                             lastY = change.position.y
-                            if (!held && (abs(change.position.x - down.position.x) > viewConfiguration.touchSlop ||
-                                abs(change.position.y - down.position.y) > viewConfiguration.touchSlop)) {
+                            // 拇指点空格常带几毫米横移：在约 4 mm 内仍算一次点击（三星、Gboard 偏移 3.6 mm 仍上屏），
+                            // 超出才算滑动。系统 touchSlop 只有约 8 dp，曾让 2.4 mm 的偏移把空格吞掉（1.12.36 实测）。
+                            if (!held && (abs(change.position.x - down.position.x) > tapTolerance ||
+                                abs(change.position.y - down.position.y) > tapTolerance)) {
                                 movedBeforeHold = true
                                 timer.cancel()
                             }

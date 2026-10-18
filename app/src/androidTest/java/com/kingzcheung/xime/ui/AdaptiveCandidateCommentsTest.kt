@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -39,6 +40,17 @@ class AdaptiveCandidateCommentsTest {
     @Before fun setup() { SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
     @After fun teardown() { SettingsPreferences.getPrefsPublic(context).edit().clear().commit() }
 
+    @Test fun explicitLegacyPreferenceIsPreservedInsteadOfBecomingAuto() {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        assertEquals(com.kingzcheung.xime.settings.CandidateCommentMode.AUTO, SettingsPreferences.candidateCommentMode(context))
+        prefs.edit().putBoolean(SettingsPreferences.KEY_SHOW_CANDIDATE_COMMENTS, true).commit()
+        assertEquals(com.kingzcheung.xime.settings.CandidateCommentMode.SHOW, SettingsPreferences.candidateCommentMode(context))
+        prefs.edit().putBoolean(SettingsPreferences.KEY_SHOW_CANDIDATE_COMMENTS, false).commit()
+        assertEquals(com.kingzcheung.xime.settings.CandidateCommentMode.HIDE, SettingsPreferences.candidateCommentMode(context))
+        SettingsPreferences.setCandidateCommentMode(context, com.kingzcheung.xime.settings.CandidateCommentMode.AUTO)
+        assertEquals(com.kingzcheung.xime.settings.CandidateCommentMode.AUTO, SettingsPreferences.candidateCommentMode(context))
+    }
+
     @Composable private fun Host(content: @Composable () -> Unit) {
         val config = Configuration(LocalConfiguration.current).apply { screenWidthDp = 1600 }
         CompositionLocalProvider(LocalContext provides context, LocalConfiguration provides config,
@@ -53,7 +65,7 @@ class AdaptiveCandidateCommentsTest {
             CandidateBar(CandidateBarState.ChineseCandidates(listOf("你好", "你"),
                 comments = listOf("ni hao", "ni"), inputText = "nihao"),
                 visuals = visuals, callbacks = CandidateBarCallbacks(onCandidateSelect = { selected = it }),
-                modifier = Modifier.requiredWidth(width.value.dp))
+                modifier = Modifier.requiredWidth(width.value.dp).testTag("comments-strip"))
         } }
         rule.onNodeWithText("ni hao").assertDoesNotExist()
         rule.onNodeWithText("nihao").assertExists() // Editing preedit is not an optional annotation.
@@ -67,6 +79,9 @@ class AdaptiveCandidateCommentsTest {
         rule.runOnIdle { SettingsPreferences.setShowCandidateComments(context, true) }
         rule.onNodeWithText("ni hao").assertIsDisplayed()
         rule.runOnIdle { width.value = 320 }
+        rule.onNodeWithText("ni hao").assertIsDisplayed()
+        saveUiEvidence("candidate-comments-show-narrow", rule.onNodeWithTag("comments-strip"))
+        rule.runOnIdle { SettingsPreferences.setCandidateCommentMode(context, com.kingzcheung.xime.settings.CandidateCommentMode.AUTO) }
         rule.onNodeWithText("ni hao").assertDoesNotExist()
     }
 
@@ -89,8 +104,9 @@ class AdaptiveCandidateCommentsTest {
         val thirdWithout = rule.onNodeWithTag("expanded-candidate:102").fetchSemanticsNode().boundsInRoot
         assertEquals("hidden annotations free room in the same row", firstWithout.top, thirdWithout.top, 1f)
         rule.runOnIdle { width.value = 320; SettingsPreferences.setShowCandidateComments(context, true) }
-        rule.onNodeWithText("候选0 hou xuan xiang mu de pin yin").assertDoesNotExist()
+        rule.onNodeWithText("候选0 hou xuan xiang mu de pin yin").assertIsDisplayed()
         rule.onNodeWithText("hou").assertIsDisplayed()
+        saveUiEvidence("candidate-comments-expanded-show-narrow", rule.onRoot())
         rule.onNodeWithTag("expanded-candidate:100").performClick()
         rule.runOnIdle { assertEquals(entries.first(), selected) }
     }

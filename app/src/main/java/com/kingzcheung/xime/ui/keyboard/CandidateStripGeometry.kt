@@ -48,3 +48,35 @@ internal inline fun candidatePrefixCount(total: Int, available: Int, spacing: In
 /** Remove the rendered prefix only; global engine indices survive filtering/reflow unchanged. */
 internal fun remainingCandidates(entries: List<CandidateEntry>, visible: List<String>): List<CandidateEntry> =
     if (entries.take(visible.size).map { it.text } == visible) entries.drop(visible.size) else entries
+
+/** 分体候选窗口：[range] 为显示的候选，前 [leftCount] 个排在中缝左边。 */
+internal data class CandidateWindowSplit(val range: IntRange, val leftCount: Int)
+
+/** 分体候选：从窗口起点先填满中缝左侧，再接着填右侧；焦点不在其中时从焦点重新开始。 */
+internal fun splitCandidateWindow(
+    total: Int, highlighted: Int, leftAvailable: Int, rightAvailable: Int, spacing: Int,
+    windowStart: Int, widthAt: (Int) -> Int,
+): CandidateWindowSplit {
+    if (total <= 0) return CandidateWindowSplit(IntRange.EMPTY, 0)
+    val focused = highlighted.takeIf { it in 0 until total } ?: 0
+    fun fit(from: Int, available: Int): Int {
+        var used = 0
+        var count = 0
+        while (from + count < total) {
+            val next = used + (if (count == 0) 0 else spacing) + widthAt(from + count)
+            if (next > available) break
+            used = next
+            count++
+        }
+        return count
+    }
+    fun fill(start: Int): CandidateWindowSplit {
+        val left = fit(start, leftAvailable)
+        val right = if (start + left < total) fit(start + left, rightAvailable) else 0
+        val end = (start + (left + right).coerceAtLeast(1)).coerceAtMost(total)
+        return CandidateWindowSplit(start until end, left)
+    }
+    val start = windowStart.coerceIn(0, total - 1)
+    val window = fill(if (focused < start) focused else start)
+    return if (focused in window.range) window else fill(focused)
+}

@@ -204,6 +204,7 @@ private fun CandidatePageContent(
     onHapticFeedback: (() -> Unit)? = null,
 ) {
     val configuration = LocalConfiguration.current
+    val candidateTextSize = rememberCandidateTextSize()
     val isLandscape =
         configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val leftRailWidth = if (isLandscape) 48.dp else 40.dp
@@ -351,9 +352,9 @@ private fun CandidatePageContent(
                 // 随内容一并滚动 ──
                 BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
                     val showComments = candidateCommentsVisible(maxWidth.value, LocalDensity.current.fontScale,
-                        18f, rememberCandidateCommentsAllowed())
+                        candidateTextSize.toFloat(), rememberCandidateCommentsAllowed())
                     val rowWidthUnits = with(LocalDensity.current) {
-                        ExpandedCandidatePager.rowWidthUnits(maxWidth.toPx(), density * fontScale)
+                        ExpandedCandidatePager.rowWidthUnits(maxWidth.toPx(), density * fontScale * candidateTextSize / 18f)
                     }
                     val candidateRows = remember(state.candidates, rowWidthUnits, showComments) {
                         // Only layout measurements omit annotations; selection keeps the original entry.
@@ -380,6 +381,7 @@ private fun CandidatePageContent(
                                     if (colIndex > 0) FlexRowDivider(dividerColor)
                                     CandidatePageItem(
                                         entry = entry,
+                                        textSizeSp = candidateTextSize,
                                         showComment = showComments,
                                         onClick = { callbacks.onCandidateSelect(entry) },
                                         onLongClick = { callbacks.onCandidateLongPress?.invoke(entry) },
@@ -409,6 +411,7 @@ private fun CandidatePageContent(
                                             if (index > 0) FlexRowDivider(dividerColor)
                                             CandidatePageItem(
                                                 entry = CandidateEntry(text = candidate),
+                                                textSizeSp = candidateTextSize,
                                                 onClick = { callbacks.onAssociationSelect?.invoke(index) },
                                                 textColor = state.textColor
                                             )
@@ -452,7 +455,10 @@ private fun CandidatePageContent(
                             onSwipeUp = callbacks.onClear,
                             onSwipeDown = callbacks.onUndoClear,
                             onSwipeLeft = callbacks.onClearComposition,
+                            followSymbolSwipeDirection = true,
+                            upFeedback = KeyFlickFeedback.DELETE,
                             swipeUpLabel = "清空",
+                            downFeedback = KeyFlickFeedback.UNDO,
                             swipeDownLabel = "撤回",
                             backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
                             iconColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
@@ -497,7 +503,7 @@ private fun CandidatePageContent(
 
 /**
  * 候选条目：候选词与拼音注释拼进同一文本（注释用次级色 + 注释字体），
- * 字号固定不缩放，超宽时省略号截断。
+ * 与候选栏共用用户字号，超宽时省略号截断。
  * 主候选与联想都按真实文字宽度流式排布，余量均分给条目。
  */
 @Composable
@@ -508,14 +514,15 @@ private fun CandidatePageItem(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     showComment: Boolean = false,
+    textSizeSp: Int = 18,
 ) {
     val displayComment = if (showComment) entry.comment.replace("~", "") else ""
-    val annotated = remember(entry.text, displayComment, textColor) {
+    val annotated = remember(entry.text, displayComment, textColor, textSizeSp) {
         buildAnnotatedString {
             withStyle(
                 SpanStyle(
                     color = textColor,
-                    fontSize = 18.sp,
+                    fontSize = textSizeSp.sp,
                     fontFamily = AppFonts.candidateFontFamily
                 )
             ) {
@@ -525,7 +532,7 @@ private fun CandidatePageItem(
                 withStyle(
                     SpanStyle(
                         color = textColor.copy(alpha = 0.5f),
-                        fontSize = 11.sp,
+                        fontSize = (textSizeSp * 11f / 18f).sp,
                         fontFamily = AppFonts.commentFontFamily
                     )
                 ) {

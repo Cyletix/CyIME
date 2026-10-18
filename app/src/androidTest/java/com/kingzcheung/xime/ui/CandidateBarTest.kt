@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,41 @@ class CandidateBarTest {
     
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun associationNumbersFollowConnectionAndEnglishHasNoNumbers() {
+        var selected = -1
+        val connected = mutableStateOf(false)
+        val state = mutableStateOf<CandidateBarState>(
+            CandidateBarState.AssociationOnly(listOf("明天见", "再联系")))
+        composeTestRule.setContent {
+            CandidateBar(state = state.value,
+                showNumberLabels = connected.value,
+                visuals = CandidateBarVisuals(KeyboardBackground, KeyTextColor, DividerColor),
+                callbacks = CandidateBarCallbacks(onCandidateSelect = { selected = it },
+                    onAssociationSelect = { selected = it }))
+        }
+        composeTestRule.onNodeWithText("明天见").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1 明天见").assertDoesNotExist()
+        composeTestRule.runOnIdle { connected.value = true }
+        composeTestRule.onNodeWithText("1 明天见").assertIsDisplayed()
+        composeTestRule.onNodeWithText("2 再联系").performClick()
+        composeTestRule.runOnIdle {
+            assertEquals(1, selected)
+            connected.value = false
+        }
+        composeTestRule.onNodeWithText("再联系").assertIsDisplayed()
+        composeTestRule.onNodeWithText("2 再联系").assertDoesNotExist()
+        composeTestRule.runOnIdle {
+            connected.value = true
+            state.value = CandidateBarState.EnglishCandidates(listOf("hello", "help"), pendingText = "hel")
+        }
+        composeTestRule.onNodeWithText("hello").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1 hello").assertDoesNotExist()
+        composeTestRule.runOnIdle { state.value = CandidateBarState.ClipboardDisplay(listOf("复制文本")) }
+        composeTestRule.onNodeWithText("复制文本").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1 复制文本").assertDoesNotExist()
+    }
     
     @Test
     fun candidateBarDisplaysCandidates() {
@@ -69,6 +105,7 @@ class CandidateBarTest {
         composeTestRule.onNodeWithText("你好").assertIsDisplayed()
         composeTestRule.onNodeWithText("世界").assertIsDisplayed()
         composeTestRule.onNodeWithText("测试").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1 你好").assertDoesNotExist()
     }
     
     @Test
@@ -185,6 +222,49 @@ class CandidateBarTest {
         
         composeTestRule.onNodeWithText("你好").assertIsDisplayed()
         composeTestRule.onNodeWithText("aaaa").assertIsDisplayed()
+    }
+
+    @Test
+    fun fullKeyboardNumbersFollowPhysicalConnectionAcrossAllChineseLayouts() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        KeysConfigHelper.loadConfig(app)
+        val viewModel = KeyboardViewModel(app)
+        val connected = mutableStateOf(false)
+        val ui = mutableStateOf(KeyboardUiState(currentSchemaId = "rime_ice"))
+        val candidates = mutableStateOf(CandidateState(
+            candidates = listOf("你好", "世界"), inputText = "nihao", preeditText = "ni hao", isComposing = true,
+        ))
+        var selected = -1
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                MaterialTheme {
+                    KeyboardView(viewModel, ui.value,
+                        KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = { selected = it }),
+                        modifier = Modifier.size(360.dp, 240.dp), candidateState = candidates,
+                        hardwareKeyboardConnected = connected.value)
+                }
+            }
+        }
+        for (schema in listOf("rime_ice", "pinyin_14jian", "t9_pinyin")) {
+            composeTestRule.runOnIdle {
+                viewModel.setKeyboardState(if (schema == "t9_pinyin") KeyboardLayoutState.T9Pinyin else KeyboardLayoutState.Chinese)
+                ui.value = ui.value.copy(currentSchemaId = schema)
+                candidates.value = candidates.value.copy(inputText = if (schema == "t9_pinyin") "64426" else "nihao")
+            }
+            composeTestRule.onNodeWithText("你好").assertIsDisplayed()
+            composeTestRule.onNodeWithText("1 你好").assertDoesNotExist()
+            saveUiEvidence("candidate-numbers-$schema-touch", composeTestRule.onRoot())
+            // Physical input can coexist with the full onscreen keyboard; do not key this on compact mode.
+            composeTestRule.runOnIdle { connected.value = true }
+            composeTestRule.onNodeWithText("1 你好").assertIsDisplayed()
+            composeTestRule.onNodeWithText("2 世界").assertIsDisplayed().performClick()
+            saveUiEvidence("candidate-numbers-$schema-hardware", composeTestRule.onRoot())
+            composeTestRule.runOnIdle { assertEquals(1, selected); connected.value = false }
+            composeTestRule.onNodeWithText("你好").assertIsDisplayed()
+            composeTestRule.onNodeWithText("1 你好").assertDoesNotExist()
+            composeTestRule.onNodeWithText("世界").performClick()
+            composeTestRule.runOnIdle { assertEquals(1, selected) }
+        }
     }
 
     @Test

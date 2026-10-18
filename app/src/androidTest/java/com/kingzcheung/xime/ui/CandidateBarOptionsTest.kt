@@ -137,6 +137,8 @@ class CandidateBarOptionsTest {
                 MaterialTheme { LayoutDisplaySettingsContent(onBack = {}) }
             }
         }
+        // 布局与显示 is an index now; the candidate options live on its 候选词 page.
+        rule.onNodeWithText("候选词").performScrollTo().performClick()
         val setting = rule.onNodeWithTag("candidate-cancel-setting")
         rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("candidate-cancel-setting"))
         setting.assertIsOff().performClick().assertIsOn()

@@ -70,6 +70,13 @@ class NgramTrie {
         if (total == 0f) return emptyList()
         return node.children.map { (token, child) -> token to child.count / total }
     }
+
+    /** How many continuations were observed after this prefix (0 when never seen). */
+    fun observations(prefix: List<String>): Long {
+        var node = root
+        for (token in prefix) node = node.children[token] ?: return 0L
+        return node.children.values.sumOf { it.count.toLong() }
+    }
     
     fun getAllEntries(): List<Pair<List<String>, Int>> {
         val entries = mutableListOf<Pair<List<String>, Int>>()

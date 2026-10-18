@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,9 +49,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -60,11 +63,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.FirstBaseline
 import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
@@ -88,6 +94,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -117,6 +124,9 @@ data class CandidateBarVisuals(
     val selectedTextColor: Color = Color(0xFF1A73E8),
     val isDarkTheme: Boolean = false,
     val preeditBackgroundColor: Color = Color.Unspecified,
+    val opaqueComments: Boolean = false,
+    val textShadow: androidx.compose.ui.graphics.Shadow? = null,
+    val glassControlBackground: Color? = null,
 )
 
 data class CandidateBarCallbacks(
@@ -178,19 +188,32 @@ fun CandidateBar(
     voicePluginName: String = "",
     onEditPreedit: (() -> Unit)? = null,
     showPreeditPreview: Boolean = true,
+    showNumberLabels: Boolean = false,
 ) {
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    val glassEnabled = glass.enabled
+    val themeSurface = com.kingzcheung.xime.ui.theme.LocalMaterialPalette.current?.surface
+        ?: visuals.preeditBackgroundColor.takeUnless { it == Color.Unspecified || it.alpha == 0f }
+        ?: if (visuals.isDarkTheme) Color(0xFF202020) else Color(0xFFF2F2F2)
+    val themeKey = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.key ?: themeSurface
+    val shadowRadius = with(LocalDensity.current) { 1.dp.toPx() }
+    val textSurface = remember(glass, themeSurface, themeKey, shadowRadius, visuals.textColor, visuals.selectedTextColor, visuals.accentColor) {
+        if (glassEnabled) resolveFrostedTextSurface(themeSurface, visuals.textColor,
+            visuals.selectedTextColor, visuals.accentColor, glass, themeKey, shadowRadius) else null
+    }
+    val protectedVisuals = visuals.withTextSurface(textSurface)
     val configuration = LocalConfiguration.current
     val isLandscape = !isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val horizontalPadding = 8.dp
     val context = LocalContext.current
 
     // Toolbar and keys share the selected keyboard palette, including in previews.
-    val iconButtonContainer = androidx.compose.ui.graphics.lerp(
-        visuals.backgroundColor,
-        visuals.accentColor,
+    val iconButtonContainer = protectedVisuals.glassControlBackground ?: androidx.compose.ui.graphics.lerp(
+        protectedVisuals.backgroundColor,
+        protectedVisuals.accentColor,
         0.15f
     )
-    val iconButtonTint = visuals.textColor
+    val iconButtonTint = protectedVisuals.textColor
     val preferences = remember(context) { SettingsPreferences.getPrefsPublic(context) }
     var showCancelButton by remember(preferences) {
         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
@@ -208,7 +231,7 @@ fun CandidateBar(
     val commentsAllowed = rememberCandidateCommentsAllowed()
     val inputTextLocation = SettingsPreferences.getInputTextLocation(context)
     val showInputBoxStyle = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX
-    val candidateTextSize = SettingsPreferences.getCandidateTextSize(context)
+    val candidateTextSize = rememberCandidateTextSize()
     val candidateFontFamily = AppFonts.candidateFontFamily
     val commentFontFamily = AppFonts.commentFontFamily
 
@@ -308,33 +331,61 @@ fun CandidateBar(
     }.orEmpty()
     val showPreedit = showPreeditPreview && showInputTextRow && preeditText.isNotEmpty() &&
         (!showInputBoxStyle || onEditPreedit != null)
+    // 分体时工具栏和候选栏也分到中缝两侧；剪贴板预览与自动填充建议仍是整条。
+    // 编码预览浮在栏上方，不受中缝裁剪影响。
+    val splitGap = LocalSplitKeyboardGap.current
+    val splitGapX = splitGap?.gapX()?.takeIf {
+        state !is CandidateBarState.ClipboardDisplay && inlineSuggestions.isEmpty()
+    }
+    var barOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var barTopInWindow by remember { mutableStateOf<Float?>(null) }
+    SideEffect { splitGap?.reportBarTop(if (splitGapX != null) barTopInWindow else null) }
+    DisposableEffect(splitGap) { onDispose { splitGap?.reportBarTop(null) } }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .then(if (state is CandidateBarState.ClipboardDisplay) Modifier.heightIn(min = 44.dp)
                 else Modifier.height(44.dp))
-            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else visuals.backgroundColor)
-            .visualMaterial(VisualStyles.current, 0.dp, level = if (state is CandidateBarState.Idle) com.kingzcheung.xime.ui.theme.MaterialLevel.FLOATING else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE)
+            .onGloballyPositioned {
+                barOrigin = it.positionInWindow()
+                barTopInWindow = barOrigin.y
+            }
+            .clipSplitGapColumn(splitGapX) { barOrigin }
+            .background(if (glassEnabled) Color.Transparent else protectedVisuals.backgroundColor)
+            // Glass rails inherit the keyboard background; only individual controls get a material.
+            .then(if (glassEnabled) Modifier else Modifier.visualMaterial(VisualStyles.current, 0.dp,
+                level = if (state is CandidateBarState.Idle) com.kingzcheung.xime.ui.theme.MaterialLevel.FLOATING
+                    else com.kingzcheung.xime.ui.theme.MaterialLevel.BASE))
             .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.Center,
     ) {
         if (showPreedit) {
-            PreeditPreview(preeditText, visuals, onEditPreedit)
+            PreeditPreview(preeditText, protectedVisuals, onEditPreedit)
         }
 
         if (state is CandidateBarState.ClipboardDisplay) {
-            ClipboardPreviewBar(state.candidates, visuals, callbacks, iconButtonContainer, state.smsVerificationCode, state.image)
+            ClipboardPreviewBar(state.candidates, protectedVisuals, callbacks, iconButtonContainer, state.smsVerificationCode, state.image)
             return@Column
         }
 
+        // 空闲工具栏：菜单、收起与中间各图标同为等宽一格，胶囊同尺寸（分体时扣除中缝）。
+        val rowDensity = LocalDensity.current
+        var toolbarRowWidth by remember { mutableStateOf(0.dp) }
+        val toolbarSlot = if (state is CandidateBarState.Idle && inlineSuggestions.isEmpty() && toolbarRowWidth > 0.dp) {
+            val gap = splitGapX?.let { (l, r) -> with(rowDensity) { (r - l).toDp() } } ?: 0.dp
+            val fixed = (if (callbacks.onHideKeyboard != null) 1 else 0) + (if (showLeftIcon) 1 else 0)
+            // 悬浮小窗里格子随宽度收窄（最窄 36dp），图标都留在面板内，不再横向溢出压住边框。
+            maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + fixed).coerceAtLeast(1), 36.dp)
+        } else null
         Row(
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .onSizeChanged { toolbarRowWidth = with(rowDensity) { it.width.toDp() } },
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (showCompositionCancel) {
-                KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, visuals.textColor, label = "取消输入")
+                KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor, label = "取消输入")
                 Spacer(Modifier.width(4.dp))
             }
             if (showLeftIcon) {
@@ -344,11 +395,11 @@ fun CandidateBar(
                             (page.route is OverlayRoute.Menu || page.route is OverlayRoute.SchemaList || page.route is OverlayRoute.Edit ||
                                 page.route is OverlayRoute.Emoji || page.route is OverlayRoute.Clipboard)
                         if ((page is KeyboardPage.Main && page.type == MainType.HANDWRITING || panelHasToolbarBack) && callbacks.onBack != null) {
-                            KeyboardBackButton(callbacks.onBack, iconButtonContainer, visuals.textColor,
-                                modifier = Modifier.testTag("toolbar-leading"))
+                            KeyboardBackButton(callbacks.onBack, iconButtonContainer, protectedVisuals.textColor,
+                                modifier = Modifier.testTag("toolbar-leading"), slotWidth = toolbarSlot)
                         } else {
                             KeyboardToolbarButton({ callbacks.onLogoClick?.invoke() }, iconButtonContainer,
-                                modifier = Modifier.testTag("toolbar-leading")) {
+                                modifier = Modifier.testTag("toolbar-leading"), slotWidth = toolbarSlot) {
                                 Icon(painterResource(R.drawable.cyime_toolbar_mark), contentDescription = "CyIME Logo",
                                     tint = iconButtonTint, modifier = Modifier.size(22.dp))
                             }
@@ -363,7 +414,7 @@ fun CandidateBar(
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
                                 contentDescription = "剪切板",
-                                tint = visuals.accentColor,
+                                tint = protectedVisuals.accentColor,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -393,21 +444,23 @@ fun CandidateBar(
                             // 同时充当与候选词区的分界（与旧平铺布局视觉一致）
                             InlineSuggestionDivider(
                                 modifier = Modifier.align(Alignment.CenterEnd),
-                                color = visuals.dividerColor,
+                                color = protectedVisuals.dividerColor,
                             )
                         }
                     }
                 }
             }
 
-            if (state is CandidateBarState.ChineseCandidates) {
+            if (state is CandidateBarState.ChineseCandidates || (splitGapX != null && state !is CandidateBarState.Idle)) {
                 FixedCandidateStrip(
                     candidates = displayCandidates, associations = displayAssociation,
                     comments = displayComments,
-                    visuals = visuals, callbacks = callbacks,
+                    visuals = protectedVisuals, callbacks = callbacks,
                     fontSize = candidateTextSize.sp,
                     modifier = Modifier.weight(1f),
-                    highlightIndex = state.highlightIndex,
+                    highlightIndex = (state as? CandidateBarState.ChineseCandidates)?.highlightIndex ?: 0,
+                    showNumberLabels = showNumberLabels,
+                    gapWindowX = splitGapX,
                 )
             } else if (state !is CandidateBarState.Idle) BoxWithConstraints(Modifier.weight(1f)) {
                 val showComments = candidateCommentsVisible(maxWidth.value, density.fontScale,
@@ -425,7 +478,7 @@ fun CandidateBar(
                             onLongClick = if (callbacks.onCandidateLongPress != null) {
                                 { callbacks.onCandidateLongPress(index) }
                             } else null,
-                            textColor = visuals.textColor,
+                            textColor = protectedVisuals.textColor,
                             comment = if (showComments) {
                                 when (val s = state) {
                                     is CandidateBarState.ChineseCandidates -> s.comments.getOrElse(index) { "" }
@@ -434,11 +487,14 @@ fun CandidateBar(
                                 }
                             } else "",
                             isSelected = index == 0,
-                            accentColor = visuals.accentColor,
-                            selectedTextColor = visuals.selectedTextColor,
+                            accentColor = protectedVisuals.accentColor,
+                            selectedTextColor = protectedVisuals.selectedTextColor,
+                            opaqueComment = protectedVisuals.opaqueComments,
+                            textShadow = protectedVisuals.textShadow,
                             fontSize = candidateTextSize.sp,
                             candidateFontFamily = candidateFontFamily,
-                            commentFontFamily = commentFontFamily
+                            commentFontFamily = commentFontFamily,
+                            learned = state is CandidateBarState.ChineseCandidates && candidate in LocalLearnedCandidates.current,
                         )
                     }
 
@@ -452,7 +508,7 @@ fun CandidateBar(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height(20.dp)
-                                    .background(visuals.dividerColor.copy(alpha = 0.5f))
+                                    .background(protectedVisuals.dividerColor.copy(alpha = 0.5f))
                                     .padding(horizontal = 4.dp)
                             )
                         }
@@ -461,14 +517,16 @@ fun CandidateBar(
                     itemsIndexed(displayAssociation, key = { index, _ -> "assoc-$index" }) { index, candidate ->
                         val assocState = state as? CandidateBarState.AssociationOnly
                         CandidateItem(
-                            text = candidate,
+                            text = candidateNumberedText(candidate, index, showNumberLabels && assocState != null),
                             index = -1,
                             onClick = { callbacks.onAssociationSelect?.invoke(index) },
-                            textColor = visuals.textColor,
+                            textColor = protectedVisuals.textColor,
                             comment = if (showComments) displayComments.getOrElse(index) { "" } else "",
                             isSelected = assocState?.highlightIndex == index,
-                            accentColor = visuals.accentColor,
-                            selectedTextColor = visuals.selectedTextColor,
+                            accentColor = protectedVisuals.accentColor,
+                            selectedTextColor = protectedVisuals.selectedTextColor,
+                            opaqueComment = protectedVisuals.opaqueComments,
+                            textShadow = protectedVisuals.textShadow,
                             fontSize = candidateTextSize.sp,
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily,
@@ -484,25 +542,37 @@ fun CandidateBar(
                 state is CandidateBarState.Idle -> {
                     // 显示内联建议时隐藏工具栏按钮区，把宽度让给建议；logo 与
                     // 收起按钮保留，退格回到 idle 时的状态感知不变
-                    if (inlineSuggestions.isEmpty()) {
-                        ReorderableToolbar(toolbarActions, visuals.accentColor, callbacks.onReorderToolbar,
+                    if (inlineSuggestions.isEmpty() && splitGapX != null) {
+                        // 分体：图标按两侧宽度比例分到中缝左右，各自整格可点。
+                        SplitGapRow(splitGapX, Modifier.weight(1f).fillMaxHeight(), left = { leftWidth, rightWidth ->
+                            ToolbarHalf(toolbarActions, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState,
+                                callbacks.onReorderToolbar, leftWidth, rightWidth, rightSide = false)
+                        }, right = { leftWidth, rightWidth ->
+                            ToolbarHalf(toolbarActions, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState,
+                                callbacks.onReorderToolbar, leftWidth, rightWidth, rightSide = true)
+                        })
+                    } else if (inlineSuggestions.isEmpty()) {
+                        ReorderableToolbar(toolbarActions, protectedVisuals.accentColor, callbacks.onReorderToolbar,
                             modifier = Modifier.weight(1f)) { action ->
-                            ToolbarActionButton(action, visuals, iconButtonTint, voiceAmplitude, voiceRecognitionState)
+                            ToolbarActionButton(action, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState,
+                                modifier = Modifier.fillMaxWidth())
                         }
                     }
 
                     if (callbacks.onHideKeyboard != null) {
                         Spacer(modifier = Modifier.width(4.dp))
                         KeyboardToolbarButton(callbacks.onHideKeyboard, iconButtonContainer,
-                            modifier = Modifier.testTag("toolbar-hide")) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "收起键盘",
-                                tint = visuals.textColor, modifier = Modifier.size(24.dp))
+                            modifier = Modifier.testTag("toolbar-hide"), slotWidth = toolbarSlot) {
+                            // 语音听写中：收起成底部悬浮条，语音继续。
+                            Icon(if (isVoiceSticky) Icons.Default.KeyboardDoubleArrowDown else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (isVoiceSticky) "收起成悬浮条" else "收起键盘",
+                                tint = protectedVisuals.textColor, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
                 candidatePageExpanded -> {
                     callbacks.onBack?.let {
-                        CandidateExpansionButton(it, iconButtonContainer, visuals.accentColor, expanded = true, rotation = expansionRotation)
+                        CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor, expanded = true, rotation = expansionRotation)
                     }
                 }
                 displayAssociation.isNotEmpty() && callbacks.onClearAssociation != null && callbacks.onCancelInput == null -> {
@@ -514,7 +584,7 @@ fun CandidateBar(
                         modifier = Modifier
                             .width(1.dp)
                             .height(28.dp)
-                            .background(visuals.dividerColor).padding(end = 1.dp)
+                            .background(protectedVisuals.dividerColor).padding(end = 1.dp)
                     )
                     Box(
                         modifier = Modifier
@@ -522,7 +592,7 @@ fun CandidateBar(
                             .height(24.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(
-                                if (isClearPressed) (if (visuals.isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(
+                                if (isClearPressed) (if (protectedVisuals.isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(
                                     alpha = 0.1f
                                 ))
                                 else Color.Transparent
@@ -536,23 +606,34 @@ fun CandidateBar(
                     ) {
                         Text(
                             text = "清空",
-                            color = if (isClearPressed) visuals.textColor.copy(alpha = 0.6f) else visuals.textColor,
+                            color = if (isClearPressed) protectedVisuals.textColor.copy(alpha = 0.6f) else protectedVisuals.textColor,
                             fontSize = 11.sp
                         )
                     }
                 }
                 hasAnyMore && callbacks.onShowMoreCandidates != null -> {
                     CandidateExpansionButton(callbacks.onShowMoreCandidates,
-                        iconButtonContainer, visuals.accentColor, expanded = false, rotation = expansionRotation)
+                        iconButtonContainer, protectedVisuals.accentColor, expanded = false, rotation = expansionRotation)
                 }
             }
             if (state !is CandidateBarState.Idle) {
                 toolbarActions.filter { it.active }.forEach { action ->
-                    ToolbarActionButton(action, visuals, iconButtonTint, voiceAmplitude, voiceRecognitionState)
+                    ToolbarActionButton(action, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState)
                 }
             }
         }
     }
+}
+
+/**
+ * 工具栏一格里的胶囊：随格宽向两边拉长（参照 Gboard 大屏），窄格退为圆。
+ * 中间按钮的按下/开启底色、菜单与收起按钮的底色、拖动排序的外框共用这一尺寸。
+ */
+internal fun toolbarPillSize(slot: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.DpSize {
+    // 高 32dp，在 44dp 的栏里上下各留 6dp；窄格（悬浮小窗）缩成圆，左右至少留 4dp，不压面板边框。
+    val width = (slot - 12.dp).coerceIn(28.dp, 112.dp)
+    return if (width > 40.dp) androidx.compose.ui.unit.DpSize(width, 32.dp)
+        else androidx.compose.ui.unit.DpSize(minOf(width, 32.dp), minOf(width, 32.dp))
 }
 
 @Composable
@@ -560,30 +641,31 @@ internal fun ToolbarActionButton(
     action: ToolbarAction, visuals: CandidateBarVisuals, tint: Color,
     amplitude: Float, voiceState: RecognitionState,
     source: MutableInteractionSource = remember { MutableInteractionSource() },
+    modifier: Modifier = Modifier,
 ) {
     val voiceActive = action.active && action.item.id == "voice"
-    val pulse = if (voiceActive) {
-        val transition = rememberInfiniteTransition(label = "microphone")
-        val value by transition.animateFloat(0.35f, 1f,
-            infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "microphoneGlow")
-        value
-    } else 0f
+    // 外圈（胶囊底色）固定，内圈只跟随实时音量；峰值按分贝映射，正常说话也能明显撑开。
+    val voiceLevel by animateFloatAsState(
+        if (voiceActive && voiceState == RecognitionState.LISTENING) microphoneLevel(amplitude) else 0f,
+        animationSpec = tween(100), label = "microphoneLevel")
     val pressed by source.collectIsPressedAsState()
     // Hover/focus events must not cancel a release fade and leave a permanent glow.
     val pressAlpha by animateFloatAsState(if (pressed) 1f else 0f,
         animationSpec = tween(if (pressed) 0 else 300), label = "toolbar-press")
-    Box(
-        Modifier.size(40.dp)
-            .clip(CircleShape)
-            .background(if (action.active) visuals.accentColor.copy(alpha = 0.28f)
-                else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha)
-                else Color(0xFFE0E0E0).copy(alpha = pressAlpha))
-            .drawBehind {
-                if (voiceActive) {
-                    drawCircle(Brush.radialGradient(listOf(visuals.accentColor.copy(alpha = 0.55f), Color.Transparent)),
-                        radius = size.minDimension * (0.36f + 0.14f * maxOf(pulse, amplitude.coerceIn(0f, 1f))))
-                }
-            }
+    // The disc appears only while pressed or on (no resting disc, glass or not). Under glass
+    // the active tool is filled solidly with an inverted glyph; voice keeps its pulsing glow.
+    val glassActiveFill = visuals.glassControlBackground?.takeIf { action.active && !voiceActive }?.let { fill ->
+        val surface = fill.copy(alpha = 1f)
+        if (textContrast(visuals.accentColor, surface) >= 3f) visuals.accentColor.copy(alpha = 1f) else tint.copy(alpha = 1f)
+    }
+    val iconTint = when {
+        glassActiveFill != null -> if (glassActiveFill.luminance() > 0.5f) Color.Black else Color.White
+        action.active -> visuals.accentColor
+        else -> tint
+    }
+    // 大屏参照 Gboard：整格都可点，按下/开启的底色是随格宽向两边拉长的胶囊；窄格仍是圆形。
+    BoxWithConstraints(
+        modifier.widthIn(min = 36.dp).height(40.dp)
             .semantics {
                 selected = action.active
                 if (voiceActive) stateDescription = if (voiceState == RecognitionState.PROCESSING) "正在转录" else "正在聆听，点击结束"
@@ -591,11 +673,41 @@ internal fun ToolbarActionButton(
             .clickable(interactionSource = source, indication = null, onClick = action.onClick),
         contentAlignment = Alignment.Center,
     ) {
+    Box(
+        Modifier.size(toolbarPillSize(maxWidth))
+            .clip(CircleShape)
+            .background(glassActiveFill ?: visuals.glassControlBackground?.let { fill ->
+                if (action.active) androidx.compose.ui.graphics.lerp(fill, visuals.accentColor, 0.18f).copy(alpha = fill.alpha)
+                else fill.copy(alpha = fill.alpha * pressAlpha)
+            } ?: if (action.active) visuals.accentColor.copy(alpha = 0.28f)
+                else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha)
+                else Color(0xFFE0E0E0).copy(alpha = pressAlpha))
+            .drawBehind {
+                if (voiceActive && voiceState == RecognitionState.LISTENING) {
+                    // 静音时内圈约为外圈的 45%，满音量时铺满外圈；宽胶囊按同一比例横竖一起缩放。
+                    val scale = 0.45f + 0.55f * voiceLevel
+                    val inner = androidx.compose.ui.geometry.Size(size.width * scale, size.height * scale)
+                    drawRoundRect(visuals.accentColor.copy(alpha = 0.32f + 0.28f * voiceLevel),
+                        topLeft = androidx.compose.ui.geometry.Offset((size.width - inner.width) / 2f, (size.height - inner.height) / 2f),
+                        size = inner,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(inner.height / 2f))
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
         if (voiceActive && voiceState == RecognitionState.PROCESSING) {
             androidx.compose.material3.CircularProgressIndicator(Modifier.size(36.dp), color = visuals.accentColor, strokeWidth = 2.dp)
         }
-        ToolbarButtonIcon(action.item, tint = if (action.active) visuals.accentColor else tint, modifier = Modifier.size(22.dp))
+        ToolbarButtonIcon(action.item, tint = iconTint, modifier = Modifier.size(22.dp), active = action.active)
     }
+    }
+}
+
+/** 麦克风峰值（0~1 线性）转成 0~1 的显示音量：-45 dB 以下当静音，-5 dB 以上算满。 */
+internal fun microphoneLevel(peak: Float): Float {
+    if (peak <= 0f) return 0f
+    val db = 20f * kotlin.math.log10(peak.coerceAtMost(1f))
+    return ((db + 45f) / 40f).coerceIn(0f, 1f)
 }
 
 @Composable
@@ -725,6 +837,9 @@ internal fun candidatePrimaryTextStyle(
     platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
 )
 
+/** 当前候选中用户以前打过的词（按文字），由键盘根部提供。 */
+internal val LocalLearnedCandidates = androidx.compose.runtime.compositionLocalOf<Set<String>> { emptySet() }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CandidateItem(
@@ -741,6 +856,10 @@ fun CandidateItem(
     candidateFontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.Default,
     commentFontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.Default,
     onLongClick: (() -> Unit)? = null,
+    opaqueComment: Boolean = false,
+    textShadow: androidx.compose.ui.graphics.Shadow? = null,
+    /** 用户以前打过的词：文字右上角画一个小编辑图标。 */
+    learned: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -766,19 +885,29 @@ fun CandidateItem(
             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1,
             fontFamily = candidateFontFamily,
-            style = candidatePrimaryTextStyle(fontSize, candidateFontFamily, isSelected),
+            style = candidatePrimaryTextStyle(fontSize, candidateFontFamily, isSelected).copy(shadow = textShadow),
             overflow = TextOverflow.Ellipsis,
         )
+        if (learned) {
+            androidx.compose.material3.Icon(
+                imageVector = androidx.compose.material.icons.Icons.Filled.Edit,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.align(Alignment.Top).size(with(LocalDensity.current) { (fontSize.value * 0.45f).sp.toDp() })
+                    .testTag("candidate-learned:$index"),
+            )
+        }
         if (comment.isNotEmpty()) {
             Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = comment,
                 modifier = Modifier.candidateBaseline(fontSize),
-                color = if (isSelected) selectedTextColor.copy(alpha = 0.6f) else textColor.copy(alpha = 0.5f),
+                color = if (isSelected) selectedTextColor.copy(alpha = if (opaqueComment) 1f else 0.6f) else textColor.copy(alpha = if (opaqueComment) 1f else 0.5f),
                 fontSize = (fontSize.value * 11f / 19f).sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
-                fontFamily = commentFontFamily
+                fontFamily = commentFontFamily,
+                style = LocalTextStyle.current.copy(shadow = textShadow),
             )
         }
     }
@@ -855,8 +984,8 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
             onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
         contentAlignment = Alignment.CenterStart) {
         Text(if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text,
-            color = visuals.textColor.copy(alpha = 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
-            softWrap = false, modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
+            color = visuals.textColor.copy(alpha = if (visuals.opaqueComments) 1f else 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
+            softWrap = false, style = LocalTextStyle.current.copy(shadow = visuals.textShadow), modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
     }
 }
 
@@ -872,22 +1001,31 @@ internal fun FixedCandidateStrip(
     highlightIndex: Int = 0,
     showNumberLabels: Boolean = false,
     itemSpacing: androidx.compose.ui.unit.Dp = 4.dp,
+    /** 分体中缝（窗口横坐标）；候选先排左侧，越过中缝接着排右侧。 */
+    gapWindowX: Pair<Float, Float>? = null,
 ) {
     val measurer = rememberTextMeasurer()
+    var stripOriginX by remember { mutableStateOf(Float.NaN) }
     val density = LocalDensity.current
     val inheritedTextStyle = LocalTextStyle.current
     val commentsAllowed = rememberCandidateCommentsAllowed()
-    BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")) {
+    BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")
+        .onGloballyPositioned { stripOriginX = it.positionInWindow().x }) {
         val panelWidth = maxWidth
+        // 中缝在本条内的位置（像素）；未测到位置前按整条排。
+        val localGap = gapWindowX?.takeUnless { stripOriginX.isNaN() }?.let { (l, r) ->
+            val left = (l - stripOriginX).coerceIn(0f, constraints.maxWidth.toFloat())
+            val right = (r - stripOriginX).coerceIn(left, constraints.maxWidth.toFloat())
+            if (right - left >= 1f && left > 0f) left.toInt() to right.toInt() else null
+        }
         val shownComments = if (candidateCommentsVisible(maxWidth.value, density.fontScale,
             fontSize.value, commentsAllowed)) comments else emptyList()
         val all = candidates + associations
         val focused = highlightIndex.takeIf { it in candidates.indices } ?: 0
         val viewport = remember(candidates, shownComments) { CandidateStripViewport() }
-        val visibleIndices = remember(viewport, all, shownComments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily) {
-            candidateWindow(all.size, focused, constraints.maxWidth, with(density) { itemSpacing.roundToPx() },
-                windowStart = viewport.firstIndex) { index ->
-                val text = if (showNumberLabels && index < candidates.size) "${(index + 1) % 10} ${all[index]}" else all[index]
+        val window = remember(viewport, all, shownComments, focused, fontSize, density, measurer, inheritedTextStyle, showNumberLabels, itemSpacing, constraints.maxWidth, AppFonts.candidateFontFamily, AppFonts.commentFontFamily, localGap) {
+            val widthAt: (Int) -> Int = { index ->
+                val text = candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size)
                 val primary = measurer.measure(AnnotatedString(text),
                     candidatePrimaryTextStyle(fontSize, AppFonts.candidateFontFamily, index == focused),
                     softWrap = false).size.width
@@ -898,7 +1036,14 @@ internal fun FixedCandidateStrip(
                 // Padding rounds each side independently at fractional device densities.
                 primary + secondary + with(density) { 2 * 4.dp.roundToPx() }
             }
+            if (localGap != null) {
+                splitCandidateWindow(all.size, focused, localGap.first, constraints.maxWidth - localGap.second,
+                    with(density) { itemSpacing.roundToPx() }, viewport.firstIndex, widthAt)
+            } else CandidateWindowSplit(candidateWindow(all.size, focused, constraints.maxWidth,
+                with(density) { itemSpacing.roundToPx() }, windowStart = viewport.firstIndex, widthAt = widthAt), Int.MAX_VALUE)
         }
+        val visibleIndices = window.range
+        val splitLeftCount = window.leftCount
         androidx.compose.runtime.SideEffect {
             viewport.firstIndex = visibleIndices.first.takeUnless { visibleIndices.isEmpty() } ?: 0
             // Expanded pagination removes a prefix only. A shifted window must not hide earlier items.
@@ -907,19 +1052,29 @@ internal fun FixedCandidateStrip(
             callbacks.onVisibleAssociationsChanged?.invoke(visibleIndices.filter { it >= candidates.size }
                 .map { all[it] })
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
-            visibleIndices.forEach { index ->
-                CandidateItem(if (showNumberLabels && index < candidates.size) "${(index + 1) % 10} ${all[index]}" else all[index], index, {
+        // 分体：前半段排在中缝左边，后半段从中缝右边开始。
+        val leftCount = splitLeftCount
+        val segments = if (localGap == null) listOf(visibleIndices.toList() to 0)
+            else listOf(visibleIndices.take(leftCount) to 0, visibleIndices.drop(leftCount) to localGap.second)
+        segments.forEach { (segmentIndices, offsetPx) ->
+        Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) },
+            horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
+            segmentIndices.forEach { index ->
+                CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size), index, {
                     if (index < candidates.size) callbacks.onCandidateSelect(index)
                     else callbacks.onAssociationSelect?.invoke(index - candidates.size)
                 }, visuals.textColor,
                     comment = shownComments.getOrElse(index) { "" }, isSelected = index == focused,
                     accentColor = visuals.accentColor, selectedTextColor = visuals.selectedTextColor,
+                    opaqueComment = visuals.opaqueComments,
+                    textShadow = visuals.textShadow,
                     fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
                     commentFontFamily = AppFonts.commentFontFamily,
                     modifier = Modifier.widthIn(max = panelWidth).testTag("bar-candidate:$index"),
-                    onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null)
+                    onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
+                    learned = index < candidates.size && all[index] in LocalLearnedCandidates.current)
             }
+        }
         }
     }
 }
@@ -932,5 +1087,28 @@ private fun Modifier.candidateBaseline(fontSize: androidx.compose.ui.unit.TextUn
     val baseline = child[FirstBaseline]
     layout(child.width, height) {
         child.placeRelative(0, (fontSize.toPx() * 1.05f).roundToInt() - baseline)
+    }
+}
+
+/** 分体工具栏的一侧：按两侧宽度比例分配图标；拖动排序后合回整条顺序保存。 */
+@Composable
+private fun ToolbarHalf(
+    actions: List<ToolbarAction>, visuals: CandidateBarVisuals, tint: Color, amplitude: Float,
+    voiceState: RecognitionState, onReorder: ((List<String>) -> Unit)?,
+    leftWidth: androidx.compose.ui.unit.Dp, rightWidth: androidx.compose.ui.unit.Dp, rightSide: Boolean,
+) {
+    val total = (leftWidth.value + rightWidth.value).coerceAtLeast(1f)
+    val leftCount = kotlin.math.round(actions.size * leftWidth.value / total).toInt().coerceIn(0, actions.size)
+    val left = actions.take(leftCount)
+    val right = actions.drop(leftCount)
+    val mine = if (rightSide) right else left
+    if (mine.isEmpty()) return
+    val save: ((List<String>) -> Unit)? = onReorder?.let { persist ->
+        { ids: List<String> ->
+            persist(if (rightSide) left.map { it.item.id } + ids else ids + right.map { it.item.id })
+        }
+    }
+    ReorderableToolbar(mine, visuals.accentColor, save, modifier = Modifier.fillMaxSize()) { action ->
+        ToolbarActionButton(action, visuals, tint, amplitude, voiceState, modifier = Modifier.fillMaxWidth())
     }
 }

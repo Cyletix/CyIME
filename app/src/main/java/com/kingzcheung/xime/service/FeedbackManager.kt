@@ -6,6 +6,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
 import android.os.Build
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -61,6 +62,14 @@ class FeedbackManager(private val context: Context) {
 
     fun initialize() {
         hasAmplitudeControl = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && vibrator.hasAmplitudeControl()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            android.util.Log.i(
+                "FeedbackManager",
+                "haptics click=${vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK)} " +
+                    "tick=${vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK)} " +
+                    "effectTick=${vibrator.areAllEffectsSupported(VibrationEffect.EFFECT_TICK)} amp=$hasAmplitudeControl"
+            )
+        }
         initSoundPool()
         loadSettings()
         registerPrefsListener()
@@ -92,6 +101,7 @@ class FeedbackManager(private val context: Context) {
             soundIds["enter"] = pool.load(context, R.raw.kb_key_enter, 1)
             soundIds["voice_start"] = pool.load(context, R.raw.kb_voice_start, 1)
             soundIds["voice_end"] = pool.load(context, R.raw.kb_voice_end, 1)
+            soundIds["handwriting_erase"] = pool.load(context, R.raw.kb_handwriting_erase, 1)
         }
     }
 
@@ -153,18 +163,31 @@ class FeedbackManager(private val context: Context) {
             }
         }
 
-        val duration = if (longPress) longPressDuration else pressDuration
-        val amplitude = if (longPress) longPressAmplitude else pressAmplitude
+        // 自定义时长、振幅只在「启用」模式下显示，跟随系统时不使用残留值。
+        val custom = hapticMode == HapticMode.Enabled
+        val duration = if (!custom) 0L else if (longPress) longPressDuration else pressDuration
+        val amplitude = if (!custom) 0 else if (longPress) longPressAmplitude else pressAmplitude
         val hfc: Int = if (longPress) {
             HapticFeedbackConstants.LONG_PRESS
         } else if (keyUp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             HapticFeedbackConstants.KEYBOARD_RELEASE
-        } else if (type == KeyFeedbackType.CURSOR_STEP) {
+        } else if (type == KeyFeedbackType.CURSOR_STEP || type == KeyFeedbackType.HANDWRITING_ERASE) {
             HapticFeedbackConstants.TEXT_HANDLE_MOVE
         } else {
             HapticFeedbackConstants.KEYBOARD_TAP
         }
 
+        val light = keyUp || hfc == HapticFeedbackConstants.TEXT_HANDLE_MOVE
+        // 线性马达优先：按下是轻 click，抬起/光标是更轻的 tick，长按是完整 click；
+        // 时长由马达决定，振幅设置只调强弱。系统默认时不再交给 KEYBOARD_TAP（三星上偏重）。
+        val primitive = if (light) VibrationEffect.Composition.PRIMITIVE_TICK else VibrationEffect.Composition.PRIMITIVE_CLICK
+        val defaultScale = when {
+            longPress -> 1f
+            light -> 0.5f
+            else -> 0.6f
+        }
+        if (vibratePrimitive(primitive, amplitude, defaultScale)) return
+        if (duration == 0L && amplitude == 0 && vibratePredefined(if (longPress) VibrationEffect.EFFECT_CLICK else VibrationEffect.EFFECT_TICK)) return
         if (duration != 0L) {
             if (hasAmplitudeControl && amplitude != 0) {
                 vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
@@ -197,11 +220,40 @@ class FeedbackManager(private val context: Context) {
     }
 
 
+    /** 设备支持组合原语（线性马达）时按原语震动；振幅 0 用 [defaultScale]。不支持时返回 false 交给原路径。 */
+    private fun vibratePrimitive(primitive: Int, amplitude: Int, defaultScale: Float = 1f): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        if (!vibrator.areAllPrimitivesSupported(primitive)) return false
+        val scale = if (amplitude != 0) (amplitude / 255f).coerceIn(0.05f, 1f) else defaultScale
+        vibrateTouch(VibrationEffect.startComposition().addPrimitive(primitive, scale).compose())
+        return true
+    }
+
+    /** 不支持原语但马达确认支持预设效果（tick/click）时使用；状态未知时不用，交回系统触感。 */
+    private fun vibratePredefined(effect: Int): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        if (vibrator.areAllEffectsSupported(effect) != Vibrator.VIBRATION_EFFECT_SUPPORT_YES) return false
+        vibrateTouch(VibrationEffect.createPredefined(effect))
+        return true
+    }
+
+    /** 跟随系统时标记为触摸反馈，随系统“触摸互动”强度；强制启用时不受系统开关影响。 */
+    private fun vibrateTouch(effect: VibrationEffect) {
+        if (hapticMode == HapticMode.FollowingSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
+        } else {
+            vibrator.vibrate(effect)
+        }
+    }
+
     fun performVibration() {
         if (hapticMode == HapticMode.Disabled) return
         if (!vibrator.hasVibrator()) return
-        val duration = if (pressDuration != 0L) pressDuration else 20L
-        val amplitude = if (hasAmplitudeControl && pressAmplitude != 0) pressAmplitude else VibrationEffect.DEFAULT_AMPLITUDE
+        val custom = hapticMode == HapticMode.Enabled
+        val pressAmp = if (custom) pressAmplitude else 0
+        if (vibratePrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, pressAmp)) return
+        val duration = if (custom && pressDuration != 0L) pressDuration else 20L
+        val amplitude = if (hasAmplitudeControl && pressAmp != 0) pressAmp else VibrationEffect.DEFAULT_AMPLITUDE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
         } else {

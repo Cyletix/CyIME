@@ -3,7 +3,7 @@ package com.kingzcheung.xime.service
 /** 触觉按操作类型分发；后续线性马达波形只需在反馈层按此类型绑定。 */
 enum class KeyFeedbackType(val sound: String = "standard") {
     CHARACTER, SYMBOL, NUMBER, SPACE("space"), DELETE("delete"), ENTER("enter"),
-    MODE_SWITCH, MODIFIER, NAVIGATION, EDITING, TOOLBAR, CURSOR_STEP;
+    MODE_SWITCH, MODIFIER, NAVIGATION, EDITING, TOOLBAR, CURSOR_STEP, HANDWRITING_ERASE("handwriting_erase");
 
     companion object {
         fun fromKey(key: String): KeyFeedbackType = when (key.lowercase().removePrefix("select_").removePrefix("arrow_")) {
@@ -15,6 +15,7 @@ enum class KeyFeedbackType(val sound: String = "standard") {
             "left", "right", "up", "down", "home", "end", "paragraph_start", "paragraph_end", "japanese_left", "japanese_right" -> NAVIGATION
             "copy", "cut", "paste", "all", "begin" -> EDITING
             "cursor_step" -> CURSOR_STEP
+            "handwriting_erase" -> HANDWRITING_ERASE
             "toolbar" -> TOOLBAR
             "number" -> NUMBER
             "symbol" -> SYMBOL

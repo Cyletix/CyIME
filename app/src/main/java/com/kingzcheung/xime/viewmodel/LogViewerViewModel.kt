@@ -29,6 +29,9 @@ data class LogViewerUiState(
     val logFiles: List<File> = emptyList(),
     val selectedLogFile: File? = null,
     val logContent: String = "",
+    /** 已在后台拆好的行；只含文件最后 [LogViewerViewModel.TAIL_BYTES]。 */
+    val logLines: List<String> = emptyList(),
+    val isTruncated: Boolean = false,
     val isLoading: Boolean = false,
     val errorMsg: String? = null
 )
@@ -90,7 +93,7 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
     }
     
     fun goBackToList() {
-        _uiState.update { it.copy(selectedLogFile = null, logContent = "", errorMsg = null) }
+        _uiState.update { it.copy(selectedLogFile = null, logContent = "", logLines = emptyList(), isTruncated = false, errorMsg = null) }
     }
     
     fun selectLogFile(file: File) {
@@ -98,12 +101,13 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
             _uiState.update { it.copy(isLoading = true, selectedLogFile = file) }
             
             try {
-                val content = withContext(Dispatchers.IO) {
-                    file.readText()
-                }
+                val (content, truncated) = withContext(Dispatchers.IO) { readTail(file) }
+                val lines = withContext(Dispatchers.Default) { content.lines() }
                 
                 _uiState.update { it.copy(
                     logContent = content,
+                    logLines = lines,
+                    isTruncated = truncated,
                     isLoading = false
                 )}
             } catch (e: Exception) {
@@ -131,7 +135,8 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 state.copy(
                     logFiles = newFiles,
                     selectedLogFile = if (state.selectedLogFile == file) null else state.selectedLogFile,
-                    logContent = if (state.selectedLogFile == file) "" else state.logContent
+                    logContent = if (state.selectedLogFile == file) "" else state.logContent,
+                    logLines = if (state.selectedLogFile == file) emptyList() else state.logLines
                 )
             }
             
@@ -153,6 +158,23 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
     
+    /** 只读最后一段，从第一个完整行开始；完整文件用分享或保存。 */
+    private fun readTail(file: File): Pair<String, Boolean> {
+        java.io.RandomAccessFile(file, "r").use { raf ->
+            val length = raf.length()
+            val start = (length - TAIL_BYTES).coerceAtLeast(0L)
+            val bytes = ByteArray((length - start).toInt())
+            raf.seek(start)
+            raf.readFully(bytes)
+            val text = String(bytes, Charsets.UTF_8)
+            return if (start == 0L) text to false else text.substringAfter('\n') to true
+        }
+    }
+
+    companion object {
+        const val TAIL_BYTES = 512 * 1024
+    }
+
     fun shareLogFile(file: File) {
         viewModelScope.launch {
             try {
