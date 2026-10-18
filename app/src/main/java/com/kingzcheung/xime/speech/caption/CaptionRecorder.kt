@@ -17,6 +17,7 @@ internal class CaptionRecorder(
     private val onChunk: (ByteArray) -> Unit,
     private val onLevel: (Float) -> Unit,
     private val onFailure: (String) -> Unit,
+    private val onChunkRead: (Float) -> Unit = {},
     /** Three spectra per 100 ms chunk, ~33 ms apart, for the sound ribbon. */
     private val onSpectrum: (List<FloatArray>) -> Unit = {},
 ) {
@@ -51,6 +52,7 @@ internal class CaptionRecorder(
                     i += 2
                 }
                 onLevel(peak / 32768f)
+                onChunkRead(peak / 32768f)
                 val samples = read / 2
                 if (samples >= CaptionSpectrum.SIZE) {
                     val hop = (samples - CaptionSpectrum.SIZE) / 2
@@ -76,6 +78,9 @@ internal class CaptionRecorder(
     }
 
     val isRunning: Boolean get() = running.get()
+
+    /** Audio session of the live recording (0 when stopped): matches it in AudioManager's recording list. */
+    val sessionId: Int get() = record?.audioSessionId ?: 0
 
     companion object {
         private const val TAG = "CaptionRecorder"

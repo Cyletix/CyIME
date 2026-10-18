@@ -54,7 +54,11 @@ internal fun CallCaptionBar(controller: CaptionController, route: CallRoute, onD
             val hint = when (route) {
                 CallRoute.Earpiece -> "开免提后，这里会显示对方说的话"
                 CallRoute.Headset -> "戴着耳机时手机听不到对方，请改用免提"
-                CallRoute.Speaker -> if (controller.status == CaptionController.Status.Error) controller.message else null
+                CallRoute.Speaker -> when {
+                    controller.status == CaptionController.Status.Error -> controller.message
+                    controller.micTaken -> "麦克风被别的应用占着（比如带声音的录屏），这会儿听不到对方"
+                    else -> null
+                }
             }
             if (hint != null) Text(hint, color = Color.White, fontSize = 20.sp, lineHeight = 26.sp)
             else CallLines(controller, onSpeakerTap = { choosing = it })

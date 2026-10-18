@@ -46,6 +46,8 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     private val speakers = linkedMapOf<Int, Speaker>()
     private val windows = ArrayDeque<Window>()
+    /** 1 s probes every 0.5 s: only matched against known voices, they place the change points. */
+    private val probes = ArrayDeque<Window>()
     private val pending = ArrayList<Pending>()
     private val segmentSpeaker = object : LinkedHashMap<Long, Int>(64, .75f, false) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Int>?) = size > MAX_SEGMENTS
@@ -113,6 +115,50 @@ internal class SpeakerTracker(strictness: Int = 1) {
         return changed + resolve(endMs)
     }
 
+    /**
+     * A short probe (1 s, every 0.5 s). Two-second windows straddle a quick turn and blur both voices,
+     * so they only find and learn the voices; the probes, too short to learn from, say who is speaking
+     * at each half second. A probe that matches nobody well keeps the window's answer.
+     */
+    @Synchronized fun addProbe(startMs: Long, endMs: Long, rawPrint: FloatArray): List<Label> {
+        val print = normalized(rawPrint)
+        val ranked = speakers.values.map { it to similarity(print, it.centroid) }.sortedByDescending { it.second }
+        val best = ranked.firstOrNull() ?: return emptyList()
+        val second = ranked.getOrNull(1)?.second ?: -1f
+        val sure = best.second >= threshold - PROBE_SLACK && best.second - second >= PROBE_MARGIN
+        probes.addLast(Window(startMs, endMs, print, if (sure) best.first.id else -1))
+        while (probes.size > MAX_WINDOWS * 2) probes.removeFirst()
+        // A short reply never fills a 2 s window: three probes in a row unlike everyone known but
+        // alike each other are a new person (probes overlap by half, so this is 2 s of that voice).
+        if (best.second < PROBE_NEW) {
+            val last = probes.takeLast(PROBE_RUN)
+            if (last.size == PROBE_RUN && last.all { p -> (speakers.values.maxOfOrNull { similarity(p.print, it.centroid) } ?: 0f) < PROBE_NEW } &&
+                (0 until PROBE_RUN).all { i -> (i + 1 until PROBE_RUN).all { j -> similarity(last[i].print, last[j].print) >= threshold } }) {
+                val speaker = newSpeaker(last[0].print)
+                for (p in last.drop(1)) speaker.add(p.print)
+                for (p in last) p.speaker = speaker.id
+                return revote(last.first().startMs, endMs) + mergeSimilar()
+            }
+        }
+        return emptyList()
+    }
+
+    /** Who speaks around [ms]: the sure probe centred nearest, else the covering window. */
+    private fun speakerAt(ms: Long): Int? {
+        val probe = probes.filter { it.speaker > 0 && it.startMs <= ms && ms <= it.endMs }
+            .minByOrNull { kotlin.math.abs((it.startMs + it.endMs) / 2 - ms) }
+        if (probe != null) return probe.speaker
+        return windows.filter { it.startMs <= ms && ms <= it.endMs }.minByOrNull { kotlin.math.abs((it.startMs + it.endMs) / 2 - ms) }?.speaker
+    }
+
+    /** Votes over [startMs, endMs] sampled every 250 ms with [speakerAt]. */
+    private fun sampledVotes(startMs: Long, endMs: Long): Map<Int, Int> {
+        val votes = HashMap<Int, Int>()
+        var t = startMs + 125
+        while (t < endMs) { speakerAt(t)?.let { votes[it] = (votes[it] ?: 0) + 1 }; t += 250 }
+        return votes
+    }
+
     /** A finished sentence; labelled once a window covers its end (or [settle] is called). */
     @Synchronized fun addSegment(id: Long, startMs: Long, endMs: Long): List<Label> {
         pending.add(Pending(id, startMs, endMs))
@@ -132,7 +178,8 @@ internal class SpeakerTracker(strictness: Int = 1) {
                 val overlap = minOf(w.endMs, segment.endMs) - maxOf(w.startMs, segment.startMs)
                 if (overlap > 0) votes[w.speaker] = (votes[w.speaker] ?: 0) + overlap
             }
-            val speaker = votes.maxByOrNull { it.value }?.key
+            val sampled = sampledVotes(segment.startMs, segment.endMs)
+            val speaker = sampled.maxByOrNull { it.value }?.key ?: votes.maxByOrNull { it.value }?.key
                 ?: windows.minBy { minOf(kotlin.math.abs(it.endMs - segment.startMs), kotlin.math.abs(it.startMs - segment.endMs)) }.speaker
             segmentSpeaker[segment.id] = speaker
             segmentSpan[segment.id] = longArrayOf(segment.startMs, segment.endMs)
@@ -140,19 +187,18 @@ internal class SpeakerTracker(strictness: Int = 1) {
         }
     }
 
-    /** Voices inside [startMs, endMs] in order; a change point sits halfway between the two windows' centres. */
+    /** Voices inside [startMs, endMs] in order, sampled every 250 ms; a change needs 500 ms of the new voice. */
     private fun runs(startMs: Long, endMs: Long): List<Pair<Int, Long>> {
-        val inside = windows.filter { minOf(it.endMs, endMs) - maxOf(it.startMs, startMs) > 0 }.sortedBy { it.endMs }
+        val samples = ArrayList<Pair<Long, Int>>()
+        var t = startMs + 125
+        while (t < endMs) { speakerAt(t)?.let { samples += t to it }; t += 250 }
         val out = ArrayList<Pair<Int, Long>>()
-        var previous: Window? = null
-        for (w in inside) {
-            if (out.isEmpty()) out += w.speaker to startMs
-            else if (w.speaker != out.last().first) {
-                val prev = previous!!
-                val change = ((prev.startMs + prev.endMs) / 2 + (w.startMs + w.endMs) / 2) / 2
-                out += w.speaker to change.coerceIn(startMs, endMs)
-            }
-            previous = w
+        var i = 0
+        while (i < samples.size) {
+            val (at, who) = samples[i]
+            if (out.isEmpty()) { out += who to startMs; i++; continue }
+            if (who != out.last().first && i + 1 < samples.size && samples[i + 1].second == who) out += who to (at - 125).coerceIn(startMs, endMs)
+            i++
         }
         return out
     }
@@ -270,7 +316,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
     @Synchronized fun setNamed(speakerId: Int, named: Boolean) { speakers[speakerId]?.named = named }
 
     @Synchronized fun reset() {
-        speakers.clear(); windows.clear(); pending.clear(); segmentSpeaker.clear(); segmentSpan.clear()
+        speakers.clear(); windows.clear(); probes.clear(); pending.clear(); segmentSpeaker.clear(); segmentSpan.clear()
         nextId = 1; unmatched = null
     }
 
@@ -279,6 +325,10 @@ internal class SpeakerTracker(strictness: Int = 1) {
     companion object {
         /** The phone holder (see [seedSelf]); far above any automatic number. */
         const val SELF = 999
+        const val PROBE_SLACK = .05f
+        const val PROBE_NEW = .25f
+        const val PROBE_RUN = 3
+        const val PROBE_MARGIN = .08f
         const val WINDOW_MS = 2000L
         const val HOP_MS = 1000L
         const val MAX_PRINTS = 30

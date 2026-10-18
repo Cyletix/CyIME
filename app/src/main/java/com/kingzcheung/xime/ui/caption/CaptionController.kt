@@ -82,6 +82,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         onChunk = { pcm -> client.push(pcm) },
         onLevel = { level -> if (level > .002f) lastLoudAt = SystemClock.elapsedRealtime(); main.post { amplitude = level } },
         onFailure = { message -> main.post { fail(message) } },
+        onChunkRead = { peak -> chunks++; if (peak > peakSinceLog) peakSinceLog = peak },
         onSpectrum = { frames -> frames.forEachIndexed { k, bands -> main.postDelayed({ if (status == Status.Listening) spectrum = bands }, k * 33L) } })
 
     var status by mutableStateOf(Status.Idle); private set
@@ -90,6 +91,39 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     /** Voice-range loudness in [CaptionSpectrum.BANDS] bands, newest ~33 ms frame. */
     var spectrum by mutableStateOf(FloatArray(CaptionSpectrum.BANDS)); private set
     var micMuted by mutableStateOf(false); private set
+    /**
+     * Android gave the microphone to another app (a screen recorder with sound, a voice message, a
+     * call app taking it back) and records silence for us. Seen on a TIM call 2026-10-18: captions
+     * stopped for 35 s while the screen recorder captured the microphone.
+     */
+    var micTaken by mutableStateOf(false); private set
+    private val audioManager = app.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    private val recordingCallback = if (android.os.Build.VERSION.SDK_INT >= 29) object : android.media.AudioManager.AudioRecordingCallback() {
+        override fun onRecordingConfigChanged(configs: MutableList<android.media.AudioRecordingConfiguration>) {
+            val session = recorder.sessionId
+            if (session == 0) return
+            val mine = configs.firstOrNull { it.clientAudioSessionId == session } ?: return
+            val taken = mine.isClientSilenced
+            if (taken != micTaken) {
+                // Which other sources are recording (no package names are visible to us), for the log only.
+                val others = configs.filter { it.clientAudioSessionId != session }.joinToString { "src=${it.clientAudioSource}" }
+                FileLogger.i(TAG, "mic silenced=$taken others=[$others]")
+            }
+            micTaken = taken
+        }
+    } else null
+    // Diagnostics without content: chunk count, audio level and when the last text arrived.
+    @Volatile private var chunks = 0L
+    @Volatile private var peakSinceLog = 0f
+    private var lastTextAt = 0L
+    private val diagnostics = object : Runnable {
+        override fun run() {
+            if (status == Status.Listening) FileLogger.i(TAG, "diag chunks=$chunks peak=${"%.3f".format(peakSinceLog)} " +
+                "silenced=$micTaken sinceText=${if (lastTextAt == 0L) -1 else SystemClock.elapsedRealtime() - lastTextAt}ms lines=${segments.size}")
+            peakSinceLog = 0f
+            main.postDelayed(this, 5_000)
+        }
+    }
     val speakers = mutableStateListOf<SpeakerUi>()
     val segments = mutableStateListOf<SegmentUi>()
     var fontLevel by mutableStateOf(prefs.getInt("font", 1)); private set
@@ -141,6 +175,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
                     message = ""
                     sessionStartedAt = System.currentTimeMillis()
                     main.removeCallbacks(muteCheck); main.postDelayed(muteCheck, 5_000)
+                    main.removeCallbacks(diagnostics); main.postDelayed(diagnostics, 5_000)
+                    recordingCallback?.let { callback -> audioManager.registerAudioRecordingCallback(callback, main) }
                     FileLogger.i(TAG, "session started speakerModel=${speakerModelReady}")
                 }.onFailure { fail(it.message ?: "字幕启动失败") }
             }
@@ -150,6 +186,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     private fun fail(message: String) {
         if (status == Status.Idle) return
         recorder.stop()
+        stopDiagnostics()
         io.execute { client.cancel() }
         status = Status.Error
         this.message = message
@@ -161,6 +198,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         if (status != Status.Listening && status != Status.Starting) return
         ++sessionEpoch
         recorder.stop()
+        stopDiagnostics()
         io.execute { client.stop() }
         status = Status.Paused
         message = ""
@@ -172,6 +210,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     fun exit() {
         ++sessionEpoch
         recorder.stop()
+        stopDiagnostics()
         main.removeCallbacks(muteCheck)
         status = Status.Idle
         io.execute { client.cancel(); client.resetSpeakers(); client.unbind() }
@@ -202,6 +241,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
                 line.speakerId?.let { speaker -> ensureSpeaker(speaker); it.speakerId = speaker; it.confident = line.confident }
                 segments.add(it)
             }
+            if (text.isNotEmpty()) lastTextAt = now
             if (text.isNotEmpty() && firstPartialAt.put(id, now) == null) FileLogger.i(TAG, "seg=$id firstTextMs=${now - startAtElapsed()}")
             ui.text = displayText(line)
             ui.event = event
@@ -233,6 +273,12 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     override fun onError(message: String) { main.post { this.message = message } }
 
     override fun onLost() { main.post { fail("语音服务中断了，点“重新开始”") } }
+
+    private fun stopDiagnostics() {
+        main.removeCallbacks(diagnostics)
+        recordingCallback?.let { callback -> runCatching { audioManager.unregisterAudioRecordingCallback(callback) } }
+        micTaken = false
+    }
 
     private fun startAtElapsed(): Long = SystemClock.elapsedRealtime() - (System.currentTimeMillis() - sessionStartedAt)
 

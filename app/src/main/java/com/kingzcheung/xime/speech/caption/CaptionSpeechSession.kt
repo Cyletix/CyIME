@@ -35,7 +35,7 @@ internal class CaptionSpeechSession(
         ArrayBlockingQueue(capacity), { task -> Thread(task, name).apply { isDaemon = true } })
     private val audio = worker("CyIME-Caption", 100)
     private val refinement = worker("CyIME-CaptionRefine", 4)
-    private val speaker = worker("CyIME-Speaker", 4)
+    private val speaker = worker("CyIME-Speaker", 8) // windows and probes
     private val lifecycle = Any()
     private val abandoned = AtomicBoolean(false)
     private var accepting = true
@@ -113,6 +113,7 @@ internal class CaptionSpeechSession(
                         for (x in samples) { ring[(processedSamples % ring.size).toInt()] = x; processedSamples++ }
                         segmenter.accept(samples)
                         if (processedSamples - lastWindowEnd >= SpeakerTracker.HOP_MS * 16) speakerWindow()
+                        if (processedSamples - lastProbeEnd >= PROBE_HOP_MS * 16) speakerProbe()
                     } catch (e: Exception) { listener.onError("语音处理失败：${e.message}") }
                 }
             } catch (_: RejectedExecutionException) {
@@ -143,6 +144,34 @@ internal class CaptionSpeechSession(
                 publish(tracker.addWindow(endMs - SpeakerTracker.WINDOW_MS, endMs, print))
             }
         } catch (_: RejectedExecutionException) { /* a skipped window only delays labels */ }
+    }
+
+    private var lastProbeEnd = 0L
+
+    /**
+     * The last 1 s, every 0.5 s, if mostly speech: matched against known voices to place quick turn
+     * changes (2 s windows straddle them). PC replay of 20 tight two-person dialogues: speaker
+     * errors 17.1% → 11.4%, a single voice still never split (docs/development/caption-mode-20261016.md).
+     */
+    private fun speakerProbe() {
+        val tracker = tracker ?: return
+        val embed = embed ?: return
+        val length = (PROBE_MS * 16).toInt()
+        lastProbeEnd = processedSamples
+        if (processedSamples < length) return
+        val frames = length / 512
+        var voiced = 0
+        for (k in 1..frames) if (ringSpeech[((ringFrames - k).mod(ringSpeech.size.toLong())).toInt()]) voiced++
+        if (voiced < frames / 2) return
+        val audio = FloatArray(length) { i -> ring[((processedSamples - length + i) % ring.size).toInt()] }
+        val endMs = processedSamples / 16
+        try {
+            speaker.execute {
+                if (abandoned.get()) return@execute
+                val print = try { embed.embed(audio) } catch (e: Exception) { null } ?: return@execute
+                publish(tracker.addProbe(endMs - PROBE_MS, endMs, print))
+            }
+        } catch (_: RejectedExecutionException) { /* a skipped probe falls back to the 2 s windows */ }
     }
 
     private var provisionalFor = 0L
@@ -336,6 +365,8 @@ internal object CaptionSpeakers { const val SINGLE = 0 }
 
 /** Ids of sentence pieces split off at a change of voice; far above anything the segmenter numbers. */
 internal const val SPLIT_BASE = 1L shl 40
+private const val PROBE_MS = 1000L
+private const val PROBE_HOP_MS = 500L
 
 /**
  * Two-pass choice per sentence. SenseVoice normally wins (CER 7.6 % vs 15.1 % on FLEURS), but when
