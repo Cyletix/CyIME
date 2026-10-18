@@ -271,15 +271,15 @@ class ResizeControlsContrastTest {
         assertEquals(actions.left, opacityPanel.left, 1f)
         assertTrue("tablet action buttons must not stretch across the screen", reset.width <= 140f)
         assertEquals(controls.center.x, opacityPanel.center.x, 1f)
-        // 「透明度 N%」在滑条左边、同一条中线上，不再盖在进度条上。
-        assertTrue("opacity label must sit left of the slider", opacityLabel.right <= slider.left + 1f &&
-            opacityLabel.left >= opacityPanel.left)
+        // 百分比在滑条右边、同一条中线上（设计图：左「透明度」、中滑轨、右百分比）。
+        assertTrue("opacity percentage must sit right of the slider", opacityLabel.left >= slider.right - 1f &&
+            opacityLabel.right <= opacityPanel.right)
         assertEquals(slider.center.y, opacityLabel.center.y, 1f)
         assertTrue(slider.bottom <= reset.top)
         assertTrue(reset.right < mode.left && mode.right < confirm.left)
         assertEquals(reset.center.y, mode.center.y, 1f)
         val layouts = mutableListOf<TextLayoutResult>()
-        rule.onNodeWithText("透明度 70%", useUnmergedTree = true)
+        rule.onNodeWithText("70%", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
         assertFalse("opacity label overflow at $width x $height, floating=$floating, font=$font: " +
