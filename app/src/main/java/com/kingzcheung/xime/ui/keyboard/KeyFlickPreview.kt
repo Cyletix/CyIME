@@ -1,6 +1,10 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.runtime.State
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,6 +57,39 @@ internal fun horizontalKeyFlickPreview(
     return KeyFlickPreview(text, progress, if (dx < 0f) KeyFlickOrigin.LEFT else KeyFlickOrigin.RIGHT)
 }
 
+/**
+ * In-key flick labels per direction. The direction under the finger follows it exactly; when the
+ * finger re-aims, the previous direction's label shrinks back to its side instead of vanishing.
+ * Ending the gesture clears everything at once, as before.
+ */
+internal class KeyFlickFade(private val texts: Map<KeyFlickOrigin, String>, private val progress: List<State<Float>>) {
+    val strongest: Float get() = progress.maxOf { it.value }
+    fun labels(): List<KeyFlickPreview> = KeyFlickOrigin.entries.mapIndexedNotNull { index, origin ->
+        val value = progress[index].value
+        texts[origin]?.takeIf { value > 0.001f }?.let { KeyFlickPreview(it, value, origin) }
+    }
+}
+
+@Composable
+internal fun rememberKeyFlickFade(preview: KeyFlickPreview?): KeyFlickFade {
+    // The preview itself drives recomposition; this only remembers each side's last text.
+    val texts = remember { HashMap<KeyFlickOrigin, String>() }
+    if (preview == null) texts.clear() else texts[preview.origin] = preview.text
+    val progress = KeyFlickOrigin.entries.map { origin ->
+        val active = preview?.origin == origin
+        animateFloatAsState(if (active) preview!!.progress else 0f,
+            if (active || preview == null) snap() else tween(120), label = "flick-${origin.name}")
+    }
+    return KeyFlickFade(texts.toMap(), progress)
+}
+
+@Composable
+internal fun BoxScope.KeyFlickLabels(
+    fade: KeyFlickFade, color: Color, widthDp: Float, heightDp: Float, hintSizeSp: Float, labelSizeSp: Float,
+) {
+    for (label in fade.labels()) KeyFlickLabel(label, color, widthDp, heightDp, hintSizeSp, labelSizeSp)
+}
+
 /** Move the existing corner hint into the key's centre, without changing its bounds. */
 @Composable
 internal fun BoxScope.KeyFlickLabel(
@@ -66,14 +103,14 @@ internal fun BoxScope.KeyFlickLabel(
     val density = LocalDensity.current
     val label = punctuationKeyLabel(preview.text)
     // labelSizeSp already includes the keyboard/user scaling; fit long action labels once.
-    val targetSize = KeyboardKeyMetrics.labelSizeSp(label, labelSizeSp, widthDp, heightDp,
+    val targetSize = KeyboardKeyMetrics.labelSizeSp(label, labelSizeSp * 1.15f, widthDp, heightDp,
         density.fontScale, scaleOverride = 1f)
     val progress = preview.progress
     val fontSize = hintSizeSp + (targetSize - hintSizeSp) * progress
     var textSize by remember(label) { mutableStateOf(IntSize.Zero) }
     Text(
         text = label,
-        color = color.copy(alpha = color.alpha * (0.6f + 0.4f * progress)),
+        color = keyHintColor(color, LocalKeyboardInputPreferences.current.frostedGlass, color.alpha * (0.6f + 0.4f * progress)),
         fontSize = fontSize.sp,
         lineHeight = (fontSize * 1.2f).sp,
         fontWeight = FontWeight.Normal,

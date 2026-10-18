@@ -46,7 +46,7 @@ internal val kanaModifierCycles = listOf(
     listOf("a", "xa"), listOf("i", "xi"), listOf("u", "vu", "xu"), listOf("e", "xe"), listOf("o", "xo"),
     listOf("ka", "ga", "xka"), listOf("ki", "gi"), listOf("ku", "gu"), listOf("ke", "ge", "xke"), listOf("ko", "go"),
     listOf("sa", "za"), listOf("si", "zi"), listOf("su", "zu"), listOf("se", "ze"), listOf("so", "zo"),
-    listOf("ta", "da"), listOf("ti", "di"), listOf("tu", "du", "xtu"), listOf("te", "de"), listOf("to", "do"),
+    listOf("ta", "da"), listOf("ti", "di"), listOf("tu", "xtu", "du"), listOf("te", "de"), listOf("to", "do"),
     listOf("ha", "ba", "pa"), listOf("hi", "bi", "pi"), listOf("hu", "bu", "pu"), listOf("he", "be", "pe"), listOf("ho", "bo", "po"),
     listOf("ya", "xya"), listOf("yu", "xyu"), listOf("yo", "xyo"), listOf("wa", "xwa"),
 )

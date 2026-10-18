@@ -14,6 +14,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -47,8 +49,13 @@ class JapaneseKanaGestureTest {
                     } while (change.pressed)
                 }
             }, contentAlignment = androidx.compose.ui.Alignment.Center) {
+                // These tests cover the optional direction disc (off by default).
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences provides
+                        com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences(flickDirectionDisc = true)) {
                 KanaFlickButton(japaneseKanaKeys.first { it.center.romaji == romaji }, { actions += it },
                     Color.White, Color.Black, Modifier.size(140.dp).testTag("kana"), shadowEnabled = false)
+                }
             }
         }
     }
@@ -61,12 +68,22 @@ class JapaneseKanaGestureTest {
         preview.assertIsDisplayed()
         for (label in listOf("ち", "つ", "て", "と")) rule.onNodeWithText(label).assertIsDisplayed()
         assertEquals("た", preview.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        val fixedOrigin = rule.onNodeWithTag("kana-preview-bubble").fetchSemanticsNode().positionOnScreen
+        val fixedSize = rule.onNodeWithTag("kana-preview-bubble").fetchSemanticsNode().size
         val directions = listOf(Triple(Offset(-40f, 0f), "LEFT", "ち"), Triple(Offset(0f, -40f), "UP", "つ"),
             Triple(Offset(40f, 0f), "RIGHT", "て"), Triple(Offset(0f, 40f), "DOWN", "と"))
         for ((delta, direction, label) in directions) {
             key.performTouchInput { moveTo(center + delta * density) }
             assertEquals(label, preview.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
             rule.onNodeWithTag("kana-direction:$direction", useUnmergedTree = true).assertIsDisplayed()
+            val bubble = rule.onNodeWithTag("kana-preview-bubble").fetchSemanticsNode()
+            assertEquals("The disc must not follow the finger", fixedOrigin, bubble.positionOnScreen)
+            assertEquals("The disc must not shrink after selecting a direction", fixedSize, bubble.size)
+            for (item in listOf("TAP", "LEFT", "UP", "RIGHT", "DOWN")) {
+                val choice = rule.onNodeWithTag("kana-preview-choice:$item")
+                choice.assertIsDisplayed()
+                if (item == direction) choice.assertIsSelected() else choice.assertIsNotSelected()
+            }
             rule.runOnIdle { assertTrue(actions.isEmpty()) }
         }
         key.performTouchInput { moveTo(center) }
@@ -88,24 +105,18 @@ class JapaneseKanaGestureTest {
         rule.runOnIdle { assertEquals(listOf(JapaneseKanaAction.Input("!")), actions) }
     }
 
-    @Test fun directionBubbleAnimatesInsteadOfJumpingToTheFinalSize() {
+    @Test fun previewStaysAboveThePressedKeyAndReleaseDoesNotDuplicateInput() {
         setKey("ta")
-        rule.mainClock.autoAdvance = false
         val key = rule.onNodeWithTag("kana")
-        key.performTouchInput { down(center) }
-        rule.mainClock.advanceTimeBy(200)
-        val bubble = rule.onNodeWithTag("kana-preview-bubble", useUnmergedTree = true)
-        val initial = bubble.fetchSemanticsNode().boundsInRoot.width
-        key.performTouchInput { moveTo(center + Offset(0f, -40f * density)) }
-        rule.mainClock.advanceTimeBy(48)
-        val intermediate = bubble.fetchSemanticsNode().boundsInRoot.width
-        rule.mainClock.advanceTimeBy(120)
-        val finalWidth = bubble.fetchSemanticsNode().boundsInRoot.width
-        assertTrue(initial > intermediate && intermediate > finalWidth)
-        key.performTouchInput { cancel() }
-        rule.mainClock.advanceTimeByFrame()
-        rule.onNodeWithTag("kana-flick-preview").assertDoesNotExist()
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, -40f * density)) }
+        val anchor = key.fetchSemanticsNode()
+        val preview = rule.onNodeWithTag("kana-flick-preview").fetchSemanticsNode()
+        assertTrue(preview.positionOnScreen.y + preview.size.height <= anchor.positionOnScreen.y)
+        assertEquals("つ", rule.onNodeWithTag("kana-flick-preview").fetchSemanticsNode().config[SemanticsProperties.StateDescription])
         rule.runOnIdle { assertTrue(actions.isEmpty()) }
+        key.performTouchInput { up() }
+        // The kana composer uses the canonical tu / du / xtu conversion cycle.
+        rule.runOnIdle { assertEquals(listOf(JapaneseKanaAction.Input("tu")), actions) }
     }
 
     @Test fun tapCommitsTheBaseKanaExactlyOnceOnRelease() {

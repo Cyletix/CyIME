@@ -1,9 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
@@ -20,10 +19,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -72,18 +69,23 @@ fun JapaneseKanaKeyboardLayout(
             .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else keyboardBackgroundColor)
             .padding(bottom = bottomPaddingDp.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                val utilityKey = if (numberMode) {
-                    KanaFlickKey(listOf("+", "-", "*", "/", "=").map { KanaChoice(it, it) })
-                } else {
-                    val convert = KanaChoice("変換", "japanese_convert")
-                    val undo = KanaChoice("↶", "japanese_undo")
-                    KanaFlickKey(listOf(convert, undo, undo, undo, undo))
+                if (numberMode) {
+                    val utilityKey = KanaFlickKey(listOf("+", "-", "*", "/", "=").map { KanaChoice(it, it) })
+                    KanaFlickButton(utilityKey,
+                        { if (it is JapaneseKanaAction.Input) onKeyPress(it.romaji) }, specialKeyBackgroundColor, specialKeyTextColor,
+                        Modifier.weight(1f).testTag("kana-operators"),
+                        onPress = { onKeyPressDown?.invoke(utilityKey.center.romaji) },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
+                } else CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
+                    // One 無変換 hint, triggered like the nine-key delete key's 清空 (follows the corner-swipe direction setting).
+                    SwipeableKeyButton(text = "変換", onClick = { onKeyPress("japanese_convert") },
+                        backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
+                        modifier = Modifier.weight(1f).testTag("kana-convert"),
+                        swipeText = "無変換", onSwipe = { onKeyPress("japanese_undo") },
+                        followSymbolSwipeDirection = true,
+                        onPress = { onKeyPressDown?.invoke("japanese_convert") },
+                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
                 }
-                KanaFlickButton(utilityKey,
-                    { if (it is JapaneseKanaAction.Input) onKeyPress(it.romaji) }, specialKeyBackgroundColor, specialKeyTextColor,
-                    Modifier.weight(1f).testTag(if (numberMode) "kana-operators" else "kana-convert"),
-                    onPress = { onKeyPressDown?.invoke(utilityKey.center.romaji) },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
                 SwipeableIconKeyButton(icon = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft),
                     onClick = { onKeyPress("japanese_left") }, onLongClick = { onKeyPressDown?.invoke("japanese_left"); onKeyPress("japanese_left") },
                     backgroundColor = specialKeyBackgroundColor, iconColor = specialKeyTextColor, modifier = Modifier.weight(1f).testTag("kana-left"),
@@ -172,17 +174,50 @@ internal fun KanaFlickButton(
     val currentAction by rememberUpdatedState(onAction)
     val currentPress by rememberUpdatedState(onPress)
     var pressed by remember { mutableStateOf(false) }
-    var direction by remember { mutableStateOf(KanaFlickDirection.TAP) }
+    var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     val density = LocalDensity.current
     val suppressCursorMove = LocalSuppressCursorMove.current
-    val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
+    val inputPreferences = LocalKeyboardInputPreferences.current
+    val frostedGlass = inputPreferences.frostedGlass
     val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, background, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) Modifier.drawBehind {
             drawRoundRect(crispShadowColor(background), topLeft = Offset(0f, shadowElevation.toPx()),
                 size = size, cornerRadius = CornerRadius(shadowShapeRadius.toPx()))
         } else Modifier
     }
-    val textScale = LocalKeyboardInputPreferences.current.keyTextScale
+    val textScale = inputPreferences.keyTextScale
+    fun choiceAction(direction: KanaFlickDirection): (() -> Unit)? = key.choice(direction)?.let { choice ->
+        { currentAction(JapaneseKanaAction.Input(choice.romaji)) }
+    }
+    // Same recognizer as the nine-key flick letters: shared distance setting, free re-aim, release decides.
+    val threshold = normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp)
+    val gestureActions = KeyGestureActions(
+        text = key.center.label,
+        onTap = { currentAction(JapaneseKanaAction.Input(key.center.romaji)) },
+        onPress = { pressed = true; suppressCursorMove.value = true; currentPress?.invoke() },
+        onRelease = { pressed = false; suppressCursorMove.value = false },
+        onPreview = { state ->
+            // Kana labels sit at the middle of each edge, not in the corner-hint positions.
+            flickPreview = state.keyFlick?.let { preview -> when (preview.origin) {
+                KeyFlickOrigin.TOP_END -> preview.copy(origin = KeyFlickOrigin.TOP)
+                KeyFlickOrigin.BOTTOM_START -> preview.copy(origin = KeyFlickOrigin.BOTTOM)
+                else -> preview
+            } }
+        },
+        leftText = key.choice(KanaFlickDirection.LEFT)?.label, onLeft = choiceAction(KanaFlickDirection.LEFT),
+        upText = key.choice(KanaFlickDirection.UP)?.label,
+        onUp = choiceAction(KanaFlickDirection.UP)?.let { action -> { _: String -> action() } },
+        rightText = key.choice(KanaFlickDirection.RIGHT)?.label, onRight = choiceAction(KanaFlickDirection.RIGHT),
+        downText = key.choice(KanaFlickDirection.DOWN)?.label,
+        onDown = choiceAction(KanaFlickDirection.DOWN)?.let { action -> { _: String -> action() } },
+        horizontalThresholdDp = threshold,
+        verticalThresholdDp = threshold,
+        reserveHorizontalSwipe = true,
+        freeDirection = true,
+        inlineVerticalPreview = true,
+        inlineHorizontalPreview = true,
+    )
+    val currentActions by rememberUpdatedState(gestureActions)
     BoxWithConstraints(
         modifier.fillMaxSize()
             .semantics {
@@ -193,55 +228,47 @@ internal fun KanaFlickButton(
                     CustomAccessibilityAction(choice.label) { currentAction(JapaneseKanaAction.Input(choice.romaji)); true }
                 }
             }
-            .pointerInput(key) {
-                val threshold = 18.dp.toPx()
-                awaitEachGesture {
-                    val down = awaitFirstDown(pass = PointerEventPass.Initial)
-                    down.consume()
-                    val origin = down.position
-                    suppressCursorMove.value = true
-                    pressed = true
-                    direction = KanaFlickDirection.TAP
-                    currentPress?.invoke()
-                    var choice: KanaChoice? = null
-                    try {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (change.isConsumed) break
-                            val delta = change.position - origin
-                            val returnedToCenter = change.position.x in size.width * 0.3f..size.width * 0.7f &&
-                                change.position.y in size.height * 0.3f..size.height * 0.7f
-                            direction = if (returnedToCenter) KanaFlickDirection.TAP
-                                else kanaFlickDirection(delta.x, delta.y, threshold)
-                            change.consume()
-                            if (!change.pressed) { choice = key.choice(direction); break }
-                        }
-                    } finally {
-                        pressed = false
-                        direction = KanaFlickDirection.TAP
-                        suppressCursorMove.value = false
-                    }
-                    choice?.let { currentAction(JapaneseKanaAction.Input(it.romaji)) }
-                }
-            }
+            .pointerInput(Unit) { detectExclusiveKeyGestures { currentActions } }
             .padding(scaledKeyVisualPadding())
             .keyGlow(Modifier.then(shadow)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
             .background(frostedKeyColor(
                 background, foreground, frostedGlass,
-                legacyStateColor = if (pressed) foreground.copy(alpha = 0.18f).compositeOver(background) else background,
+                legacyStateColor = if (pressed) background.copy(alpha = 0.7f) else background,
                 pressed = pressed,
-            ))),
+                opacityScale = glassFunctionKeyScale(background),
+            )).keyHeldHighlight(pressed)),
         contentAlignment = Alignment.Center,
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
         val fontSp = keyLabelSizeSp(key.center.label, KeyboardKeyMetrics.LabelSize.value,
             maxWidth.value, maxHeight.value, density.fontScale, textScale)
-        if (pressed) KanaDirectionIndicator(direction, MaterialTheme.colorScheme.primary)
-        Text(punctuationKeyLabel(key.center.label), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+        val disc = inputPreferences.flickDirectionDisc
+        val flickFade = rememberKeyFlickFade(flickPreview.takeIf { !disc })
+        val direction = flickPreview?.takeIf { it.progress >= 1f }?.let { preview ->
+            when (preview.origin) {
+                KeyFlickOrigin.LEFT -> KanaFlickDirection.LEFT
+                KeyFlickOrigin.RIGHT -> KanaFlickDirection.RIGHT
+                KeyFlickOrigin.TOP, KeyFlickOrigin.TOP_END -> KanaFlickDirection.UP
+                KeyFlickOrigin.BOTTOM, KeyFlickOrigin.BOTTOM_START -> KanaFlickDirection.DOWN
+            }
+        } ?: KanaFlickDirection.TAP
+        if (pressed && disc) KanaDirectionIndicator(direction, MaterialTheme.colorScheme.primary.copy(alpha = .6f))
+        val keyWidthDp = maxWidth.value
+        val keyHeightDp = maxHeight.value
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - flickFade.strongest },
+            contentAlignment = Alignment.Center) {
+        if (inputPreferences.kanaDirectionHints) {
+            val centerSp = keyLabelSizeSp(key.center.label, KeyboardKeyMetrics.LabelSize.value,
+                keyWidthDp * .5f, keyHeightDp * .52f, density.fontScale, textScale)
+            val hintSp = minOf(centerSp * .46f, (keyHeightDp - 4f).coerceAtLeast(1f) * .22f / density.fontScale)
+            KanaDirectionLabels(key, foreground, centerSp, hintSp)
+        } else Text(punctuationKeyLabel(key.center.label), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
             color = foreground, fontSize = fontSp.sp, lineHeight = (fontSp * 1.2f).sp,
             maxLines = 1, softWrap = false, fontFamily = AppFonts.keyFontFamily)
-        if (pressed) KanaFlickPreview(key, direction, background, foreground, contentScale)
+        }
+        // Default: the chosen kana grows from its side into the key, as 26-key symbols do.
+        KeyFlickLabels(flickFade, foreground, keyWidthDp, keyHeightDp, 10f * contentScale, fontSp)
+        if (pressed && disc) KanaFlickPreview(key, direction, background, foreground, contentScale)
     }
 }
