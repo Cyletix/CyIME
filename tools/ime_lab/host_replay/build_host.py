@@ -231,7 +231,8 @@ def build(args):
     prefix = production[:production.index(anchor)] + 'list(PREPEND CMAKE_MODULE_PATH "${HOST_ADAPTER_DIR}")\n' + anchor
     tail = (HERE / "host_tail.cmake").read_text(encoding="utf-8")
     (source / "CMakeLists.txt").write_text(prefix + "\n" + tail, encoding="utf-8")
-    adapter_hashes = {name: sha(HERE / name) for name in ("build_host.py", "host_tail.cmake", "android/log.h", "FindBoost.cmake")}
+    adapter_hashes = {name: sha(HERE / name) for name in ("build_host.py", "host_tail.cmake", "android/log.h", "FindBoost.cmake",
+                                                         "host_replay_jni.cc")}
     build_id = hashlib.sha256(json.dumps({"source": identity, "adapters": adapter_hashes,
                                         "dependencies": dependency_identity}, sort_keys=True).encode()).hexdigest()[:20]
     directory = cache / "builds" / build_id
@@ -249,7 +250,9 @@ def build(args):
                  "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
                  "-DCMAKE_MAKE_PROGRAM=" + str(tools["ninja"]), "-DHOST_ADAPTER_DIR=" + str(adapters),
                  "-DHOST_JNI_INCLUDE=" + str(tools["jni"]), "-DHOST_ORT_DIR=" + str(tools["onnx"].parent),
-                 "-DHOST_ORT_LIBRARY=" + str(tools["onnx"]), "-DBUILD_TESTING=OFF", "-DBUILD_TEST=OFF"]
+                 "-DHOST_ORT_LIBRARY=" + str(tools["onnx"]), "-DBUILD_TESTING=OFF", "-DBUILD_TEST=OFF",
+                 # Host-only per-key work counters; Android builds leave this OFF.
+                 "-DCYIME_T9_WORK_COUNTERS=ON"]
     compile_args = [tools["cmake"], "--build", directory, "--target", "rime_jni", "--parallel", "2"]
     manifest = {"format_version": 1, "status": "building", "backend": "linux-x86_64-production-jni",
                 "source_repo": str(repo), "source_root": str(source), "source_sha256": identity,
@@ -257,7 +260,8 @@ def build(args):
                 "source_file_count": len(files), "adapter_hashes": adapter_hashes,
                 "source_transforms": ["CRLF normalized to LF in C/C++/CMake/text inputs before production git-apply checks",
                                       "Android top-level build replaced after include(Rime) with host JNI linkage",
-                                      "FindBoost uses the production vendored Boost 1.89 target"],
+                                      "FindBoost uses the production vendored Boost 1.89 target",
+                                      "CYIME_T9_WORK_COUNTERS=ON: per-key work counters and host_replay_jni.cc entry points"],
                 "dependencies": dependency_identity, "configure": list(map(str, configure)),
                 "compile": list(map(str, compile_args)), "started_utc": datetime.now(timezone.utc).isoformat()}
     save(manifest_path, manifest)

@@ -37,6 +37,7 @@ class HostReplayTest(unittest.TestCase):
     def local(self, build_output=None):
         self.stack.enter_context(patch("t9_host.os", SimpleNamespace(name="posix", pathsep=":")))
         self.stack.enter_context(patch("t9_host.platform.system", return_value="Linux"))
+        self.args.host_cache = str(self.root / "cache")  # never the real home cache
         self.library_dir = self.root / "lib"
         self.library_dir.mkdir()
         (self.library_dir / "librime_jni.so").write_bytes(b"fake host engine")
@@ -45,6 +46,7 @@ class HostReplayTest(unittest.TestCase):
         self.source_inventory.write_text('{"source":"test"}', encoding="utf-8")
         self.build_manifest = self.root / "engine-build.json"
         self.build_manifest.write_text(json.dumps({"status": "complete",
+            "library": str(self.library_dir / "librime_jni.so"),
             "library_sha256": host.file_digest(self.library_dir / "librime_jni.so"),
             "source_files_sha256": host.file_digest(self.source_inventory)}), encoding="utf-8")
         description = {"library_dir": str(self.library_dir), "manifest": str(self.build_manifest),
@@ -60,7 +62,7 @@ class HostReplayTest(unittest.TestCase):
         return {"sha256": host.file_digest(output)}
 
     def execute(self, argv, **kwargs):
-        if argv[0] == "fake-javac":
+        if str(argv[0]).endswith("javac"):
             return
         self.assertEqual(argv[0], "fake-java")
         manifest = json.loads((self.output / "run.json").read_text(encoding="utf-8"))
@@ -69,13 +71,24 @@ class HostReplayTest(unittest.TestCase):
                     "apk_sha256": manifest["engine"]["apk_sha256"],
                     "library_sha256": manifest["engine"]["libraries"],
                     "corpus_sha256": manifest["fixture_sha256"]}
+        ready = {"stage": "ready"}
+        snapshot = manifest.get("user_dict_snapshot")
+        if snapshot:
+            self.assertEqual(argv[argv.index("--user-dict") + 1], self.output / "user-dict.userdb.txt")
+            metadata["user_dict_sha256"] = snapshot["sha256"]
+            ready["user_dict"] = {key: snapshot[key] for key in ("db_name", "sha256", "entries")}
+        else:
+            self.assertNotIn("--user-dict", argv)
         if self.metadata_mutation:
             self.metadata_mutation(metadata)
         continuous = [dict(row, mode="continuous") for row in sample() if row["stage"] != "syllable_settled"]
-        rows = [metadata, {"stage": "ready"}, *continuous, *sample()]
+        rows = [metadata, ready, *continuous, *sample()]
         rows.append({"stage": "complete", "records_before_complete": len(rows)})
         (self.output / "replay.jsonl").write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows), encoding="utf-8")
-        schema = self.output / "native-run/user/build/t9_pinyin.schema.yaml"
+        root = Path(argv[argv.index("--root") + 1])
+        self.assertFalse(root.exists())
+        self.assertEqual(root.parent, self.root / "cache/replay-roots")
+        schema = root / "user/build/t9_pinyin.schema.yaml"
         schema.parent.mkdir(parents=True)
         schema.write_text("schema: t9_pinyin", encoding="utf-8")
 
@@ -124,6 +137,62 @@ class HostReplayTest(unittest.TestCase):
         self.assertFalse(run.call_args.kwargs.get("shell", False))
         self.assertFalse(self.output.exists())
 
+    def write_snapshot(self, body="ni hao\t你好\tc=2 d=1.5 t=90\nzai jian\t再见\tc=0 d=0.1 t=80\n"):
+        path = self.root / "seed.userdb.txt"
+        path.write_text("# Rime user dictionary\n#@/db_name\trime_ice.userdb\n#@/db_type\tuserdb\n"
+                        "#@/tick\t100\n" + body, encoding="utf-8")
+        return path
+
+    def test_preset_user_dict_is_recorded_and_never_labelled_empty(self):
+        self.local()
+        self.args.user_dict = self.write_snapshot()
+        self.assertEqual(host.run_host(self.args), 0)
+        manifest = json.loads((self.output / "run.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["user_state"], "preset_user_dict")
+        snapshot = manifest["user_dict_snapshot"]
+        self.assertEqual((snapshot["db_name"], snapshot["entries"]), ("rime_ice", 2))
+        self.assertEqual(snapshot["sha256"], host.file_digest(self.args.user_dict))
+        self.assertEqual((self.output / "user-dict.userdb.txt").read_bytes(), self.args.user_dict.read_bytes())
+        self.assertIn("预置个人词库快照", (self.output / "index.html").read_text(encoding="utf-8"))
+
+    def test_deleted_entries_are_not_counted_as_restored_entries(self):
+        path, info = host.inspect_user_dict(self.write_snapshot(
+            "ni hao\t你好\tc=2 d=1.5 t=90\nzai jian\t再见\tc=-1 d=0.1 t=80\n"))
+        self.assertEqual((info["entries"], info["deleted_entries"], info["tick"]), (1, 1, "100"))
+
+    def test_invalid_user_dict_snapshot_fails_before_any_process(self):
+        cases = [("plain", "你好\tni hao\t1\n"), ("duplicate", "ni hao\t你好\tc=1\nni hao\t你好\tc=2\n"), ("empty", ""),
+                 ("only_deleted", "ni hao\t你好\tc=-3 d=1 t=9\n"), ("bad_commits", "ni hao\t你好\tc=x\n"),
+                 ("bad_tick", "ni hao\t你好\tc=1\n")]
+        for name, body in cases:
+            path = self.write_snapshot(body)
+            if name == "plain":
+                path.write_text(body, encoding="utf-8")
+            if name == "bad_tick":
+                path.write_text(path.read_text(encoding="utf-8").replace("#@/tick\t100", "#@/tick\t1e3"), encoding="utf-8")
+            self.args.user_dict = path
+            with self.subTest(case=name), \
+                    patch("t9_host.subprocess.run", side_effect=AssertionError("No process may start")), \
+                    self.assertRaises(ValueError):
+                host.run_host(self.args)
+        self.assertFalse(self.output.exists())
+
+    def test_windows_dispatch_forwards_translated_user_dict(self):
+        self.args.user_dict = self.write_snapshot()
+        with patch("t9_host.os", SimpleNamespace(name="nt")), \
+                patch("t9_host.linux_path", side_effect=lambda path: "/mnt/x/" + Path(path).name), \
+                patch("t9_host.subprocess.run", return_value=SimpleNamespace(returncode=0)) as run:
+            self.assertEqual(host.run_host(self.args), 0)
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[argv.index("--user-dict") + 1], "/mnt/x/seed.userdb.txt")
+        self.args.engine_from = self.root / "earlier-run"
+        with patch("t9_host.os", SimpleNamespace(name="nt")), \
+                patch("t9_host.linux_path", side_effect=lambda path: "/mnt/x/" + Path(path).name), \
+                patch("t9_host.subprocess.run", return_value=SimpleNamespace(returncode=0)) as run:
+            host.run_host(self.args)
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[argv.index("--engine-from") + 1], "/mnt/x/earlier-run")
+
     def test_existing_output_is_never_modified_or_used(self):
         for is_directory in (True, False):
             self.args.output = self.root / ("existing-dir" if is_directory else "existing-file")
@@ -148,10 +217,46 @@ class HostReplayTest(unittest.TestCase):
     def test_local_success_produces_validated_evidence_without_device_route(self):
         self.local()
         self.assertEqual(host.run_host(self.args), 0)
-        self.assertEqual(json.loads((self.output / "run.json").read_text())["status"], "complete")
+        manifest = json.loads((self.output / "run.json").read_text())
+        self.assertEqual(manifest["status"], "complete")
         self.assertEqual(host.load_run(self.output)["metadata"]["runtime"], "host")
         self.assertEqual(self.command.call_count, 2)
         self.adb.assert_not_called()
+        # The replay root lived on the Linux filesystem during the replay and was moved into the result.
+        root = manifest["replay_root"]
+        self.assertEqual((Path(root["path"]).parent, root["kept_as"]), (self.root / "cache/replay-roots", "native-run"))
+        self.assertIsInstance(root["filesystem"], str)
+        self.assertTrue((self.output / "native-run/user/build/t9_pinyin.schema.yaml").is_file())
+        self.assertFalse(Path(root["path"]).exists())
+
+    def test_engine_from_replays_an_earlier_engine_without_building(self):
+        self.local()
+        self.assertEqual(host.run_host(self.args), 0)
+        # build_host.py keeps the javac launcher under <cache>/dependencies.
+        (self.root / "cache/dependencies").mkdir()
+        (self.root / "cache/dependencies/javac").write_text("#!/bin/sh\n", encoding="utf-8")
+        first = json.loads((self.output / "run.json").read_text())
+        self.args.engine_from, self.args.output = self.output, self.root / "again"
+        self.output = self.args.output
+        self.build_process.reset_mock()
+        self.snapshot.reset_mock()
+        self.assertEqual(host.run_host(self.args), 0)
+        self.build_process.assert_not_called()
+        self.snapshot.assert_not_called()
+        second = json.loads((self.output / "run.json").read_text())
+        for field in ("libraries", "resources_sha256", "build_manifest_sha256"):
+            self.assertEqual(second["engine"][field], first["engine"][field])
+        self.assertEqual(second["engine"]["reused_from"], str(self.args.engine_from.resolve()))
+        self.assertEqual(json.loads((self.output / "build-result.txt").read_text())["javac"],
+                         str(self.root / "cache/dependencies/javac"))
+        # A run made with --engine-from can itself be reused.
+        self.args.engine_from, self.args.output = self.output, self.root / "chained"
+        self.output = self.args.output
+        self.assertEqual(host.run_host(self.args), 0)
+        (self.library_dir / "librime_jni.so").write_bytes(b"rebuilt engine")
+        self.args.output = self.root / "stale"
+        with self.assertRaisesRegex(ValueError, "no longer matches its recorded libraries"):
+            host.run_host(self.args)
 
     def test_missing_baseline_writes_invalid_comparison_but_preserves_completed_replay(self):
         self.local()

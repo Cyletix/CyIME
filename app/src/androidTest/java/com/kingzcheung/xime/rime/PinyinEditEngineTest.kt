@@ -81,6 +81,9 @@ class PinyinEditEngineTest {
         val s = engine.readPinyinEditSnapshot()
         val confirmed = s[2].toInt()
         assertTrue(confirmed > 0); assertEquals("你", s[3])
+        assertTrue(engine.applyPinyinEdit(s[0], s[0], confirmed + 1, confirmed, s[3]))
+        assertEquals("Caret movement preserves raw code", s[0], engine.getInput())
+        assertEquals("Caret movement preserves the confirmed word", "你", engine.readPinyinEditSnapshot()[3])
         val newInput = s[0].take(confirmed) + "men"
         assertTrue(engine.applyPinyinEdit(s[0], newInput, newInput.length, confirmed, s[3]))
         assertEquals("你", engine.readPinyinEditSnapshot()[3])
@@ -101,6 +104,17 @@ class PinyinEditEngineTest {
         assertEquals("删新数字后恢复编辑串，不能出现旧数字", edited, engine.getInput())
         assertFalse(engine.applyT9PinyinEdit("stale", "wo"))
         assertEquals(edited, engine.getInput())
+        engine.clearQueuedT9Composition()
+    }
+    @Test fun t9KeysInsertedAtCodeCaretStayAmbiguous() {
+        mode("t9_pinyin")
+        "748653".forEach { engine.processKey(it.code, 0) }; engine.t9FlushRimeInput()
+        val typed = engine.getCandidates().firstOrNull()
+        engine.clearQueuedT9Composition()
+        "74".forEach { engine.processKey(it.code, 0) }; engine.t9FlushRimeInput()
+        // The editor rebuilds the code from plain keys: same reading as typing them at the end.
+        assertTrue(engine.applyT9PinyinEdit(engine.getInput(), "748653"))
+        assertEquals(typed, engine.getCandidates().firstOrNull())
         engine.clearQueuedT9Composition()
     }
     @Test fun mergedAndDoublePinyinEditUseActualCodeWithoutChangingSchema() {

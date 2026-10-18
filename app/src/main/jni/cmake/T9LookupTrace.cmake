@@ -23,6 +23,30 @@ foreach(unit dictionary table user_dictionary)
     t9_trace_replace("  auto index = syll_graph.indices.find(current_pos);" "  T9ObserveExtra(current_pos);\n  auto index = syll_graph.indices.find(current_pos);")
     t9_trace_replace("      auto next_index = syll_graph.indices.find(end_pos);" "      T9ObserveExtra(end_pos);\n      auto next_index = syll_graph.indices.find(end_pos);")
   endif()
+  if(CYIME_T9_WORK_COUNTERS)
+    # Host replay only: same-line counters (t9_lookup_trace.h); no logic changes.
+    if(unit STREQUAL "dictionary")
+      t9_work_replace(code "  const CodeMatch kFailed" "  T9_WORK_COUNT(dict_extra_code_steps); const CodeMatch kFailed" 1)
+      t9_work_replace(code "void DictEntryIterator::AddChunk(dictionary::Chunk&& chunk) {"
+                      "void DictEntryIterator::AddChunk(dictionary::Chunk&& chunk) { T9_WORK_COUNT(dict_chunks); T9_WORK_ADD(dict_chunk_entries, chunk.size);" 1)
+      t9_work_replace(code "  auto collector = New<DictEntryCollector>();" "  auto collector = New<DictEntryCollector>(); T9_WORK_COUNT(dict_lookup_calls);" 1)
+      t9_work_replace(code "    lookup_table(table.get(), collector.get(), syllable_graph, start_pos,"
+                      "    T9_WORK_COUNT(dict_table_queries); lookup_table(table.get(), collector.get(), syllable_graph, start_pos," 1)
+      t9_work_replace(code "  vector<size_t> starts = start_positions;"
+                      "  vector<size_t> starts = start_positions; T9_WORK_COUNT(dict_lookup_all_calls); T9_WORK_ADD(dict_lookup_all_starts, start_positions.size());" 1)
+      t9_work_replace(code "    if (!table->QueryMulti(syllable_graph, starts,"
+                      "    T9_WORK_COUNT(dict_table_queries); if (!table->QueryMulti(syllable_graph, starts," 1)
+      t9_work_replace(code "      auto& collector = result[sv.first];" "      auto& collector = result[sv.first]; T9_WORK_COUNT(dict_buckets);" 1)
+    elseif(unit STREQUAL "table")
+      t9_work_replace(code "    size_t current_pos = item.current_pos;" "    size_t current_pos = item.current_pos; T9_WORK_COUNT(table_nodes);" 1)
+      t9_work_replace(code "        size_t end_pos = props->end_pos;" "        size_t end_pos = props->end_pos; T9_WORK_COUNT(table_edges);" 1)
+    else()
+      t9_work_replace(code "  auto index = syll_graph.indices.find(current_pos);" "  auto index = syll_graph.indices.find(current_pos); T9_WORK_COUNT(user_dfs_nodes);" 1)
+      t9_work_replace(code "                            hash_map<string, SyllableId>* syllabary) {"
+                      "                            hash_map<string, SyllableId>* syllabary) { T9_WORK_COUNT(user_entries);" 1)
+      t9_work_replace(code "  DfsState state;" "  DfsState state; T9_WORK_COUNT(user_dict_lookups);" 1)
+    endif()
+  endif()
   set(copy "${CMAKE_CURRENT_BINARY_DIR}/cyime-${unit}.cc")
   file(CONFIGURE OUTPUT "${copy}" CONTENT "${code}" @ONLY)
   get_target_property(sources rime-static SOURCES)

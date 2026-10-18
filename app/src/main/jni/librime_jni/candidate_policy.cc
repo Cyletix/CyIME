@@ -194,4 +194,7 @@ bool HideCandidate(const std::string& text) {
 bool RestoreCandidate(const std::string& text) {
   auto next = hidden; next.erase(text); return StoreHidden(next);
 }
+std::vector<std::string> HiddenCandidates() {
+  return std::vector<std::string>(hidden.begin(), hidden.end());
+}
 }

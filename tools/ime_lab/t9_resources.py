@@ -13,7 +13,9 @@ def resource_files(repo):
     generated = repo / "app/build/generated"
     roots = [("rime_ice", generated / "chinese-assets/rime_ice"),
              ("rime_chinese", base / "rime_chinese"),
-             ("rime_chinese", generated / "t9-grammar/rime_chinese")]
+             ("rime_chinese", generated / "t9-grammar/rime_chinese"),
+             # Optional word n-gram model (tools/ime_lab/ngram); absent until built.
+             ("rime_chinese", generated / "t9-ngram/rime_chinese")]
     required = [base / "default.custom.yaml", base / "rime/default.yaml",
                 roots[0][1] / "rime_ice.dict.yaml", roots[0][1] / "cn_dicts/base.dict.yaml",
                 roots[0][1] / "cyime_t9_english.dict.yaml",
@@ -35,6 +37,8 @@ def resource_files(repo):
     # Japanese resources are unrelated to the sole deployed t9_pinyin schema.
     targets = {}
     for name, root in roots:
+        if not root.is_dir():
+            continue
         for path in sorted(root.rglob("*")):
             if not path.is_file():
                 continue

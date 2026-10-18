@@ -330,6 +330,18 @@ void T9Translation::Advance() {
             translation_->Next();
             continue;
         }
+        // 拂动固定的字母：只保留该位置拼音字母一致的候选。
+        if (cand_) {
+            if (auto* proc = T9ProcessorRequire()) {
+                if (proc->HasLetterConstraints()) {
+                    auto genuine = Candidate::GetGenuineCandidate(cand_);
+                    if (genuine && !proc->MatchesLetterConstraints(genuine->start(), genuine->comment())) {
+                        translation_->Next();
+                        continue;
+                    }
+                }
+            }
+        }
         ConvertCurrent();
         return;
     }

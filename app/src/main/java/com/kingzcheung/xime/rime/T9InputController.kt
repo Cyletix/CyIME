@@ -37,6 +37,8 @@ class T9InputController(
     private val inputAdmissionTicket: () -> Long? = { 0L },
     private val captureInputContext: () -> kotlin.coroutines.CoroutineContext = { kotlin.coroutines.EmptyCoroutineContext },
     inputCommands: InputCommandQueue? = null,
+    /** 组合为空时光标前的已上屏文字（九键词组模型的上文）；null 表示未知。 */
+    private val leftContext: () -> String? = { null },
     private val onUnconsumedDelete: (suspend () -> Unit)? = null,
     private val candidateTransform: ((RimeProcessResult) -> List<com.kingzcheung.xime.service.T9CandidateInjection>?)? = null,
 ) {
@@ -84,18 +86,18 @@ class T9InputController(
     private var cachedInput: String = ""
 
     /** 将 T9 处理任务排入单线程后台队列（FIFO 保序）。 */
-    private fun enqueue(block: suspend CoroutineScope.() -> Unit) {
+    private fun enqueue(kind: String = "t9-other", block: suspend CoroutineScope.() -> Unit) {
         synchronized(enqueueLock) {
             if (closed) return
-            commands.submit { if (!closed) block() }
+            commands.submit(kind = kind) { if (!closed) block() }
         }
     }
 
-    private fun enqueueInput(block: suspend CoroutineScope.(Long, Long) -> Unit) {
+    private fun enqueueInput(kind: String = "t9-other", block: suspend CoroutineScope.(Long, Long) -> Unit) {
         val admission = inputAdmissionTicket() ?: return
         val epoch = inputEpoch.get()
         val ownerContext = captureInputContext()
-        enqueue {
+        enqueue(kind) {
             kotlinx.coroutines.withContext(ownerContext + commandValidity(admission, epoch)) {
                 if (accepts(admission, epoch)) block(admission, epoch)
             }
@@ -243,7 +245,7 @@ class T9InputController(
         val ownerContext = captureInputContext()
         val poll = Runnable {
             if (!accepts(admission, epoch) || generation != uiGeneration.get()) return@Runnable
-            enqueue {
+            enqueue("t9-refine") {
                 kotlinx.coroutines.withContext(ownerContext + commandValidity(admission, epoch)) {
                     if (!accepts(admission, epoch) || generation != uiGeneration.get() || !rimeEngine.isCandidateRevisionCurrent(revision)) return@withContext
                     when (rimeEngine.t9RefinementState()) {
@@ -365,10 +367,12 @@ class T9InputController(
         if (inputAdmissionTicket() == null) return
         val code = digit[0].code
         val traceId = InputLatencyTrace.begin()
-        enqueueInput { admission, epoch ->
+        // Read before queuing: the engine uses it only if this digit starts a composition.
+        val context = leftContext()
+        enqueueInput("t9-digit") { admission, epoch ->
             try {
                 val transaction = InputLatencyTrace.phase(traceId, "engine-jni-flush") {
-                    rimeEngine.processQueuedT9KeyAndGetResult(code)
+                    rimeEngine.processQueuedT9KeyAndGetResult(code, context)
                 }
                 if (transaction == null) InputLatencyTrace.finish(traceId, "engine-unavailable")
                 else refreshOnBackground(traceId, transaction.state, admission, epoch)
@@ -379,8 +383,21 @@ class T9InputController(
         }
     }
 
+    /**
+     * 拂动字母：并入当前拼音串（该位置固定为这个字母），不清空已输入的数字。
+     * 没有组合中的数字时返回 false，调用方按普通字母输入处理。
+     */
+    fun onLetterFlicked(letter: String): Boolean {
+        if (leftPanelState == LeftPanelState.IDLE) return false
+        enqueueInput("t9-fix-letter") { admission, epoch ->
+            val result = rimeEngine.fixQueuedT9Letter(letter) ?: return@enqueueInput
+            refreshOnBackground(result = result, admission = admission, epoch = epoch)
+        }
+        return true
+    }
+
     fun onChoiceSelected(option: SyllableOption) {
-        enqueueInput { admission, epoch ->
+        enqueueInput("t9-syllable") { admission, epoch ->
             val result = rimeEngine.selectQueuedT9Pinyin(option.pinyin, option.digitLength) ?: return@enqueueInput
             refreshOnBackground(result = result, admission = admission, epoch = epoch)
         }
@@ -430,7 +447,7 @@ class T9InputController(
         val ownerContext = captureInputContext()
         val hold = com.kingzcheung.xime.keyboard.RepeatInput.current.get()
         if (hold != null && !hold.acquire()) return
-        enqueue {
+        enqueue("t9-delete") {
             // A later delete must not jump ahead of a digit already in this FIFO.
             try {
                 kotlinx.coroutines.withContext(ownerContext + commandValidity(admission, epoch)) {
@@ -495,7 +512,7 @@ class T9InputController(
      * 用于 emoji/符号等无拼音注释的候选词，RIME 引擎已匹配输入序列到候选词，
      * T9 控制器无需做音节级消费计算。
      */
-    suspend fun onRightCandidateSelectedByDirectCommit(revision: Long): Boolean? = commands.execute {
+    suspend fun onRightCandidateSelectedByDirectCommit(revision: Long): Boolean? = commands.execute("t9-select") {
         val admission = inputAdmissionTicket() ?: return@execute null
         val epoch = inputEpoch.get()
         kotlinx.coroutines.withContext(Dispatchers.Main) {

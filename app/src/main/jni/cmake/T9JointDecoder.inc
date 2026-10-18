@@ -10,10 +10,13 @@ struct T9Line {
   double matched_length = 0;
   string text;
   Code code;
+  int32_t lm_id = ::T9NgramModel::kUnseen;    // last model word, history of the next word
+  int32_t lm_prev = ::T9NgramModel::kUnseen;  // the model word before it
 };
 
 static double T9WholeTextPrior(GramDb* db, const string& text) {
   if (!db || utf8::distance(text.begin(), text.end()) > grammar::kMaxEncodedUnicode) return -1;
+  T9_WORK_COUNT(whole_text_priors); T9_WORK_COUNT(gram_lookups);
   const auto encoded = grammar::encode(text);
   GramDb::Match matches[GramDb::kMaxResults];
   const auto size = db->Lookup("", encoded, matches);
@@ -56,7 +59,8 @@ struct T9JointCache {
   string preceding;
   hash_set<string> blacklist;
   using Options = std::tuple<size_t, size_t, size_t, size_t, size_t,
-                            double, double, double, string, bool, bool, bool>;
+                            double, double, double, string, bool, bool, bool,
+                            const void*, double, bool, double, bool, double>;
   Options options;
 };
 
@@ -82,6 +86,7 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
   const auto& syllables = syllabifier_->syllable_graph();
   const size_t total = syllables.interpreted_length;
   if (!total) return false;
+  T9_WORK_COUNT(joint_decodes);
   const auto& input = syllabifier_->input();
   const bool single_t9_key = input.size() == 1 &&
                              input.front() >= '2' && input.front() <= '9';
@@ -90,6 +95,10 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
   // credibility and the full-spelling candidate pool keep their normal role.
   const double spelling_penalty = t9_spelling_penalty_ * (single_t9_key ? 0.75 : 1.0);
   const string preceding = translator_->GetPrecedingText(start_);
+  // Decoded results also depend on the committed text before the composition (n-gram history).
+  // With neighbour correction the syllable graph also depends on the measured key geometry.
+  const string cache_context = preceding + '\x1f' + t9_left_context_ +
+      (enable_correction_ ? '\x1f' + t9_neighbors_ : string());
   T9JointCache* cache = nullptr;
   // Rebuild native objects with this query's syllabifier/spans. Neither Menu
   // indices nor mutable Phrase entries from a previous query are reused.
@@ -111,8 +120,21 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
       return x.sentence.code() < y.sentence.code();
     });
     set<string> displayed;
+#ifndef T9_ALGO_ONLY_BUILD
+    // Sentences the user deleted (long press) are skipped here, so the next best one takes the slot.
+    const auto suppressed = GetT9SuppressionStore();
+#endif
     for (const auto& item : order) {
+      // t9/display_sentences: whole-input sentences shown before the dictionary words
+      // (1 = the best sentence, then shorter words, as stock Rime; 0 = all decoded).
+      if (t9_display_sentences_ && sentences_.size() >= t9_display_sentences_) break;
+      // Further whole-input sentences only from t9/more_sentences_min_keys keys on: on short input they
+      // are weak alternatives that push dictionary words (的, 觉得) out of the first four places.
+      if (!sentences_.empty() && total < t9_more_sentences_min_keys_) break;
       const auto& path = paths[item.first];
+#ifndef T9_ALGO_ONLY_BUILD
+      if (suppressed && suppressed->Contains("t9_pinyin", path.sentence.text())) continue;
+#endif
       if (!displayed.insert(path.sentence.text()).second) continue;
       auto sentence = New<Sentence>(path.sentence);
       sentence->Offset(start_);
@@ -124,7 +146,8 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
   };
   const string cache_key = syllabifier_->input() + "#" + std::to_string(start_) +
                            "#" + std::to_string(end_of_input_);
-  if (t9_decoded_cache_ && !enable_correction_ && !translator_->strict_spelling()) {
+  if (t9_decoded_cache_ && (!enable_correction_ || t9_cache_with_correction_) &&
+      !translator_->strict_spelling()) {
     auto& owned = translator_->t9_joint_cache;
     if (!owned) owned = New<T9JointCache>();
     cache = owned.get();
@@ -134,11 +157,13 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
     T9JointCache::Options options{t9_source_budget_, t9_pool_budget_, t9_dictionary_beam_,
         t9_sentence_beam_, t9_result_budget_, t9_spelling_penalty_, t9_word_penalty_,
         t9_sentence_weight_, t9_sentence_model_, translator_->enable_completion(),
-        translator_->enable_word_completion(), translator_->complete_short_prefix()};
+        translator_->enable_word_completion(), translator_->complete_short_prefix(),
+        t9_ngram_.get(), t9_ngram_user_weight_, t9_ngram_sentence_start_, t9_ngram_eos_weight_,
+        t9_ngram_merge_segmentations_, t9_ngram_dictionary_prior_};
     if (cache->dict_checksum != prism->dict_file_checksum() ||
         cache->schema_checksum != prism->schema_file_checksum() ||
         cache->user_revision != revision || cache->user_tick != tick ||
-        cache->user_dict != user_dict || cache->preceding != preceding ||
+        cache->user_dict != user_dict || cache->preceding != cache_context ||
         cache->blacklist != translator_->blacklist() || cache->options != options) {
       cache->results.Clear();
       cache->frames.clear(); cache->frame_bytes = 0;
@@ -147,11 +172,12 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
       cache->user_revision = revision;
       cache->user_tick = tick;
       cache->user_dict = user_dict;
-      cache->preceding = preceding;
+      cache->preceding = cache_context;
       cache->blacklist = translator_->blacklist();
       cache->options = std::move(options);
     }
     if (const auto* paths = cache->results.Find(cache_key)) {
+      T9_WORK_COUNT(joint_cache_hits);
       restore(*paths);
       return !sentences_.empty();
     }
@@ -190,6 +216,7 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
   }
   set<size_t> dirty;
   if (previous) {
+    T9_WORK_COUNT(joint_frame_reuse);
     for (const auto& row : syllables.edges) {
       auto old = previous->edges.find(row.first);
       if (old == previous->edges.end() || !sameRow(row.second, old->second)) dirty.insert(row.first);
@@ -217,11 +244,14 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
       if (found != previous->merged.end()) graph[row.first] = found->second;
       system_reach[row.first] = previous->system_reach.at(row.first);
       user_reach[row.first] = previous->user_reach.at(row.first);
+      T9_WORK_COUNT(joint_origins_reused);
     } else { starts.push_back(row.first); system_reach[row.first] = row.first; }
   }
+  T9_WORK_ADD(joint_origins_queried, starts.size());
   {
     T9LookupScope scope(&system_reach);
-    auto buckets = dict->LookupAll(syllables, starts, &translator_->blacklist(), false, 0, t9_dictionary_beam_);
+    auto buckets = dict->LookupAll(syllables, starts, &translator_->blacklist(), false, 0, t9_dictionary_beam_,
+                                   IsT9NumericInput(input));
     for (auto& start : buckets) T9Collect(system[start.first], start.second, t9_source_budget_);
   }
   for (const auto start : starts) {
@@ -232,18 +262,105 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
       T9Collect(user, user_dict->Lookup(syllables, start, 0), t9_source_budget_);
     }
     auto merged = std::move(system[start]);
+    for (const auto& end : merged) T9_WORK_ADD(system_entries, end.second.size());
     for (const auto& end : user) {
+      T9_WORK_ADD(user_entries_collected, end.second.size());
       auto& entries = merged[end.first];
       entries.insert(entries.end(), end.second.begin(), end.second.end());
     }
+    if (t9_prefer_user_entries_) {
+      // A learned word and the same system word share text and code; the merge keeps the higher
+      // dictionary weight and would drop the user entry, so the user layer never applied.
+      for (auto& end : merged) {
+        auto& list = end.second;
+        // Copy the learned identities first: remove_if moves elements while it runs, so the
+        // predicate must not read the list itself (it saw moved-from null entries and crashed).
+        vector<std::pair<string, Code>> learned;
+        for (const auto& entry : list)
+          if (entry && entry->commit_count > 0) learned.emplace_back(entry->text, entry->code);
+        if (learned.empty()) continue;
+        list.erase(std::remove_if(list.begin(), list.end(), [&](const an<DictEntry>& entry) {
+          return entry && entry->commit_count <= 0 &&
+                 std::any_of(learned.begin(), learned.end(), [&](const auto& other) {
+                   return other.first == entry->text && other.second == entry->code;
+                 });
+        }), list.end());
+      }
+    }
     for (auto& end : merged) {
+      T9_WORK_COUNT(merge_calls); T9_WORK_ADD(merge_entries_in, end.second.size());
+      DictEntryList learned;
+      if (t9_prefer_user_entries_)
+        for (const auto& entry : end.second) if (entry->commit_count > 0) learned.push_back(entry);
       T9MergeEntries(end.second, t9_pool_budget_);
+      // Learned words survive the pool budget: their user-dictionary weight is on another scale.
+      for (const auto& entry : learned)
+        if (std::find(end.second.begin(), end.second.end(), entry) == end.second.end()) end.second.push_back(entry);
+      T9_WORK_ADD(merge_entries_out, end.second.size());
       graph[start][end.first] = std::move(end.second);
+    }
+  }
+  // Whole-input dictionary phrases bypass the prefix beam (26-key initials: the beam ranks prefixes by
+  // single-character weight and can drop 化妆品 for hzp before the word model sees it).
+  if (t9_whole_input_phrases_ > 0) {
+    auto whole = dict->Lookup(syllables, 0, &translator_->blacklist(), false, 0.0, 0, false, false);
+    if (whole) {
+      auto bucket = whole->find(static_cast<int>(total));
+      if (bucket != whole->end()) {
+        auto& list = graph[0][static_cast<int>(total)];
+        for (size_t n = 0; n < t9_whole_input_phrases_ && !bucket->second.exhausted(); ++n) {
+          auto entry = bucket->second.Peek();
+          if (!entry->IsPredictiveMatch() &&
+              std::none_of(list.begin(), list.end(), [&](const an<DictEntry>& x) { return x->text == entry->text; }))
+            list.push_back(entry);
+          bucket->second.Next();
+        }
+      }
     }
   }
   map<size_t, vector<an<T9Line>>> states;
   if (previous) for (const auto& state : previous->states) if (state.first <= stable) states.insert(state);
-  if (states.empty()) states[0].push_back(New<T9Line>());
+  if (states.empty()) {
+    auto root = New<T9Line>();
+    // Committed text before the composition ("\x1e" + text from the app; absent = unknown):
+    // its last two model words are the first word's history. Nothing or a non-Han character
+    // right before the composition is a sentence start, as for the training Han runs.
+    if (t9_ngram_ && !t9_left_context_.empty() && t9_left_context_[0] == '\x1e') {
+      const string text = t9_left_context_.substr(1);
+      auto run = text.end();
+      size_t chars = 0;
+      bool bounded = false;
+      while (chars < 16) {
+        if (run == text.begin()) break;
+        auto at = run;
+        const uint32_t c = utf8::unchecked::prior(at);
+        if (!((c >= 0x3400 && c <= 0x4DBF) || (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3007)) { bounded = true; break; }
+        run = at; ++chars;
+      }
+      if (!chars) {
+        root->lm_id = t9_ngram_->Bos();
+      } else {
+        vector<int32_t> parts;
+        t9_ngram_->Decompose(string(run, text.end()), &parts);
+        root->lm_id = parts.back();
+        root->lm_prev = parts.size() >= 2 ? parts[parts.size() - 2]
+                                          : bounded ? t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
+        if (root->lm_id == ::T9NgramModel::kUnseen) root->lm_prev = ::T9NgramModel::kUnseen;
+      }
+    }
+    states[0].push_back(root);
+  }
+  // Model word of each entry; an entry the corpus never contained is kept as its parts,
+  // so a long unseen entry never wins by paying a single unseen-word cost.
+  struct T9LmEntry { int32_t id; vector<int32_t> parts; };
+  std::unordered_map<const DictEntry*, T9LmEntry> lm_entries;
+  auto lm_entry_of = [&](const an<DictEntry>& entry) -> const T9LmEntry& {
+    const auto found = lm_entries.find(entry.get());
+    if (found != lm_entries.end()) return found->second;
+    T9LmEntry lm{t9_ngram_->Id(entry->text), {}};
+    if (lm.id == ::T9NgramModel::kUnseen) t9_ngram_->Decompose(entry->text, &lm.parts);
+    return lm_entries.emplace(entry.get(), std::move(lm)).first->second;
+  };
   auto better = [](const an<T9Line>& a, const an<T9Line>& b) {
     if (a->score != b->score) return a->score > b->score;
     if (a->prior != b->prior) return a->prior > b->prior;
@@ -259,21 +376,68 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
       for (const auto& previous : found->second) {
         for (const auto& entry : end.second) {
           if (entry->IsPredictiveMatch()) continue;
-          double score = previous->score + Grammar::Evaluate(
-              previous->text.empty() ? preceding : previous->text,
-              entry->text, entry->weight, static_cast<size_t>(end.first) == total, t9_grammar_.get());
+          T9_WORK_COUNT(beam_evaluations);
+          double score = previous->score;
+          int32_t lm_id = ::T9NgramModel::kUnseen, lm_prev = ::T9NgramModel::kUnseen;
+          if (t9_ngram_) {
+            // One weight scale: ln P(word | previous words) from one set of corpus counts
+            // replaces the dictionary weight, the grammar and the per-word penalty.
+            T9_WORK_COUNT(ngram_lookups);
+            // The root carries a history only when the committed text before it is known.
+            const bool first = !previous->entry && previous->lm_id == ::T9NgramModel::kUnseen;
+            const auto& lm = lm_entry_of(entry);
+            double lp;
+            if (!lm.parts.empty()) {
+              lp = t9_ngram_->Chain(previous->lm_prev, previous->lm_id, first, t9_ngram_sentence_start_,
+                                    lm.parts, &lm_prev, &lm_id);
+              if (t9_ngram_dictionary_prior_ > 0 && std::isfinite(entry->weight)) {
+                // A dictionary (or cell-pack) word the corpus never contained: its dictionary
+                // frequency is the only evidence for the whole word, so mix it in as a unigram
+                // probability of the entry, like the user layer; the chain of parts keeps 1-μ.
+                lp = std::log((1 - t9_ngram_dictionary_prior_) * std::exp(lp) +
+                              t9_ngram_dictionary_prior_ * std::exp(entry->weight));
+              }
+            } else if (first) {
+              lm_id = lm.id;
+              lm_prev = t9_ngram_sentence_start_ ? t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
+              lp = t9_ngram_->Start(lm.id, t9_ngram_sentence_start_);
+            } else {
+              lm_id = lm.id;
+              lm_prev = previous->lm_id;
+              lp = t9_ngram_->LogProb3(previous->lm_prev, previous->lm_id, lm.id);
+            }
+            if (entry->commit_count > 0 && t9_ngram_user_weight_ > 0) {
+              // User layer: P = (1-λ)·P(base) + λ·P(user), where P(user) is the user dictionary's own
+              // estimate (commit share plus a recency term that fades over a few hundred commits).
+              // The base model is read-only and keeps weight 1-λ, so learning never forgets grammar.
+              const double user = std::min(1.0, std::exp(entry->weight));
+              lp = std::log((1 - t9_ngram_user_weight_) * std::exp(lp) + t9_ngram_user_weight_ * user);
+            }
+            score += lp;
+          } else {
+            score += Grammar::Evaluate(
+                previous->text.empty() ? preceding : previous->text,
+                entry->text, entry->weight, static_cast<size_t>(end.first) == total, t9_grammar_.get());
+            // Discourage over-segmentation.
+            score -= t9_word_penalty_;
+          }
           // Apply the same score before allocating a path. Strictly worse
           // paths cannot enter a full beam; equal scores still reach tie-breaks.
-          // Discourage over-segmentation and penalize abbreviated/fuzzy spans.
-          score -= t9_word_penalty_;
+          // Keyboard-neighbour corrections (26-key touch typing): the word model scores a corrected
+          // word as if it had been typed, so charge it t9/correction_penalty (nine-key has no corrector).
+          if (enable_correction_ && syllabifier_->IsCorrection(entry->code, end.first, start.first))
+            score += t9_correction_penalty_;
+          // Penalize abbreviated/fuzzy spans.
           score -= spelling_penalty * std::max(0.0,
               static_cast<double>(end.first - start.first) - entry->quality_len);
-          if (target.size() >= t9_sentence_beam_ && score < target.back()->score) continue;
+          if (target.size() >= t9_sentence_beam_ && score < target.back()->score) { T9_WORK_COUNT(beam_rejected); continue; }
           auto line = New<T9Line>();
           line->previous = previous;
           line->entry = entry;
           line->matched_length = previous->matched_length + entry->quality_len;
           line->end = end.first;
+          line->lm_id = lm_id;
+          line->lm_prev = lm_prev;
           line->text = previous->text + entry->text;
           if (line->end == total) line->prior = T9WholeTextPrior(t9_gram_db_, line->text);
           line->code = previous->code;
@@ -283,11 +447,22 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
             return line->text == other->text && line->code == other->code;
           });
           if (duplicate != target.end()) {
-            if (!better(line, *duplicate)) continue;
-            target.erase(duplicate);
+            if (t9_ngram_ && t9_ngram_merge_segmentations_) {
+              // The same text and spelling through other words: P(text) sums its segmentations.
+              // The better segmentation keeps its words as the history of what follows; lines
+              // ending here have not been extended yet.
+              const double a = line->score, b = (*duplicate)->score;
+              if (!better(line, *duplicate)) line = *duplicate;
+              target.erase(duplicate);
+              line->score = std::max(a, b) + std::log1p(std::exp(-std::fabs(a - b)));
+            } else {
+              if (!better(line, *duplicate)) continue;
+              target.erase(duplicate);
+            }
           }
           const auto pos = std::lower_bound(target.begin(), target.end(), line, better);
           target.insert(pos, line);
+          T9_WORK_COUNT(beam_insertions);
           if (target.size() > t9_sentence_beam_) target.pop_back();
         }
       }
@@ -347,24 +522,35 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
   }
   // Explicit final beam: all survivors receive the same bounded second pass.
   // Reorder the actual native Sentence objects before filters and Menu indexing.
-  auto& final = states[total];
+  // Sentence end (n-gram </s>, weighted by t9/ngram_eos_weight): how naturally a finished
+  // path could end here. It only orders the finished paths; states kept for later keys
+  // are unchanged, since the composition may continue.
+  vector<std::pair<double, an<T9Line>>> final;
+  for (const auto& line : states[total]) {
+    double rank = line->score;
+    if (t9_ngram_ && t9_ngram_eos_weight_ > 0)
+      rank += t9_ngram_eos_weight_ * t9_ngram_->LogProb3(line->lm_prev, line->lm_id, t9_ngram_->Eos());
+    final.emplace_back(rank, line);
+  }
+  std::stable_sort(final.begin(), final.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
   if (final.size() > t9_result_budget_) final.resize(t9_result_budget_);
   vector<T9Path> paths;
   double coverage = 0;
-  for (const auto& line : final)
-    coverage = std::max(coverage, std::min(1.0, line->matched_length / total));
-  for (const auto& line : final) {
+  for (const auto& ranked : final)
+    coverage = std::max(coverage, std::min(1.0, ranked.second->matched_length / total));
+  for (const auto& [rank, line] : final) {
     auto sentence = New<Sentence>(translator_->language());
     vector<an<T9Line>> components;
     for (auto cursor = line; cursor && cursor->entry; cursor = cursor->previous)
       components.push_back(cursor);
     for (auto it = components.rbegin(); it != components.rend(); ++it)
       sentence->Extend(*(*it)->entry, (*it)->end, (*it)->score);
+    sentence->set_weight(rank);
     // All hypotheses in this translation share a match-coverage baseline,
     // preserving monotonic scores. Exact English can outrank an all-abbreviated
     // Chinese stream (e.g. two keys), without a forced language/source slot.
     sentence->set_quality(coverage + 0.1 *
-                           (0.5 + std::atan(line->score / 10.0) / 3.141592653589793));
+                           (0.5 + std::atan(rank / 10.0) / 3.141592653589793));
     paths.push_back({*sentence, line->prior, coverage});
     if (paths.size() >= t9_result_budget_) break;
   }

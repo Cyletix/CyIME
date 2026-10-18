@@ -1,0 +1,3212 @@
+{
+  "fixture_version": 1,
+  "id": "t9_everyday_chat_20261009",
+  "source_label": "Everyday chat clauses (taxonomy set, 2026-10-09)",
+  "source_text": "你吃饭了吗\r\n你现在在哪\r\n今天晚上有空吗\r\n你到家了没\r\n明天几点出发\r\n这个怎么用\r\n你觉得怎么样\r\n他们都去了吗\r\n那你还来不来\r\n周末一起去爬山吧\r\n你是不是生气了\r\n要不要我去接你\r\n怎么还没回消息\r\n你在干什么呢\r\n他怎么也不说话\r\n到底是谁说的\r\n还要等多久\r\n能不能便宜一点\r\n这件事你知道吗\r\n你什么时候有空\r\n你看到我的消息了吗\r\n你那边下雪了吗\r\n他们怎么还没到\r\n你会不会做饭\r\n你还记得吗\r\n那边怎么样了\r\n好久不见最近怎么样\r\n我们明天几点在哪集合\r\n好的我知道了\r\n没问题包在我身上\r\n我也是这么想的\r\n那就这样吧\r\n我马上就到\r\n不用了谢谢\r\n算了不说了\r\n行那就明天见\r\n我还在路上\r\n我都忘了这回事\r\n你说得对\r\n我也不太清楚\r\n等我一下\r\n刚才在开会\r\n我已经到了\r\n没事你忙吧\r\n真的假的\r\n太好了\r\n别担心\r\n我先睡了\r\n我现在就过去\r\n不好意思我来晚了\r\n下午三点在门口见\r\n我们在地铁站等你\r\n明天早上八点开会\r\n晚上一起吃火锅\r\n下周三要考试\r\n我在公司楼下\r\n车已经开走了\r\n外面下雨了\r\n今天特别冷\r\n快到了还有五分钟\r\n今天的会取消了\r\n天气预报说明天有雨\r\n早上好\r\n晚安啦\r\n今天好累啊\r\n我有点不舒服\r\n心情不太好\r\n我真的很开心\r\n这也太难了吧\r\n笑死我了\r\n有点想家了\r\n我也很想你\r\n别太难过了\r\n这事挺麻烦的\r\n辛苦了早点休息\r\n生日快乐\r\n我昨晚做了一个奇怪的梦\r\n我打算明年换工作\r\n我们下次再约\r\n回头再说吧\r\n我想去买点东西\r\n等会给你打电话\r\n吃完饭就回去\r\n我明天请假\r\n这周末我要加班\r\n我们可以先看看\r\n我去洗个澡\r\n要是明天下雨就不去了\r\n如果你有时间的话就过来吧\r\n他也会来的\r\n那我就不去了\r\n大家都在等你呢\r\n我会尽快的\r\n都是你的错\r\n那就好\r\n我就知道会这样\r\n还是你说吧\r\n这样也行\r\n他还在睡觉呢\r\n也不是不可以\r\n这个也不错\r\n你会喜欢的\r\n就差一点点\r\n我在想办法\r\n这么晚了还不睡\r\n你也早点睡吧\r\n记得带伞\r\n帮我拿个快递\r\n手机快没电了\r\n发个位置给我\r\n我把钥匙忘在家里了\r\n他说他会晚一点到\r\n这个价格还可以\r\n孩子今天发烧了\r\n我妈让我早点回家\r\n我在网上看到的\r\n这家店的菜很好吃\r\n别忘了交作业\r\n我觉得这个方案不太行\r\n这个问题我也遇到过\r\n",
+  "source_sha256_utf8": "949027dec63fe6c196c167518bcfe9737aed1c218322baf5a1609909563a9bcf",
+  "input_contract": {
+    "language": "zh-Hans",
+    "scheme": "full_pinyin",
+    "layout": "t9",
+    "keymap": {
+      "2": "abc",
+      "3": "def",
+      "4": "ghi",
+      "5": "jkl",
+      "6": "mno",
+      "7": "pqrs",
+      "8": "tuv",
+      "9": "wxyz"
+    },
+    "pinyin": "One full canonical toneless pinyin syllable per Han character; ü is v.",
+    "case_boundary": "Every contiguous Han span is an independent composition; all other characters remain source literals.",
+    "source_offsets": "Python Unicode code point offsets, start inclusive, end exclusive.",
+    "body_filter": "All generated cases default to body; heading/speaker classification requires explicit editing.",
+    "simulation_limit": "Input fixture only; pronunciation, candidate language quality and keyboard UI acceptance are not certified."
+  },
+  "pronunciation_review": {
+    "review_status": "provided",
+    "generator": "explicit one-syllable-per-Han readings",
+    "overrides": []
+  },
+  "cases": [
+    {
+      "id": "c001",
+      "text": "你吃饭了吗",
+      "pinyin": [
+        "ni",
+        "chi",
+        "fan",
+        "le",
+        "ma"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 0,
+      "source_end": 5,
+      "source_line": 1,
+      "keys": "642443265362",
+      "syllable_keys": [
+        "64",
+        "244",
+        "326",
+        "53",
+        "62"
+      ]
+    },
+    {
+      "id": "c002",
+      "text": "你现在在哪",
+      "pinyin": [
+        "ni",
+        "xian",
+        "zai",
+        "zai",
+        "na"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 7,
+      "source_end": 12,
+      "source_line": 2,
+      "keys": "64942692492462",
+      "syllable_keys": [
+        "64",
+        "9426",
+        "924",
+        "924",
+        "62"
+      ]
+    },
+    {
+      "id": "c003",
+      "text": "今天晚上有空吗",
+      "pinyin": [
+        "jin",
+        "tian",
+        "wan",
+        "shang",
+        "you",
+        "kong",
+        "ma"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 14,
+      "source_end": 21,
+      "source_line": 3,
+      "keys": "546842692674264968566462",
+      "syllable_keys": [
+        "546",
+        "8426",
+        "926",
+        "74264",
+        "968",
+        "5664",
+        "62"
+      ]
+    },
+    {
+      "id": "c004",
+      "text": "你到家了没",
+      "pinyin": [
+        "ni",
+        "dao",
+        "jia",
+        "le",
+        "mei"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 23,
+      "source_end": 28,
+      "source_line": 4,
+      "keys": "6432654253634",
+      "syllable_keys": [
+        "64",
+        "326",
+        "542",
+        "53",
+        "634"
+      ]
+    },
+    {
+      "id": "c005",
+      "text": "明天几点出发",
+      "pinyin": [
+        "ming",
+        "tian",
+        "ji",
+        "dian",
+        "chu",
+        "fa"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 30,
+      "source_end": 36,
+      "source_line": 5,
+      "keys": "6464842654342624832",
+      "syllable_keys": [
+        "6464",
+        "8426",
+        "54",
+        "3426",
+        "248",
+        "32"
+      ]
+    },
+    {
+      "id": "c006",
+      "text": "这个怎么用",
+      "pinyin": [
+        "zhe",
+        "ge",
+        "zen",
+        "me",
+        "yong"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 38,
+      "source_end": 43,
+      "source_line": 6,
+      "keys": "94343936639664",
+      "syllable_keys": [
+        "943",
+        "43",
+        "936",
+        "63",
+        "9664"
+      ]
+    },
+    {
+      "id": "c007",
+      "text": "你觉得怎么样",
+      "pinyin": [
+        "ni",
+        "jue",
+        "de",
+        "zen",
+        "me",
+        "yang"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 45,
+      "source_end": 51,
+      "source_line": 7,
+      "keys": "6458333936639264",
+      "syllable_keys": [
+        "64",
+        "583",
+        "33",
+        "936",
+        "63",
+        "9264"
+      ]
+    },
+    {
+      "id": "c008",
+      "text": "他们都去了吗",
+      "pinyin": [
+        "ta",
+        "men",
+        "dou",
+        "qu",
+        "le",
+        "ma"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 53,
+      "source_end": 59,
+      "source_line": 8,
+      "keys": "82636368785362",
+      "syllable_keys": [
+        "82",
+        "636",
+        "368",
+        "78",
+        "53",
+        "62"
+      ]
+    },
+    {
+      "id": "c009",
+      "text": "那你还来不来",
+      "pinyin": [
+        "na",
+        "ni",
+        "hai",
+        "lai",
+        "bu",
+        "lai"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 61,
+      "source_end": 67,
+      "source_line": 9,
+      "keys": "626442452428524",
+      "syllable_keys": [
+        "62",
+        "64",
+        "424",
+        "524",
+        "28",
+        "524"
+      ]
+    },
+    {
+      "id": "c010",
+      "text": "周末一起去爬山吧",
+      "pinyin": [
+        "zhou",
+        "mo",
+        "yi",
+        "qi",
+        "qu",
+        "pa",
+        "shan",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 69,
+      "source_end": 77,
+      "source_line": 10,
+      "keys": "94686694747872742622",
+      "syllable_keys": [
+        "9468",
+        "66",
+        "94",
+        "74",
+        "78",
+        "72",
+        "7426",
+        "22"
+      ]
+    },
+    {
+      "id": "c011",
+      "text": "你是不是生气了",
+      "pinyin": [
+        "ni",
+        "shi",
+        "bu",
+        "shi",
+        "sheng",
+        "qi",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 79,
+      "source_end": 86,
+      "source_line": 11,
+      "keys": "6474428744743647453",
+      "syllable_keys": [
+        "64",
+        "744",
+        "28",
+        "744",
+        "74364",
+        "74",
+        "53"
+      ]
+    },
+    {
+      "id": "c012",
+      "text": "要不要我去接你",
+      "pinyin": [
+        "yao",
+        "bu",
+        "yao",
+        "wo",
+        "qu",
+        "jie",
+        "ni"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 88,
+      "source_end": 95,
+      "source_line": 12,
+      "keys": "92628926967854364",
+      "syllable_keys": [
+        "926",
+        "28",
+        "926",
+        "96",
+        "78",
+        "543",
+        "64"
+      ]
+    },
+    {
+      "id": "c013",
+      "text": "怎么还没回消息",
+      "pinyin": [
+        "zen",
+        "me",
+        "hai",
+        "mei",
+        "hui",
+        "xiao",
+        "xi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 97,
+      "source_end": 104,
+      "source_line": 13,
+      "keys": "93663424634484942694",
+      "syllable_keys": [
+        "936",
+        "63",
+        "424",
+        "634",
+        "484",
+        "9426",
+        "94"
+      ]
+    },
+    {
+      "id": "c014",
+      "text": "你在干什么呢",
+      "pinyin": [
+        "ni",
+        "zai",
+        "gan",
+        "shen",
+        "me",
+        "ne"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 106,
+      "source_end": 112,
+      "source_line": 14,
+      "keys": "6492442674366363",
+      "syllable_keys": [
+        "64",
+        "924",
+        "426",
+        "7436",
+        "63",
+        "63"
+      ]
+    },
+    {
+      "id": "c015",
+      "text": "他怎么也不说话",
+      "pinyin": [
+        "ta",
+        "zen",
+        "me",
+        "ye",
+        "bu",
+        "shuo",
+        "hua"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 114,
+      "source_end": 121,
+      "source_line": 15,
+      "keys": "829366393287486482",
+      "syllable_keys": [
+        "82",
+        "936",
+        "63",
+        "93",
+        "28",
+        "7486",
+        "482"
+      ]
+    },
+    {
+      "id": "c016",
+      "text": "到底是谁说的",
+      "pinyin": [
+        "dao",
+        "di",
+        "shi",
+        "shei",
+        "shuo",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 123,
+      "source_end": 129,
+      "source_line": 16,
+      "keys": "326347447434748633",
+      "syllable_keys": [
+        "326",
+        "34",
+        "744",
+        "7434",
+        "7486",
+        "33"
+      ]
+    },
+    {
+      "id": "c017",
+      "text": "还要等多久",
+      "pinyin": [
+        "hai",
+        "yao",
+        "deng",
+        "duo",
+        "jiu"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 131,
+      "source_end": 136,
+      "source_line": 17,
+      "keys": "4249263364386548",
+      "syllable_keys": [
+        "424",
+        "926",
+        "3364",
+        "386",
+        "548"
+      ]
+    },
+    {
+      "id": "c018",
+      "text": "能不能便宜一点",
+      "pinyin": [
+        "neng",
+        "bu",
+        "neng",
+        "pian",
+        "yi",
+        "yi",
+        "dian"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 138,
+      "source_end": 145,
+      "source_line": 18,
+      "keys": "6364286364742694943426",
+      "syllable_keys": [
+        "6364",
+        "28",
+        "6364",
+        "7426",
+        "94",
+        "94",
+        "3426"
+      ]
+    },
+    {
+      "id": "c019",
+      "text": "这件事你知道吗",
+      "pinyin": [
+        "zhe",
+        "jian",
+        "shi",
+        "ni",
+        "zhi",
+        "dao",
+        "ma"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 147,
+      "source_end": 154,
+      "source_line": 19,
+      "keys": "94354267446494432662",
+      "syllable_keys": [
+        "943",
+        "5426",
+        "744",
+        "64",
+        "944",
+        "326",
+        "62"
+      ]
+    },
+    {
+      "id": "c020",
+      "text": "你什么时候有空",
+      "pinyin": [
+        "ni",
+        "shen",
+        "me",
+        "shi",
+        "hou",
+        "you",
+        "kong"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 156,
+      "source_end": 163,
+      "source_line": 20,
+      "keys": "647436637444689685664",
+      "syllable_keys": [
+        "64",
+        "7436",
+        "63",
+        "744",
+        "468",
+        "968",
+        "5664"
+      ]
+    },
+    {
+      "id": "c021",
+      "text": "你看到我的消息了吗",
+      "pinyin": [
+        "ni",
+        "kan",
+        "dao",
+        "wo",
+        "de",
+        "xiao",
+        "xi",
+        "le",
+        "ma"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 165,
+      "source_end": 174,
+      "source_line": 21,
+      "keys": "6452632696339426945362",
+      "syllable_keys": [
+        "64",
+        "526",
+        "326",
+        "96",
+        "33",
+        "9426",
+        "94",
+        "53",
+        "62"
+      ]
+    },
+    {
+      "id": "c022",
+      "text": "你那边下雪了吗",
+      "pinyin": [
+        "ni",
+        "na",
+        "bian",
+        "xia",
+        "xue",
+        "le",
+        "ma"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 176,
+      "source_end": 183,
+      "source_line": 22,
+      "keys": "646224269429835362",
+      "syllable_keys": [
+        "64",
+        "62",
+        "2426",
+        "942",
+        "983",
+        "53",
+        "62"
+      ]
+    },
+    {
+      "id": "c023",
+      "text": "他们怎么还没到",
+      "pinyin": [
+        "ta",
+        "men",
+        "zen",
+        "me",
+        "hai",
+        "mei",
+        "dao"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 185,
+      "source_end": 192,
+      "source_line": 23,
+      "keys": "8263693663424634326",
+      "syllable_keys": [
+        "82",
+        "636",
+        "936",
+        "63",
+        "424",
+        "634",
+        "326"
+      ]
+    },
+    {
+      "id": "c024",
+      "text": "你会不会做饭",
+      "pinyin": [
+        "ni",
+        "hui",
+        "bu",
+        "hui",
+        "zuo",
+        "fan"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 194,
+      "source_end": 200,
+      "source_line": 24,
+      "keys": "6448428484986326",
+      "syllable_keys": [
+        "64",
+        "484",
+        "28",
+        "484",
+        "986",
+        "326"
+      ]
+    },
+    {
+      "id": "c025",
+      "text": "你还记得吗",
+      "pinyin": [
+        "ni",
+        "hai",
+        "ji",
+        "de",
+        "ma"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 202,
+      "source_end": 207,
+      "source_line": 25,
+      "keys": "64424543362",
+      "syllable_keys": [
+        "64",
+        "424",
+        "54",
+        "33",
+        "62"
+      ]
+    },
+    {
+      "id": "c026",
+      "text": "那边怎么样了",
+      "pinyin": [
+        "na",
+        "bian",
+        "zen",
+        "me",
+        "yang",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 209,
+      "source_end": 215,
+      "source_line": 26,
+      "keys": "62242693663926453",
+      "syllable_keys": [
+        "62",
+        "2426",
+        "936",
+        "63",
+        "9264",
+        "53"
+      ]
+    },
+    {
+      "id": "c027",
+      "text": "好久不见最近怎么样",
+      "pinyin": [
+        "hao",
+        "jiu",
+        "bu",
+        "jian",
+        "zui",
+        "jin",
+        "zen",
+        "me",
+        "yang"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 217,
+      "source_end": 226,
+      "source_line": 27,
+      "keys": "426548285426984546936639264",
+      "syllable_keys": [
+        "426",
+        "548",
+        "28",
+        "5426",
+        "984",
+        "546",
+        "936",
+        "63",
+        "9264"
+      ]
+    },
+    {
+      "id": "c028",
+      "text": "我们明天几点在哪集合",
+      "pinyin": [
+        "wo",
+        "men",
+        "ming",
+        "tian",
+        "ji",
+        "dian",
+        "zai",
+        "na",
+        "ji",
+        "he"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 228,
+      "source_end": 238,
+      "source_line": 28,
+      "keys": "9663664648426543426924625443",
+      "syllable_keys": [
+        "96",
+        "636",
+        "6464",
+        "8426",
+        "54",
+        "3426",
+        "924",
+        "62",
+        "54",
+        "43"
+      ]
+    },
+    {
+      "id": "c029",
+      "text": "好的我知道了",
+      "pinyin": [
+        "hao",
+        "de",
+        "wo",
+        "zhi",
+        "dao",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 240,
+      "source_end": 246,
+      "source_line": 29,
+      "keys": "426339694432653",
+      "syllable_keys": [
+        "426",
+        "33",
+        "96",
+        "944",
+        "326",
+        "53"
+      ]
+    },
+    {
+      "id": "c030",
+      "text": "没问题包在我身上",
+      "pinyin": [
+        "mei",
+        "wen",
+        "ti",
+        "bao",
+        "zai",
+        "wo",
+        "shen",
+        "shang"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 248,
+      "source_end": 256,
+      "source_line": 30,
+      "keys": "6349368422692496743674264",
+      "syllable_keys": [
+        "634",
+        "936",
+        "84",
+        "226",
+        "924",
+        "96",
+        "7436",
+        "74264"
+      ]
+    },
+    {
+      "id": "c031",
+      "text": "我也是这么想的",
+      "pinyin": [
+        "wo",
+        "ye",
+        "shi",
+        "zhe",
+        "me",
+        "xiang",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 258,
+      "source_end": 265,
+      "source_line": 31,
+      "keys": "9693744943639426433",
+      "syllable_keys": [
+        "96",
+        "93",
+        "744",
+        "943",
+        "63",
+        "94264",
+        "33"
+      ]
+    },
+    {
+      "id": "c032",
+      "text": "那就这样吧",
+      "pinyin": [
+        "na",
+        "jiu",
+        "zhe",
+        "yang",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 267,
+      "source_end": 272,
+      "source_line": 32,
+      "keys": "62548943926422",
+      "syllable_keys": [
+        "62",
+        "548",
+        "943",
+        "9264",
+        "22"
+      ]
+    },
+    {
+      "id": "c033",
+      "text": "我马上就到",
+      "pinyin": [
+        "wo",
+        "ma",
+        "shang",
+        "jiu",
+        "dao"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 274,
+      "source_end": 279,
+      "source_line": 33,
+      "keys": "966274264548326",
+      "syllable_keys": [
+        "96",
+        "62",
+        "74264",
+        "548",
+        "326"
+      ]
+    },
+    {
+      "id": "c034",
+      "text": "不用了谢谢",
+      "pinyin": [
+        "bu",
+        "yong",
+        "le",
+        "xie",
+        "xie"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 281,
+      "source_end": 286,
+      "source_line": 34,
+      "keys": "28966453943943",
+      "syllable_keys": [
+        "28",
+        "9664",
+        "53",
+        "943",
+        "943"
+      ]
+    },
+    {
+      "id": "c035",
+      "text": "算了不说了",
+      "pinyin": [
+        "suan",
+        "le",
+        "bu",
+        "shuo",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 288,
+      "source_end": 293,
+      "source_line": 35,
+      "keys": "78265328748653",
+      "syllable_keys": [
+        "7826",
+        "53",
+        "28",
+        "7486",
+        "53"
+      ]
+    },
+    {
+      "id": "c036",
+      "text": "行那就明天见",
+      "pinyin": [
+        "xing",
+        "na",
+        "jiu",
+        "ming",
+        "tian",
+        "jian"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 295,
+      "source_end": 301,
+      "source_line": 36,
+      "keys": "946462548646484265426",
+      "syllable_keys": [
+        "9464",
+        "62",
+        "548",
+        "6464",
+        "8426",
+        "5426"
+      ]
+    },
+    {
+      "id": "c037",
+      "text": "我还在路上",
+      "pinyin": [
+        "wo",
+        "hai",
+        "zai",
+        "lu",
+        "shang"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 303,
+      "source_end": 308,
+      "source_line": 37,
+      "keys": "964249245874264",
+      "syllable_keys": [
+        "96",
+        "424",
+        "924",
+        "58",
+        "74264"
+      ]
+    },
+    {
+      "id": "c038",
+      "text": "我都忘了这回事",
+      "pinyin": [
+        "wo",
+        "dou",
+        "wang",
+        "le",
+        "zhe",
+        "hui",
+        "shi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 310,
+      "source_end": 317,
+      "source_line": 38,
+      "keys": "96368926453943484744",
+      "syllable_keys": [
+        "96",
+        "368",
+        "9264",
+        "53",
+        "943",
+        "484",
+        "744"
+      ]
+    },
+    {
+      "id": "c039",
+      "text": "你说得对",
+      "pinyin": [
+        "ni",
+        "shuo",
+        "de",
+        "dui"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 319,
+      "source_end": 323,
+      "source_line": 39,
+      "keys": "64748633384",
+      "syllable_keys": [
+        "64",
+        "7486",
+        "33",
+        "384"
+      ]
+    },
+    {
+      "id": "c040",
+      "text": "我也不太清楚",
+      "pinyin": [
+        "wo",
+        "ye",
+        "bu",
+        "tai",
+        "qing",
+        "chu"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 325,
+      "source_end": 331,
+      "source_line": 40,
+      "keys": "9693288247464248",
+      "syllable_keys": [
+        "96",
+        "93",
+        "28",
+        "824",
+        "7464",
+        "248"
+      ]
+    },
+    {
+      "id": "c041",
+      "text": "等我一下",
+      "pinyin": [
+        "deng",
+        "wo",
+        "yi",
+        "xia"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 333,
+      "source_end": 337,
+      "source_line": 41,
+      "keys": "33649694942",
+      "syllable_keys": [
+        "3364",
+        "96",
+        "94",
+        "942"
+      ]
+    },
+    {
+      "id": "c042",
+      "text": "刚才在开会",
+      "pinyin": [
+        "gang",
+        "cai",
+        "zai",
+        "kai",
+        "hui"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 339,
+      "source_end": 344,
+      "source_line": 42,
+      "keys": "4264224924524484",
+      "syllable_keys": [
+        "4264",
+        "224",
+        "924",
+        "524",
+        "484"
+      ]
+    },
+    {
+      "id": "c043",
+      "text": "我已经到了",
+      "pinyin": [
+        "wo",
+        "yi",
+        "jing",
+        "dao",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 346,
+      "source_end": 351,
+      "source_line": 43,
+      "keys": "9694546432653",
+      "syllable_keys": [
+        "96",
+        "94",
+        "5464",
+        "326",
+        "53"
+      ]
+    },
+    {
+      "id": "c044",
+      "text": "没事你忙吧",
+      "pinyin": [
+        "mei",
+        "shi",
+        "ni",
+        "mang",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 353,
+      "source_end": 358,
+      "source_line": 44,
+      "keys": "63474464626422",
+      "syllable_keys": [
+        "634",
+        "744",
+        "64",
+        "6264",
+        "22"
+      ]
+    },
+    {
+      "id": "c045",
+      "text": "真的假的",
+      "pinyin": [
+        "zhen",
+        "de",
+        "jia",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 360,
+      "source_end": 364,
+      "source_line": 45,
+      "keys": "94363354233",
+      "syllable_keys": [
+        "9436",
+        "33",
+        "542",
+        "33"
+      ]
+    },
+    {
+      "id": "c046",
+      "text": "太好了",
+      "pinyin": [
+        "tai",
+        "hao",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 366,
+      "source_end": 369,
+      "source_line": 46,
+      "keys": "82442653",
+      "syllable_keys": [
+        "824",
+        "426",
+        "53"
+      ]
+    },
+    {
+      "id": "c047",
+      "text": "别担心",
+      "pinyin": [
+        "bie",
+        "dan",
+        "xin"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 371,
+      "source_end": 374,
+      "source_line": 47,
+      "keys": "243326946",
+      "syllable_keys": [
+        "243",
+        "326",
+        "946"
+      ]
+    },
+    {
+      "id": "c048",
+      "text": "我先睡了",
+      "pinyin": [
+        "wo",
+        "xian",
+        "shui",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 376,
+      "source_end": 380,
+      "source_line": 48,
+      "keys": "969426748453",
+      "syllable_keys": [
+        "96",
+        "9426",
+        "7484",
+        "53"
+      ]
+    },
+    {
+      "id": "c049",
+      "text": "我现在就过去",
+      "pinyin": [
+        "wo",
+        "xian",
+        "zai",
+        "jiu",
+        "guo",
+        "qu"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 382,
+      "source_end": 388,
+      "source_line": 49,
+      "keys": "96942692454848678",
+      "syllable_keys": [
+        "96",
+        "9426",
+        "924",
+        "548",
+        "486",
+        "78"
+      ]
+    },
+    {
+      "id": "c050",
+      "text": "不好意思我来晚了",
+      "pinyin": [
+        "bu",
+        "hao",
+        "yi",
+        "si",
+        "wo",
+        "lai",
+        "wan",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 390,
+      "source_end": 398,
+      "source_line": 50,
+      "keys": "2842694749652492653",
+      "syllable_keys": [
+        "28",
+        "426",
+        "94",
+        "74",
+        "96",
+        "524",
+        "926",
+        "53"
+      ]
+    },
+    {
+      "id": "c051",
+      "text": "下午三点在门口见",
+      "pinyin": [
+        "xia",
+        "wu",
+        "san",
+        "dian",
+        "zai",
+        "men",
+        "kou",
+        "jian"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 400,
+      "source_end": 408,
+      "source_line": 51,
+      "keys": "9429872634269246365685426",
+      "syllable_keys": [
+        "942",
+        "98",
+        "726",
+        "3426",
+        "924",
+        "636",
+        "568",
+        "5426"
+      ]
+    },
+    {
+      "id": "c052",
+      "text": "我们在地铁站等你",
+      "pinyin": [
+        "wo",
+        "men",
+        "zai",
+        "di",
+        "tie",
+        "zhan",
+        "deng",
+        "ni"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 410,
+      "source_end": 418,
+      "source_line": 52,
+      "keys": "96636924348439426336464",
+      "syllable_keys": [
+        "96",
+        "636",
+        "924",
+        "34",
+        "843",
+        "9426",
+        "3364",
+        "64"
+      ]
+    },
+    {
+      "id": "c053",
+      "text": "明天早上八点开会",
+      "pinyin": [
+        "ming",
+        "tian",
+        "zao",
+        "shang",
+        "ba",
+        "dian",
+        "kai",
+        "hui"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 420,
+      "source_end": 428,
+      "source_line": 53,
+      "keys": "6464842692674264223426524484",
+      "syllable_keys": [
+        "6464",
+        "8426",
+        "926",
+        "74264",
+        "22",
+        "3426",
+        "524",
+        "484"
+      ]
+    },
+    {
+      "id": "c054",
+      "text": "晚上一起吃火锅",
+      "pinyin": [
+        "wan",
+        "shang",
+        "yi",
+        "qi",
+        "chi",
+        "huo",
+        "guo"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 430,
+      "source_end": 437,
+      "source_line": 54,
+      "keys": "926742649474244486486",
+      "syllable_keys": [
+        "926",
+        "74264",
+        "94",
+        "74",
+        "244",
+        "486",
+        "486"
+      ]
+    },
+    {
+      "id": "c055",
+      "text": "下周三要考试",
+      "pinyin": [
+        "xia",
+        "zhou",
+        "san",
+        "yao",
+        "kao",
+        "shi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 439,
+      "source_end": 445,
+      "source_line": 55,
+      "keys": "9429468726926526744",
+      "syllable_keys": [
+        "942",
+        "9468",
+        "726",
+        "926",
+        "526",
+        "744"
+      ]
+    },
+    {
+      "id": "c056",
+      "text": "我在公司楼下",
+      "pinyin": [
+        "wo",
+        "zai",
+        "gong",
+        "si",
+        "lou",
+        "xia"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 447,
+      "source_end": 453,
+      "source_line": 56,
+      "keys": "96924466474568942",
+      "syllable_keys": [
+        "96",
+        "924",
+        "4664",
+        "74",
+        "568",
+        "942"
+      ]
+    },
+    {
+      "id": "c057",
+      "text": "车已经开走了",
+      "pinyin": [
+        "che",
+        "yi",
+        "jing",
+        "kai",
+        "zou",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 455,
+      "source_end": 461,
+      "source_line": 57,
+      "keys": "24394546452496853",
+      "syllable_keys": [
+        "243",
+        "94",
+        "5464",
+        "524",
+        "968",
+        "53"
+      ]
+    },
+    {
+      "id": "c058",
+      "text": "外面下雨了",
+      "pinyin": [
+        "wai",
+        "mian",
+        "xia",
+        "yu",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 463,
+      "source_end": 468,
+      "source_line": 58,
+      "keys": "92464269429853",
+      "syllable_keys": [
+        "924",
+        "6426",
+        "942",
+        "98",
+        "53"
+      ]
+    },
+    {
+      "id": "c059",
+      "text": "今天特别冷",
+      "pinyin": [
+        "jin",
+        "tian",
+        "te",
+        "bie",
+        "leng"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 470,
+      "source_end": 475,
+      "source_line": 59,
+      "keys": "5468426832435364",
+      "syllable_keys": [
+        "546",
+        "8426",
+        "83",
+        "243",
+        "5364"
+      ]
+    },
+    {
+      "id": "c060",
+      "text": "快到了还有五分钟",
+      "pinyin": [
+        "kuai",
+        "dao",
+        "le",
+        "hai",
+        "you",
+        "wu",
+        "fen",
+        "zhong"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 477,
+      "source_end": 485,
+      "source_line": 60,
+      "keys": "5824326534249689833694664",
+      "syllable_keys": [
+        "5824",
+        "326",
+        "53",
+        "424",
+        "968",
+        "98",
+        "336",
+        "94664"
+      ]
+    },
+    {
+      "id": "c061",
+      "text": "今天的会取消了",
+      "pinyin": [
+        "jin",
+        "tian",
+        "de",
+        "hui",
+        "qu",
+        "xiao",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 487,
+      "source_end": 494,
+      "source_line": 61,
+      "keys": "54684263348478942653",
+      "syllable_keys": [
+        "546",
+        "8426",
+        "33",
+        "484",
+        "78",
+        "9426",
+        "53"
+      ]
+    },
+    {
+      "id": "c062",
+      "text": "天气预报说明天有雨",
+      "pinyin": [
+        "tian",
+        "qi",
+        "yu",
+        "bao",
+        "shuo",
+        "ming",
+        "tian",
+        "you",
+        "yu"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 496,
+      "source_end": 505,
+      "source_line": 62,
+      "keys": "8426749822674866464842696898",
+      "syllable_keys": [
+        "8426",
+        "74",
+        "98",
+        "226",
+        "7486",
+        "6464",
+        "8426",
+        "968",
+        "98"
+      ]
+    },
+    {
+      "id": "c063",
+      "text": "早上好",
+      "pinyin": [
+        "zao",
+        "shang",
+        "hao"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 507,
+      "source_end": 510,
+      "source_line": 63,
+      "keys": "92674264426",
+      "syllable_keys": [
+        "926",
+        "74264",
+        "426"
+      ]
+    },
+    {
+      "id": "c064",
+      "text": "晚安啦",
+      "pinyin": [
+        "wan",
+        "an",
+        "la"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 512,
+      "source_end": 515,
+      "source_line": 64,
+      "keys": "9262652",
+      "syllable_keys": [
+        "926",
+        "26",
+        "52"
+      ]
+    },
+    {
+      "id": "c065",
+      "text": "今天好累啊",
+      "pinyin": [
+        "jin",
+        "tian",
+        "hao",
+        "lei",
+        "a"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 517,
+      "source_end": 522,
+      "source_line": 65,
+      "keys": "54684264265342",
+      "syllable_keys": [
+        "546",
+        "8426",
+        "426",
+        "534",
+        "2"
+      ]
+    },
+    {
+      "id": "c066",
+      "text": "我有点不舒服",
+      "pinyin": [
+        "wo",
+        "you",
+        "dian",
+        "bu",
+        "shu",
+        "fu"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 524,
+      "source_end": 530,
+      "source_line": 66,
+      "keys": "9696834262874838",
+      "syllable_keys": [
+        "96",
+        "968",
+        "3426",
+        "28",
+        "748",
+        "38"
+      ]
+    },
+    {
+      "id": "c067",
+      "text": "心情不太好",
+      "pinyin": [
+        "xin",
+        "qing",
+        "bu",
+        "tai",
+        "hao"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 532,
+      "source_end": 537,
+      "source_line": 67,
+      "keys": "946746428824426",
+      "syllable_keys": [
+        "946",
+        "7464",
+        "28",
+        "824",
+        "426"
+      ]
+    },
+    {
+      "id": "c068",
+      "text": "我真的很开心",
+      "pinyin": [
+        "wo",
+        "zhen",
+        "de",
+        "hen",
+        "kai",
+        "xin"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 539,
+      "source_end": 545,
+      "source_line": 68,
+      "keys": "96943633436524946",
+      "syllable_keys": [
+        "96",
+        "9436",
+        "33",
+        "436",
+        "524",
+        "946"
+      ]
+    },
+    {
+      "id": "c069",
+      "text": "这也太难了吧",
+      "pinyin": [
+        "zhe",
+        "ye",
+        "tai",
+        "nan",
+        "le",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 547,
+      "source_end": 553,
+      "source_line": 69,
+      "keys": "943938246265322",
+      "syllable_keys": [
+        "943",
+        "93",
+        "824",
+        "626",
+        "53",
+        "22"
+      ]
+    },
+    {
+      "id": "c070",
+      "text": "笑死我了",
+      "pinyin": [
+        "xiao",
+        "si",
+        "wo",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 555,
+      "source_end": 559,
+      "source_line": 70,
+      "keys": "9426749653",
+      "syllable_keys": [
+        "9426",
+        "74",
+        "96",
+        "53"
+      ]
+    },
+    {
+      "id": "c071",
+      "text": "有点想家了",
+      "pinyin": [
+        "you",
+        "dian",
+        "xiang",
+        "jia",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 561,
+      "source_end": 566,
+      "source_line": 71,
+      "keys": "96834269426454253",
+      "syllable_keys": [
+        "968",
+        "3426",
+        "94264",
+        "542",
+        "53"
+      ]
+    },
+    {
+      "id": "c072",
+      "text": "我也很想你",
+      "pinyin": [
+        "wo",
+        "ye",
+        "hen",
+        "xiang",
+        "ni"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 568,
+      "source_end": 573,
+      "source_line": 72,
+      "keys": "96934369426464",
+      "syllable_keys": [
+        "96",
+        "93",
+        "436",
+        "94264",
+        "64"
+      ]
+    },
+    {
+      "id": "c073",
+      "text": "别太难过了",
+      "pinyin": [
+        "bie",
+        "tai",
+        "nan",
+        "guo",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 575,
+      "source_end": 580,
+      "source_line": 73,
+      "keys": "24382462648653",
+      "syllable_keys": [
+        "243",
+        "824",
+        "626",
+        "486",
+        "53"
+      ]
+    },
+    {
+      "id": "c074",
+      "text": "这事挺麻烦的",
+      "pinyin": [
+        "zhe",
+        "shi",
+        "ting",
+        "ma",
+        "fan",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 582,
+      "source_end": 588,
+      "source_line": 74,
+      "keys": "94374484646232633",
+      "syllable_keys": [
+        "943",
+        "744",
+        "8464",
+        "62",
+        "326",
+        "33"
+      ]
+    },
+    {
+      "id": "c075",
+      "text": "辛苦了早点休息",
+      "pinyin": [
+        "xin",
+        "ku",
+        "le",
+        "zao",
+        "dian",
+        "xiu",
+        "xi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 590,
+      "source_end": 597,
+      "source_line": 75,
+      "keys": "9465853926342694894",
+      "syllable_keys": [
+        "946",
+        "58",
+        "53",
+        "926",
+        "3426",
+        "948",
+        "94"
+      ]
+    },
+    {
+      "id": "c076",
+      "text": "生日快乐",
+      "pinyin": [
+        "sheng",
+        "ri",
+        "kuai",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 599,
+      "source_end": 603,
+      "source_line": 76,
+      "keys": "7436474582453",
+      "syllable_keys": [
+        "74364",
+        "74",
+        "5824",
+        "53"
+      ]
+    },
+    {
+      "id": "c077",
+      "text": "我昨晚做了一个奇怪的梦",
+      "pinyin": [
+        "wo",
+        "zuo",
+        "wan",
+        "zuo",
+        "le",
+        "yi",
+        "ge",
+        "qi",
+        "guai",
+        "de",
+        "meng"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 605,
+      "source_end": 616,
+      "source_line": 77,
+      "keys": "96986926986539443744824336364",
+      "syllable_keys": [
+        "96",
+        "986",
+        "926",
+        "986",
+        "53",
+        "94",
+        "43",
+        "74",
+        "4824",
+        "33",
+        "6364"
+      ]
+    },
+    {
+      "id": "c078",
+      "text": "我打算明年换工作",
+      "pinyin": [
+        "wo",
+        "da",
+        "suan",
+        "ming",
+        "nian",
+        "huan",
+        "gong",
+        "zuo"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 618,
+      "source_end": 626,
+      "source_line": 78,
+      "keys": "963278266464642648264664986",
+      "syllable_keys": [
+        "96",
+        "32",
+        "7826",
+        "6464",
+        "6426",
+        "4826",
+        "4664",
+        "986"
+      ]
+    },
+    {
+      "id": "c079",
+      "text": "我们下次再约",
+      "pinyin": [
+        "wo",
+        "men",
+        "xia",
+        "ci",
+        "zai",
+        "yue"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 628,
+      "source_end": 634,
+      "source_line": 79,
+      "keys": "9663694224924983",
+      "syllable_keys": [
+        "96",
+        "636",
+        "942",
+        "24",
+        "924",
+        "983"
+      ]
+    },
+    {
+      "id": "c080",
+      "text": "回头再说吧",
+      "pinyin": [
+        "hui",
+        "tou",
+        "zai",
+        "shuo",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 636,
+      "source_end": 641,
+      "source_line": 80,
+      "keys": "484868924748622",
+      "syllable_keys": [
+        "484",
+        "868",
+        "924",
+        "7486",
+        "22"
+      ]
+    },
+    {
+      "id": "c081",
+      "text": "我想去买点东西",
+      "pinyin": [
+        "wo",
+        "xiang",
+        "qu",
+        "mai",
+        "dian",
+        "dong",
+        "xi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 643,
+      "source_end": 650,
+      "source_line": 81,
+      "keys": "9694264786243426366494",
+      "syllable_keys": [
+        "96",
+        "94264",
+        "78",
+        "624",
+        "3426",
+        "3664",
+        "94"
+      ]
+    },
+    {
+      "id": "c082",
+      "text": "等会给你打电话",
+      "pinyin": [
+        "deng",
+        "hui",
+        "gei",
+        "ni",
+        "da",
+        "dian",
+        "hua"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 652,
+      "source_end": 659,
+      "source_line": 82,
+      "keys": "336448443464323426482",
+      "syllable_keys": [
+        "3364",
+        "484",
+        "434",
+        "64",
+        "32",
+        "3426",
+        "482"
+      ]
+    },
+    {
+      "id": "c083",
+      "text": "吃完饭就回去",
+      "pinyin": [
+        "chi",
+        "wan",
+        "fan",
+        "jiu",
+        "hui",
+        "qu"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 661,
+      "source_end": 667,
+      "source_line": 83,
+      "keys": "24492632654848478",
+      "syllable_keys": [
+        "244",
+        "926",
+        "326",
+        "548",
+        "484",
+        "78"
+      ]
+    },
+    {
+      "id": "c084",
+      "text": "我明天请假",
+      "pinyin": [
+        "wo",
+        "ming",
+        "tian",
+        "qing",
+        "jia"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 669,
+      "source_end": 674,
+      "source_line": 84,
+      "keys": "96646484267464542",
+      "syllable_keys": [
+        "96",
+        "6464",
+        "8426",
+        "7464",
+        "542"
+      ]
+    },
+    {
+      "id": "c085",
+      "text": "这周末我要加班",
+      "pinyin": [
+        "zhe",
+        "zhou",
+        "mo",
+        "wo",
+        "yao",
+        "jia",
+        "ban"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 676,
+      "source_end": 683,
+      "source_line": 85,
+      "keys": "94394686696926542226",
+      "syllable_keys": [
+        "943",
+        "9468",
+        "66",
+        "96",
+        "926",
+        "542",
+        "226"
+      ]
+    },
+    {
+      "id": "c086",
+      "text": "我们可以先看看",
+      "pinyin": [
+        "wo",
+        "men",
+        "ke",
+        "yi",
+        "xian",
+        "kan",
+        "kan"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 685,
+      "source_end": 692,
+      "source_line": 86,
+      "keys": "9663653949426526526",
+      "syllable_keys": [
+        "96",
+        "636",
+        "53",
+        "94",
+        "9426",
+        "526",
+        "526"
+      ]
+    },
+    {
+      "id": "c087",
+      "text": "我去洗个澡",
+      "pinyin": [
+        "wo",
+        "qu",
+        "xi",
+        "ge",
+        "zao"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 694,
+      "source_end": 699,
+      "source_line": 87,
+      "keys": "96789443926",
+      "syllable_keys": [
+        "96",
+        "78",
+        "94",
+        "43",
+        "926"
+      ]
+    },
+    {
+      "id": "c088",
+      "text": "要是明天下雨就不去了",
+      "pinyin": [
+        "yao",
+        "shi",
+        "ming",
+        "tian",
+        "xia",
+        "yu",
+        "jiu",
+        "bu",
+        "qu",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 701,
+      "source_end": 711,
+      "source_line": 88,
+      "keys": "9267446464842694298548287853",
+      "syllable_keys": [
+        "926",
+        "744",
+        "6464",
+        "8426",
+        "942",
+        "98",
+        "548",
+        "28",
+        "78",
+        "53"
+      ]
+    },
+    {
+      "id": "c089",
+      "text": "如果你有时间的话就过来吧",
+      "pinyin": [
+        "ru",
+        "guo",
+        "ni",
+        "you",
+        "shi",
+        "jian",
+        "de",
+        "hua",
+        "jiu",
+        "guo",
+        "lai",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 713,
+      "source_end": 725,
+      "source_line": 89,
+      "keys": "784866496874454263348254848652422",
+      "syllable_keys": [
+        "78",
+        "486",
+        "64",
+        "968",
+        "744",
+        "5426",
+        "33",
+        "482",
+        "548",
+        "486",
+        "524",
+        "22"
+      ]
+    },
+    {
+      "id": "c090",
+      "text": "他也会来的",
+      "pinyin": [
+        "ta",
+        "ye",
+        "hui",
+        "lai",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 727,
+      "source_end": 732,
+      "source_line": 90,
+      "keys": "829348452433",
+      "syllable_keys": [
+        "82",
+        "93",
+        "484",
+        "524",
+        "33"
+      ]
+    },
+    {
+      "id": "c091",
+      "text": "那我就不去了",
+      "pinyin": [
+        "na",
+        "wo",
+        "jiu",
+        "bu",
+        "qu",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 734,
+      "source_end": 740,
+      "source_line": 91,
+      "keys": "6296548287853",
+      "syllable_keys": [
+        "62",
+        "96",
+        "548",
+        "28",
+        "78",
+        "53"
+      ]
+    },
+    {
+      "id": "c092",
+      "text": "大家都在等你呢",
+      "pinyin": [
+        "da",
+        "jia",
+        "dou",
+        "zai",
+        "deng",
+        "ni",
+        "ne"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 742,
+      "source_end": 749,
+      "source_line": 92,
+      "keys": "3254236892433646463",
+      "syllable_keys": [
+        "32",
+        "542",
+        "368",
+        "924",
+        "3364",
+        "64",
+        "63"
+      ]
+    },
+    {
+      "id": "c093",
+      "text": "我会尽快的",
+      "pinyin": [
+        "wo",
+        "hui",
+        "jin",
+        "kuai",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 751,
+      "source_end": 756,
+      "source_line": 93,
+      "keys": "96484546582433",
+      "syllable_keys": [
+        "96",
+        "484",
+        "546",
+        "5824",
+        "33"
+      ]
+    },
+    {
+      "id": "c094",
+      "text": "都是你的错",
+      "pinyin": [
+        "dou",
+        "shi",
+        "ni",
+        "de",
+        "cuo"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 758,
+      "source_end": 763,
+      "source_line": 94,
+      "keys": "3687446433286",
+      "syllable_keys": [
+        "368",
+        "744",
+        "64",
+        "33",
+        "286"
+      ]
+    },
+    {
+      "id": "c095",
+      "text": "那就好",
+      "pinyin": [
+        "na",
+        "jiu",
+        "hao"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 765,
+      "source_end": 768,
+      "source_line": 95,
+      "keys": "62548426",
+      "syllable_keys": [
+        "62",
+        "548",
+        "426"
+      ]
+    },
+    {
+      "id": "c096",
+      "text": "我就知道会这样",
+      "pinyin": [
+        "wo",
+        "jiu",
+        "zhi",
+        "dao",
+        "hui",
+        "zhe",
+        "yang"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 770,
+      "source_end": 777,
+      "source_line": 96,
+      "keys": "965489443264849439264",
+      "syllable_keys": [
+        "96",
+        "548",
+        "944",
+        "326",
+        "484",
+        "943",
+        "9264"
+      ]
+    },
+    {
+      "id": "c097",
+      "text": "还是你说吧",
+      "pinyin": [
+        "hai",
+        "shi",
+        "ni",
+        "shuo",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 779,
+      "source_end": 784,
+      "source_line": 97,
+      "keys": "42474464748622",
+      "syllable_keys": [
+        "424",
+        "744",
+        "64",
+        "7486",
+        "22"
+      ]
+    },
+    {
+      "id": "c098",
+      "text": "这样也行",
+      "pinyin": [
+        "zhe",
+        "yang",
+        "ye",
+        "xing"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 786,
+      "source_end": 790,
+      "source_line": 98,
+      "keys": "9439264939464",
+      "syllable_keys": [
+        "943",
+        "9264",
+        "93",
+        "9464"
+      ]
+    },
+    {
+      "id": "c099",
+      "text": "他还在睡觉呢",
+      "pinyin": [
+        "ta",
+        "hai",
+        "zai",
+        "shui",
+        "jiao",
+        "ne"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 792,
+      "source_end": 798,
+      "source_line": 99,
+      "keys": "824249247484542663",
+      "syllable_keys": [
+        "82",
+        "424",
+        "924",
+        "7484",
+        "5426",
+        "63"
+      ]
+    },
+    {
+      "id": "c100",
+      "text": "也不是不可以",
+      "pinyin": [
+        "ye",
+        "bu",
+        "shi",
+        "bu",
+        "ke",
+        "yi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 800,
+      "source_end": 806,
+      "source_line": 100,
+      "keys": "9328744285394",
+      "syllable_keys": [
+        "93",
+        "28",
+        "744",
+        "28",
+        "53",
+        "94"
+      ]
+    },
+    {
+      "id": "c101",
+      "text": "这个也不错",
+      "pinyin": [
+        "zhe",
+        "ge",
+        "ye",
+        "bu",
+        "cuo"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 808,
+      "source_end": 813,
+      "source_line": 101,
+      "keys": "943439328286",
+      "syllable_keys": [
+        "943",
+        "43",
+        "93",
+        "28",
+        "286"
+      ]
+    },
+    {
+      "id": "c102",
+      "text": "你会喜欢的",
+      "pinyin": [
+        "ni",
+        "hui",
+        "xi",
+        "huan",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 815,
+      "source_end": 820,
+      "source_line": 102,
+      "keys": "6448494482633",
+      "syllable_keys": [
+        "64",
+        "484",
+        "94",
+        "4826",
+        "33"
+      ]
+    },
+    {
+      "id": "c103",
+      "text": "就差一点点",
+      "pinyin": [
+        "jiu",
+        "cha",
+        "yi",
+        "dian",
+        "dian"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 822,
+      "source_end": 827,
+      "source_line": 103,
+      "keys": "5482429434263426",
+      "syllable_keys": [
+        "548",
+        "242",
+        "94",
+        "3426",
+        "3426"
+      ]
+    },
+    {
+      "id": "c104",
+      "text": "我在想办法",
+      "pinyin": [
+        "wo",
+        "zai",
+        "xiang",
+        "ban",
+        "fa"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 829,
+      "source_end": 834,
+      "source_line": 104,
+      "keys": "969249426422632",
+      "syllable_keys": [
+        "96",
+        "924",
+        "94264",
+        "226",
+        "32"
+      ]
+    },
+    {
+      "id": "c105",
+      "text": "这么晚了还不睡",
+      "pinyin": [
+        "zhe",
+        "me",
+        "wan",
+        "le",
+        "hai",
+        "bu",
+        "shui"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 836,
+      "source_end": 843,
+      "source_line": 105,
+      "keys": "9436392653424287484",
+      "syllable_keys": [
+        "943",
+        "63",
+        "926",
+        "53",
+        "424",
+        "28",
+        "7484"
+      ]
+    },
+    {
+      "id": "c106",
+      "text": "你也早点睡吧",
+      "pinyin": [
+        "ni",
+        "ye",
+        "zao",
+        "dian",
+        "shui",
+        "ba"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 845,
+      "source_end": 851,
+      "source_line": 106,
+      "keys": "64939263426748422",
+      "syllable_keys": [
+        "64",
+        "93",
+        "926",
+        "3426",
+        "7484",
+        "22"
+      ]
+    },
+    {
+      "id": "c107",
+      "text": "记得带伞",
+      "pinyin": [
+        "ji",
+        "de",
+        "dai",
+        "san"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 853,
+      "source_end": 857,
+      "source_line": 107,
+      "keys": "5433324726",
+      "syllable_keys": [
+        "54",
+        "33",
+        "324",
+        "726"
+      ]
+    },
+    {
+      "id": "c108",
+      "text": "帮我拿个快递",
+      "pinyin": [
+        "bang",
+        "wo",
+        "na",
+        "ge",
+        "kuai",
+        "di"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 859,
+      "source_end": 865,
+      "source_line": 108,
+      "keys": "2264966243582434",
+      "syllable_keys": [
+        "2264",
+        "96",
+        "62",
+        "43",
+        "5824",
+        "34"
+      ]
+    },
+    {
+      "id": "c109",
+      "text": "手机快没电了",
+      "pinyin": [
+        "shou",
+        "ji",
+        "kuai",
+        "mei",
+        "dian",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 867,
+      "source_end": 873,
+      "source_line": 109,
+      "keys": "7468545824634342653",
+      "syllable_keys": [
+        "7468",
+        "54",
+        "5824",
+        "634",
+        "3426",
+        "53"
+      ]
+    },
+    {
+      "id": "c110",
+      "text": "发个位置给我",
+      "pinyin": [
+        "fa",
+        "ge",
+        "wei",
+        "zhi",
+        "gei",
+        "wo"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 875,
+      "source_end": 881,
+      "source_line": 110,
+      "keys": "324393494443496",
+      "syllable_keys": [
+        "32",
+        "43",
+        "934",
+        "944",
+        "434",
+        "96"
+      ]
+    },
+    {
+      "id": "c111",
+      "text": "我把钥匙忘在家里了",
+      "pinyin": [
+        "wo",
+        "ba",
+        "yao",
+        "shi",
+        "wang",
+        "zai",
+        "jia",
+        "li",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 883,
+      "source_end": 892,
+      "source_line": 111,
+      "keys": "962292674492649245425453",
+      "syllable_keys": [
+        "96",
+        "22",
+        "926",
+        "744",
+        "9264",
+        "924",
+        "542",
+        "54",
+        "53"
+      ]
+    },
+    {
+      "id": "c112",
+      "text": "他说他会晚一点到",
+      "pinyin": [
+        "ta",
+        "shuo",
+        "ta",
+        "hui",
+        "wan",
+        "yi",
+        "dian",
+        "dao"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 894,
+      "source_end": 902,
+      "source_line": 112,
+      "keys": "82748682484926943426326",
+      "syllable_keys": [
+        "82",
+        "7486",
+        "82",
+        "484",
+        "926",
+        "94",
+        "3426",
+        "326"
+      ]
+    },
+    {
+      "id": "c113",
+      "text": "这个价格还可以",
+      "pinyin": [
+        "zhe",
+        "ge",
+        "jia",
+        "ge",
+        "hai",
+        "ke",
+        "yi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 904,
+      "source_end": 911,
+      "source_line": 113,
+      "keys": "94343542434245394",
+      "syllable_keys": [
+        "943",
+        "43",
+        "542",
+        "43",
+        "424",
+        "53",
+        "94"
+      ]
+    },
+    {
+      "id": "c114",
+      "text": "孩子今天发烧了",
+      "pinyin": [
+        "hai",
+        "zi",
+        "jin",
+        "tian",
+        "fa",
+        "shao",
+        "le"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 913,
+      "source_end": 920,
+      "source_line": 114,
+      "keys": "42494546842632742653",
+      "syllable_keys": [
+        "424",
+        "94",
+        "546",
+        "8426",
+        "32",
+        "7426",
+        "53"
+      ]
+    },
+    {
+      "id": "c115",
+      "text": "我妈让我早点回家",
+      "pinyin": [
+        "wo",
+        "ma",
+        "rang",
+        "wo",
+        "zao",
+        "dian",
+        "hui",
+        "jia"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 922,
+      "source_end": 930,
+      "source_line": 115,
+      "keys": "96627264969263426484542",
+      "syllable_keys": [
+        "96",
+        "62",
+        "7264",
+        "96",
+        "926",
+        "3426",
+        "484",
+        "542"
+      ]
+    },
+    {
+      "id": "c116",
+      "text": "我在网上看到的",
+      "pinyin": [
+        "wo",
+        "zai",
+        "wang",
+        "shang",
+        "kan",
+        "dao",
+        "de"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 932,
+      "source_end": 939,
+      "source_line": 116,
+      "keys": "9692492647426452632633",
+      "syllable_keys": [
+        "96",
+        "924",
+        "9264",
+        "74264",
+        "526",
+        "326",
+        "33"
+      ]
+    },
+    {
+      "id": "c117",
+      "text": "这家店的菜很好吃",
+      "pinyin": [
+        "zhe",
+        "jia",
+        "dian",
+        "de",
+        "cai",
+        "hen",
+        "hao",
+        "chi"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 941,
+      "source_end": 949,
+      "source_line": 117,
+      "keys": "943542342633224436426244",
+      "syllable_keys": [
+        "943",
+        "542",
+        "3426",
+        "33",
+        "224",
+        "436",
+        "426",
+        "244"
+      ]
+    },
+    {
+      "id": "c118",
+      "text": "别忘了交作业",
+      "pinyin": [
+        "bie",
+        "wang",
+        "le",
+        "jiao",
+        "zuo",
+        "ye"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 951,
+      "source_end": 957,
+      "source_line": 118,
+      "keys": "243926453542698693",
+      "syllable_keys": [
+        "243",
+        "9264",
+        "53",
+        "5426",
+        "986",
+        "93"
+      ]
+    },
+    {
+      "id": "c119",
+      "text": "我觉得这个方案不太行",
+      "pinyin": [
+        "wo",
+        "jue",
+        "de",
+        "zhe",
+        "ge",
+        "fang",
+        "an",
+        "bu",
+        "tai",
+        "xing"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 959,
+      "source_end": 969,
+      "source_line": 119,
+      "keys": "965833394343326426288249464",
+      "syllable_keys": [
+        "96",
+        "583",
+        "33",
+        "943",
+        "43",
+        "3264",
+        "26",
+        "28",
+        "824",
+        "9464"
+      ]
+    },
+    {
+      "id": "c120",
+      "text": "这个问题我也遇到过",
+      "pinyin": [
+        "zhe",
+        "ge",
+        "wen",
+        "ti",
+        "wo",
+        "ye",
+        "yu",
+        "dao",
+        "guo"
+      ],
+      "role": "body",
+      "is_body": true,
+      "source_start": 971,
+      "source_end": 980,
+      "source_line": 120,
+      "keys": "9434393684969398326486",
+      "syllable_keys": [
+        "943",
+        "43",
+        "936",
+        "84",
+        "96",
+        "93",
+        "98",
+        "326",
+        "486"
+      ]
+    }
+  ],
+  "counts": {
+    "cases": 120,
+    "han_characters": 742,
+    "digit_keypresses": 2092,
+    "body_cases": 120,
+    "body_han_characters": 742,
+    "body_digit_keypresses": 2092,
+    "by_role": {
+      "body": {
+        "cases": 120,
+        "han_characters": 742
+      }
+    }
+  }
+}

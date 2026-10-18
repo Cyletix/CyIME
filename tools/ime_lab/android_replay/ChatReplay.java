@@ -39,6 +39,9 @@ public final class ChatReplay {
     private int settleTimeoutMs;
     private String variant;
     private long rowCount;
+    /** Host-only per-key work counter names; null when the engine library has none. */
+    private String[] workNames;
+    private long[] unattributedWork;
 
     public static void main(String[] args) throws Exception {
         new ChatReplay().run(args);
@@ -77,6 +80,13 @@ public final class ChatReplay {
                     throw new IllegalArgumentException("Empty or duplicate selected case id: " + id);
                 }
             }
+        }
+        File userDict = null;
+        String userDictName = null;
+        if (flags.containsKey("user-dict")) {
+            if (!host) throw new IllegalArgumentException("--user-dict requires --host");
+            userDict = new File(flags.get("user-dict")).getCanonicalFile();
+            userDictName = userDictName(userDict);
         }
         JSONTokener parser = new JSONTokener(read(corpusFile));
         Object corpus = parser.nextValue();
@@ -132,7 +142,10 @@ public final class ChatReplay {
                 .put("key_delay_ms", keyDelayMs).put("row_limit", rowLimit)
                 .put("boundary_limit", boundaryLimit).put("settle_timeout_ms", settleTimeoutMs)
                 .put("modes", new JSONArray(Arrays.asList(modes)))
-                .put("scope", "Native engine with isolated audit resources; no app data imported, no UI, commit, or personalization"));
+                .put("user_dict_sha256", userDict == null ? JSONObject.NULL : sha256(userDict))
+                .put("scope", userDict == null
+                    ? "Native engine with isolated audit resources; no app data imported, no UI, commit, or personalization"
+                    : "Native engine with isolated audit resources and a preset user dictionary snapshot; no app data, UI, commit, or learning"));
             output.flush();
             System.load(new File(libDir, "librime_jni.so").getAbsolutePath());
             engine.nativeInitialize(user.getPath(), user.getPath());
@@ -155,6 +168,24 @@ public final class ChatReplay {
                 emit(new JSONObject().put("stage", "deployment").put("started", started)
                     .put("elapsed_ms", millisSince(start)));
             }
+            JSONObject userDictState = null;
+            if (userDict != null) {
+                long[] restored = engine.nativeHostRestoreUserDict(userDict.getPath(), userDictName);
+                if (restored == null || restored.length != 2 || restored[0] <= 0) {
+                    throw new IOException("Could not restore the preset user dictionary " + userDict);
+                }
+                userDictState = new JSONObject().put("db_name", userDictName).put("sha256", sha256(userDict))
+                    .put("entries", restored[0]).put("tick", restored[1]);
+                System.err.println("USERDICT restored " + restored[0] + " entries into " + userDictName);
+            }
+            if (host) {
+                try {
+                    workNames = engine.nativeHostWorkCounterNames();
+                    unattributedWork = new long[workNames.length];
+                } catch (UnsatisfiedLinkError absent) {
+                    workNames = null;  // An engine built without counters still replays.
+                }
+            }
             if (!engine.nativeCreateSession() || !engine.nativeSwitchSchema("t9_pinyin")) {
                 throw new IOException("Could not create t9_pinyin session; inspect audit user/logs");
             }
@@ -170,7 +201,9 @@ public final class ChatReplay {
                 .put("scoring_status", engine.nativeT9ScoringStatus()).put("settings", settings)
                 .put("source_schema_sha256", sha256(new File(user, "t9_pinyin.schema.yaml")))
                 .put("deployed_schema_sha256", sha256(new File(user, "build/t9_pinyin.schema.yaml")))
-                .put("default_custom_sha256", sha256(new File(user, "default.custom.yaml"))));
+                .put("default_custom_sha256", sha256(new File(user, "default.custom.yaml")))
+                .put("work_counters", workNames == null ? JSONObject.NULL : new JSONArray(Arrays.asList(workNames)))
+                .put("user_dict", userDictState == null ? JSONObject.NULL : userDictState));
             output.flush();
             for (String mode : modes) {
                 for (int i = 0; i < cases.length(); i++) {
@@ -182,8 +215,11 @@ public final class ChatReplay {
                     System.err.println("REPLAY " + mode + " " + id + " " + (i + 1) + "/" + cases.length());
                 }
             }
+            long[] trailing = takeWork();
+            if (trailing != null) for (int k = 0; k < trailing.length; k++) unattributedWork[k] += trailing[k];
             emit(new JSONObject().put("stage", "complete").put("records_before_complete", rowCount)
-                .put("scoring_status", engine.nativeT9ScoringStatus()));
+                .put("scoring_status", engine.nativeT9ScoringStatus())
+                .put("unattributed_work", workNames == null ? JSONObject.NULL : workObject(unattributedWork)));
         } finally {
             if (initialized) engine.nativeDestroy();
             output.close();
@@ -219,10 +255,14 @@ public final class ChatReplay {
             }
             for (int pos = 0; pos < digits[syllable].length(); pos++) {
                 char digit = digits[syllable].charAt(pos);
+                long[] earlier = takeWork();  // Composition resets etc. are not this key's work.
+                if (earlier != null) for (int k = 0; k < earlier.length; k++) unattributedWork[k] += earlier[k];
                 long begin = System.nanoTime();
                 boolean accepted = engine.nativeProcessKey(digit, 0);
                 engine.nativeT9FlushRimeInput();
-                long processMs = millisSince(begin);
+                long elapsed = System.nanoTime() - begin;
+                long processMs = elapsed / 1000000;
+                long[] keyWork = takeWork();
                 typed.append(digit);
                 sentKeys.append(digit);
                 boolean boundary = pos == digits[syllable].length() - 1;
@@ -230,7 +270,8 @@ public final class ChatReplay {
                 boolean endpoint = boundary && syllable == syllables.length - 1;
                 if (!mode.equals("endpoints") || endpoint) {
                     snapshot(id, mode, "key_immediate", text, typed.toString(), sentKeys.toString(),
-                        completed, syllable + 1, boundary, endpoint, accepted, processMs, null);
+                        completed, syllable + 1, boundary, endpoint, accepted, processMs, null,
+                        elapsed / 1000, keyWork);
                 }
                 if (keyDelayMs > 0) Thread.sleep(keyDelayMs);
             }
@@ -238,14 +279,14 @@ public final class ChatReplay {
                 boolean locked = engine.nativeT9SelectPinyinDirect(syllables[syllable], digits[syllable].length());
                 engine.nativeT9FlushRimeInput();
                 snapshot(id, mode, "pinyin_locked", text, typed.toString(), sentKeys.toString(),
-                    syllable + 1, syllable + 1, true, syllable == syllables.length - 1, locked, 0, null);
+                    syllable + 1, syllable + 1, true, syllable == syllables.length - 1, locked, 0, null, 0, takeWork());
             }
             boolean endpoint = syllable == syllables.length - 1;
             if (mode.equals("paused") || endpoint) {
                 JSONObject wait = settle();
                 snapshot(id, mode, endpoint ? "clause_settled" : "syllable_settled", text,
                     typed.toString(), sentKeys.toString(), syllable + 1, syllable + 1,
-                    true, endpoint, true, 0, wait);
+                    true, endpoint, true, 0, wait, 0, takeWork());
             }
         }
     }
@@ -266,11 +307,12 @@ public final class ChatReplay {
 
     private void snapshot(String id, String mode, String stage, String target, String keys, String sentKeys,
                           int completed, int active, boolean boundary, boolean endpoint, boolean accepted,
-                          long processMs, JSONObject wait) throws Exception {
+                          long processMs, JSONObject wait, long processUs, long[] work) throws Exception {
         String prefix = target.substring(0, target.offsetByCodePoints(0, completed));
         int stateBeforeInspect = engine.nativeT9RefinementState();
         long inspectStart = System.nanoTime();
         String[][] candidates = engine.nativeInspectCandidates(boundary ? boundaryLimit : rowLimit);
+        long[] inspectWork = takeWork();
         JSONArray rows = new JSONArray();
         int rank = -1;
         for (int i = 0; i < candidates.length; i++) {
@@ -293,7 +335,45 @@ public final class ChatReplay {
             .put("input", engine.nativeGetInput()).put("remaining_digits", engine.nativeT9GetRemainingDigits())
             .put("wait_ms", wait == null ? 0 : wait.getLong("wait_ms"));
         if (wait != null) record.put("settle", wait);
+        if (stage.equals("key_immediate")) record.put("process_us", processUs);
+        if (work != null) record.put("work", workObject(work)).put("inspect_work", workObject(inspectWork));
         emit(record);
+    }
+
+    /** Returns and clears this thread's engine work counters; null without host counters. */
+    private long[] takeWork() {
+        if (workNames == null) return null;
+        long[] values = engine.nativeHostTakeWorkCounters();
+        if (values == null || values.length != workNames.length) {
+            throw new IllegalStateException("Engine work counters do not match their names");
+        }
+        return values;
+    }
+
+    private JSONObject workObject(long[] values) throws Exception {
+        JSONObject result = new JSONObject();
+        for (int i = 0; i < workNames.length; i++) result.put(workNames[i], values[i]);
+        return result;
+    }
+
+    /** A Rime userdb snapshot names its target db in a "#@/db_name" metadata line. */
+    private static String userDictName(File snapshot) throws IOException {
+        if (!snapshot.isFile()) throw new IOException("User dictionary snapshot not found: " + snapshot);
+        String name = null;
+        boolean userdb = false;
+        for (String line : read(snapshot).split("\r?\n")) {
+            if (line.startsWith("#@/db_name\t")) name = line.substring("#@/db_name\t".length()).trim();
+            if (line.equals("#@/db_type\tuserdb")) userdb = true;
+            // The native restore parses /tick as an unsigned number; reject anything else here.
+            if (line.startsWith("#@/tick\t") && !line.substring("#@/tick\t".length()).matches("[0-9]+")) {
+                throw new IOException("User dictionary snapshot has a non-numeric /tick: " + snapshot);
+            }
+        }
+        if (name != null && name.endsWith(".userdb")) name = name.substring(0, name.length() - ".userdb".length());
+        if (!userdb || name == null || !name.matches("[A-Za-z0-9_.-]+")) {
+            throw new IOException("Not a Rime userdb snapshot with a db_name: " + snapshot);
+        }
+        return name;
     }
 
     private void emit(JSONObject value) throws Exception {
@@ -487,7 +567,7 @@ public final class ChatReplay {
         Map<String, String> flags = new HashMap<>();
         Set<String> allowed = new HashSet<>(Arrays.asList("root", "apk", "resources", "host", "lib-dir", "corpus", "output",
             "key-delay-ms", "limit", "boundary-limit", "settle-timeout-ms", "variant", "modes",
-            "only-ids", "case-ids", "reuse"));
+            "only-ids", "case-ids", "reuse", "user-dict"));
         for (int i = 0; i < args.length; i++) {
             if (!args[i].startsWith("--")) throw new IllegalArgumentException("Expected --flag: " + args[i]);
             String key = args[i].substring(2);

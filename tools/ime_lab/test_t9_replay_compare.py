@@ -75,8 +75,10 @@ class ReplayComparisonTest(unittest.TestCase):
     def test_same_evidence_has_no_regression_but_is_not_quality_acceptance(self):
         write_run(self.candidate)
         result = compare.compare_runs(self.baseline, self.candidate)
-        self.assertEqual(result["exit_code"], 0)
-        self.assertEqual(result["gate"], "no_detected_regression")
+        # Quality shows no regression, but without work counters the speed gate cannot pass.
+        self.assertEqual(result["exit_code"], 3)
+        self.assertEqual(result["gate"], "incomplete")
+        self.assertEqual(result["speed_gate"], "unavailable")
         self.assertEqual(result["physical_acceptance"], "未验收")
         self.assertIn("not a claim", result["baseline_definition"])
 
@@ -111,7 +113,7 @@ class ReplayComparisonTest(unittest.TestCase):
     def test_unfinished_syllable_change_is_pending_review_not_rank_regression(self):
         write_run(self.candidate, lambda rows: set_candidates(rows[0], ["不一样"]))
         result = compare.compare_runs(self.baseline, self.candidate)
-        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(result["exit_code"], 3)
         self.assertEqual(result["counts"]["regressions"], 0)
         self.assertEqual(result["counts"]["changed_first_review_pending"], 1)
 
@@ -271,7 +273,7 @@ class ReplayComparisonTest(unittest.TestCase):
         write_run(self.candidate)
         output = self.root / "report"
         args = ["--baseline", str(self.baseline), "--candidate", str(self.candidate), "--output-dir", str(output)]
-        self.assertEqual(compare.main(args), 0)
+        self.assertEqual(compare.main(args), 3)
         write_manifest(self.candidate, status="running")
         self.assertEqual(compare.main(args), 2)
         self.assertEqual(audit.read_json(output / "comparison.json")["status"], "invalid")

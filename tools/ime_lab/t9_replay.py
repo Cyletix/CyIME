@@ -242,7 +242,7 @@ def snapshot_engine(command, args, remote, output, abi):
     return engine
 
 
-def compact_report(output, fixture, report, records, quality):
+def compact_report(output, fixture, report, records, quality, user_state="fresh_empty"):
     chars = [r for r in records if r.get("mode") == "paused" and r.get("stage") in ("syllable_settled", "clause_settled")]
     immediate = {(r["id"], r["keys"]): r for r in records if r.get("mode") == "continuous" and r.get("stage") == "key_immediate"}
     cases = {c["id"]: c for c in fixture["cases"]}
@@ -267,7 +267,8 @@ def compact_report(output, fixture, report, records, quality):
         "<title>九键算法回放</title><style>body{font:15px/1.6 system-ui;margin:30px}table{border-collapse:collapse}"
         "td,th{border-bottom:1px solid #ddd;padding:7px;text-align:left}pre{white-space:pre-wrap}</style>"
         "<h1>九键算法回放</h1><p>" + message + "</p><p>语言自然度只检查已审阅确认的具体反例；未知首选仍待审阅。"
-        "初始个人学习词库为空，不提交或学习。输入法界面与实际上屏未验收。</p>"
+        + ("初始个人学习词库为空" if user_state == "fresh_empty" else "预置个人词库快照（" + html.escape(user_state) + "）")
+        + "，不提交或学习。输入法界面与实际上屏未验收。</p>"
         "<p><a href='characters.csv'>逐字 CSV</a> · <a href='report/index.html'>完整逐键候选</a> · "
         "<a href='quality.json'>约束结果</a> · <a href='run.json'>引擎与输入身份</a></p><details><summary>统计与约束</summary><pre>"
         + html.escape(details) + "</pre></details><table><tr><th>用例</th><th>字序</th><th>原文前缀</th>"
@@ -276,7 +277,7 @@ def compact_report(output, fixture, report, records, quality):
 
 def run_replay(args):
     from t9_fixture import validate_fixture
-    from t9_replay_compare import evaluate_known_bad, compare_runs, write_comparison
+    from t9_replay_compare import evaluate_known_bad, compare_runs, write_comparison, combine_exit_codes
     fixture_path = args.fixture.resolve()
     fixture_bytes = fixture_path.read_bytes()
     original_fixture = json.loads(fixture_bytes.decode("utf-8-sig"))
@@ -348,8 +349,8 @@ def run_replay(args):
             comparison = compare_runs(args.baseline.resolve(), output, assertions)
             write_comparison(output / "comparison", comparison)
             quality["comparison"] = {"path": "comparison/comparison.json", "exit_code": comparison["exit_code"]}
-            quality["exit_code"] = max(quality["exit_code"], comparison["exit_code"])
-        quality["exit_code"] = max(quality["exit_code"], 1 if issues else 0)
+            quality["exit_code"] = combine_exit_codes(quality["exit_code"], comparison["exit_code"])
+        quality["exit_code"] = combine_exit_codes(quality["exit_code"], 1 if issues else 0)
         save(output / "quality.json", quality)
         compact_report(output, fixture, report, records, quality)
         print(json.dumps({"output": str(output), "execution": "complete", "quality_exit": quality["exit_code"],
@@ -408,6 +409,13 @@ def main(argv=None):
     compare.add_argument("candidate", type=Path)
     compare.add_argument("--assertions", type=Path)
     compare.add_argument("--output", type=Path, required=True)
+    compare.add_argument("--noise-baseline", type=Path, action="append", default=[],
+                         help="Repeated run of the baseline engine (at least two, interleaved with the candidate "
+                              "runs in one session); their spread is the latency noise band")
+    compare.add_argument("--candidate-repeat", type=Path, action="append", default=[],
+                         help="Repeated run of the candidate engine in the same timing session")
+    compare.add_argument("--work-tolerance-percent", type=float, default=0.0,
+                         help="Allowed growth of cost work counters (default 0)")
     prepare = sub.add_parser("prepare", help="Prepare a new text/pinyin fixture; see t9_fixture.py prepare --help")
     prepare.add_argument("arguments", nargs=argparse.REMAINDER)
     args, extra = parser.parse_known_args(argv)
@@ -424,6 +432,10 @@ def main(argv=None):
             forwarded = ["--baseline", str(args.baseline), "--candidate", str(args.candidate), "--output-dir", str(args.output)]
             if args.assertions:
                 forwarded.extend(["--assertions", str(args.assertions)])
+            for flag, paths in (("--noise-baseline", args.noise_baseline), ("--candidate-repeat", args.candidate_repeat)):
+                for path in paths:
+                    forwarded.extend([flag, str(path)])
+            forwarded.extend(["--work-tolerance-percent", str(args.work_tolerance_percent)])
             return compare_main(forwarded)
         if args.command == "run":
             return run_host(args)

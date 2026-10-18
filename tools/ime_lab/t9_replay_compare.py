@@ -3,8 +3,10 @@
 Runs contain fixture.json, replay.jsonl, and a format-1 run.json manifest. Raw
 evidence is validated again; summary files are never trusted as candidate data.
 Engine binaries and decoding settings may change, but the input and observation
-protocol must match. Exit 1 means a regression, execution issue, or a previously
-reviewed bad first candidate; exit 2 means invalid/incompatible evidence.
+protocol must match. Exit 1 means a regression, execution issue, speed-gate
+failure, or a previously reviewed bad first candidate; exit 2 means
+invalid/incompatible evidence; exit 3 means no regression was detected but the
+speed gate is incomplete or unavailable, which is not a pass.
 """
 
 import argparse
@@ -15,12 +17,14 @@ import re
 import sys
 
 import summarize_daily_chat as audit
+import t9_replay_speed as speed
 
 
 DEFAULT_ASSERTIONS = Path(__file__).parent / "fixtures" / "daily_chat_20261003.known-bad.json"
 IDENTITY_FIELDS = ("id", "mode", "stage", "keys", "variant")
 PROTOCOL_FIELDS = ("key_delay_ms", "row_limit", "boundary_limit", "settle_timeout_ms", "modes", "variant")
 REQUIRED_PASSES = ["digits:continuous", "digits:paused"]
+USER_STATES = ("fresh_empty", "preset_user_dict")
 
 
 def sha256(path):
@@ -108,14 +112,37 @@ def validate_fingerprints(directory, manifest, metadata, protocol):
                           f"{directory}: replay metadata differs from protocol_settings.{field}")
 
 
+def validate_user_state(directory, manifest, metadata, ready):
+    """A preset user dictionary must be the exact snapshot the runner restored."""
+    snapshot = manifest.get("user_dict_snapshot")
+    if manifest["user_state"] == "fresh_empty":
+        audit.require(snapshot is None and not metadata.get("user_dict_sha256") and not ready.get("user_dict"),
+                      f"{directory}: fresh_empty run declares a user dictionary snapshot")
+        return
+    audit.require(isinstance(snapshot, dict), f"{directory}: preset_user_dict requires user_dict_snapshot")
+    require_digest(snapshot.get("sha256"), f"{directory}: user_dict_snapshot.sha256")
+    restored = ready.get("user_dict")
+    audit.require(metadata.get("user_dict_sha256") == snapshot["sha256"] and isinstance(restored, dict) and
+                  restored.get("sha256") == snapshot["sha256"] and restored.get("db_name") == snapshot.get("db_name"),
+                  f"{directory}: restored user dictionary differs from user_dict_snapshot")
+    audit.require(isinstance(snapshot.get("entries"), int) and snapshot["entries"] > 0 and
+                  restored.get("entries") == snapshot["entries"],
+                  f"{directory}: restored user dictionary entry count differs from the snapshot")
+
+
+def user_dict_identity(manifest):
+    snapshot = manifest.get("user_dict_snapshot") or {}
+    return snapshot.get("sha256"), snapshot.get("db_name")
+
+
 def _load_run(directory):
     directory = Path(directory)
     manifest = audit.read_json(directory / "run.json")
     audit.require(isinstance(manifest, dict), f"{directory}: run.json must be an object")
     audit.require(manifest.get("format_version") == 1, f"{directory}: unsupported run format")
     audit.require(manifest.get("status") == "complete", f"{directory}: run is not complete")
-    audit.require(manifest.get("user_state") == "fresh_empty" and manifest.get("personalization") is False,
-                  f"{directory}: comparison requires an isolated empty user dictionary without personalization")
+    audit.require(manifest.get("user_state") in USER_STATES and manifest.get("personalization") is False,
+                  f"{directory}: comparison requires an isolated empty or preset user dictionary without personalization")
     audit.require(manifest.get("passes") == REQUIRED_PASSES,
                   f"{directory}: both standard digits passes are required in protocol order")
     for filename, field in (("fixture.json", "fixture_sha256"), ("replay.jsonl", "replay_sha256")):
@@ -132,6 +159,7 @@ def _load_run(directory):
     audit.require(protocol["variant"] == "digits" and protocol["modes"] == ["continuous", "paused"],
                   f"{directory}: standard comparison requires digits continuous,paused")
     validate_fingerprints(directory, manifest, metadata, protocol)
+    validate_user_state(directory, manifest, metadata, sources[0]["ready"])
     report, snapshots = audit.summarize(fixture, records, REQUIRED_PASSES)
     issues = [{"pass": name, **issue} for name, result in report["passes"].items()
               for issue in result["execution_issues"]]
@@ -238,11 +266,98 @@ def compare_snapshots(baseline, candidate):
             "changed_first_review_pending": pending}
 
 
-def compare_runs(baseline_dir, candidate_dir, assertions_path=None):
-    baseline, candidate = load_run(baseline_dir), load_run(candidate_dir)
+def require_compatible(baseline, other):
     for field in ("fixture_sha256", "protocol_settings", "passes", "user_state", "personalization"):
-        audit.require(baseline["manifest"][field] == candidate["manifest"][field],
+        audit.require(baseline["manifest"][field] == other["manifest"][field],
                       f"Incompatible comparison: {field} differs")
+    audit.require(user_dict_identity(baseline["manifest"]) == user_dict_identity(other["manifest"]),
+                  "Incompatible comparison: user_dict_snapshot differs")
+
+
+def schema_without_build_timestamps(text):
+    """Deployment writes file modification times into __build_info.timestamps; nothing else varies by run."""
+    lines, in_info, in_timestamps = [], False, False
+    for line in text.splitlines():
+        if not line.startswith(" "):
+            in_info, in_timestamps = line == "__build_info:", False
+        elif in_info and line.startswith("  ") and not line.startswith("   "):
+            in_timestamps = line.rstrip() == "  timestamps:"
+            if in_timestamps:
+                continue
+        elif in_timestamps:
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def engine_identity(run):
+    """Libraries, resources, build manifest and deployed schema, ignoring per-run timestamps."""
+    directory, manifest = Path(run["directory"]), run["manifest"]
+    engine = manifest.get("engine") or {}
+    identity = {field: engine.get(field) for field in ("libraries", "resources_sha256", "apk_sha256")}
+    audit.require(identity["libraries"] or identity["apk_sha256"], f"{directory}: run records no engine identity")
+    if engine.get("build_manifest_sha256") is not None:
+        path = directory / "engine-build.json"
+        audit.require(path.is_file() and sha256(path) == engine["build_manifest_sha256"],
+                      f"{directory}: engine-build.json differs from engine.build_manifest_sha256")
+        build = audit.read_json(path)
+        audit.require(isinstance(build, dict), f"{directory}: engine-build.json must be an object")
+        identity["build"] = {key: value for key, value in build.items() if key not in ("started_utc", "finished_utc")}
+    if manifest.get("deployed_schema_sha256") is not None:
+        path = directory / "deployed-schema.yaml"
+        audit.require(path.is_file() and sha256(path) == manifest["deployed_schema_sha256"],
+                      f"{directory}: deployed-schema.yaml differs from deployed_schema_sha256")
+        identity["deployed_schema"] = hashlib.sha256(
+            schema_without_build_timestamps(path.read_text(encoding="utf-8")).encode("utf-8")).hexdigest()
+    return identity
+
+
+def require_same_engine(reference, other, label):
+    expected, actual = engine_identity(reference), engine_identity(other)
+    for field in sorted(expected.keys() | actual.keys()):
+        audit.require(expected.get(field) == actual.get(field),
+                      f"{label} {other['directory']} is not a run of the engine of {reference['directory']}: "
+                      f"{field} differs")
+
+
+def require_distinct_runs(runs):
+    directories = [Path(run["directory"]).resolve() for run in runs]
+    audit.require(len(set(directories)) == len(directories), "The same run directory is given more than once")
+    replays = [run["manifest"]["replay_sha256"] for run in runs]
+    audit.require(len(set(replays)) == len(replays), "Two run directories contain the same replay; repeats must be separate runs")
+
+
+def as_list(value):
+    if value is None:
+        return []
+    return [value] if isinstance(value, (str, Path)) else list(value)
+
+
+def combine_exit_codes(*codes):
+    """Invalid evidence (2) > regression (1) > incomplete speed gate (3) > no detected regression (0)."""
+    for code in (2, 1, 3):
+        if code in codes:
+            return code
+    return 0
+
+
+def compare_runs(baseline_dir, candidate_dir, assertions_path=None, noise_dir=None, work_tolerance_percent=0.0,
+                 candidate_repeats=None):
+    """noise_dir: repeated runs of the baseline engine; candidate_repeats: repeated runs of the candidate engine.
+    Latency is judged only when all of them form one interleaved timing session (see t9_replay_speed)."""
+    baseline, candidate = load_run(baseline_dir), load_run(candidate_dir)
+    require_compatible(baseline, candidate)
+    baselines, candidates = [baseline], [candidate]
+    for group, label, reference, directories in ((baselines, "--noise-baseline", baseline, noise_dir),
+                                                 (candidates, "--candidate-repeat", candidate, candidate_repeats)):
+        for directory in as_list(directories):
+            run = load_run(directory)
+            require_compatible(baseline, run)
+            require_same_engine(reference, run, label)
+            group.append(run)
+    if len(baselines) + len(candidates) > 2:
+        # A timing session: every run must be a separate execution, or the noise band is meaningless.
+        require_distinct_runs(baselines + candidates)
     result = compare_snapshots(baseline["snapshots"], candidate["snapshots"])
     assertions = load_assertions(assertions_path, candidate["manifest"]["fixture_sha256"])
     known_bad = check_assertions(candidate["snapshots"], assertions)
@@ -260,9 +375,16 @@ def compare_runs(baseline_dir, candidate_dir, assertions_path=None):
     result["counts"] = {field: len(result[field]) for field in
                         ("regressions", "improvements", "top_changes", "candidate_list_changes", "changed_first_review_pending")}
     result["counts"]["known_bad_violations"] = len(known_bad["violations"])
-    result["exit_code"] = int(bool(result["regressions"] or known_bad["violations"] or
-                                   baseline["execution_issues"] or candidate["execution_issues"]))
-    result["gate"] = "failed" if result["exit_code"] else "no_detected_regression"
+    result["execution_issues"]["repeats"] = [{"run": run["directory"], "issues": run["execution_issues"]}
+                                             for run in baselines[1:] + candidates[1:] if run["execution_issues"]]
+    result["speed"] = speed.speed_report(baselines, candidates, REQUIRED_PASSES, work_tolerance_percent)
+    result["speed_gate"] = result["speed"]["gate"]
+    failed = bool(result["regressions"] or known_bad["violations"] or baseline["execution_issues"] or
+                  candidate["execution_issues"] or result["execution_issues"]["repeats"] or
+                  result["speed_gate"] == "failed")
+    # A speed gate that could not be judged is not a pass: distinct gate value and exit code 3.
+    result["exit_code"] = 1 if failed else (0 if result["speed_gate"] == "passed" else 3)
+    result["gate"] = {1: "failed", 3: "incomplete", 0: "no_detected_regression"}[result["exit_code"]]
     return result
 
 
@@ -280,6 +402,8 @@ def write_comparison(output_dir, result):
                  f"首选变化 {counts['top_changes']} 项，其中 {counts['changed_first_review_pending']} 项需语言质量审阅。", "",
                  "基线只是对照记录，不代表质量合格。未出现已知坏首选，也不代表新候选自然或原文直出。", "",
                  "完整差异、原始候选和判定原因见 comparison.json。"]
+        if "speed" in result:
+            lines += speed.markdown(result["speed"])
     (output_dir / "comparison.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -289,13 +413,22 @@ def main(argv=None):
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--assertions", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--noise-baseline", type=Path, action="append", default=[],
+                        help="Repeated run of the baseline engine (give at least two, interleaved with the "
+                             "candidate runs in one session); their spread is the latency noise band")
+    parser.add_argument("--candidate-repeat", type=Path, action="append", default=[],
+                        help="Repeated run of the candidate engine in the same timing session")
+    parser.add_argument("--work-tolerance-percent", type=float, default=0.0,
+                        help="Allowed growth of cost work counters (default 0: counts are deterministic)")
     args = parser.parse_args(argv)
     try:
-        result = compare_runs(args.baseline, args.candidate, args.assertions)
+        result = compare_runs(args.baseline, args.candidate, args.assertions, args.noise_baseline,
+                              args.work_tolerance_percent, args.candidate_repeat)
     except (audit.EvidenceError, OSError, KeyError, TypeError, ValueError) as error:
         result = {"status": "invalid", "exit_code": 2, "error": str(error)}
     write_comparison(args.output_dir, result)
-    print(json.dumps({key: result[key] for key in ("status", "exit_code", "gate", "counts", "error") if key in result},
+    print(json.dumps({key: result[key] for key in ("status", "exit_code", "gate", "speed_gate", "counts", "error")
+                      if key in result},
                      ensure_ascii=False, indent=2))
     return result["exit_code"]
 
