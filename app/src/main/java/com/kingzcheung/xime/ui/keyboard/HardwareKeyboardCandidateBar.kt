@@ -2,6 +2,12 @@ package com.kingzcheung.xime.ui.keyboard
 
 import android.graphics.Rect
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -51,7 +57,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import com.kingzcheung.xime.service.HardwareCursorAnchor
 
-private const val MAX_VISIBLE_CANDIDATES = 10
+private const val MAX_VISIBLE_CANDIDATES = com.kingzcheung.xime.service.HARDWARE_PAGE_SIZE
 internal val HardwareCandidateCornerRadius = 8.dp
 
 @Composable
@@ -78,6 +84,9 @@ fun HardwareKeyboardCandidateBar(
     bottomDocked: Boolean = false,
     onPreeditBoundsChanged: (Rect?) -> Unit = {},
     showNumberLabels: Boolean = true,
+    frostedGlass: com.kingzcheung.xime.settings.FrostedGlassConfig = com.kingzcheung.xime.settings.FrostedGlassConfig(),
+    /** 「自动避开输入区域」开启时传入光标位置：浮卡盖住这一行就上下挪开。与 [cursorAnchor] 跟随无关。 */
+    avoidCaret: HardwareCursorAnchor? = null,
 ) {
     val reportBounds by rememberUpdatedState(onBoundsChanged)
     val reportPreeditBounds by rememberUpdatedState(onPreeditBoundsChanged)
@@ -91,11 +100,19 @@ fun HardwareKeyboardCandidateBar(
 
     val density = LocalDensity.current
     val context = LocalContext.current
-    val fontSize = SettingsPreferences.getCandidateTextSize(context).sp
+    val fontSize = rememberCandidateTextSize().sp
     val measurer = rememberTextMeasurer()
+    val themeKey = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.key ?: cardBackgroundColor
+    val shadowRadius = with(density) { 1.dp.toPx() }
+    val textSurface = remember(frostedGlass, cardBackgroundColor, themeKey, shadowRadius, candidateTextColor, selectedTextColor, activeColor) {
+        if (frostedGlass.enabled) resolveFrostedTextSurface(cardBackgroundColor, candidateTextColor, selectedTextColor, activeColor, frostedGlass, themeKey, shadowRadius) else null
+    }
     val visuals = CandidateBarVisuals(cardBackgroundColor, candidateTextColor, Color.Transparent,
-        activeColor, selectedTextColor, preeditBackgroundColor = preeditBackgroundColor)
+        activeColor, selectedTextColor, preeditBackgroundColor = preeditBackgroundColor).withTextSurface(textSurface)
     val showCandidates = !bottomDocked && candidates.isNotEmpty()
+    // Like Gboard's floating window: the chevron opens the page as a grid of several rows.
+    var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(inputText.isEmpty() && preeditText.isEmpty()) { if (inputText.isEmpty() && preeditText.isEmpty()) expanded = false }
     LaunchedEffect(showCandidates) { if (!showCandidates) reportBounds(null) }
 
     val displayText = if (preeditText.isNotEmpty()) preeditText else inputText
@@ -121,18 +138,19 @@ fun HardwareKeyboardCandidateBar(
         val maxCardHeight = (maxHeight - 16.dp).coerceAtLeast(1.dp)
         view.getLocationOnScreen(viewLoc)
         val origin = (hostPositionInRoot ?: IntOffset.Zero) + IntOffset(viewLoc[0], viewLoc[1])
+        val toolbarExclusion = hostPositionInWindow?.let { hostOrigin ->
+            avoidBoundsInWindow?.let { excluded ->
+                HardwareCandidateExclusion(
+                    excluded.left - hostOrigin.x, excluded.top - hostOrigin.y,
+                    excluded.right - hostOrigin.x, excluded.bottom - hostOrigin.y,
+                )
+            }
+        }
         val placement = hardwareCandidatePosition(
             constraints.maxWidth, constraints.maxHeight, cardSize.width, cardSize.height,
             cursorAnchor.takeIf { hostPositionInRoot != null && !bottomDocked }, origin.x, origin.y,
             marginPx, with(density) { 8.dp.roundToPx() },
-            avoidBounds = hostPositionInWindow?.let { hostOrigin ->
-                avoidBoundsInWindow?.let { excluded ->
-                    HardwareCandidateExclusion(
-                        excluded.left - hostOrigin.x, excluded.top - hostOrigin.y,
-                        excluded.right - hostOrigin.x, excluded.bottom - hostOrigin.y,
-                    )
-                }
-            },
+            avoidBounds = toolbarExclusion,
         )
         val textWidth = candidates.take(MAX_VISIBLE_CANDIDATES).mapIndexed { index, text ->
             measurer.measure(AnnotatedString("${(index + 1) % 10} $text"),
@@ -143,8 +161,14 @@ fun HardwareKeyboardCandidateBar(
         val dockBounds = if (bottomDocked) hostPositionInWindow?.let { originInWindow ->
             avoidBoundsInWindow?.let { IntOffset(it.left - originInWindow.x, it.top - originInWindow.y) }
         } else null
-        val x = dockBounds?.x?.coerceIn(marginPx, maxOf(marginPx, constraints.maxWidth - cardSize.width - marginPx)) ?: placement.x
-        val y = dockBounds?.let { (it.y - cardSize.height - marginPx).coerceAtLeast(marginPx) } ?: placement.y
+        // 光标所在行按整行宽避让：只要浮卡压住这一行的任何位置，正在打的字就被挡住。
+        val caretLine = avoidCaret?.takeIf { hostPositionInRoot != null && it.top.isFinite() && it.bottom.isFinite() }
+            ?.let { HardwareCandidateExclusion(0, (it.top - origin.y).roundToInt(), constraints.maxWidth, (it.bottom - origin.y).roundToInt()) }
+        val (x, y) = avoidHardwareCaretLine(HardwareCandidatePosition(
+            dockBounds?.x?.coerceIn(marginPx, maxOf(marginPx, constraints.maxWidth - cardSize.width - marginPx)) ?: placement.x,
+            dockBounds?.let { (it.y - cardSize.height - marginPx).coerceAtLeast(marginPx) } ?: placement.y),
+            cardSize.width, cardSize.height, constraints.maxHeight, caretLine, toolbarExclusion,
+            marginPx, with(density) { 4.dp.roundToPx() })
         // This group has no painted background or pointer handler. Each visible surface reports
         // its own touch region, leaving the gap and the rest of the editor usable.
         Column(Modifier.absoluteOffset { IntOffset(x, y) }.widthIn(max = maxCardWidth)
@@ -170,9 +194,51 @@ fun HardwareKeyboardCandidateBar(
                     .testTag("hardware-candidate-card")
                     .onGloballyPositioned { reportBounds(it.boundsInWindow().toAndroidBounds()) }
                     .padding(horizontal = 6.dp, vertical = 4.dp)) {
-                    HardwareCandidateRow(candidates, comments, highlightIndex, hasPrevPage, hasNextPage,
-                        visuals, onCandidateSelect, onPrevious, onNext, showNumberLabels)
+                    if (expanded) HardwareCandidateGrid(candidates.take(MAX_VISIBLE_CANDIDATES), highlightIndex,
+                        visuals, onCandidateSelect, onCollapse = { expanded = false })
+                    else Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) {
+                            HardwareCandidateRow(candidates, comments, highlightIndex, hasPrevPage, hasNextPage,
+                                visuals, onCandidateSelect, onPrevious, onNext, showNumberLabels)
+                        }
+                        if (candidates.size > 1) KeyboardToolbarButton({ expanded = true }, Color.Transparent,
+                            modifier = Modifier.testTag("hardware-candidate-expand")) {
+                            Icon(Icons.Default.ExpandMore, "展开候选", tint = visuals.textColor)
+                        }
+                    }
                 }
+            }
+        }
+    }
+}
+
+/** Expanded floating candidates: rows of five, each numbered for the digit keys. */
+@Composable
+private fun HardwareCandidateGrid(
+    candidates: List<String>, highlightIndex: Int, visuals: CandidateBarVisuals,
+    onCandidateSelect: ((Int) -> Unit)?, onCollapse: () -> Unit,
+) {
+    val fontSize = rememberCandidateTextSize().sp
+    Column(Modifier.testTag("hardware-candidate-grid")) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            KeyboardToolbarButton(onCollapse, Color.Transparent, modifier = Modifier.testTag("hardware-candidate-collapse")) {
+                Icon(Icons.Default.ExpandLess, "收起候选", tint = visuals.textColor)
+            }
+        }
+        candidates.chunked(5).forEachIndexed { row, words ->
+            Row(Modifier.fillMaxWidth()) {
+                words.forEachIndexed { column, word ->
+                    val index = row * 5 + column
+                    val selected = index == highlightIndex
+                    Box(Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(6.dp))
+                        .background(if (selected) visuals.accentColor.copy(alpha = .18f) else Color.Transparent)
+                        .clickable { onCandidateSelect?.invoke(index) }.testTag("hardware-grid-candidate:$index"),
+                        contentAlignment = Alignment.Center) {
+                        Text("${(index + 1) % 10} $word", color = if (selected) visuals.selectedTextColor else visuals.textColor,
+                            fontSize = fontSize, maxLines = 1, softWrap = false)
+                    }
+                }
+                repeat(5 - words.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -194,10 +260,11 @@ internal fun HardwareCandidateRow(
     onCandidateSelect: ((Int) -> Unit)?, onPrevious: (() -> Unit)?, onNext: (() -> Unit)?,
     showNumberLabels: Boolean = true,
 ) {
+    val protectedVisuals = visuals.withTextSurface(LocalFrostedTextSurface.current)
     val context = LocalContext.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         FixedCandidateStrip(candidates.take(MAX_VISIBLE_CANDIDATES), comments = comments,
-            visuals = visuals,
+            visuals = protectedVisuals,
             callbacks = CandidateBarCallbacks(onCandidateSelect = { onCandidateSelect?.invoke(it) }),
             fontSize = SettingsPreferences.getCandidateTextSize(context).sp,
             highlightIndex = highlightIndex, showNumberLabels = showNumberLabels, itemSpacing = 8.dp,
@@ -205,13 +272,13 @@ internal fun HardwareCandidateRow(
         if (candidates.isNotEmpty() && onPrevious != null && (hasPrevPage || highlightIndex > 0)) {
             KeyboardToolbarButton(onPrevious, Color.Transparent,
                 modifier = Modifier.testTag("hardware-candidate-previous")) {
-                Icon(Icons.Default.ChevronLeft, "上一候选", tint = visuals.textColor)
+                Icon(Icons.Default.ChevronLeft, "上一候选", tint = protectedVisuals.textColor)
             }
         }
         if (candidates.isNotEmpty() && onNext != null && (hasNextPage || highlightIndex < candidates.lastIndex)) {
             KeyboardToolbarButton(onNext, Color.Transparent,
                 modifier = Modifier.testTag("hardware-candidate-next")) {
-                Icon(Icons.Default.ChevronRight, "下一候选", tint = visuals.textColor)
+                Icon(Icons.Default.ChevronRight, "下一候选", tint = protectedVisuals.textColor)
             }
         }
     }

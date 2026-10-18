@@ -15,8 +15,11 @@ internal data class HardwareCandidateSnapshot(
     val associationLimit: Int = 10,
     val expanded: Boolean = false,
     val singleCharOnly: Boolean = false,
+    /** First engine-page index shown by the toolbar (see [HardwareCandidatePresentation.window]). */
+    val windowStart: Int = 0,
 ) {
     private val basePresentation = hardwareCandidatePresentation(state, english, predictionPending, associationLimit)
+        .let { if (expanded) it else it.window(windowStart) }
     private val waitingForPrediction = predictionPending && !english && basePresentation.association
     /** Expanded UI indices refer to a filtered view; commits need the original global index. */
     val expandedGlobalIndices: List<Int>? = if (expanded && state.expandedCandidatesLoaded && !basePresentation.association) {
@@ -27,7 +30,7 @@ internal data class HardwareCandidateSnapshot(
     val words: List<String> = when {
         expandedGlobalIndices != null -> expandedGlobalIndices.map { state.expandedCandidates[it].text }
         basePresentation.association -> basePresentation.words
-        else -> basePresentation.words.take(10)
+        else -> basePresentation.words.take(HARDWARE_PAGE_SIZE)
     }
     val comments: List<String> = expandedGlobalIndices?.map { state.expandedCandidates[it].comment }
         ?: basePresentation.comments.take(words.size)
@@ -83,7 +86,14 @@ internal sealed interface HardwareCandidateDecision {
     data object LiteralSpace : HardwareCandidateDecision
 }
 
-/** Physical arrows belong to the editor, independent of candidate-window navigation. */
+/**
+ * Physical arrows belong to the editor, independent of candidate-window navigation.
+ *
+ * 空格有意不跟随工具栏高亮（用户 2026-10-12 决定，勿按 Windows 端改回“空格选高亮”）：
+ * Android 每次上屏后都会自动弹出下一个词的智能联想，空格必须始终是可预期的普通动作——
+ * 组词时确认默认候选，上屏后的联想只能用数字或点按选，空格照常输入空格，
+ * 否则正常打字会频繁把联想词误上屏。Windows 没有上屏后自动联想，所以那边空格选高亮项没有这个问题，两端在此有意不同。
+ */
 internal fun physicalCandidateDecision(
     key: HardwareCandidateKey,
     snapshot: HardwareCandidateSnapshot,
@@ -100,7 +110,7 @@ internal fun physicalCandidateDecision(
             // confirms active composition, using the current FIFO snapshot.
             if (engineHasInput == true && !snapshot.presentation.association &&
                 !snapshot.state.isShowingRecentClipboard && snapshot.words.isNotEmpty()) {
-                val index = if (snapshot.expandedGlobalIndices != null) 0
+                val index = if (snapshot.expandedGlobalIndices != null || snapshot.windowStart > 0) 0
                     else snapshot.state.spaceCandidateIndex(snapshot.profile)
                 HardwareCandidateDecision.Confirm(index, false)
             } else {
@@ -127,7 +137,42 @@ internal class HardwareCandidateNavigation {
     @Volatile private var focus: Focus? = null
     private val ownedArrows = mutableSetOf<HardwareCandidateKey>()
 
+    // Toolbar window over the engine page (HardwareCandidatePresentation.window). A page turned
+    // backwards is a full engine page and opens at its last window, as paging forward would end.
+    private data class Window(val revision: Long, val candidates: List<String>, val start: Int)
+    private data class BackwardPage(val revision: Long, val input: String)
+    @Volatile private var window: Window? = null
+    @Volatile private var backwardPage: BackwardPage? = null
+
     fun clear() { focus = null }
+
+    fun windowStart(state: CandidateState): Int {
+        window?.let { if (it.revision == state.engineRevision && it.candidates == state.candidates) return it.start }
+        val back = backwardPage ?: return 0
+        if (back.revision == state.engineRevision) return 0
+        backwardPage = null
+        if (back.input != state.inputText || state.candidates.isEmpty()) return 0
+        val start = (state.candidates.size - 1) / HARDWARE_PAGE_SIZE * HARDWARE_PAGE_SIZE
+        window = Window(state.engineRevision, state.candidates, start)
+        return start
+    }
+
+    /** Moves within the engine page; false when the engine itself has to page. */
+    fun moveWindow(state: CandidateState, direction: Int): Boolean {
+        val next = windowStart(state) + direction * HARDWARE_PAGE_SIZE
+        if (next < 0 || next >= state.candidates.size) return false
+        window = Window(state.engineRevision, state.candidates, next)
+        backwardPage = null
+        focus = null
+        return true
+    }
+
+    /** Call after the engine turned its page from [previous]. */
+    fun enginePaged(previous: CandidateState, direction: Int) {
+        // The old window keeps matching only the old page; the new page has a new revision.
+        backwardPage = if (direction < 0) BackwardPage(previous.engineRevision, previous.inputText) else null
+        focus = null
+    }
 
     // FIFO-only hold ownership outlives the candidate list until the physical UP.
     fun startPress(key: HardwareCandidateKey, repeat: Boolean) { if (!repeat) ownedArrows.remove(key) }

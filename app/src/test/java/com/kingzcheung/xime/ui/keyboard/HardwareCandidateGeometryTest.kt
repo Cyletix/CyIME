@@ -125,4 +125,29 @@ class HardwareCandidateGeometryTest {
             }
         }
     }
+
+    @Test
+    fun cardCoveringTheTypingLineMovesAboveItWithoutLeavingTheDock() {
+        // 聊天输入框紧贴底部候选条：拼音卡原本压在输入行上，挪到这一行上方，横向不动。
+        val line = HardwareCandidateExclusion(0, 300, 500, 340)
+        val dock = HardwareCandidateExclusion(0, 350, 500, 400)
+        val moved = avoidHardwareCaretLine(HardwareCandidatePosition(40, 290), 180, 50, 400, line, dock, 8, 4)
+        assertEquals(40, moved.x)
+        assertTrue("card ends above the caret line", moved.y + 50 <= 300)
+    }
+
+    @Test
+    fun cardAwayFromTheTypingLineStaysPut() {
+        val preferred = HardwareCandidatePosition(40, 100)
+        assertEquals(preferred, avoidHardwareCaretLine(preferred, 180, 50, 400,
+            HardwareCandidateExclusion(0, 300, 500, 340), null, 8, 4))
+        assertEquals(preferred, avoidHardwareCaretLine(preferred, 180, 50, 400, null, null, 8, 4))
+    }
+
+    @Test
+    fun caretNearTheTopPushesTheCardBelowTheLine() {
+        val moved = avoidHardwareCaretLine(HardwareCandidatePosition(0, 10), 180, 50, 400,
+            HardwareCandidateExclusion(0, 10, 500, 40), null, 8, 4)
+        assertTrue(moved.y >= 40)
+    }
 }

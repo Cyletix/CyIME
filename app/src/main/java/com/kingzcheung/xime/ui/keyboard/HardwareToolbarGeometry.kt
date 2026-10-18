@@ -3,7 +3,7 @@ package com.kingzcheung.xime.ui.keyboard
 /** Fractions of the currently available travel, retained across editors and rotations. */
 internal data class HardwareToolbarPosition(val xFraction: Float = 0.5f, val yFraction: Float = 1f)
 
-/** Bottom docking wins over side docking at the two lower corners. */
+/** Only a drop near the bottom centre docks to the bottom; the lower corners dock to the sides. */
 internal fun HardwareToolbarPosition.isBottomDocked(enabled: Boolean) = enabled && yFraction == 1f
 
 /** Shared by rendering and key routing: hidden suggestions must never capture arrow keys. */
@@ -58,7 +58,10 @@ internal data class HardwareToolbarGeometry(
             else fraction(previous.xFraction, 0.5f)
         val yFraction = if (maxY > minY) (bounded.y - minY) / (maxY - minY)
             else fraction(previous.yFraction, 1f)
-        val bottom = snapX && maxY > minY && maxY - bounded.y <= minOf(snapDistancePx, (maxY - minY) * 0.2f)
+        val nearBottom = snapX && maxY > minY && maxY - bounded.y <= minOf(snapDistancePx, (maxY - minY) * 0.2f)
+        // 与 Windows 端一致：只有拖到底部中间那一点附近才贴底边；底部其余位置照常吸侧边或自由停放，
+        // 否则通栏的吸附范围伸到两侧，想停在侧边靠下时总被吸到底部中间（用户 2026-10-12 要求）。
+        val bottom = nearBottom && kotlin.math.abs(bounded.x - (minX + maxX) / 2) <= snapDistancePx
         return HardwareToolbarPosition(
             if (bottom) 0.5f else if (snapX) when {
                 maxX <= minX -> xFraction
@@ -67,7 +70,8 @@ internal data class HardwareToolbarGeometry(
                 kotlin.math.abs(bounded.x - (minX + maxX) / 2) <= snapDistancePx / 2 -> 0.5f
                 else -> xFraction
             } else xFraction,
-            if (bottom) 1f else yFraction,
+            // yFraction == 1 表示贴底（isBottomDocked），不贴底时停在最底也要略小于 1。
+            if (bottom) 1f else if (nearBottom) minOf(yFraction, Math.nextDown(1f)) else yFraction,
         )
     }
 
