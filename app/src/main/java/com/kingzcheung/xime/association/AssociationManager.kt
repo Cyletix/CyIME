@@ -130,7 +130,8 @@ object AssociationManager {
             
             val fusedCandidates = fusionEngine.fuseCandidates(modelCandidates, contextText)
             
-            fusedCandidates.take(topK)
+            // 模型在英文字母后会“续写”单个字母（e → n s r i…），这不是可用的联想词，去掉。
+            fusedCandidates.filterNot { it.text.length == 1 && it.text[0].let { c -> c in 'a'..'z' || c in 'A'..'Z' } }.take(topK)
             
         } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
         } catch (e: Exception) {
