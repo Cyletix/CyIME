@@ -155,7 +155,7 @@ class TabletSplitResizeTest {
         assertTrue(panel.bottom <= floating.top)
         assertTrue(floating.bottom < split.top)
         assertTrue(split.bottom <= root.bottom)
-        for (label in listOf("分体", "悬浮", "透明度 0%")) {
+        for (label in listOf("分体", "悬浮", "0%")) {
             val layout = textLayout(label)
             val details = "$label: size=${layout.size}, paragraph=${layout.multiParagraph.width}x${layout.multiParagraph.height}, " +
                 "width=${layout.didOverflowWidth}, height=${layout.didOverflowHeight}, lines=${layout.lineCount}, " +

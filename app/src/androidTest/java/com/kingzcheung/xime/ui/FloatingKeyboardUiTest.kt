@@ -202,7 +202,7 @@ class FloatingKeyboardUiTest {
         showResize(initialOpacity = opacity, onOpacity = { opacity = it })
         rule.onNodeWithContentDescription("重置").performClick()
         rule.runOnIdle { assertEquals(1f, opacity, 0f) }
-        rule.onNodeWithText("透明度 0%").assertIsDisplayed()
+        rule.onNodeWithText("0%").assertIsDisplayed()
     }
 
     private fun showResize(initialOpacity: Float = 1f, onOpacity: (Float) -> Unit = {},
