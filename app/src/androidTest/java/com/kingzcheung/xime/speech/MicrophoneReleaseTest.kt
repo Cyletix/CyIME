@@ -26,13 +26,13 @@ class MicrophoneReleaseTest {
     private fun await(condition: () -> Boolean) = activity.waitUntil(5000, condition)
     private fun idle() = audio.activeRecordingConfigurations.isEmpty()
 
-    private class Backend(val begin: () -> Boolean = { true }, val finish: () -> Unit = {}) : AsrBackend {
+    private class Backend(val begin: () -> Boolean = { true }, val finish: () -> Unit = {}, val consume: () -> Unit = {}) : AsrBackend {
         override val name = "microphone lifecycle probe"
         val releases = AtomicInteger()
         val starts = AtomicInteger()
         override fun initialize() = true
         override fun start(): Boolean { starts.incrementAndGet(); return begin() }
-        override fun processAudioChunk(buffer: ByteArray) { } // discard immediately
+        override fun processAudioChunk(buffer: ByteArray) = consume() // discard audio immediately
         override fun stop() = finish()
         override fun cancel() { }
         override fun release() { releases.incrementAndGet() }
@@ -97,5 +97,20 @@ class MicrophoneReleaseTest {
         ui { manager.startRecognition() }
         await { manager.getState() == RecognitionState.LISTENING && !idle() }
         ui { manager.stopRecognition() }; await { idle() }
+    }
+
+    @Test fun brokenAudioDeliveryStopsCaptureAndReportsFailure() = probe(Backend(consume = { error("service disconnected") })) { manager, _ ->
+        ui { manager.startRecognition() }
+        await { manager.getState() == RecognitionState.ERROR && idle() }
+    }
+
+    @Test fun repeatedStartWhileListeningUsesOneCaptureSession() = probe { manager, backend ->
+        ui { manager.startRecognition() }
+        await { backend.starts.get() == 1 && manager.getState() == RecognitionState.LISTENING }
+        ui { repeat(4) { manager.startRecognition() } }
+        SystemClock.sleep(300)
+        assertEquals(1, backend.starts.get())
+        ui { manager.cancelRecognition() }
+        await { idle() }
     }
 }

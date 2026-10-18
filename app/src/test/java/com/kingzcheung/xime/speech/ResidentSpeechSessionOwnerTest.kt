@@ -11,6 +11,24 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 class ResidentSpeechSessionOwnerTest {
+    @Test fun `old connection cannot stop cancel release or feed the active owner`() {
+        val engine = Engine().also { it.allowDecode.countDown() }
+        val owner = ResidentSpeechSessionOwner { it() }
+        val old = Any()
+        val active = Any()
+        try {
+            assertTrue(owner.start("same", { engine }, ::session, owner = old))
+            assertTrue(owner.start("same", { error("Unexpected reload") }, ::session, owner = active))
+            assertNull(owner.finish(old))
+            assertFalse(owner.cancel(old))
+            assertFalse(owner.release(owner = old))
+            assertThrows(IllegalStateException::class.java) { owner.acceptPcm(pcm(16000), old) }
+            assertFalse(owner.isIdle)
+            owner.acceptPcm(pcm(16000), active)
+            assertEquals("识别结果", owner.finish(active))
+        } finally { owner.release() }
+    }
+
     private open class Engine : LocalSpeechEngine {
         override val hasRefinement = false
         override val isStreaming = false
@@ -298,5 +316,26 @@ class ResidentSpeechSessionOwnerTest {
             allowReset.countDown()
             executor.shutdownNow()
         }
+    }
+
+    @Test fun `idle ladder drops only the second pass and never while a session is active`() {
+        val refinerReleases = AtomicInteger()
+        val engine = object : Engine() {
+            override fun releaseRefinement(): Boolean { refinerReleases.incrementAndGet(); return true }
+        }.also { it.allowDecode.countDown() }
+        val owner = ResidentSpeechSessionOwner { it() }
+        try {
+            assertTrue(owner.start("same", { engine }, ::session))
+            owner.releaseRefinementIfIdle()
+            assertEquals("active session keeps SenseVoice", 0, refinerReleases.get())
+            owner.acceptPcm(pcm(16000))
+            assertEquals("识别结果", owner.finish())
+            var released = false
+            owner.releaseRefinementIfIdle { released = true }
+            assertEquals(1, refinerReleases.get())
+            assertTrue(released)
+            assertEquals("streaming model stays loaded", 0, engine.closes.get())
+            assertTrue(owner.start("same", { error("Unexpected reload") }, ::session))
+        } finally { owner.release() }
     }
 }

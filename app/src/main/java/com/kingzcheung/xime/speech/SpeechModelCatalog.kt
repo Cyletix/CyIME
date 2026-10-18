@@ -5,11 +5,29 @@ import com.kingzcheung.xime.model.*
 /** Pinned official exports, independently available even if the original market is offline. */
 object SpeechModelCatalog {
     const val ZIPFORMER = "zipformer-zh-int8"
+    const val ZIPFORMER_JA = "zipformer-ja-reazonspeech-fp32"
+    const val ZIPFORMER_JA_INT8 = "zipformer-ja-reazonspeech-int8"
+    fun isJapaneseZipformer(id: String) = id == ZIPFORMER_JA || id == ZIPFORMER_JA_INT8
     const val ZIPFORMER_TWO_PASS = "zipformer-sensevoice"
     const val PARAFORMER = "paraformer-zh-en-int8"
     const val SENSEVOICE = "sensevoice-multilingual-int8"
     const val TWO_PASS = "paraformer-sensevoice"
+    private const val reazonBase = "https://huggingface.co/reazon-research/reazonspeech-k2-v2/resolve/291488c8151be24d7da4bf7af26e533fad96e407"
     val models = listOf(
+        ModelInfo(ZIPFORMER_JA_INT8, "Zipformer · 日语轻量", "约 153 MB，原版的 INT8 量化版；说话中预览、停顿后定稿，准确度与原版可能不同。", ModelCategory.ASR,
+            versions = listOf(ModelVersion(version = "291488c8151b", size = "153.0 MB", files = listOf(
+                ModelFile("encoder-epoch-99-avg-1.int8.onnx", "$reazonBase/encoder-epoch-99-avg-1.int8.onnx", "2c7bd08a8a99f9ddd0d9e458456577b1f6279214e51426f114f9eced44c54e1d", 154670139L),
+                ModelFile("decoder-epoch-99-avg-1.int8.onnx", "$reazonBase/decoder-epoch-99-avg-1.int8.onnx", "8f0bff94d38797b03b762634ed03211a8e303d06cc4603cdd0cf4199d6eb1485", 2959337L),
+                ModelFile("joiner-epoch-99-avg-1.int8.onnx", "$reazonBase/joiner-epoch-99-avg-1.int8.onnx", "49cc7ea1d3d35a40a27442db5e89996da64bf0e683a903dce76e99e57a12e4de", 2696970L),
+                ModelFile("tokens.txt", "$reazonBase/tokens.txt", "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def", 45754L)
+            )))),
+        ModelInfo(ZIPFORMER_JA, "Zipformer · 日语原版", "约 586 MB，FP32 原版；说话中预览、停顿后定稿，加载及识别耗时较长。", ModelCategory.ASR,
+            versions = listOf(ModelVersion(version = "291488c8151b", size = "586.4 MB", files = listOf(
+                ModelFile("encoder-epoch-99-avg-1.onnx", "$reazonBase/encoder-epoch-99-avg-1.onnx", "ecdb0b771e16104aaf8e579cb3c1e32fbd589eb641c5946d82b615bd366c5f96", 592347848L),
+                ModelFile("decoder-epoch-99-avg-1.onnx", "$reazonBase/decoder-epoch-99-avg-1.onnx", "58b18211ae06265466bfa17172dab574df94f76c8bcb61a3640c28ba860e4124", 11767836L),
+                ModelFile("joiner-epoch-99-avg-1.onnx", "$reazonBase/joiner-epoch-99-avg-1.onnx", "d38a81d1191c9ed6de6a1719503692e07e3e973e2364adde0abae5eaaded1174", 10720115L),
+                ModelFile("tokens.txt", "$reazonBase/tokens.txt", "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def", 45754L)
+            )))),
         ModelInfo("paraformer-zh-en-int8", "Paraformer · 中英", "中英流式识别，边说边出字；int8 量化。", ModelCategory.ASR,
             versions = listOf(ModelVersion(version = "8e40c43232a1", size = "226.2 MB", files = listOf(
                 ModelFile("decoder.int8.onnx", "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/8e40c43232a1c5c66c82111efc5820d3accca11b/decoder.int8.onnx", "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f", 71664561L),

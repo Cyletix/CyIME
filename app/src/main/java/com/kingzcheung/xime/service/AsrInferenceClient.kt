@@ -15,7 +15,8 @@ import java.util.concurrent.TimeUnit
 /**
  * 离线语音识别服务客户端，绑定 [AsrInferenceService]（:asr 独立进程）。
  */
-class AsrInferenceClient(private val context: Context) {
+class AsrInferenceClient(context: Context) {
+    private val context = context.applicationContext
 
     companion object {
         private const val TAG = "AsrInferenceClient"
@@ -27,8 +28,9 @@ class AsrInferenceClient(private val context: Context) {
         fun onError(message: String)
     }
 
-    private var service: IInferenceAsrService? = null
-    private var bound = false
+    @Volatile private var service: IInferenceAsrService? = null
+    @Volatile private var bound = false
+    @Volatile private var sessionFailure: String? = null
 
     /** 连接等待锁：一次性 CountDownLatch，countDown 后即失效——
      *  重绑前必须在 [ensureBound] 中重建，否则断线重连后会立即假醒。 */
@@ -36,11 +38,18 @@ class AsrInferenceClient(private val context: Context) {
     private var connectLatch = CountDownLatch(1)
 
     private val callbackGeneration = java.util.concurrent.atomic.AtomicLong()
+    private data class Session(val generation: Long, val callback: IInferenceAsrCallback)
+    @Volatile private var session: Session? = null
 
     private fun callbackStub(callback: AsrCallback, token: Long) = object : IInferenceAsrCallback.Stub() {
         override fun onPartialResult(text: String) { if (token == callbackGeneration.get()) callback.onPartialResult(text) }
         override fun onFinalResult(text: String) { if (token == callbackGeneration.get()) callback.onFinalResult(text) }
-        override fun onError(message: String) { if (token == callbackGeneration.get()) callback.onError(message) }
+        override fun onError(message: String) {
+            if (token == callbackGeneration.get()) {
+                sessionFailure = message
+                callback.onError(message)
+            }
+        }
     }
 
     private val connection = object : ServiceConnection {
@@ -91,6 +100,8 @@ class AsrInferenceClient(private val context: Context) {
     }
 
     fun unbind() {
+        callbackGeneration.incrementAndGet()
+        session = null
         try {
             context.unbindService(connection)
         } catch (_: Exception) {}
@@ -103,51 +114,86 @@ class AsrInferenceClient(private val context: Context) {
     }
 
     suspend fun startAsr(modelId: String, callback: AsrCallback, language: InputLanguage? = null): Boolean = withContext(Dispatchers.IO) {
+        val token = callbackGeneration.incrementAndGet()
         try {
-            val token = callbackGeneration.incrementAndGet()
-            if (language == null) requireService().startAsr(modelId, callbackStub(callback, token))
-            else requireService().startAsrForLanguage(modelId, language.id, callbackStub(callback, token))
+            if (!ensureBound()) return@withContext false
+            if (callbackGeneration.get() != token) return@withContext false
+            sessionFailure = null
+            val active = Session(token, callbackStub(callback, token))
+            session = active
+            val remote = requireService()
+            val ready = if (language == null) remote.startAsr(modelId, active.callback)
+            else remote.startAsrForLanguage(modelId, language.id, active.callback)
+            if (callbackGeneration.get() != token) {
+                remote.cancelAsr(active.callback.asBinder())
+                false
+            } else ready
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
         } catch (e: Exception) {
             FileLogger.e(TAG, "startAsr failed", e)
-            callbackGeneration.incrementAndGet()
+            callbackGeneration.compareAndSet(token, token + 1)
             false
         }
     }
 
     fun pushAsrAudio(audioData: ByteArray) {
+        sessionFailure?.let { throw IllegalStateException(it) }
+        val active = checkNotNull(session) { "语音会话尚未启动" }
+        check(active.generation == callbackGeneration.get()) { "语音会话已结束" }
         try {
-            requireService().pushAsrAudio(audioData)
-        } catch (_: Exception) {}
+            requireService().pushAsrAudio(active.callback.asBinder(), audioData)
+        } catch (error: Exception) {
+            // Propagate to the capture owner's failure path, which releases AudioRecord.
+            // Silently dropping PCM leaves a live microphone with no recognizer.
+            throw IllegalStateException("语音服务已断开，请重新开始录音", error)
+        }
     }
 
     suspend fun stopAsr(): String = withContext(Dispatchers.IO) {
         val token = callbackGeneration.get()
         try {
-            requireService().stopAsr()
-        } catch (_: Exception) {
-            ""
+            sessionFailure?.let { throw IllegalStateException(it) }
+            session?.let { requireService().stopAsr(it.callback.asBinder()) } ?: ""
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
+        } catch (error: Exception) {
+            throw IllegalStateException("语音识别未能完成，请重新录音", error)
         } finally {
             callbackGeneration.compareAndSet(token, token + 1)
         }
     }
 
     fun cancelAsr() {
-        try {
-            requireService().cancelAsr()
-        } catch (_: Exception) {}
+        val active = session
         callbackGeneration.incrementAndGet()
+        try {
+            active?.let { requireService().cancelAsr(it.callback.asBinder()) }
+        } catch (_: Exception) {}
     }
 
     suspend fun releaseAsr() {
+        val active = session
+        callbackGeneration.incrementAndGet()
         try {
-            requireService().releaseAsr()
+            active?.let { requireService().releaseAsr(it.callback.asBinder()) }
         } catch (_: Exception) {}
     }
 
     /** 同步"保持引擎常驻"设置到 :asr 进程（服务端据此决定是否空闲自动释放模型）。 */
     suspend fun setKeepModelAlive(keepAlive: Boolean) {
         try {
-            requireService().setKeepModelAlive(keepAlive)
+            val service = requireService()
+            service.setKeepModelAlive(keepAlive)
+            // 同一次同步带上内存阶梯，服务端按两级分别计时释放。
+            service.setIdleLadder(
+                com.kingzcheung.xime.settings.SettingsPreferences.getSttRefinerIdleMinutes(context) * 60,
+                if (keepAlive) 0 else com.kingzcheung.xime.settings.SettingsPreferences.getSttEngineIdleMinutes(context) * 60)
+        } catch (_: Exception) {}
+    }
+
+    /** 同步“保存语音调优录音”设置；服务端只在开启时写入应用自己的目录。 */
+    suspend fun setSaveTuningAudio(enabled: Boolean) {
+        try {
+            requireService().setSaveTuningAudio(enabled)
         } catch (_: Exception) {}
     }
 }

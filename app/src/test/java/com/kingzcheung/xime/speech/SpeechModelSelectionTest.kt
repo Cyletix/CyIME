@@ -11,7 +11,7 @@ class SpeechModelSelectionTest {
         modes.forEach { from -> bases.forEach { to ->
             val result = SpeechModelSelection.selectPrimary(from, to)
             assertEquals(to, SpeechModelSelection.primary(result))
-            assertEquals(to != SpeechModelCatalog.SENSEVOICE && SpeechModelSelection.hasCorrection(from),
+            assertEquals(to in listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.ZIPFORMER) && SpeechModelSelection.hasCorrection(from),
                 SpeechModelSelection.hasCorrection(result))
         } }
     }
@@ -20,7 +20,7 @@ class SpeechModelSelectionTest {
         modes.forEach { mode -> listOf(false, true).forEach { enabled ->
             val result = SpeechModelSelection.withCorrection(mode, enabled)
             assertEquals(SpeechModelSelection.primary(mode), SpeechModelSelection.primary(result))
-            assertEquals(enabled && mode != SpeechModelCatalog.SENSEVOICE, SpeechModelSelection.hasCorrection(result))
+            assertEquals(enabled && SpeechModelSelection.primary(mode) in listOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.ZIPFORMER), SpeechModelSelection.hasCorrection(result))
         } }
     }
 

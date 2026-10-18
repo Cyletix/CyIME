@@ -43,9 +43,15 @@ class SpeechRecognitionManager(
          * VoiceRecognitionHandler.FINISH_TIMEOUT_MS 更长，保证回调通道存活。
          */
         private const val BACKEND_RELEASE_DELAY_MS = 3500L
+        // 覆盖按需加载本地模型的等待（实测约 2 秒）再留余量
+        private const val PRE_START_BUFFER_SECS = 6f
     }
 
-    private var backend: AsrBackend? = null
+    @Volatile private var backend: AsrBackend? = null
+    @Volatile private var backendConfiguration: String? = null
+    private fun selectedBackendConfiguration(): String =
+        if (SettingsPreferences.isSttUseLocal(context)) "local:${AsrSupport.generation}"
+        else "online:${SettingsPreferences.getSttOnlinePluginId(context)}"
     @Volatile private var recordingThread: RecordingThread? = null
     @Volatile private var released = false
     @Volatile private var recognitionLanguage = InputLanguage.CHINESE
@@ -112,7 +118,7 @@ class SpeechRecognitionManager(
         FileLogger.i(TAG, "Starting speech recognition")
         setState(RecognitionState.PROCESSING)
 
-        if (backend == null) {
+        if (backend == null || backendConfiguration != selectedBackendConfiguration()) {
             // 按需加载：后台线程加载 ASR 模型，完成后在主线程启动录音，避免阻塞键盘 UI
             FileLogger.i(TAG, "ASR backend not loaded, loading on demand")
             synchronized(preloadLock) {
@@ -124,11 +130,14 @@ class SpeechRecognitionManager(
                 loadingInProgress = true
                 loadingCancelled = false
             }
+            // 模型按需加载约 2 秒：期间保留预启动的麦克风，加载完由录音线程接着读缓冲，开头不丢。
+            mainHandler.removeCallbacks(preStartTimeoutRunnable)
             Thread {
                 try {
-                    val ok = preload()
+                    val ok = preload(warmUp = false)
                     if (!ok || synchronized(preloadLock) { backend } == null) {
                         mainHandler.post {
+                            cancelPreStart()
                             errorCallback?.invoke("无法初始化语音引擎，请检查本地模型或在线语音插件配置", true)
                             setState(RecognitionState.ERROR)
                         }
@@ -136,6 +145,7 @@ class SpeechRecognitionManager(
                     }
                     if (loadingCancelled || released) {
                         mainHandler.post {
+                            cancelPreStart()
                             if (!released) { scheduleBackendRelease(sessionId); setState(RecognitionState.IDLE) }
                         }
                         return@Thread
@@ -179,6 +189,13 @@ class SpeechRecognitionManager(
         // serialized, so an old stop/cancel can never terminate the new recognition session.
         recordingThread = RecordingThread(currentBackend, preStarted, sessionId, recognitionLanguage, recordingThread)
         recordingThread!!.start()
+    }
+
+    /** Re-route subsequent PCM without closing AudioRecord or discarding previous words. */
+    fun switchRecognitionLanguage(language: InputLanguage) {
+        if (released || language == InputLanguage.UNSPECIFIED || !SettingsPreferences.isSttUseLocal(context)) return
+        recognitionLanguage = language
+        recordingThread?.takeUnless { it.stopRequested }?.requestedLanguage = language
     }
 
     /**
@@ -242,6 +259,7 @@ class SpeechRecognitionManager(
     }
 
     fun getState(): RecognitionState = currentState
+    val finishTimeoutMs: Long get() = maxOf(JOIN_TIMEOUT_MS, backend?.finishTimeoutMs ?: JOIN_TIMEOUT_MS)
 
     private fun setState(state: RecognitionState) {
         currentState = state
@@ -267,7 +285,7 @@ class SpeechRecognitionManager(
     fun startPreStart() {
         cancelPreStart()
         if (released || recordingThread != null) return
-        val record = createAudioRecord() ?: return
+        val record = createAudioRecord(PRE_START_BUFFER_SECS) ?: return
         try {
             record.startRecording()
             synchronized(this) { preStartedRecord = record }
@@ -277,7 +295,7 @@ class SpeechRecognitionManager(
             return
         }
         mainHandler.removeCallbacks(preStartTimeoutRunnable)
-        mainHandler.postDelayed(preStartTimeoutRunnable, 2000)
+        if (!loadingInProgress) mainHandler.postDelayed(preStartTimeoutRunnable, 2000)
     }
 
     fun cancelPreStart() {
@@ -317,15 +335,26 @@ class SpeechRecognitionManager(
     private var isPreloading = false
     private val preloadLock = Object()
 
-    fun preload(): Boolean {
+    fun preload(warmUp: Boolean = true): Boolean {
+        val configuration = selectedBackendConfiguration()
+        val previous: AsrBackend?
         synchronized(preloadLock) {
+            while (isPreloading && !released) preloadLock.wait()
             if (released) return false
-            if (backend != null) return true
+            if (backend != null && backendConfiguration == configuration) return true
+            previous = backend
+            backend = null
+            backendConfiguration = null
             isPreloading = true
         }
         var candidate: AsrBackend? = null
         var retained = false
         try {
+            // Retire the exact old backend only after its last recording has finished.
+            if (previous != null) {
+                recordingThread?.awaitBackendFinished()
+                previous.release()
+            }
             val created = createBackend() ?: return false
             candidate = created
             created.setCallbacks(
@@ -333,10 +362,13 @@ class SpeechRecognitionManager(
                 onResult = {}, onPartialResult = {}, onStateChange = {},
                 onError = { error -> Log.w(TAG, "Speech warmup: $error") }
             )
-            if (!created.initialize(recognitionLanguage)) return false
+            val ready = if (warmUp) created.initialize(recognitionLanguage)
+                else created.prepareForRecording(recognitionLanguage)
+            if (!ready) return false
             synchronized(preloadLock) {
-                if (released) return false
+                if (released || configuration != selectedBackendConfiguration()) return false
                 backend = created
+                backendConfiguration = configuration
                 retained = true
             }
             return true
@@ -398,6 +430,8 @@ class SpeechRecognitionManager(
         }
     }
 
+    private data class CapturedAudio(val pcm: ByteArray, val language: InputLanguage)
+
     private inner class RecordingThread(
         private val currentBackend: AsrBackend,
         preStarted: AudioRecord? = null,
@@ -417,7 +451,8 @@ class SpeechRecognitionManager(
 
         // Own the pre-started microphone before Thread.start(): stop may arrive before run().
         private val microphone = RecordingAudioOwner(preStarted)
-        private val audioQueue = ArrayBlockingQueue<ByteArray>(100) // At most 10 s / 320 KB of PCM.
+        @Volatile var requestedLanguage = language
+        private val audioQueue = ArrayBlockingQueue<CapturedAudio>(100) // At most 10 s / 320 KB of PCM.
         private val backendFinished = CountDownLatch(1)
         @Volatile private var captureEnded = false
         @Volatile private var deliveryThread: Thread? = null
@@ -429,7 +464,7 @@ class SpeechRecognitionManager(
             Thread({
                 while (!backendFinished.await(250, TimeUnit.MILLISECONDS)) {
                     val started = backendOperationStartedAt
-                    if (started != 0L && System.nanoTime() - started >= TimeUnit.MILLISECONDS.toNanos(JOIN_TIMEOUT_MS)) {
+                    if (started != 0L && System.nanoTime() - started >= TimeUnit.MILLISECONDS.toNanos(maxOf(JOIN_TIMEOUT_MS, currentBackend.finishTimeoutMs))) {
                         // Interrupt the actual model/IPC owner, never advertise it as free early.
                         deliveryThread?.interrupt()
                         break
@@ -449,8 +484,36 @@ class SpeechRecognitionManager(
             if (interrupted) Thread.currentThread().interrupt()
         }
 
-        private fun enqueue(chunk: ByteArray) {
+        private fun enqueue(chunk: CapturedAudio) {
             if (!audioQueue.offer(chunk)) error("语音引擎准备时间过长，已停止录音，请重试")
+        }
+
+        /** Each recognizer segment owns its callbacks; late results cannot overwrite a new segment. */
+        private inner class SegmentCallbacks(val prefix: String) {
+            @Volatile var active = true
+            @Volatile var switching = false
+            @Volatile var text = ""
+            fun combined(value: String) = listOf(prefix.trim(), value.trim()).filter { it.isNotEmpty() }.joinToString(" ")
+            fun bind() = currentBackend.setCallbacks(
+                onResult = { value ->
+                    if (active) {
+                        text = value
+                        if (!switching) postForSession(session) { if (active && !cancelRequested) resultCallback?.invoke(combined(value)) }
+                    }
+                },
+                onPartialResult = { value ->
+                    if (active) {
+                        text = value
+                        postForSession(session) { if (active && !cancelRequested) partialResultCallback?.invoke(combined(value)) }
+                    }
+                },
+                onStateChange = { state ->
+                    if (active && !switching) postForSession(session) { if (active && !switching && !cancelRequested) setState(state) }
+                },
+                onError = { error ->
+                    if (active) postForSession(session) { if (active && !cancelRequested) errorCallback?.invoke(error, true) }
+                },
+            )
         }
 
         private fun reportFailure(error: Exception, duringDelivery: Boolean = false) {
@@ -470,7 +533,8 @@ class SpeechRecognitionManager(
                     if (cancelRequested || released) return
                 }
                 if (cancelRequested || released) return
-                bindSessionCallbacks(currentBackend, session) { !cancelRequested }
+                var callbacks = SegmentCallbacks("").also { it.bind() }
+                var activeLanguage = language
                 attempted = true
                 backendOperationStartedAt = System.nanoTime()
                 check(currentBackend.start(language)) { "启动语音引擎失败" }
@@ -480,7 +544,20 @@ class SpeechRecognitionManager(
                     val chunk = audioQueue.poll(50, TimeUnit.MILLISECONDS)
                     if (chunk != null) {
                         backendOperationStartedAt = System.nanoTime()
-                        currentBackend.processAudioChunk(chunk)
+                        if (chunk.language != activeLanguage) {
+                            if (!currentBackend.canContinueIn(chunk.language)) {
+                                FileLogger.i(TAG, "Switching recognizer ${activeLanguage.id} -> ${chunk.language.id}; microphone retained")
+                                callbacks.switching = true
+                                currentBackend.stop()
+                                callbacks.active = false
+                                val prefix = callbacks.combined(callbacks.text)
+                                if (cancelRequested || released) break
+                                callbacks = SegmentCallbacks(prefix).also { it.bind() }
+                                check(currentBackend.start(chunk.language)) { "无法切换到${chunk.language.displayName}语音，请检查该语言模型" }
+                            }
+                            activeLanguage = chunk.language
+                        }
+                        currentBackend.processAudioChunk(chunk.pcm)
                         backendOperationStartedAt = 0L
                     }
                     else if (captureEnded && audioQueue.isEmpty()) break
@@ -537,7 +614,7 @@ class SpeechRecognitionManager(
                 var speechDetected = false
                 // 语音前缓冲：保存检测到语音前的若干块，检测到后一起送入 ASR，
                 // 避免"你/觉"等弱开头的语音块因音量低于阈值被当作静音丢弃
-                val preSpeechBuffer = ArrayDeque<ByteArray>()
+                val preSpeechBuffer = ArrayDeque<CapturedAudio>()
                 val maxPreSpeechChunks = 4  // 0.4s 语音前缓冲
 
                 while (!interrupted() && !stopRequested) {
@@ -560,7 +637,7 @@ class SpeechRecognitionManager(
                                 spectrumCallback?.invoke(spectrum)
                             }
                         }
-                        val chunk = byteBuffer.copyOf(nread * 2)
+                        val chunk = CapturedAudio(byteBuffer.copyOf(nread * 2), requestedLanguage)
                         if (!speechDetected) {
                             preSpeechBuffer.addLast(chunk)
                             // 缓冲满仍未检测到语音：放弃 VAD，直接开始识别，
@@ -570,7 +647,7 @@ class SpeechRecognitionManager(
                                 while (preSpeechBuffer.isNotEmpty()) {
                                     enqueue(preSpeechBuffer.removeFirst())
                                 }
-                            } else if (isSpeech(chunk)) {
+                            } else if (isSpeech(chunk.pcm)) {
                                 speechDetected = true
                                 // 把语音前缓冲的块按顺序送入 ASR，保证开头不丢失
                                 while (preSpeechBuffer.isNotEmpty()) {

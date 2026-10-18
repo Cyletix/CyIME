@@ -18,9 +18,11 @@ internal object AsrSupport {
 
     @Volatile
     private var warmBackend: OfflineAsrBackend? = null
+    @Volatile internal var generation: Long = 0
+        private set
 
     /** 初始化前先登记同一个后端，预热与首次录音无论谁先到都不会创建第二个。 */
-    fun create(context: Context): AsrBackend? = synchronized(this) {
+    fun create(context: Context): AsrBackend? = warmBackend ?: synchronized(this) {
         warmBackend ?: OfflineAsrBackend(context.applicationContext).also { warmBackend = it }
     }
 
@@ -28,6 +30,7 @@ internal object AsrSupport {
 
     /** 加载本地模型并保持 :asr 服务常驻，直到 [releaseModel]。 */
     fun warmup(context: Context, language: InputLanguage = InputLanguage.CHINESE) {
+        if (!com.kingzcheung.xime.settings.SettingsPreferences.isSttKeepEngineAlive(context)) return
         synchronized(this) {
             val backend = warmBackend ?: OfflineAsrBackend(context.applicationContext).also { warmBackend = it }
             if (!backend.initialize(language)) {
@@ -38,11 +41,14 @@ internal object AsrSupport {
         }
     }
 
+    fun updateRetention() { warmBackend?.syncKeepAlive() }
+
     /** 卸载常驻模型并解绑 :asr 服务。 */
     fun releaseModel() {
         synchronized(this) {
             val backend = warmBackend
             warmBackend = null
+            generation++
             backend?.releaseModel()
             FileLogger.i(TAG, "offline ASR model released")
         }

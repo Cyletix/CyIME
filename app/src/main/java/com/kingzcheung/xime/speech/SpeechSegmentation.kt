@@ -46,6 +46,8 @@ internal class SpeechSegmenter(
     private val onAudio: (Long, FloatArray) -> Unit,
     private val onEnd: (Long, FloatArray, SpeechBoundary) -> Unit,
     private val minimumPauseMs: Int = 0,
+    private val useEnergyPause: Boolean = true,
+    private val resetDetectorOnPause: Boolean = false,
 ) {
     private val energy = SpeechEnergyGate()
     private val preRoll = ArrayDeque<FloatArray>()
@@ -71,9 +73,13 @@ internal class SpeechSegmenter(
     private fun frame(pcm: FloatArray) {
         // Only VAD needs padding. Do not invent PCM at stop or feed padding into the next segment.
         val active = detector.speech(if (pcm.size == 512) pcm else pcm.copyOf(512))
-        val rms = sqrt(pcm.sumOf { it.toDouble() * it } / pcm.size).toFloat()
-        val energyQuiet = energy.quiet(rms, active, speaking)
-        val quiet = !active || energyQuiet
+        val energyQuiet = if (useEnergyPause) {
+            val rms = sqrt(pcm.sumOf { it.toDouble() * it } / pcm.size).toFloat()
+            energy.quiet(rms, active, speaking)
+        } else false
+        // Exact digital silence cannot start a region during VAD's trailing hangover.
+        // Otherwise a VAD-only recognizer accepts quiet speech without an RMS veto.
+        val quiet = !active || pcm.all { it == 0f } || useEnergyPause && energyQuiet
         if (!speaking) {
             preRoll.addLast(pcm)
             while (preRoll.size > 32) preRoll.removeFirst()
@@ -113,7 +119,9 @@ internal class SpeechSegmenter(
         audio.forEach { it.copyInto(all, offset); offset += it.size }
         onEnd(id, all, reason)
         audio.clear(); preRoll.clear(); samples = 0; quietFrames = 0; speaking = false
-        // Keep VAD state across regions; only finishInput/reset starts a fresh acoustic session.
+        // A real pause can clear loudness history before a softer speaker. A forced cut
+        // must keep VAD warm so continuous speech is not treated as a new recording.
+        if (resetDetectorOnPause && reason == SpeechBoundary.PAUSE) detector.reset()
     }
 }
 

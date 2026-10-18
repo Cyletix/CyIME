@@ -34,6 +34,8 @@ class SpeechRecognitionLanguageSessionTest {
         @Volatile var allowClose = CountDownLatch(1)
         @Volatile var startGate: CountDownLatch? = null
         @Volatile var startSucceeds = true
+        var compatibleLanguages = emptySet<InputLanguage>()
+        override fun canContinueIn(language: InputLanguage) = language in compatibleLanguages
         @Volatile private var language = InputLanguage.UNSPECIFIED
         override fun setCallbacks(onResult: (String) -> Unit, onPartialResult: ((String) -> Unit)?,
             onStateChange: (RecognitionState) -> Unit, onError: (String) -> Unit) {
@@ -125,6 +127,10 @@ class SpeechRecognitionLanguageSessionTest {
         val queue = LinkedBlockingQueue<Runnable>()
         val delayed = CopyOnWriteArrayList<Pair<Runnable, Long>>()
         val backend = Backend()
+        val onlineBackend = Backend()
+        val anotherOnlineBackend = Backend()
+        @Volatile var useLocal = true
+        @Volatile var pluginId = ""
         val results = mutableListOf<String>()
         val errors = mutableListOf<String>()
         val microphones = CopyOnWriteArrayList<Microphone>()
@@ -136,6 +142,8 @@ class SpeechRecognitionLanguageSessionTest {
             val prefs = mock<SharedPreferences>()
             whenever(context.getSharedPreferences(any(), any())).thenReturn(prefs)
             whenever(prefs.getBoolean(any(), any())).thenAnswer { it.getArgument(1) }
+            whenever(prefs.getBoolean(eq(SettingsPreferences.KEY_STT_USE_LOCAL), any())).thenAnswer { useLocal }
+            whenever(prefs.getString(eq(SettingsPreferences.KEY_STT_ONLINE_PLUGIN_ID), any())).thenAnswer { pluginId }
             whenever(prefs.getBoolean(eq(SettingsPreferences.KEY_STT_KEEP_ENGINE_ALIVE), any())).thenAnswer { keepAlive }
             val handler = mock<Handler>()
             whenever(handler.post(any())).thenAnswer { queue.put(it.getArgument(0)); true }
@@ -148,7 +156,9 @@ class SpeechRecognitionLanguageSessionTest {
                 delayed.removeAll { scheduled -> scheduled.first === runnable }
                 null
             }.whenever(handler).removeCallbacks(any())
-            manager = SpeechRecognitionManager(context, { backend }, handler) {
+            manager = SpeechRecognitionManager(context, {
+                if (useLocal) backend else if (pluginId == "online-c") anotherOnlineBackend else onlineBackend
+            }, handler) {
                 Microphone().also { microphones += it }.record
             }
             manager.setCallbacks(onResult = { results += it }, onPartialResult = { results += it },
@@ -170,10 +180,61 @@ class SpeechRecognitionLanguageSessionTest {
             manager.cancelRecognition()
             backend.startGate?.countDown()
             backend.allowClose.countDown()
+            onlineBackend.allowClose.countDown()
+            anotherOnlineBackend.allowClose.countDown()
             manager.release()
             microphones.filterNot { it.released.get() }.forEach { it.record.release() }
             drain()
         }
+    }
+
+    @Test fun changingFromResidentLocalToOnlineReplacesTheActualBackend() = Fixture().use { f ->
+        f.manager.startRecognition()
+        f.session()
+        f.manager.stopRecognition()
+        f.backend.allowClose.countDown()
+        f.await { f.backend.completedStops.get() == 1 }
+        f.useLocal = false
+        f.pluginId = "online-b"
+        f.manager.startRecognition()
+        f.await { f.onlineBackend.sessions.isNotEmpty() }
+        assertEquals(1, f.backend.events.count { it.startsWith("start:") })
+        assertEquals(1, f.onlineBackend.events.count { it.startsWith("start:") })
+        assertTrue(f.errors.isEmpty())
+    }
+
+    @Test fun changingOnlinePluginReplacesBackendBeforeNextRecording() = Fixture(preload = false).use { f ->
+        f.useLocal = false
+        f.pluginId = "online-a"
+        f.manager.startRecognition()
+        f.await { f.onlineBackend.sessions.isNotEmpty() }
+        f.manager.stopRecognition()
+        f.onlineBackend.allowClose.countDown()
+        f.await { f.onlineBackend.completedStops.get() == 1 }
+
+        f.pluginId = "online-c"
+        f.manager.startRecognition()
+        f.await { f.anotherOnlineBackend.sessions.isNotEmpty() }
+        assertEquals(1, f.onlineBackend.events.count { it.startsWith("start:") })
+        assertEquals(1, f.anotherOnlineBackend.events.count { it.startsWith("start:") })
+        assertTrue(f.errors.isEmpty())
+    }
+
+    @Test fun changingOnlineToLocalUsesNewLocalBackend() = Fixture(preload = false).use { f ->
+        f.useLocal = false
+        f.pluginId = "online-a"
+        f.manager.startRecognition()
+        f.await { f.onlineBackend.sessions.isNotEmpty() }
+        f.manager.stopRecognition()
+        f.onlineBackend.allowClose.countDown()
+        f.await { f.onlineBackend.completedStops.get() == 1 }
+
+        f.useLocal = true
+        f.manager.startRecognition()
+        f.session()
+        assertEquals(1, f.onlineBackend.events.count { it.startsWith("start:") })
+        assertEquals(1, f.backend.events.count { it.startsWith("start:") })
+        assertTrue(f.errors.isEmpty())
     }
 
     @Test fun coldJapaneseRecordingInitializesInJapaneseAndDiscardsWarmupCallbacks() = Fixture(preload = false).use { f ->
@@ -454,6 +515,49 @@ class SpeechRecognitionLanguageSessionTest {
         assertEquals(InputLanguage.ENGLISH, active.first)
         assertTrue(f.backend.sessions.isEmpty())
         assertEquals(listOf("English"), f.results)
+    }
+
+    @Test fun japaneseEnglishJapaneseSwitchKeepsOneMicrophoneAndPreservesCompletedText() = Fixture().use { f ->
+        f.backend.allowClose.countDown()
+        f.manager.startRecognition(InputLanguage.JAPANESE)
+        val japanese = f.session()
+        f.await { f.microphones.single().starts.get() == 1 }
+        f.microphones.single().feed(101)
+        f.await { f.backend.audio.isNotEmpty() }
+        assertEquals(InputLanguage.JAPANESE, f.backend.audio.remove().first)
+        f.manager.switchRecognitionLanguage(InputLanguage.ENGLISH)
+        f.microphones.single().feed(102)
+        val english = f.session()
+        f.await { f.backend.audio.isNotEmpty() }
+        assertEquals(InputLanguage.ENGLISH, english.first)
+        assertEquals(InputLanguage.ENGLISH, f.backend.audio.remove().first)
+        english.second.partial!!.invoke("hello world")
+        f.drain()
+        assertEquals("closing result hello world", f.results.last())
+        japanese.second.final("stale Japanese")
+        f.drain()
+        assertFalse(f.results.any { it.contains("stale Japanese") })
+        f.manager.switchRecognitionLanguage(InputLanguage.JAPANESE)
+        f.microphones.single().feed(103)
+        assertEquals(InputLanguage.JAPANESE, f.session().first)
+        f.await { f.backend.audio.isNotEmpty() }
+        assertEquals(InputLanguage.JAPANESE, f.backend.audio.remove().first)
+        assertEquals(1, f.allocations)
+        assertEquals(0, f.microphones.single().releases.get())
+        assertTrue(f.errors.toString(), f.errors.isEmpty())
+    }
+
+    @Test fun compatibleBilingualModelDoesNotRestartWhenKeyboardLanguageChanges() = Fixture().use { f ->
+        f.backend.compatibleLanguages = setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
+        f.manager.startRecognition(InputLanguage.CHINESE)
+        f.session()
+        f.await { f.microphones.single().starts.get() == 1 }
+        f.manager.switchRecognitionLanguage(InputLanguage.ENGLISH)
+        f.microphones.single().feed(104)
+        f.await { f.backend.audio.isNotEmpty() }
+        assertTrue(f.backend.sessions.isEmpty())
+        assertEquals(0, f.backend.completedStops.get())
+        assertEquals(1, f.allocations)
     }
 
     @Test fun unknownLanguageIsRejectedBeforeMicrophoneAllocation() = Fixture().use { f ->

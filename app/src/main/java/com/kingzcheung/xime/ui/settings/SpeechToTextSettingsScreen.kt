@@ -52,6 +52,7 @@ import com.kingzcheung.xime.plugin.core.model.PluginCategory
 import com.kingzcheung.xime.plugin.core.api.AsrPlugin
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import com.kingzcheung.xime.speech.AsrBackendFactory
+import com.kingzcheung.xime.ui.caption.CaptionLauncherIcon
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -88,8 +89,8 @@ fun SpeechToTextSettingsContent(
         mutableStateOf(OfflineAsrSettings.isSupported() && SettingsPreferences.isSttUseLocal(context))
     }
 
-    var keepEngineAlive by remember {
-        mutableStateOf(SettingsPreferences.isSttKeepEngineAlive(context))
+    var saveTuningAudio by remember {
+        mutableStateOf(SettingsPreferences.isSttDebugRecord(context))
     }
 
     var providersRevision by remember { mutableStateOf(0) }
@@ -193,28 +194,32 @@ fun SpeechToTextSettingsContent(
                 )
 
                 if (useLocal) {
-                    // 引擎常驻开关（仅本地模式显示/生效）：语音结束后保留引擎，闲置后再用免重建。
-                    // 在线插件常驻需保持 WebSocket 长连接（耗电、占用服务端资源），不提供该选项。
-                    // 保持引擎设置排在模型选择之前。
+                    // 模型常驻与空闲释放统一在「性能与省电」设置，这里不再重复（两处会互相覆盖）。
                     SettingsSection(title = "本地识别") {
+                        Text(
+                            text = "语音模型是否常驻、空闲多久释放，在「性能与省电」中设置。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                        )
                         Column(Modifier.fillMaxWidth().padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "保持引擎常驻",
+                                    text = "保存语音调优录音",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Switch(
-                                    checked = keepEngineAlive,
+                                    checked = saveTuningAudio,
                                     onCheckedChange = {
-                                        keepEngineAlive = it
-                                        SettingsPreferences.setSttKeepEngineAlive(context, it)
+                                        saveTuningAudio = it
+                                        SettingsPreferences.setSttDebugRecord(context, it)
                                     },
                                 )
                             }
                             Text(
-                                text = "语音结束后保留所选模型，减少下次加载等待；内存占用因模型而异，不保留麦克风录音。",
+                                text = "每次本地语音的录音和识别过程只存在本机应用目录，用于连接电脑后回放分析、调整断句和模型；最多保留 300 段或 500 MB，不会上传。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -223,6 +228,32 @@ fun SpeechToTextSettingsContent(
 
                     // 本地模型下载与管理
                     OfflineAsrSettings.ModelSection()
+                }
+            }
+
+            SettingsSection(title = "字幕") {
+                var captionIcon by remember { mutableStateOf(CaptionLauncherIcon.isEnabled(context)) }
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "桌面显示“字幕”图标",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = captionIcon,
+                            onCheckedChange = {
+                                captionIcon = it
+                                CaptionLauncherIcon.setEnabled(context, it)
+                            },
+                        )
+                    }
+                    Text(
+                        text = "打开后桌面多一个单独的“字幕”图标，点一下直接进字幕页。关闭时可从下拉快捷开关或键盘菜单的“字幕”进入。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
