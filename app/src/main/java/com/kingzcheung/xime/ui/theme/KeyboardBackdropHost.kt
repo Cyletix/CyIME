@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -44,11 +45,13 @@ internal data class SharedKeyboardBackdrop(
     val frame: KeyboardBackdropFrame,
     val image: ImageBitmap?,
     val fallback: Color,
-    val tint: Color,
+    val opacity: Float,
     val windowRoot: View,
 )
 
 internal val LocalSharedKeyboardBackdrop = staticCompositionLocalOf<SharedKeyboardBackdrop?> { null }
+/** Opted into only by clipboard expansion; other theme/resize behavior is unchanged. */
+internal val LocalClipboardBackdropMotion = compositionLocalOf { false }
 
 /** Supplies pixels without painting the host itself: narrow keyboards retain transparent margins. */
 @Composable
@@ -60,6 +63,7 @@ internal fun KeyboardBackdropHost(
     glass: FrostedGlassConfig,
     backdropHeight: Dp,
     modifier: Modifier = Modifier,
+    clipboardInMotion: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -68,15 +72,14 @@ internal fun KeyboardBackdropHost(
     var size by remember { mutableStateOf(IntSize.Zero) }
     val frame = keyboardBackdropFrame(origin, size, with(density) { backdropHeight.roundToPx() })
     val image = if (enabled) {
-        rememberFrostedBackgroundImage(background, isDark, fallback, glass, frame.size)
+        rememberFrostedBackgroundImage(background, isDark, fallback, glass, frame.size, clipboardInMotion)
     } else null
     val backdrop = if (enabled) {
         SharedKeyboardBackdrop(
             frame = frame,
             image = image,
             fallback = fallback,
-            tint = (if (isDark) Color.Black else Color.White)
-                .copy(alpha = glass.normalized().backgroundOpacity),
+            opacity = glass.normalized().backgroundOpacity,
             windowRoot = windowRoot,
         )
     } else null
@@ -88,6 +91,7 @@ internal fun KeyboardBackdropHost(
     } else Modifier
 
     Box(modifier.then(positionModifier)) {
-        CompositionLocalProvider(LocalSharedKeyboardBackdrop provides backdrop) { content() }
+        CompositionLocalProvider(LocalSharedKeyboardBackdrop provides backdrop,
+            LocalClipboardBackdropMotion provides clipboardInMotion) { content() }
     }
 }

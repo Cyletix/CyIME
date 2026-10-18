@@ -112,7 +112,7 @@ object KeyboardThemes {
         PureBlackTheme.create(),
         SoftLavenderTheme.create(),
         SoftBlueTheme.create()
-    )
+    ) + TonalThemes.create()
 
     /**
      * 预计算后的主题缓存（避免每次访问都重新计算颜色）。
@@ -131,7 +131,9 @@ object KeyboardThemes {
     fun reload(context: Context) {
         VisualStyles.current = com.kingzcheung.xime.settings.SettingsPreferences.getVisualStyle(context)
         IconAppearance.reload(context)
-        configOverrides = KeysConfigHelper.loadColorSchemes(context).filterKeys { it != "858AdvanceColor" }
+        configOverrides = KeysConfigHelper.loadColorSchemes(context).filterKeys {
+            it != "858AdvanceColor"
+        }
         // 1) 对硬编码主题应用配置覆盖
         val overridden = defaultThemes.map { applyConfigOverrides(context, it) }
         // 2) 把配置中有但硬编码列表中没有的新主题也加入缓存

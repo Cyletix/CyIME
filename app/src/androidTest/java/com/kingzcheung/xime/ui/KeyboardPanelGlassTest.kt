@@ -120,7 +120,7 @@ class KeyboardPanelGlassTest {
                     awaitImage("actual-panel") { distance(corner(it), corner(reference)) <= 2 }
                     rule.onNodeWithTag("expression-emoji").assertIsDisplayed().performClick()
                 }
-                2 -> rule.onNodeWithTag("clipboard-filter:IMAGE").performClick()
+                2 -> rule.onNodeWithTag("clipboard-filter:IMAGE").performScrollTo().performClick()
                 3 -> {
                     rule.onNodeWithTag("expanded-candidate:42").assertIsDisplayed().performClick()
                     rule.runOnIdle {

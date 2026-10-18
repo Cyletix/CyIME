@@ -17,7 +17,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -34,6 +33,9 @@ import com.kingzcheung.xime.ui.theme.KeyboardColorScheme
 import com.kingzcheung.xime.viewmodel.ThemeSettingsViewModel
 import androidx.compose.ui.platform.LocalContext
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
+import com.kingzcheung.xime.settings.FrostedGlassProfiles
+import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.theme.VisualStyles
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,15 +44,36 @@ fun ThemeSettingsContent(
     onBack: () -> Unit,
     onThemeChanged: () -> Unit = {}
 ) {
+    var showIconSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var showVisualSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val subPage = when { showVisualSettings -> "visual"; showIconSettings -> "icons"; else -> null }
+    SettingsSubPages(subPage, onBack = { showIconSettings = false; showVisualSettings = false }) { shown ->
+        ThemeSettingsPage(shown, onBack, onThemeChanged,
+            openVisual = { showVisualSettings = true }, openIcons = { showIconSettings = true },
+            closeSubPage = { showIconSettings = false; showVisualSettings = false })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeSettingsPage(
+    subPage: String?,
+    onBack: () -> Unit,
+    onThemeChanged: () -> Unit,
+    openVisual: () -> Unit,
+    openIcons: () -> Unit,
+    closeSubPage: () -> Unit,
+) {
     val viewModel: ThemeSettingsViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var showIconSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    var showVisualSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    BackHandler(showIconSettings || showVisualSettings) { showIconSettings = false; showVisualSettings = false }
-    if (showVisualSettings) {
+    val glass = FrostedGlassProfiles(
+        rememberKeyboardInputPreferences(false).frostedGlass,
+        rememberKeyboardInputPreferences(true).frostedGlass,
+    )
+    if (subPage == "visual") {
         Scaffold(topBar = { TopAppBar(title = { Text("视觉样式") }, navigationIcon = {
-            IconButton(onClick = { showVisualSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+            IconButton(onClick = closeSubPage) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         }) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp)) { item {
                 VisualStylePicker(VisualStyles.current) { style ->
@@ -60,8 +83,8 @@ fun ThemeSettingsContent(
         }
         return
     }
-    if (showIconSettings) {
-        IconSettingsContent(onBack = { showIconSettings = false }, onChanged = onThemeChanged)
+    if (subPage == "icons") {
+        IconSettingsContent(onBack = closeSubPage, onChanged = onThemeChanged)
         return
     }
     
@@ -86,6 +109,7 @@ fun ThemeSettingsContent(
         }
     ) { paddingValues ->
         var previewTheme by remember { mutableStateOf<KeyboardColorScheme?>(null) }
+        var showGlassSettings by remember { mutableStateOf(false) }
 
         LazyColumn(
             modifier = Modifier
@@ -105,13 +129,14 @@ fun ThemeSettingsContent(
             
             item {
                 val currentTheme = uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
-                    ?: uiState.colorThemes.first()
+                    ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     KeyboardThemeCard(
                         theme = currentTheme,
+                        glass = glass,
                         previewAspectRatio = 1.3f,
                         isSelected = uiState.darkMode == 2,
                         onClick = {
@@ -122,6 +147,7 @@ fun ThemeSettingsContent(
                     )
                     KeyboardThemeCard(
                         theme = currentTheme,
+                        glass = glass,
                         previewAspectRatio = 1.3f,
                         title = "浅色",
                         isSelected = uiState.darkMode == 0,
@@ -133,6 +159,7 @@ fun ThemeSettingsContent(
                     )
                     KeyboardThemeCard(
                         theme = currentTheme,
+                        glass = glass,
                         previewAspectRatio = 1.3f,
                         title = "深色",
                         isSelected = uiState.darkMode == 1,
@@ -146,6 +173,23 @@ fun ThemeSettingsContent(
             }
             
             item {
+                SettingsSection(title = "材质效果") {
+                    SettingsToggleItem(icon = Icons.TwoTone.Palette, title = "玻璃效果",
+                        subtitle = "沿用当前配色，切换主题时保持", checked = glass.dark.enabled,
+                        onCheckedChange = { enabled ->
+                            changeAppearance(context, onThemeChanged) {
+                                FrostedGlassPreferences.saveProfiles(context, glass.withEnabled(enabled))
+                            }
+                        })
+                    if (glass.dark.enabled) {
+                        SettingsItem(icon = Icons.TwoTone.Palette, title = "透明度与模糊",
+                            subtitle = "切换深浅时，背景与按键透明度互换", showArrow = true,
+                            onClick = { showGlassSettings = true })
+                    }
+                }
+            }
+
+            item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "配色方案",
@@ -157,7 +201,7 @@ fun ThemeSettingsContent(
             
             item {
                 Text(
-                    text = "柔和蓝在各设备使用相同配色；跟随系统动态配色会随壁纸和系统改变。点击可预览。",
+                    text = "柔和蓝在各设备使用相同配色。点击可预览。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)
@@ -173,7 +217,8 @@ fun ThemeSettingsContent(
                         rowThemes.forEach { theme ->
                             KeyboardThemeCard(
                                 theme = theme,
-                                isSelected = uiState.colorTheme == theme.id,
+                                glass = glass,
+                                isSelected = com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme).id == theme.id,
                                 onClick = {
                                     previewTheme = theme
                                 },
@@ -194,16 +239,16 @@ fun ThemeSettingsContent(
             item {
                 SettingsSection(title = "外观细节") {
                     SettingsItem(icon = Icons.TwoTone.Palette, title = "视觉样式",
-                        subtitle = VisualStyles.current.title, onClick = { showVisualSettings = true }, showArrow = true)
+                        subtitle = VisualStyles.current.title, onClick = openVisual, showArrow = true)
                     SettingsItem(icon = Icons.TwoTone.Palette, title = "图标设置",
                         subtitle = if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择",
-                        onClick = { showIconSettings = true }, showArrow = true)
+                        onClick = openIcons, showArrow = true)
                 }
             }
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "提示: 配色切换后设置页面立即生效，键盘需重启输入法",
+                    text = "提示: 配色切换后设置页面和键盘都会立即生效",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -214,17 +259,26 @@ fun ThemeSettingsContent(
         previewTheme?.let { theme ->
             ThemePreviewSheet(
                 theme = theme,
-                onApply = { glass ->
+                onApply = {
                     changeAppearance(context, onThemeChanged) {
-                        if (theme.id == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID) {
-                            com.kingzcheung.xime.settings.FrostedGlassPreferences.saveProfiles(context, glass.copy(
-                                light = glass.light.copy(enabled = true), dark = glass.dark.copy(enabled = true)))
-                        }
                         viewModel.setColorTheme(theme.id)
                         previewTheme = null
                     }
                 },
                 onDismiss = { previewTheme = null },
+            )
+        }
+        if (showGlassSettings) {
+            FrostedGlassSettingsSheet(
+                theme = uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
+                    ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme),
+                onApply = { draftGlass ->
+                    changeAppearance(context, onThemeChanged) {
+                        FrostedGlassPreferences.saveProfiles(context, draftGlass)
+                        showGlassSettings = false
+                    }
+                },
+                onDismiss = { showGlassSettings = false },
             )
         }
     }

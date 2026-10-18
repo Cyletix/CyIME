@@ -48,9 +48,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /**
- * Only the keyboard's own background is blurred. The cached bitmap works on API 28+;
- * text/icons are drawn afterwards and never enter the blur. Opacity changes only
- * redraw the material tint, so dragging either opacity slider does no bitmap work.
+ * The theme is a translucent tint over the real window behind the keyboard.
+ * ImeGlassBlurWindow blurs that window; this modifier never fades text/icons.
+ * Theme images keep their cached material rendering and do not capture the screen.
  */
 @Composable
 internal fun Modifier.frostedGlassBackground(
@@ -66,16 +66,19 @@ internal fun Modifier.frostedGlassBackground(
     if (!translucentSurface && shared != null && LocalView.current.rootView === shared.windowRoot) {
         var origin by remember { mutableStateOf(Offset.Zero) }
         return onGloballyPositioned { origin = it.positionInWindow() }.drawWithContent {
-            drawRect(shared.fallback)
-            shared.image?.takeIf { shared.frame.size.width > 0 && shared.frame.size.height > 0 }?.let { image ->
-                val offset = shared.frame.offsetIn(origin)
-                clipRect {
-                    translate(offset.x, offset.y) {
-                        drawImage(image, dstSize = shared.frame.size, filterQuality = FilterQuality.Medium)
+            if (shared.opacity > 0f) {
+                val image = shared.image?.takeIf { shared.frame.size.width > 0 && shared.frame.size.height > 0 }
+                if (image == null) drawRect(shared.fallback, alpha = shared.opacity)
+                else {
+                    val offset = shared.frame.offsetIn(origin)
+                    clipRect {
+                        translate(offset.x, offset.y) {
+                            drawImage(image, dstSize = shared.frame.size, alpha = shared.opacity,
+                                filterQuality = FilterQuality.Medium)
+                        }
                     }
                 }
             }
-            drawRect(shared.tint)
             drawContent()
         }
     }
@@ -85,36 +88,20 @@ internal fun Modifier.frostedGlassBackground(
     val renderSize = if (translucentSurface) IntSize(512, 256) else targetSize
     val blurredImage = rememberFrostedBackgroundImage(background, isDark, fallbackColor, normalized, renderSize)
 
-    // This replaces a theme image's overlayAlpha; applying both would double-darken it.
-    val tint = (if (isDark) Color.Black else Color.White).copy(alpha = normalized.backgroundOpacity)
-    val surfacePaint = remember { androidx.compose.ui.graphics.Paint() }
     return onSizeChanged { targetSize = it }.drawWithContent {
-        // Build the same tinted material for every host, then fade the completed
-        // backdrop as one layer. Fading the raw light gradient without its dark
-        // tint made physical-keyboard windows look white next to a dark keyboard.
-        val opacity = if (translucentSurface) normalized.backgroundOpacity else 1f
+        // The cached theme bitmap is opaque. Draw exactly one source with material alpha,
+        // or its fallback while loading; labels and keycaps remain outside this operation.
+        val opacity = normalized.backgroundOpacity
         if (opacity > 0f) {
-            if (translucentSurface) {
-                surfacePaint.alpha = opacity
-                drawContext.canvas.saveLayer(
-                    androidx.compose.ui.geometry.Rect(androidx.compose.ui.geometry.Offset.Zero, size),
-                    surfacePaint,
-                )
-            }
-            try {
-                drawRect(fallbackColor)
-                blurredImage?.let { image ->
-                    drawImage(
-                        image,
-                        dstOffset = IntOffset.Zero,
-                        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
-                        filterQuality = FilterQuality.Medium,
-                    )
-                }
-                drawRect(tint)
-            } finally {
-                if (translucentSurface) drawContext.canvas.restore()
-            }
+            val image = blurredImage
+            if (image == null) drawRect(fallbackColor, alpha = opacity)
+            else drawImage(
+                image,
+                dstOffset = IntOffset.Zero,
+                dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                alpha = opacity,
+                filterQuality = FilterQuality.Medium,
+            )
         }
         drawContent()
     }
@@ -127,6 +114,7 @@ internal fun rememberFrostedBackgroundImage(
     fallbackColor: Color,
     config: FrostedGlassConfig,
     renderSize: IntSize,
+    clipboardInMotion: Boolean = LocalClipboardBackdropMotion.current,
 ): ImageBitmap? {
     val context = LocalContext.current.applicationContext
     val density = LocalDensity.current.density
@@ -141,13 +129,15 @@ internal fun rememberFrostedBackgroundImage(
         }
     }
 
+    val resizeCache = remember { ClipboardBackdropSizeCache() }
+    val cachedSize = resizeCache.resolve(renderSize, clipboardInMotion)
     var blurredImage by remember(background, isDark, fallbackColor) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(background, isDark, fallbackColor, sourceImage, renderSize, density, normalized.blurRadiusDp) {
-        if (renderSize.width <= 0 || renderSize.height <= 0) return@LaunchedEffect
+    LaunchedEffect(background, isDark, fallbackColor, sourceImage, cachedSize, density, normalized.blurRadiusDp) {
+        if (cachedSize.width <= 0 || cachedSize.height <= 0) return@LaunchedEffect
         blurredImage = withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
             renderFrostedBackground(
-                background, isDark, fallbackColor.toArgb(), sourceImage, renderSize,
+                background, isDark, fallbackColor.toArgb(), sourceImage, cachedSize,
                 normalized.blurRadiusDp * density,
                 checkCancelled = { coroutineContext.ensureActive() },
             ).asImageBitmap()
@@ -213,16 +203,6 @@ private fun renderFrostedBackground(
             )
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
             paint.shader = null
-        } else if (background?.type != "image" || image == null) {
-            // A pure solid has nothing to blur. Add a restrained, neutral light wash
-            // using the theme's base hue, without imposing a wallpaper or accent hue.
-            paint.shader = RadialGradient(
-                width * 0.22f, height * 0.2f, max(width, height) * 0.85f,
-                if (isDark) 0x38ffffff else 0x88ffffff.toInt(), 0x00ffffff,
-                Shader.TileMode.CLAMP,
-            )
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-            paint.shader = null
         }
         if (background?.type == "image" && image != null) {
             canvas.save()
@@ -232,6 +212,14 @@ private fun renderFrostedBackground(
                 frostedImageBounds(image, targetSize, background.fit ?: "cover"), paint,
             )
             canvas.restore()
+            // 与非玻璃时相同的图片遮罩，否则玻璃下图片原样露出，键面文字压在花图上。
+            val overlayAlpha = (if (isDark) background.overlayAlphaDark ?: background.overlayAlpha
+                else background.overlayAlpha)?.coerceIn(0f, 1f)
+            if (overlayAlpha != null && overlayAlpha > 0f) {
+                val overlay = (if (isDark) background.overlayColorDark ?: background.overlayColor
+                    else background.overlayColor) ?: 0L
+                canvas.drawColor(((overlayAlpha * 255).roundToInt() shl 24) or (overlay and 0xFFFFFF).toInt())
+            }
         }
         checkCancelled()
         if (blurRadiusPx >= 1f) {

@@ -117,8 +117,14 @@ fun Modifier.keyboardBackground(
             LaunchedEffect(src) {
                 imageBitmap = try {
                     withContext(Dispatchers.Default) {
+                        // 按屏幕宽度降采样：4000 px 的主题图整张解码要占几十 MB，键盘只铺满一屏宽。
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        openThemeImageStream(context, src)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                        val target = context.resources.displayMetrics.let { maxOf(it.widthPixels, it.heightPixels) }
+                        var sample = 1
+                        while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target / 2) sample *= 2
                         openThemeImageStream(context, src)?.use { stream ->
-                            BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                            BitmapFactory.decodeStream(stream, null, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
                         }
                     }
                 } catch (e: Exception) { null }
@@ -132,13 +138,15 @@ fun Modifier.keyboardBackground(
                 } else {
                     background.overlayAlpha
                 }
+                val overlayColor = (if (isDark) background.overlayColorDark ?: background.overlayColor
+                    else background.overlayColor)?.let { Color(0xFF000000 or it) } ?: Color.Black
                 return this.then(
                     Modifier.drawWithContent {
                         drawImageBackground(bitmap, fit)
-                        // 半透明黑色遮罩压暗背景，提升按键对比度
+                        // 半透明遮罩（默认黑色）压住图片，提升按键与候选字对比度
                         if (overlayAlpha != null && overlayAlpha > 0f) {
                             drawRect(
-                                color = Color.Black.copy(alpha = overlayAlpha.coerceIn(0f, 1f)),
+                                color = overlayColor.copy(alpha = overlayAlpha.coerceIn(0f, 1f)),
                             )
                         }
                         drawContent()

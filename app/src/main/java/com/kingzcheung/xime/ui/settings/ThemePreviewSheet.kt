@@ -10,7 +10,6 @@ import androidx.compose.runtime.saveable.listSaver
 import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.settings.FrostedGlassProfiles
 import com.kingzcheung.xime.settings.FrostedGlassPreferences
-import com.kingzcheung.xime.ui.theme.TransparentGlassTheme
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.frostedKeyColor
@@ -35,7 +34,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.twotone.KeyboardControlKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -82,22 +80,50 @@ private val QWERTY_ROW2 = listOf("Z", "X", "C", "V", "B", "N", "M")
 @Composable
 fun ThemePreviewSheet(
     theme: KeyboardColorScheme,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val glass = remember(theme.id) { FrostedGlassPreferences.readProfiles(context) }
+    AppearancePreviewSheet(theme.name, theme, glass, onApply, onDismiss)
+}
+
+@Composable
+internal fun FrostedGlassSettingsSheet(
+    theme: KeyboardColorScheme,
     onApply: (FrostedGlassProfiles) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val glassEnabled = theme.id == TransparentGlassTheme.ID
-    var glass by rememberSaveable(theme.id, stateSaver = listSaver(
-        save = { listOf(it.light.blurRadiusDp, it.light.backgroundOpacity, it.light.keyOpacity,
+    var glass by rememberSaveable(theme.id, stateSaver = listSaver<FrostedGlassProfiles, Any>(
+        save = { listOf(it.dark.enabled, it.light.blurRadiusDp, it.light.backgroundOpacity, it.light.keyOpacity,
             it.dark.blurRadiusDp, it.dark.backgroundOpacity, it.dark.keyOpacity) },
         restore = { FrostedGlassProfiles(
-            light = FrostedGlassConfig(glassEnabled, it[0], it[1], it[2]),
-            dark = FrostedGlassConfig(glassEnabled, it[3], it[4], it[5]),
+            light = FrostedGlassConfig(it[0] as Boolean, it[1] as Float, it[2] as Float, it[3] as Float),
+            dark = FrostedGlassConfig(it[0] as Boolean, it[4] as Float, it[5] as Float, it[6] as Float),
         ) },
-    )) { mutableStateOf(FrostedGlassPreferences.readProfiles(context).let {
-        it.copy(light = it.light.copy(enabled = glassEnabled), dark = it.dark.copy(enabled = glassEnabled))
-    }) }
-    val pagerState = rememberPagerState(pageCount = { PREVIEW_PAGES.size })
+    )) { mutableStateOf(FrostedGlassPreferences.readProfiles(context)) }
+    AppearancePreviewSheet("透明度与模糊", theme, glass, { onApply(glass) }, onDismiss) { isDark ->
+        Spacer(Modifier.height(12.dp))
+        FrostedThemeControls(glass.forAppearance(isDark), isDark) {
+            glass = glass.withAppearance(it, isDark)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppearancePreviewSheet(
+    title: String,
+    theme: KeyboardColorScheme,
+    glass: FrostedGlassProfiles,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit,
+    controls: @Composable (isDark: Boolean) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val pagerState = rememberPagerState(initialPage = if (FrostedGlassPreferences.isDark(context)) 1 else 0,
+        pageCount = { PREVIEW_PAGES.size })
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -113,7 +139,7 @@ fun ThemePreviewSheet(
                 .padding(bottom = 32.dp),
         ) {
             Text(
-                text = theme.name,
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -121,13 +147,7 @@ fun ThemePreviewSheet(
             )
 
             ThemePreviewPager(theme = theme, glass = glass, pagerState = pagerState)
-            if (glassEnabled) {
-                Spacer(Modifier.height(16.dp))
-                val isDark = PREVIEW_PAGES[pagerState.currentPage].isDark
-                FrostedThemeControls(glass.forAppearance(isDark), isDark) {
-                    glass = if (isDark) glass.copy(dark = it) else glass.copy(light = it)
-                }
-            }
+            controls(PREVIEW_PAGES[pagerState.currentPage].isDark)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -145,7 +165,7 @@ fun ThemePreviewSheet(
                     Text("取消", fontSize = 16.sp)
                 }
                 Button(
-                    onClick = { onApply(glass) },
+                    onClick = onApply,
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp),
@@ -338,7 +358,7 @@ private fun ThemeKeyboardPreview(
                     ) {
                         PreviewKey(
                             label = "",
-                            icon = rememberVectorPainter(Icons.TwoTone.KeyboardControlKey),
+                            icon = rememberVectorPainter(com.kingzcheung.xime.ui.keyboard.ShiftKeyIcons.Off),
                             color = specialKeyColor, textColor = specialTextColor, weight = 1.4f,
                             extraModifier = Modifier.padding(0.5.dp, 2.dp)
                         )
