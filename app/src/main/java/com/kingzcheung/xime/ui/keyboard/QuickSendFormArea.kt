@@ -3,6 +3,7 @@ package com.kingzcheung.xime.ui.keyboard
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,26 +43,47 @@ fun QuickSendFormArea(
     onFocusChange: (Boolean) -> Unit,
     onCodeFocusChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = if (editingItemId != null) "编辑剪贴板" else "新增固定",
+    showCode: Boolean = true,
+    onRetake: (() -> Unit)? = null,
 ) {
-    val title = if (editingItemId != null) "编辑剪贴板" else "新增固定"
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass.enabled
+    // Drafts overlay other content, so they need their own opaque theme surface and matching text.
+    val popupBackground = if (glass) MaterialTheme.colorScheme.surface.copy(alpha = 1f)
+        else if (backgroundColor.alpha > 0f) backgroundColor else cardBgColor
+    val popupText = if (glass) MaterialTheme.colorScheme.onSurface.copy(alpha = 1f) else textColor
     val currentOnFocusChange by rememberUpdatedState(onFocusChange)
     val currentOnCodeFocusChange by rememberUpdatedState(onCodeFocusChange)
-    val gap = with(LocalDensity.current) { 8.dp.roundToPx() }
-    val position = remember(gap) { object : PopupPositionProvider {
+    val density = LocalDensity.current
+    val gap = with(density) { 8.dp.roundToPx() }
+    val safeTop = WindowInsets.statusBars.getTop(density)
+    var availableHeight by remember { mutableIntStateOf(0) }
+    val position = remember(gap, safeTop) { object : PopupPositionProvider {
         override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
-            layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset = IntOffset(
+            layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+            // The anchor is the actual keyboard edge, including floating/landscape placement.
+            val above = (anchorBounds.top - safeTop - gap * 2).coerceAtLeast(0)
+            availableHeight = if (above > 0) above else (windowSize.height - safeTop - gap * 2).coerceAtLeast(1)
+            return IntOffset(
             (anchorBounds.left + (anchorBounds.width - popupContentSize.width) / 2)
                 .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
             (anchorBounds.top - popupContentSize.height - gap)
                 .coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
-        )
+            )
+        }
     } }
-    // Keep enough room for the draft after the title, optional code and footer in landscape.
-    val height = (LocalConfiguration.current.screenHeightDp * 0.45f).coerceIn(200f, 240f).dp
+    val maxHeight = if (availableHeight > 0) with(density) { availableHeight.toDp() }
+        else (LocalConfiguration.current.screenHeightDp * .45f).dp
+    // Short drafts wrap tightly; long drafts scroll only after using the free space above the IME.
+    val editorMaxHeight = (maxHeight - (if (title == null) 60.dp else 92.dp) - if (showCode) 44.dp else 0.dp).coerceAtLeast(24.dp)
+    // The popup is a sub-window where Android offers no text menu; the editor reports when the
+    // footer should show selection actions instead.
+    var selectionActions by remember(editingItemId) { mutableStateOf(false) }
+    val selectableEditor = remember { arrayOfNulls<PopupSelectableEditText>(1) }
     val save: () -> Unit = {
         val editor = QuickSendFormEditTextHolder.editText
         val text = editor?.text?.toString().orEmpty()
-        val code = QuickSendFormCodeEditTextHolder.editText?.text?.toString().orEmpty()
+        val code = if (showCode) QuickSendFormCodeEditTextHolder.editText?.text?.toString().orEmpty() else ""
         if (text.isBlank()) {
             editor?.error = ClipboardDraftSaveResult.EMPTY_TEXT.errorMessage
             editor?.requestFocus()
@@ -72,35 +94,42 @@ fun QuickSendFormArea(
         Popup(popupPositionProvider = position,
             properties = PopupProperties(focusable = false, dismissOnBackPress = false,
                 dismissOnClickOutside = false, clippingEnabled = false)) {
-            Column(Modifier.width(width).height(height).clip(RoundedCornerShape(16.dp))
-                .keyboardPanelBackground(if (backgroundColor.alpha > 0f) backgroundColor else cardBgColor)
-                .padding(12.dp).testTag("clipboard-text-editor")) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, color = textColor, modifier = Modifier.weight(1f))
+            Column(Modifier.width(width).clip(RoundedCornerShape(16.dp))
+                // Gradient/image themes paint the theme backdrop like the keyboard panels; a solid
+                // theme keeps its colour. Never glass: the editor floats over the app without a
+                // blur window, so it stays opaque and readable.
+                .keyboardPanelBackground(popupBackground, com.kingzcheung.xime.settings.FrostedGlassConfig(enabled = false))
+                .testTag("clipboard-text-editor")
+                .padding(12.dp)) {
+                if (title != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, color = popupText.copy(alpha = .75f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
                     IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Close, "关闭", tint = textColor, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Close, "关闭", tint = popupText, modifier = Modifier.size(20.dp))
                     }
                 }
                 // Only a different record starts a new draft. Focus and theme recompositions must
                 // not replace text or move the cursor back to the initial saved content.
                 key(editingItemId) {
-                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         AndroidView(
                             factory = { context ->
-                                android.widget.EditText(context).apply {
+                                PopupSelectableEditText(context).apply {
                                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
                                     showSoftInputOnFocus = false
-                                    hint = "输入剪贴板内容"
+                                    onSelectionActionsChanged = { selectionActions = it }
+                                    selectableEditor[0] = this
+                                    hint = if (showCode) "输入剪贴板内容" else ""
                                     textSize = 16f
                                     isSingleLine = false
+                                    minLines = 1
+                                    isVerticalScrollBarEnabled = true
                                     gravity = Gravity.TOP or Gravity.START
                                     setPadding(12, 8, 12, 8)
                                     setText(initialText)
                                     setSelection(initialText.length)
 
-                                    setImeActionLabel("确定", EditorInfo.IME_ACTION_DONE)
                                     imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION or
-                                        EditorInfo.IME_ACTION_DONE
+                                        EditorInfo.IME_ACTION_NONE
 
                                     onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
                                         currentOnFocusChange(hasFocus)
@@ -115,20 +144,23 @@ fun QuickSendFormArea(
                                 }
                             },
                             update = { editText ->
-                                editText.setTextColor(textColor.toArgb())
-                                editText.setHintTextColor(textColor.copy(alpha = 0.4f).toArgb())
+                                editText.setTextColor(popupText.toArgb())
+                                editText.setHintTextColor(popupText.copy(alpha = 0.4f).toArgb())
+                                editText.handleColor = accentColor.toArgb()
+                                editText.highlightColor = accentColor.copy(alpha = 0.3f).toArgb()
                             },
                             onReset = null,
                             onRelease = { editText ->
+                                if (selectableEditor[0] === editText) selectableEditor[0] = null
                                 if (QuickSendFormEditTextHolder.editText === editText) {
                                     QuickSendFormEditTextHolder.editText = null
                                 }
                             },
                             modifier = Modifier
-                                .fillMaxSize()
-                                .weight(1f),
+                                .fillMaxWidth()
+                                .heightIn(min = minOf(32.dp, editorMaxHeight), max = editorMaxHeight),
                         )
-                        AndroidView(
+                        if (showCode) AndroidView(
                             factory = { context ->
                                 android.widget.EditText(context).apply {
                                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -141,9 +173,8 @@ fun QuickSendFormArea(
                                     setText(initialCode)
                                     setSelection(initialCode.length)
 
-                                    setImeActionLabel("确定", EditorInfo.IME_ACTION_DONE)
                                     imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION or
-                                        EditorInfo.IME_ACTION_DONE
+                                        EditorInfo.IME_ACTION_NEXT
 
                                     // 焦点回调 + 点击抢焦点：宿主按键输入按焦点路由（文本框 vs 编码框）
                                     onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
@@ -157,8 +188,8 @@ fun QuickSendFormArea(
                                 }
                             },
                             update = { editText ->
-                                editText.setTextColor(textColor.toArgb())
-                                editText.setHintTextColor(textColor.copy(alpha = 0.4f).toArgb())
+                                editText.setTextColor(popupText.toArgb())
+                                editText.setHintTextColor(popupText.copy(alpha = 0.4f).toArgb())
                             },
                             onReset = null,
                             onRelease = { editText ->
@@ -166,14 +197,26 @@ fun QuickSendFormArea(
                                     QuickSendFormCodeEditTextHolder.editText = null
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
                         )
                     }
                 }
                 Row(Modifier.fillMaxWidth().height(36.dp), horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onCancel) { Text("取消", color = textColor) }
-                    TextButton(onClick = save) { Text("保存", color = accentColor) }
+                    if (selectionActions) {
+                        // Same footer height, so the draft never jumps while text is selected.
+                        TextButton(onClick = { selectableEditor[0]?.selectAllText() }) { Text("全选", color = popupText) }
+                        TextButton(onClick = { selectableEditor[0]?.copySelection() }) { Text("复制", color = popupText) }
+                        TextButton(onClick = { selectableEditor[0]?.cutSelection() }) { Text("剪切", color = popupText) }
+                        TextButton(onClick = { selectableEditor[0]?.pasteClipboard() }) { Text("粘贴", color = popupText) }
+                    } else {
+                        onRetake?.let { retake ->
+                            TextButton(onClick = retake) { Text("重拍", color = popupText) }
+                            Spacer(Modifier.weight(1f))
+                        }
+                        TextButton(onClick = onCancel) { Text("取消", color = popupText) }
+                        TextButton(onClick = save) { Text("保存", color = accentColor) }
+                    }
                 }
             }
         }
