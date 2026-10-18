@@ -26,8 +26,11 @@ import kotlin.concurrent.thread
  */
 object CandidateGlossary {
     const val MODEL_ID = "candidate-gloss"
-    const val FILE_NAME = "cyime_gloss.tsv"
+    /** 文件名带版本：v1 有俚语、读音选错的释义（几号 → heroin），装着 v1 的设备不再读它。 */
+    const val FILE_NAME = "cyime_gloss-v2.tsv"
+    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv")
     private const val TAG = "CandidateGlossary"
+    private val upgradeStarted = AtomicBoolean(false)
 
     @Volatile private var table: GlossTable? = null
     @Volatile private var signature: String? = null
@@ -44,8 +47,10 @@ object CandidateGlossary {
     /** 按当前设置在后台加载或释放词典；只读偏好和文件信息，可在主线程调用。 */
     fun prepare(context: Context) {
         val source = file(context)
-        if (SettingsPreferences.candidateCommentContent(context) != CandidateCommentContent.GLOSS ||
-            SettingsPreferences.candidateCommentMode(context) == CandidateCommentMode.HIDE || !source.isFile) {
+        val wanted = SettingsPreferences.candidateCommentContent(context) == CandidateCommentContent.GLOSS &&
+            SettingsPreferences.candidateCommentMode(context) != CandidateCommentMode.HIDE
+        if (wanted && !source.isFile) upgradeFromLegacy(context)
+        if (!wanted || !source.isFile) {
             if (table != null) revisionState.intValue++
             table = null
             signature = null
@@ -64,6 +69,25 @@ object CandidateGlossary {
                 loading.set(false)
             }
         }
+    }
+
+    /** 用户已选释义、装的是旧版词典：后台换成新版（只下载一次），下完删掉旧文件并重新加载。 */
+    private fun upgradeFromLegacy(context: Context) {
+        val dir = ModelStorage.getModelDir(context, MODEL_ID)
+        val legacy = LEGACY_FILE_NAMES.map { File(dir, it) }.filter { it.isFile }
+        if (legacy.isEmpty() || !upgradeStarted.compareAndSet(false, true)) return
+        val model = com.kingzcheung.xime.model.ModelManager.getModel(MODEL_ID) ?: return
+        val app = context.applicationContext
+        com.kingzcheung.xime.model.ModelManager.downloadModelInBackground(app, model, onProgress = { state ->
+            when (state) {
+                is com.kingzcheung.xime.model.ModelDownloadState.Complete -> {
+                    legacy.forEach { it.delete() }
+                    prepare(app)
+                }
+                is com.kingzcheung.xime.model.ModelDownloadState.Error -> upgradeStarted.set(false)
+                else -> Unit
+            }
+        })
     }
 
     /** 词典已加载（释义模式且注释未隐藏）。 */
