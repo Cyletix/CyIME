@@ -36,8 +36,8 @@ import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.kingzcheung.xime.ui.common.CompactDropdownMenu
+import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -292,20 +292,17 @@ fun HandwritingCaptureScreen(onBack: () -> Unit) {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "更多")
                     }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text("分享 JSON") },
-                            leadingIcon = { Icon(Icons.Filled.IosShare, contentDescription = null) },
+                    CompactDropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        CompactMenuRow(
+                            label = "分享 JSON", icon = Icons.Filled.IosShare,
                             onClick = { menuExpanded = false; viewModel.exportShare() },
                         )
-                        DropdownMenuItem(
-                            text = { Text("保存到下载") },
-                            leadingIcon = { Icon(Icons.Filled.SaveAlt, contentDescription = null) },
+                        CompactMenuRow(
+                            label = "保存到下载", icon = Icons.Filled.SaveAlt,
                             onClick = { menuExpanded = false; viewModel.exportToDownloads() },
                         )
-                        DropdownMenuItem(
-                            text = { Text("清空样本") },
-                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                        CompactMenuRow(
+                            label = "清空样本", icon = Icons.Filled.Delete, tint = MaterialTheme.colorScheme.error,
                             onClick = { menuExpanded = false; viewModel.clearAll() },
                         )
                     }

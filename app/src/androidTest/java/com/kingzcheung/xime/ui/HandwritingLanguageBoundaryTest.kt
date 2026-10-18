@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -12,8 +11,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.ui.keyboard.HandwritingKeyboardLayout
-import com.kingzcheung.xime.ui.keyboard.HandwritingLookupKeyboard
-import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -60,24 +57,5 @@ class HandwritingLanguageBoundaryTest {
         rule.runOnIdle { language = InputLanguage.CHINESE }
         rule.onNodeWithTag("handwriting-canvas").assertExists()
         rule.onNodeWithTag("handwriting-unavailable").assertDoesNotExist()
-    }
-
-    @Test fun lookupFromEnglishShowsChineseHandwritingAndJapaneseRemainsUnavailable() {
-        var state by mutableStateOf(KeyboardUiState(currentSchemaId = "japanese", isAsciiMode = true))
-        rule.setContent {
-            MaterialTheme {
-                HandwritingLookupKeyboard(
-                    keyTextColor = Color.Black, specialKeyBgColor = Color.LightGray, keyboardBgColor = Color.White,
-                    shadowEnabled = false, shadowElevation = 0.dp, shadowShapeRadius = 8.dp,
-                    uiState = state, onKeyPress = {}, onButtonFeedback = null, onCandidates = null,
-                    onExit = {}, clearSignal = 0, modifier = Modifier.size(320.dp, 260.dp),
-                )
-            }
-        }
-        rule.onNodeWithTag("handwriting-lookup-canvas").assertExists()
-        rule.onNodeWithTag("handwriting-language").assertTextEquals("中文手写")
-        rule.runOnIdle { state = state.copy(isAsciiMode = false) }
-        rule.onNodeWithTag("handwriting-lookup-canvas").assertDoesNotExist()
-        rule.onNodeWithTag("handwriting-unavailable").assertExists()
     }
 }

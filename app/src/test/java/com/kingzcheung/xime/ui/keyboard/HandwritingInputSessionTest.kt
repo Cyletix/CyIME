@@ -131,4 +131,40 @@ class HandwritingInputSessionTest {
         assertEquals(listOf(1), f.windows)
     }
 
+    @Test fun aFrameOfPenSamplesIsAppendedInOrderWithoutDuplicates() = runTest {
+        val f = Fixture(this)
+        val token = f.session.begin(StrokePoint(0f, 0f, 0))
+        f.session.moveAll(token, listOf(StrokePoint(1f, 0f, 4), StrokePoint(1f, 0f, 8), StrokePoint(2f, 1f, 12)))
+        assertEquals(listOf(0f to 0f, 1f to 0f, 2f to 1f), f.session.currentStroke.map { it.x to it.y })
+    }
+
+    @Test fun erasingRemovesOnlyTouchedStrokesAndRecognizesTheRest() = runTest {
+        val f = Fixture(this)
+        f.stroke()
+        val far = f.session.begin(StrokePoint(100f, 100f, 40))
+        f.session.move(far, StrokePoint(120f, 100f, 60)); f.session.end(far)
+        assertTrue(f.session.erase(listOf(StrokePoint(20f, 12f)), radius = 5f))
+        assertEquals(1, f.session.strokes.size)
+        assertEquals(100f, f.session.strokes.single().first().x)
+        advanceUntilIdle()
+        assertEquals(listOf(1), f.windows)
+    }
+
+    @Test fun erasingTheLastStrokeLeavesAnEmptyPadWithoutRecognition() = runTest {
+        val f = Fixture(this)
+        f.stroke()
+        f.session.erase(listOf(StrokePoint(10f, 10f)), radius = 5f)
+        advanceUntilIdle()
+        assertFalse(f.session.hasInk)
+        assertEquals(HandwritingPhase.IDLE, f.session.phase)
+        assertTrue(f.windows.isEmpty())
+    }
+
+    @Test fun erasingEmptySpaceKeepsInkAndPendingRecognition() = runTest {
+        val f = Fixture(this)
+        f.stroke()
+        assertFalse(f.session.erase(listOf(StrokePoint(300f, 300f)), radius = 5f))
+        advanceUntilIdle()
+        assertEquals(listOf(1), f.windows)
+    }
 }

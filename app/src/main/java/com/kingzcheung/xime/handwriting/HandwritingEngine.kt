@@ -43,7 +43,8 @@ object HandwritingEngine {
         val modelDir = ModelStorage.getModelDir(ctx, "ochwpro")
         // 兼容旧版：旧版手写模型在 filesDir 根目录
         ModelStorage.migrateLegacyForModel(ctx, "ochwpro")
-        val modelFile = File(modelDir, "ochwpro.onnx")
+        // 电脑上用自己的笔迹微调过的模型优先；字表沿用内置模型（微调不改字表）
+        val modelFile = personalModelFile(ctx).takeIf { it.isFile } ?: File(modelDir, "ochwpro.onnx")
         val charIndexFile = File(modelDir, "char_index.json")
 
         if (!modelFile.exists() || !charIndexFile.exists()) {
@@ -84,7 +85,7 @@ object HandwritingEngine {
             }
 
             initialized = true
-            Log.i(TAG, "Handwriting engine initialized via IPC")
+            Log.i(TAG, "Handwriting engine initialized via IPC: ${modelFile.name}")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "HandwritingEngine init failed: ${e.message}", e)
@@ -94,6 +95,27 @@ object HandwritingEngine {
     }
 
     fun isInitialized(): Boolean = initialized
+
+    /**
+     * 个人手写模型：用训练模式的样本在电脑上微调，放到外部私有目录（adb 可直接推送，不随安装包分发）。
+     * 文件在就用它；停用时改名为 `.disabled`，换回内置模型。
+     */
+    fun personalModelFile(context: Context): File =
+        File(context.getExternalFilesDir(null) ?: context.filesDir, "handwriting_models/ochwpro-personal.onnx")
+
+    fun disabledPersonalModelFile(context: Context): File =
+        File(personalModelFile(context).path + ".disabled")
+
+    /** 启用或停用个人模型并让下次识别重新加载；返回切换后是否在用个人模型。 */
+    fun setPersonalModelEnabled(context: Context, enabled: Boolean): Boolean {
+        val active = personalModelFile(context)
+        val disabled = disabledPersonalModelFile(context)
+        if (enabled && disabled.isFile && !active.exists()) disabled.renameTo(active)
+        if (!enabled && active.isFile) active.renameTo(disabled)
+        release()
+        appContext = context.applicationContext
+        return active.isFile
+    }
 
     /** 手写模型是否可用（含旧版 filesDir 根目录模型迁移后检查）。 */
     fun hasModel(context: Context, language: InputLanguage = InputLanguage.CHINESE): Boolean {
