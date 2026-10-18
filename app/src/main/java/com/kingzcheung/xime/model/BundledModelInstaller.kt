@@ -8,7 +8,7 @@ import org.json.JSONArray
  * User changes/deletions after setup are preserved, including on subsequent upgrades. */
 object BundledModelInstaller {
     val modelIds = setOf("ochwpro", DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE,
-        SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
+        SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, BuiltinModelCatalog.SPEAKER_MODEL)
     suspend fun install(context: Context) {
         DeviceDefaults.initialize(context)
         val prefs = context.getSharedPreferences("bundled_models", Context.MODE_PRIVATE)
