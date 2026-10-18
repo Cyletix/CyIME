@@ -74,6 +74,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -99,6 +100,14 @@ fun SettingsMainContent(
 ) {
     val context = LocalContext.current
     var searchQuery by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var entryStatus by remember { mutableStateOf(readMainEntryStatus(context)) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        // 系统输入法选择框关闭、插拔键盘都不一定触发 resume，停留在本页时定时刷新。
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            while (true) { entryStatus = readMainEntryStatus(context); kotlinx.coroutines.delay(500) }
+        }
+    }
     val density = LocalDensity.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val imeBottomDp = with(density) { imeBottomPx.toDp() }
@@ -149,6 +158,8 @@ fun SettingsMainContent(
                         icon = Icons.TwoTone.Keyboard,
                         title = "启用输入法",
                         subtitle = "在系统设置中启用 CyIME",
+                        status = if (entryStatus.imeEnabled) "已设置" else "未设置",
+                        statusTone = if (entryStatus.imeEnabled) SettingsStatusTone.OK else SettingsStatusTone.WARNING,
                         onClick = {
                             val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)
                             context.startActivity(intent)
@@ -163,6 +174,8 @@ fun SettingsMainContent(
                         icon = Icons.TwoTone.ToggleOn,
                         title = "选择输入法",
                         subtitle = "将 CyIME 设为当前输入法",
+                        status = if (entryStatus.imeSelected) "已设置" else "未设置",
+                        statusTone = if (entryStatus.imeSelected) SettingsStatusTone.OK else SettingsStatusTone.WARNING,
                         onClick = {
                             val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) 
                                 as InputMethodManager
@@ -175,7 +188,9 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "物理键盘",
-                        subtitle = "语言切换快捷键、候选跟随与浮条", onClick = onNavigateToHardwareKeyboard)
+                        subtitle = "语言切换快捷键、候选跟随与浮条", onClick = onNavigateToHardwareKeyboard,
+                        status = if (entryStatus.keyboardConnected) "已连接" else "未连接",
+                        statusTone = if (entryStatus.keyboardConnected) SettingsStatusTone.OK else SettingsStatusTone.NEUTRAL)
                     var testText by remember { mutableStateOf("") }
                     var isFocused by remember { mutableStateOf(false) }
                     val editorVisibility = remember { BringIntoViewRequester() }
@@ -252,6 +267,7 @@ fun SettingsMainContent(
                         icon = Icons.TwoTone.Palette,
                         title = "主题与定制",
                         subtitle = "自定义外观和样式",
+                        status = entryStatus.themeName,
                         onClick = onNavigateToTheme,
                         showArrow = true
                     )
@@ -471,4 +487,29 @@ fun SettingsMainContent(
             }
         }
     }
+}
+
+/** 首页入口右侧的状态：输入法启用/选中、实体键盘连接、当前主题。 */
+internal data class MainEntryStatus(
+    val imeEnabled: Boolean = false,
+    val imeSelected: Boolean = false,
+    val keyboardConnected: Boolean = false,
+    val themeName: String = "",
+)
+
+internal fun readMainEntryStatus(context: android.content.Context): MainEntryStatus {
+    val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    val selected = android.content.ComponentName.unflattenFromString(
+        Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD).orEmpty())
+    val input = context.getSystemService(android.content.Context.INPUT_SERVICE) as? android.hardware.input.InputManager
+    val devices: List<android.view.InputDevice> =
+        input?.let { manager -> manager.inputDeviceIds.map { id -> manager.getInputDevice(id) }.filterNotNull() }.orEmpty()
+    val theme = com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(SettingsPreferences.getKeyboardTheme(context)).name
+    val glass = com.kingzcheung.xime.settings.FrostedGlassPreferences.read(context).enabled
+    return MainEntryStatus(
+        imeEnabled = imm?.enabledInputMethodList?.any { it.packageName == context.packageName } == true,
+        imeSelected = selected?.packageName == context.packageName,
+        keyboardConnected = com.kingzcheung.xime.service.hasPhysicalTextKeyboard(devices),
+        themeName = if (glass) "$theme · 玻璃" else theme,
+    )
 }
