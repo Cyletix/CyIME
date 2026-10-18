@@ -1,6 +1,12 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import android.graphics.Rect
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.contentDescription
@@ -60,6 +66,9 @@ internal fun VoiceCollapsedPill(
     onSwitchLanguage: () -> Unit,
     onShowKeyboard: () -> Unit,
     onBackspace: () -> Unit,
+    /** 按下/抬起删除键：与键盘删除键同一套按键反馈（音效、震动）。 */
+    onBackspacePress: () -> Unit = {},
+    onBackspaceRelease: () -> Unit = {},
     onMic: () -> Unit,
     backgroundColor: Color,
     contentColor: Color,
@@ -95,7 +104,7 @@ internal fun VoiceCollapsedPill(
                     Text(if (listening) "正在听取…" else "点按麦克风说话", color = color, fontSize = 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                HardwareToolbarAction(Icons.AutoMirrored.Filled.Backspace, "删除", "voice-pill-backspace", color, onClick = onBackspace)
+                VoicePillBackspace(color, onBackspace, onBackspacePress, onBackspaceRelease)
                 VoicePillMic(listening, amplitude, color, accentColor, onMic)
             }
         }
@@ -117,5 +126,40 @@ private fun VoicePillMic(listening: Boolean, amplitude: () -> Float, color: Colo
         contentAlignment = Alignment.Center,
     ) {
         Icon(Icons.Default.Mic, null, tint = if (listening) accentColor else color, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** 删除键的手势：点按删一个，长按后按键盘删除键的节奏连续删除（复用同一个手势检测）。 */
+internal fun voicePillBackspaceActions(
+    onDelete: () -> Unit, onPress: () -> Unit, onRelease: () -> Unit, onPressedChange: (Boolean) -> Unit,
+) = RepeatingKeyActions(
+    onTap = onDelete,
+    onPress = { onPressedChange(true); onPress() },
+    onRelease = { onPressedChange(false); onRelease() },
+    onPreview = {},
+    onRepeat = onDelete,
+)
+
+@Composable
+private fun VoicePillBackspace(color: Color, onDelete: () -> Unit, onPress: () -> Unit, onRelease: () -> Unit) {
+    var pressed by remember { mutableStateOf(false) }
+    val currentDelete by rememberUpdatedState(onDelete)
+    val currentPress by rememberUpdatedState(onPress)
+    val currentRelease by rememberUpdatedState(onRelease)
+    Box(
+        Modifier.size(48.dp)
+            .semantics { contentDescription = "删除"; role = Role.Button; onClick { currentDelete(); true } }
+            .pointerInput(Unit) {
+                detectRepeatingKeyGestures {
+                    voicePillBackspaceActions({ currentDelete() }, { currentPress() }, { currentRelease() }) { pressed = it }
+                }
+            }
+            .testTag("voice-pill-backspace"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(36.dp).clip(CircleShape).background(color.copy(alpha = if (pressed) .14f else 0f)),
+            contentAlignment = Alignment.Center) {
+            Icon(Icons.AutoMirrored.Filled.Backspace, null, tint = color, modifier = Modifier.size(20.dp))
+        }
     }
 }
