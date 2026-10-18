@@ -46,7 +46,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
                 )
                 online = OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model, enableEndpoint = false))
             }
-            if (selection.secondDir != null) offline = createSenseVoice(selection.secondDir)
+            if (selection.secondDir != null) offline = createRefiner(selection.secondDir)
             vad = Vad(context.assets, if (japanese) japaneseVadConfig() else VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(
                 model = "speech/silero_vad.onnx", threshold = .6f, minSilenceDuration = .064f,
                 minSpeechDuration = .15f, windowSize = 512, maxSpeechDuration = 30f)))
@@ -123,11 +123,12 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
             s.acceptWaveform(samples, 16000)
             recognizer.decode(s)
             val result = recognizer.getResult(s)
+            if (dialect) return DialectCorrection.clean(result.text)
             return cleanSenseVoiceText(result.text, result.lang)
         } finally { s.release() }
     }
     override fun refineRich(samples: FloatArray): RichTranscript {
-        if (japanese) return RichTranscript(refine(samples))
+        if (japanese || dialect) return RichTranscript(refine(samples))
         val recognizer = refiner()
         val s = recognizer.createStream()
         try {
@@ -154,7 +155,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     /** 阶梯释放后在第一次定稿时重新加载 SenseVoice；日语模型本身就是离线识别器，不在此释放。 */
     private fun refiner(): OfflineRecognizer = offline ?: run {
         check(!japanese)
-        createSenseVoice(checkNotNull(selection.secondDir)).also { offline = it }
+        createRefiner(checkNotNull(selection.secondDir)).also { offline = it }
     }
     override fun releaseRefinement(): Boolean {
         if (japanese || selection.first == null || selection.secondDir == null) return false
@@ -163,6 +164,9 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
         offline = null
         return true
     }
+    private val dialect get() = DialectCorrection.isDialect(selection.second)
+    private fun createRefiner(dir: File) =
+        if (dialect) DialectCorrection.createRecognizer(selection.second, dir) else createSenseVoice(dir)
     private fun createSenseVoice(dir: File) = OfflineRecognizer(config = OfflineRecognizerConfig(modelConfig = OfflineModelConfig(
         senseVoice = OfflineSenseVoiceModelConfig(
             model = requireFile(dir, "model.int8.onnx"), language = selection.recognitionLanguage, useInverseTextNormalization = true),

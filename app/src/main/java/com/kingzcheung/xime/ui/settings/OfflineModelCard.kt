@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.model.*
 import com.kingzcheung.xime.speech.AsrModelManager
+import com.kingzcheung.xime.speech.DialectCorrection
 import com.kingzcheung.xime.speech.SpeechModelCatalog
 import com.kingzcheung.xime.speech.SpeechModelSelection
 import com.kingzcheung.xime.speech.SpeechLanguages
@@ -37,11 +38,12 @@ internal fun OfflineModelCard() {
         InputLanguage.supported.forEach { put(it, manager.getSelectedModelId(it)) }
     } }
     var editing by remember { mutableStateOf<InputLanguage?>(null) }
+    var choosingCorrector by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(emptySet<String>()) }
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { ModelManager.loadFromRemote(context) } }
     LaunchedEffect(models, downloads) {
         ready = withContext(Dispatchers.IO) {
-            SpeechModelSelection.primaryIds.filter { runCatching { manager.selection(it).ready }.getOrDefault(false) }.toSet()
+            (SpeechModelSelection.primaryIds + DialectCorrection.correctorIds).distinct().filter { runCatching { manager.selection(it).ready }.getOrDefault(false) }.toSet()
         }
     }
     fun refresh(language: InputLanguage) { selected[language] = manager.getSelectedModelId(language) }
@@ -62,8 +64,9 @@ internal fun OfflineModelCard() {
                             style = MaterialTheme.typography.bodyLarge)
                         Text(buildString {
                             append(speechModelFacts(primary))
-                            if (SpeechModelSelection.hasCorrection(mode)) append(" → SenseVoice 校正")
-                            if (primary !in ready || SpeechModelSelection.hasCorrection(mode) && !senseReady) append(" · 待下载")
+                            val corrector = SpeechModelSelection.corrector(mode)
+                            if (corrector != null) append(" → ${shortName(corrector)} 校正")
+                            if (primary !in ready || corrector != null && corrector !in ready) append(" · 待下载")
                         }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "选择${language.displayName}模型")
@@ -76,6 +79,7 @@ internal fun OfflineModelCard() {
                 listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH).forEachIndexed { index, language ->
                     val mode = selected.getValue(language)
                     val enabled = SpeechModelSelection.hasCorrection(mode)
+                    val corrector = SpeechModelSelection.corrector(mode) ?: SpeechModelCatalog.SENSEVOICE
                     val canRefine = SpeechModelSelection.supportsCorrection(mode)
                     val available = canRefine && (senseReady || enabled)
                     if (index > 0) HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
@@ -86,14 +90,29 @@ internal fun OfflineModelCard() {
                         .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("${language.displayName} SenseVoice 二次校正", style = MaterialTheme.typography.bodyLarge)
+                            Text("${language.displayName} ${shortName(corrector)} 二次校正", style = MaterialTheme.typography.bodyLarge)
                             Text(when {
                                 !canRefine -> "SenseVoice 已作为主模型，无需再次校正。"
                                 !senseReady && !enabled -> "先下载 SenseVoice 模型，再为主模型启用二次校正。"
-                                else -> "停顿后由 SenseVoice 复核主模型结果，会增加内存占用和等待时间。"
+                                else -> "停顿后由 ${shortName(corrector)} 复核主模型结果，会增加内存占用和等待时间。"
                             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(checked = enabled, enabled = available, onCheckedChange = null)
+                    }
+                    // Chinese only: SenseVoice by default, or a dialect-robust pass to try out.
+                    if (language == InputLanguage.CHINESE && canRefine) {
+                        HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        Row(Modifier.fillMaxWidth().testTag("speech-corrector:${language.id}")
+                            .clickable { choosingCorrector = true }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("中文校正模型 · ${shortName(corrector)}", style = MaterialTheme.typography.bodyLarge)
+                                Text("可改用方言模型；选中即开启中文二次校正。", style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "选择中文校正模型")
+                        }
                     }
                 }
                 if (!senseReady) {
@@ -105,6 +124,32 @@ internal fun OfflineModelCard() {
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("配置修改在下一次录音生效。录音中切换语言时，兼容同一模型就继续使用，否则保留已识别文字并切换模型，麦克风继续收音。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (choosingCorrector) {
+        val mode = selected.getValue(InputLanguage.CHINESE)
+        AlertDialog(onDismissRequest = { choosingCorrector = false }, title = { Text("中文校正模型") },
+            text = {
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).selectableGroup()) {
+                    DialectCorrection.correctorIds.forEach { id ->
+                        val checked = SpeechModelSelection.corrector(mode) == id
+                        Row(Modifier.fillMaxWidth().testTag("speech-corrector-choice:$id")
+                            .selectable(checked, enabled = id in ready, role = Role.RadioButton, onClick = {
+                                manager.setModel(SpeechModelSelection.withCorrector(mode, id), InputLanguage.CHINESE)
+                                refresh(InputLanguage.CHINESE); choosingCorrector = false
+                            }).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(checked, onClick = null, enabled = id in ready)
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(SpeechModelSelection.displayName(id).orEmpty(), style = MaterialTheme.typography.bodyLarge)
+                                Text(speechModelFacts(id), style = MaterialTheme.typography.bodySmall)
+                                Text(if (id in ready) "已下载" else "未下载", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (id !in ready) ModelDownloadAction(id, downloads) { download(id) }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+                    }
+                }
+            }, confirmButton = { TextButton(onClick = { choosingCorrector = false }) { Text("关闭") } })
     }
     editing?.let { language ->
         AlertDialog(onDismissRequest = { editing = null }, title = { Text("${language.displayName}主模型") },
@@ -139,8 +184,12 @@ internal fun speechModelFacts(id: String): String = when (id) {
     SpeechModelCatalog.ZIPFORMER -> "中文 · 流式 · 133 MB"
     SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "日语 · 分段预览 · 153 MB"
     SpeechModelCatalog.ZIPFORMER_JA -> "日语 · 分段预览 · 586 MB"
+    DialectCorrection.DOLPHIN -> "中文方言 · 无标点 · 104 MB"
+    DialectCorrection.TELESPEECH -> "中文方言 · 无标点 · 341 MB"
     else -> ""
 }
+
+private fun shortName(id: String) = SpeechModelSelection.displayName(id)?.substringBefore(" ·") ?: id
 
 @Composable
 private fun ModelDownloadAction(id: String, downloads: Map<String, ModelDownloadState>, onDownload: () -> Unit) {

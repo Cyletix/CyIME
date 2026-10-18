@@ -83,6 +83,8 @@ class AsrModelManager(private val context: Context) {
         val mode: String,
         val first: AsrModelInfo?, val firstDir: File?, val secondDir: File?,
         val recognitionLanguage: String = "auto",
+        /** Second-pass model in [secondDir]: SenseVoice, or a Chinese dialect pass ([DialectCorrection]). */
+        val second: String = SpeechModelCatalog.SENSEVOICE,
     ) {
         val ready: Boolean get() = (first == null || firstDir != null && first.files.isNotEmpty() && first.files.all { File(firstDir, it).let { f -> f.isFile && f.length() > 0 } }) &&
             (secondDir == null || listOf("model.int8.onnx", "tokens.txt").all { File(secondDir, it).let { f -> f.isFile && f.length() > 0 } })
@@ -103,6 +105,11 @@ class AsrModelManager(private val context: Context) {
         fun dir(id: String): File {
             ModelStorage.migrateLegacyForModel(context, id)
             return ModelStorage.getModelDir(context, id)
+        }
+        require(!DialectCorrection.isDialect(mode)) { "方言模型只能用于二次校正：$mode" }
+        DialectCorrection.primary(mode)?.let { primary ->
+            val corrector = checkNotNull(DialectCorrection.corrector(mode))
+            return Selection(mode, getAsrModels().first { it.id == primary }, dir(primary), dir(corrector), languageId, corrector)
         }
         val firstId = when (mode) {
             SpeechModelCatalog.TWO_PASS -> SpeechModelCatalog.PARAFORMER

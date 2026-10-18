@@ -4,7 +4,9 @@ import com.kingzcheung.xime.settings.InputLanguage
 
 /** Explicit capabilities of the shipped recognizers. Unknown models are never assumed Chinese. */
 object SpeechLanguages {
-    fun supports(mode: String, language: InputLanguage): Boolean = when (SpeechModelSelection.primary(mode)) {
+    // Dialect passes are Chinese-only; nothing ever switches to them by detected language.
+    fun supports(mode: String, language: InputLanguage): Boolean =
+        (DialectCorrection.corrector(mode) == null || language == InputLanguage.CHINESE) && when (SpeechModelSelection.primary(mode)) {
         SpeechModelCatalog.ZIPFORMER -> language == InputLanguage.CHINESE
         SpeechModelCatalog.ZIPFORMER_JA, SpeechModelCatalog.ZIPFORMER_JA_INT8 -> language == InputLanguage.JAPANESE
         SpeechModelCatalog.PARAFORMER -> language in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
