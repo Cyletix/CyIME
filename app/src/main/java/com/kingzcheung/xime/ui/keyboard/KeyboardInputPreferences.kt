@@ -54,7 +54,7 @@ data class KeyboardInputPreferences(
     val qwertyStaggerCustom: Float = 0.5f,
     /** 空格左侧逗号键、右侧句号键。 */
     val qwertyCommaKey: Boolean = true,
-    val qwertyPeriodKey: Boolean = false,
+    val qwertyPeriodKey: Boolean = true,
     /** 各固定栏按位置保存的符号（每行一个位置）；未设置的沿用旧的共用列表。 */
     val sideSymbols: Map<String, String> = emptyMap(),
     val cursorGesture: CursorGestureMode = if (spaceHold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
@@ -92,7 +92,7 @@ data class KeyboardInputPreferences(
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2",
-                "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key",
+                "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
         }
@@ -121,7 +121,9 @@ data class KeyboardInputPreferences(
                     ?: QwertyStaggerMode.AUTO,
                 qwertyStaggerCustom = prefs.getFloat("qwerty_stagger_custom", 0.5f).takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0.5f,
                 qwertyCommaKey = prefs.getBoolean("qwerty_comma_key", true),
-                qwertyPeriodKey = prefs.getBoolean("qwerty_period_key", false),
+                // 句号键 10-19 起默认开。旧键会被 save() 连同其他设置一起写成旧默认 false，
+                // 分不出是不是用户自己关的，所以只认新键；没有新键就是默认开。
+                qwertyPeriodKey = prefs.getBoolean("qwerty_period_key_v2", true),
                 sideSymbols = SideSymbolTarget.entries.mapNotNull { target ->
                     prefs.getString(target.prefKey, null)?.let { target.key to it }
                 }.toMap(),
@@ -181,6 +183,7 @@ data class KeyboardInputPreferences(
             .putString("qwerty_stagger_mode", qwertyStagger.name)
             .putFloat("qwerty_stagger_custom", qwertyStaggerCustom.coerceIn(0f, 1f))
             .putBoolean("qwerty_comma_key", qwertyCommaKey)
+            .putBoolean("qwerty_period_key_v2", qwertyPeriodKey)
             .putBoolean("qwerty_period_key", qwertyPeriodKey).apply()
     }
 

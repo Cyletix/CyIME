@@ -62,6 +62,18 @@ class KeyboardInputPreferencesTest {
         assertEquals(listOf("glide_typing_v2", "glide_typing"), com.kingzcheung.xime.keyboard.ToolbarButton.GLIDE.gestureKeys())
     }
 
+    @Test fun `comma and period keys are both on by default and the old saved period default does not turn it off`() {
+        val fresh = KeyboardInputPreferences.read(context)
+        assertEquals(true, fresh.qwertyCommaKey)
+        assertEquals(true, fresh.qwertyPeriodKey)
+        // 旧版 save() 会把旧默认 false 连同其他设置一起写进 qwerty_period_key：不能因此关掉。
+        values["qwerty_period_key"] = false
+        assertEquals(true, KeyboardInputPreferences.read(context).qwertyPeriodKey)
+        // 用户在新版自己关掉后保持关。
+        KeyboardInputPreferences.read(context).copy(qwertyPeriodKey = false).save(context)
+        assertEquals(false, KeyboardInputPreferences.read(context).qwertyPeriodKey)
+    }
+
     @Test fun `every saved setting refreshes the keyboard already on screen`() {
         // 设置页关掉滑行输入或九键拂动后，正在显示的键盘必须立即改用新值，不能等输入法重启。
         KeyboardInputPreferences().copy(glideTyping = false, t9FlickLetters = true).save(context)

@@ -138,7 +138,7 @@ object RimeConfigHelper {
         // Optional downloads become available at the normal engine initialization boundary.
         // Never restart or replay an active editor merely because a model download finished.
         com.kingzcheung.xime.model.CandidateModelAssets.installAvailable(context)
-        com.kingzcheung.xime.model.CandidateModelAssets.dropSupersededGrammar(context)
+        com.kingzcheung.xime.model.CandidateModelAssets.dropSupersededDownloads(context)
         com.kingzcheung.xime.settings.ChineseSchemas.installOptionalLayoutSchemas(context, rimeDir)
         check(installing.delete()) { "Cannot finish bundled asset installation" }
         com.kingzcheung.xime.settings.CustomKeyboardLayouts.enableMeasuredCorrection(context)
