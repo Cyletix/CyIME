@@ -33,4 +33,10 @@ class SpeechModelSelectionTest {
     @Test(expected = IllegalArgumentException::class) fun pairCannotBeSelectedAsPrimary() {
         SpeechModelSelection.selectPrimary(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.TWO_PASS)
     }
+
+    @Test fun removedDialectCorrectionFallsBackToSenseVoice() {
+        assertEquals(SpeechModelCatalog.TWO_PASS, SpeechModelSelection.withoutRetiredCorrector("${SpeechModelCatalog.PARAFORMER}+dolphin-base-ctc-int8"))
+        assertEquals(SpeechModelCatalog.ZIPFORMER_TWO_PASS, SpeechModelSelection.withoutRetiredCorrector("${SpeechModelCatalog.ZIPFORMER}+telespeech-ctc-int8"))
+        modes.forEach { assertEquals(it, SpeechModelSelection.withoutRetiredCorrector(it)) }
+    }
 }

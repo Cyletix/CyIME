@@ -35,8 +35,9 @@ internal interface LocalSpeechEngine : AutoCloseable {
     fun releaseRefinement(): Boolean = false
 }
 
-/** Text in a script Chinese speech never produces (kana, Hangul, Thai, Cyrillic…); one rule shared with dialect correction. */
-internal fun hasForeignScript(text: String): Boolean = DialectCorrection.hasForeignScript(text)
+/** Text in a script Chinese speech never produces: kana, Hangul, Thai, Lao, Myanmar, Khmer, Indic, Arabic, Cyrillic, Hebrew. */
+private val FOREIGN = Regex("[\u0400-\u04FF\u0590-\u06FF\u0900-\u0D7F\u0E00-\u0EFF\u1000-\u109F\u1780-\u17FF\u3040-\u30FF\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]")
+internal fun hasForeignScript(text: String): Boolean = FOREIGN.containsMatchIn(text)
 
 /**
  * Hard guard for Chinese speech: SenseVoice (and any later correction model) can still answer in

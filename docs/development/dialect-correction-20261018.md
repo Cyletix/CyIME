@@ -39,3 +39,32 @@ Dolphin 的地区/方言标签：sherpa-onnx 1.13.8 的结果里 `lang` 为空�
 - 接入：`SpeechModelCatalog`（下载清单）、`SpeechModelSelection`（`corrector`/`withCorrector`）、`SpeechLanguages`（方言模式只支持中文）、`AsrModelManager.selection`（`Selection.second`）、`SherpaSpeechEngine`（按 `second` 建识别器，方言结果走 `DialectCorrection.clean`）、`OfflineModelCard`。中文过滤由字幕线程在 `keepChinese` 统一使用 `hasForeignScript`。字幕模式仍固定用 SenseVoice。
 - 检查：`:app:testDebugUnitTest`（DialectCorrection 9、SpeechModelSelection 4、SpeechLanguages 8，全部通过），`:app:assembleDebug` 通过。
 - 未在手机或模拟器上测量，未安装，未真机验收。
+
+## 河南话视频复测（2026-10-18）
+
+用户提供的 39 秒教学视频（虚拟主播变声，代表性有限；音频与逐段结果在 `D:/CyIME-Data/tmp/dialect-henan/`，不入库）。按画面字幕的 13 个方言说法计，写对：Paraformer 2、SenseVoice 5、Dolphin 0、TeleSpeech 1；作参考的 Fun-ASR-Nano 0.8B 6、Qwen3-ASR 0.6B 6（每段 1.4–5.1 s，两者同进程 2.9 GB）。洋车儿、擤、洋柿、芫荽、仨馍无一写对。
+
+流程无误：1.14.25 已含方言校正；中文过滤未丢结果；超时会报错清段而不是退回流式文字。差在模型本身。
+
+决定：不加大模型（用户：手机性能跑不动）。等用户换一段真人方言视频再测，再决定 Dolphin／TeleSpeech 去留。
+
+## 河南农村大爷真人视频（2026-10-19）
+
+70 秒真人访谈（无变声），VAD 切 19 段共 61 秒，结果在 `D:/CyIME-Data/tmp/dialect-henan-p1/`。参考文字取画面字幕，字幕是整理过的普通话（如口语“拍/谝”写成“聊”），CER 只作相对比较。外文结果按产品规则换回流式文字后计算。
+
+| 模型 | CER | 外文段 | 每段中位耗时（≥3 s 段） |
+|---|---|---|---|
+| Paraformer（流式参考） | 29.7 % | 0 | — |
+| SenseVoice | 21.2 % | 0 | 0.27 s |
+| Dolphin | 34.5 % | 2（俄文、韩文） | 0.15 s |
+| TeleSpeech | 45.4 % | 0 | 0.24 s |
+
+方言/口语词（庄上、种地、经商、当兵、腔调、准不准、意音、脉络、地方言、爷们、看来、大致）中 SenseVoice 写对最多，Dolphin、TeleSpeech 都不如它；“庄上、种地、意音、脉络、地方言”四个模型都没写对。Dolphin 在不到 1 秒的短段会输出俄文、韩文。
+
+## 结论：撤下（2026-10-19）
+
+两段河南话视频都是 SenseVoice 最好，Dolphin、TeleSpeech 没有一项胜出，Dolphin 还会在短段输出外文，因此撤下这两个选项，中文二次校正只保留 SenseVoice。
+
+- 删除 `DialectCorrection.kt`、下载清单、选择模式、设置里的“中文校正模型”行和识别器分支；外文过滤 `hasForeignScript` 移到 `LocalSpeechSession.kt`，字幕和听写照旧使用。
+- 已选 Dolphin／TeleSpeech 的用户（存为 `主模型+模型`）在下次读取时改回同一主模型 + SenseVoice 校正，同时删除手机上已下载的这两个模型文件（`SpeechModelSelection.withoutRetiredCorrector`）。
+- 电脑上的测试模型副本已删；音频和结果保留在 `D:/CyIME-Data/tmp/dialect-henan*`。
