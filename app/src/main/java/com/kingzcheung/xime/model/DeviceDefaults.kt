@@ -45,6 +45,18 @@ object DeviceDefaults {
             editor.putString(TIER, "PRESERVED")
         }
         check(editor.putInt(VERSION, 1).commit()) { "无法保存设备模型默认配置" }
+        if (fresh && com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) applyElderDefaults(context)
+    }
+
+    /**
+     * The bundled-model edition is the elder package: on a fresh install the toolbar also carries
+     * 字幕 and 拍照识别, and the separate 字幕 home-screen icon is on. Existing settings are never changed.
+     */
+    private fun applyElderDefaults(context: Context) {
+        val toolbar = SettingsPreferences.getToolbarButtons(context) +
+            listOf(com.kingzcheung.xime.keyboard.ToolbarButton.CAPTION.id, com.kingzcheung.xime.keyboard.ToolbarButton.OCR.id)
+        SettingsPreferences.setToolbarButtons(context, toolbar)
+        runCatching { com.kingzcheung.xime.ui.caption.CaptionLauncherIcon.setEnabled(context, true) }
     }
 
     fun predictionModel(context: Context): String = SettingsPreferences.getPrefsPublic(context)
