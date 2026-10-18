@@ -51,6 +51,17 @@ class KeyboardInputPreferencesTest {
         assertEquals(previous.neighborCorrection, restored.neighborCorrection)
     }
 
+    @Test fun `glide typing is off by default and the old saved default does not turn it on`() {
+        assertEquals(false, KeyboardInputPreferences.read(context).glideTyping)
+        // 旧版 save() 会把旧默认 true 连同其他设置一起写进 glide_typing：不能因此打开。
+        values["glide_typing"] = true
+        assertEquals(false, KeyboardInputPreferences.read(context).glideTyping)
+        // 用户在新版自己打开后保持打开。
+        KeyboardInputPreferences.read(context).copy(glideTyping = true).save(context)
+        assertEquals(true, KeyboardInputPreferences.read(context).glideTyping)
+        assertEquals(listOf("glide_typing_v2", "glide_typing"), com.kingzcheung.xime.keyboard.ToolbarButton.GLIDE.gestureKeys())
+    }
+
     @Test fun `every saved setting refreshes the keyboard already on screen`() {
         // 设置页关掉滑行输入或九键拂动后，正在显示的键盘必须立即改用新值，不能等输入法重启。
         KeyboardInputPreferences().copy(glideTyping = false, t9FlickLetters = true).save(context)
