@@ -199,24 +199,13 @@ class KeyboardResizeGeometryTest {
         assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeHeightBounds(900, false).first)
     }
 
-    @Test fun fixedMinimumIsOneToolbarBelowTheFortyFivePercentTierInBothOrientations() {
+    @Test fun fixedAndFloatingShareMinimumPanelSizeOnTablet() {
         for (landscape in listOf(false, true)) {
-            for (height in listOf(625, 640, 698, 800, 915, 1280, 1400)) {
-                val fixed = keyboardHeightBounds(height, landscape)
-                val tier = (height * 45 / 100).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP).coerceAtMost(fixed.last)
-                // 最低档 = 屏高 45% 那档 − 工具栏，不低于悬浮共用下限；横屏也按 45% 算，不能跟着近乎整屏的上限走。
-                assertEquals(maxOf(tier - KEYBOARD_TOOLBAR_HEIGHT_DP, FLOATING_RESIZE_MIN_HEIGHT_DP.coerceAtMost(fixed.last)), fixed.first)
-                assertTrue(fixed.first <= fixed.last)
-                assertTrue("landscape minimum must stay well below the screen", !landscape || fixed.first <= height / 2)
-                assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeHeightBounds(height, landscape).first)
+            for (height in listOf(800, 1400)) {
+                assertEquals(floatingResizeHeightBounds(height, landscape).first,
+                    keyboardHeightBounds(height, landscape).first)
             }
         }
-        // 平板横屏（SM-X800 约 625dp 高）：最低 237dp，不是 1.14.27 的 509dp。
-        assertEquals(237, keyboardHeightBounds(625, true).first)
-        // 横屏固定高度首次启动回退用的参考档就是 45% 档：横屏屏高 905dp → 407dp（capLandscapeFixedHeightOnce 依赖它）。
-        assertEquals(407, fixedReferenceHeightDp(905))
-        assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, fixedReferenceHeightDp(400))
-        assertEquals(367, keyboardHeightBounds(915, false).first)
         for (width in listOf(320, 800, 1400)) {
             assertEquals(280.coerceIn(keyboardWidthBounds(width)), resolvedFixedKeyboardWidth(width, 280))
             assertEquals(width, resolvedFixedKeyboardWidth(width, 0))

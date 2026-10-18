@@ -1,7 +1,6 @@
 package com.kingzcheung.xime.settings
 
 import android.content.Context
-import com.kingzcheung.xime.ui.keyboard.fixedReferenceHeightDp
 import com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds
 import com.kingzcheung.xime.ui.keyboard.floatingStoredHeightBounds
 import com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds
@@ -65,19 +64,29 @@ internal object KeyboardHeightProfiles {
     }
 
     /**
-     * 新版第一次启动时只做一次：横屏固定高度若高于 45% 参考档（[fixedReferenceHeightDp]），改回参考档。
-     * 1.14.27 曾把横屏最低档抬到近乎整屏，用户平板上留下了约 740dp 的横屏高度；竖屏不动。
-     * [landscapeScreenHeightDp] 是横屏时的屏高，即当前配置里较短的那条边。
+     * 新版第一次启动时只做一次，横竖屏、手机平板都查：存着的固定高度若超出 1.14.25 规则允许的范围，
+     * 或横屏值高于 1.14.25 的默认横屏高度（1.14.26–1.14.27 的最低档规则只会把横屏存值往上推，
+     * 1.14.25 的默认值和用户拖动都不会落到那里），就写回 1.14.25 规则下的默认高度；范围内的值不动。
+     * 横屏默认必须显式写入：横屏键缺失时 [SettingsPreferences.getKeyboardHeightDp] 会退回竖屏值，比默认还高。
      */
-    fun capLandscapeFixedHeightOnce(context: Context, landscapeScreenHeightDp: Int) {
+    fun normalizeFixedHeightsOnce(context: Context) {
         val prefs = SettingsPreferences.getPrefsPublic(context)
-        val marker = "fixed_landscape_capped_to_reference_v1"
+        val marker = "fixed_height_normalized_to_1_14_25_v1"
         if (prefs.getBoolean(marker, false)) return
-        val key = fixedKey(true)
-        val stored = prefs.getInt(key, 0)
-        val reference = fixedReferenceHeightDp(landscapeScreenHeightDp.coerceAtLeast(1))
+        val config = context.resources.configuration
+        val portraitHeightDp = maxOf(config.screenWidthDp, config.screenHeightDp)
+        val landscapeHeightDp = minOf(config.screenWidthDp, config.screenHeightDp)
         val editor = prefs.edit().putBoolean(marker, true)
-        if (stored > reference) editor.putInt(key, reference)
+        for (landscape in listOf(false, true)) {
+            val key = fixedKey(landscape)
+            val stored = prefs.getInt(key, 0)
+            if (stored <= 0) continue
+            val bounds = keyboardHeightBounds(if (landscape) landscapeHeightDp else portraitHeightDp, landscape)
+            val default = if (landscape)
+                (portraitHeightDp * SettingsPreferences.DEFAULT_KEYBOARD_HEIGHT_PERCENT_LANDSCAPE / 100).coerceIn(bounds)
+            else (portraitHeightDp * SettingsPreferences.DEFAULT_KEYBOARD_HEIGHT_PERCENT / 100).coerceIn(bounds)
+            if (stored !in bounds || (landscape && stored > default)) editor.putInt(key, default)
+        }
         editor.apply()
     }
 
