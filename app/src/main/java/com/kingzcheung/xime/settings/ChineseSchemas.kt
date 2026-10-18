@@ -10,6 +10,18 @@ object ChineseSchemas {
     val ids = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "double_pinyin_flypy_14jian", QwjrtkLayout.ID, Cyletix10Layout.ID)
     private const val ADDED = "cyime_chinese_defaults_v1"
 
+    /** Only known, unedited predecessor bytes may migrate; personal/market ownership wins above. */
+    internal fun isPreviousMergedBuiltin(path: String, bytes: ByteArray): Boolean {
+        val expected = when (path) {
+            "pinyin_14jian.schema.yaml" -> "8c4006fcc6ef623384aa0f79335d548f14a1603a36cc8668cea0ec3e76f6a8da"
+            "double_pinyin_flypy_14jian.schema.yaml" -> "fbae7fee582beda5e9ce16c9da53f5e5505db96ef9a83460043aec3a4025effa"
+            else -> return false
+        }
+        val normalized = bytes.toString(Charsets.UTF_8).replace("\r\n", "\n").toByteArray()
+        return java.security.MessageDigest.getInstance("SHA-256").digest(normalized)
+            .joinToString("") { "%02x".format(it) } == expected
+    }
+
     private const val MAX_MIGRATION_FILE_BYTES = 256 * 1024L
 
     /** 大词库只补缺失文件；启动时不解压、更不读入内存比较已有词库。 */
@@ -63,7 +75,8 @@ object ChineseSchemas {
                 val old14 = if (relative == "pinyin_14jian.schema.yaml")
                     bytes.toString(Charsets.UTF_8).replace("dictionary: rime_ice", "dictionary: pinyin_simp").toByteArray() else null
                 // 仅迁移字节完全匹配的旧内置小配置，不以方案名判断用户文件。
-                if (oldBuiltin?.contentEquals(current) != true && old14?.contentEquals(current) != true) return
+                if (oldBuiltin?.contentEquals(current) != true && old14?.contentEquals(current) != true &&
+                    !isPreviousMergedBuiltin(relative, current)) return
                 replacement = bytes
             }
             destination.parentFile?.mkdirs()
@@ -88,6 +101,19 @@ object ChineseSchemas {
         target.mkdirs()
         for (id in listOf(QwjrtkLayout.ID, Cyletix10Layout.ID)) {
             val destination = File(target, "$id.schema.yaml")
+            if (destination.isFile) {
+                val old = destination.readText()
+                val updated = EnglishCandidatePolicy.install(old)
+                if (updated == old) continue
+                val backup = File(context.filesDir, "rime-upgrade-backups/english-policy/${destination.name}")
+                if (!backup.exists()) { backup.parentFile!!.mkdirs(); backup.writeText(old) }
+                val pending = File(target, "$id.schema.yaml.installing")
+                try {
+                    pending.writeText(updated)
+                    java.nio.file.Files.move(pending.toPath(), destination.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                } finally { pending.delete() }
+                continue
+            }
             if (destination.exists()) continue
             val pending = File(target, "$id.schema.yaml.installing")
             try {
@@ -113,11 +139,13 @@ object ChineseSchemas {
         if (!available.containsAll(CyimeInputDefaults.recommended)) return normalized
         if (prefs.getBoolean(ADDED, false)) {
             // Persist canonical IDs too: a stale custom.yaml patch otherwise overrides default.yaml at deploy time.
-            val repaired = normalized.ifEmpty { CyimeInputDefaults.recommended.filter { it in available } }
+            val repaired = CyimeInputDefaults.withCompanions(
+                normalized.ifEmpty { CyimeInputDefaults.recommended.filter { it in available } }, available)
             if (repaired != enabled) SchemaManager.setEnabledSchemas(context, repaired)
             return repaired
         }
-        val updated = (normalized.filterNot { it in CyimeInputDefaults.legacyDefaults } + CyimeInputDefaults.recommended.filter { it in available }).distinct()
+        val updated = CyimeInputDefaults.withCompanions((normalized.filterNot { it in CyimeInputDefaults.legacyDefaults } +
+            CyimeInputDefaults.recommended.filter { it in available }).distinct(), available)
         if (updated != enabled) SchemaManager.setEnabledSchemas(context, updated)
         val current = SettingsPreferences.getCurrentSchema(context)
         val selected = CyimeInputDefaults.canonicalIds(listOf(current), available).firstOrNull()

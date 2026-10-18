@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavType
@@ -57,9 +59,14 @@ fun SettingsScreen(
         }
     }
     
+    val motion = rememberSettingsMotionEnabled()
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        enterTransition = { if (motion) SettingsPageMotion.enter else EnterTransition.None },
+        exitTransition = { if (motion) SettingsPageMotion.exit else ExitTransition.None },
+        popEnterTransition = { if (motion) SettingsPageMotion.popEnter else EnterTransition.None },
+        popExitTransition = { if (motion) SettingsPageMotion.popExit else ExitTransition.None },
     ) {
         composable(SettingsRoutes.Main) {
             SettingsMainContent(
@@ -73,11 +80,13 @@ fun SettingsScreen(
                 onNavigateToDictionary = { navController.navigate(SettingsRoutes.Dictionary) },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
+                onNavigateToHandwritingTraining = { navController.navigate(SettingsRoutes.HandwritingTraining) },
                 onNavigateToSmartPrediction = { navController.navigate(SettingsRoutes.SmartPrediction) },
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
                 onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) },
-                onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) }
+                onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) },
+                onNavigateToRoute = { navController.navigate(it) },
             )
         }
         composable(SettingsRoutes.HardwareKeyboard) { HardwareKeyboardSettingsContent { navController.popBackStack() } }
@@ -171,8 +180,7 @@ fun SettingsScreen(
                     navController.navigate("plugin_market_detail/$pluginId")
                 },
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
-                onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) },
-                onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) }
+                onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) }
             )
         }
         composable(
@@ -185,15 +193,18 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() }
             )
         }
+        composable(SettingsRoutes.Performance) { PerformanceSettingsContent(onBack = { navController.popBackStack() }) }
         composable(SettingsRoutes.KeyEffect) {
             KeyEffectSettingsContent(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(SettingsRoutes.LayoutDisplay) {
+        composable("${SettingsRoutes.LayoutDisplay}?page={page}",
+            arguments = listOf(navArgument("page") { type = NavType.StringType; nullable = true; defaultValue = null })) { entry ->
             LayoutDisplaySettingsContent(
                 onBack = { navController.popBackStack() },
                 onOpenLayout = { navController.navigate(it) },
+                initialPage = entry.arguments?.getString("page"),
             )
         }
         LayoutInputCategory.entries.forEach { category ->
@@ -247,11 +258,7 @@ fun SettingsScreen(
             )
         }
         composable(SettingsRoutes.Backup) {
-            BackupSettingsContent(
-                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
-                onBack = { navController.popBackStack() },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
-            )
+            BackupSettingsContent(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoutes.About) {
             AboutContent(
@@ -305,6 +312,11 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.LogViewer) {
             LogViewerScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(SettingsRoutes.HandwritingTraining) {
+            HandwritingTrainingScreen(
                 onBack = { navController.popBackStack() }
             )
         }

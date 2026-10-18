@@ -38,19 +38,15 @@ object SettingsPreferences {
     private const val KEY_DEPLOYMENT_DONE = "deployment_done"
     private const val KEY_BUILTIN_SCHEMAS_MERGED = "builtin_schemas_merged"
     private const val KEY_DEPLOYMENT_HASH = "deployment_hash"
-    private const val KEY_RIME_ASSETS_VERSION = "rime_assets_version"
     private const val KEY_SETUP_COMPLETED = "setup_completed"
     private const val KEY_DARK_MODE = "dark_mode"
     private const val KEY_VERBOSE_LOGGING = "verbose_logging"
     
     private const val KEY_SOUND_ENABLED = "sound_enabled"
     private const val KEY_SOUND_VOLUME = "sound_volume"
-    private const val KEY_VIBRATION_ENABLED = "vibration_enabled"
-    private const val KEY_VIBRATION_INTENSITY = "vibration_intensity"
     private const val KEY_KEYBOARD_THEME = "keyboard_theme"
     
     const val KEY_SMART_PREDICTION_ENABLED = "smart_prediction_enabled"
-    private const val KEY_PREDICTION_MODEL_REPO = "prediction_model_repo"
     private const val KEY_PREDICTION_SELECTED_MODEL = "prediction_selected_model"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
@@ -59,6 +55,8 @@ object SettingsPreferences {
     const val KEY_STT_ONLINE_PLUGIN_ID = "stt_online_plugin_id"
     const val KEY_STT_USE_LOCAL = "stt_use_local"
     const val KEY_STT_KEEP_ENGINE_ALIVE = "stt_keep_engine_alive"
+    const val KEY_STT_REFINER_IDLE_MINUTES = "stt_refiner_idle_minutes"
+    const val KEY_STT_ENGINE_IDLE_MINUTES = "stt_engine_idle_minutes"
     const val KEY_STT_DEBUG_RECORD = "stt_debug_record"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
@@ -72,16 +70,6 @@ object SettingsPreferences {
     const val KEY_SWIPE_UP_HINTS_ENABLED = "swipe_up_hints_enabled"
     const val KEY_SWIPE_DOWN_HINTS_ENABLED = "swipe_down_hints_enabled"
     const val KEY_SHOW_PRESS_BUBBLE = "show_press_bubble"
-
-    private const val KEY_MODE_CHANGE_TARGET = "mode_change_target"
-
-    fun getModeChangeTargetIsNumber(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_MODE_CHANGE_TARGET, false)
-    }
-
-    fun setModeChangeTargetIsNumber(context: Context, isNumber: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_MODE_CHANGE_TARGET, isNumber).apply()
-    }
 
     private const val KEY_AUTO_NUMBER_KEYBOARD = "auto_number_keyboard_for_number_fields"
 
@@ -103,7 +91,21 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SPLIT_KEYBOARD, enabled).apply()
     }
 
-    private const val KEY_LAYOUT_PREFIX = "layout_pref_"
+    const val KEY_SPLIT_GAP_PORTRAIT = "split_gap_fraction_portrait"
+    const val KEY_SPLIT_GAP_LANDSCAPE = "split_gap_fraction_landscape"
+
+    /** 分体中缝占整张键盘宽度的比例；未调整过返回 null，由屏宽和键距自动给出。 */
+    fun getSplitGapFraction(context: Context, landscape: Boolean): Float? =
+        getPrefs(context).getFloat(if (landscape) KEY_SPLIT_GAP_LANDSCAPE else KEY_SPLIT_GAP_PORTRAIT, -1f)
+            .takeIf { it.isFinite() && it > 0f }
+
+    fun setSplitGapFraction(context: Context, landscape: Boolean, fraction: Float?) {
+        val key = if (landscape) KEY_SPLIT_GAP_LANDSCAPE else KEY_SPLIT_GAP_PORTRAIT
+        getPrefs(context).edit().apply {
+            if (fraction == null || !fraction.isFinite() || fraction <= 0f) remove(key) else putFloat(key, fraction)
+        }.apply()
+    }
+
     
     private const val KEY_KEYBOARD_HEIGHT_DP = "keyboard_height_dp"
     private const val KEY_KEYBOARD_HEIGHT_DP_LANDSCAPE = "keyboard_height_dp_landscape"
@@ -116,19 +118,92 @@ object SettingsPreferences {
 
     fun getToolbarButtons(context: Context): List<String> {
         val raw = getPrefs(context).getString(KEY_TOOLBAR_BUTTONS, DEFAULT_TOOLBAR_BUTTONS) ?: DEFAULT_TOOLBAR_BUTTONS
-        return raw.split(",").filter { it.isNotEmpty() }
+        return com.kingzcheung.xime.keyboard.ToolbarButton.normalizeIds(raw.split(",").filter { it.isNotEmpty() })
     }
 
     fun setToolbarButtons(context: Context, buttons: List<String>) {
-        getPrefs(context).edit().putString(KEY_TOOLBAR_BUTTONS, buttons.joinToString(",")).apply()
+        getPrefs(context).edit().putString(KEY_TOOLBAR_BUTTONS,
+            com.kingzcheung.xime.keyboard.ToolbarButton.normalizeIds(buttons).joinToString(",")).apply()
     }
 
+    private const val KEY_MENU_BUTTONS = "menu_buttons"
+
+    /** 菜单与工具栏共用一组入口；读出时去掉已在工具栏上的项，并保证“设置”可达。 */
+    fun getMenuButtons(context: Context): List<String> {
+        val toolbar = getToolbarButtons(context)
+        restoreFullShapeMenuItemOnce(context, toolbar)
+        insertMenuItemOnce(context, toolbar, com.kingzcheung.xime.keyboard.ToolbarButton.CAPTION.id, KEY_CAPTION_MENU_INSERTED)
+        com.kingzcheung.xime.keyboard.ToolbarButton.LAYOUT_GESTURES.forEach {
+            insertMenuItemOnce(context, toolbar, it.id, "quick_actions_${it.id}_inserted")
+        }
+        val raw = getPrefs(context).getString(KEY_MENU_BUTTONS, null)
+        val menu = raw?.split(",")?.filter { it.isNotEmpty() }
+            ?: com.kingzcheung.xime.keyboard.QuickActionLayout.defaultMenu(toolbar)
+        return com.kingzcheung.xime.keyboard.QuickActionLayout.normalize(toolbar, menu).menu
+    }
+
+    /**
+     * The menu/toolbar merge left 全角／半角 out of the default menu, so saved layouts from that
+     * time hide it. Put it back once, before 排列; a later choice to remove it is kept.
+     */
+    private fun restoreFullShapeMenuItemOnce(context: Context, toolbar: List<String>) {
+        val prefs = getPrefs(context)
+        if (prefs.getBoolean(KEY_FULL_SHAPE_MENU_RESTORED, false)) return
+        val id = com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE.id
+        val raw = prefs.getString(KEY_MENU_BUTTONS, null)
+        val editor = prefs.edit().putBoolean(KEY_FULL_SHAPE_MENU_RESTORED, true)
+        if (raw != null && id !in toolbar) {
+            val menu = raw.split(",").filter { it.isNotEmpty() }
+            if (id !in menu) {
+                val arrange = com.kingzcheung.xime.keyboard.ToolbarButton.ARRANGE.id
+                val at = menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
+                editor.putString(KEY_MENU_BUTTONS, (menu.take(at) + id + menu.drop(at)).joinToString(","))
+            }
+        }
+        editor.apply()
+    }
+    private const val KEY_FULL_SHAPE_MENU_RESTORED = "quick_actions_full_shape_restored"
+
+    /** A new built-in entry joins an already saved menu once (before 排列); removing it later is kept. */
+    private fun insertMenuItemOnce(context: Context, toolbar: List<String>, id: String, flagKey: String) {
+        val prefs = getPrefs(context)
+        if (prefs.getBoolean(flagKey, false)) return
+        val raw = prefs.getString(KEY_MENU_BUTTONS, null)
+        val editor = prefs.edit().putBoolean(flagKey, true)
+        if (raw != null && id !in toolbar) {
+            val menu = raw.split(",").filter { it.isNotEmpty() }
+            if (id !in menu) {
+                val arrange = com.kingzcheung.xime.keyboard.ToolbarButton.ARRANGE.id
+                val at = menu.indexOf(arrange).takeIf { it >= 0 } ?: menu.size
+                editor.putString(KEY_MENU_BUTTONS, (menu.take(at) + id + menu.drop(at)).joinToString(","))
+            }
+        }
+        editor.apply()
+    }
+    private const val KEY_CAPTION_MENU_INSERTED = "quick_actions_caption_inserted"
+
+    fun setQuickActions(context: Context, layout: com.kingzcheung.xime.keyboard.QuickActionLayout) {
+        getPrefs(context).edit()
+            .putString(KEY_TOOLBAR_BUTTONS, com.kingzcheung.xime.keyboard.ToolbarButton.normalizeIds(layout.toolbar).joinToString(","))
+            .putString(KEY_MENU_BUTTONS, layout.menu.joinToString(","))
+            .apply()
+    }
+
+    const val KEY_INCOGNITO = "incognito_mode"
+
+    /** 用户手动开启的无痕：不学新词、不调词频、不记剪贴板与联想；敏感输入框另行自动生效。 */
+    fun isIncognito(context: Context): Boolean = getPrefs(context).getBoolean(KEY_INCOGNITO, false)
+
+    fun setIncognito(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_INCOGNITO, enabled).apply()
+    }
 
     private const val KEY_SCHEMA_IMPORT_WARNING_DISMISSED = "schema_import_warning_dismissed"
 
     private const val KEY_INSTALLED_MARKET_IDS = "installed_market_ids"
-    private const val KEY_COMPACT_MODE = "compact_mode"
     const val KEY_SHOW_CANDIDATE_COMMENTS = "show_candidate_comments"
+    const val KEY_CANDIDATE_COMMENT_MODE = "candidate_comment_mode"
+    const val KEY_CANDIDATE_COMMENT_CONTENT = "candidate_comment_content"
     const val KEY_SHOW_CANDIDATE_CANCEL_BUTTON = "show_candidate_cancel_button"
     private const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     private const val KEY_PAGE_SIZE = "page_size"
@@ -137,21 +212,36 @@ object SettingsPreferences {
     const val INPUT_TEXT_CANDIDATE_BAR = "candidate_bar"
     const val DEFAULT_PAGE_SIZE = 20 // 手机候选栏每页候选词数；schema 里的 page_size 来自 PC 版（5），太短，默认用 20
 
-    fun isCompactModeEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_COMPACT_MODE, true)
+    fun candidateCommentMode(context: Context): CandidateCommentMode {
+        val prefs = getPrefs(context)
+        val stored = prefs.getString(KEY_CANDIDATE_COMMENT_MODE, null)
+        CandidateCommentMode.entries.firstOrNull { it.name == stored }?.let { return it }
+        // Existing explicit ON means ON, never silently reinterpret it as AUTO.
+        return if (prefs.contains(KEY_SHOW_CANDIDATE_COMMENTS)) {
+            if (prefs.getBoolean(KEY_SHOW_CANDIDATE_COMMENTS, true)) CandidateCommentMode.SHOW else CandidateCommentMode.HIDE
+        } else CandidateCommentMode.AUTO
     }
 
-    fun setCompactModeEnabled(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_COMPACT_MODE, enabled).apply()
+    fun setCandidateCommentMode(context: Context, mode: CandidateCommentMode) {
+        getPrefs(context).edit().putString(KEY_CANDIDATE_COMMENT_MODE, mode.name)
+            .putBoolean(KEY_SHOW_CANDIDATE_COMMENTS, mode != CandidateCommentMode.HIDE).apply()
     }
 
-    /** true allows automatic width-based display; false always hides candidate annotations. */
+    fun candidateCommentContent(context: Context): CandidateCommentContent {
+        val stored = getPrefs(context).getString(KEY_CANDIDATE_COMMENT_CONTENT, null)
+        return CandidateCommentContent.entries.firstOrNull { it.name == stored } ?: CandidateCommentContent.PINYIN
+    }
+
+    fun setCandidateCommentContent(context: Context, content: CandidateCommentContent) {
+        getPrefs(context).edit().putString(KEY_CANDIDATE_COMMENT_CONTENT, content.name).apply()
+    }
+
     fun showCandidateComments(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_SHOW_CANDIDATE_COMMENTS, true)
+        return candidateCommentMode(context) != CandidateCommentMode.HIDE
     }
 
     fun setShowCandidateComments(context: Context, show: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_SHOW_CANDIDATE_COMMENTS, show).apply()
+        setCandidateCommentMode(context, if (show) CandidateCommentMode.SHOW else CandidateCommentMode.HIDE)
     }
 
     /** 候选词默认靠左；需要一键取消编码时可自行启用。 */
@@ -255,13 +345,6 @@ object SettingsPreferences {
     }
 
     /** 上次完成 rime assets 同步的 versionCode（0 表示从未同步）。 */
-    fun getRimeAssetsVersion(context: Context): Int {
-        return getPrefs(context).getInt(KEY_RIME_ASSETS_VERSION, 0)
-    }
-
-    fun setRimeAssetsVersion(context: Context, version: Int) {
-        getPrefs(context).edit().putInt(KEY_RIME_ASSETS_VERSION, version).apply()
-    }
 
     /** 调试 verbose 日志总开关（仅 Debug 构建生效，Release 恒关闭）。 */
     fun isVerboseLoggingEnabled(context: Context): Boolean {
@@ -308,22 +391,24 @@ object SettingsPreferences {
         getPrefs(context).edit().putInt(KEY_SOUND_VOLUME, volume).apply()
     }
     
-    fun isVibrationEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_VIBRATION_ENABLED, true)
-    }
-    
-    fun setVibrationEnabled(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_VIBRATION_ENABLED, enabled).apply()
-    }
-    
-    fun getVibrationIntensity(context: Context): Int {
-        return getPrefs(context).getInt(KEY_VIBRATION_INTENSITY, 30)
-    }
-    
-    fun setVibrationIntensity(context: Context, intensity: Int) {
-        getPrefs(context).edit().putInt(KEY_VIBRATION_INTENSITY, intensity).apply()
-    }
+    /** 振动实际由「按键效果」的振动模式决定；关闭即“不振动”。 */
+    fun isVibrationEnabled(context: Context): Boolean = getHapticMode(context) != "disabled"
 
+    /** 菜单「声音振动」用：关闭时记住原模式，重新打开时恢复（默认跟随系统）。旧 vibration_enabled 键不再使用。 */
+    fun setVibrationEnabled(context: Context, enabled: Boolean) {
+        val prefs = getPrefs(context)
+        val current = getHapticMode(context)
+        if (enabled == (current != "disabled")) return
+        if (enabled) {
+            prefs.edit().putString(KEY_HAPTIC_MODE, prefs.getString(KEY_HAPTIC_MODE_BEFORE_MUTE, null) ?: "following_system")
+                .remove(KEY_HAPTIC_MODE_BEFORE_MUTE).apply()
+        } else {
+            prefs.edit().putString(KEY_HAPTIC_MODE_BEFORE_MUTE, current).putString(KEY_HAPTIC_MODE, "disabled").apply()
+        }
+    }
+    private const val KEY_HAPTIC_MODE_BEFORE_MUTE = "haptic_mode_before_mute"
+    
+    
 
     private const val KEY_HAPTIC_MODE = "haptic_mode"
     private const val KEY_HAPTIC_ON_KEYUP = "haptic_on_keyup"
@@ -387,7 +472,7 @@ object SettingsPreferences {
         val theme = prefs.getString(KEY_KEYBOARD_THEME, null)
         prefs.edit().apply {
             if (theme.isNullOrBlank()) putString(KEY_KEYBOARD_THEME, defaultKeyboardTheme)
-            if (!prefs.contains(KEY_DARK_MODE)) putInt(KEY_DARK_MODE, 1)
+            if (!prefs.contains(KEY_DARK_MODE)) putInt(KEY_DARK_MODE, defaultDarkMode)
             putBoolean("cyime_soft_blue_v1", true)
         }.apply()
     }
@@ -395,15 +480,14 @@ object SettingsPreferences {
     fun getKeyboardTheme(context: Context): String {
         val prefs = getPrefs(context)
         val stored = prefs.getString(KEY_KEYBOARD_THEME, defaultKeyboardTheme) ?: defaultKeyboardTheme
-        // Migrate the former independent effect without resetting its parameters.
-        if (prefs.getBoolean(FrostedGlassPreferences.KEY_ENABLED, false) &&
-            stored != com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID) {
-            setKeyboardTheme(context, com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID)
-            return com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID
+        // 不再提供的主题（如跟随系统动态配色）改用柔和蓝；只改选择，不删主题代码。
+        if (stored == "dynamic") {
+            prefs.edit().putString(KEY_KEYBOARD_THEME, com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID).apply()
+            return com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID
         }
         if (stored == "858AdvanceColor") {
             // 已移除主题仍沿用原兼容映射，不随新安装默认配色改变。
-            setKeyboardTheme(context, com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID)
+            prefs.edit().putString(KEY_KEYBOARD_THEME, com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID).apply()
             return com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID
         }
         return stored
@@ -420,9 +504,7 @@ object SettingsPreferences {
 
     
     fun setKeyboardTheme(context: Context, themeId: String) {
-        getPrefs(context).edit().putString(KEY_KEYBOARD_THEME, themeId)
-            .putBoolean(FrostedGlassPreferences.KEY_ENABLED,
-                themeId == com.kingzcheung.xime.ui.theme.TransparentGlassTheme.ID).apply()
+        getPrefs(context).edit().putString(KEY_KEYBOARD_THEME, themeId).apply()
     }
 
     
@@ -443,14 +525,7 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_SMART_PREDICTION_ENABLED, enabled).apply()
     }
     
-    fun getPredictionModelRepo(context: Context): String {
-        return getPrefs(context).getString(KEY_PREDICTION_MODEL_REPO, "https://www.modelscope.cn/models/bikeand/predictive-text-small") 
-            ?: "https://www.modelscope.cn/models/bikeand/predictive-text-small"
-    }
     
-    fun setPredictionModelRepo(context: Context, repo: String) {
-        getPrefs(context).edit().putString(KEY_PREDICTION_MODEL_REPO, repo).apply()
-    }
     
     fun getPredictionSelectedModel(context: Context): String {
         val initial = com.kingzcheung.xime.model.DeviceDefaults.predictionModel(context)
@@ -514,15 +589,38 @@ object SettingsPreferences {
      * 在线插件常驻需保持 WebSocket 长连接（耗电、占用服务端资源），不提供常驻。
      */
     fun isSttKeepEngineAlive(context: Context): Boolean {
-        return isSttUseLocal(context) &&
-            getPrefs(context).getBoolean(KEY_STT_KEEP_ENGINE_ALIVE, false)
+        return isSttUseLocal(context) && getSttEngineIdleMinutes(context) == 0
     }
 
+    /** 旧开关：开 = 两级都永不释放；关 = 恢复原来的 1 分钟空闲释放。 */
     fun setSttKeepEngineAlive(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_STT_KEEP_ENGINE_ALIVE, enabled).apply()
+        val minutes = if (enabled) 0 else 1
+        getPrefs(context).edit().putBoolean(KEY_STT_KEEP_ENGINE_ALIVE, enabled)
+            .putInt(KEY_STT_REFINER_IDLE_MINUTES, minutes).putInt(KEY_STT_ENGINE_IDLE_MINUTES, minutes).apply()
     }
 
-    /** 是否把语音识别期间的录音写入文件（调试用）。 */
+    /**
+     * 语音内存阶梯（0 = 永不释放）：空闲这么多分钟后只卸掉 SenseVoice 第二遍，保留 Paraformer。
+     * 没设过时沿用旧“保持常驻”开关的效果，升级后行为不变。
+     */
+    fun getSttRefinerIdleMinutes(context: Context): Int {
+        val prefs = getPrefs(context)
+        return prefs.getInt(KEY_STT_REFINER_IDLE_MINUTES, if (prefs.getBoolean(KEY_STT_KEEP_ENGINE_ALIVE, false)) 0 else 1)
+    }
+
+    /** 空闲这么多分钟后释放全部语音模型（0 = 常驻）。 */
+    fun getSttEngineIdleMinutes(context: Context): Int {
+        val prefs = getPrefs(context)
+        return prefs.getInt(KEY_STT_ENGINE_IDLE_MINUTES, if (prefs.getBoolean(KEY_STT_KEEP_ENGINE_ALIVE, false)) 0 else 1)
+    }
+
+    fun setSttIdleLadder(context: Context, refinerMinutes: Int, engineMinutes: Int) {
+        getPrefs(context).edit().putInt(KEY_STT_REFINER_IDLE_MINUTES, refinerMinutes.coerceAtLeast(0))
+            .putInt(KEY_STT_ENGINE_IDLE_MINUTES, engineMinutes.coerceAtLeast(0))
+            .putBoolean(KEY_STT_KEEP_ENGINE_ALIVE, engineMinutes == 0).apply()
+    }
+
+    /** 是否把本地语音识别收到的录音与识别过程保存到应用自己的 speech_tuning 目录，供电脑回放调优。 */
     fun isSttDebugRecord(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_STT_DEBUG_RECORD, false)
     }
@@ -603,14 +701,8 @@ object SettingsPreferences {
     }
     
     /** 获取方案偏好的键盘布局，默认全键盘 */
-    fun getLayoutPreference(context: Context, schemaId: String): String {
-        return getPrefs(context).getString("$KEY_LAYOUT_PREFIX$schemaId", "full") ?: "full"
-    }
     
     /** 保存方案偏好的键盘布局 */
-    fun setLayoutPreference(context: Context, schemaId: String, layout: String) {
-        getPrefs(context).edit().putString("$KEY_LAYOUT_PREFIX$schemaId", layout).apply()
-    }
     
     fun getKeyboardHeightDp(context: Context): Int {
         return getKeyboardHeightDp(context, false)
@@ -804,15 +896,5 @@ object SettingsPreferences {
 
     fun setClipboardSyncPluginId(context: Context, pluginId: String) {
         getPrefs(context).edit().putString(KEY_CLIPBOARD_SYNC_PLUGIN_ID, pluginId).apply()
-    }
-
-    const val KEY_BACKUP_PLUGIN_ID = "backup_plugin_id"
-
-    fun getBackupPluginId(context: Context): String {
-        return getPrefs(context).getString(KEY_BACKUP_PLUGIN_ID, "") ?: ""
-    }
-
-    fun setBackupPluginId(context: Context, pluginId: String) {
-        getPrefs(context).edit().putString(KEY_BACKUP_PLUGIN_ID, pluginId).apply()
     }
 }

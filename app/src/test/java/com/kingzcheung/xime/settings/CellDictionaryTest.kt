@@ -144,4 +144,44 @@ class CellDictionaryTest {
         assertEquals(1, store.read().installed.size)
         assertEquals(setOf(entry.id), store.read().applied)
     }
+
+    @Test fun `built-in dictionary is on by default once and a user switch-off survives app updates`() {
+        val store = store()
+        val builtin = CellDictionaryCatalog.builtins.single { it.id == "builtin_arknights" }
+        val v1 = "---\nname: cell_builtin_arknights\n...\n解手流\tjie shou liu\t1200\n"
+        store.installBuiltin(builtin, v1)
+        assertEquals(setOf(builtin.id), store.read().selected)
+        assertEquals(setOf(builtin.id), store.read().applied)
+        assertEquals(1, store.read().installed.single().count)
+        store.select(builtin.id, false)
+        store.markApplied(emptySet())
+        val v2 = v1 + "四星队\tsi xing dui\t1200\n"
+        store.installBuiltin(builtin, v2)
+        assertTrue(store.read().selected.isEmpty())
+        assertTrue(store.read().applied.isEmpty())
+        assertEquals(2, store.read().installed.single().count)
+        assertEquals(v2, store.dictionaryFile(builtin.id).readText())
+    }
+
+    @Test fun `bundled arknights dictionary is a valid pinyin table with the core community terms`() {
+        val text = File("src/main/assets/cell_dictionaries/cell_builtin_arknights.dict.yaml").readText()
+        assertTrue(text.contains("\nname: cell_builtin_arknights\n"))
+        val rows = text.substringAfter("\n...\n").lines().filter { it.isNotBlank() }.map { it.split('\t') }
+        assertTrue(rows.size > 1000)
+        val syllable = Regex("[a-z]{1,6}")
+        rows.forEach { row ->
+            assertEquals(row.toString(), 3, row.size)
+            val codes = row[1].split(' ')
+            assertEquals(row.toString(), row[0].length, codes.size)
+            assertTrue(row.toString(), codes.all(syllable::matches) && row[2].toInt() > 0)
+        }
+        assertEquals(rows.size, rows.map { it[0] to it[1] }.distinct().size)
+        val words = rows.groupBy({ it[0] }, { it[1] })
+        for ((word, code) in listOf("无精二" to "wu jing er", "精一1级" to "jing yi yi ji", "四星队" to "si xing dui",
+            "解手流" to "jie shou liu", "精二90级" to "jing er jiu shi ji", "无A组" to "wu a zu",
+            "卫戍协议" to "wei shu xie yi", "重装" to "zhong zhuang")) {
+            assertEquals(word, code, words[word]?.first())
+        }
+        assertEquals(listOf("wei shi dai er", "wei shen dai er"), words["维什戴尔"])
+    }
 }

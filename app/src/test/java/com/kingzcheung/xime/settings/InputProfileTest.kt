@@ -35,6 +35,36 @@ class InputProfileTest {
     }
     private fun entry(id: String) = SchemaInfo(id, id, "", "", "")
 
+    @Test fun `scheme preview uses requested codes without applying Flypy to other variants`() {
+        assertEquals("pin'yin", InputProfiles.schemePreview(entry("rime_ice").profile))
+        assertEquals("xn'he'ul'pb", InputProfiles.schemePreview(entry("double_pinyin_flypy").profile))
+        assertNotEquals("xn'he'ul'pb", InputProfiles.schemePreview(entry("double_pinyin_mspy").profile))
+    }
+
+    @Test fun `scheme options retain concrete double pinyin variants and real targets`() {
+        val entries = listOf(entry("rime_ice").copy(name = "雾凇拼音"), entry("t9_pinyin"),
+            entry("double_pinyin_flypy").copy(name = "小鹤双拼"),
+            entry("double_pinyin_mspy").copy(name = "微软双拼"), entry("japanese"))
+        for (current in listOf(entries[0], entries[1], entries[3])) {
+            val doubles = InputProfileSelection.schemeEntries(entries, current)
+                .filter { it.profile.scheme == InputScheme.DOUBLE_PINYIN }
+            assertEquals(listOf("小鹤双拼", "微软双拼"), doubles.map { it.name })
+            assertEquals(listOf("double_pinyin_flypy", "double_pinyin_mspy"), doubles.map { it.schemaId })
+            assertTrue(doubles.all { it in entries })
+            assertFalse(InputProfileSelection.schemeEntries(entries, current).any { it.schemaId == "japanese" })
+        }
+    }
+
+    @Test fun `concrete choices preserve compatible layout and custom variant names`() {
+        val flypy = entry("double_pinyin_flypy").copy(name = "小鹤双拼")
+        val flypy14 = entry("double_pinyin_flypy_14jian").copy(name = "小鹤双拼")
+        val current = entry("pinyin_14jian")
+        val choices = InputProfileSelection.schemeEntries(listOf(current, flypy, flypy14), current)
+        assertTrue(flypy14 in choices)
+        assertFalse(flypy in choices)
+        assertTrue(choices.all { it.profile.layout == InputLayout.MERGED14 })
+    }
+
     @Test fun `pinyin layouts share a scheme but retain distinct backend identities`() {
         val profiles = listOf("pinyin_simp", "rime_ice", "t9_pinyin", "pinyin_14jian").map { InputProfiles.describe(it) }
         assertEquals(setOf(InputLanguage.CHINESE), profiles.map { it.language }.toSet())
@@ -120,8 +150,10 @@ class InputProfileTest {
         assertEquals("拼音 · 九键", entry("rime_ice").profile.summary)
         assertEquals(InputScheme.PINYIN, InputUIState(currentSchemaId = "rime_ice").inputProfile.scheme)
         assertEquals(InputLayout.MERGED14, InputProfiles.current("t9_pinyin").layout)
-        assertFalse(supportsSplitKeyboard("t9_pinyin", false))
+        // 14 键可分体（跨中线的双字母键在分体时拆开）；九键不分体。
+        assertTrue(supportsSplitKeyboard("t9_pinyin", false))
         assertTrue(supportsSplitKeyboard("t9_pinyin", true))
+        assertFalse(supportsSplitKeyboard("rime_ice", false))
         File(rime, "xime.custom.yaml").writeText("keyboard:\n  t9:\n    schemas: [t9_pinyin]\n  qwerty_14:\n    schemas: [rime_ice]\n")
         KeysConfigHelper.loadConfig(context)
         assertTrue(isT9Schema("t9_pinyin"))

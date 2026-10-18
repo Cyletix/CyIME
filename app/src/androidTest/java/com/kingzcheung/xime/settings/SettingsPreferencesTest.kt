@@ -59,17 +59,17 @@ class SettingsPreferencesTest {
         assertTrue(SettingsPreferences.isSoundEnabled(context))
         assertEquals(20, SettingsPreferences.getSoundVolume(context))
         assertTrue(SettingsPreferences.isVibrationEnabled(context))
-        assertEquals(30, SettingsPreferences.getVibrationIntensity(context))
 
         SettingsPreferences.setSoundEnabled(context, false)
         SettingsPreferences.setSoundVolume(context, 72)
         SettingsPreferences.setVibrationEnabled(context, false)
-        SettingsPreferences.setVibrationIntensity(context, 66)
 
         assertFalse(SettingsPreferences.isSoundEnabled(context))
         assertEquals(72, SettingsPreferences.getSoundVolume(context))
         assertFalse(SettingsPreferences.isVibrationEnabled(context))
-        assertEquals(66, SettingsPreferences.getVibrationIntensity(context))
+        assertEquals("disabled", SettingsPreferences.getHapticMode(context))
+        SettingsPreferences.setVibrationEnabled(context, true)
+        assertEquals("following_system", SettingsPreferences.getHapticMode(context))
     }
 
     @Test
@@ -79,15 +79,6 @@ class SettingsPreferencesTest {
         
         SettingsPreferences.setSoundVolume(context, 100)
         assertEquals(100, SettingsPreferences.getSoundVolume(context))
-    }
-
-    @Test
-    fun vibrationIntensityBoundaryValues() {
-        SettingsPreferences.setVibrationIntensity(context, 0)
-        assertEquals(0, SettingsPreferences.getVibrationIntensity(context))
-        
-        SettingsPreferences.setVibrationIntensity(context, 100)
-        assertEquals(100, SettingsPreferences.getVibrationIntensity(context))
     }
 
     @Test
@@ -219,16 +210,6 @@ class SettingsPreferencesTest {
         SettingsPreferences.setSmartPredictionEnabled(context, false)
         assertFalse("Smart prediction should be disabled", 
             SettingsPreferences.isSmartPredictionEnabled(context))
-    }
-    
-    @Test
-    fun predictionModelRepoSettings() {
-        val defaultRepo = "https://www.modelscope.cn/models/bikeand/predictive-text-small"
-        assertEquals(defaultRepo, SettingsPreferences.getPredictionModelRepo(context))
-        
-        val customRepo = "https://custom.model.repo/model"
-        SettingsPreferences.setPredictionModelRepo(context, customRepo)
-        assertEquals(customRepo, SettingsPreferences.getPredictionModelRepo(context))
     }
     
     @Test

@@ -140,6 +140,11 @@ object AppInfo {
             name = "OpenCC (Open Chinese Convert)",
             license = "Apache-2.0",
             url = "https://github.com/BYVoid/OpenCC"
+        ),
+        LicenseItem(
+            name = "KaTeX",
+            license = "MIT",
+            url = "https://github.com/KaTeX/KaTeX"
         )
     )
 }
@@ -511,7 +516,7 @@ fun PrivacyPolicyContent(
                         
                         PrivacySection(
                             title = "本地存储",
-                            content = "CyIME 默认在本地存储设置、词库和剪贴板历史。主动启用云备份或剪贴板同步插件时，所选数据会按插件配置传输。您可以随时清除本地数据。"
+                            content = "CyIME 默认在本地存储设置、词库和剪贴板历史。主动启用剪贴板同步插件时，剪贴板内容会按插件配置传输；备份只导出到您选择的本地文件。您可以随时清除本地数据。"
                         )
                         
                         PrivacySection(

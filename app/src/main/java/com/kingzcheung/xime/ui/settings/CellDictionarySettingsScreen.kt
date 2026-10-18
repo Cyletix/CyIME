@@ -23,6 +23,8 @@ import com.kingzcheung.xime.settings.CellDictionaryOffer
 import com.kingzcheung.xime.settings.InstalledCellDictionary
 import com.kingzcheung.xime.viewmodel.CellDictionaryUiState
 import com.kingzcheung.xime.viewmodel.CellDictionaryViewModel
+import com.kingzcheung.xime.ui.common.CompactDropdownMenu
+import com.kingzcheung.xime.ui.common.CompactMenuRow
 
 @Composable
 fun CellDictionarySettingsContent(onBack: () -> Unit) {
@@ -61,11 +63,14 @@ fun CellDictionarySettingsPanel(
     val dictionaries = state.dictionaries
     val installed = dictionaries.installed.associateBy { it.id }
     val offers = CellDictionaryCatalog.offers
-    val catalogIds = offers.map { it.id }.toSet()
-    val categories = listOf("全部", "已下载") + offers.map { it.category }.distinct() + "本地导入"
+    val builtinIds = CellDictionaryCatalog.builtins.map { it.id }.toSet()
+    val catalogIds = offers.map { it.id }.toSet() + builtinIds
+    val categories = listOf("全部", "已下载", CellDictionaryCatalog.BUILTIN_CATEGORY) +
+        offers.map { it.category }.distinct() + "本地导入"
     fun matches(name: String, group: String, id: String) =
         (category == "全部" || category == group || category == "已下载" && id in installed) &&
             (query.isBlank() || name.contains(query.trim(), ignoreCase = true) || group.contains(query.trim()))
+    val builtins = dictionaries.installed.filter { it.id in builtinIds && matches(it.name, it.category, it.id) }
     val visibleOffers = offers.filter { matches(it.name, it.category, it.id) }
     val locals = dictionaries.installed.filter { it.id !in catalogIds && matches(it.name, it.category, it.id) }
     Scaffold(topBar = {
@@ -103,8 +108,8 @@ fun CellDictionarySettingsPanel(
                     OutlinedButton(onClick = { categoryMenu = true }, modifier = Modifier.fillMaxWidth()) {
                         Text("分类：$category")
                     }
-                    DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
-                        categories.forEach { label -> DropdownMenuItem(text = { Text(label) },
+                    CompactDropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
+                        categories.forEach { label -> CompactMenuRow(label, selected = category == label,
                             onClick = { category = label; categoryMenu = false }) }
                     }
                 }
@@ -121,7 +126,12 @@ fun CellDictionarySettingsPanel(
                 if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Text(message, color = if (state.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
             } }
-            if (visibleOffers.isEmpty() && locals.isEmpty()) item { Text("没有符合条件的词库") }
+            if (builtins.isEmpty() && visibleOffers.isEmpty() && locals.isEmpty()) item { Text("没有符合条件的词库") }
+            items(builtins, key = { it.id }) { entry ->
+                CellDictionaryRow(entry.name, entry.category, entry,
+                    entry.id in dictionaries.selected, entry.id in dictionaries.applied, state.busy,
+                    { onSelect(entry.id, it) }, {}, entry.sourceUrl.takeIf { it.isNotBlank() }?.let { url -> { onSource(url) } })
+            }
             items(visibleOffers, key = { it.id }) { offer ->
                 CellDictionaryRow(offer.name, offer.category, installed[offer.id],
                     offer.id in dictionaries.selected, offer.id in dictionaries.applied, state.busy,

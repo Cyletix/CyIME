@@ -3,34 +3,30 @@ package com.kingzcheung.xime.ui.settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.style.TextAlign
 import com.kingzcheung.xime.settings.*
+import kotlin.math.roundToInt
 
-/** Real layout/encoding combinations only; changing a layout keeps the current encoding. */
+/** Shared by language settings and IME; selection only changes real installed combinations. */
 @Composable
 internal fun InputProfileSelectors(
     entries: List<SchemaInfo>, selected: SchemaInfo,
@@ -41,99 +37,94 @@ internal fun InputProfileSelectors(
     onSelect: (SchemaInfo) -> Unit,
 ) {
     val profile = selected.profile
-    val schemes = InputProfileSelection.schemes(entries, profile.language)
+    val schemes = InputProfileSelection.schemeEntries(entries, selected)
     val layouts = InputProfileSelection.layouts(entries, selected)
-    val variants = InputProfileSelection.variants(entries, selected)
-    val fontScale = LocalDensity.current.fontScale
-    BoxWithConstraints(modifier.fillMaxWidth().testTag("profile-settings-selectors")) {
-        val stacked = maxWidth < (252f * fontScale).dp
-        // Language settings provides unbounded vertical space. A bounded caller (for example
-        // an embedded preview) scrolls the whole selector, while each list remains bounded.
-        val contentModifier = if (constraints.hasBoundedHeight) {
-            Modifier.verticalScroll(rememberScrollState())
-        } else Modifier
-        val layoutCard: @Composable (Modifier) -> Unit = { cardModifier ->
-            ProfileSelectorCard("键盘布局", Icons.Default.Keyboard, "layout-choice:${profile.language.id}",
-                layouts.map { it.id to it.displayName }, profile.layout.id, cardModifier,
-                containerColor, contentColor, accentColor) { id ->
-                InputProfileSelection.changeLayout(entries, selected, id)?.let(onSelect)
+    Column(modifier.fillMaxWidth().testTag("profile-settings-selectors")) {
+        LayoutPreviewChoices(layouts, profile.language, profile.layout.id, "layout-choice:${profile.language.id}",
+            containerColor = containerColor, contentColor = contentColor, accentColor = accentColor) { id ->
+            InputProfileSelection.changeLayout(entries, selected, id)?.let(onSelect)
+        }
+        HorizontalDivider(Modifier.padding(vertical = 4.dp), color = contentColor.copy(alpha = .15f))
+        ProfileChoiceRow("方案", "scheme-choice:${profile.language.id}",
+            schemes.map { it.schemaId to it.schemeLabel }, selected.schemaId,
+            previews = schemes.associate { it.schemaId to InputProfiles.schemePreview(it.profile) },
+            containerColor = containerColor, contentColor = contentColor, accentColor = accentColor) { id ->
+            schemes.firstOrNull { it.schemaId == id }?.let(onSelect)
+        }
+    }
+}
+
+/** Two tight text lines, with management as the final item in the same row. */
+internal fun profileCardWidths(available: Dp, count: Int, management: Boolean, fontScale: Float): Pair<Dp, Dp> {
+    // One or two choices keep the size they would have among three, instead of filling the row.
+    val slots = count.coerceAtLeast(3)
+    val gaps = (slots + if (management) 1 else 0) - 1
+    val normal = ((available - 6.dp * gaps.coerceAtLeast(0)) / (slots + if (management) .72f else 0f))
+        .coerceAtLeast(minOf(112.dp * fontScale, available))
+    return normal to (normal * .72f).coerceAtLeast(minOf(92.dp * fontScale, available))
+}
+
+@Composable
+internal fun ProfileChoiceRow(
+    title: String, tag: String, choices: List<Pair<String, String>>, selectedId: String?,
+    modifier: Modifier = Modifier, itemTagPrefix: String = "$tag:option:",
+    containerColor: Color, contentColor: Color, accentColor: Color,
+    previews: Map<String, String> = emptyMap(), onManage: (() -> Unit)? = null,
+    rowHeight: Dp? = null,
+    onSelect: (String) -> Unit,
+) {
+    val list = rememberLazyListState()
+    LaunchedEffect(selectedId, choices) {
+        val index = choices.indexOfFirst { it.first == selectedId }
+        if (index >= 0) list.animateScrollToItem(index)
+    }
+    Row(modifier.fillMaxWidth().testTag(tag), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(if (rowHeight != null) title.toList().joinToString("\n") else title,
+            Modifier.then(if (rowHeight != null) Modifier.align(Alignment.CenterVertically) else Modifier.padding(top = 3.dp)),
+            color = contentColor.copy(alpha = .75f), textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelMedium, maxLines = if (rowHeight != null) 2 else 1)
+        BoxWithConstraints(Modifier.weight(1f)) {
+        val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+        val widths = profileCardWidths(maxWidth, choices.size, onManage != null, fontScale)
+        val cardWidth = if (rowHeight != null) (widths.first.value * .75f).roundToInt().dp
+            .coerceAtLeast(minOf(112.dp * fontScale, maxWidth)) else null
+        val managementWidth = if (rowHeight != null) (widths.second.value * .75f).roundToInt().dp
+            .coerceAtLeast(minOf(88.dp * fontScale, maxWidth)) else null
+        LazyRow(Modifier.fillMaxWidth().testTag("$tag:list"), state = list,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(choices, key = { it.first }) { (id, label) ->
+                SchemeTextCard(label, previews[id].orEmpty(), id == selectedId, "$itemTagPrefix$id",
+                    containerColor, contentColor, accentColor, width = cardWidth, height = rowHeight, onClick = { onSelect(id) })
+            }
+            if (onManage != null) item(key = "scheme-management") {
+                SchemeTextCard("方案管理", "", false, "profile-scheme-management",
+                    containerColor, contentColor, accentColor, isAction = true,
+                    width = managementWidth, height = rowHeight, onClick = onManage)
             }
         }
-        val schemeCard: @Composable (Modifier) -> Unit = { cardModifier ->
-            ProfileSelectorCard("输入方案", Icons.Default.Translate, "scheme-choice:${profile.language.id}",
-                schemes.map { it.id to it.displayName }, profile.scheme.id, cardModifier,
-                containerColor, contentColor, accentColor) { id ->
-                schemes.firstOrNull { it.id == id }
-                    ?.let { InputProfileSelection.changeScheme(entries, selected, it) }?.let(onSelect)
-            }
-        }
-        Column(contentModifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (stacked) {
-                layoutCard(Modifier.fillMaxWidth())
-                schemeCard(Modifier.fillMaxWidth())
-            } else {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    layoutCard(Modifier.weight(1f))
-                    schemeCard(Modifier.weight(1f))
-                }
-            }
-            if (variants.size > 1) {
-                ProfileSelectorCard("方案版本", Icons.Default.Translate, "variant-choice:${profile.language.id}",
-                    variants.map { it.schemaId to it.name }, selected.schemaId, Modifier.fillMaxWidth(),
-                    containerColor, contentColor, accentColor) { id ->
-                    variants.firstOrNull { it.schemaId == id }?.let(onSelect)
-                }
-            }
         }
     }
 }
 
 @Composable
-private fun ProfileSelectorCard(
-    label: String, icon: ImageVector, tag: String, choices: List<Pair<String, String>>, selectedId: String,
-    modifier: Modifier, containerColor: Color, contentColor: Color, accentColor: Color,
-    onSelect: (String) -> Unit,
-) {
-    val fontScale = LocalDensity.current.fontScale
-    val rowHeight = (52f * fontScale.coerceAtLeast(1f)).dp
-    val rowGap = 6.dp
-    val viewportHeight = (rowHeight * 3 + rowGap * 2).coerceAtMost(240.dp)
-    val centeringPadding = ((viewportHeight - rowHeight) / 2).coerceAtLeast(0.dp)
-    val list = rememberLazyListState()
-    LaunchedEffect(selectedId, choices) {
-        val index = choices.indexOfFirst { it.first == selectedId }
-        if (index >= 0) list.scrollToItem(index)
-    }
-    Surface(modifier.testTag(tag).semantics { if (choices.size <= 1) disabled() },
-        color = containerColor, contentColor = contentColor,
-        shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, contentColor.copy(alpha = .09f))) {
-        Column(Modifier.fillMaxWidth().padding(8.dp)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (fontScale <= 1.3f) Icon(icon, null, Modifier.size(18.dp), tint = contentColor.copy(alpha = .75f))
-                Text(label, style = MaterialTheme.typography.labelMedium, color = contentColor.copy(alpha = .75f))
+private fun SchemeTextCard(label: String, preview: String, chosen: Boolean, tag: String,
+    containerColor: Color, contentColor: Color, accentColor: Color, isAction: Boolean = false,
+    width: Dp? = null, height: Dp? = null, onClick: () -> Unit) {
+    Surface(shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(if (chosen) 1.5.dp else 1.dp, if (chosen) accentColor else contentColor.copy(alpha = .12f)),
+        color = if (chosen) accentColor.copy(alpha = .16f).compositeOver(containerColor) else containerColor) {
+        Box(Modifier.then(if (width != null) Modifier.width(width) else Modifier)
+            .then(if (height != null) Modifier.height(height) else Modifier.heightIn(min = 48.dp)).testTag(tag)
+            .then(if (isAction) Modifier.clickable(role = Role.Button, onClick = onClick)
+                else Modifier.selectable(chosen, role = Role.RadioButton, onClick = onClick))
+            .padding(horizontal = 10.dp, vertical = 3.dp), contentAlignment = Alignment.Center) {
+            Column(Modifier.padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (isAction) Icon(Icons.Outlined.Settings, null, Modifier.size(16.dp), tint = contentColor.copy(alpha = .75f))
+                else Text(preview, style = MaterialTheme.typography.labelSmall, color = contentColor.copy(alpha = .75f),
+                    textAlign = TextAlign.Center, maxLines = 1)
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = contentColor, textAlign = TextAlign.Center, maxLines = 1)
             }
-            LazyColumn(Modifier.fillMaxWidth().height(viewportHeight).testTag("$tag:list"), state = list,
-                contentPadding = PaddingValues(vertical = centeringPadding),
-                verticalArrangement = Arrangement.spacedBy(rowGap)) {
-                items(choices, key = { it.first }) { (id, name) ->
-                    val chosen = id == selectedId
-                    Surface(shape = RoundedCornerShape(12.dp),
-                        color = if (chosen) accentColor.copy(alpha = .17f) else Color.Transparent,
-                        border = if (chosen) BorderStroke(1.dp, accentColor.copy(alpha = .5f)) else null) {
-                        Box(Modifier.fillMaxWidth().heightIn(min = rowHeight)
-                            .testTag("$tag:option:$id").semantics { this.selected = chosen }
-                            .clickable(enabled = choices.size > 1, role = Role.RadioButton) { onSelect(id) }
-                            .padding(horizontal = 22.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-                            Text(name, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
-                                color = contentColor.copy(alpha = if (chosen) 1f else .7f),
-                                fontWeight = if (chosen) FontWeight.Medium else FontWeight.Normal)
-                            if (chosen) Icon(Icons.Default.Check, null,
-                                Modifier.align(Alignment.CenterEnd).offset(x = 17.dp).size(14.dp), tint = accentColor)
-                        }
-                    }
-                }
-            }
+            if (chosen) Icon(Icons.Default.Check, "已选中", Modifier.align(Alignment.TopEnd).size(14.dp), tint = accentColor)
         }
     }
 }

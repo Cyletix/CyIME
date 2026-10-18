@@ -109,11 +109,17 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // 列目录和逐个读文件大小放到 IO 线程：大目录（词库、build）在主线程读会卡住页面。
     fun refresh() {
-        entries = currentDir.listFiles()
-            ?.map { FileEntry(it, it.isDirectory, it.name, it.length(), it.lastModified()) }
-            ?.sortedWith(compareByDescending<FileEntry> { it.isDirectory }.thenBy { it.name })
-            ?: emptyList()
+        val dir = currentDir
+        scope.launch {
+            entries = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                dir.listFiles()
+                    ?.map { FileEntry(it, it.isDirectory, it.name, it.length(), it.lastModified()) }
+                    ?.sortedWith(compareByDescending<FileEntry> { it.isDirectory }.thenBy { it.name })
+                    ?: emptyList()
+            }
+        }
     }
 
     fun deleteFile(file: File) {
@@ -129,94 +135,95 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
 
     LaunchedEffect(currentDir) { refresh() }
 
-    if (viewingFile != null) {
-        YamlEditor(
-            file = viewingFile!!,
-            onDeleted = { viewingFile = null },
-            onBack = { viewingFile = null }
-        )
-        return
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("文件管理器", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val rel = if (currentDir == rootDir) "" else
-                            currentDir.absolutePath.removePrefix(rootDir.absolutePath)
-                        if (rel.isNotEmpty()) {
-                            Text(rel, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                },
-                navigationIcon = {
-                    if (currentDir == rootDir) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
-                    } else {
-                        IconButton(onClick = { currentDir = currentDir.parentFile ?: rootDir }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "上级目录")
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { currentDir = rootDir }) {
-                        Icon(Icons.Default.Home, contentDescription = "根目录")
-                    }
-                    IconButton(onClick = { refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新")
-                    }
-                    IconButton(onClick = { showExportDialog = true }) {
-                        Icon(Icons.Default.IosShare, contentDescription = "导出")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
+    SettingsSubPages(viewingFile, onBack = { viewingFile = null }) { file ->
+        if (file != null) {
+            YamlEditor(
+                file = file,
+                onDeleted = { viewingFile = null },
+                onBack = { viewingFile = null }
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { innerPadding ->
-        if (entries.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center) {
-                Text("空目录", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(innerPadding)
-            ) {
-                items(entries, key = { currentDir.absolutePath + "/" + it.name }) { entry ->
-                    FileEntryRow(
-                        entry = entry,
-                        onView = {
-                            if (entry.isDirectory) {
-                                currentDir = entry.file
-                            } else if (entry.name.endsWith(".bin") || entry.name.endsWith(".gram")) {
-                                Toast.makeText(context, "不支持打开二进制文件", Toast.LENGTH_SHORT).show()
-                            } else {
-                                viewingFile = entry.file
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("文件管理器", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val rel = if (currentDir == rootDir) "" else
+                                currentDir.absolutePath.removePrefix(rootDir.absolutePath)
+                            if (rel.isNotEmpty()) {
+                                Text(rel, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                        },
-                        onDelete = {
-                            showDeleteDialog = entry.file
-                        },
-                        onShare = {
-                            RimeExportManager.shareSingleFile(context, entry.file)
                         }
+                    },
+                    navigationIcon = {
+                        if (currentDir == rootDir) {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            }
+                        } else {
+                            IconButton(onClick = { currentDir = currentDir.parentFile ?: rootDir }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "上级目录")
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { currentDir = rootDir }) {
+                            Icon(Icons.Default.Home, contentDescription = "根目录")
+                        }
+                        IconButton(onClick = { refresh() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "刷新")
+                        }
+                        IconButton(onClick = { showExportDialog = true }) {
+                            Icon(Icons.Default.IosShare, contentDescription = "导出")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 72.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { innerPadding ->
+            if (entries.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    contentAlignment = Alignment.Center) {
+                    Text("空目录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding)
+                ) {
+                    items(entries, key = { currentDir.absolutePath + "/" + it.name }) { entry ->
+                        FileEntryRow(
+                            entry = entry,
+                            onView = {
+                                if (entry.isDirectory) {
+                                    currentDir = entry.file
+                                } else if (entry.name.endsWith(".bin") || entry.name.endsWith(".gram")) {
+                                    Toast.makeText(context, "不支持打开二进制文件", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    viewingFile = entry.file
+                                }
+                            },
+                            onDelete = {
+                                showDeleteDialog = entry.file
+                            },
+                            onShare = {
+                                RimeExportManager.shareSingleFile(context, entry.file)
+                            }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
                 }
             }
+        }
         }
     }
 

@@ -32,9 +32,22 @@ data class SchemaInfo(
     val profile: InputProfile get() = if (KeysConfigHelper.hasLoadedLayoutBindings)
         InputProfiles.current(schemaId, language = language, scheme = scheme)
         else InputProfiles.describe(schemaId, language, scheme)
+    /** Encoding choices must not inherit legacy keyboard labels such as 中文26键. */
+    val schemeLabel: String get() = when (scheme) {
+        InputScheme.EXTERNAL, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN ->
+            name.ifBlank { schemaId }
+        else -> scheme.displayName
+    }
     val selectionLabel: String get() = when (scheme) {
         InputScheme.EXTERNAL, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI, InputScheme.WUBI_PINYIN ->
             "$name · ${profile.layout.displayName}"
         else -> profile.summary
+    }
+    /** Resource entries represent installed engines: distinguish encoding, actual layout and ownership. */
+    val resourceLabel: String get() = when {
+        schemaId.startsWith("custom_pinyin_") -> "$name · 自定义"
+        schemaId == Cyletix10Layout.ID || schemaId == QwjrtkLayout.ID -> "$name · 内置"
+        scheme == InputScheme.DOUBLE_PINYIN -> "$name · ${profile.layout.displayName}"
+        else -> name
     }
 }

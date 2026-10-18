@@ -138,10 +138,10 @@ fun CustomPhraseContent(
                         verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         itemsIndexed(items = uiState.filteredEntries,
                             key = { i, e -> "${e.word}_${e.code}_$i" }) { _, entry ->
-                            val realIndex = uiState.entries.indexOf(entry)
+                            // 点击时才查原位置：每行组合时都整表 indexOf，条目多了滚动会卡（O(n²)）。
                             PhraseItem(entry = entry,
-                                onEdit = { vm.setEditing(realIndex, entry); vm.showEditDialog() },
-                                onDelete = { vm.deleteEntry(realIndex) })
+                                onEdit = { vm.setEditing(uiState.entries.indexOf(entry), entry); vm.showEditDialog() },
+                                onDelete = { vm.deleteEntry(uiState.entries.indexOf(entry)) })
                         }
                     }
                 }
