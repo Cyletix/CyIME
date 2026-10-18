@@ -356,17 +356,10 @@ internal fun KeyboardResizeOverlay(
                         // 手机基准下限与可用区域取小：平板横屏不允许因为"按比例算"反而比手机更小。
                         val availableWidthDp = (stableBounds.width / density.density).roundToInt()
                         val availableHeightDp = (stableBounds.height / density.density).roundToInt()
-                        val squareSpacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig()
-                            .spacingFor(session.squareSnap?.section ?: "qwerty")
-                        val floorContentHeightDp = minOf(
+                        val minContentHeightDp = minOf(
                             floatingHeightRange.first,
                             floatingResizeMinHeightDp(availableHeightDp - dragBarDp),
                         )
-                        // 下限不能挡住方形按键吸附点：方形点在下限之下时把下限放到方形点下方一点。
-                        val squareContentHeightDp = if (gestureFloating) session.squareSnap?.squareTotalHeightPx(
-                            gestureRect, density.density, dragBarDp * density.density, true, squareSpacing,
-                        )?.let { it / density.density - dragBarDp } else null
-                        val minContentHeightDp = squareAwareFloatingMinHeightDp(floorContentHeightDp, squareContentHeightDp)
                         val minHeightPx = ((if (gestureFloating) minContentHeightDp else
                             fixedRange.first + session.bottomPaddingDp) + dragBarDp) * density.density
                         val screenMaxHeightPx = ((if (gestureFloating) floatingHeightRange.last else
@@ -381,6 +374,8 @@ internal fun KeyboardResizeOverlay(
                             minOf(stableBounds.width, maxWidthDp.toFloat() * density.density)
                         } else gestureRect.width
                         val aspect = session.aspectLimits
+                        val squareSpacing = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardKeyConfig()
+                            .spacingFor(session.squareSnap?.section ?: "qwerty")
 
                         var workingRect = gestureRect
                         var rawResizeRect = gestureRect

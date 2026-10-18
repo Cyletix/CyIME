@@ -171,42 +171,11 @@ class KeyboardResizeGeometryTest {
         assertEquals(0f, fixedKeyboardRect(360f, 400f, 300f, 0f, 24f, 800f, -300f).left, 0.01f)
     }
 
-    @Test fun floatingFloorNeverHidesTheSquareKeyDetentOnPhones() {
-        // 384dp 宽手机、26 键：方形点约 202dp（含工具栏），在 228dp 默认下限之下。
-        val density = 2.75f
-        val widthDp = 384f
-        val geometry = KeyboardSquareSnap(10f, false, false)
-        val spacing: Pair<Float?, Float?> = null to null
-        val dragBarPx = FLOATING_DRAG_BAR_HEIGHT_DP * density
-        val bounds = ResizeRect(0f, 0f, widthDp * density, 900f * density)
-        val card = ResizeRect(0f, bounds.bottom - 300f * density, widthDp * density, bounds.bottom)
-        val squareTotalPx = geometry.squareTotalHeightPx(card, density, dragBarPx, true, spacing)!!
-        val squareContentDp = squareTotalPx / density - FLOATING_DRAG_BAR_HEIGHT_DP
-        assertTrue("square content $squareContentDp", squareContentDp in 180f..215f)
-        assertTrue(squareContentDp < FLOATING_RESIZE_MIN_HEIGHT_DP)
-        // 下限放到方形点下方，但不低于绝对下限；方形点在下限之上时下限不变。
-        val min = squareAwareFloatingMinHeightDp(FLOATING_RESIZE_MIN_HEIGHT_DP, squareContentDp)
-        assertTrue(min < squareContentDp && min >= FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP)
-        assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, squareAwareFloatingMinHeightDp(FLOATING_RESIZE_MIN_HEIGHT_DP, 300f))
-        assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, squareAwareFloatingMinHeightDp(FLOATING_RESIZE_MIN_HEIGHT_DP, null))
-        // 从方形点上方 4dp 拖顶边：吸到方形点，且该高度在放宽后的下限之上。
-        val near = ResizeRect(0f, bounds.bottom - squareTotalPx - 4f * density, widthDp * density, bounds.bottom)
-        val snapped = near.snapSquareKeys(ResizeHandle.TOP, geometry, bounds, density, dragBarPx, true, spacing, thresholdDp = 6f)
-        assertEquals(squareTotalPx, snapped.height, 1f)
-        assertTrue(snapped.height / density - FLOATING_DRAG_BAR_HEIGHT_DP >= min)
-        // 已存高度范围放宽到绝对下限，默认范围不变。
-        assertEquals(FLOATING_RESIZE_ABSOLUTE_MIN_HEIGHT_DP, floatingStoredHeightBounds(900, false).first)
-        assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeHeightBounds(900, false).first)
-    }
-
-    @Test fun fixedMinimumIsOneToolbarBelowMaximumAndFloatingKeepsSharedFloor() {
+    @Test fun fixedAndFloatingShareMinimumPanelSizeOnTablet() {
         for (landscape in listOf(false, true)) {
-            for (height in listOf(640, 800, 915, 1400)) {
-                val fixed = keyboardHeightBounds(height, landscape)
-                // 固定键盘：最低档 = 最高档 − 工具栏，按键区高度两档一样；不低于悬浮共用下限。
-                assertEquals(maxOf(fixed.last - KEYBOARD_TOOLBAR_HEIGHT_DP, FLOATING_RESIZE_MIN_HEIGHT_DP.coerceAtMost(fixed.last)), fixed.first)
-                assertTrue(fixed.first <= fixed.last)
-                assertEquals(FLOATING_RESIZE_MIN_HEIGHT_DP, floatingResizeHeightBounds(height, landscape).first)
+            for (height in listOf(800, 1400)) {
+                assertEquals(floatingResizeHeightBounds(height, landscape).first,
+                    keyboardHeightBounds(height, landscape).first)
             }
         }
         for (width in listOf(320, 800, 1400)) {

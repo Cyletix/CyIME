@@ -23,26 +23,6 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
             (metrics.cellHeightDp - resolvedVisualGap(spacing.second, metrics.insetY ?: 0f) - 2f * metrics.extraInsetY)
     }
 
-    /**
-     * 当前宽度下按键恰好为正方形时的面板总高度（px，含 [extra]）；
-     * 范围内没有方形点时返回 null。
-     */
-    fun squareTotalHeightPx(rect: ResizeRect, density: Float, extra: Float, floating: Boolean,
-        spacing: Pair<Float?, Float?>, minTotalDp: Float = 100f, maxTotalDp: Float = 800f): Float? {
-        fun diff(totalDp: Float) = capDifference(
-            ResizeRect(rect.left, rect.bottom - totalDp * density, rect.right, rect.bottom),
-            density, extra, floating, spacing)
-        var low = minTotalDp
-        var high = maxTotalDp
-        // 面板越高按键越高：差值随高度单调下降；两端同号说明范围内没有方形点。
-        if (diff(low) < 0f || diff(high) > 0f) return null
-        repeat(24) {
-            val mid = (low + high) / 2f
-            if (diff(mid) > 0f) low = mid else high = mid
-        }
-        return (low + high) / 2f * density
-    }
-
     companion object {
         fun forLayout(kind: LayoutKind, split: Boolean, gapFraction: Float = 0.1f): KeyboardSquareSnap? = when (kind) {
             LayoutKind.ALPHABETIC -> KeyboardSquareSnap(10f, split, false, gapFraction)
