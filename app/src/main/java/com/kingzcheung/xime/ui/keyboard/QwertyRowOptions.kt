@@ -24,13 +24,22 @@ internal fun resolvedQwertyStagger(
 internal data class SpacePunctuationKey(val primary: String, val alternate: String)
 
 /**
- * 空格左侧逗号、右侧句号，各自独立开关；整个键盘只有这两个键跟随全角/半角：
- * 点按输入当前宽度，滑动输入另一种宽度（日文的全角逗号是 、）。
- * 英文输入不分全角半角，只输入 , 和 .，没有副字符（不显示角标，也不能滑动输入）。
+ * 空格左侧逗号、右侧句号，各自独立开关；整个键盘只有这两个键跟随全角/半角。
+ * - 两个都开：点按输入当前宽度，滑动输入另一种宽度（日文的全角逗号是 、）。
+ * - 只开一个：角标（滑动/长按）换成缺的那个符号，同宽度，保证逗号句号都能打（默认只开逗号）。
+ * 英文输入不分全角半角：两个都开时只有 , 和 .，没有副字符；只开一个时角标是另一个。
  */
 internal fun spacePunctuationKeys(comma: Boolean, period: Boolean, fullWidth: Boolean, english: Boolean = false,
     japanese: Boolean = false): Pair<SpacePunctuationKey?, SpacePunctuationKey?> {
     val fullComma = if (japanese) "、" else "，"
+    val wide = fullWidth && !english
+    val commaText = if (wide) fullComma else ","
+    val periodText = if (wide) "。" else "."
+    if (comma != period) {
+        return if (comma) Pair(SpacePunctuationKey(commaText, periodText), null)
+        else Pair(null, SpacePunctuationKey(periodText, commaText))
+    }
+    if (!comma) return Pair(null, null)
     val commaKey = when {
         english -> SpacePunctuationKey(",", "")
         fullWidth -> SpacePunctuationKey(fullComma, ",")
@@ -41,5 +50,5 @@ internal fun spacePunctuationKeys(comma: Boolean, period: Boolean, fullWidth: Bo
         fullWidth -> SpacePunctuationKey("。", ".")
         else -> SpacePunctuationKey(".", "。")
     }
-    return Pair(commaKey.takeIf { comma }, periodKey.takeIf { period })
+    return Pair(commaKey, periodKey)
 }
