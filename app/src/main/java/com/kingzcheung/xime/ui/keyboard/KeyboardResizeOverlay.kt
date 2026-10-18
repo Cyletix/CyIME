@@ -93,6 +93,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -847,17 +849,21 @@ internal fun KeyboardResizeOverlay(
             }
         }
         if (!editingOpacity && !floatingMode) {
-            // 提示字贴在底边把手上方，不压住把手，也不被键盘底沿裁掉。
-            val stripHeight = 18.dp
-            val handleClearance = (frameStyle.handleThicknessDp + 4f).dp
+            // 底部提示胶囊：下沿离外框底边的距离，和顶上「拖动移动」胶囊离外框顶边的距离一样（约 30dp），
+            // 完整露在外框里，不再贴着底边把手被切掉；字在胶囊里上下左右居中（去掉字体内边距）。
+            val stripHeight = 20.dp
+            val edgeGap = 30.dp
             Box(Modifier.absoluteOffset {
-                IntOffset(frame.left.roundToInt(), (frame.bottom - handleClearance.toPx() - stripHeight.toPx()).roundToInt())
+                IntOffset(frame.left.roundToInt(), (frame.bottom - edgeGap.toPx() - stripHeight.toPx()).roundToInt())
             }.size(with(density) { frame.width.toDp() }, stripHeight)
                 .testTag("keyboard-resize-padding-bar"), contentAlignment = Alignment.Center) {
-                // 提示字放在功能键实心色的圆头小条上，不再是半透明裸字。
-                Box(Modifier.clip(RoundedCornerShape(50)).background(functionColor).padding(horizontal = 10.dp, vertical = 1.dp)) {
-                    Text("上下拖动调节底部留白", color = functionTextColor.copy(alpha = 1f), fontSize = 10.sp,
-                        maxLines = 1, softWrap = false)
+                Box(
+                    Modifier.height(stripHeight).clip(RoundedCornerShape(50)).background(functionColor).padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("上下拖动调节底部留白", color = functionTextColor.copy(alpha = 1f), fontSize = 10.sp, lineHeight = 10.sp,
+                        textAlign = TextAlign.Center, maxLines = 1, softWrap = false,
+                        style = LocalTextStyle.current.copy(platformStyle = PlatformTextStyle(includeFontPadding = false)))
                 }
             }
         }
