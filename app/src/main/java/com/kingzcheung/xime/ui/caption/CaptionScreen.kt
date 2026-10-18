@@ -126,6 +126,8 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
     var confirmExit by remember { mutableStateOf(false) }
     var replying by remember { mutableStateOf(false) }
     var writing by remember { mutableStateOf(false) }
+    // 横屏快捷回复是页面里的一条（不是对话框）：返回键只收起它，回到字幕；字幕主界面按返回才退出。
+    androidx.activity.compose.BackHandler(enabled = replying) { replying = false }
     var flipped by remember { mutableStateOf<String?>(null) }
 
     // The navigation bar stays (with its back button); bottom buttons sit above it and the
@@ -294,6 +296,7 @@ private val RAIL_BUTTON = 48.dp
 
 @Composable
 private fun statusOf(controller: CaptionController) = when {
+    controller.micTaken -> MaterialTheme.colorScheme.error to "麦克风被别的应用占着（比如带声音的录屏），这会儿听不到"
     controller.micMuted -> MaterialTheme.colorScheme.error to "手机的麦克风被关了，请家人看一下"
     controller.status == CaptionController.Status.Listening -> MaterialTheme.colorScheme.primary to "正在听 · 只记字，不录音"
     controller.status == CaptionController.Status.Starting -> MaterialTheme.colorScheme.tertiary to controller.message.ifEmpty { "正在准备…" }
@@ -586,6 +589,7 @@ private fun ReplyStrip(controller: CaptionController, onShow: (String) -> Unit, 
     var group by remember { mutableStateOf(0) }
     val groups = CaptionController.PHRASE_GROUPS
     fun say(phrase: String) { controller.addReply(phrase); onShow(phrase) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     val underline = MaterialTheme.colorScheme.onSurface
     CaptionPanel(Modifier.fillMaxWidth(), padding = 8.dp) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -605,12 +609,19 @@ private fun ReplyStrip(controller: CaptionController, onShow: (String) -> Unit, 
                 }
             }
             CaptionButton("自己写", height = 44.dp, fontSize = 17.sp, onClick = onWrite)
-            CaptionButton("紧急：打120", icon = Icons.Rounded.Warning, emphasis = CaptionEmphasis.Danger, height = 44.dp, fontSize = 17.sp) {
-                say(CaptionController.EMERGENCY_TEXT)
-            }
             CaptionButton("收起", height = 44.dp, fontSize = 17.sp, onClick = onClose)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // 和竖屏一样：紧急求助在“回答”这一组里，不单独占位置。
+            if (group == 0) {
+                CaptionButton("紧急：打120", icon = Icons.Rounded.Warning, emphasis = CaptionEmphasis.Danger, height = 52.dp, fontSize = 19.sp) {
+                    say(CaptionController.EMERGENCY_TEXT)
+                }
+                CaptionButton("拨号 120", icon = Icons.Rounded.Call, emphasis = CaptionEmphasis.DangerQuiet, height = 52.dp, fontSize = 19.sp) {
+                    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:120"))
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }
+            }
             for (phrase in groups[group].second) CaptionButton(phrase, height = 52.dp, fontSize = 19.sp) { say(phrase) }
         }
     }
@@ -619,9 +630,12 @@ private fun ReplyStrip(controller: CaptionController, onShow: (String) -> Unit, 
 @OptIn(ExperimentalFoundationApi::class)
 private fun Modifier.combinedClickableNoRipple(onClick: () -> Unit): Modifier = this.combinedClickable(onClick = onClick)
 
+private const val EMERGENCY_CHOICE = "#emergency" // not a phrase: the 紧急 button in 回答
+private const val DIAL_CHOICE = "#dial"
+
 /**
  * Quick replies. The display card shows the chosen words upright for whoever holds the phone; the
- * flip button turns it around for someone across the table, and an upright line underneath always
+ * words turn around for someone across the table when tapped, and an upright line underneath always
  * says what the other person is seeing. Groups are tabs (underlined), phrases are buttons, and the
  * phrase on screen is marked, so the three never look alike.
  */
@@ -636,7 +650,10 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
     val context = androidx.compose.ui.platform.LocalContext.current
     val emergency = text == CaptionController.EMERGENCY_TEXT
     // A phrase is shown at once and kept in the conversation for the family.
-    fun say(phrase: String) { text = phrase; controller.addReply(phrase) }
+    fun say(phrase: String) {
+        if (phrase == text) { text = ""; flipped = false; return }
+        text = phrase; controller.addReply(phrase)
+    }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // 比例：给对方看的大字卡片占剩下的全部高度；其余都是统一的 52 dp 小一号按钮，放在玻璃面板里。
         // 不透明底：玻璃主题下页面本身是透的，回话页不能透出后面的字幕。
@@ -645,7 +662,6 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
             .padding(horizontal = CaptionStyle.Edge, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("快捷回复", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                CaptionButton("返回", height = 48.dp, fontSize = 18.sp, onClick = onDismiss)
             }
             // The display card: upright by default; flipped only on request.
             CaptionPanel(Modifier.weight(1f).fillMaxWidth()) {
@@ -655,13 +671,14 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                     Text(when {
                         flipped && text.isNotEmpty() -> "对方看到：$text"
                         flipped -> "给对面的人看（已倒过来）"
+                        text.isNotEmpty() -> "点一下大字，倒过来给对面看"
                         else -> "屏幕上显示"
                     }, fontSize = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    CaptionButton(if (flipped) "转回来" else "倒过来给对面看", height = 48.dp, fontSize = 18.sp,
-                        icon = Icons.Rounded.ScreenRotation) { flipped = !flipped }
+
                 }
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(CaptionStyle.Corner))
+                    .clickable(enabled = text.isNotEmpty()) { flipped = !flipped }
                     .background(if (emergency) MaterialTheme.colorScheme.error.copy(alpha = .9f) else Color.Transparent),
                     contentAlignment = Alignment.Center) {
                     // 卡片矮时（小屏、横屏）字跟着缩，至少两行写得下，不被切掉。
@@ -674,17 +691,6 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                             else -> MaterialTheme.colorScheme.onSurface
                         },
                         modifier = Modifier.graphicsLayer { rotationZ = turn }.padding(8.dp))
-                }
-            }
-            // Emergency: always visible; shows the request and opens the dialer with 120 typed in (still needs a press to call).
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CaptionButton("紧急：帮我打120", Modifier.weight(1f), icon = Icons.Rounded.Warning, emphasis = CaptionEmphasis.Danger,
-                    height = 52.dp, fontSize = 19.sp) {
-                    say(CaptionController.EMERGENCY_TEXT); flipped = true
-                }
-                CaptionButton("拨号 120", icon = Icons.Rounded.Call, emphasis = CaptionEmphasis.DangerQuiet, height = 52.dp, fontSize = 19.sp) {
-                    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:120"))
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 }
             }
             // 输入框、分类标签、常用的话、清空/保存同在一块玻璃面板里，颜色都取自键盘主题。
@@ -721,18 +727,33 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                     flingBehavior = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(pager, snapPositionalThreshold = .33f),
                     verticalAlignment = Alignment.Top) { page ->
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        val phrases = groups[page].second
+                        // 回答组里带上紧急求助：不再单独占一排屏幕。
+                        val phrases = if (page == 0) listOf(EMERGENCY_CHOICE, DIAL_CHOICE) + groups[page].second else groups[page].second
                         // 这一组里有长句就少分一列，两行内写得下。
-                        val long = phrases.any { it.length > 5 }
+                        val long = groups[page].second.any { it.length > 5 }
                         val columns = (if (maxWidth >= 600.dp) 4 else 3) - if (long) 1 else 0
                         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             for (row in phrases.chunked(columns)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     for (phrase in row) {
                                         // The phrase on screen is filled and ticked; the rest are plain.
-                                        CaptionButton(if (phrase == text) "✓ $phrase" else phrase, Modifier.weight(1f), height = 52.dp,
-                                            fontSize = 18.sp, maxLines = 2,
-                                            emphasis = if (phrase == text) CaptionEmphasis.Primary else CaptionEmphasis.Normal) { say(phrase) }
+                                        when (phrase) {
+                                            // 和其他话同样宽的格子里要写得下：不放图标，红底就是紧急。
+                                            EMERGENCY_CHOICE -> CaptionButton("紧急求助", Modifier.weight(1f),
+                                                emphasis = CaptionEmphasis.Danger, height = 52.dp, fontSize = 17.sp) {
+                                                if (text != CaptionController.EMERGENCY_TEXT) { say(CaptionController.EMERGENCY_TEXT); flipped = true }
+                                                else say(CaptionController.EMERGENCY_TEXT)
+                                            }
+                                            DIAL_CHOICE -> CaptionButton("拨打120", Modifier.weight(1f),
+                                                emphasis = CaptionEmphasis.DangerQuiet, height = 52.dp, fontSize = 17.sp) {
+                                                runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:120"))
+                                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                                            }
+                                            // The phrase on screen is filled and ticked; tap it again to take it away.
+                                            else -> CaptionButton(if (phrase == text) "✓ $phrase" else phrase, Modifier.weight(1f), height = 52.dp,
+                                                fontSize = 18.sp, maxLines = 2,
+                                                emphasis = if (phrase == text) CaptionEmphasis.Primary else CaptionEmphasis.Normal) { say(phrase) }
+                                        }
                                     }
                                     repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                                 }
@@ -741,7 +762,7 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CaptionButton("清空", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp) { text = ""; flipped = false }
+                    CaptionButton("返回", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp, onClick = onDismiss)
                     CaptionButton("保存到对话", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp) { if (text.isNotBlank()) controller.addReply(text) }
                 }
             }
