@@ -34,8 +34,6 @@ MODELS = {
     'zip-2026-stream-ctc': (SHARED/'zipformer-large-streaming', ['zh','en']),
     'zip-2026-xl-ctc': (SHARED/'zipformer-xlarge', ['zh','en']),
     'funasr-nano': (SHARED/'sherpa-onnx-funasr-nano-int8-2025-12-30', ['zh','ja','en']),
-    'dolphin-base': (Path('D:/CyIME-Data/speech-lab/models/dolphin-base-int8'), ['zh']),
-    'telespeech': (Path('D:/CyIME-Data/speech-lab/models/telespeech-ctc-int8'), ['zh']),
 }
 
 
@@ -69,12 +67,6 @@ def worker(a):
     elif a.model=='zip-2026-stream-rnnt':
         files=[x+'-chunk-16-left-64.onnx' for x in ['encoder','decoder','joiner']]+['data/tokens.txt']
         recognizer=so.OnlineRecognizer.from_transducer(encoder=path(files[0]),decoder=path(files[1]),joiner=path(files[2]),tokens=path(files[3]),num_threads=2,enable_endpoint_detection=False)
-    elif a.model=='dolphin-base':
-        files=['model.int8.onnx','tokens.txt']
-        recognizer=so.OfflineRecognizer.from_dolphin_ctc(model=path(files[0]),tokens=path(files[1]),num_threads=2)
-    elif a.model=='telespeech':
-        files=['model.int8.onnx','tokens.txt']
-        recognizer=so.OfflineRecognizer.from_telespeech_ctc(model=path(files[0]),tokens=path(files[1]),num_threads=2)
     elif a.model=='zip-2026-xl-ctc':
         files=['ctc.int8.onnx','data/tokens.txt']
         recognizer=so.OfflineRecognizer.from_zipformer_ctc(model=path(files[0]),tokens=path(files[1]),num_threads=2)

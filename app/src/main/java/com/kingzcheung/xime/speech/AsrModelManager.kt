@@ -83,8 +83,6 @@ class AsrModelManager(private val context: Context) {
         val mode: String,
         val first: AsrModelInfo?, val firstDir: File?, val secondDir: File?,
         val recognitionLanguage: String = "auto",
-        /** Second-pass model in [secondDir]: SenseVoice, or a Chinese dialect pass ([DialectCorrection]). */
-        val second: String = SpeechModelCatalog.SENSEVOICE,
     ) {
         val ready: Boolean get() = (first == null || firstDir != null && first.files.isNotEmpty() && first.files.all { File(firstDir, it).let { f -> f.isFile && f.length() > 0 } }) &&
             (secondDir == null || listOf("model.int8.onnx", "tokens.txt").all { File(secondDir, it).let { f -> f.isFile && f.length() > 0 } })
@@ -109,11 +107,6 @@ class AsrModelManager(private val context: Context) {
         fun dir(id: String): File {
             ModelStorage.migrateLegacyForModel(context, id)
             return ModelStorage.getModelDir(context, id)
-        }
-        require(!DialectCorrection.isDialect(mode)) { "方言模型只能用于二次校正：$mode" }
-        DialectCorrection.primary(mode)?.let { primary ->
-            val corrector = checkNotNull(DialectCorrection.corrector(mode))
-            return Selection(mode, getAsrModels().first { it.id == primary }, dir(primary), dir(corrector), languageId, corrector)
         }
         val firstId = when (mode) {
             SpeechModelCatalog.TWO_PASS -> SpeechModelCatalog.PARAFORMER
@@ -144,7 +137,14 @@ class AsrModelManager(private val context: Context) {
     /** Language choices are independent. Legacy global choices remain a read-only migration fallback. */
     fun getSelectedModelId(language: InputLanguage): String {
         require(language in InputLanguage.supported) { "当前方案未标注语言，请先选择输入语言" }
-        preferences.getString("selected_model_${language.id}", null)?.let { return it }
+        preferences.getString("selected_model_${language.id}", null)?.let { stored ->
+            val mode = SpeechModelSelection.withoutRetiredCorrector(stored)
+            if (mode != stored) {
+                preferences.edit().putString("selected_model_${language.id}", mode).apply()
+                SpeechModelSelection.retiredCorrectors.forEach { ModelStorage.getModelDir(context, it).deleteRecursively() }
+            }
+            return mode
+        }
         val legacy = getSelectedModelId()
         if (SpeechLanguages.supports(legacy, language)) return withDefaultCorrection(legacy)
         return runCatching { SpeechLanguages.select(language, legacy) { selection(it, language).ready } }.getOrElse {
