@@ -664,8 +664,11 @@ internal fun ToolbarActionButton(
         else -> tint
     }
     // 大屏参照 Gboard：整格都可点，按下/开启的底色是随格宽向两边拉长的胶囊；窄格仍是圆形。
+    val listening = voiceActive && voiceState == RecognitionState.LISTENING
     BoxWithConstraints(
         modifier.widthIn(min = 36.dp).height(40.dp)
+            // 音量光圈画在不裁切的外层：始终正圆、比图标大，宽格也不会被拉成胶囊。
+            .then(if (listening) Modifier.microphoneLevelHalo({ voiceLevel }, visuals.accentColor) else Modifier)
             .semantics {
                 selected = action.active
                 if (voiceActive) stateDescription = if (voiceState == RecognitionState.PROCESSING) "正在转录" else "正在聆听，点击结束"
@@ -674,25 +677,14 @@ internal fun ToolbarActionButton(
         contentAlignment = Alignment.Center,
     ) {
     Box(
-        Modifier.size(toolbarPillSize(maxWidth))
+        Modifier.size(if (listening) androidx.compose.ui.unit.DpSize(36.dp, 36.dp) else toolbarPillSize(maxWidth))
             .clip(CircleShape)
-            .background(glassActiveFill ?: visuals.glassControlBackground?.let { fill ->
+            .background(if (listening) Color.Transparent else glassActiveFill ?: visuals.glassControlBackground?.let { fill ->
                 if (action.active) androidx.compose.ui.graphics.lerp(fill, visuals.accentColor, 0.18f).copy(alpha = fill.alpha)
                 else fill.copy(alpha = fill.alpha * pressAlpha)
             } ?: if (action.active) visuals.accentColor.copy(alpha = 0.28f)
                 else if (visuals.isDarkTheme) Color.White.copy(alpha = 0.25f * pressAlpha)
-                else Color(0xFFE0E0E0).copy(alpha = pressAlpha))
-            .drawBehind {
-                if (voiceActive && voiceState == RecognitionState.LISTENING) {
-                    // 静音时内圈约为外圈的 45%，满音量时铺满外圈；宽胶囊按同一比例横竖一起缩放。
-                    val scale = 0.45f + 0.55f * voiceLevel
-                    val inner = androidx.compose.ui.geometry.Size(size.width * scale, size.height * scale)
-                    drawRoundRect(visuals.accentColor.copy(alpha = 0.32f + 0.28f * voiceLevel),
-                        topLeft = androidx.compose.ui.geometry.Offset((size.width - inner.width) / 2f, (size.height - inner.height) / 2f),
-                        size = inner,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(inner.height / 2f))
-                }
-            },
+                else Color(0xFFE0E0E0).copy(alpha = pressAlpha)),
         contentAlignment = Alignment.Center,
     ) {
         if (voiceActive && voiceState == RecognitionState.PROCESSING) {
@@ -703,11 +695,20 @@ internal fun ToolbarActionButton(
     }
 }
 
-/** 麦克风峰值（0~1 线性）转成 0~1 的显示音量：-45 dB 以下当静音，-5 dB 以上算满。 */
+/** 麦克风峰值（0~1 线性）转成 0~1 的显示音量：-50 dB 以下当静音，-15 dB 以上算满，小声说话也能明显撑开。 */
 internal fun microphoneLevel(peak: Float): Float {
     if (peak <= 0f) return 0f
     val db = 20f * kotlin.math.log10(peak.coerceAtMost(1f))
-    return ((db + 45f) / 40f).coerceIn(0f, 1f)
+    return ((db + 50f) / 35f).coerceIn(0f, 1f)
+}
+
+/**
+ * 麦克风音量光圈：以控件中心画正圆，静音 30dp（比 22dp 图标大一圈），满音量 42dp。
+ * 展开键盘的工具栏和收起后的悬浮条共用，外观一致。
+ */
+internal fun Modifier.microphoneLevelHalo(level: () -> Float, color: Color): Modifier = drawBehind {
+    val value = level()
+    drawCircle(color.copy(alpha = 0.30f + 0.30f * value), radius = (30.dp.toPx() + 12.dp.toPx() * value) / 2f)
 }
 
 @Composable
