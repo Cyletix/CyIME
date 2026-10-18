@@ -1,10 +1,9 @@
 # Rime schema
-# 小鹤双拼音节先转换为双拼码，再派生十四键代表码；原双拼码仍可精确输入。
-# 双拼映射来自 rime/rime-double-pinyin 与随包 rime-ice，使用独立 prism。
+# 小写编码为精确字母，大写代表合并键；逐位派生支持点击与滑动混合输入。
 schema:
   schema_id: double_pinyin_flypy_14jian
   name: 小鹤双拼
-  version: "1.0"
+  version: "1.1"
   language: zh
   input_scheme: double_pinyin
   description: |
@@ -44,9 +43,12 @@ engine:
     - uniquifier
 
 speller:
-  alphabet: zyxwvutsrqponmlkjihgfedcba
+  alphabet: zyxwvutsrqponmlkjihgfedcbaQETUOADGJZCB
   delimiter: " '"
   algebra:
+    # 词库里的单个大写字母音节（A–Z，供 26 键直接打出字母）与合并键的大写编码同形，
+    # 会被当成完整拼写，使同一输入里的简拼全部被剪掉（zdky 只出 ZDJT）。14 键用不到它们。
+    - erase/^[A-Z]$/
     - erase/^xx$/
     - derive/^([jqxy])u$/$1v/
     - derive/^([aoe])([ioun])$/$1$1$2/
@@ -77,14 +79,39 @@ speller:
     - xform/ui$/Ⓥ/
     - xform/in$/Ⓑ/
     - xlit/ⓆⓌⓇⓉⓎⓊⒾⓄⓅⓈⒹⒻⒼⒽⒿⓀⓁⓏⓍⒸⓋⒷⓃⓂ/qwrtyuiopsdfghjklzxcvbnm/
-    - derive/(.*)/\U$1/
-    - xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qqeettuuooaaddggjjlzzccbbm/
+    # 每一位可独立为精确字母或合并键，不将精确字母重新映射成歧义编码。
+    - derive/^(.{0})[qw](.*)$/$1Q$2/
+    - derive/^(.{0})[er](.*)$/$1E$2/
+    - derive/^(.{0})[ty](.*)$/$1T$2/
+    - derive/^(.{0})[ui](.*)$/$1U$2/
+    - derive/^(.{0})[op](.*)$/$1O$2/
+    - derive/^(.{0})[as](.*)$/$1A$2/
+    - derive/^(.{0})[df](.*)$/$1D$2/
+    - derive/^(.{0})[gh](.*)$/$1G$2/
+    - derive/^(.{0})[jk](.*)$/$1J$2/
+    - derive/^(.{0})[zx](.*)$/$1Z$2/
+    - derive/^(.{0})[cv](.*)$/$1C$2/
+    - derive/^(.{0})[bn](.*)$/$1B$2/
+    - derive/^(.{1})[qw](.*)$/$1Q$2/
+    - derive/^(.{1})[er](.*)$/$1E$2/
+    - derive/^(.{1})[ty](.*)$/$1T$2/
+    - derive/^(.{1})[ui](.*)$/$1U$2/
+    - derive/^(.{1})[op](.*)$/$1O$2/
+    - derive/^(.{1})[as](.*)$/$1A$2/
+    - derive/^(.{1})[df](.*)$/$1D$2/
+    - derive/^(.{1})[gh](.*)$/$1G$2/
+    - derive/^(.{1})[jk](.*)$/$1J$2/
+    - derive/^(.{1})[zx](.*)$/$1Z$2/
+    - derive/^(.{1})[cv](.*)$/$1C$2/
+    - derive/^(.{1})[bn](.*)$/$1B$2/
 
 translator:
   dictionary: rime_ice
   prism: double_pinyin_flypy_14jian
   spelling_hints: 8
   always_show_comments: true
+  preedit_format:
+    - xlit/QETUOADGJZCB/qetuoadgjzcb/
   # 合并码无法直接反算唯一音节；保留真实双拼编码，候选注释显示词库读音。
   # 不能套用二十六键 preedit_format 将合并代表字母误显示成另一音节。
 

@@ -1,15 +1,9 @@
 # Rime schema
-# encoding: utf-8
-# 拼音 14 键（与 pinyin_simp 共享字典）
-# 合并键布局：qw/er/ty/ui/op、as/df/gh/jk/l、zx/cv/bn/m
-# 前端点击合并键只发代表字母（组内第一个字母），
-# 由 speller/algebra 把词库拼音码派生出"按键序列码"，靠词库消歧：
-#   derive/(.*)/\U$1/   先派生大写副本（不污染原始小写码）
-#   xlit/大写字母/代表字母/  再把大写副本逐位映射为按键序列
+# 小写编码为精确字母，大写代表合并键；逐位派生支持点击与滑动混合输入。
 schema:
   schema_id: pinyin_14jian
   name: 中文14键
-  version: "1.0"
+  version: "1.1"
   description: |
     拼音 14 键方案，字母两两合并（qw/er/ty/ui/op、as/df/gh/jk/l、zx/cv/bn/m），
     键宽更大误触更少，与九键同为词库消歧。
@@ -47,9 +41,12 @@ engine:
     - lua_translator@*uuid
 
 speller:
-  alphabet: zyxwvutsrqponmlkjihgfedcba
+  alphabet: zyxwvutsrqponmlkjihgfedcbaQETUOADGJZCB
   delimiter: " '"
   algebra:
+    # 词库里的单个大写字母音节（A–Z，供 26 键直接打出字母）与合并键的大写编码同形，
+    # 会被当成完整拼写，使同一输入里的简拼全部被剪掉（zdky 只出 ZDJT）。14 键用不到它们。
+    - erase/^[A-Z]$/
     # 简拼与容错规则（与 pinyin_simp 一致）
     - abbrev/^([a-z]).+$/$1/
     - abbrev/^([zcs]h).+$/$1/
@@ -63,10 +60,91 @@ speller:
     - derive/ong$/on/
     - derive/ao$/oa/
     - derive/([iu])a(o|ng?)$/a$1$2/
-    # 合并键"按键序列码"派生：先把每条码复制为大写（不污染原始小写码），
-    # 再由 xlit 逐位映射为该键的代表字母（与 xime.yaml qwerty_14 分组一一对应）
-    - derive/(.*)/\U$1/
-    - xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qqeettuuooaaddggjjlzzccbbm/
+    # 每一位可独立为精确字母或合并键，不将精确字母重新映射成歧义编码。
+    - derive/^(.{0})[qw](.*)$/$1Q$2/
+    - derive/^(.{0})[er](.*)$/$1E$2/
+    - derive/^(.{0})[ty](.*)$/$1T$2/
+    - derive/^(.{0})[ui](.*)$/$1U$2/
+    - derive/^(.{0})[op](.*)$/$1O$2/
+    - derive/^(.{0})[as](.*)$/$1A$2/
+    - derive/^(.{0})[df](.*)$/$1D$2/
+    - derive/^(.{0})[gh](.*)$/$1G$2/
+    - derive/^(.{0})[jk](.*)$/$1J$2/
+    - derive/^(.{0})[zx](.*)$/$1Z$2/
+    - derive/^(.{0})[cv](.*)$/$1C$2/
+    - derive/^(.{0})[bn](.*)$/$1B$2/
+    - derive/^(.{1})[qw](.*)$/$1Q$2/
+    - derive/^(.{1})[er](.*)$/$1E$2/
+    - derive/^(.{1})[ty](.*)$/$1T$2/
+    - derive/^(.{1})[ui](.*)$/$1U$2/
+    - derive/^(.{1})[op](.*)$/$1O$2/
+    - derive/^(.{1})[as](.*)$/$1A$2/
+    - derive/^(.{1})[df](.*)$/$1D$2/
+    - derive/^(.{1})[gh](.*)$/$1G$2/
+    - derive/^(.{1})[jk](.*)$/$1J$2/
+    - derive/^(.{1})[zx](.*)$/$1Z$2/
+    - derive/^(.{1})[cv](.*)$/$1C$2/
+    - derive/^(.{1})[bn](.*)$/$1B$2/
+    - derive/^(.{2})[qw](.*)$/$1Q$2/
+    - derive/^(.{2})[er](.*)$/$1E$2/
+    - derive/^(.{2})[ty](.*)$/$1T$2/
+    - derive/^(.{2})[ui](.*)$/$1U$2/
+    - derive/^(.{2})[op](.*)$/$1O$2/
+    - derive/^(.{2})[as](.*)$/$1A$2/
+    - derive/^(.{2})[df](.*)$/$1D$2/
+    - derive/^(.{2})[gh](.*)$/$1G$2/
+    - derive/^(.{2})[jk](.*)$/$1J$2/
+    - derive/^(.{2})[zx](.*)$/$1Z$2/
+    - derive/^(.{2})[cv](.*)$/$1C$2/
+    - derive/^(.{2})[bn](.*)$/$1B$2/
+    - derive/^(.{3})[qw](.*)$/$1Q$2/
+    - derive/^(.{3})[er](.*)$/$1E$2/
+    - derive/^(.{3})[ty](.*)$/$1T$2/
+    - derive/^(.{3})[ui](.*)$/$1U$2/
+    - derive/^(.{3})[op](.*)$/$1O$2/
+    - derive/^(.{3})[as](.*)$/$1A$2/
+    - derive/^(.{3})[df](.*)$/$1D$2/
+    - derive/^(.{3})[gh](.*)$/$1G$2/
+    - derive/^(.{3})[jk](.*)$/$1J$2/
+    - derive/^(.{3})[zx](.*)$/$1Z$2/
+    - derive/^(.{3})[cv](.*)$/$1C$2/
+    - derive/^(.{3})[bn](.*)$/$1B$2/
+    - derive/^(.{4})[qw](.*)$/$1Q$2/
+    - derive/^(.{4})[er](.*)$/$1E$2/
+    - derive/^(.{4})[ty](.*)$/$1T$2/
+    - derive/^(.{4})[ui](.*)$/$1U$2/
+    - derive/^(.{4})[op](.*)$/$1O$2/
+    - derive/^(.{4})[as](.*)$/$1A$2/
+    - derive/^(.{4})[df](.*)$/$1D$2/
+    - derive/^(.{4})[gh](.*)$/$1G$2/
+    - derive/^(.{4})[jk](.*)$/$1J$2/
+    - derive/^(.{4})[zx](.*)$/$1Z$2/
+    - derive/^(.{4})[cv](.*)$/$1C$2/
+    - derive/^(.{4})[bn](.*)$/$1B$2/
+    - derive/^(.{5})[qw](.*)$/$1Q$2/
+    - derive/^(.{5})[er](.*)$/$1E$2/
+    - derive/^(.{5})[ty](.*)$/$1T$2/
+    - derive/^(.{5})[ui](.*)$/$1U$2/
+    - derive/^(.{5})[op](.*)$/$1O$2/
+    - derive/^(.{5})[as](.*)$/$1A$2/
+    - derive/^(.{5})[df](.*)$/$1D$2/
+    - derive/^(.{5})[gh](.*)$/$1G$2/
+    - derive/^(.{5})[jk](.*)$/$1J$2/
+    - derive/^(.{5})[zx](.*)$/$1Z$2/
+    - derive/^(.{5})[cv](.*)$/$1C$2/
+    - derive/^(.{5})[bn](.*)$/$1B$2/
+    - derive/^(.{6})[qw](.*)$/$1Q$2/
+    - derive/^(.{6})[er](.*)$/$1E$2/
+    - derive/^(.{6})[ty](.*)$/$1T$2/
+    - derive/^(.{6})[ui](.*)$/$1U$2/
+    - derive/^(.{6})[op](.*)$/$1O$2/
+    - derive/^(.{6})[as](.*)$/$1A$2/
+    - derive/^(.{6})[df](.*)$/$1D$2/
+    - derive/^(.{6})[gh](.*)$/$1G$2/
+    - derive/^(.{6})[jk](.*)$/$1J$2/
+    - derive/^(.{6})[zx](.*)$/$1Z$2/
+    - derive/^(.{6})[cv](.*)$/$1C$2/
+    - derive/^(.{6})[bn](.*)$/$1B$2/
 
 translator:
   dictionary: rime_ice
@@ -75,6 +153,7 @@ translator:
     - user_simp
   spelling_hints: 8
   preedit_format:
+    - xlit/QETUOADGJZCB/qetuoadgjzcb/
     - xform/([nl])v/$1ü/
     - xform/([nl])ue/$1üe/
     - xform/([jqxy])v/$1u/
