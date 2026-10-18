@@ -19,13 +19,13 @@ internal data class KeyboardAspectLimits(val min: Float, val max: Float) {
         // T9's three centre columns occupy 3.4 of the total five weight units.
         val T9 = KeyboardAspectLimits((5f * 3f / 3.4f) / 4f * 0.8f,
             (5f * 3f / 3.4f) / 4f * 1.8f)
-        fun forLayout(kind: LayoutKind, split: Boolean = false): KeyboardAspectLimits = when (kind) {
+        fun forLayout(kind: LayoutKind, split: Boolean = false, splitGapFraction: Float = 0.1f): KeyboardAspectLimits = when (kind) {
             LayoutKind.T9 -> T9
             LayoutKind.KANA_KEYPAD, LayoutKind.STROKE_KEYPAD,
             LayoutKind.NUMBER, LayoutKind.HANDWRITING -> Keypad
-            // The actual split layout reserves 10% for its centre gap.
-            LayoutKind.ALPHABETIC -> if (split) KeyboardAspectLimits(Letters.min / 0.9f, Letters.max / 0.9f) else Letters
-            LayoutKind.MERGED -> Letters
+            // The split layout gives its centre gap to neither half.
+            LayoutKind.ALPHABETIC, LayoutKind.MERGED -> if (split) (1f - splitGapFraction.coerceIn(0f, 0.9f)).let {
+                KeyboardAspectLimits(Letters.min / it, Letters.max / it) } else Letters
         }
     }
 }

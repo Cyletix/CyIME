@@ -7,6 +7,7 @@ import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.settings.KeyEffectPreferences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -16,6 +17,17 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
 class KeyboardInputPreferencesTest {
+    @Test fun `kana hints persist independently of symbol direction and cursor gestures`() {
+        val before = KeyboardInputPreferences.read(context)
+        assertEquals(false, before.kanaDirectionHints)
+        for (enabled in listOf(true, false)) {
+            before.copy(kanaDirectionHints = enabled).save(context)
+            val after = KeyboardInputPreferences.read(context)
+            assertEquals(enabled, after.kanaDirectionHints)
+            assertEquals(before, after.copy(kanaDirectionHints = false))
+        }
+    }
+
     @Test fun `symbol direction defaults to pulling into key and persists either habit`() {
         assertEquals(false, KeyboardInputPreferences.read(context).reverseSymbolSwipe)
         for (reversed in listOf(true, false)) {
@@ -37,6 +49,14 @@ class KeyboardInputPreferencesTest {
         assertEquals(previous.cursorGesture, restored.cursorGesture)
         assertEquals(previous.symbolInputMode, restored.symbolInputMode)
         assertEquals(previous.neighborCorrection, restored.neighborCorrection)
+    }
+
+    @Test fun `every saved setting refreshes the keyboard already on screen`() {
+        // 设置页关掉滑行输入或九键拂动后，正在显示的键盘必须立即改用新值，不能等输入法重启。
+        KeyboardInputPreferences().copy(glideTyping = false, t9FlickLetters = true).save(context)
+        val unwatched = values.keys - KeyboardInputPreferences.watchedKeys
+        assertTrue("save() 写入但键盘不监听：$unwatched", unwatched.isEmpty())
+        assertTrue("glide_typing" in values && "t9_flick_letters" in values)
     }
 
     private val context = mock<Context>()
@@ -101,9 +121,17 @@ class KeyboardInputPreferencesTest {
         assertEquals(FrostedGlassConfig(), KeyboardInputPreferences.read(context).frostedGlass)
         val effect = FrostedGlassConfig(true, 18f, 0.7f, 0.3f)
         FrostedGlassPreferences.save(context, effect)
-        assertEquals(effect, KeyboardInputPreferences.read(context).frostedGlass)
+        // 保存的是用户值；键盘实际使用的值只会为可读性加深，不会更透。
+        fun assertKept() {
+            assertEquals(effect, FrostedGlassPreferences.read(context))
+            val shown = KeyboardInputPreferences.read(context).frostedGlass
+            assertEquals(effect.blurRadiusDp, shown.blurRadiusDp, 0f)
+            assertTrue(shown.enabled && shown.backgroundOpacity >= effect.backgroundOpacity &&
+                shown.keyOpacity >= effect.keyOpacity)
+        }
+        assertKept()
         KeyboardInputPreferences(spaceHold = SpaceHoldAction.REPEAT).save(context)
-        assertEquals(effect, KeyboardInputPreferences.read(context).frostedGlass)
+        assertKept()
         assertEquals(false, KeyboardInputPreferences.read(context).keyGlowEnabled)
     }
 
@@ -113,11 +141,12 @@ class KeyboardInputPreferencesTest {
         val light = FrostedGlassConfig(true, 11f, 0.24f, 0.84f)
         FrostedGlassPreferences.save(context, dark, true)
         FrostedGlassPreferences.save(context, light, false)
-        assertEquals(dark, KeyboardInputPreferences.read(context, true).frostedGlass)
+        val swappedDark = dark.copy(backgroundOpacity = light.keyOpacity, keyOpacity = light.backgroundOpacity)
+        assertEquals(swappedDark, KeyboardInputPreferences.read(context, true).frostedGlass)
         assertEquals(light, KeyboardInputPreferences.read(context, false).frostedGlass)
         values["dark_mode"] = 1
         assertEquals(light, KeyboardInputPreferences.read(context, false).frostedGlass)
-        assertEquals(dark, KeyboardInputPreferences.read(context).frostedGlass)
+        assertEquals(swappedDark, KeyboardInputPreferences.read(context).frostedGlass)
     }
 
     @Test
@@ -138,7 +167,8 @@ class KeyboardInputPreferencesTest {
             assertEquals(seconds, restored.cursorHoldSeconds, 0f)
             assertEquals(tenth * 100L, restored.spaceHoldDelayMs)
             for (action in listOf(SpaceHoldAction.REPEAT, SpaceHoldAction.VOICE_TOGGLE)) {
-                assertEquals(300L, restored.copy(spaceHold = action, cursorGesture = CursorGestureMode.NONE).spaceHoldDelayMs)
+                assertEquals("every space hold action uses the space hold delay", tenth * 100L,
+                    restored.copy(spaceHold = action, cursorGesture = CursorGestureMode.NONE).spaceHoldDelayMs)
                 assertEquals("Space cursor override uses its configured delay", tenth * 100L,
                     restored.copy(spaceHold = action, cursorGesture = CursorGestureMode.SPACE).spaceHoldDelayMs)
             }
@@ -272,4 +302,22 @@ class KeyboardInputPreferencesTest {
         assertEquals(false, KeyboardInputPreferences.read(context).keyAnimationEnabled)
     }
 
+    @Test fun `language key and space have separate hold delays with their own defaults`() {
+        val defaults = KeyboardInputPreferences()
+        assertEquals(0.15f, defaults.languageMenuHoldSeconds, 0f)
+        assertEquals(200L, defaults.spaceHoldDelayMs)
+        KeyboardInputPreferences(languageMenuHoldSeconds = 0.35f, cursorHoldSeconds = 0.6f).save(context)
+        val restored = KeyboardInputPreferences.read(context)
+        assertEquals(0.35f, restored.languageMenuHoldSeconds, 0f)
+        assertEquals(600L, restored.spaceHoldDelayMs)
+    }
+
+    @Test fun `stored old language hold default migrates to new default but custom values stay`() {
+        values["language_key_hold_seconds"] = 0.1f
+        assertEquals(0.15f, KeyboardInputPreferences.read(context).languageMenuHoldSeconds, 0f)
+        values["language_key_hold_seconds"] = 0.35f
+        assertEquals(0.35f, KeyboardInputPreferences.read(context).languageMenuHoldSeconds, 0f)
+        KeyboardInputPreferences(languageMenuHoldSeconds = 0.1f).save(context)
+        assertEquals(0.1f, KeyboardInputPreferences.read(context).languageMenuHoldSeconds, 0f)
+    }
 }

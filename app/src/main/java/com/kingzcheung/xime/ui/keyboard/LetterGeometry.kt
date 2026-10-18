@@ -13,6 +13,9 @@ class LetterGeometry(private val publish: (String) -> Unit) {
         val measured = LetterKeyRect(rect.left, rect.top, rect.width, rect.height)
         if (keys.put(key, measured) != measured) publish(encodeLetterNeighbors(keys))
     }
+
+    /** 当前各字母键的根坐标矩形（滑行识别用）。 */
+    fun snapshot(): Map<Char, LetterKeyRect> = keys.toMap()
 }
 
 val LocalLetterGeometry = staticCompositionLocalOf<LetterGeometry?> { null }

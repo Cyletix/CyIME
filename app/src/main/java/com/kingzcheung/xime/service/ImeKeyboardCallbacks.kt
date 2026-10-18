@@ -50,27 +50,46 @@ internal fun rememberImeKeyboardCallbacks(
 ): KeyboardCallbacks {
     val view = LocalView.current
     val preeditEditor = remember(service) { ImePreeditEditor(service) }
+    val syllableSelector = remember(service) { ImePinyinSyllableSelector(service) }
     return remember(floatingMinY, state.isFloatingMode, effectiveScreenH, state.inputSessionId, state.showKeyboardResize) {
         val floatingDragX = FloatingDragAxis()
         val floatingDragY = FloatingDragAxis()
         KeyboardCallbacks(
             onLetterNeighbors = { schema, encoded -> service.keyRouter.letterNeighbors = schema to encoded },
+            onGlideWord = service.keyRouter::commitGlideWord,
             inputAdmissionTicket = { if (service.keyRouter.hasPendingCandidateCommit) null else service.inputReadiness.ticket() },
             captureInputContext = service.keyRouter::captureInputContext,
+            t9LeftContext = {
+                if (service.candidateState.value.inputText.isNotEmpty() || service.t9PartialSegments.isNotEmpty() ||
+                    service.isSecretEditor()) null
+                else runCatching { service.currentInputConnection?.getTextBeforeCursor(16, 0)?.toString() }.getOrNull()
+            },
             inputCommands = service.inputCommands,
             onT9UnconsumedDelete = service.keyRouter::processDeleteKey,
             onRetryRejectedCommit = service.keyRouter::retryRejectedCommit,
             onCancelRejectedCommit = service.keyRouter::cancelRejectedCommit,
             onOpenPreeditEditor = preeditEditor::open,
             onLivePreeditEdit = preeditEditor::edit,
+            onRequestPinyinSyllables = syllableSelector::request,
+            onSelectPinyinSyllable = syllableSelector::select,
             onKeyPress = keyPress@{ key, isShifted ->
                 if (service.inputReadiness.ticket() == null) return@keyPress
+                if (service.keyRouter.usesDirectFieldInput) {
+                    service.keyRouter.handleKeyPress(key, isShifted)
+                    return@keyPress
+                }
                 if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke(key) != true) {
                     val numberPanel = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number
                     val separator = key == "'" && service.candidateState.value.isComposing && !service.uiState.value.isAsciiMode
                     if (!numberPanel && !separator && isLiteralPunctuation(key)) {
                         service.textCommit.commitLiteralText(key)
-                    } else service.keyRouter.handleKeyPress(key, isShifted)
+                    } else {
+                        val mergedKey = com.kingzcheung.xime.rime.MergedLetterInput.isGroup(key,
+                            !service.uiState.value.isAsciiMode &&
+                            service.uiState.value.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14)
+                        service.keyRouter.handleKeyPress(if (mergedKey) key.take(1) else key, isShifted,
+                            mergedKey = mergedKey)
+                    }
                 }
             },
             onJapaneseKanaAction = kana@{ action ->
@@ -175,7 +194,6 @@ internal fun rememberImeKeyboardCallbacks(
             onCommitText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text) },
             onCommitExactText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text, preserveWidth = true) },
             onDeleteText = { count -> service.textCommit.deleteClipboardChars(count) },
-            onQuickSend = {},
             onKeyboardResize = {
                 service.keyboardViewModel.closeOverlay()
                 val config = service.resources.configuration
@@ -228,7 +246,7 @@ internal fun rememberImeKeyboardCallbacks(
                 if (!enabled) {
                     // 长按抬手：结束语音会话（提交当前已识别文本并停止识别）
                     service.endVoiceSession()
-                } else if (!service.uiState.value.isVoiceMode) {
+                } else if (!service.uiState.value.isVoiceMode && !service.editorInputPolicy.locksNativeInput) {
                     service.uiState.value = service.uiState.value.copy(
                         isVoiceMode = true,
                         voiceSticky = false,
@@ -251,7 +269,7 @@ internal fun rememberImeKeyboardCallbacks(
                 if (state.isVoiceMode && state.voiceSticky) {
                     // 再次点击麦克风：停止录音并提交转录。
                     service.endVoiceSession()
-                } else if (!state.isVoiceMode) {
+                } else if (!state.isVoiceMode && !service.editorInputPolicy.locksNativeInput) {
                     // 工具栏独立语音组件，不占用空格或改变键盘页面。
                     service.feedbackManager.playKeySound("voice_start")
                     service.uiState.value = service.uiState.value.copy(
@@ -279,7 +297,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.refreshExpandedCandidates()
             },
             onCursorMove = { direction ->
-                if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke("preedit_cursor:$direction") == true) {
+                if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$direction") == true) {
                     service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
                 } else service.schemaController.moveEditorCursor(direction) {
                     service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
@@ -287,7 +305,7 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onCursorMoveVertical = { steps ->
                 val edge = if (steps < 0) "start" else "end"
-                if (service.keyboardCallbacks?.onPreeditKeyInput?.invoke("preedit_cursor:$edge") != true)
+                if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$edge") != true)
                     service.schemaController.moveEditorCursorVertical(steps)
             },
             onGestureAction = { action, value ->
@@ -296,6 +314,11 @@ internal fun rememberImeKeyboardCallbacks(
             onUpdateToolbarButtons = { buttons ->
                 SettingsPreferences.setToolbarButtons(service, buttons)
                 service.uiState.value = service.uiState.value.copy(toolbarButtons = buttons)
+            },
+            onUpdateQuickActions = { layout ->
+                SettingsPreferences.setQuickActions(service, layout)
+                service.uiState.value = service.uiState.value.copy(
+                    toolbarButtons = layout.toolbar, menuButtons = layout.menu)
             },
             onOpenToolPanel = { pluginId -> service.openToolPanel(pluginId) },
             onToolPanelClose = { service.closeToolPanel() },
@@ -405,27 +428,8 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onCommitCandidateBeforeModeChange = {
-                val cs = service.candidateState.value
-                if (cs.pendingEnglishText.isNotEmpty()) {
-                    // 英文直接上屏模式：编码字符已逐字落盘，切模式只需结束本轮输入（清状态），
-                    // 不可再 commitText 否则会重复输出整个词。
-                    service.candidateState.value = cs.copy(
-                        pendingEnglishText = "",
-                        associationCandidates = emptyList()
-                    )
-                } else if (!isT9Schema(service.uiState.value.currentSchemaId)
-                    && cs.isComposing) {
-                    if (cs.candidates.isNotEmpty()) {
-                        if (service.rimeEngine.selectCandidate(0)) {
-                            val text = service.rimeEngine.commit()
-                            if (text.isNotEmpty()) service.commitText(text)
-                        }
-                    } else if (cs.preeditText.isNotEmpty()) {
-                        // 提交原始键入串而非 preeditText：后者现为带回显分隔符的展示串（如 ni'hao），
-                        // 直接上屏会混入分隔符。
-                        service.commitText(cs.inputText)
-                        service.rimeEngine.clearComposition()
-                    }
+                service.keyRouter.postRimeJob {
+                    service.textCommit.commitCompositionAndLiteral()
                 }
             },
             onShowQuickSendForm = {
@@ -438,12 +442,13 @@ internal fun rememberImeKeyboardCallbacks(
                 val current = service.uiState.value
                 service.uiState.value = current.copy(
                     showQuickSendForm = true,
+                    ocrDraft = false,
                     quickSendFormFocused = true,
                     quickSendCodeFocused = false,
                     quickSendEditingItemId = null,
                     quickSendEditingItemText = "",
                     quickSendEditingItemCode = "",
-                    enterKeyText = "确定",
+                    enterKeyText = "换行",
                 )
                 // The floating editor reuses IME input without adding height to the keyboard.
             },
@@ -453,18 +458,29 @@ internal fun rememberImeKeyboardCallbacks(
                 service.keyboardViewModel.closeOverlay()
                 service.uiState.value = service.uiState.value.copy(
                     showQuickSendForm = true,
+                    ocrDraft = false,
                     quickSendFormFocused = true,
                     quickSendCodeFocused = false,
                     quickSendEditingItemId = id,
                     quickSendEditingItemText = text,
                     quickSendEditingItemCode = code,
-                    enterKeyText = "确定",
+                    enterKeyText = "换行",
+                )
+            },
+            onReviewOcrText = { text ->
+                service.closeToolPanel()
+                service.keyboardViewModel.closeOverlay()
+                service.uiState.value = service.uiState.value.copy(
+                    showQuickSendForm = true, ocrDraft = true, quickSendFormFocused = true,
+                    quickSendCodeFocused = false, quickSendEditingItemId = null,
+                    quickSendEditingItemText = text, quickSendEditingItemCode = "", enterKeyText = "换行",
                 )
             },
             onHideQuickSendForm = {
                 android.util.Log.d("QuickSendForm", "onHideQuickSendForm invoked")
                 service.uiState.value = service.uiState.value.copy(
                     showQuickSendForm = false,
+                    ocrDraft = false,
                     quickSendFormFocused = false,
                     quickSendCodeFocused = false,
                     quickSendEditingItemId = null,
@@ -477,13 +493,12 @@ internal fun rememberImeKeyboardCallbacks(
                 service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
             },
             onQuickSendFormFocusChange = { focused: Boolean ->
-                // 聚焦时回车键为"确定"；失焦不改文案——表单仍显示，回车保持"确定"
-                // 语义（提交并关闭，由 handleKeyPress 的 showQuickSendForm 分支保证）。
+                // Draft text always uses a newline key; focus changes never submit the form.
                 // 关闭表单时由 onHideQuickSendForm / onWindowHidden 统一还原"发送"。
                 val s = service.uiState.value
                 service.uiState.value = if (focused) {
                     // 文本框抢回焦点：编码焦点清除，按键输入回到文本框
-                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = false, enterKeyText = "确定")
+                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = false, enterKeyText = "换行")
                 } else {
                     s.copy(quickSendFormFocused = false, quickSendCodeFocused = false)
                 }
@@ -491,8 +506,8 @@ internal fun rememberImeKeyboardCallbacks(
             onQuickSendCodeFocusChange = { focused: Boolean ->
                 val s = service.uiState.value
                 service.uiState.value = if (focused) {
-                    // 编码框获得焦点：同样视为表单聚焦（回车"确定"/按键路由生效）
-                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = true, enterKeyText = "确定")
+                    // 编码框的回车只返回正文，不保存。
+                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = true, enterKeyText = "下一步")
                 } else {
                     s.copy(quickSendCodeFocused = false)
                 }

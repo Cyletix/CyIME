@@ -143,11 +143,8 @@ fun NumberKeyboardLayout(
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
             }
-            .drawWithContent {
-                drawContent()
-                bubbleData?.let { drawSwipeBubble(it) }
-            }
     ) {
+        SwipeBubbleOverlay(bubbleData)
         run {
             CompositionLocalProvider(
                 LocalKeyVisualPadding provides PaddingValues(
@@ -236,7 +233,9 @@ private fun NumberRows(
                     iconColor = specialKeyTextColor, modifier = Modifier.weight(1f).testTag("number-delete-key"),
                     swipeText = "清空", onSwipe = { onKeyPress("clear_composition") },
                     onLongClick = { onKeyPress("delete") }, onPress = { onKeyPressDown?.invoke("delete") },
-                    swipeUpLabel = "上滑清空", swipeDownLabel = "下滑撤回",
+                    followSymbolSwipeDirection = true,
+                    upFeedback = KeyFlickFeedback.DELETE,
+                    swipeUpLabel = "上滑清空", downFeedback = KeyFlickFeedback.UNDO, swipeDownLabel = "下滑撤回",
                     onSwipeUp = { onKeyPress("clear_all") }, onSwipeDown = { onKeyPress("undo_clear") },
                     onSwipeLeft = { suppressCursorMove.value = true; onKeyPress("clear_composition") },
                     onSwipeStateChange = onSwipeStateChange,

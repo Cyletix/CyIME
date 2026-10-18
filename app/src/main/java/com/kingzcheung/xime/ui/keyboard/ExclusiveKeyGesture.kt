@@ -26,6 +26,7 @@ internal data class KeyGestureActions(
     val rightText: String? = null,
     val onRight: (() -> Unit)? = null,
     val horizontalThresholdDp: Float = 50f,
+    val verticalThresholdDp: Float = 50f,
     val reserveHorizontalSwipe: Boolean = false,
     val longPressItems: List<String> = emptyList(),
     val longPressDrawableIds: List<Int> = emptyList(),
@@ -42,17 +43,24 @@ internal data class KeyGestureActions(
     val downPreviewText: String? = downText,
     val upPreviewFromTop: Boolean = true,
     val downPreviewFromTop: Boolean = false,
+    /**
+     * Four-way flick keys (nine-key flick letters, Japanese kana): the direction follows the finger's
+     * current dominant axis, so the finger may re-aim without returning to the centre, and the release
+     * point decides. Released within the threshold is a tap; past it in a direction without a choice
+     * enters nothing.
+     */
+    val freeDirection: Boolean = false,
 )
 
 internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
     currentActions: () -> KeyGestureActions,
 ) = coroutineScope {
     val gestureScope = this
-    val swipeThreshold = 50.dp.toPx()
     val horizontalCancelThreshold = 60.dp.toPx()
     awaitEachGesture {
         val down = awaitFirstDown()
         val actions = currentActions()
+        val swipeThreshold = actions.verticalThresholdDp.dp.toPx()
         val horizontalThreshold = actions.horizontalThresholdDp.dp.toPx()
         down.consume()
         actions.onPress()
@@ -60,6 +68,11 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
         var longPressed = false
         var moved = false
         var crossedSwipeThreshold = false
+        // Once a direction owns the drag, sideways drift cannot undo its preview.
+        // Returning along that axis to the key centre releases the direction.
+        var verticalDrag: Boolean? = null
+        // A free flick keeps the touch once it has left the centre, even after coming back.
+        var flickClaimed = false
         var selectedIndex = 0
         val items = actions.longPressItems
         val longPressJob = if (items.isNotEmpty() || actions.onLongPress != null) gestureScope.launch {
@@ -83,13 +96,36 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                     moved = true
                     longPressJob?.cancel()
                 }
-                val up = dy < -swipeThreshold && abs(dy) > abs(dx) * 1.1f && actions.onUp != null
-                val downSwipe = dy > swipeThreshold && dy > abs(dx) * 1.1f && actions.onDown != null
-                val left = dx < -horizontalThreshold && -dx > abs(dy) * 1.1f && actions.onLeft != null
-                val right = dx > horizontalThreshold && dx > abs(dy) * 1.1f && actions.onRight != null
-                val blockedUp = actions.blockUpSwipe && dy < -swipeThreshold && abs(dy) > abs(dx) * 1.1f
-                val blockedDown = actions.blockDownSwipe && dy > swipeThreshold && dy > abs(dx) * 1.1f
-                crossedSwipeThreshold = crossedSwipeThreshold || up || downSwipe || left || right || blockedUp || blockedDown
+                val slop = viewConfiguration.touchSlop
+                // Back at the key's own centre also means the centre choice, for presses that began
+                // off-centre; a fixed tolerance, so wide tablet keys still flick sideways.
+                val atKeyCentre = actions.freeDirection && moved &&
+                    abs(change.position.x - size.width / 2f) <= slop && abs(change.position.y - size.height / 2f) <= slop
+                if (actions.freeDirection) {
+                    if (!longPressed) verticalDrag = when {
+                        maxOf(abs(dx), abs(dy)) <= slop || atKeyCentre -> null
+                        abs(dy) >= abs(dx) -> true
+                        else -> false
+                    }
+                    if (verticalDrag != null) flickClaimed = true
+                } else if ((verticalDrag == true && abs(dy) <= slop) || (verticalDrag == false && abs(dx) <= slop))
+                    verticalDrag = null
+                if (verticalDrag == null && !longPressed && !actions.freeDirection) {
+                    if (abs(dy) > slop && abs(dy) > abs(dx) * 1.1f &&
+                        (actions.onUp != null || actions.onDown != null || actions.blockUpSwipe || actions.blockDownSwipe)) verticalDrag = true
+                    else if (abs(dx) > slop && abs(dx) > abs(dy) * 1.1f &&
+                        (actions.onLeft != null || actions.onRight != null)) verticalDrag = false
+                }
+                val up = verticalDrag == true && dy < -swipeThreshold && actions.onUp != null
+                val downSwipe = verticalDrag == true && dy > swipeThreshold && actions.onDown != null
+                val left = verticalDrag == false && dx < -horizontalThreshold && actions.onLeft != null
+                val right = verticalDrag == false && dx > horizontalThreshold && actions.onRight != null
+                val blockedUp = verticalDrag == true && actions.blockUpSwipe && dy < -swipeThreshold
+                val blockedDown = verticalDrag == true && actions.blockDownSwipe && dy > swipeThreshold
+                // Free flicks are decided where the finger lifts, so leaving the centre is not sticky.
+                val outsideCentre = actions.freeDirection && !atKeyCentre && maxOf(abs(dx), abs(dy)) > swipeThreshold
+                crossedSwipeThreshold = if (actions.freeDirection) outsideCentre
+                    else crossedSwipeThreshold || up || downSwipe || left || right || blockedUp || blockedDown
                 if (longPressed && items.isNotEmpty()) {
                     val itemWidth = (actions.keyWidth / items.size).coerceAtLeast(1f)
                     selectedIndex = ((dx / itemWidth) + if (items.size > 1) 0.5f else 0f)
@@ -101,13 +137,13 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                     val hint = if (up) actions.upText else if (downSwipe) actions.downText else if (left) actions.leftText else if (right) actions.rightText else null
                     actions.onPreview(SwipeState(isSwiping = hint != null, swipeText = hint,
                         isSwipeDown = downSwipe, isPressed = !moved, pressedText = actions.text,
-                        keyFlick = (if (actions.inlineVerticalPreview) keyFlickPreview(
-                            dx, dy, viewConfiguration.touchSlop, swipeThreshold,
+                        keyFlick = (if (actions.inlineVerticalPreview && verticalDrag == true) keyFlickPreview(
+                            0f, dy, viewConfiguration.touchSlop, swipeThreshold,
                             actions.upPreviewText.takeIf { actions.onUp != null && !actions.blockUpSwipe },
                             actions.downPreviewText.takeIf { actions.onDown != null && !actions.blockDownSwipe },
                             actions.upPreviewFromTop, actions.downPreviewFromTop,
-                        ) else null) ?: if (actions.inlineHorizontalPreview) horizontalKeyFlickPreview(
-                            dx, dy, viewConfiguration.touchSlop, horizontalThreshold,
+                        ) else null) ?: if (actions.inlineHorizontalPreview && verticalDrag == false) horizontalKeyFlickPreview(
+                            dx, 0f, viewConfiguration.touchSlop, horizontalThreshold,
                             actions.leftText.takeIf { actions.onLeft != null },
                             actions.rightText.takeIf { actions.onRight != null },
                         ) else null))
@@ -120,13 +156,13 @@ internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
                         downSwipe -> actions.onDown?.invoke(actions.downText.orEmpty())
                         left -> actions.onLeft?.invoke()
                         right -> actions.onRight?.invoke()
-                        !crossedSwipeThreshold && abs(dx) < horizontalCancelThreshold -> actions.onTap()
+                        !crossedSwipeThreshold && (actions.freeDirection || abs(dx) < horizontalCancelThreshold) -> actions.onTap()
                     }
                     break
                 }
                 // Reserve paired-letter drags before the whole-keyboard cursor's
                 // activation distance, even when the user sets a longer threshold.
-                if (longPressed || crossedSwipeThreshold || actions.reserveHorizontalSwipe &&
+                if (longPressed || crossedSwipeThreshold || verticalDrag != null || flickClaimed || actions.reserveHorizontalSwipe &&
                     abs(dx) > viewConfiguration.touchSlop && abs(dx) > abs(dy) * 1.1f) change.consume()
                 else {
                     // 父层光标/滚动手势可能在 Main 后半段消费；取消后不得补出普通字符。

@@ -16,11 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.CompositionLocalProvider
@@ -60,6 +61,7 @@ import kotlinx.coroutines.launch
 fun SymbolKeyboardLayout(
     onSelect: (String) -> Unit,
     onBack: () -> Unit,
+    onKeyPressDown: ((String) -> Unit)? = null,
     backgroundColor: Color,
     textColor: Color,
     accentColor: Color,
@@ -100,6 +102,9 @@ fun SymbolKeyboardLayout(
     )
 
     val keySpacing = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
+    // The spacing scope hands back a fresh modifier; keep the host's glass inheritance marker,
+    // otherwise the panel paints a second keyboard background over the glass.
+    val inheritBackground = modifier.inheritsKeyboardBackground()
     KeyboardKeySpacingScope(modifier.padding(bottom = bottomPaddingDp.dp),
         policy = KeyVisualPolicy.Qwerty, allowShrink = isFloatingMode, applyGutter = true,
         growthSpacing = keySpacing) { bodyModifier ->
@@ -110,6 +115,7 @@ fun SymbolKeyboardLayout(
     Column(
         modifier = bodyModifier
             .fillMaxWidth()
+            .inheritKeyboardBackground(inheritBackground)
             .keyboardPanelBackground(backgroundColor)
             .padding(bottom = 8.dp)
     ) {
@@ -151,35 +157,39 @@ fun SymbolKeyboardLayout(
                             fontSize = 14.sp
                         )
                     }
-                } else Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.Top
-                ) {
-                    category.symbols.chunked(columns).forEach { rowSymbols ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start
-                        ) {
-                            rowSymbols.forEach { symbol ->
-                                SymbolButton(
-                                    symbol = symbol,
-                                    preserveWidth = preserveWidth,
-                                    onClick = {
-                                        recentSymbols = RecentUsageStore.record(
-                                            context, RecentUsageStore.KEY_RECENT_SYMBOLS, symbol
-                                        )
-                                        if (preserveWidth) onSelectExact(symbol) else onSelect(symbol)
-                                    },
-                                    modifier = Modifier.weight(1f).height(grid.rowHeightDp.dp).testTag("symbol-key:$symbol"),
-                                    fontSize = symbolFontSize,
-                                    textColor = textColor,
-                                    backgroundColor = keyBgColor,
-                                )
-                            }
-                            repeat(columns - rowSymbols.size) {
-                                Spacer(modifier = Modifier.weight(1f))
+                } else {
+                    // 大分类有数百个符号：只组合可见行，打开或切换分类时不一次创建全部按键。
+                    val rows = remember(category.symbols, columns) { category.symbols.chunked(columns) }
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("symbol-grid:${category.id}"),
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        items(rows) { rowSymbols ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start
+                            ) {
+                                rowSymbols.forEach { symbol ->
+                                    SymbolButton(
+                                        symbol = symbol,
+                                        preserveWidth = preserveWidth,
+                                        onClick = {
+                                            recentSymbols = RecentUsageStore.record(
+                                                context, RecentUsageStore.KEY_RECENT_SYMBOLS, symbol
+                                            )
+                                            if (preserveWidth) onSelectExact(symbol) else onSelect(symbol)
+                                        },
+                                        modifier = Modifier.weight(1f).height(grid.rowHeightDp.dp).testTag("symbol-key:$symbol"),
+                                        fontSize = symbolFontSize,
+                                        textColor = textColor,
+                                        backgroundColor = keyBgColor,
+                                    )
+                                }
+                                repeat(columns - rowSymbols.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
@@ -202,7 +212,9 @@ fun SymbolKeyboardLayout(
                 KeyboardModeKey(
                     slot = slot, page = KeyboardInputPage.SYMBOLS,
                     onKeyPress = { action -> if (action == "abc") onBack() else onNumber() },
-                    onKeyPressDown = { onHapticFeedback?.invoke() },
+                    onKeyPressDown = { action ->
+                        if (onKeyPressDown != null) onKeyPressDown(action) else onHapticFeedback?.invoke()
+                    },
                     backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
                     modifier = Modifier.weight(bottom.mode),
                     shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
@@ -216,12 +228,20 @@ fun SymbolKeyboardLayout(
                     .testTag("symbol-category-strip"),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                // 高键盘中分类不无限放大；窄窗口仍保留可读宽度，通过滚动访问其余分类。
-                val tabHeight = minOf(maxHeight, 72.dp)
-                val tabWidth = (tabHeight * 1.1f).coerceIn(48.dp, 88.dp)
-                val categoryColor = lerp(keyBgColor, textColor, 0.07f)
+                // The rail uses the same footer and key inset as the adjacent actions.
+                // Only tab width is capped; a tablet must not get a shorter category row.
+                val tabWidth = (maxHeight * 1.1f).coerceIn(48.dp, 88.dp)
+                val glass = LocalKeyboardInputPreferences.current.frostedGlass
+                // Under glass the rail is a translucent keycap like its neighbours, not a solid bar.
+                // A light tint over whatever is below (solid colour, gradient or glass); on a solid
+                // background this equals the former lerp(background, text, 0.05).
+                val categoryColor = frostedKeyColor(lerp(backgroundColor, textColor, 0.05f), textColor, glass,
+                    legacyStateColor = textColor.copy(alpha = 0.05f))
                 Row(
-                    Modifier.fillMaxWidth().height(tabHeight).horizontalScroll(rememberScrollState()),
+                    Modifier.fillMaxSize().padding(scaledKeyVisualPadding())
+                        .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+                        .background(categoryColor)
+                        .horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     displayCategories.forEachIndexed { index, category ->
@@ -232,9 +252,10 @@ fun SymbolKeyboardLayout(
                                 onHapticFeedback?.invoke()
                                 scope.launch { pagerState.animateScrollToPage(index) }
                             },
-                            backgroundColor = categoryColor,
+                            // The rail already paints the fill; tabs only add the selection tint.
+                            backgroundColor = Color.Transparent,
                             textColor = textColor,
-                            selectedBackgroundColor = lerp(categoryColor, accentColor, 0.24f),
+                            selectedBackgroundColor = textColor.copy(alpha = 0.12f),
                             modifier = Modifier.width(tabWidth).fillMaxHeight()
                                 .testTag("symbol-category:${category.id}"),
                         )
@@ -311,23 +332,20 @@ private fun SymbolCategoryTab(
     val pressed by interactionSource.collectIsPressedAsState()
     val fill = if (isSelected) selectedBackgroundColor else backgroundColor
     Box(
-        modifier = modifier.padding(scaledKeyVisualPadding())
-            .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+        modifier = modifier
             .semantics(mergeDescendants = true) {
                 selected = isSelected
                 role = Role.Tab
                 onClick { onClick(); true }
             }
             .tolerantClick(interactionSource = interactionSource, onClick = onClick)
-            .keyGlow(Modifier.background(frostedKeyColor(
-                fill, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
-                pressed = pressed, highlighted = isSelected,
-            )))
-            .padding(horizontal = 6.dp),
+            .background(if (pressed) lerp(fill, textColor, .15f) else fill),
         contentAlignment = Alignment.Center,
     ) {
         Text(name, color = if (isSelected) textColor else textColor.copy(alpha = 0.65f),
             fontSize = 16.sp, maxLines = 1, textAlign = TextAlign.Center,
             fontFamily = AppFonts.keyFontFamily)
+        if (isSelected) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth(.55f)
+            .height(2.dp).background(textColor))
     }
 }

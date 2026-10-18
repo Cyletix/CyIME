@@ -7,6 +7,17 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 
 class QwertySwipeSymbolsTest {
+    @Test fun savedSymbolsAreReadBackIncludingExplicitlyEmptySlots() {
+        val prefs = mock<android.content.SharedPreferences>()
+        val context = mock<android.content.Context>()
+        whenever(context.getSharedPreferences("kime_settings", android.content.Context.MODE_PRIVATE)).thenReturn(prefs)
+        whenever(prefs.contains("qwerty_symbols_zh_up.q")).thenReturn(true)
+        whenever(prefs.getString("qwerty_symbols_zh_up.q", "")).thenReturn("★")
+        whenever(prefs.contains("qwerty_symbols_zh_down.q")).thenReturn(true)
+        whenever(prefs.getString("qwerty_symbols_zh_down.q", "")).thenReturn("")
+        assertEquals(mapOf("up.q" to "★", "down.q" to ""), QwertySwipeSymbols.load(context, false))
+        assertEquals(emptyMap<String, String>(), QwertySwipeSymbols.load(context, true))
+    }
     @get:org.junit.Rule val temp = org.junit.rules.TemporaryFolder()
     private val defaults get() = requireNotNull(javaClass.classLoader?.getResource("xime.yaml")).readText()
     @org.junit.Before fun loadActualLayoutBindings() {
@@ -35,8 +46,10 @@ class QwertySwipeSymbolsTest {
     @Test fun presetMatchesEveryRequestedKeyExactly() {
         val keys = "qwertyuiopasdfghjklzxcvbnm"
         assertEquals(26, QwertySwipeSymbols.up.size)
-        assertEquals("1234567890@-*_[]()\\'\":;!?/", keys.map { QwertySwipeSymbols.up.getValue(it.toString()) }.joinToString(""))
-        assertEquals("!@#$%^&*()`~·—…°{}|=+-×÷<>", keys.map { QwertySwipeSymbols.down.getValue(it.toString()) }.joinToString(""))
+        // 中文：上方数字和常用全角符号，下方半角符号；英文有自己的半角预设。
+        assertEquals("1234567890～—…·¥、【】！（）：；《》？", keys.map { QwertySwipeSymbols.up.getValue(it.toString()) }.joinToString(""))
+        assertEquals("!@#$%^&*()~-_'=\\[]/\"`:;<>?", keys.map { QwertySwipeSymbols.down.getValue(it.toString()) }.joinToString(""))
+        assertEquals("1234567890~-_'=\\[]/\"`:;<>?", keys.map { QwertySwipeSymbols.englishUp.getValue(it.toString()) }.joinToString(""))
     }
     @Test fun editorOverridesYamlAndPreservesTapAndLongPress() {
         val original = KeyGestureConfig(tap = GestureDef(value = "a"), longPress = LongPressConfig())
@@ -52,9 +65,9 @@ class QwertySwipeSymbolsTest {
     @Test fun productionAccessorsAgreeOnChineseAndEnglishGestures() {
         KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
         for (ascii in listOf(false, true)) for (key in QwertySwipeSymbols.keys.map(Char::toString)) {
-            assertEquals(QwertySwipeSymbols.up[key], KeysConfigHelper.getSwipeUpCommitValue(key, ascii))
-            assertEquals(QwertySwipeSymbols.up[key], KeysConfigHelper.getSwipeUpLabel(key, ascii))
-            assertEquals(QwertySwipeSymbols.down[key], KeysConfigHelper.getKeyGesture(key, ascii)!!.swipeDown!!.value)
+            assertEquals(QwertySwipeSymbols.up(ascii)[key], KeysConfigHelper.getSwipeUpCommitValue(key, ascii))
+            assertEquals(QwertySwipeSymbols.up(ascii)[key], KeysConfigHelper.getSwipeUpLabel(key, ascii))
+            assertEquals(QwertySwipeSymbols.down(ascii)[key], KeysConfigHelper.getKeyGesture(key, ascii)!!.swipeDown!!.value)
             assertEquals(GestureAction.COMMIT, KeysConfigHelper.getSwipeDownAction(key, ascii))
         }
     }

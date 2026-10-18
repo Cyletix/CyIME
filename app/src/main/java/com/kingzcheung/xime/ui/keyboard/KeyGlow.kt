@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -29,6 +30,9 @@ import com.kingzcheung.xime.ui.theme.visualMaterial
 
 internal const val KEY_GLOW_DURATION_MS = 500
 internal const val KEY_CAP_DURATION_MS = 235
+/** Background tint kept while a key is held after the press animation, and its release fade. */
+internal const val KEY_GLOW_HOLD_ALPHA = 0.4f
+internal const val KEY_GLOW_RELEASE_MS = 180
 
 private data class GlowSquare(val x: Float, val y: Float, val side: Float, val angle: Float, val spin: Float)
 
@@ -38,19 +42,30 @@ internal fun Modifier.keyGlow(
     materialLevel: com.kingzcheung.xime.ui.theme.MaterialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.BASE,
     particleSize: androidx.compose.ui.unit.DpSize? = null,
     particleOffset: androidx.compose.ui.unit.DpOffset = androidx.compose.ui.unit.DpOffset.Zero,
+    applyMaterial: Boolean = true,
+    // 1 = full glow; drops toward 0 while a semantic flick colour (clear/undo) takes over the key.
+    glowVisibility: Float = 1f,
 ): Modifier = composed {
-    val paintedCap = cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current, materialLevel)
+    val visibility by rememberUpdatedState(glowVisibility.coerceIn(0f, 1f))
+    val paintedCap = if (applyMaterial) cap.visualMaterial(VisualStyles.current, LocalKeyCornerRadius.current, materialLevel) else cap
     val preferences = LocalKeyboardInputPreferences.current
     val glowEnabled = preferences.keyGlowEnabled
     val motionEnabled = preferences.keyAnimationEnabled && animateCap
     if (!glowEnabled && !motionEnabled) return@composed this.then(paintedCap)
     // One coherent colour per press, as in the reference; overlapping squares
     // vary in brightness instead of mixing three unrelated theme colours.
-    var color by remember(glowEnabled, motionEnabled) { mutableStateOf(glowPalette.first()) }
+    // 光色跟随主题强调色（相邻几种色相）；单色主题用带一点冷暖的中性光，不再是固定的七彩。
+    val themeAccent = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.accent
+    val glowColors = remember(themeAccent) { themeAccent?.let(::themedGlowPalette) ?: glowPalette }
+    var color by remember(glowEnabled, motionEnabled) { mutableStateOf(glowColors.first()) }
     val elapsed = remember(glowEnabled, motionEnabled) { Animatable(1f) }
     val scope = rememberCoroutineScope()
     var animation by remember(glowEnabled, motionEnabled) { mutableStateOf<Job?>(null) }
     var particles by remember(glowEnabled, motionEnabled) { mutableStateOf(emptyList<GlowSquare>()) }
+    // While the finger stays down (e.g. a repeating arrow key) the colour stays lit after the
+    // squares finish, and only fades once the key is released.
+    val held = remember(glowEnabled, motionEnabled) { Animatable(0f) }
+    var release by remember(glowEnabled, motionEnabled) { mutableStateOf<Job?>(null) }
     DisposableEffect(glowEnabled, motionEnabled) {
         onDispose { animation?.cancel() }
     }
@@ -59,8 +74,10 @@ internal fun Modifier.keyGlow(
             // 只旁观 DOWN，因此同一帧内按下/松开也不会丢失动画；不干扰拂动和长按。
             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             animation?.cancel()
+            release?.cancel()
+            if (glowEnabled) scope.launch { held.snapTo(KEY_GLOW_HOLD_ALPHA) }
             if (glowEnabled) {
-                color = glowPalette[Random.nextInt(glowPalette.size)]
+                color = glowColors[Random.nextInt(glowColors.size)]
                 particles = List(4) { index ->
                     GlowSquare(0.2f + (index % 2) * 0.6f + (Random.nextFloat() - 0.5f) * 0.25f,
                         0.15f + (index / 2) * 0.7f + (Random.nextFloat() - 0.5f) * 0.25f,
@@ -76,6 +93,11 @@ internal fun Modifier.keyGlow(
                 // Keep the original cap curve; motion-only stops its clock after cap recovery.
                 elapsed.animateTo(duration.toFloat() / KEY_GLOW_DURATION_MS, tween(duration, easing = LinearEasing))
             }
+            // Watch (never consume) until every pointer is up, then let the held colour fade.
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+            } while (event.changes.any { it.pressed })
+            if (glowEnabled) release = scope.launch { held.animateTo(0f, tween(KEY_GLOW_RELEASE_MS)) }
         }
     }
     val animatedCap = if (motionEnabled) Modifier.graphicsLayer {
@@ -96,13 +118,18 @@ internal fun Modifier.keyGlow(
             center = Offset.Zero, radius = lightSize.maxDimension.coerceAtLeast(1f) * 0.8f,
         )
         onDrawWithContent {
+            // The glow sits above the key fill, so it must yield to the clear/undo warning colour.
+            val shown = visibility
+            if (shown <= 0f) { drawContent(); return@onDrawWithContent }
             val t = elapsed.value
+            val hold = held.value * shown
+            if (t >= 1f && hold > 0f && particles.isNotEmpty()) drawRect(color, alpha = hold)
             if (t < 1f && particles.isNotEmpty()) {
                 val remaining = keyGlowRemaining(t)
                 // The first rendered DOWN frame is already lit in the reference.
-                val fade = remaining
+                val fade = remaining * shown
                 val travel = keyGlowTravel(t)
-                drawRect(color, alpha = fade * 0.75f)
+                drawRect(color, alpha = maxOf(fade * 0.75f, hold))
                 val glowCenter = lightOrigin + Offset(lightSize.width * 0.5f, lightSize.height * 0.55f)
                 translate(glowCenter.x, glowCenter.y) {
                     drawRect(glowBrush, topLeft = -glowCenter, size = size, alpha = fade,
@@ -137,6 +164,17 @@ internal fun DrawScope.drawKeyGlowSquare(color: Color, center: Offset, side: Flo
             alpha = alpha * if (layer == 0) 0.22f else 0.035f,
             blendMode = BlendMode.Screen,
         )
+    }
+}
+
+/** 强调色两侧 ±40° 的五个色相，统一成柔和高亮（Screen 混合下不刺眼，也不压过强提示色）。 */
+internal fun themedGlowPalette(accent: Color): List<Color> {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(accent.toArgb(), hsv)
+    if (hsv[1] < .15f) return listOf(Color(0xFFE6ECF5), Color(0xFFF2EEE6), Color(0xFFE9E9F2), Color(0xFFEEF3EE))
+    val saturation = hsv[1].coerceIn(.35f, .55f)
+    return listOf(0f, -20f, 20f, -40f, 40f).map { shift ->
+        Color(android.graphics.Color.HSVToColor(floatArrayOf((hsv[0] + shift + 360f) % 360f, saturation, .96f)))
     }
 }
 

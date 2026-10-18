@@ -31,6 +31,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -243,20 +245,20 @@ class ToolbarUiTest {
                     backgroundColor = Color.White,
                     accentColor = Color.Blue,
                     keyBgColor = Color.LightGray,
-                    onUpdateToolbarButtons = { selected = it; saved = it },
+                    onUpdateQuickActions = { selected = it.toolbar; saved = it.toolbar },
                     onDismiss = {},
                     modifier = Modifier.size(width = 320.dp, height = 160.dp),
                 )
             }
         }
-        rule.onNode(hasScrollToIndexAction()).performScrollToIndex(ToolbarButton.entries.size)
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("quick-action:${plugin.id}"))
         val label = rule.onNodeWithText(plugin.label, useUnmergedTree = true)
         label.assertIsDisplayed()
         val textLayouts = mutableListOf<TextLayoutResult>()
         label.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
         assertFalse(textLayouts.single().hasVisualOverflow)
-        rule.onNodeWithText(plugin.label).performClick()
-        rule.runOnIdle { assertEquals(listOf(ToolbarButton.CLIPBOARD.id, plugin.id), saved) }
+        // Arranging never changes the saved toolbar until something is dragged.
+        rule.runOnIdle { assertEquals(listOf(ToolbarButton.CLIPBOARD.id), saved) }
     }
 
     @Test fun voiceKeepsAllToolbarButtonsAndHighlightsOnlyMicrophone() {

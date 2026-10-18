@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.update
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.keyboard.textMainType
+import com.kingzcheung.xime.keyboard.afterEditorPreparation
 import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.MainType
 import com.kingzcheung.xime.keyboard.OverlayRoute
@@ -79,6 +80,7 @@ data class KeyboardUiState(
     val voiceRecognizedText: String = "",
     val isSttEnabled: Boolean = true,
     val toolbarButtons: List<String> = ToolbarButton.DEFAULT_VISIBLE.map { it.id },
+    val menuButtons: List<String> = ToolbarButton.DEFAULT_MENU.map { it.id },
     /** 已启用插件声明的工具栏按钮（候选池），渲染时与内置按钮合并。 */
     val toolbarPluginButtons: List<ToolbarButtonItem.Plugin> = emptyList(),
     val isCalculatorMode: Boolean = false,
@@ -102,6 +104,7 @@ data class KeyboardUiState(
     val t9RightCandidateSelectedCount: Long = 0L,
     val t9SelectedCandidatePinyin: String = "",
     val showQuickSendForm: Boolean = false,
+    val ocrDraft: Boolean = false,
     val quickSendFormFocused: Boolean = false,
     val quickSendEditingItemId: Long? = null,
     val quickSendEditingItemText: String = "",
@@ -235,6 +238,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 currentKeyboardCallbacks?.captureInputContext?.invoke() ?: kotlin.coroutines.EmptyCoroutineContext
             },
             inputCommands = callbacks.inputCommands,
+            leftContext = { currentKeyboardCallbacks?.t9LeftContext?.invoke() },
             onUnconsumedDelete = onUnconsumedDelete,
             onCompositionRefresh = { composition, snapshots ->
                 currentKeyboardCallbacks?.onT9RefreshComposition?.invoke(composition, snapshots)
@@ -430,6 +434,10 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
                 // 面板（数字/符号）不应被新会话事件重置，否则输入一个数字后键盘会切回全键盘
                 if (current is KeyboardViewState.NumberPanel || current is KeyboardViewState.CommonSymbolPanel) {
                     Triple(current, _page.value, _keyboardState.value)
+                } else if (currentPage is KeyboardPage.Overlay) {
+                    // 还开着的面板（编辑/方向盘、剪贴板等）说明是同一输入框重启会话：真正换输入框或收起键盘时
+                    // onFinishInput/onWindowHidden 已先关掉面板。有的应用粘贴后会重启输入（如短信），不能因此关面板。
+                    Triple(current, currentPage, _keyboardState.value)
                 } else if (currentPage is KeyboardPage.Main && currentPage.type == MainType.HANDWRITING
                     && (hasTemporaryHandwriting || action.schemaId.isEmpty() || isHandwritingSchema(action.schemaId))
                 ) {
@@ -614,6 +622,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     /** Level 3: 打开覆盖页面，可从任意页面进入 */
     fun showOverlay(route: OverlayRoute, initialBackStack: List<OverlayRoute> = emptyList()) {
+        leaveHandwritingForClipboard(route)
         // Keep the current input surface in place while the tool reveals over it.
         // Symbols still return to text, but only when leaving the symbol panel.
         val current = _page.value
@@ -628,12 +637,31 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     fun toggleOverlay(route: OverlayRoute, initialBackStack: List<OverlayRoute> = emptyList()) {
         val currentRoute = (_page.value as? KeyboardPage.Overlay)?.route
         // Text, images and legacy pinned links are one clipboard tool, not separate toggles.
-        if (currentRoute == route || currentRoute is OverlayRoute.Clipboard && route is OverlayRoute.Clipboard) closeOverlay()
+        if (currentRoute == route || currentRoute is OverlayRoute.Clipboard && route is OverlayRoute.Clipboard) leaveClipboard()
+        // 从方向盘（编辑）面板打开剪贴板：记住编辑面板，粘贴或收起剪贴板后回到它，而不是回主键盘。
+        else if (currentRoute == OverlayRoute.Edit && route is OverlayRoute.Clipboard && initialBackStack.isEmpty()) pushOverlay(route)
         else showOverlay(route, initialBackStack)
+    }
+
+    /**
+     * 离开剪贴板（粘贴、返回或再次点剪贴板图标）：若剪贴板是从编辑面板打开的，回到编辑面板；
+     * 否则照常关闭覆盖页。
+     */
+    fun leaveClipboard() {
+        val current = _page.value
+        val editIndex = (current as? KeyboardPage.Overlay)?.backStack?.lastIndexOf(OverlayRoute.Edit) ?: -1
+        if (current is KeyboardPage.Overlay && current.route is OverlayRoute.Clipboard && editIndex >= 0) {
+            _page.value = current.copy(route = OverlayRoute.Edit, backStack = current.backStack.take(editIndex))
+            _syncViewState()
+        } else closeOverlay()
     }
 
     /** Level 3: 在覆盖页面内推入子页 */
     fun pushOverlay(route: OverlayRoute) {
+        if (leaveHandwritingForClipboard(route)) {
+            showOverlay(route)
+            return
+        }
         val current = _page.value
         if (current is KeyboardPage.Overlay) {
             _page.value = current.copy(
@@ -643,6 +671,20 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
             )
             _syncViewState()
         }
+    }
+
+    /** Clipboard owns the normal keyboard area; voice and other tools keep their current rules. */
+    private fun leaveHandwritingForClipboard(route: OverlayRoute): Boolean {
+        if (route !is OverlayRoute.Clipboard || _page.value.textMainType() != MainType.HANDWRITING) return false
+        if (!exitTemporaryHandwriting() || _page.value.textMainType() == MainType.HANDWRITING) {
+            handwritingReturn = null
+            _savedKbStateBeforePanel = null
+            _keyboardState.value = _lastMainLayout.value
+            _page.value = KeyboardPage.Main(MainType.FULL)
+            _syncViewState()
+        }
+        handwritingShouldReturn = false
+        return true
     }
 
     /** Level 3: 在覆盖页面内回退 */
@@ -669,6 +711,25 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
             _page.value = current.behind
             _syncViewState()
         }
+    }
+
+    /** Called only after the input FIFO verifies that this is still the same editor session. */
+    internal fun applyPreparedEditorKeyboard(
+        isAsciiMode: Boolean, schemaId: String, handwriting: Boolean,
+        restarting: Boolean, forceNumberPanel: Boolean,
+    ) {
+        if (restarting && !handwriting) return
+        // The picker or the user may already have opened OCR while the engine was preparing.
+        // Snapshot NOW, not when the background work started, so cancel/other tools also win.
+        val visiblePage = _page.value
+        if (handwriting) switchMain(MainType.HANDWRITING)
+        else resetKeyboard(isAsciiMode, schemaId, forceNumberPanel)
+        _page.value = visiblePage.afterEditorPreparation(_page.value)
+        // A delayed engine preparation must not reintroduce handwriting beneath an open clipboard.
+        if (visiblePage is KeyboardPage.Overlay && leaveHandwritingForClipboard(visiblePage.route)) {
+            showOverlay(visiblePage.route, visiblePage.backStack)
+        }
+        _syncViewState()
     }
 
     fun resetKeyboard(isAsciiMode: Boolean, schemaId: String = "", forceNumberPanel: Boolean = false) {

@@ -38,7 +38,8 @@ class ToolbarNavigationConsistencyTest {
         assertEquals(leading.width, hide.width, 0f)
         assertEquals(leading.height, hide.height, 0f)
         val pixels = rule.onNodeWithTag("toolbar-hide").captureToImage().toPixelMap()
-        assertNotEquals("收起按钮的圆形底板在未按下时也必须可见", pixels[0, 0], pixels[pixels.width / 2, pixels.height / 4])
+        // 2026-10-12 用户确认：工具栏圆底只在按下或开启时出现，收起按钮平时只有图标。
+        assertEquals("收起按钮未按下时没有底板", pixels[0, 0], pixels[pixels.width / 2, pixels.height / 4])
         for (next in listOf(KeyboardPage.Main(MainType.HANDWRITING),
             KeyboardPage.Overlay(OverlayRoute.SchemaList, emptyList(), KeyboardPage.Main(MainType.FULL)),
             KeyboardPage.Overlay(OverlayRoute.Emoji, emptyList(), KeyboardPage.Main(MainType.FULL)))) {

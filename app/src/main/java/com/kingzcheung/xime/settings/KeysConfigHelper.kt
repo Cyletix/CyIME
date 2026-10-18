@@ -340,6 +340,12 @@ data class BackgroundConfig(
     /** 暗色模式下的遮罩强度，未配置时沿用 [overlayAlpha]。 */
     @SerialName("overlay_alpha_dark")
     val overlayAlphaDark: Float? = null,
+    /** 遮罩颜色（0xRRGGBB），未配置时为黑色；浅色主题用同色调浅色遮罩提亮图片。 */
+    @SerialName("overlay_color")
+    val overlayColor: Long? = null,
+    /** 暗色模式下的遮罩颜色，未配置时沿用 [overlayColor]。 */
+    @SerialName("overlay_color_dark")
+    val overlayColorDark: Long? = null,
 )
 
 @Serializable
@@ -438,7 +444,7 @@ object ColorSchemeModeConfigSerializer :
     }
 }
 
-/** 字体配置，从 xime.yaml style 节点加载。字体文件放在 rime/fonts/ 目录下。 */
+/** 字体配置，从 xime.yaml keyboard.fonts 节点加载。字体文件放在 rime/fonts/ 目录下。 */
 data class KeyboardFontConfig(
     val keyFont: String = "",
     val keyLabelFont: String = "",
@@ -552,10 +558,17 @@ data class XimeConfig(
     val metadata: MetadataConfig? = null,
 )
 
+/** CyIME 自己的商店目录（仓库 store/），与 assets/xime.yaml 的 xime_index.base_urls 保持一致。 */
+internal val CYIME_STORE_BASE_URLS = listOf(
+    "https://cdn.jsdelivr.net/gh/Cyletix/CyIME@main/store/",
+    "https://fastly.jsdelivr.net/gh/Cyletix/CyIME@main/store/",
+    "https://raw.githubusercontent.com/Cyletix/CyIME/main/store/",
+)
+
 @Serializable
 data class XimeIndexConfig(
     @SerialName("base_urls")
-    val baseUrls: List<String> = listOf("https://index.ximei.me/")
+    val baseUrls: List<String> = CYIME_STORE_BASE_URLS
 )
 
 data class KeysConfig(
@@ -717,6 +730,14 @@ object KeysConfigHelper {
      *  合并键布局中合并键的 ID 为组内字母拼接（如 "qw"），渲染层按 ID 长度分配键宽。 */
     fun getKeyRows(isAsciiMode: Boolean): List<List<String>> =
         if (isAsciiMode) _enRows else _zhRows
+
+    /** Read a thumbnail without changing the active keyboard or its gesture state. */
+    fun previewKeyRows(layout: InputLayout, language: InputLanguage): List<List<String>> =
+        CustomKeyboardLayouts.find(layout.id)?.typingRows() ?: when {
+            layout.kind == LayoutKind.MERGED -> _mergedRows[layout.id].orEmpty()
+            layout.kind == LayoutKind.ALPHABETIC -> if (language == InputLanguage.ENGLISH) _enRows else _zhRowsBase
+            else -> emptyList()
+        }
     
     /** 配置版本号，每次 loadConfig 时递增，用于 Compose 感知配置变更。 */
     private val _configVersion = MutableStateFlow(0)
@@ -757,11 +778,16 @@ object KeysConfigHelper {
     private fun loadXimeConfig(context: Context) {
         try {
             CustomKeyboardLayouts.load(context)
-            symbolOverridesZh = QwertySwipeSymbols.load(context, false)
-            symbolOverridesEn = QwertySwipeSymbols.load(context, true)
             val symbolCustomText = readCustomText(context)
             symbolCustomZh = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty") } ?: emptyMap()
             symbolCustomEn = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty_en") } ?: emptyMap()
+            runCatching { QwertySwipeSymbols.preserveLegacyLayout(context, symbolCustomZh) }
+                .onFailure { Log.e(TAG, "无法保存旧布局", it) }
+            runCatching { QwertySwipeSymbols.adoptFixedPreset(context, symbolCustomZh) }
+                .onFailure { Log.e(TAG, "无法保存10-12布局", it) }
+            symbolOverridesZh = QwertySwipeSymbols.load(context, false)
+            // 英文26键有自己的半角预设，只用英文页的修改。
+            symbolOverridesEn = QwertySwipeSymbols.load(context, true)
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
             _keyGestureConfigZhBase = parsed?.first ?: emptyMap()
@@ -1620,7 +1646,7 @@ object KeysConfigHelper {
         val custom = if (english) symbolCustomEn else symbolCustomZh
         return buildMap {
             for (key in QwertySwipeSymbols.keys.map(Char::toString)) {
-                val gesture = QwertySwipeSymbols.apply(key, null, overrides, custom[key])!!
+                val gesture = QwertySwipeSymbols.apply(key, null, overrides, custom[key], english)!!
                 put("up.$key", gesture.swipeUp!!.value.ifEmpty { gesture.swipeUp.label })
                 put("down.$key", gesture.swipeDown!!.value.ifEmpty { gesture.swipeDown.label })
             }
@@ -1642,7 +1668,7 @@ object KeysConfigHelper {
         val customGesture = (if (isAsciiMode) symbolCustomEn else symbolCustomZh)[normalized]
             ?: config[normalized].takeIf { !isAsciiMode && CustomKeyboardLayouts.find(_activeSchemaId) != null }
         return QwertySwipeSymbols.apply(normalized, config[normalized],
-            if (isAsciiMode) symbolOverridesEn else symbolOverridesZh, customGesture)
+            if (isAsciiMode) symbolOverridesEn else symbolOverridesZh, customGesture, isAsciiMode)
     }
 
     fun getKeyDisplayLabel(key: String, isAsciiMode: Boolean = false, isShifted: Boolean = false): String {

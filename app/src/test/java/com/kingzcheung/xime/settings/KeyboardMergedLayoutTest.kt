@@ -242,16 +242,27 @@ class KeyboardMergedLayoutTest {
         return source.zip(target).toMap().mapKeys { it.key.lowercaseChar() }
     }
 
+    private fun ambiguousTapMap(schemaText: String): Map<Char, Char> {
+        val mapping = ('a'..'z').associateWith { it }.toMutableMap()
+        schemaText.lineSequence().filter { it.contains("derive/^(.{0})[") }.forEach { rule ->
+            val group = rule.substringAfter("})[").substringBefore("]")
+            val token = rule.substringAfter("/\$1").first()
+            assertTrue("Ambiguous tokens must not collide with exact lowercase letters", token.isUpperCase())
+            group.forEach { mapping[it] = token.lowercaseChar() }
+        }
+        return mapping
+    }
+
     /** 从行布局推导合并分组：每个字母 → 所在组 ID 的首字母（代表字母）。 */
     private fun representativeMap(rows: List<List<String>>): Map<Char, Char> =
         rows.flatten().flatMap { id -> id.map { it to id.first() } }.toMap()
 
     @Test
-    fun `14键前端分组与 Rime xlit 映射一致`() {
+    fun `14键点击分组与精确滑动使用不同编码`() {
         val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_14")
             ?: error("xime.yaml 缺少 qwerty_14 rows")
         assertEquals(14, rows.flatten().size)
-        assertEquals(representativeMap(rows), xlitMap(schemaExampleText("pinyin_14jian")))
+        assertEquals(representativeMap(rows), ambiguousTapMap(schemaExampleText("pinyin_14jian")))
     }
 
     @Test
@@ -264,10 +275,10 @@ class KeyboardMergedLayoutTest {
             .takeWhile { it.isBlank() || it.startsWith(" ") || it.startsWith("#") }
             .map { it.substringBefore(" #").trim() }.filter { it.startsWith("- ") }.toList()
         val rules = algebra(text)
-        assertEquals(algebra(original), rules.dropLast(2))
-        assertEquals("- derive/(.*)/\\U$1/", rules[rules.lastIndex - 1])
+        assertEquals(algebra(original), rules.take(algebra(original).size))
+        assertTrue(rules.drop(algebra(original).size).all { it.startsWith("- derive/") })
         val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_14")!!
-        assertEquals(representativeMap(rows), xlitMap(text))
+        assertEquals(representativeMap(rows), ambiguousTapMap(text))
         assertTrue(text.contains("schema_id: $id"))
         assertTrue(text.contains("dictionary: rime_ice"))
         assertTrue(text.contains("prism: $id"))
@@ -291,11 +302,7 @@ class KeyboardMergedLayoutTest {
     }
 
     @Test
-    fun `三个方案的 xlit 映射串与万象参考一致`() {
-        assertTrue(
-            schemaExampleText("pinyin_14jian")
-                .contains("xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qqeettuuooaaddggjjlzzccbbm"),
-        )
+    fun `17和18键旧参考映射不受14键精确选择修改影响`() {
         assertTrue(
             schemaExampleText("pinyin_17jian")
                 .contains("xlit/QWERTYUIOPASDFGHJKLZXCVBNM/qwwrryyiooassffhjjlzxxvbbm"),

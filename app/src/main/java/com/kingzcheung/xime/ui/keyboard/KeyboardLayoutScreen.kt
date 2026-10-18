@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kingzcheung.xime.keyboard.GestureAction
 import com.kingzcheung.xime.keyboard.OverlayRoute
-import com.kingzcheung.xime.handwriting.HandwritingCandidate
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
 import com.kingzcheung.xime.settings.KeysConfigHelper
@@ -31,11 +30,6 @@ fun KeyboardLayoutScreen(
     callbacks: KeyboardCallbacks,
     onKeyPress: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isHandwritingLookup: Boolean = false,
-    onHandwritingCandidates: ((List<HandwritingCandidate>) -> Unit)? = null,
-    onHandwritingButtonFeedback: ((String) -> Unit)? = null,
-    handwritingClearSignal: Int = 0,
-    onHandwritingLookupExit: (() -> Unit)? = null,
     t9Controller: T9InputController? = null,
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
 ) {
@@ -124,22 +118,6 @@ fun KeyboardLayoutScreen(
                         isFloatingMode = uiState.isFloatingMode,
                         modifier = modifier,
                     )
-                } else if (isHandwritingLookup) {
-                    HandwritingLookupKeyboard(
-                        keyTextColor = keyTextColor,
-                        specialKeyBgColor = specialKeyBgColor,
-                        keyboardBgColor = keyboardBgColor,
-                        shadowEnabled = kbShadow.enabled,
-                        shadowElevation = kbShadow.elevation.dp,
-                        shadowShapeRadius = kbShadow.shapeRadius.dp,
-                        onKeyPress = onKeyPress,
-                        onButtonFeedback = onHandwritingButtonFeedback,
-                        onCandidates = onHandwritingCandidates,
-                        onExit = { onHandwritingLookupExit?.invoke() },
-                        clearSignal = handwritingClearSignal,
-                        uiState = uiState,
-                        modifier = modifier,
-                    )
                 } else {
                     KeyboardLayout(
                         onKeyPress = onKeyPress,
@@ -153,32 +131,14 @@ fun KeyboardLayoutScreen(
             }
 
             is KeyboardLayoutState.English -> {
-                if (isHandwritingLookup) {
-                    HandwritingLookupKeyboard(
-                        keyTextColor = keyTextColor,
-                        specialKeyBgColor = specialKeyBgColor,
-                        keyboardBgColor = keyboardBgColor,
-                        shadowEnabled = kbShadow.enabled,
-                        shadowElevation = kbShadow.elevation.dp,
-                        shadowShapeRadius = kbShadow.shapeRadius.dp,
-                        onKeyPress = onKeyPress,
-                        onButtonFeedback = onHandwritingButtonFeedback,
-                        onCandidates = onHandwritingCandidates,
-                        onExit = { onHandwritingLookupExit?.invoke() },
-                        clearSignal = handwritingClearSignal,
-                        uiState = uiState,
-                        modifier = modifier,
-                    )
-                } else {
-                    KeyboardLayout(
-                        onKeyPress = onKeyPress,
-                        viewModel = viewModel,
-                        callbacks = callbacks,
-                        uiState = uiState,
-                        isAsciiMode = true,
-                        modifier = modifier,
-                    )
-                }
+                KeyboardLayout(
+                    onKeyPress = onKeyPress,
+                    viewModel = viewModel,
+                    callbacks = callbacks,
+                    uiState = uiState,
+                    isAsciiMode = true,
+                    modifier = modifier,
+                )
             }
 
             is KeyboardLayoutState.Number -> {
@@ -251,23 +211,7 @@ fun KeyboardLayoutScreen(
             }
 
             is KeyboardLayoutState.T9Pinyin -> {
-                if (isHandwritingLookup) {
-                    HandwritingLookupKeyboard(
-                        keyTextColor = keyTextColor,
-                        specialKeyBgColor = specialKeyBgColor,
-                        keyboardBgColor = keyboardBgColor,
-                        shadowEnabled = kbShadow.enabled,
-                        shadowElevation = kbShadow.elevation.dp,
-                        shadowShapeRadius = kbShadow.shapeRadius.dp,
-                        onKeyPress = onKeyPress,
-                        onButtonFeedback = onHandwritingButtonFeedback,
-                        onCandidates = onHandwritingCandidates,
-                        onExit = { onHandwritingLookupExit?.invoke() },
-                        clearSignal = handwritingClearSignal,
-                        uiState = uiState,
-                        modifier = modifier,
-                    )
-                } else if (t9Controller != null) {
+                if (t9Controller != null) {
                     T9KeyboardLayout(
                         onKeyPress = onKeyPress,
                         callbacks = callbacks,

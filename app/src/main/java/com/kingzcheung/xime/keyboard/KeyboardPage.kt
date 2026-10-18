@@ -17,6 +17,10 @@ sealed interface KeyboardPage {
     }
 }
 
+/** A late engine preparation updates the backing keyboard, not a tool opened in this editor. */
+internal fun KeyboardPage.afterEditorPreparation(preparedPage: KeyboardPage): KeyboardPage =
+    if (this is KeyboardPage.Overlay) copy(behind = preparedPage) else preparedPage
+
 enum class MainType {
     FULL,
     HANDWRITING,
@@ -31,6 +35,7 @@ enum class PanelType {
 
 sealed interface OverlayRoute {
     data object Menu : OverlayRoute
+    data object Ocr : OverlayRoute
     data object SchemaList : OverlayRoute
     data class Clipboard(val tab: Int = 0) : OverlayRoute
     data object ToolbarCustomize : OverlayRoute

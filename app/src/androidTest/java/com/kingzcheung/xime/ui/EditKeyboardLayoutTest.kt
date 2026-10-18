@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -24,6 +25,14 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.ui.keyboard.EditKeyboardLayout
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.ui.theme.LocalMaterialPalette
+import com.kingzcheung.xime.ui.theme.MaterialPalette
+import com.kingzcheung.xime.ui.theme.VisualStyle
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.resolveKeyboardPalette
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -171,5 +180,50 @@ class EditKeyboardLayoutTest {
             rule.onNodeWithContentDescription(it).performClick()
         }
         rule.runOnIdle { assertEquals(listOf("undo", "redo", "copy", "paste", "select_all", "cut", "delete", "enter"), actions) }
+    }
+
+    @Test fun directionDiscUsesTheSameMaterialAsOrdinaryEditingKeys() {
+        val dark = mutableStateOf(true)
+        val previousStyle = VisualStyles.current
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        rule.setContent {
+            val palette = resolveKeyboardPalette("pure_black", dark.value)
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f, 1f),
+                LocalMaterialPalette provides MaterialPalette(palette.background, palette.accent),
+                LocalKeyboardInputPreferences provides KeyboardInputPreferences(
+                    frostedGlass = FrostedGlassConfig(enabled = true, backgroundOpacity = .65f, keyOpacity = .35f)),
+            ) {
+                Box(Modifier.fillMaxSize().background(Color(0xFF637382)), contentAlignment = Alignment.Center) {
+                    EditKeyboardLayout({}, {}, palette.background, palette.text, palette.accent, palette.key,
+                        shadowEnabled = false, modifier = Modifier.size(400.dp, 184.dp).testTag("material-edit-panel"))
+                }
+            }
+        }
+        try {
+            for (isDark in listOf(true, false)) for (style in listOf(VisualStyle.ORIGINAL, VisualStyle.NEON)) {
+                rule.runOnIdle { dark.value = isDark; VisualStyles.current = style }
+                val panel = rule.onNodeWithTag("material-edit-panel", true)
+                val origin = panel.fetchSemanticsNode().boundsInRoot
+                val pad = rule.onNodeWithTag("editor-direction-pad", true).fetchSemanticsNode().boundsInRoot
+                val key = rule.onNodeWithContentDescription("撤销").fetchSemanticsNode().boundsInRoot
+                val image = panel.captureToImage().asAndroidBitmap()
+                try {
+                    // Sample empty interiors away from glyphs, rims and the centre key.
+                    // Both rendered surfaces must use the same tint/alpha/material path;
+                    // expected RGB is deliberately not tied to an old opacity formula.
+                    val padPixel = image.getPixel((pad.left - origin.left + pad.width * .25f).toInt(),
+                        (pad.top - origin.top + pad.height * .30f).toInt())
+                    val keyPixel = image.getPixel((key.left - origin.left + key.width * .20f).toInt(),
+                        (key.top - origin.top + key.height * .20f).toInt())
+                    java.io.File(context.getExternalFilesDir(null), "editor-material-${if (isDark) "dark" else "light"}-${style.id}.png")
+                        .outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                    for (shift in listOf(16, 8, 0)) {
+                        assertTrue("disc and ordinary key must share $style material in dark=$isDark",
+                            kotlin.math.abs(((padPixel shr shift) and 255) - ((keyPixel shr shift) and 255)) <= 2)
+                    }
+                } finally { image.recycle() }
+            }
+        } finally { rule.runOnIdle { VisualStyles.current = previousStyle } }
     }
 }

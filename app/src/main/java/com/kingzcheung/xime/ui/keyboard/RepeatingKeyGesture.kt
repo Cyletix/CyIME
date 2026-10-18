@@ -21,6 +21,8 @@ internal data class RepeatingKeyActions(
     val onLeft: (() -> Unit)? = null,
     val upLabel: String? = null,
     val downLabel: String? = null,
+    // 上下动作对调后，预览仍从原提示所在一侧出现（“清空”标在上方，下拉时也从上方移入）。
+    val swappedVertical: Boolean = false,
 )
 
 /** A single owner for hold and swipe: touch slop must not cancel repeated deletion. */
@@ -59,14 +61,17 @@ internal suspend fun PointerInputScope.detectRepeatingKeyGestures(
                 val up = vertical && dy < -actionDistance && actions.onUp != null
                 val downSwipe = vertical && dy > actionDistance && actions.onDown != null
                 val left = -dx > abs(dy) * 1.1f && dx < -actionDistance && actions.onLeft != null
-                val flick = keyFlickPreview(dx, dy, previewDistance, actionDistance,
+                fun flickFrom(start: Float) = keyFlickPreview(dx, dy, start, actionDistance,
                     actions.upLabel?.removePrefix("上滑").takeIf { actions.onUp != null },
                     actions.downLabel?.removePrefix("下滑").takeIf { actions.onDown != null })
-                    ?.let { it.copy(origin = if (dy < 0f) KeyFlickOrigin.TOP else KeyFlickOrigin.BOTTOM) }
-                if (flick != null) {
+                    ?.let { it.copy(origin = if ((dy < 0f) != actions.swappedVertical) KeyFlickOrigin.TOP else KeyFlickOrigin.BOTTOM) }
+                // Repeat deletion still survives small drift; only the label starts moving at touch
+                // slop, the same as character keys, instead of jumping in late at the preview distance.
+                if (flickFrom(previewDistance) != null) {
                     repeat.stop()
                     timer?.cancel()
                 }
+                val flick = flickFrom(if (repeated) previewDistance else viewConfiguration.touchSlop)
                 if (abs(dx) > actionDistance || abs(dy) > actionDistance) {
                     crossed = true
                     repeat.stop()

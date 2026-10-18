@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
@@ -13,12 +14,91 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.ui.keyboard.SwipeableIconKeyButton
+import com.kingzcheung.xime.ui.keyboard.KeyFlickFeedback
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class SwipeableIconKeyButtonTest {
     @get:Rule val rule = createComposeRule()
+
+    @Test fun clearAndUndoTintTheWholeHeldKeyAndCancelRestoresIt() {
+        var clears = 0
+        var undos = 0
+        var density = 1f
+        rule.setContent {
+            density = LocalDensity.current.density
+            Box(Modifier.size(240.dp)) {
+                SwipeableIconKeyButton(ColorPainter(Color.Transparent), onClick = {},
+                    onSwipeUp = { clears++ }, onSwipeDown = { undos++ },
+                    swipeUpLabel = "上滑清空", swipeDownLabel = "下滑撤回",
+                    upFeedback = KeyFlickFeedback.DELETE, downFeedback = KeyFlickFeedback.UNDO,
+                    backgroundColor = Color.Gray, iconColor = Color.White,
+                    modifier = Modifier.testTag("delete"), shadowEnabled = false)
+            }
+        }
+        rule.mainClock.autoAdvance = false
+        val key = rule.onNodeWithTag("delete")
+        fun sampledColors(): List<Color> {
+            val pixels = key.captureToImage().toPixelMap()
+            return listOf(.2f to .2f, .8f to .2f, .2f to .8f, .8f to .8f).map { (x, y) ->
+                pixels[(pixels.width * x).toInt(), (pixels.height * y).toInt()]
+            }
+        }
+        val original = sampledColors()
+        key.performTouchInput { down(center); moveTo(center - Offset(0f, 95f * density)) }
+        rule.mainClock.advanceTimeBy(1500)
+        sampledColors().forEach { org.junit.Assert.assertTrue("Entire key remains red while held", it.red > it.blue + .1f) }
+        saveUiEvidence("clear-held", key)
+        assertEquals(0, clears)
+        key.performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(1000)
+        assertEquals(1, clears)
+        assertEquals(original, sampledColors())
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 95f * density)) }
+        rule.mainClock.advanceTimeBy(1500)
+        sampledColors().forEach { org.junit.Assert.assertTrue("Entire key remains blue while held", it.blue > it.red + .1f) }
+        saveUiEvidence("undo-held", key)
+        assertEquals(0, undos)
+        key.performTouchInput { moveTo(center); up() }
+        rule.mainClock.advanceTimeBy(1000)
+        assertEquals(0, undos)
+        assertEquals(original, sampledColors())
+    }
+
+    @Test fun defaultSymbolDirectionPullsClearDownInRedFromTheTopHint() {
+        var clears = 0
+        var undos = 0
+        var density = 1f
+        rule.setContent {
+            density = LocalDensity.current.density
+            Box(Modifier.size(240.dp)) {
+                SwipeableIconKeyButton(ColorPainter(Color.Transparent), onClick = {},
+                    swipeText = "清空", onSwipeUp = { clears++ }, onSwipeDown = { undos++ },
+                    swipeUpLabel = "上滑清空", swipeDownLabel = "下滑撤回",
+                    upFeedback = KeyFlickFeedback.DELETE, downFeedback = KeyFlickFeedback.UNDO,
+                    followSymbolSwipeDirection = true,
+                    backgroundColor = Color.Gray, iconColor = Color.White,
+                    modifier = Modifier.testTag("delete"), shadowEnabled = false)
+            }
+        }
+        rule.mainClock.autoAdvance = false
+        val key = rule.onNodeWithTag("delete")
+        fun center(): Color = key.captureToImage().toPixelMap().let { it[it.width / 5, it.height / 5] }
+        // Default habit: the top hint (清空) is pulled down, so it stays red like the hint promises.
+        key.performTouchInput { down(center); moveTo(center + Offset(0f, 95f * density)) }
+        rule.mainClock.advanceTimeBy(1500)
+        center().let { org.junit.Assert.assertTrue("Pulling the clear hint down is red", it.red > it.blue + .1f) }
+        key.performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(1000)
+        assertEquals(1 to 0, clears to undos)
+        key.performTouchInput { down(center); moveTo(center - Offset(0f, 95f * density)) }
+        rule.mainClock.advanceTimeBy(1500)
+        center().let { org.junit.Assert.assertTrue("Pushing up is the blue undo", it.blue > it.red + .1f) }
+        key.performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(1000)
+        assertEquals(1 to 1, clears to undos)
+    }
 
     @Test fun verticalActionsPreviewInsideTheHeldKeyAndCommitOnlyOnRelease() {
         var clears = 0

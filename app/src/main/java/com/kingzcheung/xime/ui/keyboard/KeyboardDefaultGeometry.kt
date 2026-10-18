@@ -14,31 +14,44 @@ internal data class LetterKeyboardDefaults(
     val spacingX: Float? = null,
     val spacingY: Float? = null,
     val floating: Boolean = false,
+    val calibratedMaxCellWidthDp: Float? = null,
+    val maximumHeightDp: Int? = null,
 )
 
-/** Only the actual ten-column alphabetic layout uses the four-row letter geometry. */
+/** Grouped and reordered alphabetic derivatives share the same default physical frame. */
 internal fun letterKeyboardDefaults(
     profile: InputProfile, availableHeightDp: Int, isAsciiMode: Boolean, floating: Boolean = false,
     split: Boolean = false,
+    physicalMetrics: KeyboardPhysicalMetrics? = null,
+    maximumHeightDp: Int? = null,
 ): LetterKeyboardDefaults? {
-    if (profile.layout.kind != LayoutKind.ALPHABETIC || split) return null
-    val custom = (profile.engineProfile as? EngineProfile.Rime)?.schemaId?.let(CustomKeyboardLayouts::find)
-    val rows = KeysConfigHelper.getKeyRows(isAsciiMode)
+    if ((!isAsciiMode && profile.layout.kind !in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED)) || split) return null
+    val custom = if (isAsciiMode) null else
+        (profile.engineProfile as? EngineProfile.Rime)?.schemaId?.let(CustomKeyboardLayouts::find)
+    val rows = custom?.typingRows() ?: KeysConfigHelper.getKeyRows(isAsciiMode)
     if (standardLetterRowGeometry(rows, 1f, custom != null, false) == null) return null
     val (x, y) = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
-    return LetterKeyboardDefaults(availableHeightDp, x, y, floating)
+    val pitch = physicalMetrics?.dpFromMillimeters(CALIBRATED_QWERTY_PITCH_MM)
+    return LetterKeyboardDefaults(availableHeightDp, x, y, floating, pitch, maximumHeightDp)
 }
 
 /** A 56dp minimum row keeps a narrow keyboard usable. Once width permits, letter caps
- * become square. The viewport height and an 88dp cap bound oversized defaults; neither
- * bound restricts manual resizing. Includes the 44dp toolbar and 8dp bottom padding. */
+ * become square. A measured physical pitch bounds calibrated QWERTY defaults; unknown
+ * displays keep the original 88dp cap and 45% default-height budget. A calibrated target
+ * may raise that budget continuously to at most 50% (retaining the old 228dp floor),
+ * within the existing resize bounds. Manual sizes never enter here. Includes the 44dp toolbar and 8dp bottom. */
 internal fun defaultLetterKeyboardSize(
     availableWidthDp: Int, preferredWidthDp: Int, defaults: LetterKeyboardDefaults,
 ): ProtectedKeyboardSize {
     val available = availableWidthDp.coerceAtLeast(1)
     val preferred = preferredWidthDp.coerceIn(1, available)
     val availableHeight = defaults.availableHeightDp.coerceAtLeast(1)
-    val heightBudget = maxOf(228f, availableHeight * 0.45f).coerceAtMost(availableHeight.toFloat())
+    val calibratedPitch = defaults.calibratedMaxCellWidthDp
+        ?.takeIf { it.isFinite() && it >= 1f && (16f + 10f * it).isFinite() }
+    val maximumHeight = if (calibratedPitch != null)
+        (defaults.maximumHeightDp ?: availableHeight).coerceIn(1, availableHeight).toFloat()
+        else availableHeight.toFloat()
+    var heightBudget = maxOf(228f, availableHeight * 0.45f).coerceAtMost(maximumHeight)
     // No four-row geometry can fit below the toolbar plus four 1dp rows. Preserve
     // horizontal usability rather than collapsing to a 1dp strip in this degenerate case.
     if (heightBudget < 56f) return ProtectedKeyboardSize(preferred, heightBudget.toInt(), 0)
@@ -63,9 +76,23 @@ internal fun defaultLetterKeyboardSize(
         return capWidth to (52f + rowHeight * 4f)
     }
 
+    if (calibratedPitch != null) {
+        // Derive the budget from the available viewport, not a previously resolved
+        // preferred width: resolving that returned width again must not shrink it.
+        val targetWidth = minOf(available.toFloat(), 16f + 10f * calibratedPitch)
+        val progress = wideQwertyStagger((targetWidth - 16f) / 10f, calibratedPitch)
+        val expandedHeightLimit = maxOf(heightBudget, availableHeight * 0.50f).coerceAtMost(maximumHeight)
+        // Keep this continuous. Rounding before interpolation made 832->833dp of
+        // available width jump four dp. The half dp only allows final integer-dp
+        // rounding; neither it nor the physical target may exceed the height limit.
+        val targetHeight = (geometry(targetWidth).second + 0.5f).coerceAtMost(expandedHeightLimit)
+        heightBudget += (targetHeight - heightBudget).coerceAtLeast(0f) * progress
+    }
+
     fun fits(width: Float): Boolean {
         val (capWidth, height) = geometry(width)
-        return capWidth <= 88f && height <= heightBudget + 0.001f
+        val withinWidth = calibratedPitch?.let { (width - 16f) / 10f <= it } ?: (capWidth <= 88f)
+        return withinWidth && height <= heightBudget + 0.001f
     }
     var width = preferred.toFloat()
     if (!fits(width)) {

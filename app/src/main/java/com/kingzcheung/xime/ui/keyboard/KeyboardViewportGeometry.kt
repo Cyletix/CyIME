@@ -1,5 +1,18 @@
 package com.kingzcheung.xime.ui.keyboard
 
+/** Service-resolved destination; content includes any panel that remains open after docking. */
+data class KeyboardDockTarget(
+    val widthDp: Int,
+    val contentHeightDp: Int,
+    val offsetXDp: Int,
+    val bottomPaddingDp: Int,
+    val bottomInsetDp: Int,
+)
+
+internal fun KeyboardDockTarget.rectInHost(widthPx: Float, heightPx: Float, density: Float): ResizeRect =
+    fixedKeyboardRect(widthPx, heightPx, contentHeightDp * density, bottomPaddingDp * density,
+        bottomInsetDp * density, widthDp * density, offsetXDp * density)
+
 /** Service 的内层宿主与窗口必须同时使用这个条件，不能仅在调节时全高。 */
 internal fun usesFullKeyboardHost(floating: Boolean, resizing: Boolean): Boolean = floating || resizing
 

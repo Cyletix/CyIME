@@ -132,6 +132,27 @@ class SwipeableKeyButtonGestureTest {
         assertEquals(listOf("up:1"), events.commits)
     }
 
+    @Test fun sidewaysDriftDoesNotCancelChosenSymbolButBacktrackingStillDoes() {
+        val events = setKey(letterDirections = true)
+        val key = rule.onNodeWithTag("key")
+        key.performTouchInput {
+            down(center)
+            moveTo(center + Offset(0f, 30f * events.density))
+            moveTo(center + Offset(300f, 80f) * events.density)
+        }
+        rule.runOnIdle { assertEquals("1", events.state.keyFlick?.text); assertTrue(events.commits.isEmpty()) }
+        key.performTouchInput { up() }
+        rule.runOnIdle { assertEquals(listOf("up:1"), events.commits) }
+        key.performTouchInput {
+            down(center)
+            moveTo(center + Offset(0f, -80f * events.density))
+            moveTo(center + Offset(-300f, -80f) * events.density)
+            moveTo(center + Offset(-300f, 0f) * events.density)
+            up()
+        }
+        rule.runOnIdle { assertEquals("Returning along the vertical axis cancels without a normal tap", listOf("up:1"), events.commits) }
+    }
+
     @Test fun defaultLetterFlickMovesUpperHintIntoSameKeyAndCommitsOnlyOnRelease() {
         val events = setKey(letterDirections = true)
         val key = rule.onNodeWithTag("key")

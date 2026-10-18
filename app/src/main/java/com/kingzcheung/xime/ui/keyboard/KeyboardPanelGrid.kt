@@ -23,7 +23,8 @@ internal fun <T> KeyboardPanelGrid(
     if (items.isEmpty()) return
     BoxWithConstraints(modifier.padding(horizontal = if (isLandscape) 16.dp else 12.dp, vertical = 8.dp)) {
         val twoRowModes = compactCards && items.size > 2 && maxHeight >= 240.dp
-        val minimumRowHeight = (34 + (if (preferSinglePage && LocalDensity.current.fontScale <= 1.3f) 14 else 28) * LocalDensity.current.fontScale).dp
+        // Include actual CJK font metrics, not just the requested 14sp line height.
+        val minimumRowHeight = (36 + (if (preferSinglePage && LocalDensity.current.fontScale <= 1.3f) 18 else 32) * LocalDensity.current.fontScale).dp
         val lowWidePanel = maxWidth >= 560.dp && maxHeight < minimumRowHeight * 2 + 24.dp
         val menuColumns = ((maxWidth.value + 8f) / (64f * LocalDensity.current.fontScale + 8f))
             .toInt().coerceIn(1, if (lowWidePanel) 8 else 4)

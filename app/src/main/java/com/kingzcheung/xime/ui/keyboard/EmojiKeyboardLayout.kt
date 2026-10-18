@@ -2,46 +2,22 @@ package com.kingzcheung.xime.ui.keyboard
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -53,11 +29,10 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.data.EmojiCategory
-import com.kingzcheung.xime.data.EmojiData
 import com.kingzcheung.xime.data.RecentUsageStore
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.PluginResultItem
-import com.kingzcheung.xime.plugin.core.api.PluginIcon
+import kotlinx.coroutines.launch
 
 @Composable
 fun EmojiKeyboardLayout(
@@ -72,478 +47,141 @@ fun EmojiKeyboardLayout(
     onHapticFeedback: (() -> Unit)? = null,
 ) {
     var faces by remember { mutableStateOf(false) }
-    Column(modifier.fillMaxSize().keyboardPanelBackground(backgroundColor)) {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ToolTab("Emoji", !faces, { faces = false }, Modifier.testTag("expression-emoji"))
-            ToolTab("顔文字", faces, { faces = true }, Modifier.testTag("expression-kaomoji"))
+    val modeTabs: @Composable RowScope.() -> Unit = {
+        ExpressionTab("Emoji", !faces, textColor, accentColor, Modifier.testTag("expression-emoji")) {
+            onHapticFeedback?.invoke(); faces = false
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (faces) KaomojiKeyboard(onEmojiSelect, Modifier.padding(bottom = bottomPaddingDp.dp))
-            else EmojiContent(onEmojiSelect, onImageEmojiSelect, onBack, backgroundColor, textColor,
-                accentColor, bottomPaddingDp, Modifier.fillMaxSize(), onHapticFeedback)
+        ExpressionTab("颜文字", faces, textColor, accentColor, Modifier.testTag("expression-kaomoji")) {
+            onHapticFeedback?.invoke(); faces = true
         }
+    }
+    Box(modifier.fillMaxSize().keyboardPanelBackground(backgroundColor).padding(bottom = bottomPaddingDp.dp)) {
+        if (faces) KaomojiKeyboard(onEmojiSelect, textColor = textColor, accentColor = accentColor,
+            leadingTabs = modeTabs, onCategoryFeedback = onHapticFeedback)
+        else EmojiContent(onEmojiSelect, onImageEmojiSelect, backgroundColor, textColor,
+            accentColor, onHapticFeedback, modeTabs)
     }
 }
 
 @Composable
 private fun EmojiContent(
     onEmojiSelect: (String) -> Unit,
-    onImageEmojiSelect: ((String) -> Unit)? = null,
-    onBack: () -> Unit,
+    onImageEmojiSelect: ((String) -> Unit)?,
     backgroundColor: Color,
     textColor: Color,
     accentColor: Color,
-    bottomPaddingDp: Int = 0,
-    modifier: Modifier = Modifier,
-    /** 分类 tab 切换的振动钩子（emoji 点击/删除经 onEmojiSelect 由调用方统一振动）。 */
-    onHapticFeedback: (() -> Unit)? = null,
+    onHapticFeedback: (() -> Unit)?,
+    leadingTabs: @Composable RowScope.() -> Unit,
 ) {
     val context = LocalContext.current
     val clipboardManager = remember { ClipboardManager.getInstance(context) }
-
-    // 图标按钮容器色：surface 与 primary 的混合色调（带种子色但不过于强烈）
-    val iconButtonContainer = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.primary,
-        0.15f
-    )
-
-    var selectedTopTabIndex by remember { mutableStateOf(0) }
-    var selectedSubCategoryIndex by remember { mutableStateOf(0) }
-
     val allCategories by ExtensionManager.emojiCategoriesFlow.collectAsStateWithLifecycle()
-    val pluginCategories = allCategories.filter { it.isPlugin }
-    val builtinCategories = allCategories.filter { !it.isPlugin }
-
-    // 最近使用（LRU）：作为内置分区的第一个子分类页，点击 emoji 时置顶记录
     var recentEmojis by remember {
         mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_EMOJIS))
     }
-    val recentCategory = EmojiCategory(name = "最近使用", icon = "🕘", emojis = recentEmojis)
-    val displayBuiltinCategories = remember(builtinCategories, recentEmojis) {
-        listOf(recentCategory) + builtinCategories
+    // One category strip for built-ins and plugins, in exactly the pager's order.
+    // No separate plugin-group bar or bottom navigation consuming content height.
+    val categories = remember(allCategories, recentEmojis) {
+        listOf(EmojiCategory(name = "最近使用", icon = "🕘", emojis = recentEmojis)) +
+            allCategories.filter { !it.isPlugin } + allCategories.filter { it.isPlugin }
     }
-
-    // 按 pluginId 分组插件子分类（用于顶层 tab 和底部子分类 tab）
-    val pluginGroupEntries = remember(pluginCategories) {
-        pluginCategories.groupBy { it.pluginId ?: it.name }.entries.toList()
-    }
-
-    // 当前顶层 tab 对应的子分类列表
-    val currentSubCategories = if (selectedTopTabIndex == 0) {
-        displayBuiltinCategories
-    } else {
-        val groupIdx = selectedTopTabIndex - 1
-        if (groupIdx < pluginGroupEntries.size) pluginGroupEntries[groupIdx].value
-        else emptyList()
-    }
-
-    // 所有页面的扁平索引（用于动画过渡）
-    val currentPageIndex = if (selectedTopTabIndex == 0) {
-        selectedSubCategoryIndex.coerceIn(0, maxOf(0, displayBuiltinCategories.lastIndex))
-    } else {
-        val groupIdx = selectedTopTabIndex - 1
-        val startPage = displayBuiltinCategories.size + pluginGroupEntries.take(groupIdx).sumOf { it.value.size }
-        val groupSize = if (groupIdx < pluginGroupEntries.size) pluginGroupEntries[groupIdx].value.lastIndex else 0
-        startPage + selectedSubCategoryIndex.coerceIn(0, maxOf(0, groupSize))
-    }
-    val totalPages = displayBuiltinCategories.size + pluginCategories.size
-
-    val configuration = LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val emojiColumns = if (isLandscape) 15 else 8
-
-    // 当前显示的类别
-    val currentCategory =
-        if (selectedTopTabIndex == 0) {
-            if (displayBuiltinCategories.isNotEmpty()) displayBuiltinCategories[selectedSubCategoryIndex.coerceIn(0, displayBuiltinCategories.lastIndex)]
-            else EmojiData.categories.first()
-        } else {
-            val groupIdx = selectedTopTabIndex - 1
-            if (pluginGroupEntries.isNotEmpty() && groupIdx < pluginGroupEntries.size) {
-                val subCats = pluginGroupEntries[groupIdx].value
-                subCats[selectedSubCategoryIndex.coerceIn(0, subCats.lastIndex)]
-            } else EmojiData.categories.first()
+    val pager = rememberPagerState(initialPage = if (categories.size > 1) 1 else 0,
+        pageCount = { categories.size })
+    var initialCategoryChosen by remember { mutableStateOf(categories.size > 1) }
+    val tabs = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(categories.size) {
+        if (!initialCategoryChosen && categories.size > 1) {
+            pager.scrollToPage(1)
+            initialCategoryChosen = true
         }
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(if (LocalKeyboardInputPreferences.current.frostedGlass.enabled) Color.Transparent else backgroundColor)
-    ) {
-        // With no plugins there is only one group; its lone tab wastes a full row.
-        if (pluginGroupEntries.isNotEmpty()) Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-                .testTag("emoji-groups")
-                .padding(start = if (isLandscape) 50.dp else 8.dp, end = if (isLandscape) 50.dp else 8.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 顶层 Tab（ClipboardView 样式）
-                Box(
-                    modifier = Modifier
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(iconButtonContainer)
-                        .padding(2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxHeight().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        // Emoji 主 Tab
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(11.dp))
-                                .background(
-                                    if (selectedTopTabIndex == 0) accentColor.copy(0.4f)
-                                    else Color.Transparent
-                                )
-                                .tolerantClick {
-                                    onHapticFeedback?.invoke()
-                                    selectedTopTabIndex = 0
-                                    selectedSubCategoryIndex = 0
-                                }
-                                .padding(horizontal = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "😊",
-                                fontSize = 14.sp
-                            )
+    }
+    LaunchedEffect(pager.currentPage, categories.size) {
+        if (tabs.layoutInfo.visibleItemsInfo.isNotEmpty() &&
+            tabs.layoutInfo.visibleItemsInfo.none { it.index == pager.currentPage })
+            tabs.animateScrollToItem(pager.currentPage.coerceAtMost(categories.lastIndex))
+    }
+    Column(Modifier.fillMaxSize()) {
+        ExpressionPanelBar(textColor, { onEmojiSelect("delete") }, leadingTabs) {
+            LazyRow(Modifier.weight(1f).testTag("emoji-categories"), state = tabs,
+                horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                itemsIndexed(categories) { index, category ->
+                    val samePlugin = category.isPlugin && categories.count { it.isPlugin && it.pluginId == category.pluginId } > 1
+                    val label = if (category.isPlugin) {
+                        if (samePlugin) category.name else category.pluginIcon?.text ?: category.icon
+                    } else category.icon
+                    // Asset-only plugin icons keep their image; the category name is
+                    // always exposed for accessibility and multi-category plugins.
+                    val asset = category.pluginIcon?.assetName.takeIf { category.isPlugin && !samePlugin }
+                    if (asset != null) {
+                        Box(Modifier.size(32.dp).testTag("emoji-category:$index").clip(RoundedCornerShape(8.dp))
+                            .background(if (index == pager.currentPage) accentColor.copy(alpha = .22f) else Color.Transparent)
+                            .tolerantClick { onHapticFeedback?.invoke(); scope.launch { pager.animateScrollToPage(index) } }
+                            .padding(4.dp)) {
+                            AsyncImage(asset, category.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         }
-
-                        // 插件 Tab（按 pluginId 分组，每插件一个顶层 tab）
-                        pluginGroupEntries.forEachIndexed { index, (_, subCats) ->
-                            val firstCat = subCats.first()
-                            val pluginIcon = firstCat.pluginIcon
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .background(
-                                        if (selectedTopTabIndex == index + 1) accentColor.copy(0.4f)
-                                        else Color.Transparent
-                                    )
-                                    .tolerantClick {
-                                        onHapticFeedback?.invoke()
-                                        selectedTopTabIndex = index + 1
-                                        selectedSubCategoryIndex = 0
-                                    }
-                                    .padding(horizontal = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (pluginIcon?.assetName != null) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(pluginIcon.assetName)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = firstCat.name,
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .padding(2.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                } else {
-                                    Text(
-                                        text = pluginIcon?.text ?: firstCat.icon,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
-                        }
+                    } else ExpressionTab(label, index == pager.currentPage, textColor, accentColor,
+                        Modifier.testTag("emoji-category:$index"), description = category.name) {
+                        onHapticFeedback?.invoke()
+                        scope.launch { pager.animateScrollToPage(index) }
                     }
                 }
             }
         }
-
-        val pagerState = rememberPagerState(
-            initialPage = currentPageIndex,
-            pageCount = { totalPages }
-        )
-
-        // 外部切换分类时同步到 Pager
-        LaunchedEffect(currentPageIndex) {
-            pagerState.animateScrollToPage(currentPageIndex)
-        }
-
-        // Pager 滑动时同步到外部状态
-        LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-            val page = pagerState.currentPage
-            if (!pagerState.isScrollInProgress && page != currentPageIndex) {
-                if (page < displayBuiltinCategories.size) {
-                    selectedTopTabIndex = 0
-                    selectedSubCategoryIndex = page
-                } else {
-                    // 找到该 page 属于哪个插件组的哪个子分类
-                    var remaining = page - displayBuiltinCategories.size
-                    for ((groupIdx, entry) in pluginGroupEntries.withIndex()) {
-                        if (remaining < entry.value.size) {
-                            selectedTopTabIndex = groupIdx + 1
-                            selectedSubCategoryIndex = remaining
-                            break
-                        }
-                        remaining -= entry.value.size
-                    }
-                }
-            }
-        }
-
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.testTag("emoji-pages")
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 4.dp)
-                .padding(bottom = 4.dp)
-        ) { pageIndex ->
-            val category = if (pageIndex < displayBuiltinCategories.size) {
-                displayBuiltinCategories[pageIndex]
-            } else {
-                pluginCategories[pageIndex - displayBuiltinCategories.size]
-            }
-
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-            val grid = symbolGridGeometry(maxWidth.value, maxHeight.value)
-            val emojiColumns = grid.columns
-            if (category.isPlugin && category.emojiItems != null) {
-                val hasImages = category.emojiItems.any { it.imageUrl != null }
-                val defaultCols = if (hasImages) 6 else emojiColumns
-                val columns = if (category.layoutColumns > 0) category.layoutColumns else defaultCols
-                val itemHeightDp = if (category.layoutItemHeightDp > 0) category.layoutItemHeightDp
-                    else (if (hasImages) 60 else 40)
-
-                // 行分组缓存：chunked 每次重组重算会产生大量临时列表，
-                // remember 后仅在数据/列数变化时重建
-                val emojiRows = remember(category.emojiItems, columns) {
-                    category.emojiItems.chunked(columns)
-                }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    // 图片表情行间距与列间距(6dp)对齐；文本表情保持紧凑 2dp
-                    verticalArrangement = Arrangement.spacedBy(if (hasImages) 6.dp else 2.dp)
-                ) {
-                    items(
-                        items = emojiRows,
-                        // 稳定 key 提升滚动复用率（id 在单分类内唯一）
-                        key = { row -> row.firstOrNull()?.id ?: row.hashCode() },
-                        contentType = { if (hasImages) "emoji-image-row" else "emoji-text-row" }
-                    ) { rowItems ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            rowItems.forEach { item ->
-                                PluginEmojiButton(
-                                    emojiItem = item,
-                                    defaultHeightDp = itemHeightDp,
-                                    backgroundColor = backgroundColor,
-                                    textColor = textColor,
-                                    onClick = {
+        HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth().testTag("emoji-pages")) { page ->
+            val category = categories[page]
+            BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 4.dp)) {
+                val grid = emojiGridGeometry(maxWidth.value, maxHeight.value)
+                val pluginItems = category.emojiItems
+                if (category.isPlugin && pluginItems != null) {
+                    val hasImages = pluginItems.any { it.imageUrl != null }
+                    val columns = if (category.layoutColumns > 0) category.layoutColumns
+                        else if (hasImages) (maxWidth.value / 64f).toInt().coerceAtLeast(1) else grid.columns
+                    val itemHeight = if (category.layoutItemHeightDp > 0) category.layoutItemHeightDp
+                        else if (hasImages) 60 else 40
+                    val rows = remember(pluginItems, columns) { pluginItems.chunked(columns) }
+                    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(if (hasImages) 6.dp else 2.dp)) {
+                        items(rows, key = { it.firstOrNull()?.id ?: it.hashCode() }) { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                row.forEach { item ->
+                                    PluginEmojiButton(item, onClick = {
                                         val imageUrl = item.imageUrl
-                                        if (imageUrl != null && onImageEmojiSelect != null) {
-                                            onImageEmojiSelect(imageUrl)
-                                        } else if (imageUrl != null) {
-                                            val success =
-                                                clipboardManager.copyImageToSystemClipboard(
-                                                    imageUrl,
-                                                    item.text
-                                                )
-                                            if (success) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "已复制表情，可粘贴发送",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            } else {
-                                                Toast.makeText(
-                                                    context,
-                                                    "复制失败",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
+                                        when {
+                                            imageUrl != null && onImageEmojiSelect != null -> onImageEmojiSelect(imageUrl)
+                                            imageUrl != null -> {
+                                                val success = clipboardManager.copyImageToSystemClipboard(imageUrl, item.text)
+                                                Toast.makeText(context, if (success) "已复制表情，可粘贴发送" else "复制失败", Toast.LENGTH_SHORT).show()
                                             }
-                                        } else {
-                                            onEmojiSelect(item.insertText ?: item.text)
+                                            else -> onEmojiSelect(item.insertText ?: item.text)
                                         }
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            repeat(columns - rowItems.size) {
-                                Spacer(modifier = Modifier
-                                    .weight(1f)
-                                    .height((itemHeightDp).dp))
+                                    }, defaultHeightDp = itemHeight, backgroundColor = backgroundColor,
+                                        textColor = textColor, modifier = Modifier.weight(1f))
+                                }
+                                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
-                }
-            } else if (category.emojis.isEmpty()) {
-                // 最近使用为空时的占位提示
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "暂无最近使用",
-                        color = textColor.copy(alpha = 0.5f),
-                        fontSize = 14.sp
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    items(category.emojis.chunked(emojiColumns)) { rowEmojis ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            rowEmojis.forEach { emoji ->
-                                EmojiButton(
-                                    emoji = emoji,
-                                    onClick = {
-                                        recentEmojis = RecentUsageStore.record(
-                                            context, RecentUsageStore.KEY_RECENT_EMOJIS, emoji
-                                        )
+                } else if (category.emojis.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("暂无表情记录", color = textColor.copy(alpha = .5f), fontSize = 14.sp)
+                    }
+                } else {
+                    val rows = remember(category.emojis, grid.columns) { category.emojis.chunked(grid.columns) }
+                    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        items(rows) { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                row.forEach { emoji ->
+                                    EmojiButton(emoji, {
+                                        recentEmojis = RecentUsageStore.record(context, RecentUsageStore.KEY_RECENT_EMOJIS, emoji)
                                         onEmojiSelect(emoji)
-                                    },
-                                    modifier = Modifier.weight(1f).height(grid.rowHeightDp.dp),
-                                    cellHeightDp = grid.rowHeightDp
-                                )
-                            }
-                            repeat(emojiColumns - rowEmojis.size) {
-                                Spacer(modifier = Modifier.weight(1f))
+                                    }, Modifier.weight(1f).height(grid.rowHeightDp.dp), grid.rowHeightDp)
+                                }
+                                repeat(grid.columns - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
                 }
             }
-        }
-
-        }
-        // 底部：子分类 Tab 或留空 + 删除按钮
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .padding(horizontal = 4.dp, vertical = 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (currentSubCategories.isNotEmpty()) {
-                // 显示当前顶层 tab 的子分类
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    currentSubCategories.forEachIndexed { index, category ->
-                        if (category.isPlugin) {
-                            // 插件子分类：显示分类名，不用 pluginIcon（那是插件级图标）
-                            EmojiCategoryTab(
-                                icon = category.name,
-                                pluginIcon = null,
-                                isSelected = index == selectedSubCategoryIndex,
-                                onClick = {
-                                    onHapticFeedback?.invoke()
-                                    selectedSubCategoryIndex = index
-                                },
-                                backgroundColor = backgroundColor,
-                                textColor = textColor,
-                                selectedBackgroundColor = accentColor,
-                                modifier = Modifier.widthIn(min = 36.dp)
-                            )
-                        } else {
-                            EmojiCategoryTab(
-                                icon = category.icon,
-                                pluginIcon = category.pluginIcon,
-                                isSelected = index == selectedSubCategoryIndex,
-                                onClick = {
-                                    onHapticFeedback?.invoke()
-                                    selectedSubCategoryIndex = index
-                                },
-                                backgroundColor = backgroundColor,
-                                textColor = textColor,
-                                selectedBackgroundColor = accentColor,
-                                modifier = Modifier.width(36.dp)
-                            )
-                        }
-                    }
-                }
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-
-            ActionKeyButton(
-                text = "删除",
-                onClick = { onEmojiSelect("delete") },
-                backgroundColor = backgroundColor,
-                textColor = textColor,
-                modifier = Modifier.width(48.dp),
-                fontSize = 12.sp
-            )
-        }
-
-        // 底部留空
-        Spacer(modifier = Modifier.height(if (isLandscape) 15.dp else bottomPaddingDp.dp))
-    }
-}
-
-@Composable
-fun EmojiCategoryTab(
-    icon: String,
-    pluginIcon: PluginIcon? = null,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    backgroundColor: Color,
-    textColor: Color,
-    selectedBackgroundColor: Color = textColor.copy(alpha = 0.15f),
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-
-    Box(
-        modifier = modifier
-            .height(30.dp)
-            .clip(RoundedCornerShape(15.dp))
-
-            .background(
-                if (isSelected) selectedBackgroundColor.copy(0.4f)
-                else backgroundColor
-            )
-            .padding(horizontal = 5.dp)
-            .tolerantClick(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        if (pluginIcon?.assetName != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(pluginIcon.assetName)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = icon,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(4.dp),
-                contentScale = ContentScale.Fit
-            )
-        } else {
-            Text(
-                text = pluginIcon?.text ?: icon,
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

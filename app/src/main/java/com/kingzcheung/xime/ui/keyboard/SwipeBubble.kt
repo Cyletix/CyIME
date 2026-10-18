@@ -68,6 +68,7 @@ data class BubbleDrawData(
     val selectedBgRadiusPx: Float,
     val longPressIconBitmaps: List<Bitmap> = emptyList(),
     val accentArgb: Int = 0xFF8F73E2.toInt(),
+    val gapPx: Float = 0f,
 )
 
 /** 按压气泡抬起后的滞留时长：随抬起瞬间消失看不清键位提示（主流输入法约 50~80ms），取中值。 */
@@ -178,7 +179,8 @@ fun rememberSwipeBubbleDrawData(
     val cornerRadiusPx = with(density) { BubbleCornerRadius.toPx() } * bubbleScale
     val screenMarginPx = with(density) { BubbleScreenMargin.toPx() }
     val keyWidthPx = keyWidth
-    val minBodyWidthPx = keyWidthPx * 1.8f
+    // Same look as the kana flick disc: a single choice is a round bubble, several form a capsule.
+    val minBodyWidthPx = bodyHeightPx
     val shadowRadiusPx = with(density) { 4.dp.toPx() } * bubbleScale
 
     val accentArgb = accentColor.toArgb()
@@ -197,7 +199,10 @@ fun rememberSwipeBubbleDrawData(
         }
     }
 
-    val bodyWidth = if (isLongPressMode) {
+    // A single long-press choice (the digit of a nine-key flick key) is the round bubble too.
+    val bodyWidth = if (isLongPressMode && swipeState.longPressItems.size == 1 && swipeState.longPressDrawableIds.isEmpty()) {
+        maxOf(textPaint.measureText(swipeState.longPressItems.first()) + with(density) { 20.dp.toPx() } * bubbleScale, minBodyWidthPx)
+    } else if (isLongPressMode) {
         val cellMin = if (swipeState.longPressDrawableIds.isNotEmpty())
             swipeState.longPressItems.size
         else
@@ -219,23 +224,14 @@ fun rememberSwipeBubbleDrawData(
     )
     val bodyRight = bodyLeft + bodyWidth
     val pointerLeft = pointerCenterX - keyWidthPx / 2f
-    val pointerRight = pointerLeft + keyWidthPx
     val boxLeft = minOf(bodyLeft, pointerLeft)
-    // 宽体（显示文字的主体）底部对齐按键顶部，悬在按键正上方不被手指遮挡；
-    // 尖端从宽体底部向下延伸 pointerHeightPx（≈按键上半部）指示归属键。
-    val boxTop = keyBounds.top - bodyHeightPx
-    val boxRight = maxOf(bodyRight, pointerRight)
-
-    val rightRoom = bodyRight - pointerRight
-    val leftRoom = pointerLeft - bodyLeft
-    val flushTolerancePx = with(density) { 10.dp.toPx() }
-    val isLeftFlush = leftRoom < cornerRadiusPx + flushTolerancePx || kotlin.math.abs(bodyLeft - pointerLeft) < 1f
-    val isRightFlush = rightRoom < cornerRadiusPx + flushTolerancePx || kotlin.math.abs(bodyRight - pointerRight) < 1f
+    // 浮窗与日语假名圆盘同样悬在按键上方留一点空隙；按键区只保留顶部的小三角指向浮窗。
+    val gapPx = with(density) { 6.dp.toPx() } * bubbleScale
+    val boxTop = keyBounds.top - bodyHeightPx - gapPx
     val bodyLeftInBox = bodyLeft - boxLeft
     val pointerLeftInBox = pointerLeft - boxLeft
-    val pointerRightInBox = pointerLeftInBox + keyWidthPx
-    val pathBodyLeft = if (isLeftFlush && leftRoom <= cornerRadiusPx) pointerLeftInBox else bodyLeftInBox
-    val pathBodyWidth = (if (isRightFlush && rightRoom <= cornerRadiusPx) pointerRightInBox else (bodyLeftInBox + bodyWidth)) - pathBodyLeft
+    val pathBodyLeft = bodyLeftInBox
+    val pathBodyWidth = bodyWidth
 
     val paddingPx = with(density) { 10.dp.toPx() } * bubbleScale
 
@@ -261,10 +257,10 @@ fun rememberSwipeBubbleDrawData(
         pointerLeftInBox = pointerLeftInBox,
         keyWidthPx = keyWidthPx,
         bodyHeightPx = bodyHeightPx,
-        pointerHeightPx = pointerHeightPx,
+        pointerHeightPx = pointerHeightPx + gapPx,
         cornerRadiusPx = cornerRadiusPx,
-        isLeftFlush = isLeftFlush && leftRoom <= cornerRadiusPx,
-        isRightFlush = isRightFlush && rightRoom <= cornerRadiusPx,
+        isLeftFlush = false,
+        isRightFlush = false,
         bgColor = bgColor,
         textColor = textColor,
         displayText = displayText,
@@ -281,96 +277,51 @@ fun rememberSwipeBubbleDrawData(
         selectedBgRadiusPx = selectedBgRadiusPx,
         longPressIconBitmaps = longPressIconBitmaps,
         accentArgb = accentArgb,
+        gapPx = gapPx,
     )
 }
 
-private fun buildBubblePath(data: BubbleDrawData): Path {
-    val bodyLeft = data.pathBodyLeft
-    val bodyWidth = data.pathBodyWidth
-    val bodyHeight = data.bodyHeightPx
-    val pointerLeft = data.pointerLeftInBox
-    val pointerWidth = data.keyWidthPx
-    val pointerHeight = data.pointerHeightPx
-    val cornerRadius = data.cornerRadiusPx
-    val isLeftFlush = data.isLeftFlush
-    val isRightFlush = data.isRightFlush
-
-    val bodyRight = bodyLeft + bodyWidth
-    val bodyBottom = bodyHeight
-    val pointerRight = pointerLeft + pointerWidth
-    val pointerBottom = bodyBottom + pointerHeight
-
-    val r = cornerRadius.coerceAtMost(bodyWidth / 2f).coerceAtMost(bodyHeight / 2f)
-    val pr = cornerRadius.coerceAtMost(pointerWidth / 2f).coerceAtMost(pointerHeight / 2f)
-
-    bubblePath.rewind()
-    bubblePath.moveTo(bodyLeft + r, 0f)
-    bubblePath.lineTo(bodyRight - r, 0f)
-    bubblePath.quadTo(bodyRight, 0f, bodyRight, r)
-
-    if (isRightFlush) {
-        bubblePath.lineTo(bodyRight, bodyBottom)
-        bubblePath.quadTo(pointerRight, bodyBottom, pointerRight, bodyBottom + pr)
-    } else {
-        bubblePath.lineTo(bodyRight, bodyBottom - r)
-        bubblePath.quadTo(bodyRight, bodyBottom, bodyRight - r, bodyBottom)
-        bubblePath.lineTo(pointerRight + pr, bodyBottom)
-        bubblePath.quadTo(pointerRight, bodyBottom, pointerRight, bodyBottom + pr)
-    }
-
-    bubblePath.lineTo(pointerRight, pointerBottom - pr)
-    bubblePath.quadTo(pointerRight, pointerBottom, pointerRight - pr, pointerBottom)
-    bubblePath.lineTo(pointerLeft + pr, pointerBottom)
-    bubblePath.quadTo(pointerLeft, pointerBottom, pointerLeft, pointerBottom - pr)
-    bubblePath.lineTo(pointerLeft, bodyBottom + pr)
-
-    if (isLeftFlush) {
-        bubblePath.lineTo(pointerLeft, bodyBottom)
-        bubblePath.lineTo(bodyLeft, bodyBottom)
-        bubblePath.lineTo(bodyLeft, r)
-        bubblePath.quadTo(bodyLeft, 0f, bodyLeft + r, 0f)
-    } else {
-        bubblePath.quadTo(pointerLeft, bodyBottom, pointerLeft - pr, bodyBottom)
-        bubblePath.lineTo(bodyLeft + r, bodyBottom)
-        bubblePath.quadTo(bodyLeft, bodyBottom, bodyLeft, bodyBottom - r)
-        bubblePath.lineTo(bodyLeft, r)
-        bubblePath.quadTo(bodyLeft, 0f, bodyLeft + r, 0f)
-    }
-
-    bubblePath.close()
-    return bubblePath
-}
-
 fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
-    val path = buildBubblePath(data)
-
     drawIntoCanvas { composeCanvas ->
         val canvas = composeCanvas.nativeCanvas
         canvas.save()
         canvas.translate(data.boxLeft, data.boxTop)
 
+        val bodyLeft = data.pathBodyLeft
+        val bodyRight = bodyLeft + data.pathBodyWidth
+        val radius = data.bodyHeightPx / 2f
         bubbleFillPaint.color = data.bgColor
         bubbleFillPaint.setShadowLayer(data.shadowRadiusPx, 0f, 0f, SHADOW_COLOR)
-        canvas.drawPath(path, bubbleFillPaint)
+        canvas.drawRoundRect(bodyLeft, 0f, bodyRight, data.bodyHeightPx, radius, radius, bubbleFillPaint)
+
+        // Small triangle on the pressed key's top edge, as on the kana keys.
+        val keyTop = data.bodyHeightPx + data.gapPx
+        if (data.pointerHeightPx > data.gapPx + 1f) {
+            val keyCenter = data.pointerLeftInBox + data.keyWidthPx / 2f
+            val halfBase = minOf(data.keyWidthPx, data.pointerHeightPx - data.gapPx) * 0.16f
+            val depth = halfBase * 1.06f
+            bubblePath.rewind()
+            bubblePath.moveTo(keyCenter - halfBase, keyTop)
+            bubblePath.lineTo(keyCenter, keyTop + depth)
+            bubblePath.lineTo(keyCenter + halfBase, keyTop)
+            bubblePath.close()
+            bubbleBgPaint.color = withAlpha(data.accentArgb, 0x99)
+            canvas.drawPath(bubblePath, bubbleBgPaint)
+        }
 
         if (data.isLongPressMode) {
             canvas.save()
-            canvas.clipRect(0f, 0f, data.bodyWidth, data.bodyHeightPx)
-            val accentColor = data.accentArgb
-            val selectedBgColor = android.graphics.Color.argb(
-                0x33, android.graphics.Color.red(accentColor),
-                android.graphics.Color.green(accentColor), android.graphics.Color.blue(accentColor)
-            )
-            val cellWidth = data.bodyWidth / data.longPressItems.size
+            canvas.clipRect(bodyLeft, 0f, bodyRight, data.bodyHeightPx)
+            val cellWidth = data.pathBodyWidth / data.longPressItems.size
 
             data.longPressItems.forEachIndexed { index, item ->
-                val itemLeft = index * cellWidth
-                if (index == data.selectedLongPressIndex) {
-                    bubbleBgPaint.color = selectedBgColor
-                    val r = minOf(data.selectedBgRadiusPx, cellWidth / 2f)
-                    canvas.drawRoundRect(
-                        itemLeft, 0f, itemLeft + cellWidth, data.bodyHeightPx, r, r, bubbleBgPaint
-                    )
+                val itemLeft = bodyLeft + index * cellWidth
+                val selected = index == data.selectedLongPressIndex
+                if (selected) {
+                    // Light disc behind the chosen item only, like the kana preview.
+                    bubbleBgPaint.color = withAlpha(data.textColor, 0x33)
+                    canvas.drawCircle(itemLeft + cellWidth / 2f, data.bodyHeightPx / 2f,
+                        minOf(cellWidth, data.bodyHeightPx) * 0.42f, bubbleBgPaint)
                 }
                 if (data.longPressIconBitmaps.isNotEmpty() && index < data.longPressIconBitmaps.size) {
                     val icon = data.longPressIconBitmaps[index]
@@ -383,11 +334,10 @@ fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
                         null
                     )
                 } else {
-                    val fontSize = if (index == data.selectedLongPressIndex) data.selectedFontSizePx else data.normalFontSizePx
-                    bubbleLabelPaint.color = if (index == data.selectedLongPressIndex) accentColor else data.textColor
-                    bubbleLabelPaint.textSize = fontSize
+                    bubbleLabelPaint.color = if (selected) data.textColor else withAlpha(data.textColor, 0xBF)
+                    bubbleLabelPaint.textSize = if (selected) data.selectedFontSizePx else data.normalFontSizePx
                     bubbleLabelPaint.textAlign = Paint.Align.CENTER
-                    bubbleLabelPaint.isFakeBoldText = true
+                    bubbleLabelPaint.isFakeBoldText = selected
                     bubbleLabelPaint.typeface = data.keyLabelTypeface
                     val textY = data.bodyHeightPx / 2f - (bubbleLabelPaint.fontMetrics.ascent + bubbleLabelPaint.fontMetrics.descent) / 2f
                     canvas.drawText(item, itemLeft + cellWidth / 2f, textY, bubbleLabelPaint)
@@ -396,13 +346,13 @@ fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
             canvas.restore()
         } else if (data.displayText != null) {
             canvas.save()
-            canvas.clipRect(0f, 0f, data.bodyWidth, data.bodyHeightPx)
+            canvas.clipRect(bodyLeft, 0f, bodyRight, data.bodyHeightPx)
             bubbleTextPaint.color = data.textColor
-            bubbleTextPaint.textSize = data.textSizePx
+            bubbleTextPaint.textSize = data.selectedFontSizePx
             bubbleTextPaint.textAlign = Paint.Align.CENTER
             bubbleTextPaint.typeface = data.keyLabelTypeface
             bubbleTextPaint.isFakeBoldText = true
-            val textCenterX = data.pathBodyLeft + data.pathBodyWidth / 2f
+            val textCenterX = bodyLeft + data.pathBodyWidth / 2f
             val textY = data.bodyHeightPx / 2f - (bubbleTextPaint.fontMetrics.ascent + bubbleTextPaint.fontMetrics.descent) / 2f
             canvas.drawText(data.displayText, textCenterX, textY, bubbleTextPaint)
             canvas.restore()
@@ -411,3 +361,5 @@ fun DrawScope.drawSwipeBubble(data: BubbleDrawData) {
         canvas.restore()
     }
 }
+
+private fun withAlpha(argb: Int, alpha: Int): Int = (argb and 0x00FFFFFF) or (alpha shl 24)

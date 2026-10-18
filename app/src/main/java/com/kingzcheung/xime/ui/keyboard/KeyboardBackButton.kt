@@ -4,12 +4,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material3.Icon
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,11 +33,33 @@ internal fun KeyboardToolbarButton(
     background: Color,
     modifier: Modifier = Modifier,
     outline: Color = Color.Transparent,
+    /** 在工具栏里占等宽一格：整格可点，底色为与其他工具图标同尺寸的胶囊。 */
+    slotWidth: androidx.compose.ui.unit.Dp? = null,
     content: @Composable () -> Unit,
 ) {
-    Box(modifier.size(40.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(32.dp).clip(CircleShape).background(background)
-            .border(1.dp, outline, CircleShape).visualMaterial(VisualStyles.current, 16.dp, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED), contentAlignment = Alignment.Center) { content() }
+    // 底板只在按下时出现，松手淡出；平时只有图标，与工具栏其他图标一致。
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val pressAlpha by animateFloatAsState(if (pressed) 1f else 0f,
+        animationSpec = tween(if (pressed) 0 else 300), label = "toolbar-button-press")
+    val disc = Modifier.background(background.copy(alpha = background.alpha * pressAlpha))
+        .border(1.dp, outline.copy(alpha = outline.alpha * pressAlpha), CircleShape)
+    if (slotWidth != null) {
+        val pill = toolbarPillSize(slotWidth)
+        Box(modifier.width(slotWidth).height(40.dp).clickable(source, indication = null, onClick = onClick),
+            contentAlignment = Alignment.Center) {
+            Box(Modifier.size(pill).clip(CircleShape).then(disc)
+                .then(if (pressed) Modifier.visualMaterial(VisualStyles.current, pill.height / 2,
+                    com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED) else Modifier),
+                contentAlignment = Alignment.Center) { content() }
+        }
+        return
+    }
+    Box(modifier.size(40.dp).clip(CircleShape).clickable(source, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center) {
+        Box(Modifier.size(32.dp).clip(CircleShape).then(disc)
+            .then(if (pressed) Modifier.visualMaterial(VisualStyles.current, 16.dp,
+                com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED) else Modifier), contentAlignment = Alignment.Center) { content() }
     }
 }
 
@@ -40,8 +70,9 @@ internal fun KeyboardBackButton(
     foreground: Color,
     modifier: Modifier = Modifier,
     label: String = "返回",
+    slotWidth: androidx.compose.ui.unit.Dp? = null,
 ) {
-    KeyboardToolbarButton(onBack, background, modifier) {
+    KeyboardToolbarButton(onBack, background, modifier, slotWidth = slotWidth) {
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = label,
             tint = foreground, modifier = Modifier.size(24.dp))
     }

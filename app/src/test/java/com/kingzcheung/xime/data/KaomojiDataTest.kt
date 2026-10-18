@@ -6,10 +6,10 @@ import org.junit.Test
 class KaomojiDataTest {
     @Test fun catalogHasDistinctCompleteUnicodeStringsAndIndependentHistory() {
         val faces = KaomojiData.categories.flatMap { it.faces }
-        assertEquals(12, KaomojiData.categories.size)
-        assertEquals(144, faces.size)
+        assertEquals(22, KaomojiData.categories.size)
+        assertEquals(572, faces.size)
         assertEquals(faces.size, faces.distinct().size)
-        assertTrue(faces.all { it.isNotBlank() && '\n' !in it && '\uFFFD' !in it })
+        assertTrue(faces.all { it.isNotBlank() && '\n' !in it && '\uFFFD' !in it && '\u2060' !in it })
         assertNotEquals(RecentUsageStore.KEY_RECENT_EMOJIS, RecentUsageStore.KEY_RECENT_KAOMOJI)
         val face = "(づ｡◕‿‿◕｡)づ"
         assertEquals(listOf(face, "(T_T)"), RecentUsageStore.record(listOf("(T_T)", face), face))

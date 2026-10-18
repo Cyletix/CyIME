@@ -111,17 +111,39 @@ internal fun KeyVisualMetrics.withAppliedGutter(
     )
 }
 
-internal data class LetterRowGeometry(val middleRowInsetDp: Float, val outerKeyWeight: Float)
+internal data class LetterRowGeometry(
+    val middleRowInsetDp: Float,
+    val outerKeyWeight: Float,
+    val middleRowEndInsetDp: Float = middleRowInsetDp,
+    val deleteKeyWeight: Float = outerKeyWeight,
+    val bottomLetterWeight: Float = 7f,
+)
 
-/** 只校准标准 10/9/7 字母行；自定义、合并键和分体仍走原布局。 */
+/** Keep the existing compact range. Its 2x phone spacing endpoint (68.8dp) is
+ * calibrated against the user's rounded tablet default pitch (98.4dp), not a new device category. */
+internal fun wideQwertyStagger(cellWidthDp: Float, targetCellWidthDp: Float?): Float {
+    if (!cellWidthDp.isFinite() || targetCellWidthDp == null ||
+        !targetCellWidthDp.isFinite() || targetCellWidthDp <= 0f) return 0f
+    val start = targetCellWidthDp *
+        (KeyVisualPolicy.Qwerty.referenceCellWidth * KeyVisualPolicy.ScaleMax / CALIBRATED_QWERTY_REFERENCE_CELL_DP)
+    val fraction = ((cellWidthDp - start) / (targetCellWidthDp - start)).coerceIn(0f, 1f)
+    return fraction * fraction * (3f - 2f * fraction)
+}
+
+/** Every complete alphabetic derivative uses the same frame; split retains its two-panel geometry. */
 internal fun standardLetterRowGeometry(
     keyRows: List<List<String>>,
     cellWidthDp: Float,
-    hasCustomLayout: Boolean,
+    @Suppress("UNUSED_PARAMETER") hasCustomLayout: Boolean,
     isSplit: Boolean,
-): LetterRowGeometry? = if (!hasCustomLayout && !isSplit && cellWidthDp > 0f &&
-    keyRows.map { it.size } == listOf(10, 9, 7) && keyRows.all { row -> row.all { it.length == 1 } }
-) LetterRowGeometry(cellWidthDp / 2f, (10f - 7f) / 2f) else null
+    physicalTargetCellDp: Float? = null,
+    /** 用户选定的错位（见 [QwertyStaggerMode]）；null 时按尺寸自动。 */
+    stagger: Float? = null,
+): LetterRowGeometry? {
+    if (isSplit || !cellWidthDp.isFinite() || cellWidthDp <= 0f) return null
+    return letterKeyboardFrame(keyRows)?.geometry(cellWidthDp,
+        stagger ?: wideQwertyStagger(cellWidthDp, physicalTargetCellDp))
+}
 
 /**
  * 由可用尺寸、列数与策略算出 gutter / 每侧 inset / 有限缩放 / 键帽短边。
@@ -182,8 +204,8 @@ internal fun keyVisualMetrics(
 internal const val MINIMUM_KEY_BODY_HEIGHT_DP = FLOATING_RESIZE_MIN_HEIGHT_DP - 44f
 
 /** Resolve the same edge-aligned grid for typing, symbols, candidates and live resizing.
- * Row gaps depend on actual cell width, never on surplus panel height. The renderer
- * fills the chosen body height; no hidden top/bottom spacers squeeze the keycaps.
+ * Default spacing follows cell width. Above the normal/square row height, split
+ * surplus height using the existing 80% cap / 20% gap budget, without outer spacers.
  */
 internal fun keyboardGridMetrics(
     policy: KeyVisualPolicy,
@@ -224,8 +246,14 @@ internal fun keyboardGridMetrics(
         .coerceIn(if (allowShrink) KeyVisualPolicy.ScaleMin else 1f, KeyVisualPolicy.ScaleMax)
     val widthGap = if (widthScale <= 1f) policy.gapY * widthScale
         else policy.gapY + (policy.maxGapY - policy.gapY) * (widthScale - 1f) * KeyVisualPolicy.RowGapGrowth
+    val defaultGap = widthGap.coerceIn(policy.minGapY, policy.maxGapY)
+    // Preserve the existing 56dp phone default and width-derived square-key point.
+    // Explicit spacing remains exact. Taller manual sizes share their extra height
+    // with row gaps instead of stretching only the caps; hit rows stay contiguous.
+    val normalRow = maxOf(56f, capWidth + defaultGap)
+    val extraRow = (metrics.cellHeightDp - normalRow).coerceAtLeast(0f)
     val compactGap = if (automaticGap)
-        widthGap.coerceIn(policy.minGapY, policy.maxGapY)
+        (defaultGap + extraRow * KeyVisualPolicy.MaxGapFraction)
             .coerceAtMost(metrics.cellHeightDp * KeyVisualPolicy.MaxGapFraction)
         else gapY
     return metrics.copy(

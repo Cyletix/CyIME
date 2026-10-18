@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.common.CompactMenuStyle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -78,6 +80,8 @@ import androidx.compose.ui.window.PopupProperties
 import com.kingzcheung.xime.settings.ButtonLayout
 import com.kingzcheung.xime.settings.SchemaInfo
 import kotlinx.coroutines.delay
+import kotlin.math.roundToLong
+import com.kingzcheung.xime.ui.theme.cyPopupEnter
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -180,6 +184,8 @@ fun LanguageKeyButton(
         }
     }
 
+    val menuHoldSeconds by rememberUpdatedState(
+        normalizeLanguageMenuHoldSeconds(LocalKeyboardInputPreferences.current.languageMenuHoldSeconds))
     Box(
         modifier.fillMaxWidth().fillMaxHeight()
             .onGloballyPositioned {
@@ -193,7 +199,7 @@ fun LanguageKeyButton(
                     var chosenId: String? = null
                     var cancelledSwipe = false
                     val menuJob = if (hasMenu) scope.launch {
-                        delay(200L)
+                        delay((menuHoldSeconds * 1000).roundToLong())
                         menuSchemas = schemas
                         selectedId = null
                         viewport = Rect.Zero
@@ -279,35 +285,36 @@ fun LanguageKeyButton(
                 // Popup owns a separate view; retain the keyboard density and font scale.
                 androidx.compose.runtime.CompositionLocalProvider(LocalDensity provides density) {
                 val palette = LocalKeyboardPalette.current
-                val menuBackground = palette?.background ?: MaterialTheme.colorScheme.surface
+                // A popup covers the keyboard's labels. Its own reading surface must occlude them;
+                // use the theme's surface/onSurface pair, never a gradient's representative first color.
+                // 菜单底取键盘自己的键帽色（字母键与功能键之间），不透明：契合主题，
+                // 也盖得住下面按键上的字。文字对比不足时退回 Material 的 surface/onSurface。
+                val themed = palette?.let { lerp(it.function.copy(alpha = 1f), it.key.copy(alpha = 1f), 0.5f) to it.text.copy(alpha = 1f) }
+                    ?.takeIf { (surface, text) -> textContrast(text, surface) >= 4.5f }
+                val menuBackground = themed?.first ?: MaterialTheme.colorScheme.surface
                 val menuGlass = rememberKeyboardInputPreferences(menuBackground.luminance() < 0.5f).frostedGlass
-                val menuText = if (menuGlass.enabled) palette?.text ?: MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurface
+                val menuText = themed?.second ?: MaterialTheme.colorScheme.onSurface.copy(alpha = 1f)
                 val accent = palette?.accent ?: MaterialTheme.colorScheme.primary
-                // Use the keyboard's keycap material, not a solid primary fill (near-white in dark glass).
-                val selectedBackground = if (menuGlass.enabled) {
-                    val keyFill = frostedKeyColor(palette?.function ?: backgroundColor, menuText, menuGlass)
-                    lerp(keyFill, accent, 0.18f).copy(alpha = if (keyFill.alpha == 0f) 0f
-                        else keyFill.alpha + (1f - keyFill.alpha) * 0.1f)
-                } else MaterialTheme.colorScheme.primary
-                val selectedText = if (menuGlass.enabled) menuText else MaterialTheme.colorScheme.onPrimary
-                val secondaryText = if (menuGlass.enabled) menuText.copy(alpha = 0.72f)
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                // 选中行：菜单底向强调色偏一点，再加强调色细边，玻璃开关都一样。
+                val selectedBackground = lerp(menuBackground, accent.copy(alpha = 1f), 0.22f)
+                val selectedText = menuText
+                val secondaryText = menuText.copy(alpha = 0.72f)
                 Surface(
-                    shape = RoundedCornerShape(16.dp), tonalElevation = if (menuGlass.enabled) 0.dp else 6.dp, shadowElevation = 8.dp,
-                    color = if (menuGlass.enabled) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    shape = CompactMenuStyle.Shape, tonalElevation = 0.dp, shadowElevation = CompactMenuStyle.Elevation,
+                    color = menuBackground.copy(alpha = 1f),
                     contentColor = menuText,
                     border = if (menuGlass.enabled) BorderStroke(1.dp, menuText.copy(alpha = 0.14f)) else null,
                     modifier = Modifier.width(with(density) { menuGeometry.bounds.width.toDp() })
-                        .height(with(density) { menuGeometry.bounds.height.toDp() }).testTag("language-menu"),
+                        .height(with(density) { menuGeometry.bounds.height.toDp() })
+                        // 只淡入不缩放：按住滑动选择按行的屏幕位置命中，缩放会让行位置在动画中偏移。
+                        .cyPopupEnter(scale = false)
+                        .testTag("language-menu"),
                 ) {
-                    Column(Modifier.keyboardPanelBackground(
-                        if (menuGlass.enabled) menuBackground else MaterialTheme.colorScheme.surface, menuGlass)
-                        // The keyboard backdrop already supplies glass; a second white sheen washes it out.
+                    Column(Modifier
                         .then(if (menuGlass.enabled) Modifier else Modifier.visualMaterial(
-                            VisualStyles.current, 16.dp, MaterialLevel.FLOATING)).padding(6.dp)) {
+                            VisualStyles.current, CompactMenuStyle.CornerRadius, MaterialLevel.FLOATING)).padding(6.dp)) {
                         Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
-                            Text("语言", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center,
+                            Text("语言", fontSize = CompactMenuStyle.FontSize, lineHeight = CompactMenuStyle.LineHeight, textAlign = TextAlign.Center,
                                 color = if (menuGlass.enabled) secondaryText else menuText)
                         }
                         Column(
@@ -328,21 +335,21 @@ fun LanguageKeyButton(
                                             selected = isSelected
                                             contentDescription = "选择${schema.name}"
                                         }
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(CompactMenuStyle.Shape)
                                         .background(if (isSelected) selectedBackground else Color.Transparent)
-                                        .then(if (menuGlass.enabled && isSelected) Modifier.border(
-                                            1.dp, accent.copy(alpha = 0.32f), RoundedCornerShape(12.dp)) else Modifier)
-                                        .padding(horizontal = 12.dp),
+                                        .then(if (isSelected) Modifier.border(
+                                            1.dp, accent.copy(alpha = 0.32f), CompactMenuStyle.Shape) else Modifier)
+                                        .padding(horizontal = CompactMenuStyle.HorizontalPadding),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
                                 ) {
                                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                         if (isSelected) Icon(Icons.Default.Check, contentDescription = null,
                                             tint = selectedText,
-                                            modifier = Modifier.align(Alignment.CenterStart).size(16.dp))
+                                            modifier = Modifier.align(Alignment.CenterStart).size(CompactMenuStyle.IconSize))
                                         Text(schema.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.padding(horizontal = 20.dp),
-                                            style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
+                                            fontSize = CompactMenuStyle.FontSize, lineHeight = CompactMenuStyle.LineHeight, textAlign = TextAlign.Center,
                                             color = if (isSelected) selectedText else menuText)
                                     }
                                     Text(modeName, maxLines = 1, overflow = TextOverflow.Ellipsis,

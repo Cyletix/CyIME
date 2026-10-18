@@ -180,12 +180,9 @@ onKeyPressDown: ((String) -> Unit)?,
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
             }
-            .drawWithContent {
-                drawContent()
-                bubbleData?.let { drawSwipeBubble(it) }
-            }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
+        SwipeBubbleOverlay(bubbleData)
         if (isLandscape) {
             // 横屏：去除原左侧符号面板（符号走符号键盘），
             // 笔画布局撑满键盘区域（与全键盘横屏同款 50dp 边距）
@@ -311,7 +308,7 @@ private fun StrokeKeyboardContent(
     val swipeHints = rememberSwipeHintsEnabled()
     val hintsActive = !compactMode
     // 左侧快捷符号列来自 xime.yaml keyboard.stroke.side_symbols（可自定义，>4 滚动显示）
-    val customSymbols = LocalKeyboardInputPreferences.current.symbols()
+    val customSymbols = LocalKeyboardInputPreferences.current.symbolsFor(SideSymbolTarget.STROKE)
     val inputActions = LocalKeyboardInputActions.current
     val commitSymbol = (if (customSymbols != null) inputActions.onCommitExactText else null)
         ?: inputActions.onCommitText ?: onKeyPress
@@ -600,7 +597,10 @@ private fun StrokeKeyboardContent(
                 swipeText = if (compactMode) null else "清空",
                 onSwipe = { onKeyPress("clear_composition") },
                 onPress = { onKeyPressDown?.invoke("delete") },
+                followSymbolSwipeDirection = true,
+                upFeedback = KeyFlickFeedback.DELETE,
                 swipeUpLabel = "上滑清空",
+                downFeedback = KeyFlickFeedback.UNDO,
                 swipeDownLabel = "下滑撤回",
                 onSwipeUp = { onKeyPress("clear_all") },
                 onSwipeDown = { onKeyPress("undo_clear") },
@@ -859,7 +859,7 @@ private fun ResetKey(
         if (!compactMode && maxHeight >= 48.dp) {
 Text(
             text = "重输",
-            color = textColor.copy(alpha = 0.5f),
+            color = keyHintColor(textColor, frostedGlass, 0.5f),
             fontSize = 9.sp,
             lineHeight = 11.sp,
             fontWeight = FontWeight.Normal,

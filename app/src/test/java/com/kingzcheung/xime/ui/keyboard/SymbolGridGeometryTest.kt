@@ -24,4 +24,16 @@ class SymbolGridGeometryTest {
         assertTrue(symbolGridGeometry(700f, 240f).columns < symbolGridGeometry(700f, 120f).columns)
         assertTrue(symbolGridGeometry(700f, 240f).rowHeightDp > symbolGridGeometry(700f, 120f).rowHeightDp)
     }
+
+    @Test fun emojiFitsWholeRowsInMinimumViewportAndShowsMoreOnLargerPanels() {
+        for (height in listOf(84f, 104f, 128f, 148f, 220f, 400f)) {
+            val grid = emojiGridGeometry(372f, height)
+            val rows = ((height + 2f) / (grid.rowHeightDp + 2f)).toInt()
+            assertTrue(grid.columns >= 8)
+            assertTrue("Readable cells at height $height", grid.rowHeightDp in 40f..52f)
+            assertEquals("No clipped last row at height $height", height,
+                rows * grid.rowHeightDp + (rows - 1) * 2f, .01f)
+        }
+        assertTrue(emojiGridGeometry(760f, 148f).columns > emojiGridGeometry(372f, 148f).columns)
+    }
 }

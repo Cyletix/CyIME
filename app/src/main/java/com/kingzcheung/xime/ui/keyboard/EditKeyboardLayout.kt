@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
@@ -40,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.visualMaterial
 
 private data class EditorKeyShadow(
     val enabled: Boolean = true,
@@ -112,8 +115,8 @@ fun EditKeyboardLayout(
                 val padMetrics = metricsFor(padDiameter)
                 val inset = (padMetrics.insetX ?: 2f).dp
                 val glyphScale = KeyboardKeyMetrics.contentScale(cellWidth.value * .92f, padDiameter.value / 3 * .92f)
-                val padColor = frostedKeyColor(androidx.compose.ui.graphics.lerp(keyBgColor, accentColor, 0.28f),
-                    textColor, LocalKeyboardInputPreferences.current.frostedGlass)
+                val padColor = frostedKeyColor(keyBgColor, textColor,
+                    LocalKeyboardInputPreferences.current.frostedGlass)
                 @Composable
                 fun key(command: String, keyModifier: Modifier, cutout: Shape? = null,
                     offsetX: Dp = 0.dp, offsetY: Dp = 0.dp, compact: Boolean = false) {
@@ -191,7 +194,8 @@ fun EditKeyboardLayout(
                         }
                     }
                     Box(Modifier.align(Alignment.Center).size(padDiameter).padding(inset)
-                        .testTag("editor-direction-pad").drawBehind { drawCircle(padColor) })
+                        .testTag("editor-direction-pad").clip(CircleShape).background(padColor)
+                        .visualMaterial(VisualStyles.current, padDiameter / 2 - inset))
                     Box(Modifier.align(Alignment.Center).size(padDiameter).testTag("editor-pad-controls")) {
                         val labelDistance = padDiameter / 3
                         listOf("up", "right", "down", "left").forEach { direction ->
@@ -337,6 +341,7 @@ internal fun EditorActionKey(
             pressed = pressed,
             opacityScale = if (!plain) 1f else if (pressed) 0.18f else 0f,
         )),
+            applyMaterial = !plain, // The shared disc already paints the direction sectors' material.
             particleSize = glowSize,
             particleOffset = if (plain) androidx.compose.ui.unit.DpOffset(contentOffsetX, contentOffsetY) else androidx.compose.ui.unit.DpOffset.Zero), contentAlignment = Alignment.Center) {
         val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let {

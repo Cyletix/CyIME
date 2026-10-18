@@ -21,8 +21,8 @@ data class CustomKeyboardLayout(
 
     fun valid(): Boolean {
         if (name.isBlank() || name.length > 32) return false
-        if (id == Cyletix10Layout.ID) return rows == Cyletix10Layout.rows
-        return (id == QwjrtkLayout.ID || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
+        // Cyletix10 是内置起点，按键可以像自定义布局一样调整（方案由当前排列生成）。
+        return (id == QwjrtkLayout.ID || id == Cyletix10Layout.ID || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
             rows.map { row -> row.sumOf { it.length } } == (if (hasExtraSlot()) listOf(10, 10, 7) else listOf(10, 9, 7)) &&
             rows.flatten().count { it == EMPTY_SLOT || it == ";" } <= 1 &&
             rows.flatten().all { it == EMPTY_SLOT || it == ";" || it.length in 1..2 && it.all { c -> c in 'a'..'z' } } &&
@@ -179,20 +179,24 @@ object CustomKeyboardLayouts {
         notifyChanged(context)
     }
 
-    /** Upgrade only the translator flags of layouts owned by this editor; keep user key order and dictionaries. */
+    /** Upgrade translator flags and the shared candidate policy; keep user key order and dictionaries. */
     fun enableMeasuredCorrection(context: Context) = synchronized(this) {
         val dir = SchemaManager.getRimeDir(context)
         for (layout in load(context)) {
             val file = File(dir, "${layout.id}.schema.yaml")
             if (!file.isFile) continue
             val old = file.readText()
-            if (old.contains("cyime_neighbor_correction: true")) continue
-            val section = Regex("(?ms)^translator:\\r?\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(old) ?: continue
-            val updated = section.value.replace(Regex("(?m)^  enable_correction:.*\\r?\\n"), "")
-                .replaceFirst(Regex("^translator:\\r?\\n"), "translator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
+            var updated = EnglishCandidatePolicy.install(old)
+            if (!updated.contains("cyime_neighbor_correction: true")) {
+                val section = Regex("(?ms)^translator:\\r?\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(updated) ?: continue
+                val translator = section.value.replace(Regex("(?m)^  enable_correction:.*\\r?\\n"), "")
+                    .replaceFirst(Regex("^translator:\\r?\\n"), "translator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
+                updated = updated.replaceRange(section.range, translator)
+            }
+            if (updated == old) continue
             val backup = File(context.filesDir, "rime-upgrade-backups/neighbor-correction/${file.name}")
             if (!backup.exists()) { backup.parentFile!!.mkdirs(); writeAtomically(backup, old) }
-            writeAtomically(file, old.replaceRange(section.range, updated))
+            writeAtomically(file, updated)
         }
     }
     fun delete(context: Context, id: String) {

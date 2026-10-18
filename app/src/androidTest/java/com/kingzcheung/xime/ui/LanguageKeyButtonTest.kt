@@ -1,5 +1,23 @@
 package com.kingzcheung.xime.ui
 
+import android.content.ContextWrapper
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.test.platform.app.InstrumentationRegistry
+import com.kingzcheung.xime.SharedPreferencesTestRule
+import com.kingzcheung.xime.settings.FrostedGlassConfig
+import com.kingzcheung.xime.settings.FrostedGlassPreferences
+import com.kingzcheung.xime.settings.FrostedGlassProfiles
+import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.ui.keyboard.LocalFrostedGlassPreview
+import com.kingzcheung.xime.ui.theme.LocalKeyboardPalette
+import com.kingzcheung.xime.ui.theme.resolveKeyboardPalette
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,6 +33,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -37,6 +58,8 @@ import org.junit.runner.RunWith
 class LanguageKeyButtonTest {
     @get:Rule
     val rule = createComposeRule()
+
+    @get:Rule val preferences = SharedPreferencesTestRule()
 
     private val events = mutableListOf<String>()
     private var density = 1f
@@ -89,6 +112,145 @@ class LanguageKeyButtonTest {
             rule.mainClock.advanceTimeByFrame()
             rule.mainClock.autoAdvance = true
         }
+    }
+
+    @Test fun glassLanguageMenuOwnsOpaqueReadingSurfaceEvenWithZeroBackgroundOpacity() {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = object : ContextWrapper(base) {
+            override fun getSharedPreferences(name: String, mode: Int) = preferences.getSharedPreferences()
+        }
+        // The isolated store defaults to Chinese/English; explicitly enable the Japanese fixture.
+        preferences.getSharedPreferences().edit().putStringSet(
+            com.kingzcheung.xime.settings.LanguagePreferences.KEY,
+            setOf(com.kingzcheung.xime.settings.InputLanguage.CHINESE.id,
+                com.kingzcheung.xime.settings.InputLanguage.JAPANESE.id,
+                com.kingzcheung.xime.settings.InputLanguage.ENGLISH.id)).commit()
+        SettingsPreferences.setKeyboardTheme(context, "transparent_glass")
+        val saved = FrostedGlassProfiles(FrostedGlassConfig(true, 7f, .31f, .68f),
+            FrostedGlassConfig(true, 23f, .68f, .31f))
+        FrostedGlassPreferences.saveProfiles(context, saved)
+        var dark by mutableStateOf(false)
+        var opacity by mutableStateOf(0f)
+        var beneath by mutableStateOf(Color.Black)
+        val lightSurface = Color(0xFFF2F2F2)
+        val darkSurface = Color(0xFF191C22)
+        rule.setContent {
+            val glass = FrostedGlassConfig(true, 10f, opacity, .29f)
+            CompositionLocalProvider(LocalContext provides context,
+                LocalDensity provides androidx.compose.ui.unit.Density(1f),
+                LocalFrostedGlassPreview provides FrostedGlassProfiles(glass, glass),
+                // A custom gradient's representative first color can be bright in dark appearance.
+                LocalKeyboardPalette provides resolveKeyboardPalette("transparent_glass", dark)
+                    .copy(background = Color(0xFF9CACCC)),
+                LocalKeyboardInputActions provides KeyboardInputActions(
+                    schemas = listOf(SchemaInfo("first", "中文九键", "", "", "",
+                        language = com.kingzcheung.xime.settings.InputLanguage.CHINESE),
+                        SchemaInfo("second", "日语模式", "", "", "", language = com.kingzcheung.xime.settings.InputLanguage.JAPANESE)),
+                    currentInputModeId = "first", onSwitchSchema = {})) {
+                MaterialTheme(colorScheme = if (dark) darkColorScheme(surface = darkSurface, onSurface = Color.White)
+                    else lightColorScheme(surface = lightSurface, onSurface = Color(0xFF202020))) {
+                    Box(Modifier.fillMaxSize().background(beneath), contentAlignment = Alignment.Center) {
+                        Text(("Q W E R T Y U I O P\n").repeat(20), color = if (beneath == Color.Black) Color.White else Color.Black)
+                        Box(Modifier.size(360.dp, 280.dp)) {
+                            com.kingzcheung.xime.ui.keyboard.LanguageMenuPanel {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+                                    LanguageKeyButton(onClick = {}, backgroundColor = Color.Gray,
+                                        modifier = Modifier.size(44.dp).testTag("language-key"))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (appearance in listOf(false, true)) for (alpha in listOf(0f, .2f, .8f)) {
+            rule.runOnIdle { dark = appearance; opacity = alpha }
+            rule.mainClock.autoAdvance = false
+            rule.onNodeWithTag("language-key").performTouchInput { down(center) }
+            rule.mainClock.advanceTimeBy(350L)
+            // Popup initially draws at alpha=0 until placement is calculated. Its follow-up
+            // composition needs frames after the long-press timing check has completed.
+            rule.mainClock.autoAdvance = true
+            // 菜单底取键盘自己的功能键与字母键之间的颜色（不透明），不是 Material surface。
+            val themed = resolveKeyboardPalette("transparent_glass", appearance)
+            val expected = androidx.compose.ui.graphics.lerp(themed.function.copy(alpha = 1f),
+                themed.key.copy(alpha = 1f), 0.5f).toArgb()
+            try {
+                awaitPopupEvidence("language-$appearance-$alpha-opened", expected)
+                rule.onNodeWithTag("language-schema:second").assertIsDisplayed()
+                rule.onNodeWithTag("language-schema:first").assertIsSelected()
+                rule.onNodeWithText("中文").assertIsDisplayed()
+                rule.onNodeWithText("日语").assertIsDisplayed()
+                for (underlay in listOf(Color.Black, Color.White)) {
+                    rule.runOnIdle { beneath = underlay }
+                    rule.mainClock.advanceTimeByFrame()
+                    val image = awaitPopupEvidence(
+                        "language-$appearance-$alpha-${underlay.toArgb()}", expected)
+                    assertTrue("menu has a measurable reading surface", image.width > 12 && image.height > 40)
+                    // Use the middle edge: top/bottom corner radii are dp, not fixed screenshot pixels.
+                    for (y in image.height / 2 - 4..image.height / 2 + 4) for (x in 4..6) {
+                        assertEquals("menu must occlude keyboard labels at opacity=$alpha dark=$appearance x=$x y=$y",
+                            expected, image.getPixel(x, y))
+                    }
+                }
+                assertEquals("transparent_glass", SettingsPreferences.getKeyboardTheme(context))
+                assertEquals(saved, FrostedGlassPreferences.readProfiles(context))
+            } finally {
+                rule.onNodeWithTag("language-key").performTouchInput { cancel() }
+                rule.mainClock.advanceTimeByFrame()
+                rule.mainClock.autoAdvance = true
+            }
+        }
+    }
+
+    /** Semantics alone can exist while Popup's initial positioning layer is still invisible. */
+    private fun awaitPopupEvidence(name: String, expected: Int): android.graphics.Bitmap {
+        try {
+            rule.waitUntil(timeoutMillis = 5_000L) {
+                if (rule.onAllNodesWithTag("language-menu").fetchSemanticsNodes().isEmpty()) false else {
+                    val image = rule.onNodeWithTag("language-menu").captureToImage().asAndroidBitmap()
+                    try {
+                        image.width > 12 && image.height > 40 &&
+                            (image.height / 2 - 4..image.height / 2 + 4).all { y ->
+                                (4..6).all { x -> image.getPixel(x, y) == expected }
+                            }
+                    } finally { image.recycle() }
+                }
+            }
+        } catch (failure: Throwable) {
+            savePopupEvidence("$name-timeout", "language-menu")
+            throw failure
+        }
+        return checkNotNull(savePopupEvidence(name, "language-menu"))
+    }
+
+    /** Preserve diagnostics before any display/pixel assertion, including missing-menu failures. */
+    private fun savePopupEvidence(name: String, tag: String): android.graphics.Bitmap? {
+        rule.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val directory = java.io.File(instrumentation.targetContext.getExternalFilesDir(null),
+            "popup-reading-surfaces").apply { mkdirs() }
+        val roots = rule.onAllNodes(isRoot(), useUnmergedTree = true)
+        val nodes = rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes()
+        val report = buildString {
+            appendLine("physicalDensity=${instrumentation.targetContext.resources.displayMetrics.density}")
+            nodes.forEach { appendLine("$tag screen=${it.positionOnScreen} size=${it.size} root=${it.boundsInRoot}") }
+            if (nodes.isEmpty()) appendLine("$tag is absent")
+            roots.fetchSemanticsNodes().indices.forEach { index -> appendLine(roots[index].printToString()) }
+        }
+        java.io.File(directory, "$name.txt").writeText(report)
+        instrumentation.uiAutomation.takeScreenshot()?.let { image ->
+            java.io.File(directory, "$name-screen.png").outputStream().use {
+                image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+            image.recycle()
+        }
+        if (nodes.isEmpty()) return null
+        val image = rule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
+        java.io.File(directory, "$name.png").outputStream().use {
+            image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        return image
     }
 
     private fun setKey(currentModeId: String = "first") {

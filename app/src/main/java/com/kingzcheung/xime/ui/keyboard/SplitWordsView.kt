@@ -252,7 +252,7 @@ fun SplitWordsView(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = if (part.isBlank()) if (part.contains('\n')) "换行" else "空格" else part,
+                                        text = splitPartLabel(part),
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else textColor,
                                         fontSize = 17.sp,
                                         fontWeight = FontWeight.Medium
@@ -269,4 +269,13 @@ fun SplitWordsView(
         Spacer(modifier = Modifier.height(bottomPaddingDp.dp))
     }
 }
+}
+
+private val NO_BREAK_SPACE = Char(0x00A0)
+
+/** 空白词块按原样占宽显示；普通空格换成不换行空格，避免被当作行尾空白而不计宽度。 */
+internal fun splitPartLabel(part: String): String = when {
+    !part.isBlank() -> part
+    part.contains('\n') -> "换行"
+    else -> part.replace(' ', NO_BREAK_SPACE).replace("\t", NO_BREAK_SPACE.toString().repeat(4))
 }

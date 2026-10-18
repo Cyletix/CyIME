@@ -38,8 +38,9 @@ class LetterRowGeometryTest {
         assertEquals(raw.insetY, actual.insetY)
     }
 
-    @Test fun customMergedAndSplitLayoutsKeepTheirOwnRowRules() {
-        assertNull(standardLetterRowGeometry(standard, 60f, true, false))
+    @Test fun completeCustomLettersShareFrameWhileSplitAndNonLetterGridsStaySeparate() {
+        assertEquals(standardLetterRowGeometry(standard, 60f, false, false),
+            standardLetterRowGeometry(standard, 60f, true, false))
         assertNull(standardLetterRowGeometry(standard, 60f, false, true))
         assertNull(standardLetterRowGeometry(listOf(listOf("qw", "er", "ty", "ui", "op")), 60f, false, false))
         assertNull(standardLetterRowGeometry(standard.map { it.map { key -> key + key } }, 60f, false, false))

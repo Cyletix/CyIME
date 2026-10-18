@@ -5,6 +5,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SymbolInputModeTest {
+    @Test fun `clear and undo follow corner symbol direction without changing repeat or left swipe`() {
+        for (reverse in listOf(false, true)) {
+            val events = mutableListOf<String>()
+            val actions = RepeatingKeyActions(onTap = { events += "tap" }, onPress = {}, onRelease = {}, onPreview = {},
+                onRepeat = { events += "delete" }, onLeft = { events += "composition" },
+                onUp = { events += "clear" }, onDown = { events += "undo" },
+                upLabel = "上滑清空", downLabel = "下滑撤回").withSymbolSwipeDirection(reverse)
+            actions.onUp?.invoke(); actions.onDown?.invoke(); actions.onRepeat?.invoke(); actions.onLeft?.invoke()
+            assertEquals(if (reverse) listOf("clear", "undo", "delete", "composition")
+                else listOf("undo", "clear", "delete", "composition"), events)
+            assertEquals(if (reverse) "上滑清空" else "上滑撤回", actions.upLabel)
+            assertEquals(if (reverse) "下滑撤回" else "下滑清空", actions.downLabel)
+            // “清空”提示画在键的上方：对调后下拉清空，预览仍须从上方移入。
+            assertEquals(!reverse, actions.swappedVertical)
+        }
+    }
     @Test fun `default pulls top on down and bottom on up without changing custom payloads`() {
         val events = mutableListOf<String>()
         val original = actions(events).copy(upText = "①", downText = "！？",

@@ -107,6 +107,7 @@ class KeySpacingGeometryTest {
                 screenWidthDp = 1400; screenHeightDp = 1000; orientation = Configuration.ORIENTATION_PORTRAIT
             }
             CompositionLocalProvider(LocalConfiguration provides configuration, LocalDensity provides Density(1f),
+                LocalKeyboardExplicitWidth provides true,
                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(splitKeyboardEnabled = mode.value.split)) {
                 MaterialTheme {
                     key(mode.value) {
@@ -129,7 +130,8 @@ class KeySpacingGeometryTest {
             }
         }
         val report = StringBuilder()
-        for (current in modes) for (size in listOf(320 to 240, 420 to 280, 1000 to 360, 840 to 560)) {
+        for (current in modes) for (size in listOf(280 to 164, 360 to 232, 360 to 356,
+            934 to 360, 934 to 627, 1493 to 814)) {
             rule.runOnIdle {
                 KeysConfigHelper.setActiveKeyboardSchema(current.schema)
                 mode.value = current
@@ -145,10 +147,15 @@ class KeySpacingGeometryTest {
                 }
             }
             val root = rule.onNodeWithTag("actual-grid", true)
+            assertEquals("fixture width cannot silently clamp", size.first,
+                root.fetchSemanticsNode().size.width)
+            assertEquals("fixture height cannot silently clamp", size.second,
+                root.fetchSemanticsNode().size.height)
             val origin = root.fetchSemanticsNode().boundsInRoot.topLeft
             val bitmap = root.captureToImage().asAndroidBitmap()
             val keypad = current.schema == "t9_pinyin" || current.schema == "japanese_kana"
-            val policy = if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty
+            val policy = (if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty)
+                .copy(maxKeyWidth = Float.MAX_VALUE)
             val columns = when (current.schema) {
                 "t9_pinyin" -> 5f * 3f / 3.4f
                 "japanese_kana" -> 5f
@@ -184,9 +191,12 @@ class KeySpacingGeometryTest {
             val note = "${current.schema} ascii=${current.ascii} split=${current.split} $size gap=($gx,$gy) " +
                 "expected=($expectedX,$expectedY) cell=($cellWidth,$cellHeight)"
             report.appendLine(note)
-            assertEquals("$note gapX", expectedX, gx, 1.6f)
-            assertEquals("$note gapY", expectedY, gy, 1.6f)
-            saveSpacingImage("grid-${current.schema}-${current.ascii}-${current.split}-${size.first}", bitmap)
+            assertEquals("$note gapX", expectedX, gx, 1.01f)
+            assertEquals("$note gapY", expectedY, gy, 1.01f)
+            assertEquals("$note same row top", a.top, b.top, 1f)
+            assertEquals("$note same row bottom", a.bottom, b.bottom, 1f)
+            assertEquals("$note first cap top", expectedY / 2f, a.top, 1f)
+            saveSpacingImage("grid-${current.schema}-${current.ascii}-${current.split}-${size.first}-${size.second}", bitmap)
         }
         File(app.getExternalFilesDir(null), "spacing-measurements.txt").writeText(report.toString())
     }

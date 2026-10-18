@@ -31,6 +31,7 @@ import androidx.compose.material.icons.twotone.Palette
 import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.twotone.Mic
 import androidx.compose.material.icons.twotone.Storage
+import androidx.compose.material.icons.filled.DocumentScanner
 import com.kingzcheung.xime.ui.settings.SettingsRoutes
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -40,6 +41,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.graphics.luminance
+import com.kingzcheung.xime.keyboard.ToolbarAction
+import com.kingzcheung.xime.keyboard.ToolbarButton
+import com.kingzcheung.xime.keyboard.ToolbarButtonItem
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,6 +74,9 @@ data class MenuItem(
     val textIcon: String? = null,
     val currentState: String? = null,
     val id: String = label,
+    /** 非空即开关项：开启时反色填充。 */
+    val selected: Boolean? = null,
+    val toolbarItem: ToolbarButtonItem? = null,
 )
 
 data class MenuBarState(
@@ -83,94 +92,26 @@ data class MenuBarState(
     val isAsciiMode: Boolean = false,
 )
 
-data class MenuBarCallbacks(
-    val onDismiss: () -> Unit,
-    val onClipboard: () -> Unit,
-    val onQuickSend: () -> Unit,
-    val onKeyboardResize: () -> Unit,
-    val onEmoji: () -> Unit,
-    val onReloadConfig: () -> Unit,
-    val onSettings: () -> Unit,
-    val onSchemaList: () -> Unit,
-    val onToggleDarkMode: () -> Unit,
-    val onFloatingModeToggle: (() -> Unit)? = null,
-    val onToolbarCustomize: () -> Unit = {},
-    val onToggleSchemaSwitch: ((SchemaSwitchUiState) -> Unit)? = null,
-    val onSettingsPage: (String) -> Unit = {},
-)
-
+/** 菜单与工具栏共用一组快捷入口；开关项开启时反色填充，点一下即切换且菜单保持打开。 */
 @Composable
 fun MenuBar(
     state: MenuBarState,
-    callbacks: MenuBarCallbacks,
+    actions: List<ToolbarAction>,
     modifier: Modifier = Modifier
 ) {
     if (!state.isVisible) return
-    
     val textColor = state.keyTextColor
-    // 功能 item 背景：与键盘按键背景一致（keyBgColor，浅色纯白、深色跟随 keyboard.colors）
-    val itemBgColor = state.keyBgColor
     val configuration = LocalConfiguration.current
     val isLandscape = !state.isFloatingMode && configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    
-    val keyboardResizeIcon = rememberVectorPainter(Icons.TwoTone.SettingsOverscan)
-    val customizeIcon = rememberVectorPainter(Icons.TwoTone.Padding)
-    val schemaIcon = rememberVectorPainter(Icons.TwoTone.Keyboard)
-    val settingsIcon = rememberVectorPainter(Icons.TwoTone.Settings)
-
-
-    var showOptions by remember { mutableStateOf(false) }
-    // 英文（ASCII）模式标点固定半角，全角／半角对它不生效：入口直接不出现，
-    // 避免"点了看不到状态变化，实际却改了状态"的误导；中文/日文仍保留该入口。
-    val widthSwitch = if (state.isAsciiMode) null
-        else state.schemaSwitches.firstOrNull { it.name == "full_shape" }
-    val options = state.schemaSwitches.filter { it.name != "ascii_mode" && it.name != "full_shape" && it.name != "ascii_punct" }
-    if (showOptions) {
-        Column(modifier.fillMaxSize().keyboardPanelBackground(state.backgroundColor)
-            .padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
-            Row(Modifier.fillMaxWidth().height(44.dp).clickable { showOptions = false },
-                verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回菜单", tint = textColor, modifier = Modifier.size(22.dp))
-                Text("输入选项", color = textColor, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp))
-            }
-            options.forEach { sw ->
-                val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
-                val title = when (sw.name) {
-                    "simplification" -> "简繁转换"
-                    else -> sw.states.joinToString(" / ")
-                }
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp))
-                    .background(itemBgColor).semantics { stateDescription = current }
-                    .clickable { callbacks.onToggleSchemaSwitch?.invoke(sw) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp).testTag("input-option:${sw.name}"),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, color = textColor, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Text("$current  ›", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-        }
-        return
+    val menuItems = actions.map { action ->
+        val toggle = (action.item as? ToolbarButtonItem.Builtin)?.button in ToolbarButton.TOGGLES
+        MenuItem(label = action.item.stateLabel(action.active), action = action.onClick, id = action.item.id,
+            currentState = if (toggle) (if (action.active) "已开启" else "已关闭") else null,
+            selected = if (toggle) action.active else null, toolbarItem = action.item)
     }
-    // 设置始终在首屏；明暗和模型管理保留在其所属设置页，常规菜单最多八项。
-    val menuItems = listOf(
-        MenuItem(settingsIcon, "设置", callbacks.onSettings),
-        MenuItem(keyboardResizeIcon, "键盘调节", callbacks.onKeyboardResize),
-    ) + listOfNotNull(widthSwitch?.let { sw ->
-        val current = sw.states.getOrNull(sw.currentIndex) ?: "未知"
-        MenuItem(
-            icon = rememberVectorPainter(if (current == "全角") Icons.TwoTone.WidthFull else Icons.TwoTone.WidthNormal),
-            label = current, action = { callbacks.onToggleSchemaSwitch?.invoke(sw) },
-            currentState = current, id = "全角／半角",
-        )
-    }) + listOf(
-        MenuItem(customizeIcon, "定制工具栏", callbacks.onToolbarCustomize),
-        MenuItem(rememberVectorPainter(Icons.TwoTone.Palette), "主题与定制", { callbacks.onSettingsPage(SettingsRoutes.Theme) }),
-        MenuItem(rememberVectorPainter(Icons.TwoTone.AutoAwesome), "智能联想", { callbacks.onSettingsPage(SettingsRoutes.SmartPrediction) }),
-        MenuItem(rememberVectorPainter(Icons.TwoTone.Mic), "语音转文本", { callbacks.onSettingsPage(SettingsRoutes.SpeechToText) }),
-    ) + (if (options.isNotEmpty()) listOf(MenuItem(schemaIcon, "输入选项", { showOptions = true })) else emptyList())
     KeyboardPanelGrid(menuItems, isLandscape, textColor, "menu-pages",
         modifier.fillMaxWidth().keyboardPanelBackground(state.backgroundColor), preferSinglePage = true) { item, cellModifier ->
-        MenuItemButton(item, itemBgColor, textColor,
+        MenuItemButton(item, state.keyBgColor, textColor,
             cellModifier.testTag("menu-item:${item.id}"), isLandscape)
     }
 }
@@ -183,21 +124,31 @@ fun MenuItemButton(
     modifier: Modifier = Modifier,
     isLandscape: Boolean = false
 ) {
+    val on = item.selected == true
+    // 开启的开关用文字色作底、取反色作字，任何主题（含玻璃半透明键帽）下都能一眼看出。
+    val fill = if (on) textColor else bgColor
+    val content = if (on) (if (textColor.luminance() > .5f) Color.Black else Color.White) else textColor
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
+            .background(fill)
             .visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED)
             .clickable { item.action() }
-            .semantics { item.currentState?.let { stateDescription = it } }
+            .semantics {
+                item.currentState?.let { stateDescription = it }
+                item.selected?.let { selected = it }
+            }
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        if (item.textIcon != null) {
+        if (item.toolbarItem != null) {
+            ToolbarButtonIcon(item = item.toolbarItem, tint = content.copy(alpha = if (on) 1f else 0.7f),
+                modifier = Modifier.size(26.dp), active = on)
+        } else if (item.textIcon != null) {
             Text(
                 text = item.textIcon,
-                color = textColor.copy(alpha = 0.7f),
+                color = content.copy(alpha = 0.7f),
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
@@ -206,14 +157,14 @@ fun MenuItemButton(
             Icon(
                 painter = item.icon,
                 contentDescription = item.label,
-                tint = textColor.copy(alpha = 0.7f),
+                tint = content.copy(alpha = 0.7f),
                 modifier = Modifier.size(26.dp)
             )
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = item.label,
-            color = textColor,
+            color = content,
             fontSize = 12.sp,
             lineHeight = if (isLandscape) 13.sp else 14.sp,
             fontWeight = FontWeight.Medium,
