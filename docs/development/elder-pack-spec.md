@@ -2,7 +2,9 @@
 
 老人包是给听力不好的老人用的 CyIME：装上就能用，不用下载，界面简单，字大，字幕只出中文。每次打老人包都按本文逐条核对，打包器会自动检查能检查的部分，检查不过不出包。
 
-用户于 2026-10-18 定下：老人不需要日语；字幕必须出中文；桌面要有单独的字幕图标；主题和输入方式按老人的习惯设好。
+用户于 2026-10-18 定下：老人不需要日语；字幕必须出中文；桌面要有单独的字幕图标；主题和输入方式按老人的习惯设好；声纹模型必须内置。
+
+**一致性优先**：老人最怕不同场景下行为不一样。老人包只在本文列出的地方和普通版不同，不另加“方便老人”的特殊行为。用户已明确否决：字幕页保持常亮、去掉或挪走英文切换键、精简设置页（2026-10-18）。新增任何老人包专属行为前先问用户。
 
 ## 怎么打
 
@@ -10,18 +12,22 @@
 py -3 -B scripts\packager\cyime_packager.py build --preset 老人包 --bump patch
 ```
 
-预设在 `scripts/packager/config.json` 的“老人包”（旧名“离线完整版”仍指向它）：正式版、带离线模型（`-PbundleModels=true`，即 `BuildConfig.BUNDLED_MODELS`）、九键公开 v3 模型、只出包不安装。
+预设在 `scripts/packager/config.json` 的“老人包”（旧名“离线完整版”仍指向它）：正式版、带离线模型（`-PbundleModels=true`，即 `BuildConfig.BUNDLED_MODELS`）、九键用当前最佳私人模型、只出包不安装，不发布。
+
+“当前最佳／已淘汰”以 `/mnt/project-files/模型总览.md` 为准，电脑上的镜像是 `D:/CyIME-Data/models/model-status.json`（`best_private`、`best_public`、`retired`），两者由「Windows 自训模型攻坚」一起更新；打包器从镜像读取。
 
 ## 包里必须有（打包器检查）
 
 | 项目 | 内容 |
 |---|---|
-| 九键词组模型 | 公开 v3 模型 `t9_ngram-model-v3-ls-tri.c3.lm`（SHA256 以 `11cee2cbd87f42cb` 开头）。**绝不能放用户的个人模型或任何私人数据** |
+| 九键词组模型 | 模型总览里的“当前最佳”私人模型（预设写 `@best_private`，现在是 p4 `t9_ngram-personal-p4.c3.lm`）。以后有更好的模型（如 CyLM 手机版）上线，改模型总览即可，老人包自动跟着换，不再问用户；已淘汰的模型打包器直接拒绝。这个包只给家里老人，不公开发布（用户 2026-10-18 决定） |
+| 私人数据 | 除九键模型外一律不进包：录音、声纹、手写样本、家人信息、用户词库都不放 |
 | 语音 | Paraformer 中英流式（边说边出字）＋ SenseVoice（停顿后校正、加标点），只有这两个 |
 | 手写 | ochwpro 手写模型 |
 | 联想 | predictive-text base 和 small |
+| 声纹 | 字幕分说话人用的 CAM++ 中文声纹模型（27 MB），必须打进包，装上就能分出是谁在说（用户 2026-10-18 要求） |
 
-`assets/bundled-models/` 下只能是这五个目录：ochwpro、paraformer-zh-en-int8、predictive-text-base、predictive-text-small、sensevoice-multilingual-int8。
+`assets/bundled-models/` 下只能是这六个目录：ochwpro、paraformer-zh-en-int8、predictive-text-base、predictive-text-small、sensevoice-multilingual-int8、speaker-campplus-zh。
 
 ## 包里不能有（打包器检查）
 

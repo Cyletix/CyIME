@@ -10,7 +10,7 @@
 
 | 选项 | 命令行 | 说明 |
 | --- | --- | --- |
-| 预设 | `--preset 装到我的设备` | 预设在 `scripts/packager/config.json`：装到我的设备（自己试用，旧名“日常测试包”仍可用）、轻量发布包（发 GitHub，不带九键模型）、老人包（模型全打进包，旧名“离线完整版”仍可用，按 [老人包要求](elder-pack-spec.md) 检查）；都是正式版，其后的参数可覆盖预设。调试版用 `--debug`，界面里在“高级”中，只能装到自己设备 |
+| 预设 | `--preset 装到我的设备` | 预设在 `scripts/packager/config.json`：装到我的设备（自己试用，旧名“日常测试包”仍可用）、轻量发布包（发 GitHub，不带九键模型）、老人包（模型全打进包，旧名“离线完整版”仍可用，按 [老人包要求](elder-pack-spec.md) 检查）；九键模型可写 `@best_private`／`@best_public`，取 `D:/CyIME-Data/models/model-status.json`（模型总览的镜像）里的当前最佳，列在 `retired` 的模型拒绝打包；都是正式版，其后的参数可覆盖预设。调试版用 `--debug`，界面里在“高级”中，只能装到自己设备 |
 | 正式版 / 调试版 | `--release` / `--debug` | 调试版同样用正式签名，可覆盖安装；调试版不能发布 |
 | 离线模型 | `--offline-models`；`--offline-model ID`（可重复） | 只写 `--offline-models` 放全部离线模型（以前的完整版）；用 `--offline-model` 只放选中的几个（ID 见 `info` 的 offline），经 `-PbundledModelIds` 传给 `prepare-bundled-models.py --models`。应用接受部分内置，没内置的默认模型照常联网下载。界面按最近一次 APK 实测的压缩比实时估算安装包大小，并标出各模型许可（config.json 的 modelNotes） |
 | 九键词组模型 | `--t9-model <文件名或路径或 none>` | 从 `D:/CyIME-Data/models/*.lm` 选，预设默认用紧凑版 `t9_ngram-model-v3-ls-tri.c3.lm`（内容同 v3，212.7 MB，1.12.27 起，APK 约 246 MB）；构建时硬链接到 `app/src/main/assets/rime_chinese/t9_ngram.lm`，结束（含失败）后移除；被强行中断时下次运行自动清理。已有别人放的不同文件时停止，不覆盖 |

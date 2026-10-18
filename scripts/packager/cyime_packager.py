@@ -38,19 +38,18 @@ CONFIG_PATH = HERE / "config.json"
 T9_TARGET = "app/src/main/assets/rime_chinese/t9_ngram.lm"
 # The bundled-model (full) edition is the elder package; docs/development/elder-pack-spec.md is its checklist.
 ELDER_MODELS = {"ochwpro", "paraformer-zh-en-int8", "predictive-text-base", "predictive-text-small",
-                "sensevoice-multilingual-int8"}
-ELDER_T9_SHA256 = "11cee2cbd87f42cb"  # prefix of the public v3 model t9_ngram-model-v3-ls-tri.c3.lm
+                "sensevoice-multilingual-int8", "speaker-campplus-zh"}
 ELDER_FORBIDDEN = re.compile(r"^assets/.*(rime_japanese/|jaroomaji|japanese|zipformer|_ja[-_./]|kana)", re.I)
 
 
-def elder_violations(names: list[str], t9_sha256: str | None) -> list[str]:
+def elder_violations(names: list[str], t9_sha256: str | None, best_sha256: str | None = None) -> list[str]:
     """What in an elder APK breaks the spec: Japanese assets, models outside the fixed set, a non-public T9 model."""
     problems = sorted({n for n in names if ELDER_FORBIDDEN.search(n)})[:10]
     models = {n.split("/")[2] for n in names if n.startswith("assets/bundled-models/") and n.count("/") >= 3}
     if models != ELDER_MODELS:
         problems.append(f"内置模型应为 {sorted(ELDER_MODELS)}，实际 {sorted(models)}")
-    if not (t9_sha256 or "").startswith(ELDER_T9_SHA256):
-        problems.append("九键模型不是公开 v3 模型（老人包不能带个人模型）")
+    if not t9_sha256 or t9_sha256 != best_sha256:
+        problems.append("九键模型不是模型总览里的当前最佳私人模型（best_private）")
     return problems
 DICT_DIR = "app/src/main/assets/cell_dictionaries"
 PRIVATE_DIRS = (".codex-artifacts", ".git")
@@ -198,14 +197,28 @@ def size_estimate(root: Path = ROOT) -> dict:
     return {"base": 113 * 1024 * 1024, "dicts": {}, "ratios": RATIO, "from": None}
 
 
+def model_status(config: dict) -> dict:
+    """当前最佳 / 已淘汰 T9 models, mirrored from /mnt/project-files/模型总览.md (D:/CyIME-Data/models/model-status.json)."""
+    path = Path(config.get("modelStatus") or Path(config["modelsDir"]) / "model-status.json")
+    return ad.read_json(path).get("t9", {}) if path.is_file() else {}
+
+
 def resolve_model(value: str | None, config: dict) -> Path | None:
     if value in (None, "", "none"):
         return None
+    status = model_status(config)
+    if value.startswith("@"):
+        # Presets name the current best model, never a fixed file, so packaging follows 模型总览 without asking.
+        if not status.get(value[1:]):
+            raise DeliveryError(f"模型总览里没有 {value[1:]}：请先更新 model-status.json（与 模型总览.md 同步）")
+        value = status[value[1:]]
     path = Path(value)
     if not path.is_absolute():
         path = Path(config["modelsDir"]) / value
     if not path.is_file():
         raise DeliveryError(f"找不到九键模型文件：{path}")
+    if path.name in set(status.get("retired", [])):
+        raise DeliveryError(f"九键模型 {path.name} 在模型总览里已淘汰，不能再打包")
     return path.resolve()
 
 
@@ -482,10 +495,12 @@ class Packager(ad.Delivery):
         if self.edition == "full":
             import zipfile
             with zipfile.ZipFile(path) as apk:
-                problems = elder_violations(apk.namelist(), self.staging.sha256 if self.model else None)
+                best = resolve_model("@best_private", self.config)
+                problems = elder_violations(apk.namelist(), self.staging.sha256 if self.model else None,
+                                            ad.digest(best) if best else None)
             if problems:
                 raise DeliveryError("老人包不符合 docs/development/elder-pack-spec.md：" + "；".join(problems))
-            say("[VERIFY] 老人包检查通过：无日语资源，内置模型齐全，九键为公开 v3 模型。")
+            say("[VERIFY] 老人包检查通过：无日语资源，内置模型齐全，九键为模型总览的当前最佳私人模型。")
 
     def push_banks(self) -> str:
         """Copy the external handwriting-training banks to this device. Never fails the install:
