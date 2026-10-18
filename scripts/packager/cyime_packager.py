@@ -51,6 +51,26 @@ def elder_violations(names: list[str], t9_sha256: str | None, best_sha256: str |
     if not t9_sha256 or t9_sha256 != best_sha256:
         problems.append("九键模型不是模型总览里的当前最佳私人模型（best_private）")
     return problems
+
+
+def friend_violations(names: list[str], t9_sha256: str | None, public_sha256: str | None,
+                      private_sha256: str | None, manifest_tree: str) -> list[str]:
+    """Friend package (docs/development/friend-pack-spec.md): normal app, all models bundled, public T9 model only."""
+    problems = []
+    if not any(n.startswith("assets/rime_japanese/") for n in names):
+        problems.append("日语资源缺失（朋友包保留日语，只是默认不开）")
+    models = {n.split("/")[2] for n in names if n.startswith("assets/bundled-models/") and n.count("/") >= 3}
+    if models != ELDER_MODELS:
+        problems.append(f"内置模型应为 {sorted(ELDER_MODELS)}，实际 {sorted(models)}")
+    if not t9_sha256 or t9_sha256 != public_sha256:
+        problems.append("九键模型不是模型总览里的当前最佳公开模型（best_public）")
+    if t9_sha256 and t9_sha256 == private_sha256:
+        problems.append("朋友包不能带私人模型")
+    # The separate caption launcher must ship disabled (android:enabled=false) so no extra home icon appears.
+    caption = manifest_tree.split("CaptionLauncher", 1)
+    if len(caption) < 2 or not re.search(r"android:enabled\([^)]*\)=\(type 0x12\)0x0\b", caption[1].split("E: ", 1)[0]):
+        problems.append("字幕桌面图标默认没有关闭")
+    return problems
 DICT_DIR = "app/src/main/assets/cell_dictionaries"
 PRIVATE_DIRS = (".codex-artifacts", ".git")
 ASSET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -262,7 +282,8 @@ class BuildOptions(SimpleNamespace):
     """Everything the GUI can choose. Field names match the CLI flags."""
     DEFAULTS = dict(build_type="release", offline_models=False, offline_ids=(), t9_model=None, exclude_dicts=(),
                     install=True, push_banks=False, serial="", rebuild=False, bump="none", publish=False,
-                    latest=False, prerelease=False, notes="", yes=False, dry_run=False, check=False)
+                    latest=False, prerelease=False, notes="", yes=False, dry_run=False, check=False,
+                    audience="")  # "elder" / "friend": a bundled-model package checked against its spec
 
     def __init__(self, **values):
         merged = dict(self.DEFAULTS)
@@ -367,7 +388,8 @@ class Packager(ad.Delivery):
                 "t9Model": {"name": self.model.name, "sha256": self.staging.sha256} if self.model else None,
                 "excludedDicts": list(self.p.exclude_dicts),
                 # Only present for a partial offline edition, so earlier build records stay valid.
-                **({"offlineIds": list(self.p.offline_ids)} if self.p.offline_ids else {})}
+                **({"offlineIds": list(self.p.offline_ids)} if self.p.offline_ids else {}),
+                **({"audience": self.p.audience} if self.p.audience else {})}
 
     def variant_id(self) -> str:
         return hashlib.sha256(json.dumps(self.variant(), sort_keys=True).encode()).hexdigest()[:12]
@@ -471,6 +493,8 @@ class Packager(ad.Delivery):
             args.append("-PbundledModelIds=" + ",".join(self.p.offline_ids))
         if self.p.exclude_dicts:
             args.append("-PcyimeIgnoreAssets=" + ":".join(f"cell_{i}.dict.yaml" for i in self.p.exclude_dicts))
+        if self.p.audience == "elder":
+            args.append("-PelderEdition=true")
         return args
 
     def build_parameters(self) -> str:
@@ -492,15 +516,24 @@ class Packager(ad.Delivery):
             raise DeliveryError("安装包里的包名/版本和源码不一致。")
         if self.kind == "release" and "application-debuggable" in badging:
             raise DeliveryError("正式版不应是可调试包。")
-        if self.edition == "full":
+        if self.p.audience in ("elder", "friend"):
             import zipfile
             with zipfile.ZipFile(path) as apk:
+                names = apk.namelist()
+            t9 = self.staging.sha256 if self.model else None
+            if self.p.audience == "elder":
                 best = resolve_model("@best_private", self.config)
-                problems = elder_violations(apk.namelist(), self.staging.sha256 if self.model else None,
-                                            ad.digest(best) if best else None)
+                problems = elder_violations(names, t9, ad.digest(best) if best else None)
+                spec, ok = "elder-pack-spec.md", "老人包检查通过：无日语资源，内置模型齐全，九键为模型总览的当前最佳私人模型。"
+            else:
+                public, private = (resolve_model(k, self.config) for k in ("@best_public", "@best_private"))
+                problems = friend_violations(names, t9, ad.digest(public) if public else None,
+                                             ad.digest(private) if private else None,
+                                             self.r.run([self.aapt, "dump", "xmltree", path, "AndroidManifest.xml"]))
+                spec, ok = "friend-pack-spec.md", "朋友包检查通过：日语资源在、默认不开，字幕桌面图标默认关，内置模型齐全，九键为公开当前最佳模型。"
             if problems:
-                raise DeliveryError("老人包不符合 docs/development/elder-pack-spec.md：" + "；".join(problems))
-            say("[VERIFY] 老人包检查通过：无日语资源，内置模型齐全，九键为模型总览的当前最佳私人模型。")
+                raise DeliveryError(f"安装包不符合 docs/development/{spec}：" + "；".join(problems))
+            say("[VERIFY] " + ok)
 
     def push_banks(self) -> str:
         """Copy the external handwriting-training banks to this device. Never fails the install:
@@ -848,7 +881,8 @@ def main(argv=None) -> int:
     o.add_argument("--no-offline-models", dest="offline_models", action="store_false")
     b.add_argument("--offline-model", dest="offline_ids", action="append", default=[], metavar="ID",
                    help="只放这些离线模型（可重复，ID 见 info 的 offline）；不写则放全部")
-    b.add_argument("--t9-model", help="九键词组模型：模型目录里的文件名、完整路径，或 none")
+    b.add_argument("--t9-model", help="九键词组模型：模型目录里的文件名、完整路径、@best_private／@best_public，或 none")
+    b.add_argument("--audience", choices=["elder", "friend"], help="按老人包／朋友包要求构建并检查（一般由预设给出）")
     b.add_argument("--exclude-dict", dest="exclude_dicts", action="append", default=[], metavar="ID",
                    help="去掉某个内置词库（可重复），ID 见 info")
     b.add_argument("--no-install", action="store_true", help="只出包，不安装")
