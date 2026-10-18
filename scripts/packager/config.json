@@ -5,7 +5,7 @@
     "装到我的设备": {
       "build_type": "release",
       "offline_models": false,
-      "t9_model": "t9_ngram-model-v3-ls-tri.c3.lm",
+      "t9_model": "@best_private",
       "exclude_dicts": [],
       "install": true,
       "push_banks": true
@@ -20,7 +20,7 @@
     "老人包": {
       "build_type": "release",
       "offline_models": true,
-      "t9_model": "t9_ngram-model-v3-ls-tri.c3.lm",
+      "t9_model": "@best_private",
       "exclude_dicts": [],
       "install": false
     }
