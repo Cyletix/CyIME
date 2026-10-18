@@ -1,5 +1,7 @@
 # 打包与安装
 
+老人包 **1.14.18 / 20261203（full，内置手写、联想 base/small、Paraformer、SenseVoice，九键 v3 公开模型，未发布）**：2026-10-18 打包器 `build --release --offline-models --t9-model t9_ngram-model-v3-ls-tri.c3.lm --no-install --bump patch`，`D:/CyIME-Data/deliveries/1.14.18/elder/CyIME-1.14.18-full-arm64-v8a.apk`，676,178,759 字节，SHA256 `3f05e5a9d70d8c093da903c0f81bf141c4b90d96ae5a35f7fc9229a820c08957`。新装时工具栏加字幕、拍照识别并打开桌面字幕图标（DeviceDefaults，仅全新安装）；含剪贴板多设备直连同步。未安装、未验收。
+
 公开候选包 **1.14.16 / 20261201（standard，九键 v3 公开模型，未发布）**：2026-10-18 打包器 `build --release --no-offline-models --t9-model t9_ngram-model-v3-ls-tri.c3.lm --no-install`，`D:/CyIME-Data/deliveries/1.14.16/public/CyIME-1.14.16-arm64-v8a.apk`，247,216,214 字节，SHA256 `980dd2e0ab782f06ee359159eac12fa3399b668d91620948e0208761e9d4bdd0`。含 26 键词频混入聊天口语 β=0.5；九键多条整句因速度门禁未开（display_sentences 1）。GitHub 未发布：1.7.1 之后的源码尚未提交，打包器发布需已提交源码。
 
 私有测试包 **1.14.17 / 20261202（standard，用户个人 p4 九键模型，禁止发布）**：同一源码，`--t9-model D:/CyIME-Data/models/private/t9_ngram-personal-p4.c3.lm --bump patch`（同版本号不能装两种内容），248,788,202 字节，SHA256 `9b1baf7c0041464739b75378e458b3e74190c174bba4ef5611bc0924535a6d48`。2026-10-18 平板 R52T800SKWZ 锁屏时 adb install -r 覆盖安装（数据保留），读回 1.14.17/20261202，设备 APK 哈希一致；手机未连接。用户未验收。
