@@ -21,6 +21,7 @@ object DefaultModelInstaller {
         DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE)
     private val started = AtomicBoolean(false)
     private val observingNetwork = AtomicBoolean(false)
+    @Volatile private var bundledReady = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private fun preferences(context: Context) = context.getSharedPreferences("default_models", Context.MODE_PRIVATE)
@@ -34,7 +35,10 @@ object DefaultModelInstaller {
         if (SettingsPreferences.isSttEnabled(context) && SettingsPreferences.isSttUseLocal(context)) {
             fun dependencies(mode: String): List<String> = listOf(SpeechModelSelection.primary(mode)) +
                 if (SpeechModelSelection.hasCorrection(mode)) listOf(SpeechModelCatalog.SENSEVOICE) else emptyList()
-            val current = dependencies(AsrModelManager(context).getSelectedModelId())
+            val manager = AsrModelManager(context)
+            val choices = context.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
+            val current = dependencies(manager.getSelectedModelId()) + com.kingzcheung.xime.settings.InputLanguage.supported
+                .filter { choices.contains("selected_model_${it.id}") }.flatMap { dependencies(manager.getSelectedModelId(it)) }
             addAll(dependencies(DeviceDefaults.voiceModel(context)).filter { it in current })
         }
         val prediction = DeviceDefaults.predictionModel(context)
@@ -52,12 +56,14 @@ object DefaultModelInstaller {
 
     fun start(context: Context) {
         val app = context.applicationContext
-        if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) {
+        if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS && !bundledReady) {
             if (!started.compareAndSet(false, true)) return
             scope.launch {
-                try { BundledModelInstaller.install(app) }
+                try { BundledModelInstaller.install(app); bundledReady = true }
                 catch (error: Exception) { FileLogger.e("DefaultModels", "内置模型准备失败，下次启动重试", error) }
                 finally { started.set(false) }
+                // A partial offline edition: defaults that were not bundled download as usual.
+                if (bundledReady) start(app)
             }
             return
         }

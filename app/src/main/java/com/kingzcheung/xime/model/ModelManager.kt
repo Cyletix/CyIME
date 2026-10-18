@@ -57,6 +57,29 @@ object ModelManager {
         }
     }
 
+    /**
+     * 安装用户从本机提供的模型文件：[fill] 把文件放进暂存目录，之后与网络下载走同一套
+     * 校验（文件清单、大小、sha256）和替换流程，校验不过不会覆盖已安装的模型。
+     */
+    internal suspend fun installLocal(context: Context, model: ModelInfo, version: ModelVersion, fill: (File) -> Unit) {
+        val guard = installGuards.getOrPut(model.id) { ModelInstallGuard() }
+        val generation = guard.currentGeneration()
+        downloadLocks.getOrPut(model.id) { Mutex() }.withLock {
+            val root = ModelStorage.getModelsRoot(context).apply { mkdirs() }
+            val staging = File(root, ".import-${model.id}-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+            try {
+                fill(staging)
+                validateDownloadedModel(staging, version)
+                check(guard.install(generation, staging, ModelStorage.getModelDir(context, model.id)) {
+                    if (model.category == ModelCategory.CANDIDATE) CandidateModelAssets.installDownloaded(context, model, version)
+                    MarketVersionStore.setModelVersion(context, model.id, version.version)
+                }) { "模型导入已取消：${model.id}" }
+                _downloadStates.update { it + (model.id to ModelDownloadState.Complete) }
+                notifyInstalledModelsChanged()
+            } finally { if (staging.exists()) staging.deleteRecursively() }
+        }
+    }
+
     /** Same readiness contract as the prediction loader, including installs before index loading. */
     fun isModelReady(context: Context, id: String): Boolean {
         ModelStorage.migrateLegacyForModel(context, id)
@@ -112,6 +135,12 @@ object ModelManager {
 
         return installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id)) != null &&
             (model.category != ModelCategory.PREDICTION || predictionModelFilesReady(dir))
+    }
+
+    /** 实际装着的版本（按文件内容认，老版本留下的文件也能认出），未安装为 null。 */
+    fun installedVersionOf(context: Context, model: ModelInfo): ModelVersion? {
+        val dir = getModelStorageDir(context, model)?.takeIf { it.exists() } ?: return null
+        return installedModelVersion(dir, model, MarketVersionStore.getModelVersion(context, model.id))
     }
 
     fun getModelStorageDir(context: Context, model: ModelInfo): File? {

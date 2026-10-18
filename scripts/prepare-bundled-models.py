@@ -19,17 +19,22 @@ def catalog():
     models = []
     for name in ('model/BuiltinModelCatalog.kt', 'speech/SpeechModelCatalog.kt'):
         source = (ROOT / 'app/src/main/java/com/kingzcheung/xime' / name).read_text(encoding='utf-8')
+        constants = dict(re.findall(r'const val (\w+) = "([^"]+)"', source))
         for block in source.split('ModelInfo(')[1:]:
-            model_id = re.match(r'"([^"]+)"', block)[1]
+            literal = re.match(r'"([^"]+)"', block)
+            model_id = literal[1] if literal else constants.get(re.match(r'(\w+)', block)[1], '')
             version = re.search(r'ModelVersion\(version = "([^"]+)"', block)[1]
+            title = re.match(r'(?:"[^"]+"|\w+),\s*"([^"]+)"', block)
             files = [dict(name=n, url=u, sha256=s, size=int(z)) for n,u,s,z in
-                     re.findall(r'ModelFile\("([^"]+)", "([^"]*)", "([^"]*)", (\d+)L\)', block)]
+                     re.findall(r'ModelFile\("([^"]+)", "([^"]*)", "([^"]*)", (\d+)L[,)]', block)]  # files may list download mirrors after the size
             archive = re.search(r'archiveUrl = "([^"]+)", sha256 = "([^"]+)"', block)
-            if not files or (not archive and any(not f['sha256'] or not f['url'] for f in files)):
+            if model_id in INCLUDED and (not files or (not archive and any(not f['sha256'] or not f['url'] for f in files))):
                 raise ValueError(f'Unsupported/incomplete pinned catalog: {model_id}')
-            models.append(dict(id=model_id, version=version, files=files,
+            models.append(dict(id=model_id, name=title[1] if title else model_id, version=version, files=files,
                                archive=archive.groups() if archive else None))
-    if len(models) != 6 or len({m['id'] for m in models}) != len(models):
+    # Only the explicitly included models are bundled; new catalog entries never join silently.
+    ids = [m['id'] for m in models]
+    if len(set(ids)) != len(ids) or not INCLUDED <= set(ids):
         raise ValueError('Catalog changed: review the offline model edition before building')
     return [m for m in models if m['id'] in INCLUDED]
 
@@ -45,9 +50,18 @@ def download(url, target, sha):
         raise ValueError(f'Checksum mismatch: {target.name}')
     temporary.replace(target)
 
-def prepare(output, cache):
+def prepare(output, cache, selected=None):
     payload = output / 'bundled-models'
     payload.mkdir(parents=True, exist_ok=True)
+    models = [m for m in catalog() if not selected or m['id'] in selected]
+    if selected and {m['id'] for m in models} != set(selected):
+        raise ValueError('Unknown bundled model id: ' + ', '.join(sorted(set(selected) - {m['id'] for m in models})))
+    # Remove model folders left by a previous edition with a different selection.
+    for stale in payload.iterdir():
+        if stale.is_dir() and stale.name not in {m['id'] for m in models}:
+            if stale.resolve().parent != payload.resolve():
+                raise ValueError('Unsafe generated model path')
+            shutil.rmtree(stale)
     # The generated folder can contain a previous six-model edition. Never ship stale models.
     for obsolete in ('zipformer-zh-int8',):
         target = (payload / obsolete).resolve()
@@ -56,7 +70,7 @@ def prepare(output, cache):
         if target.is_dir():
             shutil.rmtree(target)
     manifest = []
-    for model in catalog():
+    for model in models:
         directory = payload / model['id']
         directory.mkdir(exist_ok=True)
         archive = None
@@ -91,5 +105,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, default=ROOT / 'app/build/generated/bundled-model-assets')
     parser.add_argument('--cache', type=Path, default=ROOT / '.gradle/bundled-model-cache')
+    parser.add_argument('--models', default='', help='Comma-separated model ids; empty means all offline models')
     args = parser.parse_args()
-    prepare(args.output, args.cache)
+    prepare(args.output, args.cache, [m for m in args.models.split(',') if m])

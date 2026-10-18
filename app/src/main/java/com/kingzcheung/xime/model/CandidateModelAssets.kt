@@ -59,24 +59,60 @@ internal object CandidateModelAssets {
     }
 
     fun installDownloaded(context: Context, model: ModelInfo, version: ModelVersion) {
-        installCandidateModel(ModelStorage.getModelDir(context, model.id), File(context.filesDir, "rime"), version)
+        // 用户主动安装时，同名文件若是目录里的已知内容（旧格式、或二选一的另一档），属于 CyIME 自己的文件，直接替换。
+        installCandidateModel(ModelStorage.getModelDir(context, model.id), File(context.filesDir, "rime"), version) { name, file ->
+            val owner = knownCatalogOwner(name, file) ?: return@installCandidateModel false
+            if (owner.id != model.id) setDisabled(context, owner.id, true)
+            true
+        }
         setDisabled(context, model.id, false)
+        if (model.id == CandidateModelCatalog.NGRAM || model.id == CandidateModelCatalog.NGRAM_SMALL) dropSupersededGrammar(context)
     }
+
+    /**
+     * 装了九键词组模型后，解码器用词组模型打分、不再加载语法增强，390 MB 白占空间：自动删掉。
+     * 需要时可在商店重新下载（删掉词组模型后它会重新起作用）。
+     */
+    fun dropSupersededGrammar(context: Context) {
+        val runtime = File(context.filesDir, "rime")
+        val ngramInstalled = CandidateModelCatalog.models
+            .filter { it.id == CandidateModelCatalog.NGRAM || it.id == CandidateModelCatalog.NGRAM_SMALL }
+            .any { model -> model.versions.any { hasDownloadedModelFiles(runtime, it) } }
+        if (!ngramInstalled) return
+        val grammar = CandidateModelCatalog.models.firstOrNull { it.id == CandidateModelCatalog.GRAMMAR } ?: return
+        val present = grammar.versions.flatMap { it.files }.any { info ->
+            modelDownloadFile(runtime, info.name).exists() ||
+                modelDownloadFile(ModelStorage.getModelDir(context, grammar.id), info.name).exists()
+        }
+        if (present && !ModelManager.deleteModel(context, grammar))
+            com.kingzcheung.xime.util.FileLogger.w("CandidateModels", "语法增强已被词组模型取代，但未能删除")
+    }
+
+    private fun matchesAnyVersion(model: ModelInfo, name: String, file: File): Boolean = model.versions.any { version ->
+        version.files.any { info -> info.name == name && info.sizeBytes == file.length() &&
+            runCatching { verifyModelDigest(file, info.sha256) }.isSuccess }
+    }
+
+    private fun knownCatalogOwner(name: String, file: File): ModelInfo? =
+        CandidateModelCatalog.models.firstOrNull { matchesAnyVersion(it, name, file) }
 
     /** Explicit deletion only removes known catalog content, never a custom same-name file. */
     fun removeRuntimeCopy(context: Context, model: ModelInfo): Boolean {
         val root = File(context.filesDir, "rime")
-        val files = model.files.map { info -> info to modelDownloadFile(root, info.name) }
-        try {
-            files.filter { it.second.exists() }.forEach { (info, file) -> verifyModelDigest(file, info.sha256) }
-        } catch (_: IOException) { return false }
+        // 任一已知版本（含旧格式）都算本条目的内容，才能删掉老版本留下的文件。
+        val files = model.versions.flatMap { it.files }.map { it.name }.distinct().map { it to modelDownloadFile(root, it) }
+        if (files.any { (name, file) -> file.exists() && !matchesAnyVersion(model, name, file) }) return false
         setDisabled(context, model.id, true)
         return files.all { (_, file) -> !file.exists() || file.delete() }
     }
 }
 
 /** Validate the complete source before publishing any file; preserve unknown destination content. */
-internal fun installCandidateModel(source: File, runtime: File, version: ModelVersion): Boolean {
+internal fun installCandidateModel(
+    source: File, runtime: File, version: ModelVersion,
+    /** 已有同名但内容不同的文件可否替换；默认保留（启动时自动应用不替换任何文件）。 */
+    canReplace: (name: String, existing: File) -> Boolean = { _, _ -> false },
+): Boolean {
     // Installed hardlinks share exactly the already-verified downloaded bytes, without rehashing
     // hundreds of megabytes every time the settings or IME prepares existing resources.
     if (hasDownloadedModelFiles(source, version) && version.files.all { info ->
@@ -84,12 +120,17 @@ internal fun installCandidateModel(source: File, runtime: File, version: ModelVe
                 modelDownloadFile(runtime, info.name).toPath()) }.getOrDefault(false)
         }) return false
     validateDownloadedModel(source, version)
+    val replaced = mutableSetOf<String>()
     val missing = version.files.filter { info ->
         val existing = modelDownloadFile(runtime, info.name)
         if (existing.exists()) {
-            try { verifyModelDigest(existing, info.sha256) }
-            catch (error: IOException) { throw IOException("保留已有不同版本的 ${info.name}，未覆盖；请先移走该文件后重试", error) }
-            false
+            try { verifyModelDigest(existing, info.sha256); false }
+            catch (error: IOException) {
+                if (!canReplace(info.name, existing))
+                    throw IOException("保留已有不同版本的 ${info.name}，未覆盖；请先移走该文件后重试", error)
+                replaced += info.name
+                true
+            }
         } else true
     }
     if (missing.isEmpty()) return false
@@ -107,6 +148,9 @@ internal fun installCandidateModel(source: File, runtime: File, version: ModelVe
             verifyModelDigest(temporary, info.sha256)
         }
         for ((temporary, destination) in pending) {
+            // 新文件已全部校验通过，才移走要替换的旧文件。
+            if (destination.name in replaced && destination.exists() && !destination.delete())
+                throw IOException("无法替换旧的 ${destination.name}")
             // A link publishes atomically without replacing a destination created after preflight.
             try { Files.createLink(destination.toPath(), temporary.toPath()) }
             catch (exists: FileAlreadyExistsException) { throw exists }

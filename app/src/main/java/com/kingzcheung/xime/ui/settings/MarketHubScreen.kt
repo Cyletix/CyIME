@@ -43,8 +43,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.kingzcheung.xime.ui.common.CompactDropdownMenu
+import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -444,6 +444,7 @@ private fun ModelsMarketTab(
         ModelCategory.PREDICTION to "联想",
         ModelCategory.HANDWRITING to "手写",
         ModelCategory.ASR to "语音",
+        ModelCategory.SPEAKER to "声纹",
         ModelCategory.OTHER to "其他",
     )
 
@@ -516,9 +517,9 @@ private fun ModelsMarketTab(
                                         append("  ·  $sizeLabel")
                                     }
                                 },
-                                versions = item.model.versions.map { it.version },
+                                versions = item.model.downloadableVersions.map { it.version },
                                 selectedVersion = uiState.selectedVersions[item.model.id]
-                                    ?: item.model.versions.firstOrNull()?.version.orEmpty(),
+                                    ?: item.model.downloadableVersions.firstOrNull()?.version.orEmpty(),
                                 onSelectVersion = { viewModel.selectVersion(item.model.id, it) },
                                 onCardClick = { onNavigateToDetail(item.model.id) },
                                 trailing = {
@@ -987,34 +988,17 @@ private fun MarketVersionSelector(
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
-        DropdownMenu(
+        CompactDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
             versions.forEach { v ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "$v",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            if (v == selectedVersion.ifEmpty { versions.first() }) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = "当前",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    },
+                CompactMenuRow(
+                    label = "$v", selected = v == selectedVersion.ifEmpty { versions.first() },
                     onClick = {
                         onSelectVersion(v)
                         expanded = false
                     },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
         }
@@ -1522,8 +1506,8 @@ private fun ModelDetailBody(
     val model = item.model
     val (iconContainer, iconContent) = modelCategoryColors(model.category)
     val selectedVersion = uiState.selectedVersions[model.id]
-        ?: model.versions.firstOrNull()?.version.orEmpty()
-    val selectedVersionObj = model.versions.firstOrNull { it.version == selectedVersion }
+        ?: model.downloadableVersions.firstOrNull()?.version.orEmpty()
+    val selectedVersionObj = model.downloadableVersions.firstOrNull { it.version == selectedVersion }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -1616,7 +1600,7 @@ private fun ModelDetailBody(
             )
         }
 
-        if (model.versions.isEmpty()) {
+        if (model.downloadableVersions.isEmpty()) {
             item {
                 Text(
                     "暂无版本信息",
@@ -1625,7 +1609,7 @@ private fun ModelDetailBody(
                 )
             }
         } else {
-            items(model.versions, key = { it.version }) { v ->
+            items(model.downloadableVersions, key = { it.version }) { v ->
                 ModelVersionCard(
                     version = v,
                     selected = v.version == selectedVersion,
@@ -1785,7 +1769,7 @@ private fun modelCategoryColors(category: ModelCategory): Pair<Color, Color> {
             scheme.primaryContainer to scheme.onPrimaryContainer
         ModelCategory.HANDWRITING ->
             scheme.secondaryContainer to scheme.onSecondaryContainer
-        ModelCategory.ASR ->
+        ModelCategory.ASR, ModelCategory.SPEAKER ->
             scheme.tertiaryContainer to scheme.onTertiaryContainer
         ModelCategory.OTHER ->
             scheme.surfaceContainerHighest to scheme.onSurfaceVariant
@@ -1795,7 +1779,7 @@ private fun modelCategoryColors(category: ModelCategory): Pair<Color, Color> {
 private fun modelCategoryIcon(category: ModelCategory): ImageVector = when (category) {
     ModelCategory.CANDIDATE -> Icons.Default.AutoAwesome
     ModelCategory.PREDICTION -> Icons.Default.AutoAwesome
-    ModelCategory.ASR -> Icons.Default.GraphicEq
+    ModelCategory.ASR, ModelCategory.SPEAKER -> Icons.Default.GraphicEq
     ModelCategory.HANDWRITING -> Icons.Outlined.Gesture
     ModelCategory.OTHER -> Icons.Default.AutoAwesome
 }
@@ -1836,6 +1820,7 @@ internal fun modelCategoryLabel(category: ModelCategory): String = when (categor
     ModelCategory.PREDICTION -> "联想"
     ModelCategory.ASR -> "语音"
     ModelCategory.HANDWRITING -> "手写"
+    ModelCategory.SPEAKER -> "声纹"
     ModelCategory.OTHER -> "其他"
 }
 

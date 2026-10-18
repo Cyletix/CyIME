@@ -50,6 +50,28 @@ class CandidateModelInstallationTest {
         assertFalse(File(runtime, "t9_sentence.vocab").exists())
     }
 
+    @Test fun knownOldFileIsReplacedOnlyAfterTheNewOneVerifies() {
+        val runtime = temporary.newFolder()
+        File(runtime, "t9_sentence.onnx").writeText("old model")
+        assertTrue(installCandidateModel(source(), runtime, version()) { name, _ -> name == "t9_sentence.onnx" })
+        assertEquals("model", File(runtime, "t9_sentence.onnx").readText())
+        assertEquals("words", File(runtime, "t9_sentence.vocab").readText())
+
+        val broken = source().apply { File(this, "t9_sentence.vocab").writeText("wrong") }
+        val other = temporary.newFolder().apply { File(this, "t9_sentence.onnx").writeText("old model") }
+        assertThrows(IOException::class.java) { installCandidateModel(broken, other, version()) { _, _ -> true } }
+        assertEquals("old model", File(other, "t9_sentence.onnx").readText())
+    }
+
+    @Test fun retiredVersionsStayRecognizableButAreNotOfferedForDownload() {
+        val full = CandidateModelCatalog.models.first { it.id == CandidateModelCatalog.NGRAM }
+        assertEquals(listOf("v3-ls-tri-c3"), full.downloadableVersions.map { it.version })
+        assertEquals("v3-ls-tri-c3", full.resolvedVersion()?.version)
+        assertTrue(full.versions.any { it.retired && it.files.single().sizeBytes == 367598664L })
+        val sentence = CandidateModelCatalog.models.first { it.id == CandidateModelCatalog.SENTENCE }
+        assertTrue(sentence.downloadableVersions.isEmpty())
+    }
+
     @Test fun lighterBundleDoesNotDeletePreviouslyInstalledEnhancements() {
         val runtime = temporary.newFolder()
         val model = File(runtime, "t9_sentence.onnx").apply { writeText("previous model") }

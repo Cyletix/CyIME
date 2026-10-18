@@ -60,12 +60,12 @@ class DeviceModelDefaultsTest {
         }
     }
 
-    @Test fun automaticZipformerDefaultsMigrateButExplicitSelectionsRemain() {
-        for (old in listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_TWO_PASS)) {
+    @Test fun automaticVoiceDefaultsMigrateButExplicitSelectionsRemain() {
+        for (old in listOf(SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_TWO_PASS, SpeechModelCatalog.TWO_PASS)) {
             val stores = Stores()
             stores.values()["device_default_voice_model"] = old
             stores.values()[DeviceDefaults.VERSION] = 1
-            assertEquals(SpeechModelCatalog.TWO_PASS, AsrModelManager(stores.context).getSelectedModelId())
+            assertEquals(SpeechModelCatalog.PARAFORMER, AsrModelManager(stores.context).getSelectedModelId())
             AsrModelManager(stores.context).setModel(old)
             DeviceDefaults.initialize(stores.context) { error("must not re-probe") }
             assertEquals(old, AsrModelManager(stores.context).getSelectedModelId())
@@ -87,8 +87,18 @@ class DeviceModelDefaultsTest {
             val profile = DeviceModelProfiles.choose(hardware)
             assertEquals(hardware.toString(), tier, profile.tier)
             assertEquals(if (tier == DeviceModelTier.LIGHT) DeviceModelProfiles.SMALL else DeviceModelProfiles.BASE, profile.predictionModel)
-            assertEquals(SpeechModelCatalog.TWO_PASS, profile.voiceModel)
+            assertEquals(SpeechModelCatalog.PARAFORMER, profile.voiceModel)
         }
+    }
+
+    @Test fun legacyJapaneseChoiceDoesNotTurnTheChineseDefaultIntoZipformer() {
+        val stores = Stores()
+        whenever(stores.context.filesDir).thenReturn(files.root)
+        stores.values("asr_model")["selected_model"] = SpeechModelCatalog.ZIPFORMER_JA
+        assertEquals(SpeechModelCatalog.PARAFORMER,
+            AsrModelManager(stores.context).getSelectedModelId(com.kingzcheung.xime.settings.InputLanguage.CHINESE))
+        assertEquals(SpeechModelCatalog.ZIPFORMER_JA, AsrModelManager(stores.context).getSelectedModelId())
+        assertFalse(stores.values("asr_model").containsKey("selected_model_zh"))
     }
 
     @Test fun missingFrequencyFallsBackToMemoryAndCoresButMissingEssentialsStayConservative() {
@@ -113,7 +123,7 @@ class DeviceModelDefaultsTest {
             assertEquals(hardware.maxCpuKHz, stores.values()["device_initial_max_cpu_khz"])
             assertFalse(stores.values().containsKey("prediction_selected_model"))
             assertFalse(stores.values("asr_model").containsKey("selected_model"))
-            val expected = setOf("ochwpro", profile.predictionModel, SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)
+            val expected = setOf("ochwpro", profile.predictionModel, SpeechModelCatalog.PARAFORMER)
             assertEquals(expected, DefaultModelInstaller.requestedModelIds(context).toSet())
         }
     }
@@ -154,7 +164,7 @@ class DeviceModelDefaultsTest {
             DeviceDefaults.initialize(stores.context) { error("existing installation must not re-probe") }
             assertEquals("PRESERVED", stores.values()[DeviceDefaults.TIER])
             assertEquals(DeviceModelProfiles.BASE, SettingsPreferences.getPredictionSelectedModel(stores.context))
-            assertEquals(SpeechModelCatalog.TWO_PASS, AsrModelManager(stores.context).getSelectedModelId())
+            assertEquals(SpeechModelCatalog.PARAFORMER, AsrModelManager(stores.context).getSelectedModelId())
         }
         val stores = Stores()
         SettingsPreferences.setPredictionSelectedModel(stores.context, DeviceModelProfiles.SMALL)
@@ -166,10 +176,12 @@ class DeviceModelDefaultsTest {
         assertFalse(SettingsPreferences.isSmartPredictionEnabled(stores.context))
     }
 
-    @Test fun disablingCorrectionRemovesOnlyTheCorrectionResourceFromThePendingPlan() {
+    @Test fun standaloneDefaultDoesNotRequestSenseVoiceAndManualCorrectionStillWorks() {
         val stores = Stores()
         DeviceDefaults.initialize(stores.context) { device() }
-        assertTrue(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
+        assertFalse(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
+        AsrModelManager(stores.context).setRefinementEnabled(true)
+        assertEquals(SpeechModelCatalog.TWO_PASS, AsrModelManager(stores.context).getSelectedModelId())
         AsrModelManager(stores.context).setRefinementEnabled(false)
         assertFalse(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
         assertTrue(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.PARAFORMER))

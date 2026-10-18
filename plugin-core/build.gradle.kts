@@ -62,6 +62,8 @@ dependencies {
     // 避免引入 org.yaml:snakeyaml（其 java.beans 反射在 Android 上不可用）
     implementation(libs.kaml)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
+    // Use the same URL parser as the host network transport.
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
     
     testImplementation("junit:junit:4.13.2")
 }

@@ -55,7 +55,8 @@ object DeviceDefaults {
         // This key stores an automatic recommendation. Explicit selections live in asr_model
         // and take priority in AsrModelManager, including a deliberate Zipformer selection.
         return when (initial) {
-            null, SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_TWO_PASS -> SpeechModelCatalog.TWO_PASS
+            null, SpeechModelCatalog.ZIPFORMER, SpeechModelCatalog.ZIPFORMER_TWO_PASS,
+            SpeechModelCatalog.TWO_PASS -> SpeechModelCatalog.PARAFORMER
             else -> initial
         }
     }
