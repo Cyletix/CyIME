@@ -1,19 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+   API 31+ backup and device-transfer rules (API 30- use backup_rules.xml).
+   Caption-mode voiceprints and transcripts (other people's speech) never leave the device:
+   excluded from both cloud backup and device-to-device transfer. Clipboard history and pins
+   (accounts, passwords, addresses) and the Windows pairing keys are excluded the same way.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="speaker" />
+        <exclude domain="file" path="caption" />
+        <exclude domain="file" path="caption_tuning" />
+        <exclude domain="database" path="clipboard.db" />
+        <exclude domain="database" path="clipboard.db-wal" />
+        <exclude domain="database" path="clipboard.db-shm" />
+        <exclude domain="sharedpref" path="clipboard_prefs.xml" />
+        <exclude domain="sharedpref" path="clipboard_board.xml" />
+        <exclude domain="sharedpref" path="clipboard_images.xml" />
+        <exclude domain="sharedpref" path="windows_device_pairing.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="speaker" />
+        <exclude domain="file" path="caption" />
+        <exclude domain="file" path="caption_tuning" />
+        <exclude domain="database" path="clipboard.db" />
+        <exclude domain="database" path="clipboard.db-wal" />
+        <exclude domain="database" path="clipboard.db-shm" />
+        <exclude domain="sharedpref" path="clipboard_prefs.xml" />
+        <exclude domain="sharedpref" path="clipboard_board.xml" />
+        <exclude domain="sharedpref" path="clipboard_images.xml" />
+        <exclude domain="sharedpref" path="windows_device_pairing.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.settings
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,8 +14,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.twotone.Backup
-import androidx.compose.material.icons.twotone.CloudUpload
+import androidx.compose.material.icons.twotone.Download
+import androidx.compose.material.icons.twotone.Person
+import androidx.compose.material.icons.twotone.Upload
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -20,31 +25,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.kingzcheung.xime.plugin.ExtensionManager
-import com.kingzcheung.xime.plugin.core.model.PluginCategory
 import com.kingzcheung.xime.settings.BackupManager
-import com.kingzcheung.xime.settings.ExportMode
-import com.kingzcheung.xime.settings.SettingsPreferences
-import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,55 +49,83 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 云备份（插件）设置页。
+ * 备份与恢复：把设置导出为本地 zip，或从 zip 恢复。
  *
- * 备份目标为已安装的 backup 类型插件（单选激活，与剪贴板同步同模式）；
- * 备份包由宿主 BackupManager 生成/恢复，服务器配置由所选插件的配置表单承载。
+ * 文件位置完全由系统文件选择器决定，备份包不上传、不发送到其他地方。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BackupSettingsContent(
-    onBack: () -> Unit,
-    onNavigateToPlugins: () -> Unit,
-    onNavigateToPluginMarket: () -> Unit = {}
-) {
+fun BackupSettingsContent(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var installedPlugins by remember { mutableStateOf(ExtensionManager.getAllInstalledPlugins()) }
-    val backupPlugins = remember(installedPlugins) { installedPlugins.filter { it.category == PluginCategory.BACKUP } }
-    val syncPlugins = remember { ExtensionManager.getEnabledBackupPlugins(context) }
-    var selectedPluginId by remember {
-        mutableStateOf(
-            SettingsPreferences.getBackupPluginId(context).ifEmpty {
-                syncPlugins.firstOrNull()?.first ?: ""
-            }
-        )
-    }
-    var activePlugin by remember {
-        mutableStateOf(
-            syncPlugins.firstOrNull { it.first == selectedPluginId } ?: syncPlugins.firstOrNull()
-        )
-    }
-    var backupMode by remember { mutableStateOf(ExportMode.CONFIG_ONLY) }
-    // 当前进行中的操作标识（"backup"/"list"/"restore:<id>"/"delete:<id>"）：
-    // 按操作独立，loading 只出现在触发它的按钮上，其余按钮仅禁用
+    var includePersonal by rememberSaveable { mutableStateOf(false) }
+    // 当前操作（"export"/"import"）：loading 只出现在触发它的按钮上，其余按钮仅禁用
     var busyOp by remember { mutableStateOf<String?>(null) }
     val busy = busyOp != null
     var message by remember { mutableStateOf<String?>(null) }
-    var remoteList by remember { mutableStateOf<List<com.kingzcheung.xime.plugin.core.api.RemoteBackupEntry>?>(null) }
+    var pendingImport by remember { mutableStateOf<ByteArray?>(null) }
 
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        installedPlugins = ExtensionManager.getAllInstalledPlugins()
-        val available = ExtensionManager.getEnabledBackupPlugins(context)
-        selectedPluginId = SettingsPreferences.getBackupPluginId(context)
-        activePlugin = available.firstOrNull { it.first == selectedPluginId } ?: available.firstOrNull()
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        busyOp = "export"
+        message = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { BackupManager.exportTo(context, uri, includePersonal) }
+            busyOp = null
+            message = result.fold(
+                onSuccess = { "备份已导出" + if (includePersonal) "（含个人词库与学习数据）" else "" },
+                onFailure = { "导出失败：${it.message ?: "未知错误"}" }
+            )
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        busyOp = "import"
+        message = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { BackupManager.readBackup(context, uri) }
+            busyOp = null
+            result.fold(
+                onSuccess = { pendingImport = it },
+                onFailure = { message = "无法导入：${it.message ?: "未知错误"}" }
+            )
+        }
+    }
+
+    pendingImport?.let { bytes ->
+        AlertDialog(
+            onDismissRequest = { pendingImport = null },
+            title = { Text("从备份恢复") },
+            text = { Text("备份中的设置会覆盖当前对应的设置；若备份含个人词库，也会覆盖当前词库。恢复后输入方案会重新部署。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImport = null
+                    busyOp = "import"
+                    message = null
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { BackupManager.importBackup(context, bytes) }
+                        busyOp = null
+                        message = result.fold(
+                            onSuccess = { "恢复完成，设置已生效" },
+                            onFailure = { "恢复失败：${it.message ?: "未知错误"}" }
+                        )
+                    }
+                }) { Text("覆盖并恢复") }
+            },
+            dismissButton = { TextButton(onClick = { pendingImport = null }) { Text("取消") } }
+        )
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("云备份") },
+                title = { Text("备份与恢复") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -125,9 +149,28 @@ fun BackupSettingsContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            PluginSetupCard("云备份", onNavigateToPluginMarket, onNavigateToPlugins)
             SettingsSection(
-                title = "备份服务",
+                title = "备份内容",
+                content = {
+                    SettingsToggleItem(
+                        icon = Icons.TwoTone.Person,
+                        title = "包含个人词库与学习数据",
+                        subtitle = "自造词、调频记录、自定义短语和个人词库；属于隐私数据，体积也较大",
+                        checked = includePersonal,
+                        onCheckedChange = { includePersonal = it }
+                    )
+                    Text(
+                        text = "始终包含：全部设置项、工具栏与菜单排列、主题与背景图、键盘布局与尺寸、自定义布局和方案定制。" +
+                            "不含插件、下载的模型、补充词库和剪贴板内容。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    )
+                }
+            )
+
+            SettingsSection(
+                title = "操作",
                 content = {
                     Column(
                         modifier = Modifier
@@ -135,286 +178,54 @@ fun BackupSettingsContent(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (backupPlugins.isEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                                    exportLauncher.launch("CyIME备份-$date.zip")
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = !busy
+                            ) {
+                                BusyIcon(busyOp == "export") {
+                                    Icon(Icons.TwoTone.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                }
+                                Text("导出备份", modifier = Modifier.padding(start = 6.dp))
+                            }
+                            OutlinedButton(
+                                onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) },
+                                modifier = Modifier.weight(1f),
+                                enabled = !busy
+                            ) {
+                                BusyIcon(busyOp == "import") {
+                                    Icon(Icons.TwoTone.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                }
+                                Text("从备份恢复", modifier = Modifier.padding(start = 6.dp))
+                            }
+                        }
+                        Text(
+                            text = "备份文件只保存到你选择的位置，不会上传到任何地方。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        message?.let {
                             Text(
-                                text = "尚未安装云备份插件，请从上方安装。",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = it,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        } else {
-                            backupPlugins.forEach { plugin ->
-                                val isActive = plugin.id == activePlugin?.first
-                                PluginServiceChoice(plugin.name, plugin.description, isActive, !busy) {
-                                    if (!isActive) {
-                                        busyOp = "select"
-                                        message = null
-                                        scope.launch {
-                                            try {
-                                                val instance = withContext(Dispatchers.IO) {
-                                                    backupPlugins.filter { it.id != plugin.id }.forEach {
-                                                        SettingsPreferences.setPluginEnabled(context, it.id, false)
-                                                        PluginManager.unloadPlugin(it.id)
-                                                    }
-                                                    SettingsPreferences.setBackupPluginId(context, plugin.id)
-                                                    SettingsPreferences.setPluginEnabled(context, plugin.id, true)
-                                                    PluginManager.launchPlugin(plugin.id)
-                                                    ExtensionManager.getEnabledBackupPlugins(context).firstOrNull { it.first == plugin.id }
-                                                }
-                                                selectedPluginId = plugin.id
-                                                activePlugin = instance
-                                                remoteList = null
-                                                if (instance == null) message = "插件未能启动，请在已安装插件中检查状态。"
-                                            } catch (error: Exception) {
-                                                activePlugin = null
-                                                message = "无法启用服务：${error.message}"
-                                            } finally { busyOp = null }
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 }
             )
-
-            if (activePlugin == null) message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-
-            activePlugin?.let { selected ->
-                val plugin = selected.second
-                // 服务器地址等配置由插件表单承载（host.config）
-                PluginConfigFormScreen(
-                    pluginId = selected.first,
-                    plugin = plugin,
-                    pluginName = installedPlugins.find { it.id == selected.first }?.name ?: selected.first,
-                    onBack = {},
-                    embedded = true
-                )
-                SettingsSection(
-                    title = "备份设置",
-                    content = {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            ExportMode.entries.forEach { mode ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = backupMode == mode,
-                                        onClick = { backupMode = mode }
-                                    )
-                                    Text(
-                                        text = mode.label,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
-                            if (backupMode == ExportMode.CONFIG_ONLY) {
-                                Text(
-                                    text = "仅配置：不含用户词典（.db）与模型（.bin/.gram）",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-                    }
-                )
-
-                SettingsSection(
-                    title = "备份操作",
-                    content = {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        busyOp = "backup"
-                                        message = null
-                                        scope.launch(Dispatchers.IO) {
-                                            val result = BackupManager.backupNow(context, plugin, backupMode)
-                                            withContext(Dispatchers.Main) {
-                                                busyOp = null
-                                                message = if (result.ok) "备份完成"
-                                                else "备份失败：${result.message ?: "未知错误"}"
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !busy
-                                ) {
-                                    if (busyOp == "backup") {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp
-                                        )
-                                    } else {
-                                        Icon(Icons.TwoTone.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    }
-                                    Text(
-                                        text = "立即备份",
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(start = 6.dp)
-                                    )
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        busyOp = "list"
-                                        message = null
-                                        scope.launch(Dispatchers.IO) {
-                                            val list = BackupManager.listRemote(plugin)
-                                            val err = if (list == null) "获取备份列表失败" else null
-                                            withContext(Dispatchers.Main) {
-                                                busyOp = null
-                                                remoteList = list
-                                                message = err
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !busy
-                                ) {
-                                    Text("查看远端备份", fontSize = 12.sp)
-                                }
-                            }
-                            message?.let {
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                )
-
-                remoteList?.let { list ->
-                    SettingsSection(
-                        title = "远端备份",
-                        content = {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (list.isEmpty()) {
-                                    Text(
-                                        text = "远端暂无备份",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                list.forEach { entry ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = entry.name,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                            Text(
-                                                text = buildString {
-                                                    if (entry.createdAt > 0) {
-                                                        append(
-                                                            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                                                                .format(Date(entry.createdAt))
-                                                        )
-                                                    }
-                                                    if (entry.size >= 0) {
-                                                        if (isNotEmpty()) append(" · ")
-                                                        append(String.format(Locale.getDefault(), "%.1f MB", entry.size / 1024.0 / 1024.0))
-                                                    }
-                                                },
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.outline
-                                            )
-                                        }
-                                        Row {
-                                            TextButton(
-                                                onClick = {
-                                                    busyOp = "restore:" + entry.id
-                                                    message = null
-                                                    scope.launch(Dispatchers.IO) {
-                                                        val result = BackupManager.restore(context, plugin, entry.id)
-                                                        withContext(Dispatchers.Main) {
-                                                            busyOp = null
-                                                            message = if (result.isSuccess) "恢复完成，重启应用后生效"
-                                                            else "恢复失败：${result.exceptionOrNull()?.message}"
-                                                        }
-                                                    }
-                                                },
-                                                enabled = !busy
-                                            ) {
-                                                if (busyOp == "restore:" + entry.id) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(14.dp),
-                                                        strokeWidth = 2.dp
-                                                    )
-                                                } else {
-                                                    Text("恢复")
-                                                }
-                                            }
-                                            TextButton(
-                                                onClick = {
-                                                    busyOp = "delete:" + entry.id
-                                                    message = null
-                                                    scope.launch(Dispatchers.IO) {
-                                                        val ok = BackupManager.deleteRemote(plugin, entry.id)
-                                                        val fresh = if (ok) BackupManager.listRemote(plugin) else null
-                                                        withContext(Dispatchers.Main) {
-                                                            busyOp = null
-                                                            if (ok) {
-                                                                remoteList = fresh
-                                                                message = "已删除"
-                                                            } else {
-                                                                message = "删除失败"
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                                enabled = !busy
-                                            ) {
-                                                if (busyOp == "delete:" + entry.id) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(14.dp),
-                                                        strokeWidth = 2.dp
-                                                    )
-                                                } else {
-                                                    Text(
-                                                        "删除",
-                                                        color = MaterialTheme.colorScheme.error
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                Text(
-                                    text = "恢复覆盖 rime/ 目录同名文件（含自造词），并还原插件、插件配置与设置项；重启应用后全部生效。",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-                    )
-                }
-
-
-            }
         }
     }
+}
+
+@Composable
+private fun BusyIcon(busy: Boolean, icon: @Composable () -> Unit) {
+    if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else icon()
 }

@@ -1,13 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   Android 11 and lower (API 30-) full-backup rules. Devices on API 31+ read
+   data_extraction_rules.xml instead; keep both in step.
+   Caption-mode voiceprints and transcripts (other people's speech) never leave the device:
+   they are excluded from cloud backup so a reinstall or a new phone starts clean.
+   Clipboard history and pins (accounts, passwords, addresses) and the Windows pairing
+   keys stay on this device for the same reason.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="file" path="speaker" />
+    <exclude domain="file" path="caption" />
+    <exclude domain="file" path="caption_tuning" />
+    <exclude domain="database" path="clipboard.db" />
+    <exclude domain="database" path="clipboard.db-wal" />
+    <exclude domain="database" path="clipboard.db-shm" />
+    <exclude domain="sharedpref" path="clipboard_prefs.xml" />
+    <exclude domain="sharedpref" path="clipboard_board.xml" />
+    <exclude domain="sharedpref" path="clipboard_images.xml" />
+    <exclude domain="sharedpref" path="windows_device_pairing.xml" />
 </full-backup-content>
