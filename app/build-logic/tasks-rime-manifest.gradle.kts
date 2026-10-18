@@ -1,7 +1,6 @@
 import java.security.MessageDigest
 
 val manifestOutput = layout.buildDirectory.dir("generated/rime-manifest")
-val bundledSentenceModel = providers.gradleProperty("bundleModels").orNull == "true"
 val roots = listOf(
     "rime_ice" to layout.buildDirectory.dir("generated/chinese-assets/rime_ice").get().asFile,
     "rime_chinese" to file("src/main/assets/rime_chinese"),
@@ -10,14 +9,14 @@ val roots = listOf(
 )
 val prepareRimeManifest by tasks.registering {
     dependsOn("prepareChineseDictionaries", "prepareJapaneseDictionaries")
-    inputs.property("bundledSentenceModel", bundledSentenceModel)
     inputs.files(roots.map { it.second })
     outputs.dir(manifestOutput)
     doLast {
         val entries = sortedMapOf<String, String>()
         for ((assetRoot, root) in roots) root.walkTopDown().filter { it.isFile }.forEach { source ->
             val relative = source.relativeTo(root).invariantSeparatorsPath
-            if (!bundledSentenceModel && assetRoot == "rime_chinese" && relative == "t9_sentence.onnx") return@forEach
+            // 长句重排已停用，两种包都不带这个模型（与 build.gradle.kts 的资源忽略规则一致）。
+            if (assetRoot == "rime_chinese" && relative == "t9_sentence.onnx") return@forEach
             if (relative.endsWith(".md") || relative.startsWith("LICENSE") || relative.endsWith(".custom.yaml")) return@forEach
             // Optional layouts are installed only when missing; a user's edited schema stays theirs.
             if (assetRoot == "rime_ice" && relative in setOf("pinyin_qwjrtk.schema.yaml", "pinyin_cyletix10.schema.yaml")) return@forEach

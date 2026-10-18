@@ -10,6 +10,14 @@ param(
     [string]$BuildDirectory = 'app/build'
 )
 $ErrorActionPreference = 'Stop'
+function Get-ApkSha256([string]$LiteralPath) {
+    # Windows PowerShell inherited from pwsh may not discover Utility's Get-FileHash.
+    # Use the same SHA-256 algorithm without depending on module auto-loading.
+    $stream = [IO.File]::OpenRead($LiteralPath)
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($hasher.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+    finally { $hasher.Dispose(); $stream.Dispose() }
+}
 $repoRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $repoRoot
 try {
@@ -81,7 +89,7 @@ try {
         if ($element.versionName -ne $version -or $element.versionCode -ne $versionCode) { throw 'APK metadata version mismatch.' }
         $apk = Get-Item -LiteralPath (Join-Path $output $element.outputFile)
         if ($apk.DirectoryName -ne $output) { throw 'Unexpected APK output location.' }
-        [pscustomobject]@{ path=$apk.FullName; bytes=$apk.Length; sha256=(Get-FileHash -LiteralPath $apk.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+        [pscustomobject]@{ path=$apk.FullName; bytes=$apk.Length; sha256=(Get-ApkSha256 -LiteralPath $apk.FullName) }
     }
     # The full layout gate is paused by project policy; opt in explicitly.
     $layoutGate = 'not-run'

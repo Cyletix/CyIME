@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="__THEME__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<!-- The page has its own light/dark theme; stop Dark Reader from recoloring it. -->
+<meta name="darkreader-lock">
+<title>CyIME 打包器</title>
+<link rel="icon" href="/icon.png">
+<style>
+/* Colors, radii and sizes follow CyIME-Windows settings (Theme.cs, Styles.xaml). */
+:root{
+  --surface:#F7F4FA;--card:#FFFFFF;--inset:#EEE8F4;--text:#25212C;--muted:#746B80;--line:#E5DDEA;
+  --selected:#E8DEF8;--accent:#7955B5;--on-accent:#FFFFFF;--danger:#B3261E;--ok:#3D735D;
+  --r-control:8px;--r-card:12px;--field:38px;color-scheme:light;
+}
+/* Windows app theme is injected by server.py; the media query is the fallback. Declaring
+   color-scheme keeps Edge's automatic dark mode from recoloring the page. */
+:root[data-theme=dark]{
+  --surface:#211E27;--card:#2C2833;--inset:#39333F;--text:#F0EAF5;--muted:#ADA3B9;--line:#403A49;
+  --selected:#59576D;--accent:#D0BCFF;--on-accent:#381E72;--danger:#F2B8B5;--ok:#A8D6B7;color-scheme:dark;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --surface:#211E27;--card:#2C2833;--inset:#39333F;--text:#F0EAF5;--muted:#ADA3B9;--line:#403A49;
+  --selected:#59576D;--accent:#D0BCFF;--on-accent:#381E72;--danger:#F2B8B5;--ok:#A8D6B7;color-scheme:dark;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--surface);color:var(--text);font:14px/1.45 "Microsoft YaHei UI","Segoe UI",sans-serif;
+  display:grid;grid-template-columns:224px 1fr;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+
+/* Sidebar */
+.side{display:flex;flex-direction:column;padding:22px 10px 0;min-height:0}
+.brand{display:flex;align-items:center;gap:8px;padding:0 10px}
+.brand img{width:32px;height:32px;border-radius:7px}
+.brand b{font-size:27px;letter-spacing:.2px}
+.brand-sub{color:var(--muted);font-size:13px;padding:0 10px;margin:-2px 0 22px}
+.nav{display:flex;flex-direction:column;gap:2px;flex:1}
+.nav button{position:relative;display:flex;align-items:center;gap:12px;min-height:42px;padding:10px 12px;border:0;
+  border-radius:var(--r-control);background:transparent;color:var(--muted);cursor:pointer;text-align:left}
+.nav button:hover{background:var(--card);color:var(--text)}
+.nav button.on{background:var(--inset);color:var(--text)}
+.nav button.on::before{content:"";position:absolute;left:0;top:12px;width:3px;height:18px;border-radius:1.5px;background:var(--accent)}
+.nav svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.status{color:var(--muted);font-size:12.5px;padding:10px 6px 12px;border-top:1px solid var(--line);margin:0 -10px;padding-left:16px}
+.status.run{color:var(--accent)}
+
+/* Content */
+main{overflow-y:auto;min-height:0}
+.page{max-width:850px;padding:22px 30px 32px}
+#page-build,#page-upload{padding-bottom:0}
+h1{font-size:28px;margin:0;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin:4px 0 18px}
+.heading{color:var(--accent);font-size:13px;font-weight:600;margin:16px 4px 8px}
+.card{background:var(--card);border-radius:var(--r-card);margin-bottom:16px}
+.row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:16px;padding:15px 20px;position:relative}
+.row+.row::before{content:"";position:absolute;left:20px;right:20px;top:0;height:1px;background:var(--line)}
+.row .t{font-weight:600}
+.row .d{color:var(--muted);font-size:12px;margin-top:2px}
+.row.off{opacity:.45;pointer-events:none}
+details.advanced{margin:0 0 4px}
+details.advanced summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;margin:16px 4px 8px;list-style:none}
+details.advanced summary::before{content:"▸ "}
+details.advanced[open] summary::before{content:"▾ "}
+.seg button:disabled{opacity:.4;cursor:default}
+.size{font-size:22px;font-weight:700;color:var(--accent);white-space:nowrap}
+.note{font-size:11.5px;padding:1px 8px;border-radius:9px;background:var(--inset);color:var(--muted);margin-left:6px;font-weight:400}
+.note.warn{color:var(--danger)}
+.preset{cursor:pointer}
+.preset:hover{background:var(--inset)}
+.preset:first-child{border-radius:var(--r-card) var(--r-card) 0 0}
+.preset:last-child{border-radius:0 0 var(--r-card) var(--r-card)}
+.preset .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.preset .tags span{font-size:11.5px;padding:1px 8px;border-radius:9px;background:var(--inset);color:var(--muted)}
+.preset:hover .tags span{background:var(--card)}
+.preset .pick{min-width:76px}
+.preset.on .pick{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+
+select,input[type=text]{min-height:var(--field);min-width:156px;background:var(--inset);border:1px solid var(--line);
+  border-radius:var(--r-control);padding:8px 12px}
+select{appearance:none;padding-right:34px;cursor:pointer;max-width:340px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23887d96' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:calc(100% - 13px) 50%;background-size:10px 6px}
+select option{background:var(--card);color:var(--text)}
+select:hover,input[type=text]:hover{border-color:var(--muted)}
+select:focus,input[type=text]:focus{border-color:var(--accent);outline:none}
+input[type=text]{width:340px;cursor:text}
+.field{display:flex;gap:8px;align-items:center}
+
+/* Switch: 48x28 track, 18px thumb */
+.sw{position:relative;width:48px;height:28px;flex:none;cursor:pointer}
+.sw input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+/* Off: hollow track, small grey thumb on the left. On: filled accent track, large thumb on the right. */
+.sw span{position:absolute;inset:0;border-radius:14px;background:transparent;border:2px solid var(--muted);transition:background .15s,border-color .15s}
+.sw span::after{content:"";position:absolute;top:50%;left:6px;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:var(--muted);
+  transition:left .15s,width .15s,height .15s,margin .15s,background .15s}
+.sw input:checked+span{background:var(--accent);border-color:var(--accent)}
+.sw input:checked+span::after{left:22px;width:18px;height:18px;margin-top:-9px;background:var(--on-accent)}
+.sw:hover span{border-color:var(--text)}
+.sw:hover input:checked+span{border-color:var(--accent)}
+.sw input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Segmented choice */
+.seg{display:inline-flex;background:var(--inset);border-radius:var(--r-control);padding:3px;gap:2px}
+.seg button{border:0;background:transparent;border-radius:7px;padding:6px 14px;cursor:pointer;color:var(--muted)}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--accent);color:var(--on-accent);font-weight:600}
+
+.btn{min-height:var(--field);padding:8px 16px;background:var(--inset);border:1px solid var(--line);border-radius:var(--r-control);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn:active{opacity:.75}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.actions{display:flex;gap:8px;align-items:center;padding:15px 20px}
+.actions .grow{flex:1}
+.cmd{color:var(--muted);font:12px/1.5 Consolas,monospace;padding:0 20px 15px;word-break:break-all}
+.cmd:empty{display:none}
+
+/* Output */
+.log{margin:0;padding:4px 20px 14px;max-height:340px;min-height:120px;overflow:auto;font:12.5px/1.55 Consolas,"Microsoft YaHei UI",monospace;
+  white-space:pre-wrap;word-break:break-all}
+.log .plan{color:var(--accent)}
+.log .stop{color:var(--danger);font-weight:600}
+.log .done{color:var(--ok);font-weight:600}
+.log .dim{color:var(--muted)}
+/* Run status: title, steps, progress bar, result banner */
+.runhead{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:16px 20px 12px}
+.runhead .t{font-weight:700;font-size:16px}
+.runhead .d{color:var(--muted);font-size:12.5px;margin-top:2px;word-break:break-all}
+.elapsed{font:600 13px Consolas,monospace;color:var(--muted)}
+.bar{height:6px;margin:0 20px 14px;border-radius:3px;background:var(--inset);overflow:hidden}
+.bar div{height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .4s}
+.bar.ok div{background:var(--ok)}
+.bar.bad div{background:var(--danger)}
+.steps{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;margin:0;padding:0 20px 14px;font-size:13px;color:var(--muted)}
+.steps li{display:flex;align-items:center;gap:6px}
+.steps li::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid var(--line);box-sizing:border-box}
+.steps li.now{color:var(--text);font-weight:600}
+.steps li.now::before{border-color:var(--accent);border-top-color:transparent;animation:spin .8s linear infinite}
+.steps li.done{color:var(--text)}
+.steps li.done::before{border:0;background:var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3.5 7.2l2.3 2.3 4.7-4.9' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat}
+.steps li.fail{color:var(--danger);font-weight:600}
+.steps li.fail::before{border:0;background:var(--danger)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.result{margin:0 20px 14px;padding:12px 14px;border-radius:var(--r-control);border:1px solid var(--line);background:var(--inset)}
+.result .t{font-weight:700;margin-bottom:4px}
+.result.ok{border-color:var(--ok)} .result.ok .t{color:var(--ok)}
+.result.bad{border-color:var(--danger)} .result.bad .t{color:var(--danger)}
+.result pre{margin:4px 0 0;white-space:pre-wrap;word-break:break-all;font:12.5px/1.55 Consolas,"Microsoft YaHei UI",monospace}
+.result .field{margin-top:10px}
+details.logwrap summary{cursor:pointer;color:var(--muted);font-size:13px;padding:10px 20px;border-top:1px solid var(--line);list-style:none}
+details.logwrap summary::before{content:"▸ "}
+details.logwrap[open] summary::before{content:"▾ "}
+.btn.danger{color:var(--danger);border-color:var(--danger);background:transparent}
+.btn.busy::before{content:"";display:inline-block;width:12px;height:12px;margin-right:8px;vertical-align:-1px;border-radius:50%;
+  border:2px solid currentColor;border-top-color:transparent;animation:spin .8s linear infinite}
+.hidden{display:none!important}
+
+/* Dialog */
+dialog{border:0;border-radius:var(--r-card);background:var(--card);color:var(--text);padding:22px 24px;width:420px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(20,16,26,.35)}
+dialog h2{font-size:17px;margin:0 0 8px}
+dialog p{color:var(--muted);margin:0 0 20px}
+dialog .actions{padding:0;justify-content:flex-end}
+::-webkit-scrollbar{width:14px;height:14px}
+::-webkit-scrollbar-thumb{background:var(--selected);border-radius:4px;border:3px solid transparent;background-clip:content-box}
+@media (max-width:760px){body{grid-template-columns:1fr}.side{display:none}.page{padding:16px}input[type=text]{width:100%}}
+</style>
+</head>
+<body>
+<aside class="side">
+  <div class="brand"><img src="/icon.png" alt=""><b>CyIME</b></div>
+  <div class="brand-sub">Android · 打包器</div>
+  <nav class="nav">
+    <button data-page="build" class="on"><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>打包</button>
+    <button data-page="upload"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>上传资源</button>
+  </nav>
+  <div class="status" id="status">正在读取…</div>
+</aside>
+
+<main>
+<section class="page" id="page-build">
+  <h1>打包</h1>
+  <div class="sub" id="versionLine">&nbsp;</div>
+
+  <div class="heading">常用组合</div>
+  <div class="card" id="presets"></div>
+
+  <div class="heading">包内容</div>
+  <div class="card">
+    <div class="row sizeRow"><div><div class="t">预计安装包大小</div><div class="d" id="sizeParts"></div></div>
+      <div class="size" id="sizeTotal"></div></div>
+    <div class="row"><div><div class="t">九键词组模型</div><div class="d">打包时临时放进源码，结束后自动移走；不带时九键用旧算法，用户可在模型管理里下载。</div></div>
+      <select id="t9"></select></div>
+    <div id="dicts"></div>
+  </div>
+
+  <div class="heading">离线模型（打进包里，拿到就能用，不用再下载）</div>
+  <div class="card" id="offlineList"></div>
+
+  <div class="heading">版本与安装</div>
+  <div class="card">
+    <div class="row"><div><div class="t">版本号</div><div class="d" id="bumpHint">自动：当前版本已经装到过设备上，才升一个小版本。</div></div>
+      <select id="bump"></select></div>
+    <div class="row"><div><div class="t">装到设备</div><div class="d">adb 覆盖安装，保留数据；不降级、不卸载。</div></div>
+      <label class="sw"><input type="checkbox" id="install"><span></span></label></div>
+    <div class="row" id="deviceRow"><div><div class="t">目标设备</div><div class="d">连着多台设备时必须选一台。</div></div>
+      <div class="field"><select id="device"></select><button class="btn" id="refresh" title="重新读取设备">刷新</button></div></div>
+    <div class="row" id="banksRow"><div><div class="t">同时放手写训练题库</div><div class="d">安装成功后把公式、英语、日语题库推到设备；题库不进安装包，找不到或推送失败只提示，不影响安装。</div></div>
+      <label class="sw"><input type="checkbox" id="pushBanks"><span></span></label></div>
+    <div class="row"><div><div class="t">强制重新构建</div><div class="d">默认源码和选项都没变时直接用上次校验过的包。</div></div>
+      <label class="sw"><input type="checkbox" id="rebuild"><span></span></label></div>
+  </div>
+
+  <details class="advanced" id="advanced"><summary>高级</summary>
+  <div class="card">
+    <div class="row" id="typeRow"><div><div class="t">编译方式</div><div class="d" id="typeHint"></div></div>
+      <div class="seg" id="buildType"><button data-v="release">正式版</button><button data-v="debug">调试版</button></div></div>
+  </div>
+  </details>
+
+  <div class="heading">GitHub 发布</div>
+  <div class="card">
+    <div class="row" id="publishRow"><div><div class="t">发布为 GitHub Release</div><div class="d">所有人可见；要求源码已提交推送，先建草稿、上传、核对哈希再公开，不覆盖已发布文件。</div></div>
+      <label class="sw"><input type="checkbox" id="publish"><span></span></label></div>
+    <div class="row" id="latestRow"><div><div class="t">设为 Latest</div><div class="d">关闭时只发布，不替换当前的最新版本。</div></div>
+      <label class="sw"><input type="checkbox" id="latest"><span></span></label></div>
+    <div class="row" id="preRow"><div><div class="t">标为预发布</div><div class="d">GitHub 上显示为 Pre-release。</div></div>
+      <label class="sw"><input type="checkbox" id="prerelease"><span></span></label></div>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button class="btn" id="dryRun">预览计划</button>
+      <button class="btn" id="check">检查环境</button>
+      <span class="grow"></span>
+      <button class="btn primary" id="go">开始打包</button>
+    </div>
+  </div>
+</section>
+
+<section class="page hidden" id="page-upload">
+  <h1>上传资源</h1>
+  <div class="sub">把模型、词库包等大文件传到 GitHub 的资源 Release（不是应用版本），给商店和模型下载用。</div>
+  <div class="heading">文件</div>
+  <div class="card">
+    <div class="row"><div><div class="t">本地文件</div><div class="d">不会上传 .codex-artifacts、.git 里的任何文件。</div></div>
+      <div class="field"><input type="text" id="upFile" placeholder="选择或粘贴路径"><button class="btn" id="pick">选择…</button></div></div>
+    <div class="row"><div><div class="t">上传后的文件名</div><div class="d">只能用英文字母、数字、点、横线、下划线。</div></div>
+      <input type="text" id="upName"></div>
+    <div class="row"><div><div class="t">Release 标签</div><div class="d">默认 models，不设为 Latest，与应用版本无关。</div></div>
+      <input type="text" id="upTag"></div>
+    <div class="row"><div><div class="t">同名不同内容时覆盖</div><div class="d">已发出的下载地址会对不上哈希，需同时更新商店目录或模型清单，慎用。</div></div>
+      <label class="sw"><input type="checkbox" id="upReplace"><span></span></label></div>
+  </div>
+  <div class="card">
+    <div class="actions"><button class="btn" id="upDry">预览</button><span class="grow"></span><button class="btn primary" id="upGo">上传</button></div>
+  </div>
+</section>
+
+<section class="page" style="padding-top:0">
+  <div class="card" id="logCard">
+    <div class="runhead">
+      <div><div class="t" id="runTitle">还没有运行</div><div class="d" id="runSub">选好选项后点“预览计划”看会做什么，确认后点“开始打包”。</div></div>
+      <div class="field"><span class="elapsed" id="elapsed"></span><button class="btn danger hidden" id="stop">停止打包</button></div>
+    </div>
+    <div class="bar hidden" id="bar"><div></div></div>
+    <ol class="steps hidden" id="steps"></ol>
+    <div class="result hidden" id="result"></div>
+    <div class="cmd" id="cmd"></div>
+    <details class="logwrap" id="logWrap"><summary>详细日志</summary><pre class="log" id="log"></pre></details>
+  </div>
+</section>
+</main>
+
+<dialog id="confirm"><h2 id="cTitle"></h2><p id="cText"></p>
+  <div class="actions"><button class="btn" value="no" id="cNo">取消</button><button class="btn primary" id="cYes">确定</button></div></dialog>
+
+<script>
+const TOKEN = "__TOKEN__";
+const forced = new URLSearchParams(location.search).get("theme");  // ?theme=light|dark for screenshots
+if (forced) document.documentElement.dataset.theme = forced;
+const $ = id => document.getElementById(id);
+const api = (path, body) => fetch(path, body === undefined ? {headers:{"X-Token":TOKEN}} :
+  {method:"POST", headers:{"X-Token":TOKEN,"Content-Type":"application/json"}, body:JSON.stringify(body)}).then(r => r.json());
+let info = null, state = {}, next = 0, serial = -1, polling = false;
+
+function ask(title, text){
+  return new Promise(done => {
+    $("cTitle").textContent = title; $("cText").textContent = text;
+    const d = $("confirm");
+    $("cYes").onclick = () => { d.close(); done(true); };
+    $("cNo").onclick = () => { d.close(); done(false); };
+    d.showModal();
+  });
+}
+
+function option(select, items, value){
+  select.innerHTML = "";
+  for (const [v, label] of items){ const o = document.createElement("option"); o.value = v; o.textContent = label; select.append(o); }
+  if (value !== undefined && items.some(([v]) => v === value)) select.value = value;
+}
+
+function render(){
+  const v = info;
+  let line = `当前版本 ${v.version} / ${v.versionCode}`;
+  if (v.lastDelivered) line += ` · 上次装到设备 ${v.lastDelivered.version} / ${v.lastDelivered.versionCode}`;
+  if (v.needsBump) line += " · 当前版本已交付，内容有变需要升版本";
+  $("versionLine").textContent = line;
+  renderPresets();
+  option($("t9"), [["none","不带九键模型"], ...v.models.map(m => [m.name, `${m.name}（${Math.round(m.size/1048576)} MB）`])], state.t9_model ?? "none");
+  option($("bump"), [["auto","自动"],["none","不升"],["patch",`小版本 → ${v.patch[0]}`],["minor",`功能版本 → ${v.minor[0]}`]], state.bump);
+  const devices = v.devices.map(d => [d.serial, `${d.model || d.serial}  ${d.serial}${d.state === "device" ? "" : "（" + d.state + "）"}`]);
+  option($("device"), [["", v.devices.length ? "唯一已授权设备" : "没有连接设备"], ...devices], state.serial || "");
+  const box = $("dicts"); box.innerHTML = "";
+  for (const d of v.dicts){
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<div><div class="t">内置词库：${d.name}</div><div class="d">${d.file} · ${Math.round(d.size/1024)} KB；关闭时只在这次打包里去掉，不动源码。</div></div>
+      <label class="sw"><input type="checkbox" data-dict="${d.id}"><span></span></label>`;
+    const input = row.querySelector("input");
+    input.checked = !(state.exclude_dicts || []).includes(d.id);
+    input.onchange = () => { state.exclude_dicts = [...box.querySelectorAll("input")].filter(i => !i.checked).map(i => i.dataset.dict); save(); };
+    box.append(row);
+  }
+  const list = $("offlineList"); list.innerHTML = "";
+  for (const m of v.offline){
+    const row = document.createElement("div"); row.className = "row";
+    const warn = /不宜|非商业|未标明/.test(m.note);
+    row.innerHTML = `<div><div class="t"></div><div class="d"></div></div><label class="sw"><input type="checkbox" data-model="${m.id}"><span></span></label>`;
+    row.querySelector(".t").textContent = m.name;
+    const note = document.createElement("span"); note.className = "note" + (warn ? " warn" : ""); note.textContent = m.note;
+    if (m.note) row.querySelector(".t").append(note);
+    row.querySelector(".d").textContent = `原文件 ${mb(m.size)}，进包后约 ${mb(m.size * v.sizes.ratios.onnx)}`;
+    const input = row.querySelector("input");
+    input.checked = offlineIds().includes(m.id);
+    input.onchange = () => { state.offline_ids = [...list.querySelectorAll("input")].filter(i => i.checked).map(i => i.dataset.model);
+      state.offline_models = state.offline_ids.length > 0; save(); };
+    list.append(row);
+  }
+  if (!$("upTag").value) $("upTag").value = v.resourceTag;
+  sync();
+}
+
+function mb(bytes){ return (bytes / 1048576).toFixed(bytes < 10 * 1048576 ? 1 : 0) + " MB"; }
+
+// Selected offline models; old saved choices only had an on/off switch, which meant all of them.
+function offlineIds(){
+  if (Array.isArray(state.offline_ids)) return state.offline_ids;
+  return state.offline_models ? info.offline.map(m => m.id) : [];
+}
+
+// Estimate from the newest APK: app itself + chosen parts at their measured compression.
+function updateSize(){
+  if (!info) return;
+  const z = info.sizes, parts = [["应用本身", z.base]];
+  const kept = info.dicts.filter(d => !(state.exclude_dicts || []).includes(d.id));
+  if (kept.length) parts.push(["内置词库", kept.reduce((n, d) => n + (z.dicts[d.id] ?? d.size * z.ratios.dict), 0)]);
+  const t9 = info.models.find(m => m.name === state.t9_model);
+  if (t9) parts.push(["九键模型", t9.size * z.ratios.t9]);
+  for (const m of info.offline) if (offlineIds().includes(m.id)) parts.push([m.name, m.size * z.ratios.onnx]);
+  const total = parts.reduce((n, [, b]) => n + b, 0);
+  $("sizeTotal").textContent = "约 " + mb(total);
+  $("sizeParts").textContent = parts.map(([k, b]) => `${k} ${mb(b)}`).join(" + ") + "。按最近一次的包估算，实际可能差几 MB。";
+  $("go").title = "预计约 " + mb(total);
+}
+
+function sync(){
+  for (const b of $("buildType").children) b.classList.toggle("on", b.dataset.v === state.build_type);
+  for (const i of $("offlineList").querySelectorAll("input")) i.checked = offlineIds().includes(i.dataset.model);
+  updateSize();
+  $("install").checked = state.install !== false;
+  $("rebuild").checked = !!state.rebuild;
+  if (state.build_type === "debug") state.publish = false;
+  $("publish").checked = !!state.publish;
+  $("latest").checked = !!state.latest;
+  $("prerelease").checked = !!state.prerelease;
+  $("publishRow").classList.toggle("off", state.build_type === "debug");
+  $("latestRow").classList.toggle("off", !state.publish);
+  $("preRow").classList.toggle("off", !state.publish);
+  $("deviceRow").classList.toggle("off", state.install === false);
+  $("banksRow").classList.toggle("off", state.install === false);
+  $("pushBanks").checked = !!state.push_banks;
+  // Debug is only for your own device: not for packages that are handed out or published.
+  const debugAllowed = state.install !== false && !state.publish;
+  if (!debugAllowed) state.build_type = "release";
+  for (const b of $("buildType").children) b.classList.toggle("on", b.dataset.v === state.build_type);
+  $("buildType").querySelector('[data-v="debug"]').disabled = !debugAllowed;
+  $("typeHint").textContent = !debugAllowed
+    ? "只出包或发布时只能用正式版；调试版只用于装到自己设备上查问题。"
+    : state.build_type === "debug"
+      ? "调试版：查闪退等问题时用，可以连电脑调试；包更大、运行更慢，不能发布。"
+      : "正式版：平时都用它。只有要查闪退等问题时才改成调试版。";
+  if (state.build_type === "debug") $("advanced").open = true;
+  if (info) for (const [i, [, p]] of visiblePresets().entries()){
+    const row = $("presets").children[i]; if (!row) continue;
+    row.classList.toggle("on", matches(p)); row.querySelector(".pick").textContent = matches(p) ? "✓ 正在用" : "用这个";
+  }
+  if (!$("go").classList.contains("busy")) $("go").textContent = state.publish ? "打包并发布" : "开始打包";
+  const hints = {auto:"自动：当前版本已经装到过设备上，才升一个小版本。", none:"不改版本号；当前版本已交付时正式版会被拒绝。",
+    patch:"兼容修复、性能和交互打磨用小版本。", minor:"兼容的新功能批次用功能版本。"};
+  $("bumpHint").textContent = hints[state.bump] || "";
+}
+
+function save(){ api("/api/last", state); sync(); }
+
+// A preset fills in what goes into the package and where it goes; it always means a release build.
+// Debug builds are an advanced choice, only for installing on your own device.
+const PRESET_TEXT = {
+  "装到我的设备": "改完功能自己试用：打包后直接装到连着的手机或平板上，保留数据。",
+  "轻量发布包": "准备发到 GitHub 给别人下载。包小，不带九键模型（需要时在应用的模型管理里下载），只出包不安装。",
+  "离线完整版": "给没法在应用里下载模型的人。手写、联想、语音模型和九键模型全部打进包，包很大，只出包不安装。",
+};
+
+function visiblePresets(){
+  return Object.entries(info.presets).filter(([, p]) => (p.build_type || "release") === "release");
+}
+
+function presetTags(p){
+  const model = p.t9_model ? "带九键模型" : "不带九键模型";
+  const dicts = (p.exclude_dicts || []).length ? "去掉部分内置词库" : "带内置词库";
+  const n = (p.offline_ids || []).length;
+  return [model, p.offline_models ? (n ? `带 ${n} 个离线模型` : "带全部离线模型（大）") : "不带离线模型", dicts, p.install === false ? "只出包" : "装到设备"];
+}
+
+function matches(p){
+  const want = p.offline_ids || (p.offline_models ? info.offline.map(m => m.id) : []);
+  return JSON.stringify([...want].sort()) === JSON.stringify([...offlineIds()].sort()) && (p.t9_model || "none") === (state.t9_model || "none") &&
+    JSON.stringify([...(p.exclude_dicts || [])].sort()) === JSON.stringify([...(state.exclude_dicts || [])].sort()) &&
+    (p.install !== false) === (state.install !== false);
+}
+
+function renderPresets(){
+  const box = $("presets"); box.innerHTML = "";
+  for (const [name, p] of visiblePresets()){
+    const row = document.createElement("div");
+    row.className = "row preset" + (matches(p) ? " on" : "");
+    row.innerHTML = `<div><div class="t"></div><div class="d"></div><div class="tags">${presetTags(p).map(t => `<span>${t}</span>`).join("")}</div></div>
+      <button class="btn pick"></button>`;
+    row.querySelector(".t").textContent = name;
+    row.querySelector(".d").textContent = PRESET_TEXT[name] || "";
+    row.querySelector(".pick").textContent = matches(p) ? "✓ 正在用" : "用这个";
+    row.onclick = () => { if (!$("go").disabled) applyPreset(name); };
+    box.append(row);
+  }
+}
+
+function applyPreset(name){
+  const p = info.presets[name]; if (!p) return;
+  Object.assign(state, {build_type:"release", offline_models:!!p.offline_models,
+    offline_ids:p.offline_ids || (p.offline_models ? info.offline.map(m => m.id) : []), t9_model:p.t9_model || "none",
+    exclude_dicts:p.exclude_dicts || [], install:p.install !== false, push_banks:!!p.push_banks});
+  render(); save();
+}
+
+function buildArgs(extra){
+  const a = ["build", state.build_type === "debug" ? "--debug" : "--release",
+    offlineIds().length ? "--offline-models" : "--no-offline-models", "--bump", state.bump || "auto",
+    "--t9-model", state.t9_model || "none"];
+  for (const d of state.exclude_dicts || []) a.push("--exclude-dict", d);
+  // All offline models is the plain offline edition; a subset is listed one by one.
+  const ids = offlineIds();
+  if (ids.length && ids.length < info.offline.length) for (const id of ids) a.push("--offline-model", id);
+  if (state.install === false) a.push("--no-install"); else if (state.serial) a.push("--serial", state.serial);
+  if (state.install !== false) a.push(state.push_banks ? "--push-banks" : "--no-push-banks");
+  if (state.rebuild) a.push("--rebuild");
+  if (state.publish){ a.push("--publish", state.latest ? "--latest" : "--not-latest"); if (state.prerelease) a.push("--prerelease"); }
+  return a.concat(extra || []);
+}
+
+// ---- Run status ------------------------------------------------------------
+const STEPS = {
+  build: [["CHECK","检查环境"],["DEPENDENCIES","准备依赖"],["BUILD","构建安装包"],["VERIFY","校验安装包"],["INSTALL","安装到设备"],["PUBLISH","发布到 GitHub"]],
+  check: [["CHECK","检查环境"],["DEPENDENCIES","检查依赖"]],
+  dry: [["PLAN","生成计划"]],
+  upload: [["FILE","读取文件"],["CHECKGH","核对 GitHub"],["UPLOAD","上传"],["DONE","上传后校验"]],
+};
+let run_ = null;   // {kind, args, steps, now, started, tasks, stopped, last, finished}
+let timer = null, allLines = [];
+
+function kindOf(args){
+  if (args.includes("--dry-run")) return "dry";
+  if (args[0] === "upload") return "upload";
+  if (args.includes("--check")) return "check";
+  return "build";
+}
+
+function stepsFor(args){
+  const kind = kindOf(args);
+  let steps = STEPS[kind];
+  if (kind === "build") steps = steps.filter(([k]) => (k !== "INSTALL" || !args.includes("--no-install")) && (k !== "PUBLISH" || args.includes("--publish")));
+  return steps;
+}
+
+function stageOf(line){
+  const m = line.match(/^\[(CHECK|DEPENDENCIES|VERIFY|INSTALL|PUBLISH)\]/);
+  if (m) return m[1];
+  if (/^\[BUILD-/.test(line) || /^\[REUSE\]/.test(line)) return "BUILD";
+  if (/^\[FILE\]/.test(line)) return "FILE";
+  if (/^\[PLAN\]/.test(line)) return run_ && run_.kind === "upload" ? "CHECKGH" : "PLAN";
+  if (/^\[UPLOAD\]/.test(line)) return "UPLOAD";
+  if (/^\[DONE\] https/.test(line)) return "DONE";
+  return null;
+}
+
+function title(kind){ return {build:"打包", check:"检查环境", dry:"预览", upload:"上传"}[kind]; }
+
+function beginRun(args, started){
+  run_ = {kind:kindOf(args), args, steps:stepsFor(args), now:-1, started:started || Date.now(), tasks:0, stopped:false, last:"", finished:false};
+  allLines = [];
+  $("steps").innerHTML = run_.steps.map(([k, label]) => `<li data-k="${k}">${label}</li>`).join("");
+  $("steps").classList.toggle("hidden", run_.steps.length < 2);
+  $("bar").className = "bar"; $("bar").firstElementChild.style.width = "2%";
+  $("result").className = "result hidden";
+  $("runTitle").textContent = `正在${title(run_.kind)}…`;
+  $("runSub").textContent = "正在启动";
+  $("log").innerHTML = "";
+  clearInterval(timer); timer = setInterval(tick, 1000); tick();
+}
+
+function fmt(ms){ const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+function tick(){ if (run_) $("elapsed").textContent = "已用 " + fmt(Date.now() - run_.started); }
+
+function expectedTasks(){ try { return +localStorage.getItem("gradleTasks") || 300; } catch { return 300; } }
+
+function advance(line){
+  if (!run_) return;
+  const stage = stageOf(line);
+  const index = stage ? run_.steps.findIndex(([k]) => k === stage) : -1;
+  if (index > run_.now) run_.now = index;
+  if (/^> Task /.test(line)){ run_.tasks++; run_.last = line.slice(7).split(" ")[0]; }
+  [...$("steps").children].forEach((li, i) => li.className = i < run_.now ? "done" : i === run_.now ? "now" : "");
+  const n = run_.steps.length, inBuild = run_.steps[run_.now] && run_.steps[run_.now][0] === "BUILD";
+  const part = inBuild ? Math.min(0.95, run_.tasks / expectedTasks()) : 0.3;
+  $("bar").firstElementChild.style.width = Math.max(2, ((Math.max(run_.now, 0) + part) / n) * 100) + "%";
+  if (run_.now >= 0){
+    $("runSub").textContent = `第 ${run_.now + 1} / ${n} 步：${run_.steps[run_.now][1]}` + (inBuild && run_.last ? `　·　${run_.last}` : "");
+  }
+}
+
+// Pull the real cause out of Gradle/Python/PowerShell output instead of an exit code.
+function failureReason(lines){
+  const out = [];
+  const wrong = lines.findIndex(t => /^\* What went wrong:/.test(t));
+  if (wrong >= 0) for (const t of lines.slice(wrong + 1, wrong + 12)){ if (/^\* Try:/.test(t)) break; if (t.trim()) out.push(t.trim()); }
+  for (const t of lines){
+    const x = t.trim();
+    if (/^(\w+(Error|Exception)\b|error:|ERROR:|e: )/.test(x) && !out.includes(x)) out.push(x);
+  }
+  const stop = lines.findIndex(t => t.startsWith("STOP:"));
+  if (stop >= 0){
+    const msg = [lines[stop].slice(5).trim(), ...lines.slice(stop + 1).filter(t => t.trim() && !/^没有执行/.test(t))];
+    // "Command failed (1): powershell ..." only says a script failed; keep it only when nothing better was found.
+    for (const t of msg) if (!(/^Command failed \(\d+\)/.test(t) && out.length)) out.push(t);
+  }
+  return [...new Set(out)].slice(-12).join("\n") || "没有找到明确的错误信息，请展开详细日志查看。";
+}
+
+function finish(code, lines){
+  clearInterval(timer); tick();
+  const ok = code === 0, kind = run_ ? run_.kind : "build";
+  const items = [...$("steps").children];
+  if (ok) items.forEach(li => li.className = "done");
+  else if (run_ && run_.now >= 0 && items[run_.now]) items[run_.now].className = "fail";
+  $("bar").className = "bar " + (ok ? "ok" : "bad");
+  if (ok) $("bar").firstElementChild.style.width = "100%";
+  if (ok && kind === "build" && run_ && run_.tasks > 20) try { localStorage.setItem("gradleTasks", String(run_.tasks)); } catch {}
+  const box = $("result"), esc = t => t.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  box.className = "result " + (ok ? "ok" : "bad");
+  if (ok){
+    const apk = lines.filter(t => /\.apk$/i.test(t.trim())).pop();
+    const sha = lines.find(t => t.startsWith("SHA256 "));
+    const note = lines.filter(t => /^(已安装|安装包已就绪|\[CHECKED\]|干跑结束|\[DONE\] https|\s+sha256 |商店目录)/.test(t));
+    const head = {build:"打包成功", check:"环境检查通过", dry:"预览完成，没有做任何改动", upload:"上传完成"}[kind];
+    box.innerHTML = `<div class="t">✓ ${head}</div>` + (apk ? `<pre>${esc(apk.trim())}\n${esc(sha || "")}</pre>` : "") +
+      (note.length ? `<pre>${esc(note.join("\n"))}</pre>` : "") +
+      (apk ? `<div class="field"><button class="btn" id="reveal">打开所在文件夹</button></div>` : "");
+    if (apk) $("reveal").onclick = () => api("/api/reveal", {path:apk.trim()});
+    $("runTitle").textContent = head;
+    $("runSub").textContent = "";
+  } else {
+    const stopped = run_ && run_.stopped;
+    const head = stopped ? "已停止" : `${title(kind)}失败`;
+    box.innerHTML = `<div class="t">✕ ${head}</div><pre>${esc(stopped ? "你点了停止。临时放进源码的九键模型会在下次运行时自动清理。" : failureReason(lines))}</pre>`;
+    $("runTitle").textContent = head;
+    $("runSub").textContent = run_ && run_.now >= 0 ? `停在第 ${run_.now + 1} 步：${run_.steps[run_.now][1]}` : "";
+    $("logWrap").open = true;
+  }
+}
+
+async function run(args){
+  const r = await api("/api/run", {args});
+  if (!r.started){ $("runSub").textContent = "已有任务在运行，先等它结束或点“停止打包”。"; return; }
+  $("cmd").textContent = "packager.cmd " + args.map(x => /\s/.test(x) ? `"${x}"` : x).join(" ");
+  next = 0; serial = r.serial; beginRun(args); setRunning(true); poll();
+  $("logCard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function lineClass(t){
+  if (t.startsWith("[PLAN]")) return "plan";
+  if (t.startsWith("STOP:")) return "stop";
+  if (/^(干跑结束|已安装|\[DONE\]|\[CHECKED\])/.test(t)) return "done";
+  if (/^\[(STAGE|REUSE|SOURCE|VERSION)\]/.test(t)) return "dim";
+  return "";
+}
+
+async function poll(){
+  if (polling) return; polling = true;
+  try{
+    for (;;){
+      const r = await api("/api/log?from=" + next);
+      if (r.serial !== serial){
+        // A task started elsewhere or before this page loaded: show it from the start.
+        serial = r.serial; next = 0;
+        if (r.serial){ $("cmd").textContent = "packager.cmd " + r.args.join(" "); beginRun(r.args, r.started * 1000); }
+        continue;
+      }
+      const log = $("log"), stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+      for (const t of r.lines){
+        const s = document.createElement("span"); s.className = lineClass(t); s.textContent = t + "\n"; log.append(s);
+        allLines.push(t); advance(t);
+      }
+      next = r.next;
+      if (stick) log.scrollTop = log.scrollHeight;
+      setRunning(r.running);
+      if (!r.running){ if (run_ && r.code !== null && !run_.finished){ run_.finished = true; finish(r.code, allLines); setRunning(false); } break; }
+      await new Promise(f => setTimeout(f, 600));
+    }
+  } finally { polling = false; }
+  if (info) refresh();
+}
+
+function setRunning(running){
+  for (const id of ["dryRun","check","go","upDry","upGo","refresh"]) $(id).disabled = running;
+  for (const b of document.querySelectorAll(".preset .pick")) b.disabled = running;
+  const building = running && run_ && run_.kind === "build";
+  $("go").classList.toggle("busy", building);
+  $("go").textContent = building ? "正在打包…" : state.publish ? "打包并发布" : "开始打包";
+  $("upGo").classList.toggle("busy", running && run_ && run_.kind === "upload");
+  $("stop").classList.toggle("hidden", !running);
+  $("stop").textContent = !run_ ? "停止" : {build:"停止打包", upload:"停止上传"}[run_.kind] || "停止";
+  const s = $("status");
+  s.className = "status" + (running ? " run" : "");
+  s.textContent = running ? ($("runSub").textContent || "运行中…") : ($("runTitle").textContent === "还没有运行" ? "空闲" : $("runTitle").textContent);
+}
+
+async function refresh(){
+  const data = await api("/api/info");
+  if (data.error){ $("status").textContent = data.error; return; }
+  info = data; render();
+}
+
+// Wiring
+for (const b of document.querySelectorAll(".nav button")) b.onclick = () => {
+  for (const x of document.querySelectorAll(".nav button")) x.classList.toggle("on", x === b);
+  $("page-build").classList.toggle("hidden", b.dataset.page !== "build");
+  $("page-upload").classList.toggle("hidden", b.dataset.page !== "upload");
+  history.replaceState(null, "", "#" + b.dataset.page);
+};
+if (location.hash === "#upload") document.querySelector('.nav [data-page="upload"]').click();
+for (const b of $("buildType").children) b.onclick = () => { state.build_type = b.dataset.v; save(); };
+$("t9").onchange = e => { state.t9_model = e.target.value; save(); };
+$("bump").onchange = e => { state.bump = e.target.value; save(); };
+$("device").onchange = e => { state.serial = e.target.value; save(); };
+for (const [id, key] of [["install","install"],["pushBanks","push_banks"],["rebuild","rebuild"],["publish","publish"],["latest","latest"],["prerelease","prerelease"]])
+  $(id).onchange = e => { state[key] = e.target.checked; save(); };
+$("refresh").onclick = refresh;
+$("dryRun").onclick = () => run(buildArgs(["--dry-run"]));
+$("check").onclick = () => run(buildArgs(["--check"]));
+$("go").onclick = async () => {
+  const extra = [];
+  if (state.publish){
+    if (!await ask("确认发布", `会在 GitHub 上公开发布这个版本${state.latest ? "并设为 Latest" : ""}，所有人可见。`)) return;
+    extra.push("--yes");
+  }
+  run(buildArgs(extra));
+};
+$("stop").onclick = async () => { if (await ask("停止", "停止当前任务？临时放进源码的九键模型会在下次运行时自动清理。")){ if (run_) run_.stopped = true; api("/api/stop", {}); } };
+$("pick").onclick = async () => { const r = await api("/api/pick", {}); if (r.path){ $("upFile").value = r.path; if (!$("upName").value) $("upName").value = r.path.split(/[\\/]/).pop(); } };
+function uploadArgs(extra){
+  const a = ["upload", $("upFile").value.trim(), "--tag", $("upTag").value.trim() || info.resourceTag];
+  if ($("upName").value.trim()) a.push("--name", $("upName").value.trim());
+  if ($("upReplace").checked) a.push("--replace");
+  return a.concat(extra);
+}
+$("upDry").onclick = () => { if ($("upFile").value.trim()) run(uploadArgs(["--dry-run"])); };
+$("upGo").onclick = async () => {
+  if (!$("upFile").value.trim()) return;
+  if (await ask("确认上传", "文件会上传到 GitHub，所有人可见。")) run(uploadArgs(["--yes"]));
+};
+setInterval(() => api("/api/log?from=999999999"), 5000);  // keep-alive while the window is open
+
+(async () => {
+  const data = await api("/api/info");
+  if (data.error){ $("status").textContent = data.error; return; }
+  info = data;
+  state = Object.assign({build_type:"release", bump:"auto", install:true, t9_model:"none", exclude_dicts:[]}, data.last || {});
+  if (!data.last && data.presets["装到我的设备"]){ render(); applyPreset("装到我的设备"); }
+  else render();
+  setRunning(false);
+  poll();
+})();
+</script>
+</body>
+</html>

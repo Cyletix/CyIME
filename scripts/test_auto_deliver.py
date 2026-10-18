@@ -11,9 +11,101 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock
 
 spec = importlib.util.spec_from_file_location('auto_deliver', Path(__file__).with_name('auto-deliver.py'))
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+
+class JavaHomeTest(unittest.TestCase):
+    def test_language_server_jre_is_not_a_build_jdk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'bin').mkdir()
+            (root/'release').write_text('JAVA_VERSION="21.0.12"')
+            for name in ['java.exe', 'javac.exe']:
+                (root/'bin'/name).touch()
+            self.assertFalse(m.complete_java_home(root))
+            (root/'bin/jlink.exe').touch()
+            self.assertTrue(m.complete_java_home(root))
+
+class AdbHandshakeTest(unittest.TestCase):
+    def test_reserved_superdisplay_port_stops_before_any_adb_command(self):
+        runner = Mock()
+        runner.run.return_value = 'Start Port    End Port\n----------    --------\n      1355        1454\n'
+        with self.assertRaisesRegex(m.DeliveryError, 'reserves SuperDisplay TCP 1445'):
+            m.check_adb_forward_port(runner)
+        self.assertEqual([['netsh.exe', 'interface', 'ipv4', 'show', 'excludedportrange', 'protocol=tcp']],
+                         [call.args[0] for call in runner.run.call_args_list])
+
+    def test_reservation_checks_ipv6_and_inclusive_boundaries(self):
+        for range_text in ('1445 1544', '1346 1445 *'):
+            runner = Mock()
+            runner.run.side_effect = ['5357 5357', range_text]
+            with self.assertRaisesRegex(m.DeliveryError, 'Windows ipv6 reserves'):
+                m.check_adb_forward_port(runner)
+
+    def test_unrelated_reservations_do_not_change_services_or_ranges(self):
+        runner = Mock()
+        runner.run.return_value = '起始端口 结束端口\n 1345 1444\n 1446 1545\n 50000 50059 *\n'
+        m.check_adb_forward_port(runner)
+        self.assertEqual(2, runner.run.call_count)
+        self.assertTrue(all(call.args[0][3] == 'show' for call in runner.run.call_args_list))
+
+    def test_private_old_adb_is_rejected_without_starting_or_stopping_the_daemon(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            companion = Path(tmp) / 'adb.exe'
+            companion.touch()
+            runner = Mock()
+            runner.run.side_effect = ['Android Debug Bridge version 1.0.41', 'Android Debug Bridge version 1.0.40']
+            with self.assertRaisesRegex(m.DeliveryError, 'SuperDisplay ADB 1.0.40 conflicts'):
+                m.check_adb_compatibility(runner, 'sdk-adb', companion)
+            self.assertEqual([['sdk-adb', 'version'], [str(companion), 'version']],
+                             [call.args[0] for call in runner.run.call_args_list])
+
+    def test_matching_protocols_allow_both_clients_without_changing_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            companion = Path(tmp) / 'adb.exe'
+            companion.write_bytes(b'preserve')
+            runner = Mock()
+            runner.run.return_value = 'Android Debug Bridge version 1.0.41'
+            m.check_adb_compatibility(runner, 'sdk-adb', companion)
+            self.assertEqual(b'preserve', companion.read_bytes())
+            self.assertEqual(2, runner.run.call_count)
+
+    def test_daemon_version_restart_waits_only_for_the_selected_device_then_retries_the_read(self):
+        runner = Mock()
+        runner.run.side_effect = [m.DeliveryError("adb server version (40) doesn't match client (41); device not found"), '', 'arm64-v8a']
+        self.assertEqual('arm64-v8a', m.read_adb_device(runner, 'sdk-adb', 'tablet', 'getprop', 'ro.product.cpu.abilist'))
+        command = ['sdk-adb', '-s', 'tablet', 'shell', 'getprop', 'ro.product.cpu.abilist']
+        self.assertEqual([command, ['sdk-adb', '-s', 'tablet', 'wait-for-device'], command],
+                         [call.args[0] for call in runner.run.call_args_list])
+        self.assertEqual(10, runner.run.call_args_list[1].kwargs['timeout'])
+
+    def test_read_does_not_retry_permission_denial_or_switch_devices(self):
+        runner = Mock()
+        runner.run.side_effect = m.DeliveryError('permission denied')
+        with self.assertRaises(m.DeliveryError):
+            m.read_adb_device(runner, 'sdk-adb', 'tablet', 'getprop', 'ro.product.cpu.abilist')
+        self.assertEqual(1, runner.run.call_count)
+
+    def test_transient_daemon_restart_retries_only_the_device_read_once(self):
+        runner = Mock()
+        runner.run.side_effect = [m.DeliveryError('protocol fault: connection reset'), '', 'device-list']
+        self.assertEqual('device-list', m.list_adb_devices(runner, 'sdk-adb'))
+        self.assertEqual([['sdk-adb', 'devices'], ['sdk-adb', 'start-server'], ['sdk-adb', 'devices']],
+                         [call.args[0] for call in runner.run.call_args_list])
+
+    def test_permanent_failure_is_not_retried_forever(self):
+        runner = Mock()
+        runner.run.side_effect = [m.DeliveryError('protocol fault'), '', m.DeliveryError('protocol fault')]
+        with self.assertRaises(m.DeliveryError): m.list_adb_devices(runner, 'sdk-adb')
+        self.assertEqual(3, runner.run.call_count)
+
+    def test_unrelated_error_does_not_restart_adb(self):
+        runner = Mock()
+        runner.run.side_effect = m.DeliveryError('permission denied')
+        with self.assertRaises(m.DeliveryError): m.list_adb_devices(runner, 'sdk-adb')
+        self.assertEqual(1, runner.run.call_count)
 
 class FakeRunner(m.Runner):
     def __init__(self, root):
@@ -53,7 +145,14 @@ class FakeRunner(m.Runner):
                 if '--paginate' in args: return json.dumps(self.releases)
                 if any('/commits/' in x for x in args):
                     return self.remote_commit or super().run(['git','rev-parse','HEAD'])
+            if args[1:3] == ['release','create']:
+                self.releases = [dict(tag_name=args[3], target_commitish=args[args.index('--target')+1],
+                    draft=True, html_url='https://github.com/owner/project/releases/tag/1.6.0', assets=[])]
+                return ''
             if args[1:3] == ['release','upload']:
+                if self.fail_publish_once and self.releases[0]['assets']:
+                    self.fail_publish_once=False
+                    raise m.DeliveryError('upload interrupted')
                 path = Path(args[4])
                 self.releases[0]['assets'].append({'name':path.name, 'digest':'sha256:'+m.digest(path)})
                 return ''
@@ -65,7 +164,7 @@ class FakeDelivery(m.Delivery):
     def preflight(self):
         self.stage('CHECK')
         self.ps = 'fake-powershell'; self.adb = 'fake-adb'; self.signer = 'fake-signer'
-        self.aapt = 'fake-aapt'; self.serial = '' if getattr(self.o, 'build_only', False) else 'tablet'; self.repo = 'owner/project'
+        self.aapt = 'fake-aapt'; self.serial = '' if getattr(self.o, 'build_only', False) or getattr(self.o, 'no_device', False) else 'tablet'; self.repo = 'owner/project'
         if self.o.publish: self.require_committed_sources()
     def script(self, name, parameters='', live=True):
         if name == 'build-apk.ps1':
@@ -81,17 +180,6 @@ class FakeDelivery(m.Delivery):
                 layoutGate='not-run',files=[dict(path=str(apk),sha256=m.digest(apk))]))
             if self.r.modify_during_build:
                 (self.root/'app/src/main/example.kt').write_text('changed concurrently')
-        elif name == 'publish-release.ps1':
-            files = [self.load_artifact(x) for x in ('standard','full')]
-            self.r.releases = [dict(tag_name=self.version,target_commitish=self.commit,draft=False,
-                html_url='https://github.com/owner/project/releases/tag/1.6.0',
-                assets=[dict(name=Path(a['path']).name,digest='sha256:'+a['sha256']) for a in files])]
-            if self.r.fail_publish_once:
-                self.r.fail_publish_once=False
-                self.r.releases[0]['draft']=True
-                self.r.releases[0]['assets']=self.r.releases[0]['assets'][:1]
-                raise m.DeliveryError('upload interrupted')
-            self.r.publish_count += 1
         else: raise AssertionError(name)
 
 class PureTests(unittest.TestCase):
@@ -159,18 +247,87 @@ class FlowTests(unittest.TestCase):
         self.runner.fail_build=True
         with self.assertRaises(m.DeliveryError): self.execute(build_only=True,rebuild=True)
         self.assertEqual(self.runner.install_count,0)
+    def test_changed_uninstalled_draft_is_archived_without_a_version_bump(self):
+        self.execute(build_only=True)
+        old = self.job().load_artifact('standard')
+        content = Path(old['path']).read_bytes()
+        (self.root/'app/src/main/example.kt').write_text('same batch, improved implementation')
+        self.execute(build_only=True)
+        archived = list((self.root/'app/build/outputs/apk/archive').rglob('*.apk'))
+        self.assertEqual(len(archived), 1)
+        self.assertEqual(archived[0].read_bytes(), content)
+        self.assertEqual((self.runner.build_count, self.runner.install_count), (2, 0))
+        self.assertNotEqual(m.digest(Path(old['path'])), old['sha256'])
     def test_publish_builds_both_and_installs_once(self):
-        self.execute(publish=True)
+        self.execute(publish=True,both=True)
         self.assertEqual((self.runner.build_count,self.runner.install_count,self.runner.publish_count),(2,1,1))
+
+    def test_rejected_concurrent_draft_is_archived_before_retry(self):
+        self.execute(build_only=True)
+        original = Path(self.job().load_artifact('standard')['path']).read_bytes()
+        (self.root/'app/src/main/example.kt').write_text('second draft')
+        self.runner.modify_during_build = True
+        with self.assertRaisesRegex(m.DeliveryError, 'Source changed while building'):
+            self.execute(build_only=True)
+        rejected = Path(self.job().load_artifact('standard', require_source=False)['path']).read_bytes()
+        self.runner.modify_during_build = False
+        self.execute(build_only=True)
+        archived = list((self.root/'app/build/outputs/apk/archive').rglob('*.apk'))
+        self.assertEqual({p.read_bytes() for p in archived}, {original, rejected})
+        self.assertEqual((self.runner.build_count, self.runner.install_count), (3, 0))
+    def test_publish_defaults_to_lightweight_only(self):
+        self.execute(publish=True)
+        self.assertEqual((self.runner.build_count,self.runner.install_count,self.runner.publish_count),(1,1,1))
+        self.assertEqual(len(self.runner.releases[0]['assets']),1)
+        create = next(x for x in self.runner.calls if x[:3]==['gh','release','create'])
+        self.assertIn('--draft',create)
     def test_full_install_selects_full_receipt(self):
         self.execute(full=True)
         a=self.job().load_artifact('full');self.assertEqual(self.runner.installed,a['sha256'])
     def test_same_source_skips_build_and_install(self):
         self.execute();self.execute()
         self.assertEqual((self.runner.build_count,self.runner.install_count),(1,1))
-    def test_source_change_rebuilds_same_version_locally(self):
-        self.execute();(self.root/'app/src/main/example.kt').write_text('new code');self.execute()
-        self.assertEqual((self.runner.build_count,self.runner.install_count),(2,2))
+    def test_changed_source_must_not_replace_a_delivered_version_code(self):
+        self.execute();(self.root/'app/src/main/example.kt').write_text('new code')
+        with self.assertRaisesRegex(m.DeliveryError,'already has a different source delivery'):self.execute()
+        self.assertEqual((self.runner.build_count,self.runner.install_count),(1,1))
+
+    def test_new_delivery_cannot_only_increment_android_code(self):
+        self.execute()
+        path = self.root/'app/build.gradle.kts'
+        path.write_text('versionCode = 20261072\nversionName = "1.6.0"\n')
+        with self.assertRaisesRegex(m.DeliveryError, 'Advance versionName'): self.execute()
+        self.assertEqual((self.runner.build_count, self.runner.install_count), (1, 1))
+
+    def test_patch_two_three_four_five_and_ten_are_numeric_versions(self):
+        job = self.job()
+        for patch in [1, 2, 3, 4, 5, 10]:
+            job.state['deliveredVersions'] = {'100': f'1.8.{patch - 1}'}
+            job.state['installed'] = {}
+            job.version, job.code = f'1.8.{patch}', 101
+            job.check_delivered_version()
+
+    def test_legacy_installed_hash_defines_the_delivery_boundary(self):
+        self.execute()
+        job = self.job()
+        job.state.pop('deliveredVersions', None)
+        job.code += 1
+        with self.assertRaisesRegex(m.DeliveryError, 'already delivered'): job.check_delivered_version()
+
+    def test_new_install_preserves_the_legacy_delivered_version(self):
+        self.execute()
+        job = self.job()
+        job.state.pop('deliveredVersions', None)
+        job.version, job.code = '1.6.1', 20261072
+        job.installed_hash = lambda: 'new-hash'
+        with contextlib.redirect_stdout(io.StringIO()):
+            job.install(dict(path='verified.apk', sha256='new-hash', edition='standard'))
+        self.assertEqual({'20261071': '1.6.0', '20261072': '1.6.1'}, job.state['deliveredVersions'])
+
+    def test_failed_install_is_not_a_completed_delivery(self):
+        self.runner.fail_install = True
+        with self.assertRaises(m.DeliveryError): self.execute()
+        self.assertFalse(self.job().delivered_versions())
     def test_build_failure_does_not_install_old_apk(self):
         self.execute();self.runner.fail_build=True
         with self.assertRaises(m.DeliveryError): self.execute(rebuild=True)
@@ -207,14 +364,14 @@ class FlowTests(unittest.TestCase):
         self.assertEqual((self.runner.build_count,self.runner.install_count),(1,1))
     def test_partial_release_resumes_without_rebuild(self):
         self.runner.fail_publish_once=True
-        with self.assertRaises(m.DeliveryError): self.execute(publish=True)
+        with self.assertRaises(m.DeliveryError): self.execute(publish=True,both=True)
         self.assertTrue(self.runner.releases[0]['draft'])
-        self.execute(publish=True)
+        self.execute(publish=True,both=True)
         self.assertEqual((self.runner.build_count,self.runner.install_count,self.runner.publish_count),(2,1,1))
         self.assertFalse(self.runner.releases[0]['draft']);self.assertEqual(len(self.runner.releases[0]['assets']),2)
     def test_completed_release_repeat_is_noop(self):
         self.execute(publish=True);self.execute(publish=True)
-        self.assertEqual((self.runner.build_count,self.runner.install_count,self.runner.publish_count),(2,1,1))
+        self.assertEqual((self.runner.build_count,self.runner.install_count,self.runner.publish_count),(1,1,1))
     def test_dirty_source_rejected_for_publish_but_not_update(self):
         (self.root/'app/src/main/example.kt').write_text('local edit')
         with self.assertRaises(m.DeliveryError):self.execute(publish=True)
@@ -249,5 +406,54 @@ class FlowTests(unittest.TestCase):
     def test_state_written(self):
         self.execute();state=m.read_json(self.root/'.gradle/auto-deliver/state.json')
         self.assertEqual(state['stage'],'DONE');self.assertEqual(state['installed']['serial'],'tablet')
+
+    def test_committing_identical_source_does_not_rebuild(self):
+        self.execute()
+        subprocess.run(['git','commit','--allow-empty','-qm','record identical sources'],cwd=self.root,check=True)
+        self.execute()
+        self.assertEqual((self.runner.build_count,self.runner.install_count),(1,1))
+
+    def test_generated_python_and_fixture_cache_does_not_rebuild(self):
+        self.execute()
+        for name in ('scripts/__pycache__/delivery.pyc','tools/clipboard-sync-fixture/obj/cache'):
+            p=self.root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'generated')
+        self.execute()
+        self.assertEqual(self.runner.build_count,1)
+        self.job().require_committed_sources()
+
+    def test_no_device_builds_once_and_reconnect_resumes_install(self):
+        self.execute(no_device=True)
+        self.assertEqual((self.runner.build_count,self.runner.install_count),(1,0))
+        self.assertEqual(m.read_json(self.root/'.gradle/auto-deliver/state.json')['stage'],'INSTALL-PENDING')
+        self.execute()
+        self.assertEqual((self.runner.build_count,self.runner.install_count),(1,1))
+
+    def test_check_does_not_build_install_or_initialize_dependencies(self):
+        self.execute(check_only=True)
+        self.assertEqual((self.runner.build_count,self.runner.install_count,self.runner.publish_count),(0,0,0))
+        self.runner.submodule_status='-'+'a'*40+' app/src/main/jni/librime-predict\n'
+        with self.assertRaises(m.DeliveryError):self.execute(check_only=True)
+        self.assertFalse(any('update' in x for x in self.runner.calls))
+
+    def test_install_only_is_explicitly_existing_apk_not_current_edits(self):
+        self.execute(build_only=True)
+        (self.root/'app/src/main/example.kt').write_text('unbuilt edit')
+        self.execute(install_only=True)
+        self.assertEqual((self.runner.build_count,self.runner.install_count),(1,1))
+
+    def test_install_only_without_receipt_does_not_build(self):
+        with self.assertRaises(FileNotFoundError):self.execute(install_only=True)
+        self.assertEqual((self.runner.build_count,self.runner.install_count),(0,0))
+
+    def test_configured_entry_stays_within_the_same_repository(self):
+        subprocess.run(['git','config','cyime.integrationRoot',str(self.root/'missing')],cwd=self.root,check=True)
+        with self.assertRaises(m.DeliveryError):m.integration_root(self.root)
+
+    def test_real_cmd_launcher_help_preserves_error_exit(self):
+        import os
+        if os.name!='nt':self.skipTest('Windows entry-point check')
+        launcher=Path(__file__).resolve().parents[1]/'auto.cmd'
+        result=subprocess.run(['cmd.exe','/d','/c',str(launcher),'--not-a-valid-option'],capture_output=True)
+        self.assertNotEqual(result.returncode,0)
 
 if __name__=='__main__':unittest.main(verbosity=2)

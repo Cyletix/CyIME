@@ -71,11 +71,13 @@ android {
         // 按发布批次定号：兼容修复升 PATCH，兼容功能升 MINOR 并归零 PATCH。
         // 不兼容变更升 MAJOR；日常编辑不逐次升号。完整规则见 docs/packaging.md。
         // versionCode 是独立递增的交付序号；同批普通版与内置版共用。
-        versionCode = 20261075
-        versionName = "1.7.1"
+        versionCode = 20261202
+        versionName = "1.14.17"
 
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Isolated Compose rendering on a local x86 emulator; ordinary device tests keep the full app.
+        testInstrumentationRunner = if (providers.gradleProperty("uiRenderingOnly").orNull == "true")
+            "com.kingzcheung.xime.ui.UiRenderingTestRunner" else "androidx.test.runner.AndroidJUnitRunner"
 
         // NDK 配置
         ndk {
@@ -159,13 +161,17 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // tasks-native.gradle.kts extracts this same 1.28.0 runtime for C++ consumers.
+            // The Java OCR binding contributes an identical copy plus onnxruntime4j_jni.
+            pickFirsts.add("**/libonnxruntime.so")
+            pickFirsts.add("**/libc++_shared.so")
         }
     }
-    // The lightweight edition downloads optional sentence scoring on demand.
+    // 九键长句重排已停用（t9_pinyin.schema.yaml），两种包都不再带这个模型；源文件只留给电脑回放对照。
     // Keep vocabulary and licenses; both editions offer the large grammar separately.
-    if (providers.gradleProperty("bundleModels").orNull != "true") {
-        androidResources.ignoreAssetsPatterns.add("t9_sentence.onnx")
-    }
+    androidResources.ignoreAssetsPatterns.add("t9_sentence.onnx")
+    // Retain the old model files for the local comparison, exclude them from delivery.
+    androidResources.ignoreAssetsPatterns.add("*.traineddata")
     ndkVersion = "29.0.14206865"
 
     // F-Droid 一致性验证：不在 APK 中写入依赖元数据（Dependency metadata 签名块）。
@@ -276,6 +282,12 @@ dependencies {
 
     // ZXing for QR code generation
     implementation("com.google.zxing:core:3.5.4")
+    // Bundled OCR works without Play Services or a first-use model download.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.28.0")
+    implementation("org.opencv:opencv:4.12.0")
+    implementation("androidx.camera:camera-camera2:1.6.2")
+    implementation("androidx.camera:camera-lifecycle:1.6.2")
+    implementation("androidx.camera:camera-view:1.6.2")
 
     // Ktor embedded server for wireless import
     implementation("io.ktor:ktor-server-core:3.6.0")
