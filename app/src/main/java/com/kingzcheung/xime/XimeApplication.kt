@@ -66,6 +66,8 @@ class XimeApplication : Application(), ImageLoaderFactory {
             .runningAppProcesses?.firstOrNull { it.pid == android.os.Process.myPid() }?.processName
             ?: runCatching { java.io.File("/proc/self/cmdline").readText().substringBefore('\u0000') }.getOrNull()
         if (processName != packageName) return
+        // 先于任何下载、导入和词库准备列出上次中断的残留，后台删除。
+        com.kingzcheung.xime.settings.StorageHousekeeping.sweepAtStartup(this, applicationScope)
         com.kingzcheung.xime.model.DeviceDefaults.initialize(this)
         com.kingzcheung.xime.settings.LanguagePreferences.initialize(this)
         com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this)

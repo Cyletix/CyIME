@@ -66,7 +66,52 @@ internal object CandidateModelAssets {
             true
         }
         setDisabled(context, model.id, false)
-        if (model.id == CandidateModelCatalog.NGRAM || model.id == CandidateModelCatalog.NGRAM_SMALL) dropSupersededGrammar(context)
+        if (model.id == CandidateModelCatalog.NGRAM || model.id == CandidateModelCatalog.NGRAM_SMALL) {
+            dropSupersededGrammar(context)
+            dropUnusedNgramVariant(context)
+        }
+    }
+
+    /** 启动时清掉被替代或已停用模型留下的文件，免得空间只增不减。 */
+    fun dropSupersededDownloads(context: Context) {
+        // 清理失败只少腾空间，不能挡住输入法启动。
+        val steps = listOf<(Context) -> Unit>({ dropSupersededGrammar(it) }, { dropUnusedNgramVariant(it) }, { dropRetiredModels(it) })
+        for (step in steps) {
+            runCatching { step(context) }
+                .onFailure { com.kingzcheung.xime.util.FileLogger.w("CandidateModels", "清理旧模型失败：${it.message}") }
+        }
+    }
+
+    /**
+     * 九键词组模型完整版和精简版二选一：rime/ 里的 t9_ngram.lm 是哪一档的硬链接，另一档留在 models/
+     * 的下载（100~200 MB）就不再起作用，删掉。不是硬链接（拷贝安装）时无法确认归属，保持原样。
+     */
+    fun dropUnusedNgramVariant(context: Context) {
+        val variants = CandidateModelCatalog.models
+            .filter { it.id == CandidateModelCatalog.NGRAM || it.id == CandidateModelCatalog.NGRAM_SMALL }
+        val runtime = File(context.filesDir, "rime")
+        val active = activeVariant(runtime, variants.map { it to ModelStorage.getModelDir(context, it.id) })
+            ?.takeUnless { SettingsPreferences.getPrefsPublic(context).getBoolean(disabledKey(it.id), false) } ?: return
+        for (other in variants) {
+            if (other.id == active.id || !ModelStorage.getModelDir(context, other.id).exists()) continue
+            if (!ModelManager.deleteStoredDownload(context, other))
+                com.kingzcheung.xime.util.FileLogger.w("CandidateModels", "${other.id} 已被 ${active.id} 替代，但未能删除")
+        }
+    }
+
+    /** 整个条目都已停用（如九键长句增强）：已下载的文件不再参与排序，删掉；自定义同名文件保留。 */
+    private fun dropRetiredModels(context: Context) {
+        for (model in CandidateModelCatalog.models) {
+            if (model.versions.isEmpty() || !model.versions.all { it.retired }) continue
+            val names = model.versions.flatMap { it.files }.map { it.name }.distinct()
+            val present = names.any { name ->
+                modelDownloadFile(File(context.filesDir, "rime"), name).exists() ||
+                    modelDownloadFile(ModelStorage.getModelDir(context, model.id), name).exists()
+            }
+            // deleteModel 只删认得的完整版本，下载到一半的残余再由 deleteStoredDownload 整个目录清掉。
+            if (present && !(ModelManager.deleteModel(context, model) && ModelManager.deleteStoredDownload(context, model)))
+                com.kingzcheung.xime.util.FileLogger.w("CandidateModels", "已停用的 ${model.id} 未能删除")
+        }
     }
 
     /**
@@ -105,6 +150,16 @@ internal object CandidateModelAssets {
         setDisabled(context, model.id, true)
         return files.all { (_, file) -> !file.exists() || file.delete() }
     }
+}
+
+/** rime/ 里的词组模型和哪一档的下载是同一个文件（硬链接）；都不是时返回 null。 */
+internal fun activeVariant(runtime: File, variants: List<Pair<ModelInfo, File>>): ModelInfo? {
+    val name = variants.firstOrNull()?.first?.files?.firstOrNull()?.name ?: return null
+    val installed = modelDownloadFile(runtime, name).takeIf { it.isFile } ?: return null
+    return variants.firstOrNull { (_, dir) ->
+        val stored = modelDownloadFile(dir, name)
+        stored.isFile && runCatching { Files.isSameFile(stored.toPath(), installed.toPath()) }.getOrDefault(false)
+    }?.first
 }
 
 /** Validate the complete source before publishing any file; preserve unknown destination content. */

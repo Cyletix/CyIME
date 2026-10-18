@@ -1,10 +1,13 @@
 package com.kingzcheung.xime.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Assume.assumeNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 
 /**
  * StorageStats 纯逻辑单测：目录递归求和与总计（不依赖 Android Context）。
@@ -40,6 +43,31 @@ class StorageStatsTest {
     fun `空目录大小为0`() {
         tmp.newFolder("empty")
         assertEquals(0L, StorageStats.directorySize(tmp.newFolder("empty2")))
+    }
+
+    @Test
+    fun `重叠目录跨类目只计一次`() {
+        val rime = tmp.newFolder("rime")
+        val build = tmp.newFolder("rime", "build")
+        File(build, "a.bin").writeText("1234")      // 4，先计入编译缓存
+        File(rime, "dict.yaml").writeText("123456") // 6
+        val counter = StorageStats.SizeCounter()
+        assertEquals(4L, counter.count(build))
+        assertEquals(6L, counter.count(rime))
+        assertEquals(0L, counter.count(rime))
+    }
+
+    @Test
+    fun `硬链接只计入先统计的目录`() {
+        val models = tmp.newFolder("models")
+        val rime = tmp.newFolder("rime")
+        val model = File(models, "t9_ngram.lm").apply { writeText("0123456789") }
+        Files.createLink(File(rime, "t9_ngram.lm").toPath(), model.toPath())
+        // Windows 拿不到 inode，只能按路径去重；这条在 Linux / Android 上验证。
+        assumeNotNull(Files.readAttributes(model.toPath(), BasicFileAttributes::class.java).fileKey())
+        val counter = StorageStats.SizeCounter()
+        assertEquals(10L, counter.count(models))
+        assertEquals(0L, counter.count(rime))
     }
 
     @Test
