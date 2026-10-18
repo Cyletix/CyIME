@@ -10,15 +10,16 @@ internal class ClipboardImagePreviewState(lastCopyKey: String?) {
     var lastCopyKey: String? = lastCopyKey
         private set
     private var pendingKey: String? = null
+    private var presented = false
     private val _preview = MutableStateFlow<ClipboardImage?>(null)
     val preview = _preview.asStateFlow()
 
     @Synchronized
     fun beginCopy(uri: String, timestamp: Long): String? {
         val key = "$timestamp:$uri"
-        if (key == lastCopyKey) return null
-        lastCopyKey = key
+        if (key == lastCopyKey || key == pendingKey) return null
         pendingKey = key
+        presented = false
         _preview.value = null
         return key
     }
@@ -37,9 +38,20 @@ internal class ClipboardImagePreviewState(lastCopyKey: String?) {
     @Synchronized
     fun dismiss(uri: String? = null) {
         if (uri != null && _preview.value?.uri != uri) return
+        if (pendingKey != null) lastCopyKey = pendingKey
         pendingKey = null
+        presented = false
         _preview.value = null
     }
+
+    @Synchronized
+    fun presented(uri: String) { if (_preview.value?.uri == uri) presented = true }
+
+    @Synchronized
+    fun dismissIfPresented() { if (presented) dismiss() }
+
+    @Synchronized
+    fun failed(key: String) { if (pendingKey == key) { pendingKey = null; _preview.value = null } }
 
     @Synchronized
     fun expire(now: Long) {

@@ -24,6 +24,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -66,7 +67,7 @@ fun ClipboardSyncSettingsContent(
     // 当前选中的插件实例（切换时在 IO 协程里 launch 完成后更新，驱动表单立即渲染新插件）
     var activePlugin by remember {
         mutableStateOf(
-            syncPlugins.firstOrNull { it.first == selectedPluginId } ?: syncPlugins.firstOrNull()
+            syncPlugins.firstOrNull { it.first == selectedPluginId }
         )
     }
     var installedPlugins by remember { mutableStateOf(ExtensionManager.getAllInstalledPlugins()) }
@@ -77,19 +78,31 @@ fun ClipboardSyncSettingsContent(
     var selectionError by remember { mutableStateOf<String?>(null) }
     val pluginInstances by PluginManager.pluginInstancesFlow.collectAsState()
     val windowsPeer by com.kingzcheung.xime.clipboard.sync.WindowsDevices.paired.collectAsState()
+    DisposableEffect(context) {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            enabled = SettingsPreferences.isClipboardSyncEnabled(context)
+            selectedPluginId = SettingsPreferences.getClipboardSyncPluginId(context)
+            activePlugin = ExtensionManager.getEnabledClipboardSyncPlugins(context)
+                .firstOrNull { it.first == selectedPluginId }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     LaunchedEffect(pluginInstances, windowsPeer) {
         enabled = SettingsPreferences.isClipboardSyncEnabled(context)
         installedPlugins = ExtensionManager.getAllInstalledPlugins()
         val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
         val preferred = SettingsPreferences.getClipboardSyncPluginId(context)
-        activePlugin = available.firstOrNull { it.first == preferred } ?: available.firstOrNull()
-        selectedPluginId = activePlugin?.first.orEmpty()
+        activePlugin = available.firstOrNull { it.first == preferred }
+        selectedPluginId = preferred
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         installedPlugins = ExtensionManager.getAllInstalledPlugins()
         val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
         selectedPluginId = SettingsPreferences.getClipboardSyncPluginId(context)
-        activePlugin = available.firstOrNull { it.first == selectedPluginId } ?: available.firstOrNull()
+        activePlugin = available.firstOrNull { it.first == selectedPluginId }
+        enabled = SettingsPreferences.isClipboardSyncEnabled(context)
     }
 
     Scaffold(
@@ -121,17 +134,18 @@ fun ClipboardSyncSettingsContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            VerificationCodeSettings()
             WindowsDevicesPanel()
-            androidx.compose.material3.TextButton(onClick = { advanced = !advanced }) { Text("其他服务与旧版兼容连接") }
+            androidx.compose.material3.TextButton(onClick = { advanced = !advanced }) { Text(if (advanced) "收起手动连接与其他服务" else "备用：手动连接与其他服务") }
             if (advanced) {
+            Text("连接 Windows 优先使用上方的“扫码连接电脑”。下方手动填写仅供旧版兼容或其他同步服务使用。",
+                style = MaterialTheme.typography.bodyMedium)
             SettingsSection(title = "同步服务", content = {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     if (clipboardPlugins.isEmpty()) {
                         Text("正在准备内置同步服务；若持续未出现，请重新打开应用并在插件管理中检查状态。")
                     }
                     clipboardPlugins.forEach { plugin ->
-                        val isActive = plugin.id == activePlugin?.first
+                        val isActive = plugin.id == selectedPluginId
                         PluginServiceChoice(plugin.name, plugin.description, isActive, !selecting) {
                             if (!isActive) {
                                 selecting = true
@@ -171,11 +185,10 @@ fun ClipboardSyncSettingsContent(
                 )
             }
             Button(onClick = onNavigateToPlugins) { Text("管理其他同步服务") }
-            }
-            SettingsSection(title = "同步开关", content = {
+            if (activePlugin != null && activePlugin?.first != com.kingzcheung.xime.clipboard.sync.WindowsDevices.ID) SettingsSection(title = "同步开关", content = {
                 SettingsToggleItem(
                     icon = Icons.TwoTone.Sync,
-                    title = "启用剪贴板同步",
+                    title = "启用所选兼容服务",
                     subtitle = "先选择服务并完成配置，再开启双向同步。开启后会向该服务传输剪贴板文本。",
                     checked = enabled,
                     onCheckedChange = { checked ->
@@ -188,6 +201,10 @@ fun ClipboardSyncSettingsContent(
                     }
                 )
             })
+            }
+            var showVerification by remember { mutableStateOf(false) }
+            androidx.compose.material3.TextButton(onClick = { showVerification = !showVerification }) { Text("短信验证码设置") }
+            if (showVerification) VerificationCodeSettings()
         }
     }
 }

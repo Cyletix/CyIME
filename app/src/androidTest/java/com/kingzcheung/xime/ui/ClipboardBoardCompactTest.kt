@@ -88,7 +88,7 @@ class ClipboardBoardCompactTest {
             val records = bounds("clipboard-records-region")
             assertEquals(360f, board.width, 1f)
             assertEquals(boardHeight.toFloat(), board.height, 1f)
-            assertTrue("classification/actions need one compact row", controls.height in 24f..28f)
+            assertEquals("classification/actions use the expression menu height", 36f, controls.height, 1f)
             assertTrue("content occupies >=80%: height=$boardHeight dark=$isDark",
                 records.width * records.height >= board.width * board.height * .8f)
             assertTrue("records cannot be covered by the controls", records.top >= controls.bottom - 1f)
@@ -132,7 +132,7 @@ class ClipboardBoardCompactTest {
 
     @Test fun horizontalRecordSwipesChangeOneCategoryWithoutPastingOrWrapping() {
         showBoard()
-        for (filter in listOf("TEXT", "IMAGE", "LINK")) {
+        for (filter in listOf("TEXT", "LINK", "ADDRESS")) {
             rule.onNodeWithTag("clipboard-records-region").performTouchInput {
                 swipe(Offset(300f, 80f), Offset(80f, 100f), 300)
             }
@@ -142,7 +142,7 @@ class ClipboardBoardCompactTest {
         rule.onNodeWithTag("clipboard-records-region").performTouchInput {
             swipe(Offset(70f, 90f), Offset(290f, 80f), 300)
         }
-        rule.onNodeWithTag("clipboard-filter:IMAGE").assertIsSelected()
+        rule.onNodeWithTag("clipboard-filter:LINK").assertIsSelected()
         rule.onNodeWithTag("clipboard-filter:ALL").performScrollTo().performClick()
         rule.onNodeWithTag("clipboard-records-region").performTouchInput {
             swipe(Offset(70f, 90f), Offset(290f, 90f), 300)
@@ -222,7 +222,8 @@ class ClipboardBoardCompactTest {
         rule.onNodeWithTag("clipboard-filter:TEXT").performScrollTo().performClick().assertIsSelected()
         rule.onNodeWithTag("clipboard-card:${imageKey()}").assertDoesNotExist()
         rule.onNodeWithTag("clipboard-card:text:${pinnedText.id}").assertIsFocused()
-        rule.runOnIdle { keyboard.dispatch(ClipboardNavigation.RIGHT) }
+        // The newest unpinned card is below the full-span pin separator, not to its right.
+        rule.runOnIdle { keyboard.dispatch(ClipboardNavigation.DOWN) }
         rule.onNodeWithTag("clipboard-card:text:${newestText.id}").assertIsFocused().assertIsDisplayed()
         rule.runOnIdle { keyboard.dispatch(ClipboardNavigation.CONFIRM) }
         rule.runOnIdle {
@@ -236,6 +237,32 @@ class ClipboardBoardCompactTest {
         rule.onNodeWithTag("clipboard-filter:ALL").performScrollTo().performClick().assertIsSelected()
         rule.onNodeWithTag("clipboard-card:text:${pinnedText.id}").assertIsDisplayed()
         rule.onNodeWithTag("clipboard-card:${imageKey()}").assertIsDisplayed()
+    }
+
+    @Test fun imagesHaveSparseTextureWhilePastingKeepsTheOriginalImage() {
+        showBoard()
+        awaitLoadedImage()
+        rule.onNodeWithTag("clipboard-image-hatch:${imageKey()}", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithTag("clipboard-image-hatch:text:${pinnedText.id}", useUnmergedTree = true).assertDoesNotExist()
+        val bitmap = rule.onNodeWithTag("clipboard-card:${imageKey()}").captureToImage().asAndroidBitmap()
+        var changed = 0
+        var sampled = 0
+        // Ignore rounded borders and the lock badge, measuring the image itself.
+        for (y in 4 until bitmap.height - 4) for (x in 4 until bitmap.width - 30) {
+            val pixel = bitmap.getPixel(x, y)
+            val difference = maxOf(abs(android.graphics.Color.red(pixel) - android.graphics.Color.red(IMAGE_COLOR)),
+                abs(android.graphics.Color.green(pixel) - android.graphics.Color.green(IMAGE_COLOR)),
+                abs(android.graphics.Color.blue(pixel) - android.graphics.Color.blue(IMAGE_COLOR)))
+            if (difference > 3) changed++
+            sampled++
+        }
+        assertTrue("Lines must be visible but leave most image pixels unchanged: $changed/$sampled",
+            changed > sampled * .01f && changed < sampled * .15f)
+        val output = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
+            "clipboard-image-texture.png")
+        output.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        rule.onNodeWithTag("clipboard-card:${imageKey()}").performClick()
+        rule.runOnIdle { assertEquals(listOf(image), pastedImages) }
     }
 
     private fun showBoard() {

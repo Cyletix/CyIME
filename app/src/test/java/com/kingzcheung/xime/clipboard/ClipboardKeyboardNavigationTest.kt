@@ -12,12 +12,12 @@ class ClipboardKeyboardNavigationTest {
         state.dispatch(ClipboardNavigation.RIGHT)
         state.dispatch(ClipboardNavigation.CONFIRM)
         state.dispatch(ClipboardNavigation.DOWN)
-        state.attach { action -> events += action; if (action == ClipboardNavigation.CONFIRM) state.close() }
+        state.attach { action -> events += action; if (action == ClipboardNavigation.CONFIRM) state.close(); false }
         assertEquals(listOf(ClipboardNavigation.RIGHT, ClipboardNavigation.CONFIRM), events)
         assertEquals(1, closed)
         assertFalse(state.active)
         state.open(); state.dispatch(ClipboardNavigation.LEFT); state.reset()
-        state.attach { events += it }
+        state.attach { events += it; false }
         assertEquals(2, events.size)
     }
     @Test fun cancelClosesEvenBeforeBoardMountsAndClosedBoardDoesNotHandleKeys() {
@@ -27,6 +27,18 @@ class ClipboardKeyboardNavigationTest {
         state.dispatch(ClipboardNavigation.CONFIRM)
         assertEquals(1, closed)
         assertFalse(state.active)
+    }
+    @Test fun escapeClosesAnOpenRecordMenuBeforeTheClipboard() {
+        var closed = 0
+        var menuOpen = true
+        val state = ClipboardKeyboardNavigation { closed++ }
+        state.open()
+        state.attach { action -> if (action == ClipboardNavigation.CANCEL && menuOpen) { menuOpen = false; true } else false }
+        state.dispatch(ClipboardNavigation.CANCEL)
+        assertEquals("first Esc only closes the menu", 0, closed)
+        assertTrue(state.active)
+        state.dispatch(ClipboardNavigation.CANCEL)
+        assertEquals("second Esc closes the clipboard", 1, closed)
     }
     @Test fun directionalSelectionUsesStaggeredCellGeometry() {
         val keys = listOf("a", "b", "c", "d")

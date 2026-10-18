@@ -9,8 +9,19 @@ internal fun clipboardPanelCanExpand(page: KeyboardPage, resizing: Boolean, comp
 internal data class ClipboardPanelBounds(val collapsed: Int, val expanded: Int) {
     fun clamp(height: Float): Float = height.coerceIn(collapsed.toFloat(), expanded.toFloat())
 
-    fun shouldExpand(height: Float): Boolean =
-        expanded > collapsed && height > (collapsed + expanded) / 2f
+    fun shouldExpand(height: Float, startHeight: Float = collapsed.toFloat(),
+        wasExpanded: Boolean = false, velocityY: Float = 0f): Boolean {
+        if (expanded <= collapsed) return false
+        val distance = (expanded - collapsed) * .2f
+        // Project through half of the shared 240ms opening transition. A quick flick
+        // can settle without a long drag; slow sub-threshold movement returns home.
+        val projectedTravel = height - startHeight - (velocityY.takeIf { it.isFinite() } ?: 0f) * .12f
+        return when {
+            projectedTravel >= distance -> true
+            projectedTravel <= -distance -> false
+            else -> wasExpanded
+        }
+    }
 }
 
 /** Reserved space includes system bars, bottom padding and (when floating) the card's bottom offset. */
@@ -25,7 +36,7 @@ internal fun clipboardPanelBounds(normal: Int, screen: Int, reserved: Int): Clip
 /** Use screen coordinates: resizing the IME moves the toolbar's local coordinate origin. */
 internal class ClipboardPanelDrag(
     private val bounds: ClipboardPanelBounds,
-    private val startHeight: Float,
+    val startHeight: Float,
     private val startScreenY: Float,
 ) {
     fun heightAt(screenY: Float): Float = bounds.clamp(startHeight + startScreenY - screenY)

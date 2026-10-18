@@ -69,7 +69,7 @@ class ClipboardPanelExpansionTest {
         assertEquals(300f, drag.heightAt(750f), 0f)
     }
 
-    @Test fun releaseChoosesNearestEndpoint() = runTest {
+    @Test fun shortSlowDragReturnsAndLongerDragExpands() = runTest {
         val changes = mutableListOf<Boolean>()
         val panel = ClipboardPanelExpansion(ClipboardPanelBounds(200, 500), backgroundScope, changes::add)
         panel.beginDrag(700f)
@@ -80,6 +80,35 @@ class ClipboardPanelExpansionTest {
         panel.dragTo(500f)
         panel.finishDrag()
         assertEquals(listOf(false, true), changes)
+        panel.dispose()
+    }
+
+    @Test fun twentyPercentMovementSettlesBothWaysButSmallerSlowMovesReturn() {
+        val bounds = ClipboardPanelBounds(200, 500)
+        assertFalse(bounds.shouldExpand(259f, 200f, false))
+        assertTrue(bounds.shouldExpand(260f, 200f, false))
+        assertTrue(bounds.shouldExpand(441f, 500f, true))
+        assertFalse(bounds.shouldExpand(440f, 500f, true))
+        assertFalse(bounds.shouldExpand(210f, 200f, false, velocityY = -20f))
+        assertTrue(bounds.shouldExpand(490f, 500f, true, velocityY = 20f))
+    }
+
+    @Test fun quickShortFlicksUseVelocityAndBacktrackingUsesTheFinalDirection() {
+        val bounds = ClipboardPanelBounds(200, 500)
+        assertTrue(bounds.shouldExpand(215f, 200f, false, velocityY = -600f))
+        assertFalse(bounds.shouldExpand(485f, 500f, true, velocityY = 600f))
+        assertFalse(bounds.shouldExpand(275f, 200f, false, velocityY = 600f))
+        assertTrue(bounds.shouldExpand(425f, 500f, true, velocityY = -600f))
+        assertFalse(bounds.shouldExpand(205f, 200f, false, velocityY = Float.NaN))
+    }
+
+    @Test fun cancelledQuickFlickDoesNotApplyItsVelocity() = runTest {
+        val changes = mutableListOf<Boolean>()
+        val panel = ClipboardPanelExpansion(ClipboardPanelBounds(200, 500), backgroundScope, changes::add)
+        panel.beginDrag(700f)
+        panel.dragTo(680f)
+        panel.finishDrag(cancelled = true, velocityY = -2000f)
+        assertEquals(listOf(false), changes)
         panel.dispose()
     }
 
@@ -126,11 +155,41 @@ class ClipboardPanelExpansionTest {
             CoroutineScope(backgroundScope.coroutineContext + clock)) { changes++ }
         panel.animateTo(true)
         runCurrent(); clock.sendFrame(0L); runCurrent()
-        clock.sendFrame(220_000_000L); runCurrent()
+        clock.sendFrame(300_000_000L); runCurrent()
         assertEquals(500f, panel.height, .001f)
         panel.beginDrag(600f)
         panel.dispose()
         panel.finishDrag()
         assertEquals(0, changes)
     }
+    @Test fun motionCoversDragAndSnapAndOldCancellationCannotUnfreezeANewGesture() = runTest {
+        val clock = BroadcastFrameClock()
+        val panel = ClipboardPanelExpansion(ClipboardPanelBounds(200, 500),
+            CoroutineScope(backgroundScope.coroutineContext + clock)) {}
+        assertFalse(panel.isInMotion)
+        panel.beginDrag(700f)
+        panel.dragTo(600f)
+        assertTrue(panel.isInMotion)
+        assertEquals("fixed-card sizes stay at the old endpoint while dragging", 200, panel.contentHeight)
+        panel.finishDrag()
+        assertTrue("release must not unfreeze the texture before settling", panel.isInMotion)
+        assertEquals(500, panel.contentHeight)
+        runCurrent(); clock.sendFrame(0L); runCurrent()
+        clock.sendFrame(100_000_000L); runCurrent()
+        panel.beginDrag(700f)
+        panel.dragTo(720f)
+        runCurrent() // let the cancelled old animation execute its finally block
+        assertTrue(panel.isInMotion)
+        panel.finishDrag(cancelled = true)
+        assertEquals(500, panel.contentHeight)
+        runCurrent(); clock.sendFrame(400_000_000L); runCurrent()
+        clock.sendFrame(700_000_000L); runCurrent()
+        assertFalse(panel.isInMotion)
+        assertEquals(500f, panel.height, .001f)
+        panel.beginDrag(700f)
+        panel.dispose()
+        runCurrent()
+        assertFalse("closing/changing page cannot leave a frozen backdrop", panel.isInMotion)
+    }
+
 }
