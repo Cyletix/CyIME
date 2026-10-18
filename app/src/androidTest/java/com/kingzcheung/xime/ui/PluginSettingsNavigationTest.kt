@@ -39,11 +39,11 @@ class PluginSettingsNavigationTest {
         } finally { SettingsPreferences.setClipboardSyncEnabled(rule.activity, original) }
     }
 
-    @Test fun backupHasDirectInstallEntry() {
-        var installs = 0
-        rule.setContent { XimeTheme { BackupSettingsContent({}, {}, { installs++ }) } }
-        rule.onNodeWithText("安装插件").assertIsDisplayed().performClick()
-        assertEquals(1, installs)
+    @Test fun backupIsLocalAndNeedsNoPlugin() {
+        rule.setContent { XimeTheme { BackupSettingsContent(onBack = {}) } }
+        rule.onNodeWithText("导出备份").assertIsDisplayed()
+        rule.onNodeWithText("从备份恢复").assertIsDisplayed()
+        rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
     @Test fun onlineSpeechInstallDoesNotLeadToInstalledOnlyPage() {
         var installs = 0

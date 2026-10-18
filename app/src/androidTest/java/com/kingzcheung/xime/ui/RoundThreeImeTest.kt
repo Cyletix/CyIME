@@ -53,7 +53,6 @@ class RoundThreeImeTest {
             previousSchema = engine.getCurrentSchema()
             previousAscii = engine.isAsciiMode()
             previousSavedAscii = engine.getUserConfigBool("var/option/ascii_mode")
-            SettingsPreferences.setModeChangeTargetIsNumber(context, true)
             SettingsPreferences.setKeyboardHeightDp(context, 300)
             SettingsPreferences.setKeyboardBottomPaddingDp(context, 80)
             SettingsPreferences.setKeyboardOpacity(context, 1f)

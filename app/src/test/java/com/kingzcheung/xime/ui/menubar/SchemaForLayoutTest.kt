@@ -1,0 +1,26 @@
+package com.kingzcheung.xime.ui.menubar
+
+import com.kingzcheung.xime.settings.InputScheme
+import com.kingzcheung.xime.settings.SchemaInfo
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+/** 布局面板点一下布局就切换，不用再点方案。 */
+class SchemaForLayoutTest {
+    private val entries = listOf("rime_ice", "double_pinyin_flypy", "double_pinyin_flypy_14jian", "pinyin_14jian", "t9_pinyin")
+        .map { SchemaInfo(it, it, "", "", "") }
+
+    @Test fun keepsCurrentSchemeWhenTheLayoutHasIt() {
+        assertEquals("pinyin_14jian", schemaForLayout(entries, "qwerty_14", InputScheme.PINYIN))
+        assertEquals("double_pinyin_flypy_14jian", schemaForLayout(entries, "qwerty_14", InputScheme.DOUBLE_PINYIN))
+    }
+
+    @Test fun fallsBackToFirstSchemeOfTheLayout() {
+        assertEquals("t9_pinyin", schemaForLayout(entries, "t9", InputScheme.DOUBLE_PINYIN))
+    }
+
+    @Test fun unknownLayoutSwitchesNothing() {
+        assertNull(schemaForLayout(entries, "japanese_kana", InputScheme.PINYIN))
+    }
+}

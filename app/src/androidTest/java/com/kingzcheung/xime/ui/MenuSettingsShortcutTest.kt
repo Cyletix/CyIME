@@ -12,6 +12,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.keyboard.ToolbarButton
 import com.kingzcheung.xime.ui.keyboard.*
 import com.kingzcheung.xime.ui.settings.SettingsRoutes
 import com.kingzcheung.xime.ui.settings.SettingsScreen
@@ -22,25 +23,31 @@ import org.junit.Test
 class MenuSettingsShortcutTest {
     @get:Rule val rule = createComposeRule()
 
-    @Test fun eightItemsFitOnePageAtMinimumNormalFontHeight() {
-        var settingsOpened = false
+    @Test fun documentOcrAndSettingsAreOnTheFirstPage() {
+        val opened = mutableListOf<ToolbarButton>()
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 Box(Modifier.requiredSize(320.dp, 144.dp).testTag("menu-host")) {
-                    MenuBar(MenuBarState(true, true, backgroundColor = Color.Black, schemaSwitches = listOf(
-                        com.kingzcheung.xime.viewmodel.SchemaSwitchUiState(name = "full_shape", states = listOf("半角", "全角")),
-                        com.kingzcheung.xime.viewmodel.SchemaSwitchUiState(name = "simplification", states = listOf("简体", "繁体")))),
-                        MenuBarCallbacks({}, {}, {}, {}, {}, {}, { settingsOpened = true }, {}, {}))
+                    MenuBar(MenuBarState(true, true, backgroundColor = Color.Black),
+                        quickActions(ToolbarButton.DEFAULT_MENU) { opened += it })
                 }
             }
         }
-        listOf("设置", "键盘调节", "全角／半角", "定制工具栏", "主题与定制", "智能联想", "语音转文本", "输入选项").forEach {
-            rule.onNodeWithTag("menu-item:$it").assertIsDisplayed()
+        rule.onNodeWithTag("menu-item:ocr").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("menu-item:settings").assertIsDisplayed().performClick()
+        rule.runOnIdle { assertEquals(listOf(ToolbarButton.OCR, ToolbarButton.SETTINGS), opened) }
+        rule.assertGeometry("menu-host", "OCR 首屏入口")
+    }
+
+    @Test fun eightDefaultItemsFitOnePageAtMinimumNormalFontHeight() {
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                Box(Modifier.requiredSize(320.dp, 144.dp).testTag("menu-host")) {
+                    MenuBar(MenuBarState(true, true, backgroundColor = Color.Black), quickActions(ToolbarButton.DEFAULT_MENU))
+                }
+            }
         }
-        rule.onNodeWithTag("menu-item:设置").performClick()
-        rule.runOnIdle { org.junit.Assert.assertTrue(settingsOpened) }
-        rule.onAllNodesWithText("深色模式").assertCountEquals(0)
-        rule.onAllNodesWithText("模型管理").assertCountEquals(0)
+        ToolbarButton.DEFAULT_MENU.forEach { rule.onNodeWithTag("menu-item:${it.id}").assertIsDisplayed() }
         rule.assertGeometry("menu-host", "八项菜单单页")
     }
 
@@ -52,34 +59,32 @@ class MenuSettingsShortcutTest {
         rule.onNodeWithText("CyIME 设置").assertIsDisplayed()
     }
 
-    @Test fun shortcutsStayReachableAcrossMinimumPhoneAndTabletPanels() {
+    @Test fun everyEntryStaysReachableAcrossMinimumPhoneAndTabletPanels() {
         val viewport = mutableStateOf(Triple(320, 144, 1f))
-        val opened = mutableListOf<String>()
+        val opened = mutableListOf<ToolbarButton>()
         rule.setContent {
             val (width, height, font) = viewport.value
             CompositionLocalProvider(LocalDensity provides Density(1f, font)) {
                 Box(Modifier.requiredSize(width.dp, height.dp).testTag("menu-host")) {
                     MenuBar(MenuBarState(true, true, backgroundColor = Color.Black),
-                        MenuBarCallbacks({}, {}, {}, {}, {}, {}, {}, {}, {}, onSettingsPage = { opened += it }))
+                        quickActions(ToolbarButton.DEFAULT_MENU) { opened += it })
                 }
             }
         }
-        val entries = listOf("主题与定制" to SettingsRoutes.Theme, "智能联想" to SettingsRoutes.SmartPrediction,
-            "语音转文本" to SettingsRoutes.SpeechToText)
         for (size in listOf(Triple(320, 144, 1f), Triple(280, 180, 2f), Triple(640, 140, 1f))) {
             rule.runOnIdle { viewport.value = size }
-            for ((label, route) in entries) {
+            for (button in ToolbarButton.DEFAULT_MENU) {
                 // A compact panel paginates instead of squeezing or dropping entries.
                 rule.onNodeWithTag("menu-pages").performScrollToIndex(0)
                 var page = 0
-                while (rule.onAllNodesWithTag("menu-item:$label").fetchSemanticsNodes()
+                while (rule.onAllNodesWithTag("menu-item:${button.id}").fetchSemanticsNodes()
                         .none { it.boundsInRoot.width > 0 && it.boundsInRoot.height > 0 } && page < 7) {
                     rule.onNodeWithTag("menu-pages").performScrollToIndex(++page)
                 }
-                rule.onNodeWithTag("menu-item:$label").assertIsDisplayed().performClick()
-                rule.runOnIdle { assertEquals(route, opened.last()) }
-                rule.assertGeometry("menu-host", "menu $size $label")
+                rule.onNodeWithTag("menu-item:${button.id}").assertIsDisplayed().performClick()
+                rule.runOnIdle { assertEquals(button, opened.last()) }
             }
+            rule.assertGeometry("menu-host", "menu $size")
         }
     }
 }

@@ -1,24 +1,16 @@
-metadata:
-  app_name: CyIME
-  app_version: ">=2.5.0"
-  platform: android
-  config_version: 1
-  generator: "Xime Config Generator" # 暂时无用
-  modified_time: "2026-07-05"
-
 xime_index:
-  # 方案/插件/模型市场索引端点（ximeiorg/xime-index）。
-  # 可替换为自建代理/镜像，下载器按顺序依次尝试，直到成功为止。
-  # 末尾需要 /。
+  # CyIME 自己的方案/插件商店目录（仓库 store/ 目录）。
+  # 上游 ximeiorg/xime-index 的条目都要求 Xime 2.x，CyIME 装不了，已不再使用。
+  # 可在 xime.custom.yaml 换成自建代理/镜像；下载器按顺序依次尝试，直到成功为止。
+  # jsDelivr 在国内通常可用，放在前面。末尾需要 /。
   base_urls:
-    - "https://cdn.jsdelivr.net/gh/ximeiorg/xime-index@master/"
-    - "https://fastly.jsdelivr.net/gh/ximeiorg/xime-index@master/"
-    - "https://index.ximei.me/"
-    - "https://raw.githubusercontent.com/ximeiorg/xime-index/refs/heads/main/"
+    - "https://cdn.jsdelivr.net/gh/Cyletix/CyIME@main/store/"
+    - "https://fastly.jsdelivr.net/gh/Cyletix/CyIME@main/store/"
+    - "https://raw.githubusercontent.com/Cyletix/CyIME/main/store/"
 
 style:
   # 浅色/深色模式的配色，deep 为降级后备
-  # 可选值：内置主题 id、color_schemes 中定义的 id、或 dynamic（Material You 动态配色，随壁纸取色，仅 Android 12+ 生效）
+  # 可选值：内置主题 id 或 color_schemes 中定义的 id
   color_scheme:
     light: pure_black
     dark: "" # 默认沿用当前所选配色；可在自定义配置中指定独立深色主题
@@ -40,7 +32,7 @@ style:
 #     fit: cover                             # cover | contain | fill | fit_width | fit_height | none
 #
 # 自定义图片背景有两种方式：
-# 1. 在系统相册/文件管理中把图片「分享到 Xime」，图片会自动存入
+# 1. 在系统相册/文件管理中把图片「分享到 CyIME」，图片会自动存入
 #    rime/themes/custom_<时间戳>.jpg，并把可用的 color_schemes 配置模板复制到剪贴板，
 #    粘贴到 rime/xime.custom.yaml 后即可在主题设置中选择。
 # 2. 手动把图片放入 rime/themes/（如通过 USB 或文件管理器），然后在
@@ -59,287 +51,21 @@ style:
 #                                                 key_text_color（图片背景看不清时建议单独配置）
 #
 color_schemes:
-  # 动态配色（Material You）：颜色由运行时从壁纸调色板派生，随壁纸变化，
-  # 仅 Android 12+（API 31+）生效，低版本不显示此方案。
-  # dynamic_color: true 时忽略静态颜色字段；style.color_scheme 可用 dynamic 引用。
-  dynamic:
-    name: "跟随系统动态配色"
-    dynamic_color: true
-
   lavender_purple:
     name: "薰衣草紫"
     primary_color: 0x8F73E2
     keyboard_background:
       type: solid
-      color: 0xF7F4FA
+      color: 0xEEE8F4
       color_dark: 0x211E28
     key_background:
       type: solid
       color: 0xFFFBFF
       color_dark: 0x38333F
   
-  ocean_blue:
-    name: "海洋蔚蓝"
-    primary_color: 0x1A73E8
-    keyboard_background:
-      type: solid
-      color: 0xE3E4E8
-      color_dark: 0x0D1B33
-  
-  sunset_orange:
-    name: "落日橙光"
-    primary_color: 0xE65100
-    keyboard_background:
-      type: solid
-      color: 0xE3E4E8
-      color_dark: 0x1A0D00
-  
-  slate_gray:
-    name: "沉稳石墨"
-    primary_color: 0x424242
-    keyboard_background:
-      type: solid
-      color: 0xE3E4E8
-      color_dark: 0x1A1A1A
-  
-  rose_pink:
-    name: "浪漫玫瑰"
-    primary_color: 0xAD1457
-    keyboard_background:
-      type: solid
-      color: 0xE3E4E8
-      color_dark: 0x2D1020
-  
-  teal_cyan:
-    name: "青碧如水"
-    primary_color: 0x00796B
-    keyboard_background:
-      type: solid
-      color: 0xE3E4E8
-      color_dark: 0x002622
-
-  sakura_pink:
-    name: "樱花粉黛"
-    primary_color: 0xe91e63
-    keyboard_background:
-      type: solid
-      color: 0xfdf0f4
-      color_dark: 0xfdf0f4
-    key_bg_color: 0xfff8fb
-    key_bg_color_dark: 0xfff8fb
-    key_text_color: 0x7d3a52
-    key_text_color_dark: 0x7d3a52
-    candidate_text_color: 0x7d3a52
-    candidate_text_color_dark: 0x7d3a52
-
-  sky_blue:
-    name: "晴空浅蓝"
-    primary_color: 0x0288d1
-    keyboard_background:
-      type: solid
-      color: 0xe8f4fd
-      color_dark: 0xe8f4fd
-    key_bg_color: 0xf7fcff
-    key_bg_color_dark: 0xf7fcff
-    key_text_color: 0x2d5f7a
-    key_text_color_dark: 0x2d5f7a
-    candidate_text_color: 0x2d5f7a
-    candidate_text_color_dark: 0x2d5f7a
-
-  mint_green:
-    name: "薄荷浅绿"
-    primary_color: 0x2e7d32
-    keyboard_background:
-      type: solid
-      color: 0xe9f5ec
-      color_dark: 0xe9f5ec
-    key_bg_color: 0xf6fbf7
-    key_bg_color_dark: 0xf6fbf7
-    key_text_color: 0x3c5c44
-    key_text_color_dark: 0x3c5c44
-    candidate_text_color: 0x3c5c44
-    candidate_text_color_dark: 0x3c5c44
-
-  lilac_purple:
-    name: "丁香浅紫"
-    primary_color: 0x8e24aa
-    keyboard_background:
-      type: solid
-      color: 0xf3edf8
-      color_dark: 0xf3edf8
-    key_bg_color: 0xfbf8fd
-    key_bg_color_dark: 0xfbf8fd
-    key_text_color: 0x5d4a70
-    key_text_color_dark: 0x5d4a70
-    candidate_text_color: 0x5d4a70
-    candidate_text_color_dark: 0x5d4a70
-
-  peach_orange:
-    name: "蜜桃浅橙"
-    primary_color: 0xef6c00
-    keyboard_background:
-      type: solid
-      color: 0xfdf0e3
-      color_dark: 0xfdf0e3
-    key_bg_color: 0xfffaf3
-    key_bg_color_dark: 0xfffaf3
-    key_text_color: 0x7a5130
-    key_text_color_dark: 0x7a5130
-    candidate_text_color: 0x7a5130
-    candidate_text_color_dark: 0x7a5130
-
-  cream_beige:
-    name: "奶油米白"
-    primary_color: 0x8d6e63
-    keyboard_background:
-      type: solid
-      color: 0xfaf5ee
-      color_dark: 0xfaf5ee
-    key_bg_color: 0xfffdf8
-    key_bg_color_dark: 0xfffdf8
-    key_text_color: 0x5d4037
-    key_text_color_dark: 0x5d4037
-    candidate_text_color: 0x5d4037
-    candidate_text_color_dark: 0x5d4037
-
-  aurora_gradient:
-    name: "极光青蓝"
-    primary_color: 0x00b0a8
-    keyboard_background:
-      type: gradient
-      colors: [0xe0f7fa, 0xb2ebf2]
-      colors_dark: [0x00332e, 0x015c56]
-      angle: 90
-    key_bg_color: 0xe6ffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x14444a
-    key_text_color_dark: 0xe0f7fa
-    candidate_text_color: 0x14444a
-    candidate_text_color_dark: 0xe0f7fa
-
-  sunset_gradient:
-    name: "落日余晖"
-    primary_color: 0xff7043
-    keyboard_background:
-      type: gradient
-      colors: [0xfff3e0, 0xffccbc]
-      colors_dark: [0x3e1a12, 0x8c2f1d]
-      angle: 90
-    key_bg_color: 0xe6ffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x5d2a17
-    key_text_color_dark: 0xffe0d6
-    candidate_text_color: 0x5d2a17
-    candidate_text_color_dark: 0xffe0d6
-
-  ocean_gradient:
-    name: "深海渐变"
-    primary_color: 0x1e88e5
-    keyboard_background:
-      type: gradient
-      colors: [0xe3f2fd, 0x90caf9]
-      colors_dark: [0x0b2d52, 0x0d47a1]
-      angle: 90
-    key_bg_color: 0xe6ffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x0d3a5c
-    key_text_color_dark: 0xd6eaff
-    candidate_text_color: 0x0d3a5c
-    candidate_text_color_dark: 0xd6eaff
-
-  purple_gradient:
-    name: "紫梦渐变"
-    primary_color: 0x7e57c2
-    keyboard_background:
-      type: gradient
-      colors: [0xede7f6, 0xd1c4e9]
-      colors_dark: [0x271852, 0x4527a0]
-      angle: 90
-    key_bg_color: 0xe6ffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x3c2a66
-    key_text_color_dark: 0xe8def8
-    candidate_text_color: 0x3c2a66
-    candidate_text_color_dark: 0xe8def8
-
-  rose_gradient:
-    name: "玫瑰渐变"
-    primary_color: 0xec407a
-    keyboard_background:
-      type: gradient
-      colors: [0xfce4ec, 0xf8bbd0]
-      colors_dark: [0x3b0a22, 0x8c1356]
-      angle: 90
-    key_bg_color: 0xe6ffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x5d1035
-    key_text_color_dark: 0xffdbe8
-    candidate_text_color: 0x5d1035
-    candidate_text_color_dark: 0xffdbe8
-
-  forest_gradient:
-    name: "森林迷雾"
-    primary_color: 0x43a047
-    keyboard_background:
-      type: gradient
-      colors: [0xe8f5e9, 0xc8e6c9]
-      colors_dark: [0x0f3016, 0x1b5e20]
-      angle: 90
-    key_bg_color: 0xe6ffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x1e4620
-    key_text_color_dark: 0xdff5e0
-    candidate_text_color: 0x1e4620
-    candidate_text_color_dark: 0xdff5e0
-
-  kitosonita_landscape:
-    name: "夜幕之影"
-    keyboard_background:
-      type: image
-      src: "themes/lll-sh-silhouette-bg.jpg"
-      fit: cover
-      overlay_alpha: 0.15
-      overlay_alpha_dark: 0.30
-    key_bg_color: 0x8cffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x232323
-    key_text_color_dark: 0xf2f2f2
-    candidate_text_color: 0x232323
-    candidate_text_color_dark: 0xf2f2f2
-    candidate_selected_text_color: 0x9CB2D6
-    candidate_selected_text_color_dark: 0x9CB2D6
-
-  mrfawdi_nature:
-    name: "暮色之桥"
-    keyboard_background:
-      type: image
-      src: "themes/nordseher-bridge-bg.jpg"
-      fit: cover
-      overlay_alpha: 0.15
-      overlay_alpha_dark: 0.30
-    key_bg_color: 0x8cffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x3a2028
-    key_text_color_dark: 0xf7eef1
-    candidate_text_color: 0xA4828C
-    candidate_text_color_dark: 0xA4828C
-    candidate_selected_text_color: 0xDCA79C
-    candidate_selected_text_color_dark: 0xDCA79C
-
-  olivcelso_desert:
-    name: "大漠流金"
-    keyboard_background:
-      type: image
-      src: "themes/olivcelso-desert-bg.jpg"
-      fit: cover
-      overlay_alpha: 0.30
-      overlay_alpha_dark: 0.45
-    key_bg_color: 0x8cffffff
-    key_bg_color_dark: 0x5affffff
-    key_text_color: 0x6789BF
-    key_text_color_dark: 0xf7eccb
-    candidate_text_color: 0x6789BF
-    candidate_text_color_dark: 0xE4C656
+  # 1.9.15 移除的旧主题按单色相明度阶梯重新配色，每个色系留一套作为内置主题恢复（TonalThemes.kt，
+  # 由 tools/theme_rebuild.py 生成并检查对比度）。在 xime.custom.yaml 写同名 id 仍可覆盖；
+  # 未知 id 会回落到柔和蓝。
 
 # ── 26 键全键盘手势配置 ──
 # 每个按键可定义 4 个手势：
@@ -356,6 +82,7 @@ color_schemes:
 #             paste, line_start, line_end, undo, none, repeat
 #     command 可用命令：
 #       clear_composition - 清空当前输入编码和候选词
+#       show_ime_picker   - 弹出系统输入法选择框
 #     value:  上屏时的输出文本（不指定则用 label）
 #
 # long_press 示例（弹出多个选项供滑动选择）：
@@ -401,10 +128,10 @@ keyboard:
 
   # ── 按键阴影（可选，不设置则使用默认值）──
   # enabled:            是否启用阴影
-  # elevation:          阴影高度（dp，默认 0.5）
+  # elevation:          阴影高度（整数 dp，默认 1；小数不生效）
   shadow:
     enabled: true
-    elevation: 0.5
+    elevation: 1
 
   # ── 字体配置（可选，配置为空时使用系统默认字体）──
   # 字体路径查找规则：

@@ -33,15 +33,15 @@ class TabletPanelRegressionTest {
             CompositionLocalProvider(LocalConfiguration provides config, LocalDensity provides Density(1f)) {
                 MaterialTheme(colorScheme = androidx.compose.material3.darkColorScheme()) {
                     MenuBar(MenuBarState(true, true, 1, Color(0xFF211E29), Color(0xFF33303D), Color.White),
-                        MenuBarCallbacks({}, {}, {}, {}, {}, {}, {}, {}, {}),
+                        quickActions(com.kingzcheung.xime.keyboard.ToolbarButton.DEFAULT_MENU),
                         Modifier.size(if (landscape) 1000.dp else 700.dp, 340.dp).testTag("tablet-menu"))
                 }
             }
         }
         for (wide in listOf(true, false)) {
             rule.runOnIdle { landscape = wide }
-            val cards = listOf("键盘调节", "设置", "快捷发送", "定制工具栏", "浅色模式", "部署方案")
-                .map { rule.onNodeWithTag("menu-item:$it").assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
+            val cards = com.kingzcheung.xime.keyboard.ToolbarButton.DEFAULT_MENU
+                .map { rule.onNodeWithTag("menu-item:${it.id}").assertIsDisplayed().fetchSemanticsNode().boundsInRoot }
             cards.forEach { assertTrue(it.width <= 145); assertTrue(it.height <= 105); assertTrue(it.width / it.height in 0.7f..1.5f) }
             assertTrue(cards[4].top > cards[0].bottom)
             val file = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "tablet-menu-$wide.png")

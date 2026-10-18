@@ -26,7 +26,6 @@ class T9SuppressionPanelTest {
         val engine = RimeEngine.getInstance()
         val schema = engine.getCurrentSchema()
         val ascii = engine.isAsciiMode()
-        var suppressed: String? = null
         fun input() {
             engine.clearQueuedT9Composition()
             "6364986743663".forEach { engine.processQueuedT9Key(it.code) }
@@ -36,28 +35,25 @@ class T9SuppressionPanelTest {
             engine.setOption("ascii_mode", false)
             input()
             val state = engine.readQueuedComposition()!!
+            // Long-press delete no longer hides candidates; the panel only lists words hidden by
+            // older versions, so a fresh profile shows the empty state and the word stays available.
             val word = engine.getAllCandidates(1).first().text
-            assertTrue(engine.suppressCandidateAtRevision(0, state.engineRevision, global = true))
-            suppressed = word
+            val revision = state.engineRevision
+            assertTrue(engine.forgetCandidateAtRevision(0, revision, global = true) != 0)
             rule.setContent { MaterialTheme { Surface { T9SuppressionPanel() } } }
             rule.waitUntil(10_000) {
-                rule.onAllNodes(androidx.compose.ui.test.hasText(word)).fetchSemanticsNodes().isNotEmpty()
+                rule.onAllNodes(androidx.compose.ui.test.hasText("暂无屏蔽的候选")).fetchSemanticsNodes().isNotEmpty()
             }
-            rule.onNodeWithText(word).assertIsDisplayed()
-            rule.onNodeWithText("恢复推荐").assertIsDisplayed()
+            rule.onNodeWithText("暂无屏蔽的候选").assertIsDisplayed()
             instrumentation.uiAutomation.takeScreenshot().let { bitmap ->
                 File(context.getExternalFilesDir(null), "t9-feedback-panel.png").outputStream().use {
                     bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
                 }
                 bitmap.recycle()
             }
-            rule.onNodeWithText("恢复推荐").performClick()
-            rule.waitUntil(10_000) { word !in engine.getSuppressedCandidates() }
-            rule.onNodeWithText("暂无屏蔽的候选").assertIsDisplayed()
             input()
             assertTrue(engine.getAllCandidates(100).any { it.text == word })
         } finally {
-            suppressed?.let { engine.restoreSuppressedCandidate(it) }
             engine.clearQueuedT9Composition()
             engine.switchSchema(schema)
             engine.setOption("ascii_mode", ascii)
