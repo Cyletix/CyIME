@@ -5,24 +5,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 
-internal enum class ClipboardNavigation { LEFT, RIGHT, UP, DOWN, CONFIRM, CANCEL }
+/** MENU = Space (record actions), DELETE = Delete/Forward Delete. */
+internal enum class ClipboardNavigation { LEFT, RIGHT, UP, DOWN, CONFIRM, CANCEL, MENU, DELETE }
 
 /** IME windows do not take the editor's focus. Route physical keys to the visible board. */
 internal class ClipboardKeyboardNavigation(private val onClose: () -> Unit) {
     var active by mutableStateOf(false)
         private set
     private val pending = ArrayDeque<ClipboardNavigation>()
-    private var handler: ((ClipboardNavigation) -> Unit)? = null
+    /** Returns true when the board consumed the action (e.g. Esc closing an open menu). */
+    private var handler: ((ClipboardNavigation) -> Boolean)? = null
     fun open() { pending.clear(); active = true }
     fun reset() { active = false; pending.clear(); handler = null }
     fun close() { reset(); onClose() }
     fun dispatch(action: ClipboardNavigation) {
         if (!active) return
-        if (action == ClipboardNavigation.CANCEL) { close(); return }
+        // Esc first closes an open record menu or confirmation; only then the clipboard itself.
+        if (action == ClipboardNavigation.CANCEL) { if (handler?.invoke(action) != true) close(); return }
         val receiver = handler
         if (receiver == null) { if (pending.size < 32) pending.addLast(action) } else receiver(action)
     }
-    fun attach(receiver: ((ClipboardNavigation) -> Unit)?) {
+    fun attach(receiver: ((ClipboardNavigation) -> Boolean)?) {
         handler = receiver
         while (active && handler != null && pending.isNotEmpty()) handler?.invoke(pending.removeFirst())
     }

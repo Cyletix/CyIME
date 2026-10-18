@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 class ImageAccessActivity : ComponentActivity() {
     private val permission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         val images = ClipboardImages.getInstance(this)
-        images.enableRecentPhotos(images.hasPhotoAccess())
+        images.enableRecentScreenshots(images.hasPhotoAccess())
         finish()
     }
     private val picker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->

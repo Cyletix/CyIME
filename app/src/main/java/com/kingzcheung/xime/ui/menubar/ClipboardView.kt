@@ -2,7 +2,6 @@ package com.kingzcheung.xime.ui.menubar
 
 import com.kingzcheung.xime.ui.keyboard.keyboardPanelBackground
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
-import com.kingzcheung.xime.ui.keyboard.frostedKeyColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
@@ -75,6 +75,7 @@ fun ClipboardView(
     imagesExpanded: Boolean = false,
     onExpandImages: (() -> Unit)? = null,
     onCollapseImages: (() -> Unit)? = null,
+    onRecognizeDocument: (() -> Unit)? = null,
 ) {
     // Old tab 1 bookmarks now open the same pinned clipboard records.
     ConnectedClipboardBoard(clipboardItems, selectedTab == 2, imagesExpanded,
@@ -87,6 +88,7 @@ fun ClipboardView(
         onPullRemote = if (pullRemoteAvailable) onPullRemote else null,
         onAddPinned = onQuickSendAddClick,
         onEditText = onQuickSendEditItem,
+        onRecognizeDocument = onRecognizeDocument,
         modifier = modifier.padding(bottom = bottomPaddingDp.dp))
 }
 
@@ -168,172 +170,104 @@ internal fun ClearClipboardConfirmOverlay(
     }
 }
 
-data class LongPressMenuEntry(
-    val icon: ImageVector,
-    val label: String,
-    val tint: Color? = null,
-    val onClick: () -> Unit
-)
+internal typealias LongPressMenuEntry = com.kingzcheung.xime.ui.common.CompactActionMenuEntry
 
+/**
+ * Long-press actions anchored beside the pressed record, as in XIME and the earliest CyIME: the
+ * rest of the board is dimmed, the record stays bright, and the card opens on whichever side of
+ * the record has room. Delete confirmations reuse the same card in the same place.
+ */
 @Composable
-fun LongPressMenuOverlay(
-    text: String,
-    isLeftColumn: Boolean,
-    backgroundColor: Color,
-    contentBgColor: Color,
-    textColor: Color,
+internal fun LongPressMenuOverlay(
+    anchor: androidx.compose.ui.geometry.Rect,
+    @Suppress("UNUSED_PARAMETER") occupiedBounds: List<androidx.compose.ui.geometry.Rect>,
     onDismiss: () -> Unit,
     menuItems: List<LongPressMenuEntry>,
-    preview: (@Composable () -> Unit)? = null,
+    title: String? = null,
+    message: String? = null,
+    tag: String = "clipboard-item-menu",
+    surfaceTag: String = "clipboard-item-actions",
+    /** Row highlighted for physical-keyboard navigation; null when navigating by touch. */
+    focusedIndex: Int? = null,
 ) {
-    val cardColor = frostedKeyColor(contentBgColor, textColor, LocalKeyboardInputPreferences.current.frostedGlass)
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().testTag("clipboard-item-menu")) {
-        val menuWidth = (104.dp * LocalDensity.current.fontScale.coerceAtLeast(1f))
-            .coerceAtLeast(maxWidth / 3).coerceAtMost(maxWidth / 2)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .keyboardPanelBackground(backgroundColor)
-                .testTag("clipboard-item-menu-dismiss")
-                .clickable(onClick = onDismiss)
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .then(if (isLeftColumn) Modifier.weight(1f) else Modifier.width(menuWidth))
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isLeftColumn) {
-                    if (preview != null) preview() else ContentCard(
-                        text = text,
-                        bgColor = cardColor,
-                        textColor = textColor
-                    )
-                } else {
-                    MenuCard(menuItems = menuItems, cardBgColor = cardColor, onDismiss = onDismiss)
-                }
+    val colors = MaterialTheme.colorScheme
+    // Keyboard palette, not the Material surface: the card looks like the keys of every theme
+    // (a white Material surface showed on dark iOS). It covers other records, so it stays opaque
+    // even on glass, like CompactActionMenu; a translucent keycap fill let their text show through.
+    val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    val cardText = palette?.text ?: colors.onSurface
+    val cardColor = palette?.key?.copy(alpha = 1f)
+        ?: if (glass.enabled) colors.surface.copy(alpha = 1f) else colors.surfaceContainerHigh
+    // 输入法窗口没有返回键分发器；无条件调用 BackHandler 会直接崩溃。
+    if (androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current != null)
+        androidx.activity.compose.BackHandler(onBack = onDismiss)
+    val density = LocalDensity.current
+    val scrim = colors.scrim.copy(alpha = .32f)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // Dim everything except the pressed record, which stays visible beside its actions.
+        androidx.compose.foundation.Canvas(Modifier.matchParentSize().testTag("$tag-dismiss")
+            .clickable(onClick = onDismiss)) {
+            val hole = androidx.compose.ui.graphics.Path().apply {
+                addRoundRect(androidx.compose.ui.geometry.RoundRect(anchor,
+                    androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())))
             }
-
-            Box(
-                modifier = Modifier
-                    .then(if (isLeftColumn) Modifier.width(menuWidth) else Modifier.weight(1f))
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isLeftColumn) {
-                    MenuCard(menuItems = menuItems, cardBgColor = cardColor, onDismiss = onDismiss)
-                } else {
-                    if (preview != null) preview() else ContentCard(
-                        text = text,
-                        bgColor = cardColor,
-                        textColor = textColor
-                    )
-                }
-            }
+            clipPath(hole, clipOp = androidx.compose.ui.graphics.ClipOp.Difference) { drawRect(scrim) }
         }
-    }
-}
-
-@Composable
-private fun ContentCard(
-    text: String,
-    bgColor: Color,
-    textColor: Color,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().testTag("clipboard-item-preview"),
-        shape = RoundedCornerShape(8.dp),
-        color = bgColor
-    ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            maxLines = 8,
-            overflow = TextOverflow.Ellipsis,
-            // 卡片高度受列表区高度限制（短键盘/横屏）：超出部分改为可滚动，不再画到屏幕外
-            modifier = Modifier
-                .padding(horizontal = 10.dp, vertical = 10.dp)
-                .verticalScroll(rememberScrollState())
-        )
-    }
-}
-
-@Composable
-private fun MenuCard(
-    menuItems: List<LongPressMenuEntry>,
-    cardBgColor: Color,
-    onDismiss: () -> Unit,
-) {
-    // 操作菜单：高度随内容自适应并被列表区高度约束，超出时整卡可滚动，
-    // 保证「删除」等最后一项在任何键盘高度下都能点到
-    Surface(
-        modifier = Modifier.fillMaxWidth().testTag("clipboard-item-actions"),
-        shape = RoundedCornerShape(12.dp),
-        color = cardBgColor
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(vertical = 6.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            menuItems.forEachIndexed { index, entry ->
-                if (index > 0) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                    )
-                }
-
-                LongPressMenuItem(
-                    icon = entry.icon,
-                    label = entry.label,
-                    tint = entry.tint ?: MaterialTheme.colorScheme.onSurface,
-                    onClick = {
-                        onDismiss()
-                        entry.onClick()
+        val margin = with(density) { 6.dp.toPx() }
+        val gap = with(density) { 6.dp.toPx() }
+        val minWidth = with(density) { (if (title != null) 220.dp else 150.dp).toPx() }
+        val widthCap = with(density) { 260.dp.toPx() }
+        androidx.compose.ui.layout.Layout(content = {
+            Surface(Modifier.testTag(tag), shape = RoundedCornerShape(12.dp), color = cardColor, shadowElevation = 4.dp) {
+                Column(Modifier.testTag(surfaceTag).verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
+                    title?.let {
+                        Text(it, color = cardText, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
                     }
-                )
+                    message?.let {
+                        Text(it, color = cardText.copy(alpha = .7f), fontSize = 13.sp, lineHeight = 18.sp,
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+                    }
+                    menuItems.forEachIndexed { index, entry ->
+                        if (index > 0 || title != null) HorizontalDivider(Modifier.padding(horizontal = 12.dp),
+                            color = cardText.copy(alpha = .12f))
+                        val tint = entry.tint ?: cardText
+                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .then(entry.tag?.let { Modifier.testTag(it) } ?: Modifier)
+                            .background(if (index == focusedIndex) cardText.copy(alpha = .12f) else Color.Transparent)
+                            .clickable(enabled = entry.enabled) { onDismiss(); entry.onClick() }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            entry.icon?.let {
+                                Icon(it, null, tint = tint, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(12.dp))
+                            }
+                            Text(entry.label, color = tint, fontSize = 15.sp, maxLines = 1)
+                        }
+                    }
+                }
             }
+        }, modifier = Modifier.matchParentSize()) { measurables, constraints ->
+            val boardWidth = constraints.maxWidth.toFloat()
+            val boardHeight = constraints.maxHeight.toFloat()
+            val cap = minOf(widthCap, boardWidth - 2 * margin).coerceAtLeast(1f)
+            val width = measurables.single().maxIntrinsicWidth(constraints.maxHeight).toFloat()
+                .coerceIn(minOf(minWidth, cap), cap)
+            val card = measurables.single().measure(Constraints(
+                minWidth = width.toInt(), maxWidth = width.toInt(),
+                maxHeight = (boardHeight - 2 * margin).toInt().coerceAtLeast(1)))
+            val right = anchor.right + gap
+            val left = anchor.left - gap - card.width
+            // Beside the record on the side with room; on a single narrow column, over its edge.
+            val x = when {
+                right + card.width <= boardWidth - margin -> right
+                left >= margin -> left
+                boardWidth - anchor.right >= anchor.left -> boardWidth - margin - card.width
+                else -> margin
+            }.coerceIn(margin, (boardWidth - margin - card.width).coerceAtLeast(margin))
+            val y = anchor.top.coerceIn(margin, (boardHeight - margin - card.height).coerceAtLeast(margin))
+            layout(constraints.maxWidth, constraints.maxHeight) { card.place(x.toInt(), y.toInt()) }
         }
-    }
-}
-
-@Composable
-fun LongPressMenuItem(
-    icon: ImageVector,
-    label: String,
-    tint: Color = MaterialTheme.colorScheme.onSurface,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .heightIn(min = 48.dp)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label,
-            color = tint,
-            fontSize = 14.sp
-        )
     }
 }

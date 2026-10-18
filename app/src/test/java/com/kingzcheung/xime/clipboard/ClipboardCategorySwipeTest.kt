@@ -61,9 +61,11 @@ class ClipboardCategorySwipeTest {
     @Test fun categoryOrderIsStableAndEdgesDoNotWrap() {
         assertEquals(ClipboardFilter.ALL, ClipboardFilter.ALL.afterSwipe(-1))
         assertEquals(ClipboardFilter.TEXT, ClipboardFilter.ALL.afterSwipe(1))
-        assertEquals(ClipboardFilter.IMAGE, ClipboardFilter.TEXT.afterSwipe(1))
-        assertEquals(ClipboardFilter.LINK, ClipboardFilter.IMAGE.afterSwipe(1))
-        assertEquals(ClipboardFilter.IMAGE, ClipboardFilter.LINK.afterSwipe(-1))
-        assertEquals(ClipboardFilter.EMAIL, ClipboardFilter.EMAIL.afterSwipe(1))
+        assertEquals(ClipboardFilter.LINK, ClipboardFilter.TEXT.afterSwipe(1))
+        assertEquals(ClipboardFilter.TEXT, ClipboardFilter.LINK.afterSwipe(-1))
+        assertEquals(ClipboardFilter.IMAGE, ClipboardFilter.EMAIL.afterSwipe(1))
+        assertEquals(ClipboardFilter.EMAIL, ClipboardFilter.IMAGE.afterSwipe(-1))
+        assertEquals(ClipboardFilter.IMAGE, ClipboardFilter.IMAGE.afterSwipe(1))
+        assertEquals(ClipboardFilter.IMAGE, ClipboardFilter.entries.last())
     }
 }

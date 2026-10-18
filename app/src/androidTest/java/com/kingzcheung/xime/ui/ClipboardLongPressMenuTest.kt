@@ -6,7 +6,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -35,16 +40,17 @@ class ClipboardLongPressMenuTest {
 
     @Test fun regularPanelKeepsEveryMenuItemInsidePanel() = assertMenuInsidePanel(panelHeightDp = 240)
 
-    private fun assertMenuInsidePanel(panelHeightDp: Int) {
+    @Test fun rtlKeepsThePhysicalAnchorOnTheSameSide() = assertMenuInsidePanel(panelHeightDp = 240, rtl = true)
+
+    private fun assertMenuInsidePanel(panelHeightDp: Int, rtl: Boolean = false) {
         rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             MaterialTheme {
                 Box(Modifier.size(width = 320.dp, height = panelHeightDp.dp).testTag("menu-panel")) {
                     LongPressMenuOverlay(
-                        text = "长按词条的内容文本",
-                        isLeftColumn = false,
-                        backgroundColor = Color(0xFF292929),
-                        contentBgColor = Color(0xFF525252),
-                        textColor = Color.White,
+                        anchor = Rect(240f, 8f, 310f, 70f),
+                        occupiedBounds = listOf(Rect(240f, 8f, 310f, 70f)),
                         onDismiss = {},
                         menuItems = menuLabels.map { label ->
                             LongPressMenuEntry(icon = Icons.Default.Delete, label = label, onClick = {})
@@ -52,8 +58,11 @@ class ClipboardLongPressMenuTest {
                     )
                 }
             }
+            }
         }
         val panel = rule.onNodeWithTag("menu-panel").fetchSemanticsNode().boundsInRoot
+        val menu = rule.onNodeWithTag("clipboard-item-menu").fetchSemanticsNode().boundsInRoot
+        assertTrue("physical anchor must not be mirrored in RTL", menu.right <= panel.left + 240f)
         menuLabels.forEach { label ->
             val item = rule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
                 .fetchSemanticsNode().boundsInRoot

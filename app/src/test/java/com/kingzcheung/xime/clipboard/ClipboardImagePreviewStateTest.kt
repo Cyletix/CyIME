@@ -28,6 +28,7 @@ class ClipboardImagePreviewStateTest {
     @Test fun processRestartWithSavedCopyIdentityDoesNotReplayOldCopy() {
         val state = ClipboardImagePreviewState(null)
         state.beginCopy("content://source/first", now)
+        state.dismiss()
         val restarted = ClipboardImagePreviewState(state.lastCopyKey)
         assertNull(restarted.preview.value)
         assertNull(restarted.beginCopy("content://source/first", now))
@@ -44,12 +45,37 @@ class ClipboardImagePreviewStateTest {
         assertNull(state.beginCopy("content://source/first", now + 1))
     }
 
-    @Test fun hidingKeyboardWhileFileIsLoadingDoesNotResurrectPrompt() {
+    @Test fun explicitlyCancellingWhileFileIsLoadingDoesNotResurrectPrompt() {
         val state = ClipboardImagePreviewState(null)
         val key = state.beginCopy("content://source/first", now)!!
         state.dismiss()
         state.prepared(key, image, now)
         assertNull(state.preview.value)
+    }
+
+    @Test fun screenshotCopiedWhileKeyboardIsHiddenRemainsAvailableOnNextOpen() {
+        val state = ClipboardImagePreviewState(null)
+        val key = state.beginCopy("content://source/screenshot", now)!!
+        state.dismissIfPresented()
+        state.prepared(key, image, now)
+        state.dismissIfPresented()
+        assertEquals(image, state.preview.value)
+        state.presented(image.uri)
+        state.dismissIfPresented()
+        assertNull(state.preview.value)
+        assertNull(state.beginCopy("content://source/screenshot", now))
+    }
+
+    @Test fun aFailedReadCanRetryAndAnUnseenCopyIsNotPersistedAsDismissed() {
+        val state = ClipboardImagePreviewState(null)
+        val key = state.beginCopy("content://source/screenshot", now)!!
+        assertNull(state.lastCopyKey)
+        state.failed(key)
+        assertEquals(key, state.beginCopy("content://source/screenshot", now))
+        state.prepared(key, image, now)
+        assertEquals(image, state.preview.value)
+        val restarted = ClipboardImagePreviewState(state.lastCopyKey)
+        assertNotNull(restarted.beginCopy("content://source/screenshot", now))
     }
 
     @Test fun newerCopyWinsWhenOldFileFinishesLast() {

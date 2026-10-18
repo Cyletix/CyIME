@@ -1,6 +1,11 @@
 package com.kingzcheung.xime.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -47,6 +52,95 @@ class ClipboardPanelDragTest {
         }
     }
 
+    private var listScroll: ScrollState? = null
+    private var longClicks = 0
+
+    @OptIn(ExperimentalFoundationApi::class)
+    private fun showScrollable(expand: Boolean = true) {
+        expanded.value = expand
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                val expansion = rememberClipboardPanelExpansion(true, 0L,
+                    ClipboardPanelBounds(140, 300), expanded.value) { expanded.value = it }
+                panel = expansion
+                val scroll = rememberScrollState()
+                listScroll = scroll
+                CompositionLocalProvider(LocalClipboardPanelExpansion provides expansion) {
+                    Box(Modifier.requiredSize(280.dp, 440.dp).testTag("drag-host")) {
+                        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .height((expansion?.height ?: 140f).dp).testTag("drag-panel")) {
+                            Box(Modifier.fillMaxWidth().height(48.dp).clipboardPanelExpandGesture().testTag("drag-toolbar"))
+                            Column(Modifier.weight(1f).fillMaxWidth().testTag("scroll-records")
+                                .clipboardPanelCollapseGesture(true) { scroll.value == 0 }
+                                .verticalScroll(scroll)) {
+                                repeat(20) { index ->
+                                    Box(Modifier.fillMaxWidth().height(60.dp).testTag("record:$index")
+                                        .combinedClickable(onClick = { clicks++ }, onLongClick = { longClicks++ })) {
+                                        Text("Record $index")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+    }
+
+    @Test fun topOfExpandedListCollapsesAfterASmallDownwardDragWithoutClicking() {
+        showScrollable()
+        rule.onNodeWithTag("scroll-records").performTouchInput {
+            swipe(Offset(100f, 30f), Offset(100f, 70f), 300)
+        }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertFalse(expanded.value)
+            assertEquals(140f, panel!!.height, 1f)
+            assertEquals(0, clicks)
+            assertEquals(0, listScroll!!.value)
+        }
+    }
+
+    @Test fun listAwayFromTopScrollsWithoutCollapsingThePanel() {
+        showScrollable()
+        rule.onNodeWithTag("record:8").performScrollTo()
+        rule.runOnIdle { assertTrue(listScroll!!.value > 100) }
+        rule.onNodeWithTag("scroll-records").performTouchInput {
+            swipe(Offset(100f, 30f), Offset(100f, 70f), 300)
+        }
+        rule.runOnIdle { assertTrue(expanded.value); assertEquals(300f, panel!!.height, 1f) }
+    }
+
+    @Test fun clicksLongPressesAndUpwardScrollingDoNotBecomePanelDrags() {
+        showScrollable()
+        rule.onNodeWithTag("record:0").performTouchInput { click() }
+        rule.onNodeWithTag("record:0").performTouchInput { longClick() }
+        rule.runOnIdle {
+            assertEquals(1, clicks); assertEquals(1, longClicks)
+            assertTrue(expanded.value); assertEquals(300f, panel!!.height, 1f)
+        }
+        rule.onNodeWithTag("scroll-records").performTouchInput {
+            swipe(Offset(100f, 170f), Offset(100f, 40f), 300)
+        }
+        rule.runOnIdle {
+            assertTrue(listScroll!!.value > 0)
+            assertTrue(expanded.value); assertEquals(300f, panel!!.height, 1f)
+        }
+    }
+
+    @Test fun collapsedListAndCancelledTopDragKeepTheirOriginalPanelHeight() {
+        showScrollable(false)
+        rule.onNodeWithTag("scroll-records").performTouchInput {
+            swipe(Offset(100f, 10f), Offset(100f, 65f), 300)
+        }
+        rule.runOnIdle { assertFalse(expanded.value); assertEquals(140f, panel!!.height, 1f); expanded.value = true }
+        rule.waitForIdle()
+        rule.onNodeWithTag("scroll-records").performTouchInput { down(Offset(100f, 30f)); moveBy(Offset(0f, 70f)); cancel() }
+        rule.waitForIdle()
+        rule.runOnIdle { assertTrue(expanded.value); assertEquals(300f, panel!!.height, 1f) }
+    }
+
     @Test fun normalToolbarAndListBodyDoNotExpand() {
         open.value = false
         show()
@@ -54,6 +148,21 @@ class ClipboardPanelDragTest {
         rule.runOnIdle { assertNull(panel); assertFalse(expanded.value); open.value = true }
         rule.onNodeWithTag("list-body").performTouchInput { swipeUp() }
         rule.runOnIdle { assertEquals(140f, panel!!.height, .1f) }
+    }
+
+    @Test fun quickShortHeaderFlickExpandsAndSlowSubThresholdDragReturns() {
+        show()
+        rule.onNodeWithTag("drag-host").performTouchInput {
+            swipe(Offset(100f, 324f), Offset(100f, 304f), 40)
+        }
+        rule.waitForIdle()
+        rule.runOnIdle { assertTrue(expanded.value); assertEquals(300f, panel!!.height, 1f); expanded.value = false }
+        rule.waitForIdle()
+        rule.onNodeWithTag("drag-host").performTouchInput {
+            swipe(Offset(100f, 324f), Offset(100f, 304f), 400)
+        }
+        rule.waitForIdle()
+        rule.runOnIdle { assertFalse(expanded.value); assertEquals(140f, panel!!.height, 1f); assertEquals(0, clicks) }
     }
 
     @Test fun movingToolbarTracksScreenDistanceAndSettlesWithoutClicking() {

@@ -60,7 +60,6 @@ class ClipboardManager private constructor(private val context: Context) {
     private val androidClipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as AndroidClipboardManager
     private var lastSmsClipTimestamp = -1L
     val images = ClipboardImages.getInstance(context)
-    private var lastImageClipTimestamp = -1L
 
     private val clipboardListener = AndroidClipboardManager.OnPrimaryClipChangedListener {
         readClipboard()
@@ -71,21 +70,26 @@ class ClipboardManager private constructor(private val context: Context) {
             val clipData = androidClipboardManager.primaryClip
             if (clipData != null && clipData.itemCount > 0) {
                 val item = clipData.getItemAt(0)
+                // 系统标记为敏感（如密码管理器复制的密码）或无痕中：不进入历史、图片预览与同步。
+                val private = clipData.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
+                    com.kingzcheung.xime.settings.IncognitoState.active ||
+                    com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(context)
                 val imageMime = (0 until clipData.description.mimeTypeCount).map { clipData.description.getMimeType(it) }
                     .firstOrNull { it.startsWith("image/") }
-                val imageUri = item.uri?.takeIf { uri ->
-                    imageMime != null || runCatching { context.contentResolver.getType(uri)?.startsWith("image/") == true }.getOrDefault(false)
-                }
-                if (imageUri != null) {
+                val imageSource = copiedImageSource((0 until clipData.itemCount).mapNotNull { index ->
+                    val entry = clipData.getItemAt(index)
+                    (entry.uri ?: entry.intent?.data)?.takeIf { it.scheme == "content" }?.let { uri ->
+                        CopiedImageSource(uri.toString(), runCatching { context.contentResolver.getType(uri) }.getOrNull())
+                    }
+                }, imageMime)
+                if (imageSource != null) {
                     // 图片粘贴失败时写入系统剪贴板是兼容回退，不是用户新复制。
-                    if (clipData.description.label == INTERNAL_IMAGE_CLIP_LABEL) {
+                    if (private || clipData.description.label == INTERNAL_IMAGE_CLIP_LABEL) {
                         images.dismissPreview()
                         return
                     }
-                    if (lastImageClipTimestamp != clipData.description.timestamp) {
-                        lastImageClipTimestamp = clipData.description.timestamp
-                        images.capture(imageUri, clipData.description.timestamp, imageMime ?: "image/png")
-                    }
+                    images.capture(Uri.parse(imageSource.uri), clipData.description.timestamp,
+                        imageSource.resolvedMime?.takeIf { it.startsWith("image/") } ?: imageMime ?: "image/png")
                     return
                 }
                 images.dismissPreview()
@@ -109,7 +113,7 @@ class ClipboardManager private constructor(private val context: Context) {
                         return
                     }
                     _verificationCode.value = null
-                    addItem(text)
+                    if (!private) addItem(text)
                     return
                 }
             }
@@ -141,7 +145,8 @@ class ClipboardManager private constructor(private val context: Context) {
         images.refresh()
         val clip = androidClipboardManager.primaryClip ?: return
         if (clip.itemCount == 0) return
-        if (clip.description.hasMimeType("image/*") || clip.description.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
+        if (clip.description.hasMimeType("image/*") || (0 until clip.itemCount).any { clip.getItemAt(it).uri != null || clip.getItemAt(it).intent?.data != null } ||
+            clip.description.label == VerificationCodeSmsReceiver.CLIP_LABEL ||
             (System.currentTimeMillis() - clip.description.timestamp < 30_000 &&
                 _clipboardItems.value.none { it.text == clip.getItemAt(0).text?.toString() })
         ) readClipboard(retries = 0)

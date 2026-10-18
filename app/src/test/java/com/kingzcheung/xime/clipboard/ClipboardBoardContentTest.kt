@@ -8,71 +8,84 @@ class ClipboardBoardContentTest {
         ClipboardItem(id, "记录 $id", timestamp = timestamp),
     )
 
-    @Test fun hundredPinsCollapseToOneRowWithoutRemovingTheLatestCopies() {
-        val fixed = (1L..100L).map { text(it) }
-        val recent = listOf(text(102), text(101))
+    @Test fun extraRecentCopiesFoldSoEveryPinStaysVisible() {
+        val fixed = (1L..5L).map { text(it) }
+        val recent = (101L..120L).map { text(it) }
         val cards = fixed + recent
         val pins = fixed.mapTo(mutableSetOf()) { it.key }
 
-        val content = clipboardBoardContent(cards, pins, columns = 2, pinsExpanded = false)
+        val content = clipboardBoardContent(cards, pins, columns = 2, recentExpanded = false)
 
-        assertEquals(100, content.pinnedCount)
-        assertEquals(fixed.take(2), content.pinned)
-        assertEquals(recent, content.recent)
-        assertEquals(listOf("text:1", "text:2", "text:102", "text:101"), content.visible.map { it.key })
-        assertEquals("Presentation must not mutate stored history", 102, cards.size)
+        assertEquals(fixed, content.pinned)
+        assertEquals(recent.take(2 * ClipboardRecentRows), content.recent)
+        assertEquals(20, content.recentCount)
+        assertTrue(content.recentCollapsible)
+        assertEquals(recent.take(2 * ClipboardRecentRows).map { it.key } + fixed.map { it.key }, content.visible.map { it.key })
+        assertEquals("Presentation must not mutate stored history", 25, cards.size)
     }
 
-    @Test fun expandingAndCollapsingPreserveAllIdentitiesAndOrdering() {
+    @Test fun recentIsNotFoldedWithoutPinsOrWhenItAlreadyFits() {
+        val recent = (101L..110L).map { text(it) }
+        val noPins = clipboardBoardContent(recent, emptySet(), columns = 2, recentExpanded = false)
+        assertEquals(recent, noPins.recent)
+        assertFalse("nothing below to make room for", noPins.recentCollapsible)
+
+        val few = listOf(text(1), text(101), text(102))
+        val fits = clipboardBoardContent(few, setOf("text:1"), columns = 2, recentExpanded = false)
+        assertEquals(listOf(text(101), text(102)), fits.recent)
+        assertFalse(fits.recentCollapsible)
+
+        val onlyPins = clipboardBoardContent(listOf(text(1), text(2)), setOf("text:1", "text:2"), 2, false)
+        assertEquals(listOf(text(1), text(2)), onlyPins.pinned)
+        assertTrue(onlyPins.recent.isEmpty())
+    }
+
+    @Test fun expandingListsOlderCopiesAfterPinsAndCollapsingRestoresTheSameProjection() {
         val image = ClipboardCard.Image(ClipboardImage("content://image/pinned", "image/png", 10))
-        val cards = listOf(image, text(2), text(3), text(100))
-        val pins = cards.take(3).mapTo(mutableSetOf()) { it.key }
+        val recent = (100L..104L).map { text(it) }
+        val cards = listOf(image) + recent
+        val pins = setOf(image.key)
 
-        val collapsed = clipboardBoardContent(cards, pins, columns = 1, pinsExpanded = false)
-        val expanded = clipboardBoardContent(cards, pins, columns = 1, pinsExpanded = true)
-        val collapsedAgain = clipboardBoardContent(cards, pins, columns = 1, pinsExpanded = false)
+        val collapsed = clipboardBoardContent(cards, pins, columns = 1, recentExpanded = false)
+        val expanded = clipboardBoardContent(cards, pins, columns = 1, recentExpanded = true)
+        val collapsedAgain = clipboardBoardContent(cards, pins, columns = 1, recentExpanded = false)
 
-        assertEquals(cards, expanded.visible)
-        assertSame(image, expanded.pinned.first())
+        assertEquals("opening older copies never pushes the pins down",
+            recent.take(ClipboardRecentRows) + image + recent.drop(ClipboardRecentRows), expanded.visible)
+        assertEquals(recent.take(ClipboardRecentRows) + image, collapsed.visible)
         assertEquals(collapsed, collapsedAgain)
-        assertEquals(listOf(text(100)), expanded.recent)
     }
 
-    @Test fun changingWidthOnlyChangesTheVisiblePinRow() {
-        val cards = (1L..9L).map { text(it) }
-        val pins = cards.take(8).mapTo(mutableSetOf()) { it.key }
-        for ((width, expectedCount) in listOf(240f to 1, 360f to 2, 1000f to 5)) {
-            val content = clipboardBoardContent(cards, pins, clipboardColumnCount(width), pinsExpanded = false)
-            assertEquals(expectedCount, content.pinned.size)
-            assertEquals(listOf(text(9)), content.recent)
-            assertEquals(8, content.pinnedCount)
+    @Test fun changingWidthOnlyChangesHowManyRecentCopiesShow() {
+        val cards = listOf(text(1)) + (101L..130L).map { text(it) }
+        for ((width, columns) in listOf(240f to 1, 360f to 2, 1000f to 5)) {
+            val content = clipboardBoardContent(cards, setOf("text:1"), clipboardColumnCount(width), recentExpanded = false)
+            assertEquals(columns * ClipboardRecentRows, content.recent.size)
+            assertEquals(listOf(text(1)), content.pinned)
         }
     }
 
-    @Test fun currentCategoryHasItsOwnPinnedCountAndRecentHistory() {
+    @Test fun currentCategoryHasItsOwnPinnedAndRecentHistory() {
         val image = ClipboardImage("content://image/pinned", "image/png", 3)
         val text = listOf(ClipboardItem(1, "固定文字", timestamp = 1), ClipboardItem(2, "https://example.com", timestamp = 5))
         val pins = setOf("text:1", "image:${image.uri}")
 
         val images = clipboardBoardContent(clipboardCards(text, listOf(image), ClipboardFilter.IMAGE, pins), pins, 1, false)
-        assertEquals(1, images.pinnedCount)
         assertEquals(listOf("image:${image.uri}"), images.visible.map { it.key })
         assertTrue(images.recent.isEmpty())
 
         val links = clipboardBoardContent(clipboardCards(text, listOf(image), ClipboardFilter.LINK, pins), pins, 1, false)
-        assertEquals(0, links.pinnedCount)
+        assertTrue(links.pinned.isEmpty())
         assertEquals(listOf("text:2"), links.visible.map { it.key })
     }
 
     @Test fun keyboardNavigationUsesOnlyTheCollapsedProjection() {
-        val cards = (1L..100L).map { text(it) } + text(101)
-        val pins = cards.take(100).mapTo(mutableSetOf()) { it.key }
-        val keys = clipboardBoardContent(cards, pins, 2, false).visible.map { it.key }
+        val cards = listOf(text(1)) + (101L..110L).map { text(it) }
+        val keys = clipboardBoardContent(cards, setOf("text:1"), 2, false).visible.map { it.key }
 
-        assertEquals("text:101", nextClipboardKey(keys, "text:2", ClipboardNavigation.RIGHT, 2, emptyList()))
-        assertEquals("text:101", nextClipboardKey(keys, "text:1", ClipboardNavigation.DOWN, 2, emptyList()))
-        assertEquals("text:101", nextClipboardKey(keys, "text:101", ClipboardNavigation.RIGHT, 2, emptyList()))
-        assertEquals("text:1", nextClipboardKey(keys, "text:101", ClipboardNavigation.UP, 2, emptyList()))
+        val shown = (101L until 101L + 2 * ClipboardRecentRows).map { "text:$it" }
+        assertEquals(shown + "text:1", keys)
+        assertEquals("text:1", nextClipboardKey(keys, shown.last(), ClipboardNavigation.RIGHT, 2, emptyList()))
     }
 
     @Test fun pinPreviewLeavesMostOfTheViewportForRecentCopiesAtEveryHeight() {

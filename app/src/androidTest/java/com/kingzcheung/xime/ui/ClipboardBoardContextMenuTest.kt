@@ -13,6 +13,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
@@ -39,6 +40,7 @@ import org.junit.Test
 class ClipboardBoardContextMenuTest {
     @get:Rule val rule = createComposeRule()
     private val text = ClipboardItem(12, "保留完整的剪贴板文字", timestamp = 20)
+    private val textRecords = mutableStateOf(listOf(text))
     private lateinit var image: ClipboardImage
     private lateinit var imageFile: File
     private val darkAppearance = mutableStateOf(true)
@@ -47,6 +49,10 @@ class ClipboardBoardContextMenuTest {
     private var split: Pair<String, Long>? = null
     private var edited: Triple<Long, String, String>? = null
     private var removed = emptyList<ClipboardCard>()
+    private var pasted = 0
+    private val boardWidth = mutableStateOf(360)
+    private val boardHeight = mutableStateOf(400)
+    private val boardFontScale = mutableStateOf(1f)
 
     @Before fun createLoadableImage() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -77,97 +83,202 @@ class ClipboardBoardContextMenuTest {
         }
     }
 
-    @Test fun textPreviewAndOriginalActionsKeepTheToolbarAndRecordPositions() {
+    // As in XIME and the earliest CyIME: the board dims, the record stays in place and the action
+    // card opens right beside it (placement across columns and widths: ClipboardAnchoredMenuTest).
+    @Test fun textActionsOpenBesideThePressedRecord() {
         showBoard()
-        val toolbar = rule.onNodeWithTag("clipboard-more").fetchSemanticsNode().boundsInRoot
-        val record = rule.onNodeWithTag("clipboard-card:text:12").fetchSemanticsNode().boundsInRoot
+        val toolbar = bounds("clipboard-more")
+        val record = bounds("clipboard-card:text:12")
         open("text:12")
         rule.onNodeWithText("记录操作").assertDoesNotExist()
-        val preview = rule.onNodeWithTag("clipboard-item-preview").fetchSemanticsNode().boundsInRoot
-        val actions = rule.onNodeWithTag("clipboard-item-actions").fetchSemanticsNode().boundsInRoot
-        assertTrue("left record preview stays to the left of its actions", preview.right <= actions.left)
-        assertEquals(toolbar, rule.onNodeWithTag("clipboard-more").fetchSemanticsNode().boundsInRoot)
-        assertEquals(record, rule.onNodeWithTag("clipboard-card:text:12").fetchSemanticsNode().boundsInRoot)
+        val menu = bounds("clipboard-item-menu")
+        assertTrue("menu beside its record: $menu vs $record", menu.overlaps(record) ||
+            kotlin.math.abs(menu.left - record.right) <= 12f || kotlin.math.abs(record.left - menu.right) <= 12f)
+        assertEquals(toolbar, bounds("clipboard-more"))
+        assertEquals(record, bounds("clipboard-card:text:12"))
         rule.onNodeWithText("分词").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(text.text to text.id, split) }
         rule.onNodeWithTag("clipboard-item-menu").assertDoesNotExist()
         open("text:12")
-        rule.onNodeWithText("快捷").assertDoesNotExist()
         rule.onNodeWithText("编辑").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(Triple(text.id, text.text, text.code), edited) }
     }
 
-    @Test fun imagePreviewUsesSameMenuAndPreservesPinAndDeleteActions() {
+    @Test fun imageUsesTheSameAnchoredMenuAndKeepsPinAndConfirmedDelete() {
         showBoard(dark = false)
         val key = "image:${image.uri}"
+        val original = rule.onNodeWithTag("clipboard-card:$key")
+        awaitImage(original) { containsFixtureColors(it) }
+        val record = bounds("clipboard-card:$key")
         open(key)
-        val preview = rule.onNodeWithTag("clipboard-item-preview").fetchSemanticsNode().boundsInRoot
-        val actions = rule.onNodeWithTag("clipboard-item-actions").fetchSemanticsNode().boundsInRoot
-        assertTrue("right image preview stays to the right of its actions", actions.right <= preview.left)
-        rule.onNodeWithText("分词").assertDoesNotExist()
-        rule.onNodeWithText("快捷").assertDoesNotExist()
-        rule.onNodeWithText("编辑").assertDoesNotExist()
+        assertEquals(record, bounds("clipboard-card:$key"))
+        for (label in listOf("分词", "快捷", "编辑")) rule.onNodeWithText(label).assertDoesNotExist()
         rule.onNodeWithText("固定").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(setOf(key), pins.value) }
         open(key)
         rule.onNodeWithText("取消固定").assertExists()
         rule.onNodeWithText("删除").performScrollTo().performClick()
-        rule.runOnIdle { assertTrue("delete still requires confirmation", removed.isEmpty()) }
-        rule.onNodeWithTag("clipboard-confirm-delete").performClick()
-        rule.runOnIdle {
-            assertEquals(listOf(ClipboardCard.Image(image)), removed)
-            assertTrue(pins.value.isEmpty())
-        }
+        rule.runOnIdle { assertTrue(removed.isEmpty()) }
+        rule.onNodeWithText("删除 1 条图片记录？").assertExists()
+        rule.onNodeWithText("只移除剪贴板记录，保留原始图片。").assertExists()
+        rule.onNodeWithTag("clipboard-confirm-delete").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(listOf(ClipboardCard.Image(image)), removed); assertTrue(pins.value.isEmpty()) }
     }
 
-    @Test fun shortLargeTextPanelKeepsEveryActionReachableInsideRecords() {
+    @Test fun shortLargeTextPanelKeepsEveryActionReachableAndLeavesTheRecordInPlace() {
         showBoard(width = 240, height = 280, fontScale = 2f)
+        val record = bounds("clipboard-card:text:12")
         open("text:12")
-        val region = rule.onNodeWithTag("clipboard-records-region").fetchSemanticsNode().boundsInRoot
+        val board = bounds("clipboard-board")
         for (label in listOf("固定", "分词", "编辑", "多选", "删除")) {
-            val action = rule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
-                .fetchSemanticsNode().boundsInRoot
-            assertTrue("$label extends above records", action.top >= region.top - 1f)
-            assertTrue("$label extends below records", action.bottom <= region.bottom + 1f)
+            val row = rule.onNodeWithText(label).performScrollTo().assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertInside(board, row, label)
+            assertEquals(record, bounds("clipboard-card:text:12"))
         }
         rule.onNodeWithText("多选").performScrollTo().performClick()
         rule.onNodeWithText("已选 1").assertIsDisplayed()
         rule.onNodeWithTag("clipboard-item-menu").assertDoesNotExist()
     }
 
-    @Test fun textImageAndDeleteConfirmationRenderGlassInBothAppearances() {
+    @Test fun defaultPhoneHeightKeepsTheRecordVisibleAndAllActionsReachable() {
+        showBoard(width = 360, height = 232)
+        pins.value = setOf("text:12")
+        rule.waitForIdle()
+        val record = bounds("clipboard-card:text:12")
+        open("text:12")
+        val menu = bounds("clipboard-item-menu")
+        assertEquals(record, bounds("clipboard-card:text:12"))
+        for (label in listOf("取消固定", "分词", "编辑", "多选", "删除")) {
+            val row = rule.onNodeWithText(label).performScrollTo().assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertInside(menu, row, label)
+        }
+        saveBoard("clipboard-context-phone-compact.png")
+    }
+
+    @Test fun wideMenusUseFreeSpaceAndTheMoreButtonAnchorWithoutMovingToolbar() {
+        showBoard(width = 800, height = 360)
+        val toolbar = bounds("clipboard-controls")
+        val textRecord = bounds("clipboard-card:text:12")
+        open("text:12")
+        assertEquals(toolbar, bounds("clipboard-controls"))
+        saveBoard("clipboard-context-wide-compact.png")
+        dismissOverRecord("clipboard-item-menu", textRecord)
+        rule.onNodeWithTag("clipboard-more").performClick()
+        val button = bounds("clipboard-more")
+        val menu = bounds("clipboard-more-menu")
+        assertTrue("settings menu follows longest label", menu.width < 200f)
+        assertTrue("more menu opens below its button when the space is free", menu.top >= button.bottom)
+        assertEquals(button.right, menu.right, 1f)
+        assertEquals(toolbar, bounds("clipboard-controls"))
+        for (tag in listOf("clipboard-select", "clipboard-pick", "clipboard-photos", "clipboard-clear", "clipboard-close-menu")) {
+            assertInside(menu, rule.onNodeWithTag(tag).assertIsDisplayed().fetchSemanticsNode().boundsInRoot, tag)
+        }
+        saveBoard("clipboard-more-wide-compact.png")
+    }
+
+    @Test fun textConfirmationHasNoImageAdviceAndOutsideTapOnlyDismisses() {
+        showBoard()
+        val record = bounds("clipboard-card:text:12")
+        open("text:12")
+        dismissOverRecord("clipboard-item-menu", record)
+        open("text:12")
+        rule.onNodeWithText("删除").performScrollTo().performClick()
+        rule.onNodeWithText("删除 1 条文本记录？").assertExists()
+        rule.onNodeWithText("原始图片", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("相册", substring = true).assertDoesNotExist()
+        rule.runOnIdle { assertTrue(removed.isEmpty()) }
+        dismissOverRecord("clipboard-delete-menu", record)
+        rule.runOnIdle { assertTrue(removed.isEmpty()); assertEquals(0, pasted) }
+        rule.onNodeWithTag("clipboard-more").performClick()
+        dismissOverRecord("clipboard-more-menu", record)
+        rule.runOnIdle { assertTrue(removed.isEmpty()); assertEquals(0, pasted) }
+    }
+
+    @Test fun mixedSelectionNamesBothKindsAndKeepsDeletionAsASecondStep() {
+        showBoard()
+        rule.onNodeWithTag("clipboard-more").performClick()
+        rule.onNodeWithTag("clipboard-select").performScrollTo().performClick()
+        rule.onNodeWithTag("clipboard-select-all").performClick()
+        rule.onNodeWithTag("clipboard-delete").performClick()
+        rule.onNodeWithText("删除 1 条文本和 1 条图片记录？").assertExists()
+        rule.onNodeWithText("只移除剪贴板记录，保留原始图片。").assertExists()
+        rule.runOnIdle { assertTrue(removed.isEmpty()); assertEquals(0, pasted) }
+        rule.onNodeWithTag("clipboard-cancel-delete").performScrollTo().performClick()
+        rule.runOnIdle { assertTrue(removed.isEmpty()) }
+    }
+
+    @Test fun allThreeMenusRenderOneGlassSurfaceInBothAppearances() {
         showBoard(width = 480, height = 400)
         for (dark in listOf(true, false)) {
             val appearance = if (dark) "dark" else "light"
             rule.runOnIdle { darkAppearance.value = dark; glassEnabled.value = true }
-
+            val record = bounds("clipboard-card:text:12")
             open("text:12")
-            rule.onNode(hasText(text.text) and hasAnyAncestor(hasTestTag("clipboard-item-preview")),
-                useUnmergedTree = true).assertIsDisplayed()
-            assertGlassMaterial(rule.onNodeWithTag("clipboard-item-menu"), "$appearance text menu")
+            assertGlassMaterial(rule.onNodeWithTag("clipboard-item-menu"), "$appearance item menu")
             saveBoard("clipboard-context-$appearance-text.png")
-            rule.onNodeWithTag("clipboard-item-menu-dismiss").performTouchInput { click(Offset(2f, 2f)) }
-
+            dismissOverRecord("clipboard-item-menu", record)
+            rule.onNodeWithTag("clipboard-more").performClick()
+            assertGlassMaterial(rule.onNodeWithTag("clipboard-more-menu"), "$appearance more menu")
+            saveBoard("clipboard-context-$appearance-more.png")
+            dismissOverRecord("clipboard-more-menu", record)
             open("image:${image.uri}")
-            val preview = rule.onNodeWithTag("clipboard-item-preview")
-            awaitImage(preview) { containsFixtureColors(it) }
-            assertGlassMaterial(rule.onNodeWithTag("clipboard-item-menu"), "$appearance image menu")
-            assertTrue("the actual image remains visible after changing glass", containsFixtureColors(
-                preview.captureToImage().asAndroidBitmap()))
-            saveBoard("clipboard-context-$appearance-image.png")
-
             rule.onNodeWithText("删除").performScrollTo().performClick()
-            rule.runOnIdle { assertTrue("opening confirmation cannot remove the record", removed.isEmpty()) }
-            // The production dialog's scrollable content is the card itself, not the dark scrim behind it.
-            val confirmation = rule.onNode(hasScrollAction() and
-                hasAnyDescendant(hasTestTag("clipboard-confirm-delete")))
-            confirmation.assertIsDisplayed()
-            assertGlassMaterial(confirmation, "$appearance delete confirmation")
+            assertGlassMaterial(rule.onNodeWithTag("clipboard-delete-menu"), "$appearance confirmation")
             saveBoard("clipboard-context-$appearance-delete.png")
-            rule.onNodeWithText("取消").performScrollTo().performClick()
-            rule.onNodeWithTag("clipboard-confirm-delete").assertDoesNotExist()
-            rule.runOnIdle { assertTrue("cancel must leave the fixture records untouched", removed.isEmpty()) }
+            rule.onNodeWithTag("clipboard-cancel-delete").performScrollTo().performClick()
+            rule.runOnIdle { assertTrue(removed.isEmpty()) }
         }
+    }
+
+    @Test fun resizingOrChangingFontScaleDismissesStaleAnchorsWithoutDeleting() {
+        showBoard()
+        open("text:12")
+        rule.runOnIdle { boardHeight.value = 340 }
+        rule.onNodeWithTag("clipboard-item-menu").assertDoesNotExist()
+        open("text:12")
+        rule.runOnIdle { boardFontScale.value = 1.3f }
+        rule.onNodeWithTag("clipboard-item-menu").assertDoesNotExist()
+        rule.onNodeWithTag("clipboard-more").performClick()
+        rule.runOnIdle { boardWidth.value = 480 }
+        rule.onNodeWithTag("clipboard-more-menu").assertDoesNotExist()
+        open("text:12")
+        rule.onNodeWithText("删除").performScrollTo().performClick()
+        rule.onNodeWithTag("clipboard-delete-menu").assertIsDisplayed()
+        rule.runOnIdle { boardHeight.value = 400 }
+        rule.onNodeWithTag("clipboard-delete-menu").assertDoesNotExist()
+        rule.runOnIdle { assertTrue(removed.isEmpty()); assertEquals(0, pasted) }
+    }
+
+    @Test fun backgroundUpdatesDismissAllMenusBeforeTheirSourceRectanglesBecomeStale() {
+        showBoard()
+        open("text:12")
+        rule.runOnIdle { textRecords.value = listOf(ClipboardItem(13, "新复制的记录", timestamp = 30), text) }
+        rule.onNodeWithTag("clipboard-item-menu").assertDoesNotExist()
+        rule.onNodeWithTag("clipboard-more").performClick()
+        rule.runOnIdle { textRecords.value = listOf(text.copy(text = "更新后内容", timestamp = 40)) }
+        rule.onNodeWithTag("clipboard-more-menu").assertDoesNotExist()
+        open("text:12")
+        rule.onNodeWithText("删除").performScrollTo().performClick()
+        rule.onNodeWithTag("clipboard-delete-menu").assertIsDisplayed()
+        rule.runOnIdle { textRecords.value = listOf(text.copy(timestamp = 50)) }
+        rule.onNodeWithTag("clipboard-delete-menu").assertDoesNotExist()
+        rule.runOnIdle { assertTrue(removed.isEmpty()); assertEquals(0, pasted) }
+    }
+
+    private fun bounds(tag: String) = rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+
+    private fun assertInside(container: Rect, child: Rect, name: String) {
+        assertTrue("$name must remain inside the panel/menu", child.left >= container.left - 1f &&
+            child.right <= container.right + 1f && child.top >= container.top - 1f && child.bottom <= container.bottom + 1f)
+    }
+
+    private fun dismissOverRecord(menu: String, record: Rect) {
+        assertFalse("dismissal probe must be outside the menu", bounds(menu).contains(record.center))
+        val layer = rule.onNodeWithTag("$menu-dismiss")
+        val origin = layer.fetchSemanticsNode().boundsInRoot.topLeft
+        layer.performTouchInput { click(record.center - origin) }
+        rule.onNodeWithTag(menu).assertDoesNotExist()
+        rule.runOnIdle { assertEquals("outside tap must not paste underlying record", 0, pasted); assertTrue(removed.isEmpty()) }
     }
 
     private fun open(key: String) {
@@ -179,19 +290,20 @@ class ClipboardBoardContextMenuTest {
     private fun showBoard(width: Int = 360, height: Int = 400, fontScale: Float = 1f, dark: Boolean = true) {
         darkAppearance.value = dark
         glassEnabled.value = true
+        boardWidth.value = width; boardHeight.value = height; boardFontScale.value = fontScale
         rule.setContent {
             val isDark = darkAppearance.value
             CompositionLocalProvider(
-                LocalDensity provides Density(1f, fontScale),
+                LocalDensity provides Density(1f, boardFontScale.value),
                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(
                     frostedGlass = FrostedGlassConfig.defaults(isDark, enabled = glassEnabled.value)),
             ) {
                 MaterialTheme(colorScheme = if (isDark) darkColorScheme() else lightColorScheme()) {
-                    Box(Modifier.requiredSize(width.dp, height.dp)) {
+                    Box(Modifier.requiredSize(boardWidth.value.dp, boardHeight.value.dp)) {
                         ClipboardBoardView(
-                            textItems = listOf(text), images = listOf(image), initialImages = false,
+                            textItems = textRecords.value, images = listOf(image), initialImages = false,
                             expanded = false, pins = pins.value, photoAccess = false, failure = null,
-                            onBack = {}, onQuickSend = {}, onSelectText = {}, onSelectImage = {},
+                            onBack = {}, onQuickSend = {}, onSelectText = { pasted++ }, onSelectImage = { pasted++ },
                             onSplit = { value, id -> split = value to id }, onAddQuick = {},
                             onPinsChange = { pins.value = it }, onRemove = { removed = it },
                             onPhotoAccess = {}, onPick = {}, onSystemPaste = {}, onShare = { _, _ -> },
