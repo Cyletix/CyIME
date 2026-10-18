@@ -162,7 +162,7 @@ class ResizeTransactionImeTest {
 
         rule.onNodeWithContentDescription("键盘调节").performClick()
         rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()
-        rule.onNodeWithText("透明度 0%").assertIsDisplayed()
+        rule.onNodeWithText("0%").assertIsDisplayed()
         assertEquals("Preview must not persist before confirmation", 0.4f, SettingsPreferences.getKeyboardOpacity(context), 0.001f)
         shell("input keyevent KEYCODE_BACK")
         rule.waitUntil(5000) { rule.onAllNodesWithTag("keyboard-resize-frame", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
@@ -171,7 +171,7 @@ class ResizeTransactionImeTest {
 
         rule.onNodeWithContentDescription("键盘调节").performClick()
         rule.onNodeWithTag("keyboard-resize-floating-button", useUnmergedTree = true).performClick()
-        rule.onNodeWithText("透明度 0%").assertIsDisplayed()
+        rule.onNodeWithText("0%").assertIsDisplayed()
         rule.onNodeWithContentDescription("确认").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("keyboard-resize-frame", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
         assertFalse(SettingsPreferences.isFloatingMode(context, landscape))

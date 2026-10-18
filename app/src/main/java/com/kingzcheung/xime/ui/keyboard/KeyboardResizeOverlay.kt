@@ -3,7 +3,6 @@ package com.kingzcheung.xime.ui.keyboard
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -87,6 +86,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -197,7 +197,6 @@ internal fun KeyboardResizeOverlay(
         // 调节界面的面板、按钮和滑条使用键盘本身的配色（键帽色、文字色、强调色），
         // 与键盘设计一致；没有键盘配色时（预览、测试）退回 Material 主题色。
         val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
-        val surfaceColor = palette?.key?.copy(alpha = 1f) ?: MaterialTheme.colorScheme.surface
         val onSurfaceColor = palette?.text ?: MaterialTheme.colorScheme.onSurface
         val accentColor = (palette?.accent ?: MaterialTheme.colorScheme.primary).copy(alpha = 1f)
         // 滑条面板和按钮用功能键的实心颜色，玻璃主题也不透明；文字用功能键文字色。
@@ -578,26 +577,21 @@ internal fun KeyboardResizeOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // 使用整组控件的可用宽度，不再对滑条单独限宽后按比例缩一次。
-                // 面板：全圆头、功能键实心色、无描边；拖透明度时也保持显示。
+                // 按设计图：左「透明度」、中间滑轨、右百分比，没有自己的底框；拖透明度时也保持显示。
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(opacityHeight)
                         .testTag("keyboard-resize-opacity-panel")
-                        .clip(RoundedCornerShape(50))
-                        .background(functionColor)
-                        // 右侧留半个面板高，竖条滑块拖到 100% 时不贴到圆头边上。
-                        .padding(start = 14.dp, end = opacityHeight / 2),
+                        .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // 「透明度 N%」固定放在滑条左边，常显，拖动时数字实时变。
                     Text(
-                        text = "透明度 ${((1f - opacity) * 100).roundToInt()}%",
+                        text = "透明度",
                         modifier = Modifier
-                            .width((96f * density.fontScale).dp)
                             .clickable { editingOpacity = true }
-                            .testTag("keyboard-opacity-overlay-label"),
-                        color = functionTextColor,
+                            .padding(end = 10.dp),
+                        color = onSurfaceColor,
                         fontSize = 16.sp,
                         lineHeight = 22.sp,
                         fontWeight = FontWeight.Medium,
@@ -637,6 +631,22 @@ internal fun KeyboardResizeOverlay(
                                 .testTag("keyboard-opacity-slider"),
                         )
                     }
+                    // 百分比固定宽度、右对齐，数字变化时滑轨不抖。
+                    Text(
+                        text = "${((1f - opacity) * 100).roundToInt()}%",
+                        modifier = Modifier
+                            .padding(start = 10.dp)
+                            .width((44f * density.fontScale).dp)
+                            .clickable { editingOpacity = true }
+                            .testTag("keyboard-opacity-overlay-label"),
+                        color = onSurfaceColor,
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
 
                 @Composable
@@ -647,10 +657,12 @@ internal fun KeyboardResizeOverlay(
                     description: String,
                     // 非空即开关：文字始终是功能名，开启时用强调色实心填充，任何配色下都能一眼分辨。
                     selected: Boolean? = null,
+                    /** 常用强调色实心（设计图里只有「完成」这样）。 */
+                    emphasized: Boolean = false,
                     icon: @Composable () -> Unit,
                     onClick: () -> Unit,
                 ) {
-                    val on = selected == true
+                    val on = selected == true || emphasized
                     // 实心按钮，无描边：未选中用功能键色/功能键文字色，选中用强调色配黑或白字；
                     // 两种状态都算对比度，低于 4.5 就换成黑、白里反差大的那个。
                     val container = if (on) accentColor else functionColor
@@ -792,6 +804,7 @@ internal fun KeyboardResizeOverlay(
                         modifier = Modifier.weight(1f),
                         text = "确认",
                         description = "确认",
+                        emphasized = true,
                         icon = { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         onClick = ::confirmResize,
                     )
@@ -838,6 +851,40 @@ internal fun KeyboardResizeOverlay(
                 }
             }
         }
+        // 顶边「拖动移动」胶囊，按设计图：功能键实心色、四向箭头 + 文字，无描边。
+        @Composable
+        fun MovePill() {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(functionColor)
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.OpenWith, contentDescription = null, tint = functionTextColor.copy(alpha = 1f),
+                    modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("拖动移动", color = functionTextColor.copy(alpha = 1f), fontSize = 11.sp, maxLines = 1, softWrap = false)
+            }
+        }
+        val floatingMoveGesture = Modifier.pointerInput(floatingMode) {
+            detectDragGestures(
+                onDragEnd = {
+                    dragRect = null
+                    currentPreviewState.onDragEnd()
+                    currentOnPositionDragEnd?.invoke()
+                },
+                onDragCancel = {
+                    dragRect = null
+                    currentPreviewState.onDragEnd()
+                    currentOnPositionDragEnd?.invoke()
+                },
+                onDrag = { change, amount ->
+                    change.consume()
+                    moveKeyboardBy(amount.x, amount.y)
+                },
+            )
+        }
         if (!editingOpacity && !floatingMode && splitGapPx <= 0f) {
             val centered = kotlin.math.abs(frame.centerX - viewRect.centerX) < 0.5f
             val edgeCentered = kotlin.math.abs(frame.left - viewRect.centerX) < 0.5f ||
@@ -874,21 +921,18 @@ internal fun KeyboardResizeOverlay(
                         }
                     }
                 }, contentAlignment = Alignment.Center) {
-                // 位置不变，样子按设计图：圆角小标签，移动图标 + 文字，描边用强调色。
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(surfaceColor.copy(alpha = 0.92f))
-                        .border(1.dp, accentColor.copy(alpha = 0.7f), RoundedCornerShape(50))
-                        .padding(horizontal = 10.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Default.OpenWith, contentDescription = null, tint = accentColor,
-                        modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text(if (centered || edgeCentered) "$alignmentLabel · 左右拖动" else "左右拖动移动键盘",
-                        color = onSurfaceColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                MovePill()
+            }
+        }
+        if (!editingOpacity && floatingMode && splitGapPx <= 0f) {
+            // 悬浮模式也按设计图在顶边放「拖动移动」胶囊，拖它整块移动，和底部拖动条一样。
+            Box(Modifier.absoluteOffset {
+                IntOffset((frame.left + RESIZE_CORNER_HIT_DP.dp.toPx()).roundToInt(), (frame.top + 28.dp.toPx()).roundToInt())
+            }.size(with(density) { (frame.width.toDp() - (RESIZE_CORNER_HIT_DP * 2).dp).coerceAtLeast(1.dp) }, 28.dp)
+                .zIndex(1f).testTag("keyboard-resize-floating-move-pill")
+                .semantics { contentDescription = "拖动移动键盘，不改变尺寸" }
+                .then(floatingMoveGesture), contentAlignment = Alignment.Center) {
+                MovePill()
             }
         }
         if (!editingOpacity && floatingMode) {
@@ -901,24 +945,7 @@ internal fun KeyboardResizeOverlay(
                     .zIndex(1f)
                     .testTag("keyboard-resize-move-bar")
                     .semantics { contentDescription = "拖动移动键盘，不改变尺寸" }
-                    .pointerInput(floatingMode) {
-                        detectDragGestures(
-                            onDragEnd = {
-                                dragRect = null
-                                currentPreviewState.onDragEnd()
-                                currentOnPositionDragEnd?.invoke()
-                            },
-                            onDragCancel = {
-                                dragRect = null
-                                currentPreviewState.onDragEnd()
-                                currentOnPositionDragEnd?.invoke()
-                            },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                moveKeyboardBy(amount.x, amount.y)
-                            },
-                        )
-                    },
+                    .then(floatingMoveGesture),
             )
         }
     }
