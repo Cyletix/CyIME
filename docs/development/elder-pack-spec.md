@@ -31,6 +31,8 @@ py -3 -B scripts\packager\cyime_packager.py build --preset 老人包 --bump patc
 
 ## 包里不能有（打包器检查）
 
+- 开发者功能：“手写训练模式”和“手写数据采集”入口不出现（`BuildConfig.DEV_TOOLS=false`；打包器只给“装到我的设备”传 `-PdevTools=true`，老人包、朋友包、公开版带上会直接报错）。手写输入本身照常（用户 2026-10-18 决定）。
+
 - 日语：`assets/rime_japanese/`（jaroomaji 词库、日语和假名方案、日语 Lua）在构建时排除；`assets/` 下任何带 japanese、jaroomaji、kana、zipformer、`_ja` 的文件都算违规。
 - 日语语音模型（Zipformer 日语）和其他不在上表的模型。
 

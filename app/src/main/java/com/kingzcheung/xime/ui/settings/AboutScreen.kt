@@ -327,7 +327,7 @@ fun AboutContent(
                             title = "存储空间",
                             onClick = onNavigateToStorageSpace
                         )
-                        if (captureUnlocked) {
+                        if (captureUnlocked && (BuildConfig.DEV_TOOLS || BuildConfig.DEBUG)) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 56.dp),
                                 thickness = 0.5.dp,

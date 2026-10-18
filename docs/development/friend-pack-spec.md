@@ -27,6 +27,8 @@ py -3 -B scripts\packager\cyime_packager.py build --preset 朋友包 --bump patc
 
 ## 包里不能有（打包器检查）
 
+- 开发者功能：“手写训练模式”和“手写数据采集”入口不出现（`BuildConfig.DEV_TOOLS=false`，只有“装到我的设备”带）。手写输入本身照常（用户 2026-10-18 决定）。
+
 - 私人模型或任何私人数据：九键模型的哈希等于 `@best_private` 时拒绝；录音、声纹、手写样本、用户词库一律不放。
 - 模型总览里已淘汰的模型。
 

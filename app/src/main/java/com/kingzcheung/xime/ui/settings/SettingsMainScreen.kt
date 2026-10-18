@@ -401,18 +401,21 @@ fun SettingsMainContent(
                         onClick = onNavigateToModelLocal,
                         showArrow = true
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Gesture,
-                        title = "手写训练模式",
-                        subtitle = "按题写假名、字母、符号和公式，收集样本导出给电脑训练",
-                        onClick = onNavigateToHandwritingTraining,
-                        showArrow = true
-                    )
+                    // Handwriting training is the developer's own tool: only 装到我的设备 and debug builds show it.
+                    if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 56.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItem(
+                            icon = Icons.TwoTone.Gesture,
+                            title = "手写训练模式",
+                            subtitle = "按题写假名、字母、符号和公式，收集样本导出给电脑训练",
+                            onClick = onNavigateToHandwritingTraining,
+                            showArrow = true
+                        )
+                    }
                 })
             }
 
