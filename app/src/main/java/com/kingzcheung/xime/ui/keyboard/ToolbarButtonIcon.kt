@@ -27,11 +27,14 @@ fun ToolbarButtonIcon(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     fontSize: TextUnit = 16.sp,
+    /** 开关按钮当前是否开启；全角/半角按状态换图标。 */
+    active: Boolean = false,
 ) {
     when (item) {
         is ToolbarButtonItem.Builtin -> Icon(
-            imageVector = item.button.icon,
-            contentDescription = contentDescription ?: item.label,
+            imageVector = if (item.button == com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE && active)
+                com.kingzcheung.xime.keyboard.FullWidthIcon else item.button.icon,
+            contentDescription = contentDescription ?: item.stateLabel(active),
             tint = tint,
             modifier = modifier,
         )
@@ -62,3 +65,8 @@ fun ToolbarButtonIcon(
         }
     }
 }
+
+/** 键盘上显示的名称：全角/半角开关按当前状态显示，其余按钮用原名称。 */
+internal fun ToolbarButtonItem.stateLabel(active: Boolean): String =
+    if (this is ToolbarButtonItem.Builtin && button == com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE)
+        (if (active) "全角" else "半角") else label

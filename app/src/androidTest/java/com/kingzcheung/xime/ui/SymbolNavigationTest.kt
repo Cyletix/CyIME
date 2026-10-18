@@ -27,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.data.SymbolData
 import com.kingzcheung.xime.ui.keyboard.SymbolKeyboardLayout
 import com.kingzcheung.xime.ui.keyboard.CommonSymbolKeyboardLayout
 import org.junit.Assert.assertEquals
@@ -59,6 +60,29 @@ class SymbolNavigationTest {
             assertEquals(stopped, actions.size)
             assertTrue(actions.all { it == "delete" })
         }
+    }
+
+    @Test fun largeCategoryComposesVisibleRowsAndStillReachesItsLastSymbol() {
+        rule.setContent {
+            MaterialTheme {
+                SymbolKeyboardLayout(onSelect = {}, onBack = {}, onNumber = {},
+                    backgroundColor = Color.Black, textColor = Color.White,
+                    accentColor = Color.Blue, keyBgColor = Color.Gray, modifier = Modifier.size(360.dp, 260.dp))
+            }
+        }
+        val category = SymbolData.categories.first { it.id == "graphicalSymbols" }
+        rule.onNodeWithTag("symbol-category:${category.id}", true).performScrollTo()
+            .performTouchInput { down(center); up() }
+        val inGrid = hasAnyAncestor(hasTestTag("symbol-grid:${category.id}"))
+        val keys = rule.onAllNodes(inGrid and SemanticsMatcher("symbol grid key") {
+            (it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag) ?: "")
+                .startsWith("symbol-key:")
+        }, useUnmergedTree = true).fetchSemanticsNodes()
+        assertTrue("Only visible rows may be composed, got ${keys.size} of ${category.symbols.size}",
+            keys.isNotEmpty() && keys.size < category.symbols.size / 4)
+        val last = hasTestTag("symbol-key:${category.symbols.last()}")
+        rule.onNodeWithTag("symbol-grid:${category.id}").performScrollToNode(last)
+        rule.onNode(inGrid and last, useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun returnStaysAtBottomLeftBeforeTheRecentCategoryStrip() {
@@ -99,7 +123,7 @@ class SymbolNavigationTest {
                 }
             }
         }
-        for (size in listOf(260.dp to 180.dp, 360.dp to 240.dp, 800.dp to 360.dp)) {
+        for (size in listOf(260.dp to 180.dp, 360.dp to 240.dp, 800.dp to 560.dp)) {
             rule.runOnIdle { viewport.value = size }
             val tags = listOf("mode-slot-1", "mode-slot-2", "symbol-category:common", "symbol-category:recentSymbols", "symbol-delete")
             val bounds = tags.map { rule.onNodeWithTag(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot }
@@ -109,7 +133,8 @@ class SymbolNavigationTest {
             }
             listOf(bounds[2], bounds[3]).forEach {
                 assertTrue("Categories must fit within the footer", it.height <= bounds[0].height + 1f)
-                assertTrue("Tall keyboards must not create giant category buttons", it.height <= 72f)
+                assertTrue("Category surfaces use the full footer minus the shared key inset",
+                    it.height >= bounds[0].height - 8f)
                 assertEquals(bounds[0].center.y, it.center.y, 1f)
             }
             val panel = rule.onNodeWithTag("symbols").fetchSemanticsNode().boundsInRoot
@@ -121,6 +146,8 @@ class SymbolNavigationTest {
             assertTrue("Symbols must be rendered", keys.isNotEmpty())
             assertTrue("Grid uses the panel height instead of tiny squares", keys.first().height >= panel.height * .15f)
             val strip = rule.onNodeWithTag("symbol-category-strip").fetchSemanticsNode().boundsInRoot
+            assertEquals(bounds[0].top, strip.top, 1f)
+            assertEquals(bounds[0].bottom, strip.bottom, 1f)
             assertTrue("Scrollable content must not cover the number key", strip.left >= bounds[1].right - 1f)
             assertTrue("Scrollable content must not cover delete", strip.right <= bounds[4].left + 1f)
             rule.onNodeWithText("最近使用").assertDoesNotExist()

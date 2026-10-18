@@ -90,7 +90,8 @@ class KeyboardOverlayContinuityTest {
         val board = bounds("clipboard-board")
         assertEquals("clipboard keeps the original toolbar button height", 40f, leading.height, 1f)
         assertTrue("the board stays below the original 44dp toolbar", board.top - leading.top in 42f..45f)
-        assertEquals("classification and actions use a single row", 24f, bounds("clipboard-controls").height, 1f)
+        // Shared 32dp category items plus 2dp vertical padding, the same row height as the emoji bar.
+        assertEquals("classification and actions use a single row", 36f, bounds("clipboard-controls").height, 1f)
         assertBoundsEqual(enter, bounds("qwerty-enter-key", unmerged = true))
         java.io.File(app.cacheDir, "clipboard-compact-keyboard.png").outputStream().use {
             assertTrue(screenshot().compress(Bitmap.CompressFormat.PNG, 100, it))
@@ -142,10 +143,12 @@ class KeyboardOverlayContinuityTest {
         try {
             rule.runOnIdle { modeReports.clear(); presses.clear(); vm.showOverlay(OverlayRoute.Symbol) }
             rule.mainClock.advanceTimeBy(80)
+            // Symbols swap pages directly like the number page (no reveal), while the
+            // number panel stays mounted underneath instead of a text keyboard.
             assertBoundsEqual(underlay, bounds("keyboard-underlay"))
             assertBoundsEqual(zero, bounds("number-zero", unmerged = true))
-            assertRegionUnchanged(baseline, screenshot(), zero.translate(-root.left, -root.top),
-                "Opening symbols must not swap the visible number underlay to a text keyboard")
+            assertRegionChanged(baseline, screenshot(), zero.translate(-root.left, -root.top),
+                "Opening symbols must show the symbol page at once instead of a reveal animation")
             rule.onNodeWithTag("number-zero").assertDoesNotExist()
             rule.runOnIdle {
                 assertTrue(modeReports.isNotEmpty())
@@ -172,13 +175,10 @@ class KeyboardOverlayContinuityTest {
                 rule.runOnIdle { vm.enterPanel(PanelType.NUMBER) }
                 rule.mainClock.advanceTimeBy(32)
                 val zero = bounds("number-zero")
-                val root = bounds("continuity-keyboard")
-                val baseline = screenshot()
                 rule.runOnIdle { modeReports.clear(); vm.showOverlay(OverlayRoute.Symbol) }
                 rule.mainClock.advanceTimeBy(80)
+                // The number panel stays mounted beneath the directly swapped symbol page.
                 assertBoundsEqual(zero, bounds("number-zero", unmerged = true))
-                assertRegionUnchanged(baseline, screenshot(), zero.translate(-root.left, -root.top),
-                    "The number surface must remain visible during the first Symbol reveal")
                 rule.mainClock.advanceTimeBy(300)
                 rule.runOnIdle { vm.showOverlay(next) }
                 rule.mainClock.advanceTimeBy(32)
@@ -363,7 +363,16 @@ class KeyboardOverlayContinuityTest {
         assertEquals(expected.bottom, actual.bottom, 1f)
     }
 
+    private fun assertRegionChanged(before: Bitmap, after: Bitmap, region: Rect, message: String) {
+        assertTrue(message, changedPixels(before, after, region) > 0)
+    }
+
     private fun assertRegionUnchanged(expected: Bitmap, actual: Bitmap, region: Rect, message: String) {
+        val changed = changedPixels(expected, actual, region)
+        assertEquals("$message ($changed pixels changed)", 0, changed)
+    }
+
+    private fun changedPixels(expected: Bitmap, actual: Bitmap, region: Rect): Int {
         assertEquals(expected.width, actual.width)
         assertEquals(expected.height, actual.height)
         val left = ceil(region.left + 3).toInt().coerceIn(0, expected.width - 1)
@@ -378,6 +387,6 @@ class KeyboardOverlayContinuityTest {
                 abs(android.graphics.Color.green(a) - android.graphics.Color.green(b)) > 2 ||
                 abs(android.graphics.Color.blue(a) - android.graphics.Color.blue(b)) > 2) changed++
         }
-        assertEquals("$message ($changed pixels changed)", 0, changed)
+        return changed
     }
 }

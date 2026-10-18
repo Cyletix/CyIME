@@ -150,4 +150,23 @@ class CustomKeyboardLayoutTest {
             }
         }
     }
+
+    @Test fun cyletix10KeysCanBeRearrangedAndSaved() {
+        val preset = Cyletix10Layout.preset
+        assertTrue(preset.valid())
+        assertTrue("swapping two keys keeps the built-in layout saveable", preset.swap("d", "e").valid())
+        assertTrue(preset.copy(redVowels = true).valid())
+    }
+
+    @Test fun glassEmphasisKeepsLabelsReadableOnTheGlassSurface() {
+        // 玻璃下文字按玻璃键面取对比：浅字主题对深色键面、深字主题对浅色键面，都要 ≥4.5。
+        val layout = Cyletix10Layout.preset.copy(redVowels = true)
+        for (text in listOf(Color.White, Color(0xFF202020))) for (accent in listOf(Color(0xFF6750A4), Color(0xFFE9DDFF), Color(0xFF1A73E8))) {
+            val surface = customLayoutGlassSurface(text)
+            for (key in listOf("d", "e", "q")) {
+                val (_, fg) = customLayoutKeyColors(layout, key, Color(0xFF55555A), text, accent, surface)
+                assertTrue("$key on glass: ${layoutContrast(fg, surface)}", layoutContrast(fg, surface) >= 4.5f)
+            }
+        }
+    }
 }

@@ -44,16 +44,29 @@ class KeyboardVerticalGrowthTest {
         assertEquals(0f, m.bottomSpaceDp, 0f)
     }
 
-    @Test fun increasingHeightDoesNotInflateGapsOrAddOuterPadding() {
+    @Test fun increasingHeightSharesSpaceWithGapsWithoutMovingHorizontalEdges() {
         for (width in listOf(280f, 360f, 680f, 1200f)) for (keypad in listOf(false, true)) {
-            val normal = grid(width, 240f, keypad)
-            for (height in listOf(320f, 420f, 600f, 1000f)) {
+            val normal = grid(width, 1200f, keypad)
+            for (height in listOf(1280f, 1420f, 1600f)) {
                 val tall = grid(width, height, keypad)
-                assertEquals(normal.insetY!!, tall.insetY!!, 0.001f)
+                assertTrue(tall.insetY!! > normal.insetY!!)
                 assertEquals(normal.insetX!!, tall.insetX!!, 0.001f)
-                assertEquals((height - 240f) / 4f, cap(tall) - cap(normal), 0.001f)
+                assertTrue(cap(tall) > cap(normal))
+                assertTrue(cap(tall) - cap(normal) < (height - 1200f) / 4f)
+                assertTrue(tall.insetY!! * 2f <= tall.cellHeightDp * .2f + .001f)
                 assertEquals(0f, tall.extraInsetY + tall.topSpaceDp + tall.bottomSpaceDp, 0f)
             }
+        }
+    }
+
+    @Test fun tallPhoneAndTabletHaveLargerGapsThanTheirUnchangedDefaults() {
+        for ((width, normalHeight, tallHeight) in listOf(
+            Triple(360f, 232f, 356f), Triple(934f, 360f, 627f))) {
+            val normal = grid(width, normalHeight)
+            val tall = grid(width, tallHeight)
+            assertTrue(tall.insetY!! > normal.insetY!!)
+            assertEquals(normal.cellWidthDp, tall.cellWidthDp, 0f)
+            assertEquals(normal.gutterX, tall.gutterX, 0f)
         }
     }
 

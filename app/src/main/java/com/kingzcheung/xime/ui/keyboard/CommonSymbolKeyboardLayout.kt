@@ -126,14 +126,11 @@ fun CommonSymbolKeyboardLayout(
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
             }
-            .drawWithContent {
-                drawContent()
-                bubbleData?.let { drawSwipeBubble(it) }
-            }
             .padding(bottom = if (isFloatingMode || isLandscape) 0.dp else 0.dp),
     ) {
+        SwipeBubbleOverlay(bubbleData)
         Column(Modifier.fillMaxSize()) {
-        LocalKeyboardInputPreferences.current.symbols()?.let { symbols ->
+        LocalKeyboardInputPreferences.current.symbolsFor(SideSymbolTarget.COMMON)?.let { symbols ->
             FixedSymbolStrip(symbols, LocalKeyboardInputActions.current.onCommitExactText
                 ?: LocalKeyboardInputActions.current.onCommitText ?: onKeyPress)
         }
@@ -271,7 +268,10 @@ fun CommonSymbolKeyboardLayout(
                                 onSwipe = { onKeyPress("clear_composition") },
                                 onLongClick = { onKeyPress("delete") },
                                 onPress = { onKeyPressDown?.invoke("delete") },
+                                followSymbolSwipeDirection = true,
+                                upFeedback = KeyFlickFeedback.DELETE,
                                 swipeUpLabel = "上滑清空",
+                                downFeedback = KeyFlickFeedback.UNDO,
                                 swipeDownLabel = "下滑撤回",
                                 onSwipeUp = { onKeyPress("clear_all") },
                                 onSwipeDown = { onKeyPress("undo_clear") },
@@ -600,7 +600,10 @@ internal fun CommonSymbolLandscapeContent(
                         onSwipe = { onKeyPress("clear_composition") },
                         onLongClick = { onKeyPress("delete") },
                         onPress = { onKeyPressDown?.invoke("delete") },
+                        followSymbolSwipeDirection = true,
+                        upFeedback = KeyFlickFeedback.DELETE,
                         swipeUpLabel = "上滑清空",
+                        downFeedback = KeyFlickFeedback.UNDO,
                         swipeDownLabel = "下滑撤回",
                         onSwipeUp = { onKeyPress("clear_all") },
                         onSwipeDown = { onKeyPress("undo_clear") },

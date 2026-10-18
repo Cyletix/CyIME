@@ -67,6 +67,30 @@ class KeyGlowTest {
         rule.runOnIdle { assertEquals(1, taps) }
     }
 
+    @Test fun heldKeyKeepsItsColourUntilReleaseThenFades() {
+        rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true)) {
+            Box(Modifier.size(160.dp, 110.dp).background(Color(0xFF191C22)).testTag("held-frame").padding(24.dp)) {
+                KeyButton("←", {}, Color(0xFF525252), Color.White, Modifier.testTag("held-key"), shadowEnabled = false)
+            }
+        } } }
+        rule.mainClock.autoAdvance = false
+        val before = snapshot("held-frame")
+        rule.onNodeWithTag("held-key").performTouchInput { down(center) }
+        for (ms in listOf(100L, 600L, 1500L)) {
+            rule.mainClock.advanceTimeBy(if (ms == 100L) 100L else ms - (if (ms == 600L) 100L else 600L))
+            val frame = snapshot("held-frame")
+            save("held-glow-${ms.toString().padStart(4, '0')}.png", frame)
+            assertFalse("a held key stays lit at $ms ms", before.sameAs(frame))
+        }
+        rule.onNodeWithTag("held-key").performTouchInput { up() }
+        rule.mainClock.advanceTimeBy(80)
+        save("held-glow-release-080.png", snapshot("held-frame"))
+        rule.mainClock.advanceTimeBy(220)
+        val released = snapshot("held-frame")
+        save("held-glow-release-300.png", released)
+        assertTrue("released key returns to rest", before.sameAs(released))
+    }
+
     @Test fun exportActualSquareGlowFrames() {
         rule.setContent { MaterialTheme { CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(keyGlowEnabled = true, keyAnimationEnabled = true)) {
             Box(Modifier.size(180.dp, 130.dp).background(Color(0xFF191C22)).testTag("square-frame").padding(24.dp)) {

@@ -125,4 +125,6 @@ fun isHandwritingSchema(schemaId: String): Boolean =
 
 /** 分体只适用于26键，不能把14键、九键、手写或日语九键拆开。 */
 internal fun supportsSplitKeyboard(schemaId: String, asciiMode: Boolean): Boolean =
-    InputProfiles.current(schemaId, asciiMode).layout.kind == LayoutKind.ALPHABETIC
+    InputProfiles.current(schemaId, asciiMode).layout.let {
+        it.kind == LayoutKind.ALPHABETIC || it == com.kingzcheung.xime.settings.InputLayout.MERGED14
+    }

@@ -46,16 +46,37 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 fun LayoutDisplaySettingsContent(
     onBack: () -> Unit,
     onOpenLayout: (String) -> Unit = {},
+    /** 设置搜索直接打开某个子页；返回仍回到索引页。 */
+    initialPage: String? = null,
+) {
+    // One index page; each group opens as its own sub-page. Settings themselves are unchanged.
+    var openPage by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(initialPage?.takeIf { p -> LayoutDisplayPages.any { it.first == p } })
+    }
+    SettingsSubPages(openPage, onBack = { openPage = null }) { page ->
+        LayoutDisplayPage(page, onBack, onOpenLayout, openPage = { openPage = it }, closePage = { openPage = null })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LayoutDisplayPage(
+    page: String?,
+    onBack: () -> Unit,
+    onOpenLayout: (String) -> Unit,
+    openPage: (String) -> Unit,
+    closePage: () -> Unit,
 ) {
     val context = LocalContext.current
+    val pageTitle = LayoutDisplayPages.firstOrNull { it.first == page }?.second
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("布局与显示") },
+                title = { Text(pageTitle ?: "布局与显示") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (page != null) closePage() else onBack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回"
@@ -76,7 +97,7 @@ fun LayoutDisplaySettingsContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
+            if (page == null) item {
                 SettingsSection(title = "各布局设置", content = {
                     LayoutInputCategory.entries.forEachIndexed { index, category ->
                         if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
@@ -85,7 +106,16 @@ fun LayoutDisplaySettingsContent(
                     }
                 })
             }
-            item {
+            if (page == null) item {
+                SettingsSection(title = "通用设置", content = {
+                    LayoutDisplayPages.forEachIndexed { index, (route, title, description) ->
+                        if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                        SettingsItem(Icons.TwoTone.Straighten, title, description,
+                            onClick = { openPage(route) }, showArrow = true)
+                    }
+                })
+            }
+            if (page == "candidates") item {
                 SettingsSection(title = "候选词", content = {
                     val candidateTextSizePref = SettingsPreferences.getCandidateTextSize(context)
                     var candidateTextSize by remember(candidateTextSizePref) {
@@ -157,50 +187,63 @@ fun LayoutDisplaySettingsContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     )
 
-                    var showComments by remember {
-                        mutableStateOf(SettingsPreferences.showCandidateComments(context))
+                    var commentMode by remember { mutableStateOf(SettingsPreferences.candidateCommentMode(context)) }
+                    Text("候选注释", style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
+                    Text("26／14／九键共用。显示：始终显示；自动：宽时显示、窄时隐藏；隐藏：始终不显示。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                    Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.kingzcheung.xime.settings.CandidateCommentMode.entries.forEach { mode ->
+                            IllustratedChoiceCard(when (mode) {
+                                com.kingzcheung.xime.settings.CandidateCommentMode.AUTO -> "自动"
+                                com.kingzcheung.xime.settings.CandidateCommentMode.SHOW -> "显示"
+                                com.kingzcheung.xime.settings.CandidateCommentMode.HIDE -> "隐藏"
+                            }, commentMode == mode,
+                                onClick = {
+                                    commentMode = mode
+                                    SettingsPreferences.setCandidateCommentMode(context, mode)
+                                    com.kingzcheung.xime.gloss.CandidateGlossary.prepare(context)
+                                },
+                                modifier = Modifier.weight(1f), tag = "candidate-comments:${mode.name}") {
+                                CandidateCommentIllustration(mode)
+                            }
+                        }
                     }
 
-                    Text(
-                        text = "候选拼音与编码",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
-                    )
-                    Text(
-                        text = "自动：候选区宽时显示拼音或编码，窄时隐藏，为候选词留出空间；也可始终隐藏",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, bottom = 12.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp)
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CommentDisplayCard(
-                            title = "自动",
-                            isSelected = showComments,
-                            showComment = true,
-                            onClick = {
-                                showComments = true
-                                SettingsPreferences.setShowCandidateComments(context, true)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        CommentDisplayCard(
-                            title = "隐藏",
-                            isSelected = !showComments,
-                            showComment = false,
-                            onClick = {
-                                showComments = false
-                                SettingsPreferences.setShowCandidateComments(context, false)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
+                    // 注释隐藏时内容选项无意义：整段不显示，也不会触发释义词典下载。
+                    if (commentMode != com.kingzcheung.xime.settings.CandidateCommentMode.HIDE) {
+                        var commentContent by remember { mutableStateOf(SettingsPreferences.candidateCommentContent(context)) }
+                        Text("候选注释内容", style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
+                        Text("拼音：显示拼音或编码。释义：中文候选显示英文，中文键盘里混出的英文候选显示中文；选释义时会自动下载释义词典（也在扩展商店的模型“其他”里），查不到的候选仍显示拼音。",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp))
+                        var glossDownloadRequest by remember { mutableStateOf(0) }
+                        if (commentContent == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS) {
+                            GlossDictionaryStatus(glossDownloadRequest)
+                        }
+                        Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.kingzcheung.xime.settings.CandidateCommentContent.entries.forEach { content ->
+                                IllustratedChoiceCard(when (content) {
+                                    com.kingzcheung.xime.settings.CandidateCommentContent.PINYIN -> "拼音"
+                                    com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS -> "释义"
+                                }, commentContent == content,
+                                    onClick = {
+                                        // 刚选释义且词典没下载：直接开始下载，不让用户去商店找。
+                                        if (content == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS &&
+                                            commentContent != content) glossDownloadRequest++
+                                        commentContent = content
+                                        SettingsPreferences.setCandidateCommentContent(context, content)
+                                        com.kingzcheung.xime.gloss.CandidateGlossary.prepare(context)
+                                    },
+                                    modifier = Modifier.weight(1f), tag = "candidate-comment-content:${content.name}") {
+                                    CandidateCommentContentIllustration(content)
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -303,7 +346,7 @@ fun LayoutDisplaySettingsContent(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "修改后需到方案设置中点击部署才能生效",
+                            text = "下次开始输入时生效，无需重新部署",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -311,8 +354,9 @@ fun LayoutDisplaySettingsContent(
                 })
             }
 
-            item {
-                SettingsSection(title = "按键手势", content = {
+            if (page == "appearance") item { InputExperienceSettings(setOf(InputExperiencePart.KEY_TEXT), "按键文字") }
+            if (page == "appearance") item {
+                SettingsSection(title = "角标与气泡", content = {
                     var swipeUpEnabled by remember {
                         mutableStateOf(SettingsPreferences.isSwipeUpHintsEnabled(context))
                     }
@@ -329,7 +373,7 @@ fun LayoutDisplaySettingsContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键上方的符号提示，滑动方向由共通输入设置决定",
+                                text = "显示按键上方的符号提示，输入方式和滑动方向在「角标与长按」设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -363,7 +407,7 @@ fun LayoutDisplaySettingsContent(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键下方的提示内容，滑动方向由共通输入设置决定",
+                                text = "显示按键下方的提示内容，输入方式和滑动方向在「角标与长按」设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -413,8 +457,9 @@ fun LayoutDisplaySettingsContent(
                 })
             }
 
-            item {
-                SettingsSection(title = "输入框适配", content = {
+            if (page == "handwriting") item { InputExperienceSettings(setOf(InputExperiencePart.HANDWRITING), "手写") }
+            if (page == "handwriting") item {
+                SettingsSection(title = "数字键盘", content = {
                     var autoNumberKeyboard by remember {
                         mutableStateOf(SettingsPreferences.isAutoNumberKeyboardEnabled(context))
                     }
@@ -446,8 +491,11 @@ fun LayoutDisplaySettingsContent(
                     }
                 })
             }
-            item { InputExperienceSettings() }
-            item {
+            if (page == "gestures") item {
+                InputExperienceSettings(setOf(InputExperiencePart.SYMBOLS, InputExperiencePart.LANGUAGE_HOLD), "角标与长按")
+            }
+            if (page == "cursor") item { InputExperienceSettings(setOf(InputExperiencePart.CURSOR), "光标与空格") }
+            if (page == "appearance") item {
                 SettingsSection(title = "键盘底部样式", content = {
                     var rounded by remember { mutableStateOf(SettingsPreferences.roundedKeyboardBottom(context)) }
                     Row(
@@ -475,3 +523,12 @@ fun LayoutDisplaySettingsContent(
         }
     }
 }
+
+/** Sub-pages of 布局与显示: route, title, one-line description. */
+internal val LayoutDisplayPages = listOf(
+    Triple("candidates", "候选词", "字号、候选注释（拼音或中英释义）、取消按钮、输入框或候选栏显示"),
+    Triple("appearance", "键盘外观", "按键字号、角标提示、点按气泡、底部圆角与导航栏"),
+    Triple("gestures", "角标与长按", "角标输入方式、上下滑方向、长按语言键时长"),
+    Triple("cursor", "光标与空格", "滑动移动光标、空格长按行为、光标灵敏度"),
+    Triple("handwriting", "手写与数字键盘", "手写停顿时长、公式标记、数字框自动弹出数字键盘"),
+)

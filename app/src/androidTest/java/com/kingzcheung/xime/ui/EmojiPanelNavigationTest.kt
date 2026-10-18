@@ -1,6 +1,9 @@
 package com.kingzcheung.xime.ui
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -25,12 +28,13 @@ class EmojiPanelNavigationTest {
     private val saved = categories.value
     @After fun restoreCategories() { categories.value = saved }
 
-    private fun show(items: List<EmojiCategory>) {
+    private fun show(items: List<EmojiCategory>, width: Int = 400, height: Int = 184, bottomPadding: Int = 0) {
         categories.value = items
-        rule.setContent { MaterialTheme {
+        rule.setContent { CompositionLocalProvider(LocalDensity provides Density(1f)) { MaterialTheme {
             EmojiKeyboardLayout(onEmojiSelect = {}, onBack = {}, backgroundColor = Color(0xFF211E29),
-                textColor = Color.White, accentColor = Color(0xFFCEB7F7), modifier = Modifier.size(400.dp, 184.dp).testTag("emoji-panel"))
-        } }
+                textColor = Color.White, accentColor = Color(0xFFCEB7F7), bottomPaddingDp = bottomPadding,
+                modifier = Modifier.size(width.dp, height.dp).testTag("emoji-panel"))
+        } } }
     }
 
     @Test fun builtinEmojiStartsBelowExpressionSelectorWithoutASingleGroupTab() {
@@ -68,7 +72,28 @@ class EmojiPanelNavigationTest {
     @Test fun pluginTabsRemainReachableWhenThereAreMoreThanThePanelCanFit() {
         show((0..11).map { i -> EmojiCategory("分类$i", "P$i", emojis = listOf("结果$i"),
             isPlugin = true, pluginId = "plugin$i") })
-        rule.onNodeWithText("P11").performScrollTo().assertIsDisplayed().performClick()
+        rule.onNodeWithTag("emoji-categories").performScrollToIndex(12)
+        rule.onNodeWithText("P11").assertIsDisplayed().performClick()
         rule.onNodeWithText("结果11").assertIsDisplayed()
+    }
+
+    @Test fun minimumPanelUsesOneControlRowAndKeepsTheSameBottomInsetInBothModes() {
+        show(com.kingzcheung.xime.data.EmojiData.categories, width = 380, height = 184, bottomPadding = 20)
+        val panel = rule.onNodeWithTag("emoji-panel").fetchSemanticsNode().boundsInRoot
+        val bar = rule.onNodeWithTag("expression-controls").fetchSemanticsNode().boundsInRoot
+        val delete = rule.onNodeWithTag("expression-delete").fetchSemanticsNode().boundsInRoot
+        val pages = rule.onNodeWithTag("emoji-pages").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue("Controls consume at most one compact row", bar.height <= 40f)
+        org.junit.Assert.assertTrue("Delete is in the category row", delete.top >= bar.top && delete.bottom <= bar.bottom)
+        org.junit.Assert.assertEquals(bar.bottom, pages.top, 1f)
+        org.junit.Assert.assertEquals(panel.bottom - 20f, pages.bottom, 1f)
+        org.junit.Assert.assertTrue("Most space is content", pages.height >= 120f)
+        rule.onNodeWithTag("expression-kaomoji").performClick()
+        val kaomojiBar = rule.onNodeWithTag("expression-controls").fetchSemanticsNode().boundsInRoot
+        val grid = rule.onNodeWithTag("kaomoji-grid").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertEquals(bar.height, kaomojiBar.height, 1f)
+        org.junit.Assert.assertEquals(pages.top, grid.top, 1f)
+        org.junit.Assert.assertEquals(pages.bottom, grid.bottom, 1f)
+        rule.onNodeWithTag("expression-delete").assertIsDisplayed()
     }
 }

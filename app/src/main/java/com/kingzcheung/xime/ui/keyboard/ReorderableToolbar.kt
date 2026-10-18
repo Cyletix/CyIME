@@ -97,13 +97,21 @@ internal fun ReorderableToolbar(
                 }
             }
         }) {
+        // 每个图标占等宽一格，整格可点；放不下时按最小格宽横向滚动。
+        val slotWidth = maxOf(maxWidth / order.size.coerceAtLeast(1), 36.dp)
         Row(Modifier.horizontalScroll(scroll).widthIn(min = maxWidth),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             order.forEach { id ->
                 val action = actions.firstOrNull { it.item.id == id } ?: return@forEach
                 key(id) {
-                    Box(Modifier.onGloballyPositioned { bounds[id] = Rect(it.positionInRoot(), Size(it.size.width.toFloat(), it.size.height.toFloat())) }
-                        .then(if (dragged == id) Modifier.border(2.dp, accent, CircleShape) else Modifier)) { content(action) }
+                    Box(Modifier.width(slotWidth).testTag("toolbar-slot")
+                        .onGloballyPositioned { bounds[id] = Rect(it.positionInRoot(), Size(it.size.width.toFloat(), it.size.height.toFloat())) },
+                        contentAlignment = Alignment.Center) {
+                        content(action)
+                        // 拖动外框沿按钮胶囊描边，与按下、开启时的底色同尺寸。
+                        if (dragged == id) Box(Modifier.size(toolbarPillSize(slotWidth)).border(2.dp, accent, CircleShape)
+                            .testTag("toolbar-drag-outline"))
+                    }
                 }
             }
         }

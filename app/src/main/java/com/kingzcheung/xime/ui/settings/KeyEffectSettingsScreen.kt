@@ -15,8 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -153,7 +151,7 @@ fun KeyEffectSettingsContent(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(104.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             listOf(
@@ -161,15 +159,11 @@ fun KeyEffectSettingsContent(
                                 "enabled" to "启用",
                                 "disabled" to "关闭"
                             ).forEach { (value, label) ->
-                                FilterChip(
-                                    selected = uiState.hapticMode == value,
+                                IllustratedChoiceCard(label, uiState.hapticMode == value,
                                     onClick = { viewModel.setHapticMode(value) },
-                                    label = { Text(label) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                )
+                                    modifier = Modifier.weight(1f), tag = "haptic-mode:$value") {
+                                    HapticModeIllustration(value)
+                                }
                             }
                         }
                     }
@@ -333,7 +327,7 @@ fun KeyEffectSettingsContent(
                         }
 
                         Text(
-                            text = "当自定义时长和振幅均设为 0 时（即「系统默认」），将使用系统默认的触觉反馈效果。",
+                            text = "支持线性马达点击触感的设备上，按键使用短促的点击触感，振幅调强弱，时长不生效；均为 0（「系统默认」）时使用内置的轻触强度。不支持的设备按时长振动，均为 0 时使用系统默认触觉反馈。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)

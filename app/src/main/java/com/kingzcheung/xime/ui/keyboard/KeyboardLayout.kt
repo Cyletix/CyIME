@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.twotone.EmojiEmotions
-import androidx.compose.material.icons.twotone.KeyboardCapslock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,9 +70,11 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -94,7 +96,6 @@ import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
 
-import androidx.compose.material.icons.twotone.KeyboardControlKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -133,22 +134,71 @@ fun KeyboardLayout(
     // Shared physical frame and bottom-row spacing for 14/26 keys. The paired
     // alphabet keys still occupy their own five-column rows inside that frame.
     val fourteenKey = !isAsciiMode && uiState.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14
-    KeyboardKeySpacingScope(modifier,
-        columns = if (fourteenKey) 10f else keyRows.firstOrNull()?.size?.toFloat() ?: 10f,
-        widthFraction = if (splitKeyboard) 0.9f else 1f,
+    val metricContext = LocalContext.current
+    val metricDisplay = LocalView.current.display
+    val metricConfiguration = LocalConfiguration.current
+    val pixelsPerDp = LocalDensity.current.density
+    val physicalTargetCellDp = remember(metricContext, metricDisplay, metricConfiguration, pixelsPerDp) {
+        keyboardPhysicalMetrics(metricContext, metricDisplay, pixelsPerDp)
+            ?.dpFromMillimeters(CALIBRATED_QWERTY_PITCH_MM)
+    }
+    // 分体 = 正常 26 键 + 每行中线处同宽的一条缝：错位、键宽、按键功能都与正常键盘一致。
+    val splitGap = LocalSplitKeyboardGap.current
+    val splitGapSetting = LocalSplitGapPreview.current?.value ?: LocalKeyboardInputPreferences.current.let {
+        if (metricConfiguration.screenWidthDp > metricConfiguration.screenHeightDp) it.splitGapLandscape else it.splitGapPortrait
+    }
+    BoxWithConstraints(modifier.then(if (splitKeyboard && splitGap != null)
+        Modifier.onGloballyPositioned { splitGap.reportAreaTop(it.boundsInWindow().top) } else Modifier)) {
+    val splitGutterDp = SplitKeyboardGeometry.gutterDp(uiState.isFloatingMode)
+    val splitGapFraction = if (splitKeyboard) SplitKeyboardGeometry.resolvedGap(
+        splitGapSetting, maxWidth.value, splitGutterDp, physicalTargetCellDp) else 0f
+    val splitGapDp = (splitGapFraction * maxWidth.value).dp
+    // 分体两半贴住左右边：不套用居中的键宽上限。
+    CompositionLocalProvider(LocalKeyboardExplicitWidth provides (LocalKeyboardExplicitWidth.current || splitKeyboard)) {
+    KeyboardKeySpacingScope(Modifier.fillMaxSize(),
+        columns = letterKeyboardColumns(keyRows, fourteenKey),
+        widthFraction = if (splitKeyboard) SplitKeyboardGeometry.keyWidthFraction(
+            maxWidth.value, splitGapFraction, splitGutterDp) else 1f,
         policy = KeyVisualPolicy.Qwerty,
         allowShrink = uiState.isFloatingMode,
         applyGutter = true,
         growthSpacing = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty"),
     ) { bodyModifier ->
+    val splitCellDp = LocalKeyboardKeyVisualMetrics.current.cellWidthDp
     val letterRowGeometry = standardLetterRowGeometry(
         keyRows = keyRows,
-        cellWidthDp = LocalKeyboardKeyVisualMetrics.current.cellWidthDp,
+        cellWidthDp = splitCellDp,
         hasCustomLayout = !isAsciiMode && com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId) != null,
-        isSplit = splitKeyboard,
+        isSplit = false,
+        physicalTargetCellDp = physicalTargetCellDp,
+        stagger = LocalKeyboardInputPreferences.current.let {
+            resolvedQwertyStagger(it.qwertyStagger, it.qwertyStaggerCustom, splitCellDp, physicalTargetCellDp)
+        },
     )
     val standardRowInset = letterRowGeometry?.middleRowInsetDp?.dp
+    val standardRowEndInset = letterRowGeometry?.middleRowEndInsetDp?.dp
     val letterSideKeyWeight = letterRowGeometry?.outerKeyWeight ?: 1.4f
+    val letterDeleteKeyWeight = letterRowGeometry?.deleteKeyWeight ?: 1.4f
+    val letterBottomWeight = letterRowGeometry?.bottomLetterWeight ?: 7f
+    val splitWeighted = !isAsciiMode && com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId) != null ||
+        fourteenKey
+    val baseRow1 = keyRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
+    val splitRow1InsetDp = standardRowInset
+        ?: if ((if (splitWeighted) baseRow1.sumOf { it.length } else baseRow1.size) > 9) 0.dp else 16.dp
+    // 14 键分体：跨中线的双字母键拆成两个单字母键，其余行与键不变。
+    val renderRows = if (splitKeyboard && fourteenKey && keyRows.size >= 3) listOf(
+        SplitKeyboardGeometry.splitStraddlingPairs(keyRows[0], 0f),
+        SplitKeyboardGeometry.splitStraddlingPairs(keyRows[1], splitRow1InsetDp.value / splitCellDp.coerceAtLeast(1f)),
+        SplitKeyboardGeometry.splitStraddlingPairs(keyRows[2], letterSideKeyWeight),
+    ) + keyRows.drop(3) else keyRows
+    val splitRow0 = renderRows.getOrElse(0) { listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p") }
+    val splitRow1 = renderRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
+    val splitRow2 = renderRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
+    // 每行左半的键数；-1 表示不分体。
+    val splitAt0 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow0, 0f, splitWeighted) else -1
+    val splitAt1 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow1,
+        splitRow1InsetDp.value / splitCellDp.coerceAtLeast(1f), splitWeighted) else -1
+    val splitAt2 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow2, letterSideKeyWeight, splitWeighted) else -1
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     val isShifted = shiftMode.isShifted
 
@@ -252,6 +302,36 @@ fun KeyboardLayout(
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    // 英文滑行：只在英文 26 键（含分体）启用；整键盘滑动移动光标与其冲突时让位。
+    val glidePrefs = LocalKeyboardInputPreferences.current
+    val glideEnabled = isAsciiMode && glidePrefs.glideTyping && callbacks.onGlideWord != null &&
+        glidePrefs.cursorGesture != CursorGestureMode.KEYBOARD && !(isVoiceMode && !isVoiceSticky)
+    val glideTrail = remember { GlideTrail() }
+    val glideScope = rememberCoroutineScope()
+    val glideContext = LocalContext.current.applicationContext
+    val onGlideTrace: (FloatArray, FloatArray) -> Unit = trace@{ xs, ys ->
+        val keys = geometry.snapshot()
+        if (keys.size < 26) return@trace
+        // 输入框归属在抬手时确定；识别完成前切换输入框则作废。
+        val inputContext = runCatching { callbacks.captureInputContext() }.getOrNull() ?: return@trace
+        val shift = viewModel.shiftMode.value
+        glideScope.launch {
+            val words = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                com.kingzcheung.xime.glide.GlideLexicon.decoder(glideContext,
+                    com.kingzcheung.xime.glide.GlideLexicon.keyboard(keys)).decode(xs, ys)
+            }.map { com.kingzcheung.xime.glide.glideCased(it.word, shift.isShifted,
+                shift == com.kingzcheung.xime.viewmodel.ShiftMode.CAPS) }
+            if (words.isEmpty()) return@launch
+            viewModel.onCharacterTyped()
+            kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideWord?.invoke(words.first(), words.drop(1)) }
+        }
+    }
+    // 提前读入词表，第一次滑行不必等待。
+    LaunchedEffect(glideEnabled) {
+        if (glideEnabled) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.kingzcheung.xime.glide.GlideLexicon.words(glideContext) }
+        }
+    }
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         val newState = if (state.isSwipeDown && state.swipeText != null) {
@@ -302,31 +382,19 @@ fun KeyboardLayout(
                 keyboardBounds = coordinates.boundsInRoot()
                 shiftSlideTargets.keyboardBounds = keyboardBounds
             }
-            .drawWithContent {
-                drawContent()
-                bubbleData?.let { drawSwipeBubble(it) }
-            }
+            .glideTyping(glideEnabled, geometry, { keyboardBounds.topLeft }, glideTrail, onGlideTrace)
 
     ) {
-            if (splitKeyboard) {
-            SplitKeyboardContent(
-                onKeyPress = onKeyPress,
-                viewModel = viewModel,
-                callbacks = callbacks,
-                uiState = uiState,
-                swipeUpHintsEnabled = swipeUpHintsEnabled,
-                swipeDownHintsEnabled = effectiveSwipeDownHintsEnabled,
-                isAsciiMode = isAsciiMode,
-                keyRows = keyRows,
-                configVersion = cfgVer,
-                onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
-            )
-        } else {
+        SwipeBubbleOverlay(bubbleData)
+        if (glideEnabled) GlideTrailOverlay(glideTrail,
+            KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme),
+            Modifier.matchParentSize().zIndex(1f))
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight()
-                        .padding(bottom = 8.dp),
+                        .padding(bottom = 8.dp)
+                        .then(if (splitKeyboard) Modifier.testTag("split-keyboard") else Modifier),
             ) {
 
                 Column(
@@ -339,14 +407,16 @@ fun KeyboardLayout(
                     if (isVoiceMode && !isVoiceSticky) {
                         Box(modifier = Modifier.weight(1f)) {
                             DummyKeyboardRow(
-                                keysCount = 10,
+                                keys = renderRows.getOrNull(0).orEmpty(),
+                                weightedLetters = LocalCustomLayout.current != null || fourteenKey,
                                 keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
-                                keyboardBackgroundColor = keyboardBackgroundColor
+                                keyboardBackgroundColor = keyboardBackgroundColor,
+                                splitAt = splitAt0, splitGap = splitGapDp, splitRow = 0,
                             )
                         }
                     } else {
                         Box(modifier = Modifier.weight(1f)) {
-                            val row0 = keyRows.getOrElse(0) { listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p") }
+                            val row0 = renderRows.getOrElse(0) { listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p") }
                             KeyboardRowWithConfig(
                                 keys = row0,
                                 onKeyPress = onKeyPress,
@@ -373,6 +443,7 @@ fun KeyboardLayout(
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
+                                splitAt = splitAt0, splitGap = splitGapDp, splitRow = 0,
                             )
                         }
                     }
@@ -382,17 +453,19 @@ fun KeyboardLayout(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = standardRowInset ?: 16.dp)
+                                .padding(start = standardRowInset ?: 16.dp, end = standardRowEndInset ?: 16.dp)
                         ) {
                             DummyKeyboardRow(
-                                keysCount = 9,
+                                keys = renderRows.getOrNull(1).orEmpty(),
+                                weightedLetters = LocalCustomLayout.current != null || fourteenKey,
                                 keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
-                                keyboardBackgroundColor = keyboardBackgroundColor
+                                keyboardBackgroundColor = keyboardBackgroundColor,
+                                splitAt = splitAt1, splitGap = splitGapDp, splitRow = 1,
                             )
                         }
                     } else {
                         Box(modifier = Modifier.weight(1f)) {
-                            val row1 = keyRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
+                            val row1 = renderRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
                             val row1Inset = standardRowInset
                                 ?: if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) 0.dp else 16.dp
                             KeyboardRowWithConfig(
@@ -409,6 +482,8 @@ fun KeyboardLayout(
                                 isShifted = isShifted,
                                 isAsciiMode = isAsciiMode,
                                 edgeInset = row1Inset,
+                                edgeEndInset = standardRowEndInset ?: row1Inset,
+                                extendLastKeyToEdge = fourteenKey && row1.lastOrNull()?.length == 1,
                                 onSwipeStateChange = { state, bounds ->
                                     processSwipeState(
                                         state,
@@ -422,6 +497,7 @@ fun KeyboardLayout(
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
+                                splitAt = splitAt1, splitGap = splitGapDp, splitRow = 1,
                             )
                         }
                     }
@@ -430,10 +506,15 @@ fun KeyboardLayout(
                     if (isVoiceMode && !isVoiceSticky) {
                         Box(modifier = Modifier.weight(1f)) {
                             DummyBottomRow(
+                                keys = renderRows.getOrNull(2).orEmpty(),
+                                weightedLetters = LocalCustomLayout.current != null || fourteenKey,
                                 keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
                                 specialKeyBackgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
                                 keyboardBackgroundColor = keyboardBackgroundColor,
                                 sideKeyWeight = if (standardRowInset != null) letterSideKeyWeight else 1.2f,
+                                endKeyWeight = if (standardRowInset != null) letterDeleteKeyWeight else 1.2f,
+                                letterWeight = letterBottomWeight,
+                                splitAt = splitAt2, splitGap = splitGapDp,
                             )
                         }
                     } else {
@@ -460,13 +541,23 @@ fun KeyboardLayout(
                                 shadowShapeRadius = shadowShapeRadius,
                             )
 
+                                val bottomKeys = renderRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
+                                val bottomWeighted = LocalCustomLayout.current != null || fourteenKey
+                                // 14 键的 m 与 26 键的 m 同位同宽；删除键保持与 Shift 对称的宽度。
+                                // 宽屏错位让删除键比 Shift 宽时，m 只借这部分富余的一半，最多一个键宽。
+                                val fourteenMExtra = if (fourteenKey && splitAt2 < 0 && bottomKeys.lastOrNull()?.length == 1)
+                                    fourteenMBorrowedWeight(letterSideKeyWeight, letterDeleteKeyWeight) else 0f
+                                val bottomSegments = if (splitAt2 < 0) listOf(bottomKeys)
+                                    else listOf(bottomKeys.take(splitAt2), bottomKeys.drop(splitAt2))
+                                bottomSegments.forEachIndexed { segment, segmentKeys ->
+                                if (segment > 0) SplitGapSpacer(2, splitGapDp)
                                 Row(
                                     modifier = Modifier
-                                        .weight(7f)
+                                        .weight(if (splitAt2 < 0) letterBottomWeight + fourteenMExtra else segmentKeys
+                                            .sumOf { if (splitWeighted) it.length else 1 }.toFloat().coerceAtLeast(0.001f))
                                         .fillMaxHeight(),
                                 ) {
-                                val bottomKeys = keyRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
-                                bottomKeys.forEach { key ->
+                                segmentKeys.forEach { key ->
                                     val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
                                     val swipeUpText =
                                         if (swipeUpHintsEnabled) rawSwipeUpLabel else null
@@ -495,11 +586,8 @@ fun KeyboardLayout(
                                     } else null
 
                                     val rawCommitValue = KeysConfigHelper.getKeyCommitValue(key, isAsciiMode)
-                                    val commitValue = if (isShifted) {
-                                        rawCommitValue.uppercase()
-                                    } else {
-                                        rawCommitValue
-                                    }
+                                    val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
+                key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
                                     val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode, isShifted)
 
                                     val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
@@ -542,7 +630,8 @@ fun KeyboardLayout(
                                         onClick = onClick,
                                         backgroundColor = keyBackgroundColor,
                                         textColor = keyTextColor,
-                                        modifier = Modifier.weight(if (LocalCustomLayout.current != null) key.length.toFloat() else 1f)
+                                        modifier = Modifier.weight(if (bottomWeighted) key.length.toFloat() +
+                                            (if (key === bottomKeys.last()) fourteenMExtra else 0f) else 1f)
                                             .testTag("qwerty-key:$key"),
                                         swipeText = swipeUpText,
                                         symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
@@ -569,6 +658,7 @@ fun KeyboardLayout(
                                     )
                                 }
                             }
+                            }
 
                             SwipeableIconKeyButton(
                                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
@@ -576,14 +666,17 @@ fun KeyboardLayout(
                                 backgroundColor = specialKeyBackgroundColor,
                                 iconColor = specialKeyTextColor,
                                 modifier = Modifier
-                                    .weight(letterSideKeyWeight)
+                                    .weight(letterDeleteKeyWeight - fourteenMExtra)
                                     .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
                                 swipeText = "清空",
                                 onSwipe = { onKeyPress("clear_composition") },
                                 onLongClick = { onKeyPress("delete") },
                                 onPress = { onKeyPressDown?.invoke("delete") },
                                 onRelease = { onKeyRelease?.invoke("delete") },
+                                followSymbolSwipeDirection = true,
+                                upFeedback = KeyFlickFeedback.DELETE,
                                 swipeUpLabel = "上滑清空",
+                                downFeedback = KeyFlickFeedback.UNDO,
                                 swipeDownLabel = "下滑撤回",
                                 onSwipeUp = { onKeyPress("clear_all") },
                                 onSwipeDown = { onKeyPress("undo_clear") },
@@ -601,8 +694,47 @@ fun KeyboardLayout(
                         }
                     }
 
-                    // 26键底行：逗号与地球等宽，逗号右缘不超过上一行 X 键右缘。
-                    val bottom = if (fourteenKey || keyRows.firstOrNull()?.size == 10) QwertyBottomRowWeights.Standard else QwertyBottomRowWeights.Legacy
+                    // 底排保留共用权重及逗号/地球等宽；宽屏实体字母错位不移动底排。
+                    val bottom = letterKeyboardBottomRow(keyRows, fourteenKey)
+                    // 空格左侧逗号、右侧句号；只开逗号时沿用原配置的逗号键。
+                    val bottomPrefs = LocalKeyboardInputPreferences.current
+                    val commaOnLeft = bottomPrefs.qwertyCommaKey
+                    val periodOnRight = bottomPrefs.qwertyPeriodKey
+                    val punctuationFull = LocalKeyboardPunctuation.current?.full ?: !isAsciiMode
+                    val (leftPunctuation, rightPunctuation) = spacePunctuationKeys(commaOnLeft, periodOnRight,
+                        punctuationFull, english = isAsciiMode,
+                        japanese = LocalKeyboardPunctuation.current?.japanese == true)
+                    val punctuationCount = (if (commaOnLeft) 1 else 0) + (if (periodOnRight) 1 else 0)
+                    val bottomSpaceWeight = bottom.space + bottom.punctuation * (1 - punctuationCount)
+                    // 键面写什么就上屏什么：只有与当前宽度一致的全角标点走普通按键；
+                    // 半角模式下滑的全角标点、中文状态的半角标点都原样上屏，避免被宽度设置转回去。
+                    val commitPunctuation: (String) -> Unit = { text ->
+                        if (isAsciiMode || (punctuationFull && text.any { it.code > 0x7E })) onKeyPress(text)
+                        else (callbacks.onCommitExactText ?: onCommitText ?: onKeyPress)(text)
+                    }
+                    @Composable
+                    fun RowScope.PunctuationKey(key: SpacePunctuationKey, tag: String) =
+                        // 主副字符已按全角/半角写定并原样上屏；键面不能再转一次，否则角标与副字符的宽度相反。
+                        CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
+                        SwipeableKeyButton(
+                            layoutMode = KeysConfigHelper.getButtonLayout(isAsciiMode),
+                            followSymbolSwipeDirection = true,
+                            text = key.primary,
+                            onClick = { commitPunctuation(key.primary) },
+                            backgroundColor = keyBackgroundColor,
+                            textColor = keyTextColor,
+                            modifier = Modifier.weight(bottom.punctuation).testTag(tag),
+                            swipeText = key.alternate.ifEmpty { null },
+                            symbolInputText = key.alternate.ifEmpty { null },
+                            onSwipe = if (key.alternate.isEmpty()) null else { _ -> commitPunctuation(key.alternate) },
+                            onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
+                            onPress = { onKeyPressDown?.invoke(key.primary) },
+                            onRelease = { onKeyRelease?.invoke(key.primary) },
+                            shadowEnabled = shadowEnabled,
+                            shadowElevation = shadowElevation,
+                            shadowShapeRadius = shadowShapeRadius,
+                        )
+                        }
                     // 第四行（控制行）
                     Row(
                         modifier = Modifier
@@ -614,7 +746,7 @@ fun KeyboardLayout(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
                                 modifier = Modifier.weight(bottom.mode * 2)
                             )
-                            DummyKeyButton(
+                            if (commaOnLeft) DummyKeyButton(
                                 backgroundColor = specialKeyBackgroundColor.copy(alpha = 0.5f),
                                 modifier = Modifier.weight(bottom.punctuation)
                             )
@@ -631,6 +763,8 @@ fun KeyboardLayout(
                                 )
                             }
 
+                            if (leftPunctuation != null) PunctuationKey(leftPunctuation, "qwerty-punctuation-key")
+                            else if (commaOnLeft) {
                             // 逗号 — 从配置读取 "'"
                             val k2KeyGesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
                             val k2TapAction = k2KeyGesture?.tap?.action
@@ -689,7 +823,8 @@ fun KeyboardLayout(
                                     if (gesture != null && gesture.action != GestureAction.COMMIT) {
                                         onGestureAction?.invoke(gesture.action!!, gesture.value.ifEmpty { selectedLabel })
                                     } else {
-                                        (onCommitText ?: onKeyPress)(selectedLabel)
+                                        // 气泡里写的就是要上屏的写法（如全角时选半角 , .），不再随全角/半角转换。
+                                        (callbacks.onCommitExactText ?: onCommitText ?: onKeyPress)(selectedLabel)
                                     }
                                     Unit
                                 }
@@ -740,25 +875,40 @@ fun KeyboardLayout(
                                     shadowShapeRadius = shadowShapeRadius,
                                 )
                             }
+                            }
                         }
 
-                        SpaceKey(
-                            schemaName = schemaName,
-                            isAsciiMode = isAsciiMode,
-                            isSttEnabled = isSttEnabled,
-                            isVoiceMode = isVoiceMode,
-                            voiceSticky = isVoiceSticky,
-                            keyBackgroundColor = keyBackgroundColor,
-                            keyTextColor = keyTextColor,
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                            modifier = Modifier.weight(bottom.space),
-                            onKeyPress = onKeyPress,
-                            onKeyPressDown = onKeyPressDown,
-                            onKeyRelease = onKeyRelease,
-                            onVoiceModeChange = onVoiceModeChange,
-                        )
+                        // 分体时空格在中线处分成左右两块，两块都是完整的空格键。
+                        val spaceParts = if (splitKeyboard) SplitKeyboardGeometry.spaceSplit(bottom, bottomSpaceWeight,
+                            bottom.mode * 2f + if (commaOnLeft) bottom.punctuation else 0f).toList()
+                            else listOf(bottomSpaceWeight)
+                        spaceParts.forEachIndexed { part, spaceWeight ->
+                            if (part > 0) SplitGapSpacer(3, splitGapDp)
+                            SpaceKey(
+                                schemaName = if (part == 0) schemaName else "",
+                                isAsciiMode = isAsciiMode && part == 0,
+                                isSttEnabled = isSttEnabled,
+                                isVoiceMode = isVoiceMode,
+                                voiceSticky = isVoiceSticky,
+                                keyBackgroundColor = keyBackgroundColor,
+                                keyTextColor = keyTextColor,
+                                shadowEnabled = shadowEnabled,
+                                shadowElevation = shadowElevation,
+                                shadowShapeRadius = shadowShapeRadius,
+                                modifier = Modifier.weight(spaceWeight),
+                                onKeyPress = onKeyPress,
+                                onKeyPressDown = onKeyPressDown,
+                                onKeyRelease = onKeyRelease,
+                                onVoiceModeChange = onVoiceModeChange,
+                            )
+                        }
+
+                        if (rightPunctuation != null) {
+                            if (isVoiceMode && !isVoiceSticky) DummyKeyButton(
+                                backgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
+                                modifier = Modifier.weight(bottom.punctuation)
+                            ) else PunctuationKey(rightPunctuation, "qwerty-period-key")
+                        }
 
                         // 中/英切换 + 回车（硬编码 + 配置驱动）
                         if (isVoiceMode && !isVoiceSticky) {
@@ -909,7 +1059,6 @@ fun KeyboardLayout(
                 }
 
             }
-        }
 
         ShiftSlideLine(shiftSlideTargets, { keyboardBounds.topLeft },
             KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
@@ -932,34 +1081,48 @@ fun KeyboardLayout(
 
     }
     }
+    }
+    }
 }
 
 @Composable
 private fun DummyKeyboardRow(
-    keysCount: Int,
+    keys: List<String>,
+    weightedLetters: Boolean,
     keyBackgroundColor: Color,
     keyboardBackgroundColor: Color = Color.Transparent,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    splitAt: Int = -1,
+    splitGap: Dp = 0.dp,
+    splitRow: Int = 0,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth(),
     ) {
-        repeat(keysCount) {
+        keys.forEachIndexed { index, key ->
+            if (index == splitAt) SplitGapSpacer(splitRow, splitGap)
             DummyKeyButton(
                 backgroundColor = keyBackgroundColor,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
             )
         }
+        if (splitAt == keys.size) SplitGapSpacer(splitRow, splitGap)
     }
 }
 
 @Composable
 private fun DummyBottomRow(
+    keys: List<String>,
+    weightedLetters: Boolean,
     keyBackgroundColor: Color,
     specialKeyBackgroundColor: Color,
     keyboardBackgroundColor: Color = Color.Transparent,
     sideKeyWeight: Float = 1.2f,
+    endKeyWeight: Float = sideKeyWeight,
+    letterWeight: Float = 7f,
+    splitAt: Int = -1,
+    splitGap: Dp = 0.dp,
 ) {
     Row(
         modifier = Modifier
@@ -969,21 +1132,26 @@ private fun DummyBottomRow(
             backgroundColor = specialKeyBackgroundColor,
             modifier = Modifier.weight(sideKeyWeight)
         )
-        Row(
-            modifier = Modifier
-                .weight(7f)
-                .fillMaxHeight(),
-        ) {
-            repeat(7) {
-                DummyKeyButton(
-                    backgroundColor = keyBackgroundColor,
-                    modifier = Modifier.weight(1f)
-                )
+        val segments = if (splitAt < 0) listOf(keys) else listOf(keys.take(splitAt), keys.drop(splitAt))
+        segments.forEachIndexed { segment, segmentKeys ->
+            if (segment > 0) SplitGapSpacer(2, splitGap)
+            Row(
+                modifier = Modifier
+                    .weight(if (splitAt < 0) letterWeight else segmentKeys
+                        .sumOf { if (weightedLetters) it.length else 1 }.toFloat().coerceAtLeast(0.001f))
+                    .fillMaxHeight(),
+            ) {
+                segmentKeys.forEach { key ->
+                    DummyKeyButton(
+                        backgroundColor = keyBackgroundColor,
+                        modifier = Modifier.weight(if (weightedLetters) key.length.toFloat() else 1f)
+                    )
+                }
             }
         }
         DummyKeyButton(
             backgroundColor = specialKeyBackgroundColor,
-            modifier = Modifier.weight(sideKeyWeight)
+            modifier = Modifier.weight(endKeyWeight)
         )
     }
 }
@@ -1021,17 +1189,27 @@ fun KeyboardRowWithConfig(
     edgeInset: Dp = 0.dp,
     edgeStartInset: Dp = edgeInset,
     edgeEndInset: Dp = edgeInset,
+    /** 最后一个键画到行尾（14 键的 l 与 p 右边对齐）。 */
+    extendLastKeyToEdge: Boolean = false,
+    /** 分体：在第 [splitAt] 个键之前插入宽 [splitGap] 的中缝；-1 不分体。 */
+    splitAt: Int = -1,
+    splitGap: Dp = 0.dp,
+    splitRow: Int = 0,
 ) {
     val customLayout = LocalCustomLayout.current
+    // 14 键合并键与自定义布局一样按字母数占位，和 26 键同一网格对齐。
+    val weighted = customLayout != null || LocalFourteenKeyLayout.current
     BoxWithConstraints(modifier.fillMaxWidth()) {
-    val totalWeight = keys.sumOf { if (customLayout != null) it.length else 1 }.coerceAtLeast(1)
+    val totalWeight = keys.sumOf { if (weighted) it.length else 1 }.coerceAtLeast(1)
     val startInset = edgeStartInset.coerceAtMost(maxWidth / 4)
     val endInset = edgeEndInset.coerceAtMost(maxWidth / 4)
-    val unitWidth = (maxWidth - startInset - endInset) / totalWeight
+    val gap = if (splitAt in 0..keys.size) splitGap.coerceAtMost(maxWidth) else 0.dp
+    val unitWidth = (maxWidth - startInset - endInset - gap) / totalWeight
     Row(
         modifier = Modifier.fillMaxWidth(),
     ) {
         keys.forEachIndexed { index, key ->
+            if (index == splitAt) SplitGapSpacer(splitRow, gap)
             val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
             val swipeUpText = if (swipeUpHintsEnabled) rawSwipeUpLabel else null
             val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
@@ -1060,11 +1238,8 @@ fun KeyboardRowWithConfig(
 
             // 键帽显示文本
             val rawCommitValue = KeysConfigHelper.getKeyCommitValue(key, isAsciiMode)
-            val commitValue = if (isShifted) {
-                rawCommitValue.uppercase()
-            } else {
-                rawCommitValue
-            }
+            val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
+                key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
             val displayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode, isShifted)
 
             val onClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
@@ -1106,12 +1281,12 @@ fun KeyboardRowWithConfig(
                 onClick = onClick,
                 backgroundColor = config.keyBackgroundColor,
                 textColor = config.keyTextColor,
-                modifier = Modifier.weight((unitWidth * (if (customLayout != null) key.length else 1) +
+                modifier = Modifier.weight((unitWidth * (if (weighted) key.length else 1) +
                     (if (index == 0) startInset else 0.dp) + (if (index == keys.lastIndex) endInset else 0.dp)).value.coerceAtLeast(1f))
                     .testTag("qwerty-key:$key"),
                 edgeContentPadding = PaddingValues(
                     start = if (index == 0) startInset else 0.dp,
-                    end = if (index == keys.lastIndex) endInset else 0.dp,
+                    end = if (index == keys.lastIndex && !extendLastKeyToEdge) endInset else 0.dp,
                 ),
                 swipeText = swipeUpText,
                 symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
@@ -1139,12 +1314,13 @@ fun KeyboardRowWithConfig(
                 shadowShapeRadius = config.shadowShapeRadius,
             )
         }
+        if (splitAt == keys.size) SplitGapSpacer(splitRow, gap)
     }
     }
 }
 
 @Composable
-private fun ShiftCapsKeyButton(
+internal fun ShiftCapsKeyButton(
     viewModel: KeyboardViewModel,
     shiftMode: ShiftMode,
     onKeyPress: (String) -> Unit,
@@ -1198,7 +1374,8 @@ private fun ShiftCapsKeyButton(
         legacyStateColor = if (isPressed) darkenColor(backgroundColor, 0.1f)
         else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
         else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
-        else backgroundColor)
+        else backgroundColor,
+        opacityScale = glassFunctionKeyScale(backgroundColor))
 
     Box(
         modifier = modifier
@@ -1259,529 +1436,13 @@ private fun ShiftCapsKeyButton(
             .background(colors.background).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
     ) {
-        val painter = when (shiftMode) {
-            ShiftMode.OFF -> rememberVectorPainter(Icons.TwoTone.KeyboardControlKey)
-            else -> rememberVectorPainter(Icons.TwoTone.KeyboardCapslock)
-        }
+        // 空心箭头＝小写，实心＝下一个字母大写，实心加底横线＝大写锁定。
         Icon(
-            painter = painter,
-            contentDescription = null,
+            imageVector = ShiftKeyIcons.forMode(shiftMode),
+            contentDescription = ShiftKeyIcons.description(shiftMode),
             tint = colors.foreground,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(22.dp)
         )
-
-        if (shiftMode == ShiftMode.CAPS) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(3.dp)
-                    .size(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(colors.foreground)
-            )
-        }
-    }
-}
-
-/**
- * 横屏分体键盘行拆分：前/后各取 ceil(n/2) 个按键，奇数行的中间键两侧重复，
- * 与历史内置 QWERTY 拆分一致（asdfghjkl → asdfg / ghjkl，zxcvbnm → zxcv / vbnm）。
- * 行内容来自 xime.yaml / xime.custom.yaml 的 layout.rows，自定义布局（如 Colemak）同样生效。
- */
-internal fun splitRowForLandscape(row: List<String>): Pair<List<String>, List<String>> {
-    if (row.isEmpty()) return emptyList<String>() to emptyList()
-    val half = (row.size + 1) / 2
-    return row.take(half) to row.takeLast(half)
-}
-
-/**
- * 用户手动开启的分体键盘内容；尺寸始终取实际键盘窗口。
- * 将键盘拆分为左右两个面板，紧贴屏幕左右边缘，中间留空方便双手持机拇指操作。
- */
-@Composable
-private fun SplitKeyboardContent(
-    onKeyPress: (String) -> Unit,
-    viewModel: KeyboardViewModel,
-    callbacks: KeyboardCallbacks,
-    uiState: KeyboardUiState,
-    swipeUpHintsEnabled: Boolean,
-    swipeDownHintsEnabled: Boolean,
-    isAsciiMode: Boolean,
-    keyRows: List<List<String>>,
-    configVersion: Int = 0,
-    onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
-) {
-    val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
-    val isShifted = shiftMode.isShifted
-
-    val suppressCursorMove = LocalSuppressCursorMove.current
-    val staggerStep = 6.dp
-    val landscapeFontSize = 18.sp
-    val landscapeSwipeFontSize = 10.sp
-
-    val kbColors = KeysConfigHelper.getKeyboardColors()
-    val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
-    val keyboardBackgroundColor = KeyboardThemes.getKeyboardBackgroundColor(uiState.themeId, uiState.isDarkTheme)
-    val themeScheme = KeyboardThemes.getRenderingScheme(uiState.themeId)
-    val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(uiState.themeId, uiState.isDarkTheme)
-    val keyBackgroundColor = KeyboardThemes.getKeyBgColorOverride(uiState.themeId, uiState.isDarkTheme)
-        ?: if (uiState.isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
-    val keyTextColor = KeyboardThemes.getKeyTextColorOverride(uiState.themeId, uiState.isDarkTheme)
-        ?: if (uiState.isDarkTheme) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
-    val specialKeyBackgroundColor = com.kingzcheung.xime.ui.theme.resolvedSpecialKeyColor(
-        themeScheme, uiState.isDarkTheme,
-        (if (uiState.isDarkTheme) kbColors.specialKeyBgColorDark else kbColors.specialKeyBgColor)?.let(longToColor)
-    )
-    val specialKeyTextColor = if (uiState.isDarkTheme) Color.White
-        else KeyboardThemes.getSpecialKeyTextColor(uiState.themeId, false)
-    val bubbleBgColor = if (uiState.isDarkTheme) themeScheme.specialKeyDark
-        else themeScheme.specialKeyLight
-    val kbShadow = KeysConfigHelper.getKeyboardShadow()
-    val kbKey = KeysConfigHelper.getKeyboardKeyConfig()
-    val shadowEnabled = kbShadow.enabled
-    val shadowElevation = kbShadow.elevation.dp
-    val shadowShapeRadius = kbShadow.shapeRadius.dp
-    // 分体行拆分：行内容与竖屏同源（getKeyRows，含 xime.custom.yaml 自定义布局），
-    // 未配置时回退内置 QWERTY（与竖屏 getOrElse 兜底一致）
-    val (row0Left, row0Right) = splitRowForLandscape(
-        keyRows.getOrElse(0) { listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p") }
-    )
-    val (row1Left, row1Right) = splitRowForLandscape(
-        keyRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
-    )
-    val (row2Left, row2Right) = splitRowForLandscape(
-        keyRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
-    )
-    val schemaName = uiState.schemaName
-    val enterKeyText = uiState.enterKeyText
-    val onKeyPressDown = callbacks.onKeyPressDown
-    val onKeyRelease = callbacks.onKeyRelease
-    val onCommitText = callbacks.onCommitText
-    val onGestureAction: (GestureAction, String) -> Unit = { action, value ->
-        when (action) {
-            GestureAction.SWITCH_ROUTE -> {
-                val overlayRoute = when (value) {
-                    "emoji" -> OverlayRoute.Emoji
-                    "symbol" -> OverlayRoute.Symbol
-                    else -> null
-                }
-                overlayRoute?.let { viewModel.showOverlay(it) }
-            }
-            GestureAction.TOGGLE_ASCII -> {
-                FileLogger.i("XimeKeyboard", "earth key toggle_ascii tapped, ui ascii=${uiState.isAsciiMode}")
-                viewModel.resetShift()
-                callbacks.onKeyPress("ime_switch", uiState.isAsciiMode)
-            }
-            GestureAction.DELETE -> {
-                callbacks.onKeyPress("delete", false)
-            }
-            GestureAction.TOGGLE_SYMBOLS -> {
-                callbacks.onKeyPress("mode_change", false)
-            }
-            GestureAction.TOGGLE_SHIFT -> {
-                viewModel.toggleShift()
-            }
-            else -> callbacks.onGestureAction?.invoke(action, value) ?: Unit
-        }
-    }
-
-    CompositionLocalProvider(
-        LocalKeyVisualPadding provides PaddingValues(
-            horizontal = kbKey.spacingFor("qwerty").first?.dp ?: 2.dp,
-            vertical = kbKey.spacingFor("qwerty").second?.dp ?: 2.dp,
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 4.dp, end = 4.dp, bottom = 8.dp)
-                .testTag("split-keyboard")
-        ) {
-        // ========== 左面板 ==========
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(0.45f),
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                KeyboardRowWithConfig(
-                    keys = row0Left,
-                    onKeyPress = onKeyPress,
-                    config = KeyboardRowConfig(
-                        keyBackgroundColor = keyBackgroundColor,
-                        keyTextColor = keyTextColor,
-                        keyboardBackgroundColor = keyboardBackgroundColor,
-                        fontSize = landscapeFontSize,
-                        swipeFontSize = landscapeSwipeFontSize,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    ),
-                    isShifted = isShifted,
-                    isAsciiMode = isAsciiMode,
-                    configVersion = configVersion,
-                    onKeyPressDown = onKeyPressDown,
-                    onKeyRelease = onKeyRelease,
-                    swipeDownHintsEnabled = swipeDownHintsEnabled,
-                    swipeUpHintsEnabled = swipeUpHintsEnabled,
-                    onCommitText = onCommitText,
-                    onGestureAction = onGestureAction,
-                    onSwipeStateChange = onSwipeStateChange,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-            ) {
-                KeyboardRowWithConfig(
-                    keys = row1Left,
-                    edgeStartInset = staggerStep,
-                    onKeyPress = onKeyPress,
-                    config = KeyboardRowConfig(
-                        keyBackgroundColor = keyBackgroundColor,
-                        keyTextColor = keyTextColor,
-                        keyboardBackgroundColor = keyboardBackgroundColor,
-                        fontSize = landscapeFontSize,
-                        swipeFontSize = landscapeSwipeFontSize,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    ),
-                    isShifted = isShifted,
-                    isAsciiMode = isAsciiMode,
-                    configVersion = configVersion,
-                    onKeyPressDown = onKeyPressDown,
-                    onKeyRelease = onKeyRelease,
-                    swipeDownHintsEnabled = swipeDownHintsEnabled,
-                    swipeUpHintsEnabled = swipeUpHintsEnabled,
-                    onCommitText = onCommitText,
-                    onGestureAction = onGestureAction,
-                    onSwipeStateChange = onSwipeStateChange,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = staggerStep * 2)
-            ) {
-                ShiftCapsKeyButton(
-                    viewModel = viewModel,
-                    shiftMode = shiftMode,
-                    onKeyPress = onKeyPress,
-                    onKeyPressDown = onKeyPressDown,
-                    backgroundColor = specialKeyBackgroundColor,
-                    iconColor = specialKeyTextColor,
-                    accentColor = KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme),
-                    panelColor = keyboardBackgroundColor,
-                    modifier = Modifier.weight(1.2f),
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                )
-                Box(Modifier.weight(4f)) {
-                    KeyboardRowWithConfig(
-                        keys = row2Left,
-                        onKeyPress = onKeyPress,
-                        config = KeyboardRowConfig(
-                            keyBackgroundColor = keyBackgroundColor,
-                            keyTextColor = keyTextColor,
-                            keyboardBackgroundColor = keyboardBackgroundColor,
-                            fontSize = landscapeFontSize,
-                            swipeFontSize = landscapeSwipeFontSize,
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                        ),
-                        isShifted = isShifted,
-                        isAsciiMode = isAsciiMode,
-                        configVersion = configVersion,
-                        onKeyPressDown = onKeyPressDown,
-                        onKeyRelease = onKeyRelease,
-                        swipeDownHintsEnabled = swipeDownHintsEnabled,
-                        swipeUpHintsEnabled = swipeUpHintsEnabled,
-                        onCommitText = onCommitText,
-                        onGestureAction = onGestureAction,
-                        onSwipeStateChange = onSwipeStateChange,
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            ) {
-                for (slot in 1..2) {
-                    KeyboardModeKey(slot = slot, onKeyPress = onKeyPress,
-                        backgroundColor = specialKeyBackgroundColor, textColor = specialKeyTextColor,
-                        modifier = Modifier.weight(16f), onKeyPressDown = onKeyPressDown,
-                        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius)
-                }
-                SplitSpaceKey(
-                    onClick = { onKeyPress("space") },
-                    backgroundColor = keyBackgroundColor,
-                    textColor = keyTextColor,
-                    schemaName = if (isAsciiMode) "英文" else schemaName,
-                    modifier = Modifier.weight(13f),
-                    onPress = { onKeyPressDown?.invoke("space") },
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                )
-            }
-        }
-
-        // 中间留空
-        Spacer(modifier = Modifier.weight(0.10f).fillMaxHeight().testTag("split-keyboard-gap"))
-
-        // ========== 右面板 ==========
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(0.45f),
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                KeyboardRowWithConfig(
-                    keys = row0Right,
-                    onKeyPress = onKeyPress,
-                    config = KeyboardRowConfig(
-                        keyBackgroundColor = keyBackgroundColor,
-                        keyTextColor = keyTextColor,
-                        keyboardBackgroundColor = keyboardBackgroundColor,
-                        fontSize = landscapeFontSize,
-                        swipeFontSize = landscapeSwipeFontSize,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    ),
-                    isShifted = isShifted,
-                    isAsciiMode = isAsciiMode,
-                    configVersion = configVersion,
-                    onKeyPressDown = onKeyPressDown,
-                    onKeyRelease = onKeyRelease,
-                    swipeDownHintsEnabled = swipeDownHintsEnabled,
-                    swipeUpHintsEnabled = swipeUpHintsEnabled,
-                    onCommitText = onCommitText,
-                    onGestureAction = onGestureAction,
-                    onSwipeStateChange = onSwipeStateChange,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-            ) {
-                KeyboardRowWithConfig(
-                    keys = row1Right,
-                    edgeEndInset = staggerStep,
-                    onKeyPress = onKeyPress,
-                    config = KeyboardRowConfig(
-                        keyBackgroundColor = keyBackgroundColor,
-                        keyTextColor = keyTextColor,
-                        keyboardBackgroundColor = keyboardBackgroundColor,
-                        fontSize = landscapeFontSize,
-                        swipeFontSize = landscapeSwipeFontSize,
-                    ),
-                    isShifted = isShifted,
-                    isAsciiMode = isAsciiMode,
-                    configVersion = configVersion,
-                    onKeyPressDown = onKeyPressDown,
-                    onKeyRelease = onKeyRelease,
-                    swipeDownHintsEnabled = swipeDownHintsEnabled,
-                    swipeUpHintsEnabled = swipeUpHintsEnabled,
-                    onCommitText = onCommitText,
-                    onGestureAction = onGestureAction,
-                    onSwipeStateChange = onSwipeStateChange,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(end = staggerStep * 2),
-            ) {
-                Box(modifier = Modifier.weight(4f)) {
-                    KeyboardRowWithConfig(
-                        keys = row2Right,
-                        onKeyPress = onKeyPress,
-                        config = KeyboardRowConfig(
-                            keyBackgroundColor = keyBackgroundColor,
-                            keyTextColor = keyTextColor,
-                            keyboardBackgroundColor = keyboardBackgroundColor,
-                            fontSize = landscapeFontSize,
-                            swipeFontSize = landscapeSwipeFontSize,
-                        ),
-                        isShifted = isShifted,
-                        isAsciiMode = isAsciiMode,
-                        configVersion = configVersion,
-                        onKeyPressDown = onKeyPressDown,
-                        onKeyRelease = onKeyRelease,
-                        swipeDownHintsEnabled = swipeDownHintsEnabled,
-                        swipeUpHintsEnabled = swipeUpHintsEnabled,
-                        onCommitText = onCommitText,
-                        onGestureAction = onGestureAction,
-                        onSwipeStateChange = onSwipeStateChange,
-                    )
-                }
-                SwipeableIconKeyButton(
-                    icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                    onClick = { onKeyPress("delete") },
-                    backgroundColor = specialKeyBackgroundColor,
-                    iconColor = specialKeyTextColor,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
-                    onLongClick = { onKeyPress("delete") },
-                    onPress = { onKeyPressDown?.invoke("delete") },
-                    onRelease = { onKeyRelease?.invoke("delete") },
-                    swipeUpLabel = "上滑清空",
-                    swipeDownLabel = "下滑撤回",
-                    onSwipeUp = { onKeyPress("clear_all") },
-                    onSwipeDown = { onKeyPress("undo_clear") },
-                    onSwipeLeft = { suppressCursorMove.value = true; onKeyPress("clear_composition") },
-                    onSwipeStateChange = onSwipeStateChange,
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.Start,
-            ) {
-                SplitSpaceKey(
-                    onClick = { onKeyPress("space") },
-                    backgroundColor = keyBackgroundColor,
-                    textColor = keyTextColor,
-                    schemaName = if (isAsciiMode) "英文" else "",
-                    modifier = Modifier.weight(2f),
-                    onPress = { onKeyPressDown?.invoke("space") },
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                )
-                    val k2Gesture = KeysConfigHelper.getKeyGesture("'", isAsciiMode)
-                    val k2Action = k2Gesture?.tap?.action
-                    val k2Tap = k2Gesture?.tap?.value?.takeIf { it.isNotEmpty() }
-                        ?: k2Gesture?.tap?.label?.takeIf { it.isNotEmpty() }
-                        ?: "，"
-                    val k2SwipeValue = k2Gesture?.swipeUp?.value?.takeIf { it.isNotEmpty() } ?: "。"
-                    val k2SwipeLabel = if (isAsciiMode) k2SwipeValue
-                        else (k2Gesture?.swipeUp?.label?.takeIf { it.isNotEmpty() } ?: k2SwipeValue)
-                    val k2Swipe = k2SwipeValue
-                    if (k2Action == GestureAction.TOGGLE_ASCII) {
-                        LanguageKeyButton(
-                            icon = rememberVectorPainter(Icons.Default.Language),
-                            onClick = {
-                                onGestureAction.invoke(k2Action, k2Tap)
-                            },
-                            backgroundColor = specialKeyBackgroundColor,
-                            iconColor = specialKeyTextColor,
-                            modifier = Modifier.weight(1.2f),
-                            onPress = { onKeyPressDown?.invoke(k2Swipe) },
-                            swipeText = k2SwipeLabel,
-                            swipeDownText = k2Gesture?.swipeDown?.let { it.label.ifEmpty { it.value } },
-                            onSwipe = swipeHandlerFor(k2Gesture?.swipeUp, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                            onSwipeDown = swipeHandlerFor(k2Gesture?.swipeDown, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                            onSwipeStateChange = onSwipeStateChange,
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                        )
-                    } else {
-                        SwipeableKeyButtonLandscape(
-                            text = k2Tap,
-                            onClick = {
-                                if (k2Action != null && k2Action != GestureAction.COMMIT) {
-                                    onGestureAction?.invoke(k2Action, k2Tap)
-                                } else {
-                                    onKeyPress(k2Tap)
-                                }
-                            },
-                            backgroundColor = keyBackgroundColor,
-                            textColor = keyTextColor,
-                            modifier = Modifier.weight(1.2f),
-                            swipeText = k2Swipe,
-                            swipeFontSize = landscapeSwipeFontSize,
-                            onSwipe = { onKeyPress(it) },
-                            onPress = { onKeyPressDown?.invoke(k2Swipe) },
-                            shadowEnabled = shadowEnabled,
-                            shadowElevation = shadowElevation,
-                            shadowShapeRadius = shadowShapeRadius,
-                        )
-                    }
-                val k4Gesture = KeysConfigHelper.getKeyGesture("earth", isAsciiMode)
-                val k4Action = k4Gesture?.tap?.action
-                val k4Value = k4Gesture?.tap?.value?.takeIf { it.isNotEmpty() } ?: k4Gesture?.tap?.label?.takeIf { it.isNotEmpty() } ?: "ime_switch"
-                val k4Label = k4Gesture?.tap?.label?.takeIf { it.isNotEmpty() } ?: "中"
-                if (k4Action == GestureAction.TOGGLE_ASCII) {
-                    LanguageKeyButton(
-                        icon = rememberVectorPainter(Icons.Default.Language),
-                        onClick = {
-                            if (k4Action != null && k4Action != GestureAction.COMMIT) {
-                                onGestureAction?.invoke(k4Action, k4Value)
-                            } else {
-                                onKeyPress(k4Value)
-                            }
-                        },
-                        backgroundColor = specialKeyBackgroundColor,
-                        iconColor = specialKeyTextColor,
-                        modifier = Modifier.weight(0.8f),
-                        onPress = { onKeyPressDown?.invoke(k4Value) },
-                        onRelease = { onKeyRelease?.invoke(k4Value) },
-                        swipeText = k4Gesture?.swipeUp?.let { it.label.ifEmpty { it.value } },
-                        swipeDownText = k4Gesture?.swipeDown?.let { it.label.ifEmpty { it.value } },
-                        onSwipe = swipeHandlerFor(k4Gesture?.swipeUp, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                        onSwipeDown = swipeHandlerFor(k4Gesture?.swipeDown, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                        onSwipeStateChange = onSwipeStateChange,
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    )
-                } else {
-                    val k4SwipeValue = k4Gesture?.swipeUp?.value?.takeIf { it.isNotEmpty() }
-                    val k4SwipeLabel = if (isAsciiMode) (k4SwipeValue ?: "")
-                        else (k4Gesture?.swipeUp?.label?.takeIf { it.isNotEmpty() } ?: k4SwipeValue ?: "")
-                    LanguageKeyButton(
-                        text = k4Label,
-                        onClick = {
-                            if (k4Action != null && k4Action != GestureAction.COMMIT) {
-                                onGestureAction?.invoke(k4Action, k4Value)
-                            } else {
-                                onKeyPress(k4Value)
-                            }
-                        },
-                        backgroundColor = specialKeyBackgroundColor,
-                        textColor = specialKeyTextColor,
-                        modifier = Modifier.weight(0.8f),
-                        swipeText = k4SwipeLabel,
-                        swipeDownText = k4Gesture?.swipeDown?.let { it.label.ifEmpty { it.value } },
-                        onSwipe = swipeHandlerFor(k4Gesture?.swipeUp, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                        onSwipeDown = swipeHandlerFor(k4Gesture?.swipeDown, onKeyPress, onGestureAction)?.let { handler -> { _: String -> handler() } },
-                        onSwipeStateChange = onSwipeStateChange,
-                        onPress = { onKeyPressDown?.invoke(k4Value) },
-                        onRelease = { onKeyRelease?.invoke(k4Value) },
-                        shadowEnabled = shadowEnabled,
-                        shadowElevation = shadowElevation,
-                        shadowShapeRadius = shadowShapeRadius,
-                    )
-                }
-                ActionKeyButton(
-                    text = enterKeyText,
-                    onClick = { onKeyPress("enter") },
-                    backgroundColor = specialKeyBackgroundColor,
-                    textColor = specialKeyTextColor,
-                    modifier = Modifier.weight(1.2f).testTag("qwerty-enter-key"),
-                    onPress = { onKeyPressDown?.invoke("enter") },
-                    onRelease = { onKeyRelease?.invoke("enter") },
-                    shadowEnabled = shadowEnabled,
-                    shadowElevation = shadowElevation,
-                    shadowShapeRadius = shadowShapeRadius,
-                )
-            }
-        }
-    }
     }
 }
 
@@ -1878,11 +1539,8 @@ fun CompactKeyboardRowWithConfig(
             } else null
 
             val rawCommitValue = KeysConfigHelper.getKeyCommitValue(key, isAsciiMode)
-            val commitValue = if (isShifted) {
-                rawCommitValue.uppercase()
-            } else {
-                rawCommitValue
-            }
+            val commitValue = com.kingzcheung.xime.rime.MergedLetterInput.tapValue(
+                key, rawCommitValue, LocalFourteenKeyLayout.current, isShifted)
             val compactDisplayText = KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode, isShifted)
             val compactOnClick = remember(key, commitValue, onKeyPress) { { onKeyPress(commitValue) } }
             val compactOnPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
@@ -1949,27 +1607,6 @@ fun CompactKeyboardRowWithConfig(
             )
         }
     }
-}
-
-/**
- * 横屏分体空格键，复用统一长按行为
- */
-@Composable
-private fun SplitSpaceKey(
-    onClick: () -> Unit,
-    backgroundColor: Color,
-    textColor: Color,
-    schemaName: String = "",
-    modifier: Modifier = Modifier,
-    onPress: (() -> Unit)? = null,
-    shadowEnabled: Boolean = true,
-    shadowElevation: Dp = 1.dp,
-    shadowShapeRadius: Dp = 8.dp,
-) {
-
-    SpaceKeyButton(onClick = onClick, backgroundColor = backgroundColor, textColor = textColor,
-        schemaName = schemaName, modifier = modifier, onPress = onPress,
-        shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius)
 }
 
 /** QWERTY 空格键 */

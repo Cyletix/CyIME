@@ -8,8 +8,12 @@ import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 data class KeyboardCallbacks(
     val onKeyPress: (String, Boolean) -> Unit,
     val onLetterNeighbors: ((String, String) -> Unit)? = null,
+    /** 英文滑行：首选整词上屏，其余作为可替换的英文候选。 */
+    val onGlideWord: ((String, List<String>) -> Unit)? = null,
     val inputAdmissionTicket: () -> Long? = { 0L },
     val captureInputContext: () -> kotlin.coroutines.CoroutineContext = { kotlin.coroutines.EmptyCoroutineContext },
+    /** 九键组句的上文：组合为空时光标前的已上屏文字；null 表示未知或正在组合。 */
+    val t9LeftContext: () -> String? = { null },
     val inputCommands: com.kingzcheung.xime.rime.InputCommandQueue? = null,
     val onT9UnconsumedDelete: (suspend () -> Unit)? = null,
     val onKeyPressDown: ((String) -> Unit)? = null,
@@ -26,6 +30,8 @@ data class KeyboardCallbacks(
     /** Installed by the visible editor; the IME service consumes Back before hiding. */
     var onDismissPreeditEditor: (() -> Unit)? = null,
     var onPreeditKeyInput: ((String) -> Boolean)? = null,
+    /** Touch cursor gestures can enter preedit editing; physical arrows never call this. */
+    var onPreeditCursorMove: ((String) -> Boolean)? = null,
     val onLivePreeditEdit: ((com.kingzcheung.xime.rime.PinyinEditSession, String?, Int?, String?, (com.kingzcheung.xime.rime.PinyinEditSession?) -> Unit) -> Unit)? = null,
     // 长按候选删除自造词：index 为候选栏显示索引（候选栏→服务层透传）
     val onCandidateDelete: ((Int) -> Unit)? = null,
@@ -38,6 +44,9 @@ data class KeyboardCallbacks(
     val onGlobalCandidateDelete: ((Int) -> Unit)? = null,
     /** 用户展开候选页时请求服务层拉取跨页全量候选（本地分页数据源）。 */
     val onRequestExpandedCandidates: (() -> Unit)? = null,
+    val onRequestPinyinSyllables: ((Long, (com.kingzcheung.xime.rime.PinyinSyllableChoices?) -> Unit) -> Unit)? = null,
+    val onSelectPinyinSyllable: ((com.kingzcheung.xime.rime.PinyinSyllableChoices, Int,
+        (com.kingzcheung.xime.rime.PinyinSyllableChoices?) -> Unit) -> Unit)? = null,
     val onAssociationSelect: ((Int) -> Unit)? = null,
     val onClearAssociation: (() -> Unit)? = null,
     val onToggleDarkMode: (() -> Unit)? = null,
@@ -52,7 +61,6 @@ data class KeyboardCallbacks(
     val onCollapseClipboardImages: (() -> Unit)? = null,
     val onCommitText: ((String) -> Unit)? = null,
     val onDeleteText: ((Int) -> Unit)? = null,
-    val onQuickSend: (() -> Unit)? = null,
     val onKeyboardResize: (() -> Unit)? = null,
     val onReloadConfig: (() -> Unit)? = null,
     val onSettings: (() -> Unit)? = null,
@@ -73,6 +81,8 @@ data class KeyboardCallbacks(
     val onCursorMoveVertical: ((Int) -> Unit)? = null,
     val onGestureAction: ((GestureAction, String) -> Unit)? = null,
     val onUpdateToolbarButtons: ((List<String>) -> Unit)? = null,
+    /** 工具栏与菜单同时更新：排列编辑器跨区拖动后一次保存。 */
+    val onUpdateQuickActions: ((com.kingzcheung.xime.keyboard.QuickActionLayout) -> Unit)? = null,
     /**
      * 插件工具栏按钮点击（manifest 声明的 action，如 open_panel）触发。
      * 宿主据此打开对应插件的通用面板。
@@ -144,6 +154,7 @@ data class KeyboardCallbacks(
      *  返回带引擎锚点的插件候选注入列表（text 追加项），null/空 = 不干预。 */
     val onTCandidateTransform: ((RimeProcessResult) -> List<com.kingzcheung.xime.service.T9CandidateInjection>?)? = null,
     val onShowQuickSendForm: (() -> Unit)? = null,
+    val onReviewOcrText: ((String) -> Unit)? = null,
     /**
      * 从剪贴板面板主动拉取远端剪贴板内容（仅剪贴板同步已启用时非空）。
      * 由剪贴板面板导航头的「拉取」按钮触发。

@@ -66,4 +66,9 @@ class ToolbarButtonItemTest {
         val item = resolveToolbarButtonItem("emoji", colliding)
         assertEquals(ToolbarButton.EMOJI, (item as ToolbarButtonItem.Builtin).button)
     }
+    @Test fun legacyPinnedShortcutMergesWithoutDroppingPluginsOrEditingShortcuts() {
+        assertEquals(listOf("voice", "clipboard", "copy", "com.test.ai_reply"),
+            ToolbarButton.normalizeIds(listOf("voice", "quick_phrase", "copy", "clipboard", "com.test.ai_reply")))
+    }
+
 }

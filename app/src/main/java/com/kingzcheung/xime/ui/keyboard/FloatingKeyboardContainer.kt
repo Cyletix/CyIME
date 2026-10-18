@@ -12,12 +12,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,8 +40,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import com.kingzcheung.xime.settings.KeyboardHeightProfiles
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
@@ -90,8 +86,7 @@ internal fun FloatingKeyboardContainer(
     fixedWidthDp: Int = 0,
     fixedOffsetX: Int = 0,
     resolvedWidthDp: Int = 0,
-    aspectLimits: KeyboardAspectLimits = KeyboardAspectLimits.Letters,
-    letterDefaults: LetterKeyboardDefaults? = null,
+    dockTarget: KeyboardDockTarget? = null,
     bottomContentPaddingDp: Int = 0,
     bottomKeyClearance: State<Float>? = null,
     keyboardContent: @Composable () -> Unit,
@@ -101,6 +96,7 @@ internal fun FloatingKeyboardContainer(
     // Read here so pointer updates remeasure the card without recomposing KeyboardView.
     // Keys, toolbar and the resize frame now use the same geometry before release.
     val previewRect = previewRectState?.value
+    val hideDragBar = previewRect != null && LocalKeyboardResizeOpacityEditing.current?.value == true
 
     // 调节模式下固定键盘也放进稳定的全屏宿主里，previewRect 直接决定它的真实区域。
     // 这样控制面板可以放在键盘外面，边框也不会因为宿主高度变化而漂移。
@@ -167,6 +163,8 @@ internal fun FloatingKeyboardContainer(
             offsetX * density.density, offsetY * density.density,
             minOffsetY.coerceAtLeast(0) * density.density,
         )
+        val destination = dockTarget?.takeIf { it.widthDp > 0 && it.contentHeightDp > 0 }
+            ?.rectInHost(maxWidth.value * density.density, maxHeight.value * density.density, density.density)
         val cardRect = previewRect ?: normalRect
         val cardTotalHeight = with(density) { cardRect.height.toDp() }
         val dragAreaHeight = floatingDragAreaHeightDp(bottomContentPaddingDp,
@@ -180,6 +178,7 @@ internal fun FloatingKeyboardContainer(
         val dockGesture = remember(maxWidth, cardTotalHeight, screenHeightDp, minOffsetY) { FloatingDockGesture() }
         var isDragging by remember(dockGesture) { mutableStateOf(false) }
         var dockReady by remember(dockGesture) { mutableStateOf(false) }
+        var armedDestination by remember(dockGesture) { mutableStateOf<ResizeRect?>(null) }
         var dragX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
         var dragY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
         var dragEdge by remember(dockGesture) { mutableStateOf(positionedEdge) }
@@ -187,10 +186,11 @@ internal fun FloatingKeyboardContainer(
         val edge = if (isDragging) dragEdge else positionedEdge
         val effectEpoch = dockEpoch
         val dockProgress = remember(dockGesture) { Animatable(0f) }
-        LaunchedEffect(isDragging, edge, dockGesture, effectEpoch) {
+        LaunchedEffect(isDragging, edge, dockGesture, effectEpoch, destination) {
             dockReady = false
+            armedDestination = null
             dockProgress.snapTo(0f)
-            if (isDragging) {
+            if (isDragging && destination != null) {
                 dockGesture.update(edge, 0L)
                 if (edge != null) {
                     coroutineScope {
@@ -199,39 +199,29 @@ internal fun FloatingKeyboardContainer(
                         // 停留时间由可取消的协程延时确定，避免与动画使用不同的时钟。
                         if (effectEpoch == dockEpoch && isDragging && dragEdge == edge) {
                             dockReady = dockGesture.update(edge, FLOATING_DOCK_DURATION_MILLIS)
+                            if (dockReady) armedDestination = destination
                         }
                     }
                 }
             }
         }
-        if (isDragging && edge != null) {
+        if (isDragging && edge != null && destination != null) {
             val progress = dockProgress.value
-            val config = LocalConfiguration.current
-            val restoredHeight = KeyboardHeightProfiles.fixed(
-                LocalContext.current, config.screenWidthDp > config.screenHeightDp
-            )
-            val savedDockWidth = com.kingzcheung.xime.settings.SettingsPreferences.getFixedWidthDp(LocalContext.current,
-                config.screenWidthDp > config.screenHeightDp)
-            val dockSize = protectKeyboardSize(maxWidth.value.roundToInt(),
-                savedDockWidth.takeIf { it > 0 } ?: maxWidth.value.roundToInt(), restoredHeight, 0, aspectLimits,
-                customSize = savedDockWidth > 0 || KeyboardHeightProfiles.hasSavedHeight(LocalContext.current,
-                    false, config.screenWidthDp > config.screenHeightDp),
-                letterDefaults = letterDefaults)
+            fun between(start: Float, end: Float) = start + (end - start) * progress
+            val shown = ResizeRect(between(normalRect.left, destination.left), between(normalRect.top, destination.top),
+                between(normalRect.right, destination.right), between(normalRect.bottom, destination.bottom))
             val previewColor = MaterialTheme.colorScheme.primary
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .wrapContentSize(Alignment.BottomCenter, unbounded = true)
-                    .width((normalRect.width / density.density +
-                        (dockSize.width - normalRect.width / density.density) * progress).dp)
-                    .height(dockSize.height.dp)
-                    .offset(x = (offsetX * (1f - progress)).dp, y = (-minimumY).dp)
-                    .background(previewColor.copy(alpha = 0.12f * progress), RoundedCornerShape(16.dp))
+                    .align(Alignment.TopStart)
+                    .absoluteOffset { IntOffset(shown.left.roundToInt(), shown.top.roundToInt()) }
+                    .size(with(density) { shown.width.toDp() }, with(density) { shown.height.toDp() })
+                    .background(previewColor.copy(alpha = 0.12f * progress), fixedCardShape)
                     .border(2.dp, Brush.horizontalGradient(listOf(
                         previewColor.copy(alpha = progress * 0.4f),
                         previewColor.copy(alpha = progress),
                         previewColor.copy(alpha = progress * 0.4f),
-                    )), RoundedCornerShape(16.dp))
+                    )), fixedCardShape)
                     .testTag("floating-dock-preview").semantics { stateDescription = if (dockReady) "ready" else "expanding" },
             )
         }
@@ -272,11 +262,13 @@ internal fun FloatingKeyboardContainer(
                 Spacer(Modifier.fillMaxWidth().height(FLOATING_DRAG_BAR_HEIGHT_DP.dp)
                     .keyboardPanelBackground(backgroundColor))
             }
-            DragBar(
+            // Keep the fixed-height Spacer above: hiding the affordance must not resize the keyboard.
+            if (!hideDragBar) DragBar(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
                 onDragStart = {
                     dockEpoch++
                     dockReady = false
+                    armedDestination = null
                     dragX = safeOffsetX
                     dragY = safeOffsetY
                     dragEdge = positionedEdge
@@ -301,11 +293,13 @@ internal fun FloatingKeyboardContainer(
                     onDrag(dxDp, -dyDp)
                 },
                 onDragEnd = {
-                    val restore = dockReady && dockGesture.release(dragEdge, FLOATING_DOCK_DURATION_MILLIS)
+                    val restore = destination != null && armedDestination == destination && dockReady &&
+                        dockGesture.release(dragEdge, FLOATING_DOCK_DURATION_MILLIS)
                     dockGesture.cancel()
                     dockEpoch++
                     isDragging = false
                     dockReady = false
+                    armedDestination = null
                     onDragEnd()
                     if (restore) onDock()
                 },
@@ -314,6 +308,7 @@ internal fun FloatingKeyboardContainer(
                     dockEpoch++
                     isDragging = false
                     dockReady = false
+                    armedDestination = null
                     onDragEnd()
                 },
             )

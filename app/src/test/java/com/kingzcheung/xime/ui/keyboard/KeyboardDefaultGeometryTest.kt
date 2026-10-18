@@ -4,6 +4,8 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class KeyboardDefaultGeometryTest {
+    private val calibratedPitch = KeyboardPhysicalMetrics.from(1.875f, 266.471f)!!
+        .dpFromMillimeters(CALIBRATED_QWERTY_PITCH_MM)
     private fun caps(size: ProtectedKeyboardSize, defaults: LetterKeyboardDefaults): Pair<Float, Float> {
         val metrics = keyboardGridMetrics(KeyVisualPolicy.Qwerty.copy(maxKeyWidth = Float.MAX_VALUE),
             size.width.toFloat(), size.height - 44f, 10f, allowShrink = defaults.floating,
@@ -109,5 +111,107 @@ class KeyboardDefaultGeometryTest {
             }
         assertEquals(ProtectedKeyboardSize(360, 40, 0),
             defaultLetterKeyboardSize(360, 360, LetterKeyboardDefaults(40)))
+    }
+
+    @Test fun calibratedLandscapeTabletReproducesChosenWidthWithinExistingHeightBounds() {
+        val defaults = LetterKeyboardDefaults(862, calibratedMaxCellWidthDp = calibratedPitch,
+            maximumHeightDp = keyboardHeightBounds(862, true).last)
+        val size = defaultLetterKeyboardSize(1493, 1493, defaults)
+        assertEquals(1000, size.width)
+        assertEquals(431, size.height)
+        assertEquals(0, size.offsetX)
+        val cap = caps(size, defaults)
+        assertEquals(cap.first, cap.second, 0.2f)
+        assertTrue(size.height <= defaults.maximumHeightDp!!)
+    }
+
+    @Test fun narrowPhoneAndUnknownDisplayKeepTheirExistingDefaults() {
+        for (height in listOf(120, 228, 393, 600, 800, 1500)) {
+            val original = LetterKeyboardDefaults(height)
+            val calibrated = original.copy(calibratedMaxCellWidthDp = calibratedPitch, maximumHeightDp = height)
+            for (width in listOf(280, 320, 360, 393, 412))
+                assertEquals("$width x $height", defaultLetterKeyboardSize(width, width, original),
+                    defaultLetterKeyboardSize(width, width, calibrated))
+        }
+        for (pitch in listOf(null, 0f, -1f, Float.NaN, Float.POSITIVE_INFINITY)) {
+            val original = LetterKeyboardDefaults(934)
+            assertEquals(defaultLetterKeyboardSize(1493, 1493, original),
+                defaultLetterKeyboardSize(1493, 1493, original.copy(calibratedMaxCellWidthDp = pitch)))
+        }
+    }
+
+    @Test fun physicalDefaultsCannotOverrideAnyPreviouslySavedDimensionsOrPosition() {
+        val defaults = LetterKeyboardDefaults(934, calibratedMaxCellWidthDp = calibratedPitch,
+            maximumHeightDp = keyboardHeightBounds(934, true).last)
+        for (width in listOf(360, 728, 1005, 1493)) for (height in listOf(276, 433, 600))
+            for (offset in listOf(-244, 0, 244)) {
+                val before = protectKeyboardSize(1493, width, height, offset, KeyboardAspectLimits.Letters,
+                    customSize = true)
+                assertEquals(before, protectKeyboardSize(1493, width, height, offset, KeyboardAspectLimits.Letters,
+                    customSize = true, letterDefaults = defaults))
+            }
+        assertEquals(ProtectedKeyboardSize(1005, 433, -244),
+            protectKeyboardSize(1493, 1005, 433, -244, KeyboardAspectLimits.Letters,
+                customSize = true, letterDefaults = defaults))
+    }
+
+    @Test fun calibratedDefaultKeepsUserGapValuesAndCannotExceedRealHeightBounds() {
+        for ((x, y) in listOf(null to null, 0f to 0f, 8f to 16f, 20f to 6f)) {
+            val defaults = LetterKeyboardDefaults(1500, spacingX = x, spacingY = y,
+                calibratedMaxCellWidthDp = calibratedPitch, maximumHeightDp = 500)
+            val size = defaultLetterKeyboardSize(1493, 1493, defaults)
+            assertEquals(1000, size.width)
+            assertEquals(x, defaults.spacingX)
+            assertEquals(y, defaults.spacingY)
+            val cap = caps(size, defaults)
+            assertEquals(cap.first, cap.second, 0.2f)
+            val constrained = defaultLetterKeyboardSize(1493, 1493, defaults.copy(maximumHeightDp = 300))
+            assertTrue(constrained.width < size.width)
+            assertTrue(constrained.height <= 300)
+        }
+    }
+
+    @Test fun calibratedWidthBudgetHasNoThresholdJumpAndDoesNotShrinkWhenResolvedAgain() {
+        for (height in listOf(393, 600, 934, 1500)) {
+            val defaults = LetterKeyboardDefaults(height, calibratedMaxCellWidthDp = calibratedPitch,
+                maximumHeightDp = height)
+            var previous = defaultLetterKeyboardSize(280, 280, defaults)
+            for (available in 281..1600) {
+                val next = defaultLetterKeyboardSize(available, available, defaults)
+                assertTrue("width $available/$height: $previous -> $next", next.width >= previous.width)
+                assertTrue("width jump $available/$height: $previous -> $next", next.width - previous.width <= 3)
+                assertTrue("height $available/$height: $previous -> $next", next.height >= previous.height)
+                assertTrue("height jump $available/$height: $previous -> $next", next.height - previous.height <= 1)
+                assertTrue(next.width <= available)
+                assertTrue(next.height <= height)
+                assertEquals("re-resolve $available/$height", next,
+                    defaultLetterKeyboardSize(available, next.width, defaults))
+                previous = next
+            }
+        }
+    }
+
+    @Test fun shortViewportRegressionDoesNotSpendAlmostItsWholeHeightOnTheDefaultKeyboard() {
+        val defaults = LetterKeyboardDefaults(393, calibratedMaxCellWidthDp = calibratedPitch,
+            maximumHeightDp = 393)
+        val left = defaultLetterKeyboardSize(832, 832, defaults)
+        val right = defaultLetterKeyboardSize(833, 833, defaults)
+        assertEquals(left, right)
+        assertTrue(right.height <= 228) // Existing narrow-window minimum is the only 50% exception.
+    }
+
+    @Test fun highPhysicalDpiAndVeryWideViewportsCannotRaiseDefaultHeightToNinetyPercent() {
+        for (density in listOf(1f, 1.875f, 3f)) for (xDpi in listOf(120f, 266.471f, 480f, 1000f)) {
+            val pitch = KeyboardPhysicalMetrics.from(density, xDpi)!!
+                .dpFromMillimeters(CALIBRATED_QWERTY_PITCH_MM)
+            for (height in listOf(600, 862, 1200)) for (width in listOf(1000, 2000, 6000)) {
+                val defaults = LetterKeyboardDefaults(height, calibratedMaxCellWidthDp = pitch,
+                    maximumHeightDp = height)
+                val size = defaultLetterKeyboardSize(width, width, defaults)
+                assertTrue("$density/$xDpi $width x $height -> $size", size.height <= height / 2)
+                assertTrue(size.width in 1..width)
+                assertEquals(size, defaultLetterKeyboardSize(width, size.width, defaults))
+            }
+        }
     }
 }

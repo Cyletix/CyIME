@@ -72,10 +72,12 @@ class CustomLayoutActivity : ComponentActivity() {
             }
             // Match MainActivity and the IME: do not fall back to the YAML dark-theme ID.
             XimeTheme(darkTheme = dark, themeId = themeId) {
-                Surface(Modifier.fillMaxSize()) {
+                Surface(Modifier.fillMaxSize()) { com.kingzcheung.xime.ui.settings.SettingsWidthLimit {
                     CustomLayoutManager(themeId, dark,
+                        editSymbols = intent.getBooleanExtra("edit_symbols", false),
+                        symbolTarget = intent.getStringExtra("symbol_target"),
                         createNew = savedInstanceState == null && intent.getBooleanExtra("create_layout", false)) { finish() }
-                }
+                } }
             }
         }
     }
@@ -83,7 +85,8 @@ class CustomLayoutActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boolean = false, close: () -> Unit) {
+internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boolean = false,
+    editSymbols: Boolean = false, symbolTarget: String? = null, close: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var layouts by remember { mutableStateOf<List<CustomKeyboardLayout>>(emptyList()) }
@@ -97,6 +100,12 @@ private fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boole
     var message by remember { mutableStateOf("") }
     var deleteId by remember { mutableStateOf<String?>(null) }
     var discard by remember { mutableStateOf(false) }
+    var symbols by rememberSaveable { mutableStateOf(editSymbols) }
+    if (symbols) {
+        com.kingzcheung.xime.ui.settings.QwertySymbolEditor(
+            onBack = { if (editSymbols) close() else symbols = false }, initialTarget = symbolTarget)
+        return
+    }
     fun edit(layout: CustomKeyboardLayout) {
         id = layout.id; name = layout.name; rowText = layout.withSpareSlot().rows.joinToString("/") { it.joinToString(",") }
         red = layout.redVowels; redMoved = layout.redMoved; selected = null; message = ""
@@ -121,7 +130,7 @@ private fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boole
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(if (id == null) "自定义布局" else "编辑布局") },
+                title = { Text(if (id == null) "布局管理" else "编辑布局") },
                 navigationIcon = {
                     IconButton(onClick = { back() }, enabled = !busy) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -136,7 +145,15 @@ private fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Boole
     Column(Modifier.fillMaxSize().padding(paddingValues).imePadding().verticalScroll(rememberScrollState())
         .padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (id == null) {
-            com.kingzcheung.xime.ui.settings.QwertySymbolEditor()
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("26键", style = MaterialTheme.typography.titleMedium)
+                        Text("固定字母排列 · 各输入方案共用符号", style = MaterialTheme.typography.bodySmall)
+                    }
+                    TextButton(onClick = { symbols = true }) { Text("编辑符号") }
+                }
+            }
             Text("中文按键布局：调整字母排列，保留词库和功能键。")
             Button(onClick = { edit(CustomKeyboardLayout.fresh()) }, enabled = !busy) { Text("新建布局") }
             layouts.forEach { layout ->
