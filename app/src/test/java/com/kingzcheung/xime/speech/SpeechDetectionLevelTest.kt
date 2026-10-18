@@ -23,4 +23,9 @@ class SpeechDetectionLevelTest {
         level.process(loud); level.reset()
         assertEquals(.016f, level.process(floatArrayOf(.001f))[0], .000001f)
     }
+
+    @Test fun `distant speech peaking at 0_03 reaches the VAD at a fifth of full scale`() {
+        val far = FloatArray(512) { if (it == 100) .03f else .01f }
+        assertEquals(.2f, SpeechDetectionLevel().process(far)[100], .0001f)
+    }
 }
