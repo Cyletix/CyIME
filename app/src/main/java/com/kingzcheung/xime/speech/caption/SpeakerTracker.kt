@@ -246,6 +246,26 @@ internal class SpeakerTracker(strictness: Int = 1) {
         return speakers[SELF]?.centroid
     }
 
+    /** A remembered person (see [KnownVoices]): recognised from the first window, already named. */
+    @Synchronized fun seedKnown(id: Int, print: FloatArray) {
+        val known = speakers[id] ?: Speaker(id).also { speakers[id] = it }
+        known.named = true
+        known.add(normalized(print))
+    }
+
+    /** "记住这个人的声音": [from] becomes the remembered person [id]. Returns the voiceprint to keep. */
+    @Synchronized fun remember(from: Int, id: Int): FloatArray? {
+        if (from != id) {
+            val source = speakers[from] ?: return speakers[id]?.centroid
+            val target = speakers[id] ?: Speaker(id).also { speakers[id] = it }
+            moveAll(source, target)
+        }
+        speakers[id]?.named = true
+        return speakers[id]?.centroid
+    }
+
+    @Synchronized fun forget(id: Int) { speakers.remove(id) }
+
     @Synchronized fun forgetSelf() { speakers.remove(SELF)?.let { self -> for (w in windows) if (w.speaker == self.id) w.speaker = -1 } }
     @Synchronized fun setNamed(speakerId: Int, named: Boolean) { speakers[speakerId]?.named = named }
 
