@@ -6,6 +6,39 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WindowsPairingProtocolTest {
+    // Shared network-order fixture with Windows PairingTests; these are dummy values, not credentials.
+    private val compact = "cyime://pair?v=2&c=AgHAqAECSTQAESIzRFVmd4iZqrvM3e7_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8RIjNEVWZ3iJmqu8zd7v8AAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAAAdzWUAA"
+
+    @Test fun compactWindowsCodeAndLegacyJsonPreserveFullIdentityAndSecret() {
+        val data = WindowsPairingProtocol.offer(compact)
+        assertEquals("00112233-4455-6677-8899-aabbccddeeff", data.getString("server_id"))
+        assertEquals("11223344-5566-7788-99aa-bbccddeeff00", data.getString("pairing_id"))
+        assertEquals("https://192.168.1.2:18740", data.getJSONArray("endpoints").getString(0))
+        assertEquals("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", data.getString("certificate_sha256"))
+        assertEquals("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8", data.getString("secret"))
+        assertEquals(2_000_000_000L, data.getLong("expires_at"))
+        val legacy = "cyime://pair?v=2&data=" + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(data.toString().toByteArray())
+        assertEquals(data.getString("secret"), WindowsPairingProtocol.offer(legacy).getString("secret"))
+        for (invalid in listOf(compact.dropLast(4), compact + "AA", compact.replace("AgH", "AgA"), "https://example.org", compact + "&redirect=x")) {
+            assertTrue(runCatching { WindowsPairingProtocol.offer(invalid) }.isFailure)
+        }
+    }
+
+    @Test fun scannerReadsCompactAndLegacyCodesAtPreviewSizesAndRotation() {
+        val json = WindowsPairingProtocol.offer(compact)
+        val legacy = "cyime://pair?v=2&data=" + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(json.toString().toByteArray())
+        for (uri in listOf(compact, legacy)) for (size in listOf(240, 360, 720)) {
+            val matrix = com.google.zxing.qrcode.QRCodeWriter().encode(uri, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
+            for (rotated in listOf(false, true)) {
+                val pixels = IntArray(size * size) { index ->
+                    val x = index % size; val y = index / size
+                    if (if (rotated) matrix[y, size - 1 - x] else matrix[x, y]) 0xff000000.toInt() else 0xffffffff.toInt()
+                }
+                assertEquals("$size, rotated=$rotated", uri,
+                    PairingQrDecoder.decode(com.google.zxing.RGBLuminanceSource(size, size, pixels)))
+            }
+        }
+    }
     @Test fun discoveryAcceptsLocalLiteralAddressesOnly() {
         for (origin in listOf("https://192.168.1.10:4443", "https://10.0.0.2:8443/", "https://[fd12::2]:4443")) {
             assertEquals(origin.trimEnd('/'), WindowsPairingProtocol.localOrigin(origin))

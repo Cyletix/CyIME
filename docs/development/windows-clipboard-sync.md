@@ -6,7 +6,7 @@ Android 新增原生 Windows 连接入口，使用 Windows 现有 `_cyime-clip._
 
 Windows 对应增加 `/api/pair/nearby`，在加密连接和附近发现开启时提供有时限的配对请求；请求须由本机同意，拒绝、过期和已消费请求不再发放令牌。关闭二维码不会关闭附近连接；停止同步会取消附近请求。双方仍复用既有文本同步协议和协调器，不传历史记录或图片。
 
-当前 Kotlin 编译、Windows 构建及 Windows HTTPS 配对自测通过。Android 真机发现、两端系统剪贴板与实际局域网断线重连尚未运行；本轮未打包或安装，未验收。
+本轮已修正真实主机名解析、虚拟网卡选择、原生／旧插件状态混用，并接入内置连续扫码和紧凑二维码。Windows 设置组件经授权已备份更新；实际平板 NSD 发现、解析、TLS 指纹一致性和未认证 401 已通过。Android JVM 测试通过，更新后的 APK 尚未打包安装，双端实际复制、相机扫码、断网重连仍未验收。完整证据与失败项见 [本轮复查](settings-connection-audit-20261004.md)，对端契约见 `D:/GitHub/CyIME-Windows/docs/CLIPBOARD_PAIRING.md`。
 
 ## 前一实现：内置 Lua 兼容插件
 

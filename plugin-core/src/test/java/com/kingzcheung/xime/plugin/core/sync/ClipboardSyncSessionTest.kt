@@ -45,6 +45,28 @@ class ClipboardSyncSessionTest {
         fun copy(text: String?, sensitive: Boolean = false) { port.copy(text, sensitive); session.localChanged(port.value) }
     }
 
+    @Test fun `offline peer backs off exponentially up to a day and recovers on success`() = runBlocking {
+        val f = Fixture()
+        f.transport.pullAction = { throw java.net.SocketTimeoutException() }
+        val waits = mutableListOf<Long>()
+        repeat(20) {
+            f.session.pump { true }
+            waits += f.session.retryInMs
+            f.session.pump { true } // Still inside the backoff: no new network attempt.
+            f.clock += f.session.retryInMs
+        }
+        assertEquals(20, f.transport.pulls)
+        assertEquals(listOf(5_000L, 10_000L, 20_000L, 40_000L), waits.take(4))
+        assertEquals(24 * 60 * 60 * 1_000L, waits.last())
+        f.session.retryNow()
+        f.transport.pullAction = {}
+        f.session.pump { true }
+        assertEquals(0L, f.session.retryInMs)
+        f.transport.pullAction = { throw java.net.SocketTimeoutException() }
+        f.session.pump { true }
+        assertEquals("success resets the backoff", 5_000L, f.session.retryInMs)
+    }
+
     @Test fun `remote applies once acknowledges and does not echo`() = runBlocking {
         val f = Fixture()
         f.session.pump { true }
@@ -141,7 +163,8 @@ class ClipboardSyncSessionTest {
         val f = Fixture()
         listOf(ClipboardProfile.fromText("hi").copy(hash = "bad"),
             ClipboardProfile.fromText("hi").copy(hasData = true), ClipboardProfile.fromText("")).forEach {
-            f.transport.remote = it; f.session.pump { true }
+            // Each invalid payload is a failed attempt; skip the resulting backoff to check every case.
+            f.transport.remote = it; f.session.retryNow(); f.session.pump { true }
         }
         assertEquals(0, f.port.writes); assertEquals(3, f.errors.size)
     }
