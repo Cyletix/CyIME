@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -13,16 +15,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.twotone.Memory
-import androidx.compose.material.icons.twotone.RecordVoiceOver
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -34,8 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +43,7 @@ import com.kingzcheung.xime.runtime.adaptation.DeviceCapabilityProbe
 import com.kingzcheung.xime.runtime.adaptation.PerformanceTier
 import com.kingzcheung.xime.settings.PerformanceProfile
 import com.kingzcheung.xime.settings.PerformanceSettings
+import kotlin.math.roundToInt
 
 private val tierNames = mapOf(PerformanceTier.HIGH to "高配", PerformanceTier.MEDIUM to "中配", PerformanceTier.LOW to "低配")
 private val tierHints = mapOf(
@@ -51,7 +51,6 @@ private val tierHints = mapOf(
     PerformanceTier.MEDIUM to "保留按键动效，语音空闲 5 分钟先释放 SenseVoice，30 分钟后全部释放",
     PerformanceTier.LOW to "关闭动效和炫光，语音用完 1 分钟就释放，内存最省",
 )
-private val idleChoices = listOf(1, 5, 30, 0)
 private fun idleLabel(minutes: Int) = if (minutes == 0) "永不" else "$minutes 分钟"
 
 /** 性能与省电：一键选档；改任何一项自动变成“自定义”。 */
@@ -83,13 +82,13 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                Text("本机：${describe(device)} · 判为${tierNames.getValue(detected)}",
+                Text("本机：${describe(device)} · 本机配置推荐：${tierNames.getValue(detected)}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp))
             }
             item {
                 SettingsSection(title = "档位") {
-                    TierRow("自动（推荐）", "按本机配置选档：现在是${tierNames.getValue(detected)}", auto) {
+                    TierRow("自动（推荐）", "按本机配置自动选档 · 本机配置推荐：${tierNames.getValue(detected)}", auto) {
                         PerformanceProfile.applyAuto(context); refresh()
                     }
                     listOf(PerformanceTier.HIGH, PerformanceTier.MEDIUM, PerformanceTier.LOW).forEach { tier ->
@@ -105,13 +104,16 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
             }
             item {
                 SettingsSection(title = "明细") {
-                    ChoiceRow(Icons.TwoTone.RecordVoiceOver, "语音二次校正空闲后释放",
-                        "SenseVoice 不用时卸掉，保留 Paraformer 边说边出字；再用时第一句定稿稍慢",
-                        settings.speechRefinerIdleMinutes) { custom(settings.copy(speechRefinerIdleMinutes = it)) }
-                    RowDivider()
-                    ChoiceRow(Icons.TwoTone.Memory, "语音模型空闲后全部释放",
-                        "“永不”= 一直常驻，按麦克风最快，占内存最多",
-                        settings.speechEngineIdleMinutes) { custom(settings.copy(speechEngineIdleMinutes = it)) }
+                    // 分档横条，与「输入体验」里长按时长等设置同一样式：标题写当前值，下面一行说明，再是分档滑块。
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IdleLevelSlider("语音二次校正空闲后释放", settings.speechRefinerIdleMinutes,
+                            "SenseVoice 不用时卸掉，保留 Paraformer 边说边出字；再用时第一句定稿稍慢",
+                            "speech-refiner-idle-slider") { custom(settings.copy(speechRefinerIdleMinutes = it)) }
+                        HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                        IdleLevelSlider("语音模型空闲后全部释放", settings.speechEngineIdleMinutes,
+                            "“永不”= 一直常驻，按麦克风最快，占内存最多",
+                            "speech-engine-idle-slider") { custom(settings.copy(speechEngineIdleMinutes = it)) }
+                    }
                 }
             }
             item {
@@ -150,16 +152,30 @@ private fun TierRow(title: String, subtitle: String, selected: Boolean, enabled:
     }
 }
 
+/** 空闲释放时间的几个档：1、5、10、30、60 分钟和“永不”（0）。 */
+private val idleLevels = listOf(1, 5, 10, 30, 60, 0)
+
 @Composable
-private fun ChoiceRow(icon: ImageVector, title: String, subtitle: String, minutes: Int, onChoose: (Int) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        SettingsItem(icon = icon, title = title, subtitle = "${idleLabel(minutes)} · $subtitle", onClick = { open = true }, showArrow = true)
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            (idleChoices + listOf(minutes)).distinct().forEach { choice ->
-                DropdownMenuItem(text = { Text(idleLabel(choice) + if (choice == minutes) "（当前）" else "") },
-                    onClick = { open = false; if (choice != minutes) onChoose(choice) })
-            }
-        }
+private fun IdleLevelSlider(title: String, minutes: Int, description: String, tag: String, onChoose: (Int) -> Unit) {
+    // 旧设置里可能有不在档位上的值：落到最接近的档显示，拖动后才改。
+    val index = idleLevels.indexOf(minutes).takeIf { it >= 0 }
+        ?: idleLevels.indices.filter { idleLevels[it] != 0 }.minBy { kotlin.math.abs(idleLevels[it] - minutes) }
+    var position by remember(minutes) { mutableStateOf(index.toFloat()) }
+    val shown = idleLevels[position.roundToInt().coerceIn(idleLevels.indices)]
+    // 和「按键效果」里的滑条同一写法：标题 + 主题色当前值一行，说明，滑条；两端标出最短和“永不”。
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.width(8.dp))
+        Text(idleLabel(shown), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+    }
+    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(8.dp))
+    Slider(value = position, onValueChange = { position = it }, modifier = Modifier.testTag(tag),
+        onValueChangeFinished = { if (shown != minutes) onChoose(shown) },
+        valueRange = 0f..(idleLevels.size - 1).toFloat(), steps = idleLevels.size - 2)
+    Row(Modifier.fillMaxWidth()) {
+        Text(idleLabel(idleLevels.first()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.weight(1f))
+        Text(idleLabel(idleLevels.last()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
