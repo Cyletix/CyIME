@@ -1639,6 +1639,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     // 释义只换显示用注释，与屏幕候选栏同一规则。
                                     if (hardwareEnglish || shown.association ||
                                         state.inputProfile.language != com.kingzcheung.xime.settings.InputLanguage.CHINESE) shown
+                                    else if (com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value) {
+                                        val (words, notes) = com.kingzcheung.xime.gloss.CandidateGlossary.swapped(shown.words, shown.comments)
+                                        shown.copy(words = words, comments = notes)
+                                    }
                                     else shown.copy(comments = com.kingzcheung.xime.gloss.CandidateGlossary.annotate(shown.words, shown.comments))
                                 }
                             val hardwareHighlight = keyRouter.hardwareCandidateHighlight(cand, hardwareEnglish,
@@ -2375,6 +2379,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private var microphoneRestoreCompact = false
     private val clipboardNavigationKeys = mutableSetOf<Int>()
     private val hardwareCandidateNavigationKeys = mutableSetOf<Int>()
+    /** Shift 加数字或空格已用来选候选（上屏英文）的键，松开时一并吞掉。 */
+    private val glossShiftKeys = mutableSetOf<Int>()
     private val clipboardKeyboard = com.kingzcheung.xime.clipboard.ClipboardKeyboardNavigation {
         keyboardViewModel.leaveClipboard()
         if (clipboardRestoreCompact) collapseScreenKeyboardToHardwareToolbar()
@@ -2437,6 +2443,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         val e = event ?: return super.onKeyDown(keyCode, event)
         if (hasHardwareKeyboard) {
+            // Shift 单击切语言时这个键会被下面的快捷键吞掉，按住状态要先记下。
+            if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
+                com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = true
+            }
             val shortcut = hardwareLanguageShortcuts.down(keyCode, e.eventTime, e.repeatCount,
                 e.isCtrlPressed, e.isAltPressed, e.isMetaPressed, e.isShiftPressed, uiState.value.hardwareOptions)
             shortcut.switchMode?.let { switchHardwareLanguage(it) }
@@ -2445,6 +2455,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val continuingCandidatePress = e.repeatCount > 0 && hardwareCandidateNavigationKeys.contains(keyCode)
             if ((e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) && !continuingCandidatePress && !isHardwareArrow(keyCode)) {
                 return super.onKeyDown(keyCode, event)
+            }
+            // 按住 Shift：候选栏中英对调；Shift 加数字或空格选候选时上屏英文（只在释义词典生效时接管）。
+            if (keyCode != KeyEvent.KEYCODE_SHIFT_LEFT && keyCode != KeyEvent.KEYCODE_SHIFT_RIGHT &&
+                e.isShiftPressed && e.repeatCount == 0 && keyRouter.selectHardwareCandidateWithShift(keyCode)) {
+                glossShiftKeys += keyCode
+                return true
             }
             val clipboardRoute = (keyboardViewModel.page.value as? KeyboardPage.Overlay)?.route as? OverlayRoute.Clipboard
             val clipboardOpen = clipboardRoute != null
@@ -2541,6 +2557,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (event?.isCanceled != true) keyboardCallbacks?.onHideQuickSendForm?.invoke()
             return true
         }
+        if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT || keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
+            com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = event?.isShiftPressed == true
+        }
+        if (glossShiftKeys.remove(keyCode)) return true
         val clipboardConsumed = clipboardNavigationKeys.remove(keyCode)
         val candidateConsumed = hardwareCandidateNavigationKeys.remove(keyCode)
         if (candidateConsumed) keyRouter.releaseHardwareCandidateKey(keyCode)
@@ -2642,6 +2662,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         clipboardKeyboard.reset()
         clipboardNavigationKeys.clear()
         hardwareCandidateNavigationKeys.clear()
+        glossShiftKeys.clear()
+        com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = false
+        com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = false
         clipboardRestoreCompact = false
         microphoneRestoreCompact = false
         uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
@@ -3067,6 +3090,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         clipboardKeyboard.reset()
         clipboardNavigationKeys.clear()
         hardwareCandidateNavigationKeys.clear()
+        glossShiftKeys.clear()
+        com.kingzcheung.xime.gloss.CandidateGlossary.physicalShiftHeld.value = false
+        com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = false
         clipboardRestoreCompact = false
         microphoneRestoreCompact = false
         hardwareCursorImmediateOnly = false
