@@ -21,17 +21,20 @@ class QwertyRowOptionsTest {
     }
 
     @Test fun spacePunctuationFollowsTheChosenKeysAndWidth() {
-        // 只开一个键时，它和两个都开时完全一样：点按当前宽度，滑动另一种宽度。
-        assertEquals(Pair(SpacePunctuationKey("，", ","), null), spacePunctuationKeys(comma = true, period = false, fullWidth = true))
-        val periodOnly = spacePunctuationKeys(comma = false, period = true, fullWidth = false)
+        // 只开一个键时角标换成缺的那个符号，同宽度：默认只开逗号也能打出句号（用户 10-19 报的回归）。
+        assertEquals(Pair(SpacePunctuationKey("，", "。"), null), spacePunctuationKeys(comma = true, period = false, fullWidth = true))
+        assertEquals(Pair(SpacePunctuationKey(",", "."), null), spacePunctuationKeys(comma = true, period = false, fullWidth = false))
+        assertEquals(Pair(SpacePunctuationKey(",", "."), null),
+            spacePunctuationKeys(comma = true, period = false, fullWidth = true, english = true))
+        val periodOnly = spacePunctuationKeys(comma = false, period = true, fullWidth = true)
         assertNull(periodOnly.first)
-        assertEquals(SpacePunctuationKey(".", "。"), periodOnly.second)
+        assertEquals(SpacePunctuationKey("。", "，"), periodOnly.second)
         assertEquals(Pair(null, null), spacePunctuationKeys(comma = false, period = false, fullWidth = true))
         // 日文的全角逗号是 、。
         assertEquals(Pair(SpacePunctuationKey("、", ","), SpacePunctuationKey("。", ".")),
             spacePunctuationKeys(comma = true, period = true, fullWidth = true, japanese = true))
-        assertEquals(SpacePunctuationKey(",", "、"),
-            spacePunctuationKeys(comma = true, period = false, fullWidth = false, japanese = true).first)
+        assertEquals(SpacePunctuationKey("、", "。"),
+            spacePunctuationKeys(comma = true, period = false, fullWidth = true, japanese = true).first)
         // 两个都开：副字符是另一种宽度，主字符跟随全角／半角状态。
         assertEquals(Pair(SpacePunctuationKey("，", ","), SpacePunctuationKey("。", ".")),
             spacePunctuationKeys(comma = true, period = true, fullWidth = true))
