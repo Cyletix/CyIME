@@ -28,9 +28,10 @@ object BuiltinModelCatalog {
                 )))),
         // 候选注释“释义”用的词典（tools/dictionaries/glossary/build_glossary.py 生成）；id 与 CandidateGlossary.MODEL_ID 一致。
         ModelInfo("candidate-gloss", "候选中英释义词典", "设置里“候选注释内容”选释义后，中文候选旁显示英文，中文键盘里的英文候选旁显示中文。英→中取自 ECDICT（MIT），中→英取自 CC-CEDICT（MDBG，CC BY-SA 4.0），本词典按 CC BY-SA 4.0 分发，署名与许可写在文件开头。", ModelCategory.OTHER,
-            versions = listOf(ModelVersion(version = "v1", size = "5.3 MB",
+            // v2：去掉俚语／粗口义项，多音字按 Rime 常用读音、义项按英文反查来选（v1 有 几号 → heroin）。
+            versions = listOf(ModelVersion(version = "v2", size = "1.5 MB",
                 files = listOf(
-                    ModelFile("cyime_gloss.tsv", "https://github.com/Cyletix/CyIME/releases/download/models/cyime_gloss-v1.tsv", "f7b5d96b8e973d5462b71d0febcda08ea8e13a2935dedf1c3ecb52be95fc3617", 5541245L),
+                    ModelFile("cyime_gloss-v2.tsv", "https://github.com/Cyletix/CyIME/releases/download/models/cyime_gloss-v2.tsv", "4492a6b05b19918d9a3fd631ad04ad3eaa08e8a4e1c9b8bba370c0806429061c", 1547732L),
                 )))),
         // 字幕模式分说话人用的声纹模型（3D-Speaker CAM++ 中文，sherpa-onnx 导出，Apache-2.0）；不是语音识别模型。
         ModelInfo(SPEAKER_MODEL, "声纹模型 · 中文", "字幕模式用来区分不同说话人。", ModelCategory.SPEAKER,
