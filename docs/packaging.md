@@ -1,5 +1,7 @@
 # 打包与安装
 
+私人测试包 **1.14.26 / 20261211（standard，九键 best_private = p4，禁止发布）**：在 1.14.25 上加字幕第二批（存 txt、永久记住声纹、「这是谁」输入与确认、单一音量条、横屏快捷回复矮横排、快捷回复「我想见孙子/孙女」）。248,865,102 字节，SHA256 `142d5aea2840a37fab88aebf2ac7817c1fb963d8fbe78ebad6d7516de369d75b`。2026-10-18 23:32 JST 手机 R5CW13EYCSF 在 CyIME 不在前台、键盘收起、无通话时 adb install -r（数据保留），读回 1.14.26，设备 APK 哈希一致。用户未验收。
+
 私人测试包 **1.14.25 / 20261210（standard，九键 best_private = p4，禁止发布）**：合并字幕横屏窄栏／玻璃／逐字淡入／通话只听免提／固定中文过滤外文、语音音量光圈、剪贴板固定区折叠、调节尺寸边框即时刷新、Windows 扫码配对、方言校正（可选）等。打包器 `build --preset 装到我的设备 --bump patch --serial R5CW13EYCSF --no-install`，248,852,278 字节，SHA256 `fc17e4d1b1c04d2be7e2f4ad74501c0cb4cc1d5612e79fc5a2ffec0e6f86f374`。2026-10-18 手机 R5CW13EYCSF 锁屏、无通话时 adb install -r（数据保留），读回 1.14.25/20261210，设备 APK 哈希一致。用户未验收。
 
 朋友包 **1.14.22 / 20261207（full，按 [朋友包要求](development/friend-pack-spec.md)，九键用公开当前最佳 v3，不发布）**：普通默认值、模型全内置（含声纹），日语资源在但默认不开，字幕桌面图标默认关；含图标按实际外框居中。打包器 `build --preset 朋友包`，朋友包检查通过；`D:/CyIME-Data/deliveries/1.14.22/friend/CyIME-1.14.22-friend-arm64-v8a.apk`（与 editions 硬链接），701,973,101 字节，SHA256 `46d1230b66fdcbe0da1db658eb99b5c95365b3faf021ddfa859fd37a9cece890`。模拟器全新安装（同源 x86_64 debug）：桌面只有 CyIME 一个图标、图形四边留白 10/10/13/13 px 居中，语言管理里日语存在但未启用；截图 `D:/CyIME-Data/tmp/friend-shots/`。未装朋友手机，未验收。
