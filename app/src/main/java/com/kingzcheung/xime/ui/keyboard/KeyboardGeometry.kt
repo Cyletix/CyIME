@@ -65,6 +65,10 @@ internal fun floatingStoredHeightBounds(hostHeightDp: Int, landscape: Boolean): 
 /** 悬浮键盘允许的最大高宽比。只限制畸形，不强制等比缩放。 */
 internal fun floatingResizeMaxAspect(landscape: Boolean): Float = if (landscape) 0.95f else 1.35f
 
+/** 固定键盘的"默认参考档"：屏高 45%，不低于悬浮共用下限；横竖屏都按这个算，是最低档和横屏回退的依据。 */
+internal fun fixedReferenceHeightDp(screenHeight: Int): Int =
+    (screenHeight * 45 / 100).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP)
+
 /** 高度包含44dp工具栏与四行按键，不含悬浮拖条及系统导航栏。 */
 internal fun keyboardHeightBounds(screenHeight: Int, landscape: Boolean, navInset: Int = 24): IntRange {
     val max = if (landscape) (screenHeight - navInset - FLOATING_DRAG_BAR_HEIGHT_DP - 24).coerceAtLeast(160)
@@ -72,7 +76,7 @@ internal fun keyboardHeightBounds(screenHeight: Int, landscape: Boolean, navInse
     // 固定键盘的最低档只比"屏高 45% 这一档"矮一个工具栏（用户 2026-10-18 要求），
     // 按键区高度和那一档一样。横屏的上限是近乎整屏高，不能拿它来算最低档，
     // 否则平板横屏最低档会撑满屏（1.14.27 的教训）；最低不低于悬浮共用的面板下限。
-    val reference = (screenHeight * 45 / 100).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP).coerceAtMost(max)
+    val reference = fixedReferenceHeightDp(screenHeight).coerceAtMost(max)
     val min = (reference - KEYBOARD_TOOLBAR_HEIGHT_DP).coerceAtLeast(FLOATING_RESIZE_MIN_HEIGHT_DP.coerceAtMost(max))
     return min..max
 }

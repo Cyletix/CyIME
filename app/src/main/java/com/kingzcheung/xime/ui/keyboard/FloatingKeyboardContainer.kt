@@ -33,7 +33,9 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
@@ -93,6 +95,10 @@ internal fun FloatingKeyboardContainer(
 ) {
     val density = LocalDensity.current
     val fixedCardShape = keyboardPanelShape(false, rememberRoundedKeyboardBottom())
+    val dragPalette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
+    val dragIndicatorColor = if (dragPalette != null)
+        lerp(dragPalette.background.copy(alpha = 1f), dragPalette.text.copy(alpha = 1f), 0.5f)
+        else lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurface, 0.5f)
     // Read here so pointer updates remeasure the card without recomposing KeyboardView.
     // Keys, toolbar and the resize frame now use the same geometry before release.
     val previewRect = previewRectState?.value
@@ -181,6 +187,15 @@ internal fun FloatingKeyboardContainer(
         var armedDestination by remember(dockGesture) { mutableStateOf<ResizeRect?>(null) }
         var dragX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
         var dragY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
+        // 拖动期间卡片只按本地的 dragX/dragY 摆放，不每一下都写回状态重建整个键盘；
+        // 松手时再把总位移一次性交给后台限位、取整、保存。
+        var dragStartX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
+        var dragStartY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
+        val dragging = isDragging
+        fun liveShiftPx(): Offset = if (dragging)
+            Offset((dragX.roundToInt() - dragStartX.roundToInt()) * density.density,
+                -(dragY.roundToInt() - dragStartY.roundToInt()) * density.density)
+            else Offset.Zero
         var dragEdge by remember(dockGesture) { mutableStateOf(positionedEdge) }
         var dockEpoch by remember(dockGesture) { mutableIntStateOf(0) }
         val edge = if (isDragging) dragEdge else positionedEdge
@@ -208,8 +223,10 @@ internal fun FloatingKeyboardContainer(
         if (isDragging && edge != null && destination != null) {
             val progress = dockProgress.value
             fun between(start: Float, end: Float) = start + (end - start) * progress
-            val shown = ResizeRect(between(normalRect.left, destination.left), between(normalRect.top, destination.top),
-                between(normalRect.right, destination.right), between(normalRect.bottom, destination.bottom))
+            // 「变回固定」预览从卡片的实时位置插值到目标位置。
+            val liveRect = liveShiftPx().let { normalRect.translated(it.x, it.y) }
+            val shown = ResizeRect(between(liveRect.left, destination.left), between(liveRect.top, destination.top),
+                between(liveRect.right, destination.right), between(liveRect.bottom, destination.bottom))
             val previewColor = MaterialTheme.colorScheme.primary
             Box(
                 modifier = Modifier
@@ -228,14 +245,19 @@ internal fun FloatingKeyboardContainer(
         // 正常态和调节态共用 TopStart 放置，不在确认时重新换坐标系。
         val cardPlacement = Modifier
             .align(Alignment.TopStart)
-            .absoluteOffset { IntOffset(cardRect.left.roundToInt(), cardRect.top.roundToInt()) }
+            // 拖动位移只在摆放 lambda 里读：手指每动一下只改位置，不重组键盘。
+            .absoluteOffset {
+                val shift = liveShiftPx()
+                IntOffset((cardRect.left + shift.x).roundToInt(), (cardRect.top + shift.y).roundToInt())
+            }
             .size(with(density) { cardRect.width.toDp() }, with(density) { cardRect.height.toDp() })
         Box(
             modifier = cardPlacement
                 .clip(FloatingKeyboardCardShape)
                 .graphicsLayer {
                     alpha = opacity.coerceIn(0.3f, 1f)
-                    compositingStrategy = CompositingStrategy.Offscreen
+                    // 只有半透明时才需要离屏合成；不透明时用 Auto，少一次全卡片离屏绘制。
+                    compositingStrategy = if (opacity < 1f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }
                 .testTag("floating-keyboard-card")
                 .onGloballyPositioned { coords ->
@@ -265,12 +287,15 @@ internal fun FloatingKeyboardContainer(
             // Keep the fixed-height Spacer above: hiding the affordance must not resize the keyboard.
             if (!hideDragBar) DragBar(
                 modifier = Modifier.align(Alignment.BottomCenter).height(dragAreaHeight),
+                indicatorColor = dragIndicatorColor,
                 onDragStart = {
                     dockEpoch++
                     dockReady = false
                     armedDestination = null
                     dragX = safeOffsetX
                     dragY = safeOffsetY
+                    dragStartX = safeOffsetX
+                    dragStartY = safeOffsetY
                     dragEdge = positionedEdge
                     dockGesture.start(dragEdge, 0L)
                     isDragging = true
@@ -290,13 +315,14 @@ internal fun FloatingKeyboardContainer(
                         dockReady = false
                         dockGesture.update(nextEdge, 0L)
                     }
-                    onDrag(dxDp, -dyDp)
                 },
                 onDragEnd = {
                     val restore = destination != null && armedDestination == destination && dockReady &&
                         dockGesture.release(dragEdge, FLOATING_DOCK_DURATION_MILLIS)
                     dockGesture.cancel()
                     dockEpoch++
+                    // 松手时把整段位移一次交给后台，按原规矩限位、取整、保存。
+                    onDrag(dragX - dragStartX, dragY - dragStartY)
                     isDragging = false
                     dockReady = false
                     armedDestination = null
@@ -306,6 +332,7 @@ internal fun FloatingKeyboardContainer(
                 onDragCancel = {
                     dockGesture.cancel()
                     dockEpoch++
+                    onDrag(dragX - dragStartX, dragY - dragStartY)
                     isDragging = false
                     dockReady = false
                     armedDestination = null
@@ -320,6 +347,7 @@ internal fun FloatingKeyboardContainer(
 @Composable
 private fun DragBar(
     modifier: Modifier,
+    indicatorColor: Color,
     onDragStart: () -> Unit,
     onDrag: (change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -343,12 +371,13 @@ private fun DragBar(
             },
         contentAlignment = Alignment.Center
     ) {
+        // 40dp×4dp 全圆头；颜色是键盘配色里按键文字色和键盘底色各一半混出来的实色，平时和调节时相同。
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.36f)
-                .height(5.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                .width(40.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(50))
+                .background(indicatorColor)
                 .testTag("floating-drag-indicator")
         )
     }
