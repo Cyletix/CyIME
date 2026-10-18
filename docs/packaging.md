@@ -1,5 +1,7 @@
 # 打包与安装
 
+老人包 **1.14.19 / 20261204（full，按 [老人包要求](development/elder-pack-spec.md)，取代 1.14.18）**：1.14.18 字幕出日语（SenseVoice 自动识别语言），本包字幕与中文语音固定按中文识别，去掉日语词库、方案和语言选项，新装默认九键、黑白、大字、高键盘、字幕图标和老人工具栏。打包器 `build --preset 老人包`，“老人包检查通过”；`D:/CyIME-Data/deliveries/1.14.19/elder/CyIME-1.14.19-full-arm64-v8a.apk`，654,914,284 字节，SHA256 `0d3c3b49c2831ed37261923fa5c4b34ec872e84522febf5ccbdd249aca8779b3`。模拟器 emulator-5560（x86_64，同源 debug 包）全新安装核对：桌面字幕图标、九键黑白大字键盘、老人工具栏、语言管理无日语，截图在 `D:/CyIME-Data/tmp/elder-shots/`；模拟器没有麦克风输入，字幕实际出字未核对。电脑上 SenseVoice 对 FLEURS 普通话 32 句（含 -5 dB 噪声）固定中文全部输出中文。未装手机，用户未验收。
+
 老人包 **1.14.18 / 20261203（full，内置手写、联想 base/small、Paraformer、SenseVoice，九键 v3 公开模型，未发布）**：2026-10-18 打包器 `build --release --offline-models --t9-model t9_ngram-model-v3-ls-tri.c3.lm --no-install --bump patch`，`D:/CyIME-Data/deliveries/1.14.18/elder/CyIME-1.14.18-full-arm64-v8a.apk`，676,178,759 字节，SHA256 `3f05e5a9d70d8c093da903c0f81bf141c4b90d96ae5a35f7fc9229a820c08957`。新装时工具栏加字幕、拍照识别并打开桌面字幕图标（DeviceDefaults，仅全新安装）；含剪贴板多设备直连同步。未安装、未验收。
 
 公开候选包 **1.14.16 / 20261201（standard，九键 v3 公开模型，未发布）**：2026-10-18 打包器 `build --release --no-offline-models --t9-model t9_ngram-model-v3-ls-tri.c3.lm --no-install`，`D:/CyIME-Data/deliveries/1.14.16/public/CyIME-1.14.16-arm64-v8a.apk`，247,216,214 字节，SHA256 `980dd2e0ab782f06ee359159eac12fa3399b668d91620948e0208761e9d4bdd0`。含 26 键词频混入聊天口语 β=0.5；九键多条整句因速度门禁未开（display_sentences 1）。GitHub 未发布：1.7.1 之后的源码尚未提交，打包器发布需已提交源码。

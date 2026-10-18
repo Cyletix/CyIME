@@ -71,8 +71,8 @@ android {
         // 按发布批次定号：兼容修复升 PATCH，兼容功能升 MINOR 并归零 PATCH。
         // 不兼容变更升 MAJOR；日常编辑不逐次升号。完整规则见 docs/packaging.md。
         // versionCode 是独立递增的交付序号；同批普通版与内置版共用。
-        versionCode = 20261203
-        versionName = "1.14.18"
+        versionCode = 20261204
+        versionName = "1.14.19"
 
 
         // Isolated Compose rendering on a local x86 emulator; ordinary device tests keep the full app.
@@ -172,6 +172,8 @@ android {
     androidResources.ignoreAssetsPatterns.add("t9_sentence.onnx")
     // Retain the old model files for the local comparison, exclude them from delivery.
     androidResources.ignoreAssetsPatterns.add("*.traineddata")
+    // The elder package (bundled models) carries no Japanese dictionaries or schemas (elder-pack-spec.md).
+    if (providers.gradleProperty("bundleModels").orNull == "true") androidResources.ignoreAssetsPatterns.add("<dir>rime_japanese")
     ndkVersion = "29.0.14206865"
 
     // F-Droid 一致性验证：不在 APK 中写入依赖元数据（Dependency metadata 签名块）。

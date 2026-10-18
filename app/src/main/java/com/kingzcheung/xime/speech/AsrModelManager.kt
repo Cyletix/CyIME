@@ -98,7 +98,8 @@ class AsrModelManager(private val context: Context) {
         }
         // SenseVoice performs language detection for multilingual speech. Keyboard language
         // selects a compatible model; it must not force mixed English speech to Chinese/Japanese.
-        val languageId = "auto"
+        // The elder package (bundled models) has no Japanese at all: Chinese speech decodes as Chinese.
+        val languageId = if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS && language != InputLanguage.ENGLISH) "zh" else "auto"
         fun dir(id: String): File {
             ModelStorage.migrateLegacyForModel(context, id)
             return ModelStorage.getModelDir(context, id)

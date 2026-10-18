@@ -6,7 +6,9 @@ enum class InputLanguage(val id: String, val displayName: String) {
     UNSPECIFIED("und", "未标注语言");
 
     companion object {
-        val supported = listOf(CHINESE, JAPANESE, ENGLISH)
+        /** The elder package (bundled models) offers no Japanese anywhere; see docs/development/elder-pack-spec.md. */
+        val supported = if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) listOf(CHINESE, ENGLISH)
+            else listOf(CHINESE, JAPANESE, ENGLISH)
         fun fromId(id: String): InputLanguage? = entries.firstOrNull { it.id == id }
         /** Compatibility boundary for stored Rime IDs. New business code uses InputProfile. */
         fun forSchema(id: String): InputLanguage = InputProfiles.describe(id).language

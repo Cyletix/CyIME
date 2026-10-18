@@ -17,7 +17,7 @@
       "exclude_dicts": [],
       "install": false
     },
-    "离线完整版": {
+    "老人包": {
       "build_type": "release",
       "offline_models": true,
       "t9_model": "t9_ngram-model-v3-ls-tri.c3.lm",
@@ -26,7 +26,8 @@
     }
   },
   "presetAliases": {
-    "日常测试包": "装到我的设备"
+    "日常测试包": "装到我的设备",
+    "离线完整版": "老人包"
   },
   "modelNotes": {
     "ochwpro": "MIT：可以分发，需附带原许可声明",
