@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -15,6 +16,10 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.ui.keyboard.JapaneseKanaKeyboardLayout
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -25,7 +30,8 @@ class KanaPreviewLayoutTest {
     @Test fun standardKeyboardPopupStaysAboveThePressedKey() = checkLayout(360, 1f)
     private fun checkLayout(width: Int, fontScale: Float) {
         rule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale),
+                LocalKeyboardInputPreferences provides KeyboardInputPreferences(kanaDirectionHints = true, flickDirectionDisc = true)) {
                 MaterialTheme {
                     Box(Modifier.size(width.dp, 500.dp).testTag("kana-window"), contentAlignment = Alignment.BottomCenter) {
                         JapaneseKanaKeyboardLayout(onKanaAction = {}, onKeyPress = {}, keyBackgroundColor = Color.DarkGray,
@@ -48,6 +54,7 @@ class KanaPreviewLayoutTest {
             node.fetchSemanticsNode().boundsInRoot
         }
         labelBounds.forEachIndexed { index, a -> labelBounds.drop(index + 1).forEach { b -> assertFalse("字符边界重叠: $a / $b", a.overlaps(b)) } }
+        saveScreenshot("hints-$width-$fontScale.png")
         for (tag in listOf("kana-key:a", "kana-key:sa", "kana-punctuation")) {
             val key = rule.onNodeWithTag(tag)
             key.performTouchInput { down(center) }
@@ -55,8 +62,18 @@ class KanaPreviewLayoutTest {
             val anchor = key.fetchSemanticsNode()
             assertTrue(popup.positionOnScreen.x >= 0)
             assertTrue("$tag popup=${popup.positionOnScreen}, size=${popup.size}, anchor=${anchor.positionOnScreen}", popup.positionOnScreen.y + popup.size.height <= anchor.positionOnScreen.y)
+            saveScreenshot("preview-$width-$fontScale-${tag.replace(':', '-')}.png")
             key.performTouchInput { cancel() }
             rule.onNodeWithTag("kana-flick-preview").assertDoesNotExist()
         }
     }
+
+    private fun saveScreenshot(name: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "kana-preview").apply { mkdirs() }
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+    }
+
 }

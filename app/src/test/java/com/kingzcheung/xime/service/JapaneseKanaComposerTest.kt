@@ -23,13 +23,16 @@ class JapaneseKanaComposerTest {
         assertEquals("kiya", composer.replacement("kixya")!!.input)
     }
 
-    @Test fun `tsu cycles through voiced and small forms`() {
+    @Test fun `tsu prefers small form then voiced form and returns to full size`() {
         val composer = JapaneseKanaComposer()
         composer.recordInput("", "tu", "tu", false)
-        val voiced = composer.replacement("tu")!!
+        val small = composer.replacement("tu")!!
+        assertEquals("xtu", small.input)
+        composer.recordReplacement(small, "xtu")
+        val voiced = composer.replacement("xtu")!!
         assertEquals("du", voiced.input)
         composer.recordReplacement(voiced, "du")
-        assertEquals("xtu", composer.replacement("du")!!.input)
+        assertEquals("tu", composer.replacement("du")!!.input)
     }
 
     @Test fun `modifier after commit cannot create a replacement`() {
