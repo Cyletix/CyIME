@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.settings
 
 import android.content.Context
+import com.kingzcheung.xime.ui.keyboard.fixedReferenceHeightDp
 import com.kingzcheung.xime.ui.keyboard.floatingResizeHeightBounds
 import com.kingzcheung.xime.ui.keyboard.floatingStoredHeightBounds
 import com.kingzcheung.xime.ui.keyboard.keyboardHeightBounds
@@ -61,6 +62,23 @@ internal object KeyboardHeightProfiles {
             SettingsPreferences.setKeyboardHeightDp(context, height, landscape)
         }
         return height
+    }
+
+    /**
+     * 新版第一次启动时只做一次：横屏固定高度若高于 45% 参考档（[fixedReferenceHeightDp]），改回参考档。
+     * 1.14.27 曾把横屏最低档抬到近乎整屏，用户平板上留下了约 740dp 的横屏高度；竖屏不动。
+     * [landscapeScreenHeightDp] 是横屏时的屏高，即当前配置里较短的那条边。
+     */
+    fun capLandscapeFixedHeightOnce(context: Context, landscapeScreenHeightDp: Int) {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        val marker = "fixed_landscape_capped_to_reference_v1"
+        if (prefs.getBoolean(marker, false)) return
+        val key = fixedKey(true)
+        val stored = prefs.getInt(key, 0)
+        val reference = fixedReferenceHeightDp(landscapeScreenHeightDp.coerceAtLeast(1))
+        val editor = prefs.edit().putBoolean(marker, true)
+        if (stored > reference) editor.putInt(key, reference)
+        editor.apply()
     }
 
     /**
