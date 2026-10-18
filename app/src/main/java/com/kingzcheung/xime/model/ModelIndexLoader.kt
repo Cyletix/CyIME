@@ -134,6 +134,7 @@ object ModelIndexLoader {
             "prediction" -> ModelCategory.PREDICTION
             "asr" -> ModelCategory.ASR
             "handwriting" -> ModelCategory.HANDWRITING
+            "speaker" -> ModelCategory.SPEAKER
             else -> ModelCategory.OTHER
         }
     }

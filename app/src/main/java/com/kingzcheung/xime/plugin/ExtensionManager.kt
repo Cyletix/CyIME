@@ -3,7 +3,6 @@ package com.kingzcheung.xime.plugin
 import android.content.Context
 import android.util.Log
 import com.kingzcheung.xime.plugin.core.api.AsrPlugin
-import com.kingzcheung.xime.plugin.core.api.BackupPlugin
 import com.kingzcheung.xime.plugin.core.api.ClipboardSyncPlugin
 import com.kingzcheung.xime.plugin.core.api.EmojiPlugin
 import com.kingzcheung.xime.plugin.core.api.IPluginEntryClass
@@ -268,22 +267,6 @@ object ExtensionManager {
         }
     }
 
-    fun getBackupPlugins(): List<BackupPlugin> {
-        val all = PluginManager.getAllPluginInstances()
-        return all.values.mapNotNull { instance ->
-            if (instance is BackupPlugin) instance else null
-        }
-    }
-
-    fun getEnabledBackupPlugins(context: Context): List<Pair<String, BackupPlugin>> {
-        return getBackupPlugins().mapNotNull { plugin ->
-            val pluginId = getPluginId(plugin)
-            if (pluginId.isNotEmpty() && SettingsPreferences.isPluginEnabled(context, pluginId)) {
-                Pair(pluginId, plugin)
-            } else null
-        }
-    }
-    
     private fun getPluginId(plugin: Any): String {
         return PluginManager.getAllPluginInstances().entries
             .firstOrNull { it.value == plugin }?.key ?: ""

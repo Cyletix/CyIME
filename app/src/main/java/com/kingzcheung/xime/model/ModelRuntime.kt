@@ -109,6 +109,8 @@ object ModelRuntime {
             FileLogger.i(TAG, "${reg.label}: loading...")
             state.loaded = try {
                 reg.loader()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 FileLogger.e(TAG, "${reg.label}: load failed", e)
                 false

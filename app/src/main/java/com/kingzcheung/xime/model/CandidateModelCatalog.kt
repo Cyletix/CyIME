@@ -4,15 +4,41 @@ package com.kingzcheung.xime.model
 object CandidateModelCatalog {
     const val GRAMMAR = "t9-grammar"
     const val SENTENCE = "t9-sentence"
+    const val NGRAM = "t9-ngram"
+    const val NGRAM_SMALL = "t9-ngram-small"
     private const val SOURCE = "https://raw.githubusercontent.com/Cyletix/CyIME/6cc85b1c08a90a68eca0bd8d018fdb33e7e3d791/app/src/main/assets/rime_chinese/"
     val models = listOf(
-        ModelInfo(GRAMMAR, "九键语法增强", "增强中文九键组句排序，安装后重新启动输入法生效；未下载也可使用基础词库。来源：RIME-LMDG，CC-BY-4.0。", ModelCategory.CANDIDATE,
-            versions = listOf(ModelVersion(version = "lts-602588267", size = "390.4 MB", files = listOf(
+        // 引擎按方案的 t9/ngram_model 在 rime 用户目录找 t9_ngram.lm；文件名必须保持 .lm。
+        // 完整版与精简版写同一个文件名，装哪个九键就用哪个；紧凑格式（c3）内容与原 370 MB 文件相同，旧文件仍可读。
+        ModelInfo(NGRAM, "九键词组模型（完整，203 MB）", "让九键按整句常用说法组词和排序，安装后重新启动输入法生效；不下载时九键使用旧算法。CyIME 自行训练，默认推荐。", ModelCategory.CANDIDATE,
+            versions = listOf(ModelVersion(version = "v3-ls-tri-c3", size = "202.9 MB", files = listOf(
+                ModelFile("t9_ngram.lm", "https://github.com/Cyletix/CyIME/releases/download/models/t9_ngram-v3-ls-tri-c3.lm",
+                    "11cee2cbd87f42cb18ddcd2b38ac2c2ef9e4a778c64da68f8c6f615e4050c867", 212706156L),
+            )),
+            // 旧版 370 MB 格式：只用来认出老版本留下的文件，让它在模型管理里可见、可删、可被新版替换；不作为下载版本。
+            ModelVersion(version = "v3-ls-tri", retired = true, changelog = "旧格式，内容与新版相同；可删除后改装新版以节省空间。", size = "350.6 MB", files = listOf(
+                ModelFile("t9_ngram.lm", "https://github.com/Cyletix/CyIME/releases/download/models/t9_ngram-v3-ls-tri.lm",
+                    "766c21385a6d3e5ad22a0367373531d0c7bed4bc31074a5265da8ad1a3d46f12", 367598664L),
+            )))),
+        ModelInfo(NGRAM_SMALL, "九键词组模型（精简，105 MB）", "完整版剪枝后的小一半版本，整句首选约低 3 个百分点；和完整版二选一，安装后重新启动输入法生效。CyIME 自行训练。", ModelCategory.CANDIDATE,
+            versions = listOf(ModelVersion(version = "v4-ls-p5e-8-c3", size = "104.6 MB", files = listOf(
+                ModelFile("t9_ngram.lm", "https://github.com/Cyletix/CyIME/releases/download/models/t9_ngram-v4-ls-p5e-8-c3.lm",
+                    "7d346a1fa2b332bdd764d1b91bc8002526cb7d563fea091f6b861279be025c4e", 109685894L),
+            )))),
+        ModelInfo(GRAMMAR, "九键语法增强", "没装九键词组模型时增强九键组句排序；装了词组模型就不再起作用，会自动删除。来源：RIME-LMDG，CC-BY-4.0。", ModelCategory.CANDIDATE,
+            versions = listOf(ModelVersion(version = "lts-650124920", size = "380.0 MB", files = listOf(
+                // 上游 2026-10-17 替换了 LTS 资产（同为 Rime::Grammar/1.0 格式），旧资产 602588267 已 404。
+                ModelFile("wanxiang-lts-zh-hans.gram", "https://api.github.com/repos/amzxyz/RIME-LMDG/releases/assets/650124920",
+                    "1849e5e4acbdbfaf41fceeb86b739d5d0c85d574bd8a688562cba1e6beb78488", 398505004L),
+            )),
+            // 旧版：上游已下架，只用来认出设备上已有的文件并允许删除。
+            ModelVersion(version = "lts-602588267", retired = true, size = "390.4 MB", files = listOf(
                 ModelFile("wanxiang-lts-zh-hans.gram", "https://api.github.com/repos/amzxyz/RIME-LMDG/releases/assets/602588267",
                     "873cbbb359fcf4df8b200183683ddc8be7b321eac4c864f8d2c7fc3136d4279f", 409412652L),
             )))),
-        ModelInfo(SENTENCE, "九键长句增强", "增强中文九键长句候选排序，安装后重新启动输入法生效；老人包已内置。来源：UER-py，Apache-2.0。", ModelCategory.CANDIDATE,
-            versions = listOf(ModelVersion(version = "uer-int8-v1", size = "33.8 MB", files = listOf(
+        // 九键方案已不再加载这个模型；条目保留，让已下载的用户能在模型管理里删除它。
+        ModelInfo(SENTENCE, "九键长句增强（已停用）", "已停用：实测对首选提升很小，却拖慢打字并在停顿后改动候选；现在不参与排序，已下载的可删除以释放空间。来源：UER-py，Apache-2.0。", ModelCategory.CANDIDATE,
+            versions = listOf(ModelVersion(version = "uer-int8-v1", retired = true, size = "33.8 MB", files = listOf(
                 ModelFile("t9_sentence.vocab", SOURCE + "t9_sentence.vocab",
                     "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c", 109540L),
                 ModelFile("t9_sentence.onnx", SOURCE + "t9_sentence.onnx",

@@ -64,9 +64,10 @@ object ModelDownloader {
 
         try {
             if (target.archiveUrl != null) {
-                downloadAndExtractArchive(context, target.archiveUrl, staging, onProgress, target.sha256)
+                downloadAndExtractArchive(context, DownloadMirrors.candidates(context, target.archiveUrl, target.archiveMirrors),
+                    staging, onProgress, target.sha256)
             } else {
-                downloadFiles(target.files, staging, onProgress)
+                downloadFiles(context, target.files, staging, onProgress)
             }
             validateDownloadedModel(staging, target)
             currentCoroutineContext().ensureActive()
@@ -92,6 +93,7 @@ object ModelDownloader {
     }
 
     private suspend fun downloadFiles(
+        context: Context,
         files: List<ModelFile>,
         targetDir: File,
         onProgress: (ModelDownloadState) -> Unit
@@ -100,10 +102,31 @@ object ModelDownloader {
 
         files.forEachIndexed { index, file ->
             FileLogger.i(TAG, "Downloading ${file.name} (${index + 1}/$totalFiles)")
-            downloadSingleFile(file.downloadUrl, modelDownloadFile(targetDir, file.name)) { fileProgress ->
-                val overall = (index.toFloat() + fileProgress) / totalFiles
-                onProgress(ModelDownloadState.Downloading(overall, 0, -1))
+            val target = modelDownloadFile(targetDir, file.name)
+            val urls = DownloadMirrors.candidates(context, file.downloadUrl, file.mirrors)
+            if (urls.isEmpty()) throw IOException("缺少下载地址：${file.name}")
+            var lastError: Exception? = null
+            for (url in urls) {
+                currentCoroutineContext().ensureActive()
+                try {
+                    downloadSingleFile(url, target) { fileProgress ->
+                        val overall = (index.toFloat() + fileProgress) / totalFiles
+                        onProgress(ModelDownloadState.Downloading(overall, 0, -1))
+                    }
+                    // 换线路的前提是内容一致：每条线路下载完都按目录哈希校验。
+                    verifyModelDigest(target, file.sha256)
+                    lastError = null
+                    break
+                } catch (e: CancellationException) {
+                    target.delete()
+                    throw e
+                } catch (e: Exception) {
+                    FileLogger.w(TAG, "${file.name} 从 $url 下载失败，尝试下一条线路：${e.message}")
+                    target.delete()
+                    lastError = e
+                }
             }
+            lastError?.let { throw it }
         }
     }
 
@@ -151,7 +174,7 @@ object ModelDownloader {
         tmpFile: File,
         onProgress: (ModelDownloadState) -> Unit
     ) {
-        val request = Request.Builder().url(url).build()
+        val request = modelDownloadRequest(url).build()
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
@@ -190,14 +213,18 @@ object ModelDownloader {
 
     private suspend fun downloadAndExtractArchive(
         context: Context,
-        archiveUrl: String,
+        archiveUrls: List<String>,
         targetDir: File,
         onProgress: (ModelDownloadState) -> Unit,
         sha256: String = "",
     ) {
-        val tmpFile = File(context.cacheDir, "${archiveUrl.hashCode()}.tar.bz2")
+        if (archiveUrls.isEmpty()) throw IOException("缺少下载地址")
+        val tmpFile = File(context.cacheDir, "${archiveUrls.first().hashCode()}.tar.bz2")
 
-        for (attempt in 1..MAX_RETRIES) {
+        // 每轮先试偏好线路，失败换下一条；重试次数不少于线路数，保证每条至少试一次。
+        val attempts = maxOf(MAX_RETRIES, archiveUrls.size)
+        for (attempt in 1..attempts) {
+            val archiveUrl = archiveUrls[(attempt - 1) % archiveUrls.size]
             try {
                 if (attempt > 1) {
                     tmpFile.delete()
@@ -213,9 +240,9 @@ object ModelDownloader {
                 tmpFile.delete()
                 throw e
             } catch (e: Exception) {
-                FileLogger.e(TAG, "Attempt $attempt/$MAX_RETRIES failed: ${e.message}")
+                FileLogger.e(TAG, "Attempt $attempt/$attempts ($archiveUrl) failed: ${e.message}")
                 tmpFile.delete()
-                if (attempt < MAX_RETRIES) {
+                if (attempt < attempts) {
                     val delayMs = 1000L * (1L shl (attempt - 1))
                     delay(delayMs)
                 } else {
@@ -225,7 +252,7 @@ object ModelDownloader {
         }
     }
 
-    private fun extractTarBz2(archiveFile: File, targetDir: File) {
+    internal fun extractTarBz2(archiveFile: File, targetDir: File) {
         FileInputStream(archiveFile).use { fis ->
             BufferedInputStream(fis, 65536).use { bis ->
                 BZip2CompressorInputStream(bis).use { bzIn ->

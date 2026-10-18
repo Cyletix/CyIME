@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.plugin.core.lua.ws
 
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+
 /**
  * 插件网络访问策略（纯函数，可单测）。
  *
@@ -33,23 +35,22 @@ object NetworkPolicy {
         return null
     }
 
-    /** 从 URL 提取域名（不含端口，纯字符串解析，无 Android 依赖）。 */
+    /** 与实际请求共用 OkHttp 的规范解析；禁止 URL 内嵌凭据。 */
     fun extractHost(url: String): String? {
-        var rest = url
-        val schemeIdx = rest.indexOf("://")
-        if (schemeIdx >= 0) rest = rest.substring(schemeIdx + 3)
-        val pathIdx = rest.indexOf('/')
-        if (pathIdx >= 0) rest = rest.substring(0, pathIdx)
-        val queryIdx = rest.indexOf('?')
-        if (queryIdx >= 0) rest = rest.substring(0, queryIdx)
-        val host = rest.substringBefore(':')
-        return host.takeIf { it.isNotBlank() }
+        val normalized = when {
+            url.startsWith("wss://", ignoreCase = true) -> "https://" + url.substring(6)
+            url.startsWith("ws://", ignoreCase = true) -> "http://" + url.substring(5)
+            else -> url
+        }
+        val parsed = normalized.toHttpUrlOrNull() ?: return null
+        if (parsed.username.isNotEmpty() || parsed.password.isNotEmpty()) return null
+        return parsed.host
     }
 
     /** 从配置值文本提取 HTTP(S) URL 的域名（非 http/https 值返回 null，供 UI 展示授权候选）。 */
     fun extractHttpHost(value: String): String? {
         val trimmed = value.trim()
-        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return null
+        if (!trimmed.startsWith("http://", true) && !trimmed.startsWith("https://", true)) return null
         return extractHost(trimmed)
     }
 }

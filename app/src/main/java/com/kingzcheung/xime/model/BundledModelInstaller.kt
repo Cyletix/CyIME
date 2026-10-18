@@ -14,7 +14,9 @@ object BundledModelInstaller {
         val prefs = context.getSharedPreferences("bundled_models", Context.MODE_PRIVATE)
         val manifest = context.assets.open("bundled-models/manifest.json").bufferedReader().use { JSONArray(it.readText()) }
         val entries = (0 until manifest.length()).map { manifest.getJSONObject(it) }
-        check(entries.map { it.getString("id") }.toSet() == modelIds) {
+        // The packager may bundle only some of these; the rest download like the standard edition.
+        val bundled = entries.map { it.getString("id") }.toSet()
+        check(bundled.isNotEmpty() && bundled.all { it in modelIds }) {
             "内置模型清单与应用不匹配"
         }
         for (entry in entries.sortedBy { when (it.getString("id")) {
@@ -27,7 +29,7 @@ object BundledModelInstaller {
             check(prefs.edit().putString(id, version).commit())
         }
         if (!prefs.getBoolean("defaults_applied", false)) {
-            check(modelIds.all { ModelManager.isModelReady(context, it) })
+            check(bundled.all { ModelManager.isModelReady(context, it) })
             // Both editions use the same saved first-run defaults. Copying files never selects models.
             check(prefs.edit().putBoolean("defaults_applied", true).commit())
         }

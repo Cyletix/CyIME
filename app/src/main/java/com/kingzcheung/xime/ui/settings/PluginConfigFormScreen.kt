@@ -20,7 +20,8 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
+import com.kingzcheung.xime.ui.common.CompactMenuStyle
+import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -354,10 +355,7 @@ private fun UiNodeEditor(
                         value = it.toString()
                         persist()
                     },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                    colors = SwitchDefaults.colors()
                 )
             }
         }
@@ -390,11 +388,15 @@ private fun UiNodeEditor(
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
+                    shape = CompactMenuStyle.Shape,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 0.dp,
+                    shadowElevation = CompactMenuStyle.Elevation,
                 ) {
                     options.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option) },
+                        CompactMenuRow(
+                            label = option, selected = value == option,
                             onClick = {
                                 value = option
                                 persist()

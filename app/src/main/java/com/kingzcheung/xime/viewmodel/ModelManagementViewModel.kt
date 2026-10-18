@@ -1,9 +1,13 @@
 package com.kingzcheung.xime.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.kingzcheung.xime.model.DownloadMirrors
+import com.kingzcheung.xime.model.DownloadRegion
 import com.kingzcheung.xime.model.ModelCategory
+import com.kingzcheung.xime.model.ModelImporter
 import com.kingzcheung.xime.model.ModelDownloadState
 import com.kingzcheung.xime.model.ModelInfo
 import com.kingzcheung.xime.model.ModelManager
@@ -44,17 +48,26 @@ data class ModelManagementUiState(
     val selectedVersions: Map<String, String> = emptyMap(),
     /** 分类过滤：null 表示全部 */
     val selectedCategory: ModelCategory? = null,
+    /** 正在从本机导入模型文件。 */
+    val isImporting: Boolean = false,
+    /** 模型下载线路偏好。 */
+    val downloadRegion: DownloadRegion = DownloadRegion.AUTO,
+    /** 自动模式下的判断结果：是否按中国大陆线路下载。 */
+    val detectedChina: Boolean = false,
 ) {
-    /** 按分类过滤后的模型列表。 */
+    /** 商店里按分类过滤后的模型列表；已全部退役的条目不再提供下载（已下载的仍在模型管理里可删）。 */
     val filteredModels: List<ModelItemState>
-        get() = if (selectedCategory == null) models
-        else models.filter { it.model.category == selectedCategory }
+        get() = models.filter { it.model.downloadableVersions.isNotEmpty() &&
+            (selectedCategory == null || it.model.category == selectedCategory) }
 }
 
 class ModelManagementViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
 
-    private val _uiState = MutableStateFlow(ModelManagementUiState())
+    private val _uiState = MutableStateFlow(ModelManagementUiState(
+        downloadRegion = DownloadMirrors.region(context),
+        detectedChina = DownloadMirrors.detectChina(context),
+    ))
     val uiState: StateFlow<ModelManagementUiState> = _uiState.asStateFlow()
 
     init {
@@ -100,7 +113,9 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
                 model = model,
                 isDownloaded = downloaded,
                 diskSize = size,
-                installedVersion = if (downloaded) versions[model.id] else null,
+                installedVersion = if (downloaded) withContext(Dispatchers.IO) {
+                    ModelManager.installedVersionOf(context, model)?.version
+                } ?: versions[model.id] else null,
                 downloadState = ModelManager.downloadStates.value[model.id]
                     ?.takeUnless { it is ModelDownloadState.Complete } ?: ModelDownloadState.Idle,
             )
@@ -214,6 +229,26 @@ class ModelManagementViewModel(application: Application) : AndroidViewModel(appl
                 }
                 _uiState.update { s -> s.copy(toastMessage = "模型已删除") }
             }
+        }
+    }
+
+    fun setDownloadRegion(region: DownloadRegion) {
+        DownloadMirrors.setRegion(context, region)
+        _uiState.update { it.copy(downloadRegion = region) }
+    }
+
+    /** 从选中的文件、整合包或文件夹导入；按哈希自动认出属于哪个模型。 */
+    fun importDocuments(uris: List<Uri>) = runImport { ModelImporter.importDocuments(context, uris) }
+
+    fun importTree(treeUri: Uri) = runImport { ModelImporter.importTree(context, treeUri) }
+
+    private fun runImport(block: suspend () -> ModelImporter.Report) {
+        if (_uiState.value.isImporting) return
+        _uiState.update { it.copy(isImporting = true) }
+        viewModelScope.launch {
+            val message = try { block().message() } catch (e: Exception) { "导入失败：${e.message}" }
+            loadModels()
+            _uiState.update { it.copy(isImporting = false, toastMessage = message) }
         }
     }
 

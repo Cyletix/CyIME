@@ -7,6 +7,22 @@ import org.junit.Test
 
 class NetworkPolicyTest {
 
+    @Test
+    fun `authorization cannot be spoofed by userinfo or parser differences`() {
+        for (url in listOf(
+            "https://allowed.example:443@blocked.example/resource",
+            "https://allowed.example%40blocked.example/",
+            "wss://allowed.example@blocked.example/ws",
+            "file://allowed.example/path",
+        )) {
+            assertTrue(url, NetworkPolicy.check(url, emptySet(), listOf("allowed.example"),
+                setOf("allowed.example")) != null)
+        }
+        assertEquals("allowed.example", NetworkPolicy.extractHost("HTTPS://ALLOWED.EXAMPLE:443/a"))
+        assertEquals("::1", NetworkPolicy.extractHost("ws://[::1]:8080/ws"))
+        assertEquals("xn--bcher-kva.example", NetworkPolicy.extractHost("https://bücher.example/"))
+    }
+
     private val trusted = setOf("dashscope.aliyuncs.com")
 
     @Test

@@ -27,6 +27,6 @@ object DeviceModelProfiles {
             else -> DeviceModelTier.STANDARD
         }
         return DeviceModelProfile(tier, if (tier == DeviceModelTier.LIGHT) SMALL else BASE,
-            SpeechModelCatalog.TWO_PASS)
+            SpeechModelCatalog.PARAFORMER)
     }
 }

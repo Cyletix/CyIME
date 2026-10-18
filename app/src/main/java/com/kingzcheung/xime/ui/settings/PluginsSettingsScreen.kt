@@ -50,8 +50,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.kingzcheung.xime.ui.common.CompactDropdownMenu
+import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -111,8 +111,7 @@ fun PluginsSettingsContent(
     onNavigateToPluginSettings: (String) -> Unit = {},
     onNavigateToPluginMarketDetail: (String) -> Unit = {},
     onNavigateToSpeechToText: () -> Unit = {},
-    onNavigateToClipboardSync: () -> Unit = {},
-    onNavigateToBackup: () -> Unit = {}
+    onNavigateToClipboardSync: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: PluginsSettingsViewModel = viewModel()
@@ -171,34 +170,23 @@ fun PluginsSettingsContent(
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "更多")
                         }
-                        DropdownMenu(
+                        CompactDropdownMenu(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
-                            offset = DpOffset(0.dp, 4.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            offset = DpOffset(0.dp, 4.dp)
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("从文件安装插件") },
+                            CompactMenuRow(
+                                label = "从文件安装插件", icon = Icons.Default.FileOpen,
                                 onClick = {
                                     showMenu = false
                                     importLauncher.launch(arrayOf("*/*"))
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.FileOpen, null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp))
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text("浏览器导入") },
+                            CompactMenuRow(
+                                label = "浏览器导入", icon = Icons.Default.Wifi,
                                 onClick = {
                                     showMenu = false
                                     showWirelessSheet = true
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Wifi, null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp))
                                 }
                             )
                         }
@@ -283,14 +271,11 @@ fun PluginsSettingsContent(
                                     extension.id == activeAsrPluginId
                                 PluginCategory.CLIPBOARD_SYNC ->
                                     extension.id == activeClipboardSyncPluginId
-                                PluginCategory.BACKUP ->
-                                    extension.id == SettingsPreferences.getBackupPluginId(context)
                                 else -> false
                             },
                             onActivate = when (extension.category) {
                                 PluginCategory.ASR -> onNavigateToSpeechToText
                                 PluginCategory.CLIPBOARD_SYNC -> onNavigateToClipboardSync
-                                PluginCategory.BACKUP -> onNavigateToBackup
                                 else -> null
                             }
                         )
@@ -844,12 +829,17 @@ fun PluginIconView(
     }
 
     val assetPath = icon?.assetName
-    if (assetPath != null) {
-        val bitmap = remember(assetPath) {
-            runCatching { BitmapFactory.decodeFile(assetPath) }.getOrNull()
+    // 图标在后台线程解码：列表里插件多时，主线程逐个解码会让设置页滚动卡顿。
+    val decoded by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, assetPath) {
+        value = assetPath?.let { path ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()
+            }
         }
-        if (bitmap != null) {
-            val imageBitmap = remember(assetPath) { bitmap.asImageBitmap() }
+    }
+    if (assetPath != null) {
+        val imageBitmap = decoded
+        if (imageBitmap != null) {
             Image(
                 bitmap = imageBitmap,
                 contentDescription = null,

@@ -36,6 +36,8 @@ class HttpHostApiImpl(
     }
 
     private val client: OkHttpClient = OkHttpClient.Builder()
+        .followRedirects(false)
+        .followSslRedirects(false)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -104,14 +106,18 @@ class HttpHostApiImpl(
                 "PROPFIND" -> requestBuilder.method("PROPFIND", null)
                 else -> requestBuilder.get()
             }
+            val authorizedClient = client.newBuilder()
+                .addInterceptor(AuthorizedRedirectInterceptor { target ->
+                    NetworkPolicy.check(target, emptySet(), declaredHosts, authorizedHosts, customHosts)
+                }).build()
             val effectiveClient = if (timeoutMillis != null && timeoutMillis > 0) {
-                client.newBuilder()
+                authorizedClient.newBuilder()
                     .connectTimeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
                     .readTimeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
                     .writeTimeout(timeoutMillis.toLong(), TimeUnit.MILLISECONDS)
                     .build()
             } else {
-                client
+                authorizedClient
             }
             val call = effectiveClient.newCall(requestBuilder.build())
             if (timeoutMillis != null && timeoutMillis > 0) {
