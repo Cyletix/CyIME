@@ -755,13 +755,17 @@ fun KeyboardView(
             // 释义模式只换显示用注释；点选仍按索引回到原候选数据（九键靠其中的拼音定位）。
             val glossRevision = CandidateGlossary.revision
             val glossChinese = !state.isAsciiMode && state.inputProfile.language == InputLanguage.CHINESE
+            // 按住 Shift（屏幕键、物理键或九键长按“下一项”）时有英文的候选中英对调，此时点选上屏英文。
+            val shiftModeNow by viewModel.shiftMode.collectAsStateWithLifecycle()
+            val glossSwap = glossChinese &&
+                CandidateGlossary.swapHeld(shiftModeNow == com.kingzcheung.xime.viewmodel.ShiftMode.HELD)
             val candidateBarState = remember(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
                 state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
                 railExpanded, expandedDataMode, isHandwritingPage, cs.smsVerificationCode, cs.clipboardImage,
                 cs.candidateFocus, cs.engineRevision, cs.candidateActions, state.inputProfile,
-                hardwareCandidateHighlight, glossRevision, glossChinese,
+                hardwareCandidateHighlight, glossRevision, glossChinese, glossSwap,
             ) {
                 if (showHandwritingCandidates) {
                     CandidateBarState.AssociationOnly(
@@ -772,12 +776,16 @@ fun KeyboardView(
                 } else if (isHandwritingPage) {
                     CandidateBarState.Idle
                 } else {
+                    val barTexts = if (expandedDataMode) railExpanded.map { it.second.text } else cs.candidates
+                    val barComments = if (expandedDataMode) railExpanded.map { it.second.comment } else cs.candidateComments
+                    val (shownTexts, shownComments) = when {
+                        glossSwap -> CandidateGlossary.swapped(barTexts, barComments)
+                        glossChinese -> barTexts to CandidateGlossary.annotate(barTexts, barComments)
+                        else -> barTexts to barComments
+                    }
                     CandidateBarState.from(
-                        candidates = if (expandedDataMode) railExpanded.map { it.second.text } else cs.candidates,
-                        candidateComments = (if (expandedDataMode) railExpanded.map { it.second.comment } else cs.candidateComments).let {
-                            if (glossChinese) CandidateGlossary.annotate(
-                                if (expandedDataMode) railExpanded.map { r -> r.second.text } else cs.candidates, it) else it
-                        },
+                        candidates = shownTexts,
+                        candidateComments = shownComments,
                         inputText = cs.inputText,
                         preeditText = cs.preeditText,
                         isComposing = cs.isComposing,

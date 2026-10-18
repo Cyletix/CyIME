@@ -2,6 +2,7 @@ package com.kingzcheung.xime.gloss
 
 import android.content.Context
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import com.kingzcheung.xime.model.ModelStorage
 import com.kingzcheung.xime.settings.CandidateCommentContent
 import com.kingzcheung.xime.settings.CandidateCommentMode
@@ -19,7 +20,8 @@ import kotlin.concurrent.thread
  * 候选注释的中英释义：中文候选显示英文，中文键盘里混出的英文候选显示中文。
  *
  * 词典是商店里的可选下载包，只在注释未隐藏且“候选注释内容”选了释义时才映射进来；查表只做在候选
- * 显示层，每屏十几次二分查找，不进逐键解码。查不到的候选保留原注释（拼音或编码）。
+ * 显示层，每屏十几次二分查找，不进逐键解码。词典已加载时查不到释义的候选不显示注释（不退回拼音）。
+ * 按住 Shift 时有英文的中文候选中英对调，此时选它上屏英文（[englishFor]）。
  * 只替换显示用的注释：九键选词要用候选数据里的拼音注释定位，候选数据本身不能改。
  */
 object CandidateGlossary {
@@ -64,13 +66,53 @@ object CandidateGlossary {
         }
     }
 
-    /** 把查得到释义的候选注释换成释义；未加载或查不到时原样返回。 */
-    fun annotate(texts: List<String>, comments: List<String>): List<String> {
-        val glossary = table ?: return comments
-        return texts.mapIndexed { index, text -> glossary.lookup(keyOf(text)) ?: comments.getOrElse(index) { "" } }
+    /** 词典已加载（释义模式且注释未隐藏）。 */
+    val isLoaded: Boolean get() = table != null
+
+    /** 物理键盘的 Shift 正被按住；屏幕键盘看 ShiftMode.HELD。按住时候选中英对调。 */
+    val physicalShiftHeld = mutableStateOf(false)
+
+    /** 九键长按“下一项”切到的中英对调（代替 Shift，松手保持）；上屏英文、再长按或编码结束时恢复。 */
+    val t9NextHeld = mutableStateOf(false)
+
+    /** 任一种“按住 Shift”生效中：屏幕 Shift 键按住（[screenShiftHeld]）、物理 Shift 或九键长按“下一项”。 */
+    fun swapHeld(screenShiftHeld: Boolean): Boolean = screenShiftHeld || physicalShiftHeld.value || t9NextHeld.value
+
+    /** 注释换成释义；词典未加载时原样返回，已加载但查不到的候选不显示注释。 */
+    fun annotate(texts: List<String>, comments: List<String>): List<String> = annotate(table, texts, comments)
+
+    fun annotate(text: String, comment: String): String = annotate(table, listOf(text), listOf(comment)).first()
+
+    /** 按住 Shift 选这条候选时上屏的英文；没有完整英文时为 null，照常上中文。 */
+    fun englishFor(text: String): String? = table?.let { englishFor(it, text) }
+
+    /** 按住 Shift 时的显示：有英文的中文候选显示英文、中文退作注释，其余候选同 [annotate]。 */
+    fun swapped(texts: List<String>, comments: List<String>): Pair<List<String>, List<String>> =
+        swapped(table, texts, comments)
+
+    internal fun annotate(table: GlossTable?, texts: List<String>, comments: List<String>): List<String> {
+        if (table == null) return comments
+        return texts.map { table.lookup(keyOf(it)).orEmpty() }
     }
 
-    fun annotate(text: String, comment: String): String = table?.lookup(keyOf(text)) ?: comment
+    internal fun englishFor(table: GlossTable, text: String): String? {
+        // 本身是英文的候选直接上屏它自己；被截断的释义（以 … 结尾）不是完整英文，不拿来上屏。
+        if (text.isBlank() || text.all { it.code < 0x80 }) return null
+        return table.lookup(keyOf(text))?.takeUnless { it.isBlank() || it.endsWith("…") }
+    }
+
+    internal fun swapped(table: GlossTable?, texts: List<String>, comments: List<String>): Pair<List<String>, List<String>> {
+        if (table == null) return texts to comments
+        val notes = annotate(table, texts, comments)
+        val words = ArrayList<String>(texts.size)
+        val shown = ArrayList<String>(texts.size)
+        texts.forEachIndexed { index, text ->
+            val english = englishFor(table, text)
+            words += english ?: text
+            shown += if (english != null) text else notes[index]
+        }
+        return words to shown
+    }
 
     internal fun keyOf(text: String): String {
         val trimmed = text.trim()
