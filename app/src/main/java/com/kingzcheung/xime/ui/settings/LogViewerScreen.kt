@@ -175,7 +175,8 @@ fun LogViewerScreen(
         } else if (uiState.selectedLogFile != null && uiState.selectedLogFile!!.exists()) {
             LogContentSection(
                 selectedLogFile = uiState.selectedLogFile!!,
-                logContent = uiState.logContent,
+                logLines = uiState.logLines,
+                isTruncated = uiState.isTruncated,
                 onBackToList = { viewModel.goBackToList() },
                 onDelete = { viewModel.deleteLogFile(uiState.selectedLogFile!!) },
                 onShare = { viewModel.shareLogFile(uiState.selectedLogFile!!) },
@@ -198,7 +199,8 @@ fun LogViewerScreen(
 @Composable
 private fun LogContentSection(
     selectedLogFile: File,
-    logContent: String,
+    logLines: List<String>,
+    isTruncated: Boolean,
     onBackToList: () -> Unit,
     onDelete: () -> Unit,
     onShare: () -> Unit,
@@ -244,7 +246,7 @@ private fun LogContentSection(
         
         HorizontalDivider()
         
-        if (logContent.isEmpty()) {
+        if (logLines.all { it.isEmpty() }) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -252,20 +254,27 @@ private fun LogContentSection(
                 Text("日志文件为空")
             }
         } else {
-            val lines = logContent.lines()
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                items(lines) { line ->
+                if (isTruncated) item(key = "truncated") {
+                    Text(
+                        text = "日志较大，这里只显示最后 512 KB；完整内容请分享或保存",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                items(logLines) { line ->
                     Text(
                         text = line,
                         fontSize = 12.sp,
                         color = when {
-                            line.contains("ERROR") -> MaterialTheme.colorScheme.error
-                            line.contains("WARNING") -> MaterialTheme.colorScheme.secondary
-                            line.contains("FATAL") -> MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                            // FileLogger 写的级别是 [E]/[W]/[F]，旧判断按 ERROR 匹配从未生效。
+                            line.contains(" [E] ") || line.contains("ERROR") -> MaterialTheme.colorScheme.error
+                            line.contains(" [W] ") || line.contains("WARNING") -> MaterialTheme.colorScheme.secondary
+                            line.contains(" [F] ") || line.contains("FATAL") -> MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )

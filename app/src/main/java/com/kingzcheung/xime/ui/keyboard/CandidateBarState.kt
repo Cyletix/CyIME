@@ -55,6 +55,7 @@ sealed interface CandidateBarState {
             clipboardImage: com.kingzcheung.xime.clipboard.ClipboardImage? = null,
             highlightIndex: Int = 0,
             hardwareHighlightIndex: Int? = null,
+            associationHighlightIndex: Int? = null,
         ): CandidateBarState {
             val hasCandidates = candidates.isNotEmpty()
             val hasAssociations = associationCandidates.isNotEmpty()
@@ -78,7 +79,7 @@ sealed interface CandidateBarState {
                     AssociationOnly(
                         candidates = associationCandidates,
                         hasMore = hasNextPage,
-                        highlightIndex = hardwareHighlightIndex ?: -1,
+                        highlightIndex = hardwareHighlightIndex ?: associationHighlightIndex ?: -1,
                     )
                 hasCandidates || hasInput ->
                     ChineseCandidates(

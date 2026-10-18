@@ -18,6 +18,7 @@ object AssociationManager {
     @Volatile
     private var isInitialized = false
     private val mutex = Mutex()
+    private val generation = java.util.concurrent.atomic.AtomicLong()
     
     private lateinit var fusionEngine: NgramFusionEngine
     private var context: Context? = null
@@ -27,13 +28,14 @@ object AssociationManager {
     }
     
     suspend fun initialize(ctx: Context): Boolean = withContext(Dispatchers.IO) {
-        context = ctx
+        context = ctx.applicationContext
         if (isInitialized) {
             FileLogger.d(TAG, "Already initialized")
             return@withContext true
         }
         
         mutex.withLock {
+            val token = generation.get()
             if (isInitialized) {
                 FileLogger.d(TAG, "Already initialized (in lock)")
                 return@withContext true
@@ -44,13 +46,18 @@ object AssociationManager {
                 
                 ModelRuntime.register(
                     id = "predictive_text",
-                    loader = { OnnxAssociationEngine.initialize(ctx) },
+                    loader = { OnnxAssociationEngine.initialize(ctx.applicationContext) },
                     releaser = { OnnxAssociationEngine.release() },
                     label = "智能联想模型"
                 )
                 val modelLoaded = ModelManager.isModelReady(ctx, SettingsPreferences.getPredictionSelectedModel(ctx)) &&
                     ModelRuntime.load("predictive_text")
                 FileLogger.i(TAG, "ModelRuntime.load(predictive_text) result: $modelLoaded")
+
+                if (generation.get() != token) {
+                    OnnxAssociationEngine.release()
+                    return@withContext false
+                }
 
                 if (modelLoaded) {
                     ModelRuntime.keepWarm("predictive_text")
@@ -59,12 +66,19 @@ object AssociationManager {
 
                 val cacheInit = fusionEngine.initialize()
                 FileLogger.i(TAG, "NgramFusionEngine init result: $cacheInit")
+
+                if (generation.get() != token) {
+                    ModelRuntime.releaseWarm("predictive_text")
+                    OnnxAssociationEngine.release()
+                    return@withContext false
+                }
                 
                 isInitialized = cacheInit || modelLoaded
                 
                 FileLogger.i(TAG, "AssociationManager initialized: model=$modelLoaded, cache=$cacheInit")
                 isInitialized
                 
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
             } catch (e: Exception) {
                 FileLogger.e(TAG, "Failed to initialize AssociationManager: ${e.message}", e)
                 false
@@ -105,7 +119,11 @@ object AssociationManager {
 
         try {
             val modelCandidates = if (OnnxAssociationEngine.isInitialized()) {
-                try { OnnxAssociationEngine.predict(contextText, topK * 2) }
+                try {
+                    FragmentCompletion.complete(contextText, OnnxAssociationEngine.predict(contextText, topK * 2)) { text, k ->
+                        OnnxAssociationEngine.predict(text, k)
+                    }
+                }
                 catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                 catch (error: Exception) { Log.w(TAG, "Using bundled prediction fallback", error); emptyList() }
             } else emptyList()
@@ -149,10 +167,31 @@ object AssociationManager {
     fun isInitialized(): Boolean = isInitialized
     
     fun release() {
-        if (isInitialized) {
-            ModelRuntime.unload("predictive_text")
-            isInitialized = false
-            context = null
+        generation.incrementAndGet()
+        isInitialized = false
+        context = null
+        // Explicit off/model switch must also release a HOT model.
+        ModelRuntime.releaseWarm("predictive_text")
+        OnnxAssociationEngine.release()
+    }
+
+    /** 键盘收起较久：卸载联想模型让 :inference 进程可被回收，词频缓存与学习数据保留。 */
+    fun releaseModelWhileIdle() {
+        if (!isInitialized || !OnnxAssociationEngine.isInitialized()) return
+        ModelRuntime.releaseWarm("predictive_text")
+        OnnxAssociationEngine.release()
+        FileLogger.i(TAG, "Prediction model released while keyboard idle")
+    }
+
+    /** 键盘再次弹出：后台重载闲置时卸载的联想模型，首次上屏前通常已就绪。 */
+    suspend fun restoreModelAfterIdle() = withContext(Dispatchers.IO) {
+        val ctx = context ?: return@withContext
+        if (!isInitialized || OnnxAssociationEngine.isInitialized() ||
+            !ModelManager.isModelReady(ctx, SettingsPreferences.getPredictionSelectedModel(ctx))) return@withContext
+        val token = generation.get()
+        if (ModelRuntime.load("predictive_text") && generation.get() == token) {
+            ModelRuntime.keepWarm("predictive_text")
+            OnnxAssociationEngine.startWarmup()
         }
     }
 }

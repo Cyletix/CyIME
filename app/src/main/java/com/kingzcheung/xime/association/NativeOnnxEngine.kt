@@ -75,9 +75,7 @@ object NativeOnnxEngine {
 
     fun initialize(context: Context, modelPath: String): Boolean {
         try {
-            nativeInitialize(modelPath)
-            FileLogger.d(TAG, "Native method already available")
-            return true
+            return nativeInitialize(modelPath)
         } catch (e: UnsatisfiedLinkError) {
             FileLogger.d(TAG, "Native method not available, loading libraries...")
         }
@@ -100,18 +98,24 @@ object NativeOnnxEngine {
     }
 
     fun predict(inputText: String, topK: Int = 20): List<AssociationCandidate> {
+        if (inputText.isBlank() || topK <= 0) return emptyList()
         val trimmed = if (inputText.length > MAX_CONTEXT_LENGTH) {
             inputText.takeLast(MAX_CONTEXT_LENGTH)
         } else {
             inputText
         }
-        val inputIds = nativeEncode(trimmed) ?: return emptyList()
+        val encoded = nativeEncode(trimmed) ?: return emptyList()
+        // The model has 64 positional embeddings INCLUDING BOS. Limit tokens,
+        // not characters: multicharacter vocabulary entries also occupy one slot.
+        val inputIds = if (encoded.size > MAX_CONTEXT_LENGTH) {
+            longArrayOf(encoded.first()) + encoded.takeLast(MAX_CONTEXT_LENGTH - 1)
+        } else encoded
         val result = nativePredict(inputIds, topK) ?: return emptyList()
 
         val candidates = mutableListOf<AssociationCandidate>()
         for (i in result.indices step 2) {
             val word = result[i]
-            val score = result[i + 1].toFloatOrNull() ?: continue
+            val score = result.getOrNull(i + 1)?.toFloatOrNull()?.takeIf { it.isFinite() } ?: continue
             candidates.add(AssociationCandidate(word, score))
         }
         return candidates

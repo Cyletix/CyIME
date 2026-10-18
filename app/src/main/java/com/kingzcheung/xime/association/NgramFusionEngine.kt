@@ -9,6 +9,12 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
     companion object {
         private const val TAG = "NgramFusionEngine"
         private const val DEFAULT_LAMBDA = 0.7f
+        /** Mixture weights over probabilities: corpus table, downloaded neural model, personal data. */
+        const val BASE_WEIGHT = 0.7f
+        const val MODEL_WEIGHT = 0.15f
+        const val USER_WEIGHT = 0.15f
+        /** Typed observations reach full weight after this many events on the same context. */
+        const val USER_CONFIDENCE_EVENTS = 8f
     }
     
     private var lambda = DEFAULT_LAMBDA
@@ -45,28 +51,27 @@ class NgramFusionEngine(private val context: Context, private val userNgramCache
             return normalizeModelCandidates(modelCandidates)
         }
         
-        val userCandidates = userNgramCache.getUserCandidates(context, 10)
-        
+        // One scale: every source contributes a probability of the continuation given the
+        // context, mixed with fixed weights. The corpus table leads; the optional neural model
+        // (a softmax share over its own top-k, not calibrated) and personal observations only
+        // add a bounded share, so a rare long phrase cannot outrank 个/是/些 after 这 on its own.
         val allCandidates = mutableMapOf<String, Float>()
-        
-        baseModel?.predict(context, 10)?.forEach { allCandidates[it.text] = it.score }
+        baseModel?.predict(context, BaseAssociationModel.MAX_PER_CONTEXT)?.forEach {
+            allCandidates[it.text] = BASE_WEIGHT * it.score
+        }
         normalizeModelCandidates(modelCandidates).forEach { candidate ->
-            allCandidates[candidate.text] = candidate.score
+            allCandidates[candidate.text] = (allCandidates[candidate.text] ?: 0f) + MODEL_WEIGHT * candidate.score
         }
+        // Imported personal corpora carry their own counts (0.4·share); typed observations are
+        // shares over few events, so they earn weight gradually (n/USER_CONFIDENCE_EVENTS).
         userNgramCache.profileCandidates(context).forEach { candidate ->
-            allCandidates[candidate.text] = maxOf(allCandidates[candidate.text] ?: 0f, candidate.score)
+            allCandidates[candidate.text] = (allCandidates[candidate.text] ?: 0f) + USER_WEIGHT * candidate.score / 0.4f
         }
-        
+        val userCandidates = userNgramCache.getUserCandidates(context, 10)
+        val confidence = minOf(1f, userNgramCache.observationCount(context) / USER_CONFIDENCE_EVENTS)
         userCandidates.forEach { (word, userScore) ->
-            val existingScore = allCandidates[word]
-            if (existingScore != null) {
-                val effectiveLambda = 0.3f
-                allCandidates[word] = effectiveLambda * existingScore + (1 - effectiveLambda) * userScore
-            } else {
-                allCandidates[word] = userScore
-            }
+            allCandidates[word] = (allCandidates[word] ?: 0f) + USER_WEIGHT * confidence * userScore
         }
-        
 
         return allCandidates.map { (word, score) ->
             AssociationCandidate(word, score)

@@ -29,10 +29,43 @@ data class PersonalLearningData(
             })).toString()
     }
 
+    /**
+     * 本机学习数据的存储上限：超过 [STORED_HIGH_WATER] 条时只留次数最多的 [STORED_KEPT] 条，
+     * 任一次数超过 [MAX_COUNT] 时全部减半。这样保存的文件永远能被 [decode] 读回，
+     * 不会因长期使用越界而让学习静默停止。没有越界时原样返回同一对象。
+     */
+    fun boundedForStorage(): PersonalLearningData {
+        fun bound(rows: List<LearnedSequence>): List<LearnedSequence> {
+            var kept = if (rows.size > STORED_HIGH_WATER) rows.sortedByDescending { it.count }.take(STORED_KEPT) else rows
+            while (kept.any { it.count > MAX_COUNT }) kept = kept.map { it.copy(count = maxOf(1, it.count / 2)) }
+            return kept
+        }
+        val b = bound(bigrams)
+        val t = bound(trigrams)
+        val r = if (recentInputs.size > MAX_RECENT) recentInputs.takeLast(MAX_RECENT) else recentInputs
+        return if (b === bigrams && t === trigrams && r === recentInputs) this
+        else copy(bigrams = b, trigrams = t, recentInputs = r)
+    }
+
     companion object {
         const val MAX_BYTES = 32 * 1024 * 1024
-        fun decode(text: String): PersonalLearningData {
-            require(text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "学习文件超过 32 MB" }
+        const val MAX_SEQUENCES = 100_000
+        const val MAX_COUNT = 1_000_000
+        const val MAX_RECENT = 100
+        const val STORED_HIGH_WATER = MAX_SEQUENCES
+        const val STORED_KEPT = 90_000
+
+        /**
+         * [storedLocally] 读本机自己的学习文件：条目数、次数和最近输入超限时先读入、再由
+         * [boundedForStorage] 裁剪；格式错误仍然拒绝，避免覆盖损坏前的数据。导入外部文件保持严格。
+         */
+        fun decode(text: String, storedLocally: Boolean = false): PersonalLearningData {
+            if (storedLocally) return decodeChecked(text, lenient = true).boundedForStorage()
+            return decodeChecked(text, lenient = false)
+        }
+
+        private fun decodeChecked(text: String, lenient: Boolean): PersonalLearningData {
+            require(lenient || text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "学习文件超过 32 MB" }
             val root = JSONObject(text)
             if (root.has("format")) {
                 require(root.getString("format") == "cyime-personal-learning" && root.getInt("version") == 1) { "不支持的学习文件格式" }
@@ -40,13 +73,13 @@ data class PersonalLearningData(
             require(root.has("bigrams") && root.has("trigrams")) { "缺少手机学习数据" }
             fun count(row: JSONObject): Int {
                 val value = row.getLong("count")
-                require(value in 1..1_000_000) { "次数必须在 1～1000000 之间" }
+                require(value >= 1 && (lenient || value <= MAX_COUNT)) { "次数必须在 1～1000000 之间" }
                 require(row.getDouble("count") == value.toDouble()) { "次数必须是整数" }
-                return value.toInt()
+                return value.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             }
             fun sequences(key: String, size: Int): List<LearnedSequence> {
                 val array = root.getJSONArray(key)
-                require(array.length() <= 100_000) { "学习条目过多" }
+                require(lenient || array.length() <= MAX_SEQUENCES) { "学习条目过多" }
                 val seen = hashSetOf<List<String>>()
                 return List(array.length()) { index ->
                     val row = array.getJSONObject(index)
@@ -70,7 +103,7 @@ data class PersonalLearningData(
                 PersonalContinuation(prefix, next, count(row))
             }
             val recent = root.optJSONArray("recentInputs") ?: JSONArray()
-            require(recent.length() <= 100)
+            require(lenient || recent.length() <= MAX_RECENT)
             return PersonalLearningData(sequences("bigrams", 2), sequences("trigrams", 3),
                 List(recent.length()) { recent.getString(it).also { value -> require(value.length in 1..2) } },
                 profile?.optString("name").orEmpty().also { require(it.length <= 100) }, continuations)

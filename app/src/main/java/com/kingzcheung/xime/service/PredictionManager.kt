@@ -139,12 +139,15 @@ class PredictionManager(
     }
     
     fun recordInput(text: String) {
+        // 无痕只停止学习，联想仍按已有数据给出。
+        if (com.kingzcheung.xime.settings.IncognitoState.active) return
         if (SettingsPreferences.isSmartPredictionEnabled(context) && AssociationManager.isInitialized()) {
             AssociationManager.recordInput(text)
         }
     }
     
     fun recordInputPair(lastChar: String, candidate: String) {
+        if (com.kingzcheung.xime.settings.IncognitoState.active) return
         if (SettingsPreferences.isSmartPredictionEnabled(context) && AssociationManager.isInitialized()) {
             AssociationManager.recordInput(lastChar + candidate)
         }

@@ -6,9 +6,6 @@ import com.kingzcheung.xime.model.ModelManager
 import com.kingzcheung.xime.settings.SchemaManifestManager.BUILTIN_PACKAGE_ID
 import com.kingzcheung.xime.util.FileLogger
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * 存储空间分类统计与清除（设置 → 关于 → 存储空间）。
@@ -222,15 +219,13 @@ object StorageStats {
     }
 
     private fun clearLogs(context: Context): Boolean {
-        // 当日活跃文件被 FileLogger 持有句柄，删除后空间不会释放且新日志丢失，保留
-        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
-        val keep = "kime_$today.log"
+        // 当日活跃文件（各进程各一个）被 FileLogger 持有句柄，删除后空间不会释放且新日志丢失，保留
         val dir = logsDir(context)
         var ok = true
         dir.listFiles()?.forEach { f ->
-            if (f.name != keep && !f.delete()) ok = false
+            if (!FileLogger.isActiveLogName(f.name) && !f.delete()) ok = false
         }
-        FileLogger.i("StorageStats", "Logs cleared (kept active file: $keep)")
+        FileLogger.i("StorageStats", "Logs cleared (kept today's active files)")
         return ok
     }
 

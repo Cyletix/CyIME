@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.kingzcheung.xime.association.AssociationManager
 import com.kingzcheung.xime.model.ModelManager
 import com.kingzcheung.xime.model.ModelRuntime
-import com.kingzcheung.xime.model.ModelStorage
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,20 +28,17 @@ data class SmartPredictionUiState(
     val isDownloading: Boolean = false,
     val downloadProgress: Float = 0f,
     val downloadStatus: String = "",
-    val modelRepo: String = "",
     val hasModel: Boolean = false,
-    val showRepoDialog: Boolean = false,
-    val tempRepo: String = "",
     val toastMessage: String? = null
 )
 
 class SmartPredictionSettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
+    private var modelOperation: kotlinx.coroutines.Job? = null
     
     private val _uiState = MutableStateFlow(SmartPredictionUiState(
         isEnabled = SettingsPreferences.isSmartPredictionEnabled(context),
-        isInitialized = AssociationManager.isInitialized(),
-        modelRepo = SettingsPreferences.getPredictionModelRepo(context)
+        isInitialized = AssociationManager.isInitialized()
     ))
     val uiState: StateFlow<SmartPredictionUiState> = _uiState.asStateFlow()
     
@@ -142,13 +138,12 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     }
 
     fun selectModel(id: String) {
+        modelOperation?.cancel()
         SettingsPreferences.setPredictionSelectedModel(context, id)
         checkModelState()
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { AssociationManager.release() }
-            _uiState.update { it.copy(isInitialized = false) }
-            if (_uiState.value.isEnabled) loadModel()
-        }
+        AssociationManager.release()
+        _uiState.update { it.copy(isInitialized = false, isLoading = false) }
+        if (_uiState.value.isEnabled) loadModel()
     }
 
     fun setEnabled(enabled: Boolean) {
@@ -161,14 +156,15 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
             if (_uiState.value.isInitialized) {
                 ModelRuntime.keepWarm("predictive_text")
             }
-        } else if (!enabled && _uiState.value.isInitialized) {
+        } else if (!enabled) {
             ModelRuntime.releaseWarm("predictive_text")
             releaseModel()
         }
     }
     
     private fun loadModel() {
-        viewModelScope.launch {
+        modelOperation?.cancel()
+        modelOperation = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             
             val success = withContext(Dispatchers.IO) {
@@ -180,19 +176,16 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
                 isLoading = false
             )}
             
-            if (!success) {
-                _uiState.update { it.copy(toastMessage = "模型加载失败，请检查模型文件") }
+            if (!success || _uiState.value.hasModel && !com.kingzcheung.xime.association.OnnxAssociationEngine.isInitialized()) {
+                _uiState.update { it.copy(toastMessage = "模型加载失败，当前使用基础联想；请检查模型文件") }
             }
         }
     }
     
     private fun releaseModel() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                AssociationManager.release()
-            }
-            _uiState.update { it.copy(isInitialized = false) }
-        }
+        modelOperation?.cancel()
+        AssociationManager.release()
+        _uiState.update { it.copy(isInitialized = false, isLoading = false) }
     }
     
     fun saveUserData() {
@@ -201,68 +194,6 @@ class SmartPredictionSettingsViewModel(application: Application) : AndroidViewMo
     
     fun refreshCacheSize() {
         learningOperation("已刷新统计") { }
-    }
-    
-    fun downloadModelFiles() {
-        val id = SettingsPreferences.getPredictionSelectedModel(context)
-        val base = _uiState.value.modelRepo.trimEnd('/')
-        val prefix = if (base.contains("modelscope.cn")) "$base/resolve/master" else base
-        val model = ModelManager.getModel(id) ?: com.kingzcheung.xime.model.ModelInfo(
-            id, "智能联想", "", com.kingzcheung.xime.model.ModelCategory.PREDICTION,
-            versions = listOf(com.kingzcheung.xime.model.ModelVersion(version = "custom",
-                files = listOf("vocab.json", "model_int8_dynamic.onnx").map {
-                    com.kingzcheung.xime.model.ModelFile(it, "$prefix/$it")
-                })))
-        ModelManager.downloadModelInBackground(context, model)
-    }
-
-    fun deleteModel() {
-        val modelId = SettingsPreferences.getPredictionSelectedModel(context)
-        val modelDir = ModelStorage.getModelDir(context, modelId)
-        val vocabFile = modelDir.resolve("vocab.json")
-        val modelFile = modelDir.resolve("model_int8_dynamic.onnx")
-        if (ModelManager.getModel(modelId) != null) ModelManager.deleteModel(context, modelId)
-        else { vocabFile.delete(); modelFile.delete(); ModelManager.notifyInstalledModelsChanged() }
-        
-        SettingsPreferences.setSmartPredictionEnabled(context, false)
-        
-        viewModelScope.launch {
-            if (_uiState.value.isInitialized) {
-                withContext(Dispatchers.IO) {
-                    AssociationManager.release()
-                }
-            }
-            
-            _uiState.update { it.copy(
-                hasModel = false,
-                isEnabled = false,
-                isInitialized = false,
-                toastMessage = "模型已删除"
-            )}
-        }
-    }
-    
-    fun showRepoDialog() {
-        _uiState.update { it.copy(
-            showRepoDialog = true,
-            tempRepo = it.modelRepo
-        )}
-    }
-    
-    fun hideRepoDialog() {
-        _uiState.update { it.copy(showRepoDialog = false) }
-    }
-    
-    fun setTempRepo(repo: String) {
-        _uiState.update { it.copy(tempRepo = repo) }
-    }
-    
-    fun saveRepo() {
-        SettingsPreferences.setPredictionModelRepo(context, _uiState.value.tempRepo)
-        _uiState.update { it.copy(
-            modelRepo = it.tempRepo,
-            showRepoDialog = false
-        )}
     }
     
     fun clearToast() {

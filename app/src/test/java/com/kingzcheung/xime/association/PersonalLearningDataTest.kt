@@ -42,4 +42,21 @@ class PersonalLearningDataTest {
         val index = PersonalContinuationIndex(rows)
         repeat(1000) { assertEquals("看看", index.predict("我想").first().text) }
     }
+
+    @Test fun storedLearningOverLimitsIsTrimmedInsteadOfRejected() {
+        val rows = (0 until PersonalLearningData.MAX_SEQUENCES + 5).joinToString(",") {
+            """{"tokens":["${'a' + it % 26}","${(0x4e00 + it % 20_000).toChar()}${(0x4e00 + it / 20_000).toChar()}"],"count":${if (it == 0) 3_000_000 else 1 + it % 7}}"""
+        }
+        val text = """{"bigrams":[$rows],"trigrams":[],"recentInputs":[]}"""
+        try { PersonalLearningData.decode(text); fail("imports stay strict") } catch (_: IllegalArgumentException) { }
+        val data = PersonalLearningData.decode(text, storedLocally = true)
+        assertEquals(PersonalLearningData.STORED_KEPT, data.bigrams.size)
+        assertTrue(data.bigrams.all { it.count in 1..PersonalLearningData.MAX_COUNT })
+        assertEquals(listOf("a", "一一"), data.bigrams.first().tokens)
+        assertEquals(data, PersonalLearningData.decode(data.encode()))
+    }
+    @Test fun dataWithinLimitsIsStoredUnchanged() {
+        val data = PersonalLearningData(bigrams = listOf(LearnedSequence(listOf("你", "好"), 3)))
+        assertSame(data, data.boundedForStorage())
+    }
 }

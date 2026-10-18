@@ -1,15 +1,15 @@
 {
-  "source": "https://huggingface.co/datasets/thu-coai/lccc",
-  "license": "MIT",
-  "source_sha256": "2162e0ed923fba62329cabf7e1493fbe59248afc94a62508e4abdea61e624627",
-  "split": "train only",
-  "sampling": "zero-based dialogue index modulo 34 == 0",
-  "dialogs": 200604,
-  "sentences": 589546,
-  "contexts": 9191,
-  "entries": 29245,
-  "bytes": 160873,
-  "sha256": "ecb745047b3d1c368b3a0097750b97618919927ac9fc1137e3018ff67451d394",
+  "source": [
+    "https://huggingface.co/datasets/thu-coai/lccc (LCCC-base train, MIT)",
+    "OpenSubtitles (OPUS) zh subtitles converted to simplified"
+  ],
+  "license": "LCCC-base MIT; OpenSubtitles per OPUS terms (user accepted 2026-10-10)",
+  "build": "tools/ime_lab/ngram/continuation_build.cc (two passes) over the segmented corpus of the T9 word model (ngram_build --segment): context = trailing 1-2 characters of committed text, continuation = next Han word or rest of the current word; --contexts 40000 --top 10 --min-total 80 --min-count 3 --max-context 2",
+  "contexts": 40000,
+  "entries": 392708,
+  "bytes": 2428256,
+  "sha256": "a8e76e91022e611afa34dad541d7574ec89119bfdbf4fcc216aed40ea710ddb4",
+  "score": "count/total = P(continuation | context); mixed 0.7 base + 0.15 neural model + 0.15 personal in NgramFusionEngine",
   "purpose": "post-commit word association baseline, not a pinyin decoder or personal history",
-  "validation": "file integrity only; quality evaluation separate"
+  "validation": "tools/ime_lab/ngram/suggest_eval.py on API-generated chat sentences (test only): top-3 continuation hit 18.4% -> 38.1% (chat-fn, 235 sentences), 17.1% -> 41.7% (everyday, 171); after common single characters 11.7% -> 21.2%; 这 1/53 -> 18/53"
 }

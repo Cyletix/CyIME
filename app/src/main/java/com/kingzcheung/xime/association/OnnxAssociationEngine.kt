@@ -6,145 +6,114 @@ import com.kingzcheung.xime.model.ModelStorage
 import com.kingzcheung.xime.service.InferenceClient
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.util.FileLogger
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 
 object OnnxAssociationEngine {
     private const val TAG = "OnnxAssociationEngine"
-
-    @Volatile
-    private var isInitialized = false
+    private val lifecycle = Mutex()
+    private val stateLock = Any()
+    private val generation = AtomicLong()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    @Volatile private var inferenceClient: InferenceClient? = null
+    @Volatile private var loadedModelId: String? = null
     private var warmupStarted = false
-    private val warmupScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var inferenceClient: InferenceClient? = null
 
-    suspend fun initialize(context: Context): Boolean {
-        if (isInitialized) {
-            FileLogger.d(TAG, "Already initialized")
-            return true
+    suspend fun initialize(context: Context): Boolean = lifecycle.withLock {
+        val app = context.applicationContext
+        val modelId = SettingsPreferences.getPredictionSelectedModel(app)
+        if (loadedModelId == modelId && inferenceClient?.isBound() == true) return@withLock true
+        val token = generation.get()
+        ModelRuntime.register("predictive_text", { initialize(app) }, { release() }, "智能联想模型")
+        val old = synchronized(stateLock) {
+            inferenceClient.also { inferenceClient = null; loadedModelId = null; warmupStarted = false }
         }
-
-        ModelRuntime.register(
-            id = "predictive_text",
-            loader = { initialize(context) },
-            releaser = { release() },
-            label = "智能联想模型"
-        )
-
+        dispose(old)
+        ModelRuntime.markUnloaded("predictive_text")
+        ModelStorage.migrateLegacyForModel(app, modelId)
+        val dir = ModelStorage.getModelDir(app, modelId)
+        val model = File(dir, "model_int8_dynamic.onnx")
+        val vocab = File(dir, "vocab.json")
+        if (!model.isFile || !vocab.isFile) return@withLock false
+        val client = InferenceClient(app)
+        var installed = false
         try {
-            // 模型 id 由设置决定，支持 small/base 等多版本共存切换
-            val modelId = SettingsPreferences.getPredictionSelectedModel(context)
-            val modelDir = ModelStorage.getModelDir(context, modelId)
-            modelDir.mkdirs()
-
-            // 兼容旧版：把旧路径模型迁移到统一目录
-            ModelStorage.migrateLegacyForModel(context, modelId)
-
-            val filesToCheck = listOf("vocab.json", "model_int8_dynamic.onnx")
-            for (fileName in filesToCheck) {
-                val file = File(modelDir, fileName)
-                if (!file.exists()) {
-                    FileLogger.e(TAG, "$fileName not found at ${file.absolutePath}")
-                    return false
-                }
-                FileLogger.d(TAG, "$fileName exists: ${file.length()} bytes")
-            }
-
-            val modelFile = File(modelDir, "model_int8_dynamic.onnx")
-            val vocabFile = File(modelDir, "vocab.json")
-            FileLogger.d(TAG, "Using model: ${modelFile.name} (${modelFile.length()} bytes)")
-
-            val client = InferenceClient(context)
-            // 先释放旧 client 的绑定，避免每次 initialize 泄漏一个 ServiceConnection
-            // （ServiceConnectionLeaked：切换预测设置时反复 initialize 累积泄漏）
-            inferenceClient?.unbind()
-            inferenceClient = client
             client.onDisconnected = {
-                // 服务进程被回收后 AUTO_CREATE 自动重启只恢复 binder，模型不会自己回来：
-                // 软重置本地状态（不 unbind，保留系统自动重启与连接），下次预测由
-                // AssociationManager.predict 的引擎状态守卫检测并重新 load，
-                // 避免"重启抢先→服务端空返回→联想静默失效"
-                isInitialized = false
-                ModelRuntime.markUnloaded("predictive_text")
+                synchronized(stateLock) {
+                    if (inferenceClient === client) {
+                        loadedModelId = null
+                        warmupStarted = false
+                        ModelRuntime.markUnloaded("predictive_text")
+                    }
+                }
             }
-
-            if (!client.ensureBound()) {
-                FileLogger.e(TAG, "Failed to bind to InferenceService")
-                return false
+            if (!client.ensureBound() || !client.loadModel(InferenceClient.MODEL_PREDICTION, model.path, vocab.path)) {
+                return@withLock false
             }
-            val ok = client.loadModel(
-                InferenceClient.MODEL_PREDICTION,
-                modelFile.absolutePath,
-                vocabFile.absolutePath
-            )
-            if (!ok) {
-                FileLogger.e(TAG, "Failed to load prediction model in inference process")
-                return false
+            currentCoroutineContext().ensureActive()
+            synchronized(stateLock) {
+                if (generation.get() == token && SettingsPreferences.getPredictionSelectedModel(app) == modelId) {
+                    inferenceClient = client
+                    loadedModelId = modelId
+                    installed = true
+                    ModelRuntime.markLoaded("predictive_text")
+                }
             }
-
-            isInitialized = true
-            FileLogger.i(TAG, "Prediction model loaded via IPC")
-            ModelRuntime.markLoaded("predictive_text")
-            return true
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "Failed to initialize prediction: ${e.message}", e)
-            return false
+            if (installed) FileLogger.i(TAG, "Prediction model loaded: $modelId")
+            installed
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (error: Exception) {
+            FileLogger.e(TAG, "Prediction model load failed", error)
+            false
+        } finally {
+            if (!installed) withContext(NonCancellable) { dispose(client) }
         }
     }
 
-    suspend fun predict(inputText: String, topK: Int = 20): List<AssociationCandidate> = withContext(Dispatchers.Default) {
-        val client = inferenceClient
-        if (!isInitialized || client == null) {
-            FileLogger.e(TAG, "Engine not initialized")
-            return@withContext emptyList()
-        }
-
-        // 服务进程被系统回收（设计内行为）后 binder 失效：这里必须重置本地
-        // "已初始化"假象，否则联想将永远空转（无法重新 bind + loadModel）。
-        // 重置后由 AssociationManager.predict 的引擎状态守卫检测到并按需
-        // 重新加载（ModelRuntime.load → 本类 initialize），实现自愈。
-        if (!client.isBound()) {
-            FileLogger.w(TAG, "InferenceService not bound, resetting engine state for recovery")
-            release()
-            return@withContext emptyList()
-        }
-
-        try {
-            client.predict(inputText, topK)
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "Prediction failed: ${e.message}", e)
-            emptyList()
-        }
+    suspend fun predict(inputText: String, topK: Int = 20): List<AssociationCandidate> {
+        val client = inferenceClient ?: return emptyList()
+        if (loadedModelId == null) return emptyList()
+        return client.predict(inputText, topK)
     }
 
     fun startWarmup() {
-        if (!isInitialized || warmupStarted) return
-        warmupStarted = true
-        warmupScope.launch {
-            try {
-                val client = inferenceClient ?: return@launch
-                client.predict("，", 5)
-            } catch (e: Exception) {
-                FileLogger.w(TAG, "Warmup prediction failed (non-fatal): ${e.message}")
+        val client = synchronized(stateLock) {
+            if (loadedModelId == null || warmupStarted) return
+            warmupStarted = true
+            inferenceClient
+        } ?: return
+        scope.launch {
+            lifecycle.withLock {
+                if (inferenceClient === client) client.predict("，", 5)
             }
         }
     }
 
+    // Invalidate immediately, but never wait for a running inference on the UI thread.
+    // UNDISPATCHED queues cleanup at the mutex before a later initialize can load a new model.
     fun release() {
-        isInitialized = false
-        inferenceClient?.apply {
-            runBlocking { runCatching { unloadModel(InferenceClient.MODEL_PREDICTION) } }
-            unbind()
+        val client = synchronized(stateLock) {
+            generation.incrementAndGet()
+            loadedModelId = null
+            warmupStarted = false
+            ModelRuntime.markUnloaded("predictive_text")
+            inferenceClient.also { inferenceClient = null }
         }
-        inferenceClient = null
-        ModelRuntime.markUnloaded("predictive_text")
-        FileLogger.d(TAG, "Prediction model released")
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            lifecycle.withLock { withContext(Dispatchers.IO) { dispose(client) } }
+        }
     }
 
-    fun isInitialized(): Boolean = isInitialized
+    private suspend fun dispose(client: InferenceClient?) {
+        if (client == null) return
+        client.onDisconnected = null
+        try { client.unloadModel(InferenceClient.MODEL_PREDICTION) }
+        finally { client.unbind() }
+    }
+
+    fun isInitialized(): Boolean = loadedModelId != null && inferenceClient?.isBound() == true
+    fun activeModelId(): String? = loadedModelId.takeIf { isInitialized() }
 }

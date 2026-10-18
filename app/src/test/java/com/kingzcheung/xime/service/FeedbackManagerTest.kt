@@ -20,6 +20,13 @@ class FeedbackManagerTest {
         verifyNoInteractions(view)
     }
 
+    @Test fun `pen erasing plays its own sound with a light tick`() {
+        org.junit.Assert.assertEquals("handwriting_erase", KeyFeedbackType.HANDWRITING_ERASE.sound)
+        val view = mock<View>()
+        manager(HapticMode.Enabled).hapticFeedback(view, type = KeyFeedbackType.HANDWRITING_ERASE)
+        verify(view).performHapticFeedback(eq(HapticFeedbackConstants.TEXT_HANDLE_MOVE), any())
+    }
+
     @Test fun `typing retains keyboard haptics independently of cursor ticks`() {
         val view = mock<View>()
         manager(HapticMode.Enabled).performKeyPressDownEffect("delete", view)
@@ -35,6 +42,7 @@ class FeedbackManagerTest {
             "select_arrow_right" to KeyFeedbackType.NAVIGATION, "select_paragraph_start" to KeyFeedbackType.NAVIGATION,
             "copy" to KeyFeedbackType.EDITING, "toolbar" to KeyFeedbackType.TOOLBAR,
             "cursor_step" to KeyFeedbackType.CURSOR_STEP,
+            "handwriting_erase" to KeyFeedbackType.HANDWRITING_ERASE,
         ).forEach { (action, expected) -> org.junit.Assert.assertEquals(action, expected, KeyFeedbackType.fromKey(action)) }
     }
 }
