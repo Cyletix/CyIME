@@ -194,11 +194,11 @@
             </intent-filter>
         </service>
 
-        <!-- 输入法服务 -->
+        <!-- 输入法服务。名字直接写字面量：系统设置在应用更新途中读不到资源时会退回显示类名（2026-10-19 平板“默认键盘”显示成 XimeInputMethodService），打包器检查。 -->
         <service
             android:name="com.kingzcheung.xime.service.XimeInputMethodService"
             android:exported="true"
-            android:label="@string/ime_service_label"
+            android:label="CyIME"
             android:permission="android.permission.BIND_INPUT_METHOD">
             <intent-filter>
                 <action android:name="android.view.InputMethod" />
