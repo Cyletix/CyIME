@@ -64,7 +64,7 @@ class JapaneseImeWorkflowTest {
             rule.waitUntil(5000) { text().startsWith("何") && text().endsWith("しますか") }
             screenshot("japanese-range")
             tap("kana-convert")
-            rule.onNodeWithTag("kana-convert").performTouchInput { down(center); moveTo(center + Offset(100f, 0f)); up() }
+            rule.onNodeWithTag("kana-convert").performTouchInput { down(center); moveTo(center + Offset(0f, 50f)); moveTo(center + Offset(0f, 100f)); up() }
             waitText("なにをしますか")
             tap("kana-convert"); tap("kana-delete")
             waitText("なにをします")

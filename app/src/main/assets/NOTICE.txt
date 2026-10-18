@@ -15,7 +15,7 @@ ONNX Runtime
 Source: https://github.com/microsoft/onnxruntime
 License: MIT License
 
-Used for neural network inference in association prediction, punctuation and handwriting recognition.
+Used for neural network inference in association prediction, punctuation, handwriting and document OCR.
 
 ================================================================================
 Librime
@@ -25,3 +25,47 @@ Source: https://github.com/rime/librime
 License: BSD 3-Clause License
 
 Used as the core input method engine.
+
+================================================================================
+AndroidX CameraX 1.6.2
+================================================================================
+
+Source: https://developer.android.com/jetpack/androidx/releases/camera#1.6.2
+Source tree: https://android.googlesource.com/platform/frameworks/support/+/androidx-main/camera/
+Artifacts: camera-camera2, camera-lifecycle, camera-view; transitive CameraX
+artifacts include camera-core, camera-video and camera-camera2-pipe.
+License: Apache-2.0. camera-core also declares BSD-3-Clause for native code.
+Original artifact license texts: licenses/camerax/*-1.6.2.txt.
+LibYuv notice: licenses/camerax/libyuv-BSD-3-Clause.txt.
+LibYuv source/license: https://chromium.googlesource.com/libyuv/libyuv/+/refs/heads/main/LICENSE
+
+Used, without source modification, for the in-app pairing QR camera preview
+and image analysis. QR decoding reuses the application's existing ZXing dependency.
+
+================================================================================
+Offline document OCR
+================================================================================
+
+PP-OCRv5 mobile models, PaddlePaddle; ONNX distribution by RapidAI/RapidOCR v3.9.2.
+Apache-2.0. OpenCV 4.12.0 Android, Apache-2.0, with ONNX Runtime 1.28.0, MIT.
+Source, model hashes, adaptations and full licenses: licenses/ocr/PP-OCR-NOTICE.txt.
+Recognition is offline; models are bundled and never require Play Services or first-use downloads.
+
+================================================================================
+Offline speech recognition runtime and models
+================================================================================
+
+sherpa-onnx 1.13.8 (k2-fsa), Apache-2.0: https://github.com/k2-fsa/sherpa-onnx
+Full license text: licenses/sherpa-onnx-Apache-2.0.txt. Used for on-device speech
+recognition, voice activity detection and speaker embeddings (caption mode).
+Silero VAD (snakers4/silero-vad), MIT: licenses/silero-vad-MIT.txt.
+
+Models are downloaded on first use, or bundled in the offline edition only:
+- Paraformer streaming zh-en (Alibaba DAMO / FunASR), Apache-2.0; sherpa-onnx export.
+- SenseVoice Small (FunAudioLLM), released under the FunASR model license
+  (attribution and model-name retention required); sherpa-onnx int8 export.
+  https://github.com/FunAudioLLM/SenseVoice
+- Zipformer streaming zh (k2-fsa), Apache-2.0.
+- 3D-Speaker CAM++ speaker embedding zh-cn 16k-common (Alibaba 3D-Speaker), Apache-2.0;
+  ONNX export published by sherpa-onnx. Used only to tell speakers apart in caption mode;
+  voiceprints stay on the device.

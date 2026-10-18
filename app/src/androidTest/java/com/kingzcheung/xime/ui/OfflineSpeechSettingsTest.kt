@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
@@ -11,69 +12,73 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
+import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.SpeechModelCatalog
 import com.kingzcheung.xime.ui.settings.OfflineModelCard
 import com.kingzcheung.xime.ui.theme.XimeTheme
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
 class OfflineSpeechSettingsTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
-    @Test fun allModelsHaveNamedChoicesAndSelectionPersists() {
-        val manager = AsrModelManager(rule.activity)
-        val original = manager.getSelectedModelId()
-        try {
-            rule.setContent {
-                XimeTheme(darkTheme = true) {
-                    Surface(Modifier.fillMaxSize()) {
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) { OfflineModelCard() }
-                    }
-                }
-            }
-            val zip = rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.ZIPFORMER}")
-            val para = rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.PARAFORMER}")
-            val sense = rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.SENSEVOICE}")
-            assertTrue(rule.onAllNodes(isSelectable()).fetchSemanticsNodes().size == 3)
-            assertTrue(rule.onAllNodes(isToggleable()).fetchSemanticsNodes().size == 1)
-            val correction = rule.onNodeWithTag("speech-correction")
-            assertTrue(zip.fetchSemanticsNode().boundsInRoot.top < para.fetchSemanticsNode().boundsInRoot.top)
-            assertTrue(para.fetchSemanticsNode().boundsInRoot.top < sense.fetchSemanticsNode().boundsInRoot.top)
-            if (manager.selection(SpeechModelCatalog.TWO_PASS).ready && manager.selection(SpeechModelCatalog.ZIPFORMER).ready) {
-                para.performScrollTo().performClick()
-                if (!manager.isRefinementEnabled()) correction.performScrollTo().performClick()
-                assertEquals(SpeechModelCatalog.TWO_PASS, manager.getSelectedModelId())
-                zip.performScrollTo().performClick()
-                assertEquals(SpeechModelCatalog.ZIPFORMER_TWO_PASS, manager.getSelectedModelId())
-                correction.performScrollTo().assertIsOn().performClick().assertIsOff()
-                assertEquals(SpeechModelCatalog.ZIPFORMER, manager.getSelectedModelId())
-                para.performScrollTo().performClick()
-                correction.performScrollTo().assertIsOff()
-                assertEquals(SpeechModelCatalog.PARAFORMER, AsrModelManager(rule.activity).getSelectedModelId())
-            }
-            val output = File(rule.activity.getExternalFilesDir(null), "speech-eval/model-settings.png")
-            output.parentFile?.mkdirs()
-            rule.onRoot().captureToImage().asAndroidBitmap().useBitmap { bitmap ->
-                output.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            }
-        } finally { manager.setModel(original) }
+    private fun choice(language: InputLanguage, model: String) = rule.onNodeWithTag("speech-choice:${language.id}:$model")
+    private fun screen() = rule.setContent { XimeTheme(darkTheme = true) { Surface(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) { OfflineModelCard() }
+    } } }
+    private fun withSavedChoices(test: (AsrModelManager) -> Unit) {
+        val prefs = rule.activity.getSharedPreferences("asr_model", Context.MODE_PRIVATE)
+        val keys = InputLanguage.supported.map { "selected_model_${it.id}" }
+        val saved = keys.associateWith { prefs.getString(it, null) }
+        try { test(AsrModelManager(rule.activity)) }
+        finally { prefs.edit().also { editor -> saved.forEach { (key, value) ->
+            if (value == null) editor.remove(key) else editor.putString(key, value)
+        } }.commit() }
     }
-    @Test fun standaloneSenseVoiceIsSelectedAndCannotCorrectItself() {
-        val manager = AsrModelManager(rule.activity)
-        val original = manager.getSelectedModelId()
-        try {
-            manager.setFirstPassModel(SpeechModelCatalog.SENSEVOICE)
-            rule.setContent { XimeTheme {
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { OfflineModelCard() }
-            } }
-            rule.onNodeWithTag("speech-choice:${SpeechModelCatalog.SENSEVOICE}").performScrollTo().assertIsSelected()
-            rule.onNodeWithTag("speech-correction").performScrollTo().assertIsOff().assertIsNotEnabled()
-            assertEquals(SpeechModelCatalog.SENSEVOICE, AsrModelManager(rule.activity).getSelectedModelId())
-        } finally { manager.setModel(original) }
+    @Test fun eachLanguageSelectsIndependentlyAndShowsOnlyCompatibleModels() = withSavedChoices { manager ->
+        screen()
+        val zh = InputLanguage.CHINESE; val ja = InputLanguage.JAPANESE; val en = InputLanguage.ENGLISH
+        rule.onNodeWithTag("speech-correction:ja").assertDoesNotExist()
+        rule.onNodeWithTag("speech-language:ja").performScrollTo().performClick()
+        choice(ja, SpeechModelCatalog.ZIPFORMER).assertDoesNotExist()
+        if (manager.selection(SpeechModelCatalog.ZIPFORMER_JA).ready) {
+            choice(ja, SpeechModelCatalog.ZIPFORMER_JA).performScrollTo().performClick()
+            assertEquals(SpeechModelCatalog.ZIPFORMER_JA, manager.getSelectedModelId(ja))
+        } else rule.onNode(hasText("关闭") and hasAnyAncestor(isDialog())).performClick()
+        val japanese = manager.getSelectedModelId(ja)
+        rule.onNodeWithTag("speech-language:en").performScrollTo().performClick()
+        choice(en, SpeechModelCatalog.ZIPFORMER_JA).assertDoesNotExist()
+        if (manager.selection(SpeechModelCatalog.SENSEVOICE).ready) {
+            choice(en, SpeechModelCatalog.SENSEVOICE).performScrollTo().performClick()
+            assertEquals(SpeechModelCatalog.SENSEVOICE, manager.getSelectedModelId(en))
+        } else rule.onNode(hasText("关闭") and hasAnyAncestor(isDialog())).performClick()
+        val english = manager.getSelectedModelId(en)
+        rule.onNodeWithTag("speech-language:zh").performScrollTo().performClick()
+        if (manager.selection(SpeechModelCatalog.PARAFORMER).ready) {
+            choice(zh, SpeechModelCatalog.PARAFORMER).performScrollTo().performClick()
+            if (manager.selection(SpeechModelCatalog.SENSEVOICE).ready) {
+                rule.onNodeWithTag("speech-correction:zh").performScrollTo().performClick()
+            }
+        } else rule.onNode(hasText("关闭") and hasAnyAncestor(isDialog())).performClick()
+        assertEquals(english, manager.getSelectedModelId(en))
+        assertEquals(japanese, manager.getSelectedModelId(ja))
+        rule.onNodeWithTag("speech-language:zh").performScrollTo()
+        val output = File(rule.activity.getExternalFilesDir(null), "speech-eval/model-settings.png")
+        output.parentFile?.mkdirs()
+        val bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
+        try { output.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+        finally { bitmap.recycle() }
     }
-
-    private fun Bitmap.useBitmap(block: (Bitmap) -> Unit) { try { block(this) } finally { recycle() } }
+    @Test fun senseVoiceCannotCorrectItselfAndDoesNotChangeOtherLanguages() = withSavedChoices { manager ->
+        val japanese = manager.getSelectedModelId(InputLanguage.JAPANESE)
+        manager.setModel(SpeechModelCatalog.SENSEVOICE, InputLanguage.CHINESE)
+        screen()
+        rule.onNodeWithTag("speech-language:zh").performScrollTo().performClick()
+        choice(InputLanguage.CHINESE, SpeechModelCatalog.SENSEVOICE).assertIsSelected()
+        rule.onNode(hasText("关闭") and hasAnyAncestor(isDialog())).performClick()
+        rule.onNodeWithTag("speech-correction:zh").performScrollTo().assertIsOff().assertIsNotEnabled()
+        assertEquals(japanese, manager.getSelectedModelId(InputLanguage.JAPANESE))
+    }
 }

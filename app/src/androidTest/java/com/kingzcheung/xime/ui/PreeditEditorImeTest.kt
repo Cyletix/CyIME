@@ -272,14 +272,16 @@ class PreeditEditorImeTest {
         chooseMode("rime_ice"); setPrefix()
         "nihao".forEach { tap(it.toString()) }
         rule.waitUntil(5000) { engine.getInput() == "nihao" }
-        openEditor()
-        rule.onNodeWithTag("preedit-editor").assertHeightIsEqualTo(44.dp)
+        // Start in ordinary composition: requiring a prior tap on preedit hid the bug.
+        rule.onNodeWithTag("preedit-editor").assertDoesNotExist()
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("space-key", true).performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(400)
         rule.onNodeWithTag("space-key", true).performTouchInput { moveTo(center - Offset(50f, 0f)); up() }
         rule.mainClock.autoAdvance = true
         rule.waitUntil(5000) { engine.readPinyinEditSnapshot()[1].toInt() < 5 }
+        rule.onNodeWithTag("preedit-editor").assertHeightIsEqualTo(44.dp)
+        assertEquals("nihao", engine.getInput())
         assertEquals("前文", text())
         rule.runOnUiThread { assertEquals(2, editor.selectionStart) }
         draft("a")
@@ -287,6 +289,25 @@ class PreeditEditorImeTest {
         rule.onNodeWithContentDescription("删除", true).performTouchInput { click() }
         rule.waitUntil(5000) { engine.getInput().isEmpty() && rule.onAllNodesWithTag("preedit-editor").fetchSemanticsNodes().isEmpty() }
         assertEquals("前文", text())
+    }
+    @Test fun spaceDragFromInputBoxCompositionKeepsRawInputAndNeverFinalizesTheHost() {
+        SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
+        chooseMode("rime_ice"); setPrefix()
+        "nihao".forEach { tap(it.toString()) }
+        rule.waitUntil(5000) { engine.getInput() == "nihao" && text().startsWith("前文") && text().length > 2 }
+        val before = text()
+        var beforeSelection = -1
+        rule.runOnUiThread { beforeSelection = editor.selectionStart }
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("space-key", true).performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(400)
+        rule.onNodeWithTag("space-key", true).performTouchInput { moveTo(center - Offset(50f, 0f)); up() }
+        rule.mainClock.autoAdvance = true
+        rule.waitUntil(5000) { engine.readPinyinEditSnapshot()[1].toInt() < 5 }
+        assertEquals("nihao", engine.getInput())
+        assertEquals(before, text())
+        rule.runOnUiThread { assertEquals(beforeSelection, editor.selectionStart) }
+        assertEquals("Caret movement never commits", "", engine.commit())
     }
     @Test fun punctuationCommitsImmediatelyAndNeverLeavesCandidates() {
         chooseMode("rime_ice"); setPrefix()

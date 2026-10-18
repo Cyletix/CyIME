@@ -26,7 +26,8 @@ import org.junit.Test
 
 class MenuLayoutRegressionTest {
     @get:Rule val rule = createComposeRule()
-    private val firstPage = listOf("键盘调节", "深色模式", "定制工具栏", "设置")
+    private val firstPage = listOf(com.kingzcheung.xime.keyboard.ToolbarButton.FLOAT, com.kingzcheung.xime.keyboard.ToolbarButton.OCR,
+        com.kingzcheung.xime.keyboard.ToolbarButton.ARRANGE, com.kingzcheung.xime.keyboard.ToolbarButton.SETTINGS)
 
     @Test fun compactPortraitGridDoesNotClipOrOverlapAndSettingsRemainReachable() {
         assertGrid(width = 360, height = 180, landscape = false, fontScale = 1f, expected = firstPage)
@@ -40,7 +41,7 @@ class MenuLayoutRegressionTest {
         assertGrid(width = 800, height = 120, landscape = true, fontScale = 1.2f, expected = firstPage)
     }
 
-    private fun assertGrid(width: Int, height: Int, landscape: Boolean, fontScale: Float, expected: List<String>) {
+    private fun assertGrid(width: Int, height: Int, landscape: Boolean, fontScale: Float, expected: List<com.kingzcheung.xime.keyboard.ToolbarButton>) {
         var settings = 0
         rule.setContent {
             val config = Configuration(LocalConfiguration.current).apply {
@@ -50,15 +51,16 @@ class MenuLayoutRegressionTest {
             CompositionLocalProvider(LocalConfiguration provides config, LocalDensity provides Density(1f, fontScale)) {
                 MaterialTheme {
                     MenuBar(MenuBarState(true, true, 1, Color.Black, Color.DarkGray, Color.White),
-                        MenuBarCallbacks({}, {}, {}, {}, {}, {}, { settings++ }, {}, {}),
+                        quickActions(firstPage) { if (it == com.kingzcheung.xime.keyboard.ToolbarButton.SETTINGS) settings++ },
                         Modifier.size(width.dp, height.dp).testTag("menu-panel"))
                 }
             }
         }
         rule.onNodeWithContentDescription("关闭菜单").assertDoesNotExist()
         val panel = rule.onNodeWithTag("menu-panel").fetchSemanticsNode().boundsInRoot
-        val cards = expected.map { label ->
-            val card = rule.onNodeWithTag("menu-item:$label").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val cards = expected.map { button ->
+            val label = button.label
+            val card = rule.onNodeWithTag("menu-item:${button.id}").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             assertTrue("$label 必须在菜单内部", card.top >= panel.top && card.bottom <= panel.bottom && card.left >= panel.left && card.right <= panel.right)
             val layouts = mutableListOf<TextLayoutResult>()
             rule.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
@@ -71,7 +73,7 @@ class MenuLayoutRegressionTest {
         // Short panels keep one row; narrow large-text panels page horizontally.
         assertTrue(cards.map { it.top }.distinct().size == 1)
         if (expected.size < firstPage.size) rule.onNodeWithTag("menu-pages").performTouchInput { swipeLeft() }
-        rule.onNodeWithTag("menu-item:设置").assertIsDisplayed().performClick()
+        rule.onNodeWithTag("menu-item:settings").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(1, settings) }
     }
 

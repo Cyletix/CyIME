@@ -1,10 +1,13 @@
 package com.kingzcheung.xime.ui
 
 import android.app.Application
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -37,10 +40,13 @@ class QwertyExpandedRailGeometryTest {
                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(
                     frostedGlass = FrostedGlassConfig(enabled = glass))) {
                 MaterialTheme {
+                    // Keep the Android host fixed while only the keyboard viewport changes.
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CandidatePage(CandidatePageState(backgroundColor = Color.Black, textColor = Color.White,
                         keyBackgroundColor = Color.DarkGray, matchT9Geometry = true,
                         candidates = List(300) { CandidateEntry("候选$it", globalIndex = it) }),
                         CandidatePageCallbacks(onCandidateSelect = {}), Modifier.requiredSize(width.dp, 300.dp))
+                    }
                 }
             }
         }
@@ -82,6 +88,7 @@ class QwertyExpandedRailGeometryTest {
                     splitKeyboardEnabled = window.split,
                     frostedGlass = FrostedGlassConfig(enabled = window.glass))) {
                 MaterialTheme {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val modifier = Modifier.requiredSize(window.width.dp, window.height.dp).testTag("comparison-body")
                     if (!expanded) KeyboardLayout({}, vm,
                         KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
@@ -92,6 +99,7 @@ class QwertyExpandedRailGeometryTest {
                         qwertyGeometry = candidateQwertyGeometry(KeysConfigHelper.getKeyRows(false), false, false, window.split)),
                         CandidatePageCallbacks(onCandidateSelect = {}, onDelete = { deletes++ },
                             onEnter = { enters++ }, onToggleSingleCharFilter = { filters++ }), modifier)
+                    }
                 }
             }
         }
@@ -101,10 +109,14 @@ class QwertyExpandedRailGeometryTest {
         }
         for (size in windows) {
             rule.runOnIdle { window = size; expanded = false }
+            rule.waitForIdle()
+            val imageName = "${size.width}-${size.height}-split-${size.split}-glass-${size.glass}"
+            saveUiEvidence("typing-$imageName", rule.onNodeWithTag("comparison-body", true))
             val symbol = bounds("mode-slot-1")
             val delete = bounds("qwerty-delete-key")
             val enter = bounds("qwerty-enter-key")
             rule.runOnIdle { expanded = true }
+            saveUiEvidence("expanded-$imageName", rule.onNodeWithTag("comparison-body", true))
             val filter = bounds("expanded-filter-key")
             val expandedDelete = bounds("expanded-delete-key")
             val expandedEnter = bounds("expanded-enter-key")
@@ -112,8 +124,8 @@ class QwertyExpandedRailGeometryTest {
             assertEquals("$size left width", symbol.width, filter.width, 1f)
             assertEquals("$size bottom row top", symbol.top, filter.top, 1f)
             assertEquals("$size bottom row height", symbol.height, filter.height, 1f)
-            assertEquals("$size delete right edge", delete.right, expandedDelete.right, 1f)
-            assertEquals("$size delete width", delete.width, expandedDelete.width, 1f)
+            assertEquals("$size delete right edge", enter.right, expandedDelete.right, 1f)
+            assertEquals("$size expanded delete uses the return column", enter.width, expandedDelete.width, 1f)
             assertEquals("$size delete height", delete.height, expandedDelete.height, 1f)
             assertEquals("$size enter right edge", enter.right, expandedEnter.right, 1f)
             assertEquals("$size enter width", enter.width, expandedEnter.width, 1f)
