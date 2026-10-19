@@ -250,7 +250,7 @@ fun SpeechToTextSettingsContent(
                         )
                     }
                     Text(
-                        text = "打开后桌面多一个单独的“字幕”图标，点一下直接进字幕页。关闭时可从下拉快捷开关或键盘菜单的“字幕”进入。",
+                        text = "打开后确认添加到桌面，点一下直接进字幕页；图标颜色跟随键盘主题。关闭后桌面图标变灰，可长按移除；也可从下拉快捷开关或键盘菜单的“字幕”进入。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
