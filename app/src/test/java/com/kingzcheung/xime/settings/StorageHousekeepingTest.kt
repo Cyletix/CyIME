@@ -23,6 +23,9 @@ class StorageHousekeepingTest {
             File(cache, "-1234567.tar.bz2").apply { writeText("archive") },
             File(cache, "ocr-frames/$id.png").apply { parentFile!!.mkdirs(); writeText("png") },
             File(models, ".t9-ngram-$id.previous").apply { mkdirs() },
+            File(models, ".download-t9-ngram-small-$id").apply { mkdirs(); File(this, "t9_ngram.lm").writeText("partial") },
+            File(models, ".import-ochwpro-$id").apply { mkdirs() },
+            File(models, ".bundle-paraformer-zh-en-int8-$id").apply { mkdirs() },
             File(rime, ".t9_ngram.lm.$id.installing").apply { writeText("link") },
         )
         val kept = listOf(
@@ -30,6 +33,7 @@ class StorageHousekeepingTest {
             File(cache, "clipboard_images").apply { mkdirs() },
             File(cache, "model-download-notauuid").apply { mkdirs() },
             File(models, "t9-ngram").apply { mkdirs() },
+            File(models, "download-t9-ngram-$id").apply { mkdirs() },
             File(rime, "t9_ngram.lm").apply { writeText("model") },
             File(rime, "t9_pinyin.schema.yaml.installing").apply { writeText("schema") },
         )

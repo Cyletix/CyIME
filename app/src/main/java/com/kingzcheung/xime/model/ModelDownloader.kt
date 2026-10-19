@@ -76,7 +76,8 @@ object ModelDownloader {
         }
 
         val storageDir = getStorageDir(context, modelInfo)
-        val staging = File(context.cacheDir, "model-download-${UUID.randomUUID()}").apply { mkdirs() }
+        // 暂存在数据目录里：缓存目录里写出的文件挪进模型目录后，系统仍按缓存统计它，模型会被算成几百 MB 的“缓存”。
+        val staging = File(ModelStorage.getModelsRoot(context), ".download-${modelInfo.id}-${UUID.randomUUID()}").apply { mkdirs() }
 
         try {
             if (target.archiveUrl != null) {
