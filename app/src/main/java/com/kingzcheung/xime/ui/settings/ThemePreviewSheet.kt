@@ -13,6 +13,7 @@ import com.kingzcheung.xime.settings.FrostedGlassPreferences
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.frostedKeyColor
+import com.kingzcheung.xime.ui.keyboard.legibleForTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -212,12 +213,17 @@ private fun ThemePreviewPager(
                 .height(240.dp),
         ) { page ->
             val preview = PREVIEW_PAGES[page]
+            // 与键盘相同：过透时按该主题加深到键面文字清楚（legibleForTheme）；
+            // 玻璃透出的是同明暗的页面，而不是设置页本身（浅色设置里看深色页会发灰）。
+            val previewGlass = glass.forAppearance(preview.isDark).legibleForTheme(theme.id, preview.isDark)
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize()
+                    .then(if (previewGlass.enabled) Modifier.clip(RoundedCornerShape(12.dp))
+                        .background(glassPreviewHost(preview.isDark)) else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
                 CompositionLocalProvider(LocalKeyboardInputPreferences provides KeyboardInputPreferences(
-                    frostedGlass = glass.forAppearance(preview.isDark))) {
+                    frostedGlass = previewGlass)) {
                     ThemeKeyboardPreview(
                         theme = theme,
                         isDark = preview.isDark,
@@ -239,6 +245,9 @@ private fun ThemePreviewPager(
         )
     }
 }
+
+/** 玻璃预览后面的“宿主页面”：浅色时的浅底、深色时的深底。 */
+internal fun glassPreviewHost(isDark: Boolean): Color = if (isDark) Color(0xFF121214) else Color(0xFFF4F4F6)
 
 @Composable
 private fun PageIndicator(
