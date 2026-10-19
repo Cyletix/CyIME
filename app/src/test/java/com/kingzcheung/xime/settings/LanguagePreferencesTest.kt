@@ -16,6 +16,14 @@ class LanguagePreferencesTest {
             setOf(InputLanguage.JAPANESE, InputLanguage.ENGLISH)))
     }
 
+    @Test fun enablingAJapaneseSchemaEnablesJapanese() {
+        val fresh = setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
+        assertEquals(fresh + InputLanguage.JAPANESE, LanguagePreferences.withSchemaLanguage(fresh, "japanese"))
+        assertEquals(fresh + InputLanguage.JAPANESE, LanguagePreferences.withSchemaLanguage(fresh, "japanese_kana"))
+        // A Chinese schema or an already enabled language changes nothing.
+        assertEquals(fresh, LanguagePreferences.withSchemaLanguage(fresh, "pinyin_14jian"))
+    }
+
     @Test fun englishOnlyKeepsRealNativeFallback() {
         assertEquals("rime_ice", LanguagePreferences.nativeSchema(
             InputModes.ENGLISH, listOf("rime_ice", "japanese_kana"), setOf(InputLanguage.ENGLISH)))
