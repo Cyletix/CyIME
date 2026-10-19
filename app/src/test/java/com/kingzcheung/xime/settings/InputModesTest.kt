@@ -47,6 +47,12 @@ class InputModesTest {
         assertEquals("t9_pinyin", InputModes.available(modes, listOf("t9_pinyin", "rime_ice")).first().schemaId)
     }
 
+    @Test fun japaneseComesAfterEnglishByDefaultAndWhenSwitchedOnLater() {
+        assertEquals(listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH, InputLanguage.JAPANESE), InputModes.languageOrder(emptyList()))
+        // A saved order from older versions put Japanese before English; switching Japanese on moves it last.
+        assertEquals(listOf("zh", "en", "ja"), InputModes.orderWithLanguageLast(listOf("zh", "ja", "en"), InputLanguage.JAPANESE))
+    }
+
     @Test fun englishIsAvailableWithNoEnabledSchemas() {
         assertEquals(listOf(InputModes.english), InputModes.available(emptyList()))
     }
