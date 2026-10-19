@@ -18,6 +18,8 @@ import androidx.compose.foundation.clickable
 import com.kingzcheung.xime.ui.keyboard.CursorGestureMode
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.InputGestureLock
+import com.kingzcheung.xime.ui.keyboard.InputGestureLocks
 
 /** Groups of [InputExperienceSettings]; the 布局与显示 sub-pages each show some of them. */
 internal enum class InputExperiencePart { SYMBOLS, FLICK_DISC, KANA, CURSOR, LANGUAGE_HOLD, HANDWRITING, KEY_TEXT }
@@ -40,26 +42,34 @@ internal fun InputExperienceSettings(
             // 示意图随「反转上下滑方向」实时变化，一眼看出哪个方向输入哪个角标。
             Row(Modifier.fillMaxWidth().height(116.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SymbolInputMode.entries.forEach { mode ->
+                    // 冲突的设置先设好的那一项锁住这里（见 InputGestureLocks）；选“长按”会顺带打开九键拂动。
+                    val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.SYMBOL_INPUT_MODE, mode)
                     IllustratedChoiceCard(mode.label, settings.symbolInputMode == mode,
-                        onClick = { settings = settings.copy(symbolInputMode = mode); settings.save(context) },
-                        modifier = Modifier.weight(1f), tag = "symbol-input:${mode.name}") {
+                        onClick = { settings = InputGestureLocks.withSymbolInputMode(settings, mode); settings.save(context) },
+                        modifier = Modifier.weight(1f), tag = "symbol-input:${mode.name}", enabled = lock == null) {
                         SymbolGestureIllustration(mode == SymbolInputMode.LONG_PRESS, settings.reverseSymbolSwipe)
                     }
                 }
             }
+            SymbolInputMode.entries.firstNotNullOfOrNull {
+                InputGestureLocks.lockFor(settings, InputGestureLock.Option.SYMBOL_INPUT_MODE, it)
+            }?.let { SettingsLockNote("「${it.lockedValue.let { v -> (v as SymbolInputMode).label }}」${it.message}") }
             Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
                 "按住满 0.3 秒立即输入上方角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。"
                 else "滑动时在原键内预览，松手输入；所有布局角标的方向均可在下方反转。",
                 style = MaterialTheme.typography.bodySmall)
-            // 「长按输入」模式本来就不弹字母菜单，这一行只在滑动输入时生效、才显示。
-            if (settings.symbolInputMode != SymbolInputMode.LONG_PRESS) {
+            // 角标“长按”时长按总是出角标，气泡出不来：照常显示，置灰并写明被谁锁。
+            run {
+                val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.LETTER_LONG_PRESS_MENU, true)
+                    ?.takeIf { !settings.letterLongPressMenu }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("字母键长按弹出大小写", style = MaterialTheme.typography.titleSmall)
                         Text("长按字母弹出小写、大写和带音调的字母；关掉后长按字母不弹，上下拖动输入角标不受打扰。",
                             style = MaterialTheme.typography.bodySmall)
+                        if (lock != null) SettingsLockNote(lock.message)
                     }
-                    Switch(checked = settings.letterLongPressMenu,
+                    Switch(checked = settings.letterLongPressMenu, enabled = lock == null,
                         modifier = Modifier.testTag("letter-long-press-menu"), onCheckedChange = {
                             settings = settings.copy(letterLongPressMenu = it); settings.save(context)
                         })
@@ -116,13 +126,17 @@ internal fun InputExperienceSettings(
             Text("滑动移动光标", style = MaterialTheme.typography.titleSmall)
             Row(Modifier.fillMaxWidth().height(124.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CursorGestureMode.entries.forEach { mode ->
+                    val lock = InputGestureLocks.lockFor(settings, InputGestureLock.Option.CURSOR_GESTURE, mode)
                     IllustratedChoiceCard(mode.label, settings.cursorGesture == mode,
                         onClick = { settings = settings.copy(cursorGesture = mode); settings.save(context) },
-                        modifier = Modifier.weight(1f), tag = "cursor-gesture:${mode.name}") {
+                        modifier = Modifier.weight(1f), tag = "cursor-gesture:${mode.name}", enabled = lock == null) {
                         CursorGestureIllustration(mode)
                     }
                 }
             }
+            CursorGestureMode.entries.firstNotNullOfOrNull {
+                InputGestureLocks.lockFor(settings, InputGestureLock.Option.CURSOR_GESTURE, it)
+            }?.let { SettingsLockNote("「${(it.lockedValue as CursorGestureMode).label}」${it.message}") }
             if (settings.cursorGesture == CursorGestureMode.KEYBOARD) {
                 Text("整个键盘滑动移动光标时，英文 26 键的滑行输入暂停。", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
