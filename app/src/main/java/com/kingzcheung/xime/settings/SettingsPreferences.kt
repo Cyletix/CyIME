@@ -505,6 +505,8 @@ object SettingsPreferences {
     
     fun setKeyboardTheme(context: Context, themeId: String) {
         getPrefs(context).edit().putString(KEY_KEYBOARD_THEME, themeId).apply()
+        // 桌面图标（开启“跟随主题色”时）和字幕快捷方式随主题换色。
+        com.kingzcheung.xime.ui.theme.IconAppearance.onKeyboardThemeChanged(context, themeId)
     }
 
     
