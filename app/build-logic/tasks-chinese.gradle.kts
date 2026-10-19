@@ -194,10 +194,26 @@ val prepareChineseDictionaries by tasks.registering {
                 "拼音键\tpin yin jian\t5000", "手写键\tshou xie jian\t5000", "地球键\tdi qiu jian\t5000",
                 "搜索键\tsou suo jian\t5000", "十四键\tshi si jian\t5000", "悬浮键盘\txuan fu jian pan\t5000",
                 "单手键盘\tdan shou jian pan\t5000", "键盘高度\tjian pan gao du\t5000").joinToString("\n", postfix = "\n"))
+        // rime-ice reads the adverbial 地 in 慢慢地/默默地 only as de; many people type it as di (manmandi), which
+        // matched nothing and gave 慢慢滴. Offer every such entry under di too, at the same weight: a larger
+        // (whole 的/地/得 family) weight was tried and pushed 有效地 over 有效的 for the initials yxd.
+        val diVariants = listOf("base", "ext").flatMap { name ->
+            var body = false
+            File(root, "cn_dicts/$name.dict.yaml").readLines().mapNotNull { line ->
+                if (line.trim() == "...") body = true
+                val fields = line.split('\t')
+                if (body && fields.size == 3 && fields[0].length >= 2 && fields[0].endsWith("地") && fields[1].endsWith(" de"))
+                    fields[0] + "\t" + fields[1].dropLast(2) + "di\t" + fields[2] else null
+            }
+        }.distinct()
+        check(diVariants.size > 500) { "Adverbial 地 entries not found in rime_ice base/ext" }
+        File(root, "cyime_di.dict.yaml").writeText(
+            "# Adverbial 地 typed as di (generated from rime_ice base/ext).\n---\nname: cyime_di\nversion: \"2026-10-19\"\nsort: by_weight\n...\n" +
+            diVariants.joinToString("\n", postfix = "\n"))
         val iceDict = File(root, "rime_ice.dict.yaml")
         val othersImport = "  - cn_dicts/others   # 一些杂项\n"
         check(iceDict.readText().split(othersImport).size == 2) { "Upstream rime_ice import list changed" }
-        iceDict.writeText(iceDict.readText().replace(othersImport, othersImport + "  - cyime_terms\n"))
+        iceDict.writeText(iceDict.readText().replace(othersImport, othersImport + "  - cyime_terms\n  - cyime_di\n"))
     }
 }
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareChineseDictionaries) }
