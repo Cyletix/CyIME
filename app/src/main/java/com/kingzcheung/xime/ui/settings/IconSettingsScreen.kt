@@ -77,6 +77,19 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
                     }
                     Text("桌面图标使用所选样式；键盘左上角使用简洁线稿，颜色跟随键盘主题。桌面可能需要片刻刷新。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("桌面图标跟随主题色", style = MaterialTheme.typography.bodyLarge)
+                            Text("换键盘主题时，桌面图标换成同色的带底板折面图标",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = IconAppearance.followTheme, onCheckedChange = {
+                            changeAppearance(context, onChanged) { IconAppearance.setFollowTheme(context, it) }
+                        }, modifier = Modifier.testTag("icon-follow-theme"))
+                    }
+                    Text("三星等桌面每换一次图标，会先移除再重新添加，图标可能跑到应用列表最后，需要重新拖回原位。开启时上面的底板和样式暂不生效。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             SettingsSection(title = "图标样式") {
