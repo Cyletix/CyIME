@@ -24,8 +24,26 @@ internal object CandidateModelAssets {
     }
 
     fun filterBundledManifest(context: Context, manifest: String): String = manifest.lineSequence()
-        .filterNot { isDisabledAsset(context, it.split('\t').getOrNull(3).orEmpty()) }
+        .filterNot { line ->
+            val name = line.split('\t').getOrNull(3).orEmpty()
+            isDisabledAsset(context, name) || hasEnabledDownload(context, name)
+        }
         .joinToString("\n")
+
+    /** 用户下载过同名的候选模型（如九键词组模型）时，安装包自带的那份不再同步回 rime/，免得把用户的选择换回去。 */
+    private fun hasEnabledDownload(context: Context, name: String): Boolean = CandidateModelCatalog.models.any { model ->
+        model.versions.any { version -> version.files.any { it.name == name } } &&
+            !SettingsPreferences.getPrefsPublic(context).getBoolean(disabledKey(model.id), false) &&
+            model.versions.any { hasDownloadedModelFiles(ModelStorage.getModelDir(context, model.id), it) }
+    }
+
+    /** 安装包自带、由 BundledRimeSync 放进 rime/ 的同名文件同样是 CyIME 自己的，用户下载新的一档时可以换掉。 */
+    private fun isBundledCopy(context: Context, name: String, file: File): Boolean {
+        val manifest = runCatching {
+            context.assets.open("rime-bundled-manifest.tsv").bufferedReader().use { it.readText() }
+        }.getOrNull() ?: return false
+        return isBundledCopy(manifest, name, file)
+    }
 
     fun existingDirectory(context: Context, model: ModelInfo): File? {
         if (model.category != ModelCategory.CANDIDATE) return null
@@ -59,11 +77,11 @@ internal object CandidateModelAssets {
     }
 
     fun installDownloaded(context: Context, model: ModelInfo, version: ModelVersion) {
-        // 用户主动安装时，同名文件若是目录里的已知内容（旧格式、或二选一的另一档），属于 CyIME 自己的文件，直接替换。
+        // 用户主动安装时，同名文件若是目录里的已知内容（旧格式、或二选一的另一档）或安装包自带的那份，属于 CyIME 自己的文件，直接替换。
         installCandidateModel(ModelStorage.getModelDir(context, model.id), File(context.filesDir, "rime"), version) { name, file ->
-            val owner = knownCatalogOwner(name, file) ?: return@installCandidateModel false
-            if (owner.id != model.id) setDisabled(context, owner.id, true)
-            true
+            val owner = knownCatalogOwner(name, file)
+            if (owner != null && owner.id != model.id) setDisabled(context, owner.id, true)
+            owner != null || isBundledCopy(context, name, file)
         }
         setDisabled(context, model.id, false)
         if (model.id == CandidateModelCatalog.NGRAM || model.id == CandidateModelCatalog.NGRAM_SMALL) {
@@ -150,6 +168,13 @@ internal object CandidateModelAssets {
         setDisabled(context, model.id, true)
         return files.all { (_, file) -> !file.exists() || file.delete() }
     }
+}
+
+/** [file] 与安装包清单里同名条目的大小和哈希一致。 */
+internal fun isBundledCopy(manifest: String, name: String, file: File): Boolean {
+    val entry = manifest.lineSequence().map { it.split('\t') }.firstOrNull { it.size == 4 && it[3] == name } ?: return false
+    return file.isFile && file.length() == entry[1].toLongOrNull() &&
+        runCatching { verifyModelDigest(file, entry[0]) }.isSuccess
 }
 
 /** rime/ 里的词组模型和哪一档的下载是同一个文件（硬链接）；都不是时返回 null。 */

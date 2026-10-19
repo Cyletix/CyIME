@@ -31,6 +31,22 @@ internal fun modelDownloadRequest(url: String): Request.Builder {
     return builder
 }
 
+/** 把下载/安装失败换成用户看得懂、知道下一步做什么的一句话。 */
+internal fun modelFailureText(error: Throwable): String {
+    val chain = generateSequence(error) { it.cause }.take(8).toList()
+    val text = chain.mapNotNull { it.message }.joinToString(" ")
+    return when {
+        chain.any { it is java.net.UnknownHostException || it is java.net.ConnectException ||
+            it is java.net.SocketTimeoutException || it is javax.net.ssl.SSLException } ->
+            "连不上下载服务器，请检查网络后点重试"
+        "ENOSPC" in text || "No space left" in text -> "存储空间不够，清理一些空间后点重试"
+        // 这条的 cause 是旧文件的校验失败，要先于“不完整”判断。
+        "保留已有不同版本" in text -> "输入法目录里已有一份同名的自定义文件，为免覆盖没有安装；移走它后点重试"
+        "校验失败" in text || "不完整" in text -> "下载的文件不完整，请点重试重新下载"
+        else -> "下载失败：${chain.firstNotNullOfOrNull { it.message } ?: "未知原因"}。可点重试"
+    }
+}
+
 object ModelDownloader {
 
     private const val TAG = "ModelDownloader"
@@ -81,7 +97,7 @@ object ModelDownloader {
             throw e
         } catch (e: Exception) {
             FileLogger.e(TAG, "Download failed: ${modelInfo.id}: ${e.message}", e)
-            onProgress(ModelDownloadState.Error("下载失败: ${e.message}"))
+            onProgress(ModelDownloadState.Error(modelFailureText(e)))
         } finally {
             staging.deleteRecursively()
         }

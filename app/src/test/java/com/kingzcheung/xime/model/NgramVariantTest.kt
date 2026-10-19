@@ -3,6 +3,8 @@ package com.kingzcheung.xime.model
 import java.io.File
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -35,5 +37,27 @@ class NgramVariantTest {
         // 拷贝安装的内容即使相同也无法确认归属，不能据此删掉另一档。
         File(fullDir, "t9_ngram.lm").copyTo(File(runtime, "t9_ngram.lm"))
         assertNull(activeVariant(runtime, listOf(full to fullDir, small to smallDir)))
+    }
+
+    @Test fun bundledCopyIsRecognizedOnlyWhenSizeAndHashMatch() {
+        val content = "bundled model"
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(content.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val manifest = "$hash\t${content.length}\trime_chinese/t9_ngram.lm\tt9_ngram.lm\n"
+        val runtime = temporary.newFolder("rime")
+        val file = File(runtime, "t9_ngram.lm").apply { writeText(content) }
+        assertTrue(isBundledCopy(manifest, "t9_ngram.lm", file))
+        file.writeText("bundled modeL") // 同样大小、内容不同：用户自己的文件，不能当成自带的换掉
+        assertFalse(isBundledCopy(manifest, "t9_ngram.lm", file))
+        assertFalse(isBundledCopy(manifest, "other.lm", file))
+    }
+
+    @Test fun failureTextTellsWhatToDoNext() {
+        assertEquals("连不上下载服务器，请检查网络后点重试",
+            modelFailureText(java.io.IOException("x", java.net.UnknownHostException("github.com"))))
+        assertEquals("下载的文件不完整，请点重试重新下载", modelFailureText(java.io.IOException("模型校验失败：a.onnx")))
+        assertEquals("存储空间不够，清理一些空间后点重试", modelFailureText(java.io.IOException("write failed: ENOSPC")))
+        assertEquals("输入法目录里已有一份同名的自定义文件，为免覆盖没有安装；移走它后点重试",
+            modelFailureText(java.io.IOException("保留已有不同版本的 t9_ngram.lm，未覆盖", java.io.IOException("模型校验失败：t9_ngram.lm"))))
     }
 }
