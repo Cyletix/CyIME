@@ -352,13 +352,22 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
   }
   // Model word of each entry; an entry the corpus never contained is kept as its parts,
   // so a long unseen entry never wins by paying a single unseen-word cost.
-  struct T9LmEntry { int32_t id; vector<int32_t> parts; };
+  struct T9LmEntry { int32_t id; vector<int32_t> parts; double reading = 0; };
   std::unordered_map<const DictEntry*, T9LmEntry> lm_entries;
   auto lm_entry_of = [&](const an<DictEntry>& entry) -> const T9LmEntry& {
     const auto found = lm_entries.find(entry.get());
     if (found != lm_entries.end()) return found->second;
     T9LmEntry lm{t9_ngram_->Id(entry->text), {}};
     if (lm.id == ::T9NgramModel::kUnseen) t9_ngram_->Decompose(entry->text, &lm.parts);
+    if (t9_readings_) {
+      const auto readings = t9_readings_->find(entry->text);
+      vector<string> spelling;
+      if (readings != t9_readings_->end() && dict->Decode(entry->code, &spelling)) {
+        const string code = boost::algorithm::join(spelling, " ");
+        for (const auto& reading : readings->second)
+          if (reading.first == code) lm.reading = reading.second;
+      }
+    }
     return lm_entries.emplace(entry.get(), std::move(lm)).first->second;
   };
   auto better = [](const an<T9Line>& a, const an<T9Line>& b) {
@@ -413,6 +422,8 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
               const double user = std::min(1.0, std::exp(entry->weight));
               lp = std::log((1 - t9_ngram_user_weight_) * std::exp(lp) + t9_ngram_user_weight_ * user);
             }
+            // P(reading | word): the user's own entries were learned with this reading.
+            if (entry->commit_count <= 0) score += lm.reading;
             score += lp;
           } else {
             score += Grammar::Evaluate(
