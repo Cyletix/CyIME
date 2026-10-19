@@ -260,7 +260,7 @@ object ModelManager {
                 }
                 throw cancelled
             } catch (error: Exception) {
-                val state = ModelDownloadState.Error(error.message ?: "模型安装失败")
+                val state = ModelDownloadState.Error(modelFailureText(error))
                 _downloadStates.update { it + (model.id to state) }
                 onProgress(state)
             }

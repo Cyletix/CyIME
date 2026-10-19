@@ -69,6 +69,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -121,7 +122,8 @@ fun MarketHubContent(
     onNavigateToModelLocal: () -> Unit = {},
     initialTab: Int = 0,
 ) {
-    var tabIndex by remember { mutableIntStateOf(initialTab) }
+    // 进模型详情再返回时，这一页会重新组合；要保存在返回栈里，才能回到刚才所在的分页。
+    var tabIndex by rememberSaveable { mutableIntStateOf(initialTab) }
 
     Scaffold(
         topBar = {
@@ -573,12 +575,9 @@ private fun ModelTrailingButton(
             }
         }
         downloadState is ModelDownloadState.Error -> {
-            Text(
-                "下载失败",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(end = 4.dp),
-            )
+            TextButton(onClick = onDownload) {
+                Text("下载失败，重试", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
         }
         item.isDownloaded && item.hasUpdate -> {
             Column(horizontalAlignment = Alignment.End) {
@@ -1598,6 +1597,16 @@ private fun ModelDetailBody(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
+        }
+
+        (item.downloadState as? ModelDownloadState.Error)?.let { failure ->
+            item {
+                Text(
+                    failure.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
 
         if (model.downloadableVersions.isEmpty()) {
