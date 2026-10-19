@@ -185,7 +185,15 @@ val prepareChineseDictionaries by tasks.registering {
             listOf("浮窗\tfu chuang\t10000", "悬浮工具栏\txuan fu gong ju lan\t5000", "语音上屏\tyu yin shang ping\t5000",
                 "自动互联\tzi dong hu lian\t5000", "候选窗\thou xuan chuang\t5000", "候选框\thou xuan kuang\t5000",
                 "流式识别\tliu shi shi bie\t5000", "语音转写\tyu yin zhuan xie\t5000", "九宫格输入\tjiu gong ge shu ru\t5000",
-                "数字小键盘\tshu zi xiao jian pan\t5000").joinToString("\n", postfix = "\n"))
+                "数字小键盘\tshu zi xiao jian pan\t5000",
+                // Key and keyboard names the IME itself uses (2026-10-19: yuyanjian had no 语言键, so 语言见 won).
+                "语言键\tyu yan jian\t5000", "换行键\thuan hang jian\t5000", "表情键\tbiao qing jian\t5000",
+                "中英键\tzhong ying jian\t5000", "上档键\tshang dang jian\t5000", "大小写键\tda xiao xie jian\t5000",
+                "逗号键\tdou hao jian\t5000", "句号键\tju hao jian\t5000", "剪贴板键\tjian tie ban jian\t5000",
+                "收起键\tshou qi jian\t5000", "全选键\tquan xuan jian\t5000", "撤销键\tche xiao jian\t5000",
+                "拼音键\tpin yin jian\t5000", "手写键\tshou xie jian\t5000", "地球键\tdi qiu jian\t5000",
+                "搜索键\tsou suo jian\t5000", "十四键\tshi si jian\t5000", "悬浮键盘\txuan fu jian pan\t5000",
+                "单手键盘\tdan shou jian pan\t5000", "键盘高度\tjian pan gao du\t5000").joinToString("\n", postfix = "\n"))
         val iceDict = File(root, "rime_ice.dict.yaml")
         val othersImport = "  - cn_dicts/others   # 一些杂项\n"
         check(iceDict.readText().split(othersImport).size == 2) { "Upstream rime_ice import list changed" }
