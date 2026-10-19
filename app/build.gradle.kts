@@ -59,6 +59,8 @@ android {
     // 使服务层状态机（如语音收尾流程）可直接实例化测试
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Robolectric 渲染测试（如候选栏两端按钮对比图）需要真实资源与 assets。
+        unitTests.isIncludeAndroidResources = true
     }
 
     defaultConfig {
@@ -322,6 +324,11 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:6.3.0")
     // JVM 单测使用真实 org.json 实现（android.jar 内为抛异常的 stub）
     testImplementation("org.json:json:20240303")
+    // 在电脑上用真实 Compose 代码渲染界面截图（Robolectric 原生绘制），不用模拟器。
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(libs.androidx.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
