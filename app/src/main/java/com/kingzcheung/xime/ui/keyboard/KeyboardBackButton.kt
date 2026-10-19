@@ -37,6 +37,8 @@ internal fun KeyboardToolbarButton(
     restingFill: Color = Color.Transparent,
     /** 在工具栏里占等宽一格：整格可点，底色为与其他工具图标同尺寸的胶囊。 */
     slotWidth: androidx.compose.ui.unit.Dp? = null,
+    /** 胶囊改成这个圆角（与键盘卡片同心）；null 时是两头全圆的胶囊。 */
+    cornerRadius: androidx.compose.ui.unit.Dp? = null,
     content: @Composable () -> Unit,
 ) {
     // 底板只在按下时出现，松手淡出；平时只有图标，与工具栏其他图标一致。
@@ -49,10 +51,11 @@ internal fun KeyboardToolbarButton(
         .border(1.dp, outline.copy(alpha = outline.alpha * pressAlpha), CircleShape)
     if (slotWidth != null) {
         val pill = toolbarPillSize(slotWidth)
+        val shape = cornerRadius?.let { androidx.compose.foundation.shape.RoundedCornerShape(it) } ?: CircleShape
         Box(modifier.width(slotWidth).height(40.dp).clickable(source, indication = null, onClick = onClick),
             contentAlignment = Alignment.Center) {
-            Box(Modifier.size(pill).clip(CircleShape).then(disc)
-                .then(if (pressed) Modifier.visualMaterial(VisualStyles.current, pill.height / 2,
+            Box(Modifier.size(pill).clip(shape).then(disc)
+                .then(if (pressed) Modifier.visualMaterial(VisualStyles.current, cornerRadius ?: (pill.height / 2),
                     com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED) else Modifier),
                 contentAlignment = Alignment.Center) { content() }
         }
@@ -75,8 +78,10 @@ internal fun KeyboardBackButton(
     label: String = "返回",
     slotWidth: androidx.compose.ui.unit.Dp? = null,
     restingFill: Color = Color.Transparent,
+    cornerRadius: androidx.compose.ui.unit.Dp? = null,
 ) {
-    KeyboardToolbarButton(onBack, background, modifier, slotWidth = slotWidth, restingFill = restingFill) {
+    KeyboardToolbarButton(onBack, background, modifier, slotWidth = slotWidth, restingFill = restingFill,
+        cornerRadius = cornerRadius) {
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = label,
             tint = foreground, modifier = Modifier.size(24.dp))
     }
