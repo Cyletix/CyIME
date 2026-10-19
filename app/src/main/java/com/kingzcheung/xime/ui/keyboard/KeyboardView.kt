@@ -538,7 +538,7 @@ fun KeyboardView(
                     // 字幕是独立全屏页面，键盘随之收起，麦克风交给字幕页。
                     ToolbarButton.CAPTION -> ({ viewModel.closeOverlay(); com.kingzcheung.xime.ui.caption.CaptionActivity.open(quickContext) })
                     ToolbarButton.ARRANGE -> ({ viewModel.showOverlay(OverlayRoute.ToolbarCustomize) })
-                    // 布局手势开关只在适用的布局出现。
+                    // 布局手势开关只在适用的布局出现；排列页用同一规则（[quickAction] 为 null 即不列出）。
                     ToolbarButton.GLIDE, ToolbarButton.T9_FLICK, ToolbarButton.FOURTEEN_SWIPE,
                     ToolbarButton.KANA_HINTS, ToolbarButton.FLICK_DISC ->
                         if (item.button.appliesTo(state.inputProfile.layout.kind) &&
@@ -1752,6 +1752,8 @@ fun KeyboardView(
                     is OverlayRoute.ToolbarCustomize -> ToolbarCustomizeView(
                         toolbarButtons = state.toolbarButtons,
                         menuButtons = state.menuButtons,
+                        // 排列页只列当前键盘工具栏／菜单里真会出现的入口，与菜单一致。
+                        isShown = { quickAction(it) != null },
                         pluginButtons = state.toolbarPluginButtons,
                         keyTextColor = keyTextColor,
                         backgroundColor = keyboardBgColor,
