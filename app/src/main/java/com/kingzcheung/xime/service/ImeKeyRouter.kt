@@ -777,7 +777,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 spaceSnapshot.associationCandidates == service.candidateState.value.associationCandidates) {
                                 selectAssociation(spaceSnapshot.focusedT9AssociationIndex ?: return@withEditor)
                             }
-                        } else selectCandidateAsync(spaceSnapshot.highlightedCandidateIndex, snapshot = spaceSnapshot)
+                        } else if (!withEditor { commitSpaceCandidateEnglish(spaceSnapshot, spaceSnapshot.highlightedCandidateIndex) }) {
+                            selectCandidateAsync(spaceSnapshot.highlightedCandidateIndex, snapshot = spaceSnapshot)
+                        }
                         return@command
                     }
                     val pendingEnglish = candState.pendingEnglishText
@@ -793,7 +795,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                     } else if (candState.isComposing) {
                         if (candState.candidates.isNotEmpty()) {
-                            selectCandidateAsync(candState.spaceCandidateIndex(state.inputProfile), snapshot = candState)
+                            val index = candState.spaceCandidateIndex(state.inputProfile)
+                            if (hardwareEvent != null || !withEditor { commitSpaceCandidateEnglish(candState, index) }) {
+                                selectCandidateAsync(index, snapshot = candState)
+                            }
                         } else {
                             val input = candState.inputText
                             if (input.isNotEmpty()) {
@@ -1933,15 +1938,29 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         }
     }
 
+    /** 中文键盘且不在临时英文状态。物理键盘下 isChineseMode 依赖屏幕键盘上报，改看输入方案的语言。 */
+    private fun chineseKeyboardActive(): Boolean = service.uiState.value.let {
+        !it.isAsciiMode && it.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE
+    }
+
+    /** 屏幕键盘按住 Shift（或九键长按“下一项”）时按空格：这条候选有英文就上屏英文，返回 true。 */
+    private fun commitSpaceCandidateEnglish(snapshot: CandidateState, index: Int): Boolean {
+        val screenShiftHeld = service.keyboardViewModel.shiftMode.value == com.kingzcheung.xime.viewmodel.ShiftMode.HELD
+        if (!com.kingzcheung.xime.gloss.CandidateGlossary.swapHeld(screenShiftHeld)) return false
+        if (!commitCandidateEnglish(snapshot.candidates.getOrNull(index))) return false
+        if (screenShiftHeld) service.keyboardViewModel.onCharacterTyped()
+        return true
+    }
+
     /**
      * 物理键盘按住 Shift 加数字或空格选候选（释义词典已加载、中文正在组词时）：有英文上屏英文，
      * 没有照常上中文。按编码处理完后的候选来定位，与不按 Shift 时选的是同一条。返回是否接管了这个键。
      */
     internal fun selectHardwareCandidateWithShift(keyCode: Int): Boolean {
-        if (!com.kingzcheung.xime.gloss.CandidateGlossary.isLoaded || !service.isChineseMode) return false
-        if (shiftedCandidateOffset(keyCode) { 0 } == null) return false
         val before = service.candidateState.value
-        if (!before.isComposing || before.candidates.isEmpty()) return false
+        if (!takesOverShiftedCandidateKey(keyCode, shiftPressed = true, chinese = chineseKeyboardActive(),
+                glossLoaded = com.kingzcheung.xime.gloss.CandidateGlossary.isLoaded,
+                composingWithCandidates = before.isComposing && before.candidates.isNotEmpty())) return false
         postRimeJob("select") {
             val (state, index) = withEditor {
                 val current = service.candidateState.value
@@ -1951,7 +1970,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }!!
             }
             val word = state.candidates.getOrNull(index) ?: return@postRimeJob
-            val english = com.kingzcheung.xime.gloss.CandidateGlossary.englishFor(word)
+            val english = shiftSelectionEnglish(word, com.kingzcheung.xime.gloss.CandidateGlossary::englishFor)
             if (english != null) commitPreparedText(english, isT9Schema(service.uiState.value.currentSchemaId))
             else selectCandidateAsync(index, snapshot = state)
         }
@@ -1963,7 +1982,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 只在中文键盘生效；没有英文时返回 false，调用方照常选中文。
      */
     internal fun commitCandidateEnglish(candidate: String?): Boolean {
-        if (candidate.isNullOrEmpty() || !service.isChineseMode) return false
+        if (candidate.isNullOrEmpty() || !chineseKeyboardActive()) return false
         val english = com.kingzcheung.xime.gloss.CandidateGlossary.englishFor(candidate) ?: return false
         val t9 = isT9Schema(service.uiState.value.currentSchemaId)
         postRimeJob("select") { commitPreparedText(english, t9) }
@@ -2099,3 +2118,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
 /** 物理键盘 Shift 加数字（1…9、0）或空格对应的候选位置，相对工具栏当前窗口；空格取高亮项，其它键为 null。 */
 internal fun shiftedCandidateOffset(keyCode: Int, highlight: () -> Int): Int? =
     if (keyCode == KeyEvent.KEYCODE_SPACE) highlight() else hardwareCandidateDigitIndex(keyCode, shifted = false)
+
+/**
+ * 物理键盘带 Shift 的键是否由“按住 Shift 选候选”接管：只在中文组词、有候选时。Shift+空格总是接管
+ * （否则它被当成“输入一个空格”：先上中文首选、再多补一个空格）；Shift+数字只在释义词典生效时接管，
+ * 平时仍输入 ! @ # 等符号。没按 Shift 的键一律不接管，行为不变。
+ */
+internal fun takesOverShiftedCandidateKey(
+    keyCode: Int, shiftPressed: Boolean, chinese: Boolean, glossLoaded: Boolean, composingWithCandidates: Boolean,
+): Boolean = shiftPressed && chinese && composingWithCandidates &&
+    (keyCode == KeyEvent.KEYCODE_SPACE || glossLoaded && hardwareCandidateDigitIndex(keyCode, shifted = false) != null)
+
+/** 按住 Shift 选中的候选要上屏的英文；null 表示照常上屏中文。两种情况都只上屏这个词本身，不附加空格。 */
+internal fun shiftSelectionEnglish(candidate: String, englishFor: (String) -> String?): String? = englishFor(candidate)
