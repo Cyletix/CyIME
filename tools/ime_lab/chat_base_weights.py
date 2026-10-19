@@ -36,8 +36,9 @@ def main():
     parser.add_argument("output")
     parser.add_argument("--beta", type=float, required=True)
     parser.add_argument("--floor", type=float, default=1.0)
+    parser.add_argument("--dict", default="base", help="cn_dicts table to blend: base, or 8105 for single characters")
     args = parser.parse_args()
-    base = list(entries(Path(args.root) / "cn_dicts" / "base.dict.yaml"))
+    base = list(entries(Path(args.root) / "cn_dicts" / f"{args.dict}.dict.yaml"))
     counts = {}
     for line in open(args.counts, encoding="utf-8"):
         word, count = line.rstrip("\n").split("\t")
