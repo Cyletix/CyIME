@@ -1148,13 +1148,14 @@ fun KeyboardView(
                 remember(normal) { normal }
             } else state
             // 换布局（26/14/9、全键/手写/语音）或进出数字、常用符号页时新键盘快速淡入；不吞连点。
+            // 中英切换不算换布局：直接换字，不淡入（深色主题下淡入看起来像黑了一下）。
             val underlaySwapKey = when (underlyingPage) {
-                is KeyboardPage.Main -> listOf(underlyingPage.type, state.inputProfile.layout, state.isAsciiMode)
+                is KeyboardPage.Main -> listOf(underlyingPage.type, state.inputProfile.layout)
                 is KeyboardPage.Panel -> listOf(underlyingPage.type)
                 else -> null
             }
             Column(Modifier.clipboardUnderlaySize(clipboardPanel, state.keyboardHeightDp).fillMaxSize()
-                .cySwapFadeIn(underlaySwapKey)
+                .cySwapFadeIn(underlaySwapKey, instantKey = listOf(state.isAsciiMode, state.inputProfile.language))
                 .excludeRevealedKeyboardPanels(inputPreferences.frostedGlass.enabled, candidateReveal, overlayReveal).then(
                 if (candidatePageExpanded || overlayVisible) Modifier.clearAndSetSemantics {} else Modifier
             )) {
