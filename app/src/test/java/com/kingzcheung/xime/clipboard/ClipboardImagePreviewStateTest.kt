@@ -115,4 +115,54 @@ class ClipboardImagePreviewStateTest {
         state.prepared(invalidKey, image.copy(timestamp = 0), now)
         assertNull(state.preview.value)
     }
+
+    private val shot = ClipboardImage("content://media/external/images/media/42", "image/png", now, "截图")
+
+    @Test fun screenshotWithinOneMinuteIsOfferedOnceAndExpiresAfterAMinute() {
+        val state = ClipboardImagePreviewState(null)
+        assertTrue(state.offerScreenshot(shot, now + 10_000))
+        assertEquals(shot, state.preview.value)
+        assertEquals(ClipboardImagePreviewState.SCREENSHOT_MAX_AGE_MS, state.activeMaxAgeMs)
+        assertFalse("a refresh does not offer the same screenshot again", state.offerScreenshot(shot, now + 20_000))
+        state.expire(now + 59_000)
+        assertEquals(shot, state.preview.value)
+        state.expire(now + 60_000)
+        assertNull("gone after one minute", state.preview.value)
+        assertFalse("never offered again after it expired", state.offerScreenshot(shot, now + 30_000))
+    }
+
+    @Test fun pastedOrDismissedScreenshotIsNotOfferedAgain() {
+        val state = ClipboardImagePreviewState(null)
+        assertTrue(state.offerScreenshot(shot, now + 1_000))
+        state.dismiss(shot.uri)
+        assertNull(state.preview.value)
+        assertFalse(state.offerScreenshot(shot, now + 2_000))
+    }
+
+    @Test fun oldScreenshotsNeverPrompt() {
+        val state = ClipboardImagePreviewState(null)
+        assertFalse(state.offerScreenshot(shot, now + 60_000))
+        assertFalse(state.offerScreenshot(shot.copy(timestamp = 0), now))
+        assertNull(state.preview.value)
+    }
+
+    @Test fun copiedImageWinsAndKeepsItsLongerLifetime() {
+        val state = ClipboardImagePreviewState(null)
+        val key = state.beginCopy("content://source/first", now)!!
+        assertFalse("a copy being prepared is not replaced by a screenshot", state.offerScreenshot(shot, now))
+        state.prepared(key, image, now)
+        assertEquals(image, state.preview.value)
+        assertEquals(ClipboardImagePreviewState.MAX_AGE_MS, state.activeMaxAgeMs)
+        val newer = shot.copy(uri = "content://media/external/images/media/43", timestamp = now + 5_000)
+        assertFalse(state.offerScreenshot(newer, now + 6_000))
+        assertEquals(image, state.preview.value)
+    }
+
+    @Test fun aNewerScreenshotReplacesAnOlderScreenshotHint() {
+        val state = ClipboardImagePreviewState(null)
+        assertTrue(state.offerScreenshot(shot, now + 1_000))
+        val newer = shot.copy(uri = "content://media/external/images/media/43", timestamp = now + 5_000)
+        assertTrue(state.offerScreenshot(newer, now + 6_000))
+        assertEquals(newer, state.preview.value)
+    }
 }
