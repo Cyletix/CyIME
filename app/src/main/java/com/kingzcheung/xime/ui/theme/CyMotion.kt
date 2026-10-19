@@ -46,8 +46,8 @@ object CyMotion {
     /** 弹出层出现时的起始透明度和缩放。 */
     const val POPUP_FROM_ALPHA = 0f
     const val POPUP_FROM_SCALE = 0.92f
-    /** 键盘页切换淡入的起始透明度：不从全透明开始，避免一闪。 */
-    const val SWAP_FROM_ALPHA = 0.35f
+    /** 键盘页切换淡入的起始透明度：按键始终看得见，深色主题下也不会像黑了一下。 */
+    const val SWAP_FROM_ALPHA = 0.7f
 }
 
 /**
@@ -78,12 +78,18 @@ fun Modifier.cyPopupEnter(
  * 不叠两层内容，因此不会像揭幕遮罩那样在动画期间吞掉连点。首次出现不播放。
  */
 @Composable
-fun Modifier.cySwapFadeIn(key: Any?): Modifier {
+fun Modifier.cySwapFadeIn(key: Any?, instantKey: Any? = null): Modifier {
     // 新 key 的第一帧就用起始透明度：若等 LaunchedEffect 再降透明度，会先整帧闪现一次。
+    // [instantKey] 同时变了（如中英切换）就直接换，不淡入：同一块键盘只是换了字。
     val first = remember { booleanArrayOf(true) }
+    val lastInstant = remember { arrayOf(instantKey) }
     val alpha = remember(key) {
-        Animatable(if (first[0]) 1f else CyMotion.SWAP_FROM_ALPHA).also { first[0] = false }
+        val instant = first[0] || lastInstant[0] != instantKey
+        first[0] = false
+        lastInstant[0] = instantKey
+        Animatable(if (instant) 1f else CyMotion.SWAP_FROM_ALPHA)
     }
+    lastInstant[0] = instantKey
     LaunchedEffect(alpha) { alpha.animateTo(1f, CyMotion.enter()) }
     return graphicsLayer { this.alpha = alpha.value }
 }
