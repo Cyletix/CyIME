@@ -576,7 +576,8 @@ fun KeyboardLayout(
                                     val swipeDownBubbleText = if (swipeDownDisplay != DisplayMode.KEY && swipeDownHintsEnabled) swipeDownLabel else null
                                     val longPressConfig =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
-                                    val longPressDisplay = longPressConfig?.display ?: "key"
+                                    val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
+                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu) } ?: "key"
                                     val longPressLabels = if (longPressDisplay == "bubble") {
                                         longPressConfig?.values?.map { it.label }
                                             ?.filter { it.isNotEmpty() }?.ifEmpty { null }
@@ -1227,7 +1228,8 @@ fun KeyboardRowWithConfig(
 
             // 长按选项
             val longPressConfig = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
-            val longPressDisplay = longPressConfig?.display ?: "key"
+            val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
+                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu) } ?: "key"
             val longPressLabels = if (longPressDisplay == "bubble") {
                 longPressConfig?.values?.map { it.label }?.filter { it.isNotEmpty() }
                     ?.ifEmpty { null }
@@ -1529,7 +1531,8 @@ fun CompactKeyboardRowWithConfig(
                 if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && swipeDownHintsEnabled) swipeDownLabel else null
 
             val longPressConfig = KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
-            val longPressDisplay = longPressConfig?.display ?: "key"
+            val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
+                letterLongPressMenuAllowed(key, LocalKeyboardInputPreferences.current.letterLongPressMenu) } ?: "key"
             val longPressLabels = if (longPressDisplay == "bubble") {
                 longPressConfig?.values?.map { it.label }?.filter { it.isNotEmpty() }
                     ?.ifEmpty { null }
@@ -1644,3 +1647,11 @@ private fun SpaceKey(
 internal fun commitLongPressChoice(label: String, onCommitText: ((String) -> Unit)?, onKeyPress: (String) -> Unit) {
     if (label.length == 1 && label[0] in 'a'..'z') onKeyPress(label) else (onCommitText ?: onKeyPress)(label)
 }
+
+/**
+ * 字母键长按的大小写（及带音调字母）气泡默认关：它会打断上下拖动输入角标（用户 10-20）。
+ * 打开“字母键长按弹出大小写”才恢复；非字母键（标点、地球键等）的长按不受影响。
+ */
+internal fun letterLongPressMenuAllowed(key: String, enabled: Boolean): Boolean =
+    // 字母键是 1～2 个字母（26 键 q、14 键 qw）；earth 之类的功能键名不算。
+    enabled || key.length !in 1..2 || !key.all { it in 'a'..'z' || it in 'A'..'Z' }
