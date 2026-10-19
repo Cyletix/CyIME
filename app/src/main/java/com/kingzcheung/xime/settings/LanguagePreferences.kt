@@ -34,6 +34,7 @@ object LanguagePreferences {
         val current = enabled(context)
         val next = withSchemaLanguage(current, schemaId)
         if (next == current) return
+        (next - current).forEach { InputModes.moveLanguageLast(context, it) }
         SettingsPreferences.getPrefsPublic(context).edit().putStringSet(KEY, next.map { it.id }.toSet()).commit()
     }
 
@@ -47,7 +48,9 @@ object LanguagePreferences {
     /** English always remains available; language switches never delete dictionaries. */
     fun save(context: Context, language: InputLanguage, enabled: Boolean) {
         require(language != InputLanguage.ENGLISH && language != InputLanguage.UNSPECIFIED)
-        val next = this.enabled(context).toMutableSet().apply { if (enabled) add(language) else remove(language) }
+        val before = this.enabled(context)
+        val next = before.toMutableSet().apply { if (enabled) add(language) else remove(language) }
+        if (enabled && language !in before) InputModes.moveLanguageLast(context, language)
         if (language == InputLanguage.JAPANESE) {
             val schemas = SchemaManager.getEnabledSchemas(context)
             SchemaManager.setEnabledSchemas(context, if (enabled) (schemas + JapaneseSchemas.ids).distinct()

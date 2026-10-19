@@ -9,8 +9,23 @@ object InputModes {
     private const val LANGUAGE_ORDER_KEY = "input_language_order"
     val defaultModeOrder = listOf("rime_ice", "t9_pinyin", "double_pinyin_flypy", "pinyin_14jian", "japanese", "japanese_kana", ENGLISH, QwjrtkLayout.ID)
 
+    /** Languages without a saved position: Chinese, then English, then the rest (Japanese never jumps ahead of English). */
+    private val defaultLanguageOrder: List<InputLanguage>
+        get() = listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH).filter { it in InputLanguage.supported } +
+            InputLanguage.supported.filterNot { it == InputLanguage.CHINESE || it == InputLanguage.ENGLISH }
+
     fun languageOrder(ids: List<String>): List<InputLanguage> =
-        (ids.mapNotNull { id -> InputLanguage.supported.firstOrNull { it.id == id } } + InputLanguage.supported).distinct()
+        (ids.mapNotNull { id -> InputLanguage.supported.firstOrNull { it.id == id } } + defaultLanguageOrder).distinct()
+
+    /** A language switched on later goes behind the languages already in use. */
+    internal fun orderWithLanguageLast(ids: List<String>, language: InputLanguage): List<String> =
+        languageOrder(ids).filterNot { it == language }.map { it.id } + language.id
+
+    fun moveLanguageLast(context: Context, language: InputLanguage) {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        val saved = prefs.getString(LANGUAGE_ORDER_KEY, "").orEmpty().lines()
+        prefs.edit().putString(LANGUAGE_ORDER_KEY, orderWithLanguageLast(saved, language).joinToString("\n")).apply()
+    }
 
     fun languageOrder(context: Context): List<InputLanguage> = languageOrder(
         SettingsPreferences.getPrefsPublic(context).getString(LANGUAGE_ORDER_KEY, "").orEmpty().lines())
