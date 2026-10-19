@@ -53,7 +53,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
- * 语音输入时收起键盘后的底部悬浮条（仿 Gboard）：语言、展开键盘、状态、退格、麦克风。
+ * 语音输入时收起键盘后的底部悬浮条（仿 Gboard）：语言、展开键盘、状态、麦克风、退格。
  * 外观沿用实体键盘浮条；宿主透明全屏，只有这条胶囊进入可触摸区域。
  */
 @Composable
@@ -104,8 +104,9 @@ internal fun VoiceCollapsedPill(
                     Text(if (listening) "正在听取…" else "点按麦克风说话", color = color, fontSize = 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                VoicePillBackspace(color, onBackspace, onBackspacePress, onBackspaceRelease)
+                // 麦克风在右数第二个，与展开后工具栏里麦克风的位置一致。
                 VoicePillMic(listening, amplitude, color, accentColor, onMic)
+                VoicePillBackspace(color, onBackspace, onBackspacePress, onBackspaceRelease)
             }
         }
     }
