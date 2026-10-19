@@ -19,6 +19,8 @@ object StorageHousekeeping {
     private val CACHE_TEMP = Regex("^(?:model-download-$UUID|model-import-$UUID|schema-install-$UUID|-?\\d+\\.tar\\.bz2)$")
     /** installDownloadedModel 替换时挪开的旧模型目录。 */
     private val MODEL_PREVIOUS = Regex("^\\.(.+)-$UUID\\.previous$")
+    /** ModelDownloader / installLocal / installBundled 在 models/ 里的暂存目录。 */
+    private val MODEL_STAGING = Regex("^\\.(?:download|import|bundle)-.+-$UUID$")
     /** installCandidateModel 发布前的临时链接；源文件仍在 models/，删掉不丢数据。 */
     private val RUNTIME_INSTALLING = Regex("^\\..+\\.$UUID\\.installing$")
 
@@ -30,7 +32,7 @@ object StorageHousekeeping {
         cacheDir.listFiles { file -> CACHE_TEMP.matches(file.name) }.orEmpty().toList() +
             // 文字识别请求的截图，识别完即删；进程被杀时留下。
             File(cacheDir, "ocr-frames").listFiles { file -> file.isFile }.orEmpty() +
-            modelsDir.listFiles { file -> MODEL_PREVIOUS.matches(file.name) }.orEmpty() +
+            modelsDir.listFiles { file -> MODEL_PREVIOUS.matches(file.name) || MODEL_STAGING.matches(file.name) }.orEmpty() +
             rimeDir.listFiles { file -> file.isFile && RUNTIME_INSTALLING.matches(file.name) }.orEmpty()
 
     /** 返回腾出的字节数。被挪开的旧模型若原位置已空（替换中途被杀），放回原处而不是删除。 */
