@@ -14,7 +14,7 @@ function(t9_replace old new)
   set(T9_SCRIPT_TRANSLATOR_CODE "${code}" PARENT_SCOPE)
 endfunction()
 
-t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>")
+t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>\n#include <fstream>\n#include <mutex>")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octagram/src")
 t9_replace("double sentence_cutoff_threshold)" "double sentence_cutoff_threshold, Config* config)")
@@ -28,6 +28,17 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
     if (config) {
       config->GetBool("t9/joint_decoder", &t9_joint_);
       config->GetBool("t9/decoded_cache", &t9_decoded_cache_);
+      {
+        // t9/reading_table: ln(count / count of the text's main reading) for minority readings
+        // (的 di, 了 liao). The word model scores words, not readings, so without this 默默的 beat
+        // 默默地 for momodi because 的 is also read di (目的).
+        string readings;
+        if (config->GetString("t9/reading_table", &readings) && !readings.empty()) {
+          const ResourceType type{"t9_readings", "", ".txt"};
+          std::unique_ptr<ResourceResolver> resolver(Service::instance().CreateResourceResolver(type));
+          t9_readings_ = T9LoadReadings(resolver->ResolvePath(readings).string());
+        }
+      }
       if (t9_joint_) {
         auto budget = [&](const char* key, size_t& value, int minimum, int maximum) {
           int configured = static_cast<int>(value);
@@ -87,6 +98,28 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
   bool Evaluate]=])
 t9_replace("  bool CheckEmpty();" [=[
   bool t9_joint_ = false;
+  using T9Readings = std::unordered_map<string, vector<std::pair<string, double>>>;
+  std::shared_ptr<const T9Readings> t9_readings_;
+  // Loaded once per file and kept: a translation (and this member) is rebuilt on every key, so a
+  // weak cache reread the file per key. Lines are text<TAB>spelling<TAB>ln share.
+  static std::shared_ptr<const T9Readings> T9LoadReadings(const string& path) {
+    static std::mutex mutex;
+    static std::map<string, std::shared_ptr<const T9Readings>> loaded;
+    std::lock_guard<std::mutex> lock(mutex);
+    if (auto kept = loaded[path]) return kept;
+    std::ifstream in(path);
+    if (!in) return nullptr;
+    auto table = std::make_shared<T9Readings>();
+    string line;
+    while (std::getline(in, line)) {
+      const auto a = line.find('\t');
+      const auto b = a == string::npos ? a : line.find('\t', a + 1);
+      if (b == string::npos || line[0] == '#') continue;
+      (*table)[line.substr(0, a)].emplace_back(line.substr(a + 1, b - a - 1), std::atof(line.c_str() + b + 1));
+    }
+    loaded[path] = table;
+    return table;
+  }
   bool t9_decoded_cache_ = true;
   size_t t9_source_budget_ = 128;
   size_t t9_pool_budget_ = 64;
