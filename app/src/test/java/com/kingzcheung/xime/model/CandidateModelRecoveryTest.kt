@@ -84,7 +84,7 @@ class CandidateModelRecoveryTest {
         val failed = mutableListOf<ModelDownloadState>()
         ModelManager.downloadModel(reopened, model, failed::add)
         assertTrue(failed.last() is ModelDownloadState.Error)
-        assertTrue((failed.last() as ModelDownloadState.Error).message.contains("未覆盖"))
+        assertTrue((failed.last() as ModelDownloadState.Error).message.contains("为免覆盖"))
         assertFalse(ModelManager.isModelDownloaded(stores.context(), model))
         assertNull(MarketVersionStore.getModelVersion(context, model.id))
 
