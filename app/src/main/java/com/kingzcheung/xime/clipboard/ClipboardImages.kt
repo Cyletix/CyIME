@@ -235,6 +235,10 @@ class ClipboardImages private constructor(private val context: Context) {
             media = if (hasPhotoAccess()) runCatching { queryRecentScreenshots(includeRecent) }
                 .getOrElse { clipboardMediaAfterRefreshFailure(media, includeRecent, pinnedKeys(), hidden) }
                 else emptyList()
+            // A screenshot taken in the last minute gets the same paste hint as a copied image.
+            // It is read locally only; it enters clipboard history only if the user pastes it.
+            if (includeRecent) media.filter { it.uri !in hidden }.maxByOrNull { it.timestamp }
+                ?.let { previewState.offerScreenshot(it, System.currentTimeMillis()) }
             if (recentScreenshotsEnabled() && !observing) {
                 runCatching { context.contentResolver.registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer) }.onSuccess { observing = true }
             } else if (!recentScreenshotsEnabled() && observing) {
@@ -321,8 +325,8 @@ class ClipboardImages private constructor(private val context: Context) {
         val image = preview.value
         expiry?.cancel()
         expiry = if (image == null) null else scope.launch {
-            delay((image.timestamp + ClipboardImagePreviewState.MAX_AGE_MS - System.currentTimeMillis())
-                .coerceIn(1, ClipboardImagePreviewState.MAX_AGE_MS))
+            val maxAge = previewState.activeMaxAgeMs
+            delay((image.timestamp + maxAge - System.currentTimeMillis()).coerceIn(1, maxAge))
             refresh()
         }
     }
