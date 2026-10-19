@@ -54,6 +54,7 @@ import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.keyboard.legibleForTheme
 
 @Composable
 fun SettingsSection(
@@ -957,7 +958,7 @@ fun KeyboardThemeCard(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
-                        glass = glass.light,
+                        glass = glass.light.legibleForTheme(theme.id, false),
                         keyboardBackground = theme.keyboardBackground,
                         isDark = false,
                         fallbackBg = theme.keyboardBgLight,
@@ -973,7 +974,7 @@ fun KeyboardThemeCard(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight(),
-                        glass = glass.dark,
+                        glass = glass.dark.legibleForTheme(theme.id, true),
                         keyboardBackground = theme.keyboardBackground,
                         isDark = true,
                         fallbackBg = theme.keyboardBgDark,
@@ -1035,6 +1036,8 @@ private fun ThemeHalfPreview(
     Box(
         modifier = modifier
             .clip(shape)
+            // 玻璃预览透出同明暗的页面，而不是卡片本身的底色（与键盘实际效果一致）。
+            .then(if (glass.enabled) Modifier.background(glassPreviewHost(isDark)) else Modifier)
             .keyboardBackground(keyboardBackground, isDark, fallbackBg, glass)
             .padding(4.dp)
     ) {
