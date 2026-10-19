@@ -44,7 +44,8 @@ fun QuickSendFormArea(
     onCodeFocusChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     title: String? = if (editingItemId != null) "编辑剪贴板" else "新增固定",
-    showCode: Boolean = true,
+    // Clipboard items no longer carry a trigger code; phrases with codes live in 自定义短语.
+    showCode: Boolean = false,
     onRetake: (() -> Unit)? = null,
 ) {
     val glass = LocalKeyboardInputPreferences.current.frostedGlass.enabled
@@ -118,7 +119,7 @@ fun QuickSendFormArea(
                                     showSoftInputOnFocus = false
                                     onSelectionActionsChanged = { selectionActions = it }
                                     selectableEditor[0] = this
-                                    hint = if (showCode) "输入剪贴板内容" else ""
+                                    hint = if (onRetake == null) "输入剪贴板内容" else ""
                                     textSize = 16f
                                     isSingleLine = false
                                     minLines = 1
