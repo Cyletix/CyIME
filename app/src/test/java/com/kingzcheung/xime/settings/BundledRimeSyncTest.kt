@@ -66,4 +66,31 @@ class BundledRimeSyncTest {
         assertEquals("scorer", File(target, scorer).readText())
         assertEquals("updated schema", File(target, "core.dict.yaml").readText())
     }
+
+    @Test fun unmodifiedPreviousBundleIsReplacedWithoutBackup() {
+        val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
+        BundledRimeSync.install(target, backups, manifest("one")) { "one".byteInputStream() }
+        assertTrue(BundledRimeSync.install(target, backups, manifest("two")) { "two".byteInputStream() })
+        assertEquals("two", File(target, "core.dict.yaml").readText())
+        assertTrue(backups.walkTopDown().none { it.isFile })
+    }
+
+    @Test fun userEditedFileIsStillBackedUp() {
+        val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
+        BundledRimeSync.install(target, backups, manifest("one")) { "one".byteInputStream() }
+        File(target, "core.dict.yaml").writeText("mine")
+        assertTrue(BundledRimeSync.install(target, backups, manifest("two")) { "two".byteInputStream() })
+        assertEquals("mine", backups.walkTopDown().single { it.isFile }.readText())
+    }
+
+    @Test fun onlyNewestUpgradeBackupIsKept() {
+        val backups = folder.newFolder("backup")
+        val older = File(backups, "a".repeat(64)).apply { mkdirs(); File(this, "x.yaml").writeText("old"); setLastModified(1_000_000L) }
+        val newer = File(backups, "b".repeat(64)).apply { mkdirs(); File(this, "x.yaml").writeText("new"); setLastModified(2_000_000L) }
+        val other = File(backups, "english-policy").apply { mkdirs(); File(this, "p.yaml").writeText("keep") }
+        BundledRimeSync.pruneBackups(backups)
+        assertFalse(older.exists())
+        assertTrue(newer.exists())
+        assertEquals("keep", File(other, "p.yaml").readText())
+    }
 }
