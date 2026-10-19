@@ -36,6 +36,10 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
     inputs.file(baseWeights)
+    val charWeights = file("data/rime_ice_8105_weights.tsv.gz")
+    inputs.file(charWeights)
+    val finalParticles = file("data/sentence_final_particles.txt")
+    inputs.file(finalParticles)
     outputs.dir(chineseRoot)
     doLast {
         val archive = File(rootProject.projectDir, ".gradle/chinese-data/$chineseRevision.zip")
@@ -86,6 +90,9 @@ val prepareChineseDictionaries by tasks.registering {
         // base.dict.yaml weights are counts from written text (核心 over 好像 for hx); blend them (70% written, 30% chat)
         // with LCCC chat counts (tools/ime_lab/chat_word_counts.py + chat_base_weights.py, beta 0.3).
         reweight("base", baseWeights)
+        // Single characters (8105.dict.yaml) also had written-text weights: 把 3.8M over 吧 2.4M although chat uses
+        // 吧 seven times as often, so 下个月吧 came out as 下个月把. Same blend as base (chat_base_weights.py --dict 8105).
+        reweight("8105", charWeights)
         // The upstream corrector clears ordinary spelling annotations after the
         // translator has generated them. Let the host retain that real spelling
         // for responsive candidate UI without disabling pronunciation corrections.
@@ -143,8 +150,16 @@ val prepareChineseDictionaries by tasks.registering {
             english.values.joinToString("\n", postfix = "\n"))
 
         // Same engine, dictionary and options as Chinese26; only the keyboard arrangement differs.
+        // A sentence-final particle (吧, 呗, 呢…, app/data/sentence_final_particles.txt) is penalised as the first
+        // word of a composed sentence, and sentences may choose among four single-character homophones per
+        // syllable (only one before, so 把地址给我 became 吧地址给我 once 吧 outweighed 把). Patched Poet /
+        // ScriptTranslator, see docs/development/chat-base-weights-20261018.md.
+        val particles = finalParticles.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+        check(particles.isNotEmpty()) { "No sentence-final particles in ${finalParticles.name}" }
         val baseSchema = File(root, "rime_ice.schema.yaml").readText().replace("\ntranslator:\n",
-            "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n")
+            "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
+            "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
+            "  sentence_position_final_only: [${particles.joinToString(", ")}]\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }.joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
             "\ncyime:\n  candidate_policy: true\n" +
