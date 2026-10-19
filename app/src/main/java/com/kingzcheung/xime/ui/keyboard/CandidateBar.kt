@@ -389,7 +389,7 @@ fun CandidateBar(
         val edgeStyle = LocalEdgeButtonStyle.current
         val edgeSlot = if (edgeStyle == EdgeButtonStyle.CIRCLE || toolbarRowWidth <= 0.dp) null else {
             val gap = splitGapX?.let { (l, r) -> with(rowDensity) { (r - l).toDp() } } ?: 0.dp
-            // 最多 64dp 一格（胶囊约 52dp 宽）：宽屏也不多占候选的地方（用户 10-20）。
+            // 最多 64dp 一格：按钮随格子从圆连续拉成胶囊，最宽 52dp，宽屏也不多占候选的地方（用户 10-20）。
             minOf(maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + 2).coerceAtLeast(1), 36.dp), 64.dp)
         }
         // 同心：胶囊圆角 = 键盘卡片圆角 - 胶囊离栏边的距离（上下各 6dp），和卡片四角同心。
@@ -402,7 +402,7 @@ fun CandidateBar(
         ) {
             if (showCompositionCancel) {
                 KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor, label = "取消输入",
-                    restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner)
+                    restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
                 Spacer(Modifier.width(4.dp))
             }
             if (showLeftIcon) {
@@ -590,7 +590,7 @@ fun CandidateBar(
                 candidatePageExpanded -> {
                     callbacks.onBack?.let {
                         CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor, expanded = true, rotation = expansionRotation,
-                            restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner)
+                            restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
                     }
                 }
                 displayAssociation.isNotEmpty() && callbacks.onClearAssociation != null && callbacks.onCancelInput == null -> {
@@ -632,7 +632,7 @@ fun CandidateBar(
                 hasAnyMore && callbacks.onShowMoreCandidates != null -> {
                     CandidateExpansionButton(callbacks.onShowMoreCandidates,
                         iconButtonContainer, protectedVisuals.accentColor, expanded = false, rotation = expansionRotation,
-                        restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner)
+                        restingFill = edgeButtonFill, slotWidth = edgeSlot, cornerRadius = edgeCorner, continuousPill = true)
                 }
             }
             if (state !is CandidateBarState.Idle) {
@@ -949,8 +949,10 @@ private fun CandidateExpansionButton(
     restingFill: Color = Color.Transparent,
     slotWidth: androidx.compose.ui.unit.Dp? = null,
     cornerRadius: androidx.compose.ui.unit.Dp? = null,
+    continuousPill: Boolean = false,
 ) {
     KeyboardToolbarButton(onClick, background, restingFill = restingFill, slotWidth = slotWidth, cornerRadius = cornerRadius,
+        continuousPill = continuousPill,
         modifier = Modifier.testTag("candidate-expansion").semantics { stateDescription = if (expanded) "已展开" else "已收起" }) {
         Icon(Icons.Default.KeyboardArrowUp,
             contentDescription = if (expanded) "返回键盘" else "展开候选词",
@@ -1142,4 +1144,4 @@ internal val LocalEdgeButtonStrength = androidx.compose.runtime.staticCompositio
 
 /** 两端按钮的形状：圆（原样）、和空闲工具栏一样宽的胶囊、与键盘卡片同心的圆角胶囊。 */
 internal enum class EdgeButtonStyle { CIRCLE, CAPSULE, CONCENTRIC }
-internal val LocalEdgeButtonStyle = androidx.compose.runtime.staticCompositionLocalOf { EdgeButtonStyle.CONCENTRIC }
+internal val LocalEdgeButtonStyle = androidx.compose.runtime.staticCompositionLocalOf { EdgeButtonStyle.CAPSULE }
