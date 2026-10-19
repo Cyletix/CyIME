@@ -163,7 +163,9 @@ val prepareChineseDictionaries by tasks.registering {
         val baseSchema = File(root, "rime_ice.schema.yaml").readText().replace("\ntranslator:\n",
             "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
             "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
-            "  sentence_position_final_only: [${particles.joinToString(", ")}]\n")
+            "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
+            // 把/被 open a verb phrase and never end a sentence: shuoshuobei is 说说呗, not 说说被.
+            "  sentence_position_initial_only: [把, 被]\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }.joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
             "\ncyime:\n  candidate_policy: true\n" +
