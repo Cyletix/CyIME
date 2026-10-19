@@ -70,6 +70,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -122,8 +124,10 @@ fun MarketHubContent(
     onNavigateToModelLocal: () -> Unit = {},
     initialTab: Int = 0,
 ) {
-    // 进模型详情再返回时，这一页会重新组合；要保存在返回栈里，才能回到刚才所在的分页。
-    var tabIndex by rememberSaveable { mutableIntStateOf(initialTab) }
+    // 三页可左右滑动切换，标签跟随；分页状态随返回栈保存，进详情再返回仍回到刚才那页。
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = initialTab) { 3 }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val tabIndex = pagerState.currentPage
 
     Scaffold(
         topBar = {
@@ -158,30 +162,36 @@ fun MarketHubContent(
             PrimaryTabRow(selectedTabIndex = tabIndex) {
                 Tab(
                     selected = tabIndex == 0,
-                    onClick = { tabIndex = 0 },
+                    onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
                     text = { Text("方案") },
                 )
                 Tab(
                     selected = tabIndex == 1,
-                    onClick = { tabIndex = 1 },
+                    onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
                     text = { Text("模型") },
                 )
                 Tab(
                     selected = tabIndex == 2,
-                    onClick = { tabIndex = 2 },
+                    onClick = { scope.launch { pagerState.animateScrollToPage(2) } },
                     text = { Text("插件") },
                 )
             }
-            when (tabIndex) {
-                0 -> SchemesMarketTab(
-                    onNavigateToDetail = onNavigateToDetail,
-                )
-                1 -> ModelsMarketTab(
-                    onNavigateToDetail = onNavigateToModelDetail,
-                )
-                2 -> PluginsMarketTab(
-                    onNavigateToDetail = onNavigateToPluginDetail,
-                )
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize().testTag("market-pages"),
+                beyondViewportPageCount = 0,
+            ) { page ->
+                when (page) {
+                    0 -> SchemesMarketTab(
+                        onNavigateToDetail = onNavigateToDetail,
+                    )
+                    1 -> ModelsMarketTab(
+                        onNavigateToDetail = onNavigateToModelDetail,
+                    )
+                    else -> PluginsMarketTab(
+                        onNavigateToDetail = onNavigateToPluginDetail,
+                    )
+                }
             }
         }
     }
