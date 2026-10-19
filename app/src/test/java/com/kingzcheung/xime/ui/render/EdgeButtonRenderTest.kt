@@ -46,7 +46,7 @@ import java.io.File
  * 玻璃开时候选栏后面垫一张彩色“壁纸”，才看得出半透明。
  */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1060dp-h1000dp-hdpi")
+@Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1340dp-h1000dp-hdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class EdgeButtonRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
@@ -66,14 +66,18 @@ class EdgeButtonRenderTest {
         val strengths = (System.getenv("CYIME_RENDER_STRENGTHS") ?: "0.45").split(",").map { it.trim().toFloat() }
         val styles = (System.getenv("CYIME_RENDER_STYLES") ?: "CIRCLE").split(",").map {
             com.kingzcheung.xime.ui.keyboard.EdgeButtonStyle.valueOf(it.trim()) }
-        val barWidth = (System.getenv("CYIME_RENDER_WIDTH") ?: "420").toInt().dp
+        val widths = (System.getenv("CYIME_RENDER_WIDTHS") ?: System.getenv("CYIME_RENDER_WIDTH") ?: "420")
+            .split(",").map { it.trim().toInt() }
+        val themeFilter = System.getenv("CYIME_RENDER_THEMES")?.split(",")?.map { it.trim() }
         rule.setContent {
             Column(Modifier.background(Color(0xFF808080)).padding(4.dp)) {
-                for (style in styles) for (strength in strengths) for (glass in listOf(false, true)) for ((id, dark, label) in themes) {
+                for (width in widths) for (style in styles) for (strength in strengths) for (glass in listOf(false, true)) for ((id, dark, label) in themes) {
+                    if (themeFilter != null && "$id/${if (dark) "dark" else "light"}/${if (glass) "glass" else "solid"}" !in themeFilter) continue
+                    val barWidth = width.dp
                     val palette = resolveKeyboardPalette(id, dark)
                     val config = FrostedGlassConfig.defaults(dark, enabled = glass)
                     Row(Modifier.padding(vertical = 2.dp)) {
-                        Text("$label ${if (glass) "玻璃" else "不透明"} ×$strength $style", fontSize = 10.sp, color = Color.White,
+                        Text("${width}dp $label ${if (glass) "玻璃" else "不透明"} $style", fontSize = 10.sp, color = Color.White,
                             modifier = Modifier.width(120.dp))
                         Box(Modifier.width(barWidth).height(44.dp)
                             .then(if (glass) Modifier.background(Brush.linearGradient(
