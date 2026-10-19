@@ -344,6 +344,7 @@ object SchemaManager {
                     ?.removeSuffix(".schema.yaml")
             if (firstSchema != null && switchEnabled) {
                 setEnabledSchemas(context, (getEnabledSchemas(context) + firstSchema).distinct())
+                LanguagePreferences.enableForSchema(context, firstSchema)
             }
 
             FileLogger.i(TAG, "installPackageFromMarketDir: success for $packageId, firstSchema=$firstSchema")
