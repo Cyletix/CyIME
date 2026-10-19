@@ -65,7 +65,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -944,24 +943,13 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val margin = with(density) { 4.dp.roundToPx() }
     val gap = with(density) { 2.dp.roundToPx() }
-    // 宿主报了光标位置时气泡从光标处开始（换成本窗口坐标），不再固定在键盘左边盖住已上屏的字。
-    // 一段拼音只对准一次：拼音写进输入框的应用里光标随每个字母右移，每次都跟会让气泡越打越往右飘
-    // （用户 10-19 报）。本函数随拼音出现/消失而进出组合，所以下一段会重新对准。
-    val liveCaret by com.kingzcheung.xime.service.SoftCaretAnchor.anchor
-    val pinnedCaret = remember { arrayOfNulls<com.kingzcheung.xime.service.HardwareCursorAnchor>(1) }
-    if (pinnedCaret[0] == null) pinnedCaret[0] = liveCaret
-    val caret = pinnedCaret[0]
-    val view = LocalView.current
-    val positionProvider = remember(margin, gap, caret, view) {
+    // 气泡贴着键盘左边（用户 10-20 要求恢复）：不跟光标，所有应用位置一样。
+    val positionProvider = remember(margin, gap) {
         object : PopupPositionProvider {
             override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
                 layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
-                val caretX = caret?.let { anchor ->
-                    val origin = IntArray(2).also { view.rootView.getLocationOnScreen(it) }
-                    (anchor.left - origin[0]).roundToInt()
-                }
                 return IntOffset(
-                    (caretX ?: anchorBounds.left).coerceIn(margin,
+                    anchorBounds.left.coerceIn(margin,
                         (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)),
                     (anchorBounds.top - popupContentSize.height - gap).coerceIn(0,
                         (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
