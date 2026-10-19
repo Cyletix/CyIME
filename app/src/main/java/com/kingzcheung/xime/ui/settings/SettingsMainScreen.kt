@@ -292,6 +292,19 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
+                        icon = Icons.TwoTone.Speed,
+                        title = "性能与省电",
+                        subtitle = "高配、中配、低配一键切换，语音模型占用内存",
+                        onClick = { onNavigateToRoute(SettingsRoutes.Performance) },
+                        showArrow = true
+                    )
+                })
+            }
+
+            // 键盘布局相关的两个入口放在一起：各布局的手势与显示设置、按键布局编辑。
+            item {
+                SettingsSection(title = "键盘布局", content = {
+                    SettingsItem(
                         icon = Icons.TwoTone.TableChart,
                         title = "布局与显示",
                         subtitle = "候选词显示、键盘布局等",
@@ -304,10 +317,10 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
-                        icon = Icons.TwoTone.Speed,
-                        title = "性能与省电",
-                        subtitle = "高配、中配、低配一键切换，语音模型占用内存",
-                        onClick = { onNavigateToRoute(SettingsRoutes.Performance) },
+                        icon = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
+                        title = "布局管理",
+                        subtitle = "26键符号、自定义按键布局",
+                        onClick = { context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
                         showArrow = true
                     )
                 })
@@ -332,17 +345,6 @@ fun SettingsMainContent(
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 56.dp),
                         thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
-                        title = "布局管理",
-                        subtitle = "26键符号、自定义按键布局",
-                        onClick = { context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
-                        showArrow = true
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp), thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(

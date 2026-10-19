@@ -56,20 +56,12 @@ fun ClipboardSyncSettingsContent(
         mutableStateOf(SettingsPreferences.isClipboardSyncEnabled(context))
     }
     val syncPlugins = remember { ExtensionManager.getEnabledClipboardSyncPlugins(context) }
-    // 偏好未设置时，自动选中第一个已启用的插件（与服务端 fallback 一致）
-    var selectedPluginId by remember {
-        mutableStateOf(
-            SettingsPreferences.getClipboardSyncPluginId(context).ifEmpty {
-                syncPlugins.firstOrNull()?.first ?: ""
-            }
-        )
-    }
-    // 当前选中的插件实例（切换时在 IO 协程里 launch 完成后更新，驱动表单立即渲染新插件）
+    // 当前选中的插件实例（切换时在 IO 协程里 launch 完成后更新，驱动表单立即渲染新插件）；
+    // 偏好未设置或不可用时显示第一个已启用的插件，与服务端实际使用的一致
     var activePlugin by remember {
-        mutableStateOf(
-            syncPlugins.firstOrNull { it.first == selectedPluginId }
-        )
+        mutableStateOf(effectiveClipboardSyncPlugin(syncPlugins, SettingsPreferences.getClipboardSyncPluginId(context)))
     }
+    var selectedPluginId by remember { mutableStateOf(activePlugin?.first.orEmpty()) }
     var installedPlugins by remember { mutableStateOf(ExtensionManager.getAllInstalledPlugins()) }
     val clipboardPlugins = remember(installedPlugins) { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
 
@@ -82,9 +74,9 @@ fun ClipboardSyncSettingsContent(
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             enabled = SettingsPreferences.isClipboardSyncEnabled(context)
-            selectedPluginId = SettingsPreferences.getClipboardSyncPluginId(context)
-            activePlugin = ExtensionManager.getEnabledClipboardSyncPlugins(context)
-                .firstOrNull { it.first == selectedPluginId }
+            val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
+            activePlugin = effectiveClipboardSyncPlugin(available, SettingsPreferences.getClipboardSyncPluginId(context))
+            selectedPluginId = activePlugin?.first.orEmpty()
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -93,9 +85,8 @@ fun ClipboardSyncSettingsContent(
         enabled = SettingsPreferences.isClipboardSyncEnabled(context)
         installedPlugins = ExtensionManager.getAllInstalledPlugins()
         val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
-        val preferred = SettingsPreferences.getClipboardSyncPluginId(context)
-        activePlugin = available.firstOrNull { it.first == preferred }
-        selectedPluginId = preferred
+        activePlugin = effectiveClipboardSyncPlugin(available, SettingsPreferences.getClipboardSyncPluginId(context))
+        selectedPluginId = activePlugin?.first.orEmpty()
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         installedPlugins = ExtensionManager.getAllInstalledPlugins()
@@ -208,3 +199,10 @@ fun ClipboardSyncSettingsContent(
         }
     }
 }
+
+/**
+ * 实际在用的同步插件：与输入法服务相同，偏好的插件不可用（或没选）时用第一个已启用的。
+ * 设置页按它显示，免得页面写“未选”而后台其实在用第一个。
+ */
+internal fun <T> effectiveClipboardSyncPlugin(available: List<Pair<String, T>>, preferredId: String): Pair<String, T>? =
+    available.firstOrNull { it.first == preferredId } ?: available.firstOrNull()
