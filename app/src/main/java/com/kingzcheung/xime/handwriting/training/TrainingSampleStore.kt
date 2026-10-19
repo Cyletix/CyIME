@@ -185,6 +185,30 @@ class TrainingSampleStore(private val context: Context) {
         samplesFile.appendText(TrainingSampleCodec.encode(sample, appVersion, device) + "\n", Charsets.UTF_8)
     }
 
+    /**
+     * 合并导入一份样本备份（训练模式导出的 .jsonl）：只收本格式的行，按样本 id 去重后追加。
+     * 清除数据后用它恢复，不需要 adb。返回新加入的样本数，按类型（kana / latin …）计。
+     */
+    fun importSamples(lines: Sequence<String>): Map<String, Int> {
+        val known = HashSet<String>()
+        if (samplesFile.exists()) samplesFile.forEachLine(Charsets.UTF_8) { line ->
+            runCatching { JSONObject(line).optString("id") }.getOrNull()?.takeIf { it.isNotEmpty() }?.let(known::add)
+        }
+        val added = LinkedHashMap<String, Int>()
+        val out = StringBuilder()
+        for (line in lines) {
+            if (line.isBlank()) continue
+            val o = runCatching { JSONObject(line) }.getOrNull() ?: continue
+            val id = o.optString("id")
+            if (o.optString("format") != TrainingSampleCodec.FORMAT || id.isEmpty() || !known.add(id)) continue
+            out.append(line.trim()).append('\n')
+            val type = o.optString("type")
+            added[type] = (added[type] ?: 0) + 1
+        }
+        if (out.isNotEmpty()) samplesFile.appendText(out.toString(), Charsets.UTF_8)
+        return added
+    }
+
     /** 已保存样本数，按 prompt_id 计数。 */
     fun countsByPrompt(): Map<String, Int> {
         if (!samplesFile.exists()) return emptyMap()

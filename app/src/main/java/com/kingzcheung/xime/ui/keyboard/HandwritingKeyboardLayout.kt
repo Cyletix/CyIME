@@ -252,8 +252,8 @@ fun HandwritingKeyboardLayout(
                     useTemplates && language == InputLanguage.JAPANESE -> "日语手写 · 边写边学"
                     useTemplates -> "英文手写 · 边写边学"
                     templateScript != null && importingTemplates -> "正在读取你的手写样本…"
-                    templateScript != null && language == InputLanguage.JAPANESE -> "还没有你的假名样本：去 设置 → 手写训练模式 写几个假名"
-                    templateScript != null -> "还没有你的字母样本：去 设置 → 手写训练模式 写几个字母"
+                    templateScript != null && language == InputLanguage.JAPANESE -> "还没有你的假名样本：去 设置 → 手写训练模式 写几个，或在右上角菜单导入样本备份"
+                    templateScript != null -> "还没有你的字母样本：去 设置 → 手写训练模式 写几个，或在右上角菜单导入样本备份"
                     else -> "中文手写"
                 }, color = keyTextColor.copy(alpha = 0.6f),
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp, end = 96.dp).testTag("handwriting-language"))

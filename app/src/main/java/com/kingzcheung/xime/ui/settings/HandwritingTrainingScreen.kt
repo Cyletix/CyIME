@@ -485,6 +485,48 @@ class HandwritingTrainingViewModel(app: android.app.Application) : AndroidViewMo
         }
     }
 
+    /**
+     * 导入样本备份（之前“导出到下载目录 / 分享样本文件”得到的 .jsonl，可多选）：合并进本机样本，
+     * 再把假名、字母补进英文 / 日语手写的模板库。清除数据后这样恢复，不需要 adb。
+     */
+    fun importSampleBackup(uris: List<Uri>) {
+        viewModelScope.launch {
+            val app = getApplication<android.app.Application>()
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val added = HashMap<String, Int>()
+                    for (uri in uris) app.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.useLines { lines ->
+                        store.importSamples(lines).forEach { (type, n) -> added[type] = (added[type] ?: 0) + n }
+                    }
+                    for (script in com.kingzcheung.xime.handwriting.HandwritingTemplates.Script.entries)
+                        runCatching { com.kingzcheung.xime.handwriting.HandwritingTemplates.importTrainingSamples(app, script) }
+                    added
+                }
+            }
+            val added = result.getOrElse { e ->
+                Log.e(TRAINING_TAG, "import samples failed", e)
+                _events.emit(TrainingEvent.Message("导入失败：${e.message}"))
+                return@launch
+            }
+            val total = added.values.sum()
+            val text = buildString {
+                if (total == 0) append("没有新样本（文件不是样本备份，或这些样本已经在了）")
+                else {
+                    append("已导入 $total 条样本")
+                    val parts = listOfNotNull(added["kana"]?.let { "假名 $it" }, added["latin"]?.let { "字母 $it" })
+                    if (parts.isNotEmpty()) append("（${parts.joinToString("、")}）")
+                }
+                if (total > 0 && !com.kingzcheung.xime.handwriting.FormulaRecognizer.isAvailable(app))
+                    append("；英文、日语手写还要在 模型管理 下载「公式手写模型」")
+            }
+            _events.emit(TrainingEvent.Message(text))
+            if (total > 0) {
+                val counts = withContext(Dispatchers.IO) { store.countsByPrompt() }
+                _state.update { it.copy(counts = counts) }
+            }
+        }
+    }
+
     private fun displayName(context: android.content.Context, uri: Uri): String? = runCatching {
         context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
@@ -588,6 +630,9 @@ fun HandwritingTrainingScreen(onBack: () -> Unit) {
     val bankLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) viewModel.importBankFiles(uris)
     }
+    val sampleBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) viewModel.importSampleBackup(uris)
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -657,6 +702,10 @@ fun HandwritingTrainingScreen(onBack: () -> Unit) {
                         CompactMenuRow(
                             label = "导入题库文件（.tsv）", icon = Icons.Filled.FileOpen,
                             onClick = { moreMenu = false; bankLauncher.launch(arrayOf("*/*")) },
+                        )
+                        CompactMenuRow(
+                            label = "导入样本备份（.jsonl）", icon = Icons.Filled.FileOpen,
+                            onClick = { moreMenu = false; sampleBackupLauncher.launch(arrayOf("*/*")) },
                         )
                         CompactMenuRow(
                             label = "导出到下载目录", icon = Icons.Filled.SaveAlt,
