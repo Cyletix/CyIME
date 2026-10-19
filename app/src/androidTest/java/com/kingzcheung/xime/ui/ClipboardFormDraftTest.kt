@@ -46,6 +46,7 @@ class ClipboardFormDraftTest {
                         onCancel = {},
                         onFocusChange = {},
                         onCodeFocusChange = {},
+                        showCode = true,
                     )
                 }
             }
@@ -101,6 +102,7 @@ class ClipboardFormDraftTest {
                         onCancel = {},
                         onFocusChange = {},
                         onCodeFocusChange = {},
+                        showCode = true,
                     )
                 }
             }
@@ -143,6 +145,7 @@ class ClipboardFormDraftTest {
                         onCancel = { cancelCount++; visible.value = false },
                         onFocusChange = {},
                         onCodeFocusChange = {},
+                        showCode = true,
                     )
                 }
             }
@@ -177,6 +180,7 @@ class ClipboardFormDraftTest {
                     onCancel = { cancelCount++ },
                     onFocusChange = {},
                     onCodeFocusChange = {},
+                    showCode = true,
                 )
             }
         }
@@ -189,5 +193,32 @@ class ClipboardFormDraftTest {
             assertEquals(" ", QuickSendFormEditTextHolder.editText!!.text.toString())
             assertEquals("keep", QuickSendFormCodeEditTextHolder.editText!!.text.toString())
         }
+    }
+
+    @Test fun clipboardEditorHasNoTriggerCodeAndDropsAnOldOne() {
+        var saved: Pair<String, String>? = null
+        rule.setContent {
+            MaterialTheme {
+                QuickSendFormArea(
+                    backgroundColor = Color.Transparent,
+                    textColor = Color.White,
+                    accentColor = Color.Cyan,
+                    isFocused = false,
+                    initialText = "固定内容",
+                    initialCode = "old",
+                    cardBgColor = Color.DarkGray,
+                    editingItemId = 7L,
+                    onClose = { text, code -> saved = text to code },
+                    onCancel = {},
+                    onFocusChange = {},
+                    onCodeFocusChange = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithText("编码（选填，如 dh）", useUnmergedTree = true).assertDoesNotExist()
+        rule.runOnIdle { assertNull(QuickSendFormCodeEditTextHolder.editText) }
+        rule.onNodeWithText("保存", useUnmergedTree = true).performClick()
+        rule.runOnIdle { assertEquals("固定内容" to "", saved) }
     }
 }
