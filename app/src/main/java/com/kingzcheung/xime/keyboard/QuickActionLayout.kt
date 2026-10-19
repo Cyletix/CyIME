@@ -29,6 +29,21 @@ data class QuickActionLayout(val toolbar: List<String>, val menu: List<String>) 
             return (base + ToolbarButton.LAYOUT_GESTURES + ToolbarButton.ARRANGE).map { it.id }.filter { it !in toolbar }
         }
 
+        /**
+         * 排列页只列当前键盘会出现的入口；保存时把没列出的（[hidden]，属于别的键盘）按原来的区和位置放回，
+         * 不能因为这次没显示就从工具栏／菜单里删掉。
+         */
+        fun restoreHidden(edited: QuickActionLayout, original: QuickActionLayout, hidden: Set<String>): QuickActionLayout {
+            fun merge(section: List<String>, originalSection: List<String>): List<String> {
+                val result = section.filterNot { it in hidden }.toMutableList()
+                originalSection.forEachIndexed { index, id ->
+                    if (id in hidden) result.add(index.coerceAtMost(result.size), id)
+                }
+                return result
+            }
+            return normalize(merge(edited.toolbar, original.toolbar), merge(edited.menu, original.menu))
+        }
+
         fun fromEditorOrder(order: List<String>): QuickActionLayout {
             val menuAt = order.indexOf(MENU_DIVIDER).takeIf { it >= 0 } ?: order.size
             val unusedAt = order.indexOf(UNUSED_DIVIDER).takeIf { it >= 0 } ?: order.size

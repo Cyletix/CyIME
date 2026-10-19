@@ -7,7 +7,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 
 /**
  * 布局手势开关（[ToolbarButton.LAYOUT_GESTURES]）和普通入口一样可在「排列」里隐藏、排序；
- * 这里只决定它在哪些布局出现、开关状态和存储键。
+ * 只在适用的布局出现（排列页同样只列出当前键盘会出现的）；这里决定适用布局、开关状态和存储键。
  */
 internal fun ToolbarButton.appliesTo(kind: LayoutKind): Boolean = when (this) {
     ToolbarButton.GLIDE -> kind == LayoutKind.ALPHABETIC
