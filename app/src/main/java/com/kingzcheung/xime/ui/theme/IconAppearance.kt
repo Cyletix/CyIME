@@ -78,8 +78,9 @@ object IconAppearance {
     /** 换键盘主题后：跟随主题时换桌面图标；字幕快捷方式的颜色总是跟随（原地更新，不会跳位）。 */
     fun onKeyboardThemeChanged(context: Context, themeId: String) {
         reload(context)
-        if (followTheme) runCatching { LauncherIcons.apply(context, effective, themeId = themeId) }
+        // 字幕图标先换：三星换主图标入口时可能直接结束本应用进程，排在后面的更新会丢。
         runCatching { com.kingzcheung.xime.ui.caption.CaptionLauncherIcon.refresh(context, themeId) }
+        if (followTheme) runCatching { LauncherIcons.apply(context, effective, themeId = themeId) }
     }
 }
 
