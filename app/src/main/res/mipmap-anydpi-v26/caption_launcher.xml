@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 字幕默认图标：与输入法图标同底板、同折面风格（薰衣草紫）；桌面快捷方式按主题换 caption_launcher_<色>。 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/caption_launcher_background"/>
-    <foreground android:drawable="@drawable/caption_launcher_foreground"/>
-    <monochrome android:drawable="@drawable/caption_launcher_foreground"/>
+    <background android:drawable="@drawable/cyime_theme_bg_lavender"/>
+    <foreground android:drawable="@drawable/cyime_theme_caption_lavender"/>
+    <monochrome android:drawable="@drawable/cyime_theme_caption_lavender"/>
 </adaptive-icon>
