@@ -97,9 +97,11 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
                             PerformanceProfile.applyPreset(context, tier); refresh()
                         }
                     }
-                    RowDivider()
-                    TierRow("自定义", if (current == null) "已单独调整明细或「按键效果」里的动效、炫光" else "改下面的明细或「按键效果」里的动效、炫光就会变成自定义",
-                        !auto && current == null, enabled = false) {}
+                    // 「自定义」不是可点的档位：只有手动改过明细或动效时才显示，表示当前状态。
+                    if (!auto && current == null) {
+                        RowDivider()
+                        TierRow("自定义", "已单独调整明细或「按键效果」里的动效、炫光", true, enabled = false) {}
+                    }
                 }
             }
             item {

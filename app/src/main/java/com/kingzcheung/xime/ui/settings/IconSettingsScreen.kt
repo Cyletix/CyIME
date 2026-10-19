@@ -41,7 +41,8 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SettingsSection(title = "桌面图标底板") {
+            // 「跟随主题色」打开时底板和样式不起作用，那两组就不显示。
+            if (!IconAppearance.followTheme) SettingsSection(title = "桌面图标底板") {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         listOf(true, false).forEach { framed ->
@@ -88,11 +89,11 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
                             changeAppearance(context, onChanged) { IconAppearance.setFollowTheme(context, it) }
                         }, modifier = Modifier.testTag("icon-follow-theme"))
                     }
-                    Text("三星等桌面每换一次图标，会先移除再重新添加，图标可能跑到应用列表最后，需要重新拖回原位。开启时上面的底板和样式暂不生效。",
+                    Text("三星等桌面每换一次图标，会先移除再重新添加，图标可能跑到应用列表最后，需要重新拖回原位。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            SettingsSection(title = "图标样式") {
+            if (!IconAppearance.followTheme) SettingsSection(title = "图标样式") {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     VisualStyle.entries.filter { it != VisualStyle.ORIGINAL }.chunked(2).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

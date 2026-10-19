@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.GraphicEq
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -143,7 +144,7 @@ fun SpeechToTextSettingsContent(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("语音转文本", style = MaterialTheme.typography.titleMedium,
+                title = { Text("语音与手写", style = MaterialTheme.typography.titleMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -169,6 +170,14 @@ fun SpeechToTextSettingsContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            // 语音总开关放在页内最上面（以前挂在首页那一行上，进来反而找不到）。
+            var sttEnabled by remember { mutableStateOf(SettingsPreferences.isSttEnabled(context)) }
+            SettingsSection(title = "语音输入") {
+                SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "语音转文本",
+                    subtitle = "长按空格或点工具栏麦克风说话，转成文字上屏",
+                    checked = sttEnabled, onCheckedChange = { sttEnabled = it; SettingsPreferences.setSttEnabled(context, it) })
+            }
 
             val scope = rememberCoroutineScope()
 
@@ -256,6 +265,9 @@ fun SpeechToTextSettingsContent(
                     )
                 }
             }
+
+            // 手写和语音同属输入方式，停顿识别、公式标记放在这里。
+            HandwritingSettings()
 
             if (!useLocal) {
                 OnlineAsrTab(

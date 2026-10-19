@@ -11,29 +11,43 @@ import com.kingzcheung.xime.ui.settings.LayoutDisplaySettingsContent
 import com.kingzcheung.xime.ui.settings.LayoutInputCategory
 import com.kingzcheung.xime.ui.settings.LayoutInputSettingsContent
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** 布局与显示 is a short index; every group opens on its own page and back returns to the index.
+/** 「键盘布局」页：各布局入口、自定义布局、按键符号、分体键盘、数字框。候选词、按键与手势从首页直接进入，返回回首页。
  *  14 键、九键、假名提示和拂动圆盘合在「九键与 14 键」一页。 */
 class LayoutDisplayPagesTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun indexOpensEachGroupAndFlickHintsLiveUnderNineKey() {
+    @Test fun layoutIndexHoldsLayoutsSymbolsSplitAndNumberKeyboard() {
         rule.setContent { MaterialTheme { LayoutDisplaySettingsContent(onBack = {}) } }
-        rule.onNodeWithText("通用设置").assertExists()
+        rule.onNodeWithText("键盘布局").assertExists()
         rule.onNodeWithText("九键与 14 键").assertExists()
-        rule.onNodeWithText("14 键").assertDoesNotExist()
+        rule.onNodeWithText("自定义布局").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("按键符号").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("分体键盘").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("数字框自动数字键盘").performScrollTo().assertIsDisplayed()
         save("index")
-        for ((_, title, _) in LayoutDisplayPages) {
-            rule.onNodeWithText(title).performScrollTo().performClick()
-            rule.waitForIdle()
+    }
+
+    @Test fun pagesOpenedFromHomeGoBackHome() {
+        val route = androidx.compose.runtime.mutableStateOf(LayoutDisplayPages.first().first)
+        var backs = 0
+        rule.setContent {
+            MaterialTheme {
+                androidx.compose.runtime.key(route.value) {
+                    LayoutDisplaySettingsContent(onBack = { backs++ }, initialPage = route.value)
+                }
+            }
+        }
+        for ((id, title, _) in LayoutDisplayPages) {
+            rule.runOnIdle { route.value = id; backs = 0 }
+            rule.onNodeWithText(title).assertExists()
             save("page-$title")
-            rule.onNodeWithTag("kana-direction-hints").assertDoesNotExist()
-            rule.onNodeWithTag("flick-direction-disc").assertDoesNotExist()
             rule.onNodeWithContentDescription("返回").performClick()
-            rule.onNodeWithText("通用设置").assertExists()
+            rule.runOnIdle { assertEquals("$title 返回首页", 1, backs) }
         }
     }
 

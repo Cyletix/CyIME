@@ -83,12 +83,12 @@ class SettingsShortcutActivityTest {
             ActivityScenario.launch<MainActivity>(settingsActivityIntent(context, SettingsRoutes.Theme)).use { scenario ->
                 lateinit var original: MainActivity
                 scenario.onActivity { original = it }
-                waitForTitle("主题与定制")
+                waitForTitle("主题与外观")
                 context.startActivity(settingsActivityIntent(context, SettingsRoutes.SpeechToText))
                 waitForTitle("语音转文本")
                 assertResumedInstance(original)
                 context.startActivity(settingsActivityIntent(context, SettingsRoutes.Theme))
-                waitForTitle("主题与定制")
+                waitForTitle("主题与外观")
                 assertResumedInstance(original)
             }
         } finally {

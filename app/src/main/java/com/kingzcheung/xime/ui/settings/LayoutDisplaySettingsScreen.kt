@@ -46,15 +46,18 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 fun LayoutDisplaySettingsContent(
     onBack: () -> Unit,
     onOpenLayout: (String) -> Unit = {},
-    /** 设置搜索直接打开某个子页；返回仍回到索引页。 */
+    /** 首页或设置搜索直接打开某个子页；返回回到进来的地方。 */
     initialPage: String? = null,
 ) {
     // One index page; each group opens as its own sub-page. Settings themselves are unchanged.
     var openPage by androidx.compose.runtime.saveable.rememberSaveable {
         mutableStateOf(initialPage?.takeIf { p -> LayoutDisplayPages.any { it.first == p } })
     }
-    SettingsSubPages(openPage, onBack = { openPage = null }) { page ->
-        LayoutDisplayPage(page, onBack, onOpenLayout, openPage = { openPage = it }, closePage = { openPage = null })
+    // 首页直接进入的子页（候选词、按键与手势）返回首页，不经过「键盘布局」。
+    val direct = initialPage != null
+    SettingsSubPages(openPage, onBack = { if (direct) onBack() else openPage = null }) { page ->
+        LayoutDisplayPage(page, onBack, onOpenLayout, openPage = { openPage = it },
+            closePage = { if (direct) onBack() else openPage = null })
     }
 }
 
@@ -74,7 +77,7 @@ private fun LayoutDisplayPage(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(pageTitle ?: "布局与显示") },
+                title = { Text(pageTitle ?: "键盘布局") },
                 navigationIcon = {
                     IconButton(onClick = { if (page != null) closePage() else onBack() }) {
                         Icon(
@@ -98,7 +101,7 @@ private fun LayoutDisplayPage(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (page == null) item {
-                SettingsSection(title = "各布局设置", content = {
+                SettingsSection(title = "各布局", content = {
                     LayoutInputCategory.entries.forEachIndexed { index, category ->
                         if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                         SettingsItem(Icons.TwoTone.Keyboard, category.title, category.description,
@@ -107,11 +110,52 @@ private fun LayoutDisplayPage(
                 })
             }
             if (page == null) item {
-                SettingsSection(title = "通用设置", content = {
-                    LayoutDisplayPages.forEachIndexed { index, (route, title, description) ->
-                        if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                        SettingsItem(Icons.TwoTone.Straighten, title, description,
-                            onClick = { openPage(route) }, showArrow = true)
+                SettingsSection(title = "布局与符号", content = {
+                    SettingsItem(com.kingzcheung.xime.ui.keyboard.AddLayoutIcon, "自定义布局", "新建、复制和编辑按键排列",
+                        onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
+                        showArrow = true)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    SettingsItem(Icons.TwoTone.Keyboard, "按键符号", "26 键上下角标、九键与笔画侧栏、手写和常用符号栏，一处按位置编辑",
+                        onClick = { context.startActivity(android.content.Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
+                            .putExtra("edit_symbols", true)) },
+                        showArrow = true)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    val split = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitKeyboardEnabled
+                    SettingsToggleItem(Icons.TwoTone.Keyboard, "分体键盘",
+                        "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
+                        checked = split, onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
+                })
+            }
+            if (page == null) item {
+                SettingsSection(title = "数字键盘", content = {
+                    var autoNumberKeyboard by remember {
+                        mutableStateOf(SettingsPreferences.isAutoNumberKeyboardEnabled(context))
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "数字框自动数字键盘",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "进入号码、验证码等数字输入框时自动弹出数字键盘",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = autoNumberKeyboard,
+                            onCheckedChange = { newValue ->
+                                autoNumberKeyboard = newValue
+                                SettingsPreferences.setAutoNumberKeyboardEnabled(context, newValue)
+                            }
+                        )
                     }
                 })
             }
@@ -354,8 +398,26 @@ private fun LayoutDisplayPage(
                 })
             }
 
-            if (page == "appearance") item { InputExperienceSettings(setOf(InputExperiencePart.KEY_TEXT), "按键文字") }
-            if (page == "appearance") item {
+            if (page == "gestures") item {
+                InputExperienceSettings(setOf(InputExperiencePart.SYMBOLS, InputExperiencePart.LANGUAGE_HOLD), "角标与长按")
+            }
+            if (page == "gestures") item { InputExperienceSettings(setOf(InputExperiencePart.CURSOR), "光标与空格") }
+        }
+    }
+}
+
+/** 「键盘布局」之外直接从首页进入的两页：route, title, one-line description. */
+internal val LayoutDisplayPages = listOf(
+    Triple("candidates", "候选词", "字号、候选注释（拼音或中英释义）、取消按钮、输入框或候选栏显示"),
+    Triple("gestures", "按键与手势", "角标输入方式、上下滑方向、长按语言键、滑动移动光标、长按空格"),
+)
+
+/** 按键显示：字号、角标提示、点按气泡、底部圆角；放在「主题与外观」。 */
+@Composable
+internal fun KeyboardAppearanceSettings() {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        InputExperienceSettings(setOf(InputExperiencePart.KEY_TEXT), "按键文字")
                 SettingsSection(title = "角标与气泡", content = {
                     var swipeUpEnabled by remember {
                         mutableStateOf(SettingsPreferences.isSwipeUpHintsEnabled(context))
@@ -373,7 +435,7 @@ private fun LayoutDisplayPage(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键上方的符号提示，输入方式和滑动方向在「角标与长按」设置",
+                                text = "显示按键上方的符号提示，输入方式和滑动方向在「按键与手势」设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -407,7 +469,7 @@ private fun LayoutDisplayPage(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "显示按键下方的提示内容，输入方式和滑动方向在「角标与长按」设置",
+                                text = "显示按键下方的提示内容，输入方式和滑动方向在「按键与手势」设置",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -455,47 +517,6 @@ private fun LayoutDisplayPage(
                         )
                     }
                 })
-            }
-
-            if (page == "handwriting") item { InputExperienceSettings(setOf(InputExperiencePart.HANDWRITING), "手写") }
-            if (page == "handwriting") item {
-                SettingsSection(title = "数字键盘", content = {
-                    var autoNumberKeyboard by remember {
-                        mutableStateOf(SettingsPreferences.isAutoNumberKeyboardEnabled(context))
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "数字框自动数字键盘",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "进入号码、验证码等数字输入框时自动弹出数字键盘",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = autoNumberKeyboard,
-                            onCheckedChange = { newValue ->
-                                autoNumberKeyboard = newValue
-                                SettingsPreferences.setAutoNumberKeyboardEnabled(context, newValue)
-                            }
-                        )
-                    }
-                })
-            }
-            if (page == "gestures") item {
-                InputExperienceSettings(setOf(InputExperiencePart.SYMBOLS, InputExperiencePart.LANGUAGE_HOLD), "角标与长按")
-            }
-            if (page == "cursor") item { InputExperienceSettings(setOf(InputExperiencePart.CURSOR), "光标与空格") }
-            if (page == "appearance") item {
                 SettingsSection(title = "键盘底部样式", content = {
                     var rounded by remember { mutableStateOf(SettingsPreferences.roundedKeyboardBottom(context)) }
                     Row(
@@ -519,16 +540,11 @@ private fun LayoutDisplayPage(
                         Switch(checked = rounded, onCheckedChange = null)
                     }
                 })
-            }
-        }
     }
 }
 
-/** Sub-pages of 布局与显示: route, title, one-line description. */
-internal val LayoutDisplayPages = listOf(
-    Triple("candidates", "候选词", "字号、候选注释（拼音或中英释义）、取消按钮、输入框或候选栏显示"),
-    Triple("appearance", "键盘外观", "按键字号、角标提示、点按气泡、底部圆角与导航栏"),
-    Triple("gestures", "角标与长按", "角标输入方式、上下滑方向、长按语言键时长"),
-    Triple("cursor", "光标与空格", "滑动移动光标、空格长按行为、光标灵敏度"),
-    Triple("handwriting", "手写与数字键盘", "手写停顿时长、公式标记、数字框自动弹出数字键盘"),
-)
+/** 手写：停顿识别、公式标记；放在「语音与手写」。 */
+@Composable
+internal fun HandwritingSettings() {
+    InputExperienceSettings(setOf(InputExperiencePart.HANDWRITING), "手写")
+}
