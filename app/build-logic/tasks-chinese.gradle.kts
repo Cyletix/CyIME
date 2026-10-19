@@ -233,6 +233,32 @@ val prepareChineseDictionaries by tasks.registering {
         val othersImport = "  - cn_dicts/others   # 一些杂项\n"
         check(iceDict.readText().split(othersImport).size == 2) { "Upstream rime_ice import list changed" }
         iceDict.writeText(iceDict.readText().replace(othersImport, othersImport + "  - cyime_terms\n  - cyime_di\n"))
+        // Minority readings for the joint decoder (t9/reading_table), same rule as tools/ime_lab/reading_table.py:
+        // ln(count / count of the text's main reading) when below -1. The word model scores words, not readings,
+        // so 的 (also di, as in 目的) took momodi from 默默地. The first imported table wins, as in Rime;
+        // tencent has one reading per word and is skipped.
+        val firstWeight = HashMap<String, HashMap<String, Double>>()
+        val spelled = Regex("[a-z]+( [a-z]+)*")
+        Regex("(?m)^  - ([^\\s#]+)").findAll(iceDict.readText().substringAfter("import_tables:").substringBefore("\n..."))
+            .map { it.groupValues[1] }.filter { it != "cn_dicts/tencent" }.forEach { name ->
+                var body = false
+                File(root, "$name.dict.yaml").forEachLine { line ->
+                    if (!body) { body = line.trimEnd() == "..."; return@forEachLine }
+                    val fields = line.split('\t')
+                    if (line.startsWith("#") || fields.size < 2 || !spelled.matches(fields[1])) return@forEachLine
+                    firstWeight.getOrPut(fields[0]) { HashMap(2) }
+                        .putIfAbsent(fields[1], fields.getOrNull(2)?.trim()?.toDoubleOrNull() ?: 0.0)
+                }
+            }
+        val readings = firstWeight.flatMap { (text, codes) ->
+            val top = codes.values.maxOrNull() ?: 0.0
+            if (codes.size < 2 || top <= 0) emptyList() else codes.mapNotNull { (code, weight) ->
+                val share = kotlin.math.ln(maxOf(weight, 1.0) / top)
+                if (share < -1.0) "$text\t$code\t" + String.format(java.util.Locale.ROOT, "%.3f", share) else null
+            }
+        }.sorted()
+        check(readings.any { it.startsWith("的\tdi\t") }) { "Minority reading 的 di not found" }
+        File(root, "cyime_readings.txt").writeText(readings.joinToString("\n", postfix = "\n"))
     }
 }
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(prepareChineseDictionaries) }
