@@ -43,15 +43,16 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             settings = settings.copy(neighborCorrection = it); settings.save(context)
                         })
                     HorizontalDivider()
-                    // 「键盘滑动」移动光标时滑行不生效，开关不显示（光标方式里已说明）。
-                    if (settings.cursorGesture != com.kingzcheung.xime.ui.keyboard.CursorGestureMode.KEYBOARD) {
-                        SettingsToggleItem(Icons.TwoTone.Keyboard, "滑行输入",
-                            "英文 26 键手指划过字母出整词，候选栏可换成其他词；竖着滑一行仍输入角标符号。",
-                            checked = settings.glideTyping, onCheckedChange = {
-                                settings = settings.copy(glideTyping = it); settings.save(context)
-                            })
-                        HorizontalDivider()
-                    }
+                    // 「键盘滑动」移光标和滑行冲突：照常显示，被锁时置灰并写明被谁锁（见 InputGestureLocks）。
+                    SettingsToggleItem(Icons.TwoTone.Keyboard, "滑行输入",
+                        "英文 26 键手指划过字母出整词，候选栏可换成其他词；竖着滑一行仍输入角标符号。",
+                        checked = settings.glideTyping, onCheckedChange = {
+                            settings = settings.copy(glideTyping = it); settings.save(context)
+                        },
+                        lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
+                            com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.GLIDE_TYPING, true)
+                            ?.takeIf { !settings.glideTyping }?.message)
+                    HorizontalDivider()
                     QwertyStaggerSettings(settings) { settings = it; it.save(context) }
                     HorizontalDivider()
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -78,7 +79,11 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 "开启后长按输入数字、不再弹出字母菜单，与「长按输入」角标的方式一致。触发距离在下方「滑动触发距离」设置。",
                             checked = settings.t9FlickLetters, onCheckedChange = {
                                 settings = settings.copy(t9FlickLetters = it); settings.save(context)
-                            })
+                            },
+                            // 角标“长按”时数字占了长按，拂动必须开着：锁成开，不能关。
+                            lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
+                                com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, false)
+                                ?.takeIf { settings.t9FlickLetters }?.message)
                     })
                     SettingsSection(title = "14 键双字母键", content = {
                         SettingsToggleItem(Icons.TwoTone.Keyboard, "左右滑动选字母",

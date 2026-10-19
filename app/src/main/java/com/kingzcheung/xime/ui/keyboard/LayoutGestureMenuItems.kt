@@ -39,8 +39,19 @@ internal fun ToolbarButton.gestureKeys(): List<String> = when (this) {
 
 /** 只改这一项的键，避免用整份偏好覆盖其他设置刚写入的值。 */
 internal fun ToolbarButton.flipGesture(context: Context, prefs: KeyboardInputPreferences) {
-    val edit = SettingsPreferences.getPrefsPublic(context).edit()
     val next = !gestureOn(prefs)
+    // 和设置页同一套锁：被别的设置锁住时不改，提示是谁锁的。
+    val option = when (this) {
+        ToolbarButton.GLIDE -> InputGestureLock.Option.GLIDE_TYPING
+        ToolbarButton.T9_FLICK -> InputGestureLock.Option.T9_FLICK_LETTERS
+        else -> null
+    }
+    val lock = option?.let { InputGestureLocks.lockFor(prefs, it, next) }
+    if (lock != null) {
+        android.widget.Toast.makeText(context, "$label${lock.message}", android.widget.Toast.LENGTH_SHORT).show()
+        return
+    }
+    val edit = SettingsPreferences.getPrefsPublic(context).edit()
     gestureKeys().forEach { edit.putBoolean(it, next) }
     edit.apply()
 }

@@ -101,6 +101,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("点按弹出气泡", "$kb › 主题与外观", SettingsRoutes.Theme, "气泡 预览 弹出 按键放大"),
         SettingsSearchEntry("底部圆角与透明导航栏", "$kb › 主题与外观", SettingsRoutes.Theme, "圆角 导航栏 底部"),
         SettingsSearchEntry("按键角标的符号和数字", "$kb › 按键与手势", layoutPage("gestures"), "角标 滑动输入 长按输入 符号 数字"),
+        SettingsSearchEntry("手势预设", "$kb › 按键与手势", layoutPage("gestures"), "预设 滑动 长按 英文滑行 一键 整套 手势"),
         SettingsSearchEntry("字母键长按弹出大小写", "$kb › 按键与手势", layoutPage("gestures"), "长按 字母 大写 小写 音调 气泡 弹出 拼音声调"),
         SettingsSearchEntry("反转上下滑方向", "$kb › 按键与手势", layoutPage("gestures"), "反转 方向 上滑 下滑 删除键 清空 撤销"),
         SettingsSearchEntry("长按语言键弹出列表", "$kb › 按键与手势", layoutPage("gestures"), "语言键 切换语言 长按 时长"),

@@ -135,11 +135,11 @@ private fun describe(device: DeviceCapabilities): String = buildList {
 }.ifEmpty { listOf("配置未知") }.joinToString(" · ")
 
 @Composable
-private fun RowDivider() = HorizontalDivider(Modifier.padding(start = 56.dp), thickness = 0.5.dp,
+internal fun RowDivider() = HorizontalDivider(Modifier.padding(start = 56.dp), thickness = 0.5.dp,
     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
 @Composable
-private fun TierRow(title: String, subtitle: String, selected: Boolean, enabled: Boolean = true, onSelect: () -> Unit) {
+internal fun TierRow(title: String, subtitle: String, selected: Boolean, enabled: Boolean = true, onSelect: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
         .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect)
         .padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
