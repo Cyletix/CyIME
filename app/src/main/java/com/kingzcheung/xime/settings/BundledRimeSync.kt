@@ -15,10 +15,21 @@ internal object BundledRimeSync {
         digest.digest().joinToString("") { b -> "%02x".format(b) }
     }
 
+    /** 上一次清单里没有记录时，只备份这个大小以下的文件：用户手改的是配置，几百 MB 的词库和模型不是。 */
+    private const val UNKNOWN_BACKUP_LIMIT = 1L shl 20
+    private val REVISION_DIR = Regex("[0-9a-f]{64}")
+
+    private fun parse(manifest: String) =
+        manifest.lineSequence().filter { it.isNotBlank() }.map { it.split('\t') }.toList()
+
     fun install(target: File, backups: File, manifest: String, open: (String) -> InputStream): Boolean {
         val revision = hash(manifest.byteInputStream())
         val stamp = File(target, ".cyime-bundled-revision")
-        val entries = manifest.lineSequence().filter { it.isNotBlank() }.map { it.split('\t') }.toList()
+        val installedManifest = File(target, ".cyime-bundled-manifest")
+        val entries = parse(manifest)
+        // 上一次装进来的每个文件的哈希和大小：和它一致说明用户没改过，替换前不用备份。
+        val previous = runCatching { parse(installedManifest.readText()) }.getOrDefault(emptyList())
+            .filter { it.size == 4 }.associate { it[3] to (it[0] to it[1].toLongOrNull()) }
         fun destination(relative: String): File {
             val result = File(target, relative).canonicalFile
             require(result.path.startsWith(target.canonicalPath + File.separator))
@@ -40,7 +51,7 @@ internal object BundledRimeSync {
             try {
                 open(asset).use { input -> pending.outputStream().use { input.copyTo(it) } }
                 check(pending.length() == size.toLong() && hash(pending.inputStream()) == expected) { "Bundled asset checksum mismatch: $asset" }
-                if (file.exists()) {
+                if (file.exists() && userModified(file, previous[relative])) {
                     val backup = File(backups, "$revision/$relative")
                     require(backup.canonicalPath.startsWith(backups.canonicalPath + File.separator))
                     if (!backup.exists()) { backup.parentFile?.mkdirs(); file.copyTo(backup) }
@@ -55,9 +66,25 @@ internal object BundledRimeSync {
             } finally { pending.delete() }
         }
         target.mkdirs()
+        val pendingManifest = File(target, ".cyime-bundled-manifest.tmp")
+        pendingManifest.writeText(manifest)
+        Files.move(pendingManifest.toPath(), installedManifest.toPath(), StandardCopyOption.REPLACE_EXISTING)
         val pendingStamp = File(target, ".cyime-bundled-revision.tmp")
         pendingStamp.writeText(revision)
         Files.move(pendingStamp.toPath(), stamp.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        pruneBackups(backups)
         return changed
+    }
+
+    private fun userModified(file: File, installed: Pair<String, Long?>?): Boolean {
+        if (installed == null) return file.length() < UNKNOWN_BACKUP_LIMIT
+        val (expected, size) = installed
+        return file.length() != size || hash(file.inputStream()) != expected
+    }
+
+    /** 每次升级的备份放在以清单哈希命名的目录里；只留最近一次，其它功能的备份目录不动。 */
+    internal fun pruneBackups(backups: File) {
+        val revisions = backups.listFiles { file -> file.isDirectory && REVISION_DIR.matches(file.name) }.orEmpty()
+        revisions.sortedByDescending { it.lastModified() }.drop(1).forEach { it.deleteRecursively() }
     }
 }
