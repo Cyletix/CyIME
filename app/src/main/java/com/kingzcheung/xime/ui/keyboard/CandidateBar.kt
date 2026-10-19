@@ -214,9 +214,12 @@ fun CandidateBar(
         0.15f
     )
     val iconButtonTint = protectedVisuals.textColor
-    // 候选栏两端的返回、展开按钮平时也画一圈细边：不必像中间按钮那么显眼，但要一眼看出是个圈
-    // （用户 10-20：深色玻璃下几乎看不见）。取文字色的三成，浅色、深色、玻璃都看得清。
-    val edgeButtonRing = protectedVisuals.textColor.copy(alpha = 0.3f)
+    // 候选栏两端的返回、展开按钮：不画边框，平时用一块实色底和候选栏底色稍作区分（用户 10-20：
+    // 细圈太显眼，改回原样只区分底色）。底色取主题键盘背景（实色，玻璃下也不半透明），向文字色偏一点，
+    // 比中间工具按钮弱得多。
+    val edgeButtonFill = androidx.compose.ui.graphics.lerp(
+        (com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.background ?: protectedVisuals.backgroundColor).copy(alpha = 1f),
+        protectedVisuals.textColor.copy(alpha = 1f), if (protectedVisuals.isDarkTheme) 0.10f else 0.06f)
     val preferences = remember(context) { SettingsPreferences.getPrefsPublic(context) }
     var showCancelButton by remember(preferences) {
         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
@@ -389,7 +392,7 @@ fun CandidateBar(
         ) {
             if (showCompositionCancel) {
                 KeyboardBackButton({ callbacks.onCancelInput?.invoke() }, iconButtonContainer, protectedVisuals.textColor, label = "取消输入",
-                    ring = edgeButtonRing)
+                    restingFill = edgeButtonFill)
                 Spacer(Modifier.width(4.dp))
             }
             if (showLeftIcon) {
@@ -577,7 +580,7 @@ fun CandidateBar(
                 candidatePageExpanded -> {
                     callbacks.onBack?.let {
                         CandidateExpansionButton(it, iconButtonContainer, protectedVisuals.accentColor, expanded = true, rotation = expansionRotation,
-                            ring = edgeButtonRing)
+                            restingFill = edgeButtonFill)
                     }
                 }
                 displayAssociation.isNotEmpty() && callbacks.onClearAssociation != null && callbacks.onCancelInput == null -> {
@@ -619,7 +622,7 @@ fun CandidateBar(
                 hasAnyMore && callbacks.onShowMoreCandidates != null -> {
                     CandidateExpansionButton(callbacks.onShowMoreCandidates,
                         iconButtonContainer, protectedVisuals.accentColor, expanded = false, rotation = expansionRotation,
-                        ring = edgeButtonRing)
+                        restingFill = edgeButtonFill)
                 }
             }
             if (state !is CandidateBarState.Idle) {
@@ -933,9 +936,9 @@ private fun CandidateExpansionButton(
     foreground: Color,
     expanded: Boolean,
     rotation: Float,
-    ring: Color = Color.Transparent,
+    restingFill: Color = Color.Transparent,
 ) {
-    KeyboardToolbarButton(onClick, background, ring = ring,
+    KeyboardToolbarButton(onClick, background, restingFill = restingFill,
         modifier = Modifier.testTag("candidate-expansion").semantics { stateDescription = if (expanded) "已展开" else "已收起" }) {
         Icon(Icons.Default.KeyboardArrowUp,
             contentDescription = if (expanded) "返回键盘" else "展开候选词",

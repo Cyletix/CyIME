@@ -33,8 +33,8 @@ internal fun KeyboardToolbarButton(
     background: Color,
     modifier: Modifier = Modifier,
     outline: Color = Color.Transparent,
-    /** 平时也看得见的细圈（不随按下淡出）；默认没有，只给候选栏两端的返回和展开按钮用。 */
-    ring: Color = Color.Transparent,
+    /** 平时也在的实色底（不随按下淡出）；默认没有，只给候选栏两端的返回和展开按钮用。 */
+    restingFill: Color = Color.Transparent,
     /** 在工具栏里占等宽一格：整格可点，底色为与其他工具图标同尺寸的胶囊。 */
     slotWidth: androidx.compose.ui.unit.Dp? = null,
     content: @Composable () -> Unit,
@@ -44,9 +44,9 @@ internal fun KeyboardToolbarButton(
     val pressed by source.collectIsPressedAsState()
     val pressAlpha by animateFloatAsState(if (pressed) 1f else 0f,
         animationSpec = tween(if (pressed) 0 else 300), label = "toolbar-button-press")
-    val disc = Modifier.background(background.copy(alpha = background.alpha * pressAlpha))
+    val disc = (if (restingFill.alpha > 0f) Modifier.background(restingFill) else Modifier)
+        .background(background.copy(alpha = background.alpha * pressAlpha))
         .border(1.dp, outline.copy(alpha = outline.alpha * pressAlpha), CircleShape)
-        .then(if (ring.alpha > 0f) Modifier.border(1.dp, ring, CircleShape) else Modifier)
     if (slotWidth != null) {
         val pill = toolbarPillSize(slotWidth)
         Box(modifier.width(slotWidth).height(40.dp).clickable(source, indication = null, onClick = onClick),
@@ -74,9 +74,9 @@ internal fun KeyboardBackButton(
     modifier: Modifier = Modifier,
     label: String = "返回",
     slotWidth: androidx.compose.ui.unit.Dp? = null,
-    ring: Color = Color.Transparent,
+    restingFill: Color = Color.Transparent,
 ) {
-    KeyboardToolbarButton(onBack, background, modifier, slotWidth = slotWidth, ring = ring) {
+    KeyboardToolbarButton(onBack, background, modifier, slotWidth = slotWidth, restingFill = restingFill) {
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = label,
             tint = foreground, modifier = Modifier.size(24.dp))
     }
