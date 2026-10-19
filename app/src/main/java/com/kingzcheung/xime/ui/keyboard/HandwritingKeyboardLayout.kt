@@ -59,10 +59,10 @@ import kotlinx.coroutines.withContext
 
 @Composable
 internal fun HandwritingUnavailable(language: InputLanguage, modifier: Modifier, onExit: () -> Unit,
-    exitLabel: String = "返回键盘") {
+    exitLabel: String = "返回键盘", message: String = HandwritingLanguages.unavailableMessage(language)) {
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).testTag("handwriting-unavailable"),
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(HandwritingLanguages.unavailableMessage(language), color = MaterialTheme.colorScheme.onSurface)
+        Text(message, color = MaterialTheme.colorScheme.onSurface)
         TextButton(onClick = onExit) { Text(exitLabel) }
     }
 }
@@ -99,7 +99,11 @@ fun HandwritingKeyboardLayout(
     val recognitionLanguage = HandwritingLanguages.recognitionLanguageForKeyboard(language)
         ?: if (templateScript != null) language else null
     if (recognitionLanguage == null) {
-        HandwritingUnavailable(language, modifier, onUnsupportedExit, unsupportedExitLabel)
+        // 日语手写靠公式模型算特征来比对假名：缺的是这个模型时，直接说去哪下载。
+        val missingModel = HandwritingTemplates.Script.forLanguage(language) != null
+        HandwritingUnavailable(language, modifier, onUnsupportedExit, unsupportedExitLabel,
+            message = if (missingModel) "${language.displayName}手写需要先在 设置 → 模型管理 下载「公式手写模型」"
+                else HandwritingLanguages.unavailableMessage(language))
         return
     }
     val configVersion by KeysConfigHelper.configVersion.collectAsState()
@@ -150,10 +154,14 @@ fun HandwritingKeyboardLayout(
     var templateCount by remember(templateScript) {
         mutableIntStateOf(templateScript?.let { HandwritingTemplates.count(context, it) } ?: 0)
     }
+    // 只在后台读样本那一会儿显示“正在读取”；读完仍没有模板就直接说缺什么，不一直转圈。
+    var importingTemplates by remember(templateScript) { mutableStateOf(templateScript != null) }
     LaunchedEffect(templateScript) {
         val script = templateScript ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) { HandwritingTemplates.importTrainingSamples(context, script) }
-        templateCount = HandwritingTemplates.count(context, script)
+        try {
+            withContext(Dispatchers.IO) { runCatching { HandwritingTemplates.importTrainingSamples(context, script) } }
+            templateCount = HandwritingTemplates.count(context, script)
+        } finally { importingTemplates = false }
     }
     val useTemplates by rememberUpdatedState(templateScript != null && templateCount > 0)
     // 公式模式下首选候选的渲染预览（LaTeX → KaTeX），板上没笔迹时不显示
@@ -243,10 +251,12 @@ fun HandwritingKeyboardLayout(
             if (language != recognitionLanguage || templateScript != null) Text(when {
                     useTemplates && language == InputLanguage.JAPANESE -> "日语手写 · 边写边学"
                     useTemplates -> "英文手写 · 边写边学"
-                    templateScript != null -> "正在准备模板…"
+                    templateScript != null && importingTemplates -> "正在读取你的手写样本…"
+                    templateScript != null && language == InputLanguage.JAPANESE -> "还没有你的假名样本：去 设置 → 手写训练模式 写几个假名"
+                    templateScript != null -> "还没有你的字母样本：去 设置 → 手写训练模式 写几个字母"
                     else -> "中文手写"
                 }, color = keyTextColor.copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.TopStart).padding(12.dp).testTag("handwriting-language"))
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp, end = 96.dp).testTag("handwriting-language"))
             // 公式开关是浮在画板右上角的实心小按钮，不用对钩：开启时强调色填满、文字在黑白里取反差大的；
             // 关闭时用主题功能键的底色（强制不透明）和文字色，不加描边。
             if (formulaAvailable) Surface(
@@ -361,6 +371,12 @@ private fun HandwritingFunctionKey(action: String, onClick: () -> Unit, backgrou
         contentDescription = label
         onClick { onClick(); true }
     }.testTag("handwriting-key:$action")
+    if (action == "ime_switch") {
+        // 与其他键盘同一个语言键：点按切换，长按弹出语言菜单。
+        LanguageKeyButton(icon = rememberVectorPainter(Icons.Default.Language), onClick = onClick,
+            backgroundColor = keyBackground, iconColor = keyForeground, modifier = keyModifier)
+        return
+    }
     val icon = when (action) {
         "enter" -> Icons.AutoMirrored.Filled.KeyboardReturn
         "space" -> Icons.Default.SpaceBar
