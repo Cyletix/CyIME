@@ -85,9 +85,11 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
         } else {
             enabled.add(schema.schemaId)
         }
+        val turnedOn = schema.schemaId in enabled
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 SchemaManager.setEnabledSchemas(context, enabled)
+                if (turnedOn) com.kingzcheung.xime.settings.LanguagePreferences.enableForSchema(context, schema.schemaId)
             }
             _uiState.update { it.copy(enabledSchemas = enabled) }
         }
