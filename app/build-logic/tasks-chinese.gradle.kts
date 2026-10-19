@@ -40,6 +40,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(charWeights)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
+    val measureWords = file("data/sentence_measure_words.txt")
+    inputs.file(measureWords)
     outputs.dir(chineseRoot)
     doLast {
         val archive = File(rootProject.projectDir, ".gradle/chinese-data/$chineseRevision.zip")
@@ -154,7 +156,9 @@ val prepareChineseDictionaries by tasks.registering {
         // word of a composed sentence, and sentences may choose among four single-character homophones per
         // syllable (only one before, so 把地址给我 became 吧地址给我 once 吧 outweighed 把). Patched Poet /
         // ScriptTranslator, see docs/development/chat-base-weights-20261018.md.
-        val particles = finalParticles.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+        // Measure words (个, 只…, app/data/sentence_measure_words.txt) never start a sentence either (哥你好 → 个你好).
+        val particles = (finalParticles.readLines() + measureWords.readLines()).map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
         check(particles.isNotEmpty()) { "No sentence-final particles in ${finalParticles.name}" }
         val baseSchema = File(root, "rime_ice.schema.yaml").readText().replace("\ntranslator:\n",
             "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
