@@ -981,14 +981,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             serviceScope.launch {
                 clipboardManager.quickSendItems.collect { items ->
                     quickSendItemsState.value = items
-                    // 快捷发送列表变更 → 插件事件（仅投递给 manifest 声明
-                    // capabilities.events 含 quick_send_changed 的插件）
-                    PluginManager.dispatchEvent(
-                        com.kingzcheung.xime.plugin.core.lua.PluginEvent(
-                            com.kingzcheung.xime.plugin.core.lua.PluginEvent.TYPE_QUICK_SEND_CHANGED,
-                            mapOf(com.kingzcheung.xime.plugin.core.lua.PluginEvent.FIELD_COUNT to items.size)
-                        )
-                    )
+                    // 固定剪贴板不对插件开放：连条数变化也不投递 quick_send_changed 事件。
                 }
             }
             serviceScope.launch {
