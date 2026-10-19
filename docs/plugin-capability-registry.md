@@ -82,7 +82,7 @@ enum class PluginCapabilityDef(
 | `events` | EVENT | FIRE_AND_FORGET | onPluginEvent | false | conflated 投递 | 事件订阅（input_changed / text_committed） |
 | `prediction` | PULL | SYNC | （预留） | false | 待定 | PREDICTION 消费页未实现（audit §7.3） |
 | `candidate_transform` | PULL | SYNC | transformCandidates | **true** | **15ms** | 首个 hotPath 能力，规范见 §5 |
-| `quick_send_read` | PULL | SYNC | host.quickSend.list() | false | 沿用现状（180s） | 快捷发送只读（ClipboardManager 内存缓存，零 IO）；配 `quick_send_changed` 事件做缓存刷新 |
+| `quick_send_read` | PULL | SYNC | host.quickSend.list() | false | 沿用现状（180s） | 已停用（2026-10-20）：固定剪贴板不对插件开放，list() 恒为空，宿主不再投递 `quick_send_changed` |
 | `clipboard_read` | PULL | SYNC | host.clipboard.get() | false | 沿用现状（180s） | 剪贴板当前文本只读；外发仍受网络三重门约束 |
 
 ### 3.3 manifest 规范（统一后）
