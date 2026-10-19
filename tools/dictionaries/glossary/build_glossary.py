@@ -14,7 +14,10 @@
   - 义项优先选“英文译回中文正好是 / 含有这个词”的（用 ECDICT 反查），对不上用首义。
   - 单字只认主读音首义且正好译回本字，否则不显示（行 → row、被 → quilt 这类宁可不显示）。
 
-用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --output cyime_gloss-v2.tsv
+v3：修 v2 反查时没拆开 ECDICT 多行释义的错误；单字改为“正好译回本字 → 按顺序第一个含本字的义项 → 首义”；
+“X 的异体 / 见 X” 借用 X 的释义；CC-CEDICT 没收的常用词组用 ECDICT 反查补（很多 → plenty，博客 → blog）。
+
+用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --output cyime_gloss-v3.tsv
 """
 from __future__ import annotations
 
@@ -37,6 +40,9 @@ EN_REGISTER = re.compile(r"\([^)]*\b(?:slang|vulgar|derog|offensive|pejorative|e
                          r"loanword|onom|neologism|Internet|chemistry|physics|math|mathematics|medicine|anatomy|zoology|botany|"
                          r"biology|geology|astronomy|TCM)\b[^)]*\)", re.I)
 EN_GLOSS_CHOICES = 4
+# “variant of 賬號|账号[zhang4 hao4]”、“see 深圳市[Shen1 zhen4 Shi4]” 指向的词
+CROSS_REF = re.compile(r"(?:^|/)(?:variant of|see) ([^\[\s/]+)\[")
+EN_SINGLE_CHOICES = 6    # 单字每个条目看前几个义项
 # 粗口义项不做候选释义（你妈 → “fuck you”）；字面直译说明（lit. …）也不是译文。
 EN_PROFANITY = re.compile(r"\b(?:fuck\w*|shit\w*|cunt|bitch\w*|dick|cock|piss\w*|bastard|whore\w*|motherfuck\w*)\b", re.I)
 EN_ALT_MAX_RANK = 20000   # 换用后面义项时，这个英文的词频名次上限
@@ -100,6 +106,8 @@ def en_candidates(senses: list[str]) -> list[str]:
         text = re.sub(r"\S+\|\S+\[[^\]]*\]", "", text)  # 内嵌的中文交叉引用
         text = re.sub(r"\s+", " ", text).strip(" ,.")
         text = re.sub(r"^to ", "", text)
+        # “Shenzhen, subprovincial city …” 这类逗号后是说明，只留逗号前的名称。
+        text = text.split(", ")[0]
         if not text or re.search(r"[\u4e00-\u9fff]", text):
             continue
         if len(text) > EN_GLOSS_MAX:
@@ -123,7 +131,7 @@ def back_match(word: str, english: str, back: dict[str, str]) -> int:
     1 = 只是包含在更长的义项里（regional → 地方的），0 = 没有。
     带 [化]、[医]、[网络] 这类标签的义项不算（丙 → propyl 的 丙基 是化学义）。"""
     best = 0
-    for line in back.get(english.rstrip("…").lower(), "").replace("\n", "\n").split("\n"):
+    for line in back.get(english.rstrip("…").lower(), "").replace("\\n", "\n").split("\n"):
         for piece in ZH_SPLIT.split(POS_PREFIX.sub("", line.strip())):
             piece = piece.strip()
             if not piece or piece.startswith("["):
@@ -142,16 +150,24 @@ def clean_en(word: str, readings: list[list[str]], back: dict[str, str]) -> str:
     CC-CEDICT 的读音和义项都不按常用程度排（没 有 mei2 “not have” 和 mo4 “drowned”，告诉 有 “tell”
     和 “press charges”，话 的首义是 dialect）。依次看各读音（义项多的读音在前）的前几个义项，取第一个
     “译回中文正好是 / 含有这个词”的；换到非首个候选时不收专名（东京 → Tonkin）和冷僻英文词（丙 → propyl）。
-    都对不上时用义项最多的读音的首义。单字另有更严的规则，见下。按英文词频挑会把
+    都对不上时用义项最多的读音的首义。单字规则见下。不加反查、单纯按英文词频挑会把
     打 换成 from、偶 换成 image，不用。"""
     ordered = [choices[:EN_GLOSS_CHOICES] for choices in readings if choices]
     if not ordered:
         return ""
     first = ordered[0][0]
     if len(word) == 1:
-        # 单字多音多义、又常作虚词：只认主读音的首义，且译回来正好是这个字（好 → good → 好）；
-        # 换读音、换义项会得到 行 → row、发 → hair、会 → meet 这类，宁可不显示。
-        return first if back_match(word, first, back) == 2 else ""
+        # 单字义项多、顺序不按常用（被 首义 quilt，跟 首义 heel，后 的同形条目是 empress）：
+        # 先取译回来正好是这个字的义项；没有就按条目、义项顺序取第一个“译回来含这个字”的
+        # （中 → middle，多 → many，难 → difficult）；都没有用首义。读音已限定为 Rime 的常用读音。
+        # 改按英文词频挑反而更差（中 → hit，名 → place，自 → from）。
+        candidates = [text for choices in ordered for text in choices[:EN_SINGLE_CHOICES]]
+        exact = [text for text in candidates if back_match(word, text, back) == 2]
+        if exact:
+            return exact[0]
+        near = [text for text in candidates
+                if not text[:1].isupper() and en_rank(text) <= EN_ALT_MAX_RANK and back_match(word, text, back) == 1]
+        return near[0] if near else first
     allowed = [text for choices in ordered for text in choices
                if text is first or not (text[:1].isupper() or en_rank(text) > EN_ALT_MAX_RANK)]
     # 先找译回来正好是这个词的（place → 地方），再找包含它的（talk → 谈话）。
@@ -239,6 +255,7 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_we
     # 同一写法的各个读音：专名（拼音首字母大写）在后，义项多的读音在前
     # （常用读音义项多，如 东西 dong1xi5 “thing” 胜过 dong1xi1 “east and west”）。
     readings: dict[str, list[tuple[tuple[int, int], list[str], bool]]] = {}
+    redirects: dict[str, str] = {}
     with opener(path, "rt", encoding="utf-8") as handle:
         for line in handle:
             if line.startswith("#"):
@@ -258,6 +275,11 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_we
                 continue
             choices = en_candidates(body.split("/"))
             if not choices:
+                # 只是“X 的异体 / 见 X”的条目（帐号 → 账号，深圳 → 深圳市）：记下来，最后借用 X 的释义。
+                target = CROSS_REF.search(body)
+                if target:
+                    for key in dict.fromkeys((simp, trad)):
+                        redirects.setdefault(key, target.group(1).split("|")[-1])
                 continue
             order = (1 if pinyin[:1].isupper() else 0, -len(choices))
             for key in dict.fromkeys((simp, trad)):
@@ -265,14 +287,44 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_we
                 readings.setdefault(key, []).append((order, choices, key == trad))
     result: dict[str, str] = {}
     for key, entries in readings.items():
-        # 繁简同形的字（年）不用别的繁体字形简化过来的条目（秊 → 年 的 “grain”）；
-        # 只有简体字形（话 ← 話）才靠繁体条目。
-        if any(own for _, _, own in entries):
-            entries = [entry for entry in entries if entry[2]]
-        gloss = clean_en(key, [choices for _, choices, _ in sorted(entries, key=lambda item: item[0])], back)
+        # 本字形的条目排在别的繁体字形简化过来的条目前面（年 先看 年，再看 秊 “grain”）；
+        # 简化字合并了几个繁体字时（后 ← 後，里 ← 裏）各条目都参与挑选。
+        ordered = sorted(entries, key=lambda item: (not item[2], item[0]))
+        gloss = clean_en(key, [choices for _, choices, _ in ordered], back)
         if gloss:
             result[key] = gloss
+    for key, target in redirects.items():
+        if key not in result and target in result:
+            result[key] = result[target]
     return result
+
+
+def fill_from_english(result: dict[str, str], back: dict[str, str], weights: dict[str, dict[str, int]],
+                      min_weight: int) -> int:
+    """CC-CEDICT 没收、但 Rime 词库里常用的词（很多、博客、不同的）：用 ECDICT 反查，找中文释义里
+    有一条正好是这个词的英文词，取最常用的（单词优先于词组）。返回补了多少条。"""
+    wanted = {word for word, readings in weights.items()
+              if word not in result and max(readings.values(), default=0) >= min_weight
+              and any("一" <= ch <= "鿿" for ch in word)}
+    found: dict[str, tuple[tuple[int, int], str]] = {}
+    for english, translation in back.items():
+        if not re.fullmatch(r"[a-z]+(?:[' ][a-z]+)*", english) or EN_PROFANITY.search(english):
+            continue
+        rank = en_rank(english)
+        if rank > EN_ALT_MAX_RANK:
+            continue
+        score = (1 if " " in english else 0, rank)
+        for line in translation.replace("\\n", "\n").split("\n"):
+            if re.search(r"\[[^\]]+\]", line):
+                continue
+            # 只认每个词性的前两个中文释义：排在后面的多是引申（enough 的 “很多”）。
+            for piece in ZH_SPLIT.split(POS_PREFIX.sub("", line.strip()))[:2]:
+                piece = PARENS.sub("", piece).strip(" .。")
+                if piece in wanted and (piece not in found or score < found[piece][0]):
+                    found[piece] = (score, english)
+    for word, (_, english) in found.items():
+        result[word] = re.sub(r"\bi\b", "I", english)  # ECDICT 的键是小写（i should think）
+    return len(found)
 
 
 def main() -> int:
@@ -288,7 +340,10 @@ def main() -> int:
 
     entries, back = load_ecdict(args.ecdict)
     english = len(entries)
-    chinese = load_cedict(args.cedict, back, load_rime_weights(args.rime_dict), args.min_weight)
+    weights = load_rime_weights(args.rime_dict)
+    chinese = load_cedict(args.cedict, back, weights, args.min_weight)
+    filled = fill_from_english(chinese, back, weights, args.min_weight)
+    print(f"filled_from_english={filled}", file=sys.stderr)
     for key, gloss in chinese.items():
         entries.setdefault(key, gloss)
     rows = sorted(((k, v) for k, v in entries.items() if "\t" not in k + v and "\n" not in k + v),
