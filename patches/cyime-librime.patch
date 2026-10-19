@@ -749,10 +749,10 @@ index 9da80fa..d644378 100644
    CommitEntry commit_entry(this);
    for (auto& seg : ctx->composition()) {
 diff --git a/src/rime/gear/poet.cc b/src/rime/gear/poet.cc
-index dc647cd..a28474f 100644
+index dc647cd..f3df32e 100644
 --- a/src/rime/gear/poet.cc
 +++ b/src/rime/gear/poet.cc
-@@ -81,7 +81,24 @@ inline static Grammar* create_grammar(Config* config) {
+@@ -81,7 +81,25 @@ inline static Grammar* create_grammar(Config* config) {
  Poet::Poet(const Language* language, Config* config, Compare compare)
      : language_(language),
        grammar_(create_grammar(config)),
@@ -769,49 +769,54 @@ index dc647cd..a28474f 100644
 +    }
 +  };
 +  load("translator/sentence_position_final_only", final_only_);
++  load("translator/sentence_position_initial_only", initial_only_);
 +  config->GetDouble("translator/sentence_position_penalty", &position_penalty_);
 +}
 +
-+double Poet::PositionAdjust(const string& text, bool first) const {
-+  return first && final_only_.count(text) ? position_penalty_ : 0.0;
++double Poet::PositionAdjust(const string& text, bool first, bool rear) const {
++  return (first && final_only_.count(text)) || (rear && initial_only_.count(text)) ? position_penalty_ : 0.0;
 +}
  
  Poet::~Poet() {}
  
-@@ -222,7 +239,8 @@ void Poet::ExpandEdges(StateMap<Strategy>& states,
+@@ -222,7 +240,8 @@ void Poet::ExpandEdges(StateMap<Strategy>& states,
              candidate.empty() ? preceding_text : candidate.context();
          double weight = candidate.weight +
                          Grammar::Evaluate(context, entry->text, entry->weight,
 -                                          is_rear, grammar_.get());
 +                                          is_rear, grammar_.get()) +
-+                        PositionAdjust(entry->text, candidate.empty());
++                        PositionAdjust(entry->text, candidate.empty(), is_rear);
          Line new_line{&candidate, entry.get(), end_pos, weight};
          Line& best = Strategy::BestLineToUpdate(target_state, new_line);
          if (best.empty() || compare_(best, new_line)) {
-@@ -410,7 +428,8 @@ deque<an<Sentence>> Poet::MakeSentences(const WordGraph& graph,
+@@ -410,7 +429,8 @@ deque<an<Sentence>> Poet::MakeSentences(const WordGraph& graph,
                source_line.empty() ? preceding_text : source_line.context();
            double weight = source_line.weight +
                            Grammar::Evaluate(context, entry->text, entry->weight,
 -                                            is_rear, grammar_.get());
 +                                            is_rear, grammar_.get()) +
-+                          PositionAdjust(entry->text, source_line.empty());
++                          PositionAdjust(entry->text, source_line.empty(), is_rear);
            size_t new_hash = source_line.text_hash;
            for (char c : entry->text) {
              new_hash = new_hash * 31 + c;
 diff --git a/src/rime/gear/poet.h b/src/rime/gear/poet.h
-index 459f31d..305a427 100644
+index 459f31d..b0e26fd 100644
 --- a/src/rime/gear/poet.h
 +++ b/src/rime/gear/poet.h
-@@ -126,6 +126,12 @@ class Poet {
+@@ -126,6 +126,16 @@ class Poet {
    const Language* language_;
    the<Grammar> grammar_;
    Compare compare_;
 +  // CyIME: a sentence-final particle (吧, 呗, 呢…; translator/sentence_position_final_only) is penalised
 +  // as the first word of a composed sentence. Only first-ness is used: it never changes while the input
-+  // grows, so the incremental lattice stays valid (a "last word" rule would go stale there).
++  // grows, so the incremental lattice stays valid.
 +  set<string> final_only_;
++  // Words that start a verb phrase (把, 被; translator/sentence_position_initial_only) pay the same
++  // penalty as the last word: shuoshuobei is 说说呗, not 说说被. The incremental lattice recomputes the old
++  // end as a non-final position before extending it, so this stays consistent with a full rerun.
++  set<string> initial_only_;
 +  double position_penalty_ = 0.0;
-+  double PositionAdjust(const string& text, bool first) const;
++  double PositionAdjust(const string& text, bool first, bool rear) const;
  };
  
  }  // namespace rime

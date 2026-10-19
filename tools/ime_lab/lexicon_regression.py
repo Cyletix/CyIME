@@ -99,6 +99,12 @@ def prepare_android(work):
                 lines[i] = fields[0] + chr(9) + fields[1] + chr(9) + table[fields[0] + chr(9) + fields[1]]
         path.unlink()
         path.write_text(chr(10).join(lines), encoding="utf-8")
+    extra = os.environ.get("CYIME_TRANSLATOR_ADD")
+    if extra:  # "sentence_position_initial_only: [把, 被]": extra lines at the top of the translator block
+        schema = data / "rime_ice.schema.yaml"
+        text = schema.read_text(encoding="utf-8")
+        schema.write_text(text.replace(chr(10) + "translator:" + chr(10),
+                                       chr(10) + "translator:" + chr(10) + "  " + extra + chr(10), 1), encoding="utf-8")
     overrides = os.environ.get("CYIME_T9_SET")
     if overrides:  # "joint_decoder=true,pool_budget=24": replace those keys in the schema's t9 block
         schema = data / "rime_ice.schema.yaml"
