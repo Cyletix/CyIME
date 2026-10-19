@@ -195,6 +195,10 @@ class ClipboardSelectionPinsUiTest {
         assertTrue("Pinned preview must be bounded", first.height <= region.height * .4f)
         rule.onNodeWithTag("clipboard-card:text:${columns + 1}").assertDoesNotExist()
         rule.onNodeWithTag("clipboard-pins-toggle").assertIsDisplayed()
+        // Pinned records are one line high, and the toolbar uses the same pill as the divider.
+        assertEquals("pinned record is one line high", 40f * .4f, first.height, 1f)
+        rule.onNodeWithText(if (width >= 360) "固定 100" else "100", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("还有 ${100 - columns} 条固定", useUnmergedTree = true).assertExists()
     }
 
     @Test fun collapsingPinsRemovesHiddenRecordsFromKeyboardNavigation() {
