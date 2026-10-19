@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import com.kingzcheung.xime.ui.common.CompactActionMenu
 import com.kingzcheung.xime.ui.common.CompactActionMenuEntry
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -339,10 +340,17 @@ internal fun ClipboardBoardView(
                         }
                     }
                     if (content.pinsCollapsible) {
-                        CompactClipboardAction(if (pinsActuallyExpanded) Icons.Default.ExpandLess else Icons.Default.MoreHoriz,
-                            if (pinsActuallyExpanded) "收起固定内容" else "展开全部 ${content.pinnedCount} 条固定内容",
-                            { changePinsExpansion(!pinsExpanded) }, "clipboard-pins-toggle",
-                            label = if (compactControls) "${content.pinnedCount}" else "固定 ${content.pinnedCount}")
+                        Box(Modifier.heightIn(min = PanelCategoryHeight).clip(RoundedCornerShape(50))
+                            .semantics { stateDescription = if (pinsActuallyExpanded) "已展开" else "已收起" }
+                            .clickable(role = Role.Button,
+                                onClickLabel = if (pinsActuallyExpanded) "收起固定内容" else "展开全部 ${content.pinnedCount} 条固定内容") {
+                                changePinsExpansion(!pinsExpanded)
+                            }.testTag("clipboard-pins-toggle").padding(horizontal = 2.dp),
+                            contentAlignment = Alignment.Center) {
+                            PinsFoldPill(if (pinsActuallyExpanded) "收起固定"
+                                else if (compactControls) "${content.pinnedCount}" else "固定 ${content.pinnedCount}",
+                                pinsActuallyExpanded, colors.onSurface)
+                        }
                     }
                     onAddPinned?.let {
                         CompactClipboardAction(Icons.Default.Add, "新增固定内容", it, "clipboard-add-pinned")
@@ -387,7 +395,9 @@ internal fun ClipboardBoardView(
                             ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen,
                                 selecting = selecting, keyboardFocused = keyboard?.active == true && card.key == focused,
                                 // Pictures share the pinned preview height: a tall screenshot must not fill the board.
-                                previewHeight = if (fixedRecords || card is ClipboardCard.Image) pinnedHeight else null,
+                                // Pins are one line; a recent picture keeps the bounded preview height.
+                                previewHeight = if (fixedRecords) ClipboardPinnedRowHeight
+                                    else if (card is ClipboardCard.Image) pinnedHeight else null,
                                 // Lazy layout retains removed keyed items through fade-out. Keep one
                                 // grid so collapsing pins does not flash or replace recent history.
                                 modifier = Modifier.animateItem(
@@ -520,13 +530,15 @@ private fun ClipboardRecordCard(
     val colors = MaterialTheme.colorScheme
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
     val highlighted = chosen || keyboardFocused
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(if (previewHeight == ClipboardPinnedRowHeight) 10.dp else 12.dp)
+    val oneLine = previewHeight == ClipboardPinnedRowHeight
     BoxWithConstraints(modifier.fillMaxWidth()
         .then(if (previewHeight != null) Modifier.height(previewHeight) else Modifier)
         .clip(shape)
-        .background(frostedKeyColor(if (highlighted) colors.secondaryContainer else colors.surfaceContainerHigh,
+        .background(frostedKeyColor(if (highlighted) colors.secondaryContainer else clipboardCardColor(),
             colors.onSurface, glass))
-        .border(if (highlighted) 2.dp else 1.dp, if (highlighted) colors.primary else colors.outlineVariant, shape)
+        .border(if (highlighted) 2.dp else .5.dp,
+            if (highlighted) colors.primary else colors.onSurface.copy(alpha = .08f), shape)
         .semantics { focused = keyboardFocused; if (selecting) selected = chosen }
         .testTag("clipboard-card:${card.key}")
         .combinedClickable(role = if (selecting) Role.Checkbox else Role.Button,
@@ -534,12 +546,12 @@ private fun ClipboardRecordCard(
             onLongClickLabel = if (selecting) "切换选择" else "更多操作")) {
         when (card) {
             is ClipboardCard.Text -> Text(card.item.text,
-                Modifier.fillMaxWidth().heightIn(min = if (previewHeight == null) 48.dp else 0.dp)
+                Modifier.align(Alignment.CenterStart).fillMaxWidth().heightIn(min = if (previewHeight == null) 48.dp else 0.dp)
                     .padding(start = if (selecting) 28.dp else 8.dp,
-                        end = if (pinned) 26.dp else 8.dp, top = 8.dp, bottom = 8.dp),
+                        end = if (pinned) 26.dp else 8.dp, top = if (oneLine) 0.dp else 8.dp, bottom = if (oneLine) 0.dp else 8.dp),
                 color = if (highlighted) colors.onSecondaryContainer else colors.onSurface,
                 fontSize = 16.sp, lineHeight = 23.sp,
-                maxLines = if (previewHeight != null) 3 else 4,
+                maxLines = if (oneLine) 1 else if (previewHeight != null) 3 else 4,
                 overflow = TextOverflow.Ellipsis)
             is ClipboardCard.Image -> {
                 val context = LocalContext.current
@@ -568,7 +580,7 @@ private fun ClipboardRecordCard(
             }
         }
         if (pinned) ClipboardCardBadge(Icons.Default.Lock, "已固定",
-            Modifier.align(Alignment.TopEnd).padding(4.dp), "clipboard-pin:${card.key}")
+            Modifier.align(if (oneLine) Alignment.CenterEnd else Alignment.TopEnd).padding(4.dp), "clipboard-pin:${card.key}")
         if (selecting) {
             ClipboardCardBadge(if (chosen) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                 if (chosen) "已选" else "未选", Modifier.align(Alignment.TopStart).padding(4.dp)
@@ -595,7 +607,7 @@ private fun CompactClipboardAction(icon: ImageVector, description: String, onCli
 private fun ClipboardCardBadge(icon: ImageVector, description: String, modifier: Modifier, tag: String) {
     val colors = MaterialTheme.colorScheme
     Box(modifier.testTag(tag).clip(RoundedCornerShape(4.dp))
-        .background(frostedKeyColor(colors.surfaceContainerHigh, colors.onSurface,
+        .background(frostedKeyColor(clipboardCardColor(), colors.onSurface,
             LocalKeyboardInputPreferences.current.frostedGlass)).padding(2.dp)) {
         Icon(icon, description, Modifier.size(16.dp), tint = colors.onSurface)
     }
@@ -610,25 +622,44 @@ private fun PinsFoldDivider(expanded: Boolean, hidden: Int, content: androidx.co
     modifier: Modifier, onToggle: () -> Unit) {
     val line = content.copy(alpha = .22f)
     androidx.compose.foundation.layout.Row(
-        modifier.fillMaxWidth().heightIn(min = 32.dp).testTag("clipboard-pins-divider")
+        modifier.fillMaxWidth().heightIn(min = 24.dp).testTag("clipboard-pins-divider")
             .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
             .clickable(role = androidx.compose.ui.semantics.Role.Button,
                 onClickLabel = if (expanded) "收起固定内容" else "展开固定内容", onClick = onToggle),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HorizontalDivider(Modifier.weight(1f), thickness = .5.dp, color = line)
-        androidx.compose.foundation.layout.Row(
-            Modifier.padding(horizontal = 8.dp).clip(RoundedCornerShape(50))
-                .border(.5.dp, line, RoundedCornerShape(50))
-                .padding(start = 10.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
-                .testTag("clipboard-pins-fold"),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(if (expanded) "收起固定" else "还有 $hidden 条固定", color = content.copy(alpha = .78f),
-                style = MaterialTheme.typography.labelMedium)
-            Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null,
-                Modifier.size(18.dp), tint = content.copy(alpha = .78f))
-        }
+        PinsFoldPill(if (expanded) "收起固定" else "还有 $hidden 条固定", expanded, content,
+            Modifier.padding(horizontal = 8.dp).testTag("clipboard-pins-fold"))
         HorizontalDivider(Modifier.weight(1f), thickness = .5.dp, color = line)
     }
+}
+
+/** 固定内容的展开/收起胶囊：分隔线中间和工具栏右上角共用同一个样子。 */
+@Composable
+private fun PinsFoldPill(label: String, expanded: Boolean, content: Color, modifier: Modifier = Modifier) {
+    val line = content.copy(alpha = .22f)
+    val tint = content.copy(alpha = .78f)
+    Row(modifier.clip(RoundedCornerShape(50)).border(.5.dp, line, RoundedCornerShape(50))
+        .padding(start = 10.dp, end = 6.dp, top = 1.dp, bottom = 1.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = tint, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null,
+            Modifier.size(18.dp), tint = tint)
+    }
+}
+
+/** One fixed height for a pinned record: a single line of text, or a thin strip of a picture. */
+internal val ClipboardPinnedRowHeight = 40.dp
+
+/**
+ * Cards sit just above the panel in the theme's own colors (dark panel → slightly lighter dark
+ * card, light panel → slightly darker light card), instead of a fixed mid gray.
+ */
+@Composable
+private fun clipboardCardColor(): Color {
+    val colors = MaterialTheme.colorScheme
+    val dark = colors.surface.luminance() < .5f
+    return androidx.compose.ui.graphics.lerp(colors.surface, colors.onSurface, if (dark) .10f else .06f)
+        .copy(alpha = 1f)
 }
