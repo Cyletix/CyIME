@@ -39,6 +39,8 @@ internal fun KeyboardToolbarButton(
     slotWidth: androidx.compose.ui.unit.Dp? = null,
     /** 胶囊改成这个圆角（与键盘卡片同心）；null 时是两头全圆的胶囊。 */
     cornerRadius: androidx.compose.ui.unit.Dp? = null,
+    /** 按格子宽度连续地从圆变成胶囊（不像工具栏那样在 40dp 处跳变），最宽 52dp。 */
+    continuousPill: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     // 底板只在按下时出现，松手淡出；平时只有图标，与工具栏其他图标一致。
@@ -50,7 +52,7 @@ internal fun KeyboardToolbarButton(
         .background(background.copy(alpha = background.alpha * pressAlpha))
         .border(1.dp, outline.copy(alpha = outline.alpha * pressAlpha), CircleShape)
     if (slotWidth != null) {
-        val pill = toolbarPillSize(slotWidth)
+        val pill = if (continuousPill) edgePillSize(slotWidth) else toolbarPillSize(slotWidth)
         val shape = cornerRadius?.let { androidx.compose.foundation.shape.RoundedCornerShape(it) } ?: CircleShape
         Box(modifier.width(slotWidth).height(40.dp).clickable(source, indication = null, onClick = onClick),
             contentAlignment = Alignment.Center) {
@@ -79,10 +81,24 @@ internal fun KeyboardBackButton(
     slotWidth: androidx.compose.ui.unit.Dp? = null,
     restingFill: Color = Color.Transparent,
     cornerRadius: androidx.compose.ui.unit.Dp? = null,
+    continuousPill: Boolean = false,
 ) {
     KeyboardToolbarButton(onBack, background, modifier, slotWidth = slotWidth, restingFill = restingFill,
-        cornerRadius = cornerRadius) {
+        cornerRadius = cornerRadius, continuousPill = continuousPill) {
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = label,
             tint = foreground, modifier = Modifier.size(24.dp))
     }
+}
+
+/**
+ * 候选栏两端按钮：格子窄时是 32dp 圆（更窄的悬浮小窗跟着缩，最小 28dp），
+ * 格子变宽时宽度随之连续增加成胶囊，最宽 52dp，不多占候选的地方（用户 10-20）。
+ */
+internal fun edgePillSize(slot: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.DpSize {
+    val width = slot - 12.dp
+    if (width <= 32.dp) {
+        val side = width.coerceAtLeast(28.dp)
+        return androidx.compose.ui.unit.DpSize(side, side)
+    }
+    return androidx.compose.ui.unit.DpSize(width.coerceAtMost(52.dp), 32.dp)
 }
