@@ -20,7 +20,9 @@ data class KeyEffectUiState(
     val longPressDuration: Int = 0,
     val pressAmplitude: Int = 0,
     val longPressAmplitude: Int = 0,
-    val hasAmplitudeControl: Boolean = false
+    val hasAmplitudeControl: Boolean = false,
+    /** 支持点击/轻触组合原语（线性马达）：按键触感由马达决定时长，时长设置不生效（见 FeedbackManager.vibratePrimitive）。 */
+    val hapticPrimitives: Boolean = false,
 )
 
 class KeyEffectSettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,7 +55,10 @@ class KeyEffectSettingsViewModel(application: Application) : AndroidViewModel(ap
             context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
         }
         val hasAmp = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && vibrator.hasAmplitudeControl()
-        _uiState.update { it.copy(hasAmplitudeControl = hasAmp) }
+        val primitives = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+            vibrator.areAllPrimitivesSupported(android.os.VibrationEffect.Composition.PRIMITIVE_CLICK,
+                android.os.VibrationEffect.Composition.PRIMITIVE_TICK)
+        _uiState.update { it.copy(hasAmplitudeControl = hasAmp, hapticPrimitives = primitives) }
     }
 
     fun setKeyGlowEnabled(enabled: Boolean) {
