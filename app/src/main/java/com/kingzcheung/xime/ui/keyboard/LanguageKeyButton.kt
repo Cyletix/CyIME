@@ -83,7 +83,6 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 import com.kingzcheung.xime.ui.theme.cyPopupEnter
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 internal fun languageMenuSelection(
@@ -197,7 +196,8 @@ fun LanguageKeyButton(
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     if (down.isConsumed) return@awaitEachGesture
                     var chosenId: String? = null
-                    var cancelledSwipe = false
+                    // 按在语言键上就不让键盘的滑动移光标接手，菜单弹出前后都一样。
+                    suppressCursorMove.value = true
                     val menuJob = if (hasMenu) scope.launch {
                         delay((menuHoldSeconds * 1000).roundToLong())
                         menuSchemas = schemas
@@ -213,10 +213,7 @@ fun LanguageKeyButton(
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (change.isConsumed) break
-                            if (cancelledSwipe) {
-                                change.consume()
-                                if (!change.pressed) break
-                            } else if (menuOpen) {
+                            if (menuOpen) {
                                 change.consume()
                                 pointer = keyScreenPosition + change.position
                                 selectedId = languageMenuSelection(menuSchemas, pointer, viewport, scroll.value, rowHeight, selectedId)
@@ -225,14 +222,11 @@ fun LanguageKeyButton(
                                     break
                                 }
                             } else {
-                                val displacement = change.position - down.position
-                                if (displacement.y < -viewConfiguration.touchSlop) {
-                                    menuJob?.cancel()
-                                    cancelledSwipe = true
-                                    change.consume()
-                                    if (!change.pressed) break
-                                } else if (!change.pressed || abs(displacement.x) > viewConfiguration.touchSlop ||
-                                    abs(displacement.y) > viewConfiguration.touchSlop) break
+                                // 语言键不认滑动（用户 10-19 定）：按住期间手指在键内怎么挪都继续算长按，
+                                // 只有滑出键外才取消。原来超过 touchSlop 就取消，平板上手指一滚就弹不出列表。
+                                val p = change.position
+                                val inside = p.x >= 0f && p.y >= 0f && p.x <= size.width && p.y <= size.height
+                                if (!change.pressed || !inside) break
                             }
                         }
                     } finally {
