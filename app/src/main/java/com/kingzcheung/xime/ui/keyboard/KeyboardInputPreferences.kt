@@ -73,6 +73,8 @@ data class KeyboardInputPreferences(
     val flickDirectionDisc: Boolean = true,
     /** 英文 26 键滑行输入；整键盘滑动移动光标时让位。 */
     val glideTyping: Boolean = false,
+    /** 字母键长按弹出大小写气泡；默认关，免得打断上下拖动输入角标。 */
+    val letterLongPressMenu: Boolean = false,
     /** 九键拂动选字母（左上右下），数字改为长按。 */
     val t9FlickLetters: Boolean = false,
     /** 长按语言键弹出列表，与空格长按分开设置；默认 0.15 秒（2026-10-13 用户要求）。 */
@@ -91,7 +93,7 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
-                "glide_typing", "glide_typing_v2", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2",
+                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
@@ -146,6 +148,7 @@ data class KeyboardInputPreferences(
                 // 滑行输入 10-19 起默认关。旧键会被 save() 连同其他设置一起写成旧默认 true，
                 // 分不出是不是用户自己开的，所以只认新键；没有新键就是默认关。
                 glideTyping = prefs.getBoolean("glide_typing_v2", false),
+                letterLongPressMenu = prefs.getBoolean("letter_long_press_menu", false),
                 t9FlickLetters = prefs.getBoolean("t9_flick_letters", false),
                 keyTextScale = prefs.getFloat("key_text_scale", 1.15f).takeIf { it.isFinite() }?.coerceIn(0.8f, 1.6f) ?: 1.15f,
                 handwritingPauseSeconds = normalizeHandwritingPause(pause),
@@ -172,6 +175,7 @@ data class KeyboardInputPreferences(
             .putBoolean("flick_direction_disc_v2", flickDirectionDisc)
             .putBoolean("flick_direction_disc", flickDirectionDisc)
             .putBoolean("glide_typing_v2", glideTyping)
+            .putBoolean("letter_long_press_menu", letterLongPressMenu)
             .putBoolean("glide_typing", glideTyping)
             .putBoolean("t9_flick_letters", t9FlickLetters)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
