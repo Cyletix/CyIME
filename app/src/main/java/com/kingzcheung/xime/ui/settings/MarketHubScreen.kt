@@ -122,6 +122,7 @@ fun MarketHubContent(
     onNavigateToPluginDetail: (String) -> Unit = {},
     onNavigateToLocal: () -> Unit = {},
     onNavigateToModelLocal: () -> Unit = {},
+    onNavigateToPlugins: () -> Unit = {},
     initialTab: Int = 0,
 ) {
     // 三页可左右滑动切换，标签跟随；分页状态随返回栈保存，进详情再返回仍回到刚才那页。
@@ -132,19 +133,18 @@ fun MarketHubContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("扩展商店") },
+                title = { Text("扩展") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
-                    if (tabIndex == 0 || tabIndex == 1) {
-                        TextButton(
-                            onClick = if (tabIndex == 0) onNavigateToLocal else onNavigateToModelLocal,
-                        ) {
-                            Text("本地管理", style = MaterialTheme.typography.labelMedium)
-                        }
+                    // 扩展是方案、模型、插件的唯一入口；每页右上角进本页类型的已安装管理。
+                    TextButton(
+                        onClick = when (tabIndex) { 0 -> onNavigateToLocal; 1 -> onNavigateToModelLocal; else -> onNavigateToPlugins },
+                    ) {
+                        Text("已安装", style = MaterialTheme.typography.labelMedium)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

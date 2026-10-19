@@ -100,7 +100,7 @@ fun ClipboardSyncSettingsContent(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("剪贴板同步") },
+                title = { Text("剪贴板与同步") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -193,9 +193,8 @@ fun ClipboardSyncSettingsContent(
                 )
             })
             }
-            var showVerification by remember { mutableStateOf(false) }
-            androidx.compose.material3.TextButton(onClick = { showVerification = !showVerification }) { Text("短信验证码设置") }
-            if (showVerification) VerificationCodeSettings()
+            // 验证码自动复制是首页这一项的主要用途之一，直接显示，不再折叠。
+            VerificationCodeSettings()
         }
     }
 }

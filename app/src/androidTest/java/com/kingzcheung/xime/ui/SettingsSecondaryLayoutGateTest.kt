@@ -55,20 +55,18 @@ class SettingsSecondaryLayoutGateTest {
         rule.onNodeWithText("配色方案").assertIsDisplayed()
         assertTrue(rule.onNodeWithText("显示模式").fetchSemanticsNode().boundsInRoot.top <
             rule.onNodeWithText("配色方案").fetchSemanticsNode().boundsInRoot.top)
-        rule.onAllNodesWithTag("visual-style-original").assertCountEquals(0)
         rule.assertGeometry("theme-host", "明暗预览优先于配色")
         val context = ApplicationProvider.getApplicationContext<Context>()
         java.io.File(context.getExternalFilesDir(null), "settings-palette.png").outputStream().use {
             rule.onNodeWithTag("theme-host").captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("视觉样式"))
-        rule.onNodeWithText("视觉样式").assertIsDisplayed().performClick()
+        // 视觉样式直接在主题与外观页里，不再单独一页。
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("visual-style-original"))
         rule.onNodeWithTag("visual-style-original").assertIsDisplayed()
-        rule.assertGeometry("theme-host", "独立视觉样式页")
+        rule.assertGeometry("theme-host", "视觉样式")
         rule.runOnIdle { size.value = Triple(280, 360, 2f) }
         rule.assertGeometry("theme-host", "视觉样式窄屏大字体")
-        rule.onNodeWithContentDescription("返回").performClick()
-        rule.onNodeWithText("主题与定制").assertIsDisplayed()
+        rule.onNodeWithText("主题与外观").assertIsDisplayed()
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("显示模式"))
         rule.assertGeometry("theme-host", "明暗预览窄屏大字体")
     }

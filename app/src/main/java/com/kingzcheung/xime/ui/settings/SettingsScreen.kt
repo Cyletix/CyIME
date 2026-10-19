@@ -29,9 +29,11 @@ fun SettingsScreen(
     // Shortcuts enter the existing settings graph with Main underneath, so Back
     // works exactly as it does when the page is opened from the settings home.
     LaunchedEffect(initialRoute) {
-        if (initialRoute in setOf(SettingsRoutes.Theme, SettingsRoutes.SmartPrediction,
+        // 键盘提示「缺手写模型」发的是 model_management，冷启动时也要落到模型页（以前只在设置已打开时才认）。
+        val route = if (initialRoute == "model_management") SettingsRoutes.ModelLocal else initialRoute
+        if (route in setOf(SettingsRoutes.Theme, SettingsRoutes.SmartPrediction,
                 SettingsRoutes.SpeechToText, SettingsRoutes.ModelLocal)) {
-            navController.navigate(requireNotNull(initialRoute)) { launchSingleTop = true }
+            navController.navigate(requireNotNull(route)) { launchSingleTop = true }
         }
     }
 
@@ -90,7 +92,10 @@ fun SettingsScreen(
             )
         }
         composable(SettingsRoutes.HardwareKeyboard) { HardwareKeyboardSettingsContent { navController.popBackStack() } }
-        composable("languages") { LanguageSettingsContent(onBack = { navController.popBackStack() }) }
+        composable("languages") {
+            LanguageSettingsContent(onBack = { navController.popBackStack() },
+                onOpenSchemaResources = { navController.navigate(SettingsRoutes.Schema) })
+        }
         composable(SettingsRoutes.Schema) {
             SchemaSettingsContent(
                 onBack = {
@@ -119,13 +124,10 @@ fun SettingsScreen(
                 onNavigateToPluginDetail = { pluginId ->
                     navController.navigate("plugin_market_detail/$pluginId")
                 },
-                onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
+                // 方案的已安装管理与「语言与方案 › 已安装的方案」是同一页，不再另开一份本地方案页。
+                onNavigateToLocal = { navController.navigate(SettingsRoutes.Schema) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
-            )
-        }
-        composable(SettingsRoutes.SchemaLocal) {
-            SchemaLocalContent(
-                onBack = { navController.popBackStack() },
+                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
             )
         }
         composable(SettingsRoutes.ModelLocal) {
@@ -240,11 +242,6 @@ fun SettingsScreen(
         composable(SettingsRoutes.CellDictionaries) {
             CellDictionarySettingsContent(onBack = { navController.popBackStack() })
         }
-        composable(SettingsRoutes.SchemaDictBrowser) {
-            SchemaDictBrowserContent(
-                onBack = { navController.popBackStack() }
-            )
-        }
         composable(SettingsRoutes.RimeFileBrowser) {
             RimeFileBrowserContent(
                 onBack = { navController.popBackStack() }
@@ -276,23 +273,6 @@ fun SettingsScreen(
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
             )
         }
-        composable(SettingsRoutes.MarketModel) {
-            MarketHubContent(
-                onBack = { navController.popBackStack() },
-                onNavigateToDetail = { schemeId ->
-                    navController.navigate("schema_market_detail/$schemeId")
-                },
-                onNavigateToModelDetail = { modelId ->
-                    navController.navigate("model_market_detail/$modelId")
-                },
-                onNavigateToPluginDetail = { pluginId ->
-                    navController.navigate("plugin_market_detail/$pluginId")
-                },
-                onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
-                onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
-                initialTab = 1,
-            )
-        }
         composable(SettingsRoutes.MarketPlugins) {
             MarketHubContent(
                 onBack = { navController.popBackStack() },
@@ -305,8 +285,10 @@ fun SettingsScreen(
                 onNavigateToPluginDetail = { pluginId ->
                     navController.navigate("plugin_market_detail/$pluginId")
                 },
-                onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
+                // 方案的已安装管理与「语言与方案 › 已安装的方案」是同一页，不再另开一份本地方案页。
+                onNavigateToLocal = { navController.navigate(SettingsRoutes.Schema) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
+                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
                 initialTab = 2,
             )
         }

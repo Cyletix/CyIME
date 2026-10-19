@@ -287,17 +287,7 @@ fun SmartPredictionSettingsContent(
                 )
             }
 
-            item {
-                SettingsSection(title = "模型管理", content = {
-                    SettingsItem(
-                        icon = Icons.Default.Build,
-                        title = "模型管理",
-                        subtitle = "管理所有已下载的 AI 模型",
-                        onClick = onNavigateToModelManagement,
-                        showArrow = true
-                    )
-                })
-            }
+            // 模型的下载和删除统一在「扩展 › 模型」，这里只选用。
         }
     }
 }
