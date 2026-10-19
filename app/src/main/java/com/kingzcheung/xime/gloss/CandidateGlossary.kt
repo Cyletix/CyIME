@@ -26,9 +26,9 @@ import kotlin.concurrent.thread
  */
 object CandidateGlossary {
     const val MODEL_ID = "candidate-gloss"
-    /** 文件名带版本：v1 有俚语、读音选错的释义（几号 → heroin），装着 v1 的设备不再读它。 */
-    const val FILE_NAME = "cyime_gloss-v2.tsv"
-    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv")
+    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词；装着旧版的设备自动换新。 */
+    const val FILE_NAME = "cyime_gloss-v3.tsv"
+    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv")
     private const val TAG = "CandidateGlossary"
     private val upgradeStarted = AtomicBoolean(false)
 
