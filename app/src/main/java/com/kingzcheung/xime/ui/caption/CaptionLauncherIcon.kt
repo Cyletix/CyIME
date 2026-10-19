@@ -16,22 +16,48 @@ import com.kingzcheung.xime.ui.theme.ThemeIconColors
  * everyone else); an elder preset may switch it on by default. The quick-settings tile and the
  * keyboard menu open captions either way.
  *
- * It is a pinned shortcut, so its colour follows the keyboard theme in place (updateShortcuts),
- * without the launcher removing and re-adding it. The old launcher alias remains only as a
- * fallback for launchers that cannot pin shortcuts or when pinning is refused in the background.
+ * A pinned shortcut recolours in place (updateShortcuts). Launchers that cannot pin, or a request
+ * made in the background, fall back to a launcher alias; that alias comes in each theme colour and
+ * is swapped on theme change (the launcher re-adds it, as with the main icon). A theme change never
+ * turns the icon on when it is off.
  */
 object CaptionLauncherIcon {
     private const val SHORTCUT_ID = "caption"
+    private const val ALIAS = "com.kingzcheung.xime.ui.caption.CaptionLauncher"
 
-    private fun alias(context: Context) = ComponentName(context.packageName, "com.kingzcheung.xime.ui.caption.CaptionLauncher")
+    /** The legacy (fixed-colour) alias first, then one per theme colour. */
+    private fun aliases(context: Context) = (listOf("") + ThemeIconColors.ids.map { c -> c.replaceFirstChar { it.uppercaseChar() } })
+        .map { ComponentName(context.packageName, ALIAS + it) }
 
-    private fun aliasEnabled(context: Context) =
-        context.packageManager.getComponentEnabledSetting(alias(context)) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+    private fun aliasFor(context: Context, themeId: String) = ComponentName(context.packageName,
+        ALIAS + ThemeIconColors.forTheme(themeId).replaceFirstChar { it.uppercaseChar() })
 
-    private fun setAlias(context: Context, enabled: Boolean) {
-        context.packageManager.setComponentEnabledSetting(alias(context),
-            if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
-            PackageManager.DONT_KILL_APP)
+    private fun aliasEnabled(context: Context) = aliases(context).any {
+        context.packageManager.getComponentEnabledSetting(it) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+    }
+
+    /** Enable only the alias in the given theme's colour, or none. */
+    private fun setAlias(context: Context, enabled: Boolean, themeId: String = SettingsPreferences.getKeyboardTheme(context)) {
+        val pm = context.packageManager
+        val target = if (enabled) aliasFor(context, themeId) else null
+        val changes = aliases(context).map { name ->
+            name to if (name == target) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+        }.filter { (name, state) ->
+            val current = pm.getComponentEnabledSetting(name)
+            if (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) current == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            else current != state
+        }
+        if (changes.isEmpty()) return
+        // Same swap as the main icon (LauncherIcons.apply): one batch on Android 13+, so the launcher
+        // treats it as a replacement; otherwise enable the new entry before disabling the old one.
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            pm.setComponentEnabledSettings(changes.map { (name, state) ->
+                PackageManager.ComponentEnabledSetting(name, state, PackageManager.DONT_KILL_APP)
+            })
+        } else {
+            changes.sortedByDescending { it.second == PackageManager.COMPONENT_ENABLED_STATE_ENABLED }
+                .forEach { (name, state) -> pm.setComponentEnabledSetting(name, state, PackageManager.DONT_KILL_APP) }
+        }
     }
 
     private fun pinned(context: Context) = runCatching {
@@ -62,10 +88,12 @@ object CaptionLauncherIcon {
         if (requested) setAlias(context, false) else setAlias(context, true)
     }
 
-    /** Recolour an existing pinned icon after a theme change; does nothing when none is pinned. */
+    /** Recolour the icon after a theme change: the pinned shortcut in place, the alias by swapping. Off stays off. */
     fun refresh(context: Context, themeId: String) {
-        if (pinned(context) == null) return
-        ShortcutManagerCompat.updateShortcuts(context, listOf(shortcut(context, themeId)))
+        if (aliasEnabled(context) && aliasFor(context, themeId).let {
+                context.packageManager.getComponentEnabledSetting(it) != PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            }) setAlias(context, true, themeId)
+        if (pinned(context) != null) ShortcutManagerCompat.updateShortcuts(context, listOf(shortcut(context, themeId)))
     }
 
     private fun shortcut(context: Context, themeId: String) = ShortcutInfoCompat.Builder(context, SHORTCUT_ID)

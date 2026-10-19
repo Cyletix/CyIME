@@ -275,6 +275,79 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <!-- 字幕桌面入口的主题色版本：已打开字幕图标时，换主题只启用对应颜色的一个（CaptionLauncherIcon） -->
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherLavender"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_lavender">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherSoftblue"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_softblue">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherSakura"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_sakura">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherSunset"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_sunset">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherAurora"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_aurora">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherMint"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_mint">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherCream"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_cream">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherDesert"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_desert">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name="com.kingzcheung.xime.ui.caption.CaptionLauncherMono"
+            android:targetActivity="com.kingzcheung.xime.ui.caption.CaptionActivity"
+            android:enabled="false" android:exported="true" android:label="字幕" android:icon="@mipmap/caption_launcher_mono">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <!-- 下拉快捷开关里的“字幕” -->
         <service android:name="com.kingzcheung.xime.ui.caption.CaptionTileService"
             android:exported="true" android:label="字幕" android:icon="@drawable/caption_launcher_foreground"
