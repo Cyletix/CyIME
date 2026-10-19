@@ -945,7 +945,12 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     val margin = with(density) { 4.dp.roundToPx() }
     val gap = with(density) { 2.dp.roundToPx() }
     // 宿主报了光标位置时气泡从光标处开始（换成本窗口坐标），不再固定在键盘左边盖住已上屏的字。
-    val caret by com.kingzcheung.xime.service.SoftCaretAnchor.anchor
+    // 一段拼音只对准一次：拼音写进输入框的应用里光标随每个字母右移，每次都跟会让气泡越打越往右飘
+    // （用户 10-19 报）。本函数随拼音出现/消失而进出组合，所以下一段会重新对准。
+    val liveCaret by com.kingzcheung.xime.service.SoftCaretAnchor.anchor
+    val pinnedCaret = remember { arrayOfNulls<com.kingzcheung.xime.service.HardwareCursorAnchor>(1) }
+    if (pinnedCaret[0] == null) pinnedCaret[0] = liveCaret
+    val caret = pinnedCaret[0]
     val view = LocalView.current
     val positionProvider = remember(margin, gap, caret, view) {
         object : PopupPositionProvider {
