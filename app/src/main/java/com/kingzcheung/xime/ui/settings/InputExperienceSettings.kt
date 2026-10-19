@@ -49,8 +49,22 @@ internal fun InputExperienceSettings(
             }
             Text(if (settings.symbolInputMode == SymbolInputMode.LONG_PRESS)
                 "按住满 0.3 秒立即输入上方角标，持续按住和松手都不重复输入；此模式不弹出字母菜单。空格、删除和语言键保持原行为。"
-                else "滑动时在原键内预览，松手输入；所有布局角标的方向均可在下方反转，原有长按菜单保持不变。",
+                else "滑动时在原键内预览，松手输入；所有布局角标的方向均可在下方反转。",
                 style = MaterialTheme.typography.bodySmall)
+            // 「长按输入」模式本来就不弹字母菜单，这一行只在滑动输入时生效、才显示。
+            if (settings.symbolInputMode != SymbolInputMode.LONG_PRESS) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("字母键长按弹出大小写", style = MaterialTheme.typography.titleSmall)
+                        Text("长按字母弹出小写、大写和带音调的字母；关掉后长按字母不弹，上下拖动输入角标不受打扰。",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = settings.letterLongPressMenu,
+                        modifier = Modifier.testTag("letter-long-press-menu"), onCheckedChange = {
+                            settings = settings.copy(letterLongPressMenu = it); settings.save(context)
+                        })
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("反转上下滑方向", style = MaterialTheme.typography.titleSmall)
