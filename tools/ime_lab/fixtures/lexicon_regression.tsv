@@ -1115,3 +1115,8 @@ user-tonghua-t9	9	866482	通话	1	user	2026-10-18	同上，九键
 user-tonghua-win	win26	tonghua	通话	1	user	2026-10-18	同上，电脑版
 user-yuyanjian-win	win26	yuyanjian	语言键	1	user	2026-10-19	电脑版出“语言机按”，jian 被切成 ji an
 user-yuyanjian	26	yuyanjian	语言键	1	user	2026-10-19	同上，安卓 26 键
+user-manmandi	26	manmandi	慢慢地	1	user	2026-10-19	地习惯打 di，原来只有 de 读音
+user-momodi	26	momodi	默默地	1	user	2026-10-19	同上
+user-haohaodi	26	haohaodi	好好地	1	user	2026-10-19	同上
+user-nishuode	26	nishuode	你说的	1	user	2026-10-19	原来“你说得”权重远高于“你说的”
+user-shenghuode	26	shenghuode	生活的	1	user	2026-10-19	同上

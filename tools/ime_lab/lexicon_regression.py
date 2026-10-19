@@ -39,7 +39,10 @@ def qwerty_neighbors():
 
 def load_cases():
     cases = []
-    for line in CASES.read_text(encoding="utf-8").splitlines():
+    # CYIME_EXTRA_CASES: extra fixture files in the same format (e.g. a particle_phrases.py set), ';'-separated.
+    extra = [Path(p) for p in os.environ.get("CYIME_EXTRA_CASES", "").split(";") if p]
+    lines = [line for path in [CASES, *extra] for line in path.read_text(encoding="utf-8").splitlines()]
+    for line in lines:
         if not line or line.startswith("#") or line.startswith("id\t"):
             continue
         f = line.split("\t")
