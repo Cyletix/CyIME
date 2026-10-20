@@ -22,6 +22,9 @@ import kotlinx.coroutines.withContext
  * 承载按键派发（handleKeyPress）、长按退格合并、候选选择/翻页、计算器候选等逻辑。
  * 所有共享状态通过 service 引用访问（同模块 internal 成员）。
  */
+/** 26-key schemas whose speller alphabet has A–Z, so a capital joins the composition (rime-ice family). */
+private val RIME_ICE_CAPITAL_SCHEMAS = setOf("rime_ice", "pinyin_qwjrtk", "pinyin_cyletix10")
+
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     @Volatile internal var letterNeighbors: Pair<String, String> = "" to ""
     private val hardwareNavigation = HardwareCandidateNavigation()
@@ -1020,16 +1023,22 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         } else {
                             // 注：T9 数字键不经过此处（T9KeyboardLayout 直接调
                             // controller.onDigitPressed → applyComposition）。
-                            // 拼音后输入大写字母（Shift 或 Caps Lock）：已打的字母按原样连同大写字母上屏，
+                            // 大写字母（Shift、Caps Lock 或 Shift 拖线中途在字母区松手）在雾凇系 26 键方案里
+                            // 参与组字：字母表含 A–Z，大写串进当前输入（zuogeDNAjiance → 做个DNA检测，
+                            // Transformer、KFC 由英文词库和自动大写给出），已打的拼音不被顶上屏。
+                            val capitalsInRime = isShiftedChinese && !mergedKey &&
+                                state.currentSchemaId in RIME_ICE_CAPITAL_SCHEMAS && service.t9PartialSegments.isEmpty()
+                            // 其他方案（双拼、14 键合并键等）没有大写字母编码：已打的字母按原样连同大写字母上屏，
                             // 不丢弃拼音（与桌面端“整串按原样处理”一致）。
-                            if (isShiftedChinese && (service.rimeEngine.readQueuedComposition()?.input?.isNotEmpty() == true ||
+                            if (isShiftedChinese && !capitalsInRime && (service.rimeEngine.readQueuedComposition()?.input?.isNotEmpty() == true ||
                                     service.t9PartialSegments.isNotEmpty())) {
                                 commitHardwareLiteral(char)
                                 return@command
                             }
-                            val result = service.rimeEngine.processQueuedKeyAndGetResult(keyCode, mask)
+                            val result = if (capitalsInRime) service.rimeEngine.processQueuedKeyAndGetResult(char.uppercase()[0].code, 0)
+                                else service.rimeEngine.processQueuedKeyAndGetResult(keyCode, mask)
                             if (result.processed) {
-                                if (isShiftedChinese && result.committedText != char) {
+                                if (isShiftedChinese && !capitalsInRime && result.committedText != char) {
                                     service.rimeEngine.clearComposition()
                                     committedText = char
                                     needsUIUpdate = true
