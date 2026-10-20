@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -193,8 +194,13 @@ fun HardwareKeyboardCandidateBar(
                     .then(surface?.invoke() ?: Modifier.background(cardBackgroundColor))
                     .testTag("hardware-candidate-card")
                     .onGloballyPositioned { reportBounds(it.boundsInWindow().toAndroidBounds()) }
+                    // 展开、收起和屏幕键盘的候选展开同一套动效：卡片高度按面板时长过渡，内容交叉淡入（用户 10-21）。
+                    .animateContentSize(com.kingzcheung.xime.ui.theme.CyMotion.panel(expanded))
                     .padding(horizontal = 6.dp, vertical = 4.dp)) {
-                    if (expanded) HardwareCandidateGrid(candidates.take(MAX_VISIBLE_CANDIDATES), highlightIndex,
+                    androidx.compose.animation.Crossfade(expanded,
+                        animationSpec = com.kingzcheung.xime.ui.theme.CyMotion.enter(com.kingzcheung.xime.ui.theme.CyMotion.MEDIUM),
+                        label = "hardware-candidate-expand") { open ->
+                    if (open) HardwareCandidateGrid(candidates.take(MAX_VISIBLE_CANDIDATES), highlightIndex,
                         visuals, onCandidateSelect, onCollapse = { expanded = false })
                     else Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) {
@@ -205,6 +211,7 @@ fun HardwareKeyboardCandidateBar(
                             modifier = Modifier.testTag("hardware-candidate-expand")) {
                             Icon(Icons.Default.ExpandMore, "展开候选", tint = visuals.textColor)
                         }
+                    }
                     }
                 }
             }
