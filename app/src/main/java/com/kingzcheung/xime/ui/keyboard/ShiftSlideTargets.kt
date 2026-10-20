@@ -5,7 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 
 /** Actual laid-out letter cells, including custom and split QWERTY rows. */
-internal class ShiftSlideTargets {
+internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = CandidateDropTargets.shared) {
     data class Target(val key: String, val bounds: Rect, val commit: () -> Unit)
     data class Drag(val origin: Offset, val pointer: Offset)
     private val targets = mutableMapOf<Any, List<Target>>()
@@ -29,8 +29,17 @@ internal class ShiftSlideTargets {
         }
     }
     fun remove(id: Any) { targets.remove(id) }
-    fun at(point: Offset): Target? = if (!keyboardBounds.contains(point)) null
+    fun at(point: Offset): Target? = if (!keyboardBounds.contains(point)) candidateAt(point)
         else targets.values.asSequence().flatten().firstOrNull { it.bounds.contains(point) }
+
+    /** 拖出键盘、落在候选上：松手等于按住 Shift 点这个候选（释义模式上屏英文）。 */
+    private fun candidateAt(point: Offset): Target? =
+        candidates.at(point)?.let { (bounds, select) -> Target(CANDIDATE_KEY, bounds, select) }
+
+    companion object {
+        /** 候选目标的 key；不是字母，键帽高亮不会匹配到它。 */
+        const val CANDIDATE_KEY = "candidate"
+    }
 
     fun move(shiftBounds: Rect, pointer: Offset): Target? {
         if (shiftBounds.contains(pointer)) {

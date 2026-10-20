@@ -67,6 +67,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -881,8 +883,13 @@ fun CandidateItem(
     /** 用户以前打过的词：文字右上角画一个小编辑图标。 */
     learned: Boolean = false,
 ) {
+    // 登记位置给 Shift 拖动：从 Shift 拖到这里松手，按住 Shift 选它（释义模式上屏英文）。
+    val dropId = remember { Any() }
+    val currentClick by rememberUpdatedState(onClick)
+    DisposableEffect(dropId) { onDispose { CandidateDropTargets.shared.remove(dropId) } }
     Row(
         modifier = modifier
+            .onGloballyPositioned { CandidateDropTargets.shared.put(dropId, it.boundsInRoot()) { currentClick() } }
             .height(candidateItemHeight(fontSize))
             .clip(RoundedCornerShape(5.dp))
             .background(
