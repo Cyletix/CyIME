@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.twotone.KeyboardAlt
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
@@ -31,7 +32,7 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguageSettingsContent(onBack: () -> Unit) {
+fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var languages by remember { mutableStateOf(LanguagePreferences.enabled(context)) }
@@ -55,7 +56,7 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
         remembered = InputModes.rememberedModes(context)
     }
     Scaffold(modifier = Modifier.testTag("language-settings"), containerColor = MaterialTheme.colorScheme.surface,
-        topBar = { TopAppBar(title = { Text("语言管理") }, navigationIcon = {
+        topBar = { TopAppBar(title = { Text("语言与方案") }, navigationIcon = {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) }
     ) { padding ->
@@ -121,6 +122,13 @@ fun LanguageSettingsContent(onBack: () -> Unit) {
             }
             item(key = "language-key-switch") {
                 LanguageKeySwitchSettings(availableProfiles, orderedLanguages, profilesState.currentSchema)
+            }
+            // 已装的方案组合（启停、排序、应用更改）和导入，原首页「输入资源」。
+            item(key = "schema-resources") {
+                SettingsSection(title = "方案资源") {
+                    SettingsItem(Icons.TwoTone.KeyboardAlt, "已安装的方案",
+                        "启停和排序语言、方案与布局的组合，导入方案文件", onClick = onOpenSchemaResources, showArrow = true)
+                }
             }
             item { if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             item { Spacer(Modifier.height(16.dp)) }

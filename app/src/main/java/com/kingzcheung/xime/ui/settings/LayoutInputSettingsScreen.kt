@@ -1,6 +1,5 @@
 package com.kingzcheung.xime.ui.settings
 
-import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -44,19 +43,15 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             settings = settings.copy(neighborCorrection = it); settings.save(context)
                         })
                     HorizontalDivider()
-                    // 「键盘滑动」移动光标时滑行不生效，开关不显示（光标方式里已说明）。
-                    if (settings.cursorGesture != com.kingzcheung.xime.ui.keyboard.CursorGestureMode.KEYBOARD) {
-                        SettingsToggleItem(Icons.TwoTone.Keyboard, "滑行输入",
-                            "英文 26 键手指划过字母出整词，候选栏可换成其他词；竖着滑一行仍输入角标符号。",
-                            checked = settings.glideTyping, onCheckedChange = {
-                                settings = settings.copy(glideTyping = it); settings.save(context)
-                            })
-                        HorizontalDivider()
-                    }
-                    SettingsToggleItem(Icons.TwoTone.Keyboard, "分体键盘",
-                        "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸仍可在键盘调整面板中设置。",
-                        checked = settings.splitKeyboardEnabled,
-                        onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
+                    // 「键盘滑动」移光标和滑行冲突：照常显示，被锁时置灰并写明被谁锁（见 InputGestureLocks）。
+                    SettingsToggleItem(Icons.TwoTone.Keyboard, "滑行输入",
+                        "英文 26 键手指划过字母出整词，候选栏可换成其他词；竖着滑一行仍输入角标符号。",
+                        checked = settings.glideTyping, onCheckedChange = {
+                            settings = settings.copy(glideTyping = it); settings.save(context)
+                        },
+                        lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
+                            com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.GLIDE_TYPING, true)
+                            ?.takeIf { !settings.glideTyping }?.message)
                     HorizontalDivider()
                     QwertyStaggerSettings(settings) { settings = it; it.save(context) }
                     HorizontalDivider()
@@ -76,11 +71,6 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         checked = settings.qwertyPeriodKey, onCheckedChange = {
                             settings = settings.copy(qwertyPeriodKey = it); settings.save(context)
                         })
-                    HorizontalDivider()
-                    SettingsItem(Icons.TwoTone.Keyboard, "按键符号", "26 键上下角标、九键与笔画侧栏、手写和常用符号栏，一处按位置编辑。",
-                        onClick = { context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
-                            .putExtra("edit_symbols", true)) },
-                        showArrow = true)
                 })
                 LayoutInputCategory.Nine -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     SettingsSection(title = "九键与笔画", content = {
@@ -89,12 +79,11 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                                 "开启后长按输入数字、不再弹出字母菜单，与「长按输入」角标的方式一致。触发距离在下方「滑动触发距离」设置。",
                             checked = settings.t9FlickLetters, onCheckedChange = {
                                 settings = settings.copy(t9FlickLetters = it); settings.save(context)
-                            })
-                        HorizontalDivider()
-                        SettingsItem(Icons.TwoTone.Keyboard, "按键符号", "九键与笔画侧栏按位置编辑，每格一个符号或短语；手写与常用符号栏也在同一页。",
-                            onClick = { context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)
-                                .putExtra("edit_symbols", true).putExtra("symbol_target", "t9")) },
-                            showArrow = true)
+                            },
+                            // 角标“长按”时数字占了长按，拂动必须开着：锁成开，不能关。
+                            lockMessage = com.kingzcheung.xime.ui.keyboard.InputGestureLocks.lockFor(settings,
+                                com.kingzcheung.xime.ui.keyboard.InputGestureLock.Option.T9_FLICK_LETTERS, false)
+                                ?.takeIf { settings.t9FlickLetters }?.message)
                     })
                     SettingsSection(title = "14 键双字母键", content = {
                         SettingsToggleItem(Icons.TwoTone.Keyboard, "左右滑动选字母",
@@ -102,11 +91,6 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                             checked = settings.fourteenLetterSwipe, onCheckedChange = {
                                 settings = settings.copy(fourteenLetterSwipe = it); settings.save(context)
                             })
-                        HorizontalDivider()
-                        SettingsToggleItem(Icons.TwoTone.Keyboard, "分体键盘",
-                            "与 26 键页是同一开关；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸可在键盘调整面板中设置。",
-                            checked = settings.splitKeyboardEnabled,
-                            onCheckedChange = { SettingsPreferences.setSplitKeyboardEnabled(context, it) })
                         Text("开启时，双字母键的横滑优先用于选字母；其他位置的光标手势仍遵循共通设置。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
@@ -126,7 +110,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     InputExperienceSettings(setOf(InputExperiencePart.FLICK_DISC, InputExperiencePart.KANA), "拂动与假名提示")
                 }
             }
-            Text("空格、光标、字号和按键角标等共通设置在「布局与显示」的其他分页，各布局共用，无需逐个设置。",
+            Text("分体键盘、按键符号在上一页「键盘布局」；角标、光标与空格在「按键与手势」；字号在「主题与外观」。各布局共用，无需逐个设置。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

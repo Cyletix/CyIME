@@ -45,65 +45,80 @@ internal const val SEARCH_TARGET_CUSTOM_LAYOUT = "activity:custom_layout"
 private fun layoutPage(page: String) = "${SettingsRoutes.LayoutDisplay}?page=$page"
 
 internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
-    val ld = "布局与显示"
+    val input = "输入"
+    val look = "外观"
+    val layouts = "输入 › 键盘布局"
     val qwerty = LayoutInputCategory.Qwerty.route
     val nine = LayoutInputCategory.Nine.route
+    val layoutIndex = SettingsRoutes.LayoutDisplay
+    val handwriting = "智能 › 手写"
     listOf(
         // 首页入口
-        SettingsSearchEntry("物理键盘", "输入法", SettingsRoutes.HardwareKeyboard, "实体键盘 蓝牙键盘 外接键盘 语言切换快捷键 候选跟随 浮条"),
-        SettingsSearchEntry("主题与定制", "外观与交互", SettingsRoutes.Theme, "主题 皮肤 颜色 配色 深色 浅色 夜间 玻璃 背景 外观"),
-        SettingsSearchEntry("按键效果", "外观与交互", SettingsRoutes.KeyEffect, "按键音 声音 音效 振动 震动 反馈 发光 动画"),
-        SettingsSearchEntry("布局与显示", "外观与交互", SettingsRoutes.LayoutDisplay, "候选词显示 键盘布局"),
-        SettingsSearchEntry("性能与省电", "外观与交互", SettingsRoutes.Performance, "性能 省电 内存 卡顿 高配 中配 低配 自动 动效 炫光 语音常驻 释放 SenseVoice Paraformer"),
-        SettingsSearchEntry("语言管理", "方案与词库", "languages", "语言 输入方案 键盘布局 切换方式 双拼 日语 英语 九键 26键 14键"),
-        SettingsSearchEntry("输入资源", "方案与词库", SettingsRoutes.Schema, "下载 导入 启停 方案 部署"),
-        SettingsSearchEntry("布局管理", "方案与词库", SEARCH_TARGET_CUSTOM_LAYOUT, "26键符号 自定义按键布局 自定义布局"),
-        SettingsSearchEntry("词库管理", "方案与词库", SettingsRoutes.Dictionary, "分类词库 个人词库 用户词 自定义短语 词典"),
-        SettingsSearchEntry("扩展商店", "扩展", SettingsRoutes.Market, "下载 输入方案 模型 插件 商店"),
-        SettingsSearchEntry("插件管理", "扩展", SettingsRoutes.Plugins, "插件 已安装"),
+        SettingsSearchEntry("语言与方案", input, "languages", "语言 输入方案 键盘布局 切换方式 双拼 日语 英语 九键 26键 14键 语言管理"),
+        SettingsSearchEntry("主题与外观", look, SettingsRoutes.Theme, "主题 皮肤 颜色 配色 深色 浅色 夜间 玻璃 背景 外观 视觉样式 定制"),
+        SettingsSearchEntry("候选词", look, layoutPage("candidates"), "候选 候选栏"),
+        SettingsSearchEntry("键盘布局", input, layoutIndex, "布局 26键 九键 14键 布局与显示"),
+        SettingsSearchEntry("按键与手势", input, layoutPage("gestures"), "手势 角标 光标 空格 长按"),
+        SettingsSearchEntry("按键效果", look, SettingsRoutes.KeyEffect, "按键音 声音 音效 振动 震动 反馈 发光 动画"),
+        SettingsSearchEntry("按键音色", "$look › 按键效果", SettingsRoutes.KeyEffect, "音色 Rain75 紫薇轴 机械键盘 实体键盘 按键声音 音效"),
+        SettingsSearchEntry("物理键盘", input, SettingsRoutes.HardwareKeyboard, "实体键盘 蓝牙键盘 外接键盘 语言切换快捷键 候选跟随 浮条"),
         SettingsSearchEntry("智能联想", "智能", SettingsRoutes.SmartPrediction, "联想 预测 个人学习 模型增强 下一个词"),
-        SettingsSearchEntry("语音转文本", "智能", SettingsRoutes.SpeechToText, "语音 识别 麦克风 说话 听写 在线 本地"),
-        SettingsSearchEntry("模型管理", "智能", SettingsRoutes.ModelLocal, "模型 识字 语音 手写 联想 本地 下载"),
-        SettingsSearchEntry("手写训练模式", "智能", SettingsRoutes.HandwritingTraining, "手写 训练 样本 假名 字母 公式"),
-        SettingsSearchEntry("备份与恢复", "同步与备份", SettingsRoutes.Backup, "备份 恢复 导出 导入 本地备份 换机"),
-        SettingsSearchEntry("剪贴板同步", "同步与备份", SettingsRoutes.ClipboardSync, "剪贴板 同步 验证码 短信 复制 电脑"),
-        SettingsSearchEntry("关于 CyIME", "关于", SettingsRoutes.About, "版本 开发者 联系 日志 许可"),
-        // 各布局
-        SettingsSearchEntry("邻键纠错", "$ld › 26 键", qwerty, "纠错 打错 误触 全拼"),
-        SettingsSearchEntry("滑行输入", "$ld › 26 键", qwerty, "滑行 划词 滑动输入 手势输入 英文 整词"),
-        SettingsSearchEntry("分体键盘", "$ld › 26 键", qwerty, "分体 分离 拆分 平板 两手"),
-        SettingsSearchEntry("三行字母错位", "$ld › 26 键", qwerty, "错位 排布 实体键盘 对齐"),
-        SettingsSearchEntry("空格两侧的标点", "$ld › 26 键", qwerty, "逗号键 句号键 空格 标点 全角 半角"),
-        SettingsSearchEntry("按键符号", "$ld › 26 键", qwerty, "角标 符号编辑 字母键符号 上下角标"),
-        SettingsSearchEntry("拂动选字母", "$ld › 九键与 14 键", nine, "九键 拂动 滑动 长按 数字 字母 字母菜单"),
-        SettingsSearchEntry("九键侧栏按键符号", "$ld › 九键与 14 键", nine, "侧栏 笔画 符号 短语"),
-        SettingsSearchEntry("左右滑动选字母", "$ld › 九键与 14 键", nine, "14键 双字母键 滑动 选字母 小鹤"),
-        SettingsSearchEntry("滑动触发距离", "$ld › 九键与 14 键", nine, "距离 灵敏度 误触 拂动 滑动"),
-        SettingsSearchEntry("拂动时显示方向圆盘", "$ld › 九键与 14 键", nine, "圆盘 方向 箭头 拂动 提示"),
-        SettingsSearchEntry("假名方向提示", "$ld › 九键与 14 键", nine, "日语 日文 假名 灰色小字 方向"),
-        // 通用
-        SettingsSearchEntry("候选字大小", "$ld › 候选词", layoutPage("candidates"), "候选 字号 字体大小"),
-        SettingsSearchEntry("候选栏取消按钮", "$ld › 候选词", layoutPage("candidates"), "取消 左箭头"),
-        SettingsSearchEntry("候选注释", "$ld › 候选词", layoutPage("candidates"), "注释 拼音 释义 翻译 编码 候选显示"),
-        SettingsSearchEntry("编码显示", "$ld › 候选词", layoutPage("candidates"), "预编辑 输入框 候选栏 编码位置"),
-        SettingsSearchEntry("每页候选词数", "$ld › 候选词", layoutPage("candidates"), "候选数量 分页 每页"),
-        SettingsSearchEntry("按键字号", "$ld › 键盘外观", layoutPage("appearance"), "字号 字体 文字大小 按键文字"),
-        SettingsSearchEntry("上方角标提示", "$ld › 键盘外观", layoutPage("appearance"), "角标 提示 符号 显示"),
-        SettingsSearchEntry("下方角标提示", "$ld › 键盘外观", layoutPage("appearance"), "角标 提示 符号 显示"),
-        SettingsSearchEntry("点按弹出气泡", "$ld › 键盘外观", layoutPage("appearance"), "气泡 预览 弹出 按键放大"),
-        SettingsSearchEntry("底部圆角与透明导航栏", "$ld › 键盘外观", layoutPage("appearance"), "圆角 导航栏 底部"),
-        SettingsSearchEntry("按键角标的符号和数字", "$ld › 角标与长按", layoutPage("gestures"), "角标 滑动输入 长按输入 符号 数字"),
-        SettingsSearchEntry("反转上下滑方向", "$ld › 角标与长按", layoutPage("gestures"), "反转 方向 上滑 下滑 删除键 清空 撤销"),
-        SettingsSearchEntry("长按语言键弹出列表", "$ld › 角标与长按", layoutPage("gestures"), "语言键 切换语言 长按 时长"),
-        SettingsSearchEntry("滑动移动光标", "$ld › 光标与空格", layoutPage("cursor"), "光标 移动 滑动 空格"),
-        SettingsSearchEntry("空格长按", "$ld › 光标与空格", layoutPage("cursor"), "空格 长按 连续空格 语音 时长"),
-        SettingsSearchEntry("光标灵敏度", "$ld › 光标与空格", layoutPage("cursor"), "光标 距离 灵敏"),
-        SettingsSearchEntry("手写停顿识别", "$ld › 手写与数字键盘", layoutPage("handwriting"), "手写 停顿 识别 延迟 时长"),
-        SettingsSearchEntry("手写公式两边的标记", "$ld › 手写与数字键盘", layoutPage("handwriting"), "公式 latex 美元 数学"),
-        SettingsSearchEntry("数字框自动数字键盘", "$ld › 手写与数字键盘", layoutPage("handwriting"), "数字 验证码 号码 电话 数字键盘"),
+        SettingsSearchEntry("语音转文本", "智能", SettingsRoutes.SpeechToText, "语音 识别 麦克风 说话 听写 在线 本地 语音输入 开关"),
+        SettingsSearchEntry("手写", "智能", SettingsRoutes.Handwriting, "手写 写字 笔迹 公式"),
+        SettingsSearchEntry("词库", "智能", SettingsRoutes.Dictionary, "分类词库 个人词库 用户词 自定义短语 词典 词库管理"),
+        SettingsSearchEntry("手写训练模式", handwriting, SettingsRoutes.HandwritingTraining, "手写 训练 样本 假名 字母 公式"),
+        SettingsSearchEntry("手写数据采集", handwriting, SettingsRoutes.HandwritingCapture, "手写 采集 样本 笔迹 标注"),
+        SettingsSearchEntry("扩展", "系统", SettingsRoutes.Market, "下载 输入方案 模型 插件 商店 扩展商店"),
+        SettingsSearchEntry("已安装的插件", "系统 › 扩展 › 插件", SettingsRoutes.Plugins, "插件 已安装 插件管理"),
+        SettingsSearchEntry("已安装的模型", "系统 › 扩展 › 模型", SettingsRoutes.ModelLocal, "模型 识字 语音 手写 联想 本地 下载 模型管理"),
+        SettingsSearchEntry("已安装的方案", "输入 › 语言与方案", SettingsRoutes.Schema, "下载 导入 启停 方案 部署 输入资源 排序"),
+        SettingsSearchEntry("屏蔽的候选", "智能 › 词库", SettingsRoutes.Dictionary, "屏蔽 恢复 候选 九键"),
+        SettingsSearchEntry("剪贴板与同步", "系统", SettingsRoutes.ClipboardSync, "剪贴板 同步 验证码 短信 复制 电脑"),
+        SettingsSearchEntry("剪贴板卡片最多显示", "系统 › 剪贴板与同步", SettingsRoutes.ClipboardSync, "剪贴板 卡片 行数 几行 显示 记录 折叠"),
+        SettingsSearchEntry("备份与恢复", "系统", SettingsRoutes.Backup, "备份 恢复 导出 导入 本地备份 换机"),
+        SettingsSearchEntry("性能与省电", "系统", SettingsRoutes.Performance, "性能 省电 内存 卡顿 高配 中配 低配 自动 动效 炫光 语音常驻 释放 SenseVoice Paraformer"),
+        SettingsSearchEntry("关于 CyIME", "系统", SettingsRoutes.About, "版本 开发者 联系 日志 许可"),
+        SettingsSearchEntry("使用文档", "系统 › 关于 CyIME", SettingsRoutes.About, "说明 帮助 文档 教程"),
+        // 键盘布局
+        SettingsSearchEntry("自定义布局", layouts, SEARCH_TARGET_CUSTOM_LAYOUT, "自定义按键布局 布局管理 新建布局"),
+        SettingsSearchEntry("按键符号", layouts, layoutIndex, "角标 符号编辑 字母键符号 上下角标 侧栏 笔画 短语"),
+        SettingsSearchEntry("分体键盘", layouts, layoutIndex, "分体 分离 拆分 平板 两手"),
+        SettingsSearchEntry("数字框自动数字键盘", layouts, layoutIndex, "数字 验证码 号码 电话 数字键盘"),
+        SettingsSearchEntry("邻键纠错", "$layouts › 26 键", qwerty, "纠错 打错 误触 全拼"),
+        SettingsSearchEntry("滑行输入", "$layouts › 26 键", qwerty, "滑行 划词 滑动输入 手势输入 英文 整词"),
+        SettingsSearchEntry("三行字母错位", "$layouts › 26 键", qwerty, "错位 排布 实体键盘 对齐"),
+        SettingsSearchEntry("空格两侧的标点", "$layouts › 26 键", qwerty, "逗号键 句号键 空格 标点 全角 半角"),
+        SettingsSearchEntry("拂动选字母", "$layouts › 九键与 14 键", nine, "九键 拂动 滑动 长按 数字 字母 字母菜单"),
+        SettingsSearchEntry("左右滑动选字母", "$layouts › 九键与 14 键", nine, "14键 双字母键 滑动 选字母 小鹤"),
+        SettingsSearchEntry("滑动触发距离", "$layouts › 九键与 14 键", nine, "距离 灵敏度 误触 拂动 滑动"),
+        SettingsSearchEntry("拂动时显示方向圆盘", "$layouts › 九键与 14 键", nine, "圆盘 方向 箭头 拂动 提示"),
+        SettingsSearchEntry("假名方向提示", "$layouts › 九键与 14 键", nine, "日语 日文 假名 灰色小字 方向"),
+        // 候选词、主题与外观、按键与手势
+        SettingsSearchEntry("候选字大小", "$look › 候选词", layoutPage("candidates"), "候选 字号 字体大小"),
+        SettingsSearchEntry("候选栏取消按钮", "$look › 候选词", layoutPage("candidates"), "取消 左箭头"),
+        SettingsSearchEntry("候选注释", "$look › 候选词", layoutPage("candidates"), "注释 拼音 释义 翻译 编码 候选显示"),
+        SettingsSearchEntry("编码显示", "$look › 候选词", layoutPage("candidates"), "预编辑 输入框 候选栏 编码位置"),
+        SettingsSearchEntry("每页候选词数", "$look › 候选词", layoutPage("candidates"), "候选数量 分页 每页"),
+        SettingsSearchEntry("视觉样式", "$look › 主题与外观", SettingsRoutes.Theme, "样式 圆角 扁平 立体"),
+        SettingsSearchEntry("按键字号", "$look › 主题与外观", SettingsRoutes.Theme, "字号 字体 文字大小 按键文字"),
+        SettingsSearchEntry("上方角标提示", "$look › 主题与外观", SettingsRoutes.Theme, "角标 提示 符号 显示"),
+        SettingsSearchEntry("下方角标提示", "$look › 主题与外观", SettingsRoutes.Theme, "角标 提示 符号 显示"),
+        SettingsSearchEntry("点按弹出气泡", "$look › 主题与外观", SettingsRoutes.Theme, "气泡 预览 弹出 按键放大"),
+        SettingsSearchEntry("底部圆角与透明导航栏", "$look › 主题与外观", SettingsRoutes.Theme, "圆角 导航栏 底部"),
+        SettingsSearchEntry("按键角标的符号和数字", "$input › 按键与手势", layoutPage("gestures"), "角标 滑动输入 长按输入 符号 数字"),
+        SettingsSearchEntry("手势预设", "$input › 按键与手势", layoutPage("gestures"), "预设 滑动 长按 英文滑行 一键 整套 手势"),
+        SettingsSearchEntry("长按弹出字母气泡", "$input › 按键与手势", layoutPage("gestures"), "长按 字母 大写 小写 音调 气泡 弹出 拼音声调 九键 字母键长按弹出大小写"),
+        SettingsSearchEntry("反转上下滑方向", "$input › 按键与手势", layoutPage("gestures"), "反转 方向 上滑 下滑 删除键 清空 撤销"),
+        SettingsSearchEntry("长按语言键弹出列表", "$input › 按键与手势", layoutPage("gestures"), "语言键 切换语言 长按 时长"),
+        SettingsSearchEntry("滑动移动光标", "$input › 按键与手势", layoutPage("gestures"), "光标 移动 滑动 空格"),
+        SettingsSearchEntry("空格长按", "$input › 按键与手势", layoutPage("gestures"), "空格 长按 连续空格 语音 时长"),
+        SettingsSearchEntry("光标灵敏度", "$input › 按键与手势", layoutPage("gestures"), "光标 距离 灵敏"),
+        // 手写
+        SettingsSearchEntry("手写停顿识别", handwriting, SettingsRoutes.Handwriting, "手写 停顿 识别 延迟 时长"),
+        SettingsSearchEntry("手写公式两边的标记", handwriting, SettingsRoutes.Handwriting, "公式 latex 美元 数学"),
     ).filter {
         // The developer-only handwriting training page is hidden in public, elder and friend packages.
-        it.target != SettingsRoutes.HandwritingTraining || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
+        it.target !in setOf(SettingsRoutes.HandwritingTraining, SettingsRoutes.HandwritingCapture) || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
     }
 }
 

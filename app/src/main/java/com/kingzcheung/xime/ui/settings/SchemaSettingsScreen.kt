@@ -443,7 +443,7 @@ fun SchemaSettingsContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("输入资源") },
+                title = { Text("已安装的方案") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -556,7 +556,7 @@ fun SchemaSettingsContent(
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                             )
-                            Text("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言管理」选择。",
+                            Text("每项是语言、输入方案与布局的一个组合。长按可排序，开关控制资源准备；语言和默认组合在「语言与方案」选择。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

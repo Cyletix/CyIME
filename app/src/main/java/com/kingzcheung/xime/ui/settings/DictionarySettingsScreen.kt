@@ -64,7 +64,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.settings.DictEntry
 import com.kingzcheung.xime.viewmodel.CustomPhraseUiState
 import com.kingzcheung.xime.viewmodel.CustomPhraseViewModel
-import com.kingzcheung.xime.viewmodel.PersonalDictUiState
 import com.kingzcheung.xime.viewmodel.PersonalDictViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,7 +87,7 @@ fun DictionarySettingsContent(
             TopAppBar(
                 title = {
                     val schema = uiState.availableSchemas.find { it.schemaId == uiState.selectedSchema }
-                    Text("词库管理 - ${schema?.name ?: uiState.selectedSchema}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("词库 - ${schema?.name ?: uiState.selectedSchema}", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -140,20 +139,19 @@ fun DictionarySettingsContent(
                 Text("分类词库 · 下载与开关")
             }
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                // 个人词库标签去掉：只读且总是空的；屏蔽的候选和其他内容一样做成标签。
                 TabButton("自定义短语", selected = selectedDictTab == 0, onClick = { selectedDictTab = 0 }, modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(8.dp))
-                TabButton("个人词库", selected = selectedDictTab == 1, onClick = { selectedDictTab = 1 }, modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.width(8.dp))
                 TabButton("方案词库", selected = selectedDictTab == 2, onClick = { selectedDictTab = 2 }, modifier = Modifier.weight(1f))
-            }
-            TextButton(onClick = { selectedDictTab = 3 }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                Text("恢复以前屏蔽的候选")
+                if (uiState.selectedSchema == "t9_pinyin") {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TabButton("屏蔽的候选", selected = selectedDictTab == 3, onClick = { selectedDictTab = 3 }, modifier = Modifier.weight(1f))
+                }
             }
             when (selectedDictTab) {
-                0 -> CustomPhraseTabContent(viewModel = customPhraseVM, uiState = customPhraseState)
-                1 -> SchemaDictContent(viewModel = viewModel, uiState = uiState)
                 2 -> SchemaDictBrowserPanel()
                 3 -> T9SuppressionPanel()
+                else -> CustomPhraseTabContent(viewModel = customPhraseVM, uiState = customPhraseState)
             }
         }
     }
@@ -175,81 +173,6 @@ private fun TabButton(text: String, selected: Boolean, onClick: () -> Unit, modi
 }
 
 @Composable
-private fun SchemaDictContent(
-    viewModel: PersonalDictViewModel,
-    uiState: PersonalDictUiState
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Spacer(modifier = Modifier.height(12.dp))
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(28.dp),
-            tonalElevation = 2.dp,
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Search, contentDescription = null,
-                    tint = if (uiState.searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                BasicTextField(value = uiState.searchQuery, onValueChange = { viewModel.setSearchQuery(it) },
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                    decorationBox = { innerTextField ->
-                        Box { if (uiState.searchQuery.isEmpty()) Text("搜索", color = MaterialTheme.colorScheme.onSurfaceVariant); innerTextField() }
-                    })
-                if (uiState.searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.clearSearch() }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Clear, contentDescription = "清除", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
-        }
-
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            Text("共 ${uiState.entries.size} 条${if (uiState.searchQuery.isNotEmpty()) "，搜索结果 ${uiState.filteredEntries.size} 条" else ""}",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-
-            if (uiState.entries.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    UsageHint()
-                }
-            } else if (uiState.filteredEntries.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("未找到匹配条目", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    itemsIndexed(items = uiState.filteredEntries,
-                        key = { i, e -> "${e.word}_${e.code}_$i" }) { _, entry ->
-                        // 个人词库只读，不提供编辑/删除
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                        ) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(entry.word, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                                    Text(entry.code, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun UsageHint() {
     val uriHandler = LocalUriHandler.current
     Column(
@@ -264,13 +187,9 @@ private fun UsageHint() {
         Text("暂无词条", style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
-        Text("个人词库当前仅支持查看",
+        Text("点右下角 + 添加常用的短语和对应编码",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(16.dp))
-        Text("自定义短语的增删改 → 切换「自定义短语」标签页",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary)
     }
 }
 

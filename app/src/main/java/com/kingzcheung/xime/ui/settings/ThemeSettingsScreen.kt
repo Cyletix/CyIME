@@ -45,12 +45,10 @@ fun ThemeSettingsContent(
     onThemeChanged: () -> Unit = {}
 ) {
     var showIconSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    var showVisualSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    val subPage = when { showVisualSettings -> "visual"; showIconSettings -> "icons"; else -> null }
-    SettingsSubPages(subPage, onBack = { showIconSettings = false; showVisualSettings = false }) { shown ->
+    val subPage = if (showIconSettings) "icons" else null
+    SettingsSubPages(subPage, onBack = { showIconSettings = false }) { shown ->
         ThemeSettingsPage(shown, onBack, onThemeChanged,
-            openVisual = { showVisualSettings = true }, openIcons = { showIconSettings = true },
-            closeSubPage = { showIconSettings = false; showVisualSettings = false })
+            openIcons = { showIconSettings = true }, closeSubPage = { showIconSettings = false })
     }
 }
 
@@ -60,7 +58,6 @@ private fun ThemeSettingsPage(
     subPage: String?,
     onBack: () -> Unit,
     onThemeChanged: () -> Unit,
-    openVisual: () -> Unit,
     openIcons: () -> Unit,
     closeSubPage: () -> Unit,
 ) {
@@ -71,18 +68,6 @@ private fun ThemeSettingsPage(
         rememberKeyboardInputPreferences(false).frostedGlass,
         rememberKeyboardInputPreferences(true).frostedGlass,
     )
-    if (subPage == "visual") {
-        Scaffold(topBar = { TopAppBar(title = { Text("视觉样式") }, navigationIcon = {
-            IconButton(onClick = closeSubPage) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-        }) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp)) { item {
-                VisualStylePicker(VisualStyles.current) { style ->
-                    changeAppearance(context, onThemeChanged) { SettingsPreferences.setVisualStyle(context, style) }
-                }
-            } }
-        }
-        return
-    }
     if (subPage == "icons") {
         IconSettingsContent(onBack = closeSubPage, onChanged = onThemeChanged)
         return
@@ -92,7 +77,7 @@ private fun ThemeSettingsPage(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("主题与定制") },
+                title = { Text("主题与外观") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -201,7 +186,8 @@ private fun ThemeSettingsPage(
             
             item {
                 Text(
-                    text = "柔和蓝在各设备使用相同配色。点击可预览。",
+                    text = "${(uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
+                        ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme)).name}在各设备使用相同配色。点击可预览。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)
@@ -236,10 +222,15 @@ private fun ThemeSettingsPage(
                 }
             }
             
+            // 视觉样式只有一组卡片，直接放在本页；按键显示（字号、角标、气泡、底部）也属于外观。
             item {
-                SettingsSection(title = "外观细节") {
-                    SettingsItem(icon = Icons.TwoTone.Palette, title = "视觉样式",
-                        subtitle = VisualStyles.current.title, onClick = openVisual, showArrow = true)
+                VisualStylePicker(VisualStyles.current) { style ->
+                    changeAppearance(context, onThemeChanged) { SettingsPreferences.setVisualStyle(context, style) }
+                }
+            }
+            item { KeyboardAppearanceSettings() }
+            item {
+                SettingsSection(title = "桌面图标") {
                     SettingsItem(icon = Icons.TwoTone.Palette, title = "图标设置",
                         subtitle = if (com.kingzcheung.xime.ui.theme.IconAppearance.linked) "与视觉样式同步" else "独立选择",
                         onClick = openIcons, showArrow = true)

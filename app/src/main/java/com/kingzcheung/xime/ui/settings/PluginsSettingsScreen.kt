@@ -309,7 +309,10 @@ private fun ExtensionItem(
     onActivate: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    var isEnabled by remember { mutableStateOf(viewModel.isPluginEnabled(extension.id)) }
+    // 启用状态在用到它的地方切换（如表情面板）；每次回到本页都重新读，标签不显示旧状态。
+    var resumeTick by remember { mutableStateOf(0) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { resumeTick++ }
+    val isEnabled = remember(extension.id, resumeTick) { viewModel.isPluginEnabled(extension.id) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showTrustConfirm by remember { mutableStateOf(false) }

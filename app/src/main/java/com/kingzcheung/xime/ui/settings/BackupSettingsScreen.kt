@@ -35,7 +35,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -58,7 +57,8 @@ import java.util.Locale
 fun BackupSettingsContent(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var includePersonal by rememberSaveable { mutableStateOf(false) }
+    // 和其他开关一样记住选择（以前只存在页面状态里，退出再进来就变回关）。
+    var includePersonal by remember { mutableStateOf(BackupChoices.includePersonal(context)) }
     // 当前操作（"export"/"import"）：loading 只出现在触发它的按钮上，其余按钮仅禁用
     var busyOp by remember { mutableStateOf<String?>(null) }
     val busy = busyOp != null
@@ -157,7 +157,7 @@ fun BackupSettingsContent(onBack: () -> Unit) {
                         title = "包含个人词库与学习数据",
                         subtitle = "自造词、调频记录、自定义短语和个人词库；属于隐私数据，体积也较大",
                         checked = includePersonal,
-                        onCheckedChange = { includePersonal = it }
+                        onCheckedChange = { includePersonal = it; BackupChoices.setIncludePersonal(context, it) }
                     )
                     Text(
                         text = "始终包含：全部设置项、工具栏与菜单排列、主题与背景图、键盘布局与尺寸、自定义布局和方案定制。" +
@@ -228,4 +228,15 @@ fun BackupSettingsContent(onBack: () -> Unit) {
 @Composable
 private fun BusyIcon(busy: Boolean, icon: @Composable () -> Unit) {
     if (busy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else icon()
+}
+
+/** 备份页记住的选项。 */
+internal object BackupChoices {
+    const val KEY_INCLUDE_PERSONAL = "backup_include_personal"
+    fun includePersonal(context: android.content.Context): Boolean =
+        com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_INCLUDE_PERSONAL, false)
+    fun setIncludePersonal(context: android.content.Context, include: Boolean) {
+        com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context).edit()
+            .putBoolean(KEY_INCLUDE_PERSONAL, include).apply()
+    }
 }

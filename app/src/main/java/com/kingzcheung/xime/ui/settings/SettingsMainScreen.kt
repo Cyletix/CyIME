@@ -153,7 +153,7 @@ fun SettingsMainContent(
                 }
             }
             item {
-                SettingsSection(title = "输入法", content = {
+                SettingsSection(title = "配置选择", content = {
                     SettingsItem(
                         icon = Icons.TwoTone.Keyboard,
                         title = "启用输入法",
@@ -182,21 +182,15 @@ fun SettingsMainContent(
                             imm.showInputMethodPicker()
                         }
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "物理键盘",
-                        subtitle = "语言切换快捷键、候选跟随与浮条", onClick = onNavigateToHardwareKeyboard,
-                        status = if (entryStatus.keyboardConnected) "已连接" else "未连接",
-                        statusTone = if (entryStatus.keyboardConnected) SettingsStatusTone.OK else SettingsStatusTone.NEUTRAL)
                     var testText by remember { mutableStateOf("") }
                     var isFocused by remember { mutableStateOf(false) }
                     val editorVisibility = remember { BringIntoViewRequester() }
                     var editorSize by remember { mutableStateOf(IntSize.Zero) }
-                    LaunchedEffect(isFocused, imeBottomPx, editorSize) {
+                    // 清空（长按删除）会收起「清除」行、文字框变矮，列表随之回缩；等这一帧布局完成后
+                    // 再把试打框连同键盘高度一起请求进视野，试打框始终露在键盘上方。
+                    LaunchedEffect(isFocused, imeBottomPx, editorSize, testText.isEmpty()) {
                         if (isFocused && imeBottomPx > 0 && editorSize.height > 0) {
+                            androidx.compose.runtime.withFrameNanos { }
                             editorVisibility.bringIntoView(Rect(0f, 0f, editorSize.width.toFloat(),
                                 editorSize.height + imeBottomPx.toFloat()))
                         }
@@ -261,14 +255,67 @@ fun SettingsMainContent(
                 })
             }
 
+            // 首页五组按用户 10-21 的分法：配置选择 / 输入 / 外观 / 智能 / 系统。
             item {
-                SettingsSection(title = "外观与交互", content = {
+                SettingsSection(title = "输入", content = {
+                    SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "语言与方案",
+                        subtitle = "语言、每种语言的布局和输入方案、语言键切换方式", onClick = onNavigateToLanguages, showArrow = true)
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
+                        title = "键盘布局",
+                        subtitle = "26 键、九键与 14 键、自定义布局、按键符号、分体",
+                        onClick = onNavigateToLayoutDisplay,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.Gesture,
+                        title = "按键与手势",
+                        subtitle = "角标输入、长按语言键、滑动移动光标、长按空格",
+                        onClick = { onNavigateToRoute("${SettingsRoutes.LayoutDisplay}?page=gestures") },
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "物理键盘",
+                        subtitle = "语言切换快捷键、候选跟随与浮条", onClick = onNavigateToHardwareKeyboard,
+                        status = if (entryStatus.keyboardConnected) "已连接" else "未连接",
+                        statusTone = if (entryStatus.keyboardConnected) SettingsStatusTone.OK else SettingsStatusTone.NEUTRAL)
+                })
+            }
+
+            item {
+                SettingsSection(title = "外观", content = {
                     SettingsItem(
                         icon = Icons.TwoTone.Palette,
-                        title = "主题与定制",
-                        subtitle = "自定义外观和样式",
+                        title = "主题与外观",
+                        subtitle = "配色、玻璃、视觉样式、按键字号与角标提示",
                         status = entryStatus.themeName,
                         onClick = onNavigateToTheme,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.TableChart,
+                        title = "候选词",
+                        subtitle = "字号、候选注释、每页候选数",
+                        onClick = { onNavigateToRoute("${SettingsRoutes.LayoutDisplay}?page=candidates") },
                         showArrow = true
                     )
                     HorizontalDivider(
@@ -283,101 +330,23 @@ fun SettingsMainContent(
                         onClick = onNavigateToKeyEffect,
                         showArrow = true
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.TableChart,
-                        title = "布局与显示",
-                        subtitle = "候选词显示、键盘布局等",
-                        onClick = onNavigateToLayoutDisplay,
-                        showArrow = true
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Speed,
-                        title = "性能与省电",
-                        subtitle = "高配、中配、低配一键切换，语音模型占用内存",
-                        onClick = { onNavigateToRoute(SettingsRoutes.Performance) },
-                        showArrow = true
-                    )
-                })
-            }
-
-            item {
-                SettingsSection(title = "方案与词库", content = {
-                    SettingsItem(icon = Icons.TwoTone.KeyboardAlt, title = "语言管理",
-                        subtitle = "语言、输入方案、键盘布局、切换方式", onClick = onNavigateToLanguages, showArrow = true)
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.KeyboardAlt,
-                        title = "输入资源",
-                        subtitle = "下载、导入和启停方案资源",
-                        onClick = onNavigateToSchema,
-                        showArrow = true
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = com.kingzcheung.xime.ui.keyboard.AddLayoutIcon,
-                        title = "布局管理",
-                        subtitle = "26键符号、自定义按键布局",
-                        onClick = { context.startActivity(Intent(context, com.kingzcheung.xime.CustomLayoutActivity::class.java)) },
-                        showArrow = true
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp), thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Ballot,
-                        title = "词库管理",
-                        subtitle = "分类词库开关、个人词库和自定义短语",
-                        onClick = onNavigateToDictionary,
-                        showArrow = true
-                    )
-                })
-            }
-
-            item {
-                SettingsSection(title = "扩展", content = {
-                    SettingsItem(
-                        icon = Icons.TwoTone.Storefront,
-                        title = "扩展商店",
-                        subtitle = "下载输入方案 / 模型 / 插件",
-                        onClick = onNavigateToMarket,
-                        showArrow = true
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Extension,
-                        title = "插件管理",
-                        subtitle = "管理已安装的插件",
-                        onClick = onNavigateToPlugins,
-                        showArrow = true
-                    )
                 })
             }
 
             item {
                 SettingsSection(title = "智能", content = {
+                    SettingsItem(
+                        icon = Icons.TwoTone.Ballot,
+                        title = "词库",
+                        subtitle = "自定义短语、方案词库、分类词库",
+                        onClick = onNavigateToDictionary,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
                     SettingsItem(
                         icon = Icons.TwoTone.AutoAwesome,
                         title = "智能联想",
@@ -390,16 +359,15 @@ fun SettingsMainContent(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
-                    var sttEnabled by remember { mutableStateOf(SettingsPreferences.isSttEnabled(context)) }
+                    // 首页这一行右边就是语音开关，点开关直接开关语音，点行进语音页（用户 10-20 要求恢复）。
+                    var sttEnabled by remember(entryStatus.sttEnabled) { mutableStateOf(entryStatus.sttEnabled) }
                     SettingsToggleItem(
                         icon = Icons.TwoTone.GraphicEq,
                         title = "语音转文本",
                         subtitle = "本地模型或在线服务，下载并选择识别方式",
                         checked = sttEnabled,
                         showArrow = true,
-                        onClick = {
-                            onNavigateToSpeechToText()
-                        },
+                        onClick = onNavigateToSpeechToText,
                         onCheckedChange = { enabled ->
                             sttEnabled = enabled
                             SettingsPreferences.setSttEnabled(context, enabled)
@@ -411,32 +379,41 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
-                        icon = Icons.TwoTone.Straighten,
-                        title = "模型管理",
-                        subtitle = "查看识字、语音、手写和联想的本地模型",
-                        onClick = onNavigateToModelLocal,
+                        icon = Icons.TwoTone.Gesture,
+                        title = "手写",
+                        subtitle = "停顿识别、公式标记、手写模型",
+                        onClick = { onNavigateToRoute(SettingsRoutes.Handwriting) },
                         showArrow = true
                     )
-                    // Handwriting training is the developer's own tool: only 装到我的设备 and debug builds show it.
-                    if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 56.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItem(
-                            icon = Icons.TwoTone.Gesture,
-                            title = "手写训练模式",
-                            subtitle = "按题写假名、字母、符号和公式，收集样本导出给电脑训练",
-                            onClick = onNavigateToHandwritingTraining,
-                            showArrow = true
-                        )
-                    }
                 })
             }
 
             item {
-                SettingsSection(                title = "同步与备份", content = {
+                SettingsSection(title = "系统", content = {
+                    SettingsItem(
+                        icon = Icons.TwoTone.Sync,
+                        title = "剪贴板与同步",
+                        subtitle = "验证码自动复制、与电脑等设备同步剪贴板",
+                        onClick = onNavigateToClipboardSync,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.Storefront,
+                        title = "扩展",
+                        subtitle = "输入方案、模型和插件：下载、已安装、导入",
+                        onClick = onNavigateToMarket,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
                     SettingsItem(
                         icon = Icons.TwoTone.Backup,
                         title = "备份与恢复",
@@ -450,25 +427,10 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
-                        icon = Icons.TwoTone.Sync,
-                        title = "剪贴板同步",
-                        subtitle = "验证码提取、短信自动复制与远端设备同步",
-                        onClick = onNavigateToClipboardSync,
-                        showArrow = true
-                    )
-                })
-            }
-
-            item {
-                SettingsSection(title = "关于", content = {
-                    SettingsItem(
-                        icon = Icons.TwoTone.Description,
-                        title = "使用文档",
-                        subtitle = "CyIME 使用说明",
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Cyletix/CyIME/blob/main/docs/usage.md"))
-                            context.startActivity(intent)
-                        },
+                        icon = Icons.TwoTone.Speed,
+                        title = "性能与省电",
+                        subtitle = "高配、中配、低配一键切换，语音模型占用内存",
+                        onClick = { onNavigateToRoute(SettingsRoutes.Performance) },
                         showArrow = true
                     )
                     HorizontalDivider(
@@ -495,6 +457,7 @@ internal data class MainEntryStatus(
     val imeSelected: Boolean = false,
     val keyboardConnected: Boolean = false,
     val themeName: String = "",
+    val sttEnabled: Boolean = false,
 )
 
 internal fun readMainEntryStatus(context: android.content.Context): MainEntryStatus {
@@ -511,5 +474,6 @@ internal fun readMainEntryStatus(context: android.content.Context): MainEntrySta
         imeSelected = selected?.packageName == context.packageName,
         keyboardConnected = com.kingzcheung.xime.service.hasPhysicalTextKeyboard(devices),
         themeName = if (glass) "$theme · 玻璃" else theme,
+        sttEnabled = SettingsPreferences.isSttEnabled(context),
     )
 }

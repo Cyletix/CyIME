@@ -2,6 +2,13 @@ package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,20 +63,12 @@ fun ClipboardSyncSettingsContent(
         mutableStateOf(SettingsPreferences.isClipboardSyncEnabled(context))
     }
     val syncPlugins = remember { ExtensionManager.getEnabledClipboardSyncPlugins(context) }
-    // 偏好未设置时，自动选中第一个已启用的插件（与服务端 fallback 一致）
-    var selectedPluginId by remember {
-        mutableStateOf(
-            SettingsPreferences.getClipboardSyncPluginId(context).ifEmpty {
-                syncPlugins.firstOrNull()?.first ?: ""
-            }
-        )
-    }
-    // 当前选中的插件实例（切换时在 IO 协程里 launch 完成后更新，驱动表单立即渲染新插件）
+    // 当前选中的插件实例（切换时在 IO 协程里 launch 完成后更新，驱动表单立即渲染新插件）；
+    // 偏好未设置或不可用时显示第一个已启用的插件，与服务端实际使用的一致
     var activePlugin by remember {
-        mutableStateOf(
-            syncPlugins.firstOrNull { it.first == selectedPluginId }
-        )
+        mutableStateOf(effectiveClipboardSyncPlugin(syncPlugins, SettingsPreferences.getClipboardSyncPluginId(context)))
     }
+    var selectedPluginId by remember { mutableStateOf(activePlugin?.first.orEmpty()) }
     var installedPlugins by remember { mutableStateOf(ExtensionManager.getAllInstalledPlugins()) }
     val clipboardPlugins = remember(installedPlugins) { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
 
@@ -82,9 +81,9 @@ fun ClipboardSyncSettingsContent(
         val prefs = SettingsPreferences.getPrefsPublic(context)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             enabled = SettingsPreferences.isClipboardSyncEnabled(context)
-            selectedPluginId = SettingsPreferences.getClipboardSyncPluginId(context)
-            activePlugin = ExtensionManager.getEnabledClipboardSyncPlugins(context)
-                .firstOrNull { it.first == selectedPluginId }
+            val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
+            activePlugin = effectiveClipboardSyncPlugin(available, SettingsPreferences.getClipboardSyncPluginId(context))
+            selectedPluginId = activePlugin?.first.orEmpty()
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -93,9 +92,8 @@ fun ClipboardSyncSettingsContent(
         enabled = SettingsPreferences.isClipboardSyncEnabled(context)
         installedPlugins = ExtensionManager.getAllInstalledPlugins()
         val available = ExtensionManager.getEnabledClipboardSyncPlugins(context)
-        val preferred = SettingsPreferences.getClipboardSyncPluginId(context)
-        activePlugin = available.firstOrNull { it.first == preferred }
-        selectedPluginId = preferred
+        activePlugin = effectiveClipboardSyncPlugin(available, SettingsPreferences.getClipboardSyncPluginId(context))
+        selectedPluginId = activePlugin?.first.orEmpty()
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         installedPlugins = ExtensionManager.getAllInstalledPlugins()
@@ -109,7 +107,7 @@ fun ClipboardSyncSettingsContent(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("剪贴板同步") },
+                title = { Text("剪贴板与同步") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -202,9 +200,43 @@ fun ClipboardSyncSettingsContent(
                 )
             })
             }
-            var showVerification by remember { mutableStateOf(false) }
-            androidx.compose.material3.TextButton(onClick = { showVerification = !showVerification }) { Text("短信验证码设置") }
-            if (showVerification) VerificationCodeSettings()
+            // 验证码自动复制是首页这一项的主要用途之一，直接显示，不再折叠。
+            VerificationCodeSettings()
+            ClipboardCardLinesSetting()
         }
     }
+}
+
+/**
+ * 实际在用的同步插件：与输入法服务相同，偏好的插件不可用（或没选）时用第一个已启用的。
+ * 设置页按它显示，免得页面写“未选”而后台其实在用第一个。
+ */
+internal fun <T> effectiveClipboardSyncPlugin(available: List<Pair<String, T>>, preferredId: String): Pair<String, T>? =
+    available.firstOrNull { it.first == preferredId } ?: available.firstOrNull()
+
+/** 剪贴板面板里每张卡片最多显示几行文字（2 / 4 / 8，默认 4）；单选样式和本页「同步服务」一样。 */
+@Composable
+private fun ClipboardCardLinesSetting() {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("clipboard_board", android.content.Context.MODE_PRIVATE) }
+    val key = com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_MAX_LINES_KEY
+    var lines by remember { mutableStateOf(prefs.getInt(key, 4)) }
+    SettingsSection(title = "剪贴板面板", content = {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("剪贴板卡片最多显示", style = MaterialTheme.typography.titleSmall)
+            Text("每条记录最多显示几行文字", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            listOf(2, 4, 8).forEach { option ->
+                Row(Modifier.fillMaxWidth().testTag("clipboard-card-lines:$option")
+                    .selectable(lines == option, role = androidx.compose.ui.semantics.Role.RadioButton) {
+                        lines = option
+                        prefs.edit().putInt(key, option).apply()
+                    }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = lines == option, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("$option 行", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+    })
 }
