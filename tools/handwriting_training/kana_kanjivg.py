@@ -125,12 +125,38 @@ def evaluate(templates, samples_path: str, aug: int):
     print("认错举例：", " ".join(miss[:40]))
 
 
+def write_vectors(strokes_json: pathlib.Path, formula_dir: str):
+    """用公式模型把模板文件里的每一份笔画预先算成特征（与 App 的 FormulaRecognizer.embed 相同的归一化向量），
+    存成 float16 小端二进制 + 记录模型哈希与标签顺序的 json。App 发现模型哈希一致时直接用，不一致再现算。"""
+    import hashlib
+    import fewshot_eval as fe
+    data = json.loads(strokes_json.read_text(encoding="utf-8"))
+    feats = fe.Feats(formula_dir, str(fe.och.APP_MODEL))
+    labels, rows = [], []
+    for ch, variants in data["chars"].items():
+        for st in variants:
+            v = feats.formula([[tuple(p) for p in q] for q in st])
+            if v is not None:
+                labels.append(ch)
+                rows.append(v.astype(np.float32))
+    mat = np.stack(rows)
+    encoder = pathlib.Path(formula_dir) / "formula_encoder.onnx"
+    sha = hashlib.sha256(encoder.read_bytes()).hexdigest()
+    base = strokes_json.with_name("kana_default_vectors")
+    base.with_suffix(".bin").write_bytes(mat.astype("<f2").tobytes())
+    base.with_suffix(".json").write_text(json.dumps(
+        {"model_sha256": sha, "dim": int(mat.shape[1]), "labels": labels}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8")
+    print(f"预算特征 {mat.shape}，模型 {sha[:12]}…，写入 {base}.bin / .json")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--kanjivg", required=True)
     ap.add_argument("--out")
     ap.add_argument("--eval")
     ap.add_argument("--aug", type=int, default=8)
+    ap.add_argument("--vectors", help="公式模型 onnx 目录：给 --out 写出的模板预算特征")
     args = ap.parse_args()
     templates = load_kanjivg(pathlib.Path(args.kanjivg))
     print(f"KanjiVG 假名 {len(templates)} 个")
@@ -149,6 +175,8 @@ def main() -> int:
         data = {"source": "KanjiVG", "canvas": 109, "chars": variants}
         out.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         print(f"写入 {out}（{out.stat().st_size // 1024} KB）")
+        if args.vectors:
+            write_vectors(out, args.vectors)
     return 0
 
 
