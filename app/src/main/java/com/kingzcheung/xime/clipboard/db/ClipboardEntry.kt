@@ -18,5 +18,7 @@ data class ClipboardEntry(
     @ColumnInfo(defaultValue = "0") val isPinned: Boolean = false,
     /** Legacy storage flag retained so existing databases and backups remain readable. */
     @ColumnInfo(defaultValue = "0") val isQuickSend: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val consumed: Boolean = false
+    @ColumnInfo(defaultValue = "0") val consumed: Boolean = false,
+    /** Pinyin initials and lowercase letters of the first characters, for search; "" = not computed yet. */
+    @ColumnInfo(defaultValue = "") val searchKey: String = "",
 )

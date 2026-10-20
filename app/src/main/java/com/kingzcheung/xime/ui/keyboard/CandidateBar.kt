@@ -67,6 +67,11 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.runtime.setValue
@@ -348,6 +353,8 @@ fun CandidateBar(
     }
     var barOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var barTopInWindow by remember { mutableStateOf<Float?>(null) }
+    // 根布局坐标：Shift 拖线和候选位置都用这个坐标系。
+    var barRootOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     SideEffect { splitGap?.reportBarTop(if (splitGapX != null) barTopInWindow else null) }
     DisposableEffect(splitGap) { onDispose { splitGap?.reportBarTop(null) } }
 
@@ -359,7 +366,9 @@ fun CandidateBar(
             .onGloballyPositioned {
                 barOrigin = it.positionInWindow()
                 barTopInWindow = barOrigin.y
+                barRootOrigin = it.positionInRoot()
             }
+            .shiftDragOverlay({ barRootOrigin }, protectedVisuals.accentColor)
             .clipSplitGapColumn(splitGapX) { barOrigin }
             .background(if (glassEnabled) Color.Transparent else protectedVisuals.backgroundColor)
             // Glass rails inherit the keyboard background; only individual controls get a material.
@@ -391,8 +400,11 @@ fun CandidateBar(
         val edgeStyle = LocalEdgeButtonStyle.current
         val edgeSlot = if (edgeStyle == EdgeButtonStyle.CIRCLE || toolbarRowWidth <= 0.dp) null else {
             val gap = splitGapX?.let { (l, r) -> with(rowDensity) { (r - l).toDp() } } ?: 0.dp
-            // 最多 64dp 一格：按钮随格子从圆连续拉成胶囊，最宽 52dp，宽屏也不多占候选的地方（用户 10-20）。
-            minOf(maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + 2).coerceAtLeast(1), 36.dp), 64.dp)
+            val baseSlot = maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + 2).coerceAtLeast(1), 36.dp)
+            // 手机（含横屏）和平板竖屏都保持正圆；候选栏宽过 940dp 才开始拉长，到 1400dp（平板横屏）
+            // 拉到最宽 52dp（用户 10-21：原来手机上就开始拉，太早）。悬浮小窗格子窄时照旧缩小的圆。
+            val stretch = ((toolbarRowWidth - EDGE_STRETCH_START) / (EDGE_STRETCH_FULL - EDGE_STRETCH_START)).coerceIn(0f, 1f)
+            if (baseSlot < 44.dp) baseSlot else 44.dp + 20.dp * stretch
         }
         // 同心：胶囊圆角 = 键盘卡片圆角 - 胶囊离栏边的距离（上下各 6dp），和卡片四角同心。
         val edgeCorner = if (edgeStyle == EdgeButtonStyle.CONCENTRIC) FloatingKeyboardCardCorner - 6.dp else null
@@ -882,6 +894,8 @@ fun CandidateItem(
     textShadow: androidx.compose.ui.graphics.Shadow? = null,
     /** 用户以前打过的词：文字右上角画一个小编辑图标。 */
     learned: Boolean = false,
+    /** Shift 拖动指着别的候选时由候选栏统一画底色，这里先不画，保证只亮一个。 */
+    selectionFill: Boolean = true,
 ) {
     // 登记位置给 Shift 拖动：从 Shift 拖到这里松手，按住 Shift 选它（释义模式上屏英文）。
     val dropId = remember { Any() }
@@ -893,7 +907,7 @@ fun CandidateItem(
             .height(candidateItemHeight(fontSize))
             .clip(RoundedCornerShape(5.dp))
             .background(
-                if (isSelected) accentColor.copy(alpha = 0.2f)
+                if (isSelected && selectionFill) accentColor.copy(alpha = 0.2f)
                 else Color.Transparent
             )
             .semantics { selected = isSelected }
@@ -1016,7 +1030,14 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
         .then(if (onEdit != null) Modifier.clickable(role = Role.Button,
             onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
         contentAlignment = Alignment.CenterStart) {
-        Text(if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text,
+        val shownText = if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text
+        // 光标像系统文字光标一样闪（530ms 一亮一灭，用户 10-21 同意）。节拍挂在拼音条上而不是光标位置上：
+        // 移动光标、光标暂时到末尾不显示时都接着原来的节拍走，不会每移一下又从头亮起。
+        val blink = androidx.compose.animation.core.rememberInfiniteTransition(label = "preedit-caret")
+        val caretAlpha by blink.animateFloat(1f, 0f, androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.keyframes { durationMillis = 1060; 1f at 0; 1f at 529; 0f at 530; 0f at 1059 }),
+            label = "preedit-caret-alpha")
+        Text(preeditWithCaret(shownText, visuals.accentColor, visuals.textColor, visuals.selectedTextColor, caretAlpha),
             color = visuals.textColor.copy(alpha = if (visuals.opaqueComments) 1f else 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
             softWrap = false, style = LocalTextStyle.current.copy(shadow = visuals.textShadow), modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
     }
@@ -1089,8 +1110,20 @@ internal fun FixedCandidateStrip(
         val leftCount = splitLeftCount
         val segments = if (localGap == null) listOf(visibleIndices.toList() to 0)
             else listOf(visibleIndices.take(leftCount) to 0, visibleIndices.drop(leftCount) to localGap.second)
+        // 候选换了时整排从右边 8dp 滑入并淡入（用户 10-21 选 A）。只在绘制时位移，点击区域从第一帧起
+        // 就在最终位置，动画中途点照样选中；不延迟出现，也不改候选顺序。
+        val slideIn = remember(candidates) { androidx.compose.animation.core.Animatable(0f) }
+        androidx.compose.runtime.LaunchedEffect(slideIn) {
+            slideIn.animateTo(1f, androidx.compose.animation.core.tween(CANDIDATE_SLIDE_MS,
+                easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+        }
+        val slidePx = with(density) { CANDIDATE_SLIDE_DP.dp.toPx() }
+        // Shift 拖动指着候选时，选中底色改由候选栏画在手指指着的那个上，原来的先不画。
+        val shiftDragFree = CandidateDropTargets.shared.hoveredBounds == null
         segments.forEach { (segmentIndices, offsetPx) ->
-        Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) },
+        Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) }
+            .graphicsLayer { alpha = CANDIDATE_SLIDE_FROM_ALPHA + (1f - CANDIDATE_SLIDE_FROM_ALPHA) * slideIn.value }
+            .drawWithContent { translate(left = (1f - slideIn.value) * slidePx) { this@drawWithContent.drawContent() } },
             horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
             segmentIndices.forEach { index ->
                 CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size), index, {
@@ -1105,7 +1138,8 @@ internal fun FixedCandidateStrip(
                     commentFontFamily = AppFonts.commentFontFamily,
                     modifier = Modifier.widthIn(max = panelWidth).testTag("bar-candidate:$index"),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
-                    learned = index < candidates.size && all[index] in LocalLearnedCandidates.current)
+                    learned = index < candidates.size && all[index] in LocalLearnedCandidates.current,
+                    selectionFill = shiftDragFree)
             }
         }
         }
@@ -1152,3 +1186,69 @@ internal val LocalEdgeButtonStrength = androidx.compose.runtime.staticCompositio
 /** 两端按钮的形状：圆（原样）、和空闲工具栏一样宽的胶囊、与键盘卡片同心的圆角胶囊。 */
 internal enum class EdgeButtonStyle { CIRCLE, CAPSULE, CONCENTRIC }
 internal val LocalEdgeButtonStyle = androidx.compose.runtime.staticCompositionLocalOf { EdgeButtonStyle.CAPSULE }
+
+/** 候选换词滑入：起点在右边 8dp、六成透明，120ms 到位。 */
+private const val CANDIDATE_SLIDE_MS = 120
+private const val CANDIDATE_SLIDE_DP = 8f
+private const val CANDIDATE_SLIDE_FROM_ALPHA = 0.6f
+
+/**
+ * Shift 拖到候选上时（用户 10-21）：在候选栏里画出拖线的那一段（键盘那边只画到字母区为止），
+ * 并把选中底色挪到手指指着的候选上（与平时选中候选同一样式，任何时候只亮一个）；换候选时底色滑过去（120ms）。
+ * 只在绘制时读取拖动状态，不让候选栏重组。
+ */
+@Composable
+private fun Modifier.shiftDragOverlay(rootOrigin: () -> androidx.compose.ui.geometry.Offset, accent: Color): Modifier {
+    val drops = CandidateDropTargets.shared
+    val hovered = drops.hoveredBounds
+    // 底色和选中候选一样（强调色两成、5dp 圆角），不加边框；第一次指到候选时直接出现，之后换候选时滑过去。
+    val box = remember { androidx.compose.animation.core.Animatable(androidx.compose.ui.geometry.Rect.Zero,
+        androidx.compose.ui.geometry.Rect.VectorConverter) }
+    var hadTarget by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(hovered) {
+        if (hovered == null) { hadTarget = false; return@LaunchedEffect }
+        if (!hadTarget) { box.snapTo(hovered); hadTarget = true }
+        else box.animateTo(hovered, androidx.compose.animation.core.tween(CANDIDATE_SLIDE_MS))
+    }
+    return drawWithContent {
+        drawContent()
+        val origin = rootOrigin()
+        val rect = box.value
+        if (drops.hoveredBounds != null && rect.width > 0f) {
+            drawRoundRect(accent.copy(alpha = 0.2f), rect.topLeft - origin, rect.size,
+                androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
+        }
+        drops.dragLine?.let { (from, to) ->
+            drawLine(accent, from - origin, to - origin, strokeWidth = 6.dp.toPx(),
+                cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        }
+    }
+}
+
+/** 候选栏两端按钮从圆开始拉长成胶囊的候选栏宽度，和拉到最宽 52dp 的宽度。 */
+private val EDGE_STRETCH_START = 940.dp
+private val EDGE_STRETCH_FULL = 1400.dp
+
+/**
+ * 拼音里的编辑光标“|”用主题强调色加粗画，和拼音字母区分开（用户 10-21）。其余文字照旧。
+ * 柔和蓝、黑白这类强调色和拼音几乎同色的主题，改用首选候选的高亮：选中字色 + 同一层强调色底。
+ * [alpha] 是闪烁的当前亮度，字色和底一起亮灭。
+ */
+internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Color.Unspecified,
+                              selectedText: Color = accent, alpha: Float = 1f): AnnotatedString {
+    val caret = text.indexOf(com.kingzcheung.xime.service.PREEDIT_CARET)
+    if (caret < 0) return AnnotatedString(text)
+    val style = if (textColor != Color.Unspecified && colorsClose(accent, textColor))
+        androidx.compose.ui.text.SpanStyle(color = selectedText.copy(alpha = selectedText.alpha * alpha),
+            fontWeight = FontWeight.Bold, background = accent.copy(alpha = 0.2f * alpha))
+    else androidx.compose.ui.text.SpanStyle(color = accent.copy(alpha = accent.alpha * alpha), fontWeight = FontWeight.Bold)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(text)
+        addStyle(style, caret, caret + 1)
+    }
+}
+
+/** 两个颜色肉眼几乎分不开（RGB 各分量差都很小）。 */
+private fun colorsClose(a: Color, b: Color): Boolean =
+    kotlin.math.abs(a.red - b.red) < 0.12f && kotlin.math.abs(a.green - b.green) < 0.12f &&
+        kotlin.math.abs(a.blue - b.blue) < 0.12f

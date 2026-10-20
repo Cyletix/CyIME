@@ -104,6 +104,11 @@ data class KeyboardCallbacks(
      * 通用工具面板输入框焦点变化。
      */
     val onToolPanelFocusChange: ((Boolean) -> Unit)? = null,
+    /** Clipboard search bar: open (from the clipboard board), close, submit to the board, paste a result. */
+    val onClipboardSearchOpen: (() -> Unit)? = null,
+    val onClipboardSearchClose: (() -> Unit)? = null,
+    val onClipboardSearchSubmit: (() -> Unit)? = null,
+    val onClipboardSearchSelect: ((String) -> Unit)? = null,
     val onKeyboardModeChange: ((Boolean) -> Unit)? = null,
     val onDismissDeploying: (() -> Unit)? = null,
     val onFloatingModeChange: ((Boolean) -> Unit)? = null,

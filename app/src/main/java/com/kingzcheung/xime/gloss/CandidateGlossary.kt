@@ -26,11 +26,33 @@ import kotlin.concurrent.thread
  */
 object CandidateGlossary {
     const val MODEL_ID = "candidate-gloss"
-    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词；装着旧版的设备自动换新。 */
-    const val FILE_NAME = "cyime_gloss-v3.tsv"
-    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv")
+    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词，v3 没标出不可靠的单字，v4 没有日常短语，v5 的短语是逐词硬拼，v6 的机器翻译短语一成翻错，v7 还有地名翻错，v8 生僻单字给了一堆没用的释义、常用词组缺得多（v9 未发布）；装着旧版的设备自动换新。 */
+    const val FILE_NAME = "cyime_gloss-v10.tsv"
+    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv", "cyime_gloss-v3.tsv", "cyime_gloss-v4.tsv",
+        "cyime_gloss-v5.tsv", "cyime_gloss-v6.tsv", "cyime_gloss-v7.tsv", "cyime_gloss-v8.tsv", "cyime_gloss-v9.tsv")
     private const val TAG = "CandidateGlossary"
     private val upgradeStarted = AtomicBoolean(false)
+
+    /** 释义前缀：词典里不可靠的单字释义，显示时去掉，拼整句英文时不用。 */
+    private const val APPROX = "~"
+    /** 释义前缀：词典里预先翻好的常见短语英文（很有道理 → that makes sense），只显示，不拿来上屏。 */
+    private const val PHRASE = "+"
+    private const val COMPOSE_MAX_WORD = 6
+    /** 只给短语拼英文（用户定：短一点的短语，不做整句）。 */
+    private const val COMPOSE_MAX_CHARS = 4
+    /**
+     * 拼短语时可单独用的字：意思固定、放进短语里不会错的常用字（宁少勿多）。其余单字的释义多义，
+     * 拼进去会出错（会 → meet，比 → ratio），一律不用。
+     */
+    private val COMPOSE_SAFE_CHARS = mapOf(
+        '我' to "I", '你' to "you", '他' to "he", '她' to "she", '也' to "also", '不' to "not", '很' to "very",
+        '都' to "all", '和' to "and", '又' to "again", '再' to "again", '太' to "too", '最' to "most", '更' to "more",
+    )
+    private const val COMPOSE_MAX_GLOSS = 40
+    /** 拼过的整句释义；换词典时清空。 */
+    private val composed = object : LinkedHashMap<String, String>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 512
+    }
 
     @Volatile private var table: GlossTable? = null
     @Volatile private var signature: String? = null
@@ -41,6 +63,21 @@ object CandidateGlossary {
     val revision: Int get() = revisionState.intValue
 
     fun file(context: Context): File = File(ModelStorage.getModelDir(context, MODEL_ID), FILE_NAME)
+
+    /**
+     * 私人补充包：按用户自己的输入挑出的释义，只由“装到我的设备”打包放进 APK 资源，不上传、不进公开包。
+     * 同一格式（按 UTF-8 字节序的 `词\t释义`），值为 [GlossTable.HIDDEN] 表示这个词不显示释义；有就叠在公开词典上。
+     */
+    const val PRIVATE_ASSET = "gloss/cyime_gloss-private.tsv"
+
+    private fun openPrivateAsset(context: Context): GlossTable? = try {
+        context.assets.open(PRIVATE_ASSET).use { GlossTable.fromBuffer(ByteBuffer.wrap(it.readBytes())) }
+    } catch (_: java.io.FileNotFoundException) {
+        null
+    } catch (error: Exception) {
+        FileLogger.w(TAG, "私人释义补充包加载失败：${error.message}")
+        null
+    }
 
     fun isInstalled(context: Context): Boolean = file(context).let { it.isFile && it.length() > 0 }
 
@@ -60,7 +97,10 @@ object CandidateGlossary {
         if (current == signature || !loading.compareAndSet(false, true)) return
         thread(name = "candidate-gloss", isDaemon = true) {
             try {
-                table = GlossTable.open(source)
+                val opened = GlossTable.open(source)
+                opened.overlay = openPrivateAsset(context)
+                synchronized(composed) { composed.clear() }
+                table = opened
                 signature = current
                 revisionState.intValue++
             } catch (error: Exception) {
@@ -99,8 +139,12 @@ object CandidateGlossary {
     /** 九键长按“下一项”切到的中英对调（代替 Shift，松手保持）；上屏英文、再长按或编码结束时恢复。 */
     val t9NextHeld = mutableStateOf(false)
 
-    /** 任一种“按住 Shift”生效中：屏幕 Shift 键按住（[screenShiftHeld]）、物理 Shift 或九键长按“下一项”。 */
-    fun swapHeld(screenShiftHeld: Boolean): Boolean = screenShiftHeld || physicalShiftHeld.value || t9NextHeld.value
+    /** 任一种“按住 Shift”生效中：屏幕 Shift 键按住（[screenShiftHeld]）、物理 Shift、九键长按“下一项”，或从它拖到候选上。 */
+    /** 正从九键“下一项”拖着经过候选：此刻松手就上屏英文，候选先显示成英文。 */
+    val t9DragSwap = mutableStateOf(false)
+
+    fun swapHeld(screenShiftHeld: Boolean): Boolean =
+        screenShiftHeld || physicalShiftHeld.value || t9NextHeld.value || t9DragSwap.value
 
     /** 注释换成释义；词典未加载时原样返回，已加载但查不到的候选不显示注释。 */
     fun annotate(texts: List<String>, comments: List<String>): List<String> = annotate(table, texts, comments)
@@ -116,13 +160,71 @@ object CandidateGlossary {
 
     internal fun annotate(table: GlossTable?, texts: List<String>, comments: List<String>): List<String> {
         if (table == null) return comments
-        return texts.map { table.lookup(keyOf(it)).orEmpty() }
+        return texts.map { gloss(table, it).orEmpty() }
+    }
+
+    /**
+     * 运行时把任意 2～4 字候选逐词拼英文（[compose]）默认关：候选里大量是说不通的临时组合（对付一口 →
+     * handle readily），按字数拼会出错英文。日常短语改由词典预先按词库常见度挑好拼好（[PHRASE] 前缀），App 只查表。
+     */
+    @Volatile var composeEnabled = false
+
+    /** 候选的释义：词典里有就用（去掉不可靠标记）；没有时只在 [composeEnabled] 打开后按词切开逐词拼英文。 */
+    internal fun gloss(table: GlossTable, text: String): String? {
+        if (isLetterAbbreviation(text)) return null
+        return table.lookup(keyOf(text))?.removePrefix(APPROX)?.removePrefix(PHRASE) ?: if (composeEnabled) compose(table, text) else null
+    }
+
+    /**
+     * 单个字母、三个字母以内的英文和全大写缩写不给中文释义：词典把它们当缩写，释义多是生僻全称
+     * （s → 标量，abc → 预定章程，KFC 也一样），中文键盘里打的大写字母和缩写没有可信的中文意思。
+     */
+    internal fun isLetterAbbreviation(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || !trimmed.all { it.code < 0x80 }) return false
+        val letters = trimmed.filter { it.isLetter() }
+        return letters.length <= 3 || letters.all { it.isUpperCase() }
+    }
+
+    /**
+     * 2～4 字的短语候选（我闹钟 → I alarm clock）：从左往右每次取词典里最长的两字以上词，单字只用
+     * [COMPOSE_SAFE_CHARS] 里的。有一块切不出来就不显示，宁缺勿错。
+     * 结果按文字缓存，候选栏重组时不重复查表。
+     */
+    internal fun compose(table: GlossTable, text: String): String? {
+        if (text.length < 2 || text.any { it.code < 0x80 } || text.length > COMPOSE_MAX_CHARS) return null
+        // 缓存只服务当前装载的词典（测试会传别的表）。
+        val cache = composed.takeIf { table === this.table }
+        cache?.let { synchronized(it) { it[text]?.let { hit -> return hit.ifEmpty { null } } } }
+        val parts = ArrayList<String>()
+        var start = 0
+        var complete = true
+        while (start < text.length) {
+            var matched = 0
+            for (length in minOf(COMPOSE_MAX_WORD, text.length - start) downTo 2) {
+                val value = table.lookup(text.substring(start, start + length)) ?: continue
+                if (value.startsWith(APPROX) || value.startsWith(PHRASE)) continue
+                parts += value.removeSuffix("…").trimEnd()
+                matched = length
+                break
+            }
+            if (matched == 0) COMPOSE_SAFE_CHARS[text[start]]?.let { parts += it; matched = 1 }
+            if (matched == 0) { complete = false; break }
+            start += matched
+        }
+        val result = if (complete && parts.size > 1) parts.joinToString(" ").let {
+            if (it.length > COMPOSE_MAX_GLOSS) it.take(COMPOSE_MAX_GLOSS).trimEnd() + "…" else it
+        } else ""
+        cache?.let { synchronized(it) { it[text] = result } }
+        return result.ifEmpty { null }
     }
 
     internal fun englishFor(table: GlossTable, text: String): String? {
-        // 本身是英文的候选直接上屏它自己；被截断的释义（以 … 结尾）不是完整英文，不拿来上屏。
+        // 本身是英文的候选直接上屏它自己；被截断的释义（以 … 结尾）不是完整英文，不拿来上屏；
+        // 逐词拼出来的整句英文不是译文，也不上屏，只做显示参考。
         if (text.isBlank() || text.all { it.code < 0x80 }) return null
-        return table.lookup(keyOf(text))?.takeUnless { it.isBlank() || it.endsWith("…") }
+        return table.lookup(keyOf(text))?.removePrefix(APPROX)
+            ?.takeUnless { it.isBlank() || it.endsWith("…") || it.startsWith(PHRASE) }
     }
 
     internal fun swapped(table: GlossTable?, texts: List<String>, comments: List<String>): Pair<List<String>, List<String>> {
@@ -148,8 +250,12 @@ object CandidateGlossary {
 internal class GlossTable private constructor(private val buffer: ByteBuffer, private val starts: IntArray) {
     val size: Int get() = starts.size
 
+    /** 叠在上面的私人补充包：先查它，查到 [HIDDEN] 就不显示释义。 */
+    @Volatile var overlay: GlossTable? = null
+
     fun lookup(key: String): String? {
         if (key.isEmpty()) return null
+        overlay?.lookup(key)?.let { return it.takeUnless { value -> value == HIDDEN } }
         val wanted = key.toByteArray(Charsets.UTF_8)
         var low = 0
         var high = starts.size - 1
@@ -188,6 +294,8 @@ internal class GlossTable private constructor(private val buffer: ByteBuffer, pr
     }
 
     companion object {
+        /** 私人补充包里“这个词不显示释义”的值。 */
+        const val HIDDEN = "-"
         private const val TAB = '\t'.code
         private const val NEWLINE = '\n'.code
         private const val COMMENT = '#'.code

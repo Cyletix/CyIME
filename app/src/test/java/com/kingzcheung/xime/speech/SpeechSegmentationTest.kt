@@ -236,7 +236,7 @@ class SpeechSegmentationTest {
             override fun refine(samples: FloatArray): String { entered.countDown(); release.await(2, TimeUnit.SECONDS); return "校正" }
         }
         val s = LocalSpeechSession(engine, {}, {})
-        s.acceptPcm(pcm(16000)); s.acceptPcm(pcm(16000, 0))
+        s.acceptPcm(pcm(16000)); s.acceptPcm(pcm(24000, 0)) // > 1 s pause ends the region (streaming minimum 1000 ms)
         assertTrue(entered.await(2, TimeUnit.SECONDS))
         s.acceptPcm(pcm(16000)); release.countDown()
         assertEquals("校正 校正", s.finish())
@@ -248,7 +248,7 @@ class SpeechSegmentationTest {
             override fun refine(samples: FloatArray): String { entered.countDown(); release.await(2, TimeUnit.SECONDS); return "迟到" }
         }
         val s = LocalSpeechSession(engine, { output.add(it) }, {})
-        s.acceptPcm(pcm(16000)); s.acceptPcm(pcm(16000, 0))
+        s.acceptPcm(pcm(16000)); s.acceptPcm(pcm(24000, 0)) // > 1 s pause ends the region (streaming minimum 1000 ms)
         assertTrue(entered.await(2, TimeUnit.SECONDS)); s.cancel(); val count = output.size
         release.countDown(); s.awaitIdle()
         assertEquals(count, output.size); assertFalse(output.contains("迟到"))

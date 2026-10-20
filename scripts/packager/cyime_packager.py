@@ -36,6 +36,10 @@ _spec.loader.exec_module(ad)
 DeliveryError = ad.DeliveryError
 CONFIG_PATH = HERE / "config.json"
 T9_TARGET = "app/src/main/assets/rime_chinese/t9_ngram.lm"
+# Private gloss add-on (entries chosen from the user's own messages): bundled only into 装到我的设备, never committed, never public.
+GLOSS_TARGET = "app/src/main/assets/gloss/cyime_gloss-private.tsv"
+PUBLIC_FORBIDDEN_ASSETS = ("assets/gloss/cyime_gloss-private.tsv",)
+PUBLIC_FORBIDDEN_REFERENCES = ("cyime_gloss-v9",)
 # The bundled-model (full) edition is the elder package; docs/development/elder-pack-spec.md is its checklist.
 ELDER_MODELS = {"ochwpro", "paraformer-zh-en-int8", "predictive-text-base", "predictive-text-small",
                 "sensevoice-multilingual-int8", "speaker-campplus-zh"}
@@ -293,7 +297,8 @@ class BuildOptions(SimpleNamespace):
                     install=True, push_banks=False, serial="", rebuild=False, bump="none", publish=False,
                     latest=False, prerelease=False, notes="", yes=False, dry_run=False, check=False,
                     audience="",  # "elder" / "friend": a bundled-model package checked against its spec
-                    dev_tools=False)  # developer-only features (handwriting training); only 装到我的设备
+                    dev_tools=False,  # developer-only features (handwriting training); only 装到我的设备
+                    private_gloss=False)  # bundle the private gloss add-on (config privateGloss); only 装到我的设备
 
     def __init__(self, **values):
         merged = dict(self.DEFAULTS)
@@ -364,6 +369,70 @@ class Staging:
         return False
 
 
+class GlossStaging:
+    """Put the private gloss add-on under assets for 装到我的设备 only, and remove it afterwards (same rules as the T9 model)."""
+
+    def __init__(self, root: Path, source: Path | None, work: Path):
+        self.root, self.source, self.work = root, source, work
+        self.target = root / GLOSS_TARGET
+        self.marker = work / "staged-gloss.json"
+        self.created = False
+        self.sha256 = ad.digest(source) if source else None
+
+    def cleanup_stale(self):
+        if not self.marker.is_file():
+            return
+        record = ad.read_json(self.marker)
+        if self.target.is_file() and self.target.stat().st_size == record.get("size") and ad.digest(self.target) == record.get("sha256"):
+            self.target.unlink()
+            say("[STAGE] 已移除上次中断时留下的临时私人释义包。")
+        self.marker.unlink()
+
+    def __enter__(self):
+        self.cleanup_stale()
+        if self.source is None:
+            if self.target.exists():
+                raise DeliveryError(f"{GLOSS_TARGET} 已存在（不是打包器放的），这个包不该带私人释义，请先移走它。")
+            return self
+        if self.target.exists():
+            if ad.digest(self.target) != self.sha256:
+                raise DeliveryError(f"{GLOSS_TARGET} 已有另一份文件（不是打包器放的），没有覆盖。")
+            say("[STAGE] 源码目录里已有同一份私人释义包，直接使用，打包后保留原样。")
+            return self
+        self.work.mkdir(parents=True, exist_ok=True)
+        self.created_dir = not self.target.parent.exists()
+        self.target.parent.mkdir(parents=True, exist_ok=True)
+        ad.write_json(self.marker, {"sha256": self.sha256, "size": self.source.stat().st_size})
+        shutil.copyfile(self.source, self.target)
+        self.created = True
+        say(f"[STAGE] 私人释义包 {self.source.name} 已临时放入 {GLOSS_TARGET}")
+        return self
+
+    def __exit__(self, *exc):
+        if self.created:
+            with contextlib.suppress(FileNotFoundError):
+                self.target.unlink()
+            self.marker.unlink(missing_ok=True)
+            if getattr(self, "created_dir", False):
+                with contextlib.suppress(OSError):
+                    self.target.parent.rmdir()  # only the empty assets/gloss directory this run created
+            say("[STAGE] 临时私人释义包已移除，源码目录恢复原样。")
+        return False
+
+
+def public_violations(names: list[str], texts: dict[str, bytes]) -> list[str]:
+    """What must never be in a package that leaves the user's own devices: the private gloss, or any reference to the retired v9 gloss."""
+    problems = [f"包内含私人文件 {n}" for n in names if n in PUBLIC_FORBIDDEN_ASSETS]
+    for n in names:
+        if any(k in n for k in PUBLIC_FORBIDDEN_REFERENCES):
+            problems.append(f"包内含已淘汰文件 {n}")
+    for n, data in texts.items():
+        for k in PUBLIC_FORBIDDEN_REFERENCES:
+            if k.encode() in data:
+                problems.append(f"{n} 引用了 {k}")
+    return problems
+
+
 class Packager(ad.Delivery):
     def __init__(self, root: Path, opts: BuildOptions, runner=None, config=None):
         self.p = opts
@@ -389,6 +458,14 @@ class Packager(ad.Delivery):
         self.state = ad.read_json(self.state_path) if self.state_path.is_file() else {"builds": {}}
         self.state.setdefault("builds", {})
         self.staging = Staging(self.root, self.model, self.work)
+        self.gloss = None
+        if opts.private_gloss:
+            if opts.audience or opts.publish:
+                raise DeliveryError("私人释义包只能进“装到我的设备”，老人包、朋友包和公开版都不带。")
+            self.gloss = Path(self.config.get("privateGloss") or "")
+            if not self.gloss.is_file():
+                raise DeliveryError(f"找不到私人释义包：{self.gloss}（config.json 的 privateGloss）")
+        self.gloss_staging = GlossStaging(self.root, self.gloss, self.work)
         if opts.publish and self.kind != "release":
             raise DeliveryError("调试版不能发布到 GitHub Release。")
 
@@ -400,7 +477,8 @@ class Packager(ad.Delivery):
                 # Only present for a partial offline edition, so earlier build records stay valid.
                 **({"offlineIds": list(self.p.offline_ids)} if self.p.offline_ids else {}),
                 **({"audience": self.p.audience} if self.p.audience else {}),
-                **({"devTools": True} if self.p.dev_tools else {})}
+                **({"devTools": True} if self.p.dev_tools else {}),
+                **({"privateGloss": self.gloss_staging.sha256} if self.gloss else {})}
 
     def variant_id(self) -> str:
         return hashlib.sha256(json.dumps(self.variant(), sort_keys=True).encode()).hexdigest()[:12]
@@ -534,10 +612,19 @@ class Packager(ad.Delivery):
         manifest = self.r.run([self.aapt, "dump", "xmltree", path, "AndroidManifest.xml"])
         if not ime_label_ok(manifest):
             raise DeliveryError("输入法服务没有写死的名字“CyIME”，系统设置可能显示成类名。")
+        import zipfile
+        with zipfile.ZipFile(path) as apk:
+            names = apk.namelist()
+            # Text assets that could point at a gloss file: catalogs, manifests, yaml/json/tsv/txt under assets.
+            texts = {n: apk.read(n) for n in names
+                     if n.startswith("assets/") and n.rsplit(".", 1)[-1] in ("json", "yaml", "yml", "txt", "tsv", "md", "list")
+                     and not n.startswith("assets/gloss/")}
+        if not self.gloss:
+            problems = public_violations(names, texts)
+            if problems:
+                raise DeliveryError("安装包带了不能离开本机的内容：" + "；".join(problems))
+            say("[VERIFY] 公开内容检查通过：无私人释义包，无 cyime_gloss-v9 引用。")
         if self.p.audience in ("elder", "friend"):
-            import zipfile
-            with zipfile.ZipFile(path) as apk:
-                names = apk.namelist()
             t9 = self.staging.sha256 if self.model else None
             if self.p.audience == "elder":
                 best = resolve_model("@best_private", self.config)
@@ -631,6 +718,9 @@ class Packager(ad.Delivery):
                          f"临时放入 {T9_TARGET}，结束后移除")
         else:
             lines.append("九键模型：不带（九键回到旧算法，用户可在模型管理里下载）")
+        if self.gloss:
+            lines.append(f"私人释义包：{self.gloss.name}（{human(self.gloss.stat().st_size)}，SHA256 {self.gloss_staging.sha256[:16]}…）"
+                         f"临时放入 {GLOSS_TARGET}，结束后移除")
         dicts = list_dicts(self.root)
         kept = [d["name"] for d in dicts if d["id"] not in p.exclude_dicts]
         dropped = [d["name"] for d in dicts if d["id"] in p.exclude_dicts]
@@ -661,7 +751,7 @@ class Packager(ad.Delivery):
             return
         self.check_delivered_version()
         self.dependencies()
-        with self.staging:
+        with self.staging, self.gloss_staging:
             if self.p.publish:
                 self.check_remote_tag()
                 existing = self.release_info()
@@ -905,6 +995,9 @@ def main(argv=None) -> int:
                    help="去掉某个内置词库（可重复），ID 见 info")
     b.add_argument("--no-install", action="store_true", help="只出包，不安装")
     pb = b.add_mutually_exclusive_group()
+    pb.add_argument("--private-gloss", dest="private_gloss", action="store_true", default=None,
+                    help="内置私人释义补充包（config.json 的 privateGloss；只用于“装到我的设备”）")
+    pb.add_argument("--no-private-gloss", dest="private_gloss", action="store_false")
     pb.add_argument("--push-banks", dest="push_banks", action="store_true", default=None,
                     help="安装后把手写训练题库推到设备（“装到我的设备”默认开）")
     pb.add_argument("--no-push-banks", dest="push_banks", action="store_false")

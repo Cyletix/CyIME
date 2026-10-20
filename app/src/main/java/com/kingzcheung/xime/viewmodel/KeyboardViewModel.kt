@@ -111,6 +111,9 @@ data class KeyboardUiState(
     val quickSendEditingItemCode: String = "",
     val toolPanelVisible: Boolean = false,
     val toolPanelInputFocused: Boolean = false,
+    val clipboardSearchVisible: Boolean = false,
+    /** Height of the clipboard results above the search bar: the board's pulled-up height minus keyboard and bar. */
+    val clipboardSearchResultsHeight: Int = 0,
     val toolPanelPluginId: String = "",
     val toolPanelTitle: String = "",
     val toolPanelPrefillText: String = "",

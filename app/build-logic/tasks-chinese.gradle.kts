@@ -40,6 +40,10 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(charWeights)
     val tencentWeights = file("data/rime_ice_tencent_weights.tsv.gz")
     inputs.file(tencentWeights)
+    val acronymFilter = file("data/cyime_acronym_filter.lua")
+    inputs.file(acronymFilter)
+    val englishMemory = file("data/cyime_en_memory.lua")
+    inputs.file(englishMemory)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
     val measureWords = file("data/sentence_measure_words.txt")
@@ -105,6 +109,16 @@ val prepareChineseDictionaries by tasks.registering {
         // The upstream corrector clears ordinary spelling annotations after the
         // translator has generated them. Let the host retain that real spelling
         // for responsive candidate UI without disabling pronunciation corrections.
+        // Lowercase short acronyms (kfc → KFC): upstream derives lowercase codes only from four letters up, so
+        // a two/three-letter acronym needed its capitals. Derive them too; cyime_acronym_filter keeps such
+        // an acronym out of the first four candidates (kfc is also the Chinese abbreviation 开发出).
+        val meltEng = File(root, "melt_eng.schema.yaml")
+        val lowerFour = "  - derive/^.{4,}\$/\\L\$0/\n"
+        check(meltEng.readText().split(lowerFour).size == 2) { "Upstream melt_eng lowercase derivation changed" }
+        meltEng.writeText(meltEng.readText().replace(lowerFour, lowerFour + "  - derive/^[A-Z]{2,3}\$/\\L\$0/\n"))
+        acronymFilter.copyTo(File(root, "lua/cyime_acronym_filter.lua"), overwrite = true)
+        // English words the user typed by hand come back as candidates (EnglishWordMemory.kt).
+        englishMemory.copyTo(File(root, "lua/cyime_en_memory.lua"), overwrite = true)
         val corrector = File(root, "lua/corrector.lua")
         val source = corrector.readText()
         val commentGate = "if env.keep_comment then"
@@ -176,7 +190,9 @@ val prepareChineseDictionaries by tasks.registering {
             // Four sentences for t9/sentence_rescore to choose from (the menu still shows one); the cutoff
             // keeps Rime from dropping alternatives whose weight is a word penalty away.
             "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
-            .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }.joinToString("\n")
+            .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }
+            .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_acronym_filter", "    - lua_filter@*cyime_en_memory") else sequenceOf(it) }
+            .joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
             "\ncyime:\n  candidate_policy: true\n" +
             // 26-key ranking by the nine-key word n-gram model (docs/development/pinyin26-word-model-20261018.md):

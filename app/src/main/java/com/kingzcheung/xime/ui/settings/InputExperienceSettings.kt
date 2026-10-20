@@ -64,8 +64,8 @@ internal fun InputExperienceSettings(
                     ?.takeIf { !settings.letterLongPressMenu }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("字母键长按弹出大小写", style = MaterialTheme.typography.titleSmall)
-                        Text("长按字母弹出小写、大写和带音调的字母；关掉后长按字母不弹，上下拖动输入角标不受打扰。",
+                        Text("长按弹出字母气泡", style = MaterialTheme.typography.titleSmall)
+                        Text("26/14 键长按字母弹出大小写和带音调的字母，九键长按弹出本键的几个字母；关掉后长按不弹，上下拖动输入角标不受打扰。",
                             style = MaterialTheme.typography.bodySmall)
                         if (lock != null) SettingsLockNote(lock.message)
                     }

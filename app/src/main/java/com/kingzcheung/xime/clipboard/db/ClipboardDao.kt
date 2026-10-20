@@ -13,6 +13,30 @@ interface ClipboardDao {
     @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<ClipboardEntry>>
 
+    /**
+     * Every fixed record plus the newest [limit] unfixed ones. The board grows [limit] page by
+     * page as it scrolls, so a history of thousands is never read into memory at once.
+     */
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND (isPinned = 1 OR id IN " +
+        "(SELECT id FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 ORDER BY timestamp DESC LIMIT :limit)) " +
+        "ORDER BY timestamp DESC")
+    fun observeWindow(limit: Int): Flow<List<ClipboardEntry>>
+
+    @Query("SELECT COUNT(*) FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0")
+    fun observeUnpinnedCount(): Flow<Int>
+
+    /** Text fragment or pinyin initials, anywhere; fixed records first, then newest. */
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND " +
+        "(text LIKE :pattern ESCAPE '\\' OR searchKey LIKE :pattern ESCAPE '\\') " +
+        "ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
+    suspend fun search(pattern: String, limit: Int): List<ClipboardEntry>
+
+    @Query("SELECT id, substr(text, 1, 2000) AS text FROM clipboard_entries WHERE searchKey = '' AND isQuickSend = 0 LIMIT :limit")
+    suspend fun missingSearchKeys(limit: Int): List<SearchKeySource>
+
+    @Query("UPDATE clipboard_entries SET searchKey = :key WHERE id = :id")
+    suspend fun setSearchKey(id: Long, key: String)
+
     /** Compatibility feed for the existing plugin API: fixed text and its optional trigger code. */
     @Query("SELECT * FROM clipboard_entries WHERE isPinned = 1 AND isQuickSend = 0 ORDER BY timestamp DESC")
     fun observeQuickSend(): Flow<List<ClipboardEntry>>
@@ -62,7 +86,8 @@ interface ClipboardDao {
     @Query("DELETE FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0 AND id IN (SELECT id FROM clipboard_entries WHERE isPinned = 0 AND isQuickSend = 0 ORDER BY timestamp ASC LIMIT :limit)")
     suspend fun trimUnpinned(limit: Int)
 
-    @Query("UPDATE clipboard_entries SET text = :text, code = COALESCE(:code, code), timestamp = :now WHERE id = :id AND isQuickSend = 0")
+    // An edit clears the search key; the backfill recomputes it from the new text.
+    @Query("UPDATE clipboard_entries SET text = :text, code = COALESCE(:code, code), timestamp = :now, searchKey = '' WHERE id = :id AND isQuickSend = 0")
     suspend fun updateClipboardItem(id: Long, text: String, code: String?, now: Long)
 
     @Query("UPDATE clipboard_entries SET consumed = 1 WHERE id = :id")
@@ -72,12 +97,12 @@ interface ClipboardDao {
     suspend fun deleteAll()
 
     @Transaction
-    suspend fun upsertAndTrim(text: String, now: Long, maxItems: Int) {
+    suspend fun upsertAndTrim(text: String, now: Long, maxItems: Int, searchKey: String = "") {
         val existing = findByText(text)
         if (existing != null) {
             refreshCopiedItem(existing.id, now)
         } else {
-            insert(ClipboardEntry(text = text, timestamp = now))
+            insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey))
             val unpinned = countUnpinned()
             if (unpinned > maxItems) {
                 trimUnpinned(unpinned - maxItems)
@@ -85,6 +110,9 @@ interface ClipboardDao {
         }
     }
 
-    suspend fun insertPinnedText(text: String, code: String, now: Long): Long =
-        insert(ClipboardEntry(text = text, code = code, timestamp = now, isPinned = true))
+    suspend fun insertPinnedText(text: String, code: String, now: Long, searchKey: String = ""): Long =
+        insert(ClipboardEntry(text = text, code = code, timestamp = now, isPinned = true, searchKey = searchKey))
 }
+
+/** The part of a record the search-key backfill needs. */
+data class SearchKeySource(val id: Long, val text: String)
