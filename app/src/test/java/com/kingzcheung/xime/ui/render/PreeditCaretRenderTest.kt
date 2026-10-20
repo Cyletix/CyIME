@@ -42,6 +42,7 @@ class PreeditCaretRenderTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         KeyboardThemes.initFromConfig(context)
         val ids = KeyboardThemes.themes.map { it.id }
+        rule.mainClock.autoAdvance = false
         rule.setContent {
             FlowRow(Modifier.background(Color(0xFF808080)).padding(4.dp)) {
                 for (id in ids) for (dark in listOf(false, true)) {
@@ -56,11 +57,45 @@ class PreeditCaretRenderTest {
                 }
             }
         }
-        rule.waitForIdle()
+        rule.mainClock.advanceTimeBy(100)
         val root = rule.activity.window.decorView
         val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
         rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
         File(out!!).mkdirs()
         File(out, "preedit-caret.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    /** 闪烁时移动光标：灭着的时候移一下仍是灭的，节拍不从头来。 */
+    @Test fun blinkKeepsRhythmWhileMoving() {
+        val out = System.getenv("CYIME_RENDER_OUT")
+        assumeTrue(!out.isNullOrEmpty())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        KeyboardThemes.initFromConfig(context)
+        val text = androidx.compose.runtime.mutableStateOf("zhe ge luo ji bu d|ui")
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            Column(Modifier.background(Color(0xFF808080)).padding(4.dp)) {
+                for ((id, dark) in listOf("soft_blue" to false, "pure_black" to true, "sakura_pink" to false)) {
+                    val palette = resolveKeyboardPalette(id, dark)
+                    Box(Modifier.background(palette.background).padding(4.dp)) {
+                        PreeditLabel(text.value, CandidateBarVisuals(Color.Transparent,
+                            palette.candidateText, Color.Gray, palette.accent, palette.selectedText, dark, palette.key))
+                    }
+                }
+            }
+        }
+        File(out!!).mkdirs()
+        fun shot(name: String) {
+            val root = rule.activity.window.decorView
+            val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+            rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
+            File(out, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        rule.mainClock.advanceTimeBy(200); shot("blink-1-on")
+        rule.mainClock.advanceTimeBy(500); shot("blink-2-off")
+        text.value = "zhe ge luo ji b|u dui"
+        rule.mainClock.advanceTimeBy(32); shot("blink-3-moved-still-off")
+        text.value = "zhe ge luo j|i bu dui"
+        rule.mainClock.advanceTimeBy(400); shot("blink-4-on-again")
     }
 }
