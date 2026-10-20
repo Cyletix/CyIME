@@ -72,6 +72,7 @@ object BackupManager {
         if (relative.contains('/')) return false
         return relative.endsWith(".userdb.txt") ||
             (relative.startsWith("custom_phrase") && relative.endsWith(".txt")) ||
+            relative == EnglishWordMemory.FILE_NAME ||
             // 补充词库生成的 user_cyime_cells_* 由补充词库设置重建，不算个人词库
             (relative.startsWith("user_") && !relative.startsWith("user_cyime_cells_") && relative.endsWith(".dict.yaml"))
     }

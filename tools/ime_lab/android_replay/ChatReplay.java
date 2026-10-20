@@ -262,7 +262,9 @@ public final class ChatReplay {
         for (int i = 0; i < syllables.length; i++) {
             syllables[i] = normalizePinyin(pinyin.getString(i));
             // Letters: the full pinyin typed without separators, as on the 26-key keyboard.
-            digits[i] = variant.equals("letters") ? syllables[i]
+            // Capitals typed on the 26-key keyboard go to Rime as capitals (KFC, Obsidian).
+            digits[i] = variant.equals("letters")
+                ? (pinyin.getString(i).matches("[A-Za-z]+") ? pinyin.getString(i) : syllables[i])
                 : variant.equals("letters14") ? keys14(syllables[i]) : digits(syllables[i]);
             all.append(digits[i]);
         }
