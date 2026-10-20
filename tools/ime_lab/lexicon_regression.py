@@ -151,6 +151,10 @@ def prepare_android(work):
     model = os.environ.get("CYIME_T9_NGRAM")
     if model:
         os.link(model, data / "t9_ngram.lm")
+    for path in filter(None, os.environ.get("CYIME_EXTRA_FILES", "").split(";")):
+        # experiments: extra schema/dictionary files copied into the data directory (e.g. a table another
+        # translator reads); the 26-key schema names them through CYIME_RIME_ICE_REPLACE / _EXTRA
+        shutil.copy(path, data / Path(path).name)
     return data
 
 
