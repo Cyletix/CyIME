@@ -181,6 +181,16 @@ class ClipboardImages private constructor(private val context: Context) {
                 val retained = history.mapNotNull { Uri.parse(it.uri).lastPathSegment }.toSet()
                 directory.listFiles()?.filter { it.name !in retained && it.lastModified() < System.currentTimeMillis() - 24 * 60 * 60_000L }
                     ?.forEach { it.delete() }
+                // Keep the whole cache within its budget: the oldest unfixed copies go first.
+                val pinnedNames = pinnedKeys().mapNotNull { key ->
+                    key.removePrefix("image:").takeIf { it != key }?.let { Uri.parse(it).lastPathSegment } }.toSet()
+                val evicted = clipboardImageEvictions(directory.listFiles().orEmpty().filter { it.isFile }
+                    .map { CachedImageFile(it.name, it.length(), it.lastModified()) }, pinnedNames + file.name).toSet()
+                if (evicted.isNotEmpty()) {
+                    evicted.forEach { File(directory, it).delete() }
+                    history = history.filterNot { Uri.parse(it.uri).lastPathSegment in evicted }
+                    cachedSources.entries.removeAll { Uri.parse(it.value.uri).lastPathSegment in evicted }
+                }
                 save()
                 publish()
                 cached
