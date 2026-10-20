@@ -42,16 +42,18 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
         // CyLM fills the sentence slot when the schema names its files (cylm/lexicon, cylm/model, optional
         // cylm/model2 and cylm/params). Nothing names them by default, so nothing is loaded.
         // Optional cylm/reranker + cylm/vocab: the ONNX reranker runs inside the same keystroke.
-        string lexicon, model, model2, reranker, vocab, params;
+        // Optional cylm/prefer: "P<TAB>D" rows, P moves above its homophone D after ranking (cylm_prefer).
+        string lexicon, model, model2, reranker, vocab, params, prefer;
         if (config->GetString("cylm/lexicon", &lexicon) && config->GetString("cylm/model", &model) &&
             !lexicon.empty() && !model.empty()) {
           config->GetString("cylm/model2", &model2);
           config->GetString("cylm/reranker", &reranker);
           config->GetString("cylm/vocab", &vocab);
           config->GetString("cylm/params", &params);
+          config->GetString("cylm/prefer", &prefer);
           auto resolve = [](const string& name) { return name.empty() ? string() : T9ResolveOnce("cylm", "", name); };
           t9_cylm_ = T9CylmOpen(resolve(lexicon), resolve(model), resolve(model2),
-                                vocab.empty() ? string() : resolve(reranker), resolve(vocab), params);
+                                vocab.empty() ? string() : resolve(reranker), resolve(vocab), params, resolve(prefer));
         }
       }
       if (t9_sentence_rescore_ && !t9_joint_) {
@@ -211,11 +213,13 @@ t9_replace("  bool CheckEmpty();" [=[
   }
   // One CyLM model per set of files for the process (memory-mapped); a failed open is remembered too.
   static std::shared_ptr<CylmModel> T9CylmOpen(const string& lexicon, const string& model, const string& model2,
-                                               const string& reranker, const string& vocab, const string& params) {
+                                               const string& reranker, const string& vocab, const string& params,
+                                               const string& prefer) {
     static std::mutex mutex;
     static std::map<string, std::shared_ptr<CylmModel>> opened;
     std::lock_guard<std::mutex> lock(mutex);
-    const string key = lexicon + '\n' + model + '\n' + model2 + '\n' + reranker + '\n' + vocab + '\n' + params;
+    const string key = lexicon + '\n' + model + '\n' + model2 + '\n' + reranker + '\n' + vocab + '\n' + params +
+                       '\n' + prefer;
     auto found = opened.find(key);
     if (found != opened.end()) return found->second;
     std::shared_ptr<CylmModel> handle(
@@ -225,6 +229,7 @@ t9_replace("  bool CheckEmpty();" [=[
                          vocab.c_str(), params.c_str()),
         [](CylmModel* m) { if (m) cylm_close(m); });
     if (!handle.get()) handle.reset();
+    else if (!prefer.empty()) cylm_prefer(handle.get(), prefer.c_str());
     return opened[key] = handle;
   }
   // CyLM's best sentence takes the place of Rime's sentence (words keep their places). With its pinyin

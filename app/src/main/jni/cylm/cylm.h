@@ -21,6 +21,10 @@ CylmModel* cylm_open(const char* lexicon, const char* model, const char* model2,
  * with -DCYLM_ORT linked against onnxruntime; without it cylm_open2 with a reranker returns NULL. */
 CylmModel* cylm_open2(const char* lexicon, const char* model, const char* model2, const char* reranker, const char* vocab,
                       const char* params);
+/* The user's own preferences, applied after ranking: a TSV of "P<TAB>D" rows (the user types P rather than its
+ * homophone D, or reported it); a P ranked below its D moves to just above D. Call before cylm_session. Returns the
+ * number of D entries, or -1. */
+int cylm_prefer(CylmModel* model, const char* path);
 CylmSession* cylm_session(CylmModel* model);
 /* keys: pinyin letters (full, initials or mixed, "'" separates) or nine-key digits; mode 0 = pinyin, 1 = nine-key;
  * context: text before the caret (UTF-8, may be NULL). Candidates are written to out as UTF-8 strings each ended
