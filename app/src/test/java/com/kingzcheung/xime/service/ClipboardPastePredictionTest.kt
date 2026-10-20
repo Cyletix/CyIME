@@ -21,6 +21,8 @@ class ClipboardPastePredictionTest {
                 "predictionManager" to prediction, "candidateState" to candidates,
                 "mainHandler" to handler, "uiState" to mutableStateOf(InputUIState()),
                 "inputReadiness" to InputReadiness().apply { completeStartup() },
+                // Constructor-initialized on a real service; a Mockito mock skips initializers.
+                "editorInputPolicy" to EditorSessionInputPolicy(),
             ).forEach { (name, value) ->
                 XimeInputMethodService::class.java.getDeclaredField(name).apply {
                     isAccessible = true
