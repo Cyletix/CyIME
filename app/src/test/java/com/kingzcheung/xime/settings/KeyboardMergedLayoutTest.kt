@@ -274,9 +274,14 @@ class KeyboardMergedLayoutTest {
             .substringAfter("  algebra:").lineSequence()
             .takeWhile { it.isBlank() || it.startsWith(" ") || it.startsWith("#") }
             .map { it.substringBefore(" #").trim() }.filter { it.startsWith("- ") }.toList()
+        // 14 键最前面先去掉词库里单个大写字母的音节（3df6d4d5，见 abbreviation-correction-20261017.md）：
+        // 它们和合并键的大写编码同形，会把同一输入里的简拼剪掉；之后原小鹤双拼的规则一条不改，最后才派生合并键。
+        val leading = listOf("- erase/^[A-Z]$/")
         val rules = algebra(text)
-        assertEquals(algebra(original), rules.take(algebra(original).size))
-        assertTrue(rules.drop(algebra(original).size).all { it.startsWith("- derive/") })
+        assertEquals(leading, rules.take(leading.size))
+        val pinned = rules.drop(leading.size)
+        assertEquals(algebra(original), pinned.take(algebra(original).size))
+        assertTrue(pinned.drop(algebra(original).size).all { it.startsWith("- derive/") })
         val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(ximeYamlText(), "qwerty_14")!!
         assertEquals(representativeMap(rows), ambiguousTapMap(text))
         assertTrue(text.contains("schema_id: $id"))
