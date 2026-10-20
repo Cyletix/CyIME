@@ -193,7 +193,8 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
     size_t groups = 0;
     bool vowel = false, consonants_only = !in.empty();
     for (char ch : in) {
-      const bool v = ch && std::strchr("aeiouv", ch);
+      // 14-key merged keys are capitals; E/U/O/A carry the vowels (er, ui, op, as).
+      const bool v = ch && std::strchr("aeiouvEUOA", ch);
       if (v && !vowel) ++groups;
       vowel = v;
       if (ch < 'a' || ch > 'z' || v) consonants_only = false;
