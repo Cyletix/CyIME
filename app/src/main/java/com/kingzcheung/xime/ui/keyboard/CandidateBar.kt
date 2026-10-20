@@ -67,6 +67,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.runtime.setValue
@@ -1092,8 +1095,18 @@ internal fun FixedCandidateStrip(
         val leftCount = splitLeftCount
         val segments = if (localGap == null) listOf(visibleIndices.toList() to 0)
             else listOf(visibleIndices.take(leftCount) to 0, visibleIndices.drop(leftCount) to localGap.second)
+        // 候选换了时整排从右边 8dp 滑入并淡入（用户 10-21 选 A）。只在绘制时位移，点击区域从第一帧起
+        // 就在最终位置，动画中途点照样选中；不延迟出现，也不改候选顺序。
+        val slideIn = remember(candidates) { androidx.compose.animation.core.Animatable(0f) }
+        androidx.compose.runtime.LaunchedEffect(slideIn) {
+            slideIn.animateTo(1f, androidx.compose.animation.core.tween(CANDIDATE_SLIDE_MS,
+                easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+        }
+        val slidePx = with(density) { CANDIDATE_SLIDE_DP.dp.toPx() }
         segments.forEach { (segmentIndices, offsetPx) ->
-        Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) },
+        Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) }
+            .graphicsLayer { alpha = CANDIDATE_SLIDE_FROM_ALPHA + (1f - CANDIDATE_SLIDE_FROM_ALPHA) * slideIn.value }
+            .drawWithContent { translate(left = (1f - slideIn.value) * slidePx) { this@drawWithContent.drawContent() } },
             horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
             segmentIndices.forEach { index ->
                 CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size), index, {
@@ -1159,3 +1172,8 @@ internal val LocalEdgeButtonStyle = androidx.compose.runtime.staticCompositionLo
 /** 候选栏两端按钮从圆开始拉长成胶囊的候选栏宽度，和拉到最宽 52dp 的宽度。 */
 private val EDGE_STRETCH_START = 940.dp
 private val EDGE_STRETCH_FULL = 1400.dp
+
+/** 候选换词滑入：起点在右边 8dp、六成透明，120ms 到位。 */
+private const val CANDIDATE_SLIDE_MS = 120
+private const val CANDIDATE_SLIDE_DP = 8f
+private const val CANDIDATE_SLIDE_FROM_ALPHA = 0.6f
