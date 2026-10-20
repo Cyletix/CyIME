@@ -1,0 +1,873 @@
+# 单字释义白名单（v9 公开版）：rime_ice 8105 单字权重前 800 与公开聊天语料 LCCC 最常用的 500 个字逐个看过，只留单独用时意思明确的。
+# 没列的字只在 rime_ice 单字权重前 3500 内、且英文能正好译回本字时显示；生僻字和不可靠的单字释义不显示。
+# 格式：字<TAB>英文；只有字、没有英文的行表示看过但不给释义（助词、语气词、只作词素或姓氏的字等）。
+我	I
+是	is
+有	have
+一	one
+人	person
+那	that
+他	he
+来	come
+好	good
+说	say
+去	go
+也	also
+没	not
+这	this
+要	want
+到	arrive
+看	look
+大	big
+和	and
+会	can
+你	you
+想	think
+小	small
+下	down
+上	up
+她	she
+不	no
+请	please
+多	many
+但	but
+里	inside
+天	day
+放	put
+又	again
+很	very
+中	middle
+后	after
+回	return
+家	home
+开	open
+吃	eat
+做	do
+真	really
+老	old
+只	only
+走	walk
+用	use
+再	again
+手	hand
+头	head
+给	give
+事	thing
+别	don't
+打	hit
+快	fast
+话	words
+太	too
+见	see
+等	wait
+从	from
+年	year
+前	front
+笑	laugh
+美	beautiful
+脸	face
+让	let
+都	all
+听	listen
+叫	call
+高	tall
+出	out
+已	already
+先	first
+问	ask
+带	bring
+长	long
+最	most
+学	learn
+白	white
+爱	love
+像	like
+哥	elder brother
+深	deep
+两	two
+刚	just now
+三	three
+更	more
+心	heart
+住	live
+姐	elder sister
+女	female
+找	look for
+少	few
+水	water
+新	new
+几	how many
+它	it
+完	finish
+黑	black
+死	die
+早	early
+二	two
+眼	eye
+哪	which
+求	beg
+按	press
+洗	wash
+换	change
+动	move
+钱	money
+全	all
+车	car
+睡	sleep
+风	wind
+力	strength
+加	add
+该	should
+玩	play
+怕	fear
+边	side
+声	sound
+花	flower
+口	mouth
+飞	fly
+谁	who
+养	raise
+冷	cold
+变	change
+喝	drink
+光	light
+买	buy
+坐	sit
+路	road
+树	tree
+十	ten
+书	book
+拿	take
+关	close
+男	male
+西	west
+难	difficult
+穿	wear
+字	character
+四	four
+红	red
+重	heavy
+接	pick up
+跑	run
+马	horse
+空	empty
+忙	busy
+外	outside
+饭	meal
+晚	late
+名	name
+内	inside
+山	mountain
+向	towards
+强	strong
+干	dry
+送	send
+直	straight
+够	enough
+五	five
+火	fire
+海	sea
+热	hot
+远	far
+雪	snow
+留	stay
+拍	clap
+梦	dream
+您	you
+酒	alcohol
+将	will
+金	gold
+错	wrong
+饿	hungry
+东	east
+电	electricity
+城	city
+雨	rain
+脚	foot
+月	month
+收	receive
+双	pair
+狗	dog
+肉	meat
+嘴	mouth
+满	full
+教	teach
+写	write
+万	ten thousand
+站	stand
+伤	injury
+周	week
+半	half
+龙	dragon
+哭	cry
+图	picture
+球	ball
+删	delete
+云	cloud
+师	teacher
+讲	speak
+差	poor
+岁	years old
+星	star
+数	count
+帮	help
+夜	night
+米	rice
+近	near
+痛	pain
+敢	dare
+轻	light
+鬼	ghost
+背	back
+妹	younger sister
+醒	wake up
+苦	bitter
+九	nine
+假	fake
+急	urgent
+追	chase
+抱	hug
+块	piece
+南	south
+冲	rush
+胖	fat
+店	shop
+八	eight
+北	north
+皮	skin
+慢	slow
+弟	younger brother
+味	taste
+紧	tight
+改	change
+黄	yellow
+选	choose
+喊	shout
+楼	floor
+百	hundred
+久	long time
+鸡	chicken
+画	draw
+衣	clothes
+卖	sell
+歌	song
+腿	leg
+冰	ice
+低	low
+湿	wet
+菜	dish
+跳	jump
+病	illness
+今	today
+线	line
+谢	thank
+千	thousand
+床	bed
+七	seven
+药	medicine
+静	quiet
+停	stop
+刀	knife
+蓝	blue
+游	swim
+烦	annoyed
+指	finger
+瘦	thin
+六	six
+亮	bright
+贵	expensive
+累	tired
+纸	paper
+课	class
+断	break
+骂	scold
+懂	understand
+妈	mom
+卷	roll
+傻	silly
+爸	dad
+脑	brain
+聊	chat
+短	short
+试	try
+排	row
+鱼	fish
+牙	tooth
+票	ticket
+坏	bad
+血	blood
+骑	ride
+取	take
+唱	sing
+偷	steal
+抢	grab
+布	cloth
+猫	cat
+牛	cow
+读	read
+左	left
+陪	accompany
+忘	forget
+蛋	egg
+疼	hurt
+拖	drag
+石	stone
+猪	pig
+油	oil
+查	check
+网	net
+拉	pull
+铁	iron
+奶	milk
+推	push
+银	silver
+摸	touch
+梨	pear
+吹	blow
+答	answer
+暗	dark
+能	can
+春	spring
+叶	leaf
+日	day
+投	throw
+灯	light
+借	borrow
+舞	dance
+门	door
+喂	feed
+绿	green
+毒	poison
+挂	hang
+市	city
+角	corner
+茶	tea
+街	street
+丑	ugly
+疯	crazy
+鸟	bird
+咬	bite
+压	press
+狼	wolf
+钟	clock
+杯	cup
+恨	hate
+秋	autumn
+贼	thief
+烟	smoke
+汗	sweat
+湖	lake
+甜	sweet
+烧	burn
+灰	gray
+河	river
+诗	poem
+贴	stick
+圈	circle
+跟	with
+算	count
+复	repeat
+存	save
+的
+啊
+就
+在
+吗
+了
+个
+嗯
+还
+啦
+过
+吧
+哦
+对
+点
+子
+得
+时
+起
+为
+把
+发
+才
+被
+地
+生
+当
+儿
+面
+或
+比
+呀
+成
+而
+哈
+神
+无
+些
+以
+哇
+分
+集
+晒
+气
+自
+亲
+连
+啥
+阿
+然
+次
+嘛
+同
+正
+级
+着
+进
+定
+可
+张
+感
+种
+如
+本
+呢
+特
+与
+恩
+觉
+行
+却
+意
+明
+活
+超
+木
+所
+作
+知
+们
+号
+总
+法
+王
+翻
+信
+理
+其
+色
+果
+切
+机
+国
+噢
+约
+转
+表
+第
+经
+越
+包
+之
+离
+度
+友
+安
+常
+文
+相
+呗
+装
+受
+命
+记
+间
+及
+整
+怪
+此
+场
+怎
+清
+办
+倒
+照
+哎
+非
+林
+并
+样
+主
+往
+毛
+孩
+李
+条
+部
+思
+提
+于
+掉
+结
+入
+管
+报
+服
+乐
+平
+原
+流
+呆
+片
+何
+挤
+秀
+因
+乱
+破
+者
+量
+化
+交
+哼
+呃
+克
+呵
+现
+反
+认
+处
+实
+练
+工
+团
+公
+道
+队
+挺
+且
+题
+修
+额
+位
+班
+必
+宝
+待
+房
+卡
+件
+传
+元
+象
+滴
+单
+解
+华
+寄
+合
+阳
+麻
+浪
+帅
+随
+巨
+赞
+类
+咱
+唉
+音
+微
+弄
+莫
+精
+望
+喜
+立
+系
+通
+许
+根
+应
+台
+步
+青
+惊
+落
+香
+似
+领
+季
+便
+使
+准
+赶
+每
+撒
+福
+言
+罗
+业
+显
+刘
+物
+爷
+招
+露
+各
+土
+富
+由
+未
+造
+代
+德
+容
+影
+愿
+期
+丽
+值
+谈
+搞
+魔
+份
+害
+群
+细
+陈
+斯
+士
+胸
+体
+兴
+世
+江
+至
+迷
+身
+举
+利
+失
+剑
+任
+组
+夫
+达
+奇
+般
+退
+节
+区
+咋
+尽
+灵
+兵
+塞
+嘿
+即
+若
+吸
+院
+战
+奔
+告
+巴
+念
+斗
+底
+既
+目
+攻
+论
+混
+杨
+保
+休
+语
+闹
+玉
+戏
+泪
+候
+乎
+丝
+易
+配
+证
+套
+屋
+足
+食
+胡
+偶
+备
+竟
+绝
+补
+费
+雷
+艾
+困
+尔
+忍
+剧
+视
+界
+情
+段
+君
+晨
+狠
+晓
+叔
+狂
+消
+淡
+摇
+乖
+曾
+客
+格
+呼
+顿
+充
+亿
+古
+演
+甚
+仙
+板
+博
+派
+腰
+胃
+响
+极
+某
+型
+称
+首
+缺
+耶
+品
+沉
+顺
+脱
+素
+官
+吓
+野
+式
+阵
+顶
+调
+散
+则
+器
+治
+价
+运
+州
+厚
+爆
+摆
+介
+科
+晕
+章
+闪
+波
+森
+虽
+民
+制
+吐
+兄
+苏
+方
+奥
+朝
+武
+形
+建
+党
+聚
+汉
+否
+村
+校
+齐
+密
+争
+挑
+版
+瞎
+考
+良	good
+剪	cut
+肥	fat
+辣	spicy
+刷	brush
+祝	wish
+鞋	shoe
+减	subtract
+俩	two
+锅	pot
+捏	pinch
+糖	sugar
+穷	poor
+暖	warm
+盆	basin
+煮	boil
+粗	thick
+懒	lazy
+冻	freeze
+爬	climb
+逛	stroll
+坑	pit
+吼	roar
+蟹	crab
+汤	soup
+丢	lose
+臭	smelly
+拔	pull out
+抓	grab
+泡	soak
+萌	cute
+夸	praise
+娃	baby
+咯
+瑟
+耍
+嗨
+诶
+咧
+喵
+斤
+喔
+吖
+哟
+棒
+噶
+蹭
+昂
+呐
+嘻
+撩
+么
+逗
+惹
+噗
+屁
+嘞
+咦
+虐
+勒
+蛮
+俺
+馀
+哒
+呦
+喽

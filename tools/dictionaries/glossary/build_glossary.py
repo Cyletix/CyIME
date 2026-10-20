@@ -394,6 +394,40 @@ def add_everyday_phrases(entries: dict[str, str], engine: dict[str, dict[str, in
     return added
 
 
+def load_curated(path: str) -> dict[str, str]:
+    """人工表：词<TAB>英文；只有词没有英文表示不显示释义（值为空串）。"""
+    curated: dict[str, str] = {}
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("#") or not line.strip():
+                continue
+            word, _, gloss = line.rstrip("\n").partition("\t")
+            curated.setdefault(word, gloss.strip())
+    return curated
+
+
+def apply_single_policy(entries: dict[str, str], curated: dict[str, str], engine: dict[str, dict[str, int]],
+                        max_rank: int) -> int:
+    """单字只给有用的释义：看过的字按人工表；没看过的字只留常用字（rime_ice 单字权重前 max_rank）里
+    英文能正好译回本字的（没有 APPROX 前缀）。生僻字和不可靠的单字释义一律不显示。返回去掉的条数。"""
+    singles = sorted((w for w in engine if len(w) == 1 and "一" <= w <= "鿿"),
+                     key=lambda w: -max(engine[w].values()))
+    common = set(singles[:max_rank])
+    removed = 0
+    for key in [k for k in entries if len(k) == 1 and "㐀" <= k <= "鿿"]:
+        if key in curated:
+            continue
+        if key not in common or entries[key].startswith(APPROX):
+            del entries[key]
+            removed += 1
+    for key, gloss in curated.items():
+        if gloss:
+            entries[key] = gloss
+        elif entries.pop(key, None) is not None:
+            removed += 1
+    return removed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ecdict", required=True)
@@ -410,6 +444,10 @@ def main() -> int:
                         help="日常短语在 rime_ice 词库里的最低权重")
     parser.add_argument("--mt-phrases", help="电脑上离线机器翻译并筛过的常见短语（短语	英文	把握度），见 mt_filter；"
                         "替换同一短语的逐词版")
+    parser.add_argument("--curated-singles", help="单字人工表（curated_singles.tsv），需同时给 --engine-dict")
+    parser.add_argument("--single-max-rank", type=int, default=3500,
+                        help="人工表没看过的单字，只在 rime_ice 单字权重前这么多个里才显示")
+    parser.add_argument("--curated-phrases", help="多字词人工表（curated_phrases.tsv），优先于自动释义")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -435,6 +473,17 @@ def main() -> int:
     if engine and args.word_by_word_phrases:
         # v5 的逐词拼短语读不通（很有道理 → very make sense，你怎么知道 → you how? know），v7 起默认不收。
         print(f"everyday_phrases={add_everyday_phrases(entries, engine, args.phrase_min_weight)}", file=sys.stderr)
+    if args.curated_singles and engine:
+        removed = apply_single_policy(entries, load_curated(args.curated_singles), engine, args.single_max_rank)
+        print(f"singles_removed={removed}", file=sys.stderr)
+    if args.curated_phrases:
+        curated = load_curated(args.curated_phrases)
+        for key, gloss in curated.items():
+            if gloss:
+                entries[key] = gloss
+            else:
+                entries.pop(key, None)
+        print(f"curated_phrases={len(curated)}", file=sys.stderr)
     rows = sorted(((k, v) for k, v in entries.items() if "\t" not in k + v and "\n" not in k + v),
                   key=lambda item: item[0].encode("utf-8"))
     with open(args.output, "w", encoding="utf-8", newline="\n") as out:
