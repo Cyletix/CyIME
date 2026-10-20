@@ -111,7 +111,9 @@ def prepare_android(work):
                 body = True
             fields = line.split(chr(9))
             if body and len(fields) == 3 and fields[0] + chr(9) + fields[1] in table:
-                lines[i] = fields[0] + chr(9) + fields[1] + chr(9) + table[fields[0] + chr(9) + fields[1]]
+                lines[i] = fields[0] + chr(9) + fields[1] + chr(9) + table.pop(fields[0] + chr(9) + fields[1])
+        if os.environ.get("CYIME_BASE_WEIGHTS_ADD"):  # rows the table has but base.dict.yaml lacks are appended
+            lines += [key + chr(9) + weight for key, weight in table.items()]
         path.unlink()
         path.write_text(chr(10).join(lines), encoding="utf-8")
     extra = os.environ.get("CYIME_TRANSLATOR_ADD")
