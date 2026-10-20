@@ -463,6 +463,15 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             com.kingzcheung.xime.handwriting.FormulaRecognizer.isAvailable(service)
         val recognitionLanguage = com.kingzcheung.xime.handwriting.HandwritingLanguages.recognitionLanguageForKeyboard(language)
         if (recognitionLanguage == null && !templateHandwriting) {
+            if (com.kingzcheung.xime.handwriting.HandwritingTemplates.Script.forLanguage(language) != null) {
+                // 日语手写能用，只是缺公式手写模型（用它比对假名）：和缺汉字模型一样，直接带去模型管理下载。
+                Toast.makeText(service, "${language.displayName}手写要先下载「公式手写模型」", Toast.LENGTH_SHORT).show()
+                service.startActivity(android.content.Intent(service, com.kingzcheung.xime.MainActivity::class.java).apply {
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    putExtra("open_fragment", "model_management")
+                })
+                return
+            }
             Toast.makeText(service, com.kingzcheung.xime.handwriting.HandwritingLanguages.unavailableMessage(language), Toast.LENGTH_SHORT).show()
             return
         }
