@@ -14,6 +14,9 @@ import java.io.File
  * 模板来源：训练模式里写的假名 / 英文字母样本（首次使用时在设备上算特征），以后每次选候选、
  * 每次在训练页保存都会追加。每个字最多保留 [MAX_PER_LABEL] 个，超出时丢最旧的。
  * 模板只存在 App 私有目录 `handwriting_templates/`，不上传。需要公式模型包（见 [FormulaRecognizer]）。
+ *
+ * 假名另有内置默认模板（assets/handwriting/kana_default_strokes.json，KanjiVG 笔画加变体，
+ * 由 tools/handwriting_training/kana_kanjivg.py 生成）：没录过样本也能直接写；自己的模板略加分，永远优先。
  */
 object HandwritingTemplates {
     private const val TAG = "HandwritingTemplates"
@@ -47,6 +50,13 @@ object HandwritingTemplates {
     private class Entry(val label: String, val vec: FloatArray, val source: String)
 
     private val cache = HashMap<Script, MutableList<Entry>>()
+
+    /** 内置默认模板（只读，不参与 [MAX_PER_LABEL] 淘汰，不写进个人模板文件）。 */
+    private val defaults = HashMap<Script, List<Entry>>()
+    private const val DEFAULT_ASSET = "handwriting/kana_default_strokes.json"
+    private const val DEFAULT_CACHE = "kana_default_v1.json"
+    /** 自己写的模板比内置模板多算的相似度，同样像时排在前面。 */
+    private const val PERSONAL_BONUS = 0.03f
 
     /** 最近一次识别时每个字的特征，选候选后用来学习（按字的顺序）。 */
     @Volatile
@@ -86,7 +96,56 @@ object HandwritingTemplates {
         if (!tmp.renameTo(file)) { tmp.copyTo(file, overwrite = true); tmp.delete() }
     }
 
-    fun count(context: Context, script: Script): Int = entries(context, script).size
+    fun count(context: Context, script: Script): Int = entries(context, script).size + (synchronized(this) { defaults[script]?.size } ?: 0)
+
+    /**
+     * 准备内置假名模板：第一次用公式模型把内置笔画算成特征并缓存（同一个模型文件只算一次），之后直接读缓存。
+     * 在后台线程调用；没有公式模型或不是假名时什么也不做。
+     */
+    fun ensureDefaults(context: Context, script: Script): Unit = synchronized(defaultLock) { prepareDefaults(context, script) }
+
+    private val defaultLock = Any()
+
+    private fun prepareDefaults(context: Context, script: Script) {
+        if (script != Script.KANA || synchronized(this) { defaults.containsKey(script) }) return
+        if (!FormulaRecognizer.isAvailable(context)) return
+        val stamp = File(FormulaRecognizer.dir(context), "formula_encoder.onnx").let { "${it.length()}:${it.lastModified()}" }
+        val cacheFile = File(dir(context), DEFAULT_CACHE)
+        val cached = runCatching {
+            val o = JSONObject(cacheFile.readText())
+            if (o.getString("model") != stamp) null else {
+                val arr = o.getJSONArray("t")
+                (0 until arr.length()).map { i ->
+                    val e = arr.getJSONObject(i); val v = e.getJSONArray("v")
+                    Entry(e.getString("l"), FloatArray(v.length()) { v.getDouble(it).toFloat() }, "builtin")
+                }
+            }
+        }.getOrNull()
+        val list = cached ?: runCatching {
+            val chars = JSONObject(context.assets.open(DEFAULT_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() })
+                .getJSONObject("chars")
+            val out = mutableListOf<Entry>()
+            for (label in chars.keys()) {
+                val variants = chars.getJSONArray(label)
+                for (i in 0 until variants.length()) {
+                    val strokes = variants.getJSONArray(i).let { st ->
+                        (0 until st.length()).map { j ->
+                            val pts = st.getJSONArray(j)
+                            (0 until pts.length()).map { k -> pts.getJSONArray(k).let { p -> p.getDouble(0).toFloat() to p.getDouble(1).toFloat() } }
+                        }
+                    }
+                    FormulaRecognizer.embed(context, strokes)?.let { out += Entry(label, it, "builtin") }
+                }
+            }
+            val arr = JSONArray()
+            for (e in out) arr.put(JSONObject().put("l", e.label).put("v", JSONArray().also { v -> e.vec.forEach { v.put(Math.round(it * 10000) / 10000.0) } }))
+            val tmp = File(cacheFile.path + ".tmp")
+            tmp.writeText(JSONObject().put("model", stamp).put("t", arr).toString())
+            if (!tmp.renameTo(cacheFile)) { tmp.copyTo(cacheFile, overwrite = true); tmp.delete() }
+            out
+        }.onFailure { Log.w(TAG, "builtin kana templates failed", it) }.getOrNull() ?: return
+        synchronized(this) { defaults[script] = list }
+    }
 
     /**
      * 把训练模式里还没算过特征的样本补进模板库（第一次打开日语 / 英文手写时在后台跑）。
@@ -153,12 +212,18 @@ object HandwritingTemplates {
      */
     fun recognize(context: Context, script: Script, strokes: List<List<Pair<Float, Float>>>, topK: Int = 8): List<Pair<String, Float>> {
         val list = synchronized(this) { entries(context, script).toList() }
-        if (list.isEmpty()) return emptyList()
+        val builtin = synchronized(this) { defaults[script].orEmpty() }
+        if (list.isEmpty() && builtin.isEmpty()) return emptyList()
         val vec = FormulaRecognizer.embed(context, strokes) ?: return emptyList()
         lastEmbeddings = listOf(vec)
         lastScript = script
         val best = HashMap<String, Float>()
         for (e in list) {
+            var dot = PERSONAL_BONUS
+            for (i in vec.indices) dot += vec[i] * e.vec[i]
+            if (dot > (best[e.label] ?: -2f)) best[e.label] = dot
+        }
+        for (e in builtin) {
             var dot = 0f
             for (i in vec.indices) dot += vec[i] * e.vec[i]
             if (dot > (best[e.label] ?: -2f)) best[e.label] = dot
