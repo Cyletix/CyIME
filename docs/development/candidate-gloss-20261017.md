@@ -48,3 +48,11 @@ python -I tools/dictionaries/glossary/build_glossary.py --ecdict ecdict.csv --ce
 - v3 生成规则：修好多行拆分；单字改为“正好译回本字 → 按条目和义项顺序第一个含本字的 → 首义”（按英文词频挑更差：中 → hit）；“X 的异体／见 X”借用 X 的释义（帐号 → account number）；CC-CEDICT 没收、Rime 常用的词用 ECDICT 反查补（只认每个词性前两个中文释义，单词优先）；名称类释义去掉逗号后的说明（深圳 → Shenzhen）。
 - 结果：常用 500 字覆盖 496，2000 词覆盖 1470；几号、在教、你妈 仍不给释义。文件 1,737,523 字节，sha256 `ab95b1334449adcca2104d41ebee06a491bf339b1a7a33fdff0525f52990f078`，已上传 Release `models`（公开地址核对一致）。App 改读 `cyime_gloss-v3.tsv`，装着 v1／v2 的设备自动换新。
 
+## 10-21 覆盖率与词典 v4
+
+- 量法：两份九键回放（聊天 + 短语，`.codex-artifacts/gloss-coverage/`），每键前 5 个候选共 27,157 个，算有英文的比例。v3：24.2%（单字 96%，两字 21%，三四字 1%，五字以上 0%）。缺口主体是整句和临时拼出的词组（三四字候选 83% 不是词库词）。
+- 逐词拼英文（`CandidateGlossary.compose`）原型可到 40.5%，但会出现错英文（我比 → I ratio，一日游 → one sun swim），按协调意见代码保留、默认关（`composeEnabled = false`），等用户要求再开。
+- v4 整词扩充：输入法实际用 rime_ice 词库（不是 pinyin_simp），pinyin_simp 没收的常用词（口罩、缆车）改为在 rime_ice 有对应读音、且英文能反查回该词时收；ECDICT 反查补词也覆盖 rime_ice 常用词（英文最多四个词，大小写还原）；不可靠的单字释义加 `~`（App 显示时去掉）。中文 4.96 万条，文件 2,078,256 字节，sha256 `262b6fe0eee16eb6d84c19d7b4fd062b8ba4f56097a31eb83fdc432b043fac42`，已上传 Release。
+- 结果（只算整词）：24.2% → 25.0%，两字 20.6% → 24.4%。剩下两字缺口多是词组（我也、找我）和人名（小周），整词词典补不上。
+- 速度：同一批 5,433 次按键的候选（每键前 20 个），释义查表 p95 4.6 µs（v3）→ 4.8 µs（v4）；回放引擎每键处理 p95 为 20.8 ms，增量可忽略。
+
