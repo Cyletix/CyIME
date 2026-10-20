@@ -443,21 +443,6 @@ fun SettingsMainContent(
                         onClick = onNavigateToAbout,
                         showArrow = true
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Description,
-                        title = "使用文档",
-                        subtitle = "CyIME 使用说明",
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Cyletix/CyIME/blob/main/docs/usage.md"))
-                            context.startActivity(intent)
-                        },
-                        showArrow = true
-                    )
                 })
             }
         }

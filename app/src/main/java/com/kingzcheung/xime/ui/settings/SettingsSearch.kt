@@ -74,6 +74,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("备份与恢复", "系统", SettingsRoutes.Backup, "备份 恢复 导出 导入 本地备份 换机"),
         SettingsSearchEntry("性能与省电", "系统", SettingsRoutes.Performance, "性能 省电 内存 卡顿 高配 中配 低配 自动 动效 炫光 语音常驻 释放 SenseVoice Paraformer"),
         SettingsSearchEntry("关于 CyIME", "系统", SettingsRoutes.About, "版本 开发者 联系 日志 许可"),
+        SettingsSearchEntry("使用文档", "系统 › 关于 CyIME", SettingsRoutes.About, "说明 帮助 文档 教程"),
         // 键盘布局
         SettingsSearchEntry("自定义布局", layouts, SEARCH_TARGET_CUSTOM_LAYOUT, "自定义按键布局 布局管理 新建布局"),
         SettingsSearchEntry("按键符号", layouts, layoutIndex, "角标 符号编辑 字母键符号 上下角标 侧栏 笔画 短语"),
