@@ -63,6 +63,7 @@ internal fun ConnectedClipboardBoard(
     onSystemPaste: () -> Unit, onPullRemote: (() -> Unit)?, modifier: Modifier = Modifier,
     onAddPinned: (() -> Unit)? = null, onEditText: ((Long, String, String) -> Unit)? = null,
     onRecognizeDocument: (() -> Unit)? = null,
+    onOpenSearch: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val store = remember(context) { ClipboardImages.getInstance(context) }
@@ -74,17 +75,30 @@ internal fun ConnectedClipboardBoard(
     var pendingTextPins by remember { mutableStateOf(emptyMap<Long, Boolean>()) }
     var pendingPinJobs by remember { mutableStateOf(emptyMap<Long, Job>()) }
     val scope = rememberCoroutineScope()
-    val pins = remember(textItems, storedPins, pendingTextPins) {
-        clipboardPinnedKeys(textItems, storedPins, pendingTextPins)
-    }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { store.refresh() }
     LaunchedEffect(Unit) { store.refresh() }
+    val manager = remember(context) { ClipboardManager.getInstance(context) }
+    val unpinnedTotal by manager.unpinnedCount.collectAsState()
+    // Older history is read page by page while open; closing returns to the first page.
+    DisposableEffect(manager) { onDispose { manager.resetHistoryWindow() } }
+    val cardMaxLines = remember(prefs) { clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4)) }
+    // A search submitted from the keyboard search bar shows only its matches (fixed records too).
+    val boardQuery by manager.boardQuery.collectAsState()
+    var searchResults by remember { mutableStateOf<List<ClipboardItem>?>(null) }
+    LaunchedEffect(boardQuery, textItems) {
+        searchResults = if (boardQuery.isBlank()) null else manager.search(boardQuery)
+    }
+    DisposableEffect(manager) { onDispose { manager.boardQuery.value = "" } }
+    val shownText = searchResults ?: textItems
+    val pins = remember(shownText, storedPins, pendingTextPins) {
+        clipboardPinnedKeys(shownText, storedPins, pendingTextPins)
+    }
     LaunchedEffect(textItems, pendingPinJobs) {
         val inFlight = pendingTextPins.filterKeys { it in pendingPinJobs }
         val completed = pendingTextPins.filterKeys { it !in pendingPinJobs }
         pendingTextPins = inFlight + pendingClipboardTextPins(textItems, completed)
     }
-    ClipboardBoardView(textItems, images, initialImages, expanded, pins, photoAccess, failure,
+    ClipboardBoardView(shownText, if (searchResults != null) emptyList() else images, initialImages, expanded, pins, photoAccess, failure,
         onBack, onQuickSend, onSelectText, onImageSelect, onSplit, onAddQuick,
         onPinsChange = { updated ->
             val changedTextPins = ((pins - updated) + (updated - pins)).mapNotNull { key ->
@@ -126,8 +140,21 @@ internal fun ConnectedClipboardBoard(
             .putExtra("pick_image", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
         onSystemPaste = onSystemPaste, onShare = onImageShare, onPullRemote = onPullRemote, modifier = modifier,
         onAddPinned = onAddPinned, onEditText = onEditText, onDismissFailure = store::clearPasteFailure,
-        onRecognizeDocument = onRecognizeDocument)
+        onRecognizeDocument = onRecognizeDocument,
+        unpinnedTextTotal = unpinnedTotal, onLoadMore = { if (searchResults == null) manager.loadMoreHistory() },
+        onClearUnpinned = { images ->
+            // Clearing means all unfixed history in the database, not only the pages read so far.
+            manager.clearAll()
+            store.removeImages(images.filterIsInstance<ClipboardCard.Image>().map { it.item.uri }.toSet())
+        }, cardMaxLines = cardMaxLines,
+        searchQuery = boardQuery.takeIf { it.isNotBlank() }, onClearSearch = { manager.boardQuery.value = "" },
+        onOpenSearch = onOpenSearch)
 }
+
+/** Preference (board prefs) for how many lines a history card shows: 2, 4 or 8. */
+internal const val CLIPBOARD_CARD_MAX_LINES_KEY = "card_max_lines"
+
+internal fun clipboardCardMaxLines(stored: Int): Int = if (stored in setOf(2, 4, 8)) stored else 4
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -142,6 +169,16 @@ internal fun ClipboardBoardView(
     onAddPinned: (() -> Unit)? = null, onEditText: ((Long, String, String) -> Unit)? = null,
     onDismissFailure: () -> Unit = {},
     onRecognizeDocument: (() -> Unit)? = null,
+    /** Unfixed text records in the whole history; -1 when only [textItems] is known. */
+    unpinnedTextTotal: Int = -1,
+    onLoadMore: () -> Unit = {},
+    /** Clears all unfixed history; receives the unfixed images to remove. Null deletes [textItems] only. */
+    onClearUnpinned: ((List<ClipboardCard>) -> Unit)? = null,
+    cardMaxLines: Int = 4,
+    /** The search shown in the board, or null; its chip clears it. */
+    searchQuery: String? = null,
+    onClearSearch: () -> Unit = {},
+    onOpenSearch: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     var filter by remember(initialImages) { mutableStateOf(if (initialImages) ClipboardFilter.IMAGE else ClipboardFilter.ALL) }
@@ -160,11 +197,20 @@ internal fun ClipboardBoardView(
     var menuFocus by remember { mutableStateOf(0) }
     val keyboardMenuEntries = remember { arrayOf<List<com.kingzcheung.xime.ui.common.CompactActionMenuEntry>>(emptyList()) }
     var deleting by remember { mutableStateOf<List<ClipboardCard>?>(null) }
+    // True while the delete confirmation is the "clear all unfixed" one.
+    var clearingAll by remember { mutableStateOf(false) }
     val all = remember(textItems, images, pins) { clipboardCards(textItems, images, ClipboardFilter.ALL, pins) }
     val cards = remember(all, filter) { all.filter { clipboardMatches(it, filter) } }
     val keyboard = LocalClipboardKeyboardNavigation.current
     var focusedKey by remember(keyboard?.active, filter) { mutableStateOf<String?>(null) }
     val gridState = rememberLazyStaggeredGridState()
+    // Near the end of what is loaded, read the next page of older history (again after each page
+    // arrives, so a sparse category keeps filling until the whole history is read).
+    val nearEnd by remember { derivedStateOf {
+        val info = gridState.layoutInfo
+        info.totalItemsCount > 0 && (info.visibleItemsInfo.lastOrNull()?.index ?: -1) >= info.totalItemsCount - 30
+    } }
+    LaunchedEffect(nearEnd, textItems.size) { if (nearEnd) onLoadMore() }
     val scope = rememberCoroutineScope()
     fun menuPosition(anchorInRoot: Rect, preferSide: Boolean): ClipboardMenuAnchor {
         val boardOrigin = boardCoordinates[0]?.boundsInRoot()?.topLeft ?: Offset.Zero
@@ -334,6 +380,10 @@ internal fun ClipboardBoardView(
                 } else {
                     Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        searchQuery?.let { query ->
+                            CompactClipboardFilter("🔍 $query ✕", true, onClearSearch,
+                                Modifier.testTag("clipboard-search-chip"))
+                        }
                         ClipboardFilter.entries.forEach { item ->
                             CompactClipboardFilter(item.label, filter == item, { filter = item },
                                 Modifier.testTag("clipboard-filter:${item.name}"))
@@ -351,6 +401,9 @@ internal fun ClipboardBoardView(
                                 else if (compactControls) "${content.pinnedCount}" else "固定 ${content.pinnedCount}",
                                 pinsActuallyExpanded, colors.onSurface)
                         }
+                    }
+                    onOpenSearch?.let {
+                        CompactClipboardAction(Icons.Default.Search, "搜索剪贴板", it, "clipboard-search")
                     }
                     onAddPinned?.let {
                         CompactClipboardAction(Icons.Default.Add, "新增固定内容", it, "clipboard-add-pinned")
@@ -386,13 +439,14 @@ internal fun ClipboardBoardView(
                         ClipboardImageFailureNotice(failure, onSystemPaste, onShare, onDismissFailure)
                     }
                     if (cards.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
-                        Text("暂无${if (filter == ClipboardFilter.ALL) "剪贴板记录" else filter.label}，复制后会显示在这里。",
+                        Text(if (searchQuery != null) "没有找到「$searchQuery」" else
+                            "暂无${if (filter == ClipboardFilter.ALL) "剪贴板记录" else filter.label}，复制后会显示在这里。",
                             Modifier.padding(vertical = 24.dp), color = colors.onSurfaceVariant, fontSize = 14.sp)
                     }
                     fun LazyStaggeredGridScope.records(records: List<ClipboardCard>, fixedRecords: Boolean) {
                         items(records, key = { it.key }) { card ->
                             val chosen = card.key in selected
-                            ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen,
+                            ClipboardRecordCard(card = card, pinned = card.key in pins, chosen = chosen, maxLines = cardMaxLines,
                                 selecting = selecting, keyboardFocused = keyboard?.active == true && card.key == focused,
                                 // Pictures share the pinned preview height: a tall screenshot must not fill the board.
                                 // Pins are one line; a recent picture keeps the bounded preview height.
@@ -470,7 +524,7 @@ internal fun ClipboardBoardView(
                 onPullRemote?.let { action -> add(CompactActionMenuEntry(Icons.Default.Sync, "同步", tag = "clipboard-sync", onClick = action)) }
                 add(CompactActionMenuEntry(Icons.Default.DeleteOutline, "清空未固定", colors.error,
                     enabled = all.any { it.key !in pins }, tag = "clipboard-clear") {
-                    deleteAnchor = moreAnchor; deleting = all.filterNot { it.key in pins }
+                    deleteAnchor = moreAnchor; clearingAll = onClearUnpinned != null; deleting = all.filterNot { it.key in pins }
                 })
                 add(CompactActionMenuEntry(Icons.Default.Close, "关闭菜单", tag = "clipboard-close-menu") {})
             }
@@ -480,21 +534,26 @@ internal fun ClipboardBoardView(
         }
         deleting?.let { records ->
             val imageCount = records.count { it is ClipboardCard.Image }
-            val title = when (imageCount) {
-                0 -> "删除 ${records.size} 条文本记录？"
-                records.size -> "删除 ${records.size} 条图片记录？"
-                else -> "删除 ${records.size - imageCount} 条文本和 $imageCount 条图片记录？"
+            // Clearing all counts the whole unfixed history, including pages not read yet.
+            val textCount = if (clearingAll && unpinnedTextTotal >= 0) unpinnedTextTotal else records.size - imageCount
+            val title = when {
+                imageCount == 0 -> "删除 $textCount 条文本记录？"
+                textCount == 0 -> "删除 $imageCount 条图片记录？"
+                else -> "删除 $textCount 条文本和 $imageCount 条图片记录？"
             }
             val actions = listOf(
                 CompactActionMenuEntry(Icons.Default.DeleteOutline, "删除", colors.error, tag = "clipboard-confirm-delete") {
-                    onRemove(records); onPinsChange(pins - records.map { it.key }.toSet())
+                    val clearAll = clearingAll && onClearUnpinned != null
+                    clearingAll = false
+                    if (clearAll) onClearUnpinned?.invoke(records) else onRemove(records)
+                    onPinsChange(pins - records.map { it.key }.toSet())
                     selected = emptySet(); selecting = false
                 },
                 CompactActionMenuEntry(Icons.Default.Close, "取消", tag = "clipboard-cancel-delete") {},
             )
             // Same anchored card as the record actions, in the same place, at full touch size.
             if (itemMenu == null) keyboardMenuEntries[0] = actions
-            LongPressMenuOverlay(deleteAnchor.bounds, deleteAnchor.occupied, onDismiss = { deleting = null },
+            LongPressMenuOverlay(deleteAnchor.bounds, deleteAnchor.occupied, onDismiss = { deleting = null; clearingAll = false },
                 menuItems = actions, title = title, focusedIndex = menuFocus.takeIf { keyboard?.active == true },
                 message = if (imageCount > 0) "只移除剪贴板记录，保留原始图片。" else null,
                 tag = "clipboard-delete-menu", surfaceTag = "clipboard-board-action-card")
@@ -523,7 +582,7 @@ private fun CompactClipboardFilter(label: String, isSelected: Boolean, onClick: 
 @Composable
 private fun ClipboardRecordCard(
     card: ClipboardCard, pinned: Boolean, chosen: Boolean, selecting: Boolean,
-    keyboardFocused: Boolean, previewHeight: Dp?,
+    keyboardFocused: Boolean, previewHeight: Dp?, maxLines: Int = 4,
     onClick: () -> Unit, onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -551,7 +610,7 @@ private fun ClipboardRecordCard(
                         end = if (pinned) 26.dp else 8.dp, top = if (oneLine) 0.dp else 8.dp, bottom = if (oneLine) 0.dp else 8.dp),
                 color = if (highlighted) colors.onSecondaryContainer else colors.onSurface,
                 fontSize = 16.sp, lineHeight = 23.sp,
-                maxLines = if (oneLine) 1 else if (previewHeight != null) 3 else 4,
+                maxLines = if (oneLine) 1 else if (previewHeight != null) 3 else maxLines,
                 overflow = TextOverflow.Ellipsis)
             is ClipboardCard.Image -> {
                 val context = LocalContext.current
