@@ -2424,6 +2424,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
+        if (hasHardwareKeyboard) event?.let { feedbackManager.playHardwareKeySound(it) }
         cancelVerificationCodeInput()
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) {
             keyRouter.handleKeyPress("enter", event?.isShiftPressed == true)
