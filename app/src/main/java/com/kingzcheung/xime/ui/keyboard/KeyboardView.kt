@@ -716,19 +716,39 @@ fun KeyboardView(
                 )
             }
 
-            // 剪贴板搜索：沿用工具面板的位置、样式和输入通道。
+            // 剪贴板搜索：键盘尺寸和位置不变。搜索框就是工具面板（同一组件、同一位置）；
+            // 上面是剪贴板，用剪贴板上拉展开的高度和动画打开，只显示搜索结果。
             if (state.clipboardSearchVisible) {
                 val clipboardContext = androidx.compose.ui.platform.LocalContext.current
                 val clipboard = remember(clipboardContext) {
                     com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(clipboardContext) }
-                ClipboardSearchPanel(
+                val resultsHeight = remember { androidx.compose.animation.core.Animatable(0f) }
+                LaunchedEffect(state.clipboardSearchResultsHeight) {
+                    resultsHeight.animateTo(state.clipboardSearchResultsHeight.toFloat(), keyboardPanelMotion(true))
+                }
+                com.kingzcheung.xime.ui.menubar.ConnectedClipboardBoard(
+                    state.clipboardItems, initialImages = false, expanded = false,
+                    onBack = {}, onQuickSend = {},
+                    onSelectText = { text -> callbacks.onClipboardSearchSelect?.invoke(text) },
+                    onRemoveText = viewModel::removeClipboardItems, onAddQuick = {}, onSplit = { _, _ -> },
+                    onImageSelect = {}, onImageShare = { _, _ -> }, onSystemPaste = {}, onPullRemote = null,
+                    keepQueryOnDispose = true,
+                    modifier = Modifier.fillMaxWidth().height(resultsHeight.value.dp),
+                )
+                ToolPanel(
+                    title = "搜索剪贴板",
+                    isFocused = true,
+                    backgroundColor = Color.Transparent,
                     textColor = keyTextColor,
                     accentColor = accentColor,
                     cardBgColor = keyBgColor,
-                    search = clipboard::search,
-                    onSelect = { callbacks.onClipboardSearchSelect?.invoke(it) },
                     onClose = { callbacks.onClipboardSearchClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                    heightDp = CLIPBOARD_SEARCH_PANEL_HEIGHT,
+                    hint = "文字或拼音首字母",
+                    statusText = "",
+                    singleLine = true,
+                    onTextChange = { clipboard.boardQuery.value = it },
                 )
             }
 

@@ -64,6 +64,8 @@ internal fun ConnectedClipboardBoard(
     onAddPinned: (() -> Unit)? = null, onEditText: ((Long, String, String) -> Unit)? = null,
     onRecognizeDocument: (() -> Unit)? = null,
     onOpenSearch: (() -> Unit)? = null,
+    /** The search view above the keyboard hands its query on to the board when Enter is pressed. */
+    keepQueryOnDispose: Boolean = false,
 ) {
     val context = LocalContext.current
     val store = remember(context) { ClipboardImages.getInstance(context) }
@@ -86,9 +88,10 @@ internal fun ConnectedClipboardBoard(
     val boardQuery by manager.boardQuery.collectAsState()
     var searchResults by remember { mutableStateOf<List<ClipboardItem>?>(null) }
     LaunchedEffect(boardQuery, textItems) {
+        if (boardQuery.isNotBlank()) kotlinx.coroutines.delay(120) // Typing a word does not query per key.
         searchResults = if (boardQuery.isBlank()) null else manager.search(boardQuery)
     }
-    DisposableEffect(manager) { onDispose { manager.boardQuery.value = "" } }
+    DisposableEffect(manager) { onDispose { if (!keepQueryOnDispose) manager.boardQuery.value = "" } }
     val shownText = searchResults ?: textItems
     val pins = remember(shownText, storedPins, pendingTextPins) {
         clipboardPinnedKeys(shownText, storedPins, pendingTextPins)
