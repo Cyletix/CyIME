@@ -146,8 +146,9 @@ fun HandwritingKeyboardLayout(
     DisposableEffect(penSounds) { onDispose { penSounds.release() } }
     // 公式模式：只有电脑上训练的公式模型包放到了设备上才显示开关（见 FormulaRecognizer）
     val formulaPrefs = remember(context) { context.getSharedPreferences("handwriting", android.content.Context.MODE_PRIVATE) }
-    val formulaAvailable = remember(context) { FormulaRecognizer.isAvailable(context) }
-    var formulaMode by remember { mutableStateOf(formulaAvailable && formulaPrefs.getBoolean("formula_mode", false)) }
+    // 公式只在英文手写里提供：中文、日语手写不显示公式按钮，也不沿用上次的公式模式。
+    val formulaAvailable = remember(context, language) { language == InputLanguage.ENGLISH && FormulaRecognizer.isAvailable(context) }
+    var formulaMode by remember(formulaAvailable) { mutableStateOf(formulaAvailable && formulaPrefs.getBoolean("formula_mode", false)) }
     val formulaActive by rememberUpdatedState(formulaMode && formulaAvailable)
     val delimiter by rememberUpdatedState(LocalKeyboardInputPreferences.current.formulaDelimiter)
     // 模板库：第一次打开时把训练页写过的假名 / 字母算成模板（后台），之后每次选候选都会追加
