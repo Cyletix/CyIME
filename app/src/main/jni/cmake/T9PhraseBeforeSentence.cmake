@@ -20,7 +20,8 @@ target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octa
 # CyLM decoder (cylm/cylm.cpp, also built alone as libcylm.so): used only when a schema names its files.
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm")
 target_sources(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm/cylm.cpp")
-set_source_files_properties("${CMAKE_SOURCE_DIR}/cylm/cylm.cpp" PROPERTIES COMPILE_DEFINITIONS CYLM_LIBRARY)
+# Source properties are per directory: set it where rime-static is defined, or main() gets linked in.
+set_source_files_properties("${CMAKE_SOURCE_DIR}/cylm/cylm.cpp" TARGET_DIRECTORY rime-static PROPERTIES COMPILE_DEFINITIONS CYLM_LIBRARY)
 t9_replace("double sentence_cutoff_threshold)" "double sentence_cutoff_threshold, Config* config)")
 t9_replace("this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_);"
            "this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_, engine_->schema()->config());")
