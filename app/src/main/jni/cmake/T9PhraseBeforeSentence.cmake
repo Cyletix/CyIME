@@ -14,9 +14,13 @@ function(t9_replace old new)
   set(T9_SCRIPT_TRANSLATOR_CODE "${code}" PARENT_SCOPE)
 endfunction()
 
-t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>\n#include <fstream>\n#include <mutex>\n#include <limits>\n#include <cstring>")
+t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>\n#include <fstream>\n#include <mutex>\n#include <limits>\n#include <cstring>\n#include <cylm.h>")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octagram/src")
+# CyLM decoder (cylm/cylm.cpp, also built alone as libcylm.so): used only when a schema names its files.
+target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm")
+target_sources(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm/cylm.cpp")
+set_source_files_properties("${CMAKE_SOURCE_DIR}/cylm/cylm.cpp" PROPERTIES COMPILE_DEFINITIONS CYLM_LIBRARY)
 t9_replace("double sentence_cutoff_threshold)" "double sentence_cutoff_threshold, Config* config)")
 t9_replace("this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_);"
            "this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_, engine_->schema()->config());")
@@ -29,6 +33,18 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
       config->GetBool("t9/joint_decoder", &t9_joint_);
       config->GetBool("t9/decoded_cache", &t9_decoded_cache_);
       config->GetBool("t9/sentence_rescore", &t9_sentence_rescore_);
+      {
+        // CyLM fills the sentence slot when the schema names its files (cylm/lexicon, cylm/model, optional
+        // cylm/model2 and cylm/params). Nothing names them by default, so nothing is loaded.
+        string lexicon, model, model2, params;
+        if (config->GetString("cylm/lexicon", &lexicon) && config->GetString("cylm/model", &model) &&
+            !lexicon.empty() && !model.empty()) {
+          config->GetString("cylm/model2", &model2);
+          config->GetString("cylm/params", &params);
+          t9_cylm_ = T9CylmOpen(T9ResolveOnce("cylm", "", lexicon), T9ResolveOnce("cylm", "", model),
+                                model2.empty() ? string() : T9ResolveOnce("cylm", "", model2), params);
+        }
+      }
       if (t9_sentence_rescore_ && !t9_joint_) {
         // 26-key: Rime makes translator/max_sentences sentences as usual; the word model only picks
         // which one comes first (pinyin26-word-model-20261018.md, 2026-10-20).
@@ -168,10 +184,64 @@ t9_replace("  bool CheckEmpty();" [=[
   size_t t9_more_sentences_min_keys_ = 0;
   bool t9_cache_with_correction_ = false;
   bool PrepareJointCandidates(Dictionary* dict, UserDictionary* user_dict);
+  std::shared_ptr<CylmModel> t9_cylm_;
+  // One CyLM model per set of files for the process (memory-mapped); a failed open is remembered too.
+  static std::shared_ptr<CylmModel> T9CylmOpen(const string& lexicon, const string& model, const string& model2,
+                                               const string& params) {
+    static std::mutex mutex;
+    static std::map<string, std::shared_ptr<CylmModel>> opened;
+    std::lock_guard<std::mutex> lock(mutex);
+    const string key = lexicon + '\n' + model + '\n' + model2 + '\n' + params;
+    auto found = opened.find(key);
+    if (found != opened.end()) return found->second;
+    std::shared_ptr<CylmModel> handle(
+        cylm_open(lexicon.c_str(), model.c_str(), model2.empty() ? nullptr : model2.c_str(), params.c_str()),
+        [](CylmModel* m) { if (m) cylm_close(m); });
+    if (!handle.get()) handle.reset();
+    return opened[key] = handle;
+  }
+  // CyLM's best sentence takes the place of Rime's sentence (words keep their places). Text only until the
+  // C API returns the syllables: the candidate has no language, so the user dictionary does not learn it.
+  void ApplyCylmSentence() {
+    if (!t9_cylm_ || sentences_.empty()) return;
+    const string& in = syllabifier_->input();
+    if (in.empty()) return;
+    const bool digits = std::all_of(in.begin(), in.end(), [](char c) { return c >= '2' && c <= '9'; });
+    const bool letters = std::all_of(in.begin(), in.end(), [](char c) { return (c >= 'a' && c <= 'z') || c == '\''; });
+    if (!digits && !letters) return;
+    // One incremental session per translator (one text field at a time), kept for the process.
+    static std::mutex mutex;
+    static std::map<std::pair<const void*, const CylmModel*>, CylmSession*> sessions;
+    CylmSession* session;
+    {
+      std::lock_guard<std::mutex> lock(mutex);
+      auto& slot = sessions[{translator_, t9_cylm_.get()}];
+      if (!slot) slot = cylm_session(t9_cylm_.get());
+      session = slot;
+    }
+    if (!session) return;
+    const string context = !t9_left_context_.empty() && t9_left_context_[0] == '\x1e' ? t9_left_context_.substr(1) : string();
+    vector<char> out(16384);
+    const int n = cylm_decode(session, in.c_str(), digits ? 1 : 0, context.c_str(), out.data(), static_cast<int>(out.size()));
+    if (n <= 0 || !out[0]) return;
+    const string text(out.data());
+    const auto& rime = sentences_.front();
+    if (text == rime->text()) return;
+    DictEntry entry;
+    entry.text = text;
+    entry.weight = rime->weight();
+    auto sentence = New<Sentence>(nullptr);
+    sentence->Extend(entry, rime->end() - start_, rime->weight());
+    sentence->Offset(start_);
+    sentence->set_syllabifier(syllabifier_);
+    sentence->set_quality(rime->quality());
+    sentences_.front() = sentence;
+  }
   bool CheckEmpty();]=])
 t9_replace("  auto is_correction_match =" [=[
   if (t9_joint_) {
     PrepareJointCandidates(dict, user_dict);
+    ApplyCylmSentence();
     return !CheckEmpty();
   }
 
@@ -263,6 +333,7 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
     sentences_.push_back(chosen);
     if (rime_best && rime_best != chosen && corrected(rime_best)) sentences_.push_back(rime_best);
   }
+  ApplyCylmSentence();
   return !CheckEmpty();]=])
 t9_replace("set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_")
 t9_replace("#if defined(__ANDROID__)\n#include <android/log.h>\n#include <chrono>"
