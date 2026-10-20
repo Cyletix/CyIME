@@ -212,9 +212,12 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
         ids.emplace(word, id);
         return id;
       };
-      // ln P(text): best split into model words (unigram Viterbi, words up to 8 characters), chained
-      // with bigram/trigram history, so 被嫌弃了 and 被掀起了 compare as text whatever words Rime used;
-      // plus the sentence-position rules Rime applied while making it (吧 not first, 被 not last).
+      // ln P(text): summed over its splits into model words (words up to 8 characters) under the
+      // bigram/trigram chain, so 被嫌弃了 and 被掀起了 compare as text whatever words Rime used; plus the
+      // sentence-position rules Rime applied while making it (吧 not first, 被 not last). A small beam of
+      // last-word states per position carries the chain. A single unigram-chosen split read 他也会来的 as
+      // 他也|会|来|的 (-26.4) against 他也|回来|的 (-25.4); its best split 他|也会|来|的 (-20.75) still trails
+      // 他也|回来的 (-20.69), but the text's other readings add up (-20.56 against -20.67).
       auto score = [&](const Sentence& sentence) {
         const string& text = sentence.text();
         vector<size_t> at{0};
@@ -224,27 +227,43 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
           at.push_back(std::min(i, text.size()));
         }
         const size_t n = at.size() - 1;
-        vector<double> best(n + 1, -std::numeric_limits<double>::infinity());
-        vector<size_t> from(n + 1, 0);
-        vector<int32_t> word(n + 1, ::T9NgramModel::kUnseen);
-        best[0] = 0;
+        struct State { double value; int32_t prev2, prev1; bool started; };
+        constexpr size_t kStates = 4;
+        auto log_add = [](double a, double b) {
+          if (!std::isfinite(a)) return b;
+          if (!std::isfinite(b)) return a;
+          return std::max(a, b) + std::log1p(std::exp(-std::fabs(a - b)));
+        };
+        const int32_t root = t9_ngram_sentence_start_ ? t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
+        vector<vector<State>> states(n + 1);
+        states[0].push_back({0, root, root, false});
         for (size_t end = 1; end <= n; ++end) {
+          auto& here = states[end];
           for (size_t start = end > 8 ? end - 8 : 0; start < end; ++start) {
-            if (!std::isfinite(best[start])) continue;
+            if (states[start].empty()) continue;
             const int32_t id = word_id(text.substr(at[start], at[end] - at[start]));
             if (id == ::T9NgramModel::kUnseen && end - start > 1) continue;
-            const double value = best[start] + t9_ngram_->Start(id, false);
-            if (value > best[end]) { best[end] = value; from[end] = start; word[end] = id; }
+            for (const State& from : states[start]) {
+              const double value = from.value + (from.started
+                  ? t9_ngram_->LogProb3(from.prev2, from.prev1, id) : t9_ngram_->Start(id, t9_ngram_sentence_start_));
+              const State next{value, from.started ? from.prev1 : root, id, true};
+              // One state per last word (it decides the next transition), the best kStates kept.
+              auto same = std::find_if(here.begin(), here.end(), [&](const State& s) { return s.prev1 == id; });
+              if (same != here.end()) {
+                const double sum = log_add(same->value, value);
+                if (value > same->value) *same = next;
+                same->value = sum;
+                continue;
+              }
+              if (here.size() < kStates) { here.push_back(next); continue; }
+              auto worst = std::min_element(here.begin(), here.end(),
+                                            [](const State& a, const State& b) { return a.value < b.value; });
+              if (value > worst->value) *worst = next;
+            }
           }
         }
-        vector<int32_t> chain;
-        for (size_t end = n; end > 0; end = from[end]) chain.push_back(word[end]);
-        std::reverse(chain.begin(), chain.end());
-        double total = 0;
-        const int32_t root = t9_ngram_sentence_start_ ? t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
-        for (size_t k = 0; k < chain.size(); ++k)
-          total += k == 0 ? t9_ngram_->Start(chain[0], t9_ngram_sentence_start_)
-                          : t9_ngram_->LogProb3(k >= 2 ? chain[k - 2] : root, chain[k - 1], chain[k]);
+        double total = -std::numeric_limits<double>::infinity();
+        for (const State& s : states[n]) total = log_add(total, s.value);
         const auto& words = sentence.components();
         if (!words.empty() && poet_) {
           total += poet_->PositionAdjust(words.front().text, true, words.size() == 1);
