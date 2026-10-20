@@ -39,10 +39,11 @@ object BuiltinModelCatalog {
         // 候选注释“释义”用的词典（tools/dictionaries/glossary/build_glossary.py 生成）；id 与 CandidateGlossary.MODEL_ID 一致。
         ModelInfo("candidate-gloss", "候选中英释义词典", "设置里“候选注释内容”选释义后，中文候选旁显示英文，中文键盘里的英文候选旁显示中文。英→中取自 ECDICT，中→英取自 CC-CEDICT（MDBG）；常见的日常短语也显示英文。", ModelCategory.OTHER,
             // v8：去掉俚语／粗口义项，多音字按 Rime 常用读音、义项按英文反查来选（v1 有 几号 → heroin）；补齐常用单字和词组；
-            // 不可靠的单字释义带 “~”；常见的说话用短语用电脑上离线翻译翻好、且译回中文一致的才收，不收带地名人名的（带 “+”，只显示）。
-            versions = listOf(ModelVersion(version = "v8", size = "2.1 MB",
+            // 常见的说话用短语用电脑上离线翻译翻好、且译回中文一致的才收，不收带地名人名的（带 “+”，只显示）。
+            // v10：单字只给常用且意思明确的（公开语料最常用约 870 字人工看过），生僻字不显示；公开聊天语料最常用的词组人工补齐、改正错义项。
+            versions = listOf(ModelVersion(version = "v10", size = "1.9 MB",
                 files = listOf(
-                    ModelFile("cyime_gloss-v8.tsv", "https://github.com/Cyletix/CyIME/releases/download/models/cyime_gloss-v8.tsv", "5143705717bd91126c35b48591bd22b6355023141b05194bb2d7ae71ae1c8634", 2108958L),
+                    ModelFile("cyime_gloss-v10.tsv", "https://github.com/Cyletix/CyIME/releases/download/models/cyime_gloss-v10.tsv", "927129201c0c40c04ee6943f7995f8ebf431b6fdd3a49b0c64895efec35e8835", 1949392L),
                 )))),
         // 字幕模式分说话人用的声纹模型（3D-Speaker CAM++ 中文，sherpa-onnx 导出，Apache-2.0）；不是语音识别模型。
         ModelInfo(SPEAKER_MODEL, "声纹模型 · 中文", "字幕模式用来区分不同说话人。", ModelCategory.SPEAKER,
