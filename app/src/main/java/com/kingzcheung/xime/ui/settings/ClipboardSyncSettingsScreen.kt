@@ -2,6 +2,13 @@ package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -195,6 +202,7 @@ fun ClipboardSyncSettingsContent(
             }
             // 验证码自动复制是首页这一项的主要用途之一，直接显示，不再折叠。
             VerificationCodeSettings()
+            ClipboardCardLinesSetting()
         }
     }
 }
@@ -205,3 +213,30 @@ fun ClipboardSyncSettingsContent(
  */
 internal fun <T> effectiveClipboardSyncPlugin(available: List<Pair<String, T>>, preferredId: String): Pair<String, T>? =
     available.firstOrNull { it.first == preferredId } ?: available.firstOrNull()
+
+/** 剪贴板面板里每张卡片最多显示几行文字（2 / 4 / 8，默认 4）；单选样式和本页「同步服务」一样。 */
+@Composable
+private fun ClipboardCardLinesSetting() {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("clipboard_board", android.content.Context.MODE_PRIVATE) }
+    val key = com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_MAX_LINES_KEY
+    var lines by remember { mutableStateOf(prefs.getInt(key, 4)) }
+    SettingsSection(title = "剪贴板面板", content = {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("剪贴板卡片最多显示", style = MaterialTheme.typography.titleSmall)
+            Text("每条记录最多显示几行文字", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            listOf(2, 4, 8).forEach { option ->
+                Row(Modifier.fillMaxWidth().testTag("clipboard-card-lines:$option")
+                    .selectable(lines == option, role = androidx.compose.ui.semantics.Role.RadioButton) {
+                        lines = option
+                        prefs.edit().putInt(key, option).apply()
+                    }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = lines == option, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("$option 行", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+    })
+}
