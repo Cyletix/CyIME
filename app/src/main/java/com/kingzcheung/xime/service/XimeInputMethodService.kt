@@ -185,6 +185,8 @@ data class T9PartialSegment(val text: String, val pinyin: String)
 class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner, ActionExecutor {
 
     companion object {
+        /** 键盘与语音悬浮条互换、悬浮条进出时内容下沉/上浮的距离。 */
+        private const val CONTENT_SHIFT_DP = 24f
         internal const val TAG = "XimeInputMethodService"
         private const val DARK_MODE_LIGHT = 0
         private const val DARK_MODE_DARK = 1
@@ -1752,6 +1754,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                               com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
                                   com.kingzcheung.xime.ui.theme.MaterialPalette(cardBg, hardwarePalette.accent)) {
                           Box(Modifier.fillMaxSize().padding(bottom = activeBottomDp.dp)) {
+                            androidx.compose.runtime.DisposableEffect(Unit) {
+                                voicePillOnScreen = true
+                                onDispose { voicePillOnScreen = false }
+                            }
                             val glass = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).frostedGlass
                             val pillEnglish = state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
                             com.kingzcheung.xime.ui.keyboard.VoiceCollapsedPill(
@@ -3185,6 +3191,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (!uiState.value.isVoiceMode && !uiState.value.isCompact) {
                     uiState.value = uiState.value.copy(voiceCollapsed = true)
                     applyWindowBackground()
+                    animateVoicePillIn()
                     keyboardCallbacks?.onVoiceStickyToggle?.invoke()
                 }
             }
@@ -3419,16 +3426,86 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (!canCollapseToVoicePill()) return false
         keyboardViewModel.closeOverlay()
         closeToolPanel()
-        uiState.value = uiState.value.copy(voiceCollapsed = true, handwritingExpanded = false)
-        applyWindowBackground()
+        // 键盘先淡出下沉，再换成悬浮条淡入上浮（用户 10-20：收起、弹出、消失都要动效）。
+        swapKeyboardContent {
+            uiState.value = uiState.value.copy(voiceCollapsed = true, handwritingExpanded = false)
+            applyWindowBackground()
+        }
         return true
     }
 
     private fun expandFromVoicePill() {
         if (!uiState.value.voiceCollapsed) return
-        clearHardwareSurfaceBounds()
-        uiState.value = uiState.value.copy(voiceCollapsed = false)
-        applyWindowBackground()
+        swapKeyboardContent {
+            clearHardwareSurfaceBounds()
+            uiState.value = uiState.value.copy(voiceCollapsed = false)
+            applyWindowBackground()
+        }
+    }
+
+    /** 语音悬浮条正在屏幕上（由悬浮条自己的组合进出维护），收起窗口前据此决定要不要先播退场。 */
+    internal var voicePillOnScreen = false
+    private var animatedHidePending = false
+
+    /**
+     * 整块输入法内容先淡出并下沉 [CONTENT_SHIFT_DP]，执行 [change]（换成键盘或悬浮条），再淡入上浮。
+     * 时长沿用统一动效：退场 180ms、进场 200ms。
+     */
+    private fun swapKeyboardContent(change: () -> Unit) {
+        if (!::keyboardContainer.isInitialized || !isInputViewShown) { change(); return }
+        val shift = CONTENT_SHIFT_DP * resources.displayMetrics.density
+        keyboardContainer.animate().cancel()
+        keyboardContainer.animate().alpha(0f).translationY(shift)
+            .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.LONG_EXIT.toLong())
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                change()
+                keyboardContainer.animate().alpha(1f).translationY(0f)
+                    .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.MEDIUM.toLong())
+                    .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+            }.start()
+    }
+
+    /** 悬浮条出现（失焦后自动重新弹出等）：从下方淡入上浮。 */
+    internal fun animateVoicePillIn() {
+        if (!::keyboardContainer.isInitialized) return
+        keyboardContainer.animate().cancel()
+        keyboardContainer.alpha = 0f
+        keyboardContainer.translationY = CONTENT_SHIFT_DP * resources.displayMetrics.density
+        keyboardContainer.animate().alpha(1f).translationY(0f)
+            .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.MEDIUM.toLong())
+            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+    }
+
+    /** 悬浮条在屏幕上时，窗口收起（点别处失焦、系统收起）先播退场再真正收起，不再一下子消失。 */
+    override fun hideWindow() {
+        if (!voicePillOnScreen || animatedHidePending || !::keyboardContainer.isInitialized || !isInputViewShown) {
+            super.hideWindow(); return
+        }
+        animatedHidePending = true
+        keyboardContainer.animate().cancel()
+        keyboardContainer.animate().alpha(0f).translationY(CONTENT_SHIFT_DP * resources.displayMetrics.density)
+            .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.LONG_EXIT.toLong())
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                animatedHidePending = false
+                superHideWindow()
+                keyboardContainer.alpha = 1f
+                keyboardContainer.translationY = 0f
+            }.start()
+    }
+
+    private fun superHideWindow() = super.hideWindow()
+
+    override fun showWindow(showInput: Boolean) {
+        // 退场动画中又要弹出：取消退场，内容恢复原样。
+        if (animatedHidePending && ::keyboardContainer.isInitialized) {
+            animatedHidePending = false
+            keyboardContainer.animate().cancel()
+            keyboardContainer.alpha = 1f
+            keyboardContainer.translationY = 0f
+        }
+        super.showWindow(showInput)
     }
 
     // 语音听写中输入框被意外收起（系统收起键或 App 隐藏键盘、焦点仍在）：重新弹出悬浮条继续听写。
