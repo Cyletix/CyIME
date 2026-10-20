@@ -143,6 +143,13 @@ class FeedbackManager(private val context: Context) {
         pool.play(soundId, volume, volume, 1, 0, 1.0f)
     }
 
+    /** 外接实体键盘按下时调用；只出声，不振动。 */
+    fun playHardwareKeySound(event: android.view.KeyEvent) {
+        val sound = HardwareKeySound.soundFor(event.keyCode, event.repeatCount,
+            event.isCtrlPressed, event.isAltPressed, event.isMetaPressed) ?: return
+        playKeySound(sound)
+    }
+
     fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false, type: KeyFeedbackType = KeyFeedbackType.CHARACTER) {
         // 未开启松手反馈时，不必读取系统触觉设置。
         if (keyUp && !hapticOnKeyUp) return

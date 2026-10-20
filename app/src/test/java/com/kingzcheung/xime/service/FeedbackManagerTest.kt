@@ -32,6 +32,30 @@ class FeedbackManagerTest {
         manager(HapticMode.Enabled).performKeyPressDownEffect("delete", view)
         verify(view).performHapticFeedback(eq(HapticFeedbackConstants.KEYBOARD_TAP), any())
     }
+    @Test fun `physical keyboard typing keys share the soft keyboard sounds`() {
+        fun sound(code: Int, repeat: Int = 0, ctrl: Boolean = false, alt: Boolean = false, meta: Boolean = false) =
+            HardwareKeySound.soundFor(code, repeat, ctrl, alt, meta)
+        org.junit.Assert.assertEquals("standard", sound(android.view.KeyEvent.KEYCODE_A))
+        org.junit.Assert.assertEquals("standard", sound(android.view.KeyEvent.KEYCODE_7))
+        org.junit.Assert.assertEquals("standard", sound(android.view.KeyEvent.KEYCODE_SLASH))
+        org.junit.Assert.assertEquals("standard", sound(android.view.KeyEvent.KEYCODE_NUMPAD_5))
+        org.junit.Assert.assertEquals("space", sound(android.view.KeyEvent.KEYCODE_SPACE))
+        org.junit.Assert.assertEquals("enter", sound(android.view.KeyEvent.KEYCODE_NUMPAD_ENTER))
+        org.junit.Assert.assertEquals("delete", sound(android.view.KeyEvent.KEYCODE_DEL))
+    }
+
+    @Test fun `physical modifiers shortcuts and auto repeat stay silent`() {
+        listOf(android.view.KeyEvent.KEYCODE_SHIFT_LEFT, android.view.KeyEvent.KEYCODE_CTRL_RIGHT,
+            android.view.KeyEvent.KEYCODE_ALT_LEFT, android.view.KeyEvent.KEYCODE_META_LEFT,
+            android.view.KeyEvent.KEYCODE_CAPS_LOCK, android.view.KeyEvent.KEYCODE_BACK,
+            android.view.KeyEvent.KEYCODE_VOLUME_UP).forEach {
+            org.junit.Assert.assertNull("$it", HardwareKeySound.soundFor(it, 0, false, false, false))
+        }
+        org.junit.Assert.assertNull(HardwareKeySound.soundFor(android.view.KeyEvent.KEYCODE_C, 0, true, false, false))
+        org.junit.Assert.assertNull(HardwareKeySound.soundFor(android.view.KeyEvent.KEYCODE_TAB, 0, false, true, false))
+        org.junit.Assert.assertNull(HardwareKeySound.soundFor(android.view.KeyEvent.KEYCODE_DEL, 3, false, false, false))
+    }
+
     @Test fun `feedback actions retain semantic types across keyboard layouts`() {
         mapOf(
             "a" to KeyFeedbackType.CHARACTER, "あ" to KeyFeedbackType.CHARACTER,
