@@ -159,4 +159,16 @@ class CandidateGlossaryTest {
         assertEquals("meet", CandidateGlossary.englishFor(composeTable, "会"))
         assertEquals("have a meal", CandidateGlossary.englishFor(composeTable, "吃饭"))
     }
+
+    @Test
+    fun `private add-on overrides or hides public glosses and falls through otherwise`() {
+        val base = table("保存" to "conserve", "的" to "of", "电脑" to "computer")
+        base.overlay = table("保存" to "save", "的" to GlossTable.HIDDEN, "频谱" to "spectrum")
+        assertEquals("save", base.lookup("保存"))
+        assertNull(base.lookup("的"))
+        assertEquals("spectrum", base.lookup("频谱"))
+        assertEquals("computer", base.lookup("电脑"))
+        assertEquals("save", CandidateGlossary.gloss(base, "保存"))
+        assertNull(CandidateGlossary.englishFor(base, "的"))
+    }
 }
