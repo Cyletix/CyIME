@@ -400,6 +400,7 @@ class GlossStaging:
             say("[STAGE] 源码目录里已有同一份私人释义包，直接使用，打包后保留原样。")
             return self
         self.work.mkdir(parents=True, exist_ok=True)
+        self.created_dir = not self.target.parent.exists()
         self.target.parent.mkdir(parents=True, exist_ok=True)
         ad.write_json(self.marker, {"sha256": self.sha256, "size": self.source.stat().st_size})
         shutil.copyfile(self.source, self.target)
@@ -412,6 +413,9 @@ class GlossStaging:
             with contextlib.suppress(FileNotFoundError):
                 self.target.unlink()
             self.marker.unlink(missing_ok=True)
+            if getattr(self, "created_dir", False):
+                with contextlib.suppress(OSError):
+                    self.target.parent.rmdir()  # only the empty assets/gloss directory this run created
             say("[STAGE] 临时私人释义包已移除，源码目录恢复原样。")
         return False
 
