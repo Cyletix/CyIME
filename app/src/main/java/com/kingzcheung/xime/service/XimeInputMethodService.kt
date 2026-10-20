@@ -1226,11 +1226,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor = true
             applyIncognito()
         }
-        uiState.value = uiState.value.copy(clipboardSearchVisible = true, toolPanelInputFocused = true, enterKeyText = "搜索")
+        clipboardManager.boardQuery.value = ""
+        uiState.value = uiState.value.copy(clipboardSearchVisible = true, toolPanelInputFocused = true, enterKeyText = "完成")
     }
 
-    internal fun closeClipboardSearch(openBoard: Boolean) {
+    internal fun closeClipboardSearch(openBoard: Boolean, keepQuery: Boolean = false) {
         if (!uiState.value.clipboardSearchVisible) return
+        if (!keepQuery) clipboardManager.boardQuery.value = ""
         if (candidateState.value.isComposing) {
             keyRouter.postRimeJob { rimeEngine.clearComposition(); withContext(Dispatchers.Main) { updateUI() } }
         }
@@ -1243,16 +1245,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
     }
 
-    /** Enter in the search bar: the board opens showing only the matches. */
+    /** Enter in the search bar: the keyboard goes away and the clipboard keeps showing the matches. */
     internal fun submitClipboardSearch() {
         clipboardManager.boardQuery.value = ToolPanelEditTextHolder.editText?.text?.toString()?.trim().orEmpty()
-        closeClipboardSearch(openBoard = true)
+        closeClipboardSearch(openBoard = true, keepQuery = true)
     }
 
     /** A result goes through the normal clipboard paste, so a fixed record stays private. */
-    internal fun selectClipboardSearchResult(item: com.kingzcheung.xime.clipboard.ClipboardItem) {
+    internal fun selectClipboardSearchResult(text: String) {
         closeClipboardSearch(openBoard = false)
-        textCommit.selectClipboardItem(item.text)
+        textCommit.selectClipboardItem(text)
     }
 
     internal fun closeToolPanel() {        toolPanelSelection = null
@@ -1588,6 +1590,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 ) { expanded ->
                     uiState.value = uiState.value.copy(clipboardImagesExpanded = expanded)
                 }
+                // Clipboard search keeps the keyboard as it is: the results take the space the clipboard
+                // would take when pulled up, above the keyboard and the search bar.
+                val clipboardSearchResultsHeight = if (!state.clipboardSearchVisible) 0 else
+                    (clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace).expanded - keyboardHeight -
+                        com.kingzcheung.xime.ui.keyboard.CLIPBOARD_SEARCH_PANEL_HEIGHT).coerceAtLeast(120)
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
                 val effectiveKeyboardHeight = when {
                     handwritingExpanded -> handwritingSize(keyboardHeight, (effectiveScreenH - floatingMinY).coerceAtLeast(1))
@@ -1962,6 +1969,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     toolPanelVisible = state.toolPanelVisible,
                                     toolPanelInputFocused = state.toolPanelInputFocused,
                                     clipboardSearchVisible = state.clipboardSearchVisible,
+                                    clipboardSearchResultsHeight = clipboardSearchResultsHeight,
                                     toolPanelPluginId = state.toolPanelPluginId,
                                     toolPanelTitle = state.toolPanelTitle,
                                     toolPanelPrefillText = state.toolPanelPrefillText,
