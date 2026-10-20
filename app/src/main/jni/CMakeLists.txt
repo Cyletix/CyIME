@@ -224,3 +224,14 @@ target_link_libraries(handwriting_jni
 )
 
 target_link_options(handwriting_jni PRIVATE "-Wl,-z,max-page-size=16384")
+
+# CyLM decoder (from CyIME-Windows tools/cylm, commit 8d7107f). Not used by the IME yet: CylmNative.enabled is
+# false and nothing loads libcylm.so until a user-approved switch turns it on.
+add_library(cylm SHARED
+    cylm/cylm.cpp
+    cylm/cylm_jni.cpp
+)
+target_compile_definitions(cylm PRIVATE CYLM_LIBRARY)
+target_compile_features(cylm PRIVATE cxx_std_17)
+target_compile_options(cylm PRIVATE -O2)
+target_link_options(cylm PRIVATE "-Wl,-z,max-page-size=16384")
