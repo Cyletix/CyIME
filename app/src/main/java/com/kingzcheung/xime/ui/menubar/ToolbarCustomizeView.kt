@@ -54,13 +54,17 @@ fun ToolbarCustomizeView(
     onUpdateQuickActions: ((QuickActionLayout) -> Unit)?,
     onDismiss: () -> Unit,
     bottomPaddingDp: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 当前键盘工具栏／菜单里会出现的入口；其他键盘专用的不列出，保存时保留原位（见 [QuickActionLayout.restoreHidden]）。 */
+    isShown: (String) -> Boolean = { true },
 ) {
     val allButtons = ToolbarButton.CUSTOMIZABLE.map { ToolbarButtonItem.Builtin(it) } + pluginButtons
     val itemById = allButtons.associateBy { it.id }
-    val layout = QuickActionLayout.normalize(toolbarButtons.filter { it in itemById }, menuButtons.filter { it in itemById })
-    val dragOrder = rememberDragOrder(layout.editorOrder(allButtons.map { it.id })) { order ->
-        onUpdateQuickActions?.invoke(QuickActionLayout.fromEditorOrder(order))
+    val saved = QuickActionLayout.normalize(toolbarButtons.filter { it in itemById }, menuButtons.filter { it in itemById })
+    val hidden = allButtons.map { it.id }.filterNot { it == QuickActionLayout.PINNED || isShown(it) }.toSet()
+    val layout = QuickActionLayout(saved.toolbar - hidden, saved.menu - hidden)
+    val dragOrder = rememberDragOrder(layout.editorOrder(allButtons.map { it.id }.filterNot { it in hidden })) { order ->
+        onUpdateQuickActions?.invoke(QuickActionLayout.restoreHidden(QuickActionLayout.fromEditorOrder(order), saved, hidden))
     }
     val order = dragOrder.order
     val menuCount = (order.indexOf(QuickActionLayout.UNUSED_DIVIDER) - order.indexOf(QuickActionLayout.MENU_DIVIDER) - 1)
