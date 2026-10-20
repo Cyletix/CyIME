@@ -56,6 +56,17 @@ class FeedbackManagerTest {
         org.junit.Assert.assertNull(HardwareKeySound.soundFor(android.view.KeyEvent.KEYCODE_DEL, 3, false, false, false))
     }
 
+    @Test fun `physical keyboard defaults to Rain75 while the screen keyboard keeps its sound`() {
+        org.junit.Assert.assertEquals("mahjong", FeedbackManager.resolveKeySoundStyle(null, hardware = true))
+        org.junit.Assert.assertEquals("default", FeedbackManager.resolveKeySoundStyle(null, hardware = false))
+        org.junit.Assert.assertEquals("mahjong", FeedbackManager.resolveKeySoundStyle("mahjong", hardware = false))
+    }
+
+    @Test fun `removed crisp style falls back to default`() {
+        org.junit.Assert.assertEquals("default", FeedbackManager.resolveKeySoundStyle("crisp", hardware = false))
+        org.junit.Assert.assertEquals("mahjong", FeedbackManager.resolveKeySoundStyle("crisp", hardware = true))
+    }
+
     @Test fun `feedback actions retain semantic types across keyboard layouts`() {
         mapOf(
             "a" to KeyFeedbackType.CHARACTER, "あ" to KeyFeedbackType.CHARACTER,
