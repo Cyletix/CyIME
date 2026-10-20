@@ -327,7 +327,7 @@ internal fun rememberImeKeyboardCallbacks(
             onClipboardSearchOpen = { service.openClipboardSearch() },
             onClipboardSearchClose = { service.closeClipboardSearch(openBoard = true) },
             onClipboardSearchSubmit = { service.submitClipboardSearch() },
-            onClipboardSearchSelect = { item -> service.selectClipboardSearchResult(item) },
+            onClipboardSearchSelect = { text -> service.selectClipboardSearchResult(text) },
             onToolPanelFocusChange = { focused ->
                 service.uiState.value = service.uiState.value.copy(
                     toolPanelInputFocused = focused,
