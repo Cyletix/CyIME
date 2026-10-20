@@ -97,9 +97,11 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
                             PerformanceProfile.applyPreset(context, tier); refresh()
                         }
                     }
-                    RowDivider()
-                    TierRow("自定义", if (current == null) "已单独调整明细或「按键效果」里的动效、炫光" else "改下面的明细或「按键效果」里的动效、炫光就会变成自定义",
-                        !auto && current == null, enabled = false) {}
+                    // 「自定义」不是可点的档位：只有手动改过明细或动效时才显示，表示当前状态。
+                    if (!auto && current == null) {
+                        RowDivider()
+                        TierRow("自定义", "已单独调整明细或「按键效果」里的动效、炫光", true, enabled = false) {}
+                    }
                 }
             }
             item {
@@ -133,11 +135,11 @@ private fun describe(device: DeviceCapabilities): String = buildList {
 }.ifEmpty { listOf("配置未知") }.joinToString(" · ")
 
 @Composable
-private fun RowDivider() = HorizontalDivider(Modifier.padding(start = 56.dp), thickness = 0.5.dp,
+internal fun RowDivider() = HorizontalDivider(Modifier.padding(start = 56.dp), thickness = 0.5.dp,
     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
 @Composable
-private fun TierRow(title: String, subtitle: String, selected: Boolean, enabled: Boolean = true, onSelect: () -> Unit) {
+internal fun TierRow(title: String, subtitle: String, selected: Boolean, enabled: Boolean = true, onSelect: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
         .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect)
         .padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {

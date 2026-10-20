@@ -134,11 +134,10 @@ class CandidateBarOptionsTest {
     @Test fun settingIsInitiallyOffAndSavesExplicitChoice() {
         rule.setContent {
             CompositionLocalProvider(LocalContext provides context) {
-                MaterialTheme { LayoutDisplaySettingsContent(onBack = {}) }
+                // 候选词从首页直接进入。
+                MaterialTheme { LayoutDisplaySettingsContent(onBack = {}, initialPage = "candidates") }
             }
         }
-        // 布局与显示 is an index now; the candidate options live on its 候选词 page.
-        rule.onNodeWithText("候选词").performScrollTo().performClick()
         val setting = rule.onNodeWithTag("candidate-cancel-setting")
         rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("candidate-cancel-setting"))
         setting.assertIsOff().performClick().assertIsOn()

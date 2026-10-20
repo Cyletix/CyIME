@@ -29,4 +29,13 @@ class SettingsSearchTest {
         val linked = SettingsSearchIndex.mapNotNull { it.target.substringAfter("?page=", "").ifEmpty { null } }.toSet()
         assertEquals(pages, linked)
     }
+
+    /** 新设置树：每项只出现一处，路径都从首页五组之一开始。 */
+    @Test fun everySettingLivesInOnePlaceUnderTheNewGroups() {
+        val dup = SettingsSearchIndex.groupBy { it.title }.filterValues { it.size > 1 }.keys
+        assertTrue("重复：$dup", dup.isEmpty())
+        val groups = setOf("配置选择", "输入", "外观", "智能", "系统")
+        val stray = SettingsSearchIndex.filter { it.path.substringBefore(" › ") !in groups }.map { it.title }
+        assertTrue("不在新分组下：$stray", stray.isEmpty())
+    }
 }

@@ -122,6 +122,7 @@ fun MarketHubContent(
     onNavigateToPluginDetail: (String) -> Unit = {},
     onNavigateToLocal: () -> Unit = {},
     onNavigateToModelLocal: () -> Unit = {},
+    onNavigateToPlugins: () -> Unit = {},
     initialTab: Int = 0,
 ) {
     // 三页可左右滑动切换，标签跟随；分页状态随返回栈保存，进详情再返回仍回到刚才那页。
@@ -132,19 +133,18 @@ fun MarketHubContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("扩展商店") },
+                title = { Text("扩展") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
-                    if (tabIndex == 0 || tabIndex == 1) {
-                        TextButton(
-                            onClick = if (tabIndex == 0) onNavigateToLocal else onNavigateToModelLocal,
-                        ) {
-                            Text("本地管理", style = MaterialTheme.typography.labelMedium)
-                        }
+                    // 扩展是方案、模型、插件的唯一入口；每页右上角进本页类型的已安装管理。
+                    TextButton(
+                        onClick = when (tabIndex) { 0 -> onNavigateToLocal; 1 -> onNavigateToModelLocal; else -> onNavigateToPlugins },
+                    ) {
+                        Text("已安装", style = MaterialTheme.typography.labelMedium)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -285,7 +285,12 @@ private fun SchemesMarketTab(
                     }
 
                     else -> {
-                        items(uiState.filteredSchemes, key = { it.scheme.id }) { item ->
+                        // 同一页上面是已安装、下面是可安装；哪段为空就不显示。
+                        val (installedGroup, availableGroup) = uiState.filteredSchemes.partition { it.installedVersion != null }
+                        listOf("已安装" to installedGroup, "可安装" to availableGroup).forEach { (sectionLabel, group) ->
+                            if (group.isNotEmpty()) {
+                                item(key = "section:$sectionLabel") { MarketSectionLabel(sectionLabel) }
+                                items(group, key = { it.scheme.id }) { item ->
                             val (iconContainer, iconContent) = schemeCategoryColors(item.scheme.tags.firstOrNull())
                             MarketStoreCard(
                                 icon = schemeCategoryIcon(item.scheme.tags.firstOrNull()),
@@ -320,6 +325,8 @@ private fun SchemesMarketTab(
                                     )
                                 },
                             )
+                        }
+                            }
                         }
                         item {
                             Spacer(Modifier.height(8.dp))
@@ -510,7 +517,12 @@ private fun ModelsMarketTab(
                     }
 
                     else -> {
-                        items(uiState.filteredModels, key = { it.model.id }) { item ->
+                        // 同一页上面是已安装、下面是可安装；哪段为空就不显示。
+                        val (installedGroup, availableGroup) = uiState.filteredModels.partition { it.isDownloaded }
+                        listOf("已安装" to installedGroup, "可安装" to availableGroup).forEach { (sectionLabel, group) ->
+                            if (group.isNotEmpty()) {
+                                item(key = "section:$sectionLabel") { MarketSectionLabel(sectionLabel) }
+                                items(group, key = { it.model.id }) { item ->
                             val (iconContainer, iconContent) = modelCategoryColors(item.model.category)
                             MarketStoreCard(
                                 icon = modelCategoryIcon(item.model.category),
@@ -541,6 +553,8 @@ private fun ModelsMarketTab(
                                     )
                                 },
                             )
+                        }
+                            }
                         }
                         item {
                             Spacer(Modifier.height(8.dp))
@@ -731,7 +745,12 @@ private fun PluginsMarketTab(
                     }
 
                     else -> {
-                        items(uiState.filteredPlugins, key = { it.plugin.id }) { item ->
+                        // 同一页上面是已安装、下面是可安装；哪段为空就不显示。
+                        val (installedGroup, availableGroup) = uiState.filteredPlugins.partition { it.installed }
+                        listOf("已安装" to installedGroup, "可安装" to availableGroup).forEach { (sectionLabel, group) ->
+                            if (group.isNotEmpty()) {
+                                item(key = "section:$sectionLabel") { MarketSectionLabel(sectionLabel) }
+                                items(group, key = { it.plugin.id }) { item ->
                             val icon = pluginCategoryIcon(item.plugin.pluginType)
                             val (iconContainer, iconContent) = pluginCategoryColors(item.plugin.pluginType)
                             MarketStoreCard(
@@ -763,6 +782,8 @@ private fun PluginsMarketTab(
                                     )
                                 },
                             )
+                        }
+                            }
                         }
                         item {
                             Spacer(Modifier.height(8.dp))
@@ -1039,6 +1060,13 @@ private fun CategoryChips(
 }
 
 /** 居中容器：空态/加载/错误占位。 */
+/** 扩展各页里「已安装」「可安装」两段的小标题。 */
+@Composable
+private fun MarketSectionLabel(label: String) {
+    Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp).testTag("market-section:$label"))
+}
+
 @Composable
 private fun MarketCenterBox(
     modifier: Modifier = Modifier,

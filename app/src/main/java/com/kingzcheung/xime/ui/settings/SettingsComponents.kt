@@ -161,13 +161,17 @@ fun SettingsToggleItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     onClick: (() -> Unit)? = null,
-    showArrow: Boolean = false
+    showArrow: Boolean = false,
+    /** 被别的设置锁住时的原因（如「已被『角标输入方式：长按』锁定」）：开关置灰不可点，并在说明下显示这句。 */
+    lockMessage: String? = null,
 ) {
+    val locked = lockMessage != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (onClick != null) Modifier.clickable(onClick = onClick)
+                if (locked) Modifier
+                else if (onClick != null) Modifier.clickable(onClick = onClick)
                 else Modifier.clickable { onCheckedChange(!checked) }
             )
             .padding(16.dp),
@@ -200,6 +204,7 @@ fun SettingsToggleItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (lockMessage != null) SettingsLockNote(lockMessage)
         }
         if (showArrow) {
             Icon(
@@ -211,10 +216,18 @@ fun SettingsToggleItem(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = !locked,
             // Same Material on-primary thumb / primary track as the readable refinement switch.
             colors = SwitchDefaults.colors()
         )
     }
+}
+
+/** 被锁住的设置下面那一行「已被…锁定」，各页统一样式。 */
+@Composable
+fun SettingsLockNote(message: String, modifier: Modifier = Modifier) {
+    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+        modifier = modifier.padding(top = 2.dp).testTag("settings-lock:$message"))
 }
 
 @Composable

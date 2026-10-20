@@ -6,8 +6,6 @@ object SettingsRoutes {
     const val Schema = "schema"
     const val Market = "market"
     const val MarketPlugins = "market_plugins"
-    const val MarketModel = "market_model"
-    const val SchemaLocal = "schema_local"
     const val ModelLocal = "model_local"
     const val SchemaMarketDetail = "schema_market_detail/{schemeId}"
     const val ModelMarketDetail = "model_market_detail/{modelId}"
@@ -29,8 +27,8 @@ object SettingsRoutes {
     const val LogViewer = "log_viewer"
     const val HandwritingCapture = "handwriting_capture"
     const val HandwritingTraining = "handwriting_training"
+    const val Handwriting = "handwriting_settings"
     const val ClipboardSync = "clipboard_sync"
     const val Backup = "backup"
-    const val SchemaDictBrowser = "schema_dict_browser"
     const val RimeFileBrowser = "rime_file_browser"
 }
