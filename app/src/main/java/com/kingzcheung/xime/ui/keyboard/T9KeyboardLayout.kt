@@ -734,7 +734,8 @@ private fun T9KeyboardContent(
                     } else commitDirect("0")
                 },
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                modifier = Modifier.weight(1f).testTag("t9-zero-key").glossHold(glossHoldEnabled,
+                // 从这里拖到候选上松手：等于按住 Shift 选它（有英文上屏英文）；松手不在候选上，左滑等原手势照旧。
+                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(glossHoldEnabled).glossHold(glossHoldEnabled,
                     onDown = { glossHoldUsed = false }) { holding ->
                     if (holding) {
                         glossHoldUsed = true
