@@ -1,7 +1,7 @@
 <h1 align="center">CyIME</h1>
 
 <p align="center">
-  <a href="README.md">English</a> · <a href="README.zh-TW.md">繁體中文</a>
+  <a href="README.en.md">English</a> · <a href="README.zh-TW.md">繁體中文</a>
 </p>
 
 **CyIME** 是 Cyletix 维护的 Android 输入法，基于 [Rime](https://rime.im/) 引擎，提供中文（五笔 / 拼音 / 九宫格 / 双拼）、日语假名、英文、手写与语音输入。
