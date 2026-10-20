@@ -160,7 +160,10 @@ fun HandwritingKeyboardLayout(
     LaunchedEffect(templateScript) {
         val script = templateScript ?: return@LaunchedEffect
         try {
-            withContext(Dispatchers.IO) { runCatching { HandwritingTemplates.importTrainingSamples(context, script) } }
+            withContext(Dispatchers.IO) {
+                runCatching { HandwritingTemplates.importTrainingSamples(context, script) }
+                runCatching { HandwritingTemplates.ensureDefaults(context, script) }
+            }
             templateCount = HandwritingTemplates.count(context, script)
         } finally { importingTemplates = false }
     }
@@ -252,7 +255,7 @@ fun HandwritingKeyboardLayout(
             if (language != recognitionLanguage || templateScript != null) Text(when {
                     useTemplates && language == InputLanguage.JAPANESE -> "日语手写 · 边写边学"
                     useTemplates -> "英文手写 · 边写边学"
-                    templateScript != null && importingTemplates -> "正在读取你的手写样本…"
+                    templateScript != null && importingTemplates -> "正在准备手写模板（只在第一次较慢）…"
                     templateScript != null && language == InputLanguage.JAPANESE -> "还没有你的假名样本：去 设置 → 手写训练模式 写几个，或在右上角菜单导入样本备份"
                     templateScript != null -> "还没有你的字母样本：去 设置 → 手写训练模式 写几个，或在右上角菜单导入样本备份"
                     else -> "中文手写"
