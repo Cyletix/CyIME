@@ -6,7 +6,9 @@ words, chained as the decoder does (unigram, bigram, trigram with back-off). Ent
 base words. Output: gzip TSV of text, code, weight for every ext entry, read by the prepareChineseDictionaries
 Gradle task.
 
-Usage: python ext_weights.py MODEL RIME_ICE_DIR OUTPUT.tsv.gz
+Usage: python ext_weights.py MODEL RIME_ICE_DIR OUTPUT.tsv.gz [ext|tencent]
+
+tencent.dict.yaml has the same placeholder 100 and no code column (Rime encodes it); its table is text, weight.
 """
 import gzip
 import math
@@ -24,6 +26,9 @@ UPSTREAM = 100
 # phrases outrank counted base words and act as shortcuts in 26-key sentences (houhuisile -> 后惠斯勒). 0.13 is the
 # setting compared in docs/development/ext-weights-20261018.md (7 clauses fixed, 1 regressed).
 STRENGTH = 0.13
+# tencent.dict.yaml is larger and mostly phrases; at 0.13 its estimated phrases overtook user-reported abbreviations
+# (zdky -> 真的可以). 0.09 broke no column of the lexicon regression (docs/development/chat-base-weights-20261018.md).
+STRENGTHS = {"ext": STRENGTH, "tencent": 0.05}
 
 
 class FastModel(Model):
@@ -97,27 +102,30 @@ def entries(path):
         if not body or not line or line.startswith("#"):
             continue
         fields = line.split("\t")
-        if len(fields) >= 2:
+        if len(fields) == 2 and fields[1].isdigit():  # text, weight (no code)
+            yield fields[0], None, int(fields[1])
+        elif len(fields) >= 2:
             yield fields[0], fields[1], (int(fields[2]) if len(fields) > 2 and fields[2].isdigit() else None)
 
 
 def main():
     model_path, root, output = sys.argv[1:4]
+    name = sys.argv[4] if len(sys.argv) > 4 else "ext"
     model = FastModel(model_path)
     cache = {}
     root = Path(root) / "cn_dicts"
-    scored = [(text, code, score(model, text, cache)) for text, code, _ in entries(root / "ext.dict.yaml")]
+    scored = [(text, code, score(model, text, cache)) for text, code, _ in entries(root / f"{name}.dict.yaml")]
     middle = sorted(s for _, _, s in scored)[len(scored) // 2]
     rows, weights = [], []
     for text, code, value in scored:
-        weight = max(1, round(UPSTREAM * math.exp(STRENGTH * (value - middle))))
-        rows.append(f"{text}\t{code}\t{weight}\n")
+        weight = max(1, round(UPSTREAM * math.exp(STRENGTHS[name] * (value - middle))))
+        rows.append(f"{text}\t{weight}\n" if code is None else f"{text}\t{code}\t{weight}\n")
         weights.append(weight)
     with gzip.open(output, "wt", encoding="utf-8", newline="\n", compresslevel=9) as out:
         out.write("".join(rows))
     weights.sort()
     q = lambda f: weights[int(f * (len(weights) - 1))]
-    print(f"ext entries {len(weights)}; weight quantiles 10% {q(0.1)} 50% {q(0.5)} 90% {q(0.9)} 99% {q(0.99)}"
+    print(f"{name} entries {len(weights)}; weight quantiles 10% {q(0.1)} 50% {q(0.5)} 90% {q(0.9)} 99% {q(0.99)}"
           f" max {weights[-1]}", file=sys.stderr)
 
 
