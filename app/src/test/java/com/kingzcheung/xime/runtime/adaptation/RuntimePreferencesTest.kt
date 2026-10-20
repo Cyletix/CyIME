@@ -2,20 +2,28 @@ package com.kingzcheung.xime.runtime.adaptation
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.SpeechModelCatalog
+import java.io.File
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.mockito.kotlin.*
 
 class RuntimePreferencesTest {
+    @get:Rule val temporary = TemporaryFolder()
+
     private fun prefs(values: Map<String, Any>): SharedPreferences = mock<SharedPreferences>().also { prefs ->
         whenever(prefs.contains(any())).thenAnswer { values.containsKey(it.getArgument<String>(0)) }
         whenever(prefs.getBoolean(any(), any())).thenAnswer { values[it.getArgument<String>(0)] ?: it.getArgument<Boolean>(1) }
         whenever(prefs.getString(any(), anyOrNull())).thenAnswer { values[it.getArgument<String>(0)] ?: it.getArgument<String?>(1) }
     }
 
-    private fun read(settings: Map<String, Any>, asrValues: Map<String, Any> = emptyMap()): RuntimeRequests {
+    private fun read(settings: Map<String, Any>, asrValues: Map<String, Any> = emptyMap(),
+                     filesDir: File? = null): RuntimeRequests {
         val context = mock<Context>()
+        filesDir?.let { whenever(context.filesDir).thenReturn(it) }
         val settingsPrefs = prefs(settings)
         val asrPrefs = prefs(asrValues)
         whenever(context.getSharedPreferences(eq("kime_settings"), any())).thenReturn(settingsPrefs)
@@ -31,7 +39,21 @@ class RuntimePreferencesTest {
         assertEquals(RuntimeRequest(AnimationLevel.OFF, PreferenceOrigin.CURRENT_DEFAULT), requests.animation)
         assertEquals(RuntimeRequest(false, PreferenceOrigin.CURRENT_DEFAULT), requests.keyGlow)
         assertEquals(RuntimeRequest(true, PreferenceOrigin.CURRENT_DEFAULT), requests.neuralPrediction)
-        assertEquals(RuntimeRequest(true, PreferenceOrigin.CURRENT_DEFAULT), requests.voiceCorrection)
+        // Default Paraformer only adds SenseVoice correction once SenseVoice is downloaded.
+        assertEquals(RuntimeRequest(false, PreferenceOrigin.CURRENT_DEFAULT), requests.voiceCorrection)
+        assertEquals(RuntimeRequest(true, PreferenceOrigin.CURRENT_DEFAULT),
+            read(emptyMap(), filesDir = downloadedParaformerAndSenseVoice()).voiceCorrection)
+    }
+
+    /** Paraformer and SenseVoice files present under filesDir/models, as after both downloads. */
+    private fun downloadedParaformerAndSenseVoice(): File = temporary.newFolder().also { root ->
+        val paraformer = AsrModelManager(mock()).getAsrModels().first { it.id == SpeechModelCatalog.PARAFORMER }
+        File(root, "models/${SpeechModelCatalog.PARAFORMER}").apply { mkdirs() }.let { dir ->
+            paraformer.files.forEach { File(dir, it).writeText("x") }
+        }
+        File(root, "models/${SpeechModelCatalog.SENSEVOICE}").apply { mkdirs() }.let { dir ->
+            listOf("model.int8.onnx", "tokens.txt").forEach { File(dir, it).writeText("x") }
+        }
     }
 
     @Test fun `legacy values even equal to defaults retain unknown provenance`() {
@@ -44,8 +66,10 @@ class RuntimePreferencesTest {
 
     @Test fun `automatic voice default is observed and manual override wins`() {
         val automatic = mapOf("device_default_voice_model" to SpeechModelCatalog.ZIPFORMER_TWO_PASS)
-        assertTrue(read(automatic).voiceCorrection.value)
-        assertFalse(read(automatic, mapOf("selected_model" to SpeechModelCatalog.ZIPFORMER)).voiceCorrection.value)
+        val models = downloadedParaformerAndSenseVoice()
+        assertFalse(read(automatic).voiceCorrection.value)
+        assertTrue(read(automatic, filesDir = models).voiceCorrection.value)
+        assertFalse(read(automatic, mapOf("selected_model" to SpeechModelCatalog.ZIPFORMER), models).voiceCorrection.value)
     }
 
     @Test fun `motion and glow are read independently with read only legacy fallback`() {
