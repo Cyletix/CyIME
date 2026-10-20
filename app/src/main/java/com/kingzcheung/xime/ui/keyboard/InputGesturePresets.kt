@@ -52,7 +52,7 @@ object InputGestureLocks {
             add(InputGestureLock(InputGestureLock.Option.T9_FLICK_LETTERS, false, "角标输入方式：长按"))
         }
         if (settings.letterLongPressMenu) {
-            add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.LONG_PRESS, "字母键长按弹出大小写"))
+            add(InputGestureLock(InputGestureLock.Option.SYMBOL_INPUT_MODE, SymbolInputMode.LONG_PRESS, "长按弹出字母气泡"))
         }
         if (settings.glideTyping) {
             add(InputGestureLock(InputGestureLock.Option.CURSOR_GESTURE, CursorGestureMode.KEYBOARD, "英文滑行输入"))

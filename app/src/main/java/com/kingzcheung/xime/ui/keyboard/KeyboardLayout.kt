@@ -1650,7 +1650,7 @@ internal fun commitLongPressChoice(label: String, onCommitText: ((String) -> Uni
 
 /**
  * 字母键长按的大小写（及带音调字母）气泡默认关：它会打断上下拖动输入角标（用户 10-20）。
- * 打开“字母键长按弹出大小写”才恢复；非字母键（标点、地球键等）的长按不受影响。
+ * 打开“长按弹出字母气泡”才恢复；非字母键（标点、地球键等）的长按不受影响。
  */
 internal fun letterLongPressMenuAllowed(key: String, enabled: Boolean): Boolean =
     // 字母键是 1～2 个字母（26 键 q、14 键 qw）；earth 之类的功能键名不算。

@@ -73,7 +73,7 @@ data class KeyboardInputPreferences(
     val flickDirectionDisc: Boolean = true,
     /** 英文 26 键滑行输入；整键盘滑动移动光标时让位。 */
     val glideTyping: Boolean = false,
-    /** 字母键长按弹出大小写气泡；默认关，免得打断上下拖动输入角标。 */
+    /** 长按弹出字母气泡（26/14 键大小写和带音调字母、九键本键字母）；默认关，免得打断上下拖动输入角标。 */
     val letterLongPressMenu: Boolean = false,
     /** 九键拂动选字母（左上右下），数字改为长按。 */
     val t9FlickLetters: Boolean = false,
