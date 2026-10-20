@@ -512,6 +512,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     }
                     return@command
                 }
+                if (hardwareEvent.keyCode == KeyEvent.KEYCODE_TAB) {
+                    // 组字时 Tab 换到下一个候选、Shift+Tab 换回上一个，和 Windows 版同一规则（用户 10-21）；
+                    // 走候选栏左右按钮那条路（不移动拼音里的光标）。没在组字时上面已把 Tab 交给编辑框跳输入框。
+                    val direction = if (hardwareEvent.isShiftPressed) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+                    processHardwareCandidateKey(KeyEvent(KeyEvent.ACTION_DOWN, direction), pageAtBoundary = true)
+                    hardwareNavigation.releasePress(if (hardwareEvent.isShiftPressed) HardwareCandidateKey.LEFT else HardwareCandidateKey.RIGHT)
+                    return@command
+                }
                 if (processHardwareCandidateKey(hardwareEvent)) return@command
                 if (hardwareCandidateDigitIndex(hardwareEvent.keyCode, hardwareEvent.isShiftPressed) != null) {
                     // DefaultInput here means no numbered candidate owns this digit.
