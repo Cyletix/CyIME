@@ -377,10 +377,11 @@ struct Lexicon {
 struct Token { char kind; char16_t full; char letter; std::string prefix; };  // kind f / a / s(eparator)
 
 struct Params {
-  double rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
+  double mu_word = 0.0, eos_word = -1.0, adapt_word = -1.0, rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
   int t9_beam = 0, t9_per_span = 0, rr_threads = 4, incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
   bool Set(const std::string& k, const std::string& v) {
-    if (k == "t9_beam") t9_beam = std::stoi(v); else if (k == "t9_per_span") t9_per_span = std::stoi(v);
+    if (k == "mu_word") mu_word = std::stod(v); else if (k == "eos_word") eos_word = std::stod(v); else if (k == "adapt_word") adapt_word = std::stod(v);
+    else if (k == "t9_beam") t9_beam = std::stoi(v); else if (k == "t9_per_span") t9_per_span = std::stoi(v);
     else if (k == "rr_gamma") rr_gamma = std::stod(v); else if (k == "rr_short") rr_short = std::stod(v);
     else if (k == "rr_threads") rr_threads = std::stoi(v);
     else if (k == "incremental") incremental = std::stoi(v); else if (k == "abbrev_full") abbrev_full = std::stod(v); else if (k == "eos2") eos2 = std::stod(v); else if (k == "interleave") interleave = std::stoi(v);
@@ -482,6 +483,9 @@ struct Edge { int j; std::string word; int abbrevs; u16 key; };
 
 struct Decoder {
   Lexicon& lex; C3& base; Adapt& adapt; Params p; C3* base2 = nullptr; const Reranker* rr = nullptr;
+  // The user's own preferences: "P above D" pairs (their typing uses P and not its homophone D, or they reported it).
+  // After ranking, a preferred P listed below its D moves to just above D; nothing else moves.
+  const std::unordered_map<std::string, std::vector<std::string>>* prefer = nullptr;  // D -> the P that beat it
   std::unordered_map<std::string, char16_t> spell; size_t max_syl = 0;
   std::unordered_map<std::string, std::vector<char16_t>> by_t9; std::unordered_map<std::string, std::vector<std::string>> t9_prefix;
   std::unordered_map<std::string, double> prior_cache, lnw_cache;
@@ -749,6 +753,18 @@ struct Decoder {
           if (e.word.empty()) { s2 = hy.score; st2 = hy.st; }
           else {
             auto sc = EdgeScore(hy.st, e.word);
+            if (i == 0 && size_t(e.j) == n && p.adapt_word >= 0 && adapt.loaded) {
+              // the whole input as one word: add the user's own frequency of it, weighted by adapt_word
+              double lam = p.adapt_word, lp_base = sc.first;
+              if (p.adapt_lambda > 0) {  // undo the general mixture to get the base log-probability back
+                double pa = adapt.P(hy.st.wa, hy.st.wb, adapt.Lookup(e.word));
+                lp_base = std::log(std::max(1e-300, (std::exp(sc.first) - p.adapt_lambda * pa) / (1 - p.adapt_lambda)));
+              }
+              // additive: the user's own use can only raise a word, never push down words they have not typed
+              int32_t wid = adapt.Lookup(e.word);
+              double pa = wid >= 0 ? adapt.P(hy.st.wa, hy.st.wb, wid) : 0.0;
+              sc.first = std::log(std::exp(lp_base) + lam * pa);
+            }
             s2 = hy.score + sc.first + p.mu * Lnw(e.word) + p.abbrev * e.abbrevs + p.word_pen; st2 = sc.second;
           }
           std::string out2 = hy.out + e.word;
@@ -770,7 +786,10 @@ struct Decoder {
     auto ranked = [&](double eos_w) {
       std::unordered_map<std::string, double> best;
       for (auto& kv : beams[n]) {
-        double s = kv.second.score + eos_w * Eos(kv.second.st) + (abbrev - p.abbrev) * kv.second.ab;
+        const bool one_word = kv.second.tr >= 0 && arena_[kv.second.tr].prev < 0;
+        const double ew = one_word && p.eos_word >= 0 && eos_w == p.eos ? p.eos_word : eos_w;
+        double s = kv.second.score + ew * Eos(kv.second.st) + (abbrev - p.abbrev) * kv.second.ab;
+        if (one_word && p.mu_word != 0) s += p.mu_word * Lnw(kv.second.out);  // a typed word: how common the word is
         auto it = best.find(kv.second.out);
         if (it == best.end() || s > it->second) { best[kv.second.out] = s; best_tr[kv.second.out] = kv.second.tr; }
       }
@@ -803,6 +822,15 @@ struct Decoder {
       for (size_t k = 0; k < out.size(); ++k) out[k].second += g * nn[k];
       std::stable_sort(out.begin(), out.end(), [](auto& x, auto& y) { return x.second > y.second; });
     }
+    if (prefer && out.size() > 1) {
+      for (size_t k = 0; k < out.size(); ++k) {
+        auto it = prefer->find(out[k].first);
+        if (it == prefer->end()) continue;
+        for (auto& pw : it->second)
+          for (size_t m = k + 1; m < out.size(); ++m)
+            if (out[m].first == pw) { auto moved = out[m]; out.erase(out.begin() + m); out.insert(out.begin() + k, moved); ++k; break; }
+      }
+    }
     if (p.incremental) { inc_text_ = text; inc_context_ = context; inc_t9_ = t9; inc_edges_ = std::move(edges); inc_beams_ = std::move(beams); }
     return out;
   }
@@ -815,9 +843,21 @@ struct Decoder {
   }
 };
 
+static bool LoadPrefer(const char* path, std::unordered_map<std::string, std::vector<std::string>>& out) {
+  std::ifstream in(path, std::ios::binary); if (!in) return false;
+  std::string line;
+  while (std::getline(in, line)) {
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (line.empty() || line[0] == '#') continue;
+    auto f = Split(line, '\t'); if (f.size() >= 2 && !f[0].empty() && !f[1].empty()) out[f[1]].push_back(f[0]);
+  }
+  return true;
+}
+
 // ------------------------------------------------------------------ C API (cylm.h): library for Windows Core / Android JNI
 #include "cylm.h"
-struct CylmModel { Lexicon lex; C3 base; C3 base2; bool has2 = false; Adapt adapt; Params p; Reranker rr; bool has_rr = false; };
+struct CylmModel { Lexicon lex; C3 base; C3 base2; bool has2 = false; Adapt adapt; Params p; Reranker rr; bool has_rr = false;
+                   std::unordered_map<std::string, std::vector<std::string>> prefer; };
 struct CylmSession { std::unique_ptr<Decoder> d; };
 extern "C" {
 CylmModel* cylm_open(const char* lexicon, const char* model, const char* model2, const char* params) {
@@ -847,6 +887,7 @@ CylmSession* cylm_session(CylmModel* m) {
   s->d = std::make_unique<Decoder>(m->lex, m->base, m->adapt, m->p);
   if (m->has2) s->d->base2 = &m->base2;
   if (m->has_rr) s->d->rr = &m->rr;
+  if (!m->prefer.empty()) s->d->prefer = &m->prefer;
   return s;
 }
 int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
@@ -858,6 +899,11 @@ int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context,
     std::memcpy(out + used, w.data(), w.size()); used += int(w.size()); out[used++] = '\0'; ++n;
   }
   return n;
+}
+int cylm_prefer(CylmModel* m, const char* path) {
+  if (!m || !path) return -1;
+  m->prefer.clear();
+  return LoadPrefer(path, m->prefer) ? int(m->prefer.size()) : -1;
 }
 int cylm_decode2(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
   if (!s || !keys || !out || cap <= 0) return -1;
@@ -879,13 +925,14 @@ void cylm_close(CylmModel* m) { delete m; }
 #ifndef CYLM_LIBRARY
 int main(int argc, char** argv) {
   if (argc < 3) { std::fprintf(stderr, "usage: cylm LEXICON.tsv MODEL.lm [--adapt COUNTS.tsv] [--set k=v]... < items > out\n"); return 2; }
-  Params p; std::string adapt_path, model2, reranker, vocab;
+  Params p; std::string adapt_path, model2, reranker, vocab, prefer_path;
   for (int i = 3; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--adapt" && i + 1 < argc) adapt_path = argv[++i];
     else if (a == "--model2" && i + 1 < argc) model2 = argv[++i];
     else if (a == "--reranker" && i + 1 < argc) reranker = argv[++i];
     else if (a == "--vocab" && i + 1 < argc) vocab = argv[++i];
+    else if (a == "--prefer" && i + 1 < argc) prefer_path = argv[++i];
     else if (a == "--set" && i + 1 < argc) {
       std::string kv = argv[++i]; auto eq = kv.find('=');
       if (eq == std::string::npos || !p.Set(kv.substr(0, eq), kv.substr(eq + 1))) { std::fprintf(stderr, "bad --set %s\n", kv.c_str()); return 2; }
@@ -907,6 +954,11 @@ int main(int argc, char** argv) {
   C3 base2; if (!model2.empty() && !base2.Open(model2.c_str())) { std::fprintf(stderr, "cannot open model2\n"); return 1; }
   Decoder d(lex, base, adapt, p);
   if (!model2.empty()) d.base2 = &base2;
+  std::unordered_map<std::string, std::vector<std::string>> prefer;
+  if (!prefer_path.empty()) {
+    for (auto& one : Split(prefer_path, ',')) if (!LoadPrefer(one.c_str(), prefer)) { std::fprintf(stderr, "cannot read %s\n", one.c_str()); return 1; }
+    d.prefer = &prefer;
+  }
   Reranker rr;
   if (!reranker.empty()) { if (!rr.Load(reranker.c_str(), vocab.c_str(), p.rr_threads)) { std::fprintf(stderr, "cannot load reranker\n"); return 1; } d.rr = &rr; }
   std::fprintf(stderr, "loaded in %.1fs: %zu words\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), lex.WordCount());
