@@ -18,7 +18,7 @@ internal interface LocalSpeechEngine : AutoCloseable {
     val hasRollingPreview: Boolean get() = false
     fun preview(samples: FloatArray): String = error("This recognizer has no rolling preview")
     fun detector(): SpeechDetector
-    /** Captions: VAD on the original level. Quiet-speech gain turns room noise into "speech" and hides turn-taking pauses. */
+    /** Captions: the VAD-only quiet-speech gain on every engine (the keyboard applies it to Paraformer). */
     fun captionDetector(): SpeechDetector = detector()
     fun accept(samples: FloatArray): String
     fun finishStream(): String

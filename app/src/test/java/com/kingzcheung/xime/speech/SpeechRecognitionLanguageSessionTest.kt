@@ -145,6 +145,8 @@ class SpeechRecognitionLanguageSessionTest {
             whenever(prefs.getBoolean(eq(SettingsPreferences.KEY_STT_USE_LOCAL), any())).thenAnswer { useLocal }
             whenever(prefs.getString(eq(SettingsPreferences.KEY_STT_ONLINE_PLUGIN_ID), any())).thenAnswer { pluginId }
             whenever(prefs.getBoolean(eq(SettingsPreferences.KEY_STT_KEEP_ENGINE_ALIVE), any())).thenAnswer { keepAlive }
+            // Residency is now read as idle minutes (0 = keep), defaulting from the old switch; an unstubbed getInt was 0 = always resident.
+            whenever(prefs.getInt(any(), any())).thenAnswer { it.getArgument(1) }
             val handler = mock<Handler>()
             whenever(handler.post(any())).thenAnswer { queue.put(it.getArgument(0)); true }
             whenever(handler.postDelayed(any(), any())).thenAnswer {
