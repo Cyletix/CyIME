@@ -49,7 +49,7 @@ def load_cases():
         cases.append({"id": f[0], "keyboard": f[1], "input": f[2], "expect": f[3], "top_k": int(f[4] or 1),
                       "source": f[5], "date": f[6], "note": f[7] if len(f) > 7 else ""})
     # Shared public-corpus set (README in that directory); kept out of the repository. Same-message context
-    # is not fed to the engine: Rime here has no left-context input, so these measure context-free typing.
+    # is fed to the engine only with CYIME_SEND_CONTEXT=1 (property cyime_left_context, as the app sets it).
     public = os.environ.get("CYIME_PUBLIC_SET")
     if public:
         for name in ("jianpin", "sentence"):
@@ -58,7 +58,7 @@ def load_cases():
                 typed = row["keys"] if name == "jianpin" else "".join(row["pinyin"]).replace("ü", "v")
                 cases.append({"id": f"pub-{row['id']}", "keyboard": "26", "input": typed, "expect": row["text"],
                               "top_k": 1, "source": f"public {name}/{row['group']}", "date": "2026-10-18",
-                              "note": "", "count": row.get("count", 1)})
+                              "note": "", "count": row.get("count", 1), "context": row.get("context")})
     return cases
 
 
@@ -189,6 +189,12 @@ def run(dll_dir, data, jobs):
             rime.RimeSetProperty(session, b"cyime_neighbors", neighbors.encode())
         for case in cases:
             rime.RimeClearComposition(session)
+            if os.environ.get("CYIME_SEND_CONTEXT"):
+                # The app passes the committed text before the composition as chr(0x1E) + text; cases without
+                # a known context are typed with an unknown one, as before.
+                context = case.get("context")
+                rime.RimeSetProperty(session, b"cyime_left_context",
+                                     (chr(0x1E) + context).encode() if context is not None else b"")
             for ch in case["input"]:
                 rime.RimeProcessKey(session, ord(ch), 0)
             it, top = Iter(), []
