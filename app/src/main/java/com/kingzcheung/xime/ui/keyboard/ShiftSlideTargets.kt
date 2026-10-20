@@ -50,11 +50,15 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         val target = at(pointer)
         // Pointer motion redraws the line; keys recompose only when the target changes.
         if (hovered?.key != target?.key || hovered?.bounds != target?.bounds) hovered = target
+        candidates.dragLine = drag?.let { it.origin to it.pointer }
+        candidates.hoveredBounds = target?.takeIf { it.key == CANDIDATE_KEY }?.bounds
         return target
     }
     fun clearDrag() {
         drag = null
         hovered = null
+        candidates.dragLine = null
+        candidates.hoveredBounds = null
     }
 }
 internal val LocalShiftSlideTargets = staticCompositionLocalOf<ShiftSlideTargets?> { null }

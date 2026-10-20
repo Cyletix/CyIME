@@ -1,5 +1,8 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 
@@ -9,6 +12,11 @@ import androidx.compose.ui.geometry.Rect
  */
 internal class CandidateDropTargets {
     private val targets = LinkedHashMap<Any, Pair<Rect, () -> Unit>>()
+
+    /** Shift 拖动中的那条线（起点、手指，根布局坐标）；候选栏据此画出线在栏里的那一段，不被字母区截断。 */
+    var dragLine by mutableStateOf<Pair<Offset, Offset>?>(null)
+    /** 手指正指着的候选的位置；候选栏在它上面画高亮，换候选时高亮滑过去。 */
+    var hoveredBounds by mutableStateOf<Rect?>(null)
 
     fun put(id: Any, bounds: Rect, select: () -> Unit) {
         if (bounds.isEmpty) targets.remove(id) else targets[id] = bounds to select
