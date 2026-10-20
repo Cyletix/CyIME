@@ -55,6 +55,9 @@ object HandwritingTemplates {
     private val defaults = HashMap<Script, List<Entry>>()
     private const val DEFAULT_ASSET = "handwriting/kana_default_strokes.json"
     private const val DEFAULT_CACHE = "kana_default_v1.json"
+    /** 电脑上用发布的公式模型预先算好的特征（float16 小端）及其模型哈希、标签顺序。 */
+    private const val DEFAULT_VECTORS = "handwriting/kana_default_vectors.bin"
+    private const val DEFAULT_VECTORS_META = "handwriting/kana_default_vectors.json"
     /** 自己写的模板比内置模板多算的相似度，同样像时排在前面。 */
     private const val PERSONAL_BONUS = 0.03f
 
@@ -96,6 +99,48 @@ object HandwritingTemplates {
         if (!tmp.renameTo(file)) { tmp.copyTo(file, overwrite = true); tmp.delete() }
     }
 
+    private fun sha256(file: File): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(1 shl 16)
+            while (true) { val n = input.read(buf); if (n < 0) break; md.update(buf, 0, n) }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * 解开预算特征：[meta] 里的 model_sha256 与当前模型的 [modelSha] 不一致（换了模型）或文件长度对不上时返回 null，
+     * 由调用方回退为在设备上现算。
+     */
+    internal fun decodePrecomputed(meta: String, bin: ByteArray, modelSha: String): List<Pair<String, FloatArray>>? {
+        val o = JSONObject(meta)
+        if (!o.optString("model_sha256").equals(modelSha, ignoreCase = true)) return null
+        val dim = o.getInt("dim")
+        val labels = o.getJSONArray("labels")
+        if (dim <= 0 || bin.size != labels.length() * dim * 2) return null
+        val buf = java.nio.ByteBuffer.wrap(bin).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        return (0 until labels.length()).map { i ->
+            labels.getString(i) to FloatArray(dim) { halfToFloat(buf.short.toInt()) }
+        }
+    }
+
+    private fun halfToFloat(h: Int): Float {
+        val sign = (h ushr 15) and 1
+        val exp = (h ushr 10) and 0x1f
+        val mant = h and 0x3ff
+        val bits = when {
+            exp == 0 && mant == 0 -> sign shl 31
+            exp == 0 -> { // 非规格化数
+                var e = -14; var m = mant
+                while (m and 0x400 == 0) { m = m shl 1; e-- }
+                (sign shl 31) or ((e + 127) shl 23) or ((m and 0x3ff) shl 13)
+            }
+            exp == 31 -> (sign shl 31) or (0xff shl 23) or (mant shl 13)
+            else -> (sign shl 31) or ((exp - 15 + 127) shl 23) or (mant shl 13)
+        }
+        return java.lang.Float.intBitsToFloat(bits)
+    }
+
     fun count(context: Context, script: Script): Int = entries(context, script).size + (synchronized(this) { defaults[script]?.size } ?: 0)
 
     /**
@@ -122,6 +167,12 @@ object HandwritingTemplates {
             }
         }.getOrNull()
         val list = cached ?: runCatching {
+            // 模型文件与预算时用的是同一个（哈希一致）就直接用预算特征，第一次打开也不用等。
+            val sha = sha256(File(FormulaRecognizer.dir(context), "formula_encoder.onnx"))
+            decodePrecomputed(context.assets.open(DEFAULT_VECTORS_META).bufferedReader(Charsets.UTF_8).use { it.readText() },
+                context.assets.open(DEFAULT_VECTORS).use { it.readBytes() }, sha)
+                ?.map { (label, vec) -> Entry(label, vec, "builtin") }
+        }.onFailure { Log.w(TAG, "precomputed kana templates unreadable", it) }.getOrNull() ?: runCatching {
             val chars = JSONObject(context.assets.open(DEFAULT_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() })
                 .getJSONObject("chars")
             val out = mutableListOf<Entry>()
