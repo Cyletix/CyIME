@@ -406,13 +406,16 @@ private fun KeyVisualEffectToggle(title: String, description: String, enabled: B
     }
 }
 
-/** 按键音色三选一：默认 / Rain75 紫薇轴 / 清脆（存的值 default|mahjong|crisp）；样式和「触觉反馈模式」的卡片一样。 */
+/** 按键音色二选一：默认 / Rain75 紫薇轴（存的值 default|mahjong）；样式和「触觉反馈模式」的卡片一样。 */
 @Composable
 private fun KeySoundStyleSetting() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context)
     val key = com.kingzcheung.xime.service.FeedbackManager.KEY_SOUND_STYLE
-    var style by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(prefs.getString(key, "default") ?: "default") }
+    // 以前选过已删的「清脆」（crisp）按默认显示，和 FeedbackManager 的处理一致。
+    var style by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf((prefs.getString(key, "default") ?: "default").takeIf { it == "mahjong" } ?: "default")
+    }
     Column(modifier = Modifier.padding(16.dp)) {
         Text(text = "按键音色", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         Text(text = "换一种按键声音，选好立即生效", style = MaterialTheme.typography.bodySmall,
@@ -424,8 +427,8 @@ private fun KeySoundStyleSetting() {
         } + 4.dp + 32.dp + 6.dp + 4.dp
         Row(modifier = Modifier.fillMaxWidth().height(maxOf(104.dp, rowHeight)),
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(Triple("default", "默认", "♪" to "原有音效"), Triple("mahjong", "Rain75 紫薇轴", "▣" to "线性轴"),
-                Triple("crisp", "清脆", "♫" to "清亮")).forEach { (value, label, art) ->
+            // 「清脆」已删（用户 10-21）；实体键盘默认就用 Rain75，写在「默认」卡片的小字里。
+            listOf(Triple("default", "默认", "♪" to "实体键盘用 Rain75"), Triple("mahjong", "Rain75 紫薇轴", "▣" to "线性轴")).forEach { (value, label, art) ->
                 IllustratedChoiceCard(label, style == value, onClick = {
                     style = value
                     prefs.edit().putString(key, value).apply()
