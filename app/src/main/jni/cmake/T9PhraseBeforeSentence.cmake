@@ -34,9 +34,7 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
         // 默默地 for momodi because 的 is also read di (目的).
         string readings;
         if (config->GetString("t9/reading_table", &readings) && !readings.empty()) {
-          const ResourceType type{"t9_readings", "", ".txt"};
-          std::unique_ptr<ResourceResolver> resolver(Service::instance().CreateResourceResolver(type));
-          t9_readings_ = T9LoadReadings(resolver->ResolvePath(readings).string());
+          t9_readings_ = T9LoadReadings(T9ResolveOnce("t9_readings", ".txt", readings));
         }
       }
       if (t9_joint_) {
@@ -63,9 +61,7 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
         string ngram_model;
         if (config->GetString("t9/ngram_model", &ngram_model) && !ngram_model.empty()) {
           // Not .bin: Rime cleanup moves *.bin in the user directory to trash.
-          const ResourceType type{"t9_ngram", "", ".lm"};
-          std::unique_ptr<ResourceResolver> resolver(Service::instance().CreateResourceResolver(type));
-          t9_ngram_ = T9NgramModel::Open(resolver->ResolvePath(ngram_model).string());
+          t9_ngram_ = T9NgramModel::Open(T9ResolveOnce("t9_ngram", ".lm", ngram_model));
         }
         config->GetDouble("t9/ngram_user_weight", &t9_ngram_user_weight_);
         config->GetDouble("t9/ngram_dictionary_prior", &t9_ngram_dictionary_prior_);
@@ -100,6 +96,21 @@ t9_replace("  bool CheckEmpty();" [=[
   bool t9_joint_ = false;
   using T9Readings = std::unordered_map<string, vector<std::pair<string, double>>>;
   std::shared_ptr<const T9Readings> t9_readings_;
+  // Resource paths resolved once per type and name. Resolving stats files in the user and shared
+  // data directories, and the translation reading this config is rebuilt on every key. A model
+  // installed later already needs a restart (T9NgramModel::Open remembers missing files too).
+  static string T9ResolveOnce(const char* type_name, const char* suffix, const string& name) {
+    static std::mutex mutex;
+    static std::map<string, string> resolved;
+    std::lock_guard<std::mutex> lock(mutex);
+    auto& path = resolved[Service::instance().deployer().user_data_dir.string() + '\n' + type_name + '\n' + name];
+    if (path.empty()) {
+      const ResourceType type{type_name, "", suffix};
+      std::unique_ptr<ResourceResolver> resolver(Service::instance().CreateResourceResolver(type));
+      path = resolver->ResolvePath(name).string();
+    }
+    return path;
+  }
   // Loaded once per file and kept: a translation (and this member) is rebuilt on every key, so a
   // weak cache reread the file per key. Lines are text<TAB>spelling<TAB>ln share.
   static std::shared_ptr<const T9Readings> T9LoadReadings(const string& path) {
