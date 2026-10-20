@@ -99,8 +99,12 @@ object CandidateGlossary {
     /** 九键长按“下一项”切到的中英对调（代替 Shift，松手保持）；上屏英文、再长按或编码结束时恢复。 */
     val t9NextHeld = mutableStateOf(false)
 
-    /** 任一种“按住 Shift”生效中：屏幕 Shift 键按住（[screenShiftHeld]）、物理 Shift 或九键长按“下一项”。 */
-    fun swapHeld(screenShiftHeld: Boolean): Boolean = screenShiftHeld || physicalShiftHeld.value || t9NextHeld.value
+    /** 任一种“按住 Shift”生效中：屏幕 Shift 键按住（[screenShiftHeld]）、物理 Shift、九键长按“下一项”，或从它拖到候选上。 */
+    /** 正从九键“下一项”拖着经过候选：此刻松手就上屏英文，候选先显示成英文。 */
+    val t9DragSwap = mutableStateOf(false)
+
+    fun swapHeld(screenShiftHeld: Boolean): Boolean =
+        screenShiftHeld || physicalShiftHeld.value || t9NextHeld.value || t9DragSwap.value
 
     /** 注释换成释义；词典未加载时原样返回，已加载但查不到的候选不显示注释。 */
     fun annotate(texts: List<String>, comments: List<String>): List<String> = annotate(table, texts, comments)
