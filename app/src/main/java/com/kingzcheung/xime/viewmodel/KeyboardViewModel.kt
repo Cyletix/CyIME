@@ -111,6 +111,7 @@ data class KeyboardUiState(
     val quickSendEditingItemCode: String = "",
     val toolPanelVisible: Boolean = false,
     val toolPanelInputFocused: Boolean = false,
+    val clipboardSearchVisible: Boolean = false,
     val toolPanelPluginId: String = "",
     val toolPanelTitle: String = "",
     val toolPanelPrefillText: String = "",
