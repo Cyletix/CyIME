@@ -123,6 +123,14 @@ def prepare_android(work):
             lines += [key + chr(9) + weight for key, weight in table.items()]
         path.unlink()
         path.write_text(chr(10).join(lines), encoding="utf-8")
+    for item in filter(None, os.environ.get("CYIME_RIME_ICE_REPLACE", "").split(";")):
+        # experiments: "max_sentences: 4=>max_sentences: 6" replaces text in the copied 26-key schema
+        old, new = item.split("=>", 1)
+        schema = data / "rime_ice.schema.yaml"
+        text = schema.read_text(encoding="utf-8")
+        if old not in text:
+            raise ValueError(f"CYIME_RIME_ICE_REPLACE: {old!r} not in the schema")
+        schema.write_text(text.replace(old, new, 1), encoding="utf-8")
     extra = os.environ.get("CYIME_TRANSLATOR_ADD")
     if extra:  # "sentence_position_initial_only: [把, 被]": extra lines at the top of the translator block
         schema = data / "rime_ice.schema.yaml"
