@@ -50,7 +50,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
     val qwerty = LayoutInputCategory.Qwerty.route
     val nine = LayoutInputCategory.Nine.route
     val layoutIndex = SettingsRoutes.LayoutDisplay
-    val speech = "智能与输入方式 › 语音与手写"
+    val handwriting = "智能与输入方式 › 手写"
     listOf(
         // 首页入口
         SettingsSearchEntry("语言与方案", "输入法", "languages", "语言 输入方案 键盘布局 切换方式 双拼 日语 英语 九键 26键 14键 语言管理"),
@@ -59,16 +59,18 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("键盘布局", kb, layoutIndex, "布局 26键 九键 14键 布局与显示"),
         SettingsSearchEntry("按键与手势", kb, layoutPage("gestures"), "手势 角标 光标 空格 长按"),
         SettingsSearchEntry("按键效果", kb, SettingsRoutes.KeyEffect, "按键音 声音 音效 振动 震动 反馈 发光 动画"),
+        SettingsSearchEntry("按键音色", "$kb › 按键效果", SettingsRoutes.KeyEffect, "音色 Rain75 紫薇轴 机械键盘 清脆 按键声音 音效"),
         SettingsSearchEntry("物理键盘", kb, SettingsRoutes.HardwareKeyboard, "实体键盘 蓝牙键盘 外接键盘 语言切换快捷键 候选跟随 浮条"),
         SettingsSearchEntry("智能联想", "智能与输入方式", SettingsRoutes.SmartPrediction, "联想 预测 个人学习 模型增强 下一个词"),
-        SettingsSearchEntry("语音与手写", "智能与输入方式", SettingsRoutes.SpeechToText, "语音 识别 麦克风 说话 听写 在线 本地 语音转文本 手写"),
+        SettingsSearchEntry("语音转文本", "智能与输入方式", SettingsRoutes.SpeechToText, "语音 识别 麦克风 说话 听写 在线 本地 语音输入 开关"),
+        SettingsSearchEntry("手写", "智能与输入方式", SettingsRoutes.Handwriting, "手写 写字 笔迹 公式"),
         SettingsSearchEntry("词库", "智能与输入方式", SettingsRoutes.Dictionary, "分类词库 个人词库 用户词 自定义短语 词典 词库管理"),
-        SettingsSearchEntry("手写训练模式", speech, SettingsRoutes.HandwritingTraining, "手写 训练 样本 假名 字母 公式"),
+        SettingsSearchEntry("手写训练模式", handwriting, SettingsRoutes.HandwritingTraining, "手写 训练 样本 假名 字母 公式"),
+        SettingsSearchEntry("手写数据采集", handwriting, SettingsRoutes.HandwritingCapture, "手写 采集 样本 笔迹 标注"),
         SettingsSearchEntry("扩展", "扩展", SettingsRoutes.Market, "下载 输入方案 模型 插件 商店 扩展商店"),
         SettingsSearchEntry("已安装的插件", "扩展 › 插件", SettingsRoutes.Plugins, "插件 已安装 插件管理"),
         SettingsSearchEntry("已安装的模型", "扩展 › 模型", SettingsRoutes.ModelLocal, "模型 识字 语音 手写 联想 本地 下载 模型管理"),
         SettingsSearchEntry("已安装的方案", "输入法 › 语言与方案", SettingsRoutes.Schema, "下载 导入 启停 方案 部署 输入资源 排序"),
-        SettingsSearchEntry("语音转文本", speech, SettingsRoutes.SpeechToText, "语音 开关 开启 关闭 麦克风"),
         SettingsSearchEntry("屏蔽的候选", "智能与输入方式 › 词库", SettingsRoutes.Dictionary, "屏蔽 恢复 候选 九键"),
         SettingsSearchEntry("剪贴板与同步", "系统", SettingsRoutes.ClipboardSync, "剪贴板 同步 验证码 短信 复制 电脑"),
         SettingsSearchEntry("备份与恢复", "系统", SettingsRoutes.Backup, "备份 恢复 导出 导入 本地备份 换机"),
@@ -109,12 +111,12 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("滑动移动光标", "$kb › 按键与手势", layoutPage("gestures"), "光标 移动 滑动 空格"),
         SettingsSearchEntry("空格长按", "$kb › 按键与手势", layoutPage("gestures"), "空格 长按 连续空格 语音 时长"),
         SettingsSearchEntry("光标灵敏度", "$kb › 按键与手势", layoutPage("gestures"), "光标 距离 灵敏"),
-        // 语音与手写
-        SettingsSearchEntry("手写停顿识别", speech, SettingsRoutes.SpeechToText, "手写 停顿 识别 延迟 时长"),
-        SettingsSearchEntry("手写公式两边的标记", speech, SettingsRoutes.SpeechToText, "公式 latex 美元 数学"),
+        // 手写
+        SettingsSearchEntry("手写停顿识别", handwriting, SettingsRoutes.Handwriting, "手写 停顿 识别 延迟 时长"),
+        SettingsSearchEntry("手写公式两边的标记", handwriting, SettingsRoutes.Handwriting, "公式 latex 美元 数学"),
     ).filter {
         // The developer-only handwriting training page is hidden in public, elder and friend packages.
-        it.target != SettingsRoutes.HandwritingTraining || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
+        it.target !in setOf(SettingsRoutes.HandwritingTraining, SettingsRoutes.HandwritingCapture) || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
     }
 }
 

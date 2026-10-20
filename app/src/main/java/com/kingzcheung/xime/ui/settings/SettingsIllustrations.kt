@@ -46,6 +46,8 @@ internal fun IllustratedChoiceCard(
     modifier: Modifier = Modifier,
     tag: String? = null,
     enabled: Boolean = true,
+    /** 标题最多几行；名字长（如「Rain75 紫薇轴」）时设 2，窄屏也显示完整。 */
+    titleMaxLines: Int = 1,
     illustration: @Composable ColumnScope.() -> Unit,
 ) {
     val primary = MaterialTheme.colorScheme.primary
@@ -73,7 +75,7 @@ internal fun IllustratedChoiceCard(
         Text(title, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             color = if (selected) primary else MaterialTheme.colorScheme.onSurface,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1)
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = titleMaxLines)
     }
 }
 
@@ -222,12 +224,13 @@ internal fun HapticModeIllustration(mode: String) {
     val primary = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
     val (mark, caption) = when (mode) {
-        "enabled" -> "〰 ▮ 〰" to "按键时振动"
+        "enabled" -> "〰▮〰" to "按键振动"
         "disabled" -> "▮" to "不振动"
-        else -> "⚙ → ▮" to "按系统触感设置"
+        else -> "⚙→▮" to "系统设置"
     }
     // 行高写明，不继承正文 24sp 行高；卡片高度按同样的行高算（见 [HAPTIC_CARD_TEXT_HEIGHT]）。
-    Text(mark, fontSize = 20.sp, lineHeight = 24.sp, color = if (mode == "disabled") muted else primary)
+    // 窄屏三张卡并排时图示不换行，否则会把下面的小字挤出卡片。
+    Text(mark, fontSize = 20.sp, lineHeight = 24.sp, color = if (mode == "disabled") muted else primary, maxLines = 1, softWrap = false)
     Spacer(Modifier.height(4.dp))
     Text(caption, fontSize = 12.sp, lineHeight = 16.sp, color = if (mode == "disabled") muted else primary, maxLines = 1)
 }

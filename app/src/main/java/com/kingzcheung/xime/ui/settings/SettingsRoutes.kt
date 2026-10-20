@@ -27,6 +27,7 @@ object SettingsRoutes {
     const val LogViewer = "log_viewer"
     const val HandwritingCapture = "handwriting_capture"
     const val HandwritingTraining = "handwriting_training"
+    const val Handwriting = "handwriting_settings"
     const val ClipboardSync = "clipboard_sync"
     const val Backup = "backup"
     const val RimeFileBrowser = "rime_file_browser"
