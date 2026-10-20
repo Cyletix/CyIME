@@ -123,6 +123,22 @@ def prepare_android(work):
             lines += [key + chr(9) + weight for key, weight in table.items()]
         path.unlink()
         path.write_text(chr(10).join(lines), encoding="utf-8")
+    char_weights = os.environ.get("CYIME_8105_WEIGHTS")
+    if char_weights:  # experiments: replace 8105.dict.yaml (single character) weights, same format as base
+        import gzip
+        with gzip.open(char_weights, "rt", encoding="utf-8") as rows:
+            table = {row.rsplit(chr(9), 1)[0]: row.rstrip(chr(10)).rsplit(chr(9), 1)[1] for row in rows}
+        path = data / "cn_dicts" / "8105.dict.yaml"
+        lines = path.read_text(encoding="utf-8").split(chr(10))
+        body = False
+        for i, line in enumerate(lines):
+            if line.strip() == "...":
+                body = True
+            fields = line.split(chr(9))
+            if body and len(fields) == 3 and fields[0] + chr(9) + fields[1] in table:
+                lines[i] = fields[0] + chr(9) + fields[1] + chr(9) + table[fields[0] + chr(9) + fields[1]]
+        path.unlink()
+        path.write_text(chr(10).join(lines), encoding="utf-8")
     for item in filter(None, os.environ.get("CYIME_RIME_ICE_REPLACE", "").split(";")):
         # experiments: "max_sentences: 4=>max_sentences: 6" replaces text in the copied 26-key schema
         old, new = item.split("=>", 1)
