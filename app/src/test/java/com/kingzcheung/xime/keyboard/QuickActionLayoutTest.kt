@@ -29,4 +29,18 @@ class QuickActionLayoutTest {
         assertEquals(listOf("voice", "sound", "settings"), layout.menu)
         assertTrue("unused entries are not stored", "ocr" !in layout.toolbar + layout.menu)
     }
+
+    /** 排列页只列当前键盘会出现的入口；别的键盘专用的入口保存后仍在原来的区和位置。 */
+    @Test fun hiddenEntriesKeepTheirPlaceWhenArrangingInAnotherLayout() {
+        val saved = QuickActionLayout(listOf("schema", "emoji"), listOf("settings", "t9_flick", "sound", "flick_disc", "arrange"))
+        val hidden = setOf("t9_flick", "flick_disc")
+        // 在 26 键里排列：只看到 settings/sound/arrange，把 sound 拖到最前，emoji 拖进菜单
+        val edited = QuickActionLayout(listOf("schema"), listOf("sound", "emoji", "settings", "arrange"))
+        val result = QuickActionLayout.restoreHidden(edited, saved, hidden)
+        assertEquals(listOf("schema"), result.toolbar)
+        assertEquals(listOf("sound", "t9_flick", "emoji", "flick_disc", "settings", "arrange"), result.menu)
+        // 什么都不动时保存，原样不变
+        assertEquals(saved, QuickActionLayout.restoreHidden(
+            QuickActionLayout(saved.toolbar, saved.menu - hidden), saved, hidden))
+    }
 }
