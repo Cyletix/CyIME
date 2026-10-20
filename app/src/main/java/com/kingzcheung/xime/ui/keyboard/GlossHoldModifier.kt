@@ -2,9 +2,13 @@ package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 
 /**
  * 按住这个键超过 [timeoutMillis] 且没有滑动算一次长按：[onHoldChange] 收到 true，松手时收到 false。
@@ -46,3 +50,37 @@ internal fun Modifier.glossHold(
         }
     }
 }
+
+/**
+ * 从这个键拖到候选栏上：经过候选时候选中英对调（[CandidateGlossary.t9DragSwap]），在候选上松手就按住
+ * Shift 选它（有英文上屏英文）。松手判定在键自己的手势之前（Initial 阶段）消费掉这次抬起，所以键原来的
+ * 左滑、上滑、点按都不会再触发；松手不在候选上则一律不碰，原手势照旧。
+ */
+internal fun Modifier.dragToCandidate(enabled: Boolean, targets: CandidateDropTargets = CandidateDropTargets.shared): Modifier =
+    if (!enabled) this else composed {
+        val coordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+        onGloballyPositioned { coordinates[0] = it }.pointerInput(targets) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val swap = com.kingzcheung.xime.gloss.CandidateGlossary.t9DragSwap
+                try {
+                    while (true) {
+                        val change = awaitPointerEvent(PointerEventPass.Initial).changes
+                            .firstOrNull { it.id == down.id } ?: break
+                        val point = coordinates[0]?.takeIf { it.isAttached }?.localToRoot(change.position)
+                        val target = point?.let { targets.at(it) }
+                        swap.value = target != null
+                        if (!change.pressed) {
+                            if (target != null) {
+                                change.consume()
+                                target.second()
+                            }
+                            break
+                        }
+                    }
+                } finally {
+                    swap.value = false
+                }
+            }
+        }
+    }
