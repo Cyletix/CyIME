@@ -733,6 +733,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         if (input.isNotEmpty()) {
                             val accepted = withEditor { service.submitText(input).accepted }
                             if (!accepted) return@command
+                            // English typed by hand (Obsidian) is offered again next time, dictionary or not.
+                            if (!isT9 && state.currentSchemaId in RIME_ICE_CAPITAL_SCHEMAS &&
+                                !com.kingzcheung.xime.settings.IncognitoState.active) {
+                                com.kingzcheung.xime.settings.EnglishWordMemory.remember(
+                                    com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service), input)
+                            }
                         }
                         if (isT9) {
                             // 同步清空，避免异步 postRimeJob 延迟导致后续 backspace 拿到旧状态。
@@ -2021,6 +2027,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (!snapshot.hasSameSelectionSource(service.candidateState.value)) return@postRimeJob
             val text = snapshot.candidates.getOrNull(displayIndex)
             if (text.isNullOrEmpty()) return@postRimeJob
+            if (forgetEnglishWord(text)) return@postRimeJob
             val engineIndex = resolveRimeCandidateIndex(
                 displayIndex, text, service.rimeEngine.getCandidates().toList()
             )
@@ -2110,6 +2117,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (!snapshot.hasSameSelectionSource(service.candidateState.value)) return@postRimeJob
             val text = snapshot.expandedCandidates.getOrNull(globalIndex)?.text
             if (text.isNullOrEmpty()) return@postRimeJob
+            if (forgetEnglishWord(text)) return@postRimeJob
             val result = service.rimeEngine.forgetCandidateAtRevision(globalIndex, snapshot.engineRevision, global = true)
             FileLogger.i(
                 "ImeKeyRouter",
@@ -2121,6 +2129,18 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             }
             showForgetResult(text, result)
         }
+    }
+
+    /** A remembered hand-typed English word (lua/cyime_en_memory.lua) has no Rime record: forget it from its file. */
+    private suspend fun forgetEnglishWord(text: String): Boolean {
+        if (service.uiState.value.currentSchemaId !in RIME_ICE_CAPITAL_SCHEMAS) return false
+        val rimeDir = com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service)
+        if (!com.kingzcheung.xime.settings.EnglishWordMemory.forget(rimeDir, text)) return false
+        // Translate the same input again so the forgotten word leaves the menu.
+        service.rimeEngine.setInput(service.rimeEngine.getInput())
+        withEditor { service.updateUI() }
+        showForgetResult(text, 1)
+        return true
     }
 
     /** 忘掉学习的结果提示：用户看不到词库内部状态，只有这句话说明发生了什么。 */
