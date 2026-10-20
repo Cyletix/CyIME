@@ -1031,7 +1031,14 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
             onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
         contentAlignment = Alignment.CenterStart) {
         val shownText = if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text
-        Text(preeditWithCaret(shownText, visuals.accentColor),
+        // 光标像系统文字光标一样闪（530ms 一亮一灭）；黑白、柔和蓝等主题里强调色和拼音同色，光靠颜色分不开。
+        val caretAlpha = if (com.kingzcheung.xime.service.PREEDIT_CARET in shownText) {
+            val blink = androidx.compose.animation.core.rememberInfiniteTransition(label = "preedit-caret")
+            blink.animateFloat(1f, 0f, androidx.compose.animation.core.infiniteRepeatable(
+                androidx.compose.animation.core.keyframes { durationMillis = 1060; 1f at 0; 1f at 529; 0f at 530; 0f at 1059 }),
+                label = "preedit-caret-alpha").value
+        } else 1f
+        Text(preeditWithCaret(shownText, visuals.accentColor.copy(alpha = caretAlpha)),
             color = visuals.textColor.copy(alpha = if (visuals.opaqueComments) 1f else 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
             softWrap = false, style = LocalTextStyle.current.copy(shadow = visuals.textShadow), modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
     }
@@ -1223,7 +1230,7 @@ private fun Modifier.shiftDragOverlay(rootOrigin: () -> androidx.compose.ui.geom
 private val EDGE_STRETCH_START = 940.dp
 private val EDGE_STRETCH_FULL = 1400.dp
 
-/** 拼音里的编辑光标“|”用主题强调色加粗画，和拼音字母区分开（用户 10-21）。其余文字照旧。 */
+/** 拼音里的编辑光标“|”用主题强调色加粗画（调用处让它闪烁），和拼音字母区分开（用户 10-21）。其余文字照旧。 */
 internal fun preeditWithCaret(text: String, accent: Color): AnnotatedString {
     val caret = text.indexOf(com.kingzcheung.xime.service.PREEDIT_CARET)
     if (caret < 0) return AnnotatedString(text)
