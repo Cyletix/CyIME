@@ -63,12 +63,12 @@ public final class ChatReplay {
         boundaryLimit = integer(flags, "boundary-limit", 100, rowLimit, 500);
         settleTimeoutMs = integer(flags, "settle-timeout-ms", 5000, 1, 60000);
         variant = flags.containsKey("variant") ? flags.get("variant") : "digits";
-        if (!Arrays.asList("digits", "separated", "locked", "letters").contains(variant)) {
+        if (!Arrays.asList("digits", "separated", "locked", "letters", "letters14").contains(variant)) {
             throw new IllegalArgumentException("Unknown --variant " + variant);
         }
         schema = flags.getOrDefault("schema", "t9_pinyin");
         if (!schema.matches("[a-z0-9_]+")) throw new IllegalArgumentException("Bad --schema " + schema);
-        if (variant.equals("letters") == schema.equals("t9_pinyin")) {
+        if (variant.startsWith("letters") == schema.equals("t9_pinyin")) {
             throw new IllegalArgumentException("--variant letters types full pinyin into a 26-key --schema; digit variants need t9_pinyin");
         }
         // "translator/max_sentences=1;t9/sentence_rescore=false": a <schema>.custom.yaml patch written before
@@ -259,15 +259,16 @@ public final class ChatReplay {
         for (int i = 0; i < syllables.length; i++) {
             syllables[i] = normalizePinyin(pinyin.getString(i));
             // Letters: the full pinyin typed without separators, as on the 26-key keyboard.
-            digits[i] = variant.equals("letters") ? syllables[i] : digits(syllables[i]);
+            digits[i] = variant.equals("letters") ? syllables[i]
+                : variant.equals("letters14") ? keys14(syllables[i]) : digits(syllables[i]);
             all.append(digits[i]);
         }
-        if (!variant.equals("letters") && item.has("keys") && !all.toString().equals(item.getString("keys"))) {
+        if (!variant.startsWith("letters") && item.has("keys") && !all.toString().equals(item.getString("keys"))) {
             throw new IllegalArgumentException(id + ": keys disagree with pinyin");
         }
         engine.nativeT9ClearComposition(1);
         engine.nativeT9FlushRimeInput();
-        if (variant.equals("letters")) engine.nativeSetInput("");  // 26-key schemas have no T9 processor
+        if (variant.startsWith("letters")) engine.nativeSetInput("");  // 26-key schemas have no T9 processor
         StringBuilder typed = new StringBuilder();
         StringBuilder sentKeys = new StringBuilder();
         for (int syllable = 0; syllable < syllables.length; syllable++) {
@@ -465,6 +466,17 @@ public final class ChatReplay {
             for (byte value : digest.digest()) actual.append(String.format(Locale.ROOT, "%02x", value & 255));
             if (!hash.equals(actual.toString())) throw new IOException("Asset hash mismatch: " + entry.getName());
         }
+    }
+
+    /** 14-key keyboard (pinyin_14jian): paired letters share one key, typed as its capital; l and m stand alone. */
+    private static String keys14(String pinyin) {
+        String pairs = "qwQerEtyTuiUopOasAdfDghGjkJzxZcvCbnB";
+        StringBuilder out = new StringBuilder();
+        for (char ch : pinyin.toCharArray()) {
+            int at = pairs.indexOf(ch);
+            out.append(at < 0 || Character.isUpperCase(ch) ? ch : pairs.charAt(at - at % 3 + 2));
+        }
+        return out.toString();
     }
 
     private static String digits(String pinyin) {
