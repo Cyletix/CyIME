@@ -62,3 +62,12 @@ python -I tools/dictionaries/glossary/build_glossary.py --ecdict ecdict.csv --ce
 - 回放前 5 候选有英文：25.0%（v4）→ 25.7%（v5）。
 - v5：2,127,575 字节，sha256 `e129bda7454ffeca8b0445c9791be67e027f0874952b5a0ef2ea8d4ccf8fc85b`，已上传 Release。每键查表 p95 4.6 µs（v3）／4.8（v4）／5.0（v5），引擎每键 p95 20.8 ms。
 
+## 10-21 常见短语离线翻译（v6～v8）
+
+- 电脑上用 opus-mt-zh-en（单独环境 `D:/CyIME-Data/gloss-mt`，CPU 低优先级）把 rime_ice 权重 ≥ 5000、没有整词英文的 50,709 条短语一次性翻好（`tools/dictionaries/glossary/phrase_pool.py`、`translate_phrases.py`）。
+- v6：按模型把握度 + 词典对照筛，留 15,137 条，抽 30 条错 3 条，不合格（未接进 App）。只看把握度也不可靠：垃圾信息 曾被高把握地译成一句程序报错。
+- v7：改为回译核对（`backtranslate.py`，opus-mt-en-zh），只收说话用短语（带代词、虚词、助动词），英文译回中文能回到原短语的（`roundtrip_filter.py`）；名词复合词交给整词词典（模型会按字面拆错：白天鹅 → day goose）。同时去掉 v5 的逐词拼短语（很有道理 → very make sense）。抽 100 条错 1 条（在青岛 → in Aoshima）。
+- v8：再去掉带地名、人名（句首以外有大写词）的翻译短语，共 1,200 条。回放前 5 候选有英文 25.3%（整词 25.0%）。文件 2,108,958 字节，sha256 `5143705717bd91126c35b48591bd22b6355023141b05194bb2d7ae71ae1c8634`，已上传 Release；v6、v7 也在 Release 上，App 不读。
+- 速度：v8 每键查表 p95 6.0 µs（同批按键，引擎每键 p95 20.8 ms）。
+- 再提高覆盖率的方向：候选里四分之三是整句和临时组合，词典式释义到顶约三成；要更多只能在候选栏里做实时整句翻译（端侧翻译模型，体积和延迟代价大，此前已评估不进候选栏）。
+
