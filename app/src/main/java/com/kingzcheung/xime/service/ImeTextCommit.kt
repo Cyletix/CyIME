@@ -151,7 +151,8 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         }
         // 标记为已消费：候选栏/剪贴板点选上屏后不再重复出现在候选栏
         service.clipboardManager.markConsumed(text)
-        if (service.clipboardManager.quickSendItems.value.any { it.text == text }) {
+        if (com.kingzcheung.xime.clipboard.clipboardPasteMode(text, service.clipboardManager.quickSendItems.value) ==
+            com.kingzcheung.xime.clipboard.ClipboardPasteMode.PRIVATE) {
             // 固定内容多是账号、密码等个人信息：照常上屏，但不发给插件提交事件，也不进联想上下文。
             service.cancelVerificationCodeInput()
             service.dismissPredictionsForPaste()

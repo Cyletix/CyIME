@@ -716,6 +716,22 @@ fun KeyboardView(
                 )
             }
 
+            // 剪贴板搜索：沿用工具面板的位置、样式和输入通道。
+            if (state.clipboardSearchVisible) {
+                val clipboardContext = androidx.compose.ui.platform.LocalContext.current
+                val clipboard = remember(clipboardContext) {
+                    com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(clipboardContext) }
+                ClipboardSearchPanel(
+                    textColor = keyTextColor,
+                    accentColor = accentColor,
+                    cardBgColor = keyBgColor,
+                    search = clipboard::search,
+                    onSelect = { callbacks.onClipboardSearchSelect?.invoke(it) },
+                    onClose = { callbacks.onClipboardSearchClose?.invoke() },
+                    onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
+                )
+            }
+
             if (preeditEditSession != null && preeditFrame != null) {
                 PreeditEditorBar(preeditFrame!!, keyBgColor, candidateTextColor, accentColor,
                     onClose = { closePreeditEditor() },
@@ -1748,6 +1764,7 @@ fun KeyboardView(
                         onExpandImages = callbacks.onExpandClipboardImages,
                         onCollapseImages = callbacks.onCollapseClipboardImages,
                         onRecognizeDocument = { viewModel.showOverlay(OverlayRoute.Ocr) },
+                        onOpenSearch = callbacks.onClipboardSearchOpen,
                     )
                     is OverlayRoute.ToolbarCustomize -> ToolbarCustomizeView(
                         toolbarButtons = state.toolbarButtons,

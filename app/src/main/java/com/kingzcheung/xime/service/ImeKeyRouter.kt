@@ -382,7 +382,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             )
                         }
                     }
-                    service.triggerToolPanelGenerate()
+                    if (service.uiState.value.clipboardSearchVisible) service.mainHandler.post { service.submitClipboardSearch() }
+                    else service.triggerToolPanelGenerate()
                     return
                 }
                 "delete" -> {

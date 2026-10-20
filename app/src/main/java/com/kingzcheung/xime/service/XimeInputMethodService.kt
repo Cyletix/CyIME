@@ -1211,6 +1211,50 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /** Learning state saved while the clipboard search bar keeps the engine incognito. */
+    private var clipboardSearchSavedSensitive: Boolean? = null
+
+    /**
+     * Opens the clipboard search bar above the keyboard. It types through the tool-panel input
+     * channel; the engine is incognito meanwhile, so nothing typed into search is learned.
+     */
+    internal fun openClipboardSearch() {
+        if (uiState.value.toolPanelVisible) closeToolPanel()
+        keyboardViewModel.closeOverlay()
+        if (clipboardSearchSavedSensitive == null) {
+            clipboardSearchSavedSensitive = com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor
+            com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor = true
+            applyIncognito()
+        }
+        uiState.value = uiState.value.copy(clipboardSearchVisible = true, toolPanelInputFocused = true, enterKeyText = "搜索")
+    }
+
+    internal fun closeClipboardSearch(openBoard: Boolean) {
+        if (!uiState.value.clipboardSearchVisible) return
+        if (candidateState.value.isComposing) {
+            keyRouter.postRimeJob { rimeEngine.clearComposition(); withContext(Dispatchers.Main) { updateUI() } }
+        }
+        uiState.value = uiState.value.copy(clipboardSearchVisible = false, toolPanelInputFocused = false,
+            enterKeyText = editorEnterKeyText())
+        ToolPanelEditTextHolder.editText = null
+        clipboardSearchSavedSensitive?.let { com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor = it }
+        clipboardSearchSavedSensitive = null
+        applyIncognito()
+        if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
+    }
+
+    /** Enter in the search bar: the board opens showing only the matches. */
+    internal fun submitClipboardSearch() {
+        clipboardManager.boardQuery.value = ToolPanelEditTextHolder.editText?.text?.toString()?.trim().orEmpty()
+        closeClipboardSearch(openBoard = true)
+    }
+
+    /** A result goes through the normal clipboard paste, so a fixed record stays private. */
+    internal fun selectClipboardSearchResult(item: com.kingzcheung.xime.clipboard.ClipboardItem) {
+        closeClipboardSearch(openBoard = false)
+        textCommit.selectClipboardItem(item.text)
+    }
+
     internal fun closeToolPanel() {        toolPanelSelection = null
         stopToolPanelPoll()
         // 面板相关 Overlay 页面（ToolPanel 纯展示页）开着时联动关闭
@@ -1917,6 +1961,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     quickSendEditingItemCode = state.quickSendEditingItemCode,
                                     toolPanelVisible = state.toolPanelVisible,
                                     toolPanelInputFocused = state.toolPanelInputFocused,
+                                    clipboardSearchVisible = state.clipboardSearchVisible,
                                     toolPanelPluginId = state.toolPanelPluginId,
                                     toolPanelTitle = state.toolPanelTitle,
                                     toolPanelPrefillText = state.toolPanelPrefillText,
@@ -3136,6 +3181,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         voiceReviveCandidate = !finishingInput && !voicePillDismissed && voiceState.isVoiceMode && voiceState.voiceSticky &&
             !voiceState.isCompact && !voiceState.voiceCollapsed
         discardInlinePinyinBeforeFrameworkFinish()
+        // The search bar belongs to this keyboard session; leaving restores learning.
+        closeClipboardSearch(openBoard = false)
         super.onFinishInputView(finishingInput)
         runtimeObserver?.stop()
         voiceRecognitionHandler.endInputSession()
