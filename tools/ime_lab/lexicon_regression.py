@@ -69,6 +69,13 @@ def prepare_android(work):
     shutil.copytree(REPO / "app/build/generated/chinese-assets/rime_ice", data)
     for name in ("pinyin_14jian.schema.yaml",):
         shutil.copy(REPO / "app/src/main/assets/rime_chinese" / name, data / name)
+    if os.environ.get("CYIME_K14_RESCORE"):  # experiment: the 26-key sentence rescoring on the 14-key schema
+        path = data / "pinyin_14jian.schema.yaml"
+        text = path.read_text(encoding="utf-8").replace(
+            chr(10) + "translator:" + chr(10),
+            chr(10) + "translator:" + chr(10) + "  max_sentences: 4" + chr(10) + "  sentence_cutoff_threshold: 100" + chr(10), 1)
+        path.write_text(text + chr(10) + "t9:" + chr(10) + "  sentence_rescore: true" + chr(10) + "  ngram_model: t9_ngram"
+                        + chr(10) + "  ngram_sentence_start: false" + chr(10), encoding="utf-8")
     for name in ("default.yaml", "symbols.yaml"):
         shutil.copy(REPO / "app/src/main/assets/rime" / name, data / name)
     text = (data / "default.yaml").read_text(encoding="utf-8")

@@ -149,6 +149,9 @@ speller:
 translator:
   dictionary: rime_ice
   prism: pinyin_14jian
+  # 四条整句备选，由词组模型挑最自然的一条放第一（菜单仍只显示一条），同 26 键（t9/sentence_rescore）。
+  max_sentences: 4
+  sentence_cutoff_threshold: 100
   packs:
     - user_simp
   spelling_hints: 8
@@ -182,3 +185,10 @@ recognizer:
   patterns:
     punct: "^/([0-9]+[a-z]*|[a-z]+)$"
     reverse_lookup: "`[a-z]*'?$"
+
+# 词组模型给 Rime 的四条整句重新打分（同 26 键；2026-10-20 电脑回归：整句首选 调参 LCCC 299→365、SMS 324→387，
+# 各列不变差，逐键 p95 约 +1.5%）。没有 t9_ngram.lm 时照原样只出一条。14 键不传前文，第一个词不按句首算。
+t9:
+  sentence_rescore: true
+  ngram_model: t9_ngram
+  ngram_sentence_start: false
