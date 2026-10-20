@@ -114,32 +114,40 @@ class CandidateGlossaryTest {
     }
 
     private val composeTable get() = table("我" to "I", "想" to "think", "吃" to "eat", "吃饭" to "have a meal",
-        "会" to "~meet", "昨天" to "yesterday", "你好" to "hello")
+        "会" to "~meet", "昨天" to "yesterday", "你好" to "hello", "我估计" to "+I estimate")
 
     @Test
-    fun `word-by-word phrase glosses stay off by default`() {
-        assertEquals(listOf("", "hello"),
-            CandidateGlossary.annotate(composeTable, listOf("我想吃饭", "你好"), listOf("", "")))
+    fun `everyday phrases come pre-composed from the dictionary, other combinations show nothing`() {
+        // 词典里预先拼好的日常短语（+ 前缀）显示时去掉前缀；运行时不再按字数拼。
+        assertEquals(listOf("I estimate", "", "hello"),
+            CandidateGlossary.annotate(composeTable, listOf("我估计", "我吃饭", "你好"), listOf("", "", "")))
         // 单字照常显示，去掉不可靠标记。
         assertEquals("meet", CandidateGlossary.annotate(composeTable, listOf("会"), listOf("")).first())
     }
 
     @Test
-    fun `when enabled, phrases are glossed from the longest dictionary words`() {
-        assertEquals("I think have a meal", CandidateGlossary.compose(composeTable, "我想吃饭"))
-        assertEquals("I yesterday eat", CandidateGlossary.compose(composeTable, "我昨天吃"))
+    fun `runtime composition, when switched on, uses dictionary words and fixed characters only`() {
+        assertEquals("I have a meal", CandidateGlossary.compose(composeTable, "我吃饭"))
+        assertEquals("I yesterday", CandidateGlossary.compose(composeTable, "我昨天"))
     }
 
     @Test
-    fun `composition shows nothing when a character is unreliable or unknown`() {
-        // 会 只有不可靠的单字释义，拼进句子不用；拟 词典里没有。
+    fun `sentences longer than four characters are never composed`() {
+        assertNull(CandidateGlossary.compose(composeTable, "我昨天吃饭"))
+    }
+
+    @Test
+    fun `phrases with a non-fixed single character show nothing rather than a guess`() {
+        // 想、会 不在固定常用字里（会 还只有不可靠释义）；拟 词典里没有。
+        assertNull(CandidateGlossary.compose(composeTable, "我想吃饭"))
         assertNull(CandidateGlossary.compose(composeTable, "我会吃"))
-        assertNull(CandidateGlossary.compose(composeTable, "我拟吃"))
+        assertNull(CandidateGlossary.compose(composeTable, "我拟"))
     }
 
     @Test
     fun `shift only commits dictionary words, never a word-by-word phrase gloss`() {
-        assertNull(CandidateGlossary.englishFor(composeTable, "我想吃饭"))
+        assertNull(CandidateGlossary.englishFor(composeTable, "我吃饭"))
+        assertNull(CandidateGlossary.englishFor(composeTable, "我估计"))   // 预拼短语只显示不上屏
         assertEquals("meet", CandidateGlossary.englishFor(composeTable, "会"))
         assertEquals("have a meal", CandidateGlossary.englishFor(composeTable, "吃饭"))
     }
