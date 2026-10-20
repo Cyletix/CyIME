@@ -21,7 +21,9 @@ target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octa
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm")
 target_sources(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm/cylm.cpp")
 # Source properties are per directory: set it where rime-static is defined, or main() gets linked in.
-set_source_files_properties("${CMAKE_SOURCE_DIR}/cylm/cylm.cpp" TARGET_DIRECTORY rime-static PROPERTIES COMPILE_DEFINITIONS "CYLM_LIBRARY;CYLM_ORT")
+set_source_files_properties("${CMAKE_SOURCE_DIR}/cylm/cylm.cpp" TARGET_DIRECTORY rime-static PROPERTIES COMPILE_DEFINITIONS "CYLM_LIBRARY;CYLM_ORT"
+  # OrtStatus results of option setters are ignored on purpose in cylm.cpp; the NDK build treats that as an error.
+  COMPILE_OPTIONS "-Wno-unused-result")
 # The reranker uses the onnxruntime C API; rime-static links onnxruntime already (jni CMakeLists).
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/onnxruntime/include")
 t9_replace("double sentence_cutoff_threshold)" "double sentence_cutoff_threshold, Config* config)")
