@@ -141,3 +141,5 @@ Rime 26 键照原样组句，`translator/max_sentences: 4`（`sentence_cutoff_th
 ### 14 键也用重新打分（同日）
 
 14 键（`pinyin_14jian`，合并键是大写字母）同样由 Rime 组句，同一套 `t9/sentence_rescore` 直接可用；门槛里的“元音段”把带元音的合并键 E/U/O/A 也算上（否则 14 键输入一律被当成缩写跳过）。把公开集、调参集和 14 类句式按 14 键键位转成输入（`D:/CyIME-Data/tmp/k14/k14.tsv`，`lexicon_regression.py` 设 `CYIME_K14_RESCORE=1`）：整句首选 调参 LCCC 299→365、SMS 324→387，公开 LCCC 282→323、SMS 295→326、日常 134→148，句式 1196→1232；改对 275、改错 24，各列都不变差。逐键 p95（电脑，23,822 键，四轮交替）3.86→3.92 ms，约 +1.5%，在用户同意的 +5% 以内。
+
+备选从 4 条加到 6 条（`lexicon_regression.py` 设 `CYIME_RIME_ICE_REPLACE="max_sentences: 4=>max_sentences: 6"`）：调参 LCCC 414→419、SMS 447→454，公开 LCCC 375→380、SMS 382→385，句式 1323→1330，但日常聊天全拼 68→67，有列变差，保持 4 条。
