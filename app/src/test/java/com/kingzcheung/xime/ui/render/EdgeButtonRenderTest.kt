@@ -46,7 +46,7 @@ import java.io.File
  * 玻璃开时候选栏后面垫一张彩色“壁纸”，才看得出半透明。
  */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1340dp-h1000dp-hdpi")
+@Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1620dp-h1000dp-hdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class EdgeButtonRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()

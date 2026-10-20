@@ -391,8 +391,11 @@ fun CandidateBar(
         val edgeStyle = LocalEdgeButtonStyle.current
         val edgeSlot = if (edgeStyle == EdgeButtonStyle.CIRCLE || toolbarRowWidth <= 0.dp) null else {
             val gap = splitGapX?.let { (l, r) -> with(rowDensity) { (r - l).toDp() } } ?: 0.dp
-            // 最多 64dp 一格：按钮随格子从圆连续拉成胶囊，最宽 52dp，宽屏也不多占候选的地方（用户 10-20）。
-            minOf(maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + 2).coerceAtLeast(1), 36.dp), 64.dp)
+            val baseSlot = maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + 2).coerceAtLeast(1), 36.dp)
+            // 手机（含横屏）和平板竖屏都保持正圆；候选栏宽过 940dp 才开始拉长，到 1400dp（平板横屏）
+            // 拉到最宽 52dp（用户 10-21：原来手机上就开始拉，太早）。悬浮小窗格子窄时照旧缩小的圆。
+            val stretch = ((toolbarRowWidth - EDGE_STRETCH_START) / (EDGE_STRETCH_FULL - EDGE_STRETCH_START)).coerceIn(0f, 1f)
+            if (baseSlot < 44.dp) baseSlot else 44.dp + 20.dp * stretch
         }
         // 同心：胶囊圆角 = 键盘卡片圆角 - 胶囊离栏边的距离（上下各 6dp），和卡片四角同心。
         val edgeCorner = if (edgeStyle == EdgeButtonStyle.CONCENTRIC) FloatingKeyboardCardCorner - 6.dp else null
@@ -1152,3 +1155,7 @@ internal val LocalEdgeButtonStrength = androidx.compose.runtime.staticCompositio
 /** 两端按钮的形状：圆（原样）、和空闲工具栏一样宽的胶囊、与键盘卡片同心的圆角胶囊。 */
 internal enum class EdgeButtonStyle { CIRCLE, CAPSULE, CONCENTRIC }
 internal val LocalEdgeButtonStyle = androidx.compose.runtime.staticCompositionLocalOf { EdgeButtonStyle.CAPSULE }
+
+/** 候选栏两端按钮从圆开始拉长成胶囊的候选栏宽度，和拉到最宽 52dp 的宽度。 */
+private val EDGE_STRETCH_START = 940.dp
+private val EDGE_STRETCH_FULL = 1400.dp
