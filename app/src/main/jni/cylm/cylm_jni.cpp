@@ -24,6 +24,32 @@ JNIEXPORT jlong JNICALL Java_im_cyime_cylm_CylmNative_open(JNIEnv* env, jclass, 
   return reinterpret_cast<jlong>(cylm_open(l.c_str(), m.c_str(), m2.empty() ? nullptr : m2.c_str(), p.c_str()));
 }
 
+JNIEXPORT jlong JNICALL Java_im_cyime_cylm_CylmNative_open2(JNIEnv* env, jclass, jstring lexicon, jstring model,
+                                                             jstring model2, jstring reranker, jstring vocab, jstring params) {
+  auto l = Utf8(env, lexicon), m = Utf8(env, model), m2 = Utf8(env, model2), r = Utf8(env, reranker), v = Utf8(env, vocab),
+       p = Utf8(env, params);
+  return reinterpret_cast<jlong>(cylm_open2(l.c_str(), m.c_str(), m2.empty() ? nullptr : m2.c_str(),
+                                            r.empty() ? nullptr : r.c_str(), v.empty() ? nullptr : v.c_str(), p.c_str()));
+}
+
+// Like decode, but each element is "text\u001fpinyin\u001fspans" (see cylm_decode2 in cylm.h).
+JNIEXPORT jobjectArray JNICALL Java_im_cyime_cylm_CylmNative_decode2(JNIEnv* env, jclass, jlong session, jstring keys,
+                                                                     jint mode, jstring context) {
+  auto k = Utf8(env, keys), c = Utf8(env, context);
+  std::vector<char> buf(32768);
+  int n = cylm_decode2(reinterpret_cast<CylmSession*>(session), k.c_str(), mode, c.c_str(), buf.data(), int(buf.size()));
+  jclass str = env->FindClass("java/lang/String");
+  jobjectArray out = env->NewObjectArray(n > 0 ? n : 0, str, nullptr);
+  const char* q = buf.data();
+  for (int i = 0; i < n; ++i) {
+    jstring s = env->NewStringUTF(q);
+    env->SetObjectArrayElement(out, i, s);
+    env->DeleteLocalRef(s);
+    q += std::char_traits<char>::length(q) + 1;
+  }
+  return out;
+}
+
 JNIEXPORT jlong JNICALL Java_im_cyime_cylm_CylmNative_session(JNIEnv*, jclass, jlong model) {
   return reinterpret_cast<jlong>(cylm_session(reinterpret_cast<CylmModel*>(model)));
 }
