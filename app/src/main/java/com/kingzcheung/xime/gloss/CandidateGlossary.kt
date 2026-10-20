@@ -26,15 +26,16 @@ import kotlin.concurrent.thread
  */
 object CandidateGlossary {
     const val MODEL_ID = "candidate-gloss"
-    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词，v3 没标出不可靠的单字，v4 没有日常短语；装着旧版的设备自动换新。 */
-    const val FILE_NAME = "cyime_gloss-v5.tsv"
-    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv", "cyime_gloss-v3.tsv", "cyime_gloss-v4.tsv")
+    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词，v3 没标出不可靠的单字，v4 没有日常短语，v5 的短语是逐词硬拼，v6 的机器翻译短语一成翻错，v7 还有地名翻错；装着旧版的设备自动换新。 */
+    const val FILE_NAME = "cyime_gloss-v8.tsv"
+    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv", "cyime_gloss-v3.tsv", "cyime_gloss-v4.tsv",
+        "cyime_gloss-v5.tsv", "cyime_gloss-v6.tsv", "cyime_gloss-v7.tsv")
     private const val TAG = "CandidateGlossary"
     private val upgradeStarted = AtomicBoolean(false)
 
     /** 释义前缀：词典里不可靠的单字释义，显示时去掉，拼整句英文时不用。 */
     private const val APPROX = "~"
-    /** 释义前缀：词典里预先逐词拼好的日常短语英文（我估计 → I estimate），只显示，不拿来上屏。 */
+    /** 释义前缀：词典里预先翻好的常见短语英文（很有道理 → that makes sense），只显示，不拿来上屏。 */
     private const val PHRASE = "+"
     private const val COMPOSE_MAX_WORD = 6
     /** 只给短语拼英文（用户定：短一点的短语，不做整句）。 */
