@@ -822,7 +822,8 @@ private fun T9DigitKey(
         fontSize = fontSize,
         modifier = modifier,
         onPress = { currentOnPress?.invoke() },
-        longPressItems = longPressItems,
+        // 长按弹字母气泡和 26/14 键共用“长按弹出字母气泡”开关，默认关（用户 10-21）；拂动模式长按出数字，不受影响。
+        longPressItems = if (flick || inputPreferences.letterLongPressMenu) longPressItems else emptyList(),
         onLongPressSelect = { letter -> currentOnLongPressSelect?.invoke(letter) },
         // Four-letter keys: P/S on the left/right, Q/R up/down (user layout, 2026-10-18); three letters go left/up/right.
         flickLetters = if (!flick) null else if (longPressItems.size == 4)
