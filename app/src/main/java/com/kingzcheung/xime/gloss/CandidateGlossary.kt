@@ -154,8 +154,21 @@ object CandidateGlossary {
     @Volatile var composeEnabled = false
 
     /** 候选的释义：词典里有就用（去掉不可靠标记）；没有时只在 [composeEnabled] 打开后按词切开逐词拼英文。 */
-    internal fun gloss(table: GlossTable, text: String): String? =
-        table.lookup(keyOf(text))?.removePrefix(APPROX)?.removePrefix(PHRASE) ?: if (composeEnabled) compose(table, text) else null
+    internal fun gloss(table: GlossTable, text: String): String? {
+        if (isLetterAbbreviation(text)) return null
+        return table.lookup(keyOf(text))?.removePrefix(APPROX)?.removePrefix(PHRASE) ?: if (composeEnabled) compose(table, text) else null
+    }
+
+    /**
+     * 单个字母、三个字母以内的英文和全大写缩写不给中文释义：词典把它们当缩写，释义多是生僻全称
+     * （s → 标量，abc → 预定章程，KFC 也一样），中文键盘里打的大写字母和缩写没有可信的中文意思。
+     */
+    internal fun isLetterAbbreviation(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || !trimmed.all { it.code < 0x80 }) return false
+        val letters = trimmed.filter { it.isLetter() }
+        return letters.length <= 3 || letters.all { it.isUpperCase() }
+    }
 
     /**
      * 2～4 字的短语候选（我闹钟 → I alarm clock）：从左往右每次取词典里最长的两字以上词，单字只用

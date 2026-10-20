@@ -50,6 +50,14 @@ class CandidateGlossaryTest {
     }
 
     @Test
+    fun `letters and abbreviations get no Chinese gloss`() {
+        val glossary = table("s" to "标量", "abc" to "预定章程", "kfc" to "肯德基", "nasa" to "美国航空航天局",
+            "obsidian" to "黑曜石", "苹果" to "apple")
+        assertEquals(listOf("", "", "", "", "", "黑曜石", "黑曜石", "apple"), CandidateGlossary.annotate(glossary,
+            listOf("S", "s", "abc", "KFC", "NASA", "Obsidian", "obsidian", "苹果"), List(8) { "" }))
+    }
+
+    @Test
     fun `annotate keeps original comments while no glossary is loaded`() {
         assertEquals(listOf("ni hao", "ni hao"),
             CandidateGlossary.annotate(listOf("你好", "拟好"), listOf("ni hao", "ni hao")))
