@@ -14,7 +14,7 @@ function(t9_replace old new)
   set(T9_SCRIPT_TRANSLATOR_CODE "${code}" PARENT_SCOPE)
 endfunction()
 
-t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>\n#include <fstream>\n#include <mutex>")
+t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>\n#include <fstream>\n#include <mutex>\n#include <limits>\n#include <cstring>")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octagram/src")
 t9_replace("double sentence_cutoff_threshold)" "double sentence_cutoff_threshold, Config* config)")
@@ -28,6 +28,15 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
     if (config) {
       config->GetBool("t9/joint_decoder", &t9_joint_);
       config->GetBool("t9/decoded_cache", &t9_decoded_cache_);
+      config->GetBool("t9/sentence_rescore", &t9_sentence_rescore_);
+      if (t9_sentence_rescore_ && !t9_joint_) {
+        // 26-key: Rime makes translator/max_sentences sentences as usual; the word model only picks
+        // which one comes first (pinyin26-word-model-20261018.md, 2026-10-20).
+        string ngram_model;
+        if (config->GetString("t9/ngram_model", &ngram_model) && !ngram_model.empty())
+          t9_ngram_ = T9NgramModel::Open(T9ResolveOnce("t9_ngram", ".lm", ngram_model));
+        config->GetBool("t9/ngram_sentence_start", &t9_ngram_sentence_start_);
+      }
       {
         // t9/reading_table: ln(count / count of the text's main reading) for minority readings
         // (的 di, 了 liao). The word model scores words, not readings, so without this 默默的 beat
@@ -94,6 +103,7 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
   bool Evaluate]=])
 t9_replace("  bool CheckEmpty();" [=[
   bool t9_joint_ = false;
+  bool t9_sentence_rescore_ = false;
   using T9Readings = std::unordered_map<string, vector<std::pair<string, double>>>;
   std::shared_ptr<const T9Readings> t9_readings_;
   // Resource paths resolved once per type and name. Resolving stats files in the user and shared
@@ -166,6 +176,93 @@ t9_replace("  auto is_correction_match =" [=[
   }
 
   auto is_correction_match =]=])
+t9_replace("  // A corrected learned phrase can win the general sentence beam even when" [=[
+  const an<Sentence> rime_best = sentences_.empty() ? nullptr : sentences_.front();
+  // A corrected learned phrase can win the general sentence beam even when]=])
+t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmpty();" [=[
+    sentences_.push_front(exact_sentence_);
+  }
+  if (t9_sentence_rescore_ && sentences_.size() > 1) {
+    // translator/max_sentences gave the n-best to choose from; the menu keeps one sentence, as with
+    // max_sentences: 1 (followed by Rime's best when that one is a correction).
+    auto corrected = [&](const an<Sentence>& sentence) {
+      return enable_correction_ && syllabifier_->IsCorrection(sentence->code(), sentence->end() - start_);
+    };
+    an<Sentence> chosen = sentences_.front();
+    const string& in = syllabifier_->input();
+    size_t groups = 0;
+    bool vowel = false, consonants_only = !in.empty();
+    for (char ch : in) {
+      const bool v = ch && std::strchr("aeiouv", ch);
+      if (v && !vowel) ++groups;
+      vowel = v;
+      if (ch < 'a' || ch > 'z' || v) consonants_only = false;
+    }
+    // Initials and short abbreviations (zjqa, zdky) keep Rime's dictionary order.
+    if (t9_ngram_ && !consonants_only && groups >= 2) {
+      // Substring -> model word id, kept across keys (consecutive n-bests share most substrings).
+      thread_local std::unordered_map<string, int32_t> ids;
+      thread_local const T9NgramModel* ids_model = nullptr;
+      if (ids_model != t9_ngram_.get() || ids.size() > 65536) { ids.clear(); ids_model = t9_ngram_.get(); }
+      auto word_id = [&](const string& word) {
+        auto found = ids.find(word);
+        if (found != ids.end()) return found->second;
+        const int32_t id = t9_ngram_->Id(word);
+        ids.emplace(word, id);
+        return id;
+      };
+      // ln P(text): best split into model words (unigram Viterbi, words up to 8 characters), chained
+      // with bigram/trigram history, so 被嫌弃了 and 被掀起了 compare as text whatever words Rime used;
+      // plus the sentence-position rules Rime applied while making it (吧 not first, 被 not last).
+      auto score = [&](const Sentence& sentence) {
+        const string& text = sentence.text();
+        vector<size_t> at{0};
+        for (size_t i = 0; i < text.size();) {
+          const unsigned char c = static_cast<unsigned char>(text[i]);
+          i += c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+          at.push_back(std::min(i, text.size()));
+        }
+        const size_t n = at.size() - 1;
+        vector<double> best(n + 1, -std::numeric_limits<double>::infinity());
+        vector<size_t> from(n + 1, 0);
+        vector<int32_t> word(n + 1, ::T9NgramModel::kUnseen);
+        best[0] = 0;
+        for (size_t end = 1; end <= n; ++end) {
+          for (size_t start = end > 8 ? end - 8 : 0; start < end; ++start) {
+            if (!std::isfinite(best[start])) continue;
+            const int32_t id = word_id(text.substr(at[start], at[end] - at[start]));
+            if (id == ::T9NgramModel::kUnseen && end - start > 1) continue;
+            const double value = best[start] + t9_ngram_->Start(id, false);
+            if (value > best[end]) { best[end] = value; from[end] = start; word[end] = id; }
+          }
+        }
+        vector<int32_t> chain;
+        for (size_t end = n; end > 0; end = from[end]) chain.push_back(word[end]);
+        std::reverse(chain.begin(), chain.end());
+        double total = 0;
+        const int32_t root = t9_ngram_sentence_start_ ? t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
+        for (size_t k = 0; k < chain.size(); ++k)
+          total += k == 0 ? t9_ngram_->Start(chain[0], t9_ngram_sentence_start_)
+                          : t9_ngram_->LogProb3(k >= 2 ? chain[k - 2] : root, chain[k - 1], chain[k]);
+        const auto& words = sentence.components();
+        if (!words.empty() && poet_) {
+          total += poet_->PositionAdjust(words.front().text, true, words.size() == 1);
+          if (words.size() > 1) total += poet_->PositionAdjust(words.back().text, false, true);
+        }
+        return total;
+      };
+      double chosen_score = -std::numeric_limits<double>::infinity();
+      for (const auto& sentence : sentences_) {
+        if (corrected(sentence)) continue;  // a typo correction never wins on the word model alone
+        const double value = score(*sentence);
+        if (value > chosen_score) { chosen_score = value; chosen = sentence; }
+      }
+    }
+    sentences_.clear();
+    sentences_.push_back(chosen);
+    if (rime_best && rime_best != chosen && corrected(rime_best)) sentences_.push_back(rime_best);
+  }
+  return !CheckEmpty();]=])
 t9_replace("set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_")
 t9_replace("#if defined(__ANDROID__)\n#include <android/log.h>\n#include <chrono>"
            "#if defined(__ANDROID__) && defined(CYIME_ENABLE_DIAGNOSTICS)\n#include <android/log.h>")
