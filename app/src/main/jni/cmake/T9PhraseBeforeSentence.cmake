@@ -104,6 +104,10 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
 t9_replace("  bool CheckEmpty();" [=[
   bool t9_joint_ = false;
   bool t9_sentence_rescore_ = false;
+  // The word graph the last MakeSentences used (the incremental cache or a kept copy), so the
+  // sentence rescoring can make a second n-best without corrected words.
+  const WordGraph* t9_sentence_graph_ = nullptr;
+  WordGraph t9_own_sentence_graph_;
   using T9Readings = std::unordered_map<string, vector<std::pair<string, double>>>;
   std::shared_ptr<const T9Readings> t9_readings_;
   // Resource paths resolved once per type and name. Resolving stats files in the user and shared
@@ -271,9 +275,43 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
         }
         return total;
       };
+      // A typo correction never wins on the word model alone. Corrected sentences would also take
+      // n-best places from typed readings (qunawanle lost 你去哪玩了 to 你去哪完了 once swapped letters
+      // were corrections), so the choice is among sentences made from the same graph without
+      // corrected words: the typed n-best, made again only when corrections took places in it.
+      deque<an<Sentence>> pool;
+      for (const auto& sentence : sentences_)
+        if (!corrected(sentence)) pool.push_back(sentence);
+      if (pool.size() < sentences_.size() && t9_sentence_graph_ && poet_) {
+        // Spans holding no corrected syllable keep all their words without looking at each one.
+        vector<std::pair<size_t, size_t>> corrected_edges;
+        for (const auto& from : syllabifier_->syllable_graph().edges)
+          for (const auto& to : from.second)
+            for (const auto& spelling : to.second)
+              if (spelling.second.is_correction) { corrected_edges.emplace_back(from.first, to.first); break; }
+        WordGraph typed;
+        for (const auto& from : *t9_sentence_graph_)
+          for (const auto& to : from.second) {
+            const bool clean = std::none_of(corrected_edges.begin(), corrected_edges.end(), [&](const auto& edge) {
+              return edge.first >= from.first && edge.second <= to.first;
+            });
+            auto& bucket = typed[from.first][to.first];
+            if (clean) { bucket = to.second; continue; }
+            for (const auto& entry : to.second)
+              if (!syllabifier_->IsCorrection(entry->code, to.first, from.first)) bucket.push_back(entry);
+          }
+        auto remade = poet_->MakeSentences(typed, syllabifier_->syllable_graph().interpreted_length,
+                                           translator_->GetPrecedingText(start_), max_sentences_,
+                                           sentence_cutoff_threshold_);
+        for (auto& sentence : remade) {
+          sentence->Offset(start_);
+          sentence->set_syllabifier(syllabifier_);
+        }
+        if (exact_sentence_ && !corrected(exact_sentence_)) remade.push_front(exact_sentence_);
+        if (!remade.empty()) pool = std::move(remade);
+      }
       double chosen_score = -std::numeric_limits<double>::infinity();
-      for (const auto& sentence : sentences_) {
-        if (corrected(sentence)) continue;  // a typo correction never wins on the word model alone
+      for (const auto& sentence : pool) {
         const double value = score(*sentence);
         if (value > chosen_score) { chosen_score = value; chosen = sentence; }
       }
@@ -284,6 +322,11 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
   }
   return !CheckEmpty();]=])
 t9_replace("set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_")
+# Keep the graph the n-best came from: the 26-key rescoring makes a second n-best from it without corrections.
+t9_replace("        max_sentences_, sentence_cutoff_threshold_);\n    for (auto& sentence : sentences) {\n      sentence->Offset(start_);\n      sentence->set_syllabifier(syllabifier_);\n    }\n    translator_->CommitIncremental("
+           "        max_sentences_, sentence_cutoff_threshold_);\n    t9_sentence_graph_ = &inc->graph;\n    for (auto& sentence : sentences) {\n      sentence->Offset(start_);\n      sentence->set_syllabifier(syllabifier_);\n    }\n    translator_->CommitIncremental(")
+t9_replace("      max_sentences_, sentence_cutoff_threshold_);\n  for (auto& sentence : sentences) {\n    sentence->Offset(start_);\n    sentence->set_syllabifier(syllabifier_);\n  }\n  return sentences;\n}"
+           "      max_sentences_, sentence_cutoff_threshold_);\n  if (inc && cacheable) {\n    t9_sentence_graph_ = &inc->graph;\n  } else {\n    t9_own_sentence_graph_ = std::move(graph);\n    t9_sentence_graph_ = &t9_own_sentence_graph_;\n  }\n  for (auto& sentence : sentences) {\n    sentence->Offset(start_);\n    sentence->set_syllabifier(syllabifier_);\n  }\n  return sentences;\n}")
 t9_replace("#if defined(__ANDROID__)\n#include <android/log.h>\n#include <chrono>"
            "#if defined(__ANDROID__) && defined(CYIME_ENABLE_DIAGNOSTICS)\n#include <android/log.h>")
 file(READ "${T9_JOINT_DECODER}" T9_JOINT_CODE)
