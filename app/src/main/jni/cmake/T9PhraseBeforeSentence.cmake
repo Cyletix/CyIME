@@ -400,11 +400,12 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
       // A typo correction never wins on the word model alone. Corrected sentences would also take
       // n-best places from typed readings (qunawanle lost 你去哪玩了 to 你去哪完了 once swapped letters
       // were corrections), so the choice is among sentences made from the same graph without
-      // corrected words: the typed n-best, made again only when corrections took places in it.
+      // corrected words: the typed n-best, made again when corrections left two typed sentences or
+      // fewer (rebuilding whenever one place was taken cost a per-key p95 of +3.5%, this +1.6%).
       deque<an<Sentence>> pool;
       for (const auto& sentence : sentences_)
         if (!corrected(sentence)) pool.push_back(sentence);
-      if (pool.size() < sentences_.size() && t9_sentence_graph_ && poet_) {
+      if (pool.size() <= 2 && pool.size() < sentences_.size() && t9_sentence_graph_ && poet_) {
         // Spans holding no corrected syllable keep all their words without looking at each one.
         vector<std::pair<size_t, size_t>> corrected_edges;
         for (const auto& from : syllabifier_->syllable_graph().edges)
