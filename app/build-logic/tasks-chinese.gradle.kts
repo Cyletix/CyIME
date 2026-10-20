@@ -38,6 +38,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(baseWeights)
     val charWeights = file("data/rime_ice_8105_weights.tsv.gz")
     inputs.file(charWeights)
+    val tencentWeights = file("data/rime_ice_tencent_weights.tsv.gz")
+    inputs.file(tencentWeights)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
     val measureWords = file("data/sentence_measure_words.txt")
@@ -81,8 +83,10 @@ val prepareChineseDictionaries by tasks.registering {
             dict.writeText(dict.readLines().joinToString("\n", postfix = "\n") { line ->
                 if (line.trim() == "...") body = true
                 val fields = line.split('\t')
-                val weight = if (body && fields.size == 3) estimated[fields[0] + "\t" + fields[1]] else null
-                if (weight == null) line else { reweighted++; fields[0] + "\t" + fields[1] + "\t" + weight }
+                // text, code, weight; tencent has no code column (text, weight) and is keyed by text alone.
+                val key = if (fields.size == 3) fields[0] + "\t" + fields[1] else fields[0]
+                val weight = if (body && fields.size in 2..3) estimated[key] else null
+                if (weight == null) line else { reweighted++; key + "\t" + weight }
             })
             check(reweighted > estimated.size * 99 / 100) { "$name.dict.yaml no longer matches ${table.name}" }
         }
@@ -95,6 +99,9 @@ val prepareChineseDictionaries by tasks.registering {
         // Single characters (8105.dict.yaml) also had written-text weights: 把 3.8M over 吧 2.4M although chat uses
         // 吧 seven times as often, so 下个月吧 came out as 下个月把. Same blend as base (chat_base_weights.py --dict 8105).
         reweight("8105", charWeights)
+        // tencent.dict.yaml (about a million phrases) also gives every entry the placeholder 100, so 被嫌弃 and 被掀起
+        // tied and the sentence took either. Same corpus estimate as ext, spread less (ext_weights.py tencent).
+        reweight("tencent", tencentWeights)
         // The upstream corrector clears ordinary spelling annotations after the
         // translator has generated them. Let the host retain that real spelling
         // for responsive candidate UI without disabling pronunciation corrections.

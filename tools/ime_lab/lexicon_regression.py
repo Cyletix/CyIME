@@ -80,6 +80,21 @@ def prepare_android(work):
     if extra:
         with open(data / "rime_ice.schema.yaml", "a", encoding="utf-8") as schema:
             schema.write(chr(10) + Path(extra).read_text(encoding="utf-8"))
+    tencent_weights = os.environ.get("CYIME_TENCENT_WEIGHTS")
+    if tencent_weights:  # experiments: replace tencent.dict.yaml weights from a text/weight gzip TSV
+        import gzip
+        with gzip.open(tencent_weights, "rt", encoding="utf-8") as rows:
+            table = dict(row.rstrip(chr(10)).split(chr(9)) for row in rows)
+        path = data / "cn_dicts" / "tencent.dict.yaml"
+        lines = path.read_text(encoding="utf-8").split(chr(10))
+        body = False
+        for i, line in enumerate(lines):
+            if line.strip() == "...":
+                body = True
+            fields = line.split(chr(9))
+            if body and len(fields) == 2 and fields[0] in table:
+                lines[i] = fields[0] + chr(9) + table[fields[0]]
+        path.write_text(chr(10).join(lines), encoding="utf-8")
     base_weights = os.environ.get("CYIME_BASE_WEIGHTS")
     if base_weights:  # experiments: replace base.dict.yaml weights from a text/code/weight gzip TSV
         import gzip
