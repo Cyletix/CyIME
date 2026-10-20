@@ -134,11 +134,14 @@ public final class ChatReplay {
                 .put("library_sha256", libraryHashes);
             if (!schemaPatch.isEmpty()) {
                 StringBuilder custom = new StringBuilder("patch:\n");
-                for (String item : schemaPatch.split(";")) {
+                // Items are separated by ';'; a value that itself contains ';' (cylm/params) writes it as "\;".
+                for (String item : schemaPatch.split("(?<!\\\\);")) {
                     int eq = item.indexOf('=');
                     if (eq <= 0) throw new IllegalArgumentException("Bad --schema-patch item " + item);
+                    String value = item.substring(eq + 1).trim().replace("\\;", ";");
+                    if (value.contains(";") || value.contains("=")) value = "\"" + value + "\"";
                     custom.append("  \"").append(item.substring(0, eq).trim()).append("\": ")
-                        .append(item.substring(eq + 1).trim()).append('\n');
+                        .append(value).append('\n');
                 }
                 write(inside(user, schema + ".custom.yaml"), custom.toString());
                 assets.put("schema_patch", schemaPatch);
