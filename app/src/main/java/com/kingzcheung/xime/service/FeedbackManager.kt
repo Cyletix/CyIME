@@ -178,16 +178,12 @@ class FeedbackManager(private val context: Context) {
         }
 
         val light = keyUp || hfc == HapticFeedbackConstants.TEXT_HANDLE_MOVE
-        // 线性马达优先：按下是轻 click，抬起/光标是更轻的 tick，长按是完整 click；
+        // 线性马达优先：按下和长按是满强度 click，抬起/光标是稍轻的 tick；
         // 时长由马达决定，振幅设置只调强弱。系统默认时不再交给 KEYBOARD_TAP（三星上偏重）。
         val primitive = if (light) VibrationEffect.Composition.PRIMITIVE_TICK else VibrationEffect.Composition.PRIMITIVE_CLICK
-        val defaultScale = when {
-            longPress -> 1f
-            light -> 0.5f
-            else -> 0.6f
-        }
+        val defaultScale = if (light) 0.8f else 1f
         if (vibratePrimitive(primitive, amplitude, defaultScale)) return
-        if (duration == 0L && amplitude == 0 && vibratePredefined(if (longPress) VibrationEffect.EFFECT_CLICK else VibrationEffect.EFFECT_TICK)) return
+        if (duration == 0L && amplitude == 0 && vibratePredefined(if (light) VibrationEffect.EFFECT_TICK else VibrationEffect.EFFECT_CLICK)) return
         if (duration != 0L) {
             if (hasAmplitudeControl && amplitude != 0) {
                 vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
