@@ -144,7 +144,7 @@ fun SpeechToTextSettingsContent(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("语音与手写", style = MaterialTheme.typography.titleMedium,
+                title = { Text("语音转文本", style = MaterialTheme.typography.titleMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -265,9 +265,6 @@ fun SpeechToTextSettingsContent(
                     )
                 }
             }
-
-            // 手写和语音同属输入方式，停顿识别、公式标记放在这里。
-            HandwritingSettings()
 
             if (!useLocal) {
                 OnlineAsrTab(

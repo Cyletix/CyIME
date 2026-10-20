@@ -29,6 +29,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.kingzcheung.xime.ui.keyboard.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -100,6 +102,13 @@ fun KeyEffectSettingsContent(
                     }
 
                     if (uiState.soundEnabled) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        // 按键音色：和音量一样是按键音的从属行，按键音关掉时一起隐藏；写入即时生效（FeedbackManager 监听这个键）。
+                        KeySoundStyleSetting()
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 16.dp),
                             thickness = 0.5.dp,
@@ -394,5 +403,39 @@ private fun KeyVisualEffectToggle(title: String, description: String, enabled: B
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = enabled, onCheckedChange = null)
+    }
+}
+
+/** 按键音色三选一：默认 / Rain75 紫薇轴 / 清脆（存的值 default|mahjong|crisp）；样式和「触觉反馈模式」的卡片一样。 */
+@Composable
+private fun KeySoundStyleSetting() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context)
+    val key = com.kingzcheung.xime.service.FeedbackManager.KEY_SOUND_STYLE
+    var style by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(prefs.getString(key, "default") ?: "default") }
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text(text = "按键音色", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+        Text(text = "换一种按键声音，选好立即生效", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(8.dp))
+        val rowHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+            // 标题按两行算：「Rain75 紫薇轴」在窄屏要换行才放得下。
+            HAPTIC_CARD_TEXT_HEIGHT.toDp() + MaterialTheme.typography.bodyMedium.lineHeight.toDp() * 2
+        } + 4.dp + 32.dp + 6.dp + 4.dp
+        Row(modifier = Modifier.fillMaxWidth().height(maxOf(104.dp, rowHeight)),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(Triple("default", "默认", "♪" to "原有音效"), Triple("mahjong", "Rain75 紫薇轴", "▣" to "线性轴"),
+                Triple("crisp", "清脆", "♫" to "清亮")).forEach { (value, label, art) ->
+                IllustratedChoiceCard(label, style == value, onClick = {
+                    style = value
+                    prefs.edit().putString(key, value).apply()
+                }, modifier = Modifier.weight(1f), tag = "key-sound-style:$value", titleMaxLines = 2) {
+                    val primary = MaterialTheme.colorScheme.primary
+                    Text(art.first, fontSize = 20.sp, lineHeight = 24.sp, color = primary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(art.second, fontSize = 12.sp, lineHeight = 16.sp, color = primary, maxLines = 1)
+                }
+            }
+        }
     }
 }

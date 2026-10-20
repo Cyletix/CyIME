@@ -366,27 +366,24 @@ fun SettingsMainContent(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                     SettingsItem(
+                        icon = Icons.TwoTone.Gesture,
+                        title = "手写",
+                        subtitle = "停顿识别、公式标记、手写模型",
+                        onClick = { onNavigateToRoute(SettingsRoutes.Handwriting) },
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
                         icon = Icons.TwoTone.Ballot,
                         title = "词库",
                         subtitle = "自定义短语、方案词库、分类词库",
                         onClick = onNavigateToDictionary,
                         showArrow = true
                     )
-                    // Handwriting training is the developer's own tool: only 装到我的设备 and debug builds show it.
-                    if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 56.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItem(
-                            icon = Icons.TwoTone.Gesture,
-                            title = "手写训练模式",
-                            subtitle = "按题写假名、字母、符号和公式，收集样本导出给电脑训练",
-                            onClick = onNavigateToHandwritingTraining,
-                            showArrow = true
-                        )
-                    }
                 })
             }
 
