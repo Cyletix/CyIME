@@ -27,7 +27,7 @@ UPSTREAM = 100
 # setting compared in docs/development/ext-weights-20261018.md (7 clauses fixed, 1 regressed).
 STRENGTH = 0.13
 # tencent.dict.yaml is larger and mostly phrases; at 0.13 its estimated phrases overtook user-reported abbreviations
-# (zdky -> 真的可以). 0.09 broke no column of the lexicon regression (docs/development/chat-base-weights-20261018.md).
+# (zdky -> 真的可以), and at 0.09 over counted base words in nine-key (被领导); 0.05 broke neither (chat-base-weights-20261018.md).
 STRENGTHS = {"ext": STRENGTH, "tencent": 0.05}
 
 
