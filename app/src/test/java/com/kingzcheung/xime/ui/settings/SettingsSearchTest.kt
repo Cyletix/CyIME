@@ -34,7 +34,7 @@ class SettingsSearchTest {
     @Test fun everySettingLivesInOnePlaceUnderTheNewGroups() {
         val dup = SettingsSearchIndex.groupBy { it.title }.filterValues { it.size > 1 }.keys
         assertTrue("重复：$dup", dup.isEmpty())
-        val groups = setOf("输入法", "键盘", "智能与输入方式", "扩展", "系统")
+        val groups = setOf("配置选择", "输入", "外观", "智能", "系统")
         val stray = SettingsSearchIndex.filter { it.path.substringBefore(" › ") !in groups }.map { it.title }
         assertTrue("不在新分组下：$stray", stray.isEmpty())
     }
