@@ -2927,6 +2927,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        // 悬浮条状态下再点输入框：App 会再次请求弹出键盘，换回完整键盘；语音照常听写，与展开按钮相同。
+        if (voicePillExpandsOnShowRequest(uiState.value.voiceCollapsed, pendingVoicePill, configChange)) expandFromVoicePill()
         return true
     }
 
