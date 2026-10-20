@@ -1,0 +1,156 @@
+"""把 KanjiVG 的平假名、片假名笔画转成内置默认假名模板，并用自己写的假名样本测准确率。
+
+    python kana_kanjivg.py --kanjivg D:/CyIME-Data/datasets/kanjivg-kana --out app/src/main/assets/handwriting/kana_default_strokes.json
+    python kana_kanjivg.py --kanjivg ... --eval <训练模式导出.jsonl>      # 只测，不写文件
+
+模板文件只含 KanjiVG 的笔画（按笔顺，每笔若干点，坐标在 0..109 的方格里）；
+App 第一次打开日语手写时用公式模型把它们算成特征，用户自己的样本永远优先、不足时才用它补。
+测试用的个人样本只在电脑上读，不写进任何文件。
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import random
+import re
+import sys
+
+import numpy as np
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+# 只收单个假名（不含 ゕゖ 等罕用小写、ヷ 等合成字以外的都保留，按 KanjiVG 实际有的文件为准）
+KANA = [chr(c) for c in list(range(0x3041, 0x3097)) + list(range(0x30A1, 0x30FB))]
+
+_NUM = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+_CMD = re.compile(r"([MmCcSsLlZzHhVvQqTt])([^MmCcSsLlZzHhVvQqTt]*)")
+
+
+def _cubic(p0, p1, p2, p3, n):
+    t = np.linspace(0, 1, n)[:, None]
+    return ((1 - t) ** 3) * p0 + 3 * ((1 - t) ** 2) * t * p1 + 3 * (1 - t) * t * t * p2 + t ** 3 * p3
+
+
+def path_points(d: str, step: float = 2.0) -> list[tuple[float, float]]:
+    """解析 KanjiVG 的 path d（M/C/S/L 及小写相对形式），按弧长约 step 取点。"""
+    cur = np.zeros(2)
+    start = cur.copy()
+    last_ctrl = None
+    pts: list[np.ndarray] = []
+    for cmd, args in _CMD.findall(d):
+        nums = [float(x) for x in _NUM.findall(args)]
+        rel = cmd.islower()
+        c = cmd.upper()
+        if c == "M":
+            for i in range(0, len(nums), 2):
+                p = np.array(nums[i:i + 2]) + (cur if rel else 0)
+                cur = p
+                if i == 0:
+                    start = p.copy()
+                pts.append(p.copy())
+            last_ctrl = None
+        elif c == "L":
+            for i in range(0, len(nums), 2):
+                p = np.array(nums[i:i + 2]) + (cur if rel else 0)
+                pts.append(p.copy())
+                cur = p
+            last_ctrl = None
+        elif c in ("C", "S"):
+            k = 6 if c == "C" else 4
+            for i in range(0, len(nums) - k + 1, k):
+                v = np.array(nums[i:i + k]).reshape(-1, 2) + (cur if rel else 0)
+                if c == "C":
+                    c1, c2, end = v
+                else:
+                    c1 = 2 * cur - last_ctrl if last_ctrl is not None else cur.copy()
+                    c2, end = v
+                n = max(3, int(np.linalg.norm(end - cur) / step) + 2)
+                pts.extend(_cubic(cur, c1, c2, end, n)[1:])
+                last_ctrl = c2
+                cur = end
+        elif c == "Z":
+            pts.append(start.copy())
+            cur = start.copy()
+    return [(round(float(x), 1), round(float(y), 1)) for x, y in pts]
+
+
+def load_kanjivg(directory: pathlib.Path) -> dict[str, list[list[tuple[float, float]]]]:
+    out = {}
+    for ch in KANA:
+        f = directory / f"{ord(ch):05x}.svg"
+        if not f.is_file():
+            continue
+        text = f.read_text(encoding="utf-8")
+        # 只取笔画组（kvg:StrokePaths）里的 path，文档顺序即笔顺
+        body = text.split("StrokeNumbers")[0]
+        strokes = [path_points(d) for d in re.findall(r'<path[^>]*\sd="([^"]+)"', body)]
+        strokes = [s for s in strokes if len(s) >= 2]
+        if strokes:
+            out[ch] = strokes
+    return out
+
+
+def evaluate(templates, samples_path: str, aug: int):
+    import fewshot_eval as fe
+    feats = fe.Feats("D:/CyIME-Data/handwriting_training/latex-c-t/20261014/onnx", str(fe.och.APP_MODEL))
+    queries = [(l, st) for l, st, _ in fe.load(samples_path, {"kana"}) if l in templates]
+    rnd = random.Random(0)
+    support = [(l, st) for l, st in templates.items()]
+    if aug:
+        support += [(l, fe.augment(st, rnd)) for l, st in templates.items() for _ in range(aug)]
+    S = [(l, feats.formula(st)) for l, st in support]
+    S = [(l, v) for l, v in S if v is not None]
+    labels = [l for l, _ in S]
+    M = np.stack([v for _, v in S])
+    top1 = top3 = n = 0
+    miss = []
+    for ql, st in queries:
+        q = feats.formula(st)
+        if q is None:
+            continue
+        order = np.argsort(-(M @ q))
+        ranked = []
+        for i in order:
+            if labels[i] not in ranked:
+                ranked.append(labels[i])
+            if len(ranked) >= 3:
+                break
+        n += 1
+        top1 += ranked[0] == ql
+        top3 += ql in ranked
+        if ranked[0] != ql:
+            miss.append(f"{ql}→{''.join(ranked)}")
+    print(f"模板 {len(templates)} 个字（增强×{aug}），测试 {n} 条：前1 {top1 / max(n, 1):.1%}  前3 {top3 / max(n, 1):.1%}")
+    print("认错举例：", " ".join(miss[:40]))
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--kanjivg", required=True)
+    ap.add_argument("--out")
+    ap.add_argument("--eval")
+    ap.add_argument("--aug", type=int, default=8)
+    args = ap.parse_args()
+    templates = load_kanjivg(pathlib.Path(args.kanjivg))
+    print(f"KanjiVG 假名 {len(templates)} 个")
+    if args.eval:
+        evaluate(templates, args.eval, args.aug)
+    if args.out:
+        out = pathlib.Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        # 每个字：原笔画 + aug 份变体（和 --eval 同一随机种子与顺序，测出的准确率就是装进 App 的这一套）
+        import finetune_ochwpro as och
+        rnd = random.Random(0)
+        variants = {ch: [st] for ch, st in templates.items()}
+        for ch, st in templates.items():
+            for _ in range(args.aug):
+                variants[ch].append([[(round(x, 1), round(y, 1)) for x, y in q] for q in och.augment(st, rnd)])
+        data = {"source": "KanjiVG", "canvas": 109, "chars": variants}
+        out.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        print(f"写入 {out}（{out.stat().st_size // 1024} KB）")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
