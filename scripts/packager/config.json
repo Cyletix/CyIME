@@ -1,5 +1,6 @@
 {
   "modelsDir": "D:/CyIME-Data/models",
+  "privateGloss": "D:/CyIME-Data/private-gloss/cyime_gloss-private.tsv",
   "resourceTag": "models",
   "presets": {
     "装到我的设备": {
@@ -7,6 +8,7 @@
       "dev_tools": true,
       "offline_models": false,
       "t9_model": "@best_private",
+      "private_gloss": true,
       "exclude_dicts": [],
       "install": true,
       "push_banks": true
