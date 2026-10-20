@@ -47,6 +47,7 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
     private var dismissedThisCall = false
     private var modeListener: Any? = null
     private var lastLevelLog = 0L
+    private var lastStartAt = 0L
     private var route by mutableStateOf(CallRoute.Earpiece)
 
     // A ComposeView outside an activity needs its own lifecycle and saved-state owners.
@@ -100,10 +101,14 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
     private fun currentRoute(): CallRoute {
         val type = if (Build.VERSION.SDK_INT >= 31) audio.communicationDevice?.type else null
         return when (type) {
-            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> CallRoute.Speaker
+            // Some phones report the loudspeaker as SPEAKER_SAFE; only real headsets block listening.
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE -> CallRoute.Speaker
             AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> CallRoute.Earpiece
-            null -> @Suppress("DEPRECATION") if (audio.isSpeakerphoneOn) CallRoute.Speaker else CallRoute.Earpiece
-            else -> CallRoute.Headset
+            AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_USB_HEADSET,
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO, AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLE_HEADSET,
+            AudioDeviceInfo.TYPE_HEARING_AID -> CallRoute.Headset
+            // No or an unfamiliar device: trust the speakerphone flag rather than silently never listening.
+            else -> @Suppress("DEPRECATION") if (audio.isSpeakerphoneOn || type != null) CallRoute.Speaker else CallRoute.Earpiece
         }
     }
 
@@ -113,8 +118,15 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
         if (next != route) FileLogger.i(TAG, "route=$next")
         route = next
         val listening = c.status == CaptionController.Status.Listening || c.status == CaptionController.Status.Starting
-        if (next == CallRoute.Speaker && !listening && c.status != CaptionController.Status.Error) c.start()
-        else if (next != CallRoute.Speaker && listening) c.pause()
+        val now = android.os.SystemClock.elapsedRealtime()
+        // A failed start (speech service busy, model still loading) is retried every 10 s during the
+        // call instead of leaving the bar dead until hang-up.
+        val retry = c.status == CaptionController.Status.Error && now - lastStartAt > 10_000
+        if (next == CallRoute.Speaker && !listening && (c.status != CaptionController.Status.Error || retry)) {
+            lastStartAt = now
+            if (retry) FileLogger.i(TAG, "retry after error")
+            c.start()
+        } else if (next != CallRoute.Speaker && listening) c.pause()
     }
 
     private fun startCaptions() {

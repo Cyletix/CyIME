@@ -78,6 +78,8 @@ data class InputUIState(
     val toolPanelVisible: Boolean = false,
     /** 面板输入框是否聚焦（聚焦时按键路由注入面板 EditText）。 */
     val toolPanelInputFocused: Boolean = false,
+    /** The clipboard search bar above the keyboard is open; it types through the tool-panel input channel. */
+    val clipboardSearchVisible: Boolean = false,
     /** 当前打开面板的插件 id。 */
     val toolPanelPluginId: String = "",
     /** 面板标题（插件名）。 */

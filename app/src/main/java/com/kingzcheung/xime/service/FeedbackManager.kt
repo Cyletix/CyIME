@@ -58,6 +58,23 @@ class FeedbackManager(private val context: Context) {
     private var pressAmplitude = 0
     private var longPressAmplitude = 0
 
+    companion object {
+        /** 设置页「按键音色」写入的偏好键。 */
+        const val KEY_SOUND_STYLE = "key_sound_style"
+
+        /**
+         * 按键音色：default（原有）或 mahjong（显示名「Rain75 紫薇轴」，用户实录）；只影响普通键、空格、回车、删除。
+         * 外接实体键盘的「默认」就是 Rain75；已删除的旧值（如 crisp）按默认处理。
+         */
+        fun resolveKeySoundStyle(stored: String?, hardware: Boolean): String =
+            if (hardware || stored == "mahjong") "mahjong" else "default"
+    }
+
+    private var keySoundStyle: String? = null
+
+    private fun readKeySoundStyle(): String? =
+        SettingsPreferences.getPrefsPublic(context).getString(KEY_SOUND_STYLE, null)
+
     private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     fun initialize() {
@@ -99,6 +116,11 @@ class FeedbackManager(private val context: Context) {
             soundIds["delete"] = pool.load(context, R.raw.kb_key_delete, 1)
             soundIds["space"] = pool.load(context, R.raw.kb_key_space, 1)
             soundIds["enter"] = pool.load(context, R.raw.kb_key_enter, 1)
+            // Rain75 音色预加载（每个仅十几 KB），切换和实体键盘首键都不用等解码。
+            soundIds["mahjong:standard"] = pool.load(context, R.raw.kb_rec_normal, 1)
+            soundIds["mahjong:delete"] = pool.load(context, R.raw.kb_rec_backspace, 1)
+            soundIds["mahjong:space"] = pool.load(context, R.raw.kb_rec_space, 1)
+            soundIds["mahjong:enter"] = pool.load(context, R.raw.kb_rec_enter, 1)
             soundIds["voice_start"] = pool.load(context, R.raw.kb_voice_start, 1)
             soundIds["voice_end"] = pool.load(context, R.raw.kb_voice_end, 1)
             soundIds["handwriting_erase"] = pool.load(context, R.raw.kb_handwriting_erase, 1)
@@ -108,6 +130,7 @@ class FeedbackManager(private val context: Context) {
     private fun loadSettings() {
         soundEnabled = SettingsPreferences.isSoundEnabled(context)
         soundVolume = SettingsPreferences.getSoundVolume(context)
+        keySoundStyle = readKeySoundStyle()
         hapticMode = HapticMode.fromValue(SettingsPreferences.getHapticMode(context))
         hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context)
         pressDuration = SettingsPreferences.getVibrationPressDuration(context).toLong()
@@ -122,6 +145,7 @@ class FeedbackManager(private val context: Context) {
             when (key) {
                 "sound_enabled" -> soundEnabled = SettingsPreferences.isSoundEnabled(context)
                 "sound_volume" -> soundVolume = SettingsPreferences.getSoundVolume(context)
+                KEY_SOUND_STYLE -> keySoundStyle = readKeySoundStyle()
                 "haptic_mode" -> hapticMode = HapticMode.fromValue(SettingsPreferences.getHapticMode(context))
                 "haptic_on_keyup" -> hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context)
                 "vibration_press_duration" -> pressDuration = SettingsPreferences.getVibrationPressDuration(context).toLong()
@@ -133,14 +157,22 @@ class FeedbackManager(private val context: Context) {
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
     }
 
-    fun playKeySound(keyType: String = "standard") {
+    fun playKeySound(keyType: String = "standard", hardware: Boolean = false) {
         if (!soundEnabled) return
 
         val pool = soundPool ?: return
-        val soundId = soundIds[keyType] ?: soundIds["standard"] ?: return
+        val style = resolveKeySoundStyle(keySoundStyle, hardware)
+        val soundId = soundIds["$style:$keyType"] ?: soundIds[keyType] ?: soundIds["standard"] ?: return
         val volume = soundVolume / 100f
 
         pool.play(soundId, volume, volume, 1, 0, 1.0f)
+    }
+
+    /** 外接实体键盘按下时调用；只出声，不振动。 */
+    fun playHardwareKeySound(event: android.view.KeyEvent) {
+        val sound = HardwareKeySound.soundFor(event.keyCode, event.repeatCount,
+            event.isCtrlPressed, event.isAltPressed, event.isMetaPressed) ?: return
+        playKeySound(sound, hardware = true)
     }
 
     fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false, type: KeyFeedbackType = KeyFeedbackType.CHARACTER) {

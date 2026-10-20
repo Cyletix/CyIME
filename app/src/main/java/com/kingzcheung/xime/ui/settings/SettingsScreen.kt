@@ -297,6 +297,12 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() }
             )
         }
+        composable(SettingsRoutes.Handwriting) {
+            HandwritingSettingsContent(onBack = { navController.popBackStack() },
+                onOpenModels = { navController.navigate(SettingsRoutes.ModelLocal) },
+                onOpenTraining = { navController.navigate(SettingsRoutes.HandwritingTraining) },
+                onOpenCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) })
+        }
         composable(SettingsRoutes.HandwritingTraining) {
             HandwritingTrainingScreen(
                 onBack = { navController.popBackStack() }

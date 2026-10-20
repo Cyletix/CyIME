@@ -65,15 +65,23 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
         }
         override fun reset() { vad?.reset(); level.reset() }
     }
+    /**
+     * Captions get the same VAD-only gain as the keyboard (target 0.2): without it a tablet at
+     * arm's length heard nothing at all (2026-10-21, 1.14.77: the keyboard recognised, captions
+     * never opened a segment; tablet recordings gave 0 speech frames raw vs 28–110 with the gain).
+     * Room noise no longer merges turns as on 10-16: the 5 s cap and energy pauses split them, and
+     * fan-only, hiss, hum and click replays still never start recognition with this gain.
+     */
     override fun captionDetector(): SpeechDetector = object : SpeechDetector {
+        private val level = SpeechDetectionLevel()
         override fun speech(frame: FloatArray): Boolean {
             val v = checkNotNull(vad)
-            v.acceptWaveform(frame)
+            v.acceptWaveform(level.process(frame))
             val active = v.isSpeechDetected()
             while (!v.empty()) v.pop()
             return active
         }
-        override fun reset() { vad?.reset() }
+        override fun reset() { vad?.reset(); level.reset() }
     }
     override fun accept(samples: FloatArray): String {
         val recognizer = online ?: return ""

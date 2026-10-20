@@ -734,7 +734,8 @@ private fun T9KeyboardContent(
                     } else commitDirect("0")
                 },
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                modifier = Modifier.weight(1f).testTag("t9-zero-key").glossHold(glossHoldEnabled,
+                // 从这里拖到候选上松手：等于按住 Shift 选它（有英文上屏英文）；松手不在候选上，左滑等原手势照旧。
+                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(glossHoldEnabled).glossHold(glossHoldEnabled,
                     onDown = { glossHoldUsed = false }) { holding ->
                     if (holding) {
                         glossHoldUsed = true
@@ -821,7 +822,8 @@ private fun T9DigitKey(
         fontSize = fontSize,
         modifier = modifier,
         onPress = { currentOnPress?.invoke() },
-        longPressItems = longPressItems,
+        // 长按弹字母气泡和 26/14 键共用“长按弹出字母气泡”开关，默认关（用户 10-21）；拂动模式长按出数字，不受影响。
+        longPressItems = if (flick || inputPreferences.letterLongPressMenu) longPressItems else emptyList(),
         onLongPressSelect = { letter -> currentOnLongPressSelect?.invoke(letter) },
         // Four-letter keys: P/S on the left/right, Q/R up/down (user layout, 2026-10-18); three letters go left/up/right.
         flickLetters = if (!flick) null else if (longPressItems.size == 4)

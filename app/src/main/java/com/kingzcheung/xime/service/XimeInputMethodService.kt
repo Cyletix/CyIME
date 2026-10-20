@@ -185,6 +185,8 @@ data class T9PartialSegment(val text: String, val pinyin: String)
 class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner, ActionExecutor {
 
     companion object {
+        /** 键盘与语音悬浮条互换、悬浮条进出时内容下沉/上浮的距离。 */
+        private const val CONTENT_SHIFT_DP = 24f
         internal const val TAG = "XimeInputMethodService"
         private const val DARK_MODE_LIGHT = 0
         private const val DARK_MODE_DARK = 1
@@ -1209,6 +1211,52 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /** Learning state saved while the clipboard search bar keeps the engine incognito. */
+    private var clipboardSearchSavedSensitive: Boolean? = null
+
+    /**
+     * Opens the clipboard search bar above the keyboard. It types through the tool-panel input
+     * channel; the engine is incognito meanwhile, so nothing typed into search is learned.
+     */
+    internal fun openClipboardSearch() {
+        if (uiState.value.toolPanelVisible) closeToolPanel()
+        keyboardViewModel.closeOverlay()
+        if (clipboardSearchSavedSensitive == null) {
+            clipboardSearchSavedSensitive = com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor
+            com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor = true
+            applyIncognito()
+        }
+        clipboardManager.boardQuery.value = ""
+        uiState.value = uiState.value.copy(clipboardSearchVisible = true, toolPanelInputFocused = true, enterKeyText = "完成")
+    }
+
+    internal fun closeClipboardSearch(openBoard: Boolean, keepQuery: Boolean = false) {
+        if (!uiState.value.clipboardSearchVisible) return
+        if (!keepQuery) clipboardManager.boardQuery.value = ""
+        if (candidateState.value.isComposing) {
+            keyRouter.postRimeJob { rimeEngine.clearComposition(); withContext(Dispatchers.Main) { updateUI() } }
+        }
+        uiState.value = uiState.value.copy(clipboardSearchVisible = false, toolPanelInputFocused = false,
+            enterKeyText = editorEnterKeyText())
+        ToolPanelEditTextHolder.editText = null
+        clipboardSearchSavedSensitive?.let { com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor = it }
+        clipboardSearchSavedSensitive = null
+        applyIncognito()
+        if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
+    }
+
+    /** Enter in the search bar: the keyboard goes away and the clipboard keeps showing the matches. */
+    internal fun submitClipboardSearch() {
+        clipboardManager.boardQuery.value = ToolPanelEditTextHolder.editText?.text?.toString()?.trim().orEmpty()
+        closeClipboardSearch(openBoard = true, keepQuery = true)
+    }
+
+    /** A result goes through the normal clipboard paste, so a fixed record stays private. */
+    internal fun selectClipboardSearchResult(text: String) {
+        closeClipboardSearch(openBoard = false)
+        textCommit.selectClipboardItem(text)
+    }
+
     internal fun closeToolPanel() {        toolPanelSelection = null
         stopToolPanelPoll()
         // 面板相关 Overlay 页面（ToolPanel 纯展示页）开着时联动关闭
@@ -1542,6 +1590,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 ) { expanded ->
                     uiState.value = uiState.value.copy(clipboardImagesExpanded = expanded)
                 }
+                // Clipboard search keeps the keyboard as it is: the results take the space the clipboard
+                // would take when pulled up, above the keyboard and the search bar.
+                val clipboardSearchResultsHeight = if (!state.clipboardSearchVisible) 0 else
+                    (clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace).expanded - keyboardHeight -
+                        com.kingzcheung.xime.ui.keyboard.CLIPBOARD_SEARCH_PANEL_HEIGHT).coerceAtLeast(120)
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
                 val effectiveKeyboardHeight = when {
                     handwritingExpanded -> handwritingSize(keyboardHeight, (effectiveScreenH - floatingMinY).coerceAtLeast(1))
@@ -1752,6 +1805,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                               com.kingzcheung.xime.ui.theme.LocalMaterialPalette provides
                                   com.kingzcheung.xime.ui.theme.MaterialPalette(cardBg, hardwarePalette.accent)) {
                           Box(Modifier.fillMaxSize().padding(bottom = activeBottomDp.dp)) {
+                            androidx.compose.runtime.DisposableEffect(Unit) {
+                                voicePillOnScreen = true
+                                onDispose { voicePillOnScreen = false }
+                            }
                             val glass = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences(isDark).frostedGlass
                             val pillEnglish = state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
                             com.kingzcheung.xime.ui.keyboard.VoiceCollapsedPill(
@@ -1911,6 +1968,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     quickSendEditingItemCode = state.quickSendEditingItemCode,
                                     toolPanelVisible = state.toolPanelVisible,
                                     toolPanelInputFocused = state.toolPanelInputFocused,
+                                    clipboardSearchVisible = state.clipboardSearchVisible,
+                                    clipboardSearchResultsHeight = clipboardSearchResultsHeight,
                                     toolPanelPluginId = state.toolPanelPluginId,
                                     toolPanelTitle = state.toolPanelTitle,
                                     toolPanelPrefillText = state.toolPanelPrefillText,
@@ -2418,6 +2477,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
+        if (hasHardwareKeyboard) event?.let { feedbackManager.playHardwareKeySound(it) }
         cancelVerificationCodeInput()
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) {
             keyRouter.handleKeyPress("enter", event?.isShiftPressed == true)
@@ -3129,6 +3189,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         voiceReviveCandidate = !finishingInput && !voicePillDismissed && voiceState.isVoiceMode && voiceState.voiceSticky &&
             !voiceState.isCompact && !voiceState.voiceCollapsed
         discardInlinePinyinBeforeFrameworkFinish()
+        // The search bar belongs to this keyboard session; leaving restores learning.
+        closeClipboardSearch(openBoard = false)
         super.onFinishInputView(finishingInput)
         runtimeObserver?.stop()
         voiceRecognitionHandler.endInputSession()
@@ -3185,6 +3247,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 if (!uiState.value.isVoiceMode && !uiState.value.isCompact) {
                     uiState.value = uiState.value.copy(voiceCollapsed = true)
                     applyWindowBackground()
+                    animateVoicePillIn()
                     keyboardCallbacks?.onVoiceStickyToggle?.invoke()
                 }
             }
@@ -3419,16 +3482,86 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (!canCollapseToVoicePill()) return false
         keyboardViewModel.closeOverlay()
         closeToolPanel()
-        uiState.value = uiState.value.copy(voiceCollapsed = true, handwritingExpanded = false)
-        applyWindowBackground()
+        // 键盘先淡出下沉，再换成悬浮条淡入上浮（用户 10-20：收起、弹出、消失都要动效）。
+        swapKeyboardContent {
+            uiState.value = uiState.value.copy(voiceCollapsed = true, handwritingExpanded = false)
+            applyWindowBackground()
+        }
         return true
     }
 
     private fun expandFromVoicePill() {
         if (!uiState.value.voiceCollapsed) return
-        clearHardwareSurfaceBounds()
-        uiState.value = uiState.value.copy(voiceCollapsed = false)
-        applyWindowBackground()
+        swapKeyboardContent {
+            clearHardwareSurfaceBounds()
+            uiState.value = uiState.value.copy(voiceCollapsed = false)
+            applyWindowBackground()
+        }
+    }
+
+    /** 语音悬浮条正在屏幕上（由悬浮条自己的组合进出维护），收起窗口前据此决定要不要先播退场。 */
+    internal var voicePillOnScreen = false
+    private var animatedHidePending = false
+
+    /**
+     * 整块输入法内容先淡出并下沉 [CONTENT_SHIFT_DP]，执行 [change]（换成键盘或悬浮条），再淡入上浮。
+     * 时长沿用统一动效：退场 180ms、进场 200ms。
+     */
+    private fun swapKeyboardContent(change: () -> Unit) {
+        if (!::keyboardContainer.isInitialized || !isInputViewShown) { change(); return }
+        val shift = CONTENT_SHIFT_DP * resources.displayMetrics.density
+        keyboardContainer.animate().cancel()
+        keyboardContainer.animate().alpha(0f).translationY(shift)
+            .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.LONG_EXIT.toLong())
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                change()
+                keyboardContainer.animate().alpha(1f).translationY(0f)
+                    .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.MEDIUM.toLong())
+                    .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+            }.start()
+    }
+
+    /** 悬浮条出现（失焦后自动重新弹出等）：从下方淡入上浮。 */
+    internal fun animateVoicePillIn() {
+        if (!::keyboardContainer.isInitialized) return
+        keyboardContainer.animate().cancel()
+        keyboardContainer.alpha = 0f
+        keyboardContainer.translationY = CONTENT_SHIFT_DP * resources.displayMetrics.density
+        keyboardContainer.animate().alpha(1f).translationY(0f)
+            .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.MEDIUM.toLong())
+            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+    }
+
+    /** 悬浮条在屏幕上时，窗口收起（点别处失焦、系统收起）先播退场再真正收起，不再一下子消失。 */
+    override fun hideWindow() {
+        if (!voicePillOnScreen || animatedHidePending || !::keyboardContainer.isInitialized || !isInputViewShown) {
+            super.hideWindow(); return
+        }
+        animatedHidePending = true
+        keyboardContainer.animate().cancel()
+        keyboardContainer.animate().alpha(0f).translationY(CONTENT_SHIFT_DP * resources.displayMetrics.density)
+            .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.LONG_EXIT.toLong())
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                animatedHidePending = false
+                superHideWindow()
+                keyboardContainer.alpha = 1f
+                keyboardContainer.translationY = 0f
+            }.start()
+    }
+
+    private fun superHideWindow() = super.hideWindow()
+
+    override fun showWindow(showInput: Boolean) {
+        // 退场动画中又要弹出：取消退场，内容恢复原样。
+        if (animatedHidePending && ::keyboardContainer.isInitialized) {
+            animatedHidePending = false
+            keyboardContainer.animate().cancel()
+            keyboardContainer.alpha = 1f
+            keyboardContainer.translationY = 0f
+        }
+        super.showWindow(showInput)
     }
 
     // 语音听写中输入框被意外收起（系统收起键或 App 隐藏键盘、焦点仍在）：重新弹出悬浮条继续听写。

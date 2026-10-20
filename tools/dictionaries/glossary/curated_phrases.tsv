@@ -1,0 +1,905 @@
+# 多字词释义人工表（v9 公开版）：优先于自动生成的释义。范围只按公开数据定：公开聊天语料 LCCC 里最常用的 2,000 个多字词逐个看过，
+# 自动释义取错义项的改正（感觉 feeling → feel），常用却没有释义的补上（有道理 → makes sense）；另有回放抽查发现的几处错释义。
+# 格式：词<TAB>英文；只有词、没有英文的行表示这个词不显示释义。
+问题	problem
+没有	no
+还有	also
+应该	should
+不是	not
+不要	don't
+不需要	don't need
+结果	result
+是不是	is it
+更新	update
+后面	behind
+有问题	there's a problem
+有没有	is there
+具体	specific
+作为	as
+状态	state
+不过	but
+我要	I want
+目前	currently
+没法	can't
+一直	always
+才能
+真正	real
+不会	won't
+到底	after all
+并没有	did not
+我想	I want
+做好	do well
+错了	wrong
+多少	how many
+确定	sure
+一般	usually
+回复	reply
+镜头	shot
+没了	gone
+成绩	grade
+坏了	broken
+不到	less than
+有了	got it
+好的	okay
+倒是
+个人	personal
+很多	a lot
+有很多	there are many
+只有	only
+不知道	don't know
+全是	all
+情况	situation
+别的	other
+中间	middle
+上面	above
+一遍	once
+一份	a copy
+不动	not moving
+一种	a kind of
+也没有
+也不	not either
+哪里	where
+那么	so
+准备	prepare
+前面	front
+打包	pack
+这么	so
+只是	just
+注意	note
+根本	at all
+遇到	encounter
+暂时	for now
+很好	very good
+最大	maximum
+真的	really
+再说
+完了	done
+建议	suggest
+正在	currently
+大的	big
+事情	thing
+提前	in advance
+为什么	why
+什么	what
+完全	completely
+干什么	what for
+不用	no need
+手机	phone
+不了
+头像	avatar
+什么时候	when
+一下
+就是	just
+怎么	how
+是什么	what is it
+怎么样	how
+都是	are all
+我现在	I'm now
+的时候	when
+能不能	can you
+这是	this is
+两个	two
+你可以	you can
+就行了	that's it
+让你	let you
+也是	also
+你要	you need to
+应该是	should be
+你看	look
+有一个	there is one
+我已经	I have already
+在哪	where
+做了	did
+也要	also need
+你在	you are
+都没有	none
+你现在	you now
+都有	all have
+你觉得	do you think
+为什么要	why
+都可以	either is fine
+你为什么	why do you
+我觉得	I think
+你说	you say
+你是	you are
+我在	I am
+还要	still need
+我发现	I found
+第一个	the first
+有什么	what is there
+不应该	shouldn't
+一定要	must
+看不到	can't see
+你给我	you give me
+是一个	is a
+也可以	also can
+你怎么	how do you
+就可以	then you can
+太多了	too many
+我不知道	I don't know
+现在是	now it is
+你也	you too
+这么多	so many
+没看到	didn't see
+就像	just like
+说了	said
+并不是	is not
+做个	make a
+我可以	I can
+你是不是	are you
+很大	very big
+可能是	may be
+主要是	mainly
+这不是	this isn't
+干啥	what for
+我也	me too
+好像是	seems to be
+做什么	what to do
+不是说	didn't you say
+你不要	don't
+有个	there is a
+还能	can still
+什么都	anything
+我不想	I don't want
+好了	done
+那就	then
+还在	still
+也不能	can't either
+也不知道	don't know either
+还是要	still need
+试试	try
+什么意思	what does it mean
+到了	arrived
+也能	can also
+你别	don't
+这就是	this is
+都能	can all
+可能会	may
+每次都	every time
+不存在	doesn't exist
+是因为	is because
+我不是	I'm not
+用了	used
+啥意思	what does it mean
+看着	look at
+也行	that works too
+都不是	neither
+都不知道	don't even know
+我看到	I see
+肯定是	must be
+还会	will still
+我没有	I don't have
+出来了	came out
+没有了	gone
+不太	not very
+忘了	forgot
+等我	wait for me
+一晚上	all night
+我给你	I'll give you
+不是很	not very
+就知道	knew
+很久	a long time
+怎么说	how to say
+就没有	there is no
+告诉你	tell you
+这么大	so big
+是这样的	it's like this
+看不出来	can't tell
+一个月	a month
+说什么	what to say
+要不要	do you want
+不好看	ugly
+看过	have seen
+很多人	many people
+就好了	will be fine
+看到了	saw
+套路	routine
+可以吗	is it OK
+懂了	got it
+这句话	this sentence
+好吧	okay
+加油	come on
+呵呵	heh
+晚安	good night
+感觉	feel
+嘿嘿	hehe
+人家	others
+对啊	right
+没事	it's okay
+好好	properly
+不想	don't want
+难道	could it be
+那是	that is
+好啊	sure
+为啥	why
+在家	at home
+早点	earlier
+起来	get up
+确实	indeed
+放假	on holiday
+努力	work hard
+哎呀	oh dear
+厉害	awesome
+心疼	feel sorry for
+必须的	of course
+话说	by the way
+女生	girl
+男生	boy
+不懂	don't understand
+真心	sincerely
+过年	Chinese New Year
+对象	partner
+不开心	unhappy
+咱们	we
+心里	in my heart
+死了	dead
+没办法	no way
+你知道	you know
+分手	break up
+专业	major
+激动	excited
+感情	feelings
+意思	meaning
+宝贝	baby
+可以的	sure
+早就	long ago
+看完	finish watching
+不在	not here
+来着
+表白	confess
+不管	no matter
+还不错	not bad
+寝室	dorm
+一会	a while
+故事	story
+一句	a sentence
+很棒	great
+不对	wrong
+想法	idea
+关系	relationship
+放弃	give up
+素质	manners
+感受	feel
+不如	not as good as
+解释	explain
+短发	short hair
+吃东西	eat
+剪短	cut short
+眼神	look
+一看	at a glance
+不信	don't believe
+大叔	uncle
+老子
+锻炼	exercise
+偶遇	run into
+出差	business trip
+带上	bring
+偷偷	secretly
+懒得	too lazy to
+打球	play ball
+老大	boss
+酒店	hotel
+父母	parents
+小哥哥
+自然	natural
+似的	as if
+考研	grad school exam
+地铁	subway
+外卖	takeout
+梦想	dream
+安逸	comfy
+搞笑	funny
+逛街	go shopping
+口味	taste
+不知	don't know
+得了	come on
+愿意	willing
+一口	a bite
+关键	key
+签名	signature
+看不懂	can't understand
+那个人	that person
+负责	responsible
+醉了	drunk
+社长	club president
+牛奶	milk
+奇葩	weirdo
+有事	busy
+外套	coat
+过敏	allergy
+过得
+流量	data
+心情不好	in a bad mood
+军训	military training
+都一样	all the same
+不行了	can't take it
+拜拜	bye
+听不懂	can't understand
+认识的	known
+司机	driver
+动力	motivation
+五一	May Day
+不睡觉	not sleep
+叔叔	uncle
+阿姨	aunt
+不准	not allowed
+晚点	later
+醒来	wake up
+到家	home
+学长	senior
+师姐	senior
+小仙女	fairy
+么么
+不要脸	shameless
+约会	date
+游泳	swim
+感慨	sigh
+机智	clever
+难受	feel bad
+开车	drive
+小米
+不得
+很少	rarely
+好不
+难得	rare
+回头	later
+实习	internship
+一边	while
+节目	show
+打电话	call
+我爱你	I love you
+你先	you first
+算是	counts as
+熬夜	stay up late
+单身	single
+有钱	rich
+宝宝	baby
+结婚	marry
+上海	Shanghai
+北京	Beijing
+重庆	Chongqing
+天津	Tianjin
+第二天	next day
+好友	friend
+主动	take the initiative
+刚好	just right
+一周	a week
+打算	plan to
+快点	hurry up
+本人	myself
+表示	say
+这几天	these few days
+可怜	poor thing
+明明	clearly
+失眠	insomnia
+旅游	travel
+睡不着	can't sleep
+女孩	girl
+女的	woman
+男的	man
+一会儿	a while
+美食	food
+好听	sounds good
+瘦的	thin
+食堂	canteen
+严重	serious
+说出来	say it
+不算	doesn't count
+不带	without
+有道理	makes sense
+开玩笑	joke
+多大	how old
+留着	keep it
+爱国	patriotic
+据说	it is said
+太好了	great
+骂人	swear
+消息	message
+证明	prove
+互相	each other
+我是说	I mean
+赚钱	make money
+有可能	might
+对方	the other person
+坏人	bad guy
+问我	ask me
+排队	line up
+孤独	lonely
+参加	take part
+一堆	a pile
+朋友圈	Moments
+化妆	makeup
+不舒服	unwell
+电视	TV
+请假	ask for leave
+国庆	National Day
+零食	snacks
+缘分	fate
+寒假	winter break
+门口	doorway
+眼镜	glasses
+紧张	nervous
+我的天	oh my god
+故意	on purpose
+瞬间	instantly
+上午	morning
+年轻人	young people
+现实	reality
+初中	junior high
+小朋友	kid
+不会的	no way
+自信	confident
+家人	family
+少年	youth
+当年	back then
+通知	notice
+小学	primary school
+晚饭	dinner
+碰到	run into
+还不如	might as well
+王者
+原来是	so it was
+考完	finish the exam
+遇见	meet
+话题	topic
+怀念	miss
+广告	ad
+体验	experience
+被子	quilt
+善良	kind
+论文	paper
+说说	tell me
+我先	me first
+大半夜	middle of the night
+饺子	dumplings
+遗憾	pity
+面膜	face mask
+不适合	not suitable
+气质	temperament
+韩国	Korea
+请客	treat
+通宵	all night
+惊喜	surprise
+满足	satisfied
+一段时间	a while
+乖乖	good
+对面	opposite
+什么鬼	what the hell
+机票	plane ticket
+日常	daily
+性格	personality
+起码	at least
+转发	share
+胖的	fat
+脾气	temper
+当初	at first
+懂得	understand
+专门	specially
+等等	wait
+无奈	helpless
+人品	character
+好奇	curious
+时光	time
+认真的	seriously
+委屈	wronged
+躺着	lying down
+诱惑	temptation
+一开始	at first
+国内	domestic
+整天	all day
+照顾	take care of
+另外	besides
+哈哈	haha
+哈哈哈	hahaha
+哈哈哈哈	hahaha
+哈哈哈哈哈	hahaha
+哈哈哈哈哈哈	hahaha
+我是	I am
+那你	then you
+我就	then I
+都不	not at all
+都没	none
+吃了	ate
+你还	you still
+一天	one day
+我家	my home
+看了	watched
+是你	it's you
+说的	said
+你不是	aren't you
+多了	much more
+啥时候	when
+等你	wait for you
+睡了	asleep
+我还	I still
+我去	I'll go
+你有	you have
+跟你	with you
+我也想	I want to too
+去了	went
+买了	bought
+看你	look at you
+我说	I say
+那我	then I
+你去	you go
+你想	you want
+我不	I don't
+是我	it's me
+还不	not yet
+我有	I have
+不敢	dare not
+么么哒	mwah
+回来了	back
+和你	with you
+你来	you come
+都在	all here
+你会	you will
+你呢	and you
+真好	so good
+你家	your home
+真的是	really
+哦哦	oh oh
+到时候	by then
+我没	I didn't
+对呀	yes
+瘦了	lost weight
+和我	with me
+去看	go see
+想吃	want to eat
+胖了	gained weight
+哪有	no way
+有机会	if there's a chance
+早安	good morning
+所以我	so I
+你也是	you too
+好嘛	okay
+有时间	have time
+好呀	sure
+是吧	right
+找你	look for you
+我怎么	how do I
+你猜	guess
+我只是	I'm just
+我一直	I've always
+两天	two days
+走了	gone
+想想	think about it
+我也要	me too
+一年	one year
+真的很	really
+看到你	see you
+是呀	yes
+挺好的	pretty good
+是吗	really?
+纠结	torn
+帮你	help you
+要去	going to
+土豪	rich guy
+你懂	you know
+都好	all good
+比我	than me
+不吃	not eat
+叫我	call me
+没有啊	no
+大家都	everyone
+回家了	home
+去吧	go
+比你	than you
+快来	come quickly
+睡吧	go to sleep
+我也觉得	I think so too
+祝你	wish you
+这么说	so to speak
+找我	look for me
+可是我	but I
+去吃	go eat
+我很	I'm very
+不去	not going
+我怕	I'm afraid
+叫你	call you
+我来	let me
+老了	old
+对你	to you
+不客气	you're welcome
+一起去	go together
+好想	really want to
+对我	to me
+想去	want to go
+想你	miss you
+这两天	these two days
+我还以为	I thought
+哪天	someday
+回去了	went back
+看我	look at me
+你居然	you actually
+我能	I can
+换了	changed
+醒了	awake
+来找我	come find me
+带你	take you
+请你	invite you
+怎么会	how come
+我刚	I just
+来来来	come on
+会有	there will be
+也会	will also
+是啥	what is it
+还得	still have to
+送你	give you
+你才	you're the one
+哎哟	ouch
+我昨天	I yesterday
+你就是	you are
+我不会	I won't
+男神	heartthrob
+出去玩	go out
+你俩	you two
+就是你	it's you
+不来	not coming
+都快	almost
+淡定	calm
+对对	yes yes
+有啥	what's there
+都说	everyone says
+知道你	know you
+你已经	you already
+那就好	that's good
+啥子	what
+神马	what
+喝了	drank
+去哪里	where to
+再去	go again
+又是	again
+学姐	senior
+见过	have seen
+吃货	foodie
+没啥	nothing
+又不是	it's not like
+好哒	okay
+我吃	I eat
+哭了	cried
+问你	ask you
+没睡	not asleep
+好滴	okay
+去买	go buy
+真的吗	really?
+回学校	back to school
+多少钱	how much
+厦门	Xiamen
+陪你	with you
+买个	buy a
+睡觉了	going to bed
+没见过	never seen
+这么早	so early
+疯了	crazy
+赢了	won
+不晓得	don't know
+博主	blogger
+不是你	not you
+夸我	praise me
+还没睡	still up
+最美	most beautiful
+发现了	found
+快去	go now
+玩了	played
+吃过	have eaten
+没想到	unexpectedly
+还行	not bad
+好好休息	get some rest
+感冒了	caught a cold
+过几天	in a few days
+我呢	what about me
+送我	give me
+再来	again
+不让	not allow
+咋样	how is it
+不认识	don't know
+你以为	you think
+陪我	keep me company
+带着	with
+咋了	what's wrong
+你不会	you won't
+恩爱	loving
+一顿	a meal
+上班了	at work
+辛苦了	thanks for your hard work
+我还在	I'm still
+去哪	where to
+好美	so beautiful
+一直都	always
+两个人	two people
+不容易	not easy
+三天	three days
+吃什么	what to eat
+可以啊	sure
+放假了	on holiday
+结婚了	married
+想看	want to see
+吃点	eat some
+见你	see you
+过去了	passed
+我以前	I used to
+问一下	ask
+注意安全	be careful
+睡着了	fell asleep
+很开心	very happy
+问问	ask
+我帮你	I'll help you
+这么快	so fast
+剪了	cut
+吃肉	eat meat
+可以去	can go
+不胖	not fat
+来看	come see
+明明是	clearly
+好多人	many people
+他是	he is
+多好	how nice
+好棒	great
+才知道	only now know
+好可爱	so cute
+不爱	don't love
+你回来	you come back
+小伙伴	buddy
+多吃点	eat more
+打你	hit you
+玩儿	play
+他说	he said
+去过	have been
+你在哪	where are you
+坐等	waiting
+一定会	will definitely
+这样啊	I see
+学霸	top student
+我是不是	am I
+还想	still want
+我俩	the two of us
+玩手机	play on the phone
+为你	for you
+开心的	happy
+我朋友	my friend
+吃火锅	eat hotpot
+快了	soon
+好嘞	okay
+不多	not many
+大神	expert
+我也在	me too
+好好的	fine
+小可爱	cutie
+就想	just want
+脸上	on the face
+吐槽	complain
+很好看	very pretty
+不是吧	no way
+关键是	the key is
+咋办	what to do
+就可以了	that's enough
+还挺	quite
+很喜欢	really like
+都不敢	don't dare
+好喜欢	really like
+我们学校	our school
+去玩	go play
+想买	want to buy
+累了	tired
+我知道你	I know you
+好开心	so happy
+怪我	blame me
+还以为	thought
+恭喜恭喜	congratulations
+怎么能	how can
+我一个人	by myself
+早啊	morning
+我准备	I'm going to
+好累	so tired
+本来就是	it was always
+带你去	take you
+跑了	ran
+扎心	that hurts
+就不要	then don't
+怎么这么	why so
+我猜	I guess
+很美	beautiful
+我们家	our family
+请我	treat me
+等你回来	wait for you to come back
+好梦	sweet dreams
+两年	two years
+跟你说	tell you
+拉黑	block
+一定是	must be
+下雨了	it's raining
+其实是	actually
+喜欢吃	like to eat
+我爱	I love
+那么大	that big
+像你	like you
+喝点	drink some
+我爸	my dad
+还好吧	it's okay
+你不懂	you don't understand
+半个月	half a month
+真的假的	really?
+少吃	eat less
+所以说	so
+明天去	go tomorrow
+有吗	is there
+恭喜你	congratulations
+带我去	take me
+哪里有	where is there
+三年	three years
+今天是	today is
+毕业了	graduated
+过两天	in a couple of days
+在北京	in Beijing
+都喜欢	all like
+榴莲	durian
+呜呜呜	boohoo
+都知道	everyone knows
+很好吃	delicious
+长沙	Changsha
+你也可以	you can too
+好多了	much better
+嘿嘿嘿	hehehe
+昨天晚上	last night
+不会吧	no way
+长大了	grown up
+喜欢的人	the one I like
+梦里	in a dream
+打麻将	play mahjong
+没事儿	it's okay
+想问	want to ask
+媳妇	wife
+这么久	so long
+谁啊	who is it
+一个星期	a week
+店里	in the store
+不去了	not going
+就够了	that's enough
+老铁	bro
+你干嘛	what are you doing
+暖气	heating
+在家里	at home
+好喝	tasty
+我刚刚	I just
+好羡慕	so jealous
+早睡	sleep early
+欢迎你	welcome
+才发现	just realized
+注意身体	take care
+爱吃	love to eat
+看完了	finished watching
+只能说	can only say
+没吃过	never eaten
+喜欢我	like me
+我还有	I still have
+你怎么知道	how do you know
+给你看	show you
+舍友	roommate
+你也要	you too
+短袖	short sleeves
+这种人	this kind of person
+好点	better
+泥沼	mire
+口罩	face mask
+迟了	late

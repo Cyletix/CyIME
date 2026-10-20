@@ -50,6 +50,14 @@ class CandidateGlossaryTest {
     }
 
     @Test
+    fun `letters and abbreviations get no Chinese gloss`() {
+        val glossary = table("s" to "标量", "abc" to "预定章程", "kfc" to "肯德基", "nasa" to "美国航空航天局",
+            "obsidian" to "黑曜石", "苹果" to "apple")
+        assertEquals(listOf("", "", "", "", "", "黑曜石", "黑曜石", "apple"), CandidateGlossary.annotate(glossary,
+            listOf("S", "s", "abc", "KFC", "NASA", "Obsidian", "obsidian", "苹果"), List(8) { "" }))
+    }
+
+    @Test
     fun `annotate keeps original comments while no glossary is loaded`() {
         assertEquals(listOf("ni hao", "ni hao"),
             CandidateGlossary.annotate(listOf("你好", "拟好"), listOf("ni hao", "ni hao")))
@@ -111,5 +119,56 @@ class CandidateGlossaryTest {
             CandidateGlossary.t9NextHeld.value = false
             CandidateGlossary.physicalShiftHeld.value = false
         }
+    }
+
+    private val composeTable get() = table("我" to "I", "想" to "think", "吃" to "eat", "吃饭" to "have a meal",
+        "会" to "~meet", "昨天" to "yesterday", "你好" to "hello", "我估计" to "+I estimate")
+
+    @Test
+    fun `everyday phrases come pre-composed from the dictionary, other combinations show nothing`() {
+        // 词典里预先拼好的日常短语（+ 前缀）显示时去掉前缀；运行时不再按字数拼。
+        assertEquals(listOf("I estimate", "", "hello"),
+            CandidateGlossary.annotate(composeTable, listOf("我估计", "我吃饭", "你好"), listOf("", "", "")))
+        // 单字照常显示，去掉不可靠标记。
+        assertEquals("meet", CandidateGlossary.annotate(composeTable, listOf("会"), listOf("")).first())
+    }
+
+    @Test
+    fun `runtime composition, when switched on, uses dictionary words and fixed characters only`() {
+        assertEquals("I have a meal", CandidateGlossary.compose(composeTable, "我吃饭"))
+        assertEquals("I yesterday", CandidateGlossary.compose(composeTable, "我昨天"))
+    }
+
+    @Test
+    fun `sentences longer than four characters are never composed`() {
+        assertNull(CandidateGlossary.compose(composeTable, "我昨天吃饭"))
+    }
+
+    @Test
+    fun `phrases with a non-fixed single character show nothing rather than a guess`() {
+        // 想、会 不在固定常用字里（会 还只有不可靠释义）；拟 词典里没有。
+        assertNull(CandidateGlossary.compose(composeTable, "我想吃饭"))
+        assertNull(CandidateGlossary.compose(composeTable, "我会吃"))
+        assertNull(CandidateGlossary.compose(composeTable, "我拟"))
+    }
+
+    @Test
+    fun `shift only commits dictionary words, never a word-by-word phrase gloss`() {
+        assertNull(CandidateGlossary.englishFor(composeTable, "我吃饭"))
+        assertNull(CandidateGlossary.englishFor(composeTable, "我估计"))   // 预拼短语只显示不上屏
+        assertEquals("meet", CandidateGlossary.englishFor(composeTable, "会"))
+        assertEquals("have a meal", CandidateGlossary.englishFor(composeTable, "吃饭"))
+    }
+
+    @Test
+    fun `private add-on overrides or hides public glosses and falls through otherwise`() {
+        val base = table("保存" to "conserve", "的" to "of", "电脑" to "computer")
+        base.overlay = table("保存" to "save", "的" to GlossTable.HIDDEN, "频谱" to "spectrum")
+        assertEquals("save", base.lookup("保存"))
+        assertNull(base.lookup("的"))
+        assertEquals("spectrum", base.lookup("频谱"))
+        assertEquals("computer", base.lookup("电脑"))
+        assertEquals("save", CandidateGlossary.gloss(base, "保存"))
+        assertNull(CandidateGlossary.englishFor(base, "的"))
     }
 }

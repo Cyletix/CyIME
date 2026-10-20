@@ -22,6 +22,9 @@ import com.kingzcheung.xime.service.ToolPanelEditTextHolder
 
 internal val TOOL_PANEL_HEIGHT = 170
 
+/** The same tool panel used as the clipboard search field: one line, no status row. */
+internal const val CLIPBOARD_SEARCH_PANEL_HEIGHT = 96
+
 /**
  * AI 工具插件输入面板（候选栏上方）。
  *
@@ -41,6 +44,12 @@ fun ToolPanel(
     onClose: () -> Unit,
     onFocusChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    heightDp: Int = TOOL_PANEL_HEIGHT,
+    hint: String = "输入上下文或指令",
+    /** Null keeps the generate hint; an empty string hides the status row. */
+    statusText: String? = null,
+    singleLine: Boolean = false,
+    onTextChange: ((String) -> Unit)? = null,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
         MaterialTheme.colorScheme.surface,
@@ -49,7 +58,7 @@ fun ToolPanel(
     )
 
     CandidateBarOverlayPanel(
-        heightDp = TOOL_PANEL_HEIGHT,
+        heightDp = heightDp,
         backgroundColor = backgroundColor,
         cardBgColor = cardBgColor,
         closeButtonBg = closeButtonBg,
@@ -66,9 +75,9 @@ fun ToolPanel(
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
                         setTextColor(textColor.hashCode())
                         setHintTextColor((textColor.copy(alpha = 0.4f)).hashCode())
-                        hint = "输入上下文或指令"
+                        this.hint = hint
                         textSize = 16f
-                        isSingleLine = false
+                        isSingleLine = singleLine
                         gravity = Gravity.TOP or Gravity.START
                         setPadding(4, 2, 4, 2)
 
@@ -80,6 +89,13 @@ fun ToolPanel(
                             onFocusChange(hasFocus)
                         }
                         setOnClickListener { onFocusChange(true) }
+                        onTextChange?.let { change ->
+                            addTextChangedListener(object : android.text.TextWatcher {
+                                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                                override fun afterTextChanged(s: android.text.Editable?) { change(s?.toString().orEmpty()) }
+                            })
+                        }
                         ToolPanelEditTextHolder.editText = this
                         if (isFocused) {
                             post { requestFocus() }
@@ -94,17 +110,17 @@ fun ToolPanel(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(if (singleLine) 36.dp else 52.dp),
             )
 
-            Row(
+            if (statusText != "") Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = if (isLoading) "生成中..." else "输入上下文后按回车生成",
+                    text = statusText ?: if (isLoading) "生成中..." else "输入上下文后按回车生成",
                     color = textColor.copy(alpha = 0.5f),
                     fontSize = 11.sp,
                 )

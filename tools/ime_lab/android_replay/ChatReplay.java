@@ -38,6 +38,8 @@ public final class ChatReplay {
     private int boundaryLimit;
     private int settleTimeoutMs;
     private String variant;
+    /** Rime schema replayed: t9_pinyin (nine-key) or a 26-key schema such as rime_ice with --variant letters. */
+    private String schema;
     private long rowCount;
     /** Host-only per-key work counter names; null when the engine library has none. */
     private String[] workNames;
@@ -61,9 +63,17 @@ public final class ChatReplay {
         boundaryLimit = integer(flags, "boundary-limit", 100, rowLimit, 500);
         settleTimeoutMs = integer(flags, "settle-timeout-ms", 5000, 1, 60000);
         variant = flags.containsKey("variant") ? flags.get("variant") : "digits";
-        if (!Arrays.asList("digits", "separated", "locked").contains(variant)) {
+        if (!Arrays.asList("digits", "separated", "locked", "letters", "letters14").contains(variant)) {
             throw new IllegalArgumentException("Unknown --variant " + variant);
         }
+        schema = flags.getOrDefault("schema", "t9_pinyin");
+        if (!schema.matches("[a-z0-9_]+")) throw new IllegalArgumentException("Bad --schema " + schema);
+        if (variant.startsWith("letters") == schema.equals("t9_pinyin")) {
+            throw new IllegalArgumentException("--variant letters types full pinyin into a 26-key --schema; digit variants need t9_pinyin");
+        }
+        // "translator/max_sentences=1;t9/sentence_rescore=false": a <schema>.custom.yaml patch written before
+        // deployment, so one installed build can be measured with a setting on and off.
+        String schemaPatch = flags.getOrDefault("schema-patch", "");
         String[] modes = flags.getOrDefault("modes", "continuous,paused").split(",", -1);
         Set<String> uniqueModes = new HashSet<>();
         for (String mode : modes) {
@@ -112,7 +122,7 @@ public final class ChatReplay {
             if (!apk.getCanonicalPath().equals(assets.getString("apk")) ||
                     apk.length() != assets.getLong("apk_bytes") || !apkHash.equals(assets.optString("apk_sha256")) ||
                     !sameHashes(libraryHashes, assets.optJSONObject("library_sha256")) ||
-                    !new File(user, "t9_pinyin.schema.yaml").isFile()) {
+                    !new File(user, schema + ".schema.yaml").isFile()) {
                 throw new IOException("Audit marker does not match APK/library hashes; choose a fresh root");
             }
         } else {
@@ -120,8 +130,22 @@ public final class ChatReplay {
                 throw new IOException("Audit user directory already exists; choose a fresh root or explicit --reuse");
             }
             mkdir(user);
-            assets = extract(apk, user).put("apk_sha256", apkHash)
+            assets = extract(apk, user, schema).put("apk_sha256", apkHash)
                 .put("library_sha256", libraryHashes);
+            if (!schemaPatch.isEmpty()) {
+                StringBuilder custom = new StringBuilder("patch:\n");
+                // Items are separated by ';'; a value that itself contains ';' (cylm/params) writes it as "\;".
+                for (String item : schemaPatch.split("(?<!\\\\);")) {
+                    int eq = item.indexOf('=');
+                    if (eq <= 0) throw new IllegalArgumentException("Bad --schema-patch item " + item);
+                    String value = item.substring(eq + 1).trim().replace("\\;", ";");
+                    if (value.contains(";") || value.contains("=")) value = "\"" + value + "\"";
+                    custom.append("  \"").append(item.substring(0, eq).trim()).append("\": ")
+                        .append(value).append('\n');
+                }
+                write(inside(user, schema + ".custom.yaml"), custom.toString());
+                assets.put("schema_patch", schemaPatch);
+            }
             write(marker, assets.toString(2));
         }
         mkdir(new File(user, "logs"));
@@ -150,7 +174,7 @@ public final class ChatReplay {
             System.load(new File(libDir, "librime_jni.so").getAbsolutePath());
             engine.nativeInitialize(user.getPath(), user.getPath());
             initialized = true;
-            engine.nativeEnsureT9SchemaPatches("t9_pinyin");
+            engine.nativeEnsureT9SchemaPatches(schema);
             if (!flags.containsKey("reuse")) {
                 System.err.println("DEPLOY starting fresh bundled t9 resources");
                 boolean started = engine.nativeStartMaintenance(true);
@@ -186,21 +210,21 @@ public final class ChatReplay {
                     workNames = null;  // An engine built without counters still replays.
                 }
             }
-            if (!engine.nativeCreateSession() || !engine.nativeSwitchSchema("t9_pinyin")) {
-                throw new IOException("Could not create t9_pinyin session; inspect audit user/logs");
+            if (!engine.nativeCreateSession() || !engine.nativeSwitchSchema(schema)) {
+                throw new IOException("Could not create " + schema + " session; inspect audit user/logs");
             }
             engine.nativeSetOption("ascii_mode", false);
             engine.nativeSetOption("full_shape", false);
             JSONObject settings = new JSONObject();
             for (String key : Arrays.asList("t9/dictionary_beam", "t9/sentence_beam", "t9/result_budget",
                     "t9/word_penalty", "t9/spelling_penalty", "t9/sentence_model", "t9/sentence_weight",
-                    "translator/contextual_suggestions")) {
-                settings.put(key, engine.nativeGetSchemaString("t9_pinyin", key));
+                    "translator/contextual_suggestions", "translator/max_sentences", "t9/sentence_rescore")) {
+                settings.put(key, engine.nativeGetSchemaString(schema, key));
             }
             emit(new JSONObject().put("stage", "ready").put("schema", engine.nativeGetCurrentSchema())
                 .put("scoring_status", engine.nativeT9ScoringStatus()).put("settings", settings)
-                .put("source_schema_sha256", sha256(new File(user, "t9_pinyin.schema.yaml")))
-                .put("deployed_schema_sha256", sha256(new File(user, "build/t9_pinyin.schema.yaml")))
+                .put("source_schema_sha256", sha256(new File(user, schema + ".schema.yaml")))
+                .put("deployed_schema_sha256", sha256(new File(user, "build/" + schema + ".schema.yaml")))
                 .put("default_custom_sha256", sha256(new File(user, "default.custom.yaml")))
                 .put("work_counters", workNames == null ? JSONObject.NULL : new JSONArray(Arrays.asList(workNames)))
                 .put("user_dict", userDictState == null ? JSONObject.NULL : userDictState));
@@ -237,14 +261,19 @@ public final class ChatReplay {
         StringBuilder all = new StringBuilder();
         for (int i = 0; i < syllables.length; i++) {
             syllables[i] = normalizePinyin(pinyin.getString(i));
-            digits[i] = digits(syllables[i]);
+            // Letters: the full pinyin typed without separators, as on the 26-key keyboard.
+            // Capitals typed on the 26-key keyboard go to Rime as capitals (KFC, Obsidian).
+            digits[i] = variant.equals("letters")
+                ? (pinyin.getString(i).matches("[A-Za-z]+") ? pinyin.getString(i) : syllables[i])
+                : variant.equals("letters14") ? keys14(syllables[i]) : digits(syllables[i]);
             all.append(digits[i]);
         }
-        if (item.has("keys") && !all.toString().equals(item.getString("keys"))) {
+        if (!variant.startsWith("letters") && item.has("keys") && !all.toString().equals(item.getString("keys"))) {
             throw new IllegalArgumentException(id + ": keys disagree with pinyin");
         }
         engine.nativeT9ClearComposition(1);
         engine.nativeT9FlushRimeInput();
+        if (variant.startsWith("letters")) engine.nativeSetInput("");  // 26-key schemas have no T9 processor
         StringBuilder typed = new StringBuilder();
         StringBuilder sentKeys = new StringBuilder();
         for (int syllable = 0; syllable < syllables.length; syllable++) {
@@ -382,7 +411,7 @@ public final class ChatReplay {
         rowCount++;
     }
 
-    private static JSONObject extract(File apk, File user) throws Exception {
+    private static JSONObject extract(File apk, File user, String schema) throws Exception {
         JSONObject result = new JSONObject().put("apk", apk.getCanonicalPath()).put("apk_bytes", apk.length());
         JSONArray verified = new JSONArray();
         try (ZipFile zip = new ZipFile(apk)) {
@@ -414,11 +443,11 @@ public final class ChatReplay {
             extractEntry(zip, appCustom, custom, null, -1);
             String settings = read(custom);
             String adjusted = settings.replaceFirst("(?ms)^  schema_list:\\s*\\n.*?(?=^  [A-Za-z_]|\\z)",
-                "  schema_list:\n    - schema: t9_pinyin\n\n");
-            if (adjusted.equals(settings)) throw new IOException("Could not restrict audit deployment to t9_pinyin");
+                "  schema_list:\n    - schema: " + schema + "\n\n");
+            if (adjusted.equals(settings)) throw new IOException("Could not restrict audit deployment to " + schema);
             write(custom, adjusted);
         }
-        result.put("manifest_verified", verified).put("default_custom_change", "schema_list restricted to t9_pinyin only");
+        result.put("manifest_verified", verified).put("default_custom_change", "schema_list restricted to " + schema + " only");
         System.err.println("EXTRACT verified " + verified.length() + " bundled resources");
         return result;
     }
@@ -442,6 +471,17 @@ public final class ChatReplay {
             for (byte value : digest.digest()) actual.append(String.format(Locale.ROOT, "%02x", value & 255));
             if (!hash.equals(actual.toString())) throw new IOException("Asset hash mismatch: " + entry.getName());
         }
+    }
+
+    /** 14-key keyboard (pinyin_14jian): paired letters share one key, typed as its capital; l and m stand alone. */
+    private static String keys14(String pinyin) {
+        String pairs = "qwQerEtyTuiUopOasAdfDghGjkJzxZcvCbnB";
+        StringBuilder out = new StringBuilder();
+        for (char ch : pinyin.toCharArray()) {
+            int at = pairs.indexOf(ch);
+            out.append(at < 0 || Character.isUpperCase(ch) ? ch : pairs.charAt(at - at % 3 + 2));
+        }
+        return out.toString();
     }
 
     private static String digits(String pinyin) {
@@ -567,7 +607,7 @@ public final class ChatReplay {
         Map<String, String> flags = new HashMap<>();
         Set<String> allowed = new HashSet<>(Arrays.asList("root", "apk", "resources", "host", "lib-dir", "corpus", "output",
             "key-delay-ms", "limit", "boundary-limit", "settle-timeout-ms", "variant", "modes",
-            "only-ids", "case-ids", "reuse", "user-dict"));
+            "only-ids", "case-ids", "reuse", "user-dict", "schema", "schema-patch"));
         for (int i = 0; i < args.length; i++) {
             if (!args[i].startsWith("--")) throw new IllegalArgumentException("Expected --flag: " + args[i]);
             String key = args[i].substring(2);

@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.kingzcheung.xime.clipboard
 
 import android.content.ClipData
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -41,7 +44,15 @@ class ClipboardManager private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "ClipboardManager"
-        private const val MAX_ITEMS = 1000
+        /** Unfixed history kept; the oldest unfixed record goes first. Fixed records are never trimmed. */
+        internal const val MAX_ITEMS = 5000
+        /** Longer copies stay on the system clipboard but are not saved to history. */
+        internal const val MAX_TEXT_BYTES = 1024 * 1024
+        /** The board reads unfixed history in pages of this many records. */
+        internal const val HISTORY_PAGE = 300
+
+        internal fun fitsHistory(text: String): Boolean =
+            text.length <= MAX_TEXT_BYTES && text.encodeToByteArray().size <= MAX_TEXT_BYTES
         private const val PREFS_NAME = "clipboard_prefs"
         private const val KEY_CLIPBOARD_ITEMS = "clipboard_items"
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
@@ -156,6 +167,32 @@ class ClipboardManager private constructor(private val context: Context) {
     /** Existing plugin protocol name; the source is now the unified set of fixed text records. */
     val quickSendItems: StateFlow<List<ClipboardItem>> = _quickSendItems.asStateFlow()
 
+    private val historyWindow = MutableStateFlow(HISTORY_PAGE)
+    private val _unpinnedCount = MutableStateFlow(0)
+    /** All unfixed text records in the database, including pages not read yet. */
+    val unpinnedCount: StateFlow<Int> = _unpinnedCount.asStateFlow()
+
+    /** Read the next page of older history; called when the board scrolls near its end. */
+    fun loadMoreHistory() {
+        val loaded = historyWindow.value
+        if (loaded < _unpinnedCount.value) historyWindow.value = loaded + HISTORY_PAGE
+    }
+
+    /** Back to the first page when the board closes, so memory stays small. */
+    fun resetHistoryWindow() { historyWindow.value = HISTORY_PAGE }
+
+    /** A search submitted from the keyboard search bar; the board shows only its matches until cleared. */
+    val boardQuery = MutableStateFlow("")
+
+    /** Fixed records and history matching a text fragment or pinyin initials (searched in the database). */
+    suspend fun search(query: String): List<ClipboardItem> {
+        if (query.isBlank()) return emptyList()
+        clipboardPinsReady.await()
+        return dao.search(ClipboardSearch.likePattern(query), ClipboardSearch.RESULT_LIMIT).map { it.toClipboardItem() }
+    }
+
+    private fun searchKey(text: String) = ClipboardSearch.key(text, AndroidPinyinInitials::initialOf)
+
     private val _recentItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val recentItems: StateFlow<List<ClipboardItem>> = _recentItems.asStateFlow()
 
@@ -188,7 +225,9 @@ class ClipboardManager private constructor(private val context: Context) {
             } finally {
                 clipboardPinsReady.complete(Unit)
             }
-            dao.observeAll().collect { entries ->
+            scope.launch { dao.observeUnpinnedCount().collect { _unpinnedCount.value = it } }
+            scope.launch { backfillSearchKeys() }
+            historyWindow.flatMapLatest { dao.observeWindow(it) }.collect { entries ->
                 _clipboardItems.value = entries.map { it.toClipboardItem() }
                 updateRecentItems()
             }
@@ -230,6 +269,15 @@ class ClipboardManager private constructor(private val context: Context) {
             Log.i(TAG, "Migrated ${entries.size} legacy clipboard items to Room")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to migrate legacy clipboard items", e)
+        }
+    }
+
+    /** Records saved before search existed get their keys in small batches, off the main thread. */
+    private suspend fun backfillSearchKeys() {
+        while (true) {
+            val batch = runCatching { dao.missingSearchKeys(100) }.getOrDefault(emptyList())
+            if (batch.isEmpty()) return
+            batch.forEach { dao.setSearchKey(it.id, searchKey(it.text)) }
         }
     }
 
@@ -311,7 +359,8 @@ class ClipboardManager private constructor(private val context: Context) {
         if (text.isBlank()) return
         scope.launch {
             clipboardPinsReady.await()
-            dao.upsertAndTrim(text, System.currentTimeMillis(), MAX_ITEMS)
+            if (!fitsHistory(text)) return@launch
+            dao.upsertAndTrim(text, System.currentTimeMillis(), MAX_ITEMS, searchKey(text))
             _clipboardChanged.emit(
                 ClipboardItem(
                     text = text,
@@ -386,11 +435,13 @@ class ClipboardManager private constructor(private val context: Context) {
 
     /** Edit in place: preserve pin state and retain the code when it was not edited. */
     fun updateClipboardItem(id: Long, newText: String, newCode: String? = null): Boolean {
-        if (newText.isBlank()) return false
-        if (_clipboardItems.value.none { it.id == id }) return false
+        if (newText.isBlank() || !fitsHistory(newText)) return false
         scope.launch {
             clipboardPinsReady.await()
+            // A search result may lie outside the loaded page; the database decides whether it exists.
+            if (dao.findById(id) == null) return@launch
             dao.updateClipboardItem(id, newText, newCode?.trim(), System.currentTimeMillis())
+            dao.setSearchKey(id, searchKey(newText))
         }
         return true
     }
@@ -400,10 +451,10 @@ class ClipboardManager private constructor(private val context: Context) {
     }
 
     fun addPinnedText(text: String, code: String = "") {
-        if (text.isBlank()) return
+        if (text.isBlank() || !fitsHistory(text)) return
         scope.launch {
             clipboardPinsReady.await()
-            dao.insertPinnedText(text, code.trim(), System.currentTimeMillis())
+            dao.insertPinnedText(text, code.trim(), System.currentTimeMillis(), searchKey(text))
         }
     }
 

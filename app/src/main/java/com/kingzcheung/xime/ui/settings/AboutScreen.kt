@@ -164,21 +164,6 @@ fun AboutContent(
     var verboseLoggingEnabled by remember {
         mutableStateOf(SettingsPreferences.isVerboseLoggingEnabled(context))
     }
-    // 彩蛋入口：1.5 秒内连点"设备信息"卡片 7 次解锁"手写数据采集"（平时隐藏）
-    var captureTapCount by remember { mutableStateOf(0) }
-    var lastCaptureTapMs by remember { mutableStateOf(0L) }
-    var captureUnlocked by rememberSaveable { mutableStateOf(false) }
-    fun onDeviceInfoTapped() {
-        val now = System.currentTimeMillis()
-        if (now - lastCaptureTapMs > 1500L) captureTapCount = 0
-        lastCaptureTapMs = now
-        captureTapCount++
-        if (captureTapCount >= 7) {
-            captureTapCount = 0
-            captureUnlocked = true
-            android.widget.Toast.makeText(context, "已解锁手写数据采集入口", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
     
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -312,6 +297,17 @@ fun AboutContent(
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
+                        // 使用文档从设置首页收到这里（内容较旧，少有人点）。
+                        SettingsItem(
+                            icon = Icons.TwoTone.Description,
+                            title = "使用文档",
+                            onClick = { uriHandler.openUri("https://github.com/Cyletix/CyIME/blob/main/docs/usage.md") }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 56.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
                         SettingsItem(
                             icon = Icons.TwoTone.BugReport,
                             title = "日志查看器",
@@ -327,18 +323,6 @@ fun AboutContent(
                             title = "存储空间",
                             onClick = onNavigateToStorageSpace
                         )
-                        if (captureUnlocked && (BuildConfig.DEV_TOOLS || BuildConfig.DEBUG)) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 56.dp),
-                                thickness = 0.5.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                            )
-                            SettingsItem(
-                                icon = Icons.Default.Edit,
-                                title = "手写数据采集",
-                                onClick = onNavigateToHandwritingCapture
-                            )
-                        }
                         if (BuildConfig.DEBUG) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 56.dp),
@@ -374,7 +358,6 @@ fun AboutContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED)
-                            .clickable { onDeviceInfoTapped() }
                             .padding(16.dp)
                     ) {
                         Text(
