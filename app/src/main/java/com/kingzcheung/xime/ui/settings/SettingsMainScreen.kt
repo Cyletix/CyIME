@@ -346,14 +346,19 @@ fun SettingsMainContent(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
-                    SettingsItem(
+                    // 首页这一行右边就是语音开关，点开关直接开关语音，点行进语音页（用户 10-20 要求恢复）。
+                    var sttEnabled by remember(entryStatus.sttEnabled) { mutableStateOf(entryStatus.sttEnabled) }
+                    SettingsToggleItem(
                         icon = Icons.TwoTone.GraphicEq,
-                        title = "语音与手写",
-                        subtitle = "语音识别方式、二次校正、字幕图标、手写停顿与公式",
-                        status = if (entryStatus.sttEnabled) "语音已开启" else "语音已关闭",
-                        statusTone = if (entryStatus.sttEnabled) SettingsStatusTone.OK else SettingsStatusTone.NEUTRAL,
+                        title = "语音转文本",
+                        subtitle = "本地模型或在线服务，下载并选择识别方式",
+                        checked = sttEnabled,
+                        showArrow = true,
                         onClick = onNavigateToSpeechToText,
-                        showArrow = true
+                        onCheckedChange = { enabled ->
+                            sttEnabled = enabled
+                            SettingsPreferences.setSttEnabled(context, enabled)
+                        }
                     )
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 56.dp),
