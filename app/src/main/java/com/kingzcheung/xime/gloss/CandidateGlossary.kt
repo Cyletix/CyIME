@@ -26,16 +26,27 @@ import kotlin.concurrent.thread
  */
 object CandidateGlossary {
     const val MODEL_ID = "candidate-gloss"
-    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词，v3 没标出不可靠的单字；装着旧版的设备自动换新。 */
-    const val FILE_NAME = "cyime_gloss-v4.tsv"
-    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv", "cyime_gloss-v3.tsv")
+    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词，v3 没标出不可靠的单字，v4 没有日常短语；装着旧版的设备自动换新。 */
+    const val FILE_NAME = "cyime_gloss-v5.tsv"
+    private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv", "cyime_gloss-v3.tsv", "cyime_gloss-v4.tsv")
     private const val TAG = "CandidateGlossary"
     private val upgradeStarted = AtomicBoolean(false)
 
     /** 释义前缀：词典里不可靠的单字释义，显示时去掉，拼整句英文时不用。 */
     private const val APPROX = "~"
+    /** 释义前缀：词典里预先逐词拼好的日常短语英文（我估计 → I estimate），只显示，不拿来上屏。 */
+    private const val PHRASE = "+"
     private const val COMPOSE_MAX_WORD = 6
-    private const val COMPOSE_MAX_CHARS = 24
+    /** 只给短语拼英文（用户定：短一点的短语，不做整句）。 */
+    private const val COMPOSE_MAX_CHARS = 4
+    /**
+     * 拼短语时可单独用的字：意思固定、放进短语里不会错的常用字（宁少勿多）。其余单字的释义多义，
+     * 拼进去会出错（会 → meet，比 → ratio），一律不用。
+     */
+    private val COMPOSE_SAFE_CHARS = mapOf(
+        '我' to "I", '你' to "you", '他' to "he", '她' to "she", '也' to "also", '不' to "not", '很' to "very",
+        '都' to "all", '和' to "and", '又' to "again", '再' to "again", '太' to "too", '最' to "most", '更' to "more",
+    )
     private const val COMPOSE_MAX_GLOSS = 40
     /** 拼过的整句释义；换词典时清空。 */
     private val composed = object : LinkedHashMap<String, String>(256, 0.75f, true) {
@@ -136,18 +147,18 @@ object CandidateGlossary {
     }
 
     /**
-     * 逐词拼整句英文（[compose]）默认关：拼出来的是逐词对照，单字取义常不对（我比 → I ratio，一日游 → one sun swim），
-     * 错的英文比不显示更糟。用户要的时候再打开。
+     * 运行时把任意 2～4 字候选逐词拼英文（[compose]）默认关：候选里大量是说不通的临时组合（对付一口 →
+     * handle readily），按字数拼会出错英文。日常短语改由词典预先按词库常见度挑好拼好（[PHRASE] 前缀），App 只查表。
      */
     @Volatile var composeEnabled = false
 
     /** 候选的释义：词典里有就用（去掉不可靠标记）；没有时只在 [composeEnabled] 打开后按词切开逐词拼英文。 */
     internal fun gloss(table: GlossTable, text: String): String? =
-        table.lookup(keyOf(text))?.removePrefix(APPROX) ?: if (composeEnabled) compose(table, text) else null
+        table.lookup(keyOf(text))?.removePrefix(APPROX)?.removePrefix(PHRASE) ?: if (composeEnabled) compose(table, text) else null
 
     /**
-     * 整句、词组候选（我昨天看到 → I yesterday see）：从左往右每次取词典里最长的词，单字只用可靠的释义
-     * （不带 [APPROX] 的，不可靠的如 会 → meet 拼进去会变成胡话）。有一个字切不出来就不显示，宁缺勿错。
+     * 2～4 字的短语候选（我闹钟 → I alarm clock）：从左往右每次取词典里最长的两字以上词，单字只用
+     * [COMPOSE_SAFE_CHARS] 里的。有一块切不出来就不显示，宁缺勿错。
      * 结果按文字缓存，候选栏重组时不重复查表。
      */
     internal fun compose(table: GlossTable, text: String): String? {
@@ -160,13 +171,14 @@ object CandidateGlossary {
         var complete = true
         while (start < text.length) {
             var matched = 0
-            for (length in minOf(COMPOSE_MAX_WORD, text.length - start) downTo 1) {
+            for (length in minOf(COMPOSE_MAX_WORD, text.length - start) downTo 2) {
                 val value = table.lookup(text.substring(start, start + length)) ?: continue
-                if (length == 1 && value.startsWith(APPROX)) continue
+                if (value.startsWith(APPROX) || value.startsWith(PHRASE)) continue
                 parts += value.removeSuffix("…").trimEnd()
                 matched = length
                 break
             }
+            if (matched == 0) COMPOSE_SAFE_CHARS[text[start]]?.let { parts += it; matched = 1 }
             if (matched == 0) { complete = false; break }
             start += matched
         }
@@ -181,7 +193,8 @@ object CandidateGlossary {
         // 本身是英文的候选直接上屏它自己；被截断的释义（以 … 结尾）不是完整英文，不拿来上屏；
         // 逐词拼出来的整句英文不是译文，也不上屏，只做显示参考。
         if (text.isBlank() || text.all { it.code < 0x80 }) return null
-        return table.lookup(keyOf(text))?.removePrefix(APPROX)?.takeUnless { it.isBlank() || it.endsWith("…") }
+        return table.lookup(keyOf(text))?.removePrefix(APPROX)
+            ?.takeUnless { it.isBlank() || it.endsWith("…") || it.startsWith(PHRASE) }
     }
 
     internal fun swapped(table: GlossTable?, texts: List<String>, comments: List<String>): Pair<List<String>, List<String>> {
