@@ -26,10 +26,10 @@ import kotlin.concurrent.thread
  */
 object CandidateGlossary {
     const val MODEL_ID = "candidate-gloss"
-    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词，v3 没标出不可靠的单字，v4 没有日常短语，v5 的短语是逐词硬拼，v6 的机器翻译短语一成翻错，v7 还有地名翻错；装着旧版的设备自动换新。 */
-    const val FILE_NAME = "cyime_gloss-v8.tsv"
+    /** 文件名带版本：v1 有错释义（几号 → heroin），v2 缺大量常用字词，v3 没标出不可靠的单字，v4 没有日常短语，v5 的短语是逐词硬拼，v6 的机器翻译短语一成翻错，v7 还有地名翻错，v8 生僻单字给了一堆没用的释义、常用词组缺得多（v9 未发布）；装着旧版的设备自动换新。 */
+    const val FILE_NAME = "cyime_gloss-v10.tsv"
     private val LEGACY_FILE_NAMES = listOf("cyime_gloss.tsv", "cyime_gloss-v2.tsv", "cyime_gloss-v3.tsv", "cyime_gloss-v4.tsv",
-        "cyime_gloss-v5.tsv", "cyime_gloss-v6.tsv", "cyime_gloss-v7.tsv")
+        "cyime_gloss-v5.tsv", "cyime_gloss-v6.tsv", "cyime_gloss-v7.tsv", "cyime_gloss-v8.tsv", "cyime_gloss-v9.tsv")
     private const val TAG = "CandidateGlossary"
     private val upgradeStarted = AtomicBoolean(false)
 
@@ -64,6 +64,21 @@ object CandidateGlossary {
 
     fun file(context: Context): File = File(ModelStorage.getModelDir(context, MODEL_ID), FILE_NAME)
 
+    /**
+     * 私人补充包：按用户自己的输入挑出的释义，只由“装到我的设备”打包放进 APK 资源，不上传、不进公开包。
+     * 同一格式（按 UTF-8 字节序的 `词\t释义`），值为 [GlossTable.HIDDEN] 表示这个词不显示释义；有就叠在公开词典上。
+     */
+    const val PRIVATE_ASSET = "gloss/cyime_gloss-private.tsv"
+
+    private fun openPrivateAsset(context: Context): GlossTable? = try {
+        context.assets.open(PRIVATE_ASSET).use { GlossTable.fromBuffer(ByteBuffer.wrap(it.readBytes())) }
+    } catch (_: java.io.FileNotFoundException) {
+        null
+    } catch (error: Exception) {
+        FileLogger.w(TAG, "私人释义补充包加载失败：${error.message}")
+        null
+    }
+
     fun isInstalled(context: Context): Boolean = file(context).let { it.isFile && it.length() > 0 }
 
     /** 按当前设置在后台加载或释放词典；只读偏好和文件信息，可在主线程调用。 */
@@ -83,6 +98,7 @@ object CandidateGlossary {
         thread(name = "candidate-gloss", isDaemon = true) {
             try {
                 val opened = GlossTable.open(source)
+                opened.overlay = openPrivateAsset(context)
                 synchronized(composed) { composed.clear() }
                 table = opened
                 signature = current
@@ -234,8 +250,12 @@ object CandidateGlossary {
 internal class GlossTable private constructor(private val buffer: ByteBuffer, private val starts: IntArray) {
     val size: Int get() = starts.size
 
+    /** 叠在上面的私人补充包：先查它，查到 [HIDDEN] 就不显示释义。 */
+    @Volatile var overlay: GlossTable? = null
+
     fun lookup(key: String): String? {
         if (key.isEmpty()) return null
+        overlay?.lookup(key)?.let { return it.takeUnless { value -> value == HIDDEN } }
         val wanted = key.toByteArray(Charsets.UTF_8)
         var low = 0
         var high = starts.size - 1
@@ -274,6 +294,8 @@ internal class GlossTable private constructor(private val buffer: ByteBuffer, pr
     }
 
     companion object {
+        /** 私人补充包里“这个词不显示释义”的值。 */
+        const val HIDDEN = "-"
         private const val TAB = '\t'.code
         private const val NEWLINE = '\n'.code
         private const val COMMENT = '#'.code
