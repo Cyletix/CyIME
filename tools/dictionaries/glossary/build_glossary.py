@@ -14,12 +14,14 @@
   - 义项优先选“英文译回中文正好是 / 含有这个词”的（用 ECDICT 反查），对不上用首义。
   - 单字只认主读音首义且正好译回本字，否则不显示（行 → row、被 → quilt 这类宁可不显示）。
 
+v8：去掉带地名、人名的翻译短语（在青岛 → in Aoshima）。
+v7：常见的说话用短语（带代词、虚词）改用电脑上离线机器翻译的通顺译文，只收英文译回中文能回到原短语的（roundtrip_filter.py），翻不准的仍用逐词版或不收。
 v5：词库里常见、没有整词英文的日常短语预先逐词拼好英文（+ 前缀，只显示不上屏）。
 v4：不可靠的单字释义加 “~” 前缀，供 App 拼整句英文时跳过。
 v3：修 v2 反查时没拆开 ECDICT 多行释义的错误；单字改为“正好译回本字 → 按顺序第一个含本字的义项 → 首义”；
 “X 的异体 / 见 X” 借用 X 的释义；CC-CEDICT 没收的常用词组用 ECDICT 反查补（很多 → plenty，博客 → blog）。
 
-用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --output cyime_gloss-v5.tsv
+用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --mt-phrases mt-phrases.tsv --output cyime_gloss-v8.tsv
 """
 from __future__ import annotations
 
@@ -402,8 +404,12 @@ def main() -> int:
                         help="多字中文词在 Rime 词库里的最低权重")
     parser.add_argument("--engine-dict", action="append", default=[],
                         help="输入法实际用的 rime_ice 词库（cn_dicts/*.dict.yaml），可重复；补收 pinyin_simp 里没有的常用词")
+    parser.add_argument("--word-by-word-phrases", action="store_true",
+                        help="同时收逐词拼出的日常短语（v5 的做法，读不通，默认不收）")
     parser.add_argument("--phrase-min-weight", type=int, default=20000,
                         help="日常短语在 rime_ice 词库里的最低权重")
+    parser.add_argument("--mt-phrases", help="电脑上离线机器翻译并筛过的常见短语（短语	英文	把握度），见 mt_filter；"
+                        "替换同一短语的逐词版")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -416,7 +422,18 @@ def main() -> int:
     print(f"filled_from_english={filled}", file=sys.stderr)
     for key, gloss in chinese.items():
         entries.setdefault(key, gloss)
-    if engine:
+    if args.mt_phrases:
+        # 机器翻译的短语读起来通顺（很有道理 → that makes sense），优先于逐词拼；同样只显示、不上屏。
+        translated = 0
+        with open(args.mt_phrases, encoding="utf-8") as handle:
+            for line in handle:
+                word, translation = line.rstrip("\n").split("\t")[:2]
+                if translation and (word not in entries or entries[word].startswith(PHRASE)):
+                    entries[word] = PHRASE + translation
+                    translated += 1
+        print(f"mt_phrases={translated}", file=sys.stderr)
+    if engine and args.word_by_word_phrases:
+        # v5 的逐词拼短语读不通（很有道理 → very make sense，你怎么知道 → you how? know），v7 起默认不收。
         print(f"everyday_phrases={add_everyday_phrases(entries, engine, args.phrase_min_weight)}", file=sys.stderr)
     rows = sorted(((k, v) for k, v in entries.items() if "\t" not in k + v and "\n" not in k + v),
                   key=lambda item: item[0].encode("utf-8"))
