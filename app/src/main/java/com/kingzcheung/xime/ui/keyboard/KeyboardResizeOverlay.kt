@@ -94,6 +94,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -141,7 +143,7 @@ internal fun KeyboardResizeOverlay(
     val pressingOpacity by opacityInteraction.collectIsPressedAsState()
     // 手指在滑条上时只留滑条本身，看到的就是真实透明效果；松手后再给出返回/完成。
     val adjustingOpacity = draggingOpacity || pressingOpacity
-    LaunchedEffect(draggingOpacity) { if (draggingOpacity) editingOpacity = true }
+    // 调透明度不再进入单独的编辑态（返回/完成），外框和按钮留在原地；editingOpacity 只保留给旧调用方。
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val frameStyle = remember(configuration.smallestScreenWidthDp) {
@@ -203,6 +205,9 @@ internal fun KeyboardResizeOverlay(
         // 与键盘设计一致；没有键盘配色时（预览、测试）退回 Material 主题色。
         val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
         val onSurfaceColor = palette?.text ?: MaterialTheme.colorScheme.onSurface
+        val surfaceColor = palette?.key?.copy(alpha = 1f) ?: MaterialTheme.colorScheme.surface
+        // 透明度底板用主题表面色和弱描边，始终与键盘预览保持对比。
+        val outlineVariantColor = (palette?.text ?: MaterialTheme.colorScheme.outlineVariant).copy(alpha = 0.35f)
         val accentColor = (palette?.accent ?: MaterialTheme.colorScheme.primary).copy(alpha = 1f)
         // 滑条面板和按钮用功能键的实心颜色，玻璃主题也不透明；文字用功能键文字色。
         val functionColor = (palette?.function ?: MaterialTheme.colorScheme.surfaceVariant).copy(alpha = 1f)
@@ -583,27 +588,18 @@ internal fun KeyboardResizeOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // 使用整组控件的可用宽度，不再对滑条单独限宽后按比例缩一次。
-                // 按设计图：左「透明度」、中间滑轨、右百分比，没有自己的底框；拖透明度时也保持显示。
-                Row(
+                // 最初的设计：圆角 10dp 的底板加细描边，「透明度 N%」贴在滑条正中，一直显示；
+                // 调透明度不进单独的编辑态，外框和四个按钮都留着（用户 2026-10-21 要求改回）。
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(opacityHeight)
                         .testTag("keyboard-resize-opacity-panel")
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(surfaceColor.copy(alpha = 0.92f))
+                        .border(1.dp, outlineVariantColor, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = "透明度",
-                        modifier = Modifier
-                            .clickable { editingOpacity = true }
-                            .padding(end = 10.dp),
-                        color = onSurfaceColor,
-                        fontSize = 16.sp,
-                        lineHeight = 22.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
                     val sliderColors = SliderDefaults.colors(
                         thumbColor = accentColor,
                         activeTrackColor = accentColor,
@@ -613,14 +609,13 @@ internal fun KeyboardResizeOverlay(
                         Slider(
                             value = 1f - opacity,
                             onValueChange = {
-                                editingOpacity = true
                                 opacity = 1f - it
                                 currentOnPreviewOpacity(opacity)
                             },
                             valueRange = 0f..0.7f,
                             interactionSource = opacityInteraction,
                             colors = sliderColors,
-                            // 按设计图：圆形滑块，自己画，按住、拖动都不变形。
+                            // 圆形滑块，自己画，按住、拖动都不变形。
                             thumb = {
                                 Box(
                                     Modifier
@@ -630,7 +625,7 @@ internal fun KeyboardResizeOverlay(
                                         .testTag("keyboard-opacity-thumb"),
                                 )
                             },
-                            // 轨道也自己画：Material 默认在滑块两侧挖的是方形缺口，这里挖成比滑块大一圈（每边 3dp）的圆形透明缺口，拖动时也保持圆形。
+                            // 轨道也自己画：滑块两侧挖成比滑块大一圈（每边 3dp）的圆形透明缺口，拖动时也保持圆形。
                             track = { sliderState ->
                                 val fraction = sliderState.coercedValueAsFraction
                                 Box(
@@ -640,7 +635,6 @@ internal fun KeyboardResizeOverlay(
                                         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                                         .drawBehind {
                                             val radius = size.height / 2f
-                                            // 轨道实心（功能键色），底下按键的缝和角标不再透出来。
                                             drawRoundRect(functionColor, cornerRadius = CornerRadius(radius))
                                             val thumbX = fraction * size.width
                                             if (thumbX > 0f) drawRoundRect(accentColor, size = Size(thumbX, size.height), cornerRadius = CornerRadius(radius))
@@ -649,27 +643,28 @@ internal fun KeyboardResizeOverlay(
                                 )
                             },
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .height(opacityHeight)
+                                .padding(horizontal = 6.dp)
                                 .semantics { contentDescription = "键盘透明度" }
                                 .testTag("keyboard-opacity-slider"),
                         )
                     }
-                    // 百分比固定宽度、右对齐，数字变化时滑轨不抖。
                     Text(
-                        text = "${((1f - opacity) * 100).roundToInt()}%",
+                        text = "透明度 ${((1f - opacity) * 100).roundToInt()}%",
                         modifier = Modifier
-                            .padding(start = 10.dp)
-                            .width((44f * density.fontScale).dp)
-                            .clickable { editingOpacity = true }
+                            .align(Alignment.Center)
+                            .width(IntrinsicSize.Max)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(surfaceColor.copy(alpha = 0.92f))
+                            .padding(horizontal = 2.dp)
                             .testTag("keyboard-opacity-overlay-label"),
                         color = onSurfaceColor,
                         fontSize = 16.sp,
                         lineHeight = 22.sp,
                         fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.End,
                         maxLines = 1,
-                        softWrap = false,
+                        textAlign = TextAlign.Center,
                     )
                 }
 
