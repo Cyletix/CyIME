@@ -315,7 +315,7 @@ def run_replay(args):
     for name, default in (("variant", "digits"), ("schema", "t9_pinyin"), ("schema_patch", "")):
         if not hasattr(args, name):
             setattr(args, name, default)
-    letters = args.variant == "letters"
+    letters = args.variant.startswith("letters")
     if letters != (args.schema != "t9_pinyin"):
         raise ValueError("--variant letters goes with a 26-key --schema (rime_ice); digits with t9_pinyin")
     protocol = dict(key_delay_ms=args.key_delay_ms, row_limit=20, boundary_limit=100,
@@ -439,8 +439,8 @@ def main(argv=None):
     run.add_argument("--baseline", type=Path)
     run.add_argument("--assertions", type=Path)
     run.add_argument("--keep-device", action="store_true", help="Retain this run's isolated device resources for diagnostics")
-    run.add_argument("--variant", choices=["digits", "letters"], default="digits",
-                     help="letters: type each case's full pinyin into a 26-key --schema (latency and first choices only)")
+    run.add_argument("--variant", choices=["digits", "letters", "letters14"], default="digits",
+                     help="letters: type each case's full pinyin into a 26-key --schema; letters14: the same on the 14-key keyboard (--schema pinyin_14jian); latency and first choices only")
     run.add_argument("--schema", default="t9_pinyin", help="Rime schema to deploy and replay (rime_ice with --variant letters)")
     run.add_argument("--schema-patch", default="",
                      help='"key=value;..." written as <schema>.custom.yaml before deployment, e.g. '
