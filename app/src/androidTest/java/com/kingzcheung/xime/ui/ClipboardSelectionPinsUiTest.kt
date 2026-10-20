@@ -198,7 +198,7 @@ class ClipboardSelectionPinsUiTest {
         // Pinned records are one line high, and the toolbar uses the same pill as the divider.
         assertEquals("pinned record is one line high", 40f * .4f, first.height, 1f)
         rule.onNodeWithText(if (width >= 360) "固定 100" else "100", useUnmergedTree = true).assertExists()
-        rule.onNodeWithText("还有 ${100 - columns} 条固定", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("展开 ${100 - columns} 条", useUnmergedTree = true).assertExists()
     }
 
     @Test fun collapsingPinsRemovesHiddenRecordsFromKeyboardNavigation() {
