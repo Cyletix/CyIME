@@ -172,7 +172,10 @@ val prepareChineseDictionaries by tasks.registering {
             "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
             "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
             // 把/被 open a verb phrase and never end a sentence: shuoshuobei is 说说呗, not 说说被.
-            "  sentence_position_initial_only: [把, 被]\n")
+            "  sentence_position_initial_only: [把, 被]\n" +
+            // Four sentences for t9/sentence_rescore to choose from (the menu still shows one); the cutoff
+            // keeps Rime from dropping alternatives whose weight is a word penalty away.
+            "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }.joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
             "\ncyime:\n  candidate_policy: true\n" +
@@ -186,11 +189,14 @@ val prepareChineseDictionaries by tasks.registering {
             // per-key p95 from ~18 to ~55 ms; 16/16/8 is about 7x faster on the computer at nearly the same
             // accuracy (pinyin26-word-model-20261018.md). Keep only if the tablet p95 stays at the baseline.
             // Off in 1.14.14 until the tablet p95 has been measured with these budgets.
-            "\nt9:\n  joint_decoder: false\n  joint_requires_ngram: true\n  source_budget: 16\n  pool_budget: 16\n" +
+            // Since 2026-10-20 the word model only reorders Rime's four sentences (sentence_rescore): the
+            // joint decoder above cost +40% per key, the rescoring +5% for most of the sentence gain. 26-key
+            // never passes the committed text, so the first word is not scored as a sentence start.
+            "\nt9:\n  sentence_rescore: true\n  joint_decoder: false\n  joint_requires_ngram: true\n  source_budget: 16\n  pool_budget: 16\n" +
             "  dictionary_beam: 64\n  sentence_beam: 8\n  result_budget: 12\n  display_sentences: 1\n" +
             "  spelling_penalty: 0\n  word_penalty: 8.0\n  correction_penalty: -9.2\n  whole_input_phrases: 16\n" +
             "  prefer_user_entries: true\n  ngram_model: t9_ngram\n" +
-            "  ngram_sentence_start: true\n  ngram_eos_weight: 0\n  ngram_user_weight: 0.3\n" +
+            "  ngram_sentence_start: false\n  ngram_eos_weight: 0\n  ngram_user_weight: 0.3\n" +
             "  ngram_dictionary_prior: 0.02\n  ngram_merge_segmentations: false\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
         File(root, "rime_ice.schema.yaml").writeText(baseSchema)

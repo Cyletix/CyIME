@@ -800,10 +800,19 @@ index dc647cd..f3df32e 100644
            for (char c : entry->text) {
              new_hash = new_hash * 31 + c;
 diff --git a/src/rime/gear/poet.h b/src/rime/gear/poet.h
-index 459f31d..b0e26fd 100644
+index 459f31d..9ae464c 100644
 --- a/src/rime/gear/poet.h
 +++ b/src/rime/gear/poet.h
-@@ -126,6 +126,16 @@ class Poet {
+@@ -25,6 +25,8 @@ struct Line;
+ 
+ class Poet {
+  public:
++  // CyIME: first/last-word penalty, also used by the 26-key sentence rescoring.
++  double PositionAdjust(const string& text, bool first, bool rear) const;
+   // Line "less", used to compare composed line of the same input range.
+   using Compare = function<bool(const Line&, const Line&)>;
+ 
+@@ -126,6 +128,15 @@ class Poet {
    const Language* language_;
    the<Grammar> grammar_;
    Compare compare_;
@@ -816,7 +825,6 @@ index 459f31d..b0e26fd 100644
 +  // end as a non-final position before extending it, so this stays consistent with a full rerun.
 +  set<string> initial_only_;
 +  double position_penalty_ = 0.0;
-+  double PositionAdjust(const string& text, bool first, bool rear) const;
  };
  
  }  // namespace rime
