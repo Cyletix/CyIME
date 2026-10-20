@@ -120,3 +120,12 @@ machine speed. Compare settled outcomes separately, and treat a refinement
 timeout as incomplete evidence rather than a settled passing result. The
 runner does not build or install an APK, select/commit candidate text, or
 validate UI hitboxes or actual application text delivery.
+
+## 26-key latency (`--variant letters`)
+
+`t9_replay.py android-run --variant letters --schema rime_ice --fixture <pinyin fixture> --apk <apk>` types each case's
+full pinyin (no separators) into the 26-key schema and writes `latency.json` (per-key process time after the first
+case: mean, p50, p95, p99; final first choices). `--schema-patch "translator/max_sentences=1;t9/sentence_rescore=false"`
+writes `rime_ice.custom.yaml` before deployment, so the same build can be measured with the sentence rescoring on and
+off. No key is injected into the keyboard and no UI is touched. The keyboard-neighbour map is not set, so typo
+correction uses the default distances. Device runs only on the user's explicit request.

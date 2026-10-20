@@ -275,6 +275,22 @@ def compact_report(output, fixture, report, records, quality, user_state="fresh_
         "<th>即时首选</th><th>目标名次</th><th>停顿首选</th><th>目标名次</th></tr>" + table + "</table></html>", encoding="utf-8")
 
 
+def letters_latency(path):
+    """Per-key process time (key_immediate, after the first case) and final first choices of a 26-key run."""
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    ready = next((r for r in rows if r.get("stage") == "ready"), {})
+    keys = [r for r in rows if r.get("stage") == "key_immediate"]
+    first = keys[0]["id"] if keys else None
+    times = sorted(int(r["process_us"]) for r in keys if r["id"] != first)
+    last = {}
+    for r in keys:
+        last[r["id"]] = r
+    top1 = sum(1 for r in last.values() if r["rows"] and r["rows"][0]["text"] == r["target"])
+    pick = lambda q: times[min(len(times) - 1, int(q * len(times)))] / 1000 if times else None
+    return dict(settings=ready.get("settings", {}), keys=len(times), mean_ms=sum(times) / len(times) / 1000 if times else None,
+                p50_ms=pick(0.5), p95_ms=pick(0.95), p99_ms=pick(0.99), cases=len(last), first_choice=top1)
+
+
 def run_replay(args):
     from t9_fixture import validate_fixture
     from t9_replay_compare import evaluate_known_bad, compare_runs, write_comparison, combine_exit_codes
@@ -296,8 +312,15 @@ def run_replay(args):
         save(output / "fixture.json", fixture)
     command = Commands(adb, output / "commands.log")
     remote = "/data/local/tmp/cyime-chat-audit-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:8]
+    for name, default in (("variant", "digits"), ("schema", "t9_pinyin"), ("schema_patch", "")):
+        if not hasattr(args, name):
+            setattr(args, name, default)
+    letters = args.variant == "letters"
+    if letters != (args.schema != "t9_pinyin"):
+        raise ValueError("--variant letters goes with a 26-key --schema (rime_ice); digits with t9_pinyin")
     protocol = dict(key_delay_ms=args.key_delay_ms, row_limit=20, boundary_limit=100,
-                    settle_timeout_ms=5000, modes=["continuous", "paused"], variant="digits", runtime="android")
+                    settle_timeout_ms=5000, modes=["continuous"] if letters else ["continuous", "paused"],
+                    variant=args.variant, schema=args.schema, schema_patch=args.schema_patch, runtime="android")
     manifest = dict(format_version=1, status="running", fixture_sha256=digest(output / "fixture.json"),
                     protocol_settings=protocol, passes=PASSES, user_state="fresh_empty", personalization=False,
                     remote_root=remote, started_utc=datetime.now(timezone.utc).isoformat(),
@@ -326,10 +349,22 @@ def run_replay(args):
         command.shell("env", "CLASSPATH=" + remote + "/replay.dex", "LD_LIBRARY_PATH=" + remote + "/lib",
                       "app_process", "/system/bin", "com.cyime.audit.ChatReplay", "--apk", remote + "/base.apk",
                       "--lib-dir", remote + "/lib", "--root", remote + "/run", "--corpus", remote + "/fixture.json",
-                      "--output", remote + "/replay.jsonl", "--modes", "continuous,paused", "--key-delay-ms", args.key_delay_ms)
+                      "--output", remote + "/replay.jsonl", "--modes", ",".join(protocol["modes"]),
+                      "--key-delay-ms", args.key_delay_ms, "--variant", args.variant, "--schema", args.schema,
+                      *(["--schema-patch", args.schema_patch] if args.schema_patch else []))
         command.adb_run("pull", remote + "/replay.jsonl", str(output / "replay.jsonl"))
         command.adb_run("pull", remote + "/run/bundled-resources.json", str(output / "bundled-resources.json"))
-        command.adb_run("pull", remote + "/run/user/build/t9_pinyin.schema.yaml", str(output / "deployed-schema.yaml"))
+        command.adb_run("pull", remote + f"/run/user/build/{args.schema}.schema.yaml", str(output / "deployed-schema.yaml"))
+        if letters:
+            # 26-key latency run: the T9 report does not apply; keep per-key timings and first choices.
+            latency = letters_latency(output / "replay.jsonl")
+            save(output / "latency.json", latency)
+            manifest.update(status="complete", replay_sha256=digest(output / "replay.jsonl"),
+                            deployed_schema_sha256=digest(output / "deployed-schema.yaml"),
+                            finished_utc=datetime.now(timezone.utc).isoformat())
+            save(output / "run.json", manifest)
+            print(json.dumps({"output": str(output), "execution": "complete", **latency}, ensure_ascii=False), flush=True)
+            return 0
         records, sources = summary.read_evidence([output / "replay.jsonl"])
         report, snapshots = summary.summarize(fixture, records, PASSES)
         report.update(fixture_sha256=manifest["fixture_sha256"], sources=sources)
@@ -404,6 +439,12 @@ def main(argv=None):
     run.add_argument("--baseline", type=Path)
     run.add_argument("--assertions", type=Path)
     run.add_argument("--keep-device", action="store_true", help="Retain this run's isolated device resources for diagnostics")
+    run.add_argument("--variant", choices=["digits", "letters"], default="digits",
+                     help="letters: type each case's full pinyin into a 26-key --schema (latency and first choices only)")
+    run.add_argument("--schema", default="t9_pinyin", help="Rime schema to deploy and replay (rime_ice with --variant letters)")
+    run.add_argument("--schema-patch", default="",
+                     help='"key=value;..." written as <schema>.custom.yaml before deployment, e.g. '
+                          '"translator/max_sentences=1;t9/sentence_rescore=false" to measure a setting off')
     compare = sub.add_parser("compare", help="Compare two complete stored runs without a device")
     compare.add_argument("baseline", type=Path)
     compare.add_argument("candidate", type=Path)
