@@ -42,6 +42,9 @@ def main():
                         help="a character missing from the corpus is a hole when upstream predicts at least this many")
     parser.add_argument("--ratio", type=float, help="fixed factor instead of the median blend factor")
     parser.add_argument("--quantile", type=float, default=0.5, help="which blend factor counts as typical")
+    parser.add_argument("--keep-single", type=Path,
+                        help="characters (one per line) whose single-character entries keep their weight: those the "
+                             "filter removed for being profane or sexual; words holding them are still re-estimated")
     args = parser.parse_args()
     occurrences = {}
     for line in args.counts.open(encoding="utf-8"):
@@ -64,6 +67,10 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "holes.txt").write_text("".join(f"{ch}\n" for ch in holes), encoding="utf-8")
     hole_set = set(holes)
+    keep_single = set()
+    if args.keep_single:
+        keep_single = {line.strip() for line in args.keep_single.open(encoding="utf-8")
+                       if line.strip() and not line.startswith("#")}
     for name, up in tables.items():
         current = list(rows((args.generated / "cn_dicts" / f"{name}.dict.yaml").open(encoding="utf-8")))
         # The blend moves a typical entry by this factor; a hole entry gets the same move from its upstream weight.
@@ -73,7 +80,9 @@ def main():
         restored = 0
         with gzip.open(args.out / f"{name}.tsv.gz", "wt", encoding="utf-8", newline="\n") as out:
             for text, code, weight in current:
-                if hole_set.intersection(text) and (text, code) in up and round(up[(text, code)] * typical) > weight:
+                if text in keep_single:
+                    pass
+                elif hole_set.intersection(text) and (text, code) in up and round(up[(text, code)] * typical) > weight:
                     weight = round(up[(text, code)] * typical)
                     restored += 1
                 out.write(f"{text}\t{code}\t{weight}\n")
