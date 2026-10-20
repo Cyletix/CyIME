@@ -377,10 +377,13 @@ struct Lexicon {
 struct Token { char kind; char16_t full; char letter; std::string prefix; };  // kind f / a / s(eparator)
 
 struct Params {
-  double abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
-  int incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
+  double rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
+  int t9_beam = 0, t9_per_span = 0, rr_threads = 4, incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
   bool Set(const std::string& k, const std::string& v) {
-    if (k == "incremental") incremental = std::stoi(v); else if (k == "abbrev_full") abbrev_full = std::stod(v); else if (k == "eos2") eos2 = std::stod(v); else if (k == "interleave") interleave = std::stoi(v);
+    if (k == "t9_beam") t9_beam = std::stoi(v); else if (k == "t9_per_span") t9_per_span = std::stoi(v);
+    else if (k == "rr_gamma") rr_gamma = std::stod(v); else if (k == "rr_short") rr_short = std::stod(v);
+    else if (k == "rr_threads") rr_threads = std::stoi(v);
+    else if (k == "incremental") incremental = std::stoi(v); else if (k == "abbrev_full") abbrev_full = std::stod(v); else if (k == "eos2") eos2 = std::stod(v); else if (k == "interleave") interleave = std::stoi(v);
     else if (k == "mix") mix = std::stod(v); else if (k == "mu") mu = std::stod(v); else if (k == "abbrev") abbrev = std::stod(v);
     else if (k == "word_pen") word_pen = std::stod(v); else if (k == "eos") eos = std::stod(v);
     else if (k == "adapt_lambda") adapt_lambda = std::stod(v); else if (k == "select_lm") select_lm = std::stod(v);
@@ -391,6 +394,76 @@ struct Params {
     return true;
   }
 };
+
+
+// ------------------------------------------------------------------ reranker (character model, onnxruntime)
+// Built with -DCYLM_ORT. The ONNX graph (tools/cylm/nn/export_onnx.py) maps ids [batch, T] to the log-probability of
+// each next token [batch, T-1]; a candidate's score is the sum over its characters (and </s>), given <s> + context.
+#ifdef CYLM_ORT
+#include "onnxruntime_c_api.h"
+struct Reranker {
+  const OrtApi* api = nullptr; OrtEnv* env = nullptr; OrtSession* sess = nullptr; OrtMemoryInfo* mem = nullptr;
+  std::unordered_map<uint32_t, int64_t> vocab;
+  bool Load(const char* model, const char* vocab_path, int threads) {
+    api = OrtGetApiBase()->GetApi(17);
+    if (!api) return false;
+    std::ifstream in(vocab_path, std::ios::binary); std::string line; int64_t id = 0;
+    while (std::getline(in, line)) { auto cps = Utf8Decode(line); if (cps.size() == 1) vocab[cps[0]] = id; ++id; }
+    if (vocab.empty()) return false;
+    OrtSessionOptions* so = nullptr;
+    if (api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "cylm", &env) || api->CreateSessionOptions(&so)) return false;
+    api->SetIntraOpNumThreads(so, threads); api->SetSessionGraphOptimizationLevel(so, ORT_ENABLE_ALL);
+#ifdef _WIN32
+    std::wstring w(model, model + std::strlen(model));
+    OrtStatus* st = api->CreateSession(env, w.c_str(), so, &sess);
+#else
+    OrtStatus* st = api->CreateSession(env, model, so, &sess);
+#endif
+    api->ReleaseSessionOptions(so);
+    if (st) { std::fprintf(stderr, "reranker: %s\n", api->GetErrorMessage(st)); api->ReleaseStatus(st); return false; }
+    return !api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &mem);
+  }
+  int64_t Id(uint32_t c) const { auto it = vocab.find(c); return it == vocab.end() ? 3 : it->second; }  // 3 = <unk>
+  std::vector<double> Score(const std::string& context, const std::vector<std::string>& cands, bool eos) const {
+    std::vector<double> out(cands.size(), 0.0);
+    if (!sess || cands.empty()) return out;
+    auto ctx = Utf8Decode(context); size_t e = ctx.size(), b = e;
+    while (b > 0 && IsHan(ctx[b - 1])) --b;
+    if (e - b > 24) b = e - 24;
+    std::vector<int64_t> head{1}; for (size_t i = b; i < e; ++i) head.push_back(Id(ctx[i]));
+    std::vector<std::vector<int64_t>> seqs; size_t L = 0;
+    for (auto& c : cands) {
+      auto s = head; for (uint32_t cp : Utf8Decode(c)) s.push_back(Id(cp));
+      if (eos) s.push_back(2);
+      if (s.size() > 129) s.resize(129);
+      L = std::max(L, s.size()); seqs.push_back(std::move(s));
+    }
+    std::vector<int64_t> ids(seqs.size() * L, 0);
+    for (size_t r = 0; r < seqs.size(); ++r) std::copy(seqs[r].begin(), seqs[r].end(), ids.begin() + r * L);
+    int64_t shape[2] = {int64_t(seqs.size()), int64_t(L)};
+    OrtValue* in = nullptr; OrtValue* res = nullptr;
+    if (api->CreateTensorWithDataAsOrtValue(mem, ids.data(), ids.size() * sizeof(int64_t), shape, 2, ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, &in)) return out;
+    const char* inames[] = {"ids"}; const char* onames[] = {"logp"};
+    OrtStatus* st = api->Run(sess, nullptr, inames, &in, 1, onames, 1, &res);
+    if (!st) {
+      float* lp = nullptr; api->GetTensorMutableData(res, reinterpret_cast<void**>(&lp));
+      for (size_t r = 0; r < seqs.size(); ++r) {
+        double sum = 0; size_t a = head.size();
+        for (size_t t = a - 1; t + 1 < seqs[r].size(); ++t) sum += lp[r * (L - 1) + t];
+        out[r] = sum;
+      }
+      api->ReleaseValue(res);
+    } else api->ReleaseStatus(st);
+    api->ReleaseValue(in);
+    return out;
+  }
+};
+#else
+struct Reranker {
+  bool Load(const char*, const char*, int) { return false; }
+  std::vector<double> Score(const std::string&, const std::vector<std::string>& c, bool) const { return std::vector<double>(c.size(), 0.0); }
+};
+#endif
 
 static const char* kT9[] = {"", "", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"};
 static char T9Of(char c) { for (int d = 2; d <= 9; ++d) if (std::strchr(kT9[d], c)) return char('0' + d); return '?'; }
@@ -405,14 +478,14 @@ struct StateHash { size_t operator()(const State& s) const {
                uint64_t(uint32_t(s.wa)) * 0x165667B19E3779F9ULL ^ uint64_t(uint32_t(s.wb)) ^
                uint64_t(uint32_t(s.a2)) * 0x27D4EB2F165667C5ULL ^ uint64_t(uint32_t(s.b2)) * 0x94D049BB133111EBULL; return size_t(x ^ (x >> 29)); } };
 
-struct Edge { int j; std::string word; int abbrevs; };
+struct Edge { int j; std::string word; int abbrevs; u16 key; };
 
 struct Decoder {
-  Lexicon& lex; C3& base; Adapt& adapt; Params p; C3* base2 = nullptr;
+  Lexicon& lex; C3& base; Adapt& adapt; Params p; C3* base2 = nullptr; const Reranker* rr = nullptr;
   std::unordered_map<std::string, char16_t> spell; size_t max_syl = 0;
   std::unordered_map<std::string, std::vector<char16_t>> by_t9; std::unordered_map<std::string, std::vector<std::string>> t9_prefix;
   std::unordered_map<std::string, double> prior_cache, lnw_cache;
-  std::unordered_map<std::string, std::vector<std::pair<double, std::string>>> hit_cache;
+  std::unordered_map<std::string, std::vector<std::tuple<double, std::string, u16>>> hit_cache;
   int32_t BOSW, EOSW;
   Decoder(Lexicon& l, C3& b, Adapt& a, Params pp) : lex(l), base(b), adapt(a), p(pp) {
     for (auto& s : lex.syls) {
@@ -483,7 +556,8 @@ struct Decoder {
     }
     return true;
   }
-  void Collect(std::unordered_map<std::string, std::pair<int, double>>& bucket, const std::vector<Token>& path, const std::string& ini) {
+  using Bucket = std::unordered_map<std::string, std::tuple<int, double, u16>>;  // word -> (initial-only syllables, prior, reading)
+  void Collect(Bucket& bucket, const std::vector<Token>& path, const std::string& ini) {
     int ab = 0; for (auto& t : path) ab += t.kind == 'a';
     std::string ck;
     if (!ab) { ck = "F"; for (auto& t : path) { ck += char(t.full >> 8); ck += char(t.full & 0xff); } }
@@ -494,43 +568,44 @@ struct Decoder {
     }
     auto it = hit_cache.find(ck);
     if (it == hit_cache.end()) {
-      std::vector<std::pair<double, std::string>> hits;
+      std::vector<std::tuple<double, std::string, u16>> hits;
+      auto order = [](auto& x, auto& y) { return std::get<0>(x) != std::get<0>(y) ? std::get<0>(x) > std::get<0>(y) : std::get<1>(x) > std::get<1>(y); };
       if (!ab) {
         u16 key; for (auto& t : path) key += t.full;
-        for (auto& [wt, w] : lex.KeyWords(key)) hits.emplace_back(Prior(w), w);
-        std::sort(hits.begin(), hits.end(), [](auto& x, auto& y) { return x.first != y.first ? x.first > y.first : x.second > y.second; });
+        for (auto& [wt, w] : lex.KeyWords(key)) hits.emplace_back(Prior(w), w, key);
+        std::sort(hits.begin(), hits.end(), order);
         if (hits.size() > size_t(p.per_span)) hits.resize(p.per_span);
       } else {
         size_t limit = path.size() == 1 ? p.per_span1 : p.per_span_abbrev;
-        std::unordered_set<std::string> words;
+        std::unordered_map<std::string, u16> words;
         auto init_keys = lex.InitKeys(ini);
         {
           size_t k = 0;
           for (auto& key : init_keys) {
             if (k++ >= size_t(p.scan)) break;
-            if (Matches(key, path)) for (auto& [wt, w] : lex.KeyWords(key)) words.insert(w);
+            if (Matches(key, path)) for (auto& [wt, w] : lex.KeyWords(key)) words.emplace(w, key);
           }
         }
-        for (auto& w : words) hits.emplace_back(Prior(w), w);
-        std::sort(hits.begin(), hits.end(), [](auto& x, auto& y) { return x.first != y.first ? x.first > y.first : x.second > y.second; });
+        for (auto& [w, key] : words) hits.emplace_back(Prior(w), w, key);
+        std::sort(hits.begin(), hits.end(), order);
         if (hits.size() > limit) hits.resize(limit);
       }
       it = hit_cache.emplace(ck, std::move(hits)).first;
     }
-    for (auto& [pr, w] : it->second) {
+    for (auto& [pr, w, key] : it->second) {
       auto old = bucket.find(w);
-      if (old == bucket.end() || std::make_pair(old->second.first, -old->second.second) > std::make_pair(ab, -pr)) bucket[w] = {ab, pr};
+      if (old == bucket.end() || std::make_pair(std::get<0>(old->second), -std::get<1>(old->second)) > std::make_pair(ab, -pr)) bucket[w] = {ab, pr, key};
     }
   }
   std::vector<std::vector<Edge>> Lattice(const std::string& text, bool t9, int min_end = -1) {
     auto toks = Tokens(text, t9);
     size_t n = text.size();
-    std::map<std::pair<int, int>, std::unordered_map<std::string, std::pair<int, double>>> spans;
+    std::map<std::pair<int, int>, Bucket> spans;
     // A word covers at most kMaxWord syllables of at most 6 keys (plus separators), so spans that end after
     // min_end start no earlier than this.
     const size_t first = min_end < 0 ? 0 : size_t(std::max(0, min_end + 1 - 64));
     for (size_t i = first; i < n; ++i) {
-      for (auto& [j, t] : toks[i]) if (t.kind == 's' && j > min_end) spans[{int(i), j}][""] = {0, 0.0};
+      for (auto& [j, t] : toks[i]) if (t.kind == 's' && j > min_end) spans[{int(i), j}][""] = {0, 0.0, u16()};
       struct Item { int pos; std::vector<Token> path; std::string ini; };
       std::vector<Item> stack{{int(i), {}, ""}};
       while (!stack.empty()) {
@@ -549,17 +624,17 @@ struct Decoder {
     }
     std::vector<std::vector<Edge>> out(n);
     for (auto& [ij, words] : spans) {
-      std::vector<std::pair<std::string, std::pair<int, double>>> items(words.begin(), words.end());
+      std::vector<std::pair<std::string, std::tuple<int, double, u16>>> items(words.begin(), words.end());
       std::sort(items.begin(), items.end(), [](auto& x, auto& y) {
-        if (x.second.first != y.second.first) return x.second.first < y.second.first;
-        if (x.second.second != y.second.second) return x.second.second > y.second.second;
+        if (std::get<0>(x.second) != std::get<0>(y.second)) return std::get<0>(x.second) < std::get<0>(y.second);
+        if (std::get<1>(x.second) != std::get<1>(y.second)) return std::get<1>(x.second) > std::get<1>(y.second);
         return x.first < y.first; });
       int kf = 0, ka = 0; bool single = ij.second - ij.first <= 2;
       int la = single ? p.per_span1 : p.per_span_abbrev;
       for (auto& [w, v] : items) {
-        if (v.first == 0) { if (kf++ >= p.per_span) continue; }
+        if (std::get<0>(v) == 0) { if (kf++ >= (t9 && p.t9_per_span > 0 ? p.t9_per_span : p.per_span)) continue; }
         else { if (ka++ >= la) continue; }
-        out[ij.first].push_back({ij.second, w, v.first});
+        out[ij.first].push_back({ij.second, w, std::get<0>(v), std::get<2>(v)});
       }
     }
     return out;
@@ -601,7 +676,24 @@ struct Decoder {
     }
     return st;
   }
-  struct Hyp { double score; State st; std::string out; int ab = 0; };
+  // The words of a path, kept as a shared back-pointer chain so extending a hypothesis does not copy its reading.
+  // The words of a path, kept as back-pointers into an arena (index, -1 = none) so extending a hypothesis does not
+  // copy its reading. The arena lives as long as the reused beams (reset when a decode starts from scratch).
+  struct Trace { int32_t prev; int16_t i, j; uint8_t len; char16_t key[kMaxWord]; };
+  struct Hyp { double score; State st; std::string out; int ab = 0; int32_t tr = -1; };
+  std::vector<Trace> arena_;
+  std::pair<std::string, std::string> Reading(int32_t tr) const {
+    std::vector<const Trace*> words; for (int32_t t = tr; t >= 0; t = arena_[t].prev) words.push_back(&arena_[t]);
+    std::string py, seg;
+    for (auto it = words.rbegin(); it != words.rend(); ++it) {
+      if (!py.empty()) { py += ' '; seg += ','; }
+      py += Spell(u16((*it)->key, (*it)->len)); seg += std::to_string((*it)->i) + "-" + std::to_string((*it)->j);
+    }
+    return {py, seg};
+  }
+  // Reading of each returned candidate: syllables ("bei xian qi le") and the key span of each word ("0-3,3-7,..").
+  std::unordered_map<std::string, std::pair<std::string, std::string>> last_meta_;
+  std::string Spell(const u16& key) const { std::string s; for (char16_t c : key) { if (!s.empty()) s += ' '; s += lex.Syl(c); } return s; }
   struct KeyHash { size_t operator()(const std::pair<State, std::string>& k) const { return StateHash()(k.first) ^ std::hash<std::string>()(k.second); } };
   using Beam = std::unordered_map<std::pair<State, std::string>, Hyp, KeyHash>;
   // Incremental state: the previous input's edges and beams. A new key changes only the spans that end after
@@ -631,23 +723,25 @@ struct Decoder {
     }
     std::vector<std::vector<Edge>> edges(n);
     std::vector<Beam> beams(n + 1);
+    if (keep == 0) arena_.clear();
     if (keep > 0) {
       for (size_t i = 0; i < std::min(n, inc_edges_.size()); ++i)
-        for (auto& e : inc_edges_[i]) if (size_t(e.j) <= keep) edges[i].push_back(e);
+        for (auto& e : inc_edges_[i]) if (size_t(e.j) <= keep) edges[i].push_back(std::move(e));
       for (size_t i = 0; i <= keep; ++i) beams[i] = std::move(inc_beams_[i]);
       auto fresh = Lattice(text, t9, int(keep));
       for (size_t i = 0; i < n; ++i) for (auto& e : fresh[i]) edges[i].push_back(e);
     } else {
       edges = Lattice(text, t9);
       State init = Start(context);
-      beams[0][{init, ""}] = Hyp{0.0, init, "", 0};
+      beams[0][{init, ""}] = Hyp{0.0, init, "", 0, -1};
     }
     for (size_t i = 0; i < n; ++i) {
       if (beams[i].empty()) continue;
       std::vector<Hyp> items; items.reserve(beams[i].size());
       for (auto& kv : beams[i]) items.push_back(kv.second);
       std::sort(items.begin(), items.end(), [](const Hyp& x, const Hyp& y) { return x.score != y.score ? x.score > y.score : x.out < y.out; });
-      if (items.size() > size_t(p.beam)) items.resize(p.beam);
+      const size_t beam = t9 && p.t9_beam > 0 ? size_t(p.t9_beam) : size_t(p.beam);
+      if (items.size() > beam) items.resize(beam);
       for (auto& hy : items) {
         for (auto& e : edges[i]) {
           if (size_t(e.j) <= keep) continue;  // already in the reused beams
@@ -660,21 +754,31 @@ struct Decoder {
           std::string out2 = hy.out + e.word;
           auto key = std::make_pair(st2, out2);
           auto old = beams[e.j].find(key);
-          if (old == beams[e.j].end() || s2 > old->second.score) beams[e.j][key] = Hyp{s2, st2, out2, hy.ab + e.abbrevs};
+          if (old == beams[e.j].end() || s2 > old->second.score) {
+            Hyp h{s2, st2, out2, hy.ab + e.abbrevs, hy.tr};
+            if (!e.word.empty()) {
+              Trace t{hy.tr, int16_t(i), int16_t(e.j), uint8_t(std::min<size_t>(e.key.size(), kMaxWord)), {}};
+              std::copy(e.key.begin(), e.key.begin() + t.len, t.key);
+              arena_.push_back(t); h.tr = int32_t(arena_.size() - 1);
+            }
+            beams[e.j][key] = std::move(h);
+          }
         }
       }
     }
+    std::unordered_map<std::string, int32_t> best_tr;
     auto ranked = [&](double eos_w) {
       std::unordered_map<std::string, double> best;
       for (auto& kv : beams[n]) {
         double s = kv.second.score + eos_w * Eos(kv.second.st) + (abbrev - p.abbrev) * kv.second.ab;
         auto it = best.find(kv.second.out);
-        if (it == best.end() || s > it->second) best[kv.second.out] = s;
+        if (it == best.end() || s > it->second) { best[kv.second.out] = s; best_tr[kv.second.out] = kv.second.tr; }
       }
       std::vector<std::pair<std::string, double>> out(best.begin(), best.end());
       std::sort(out.begin(), out.end(), [](auto& x, auto& y) { return x.second != y.second ? x.second > y.second : x.first < y.first; });
       return out;
     };
+    last_meta_.clear();
     auto out = ranked(p.eos);
     if (p.eos2 >= 0) {
       // Two readings of a short input: a whole message (with the end-of-message probability) and a word that the
@@ -691,6 +795,14 @@ struct Decoder {
       out = merged;
     }
     if (out.size() > size_t(p.nbest)) out.resize(p.nbest);
+    for (auto& [w, sc] : out) last_meta_[w] = Reading(best_tr[w]);  // readings only for the returned candidates
+    if (rr && !out.empty()) {  // rerank: decoder score + gamma * character-model log-probability (same step, no pause)
+      std::vector<std::string> cands; for (auto& [w, sc] : out) cands.push_back(w);
+      auto nn = rr->Score(context, cands, true);
+      double g = Utf8Decode(out[0].first).size() <= 3 ? p.rr_short : p.rr_gamma;
+      for (size_t k = 0; k < out.size(); ++k) out[k].second += g * nn[k];
+      std::stable_sort(out.begin(), out.end(), [](auto& x, auto& y) { return x.second > y.second; });
+    }
     if (p.incremental) { inc_text_ = text; inc_context_ = context; inc_t9_ = t9; inc_edges_ = std::move(edges); inc_beams_ = std::move(beams); }
     return out;
   }
@@ -705,10 +817,14 @@ struct Decoder {
 
 // ------------------------------------------------------------------ C API (cylm.h): library for Windows Core / Android JNI
 #include "cylm.h"
-struct CylmModel { Lexicon lex; C3 base; C3 base2; bool has2 = false; Adapt adapt; Params p; };
+struct CylmModel { Lexicon lex; C3 base; C3 base2; bool has2 = false; Adapt adapt; Params p; Reranker rr; bool has_rr = false; };
 struct CylmSession { std::unique_ptr<Decoder> d; };
 extern "C" {
 CylmModel* cylm_open(const char* lexicon, const char* model, const char* model2, const char* params) {
+  return cylm_open2(lexicon, model, model2, nullptr, nullptr, params);
+}
+CylmModel* cylm_open2(const char* lexicon, const char* model, const char* model2, const char* reranker, const char* vocab,
+                      const char* params) {
   auto m = std::make_unique<CylmModel>();
   const uint8_t* mapped = MapFile(lexicon);
   if (!mapped || !m->lex.LoadBin(mapped)) return nullptr;  // the library takes compiled lexicons only
@@ -719,6 +835,10 @@ CylmModel* cylm_open(const char* lexicon, const char* model, const char* model2,
     if (eq != std::string::npos && !m->p.Set(kv.substr(0, eq), kv.substr(eq + 1))) return nullptr;
   }
   m->p.incremental = 1;
+  if (reranker && *reranker) {
+    if (!vocab || !m->rr.Load(reranker, vocab, m->p.rr_threads)) return nullptr;
+    m->has_rr = true;
+  }
   return m.release();
 }
 CylmSession* cylm_session(CylmModel* m) {
@@ -726,6 +846,7 @@ CylmSession* cylm_session(CylmModel* m) {
   auto s = new CylmSession();
   s->d = std::make_unique<Decoder>(m->lex, m->base, m->adapt, m->p);
   if (m->has2) s->d->base2 = &m->base2;
+  if (m->has_rr) s->d->rr = &m->rr;
   return s;
 }
 int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
@@ -738,6 +859,19 @@ int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context,
   }
   return n;
 }
+int cylm_decode2(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
+  if (!s || !keys || !out || cap <= 0) return -1;
+  auto ranked = s->d->Decode(keys, mode == 1, context ? context : "");
+  int n = 0, used = 0;
+  for (auto& [w, sc] : ranked) {
+    auto it = s->d->last_meta_.find(w);
+    std::string rec = w + '\x1f' + (it == s->d->last_meta_.end() ? "" : it->second.first) + '\x1f' +
+                      (it == s->d->last_meta_.end() ? "" : it->second.second);
+    if (used + int(rec.size()) + 1 > cap) break;
+    std::memcpy(out + used, rec.data(), rec.size()); used += int(rec.size()); out[used++] = '\0'; ++n;
+  }
+  return n;
+}
 void cylm_close_session(CylmSession* s) { delete s; }
 void cylm_close(CylmModel* m) { delete m; }
 }
@@ -745,11 +879,13 @@ void cylm_close(CylmModel* m) { delete m; }
 #ifndef CYLM_LIBRARY
 int main(int argc, char** argv) {
   if (argc < 3) { std::fprintf(stderr, "usage: cylm LEXICON.tsv MODEL.lm [--adapt COUNTS.tsv] [--set k=v]... < items > out\n"); return 2; }
-  Params p; std::string adapt_path, model2;
+  Params p; std::string adapt_path, model2, reranker, vocab;
   for (int i = 3; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--adapt" && i + 1 < argc) adapt_path = argv[++i];
     else if (a == "--model2" && i + 1 < argc) model2 = argv[++i];
+    else if (a == "--reranker" && i + 1 < argc) reranker = argv[++i];
+    else if (a == "--vocab" && i + 1 < argc) vocab = argv[++i];
     else if (a == "--set" && i + 1 < argc) {
       std::string kv = argv[++i]; auto eq = kv.find('=');
       if (eq == std::string::npos || !p.Set(kv.substr(0, eq), kv.substr(eq + 1))) { std::fprintf(stderr, "bad --set %s\n", kv.c_str()); return 2; }
@@ -771,6 +907,8 @@ int main(int argc, char** argv) {
   C3 base2; if (!model2.empty() && !base2.Open(model2.c_str())) { std::fprintf(stderr, "cannot open model2\n"); return 1; }
   Decoder d(lex, base, adapt, p);
   if (!model2.empty()) d.base2 = &base2;
+  Reranker rr;
+  if (!reranker.empty()) { if (!rr.Load(reranker.c_str(), vocab.c_str(), p.rr_threads)) { std::fprintf(stderr, "cannot load reranker\n"); return 1; } d.rr = &rr; }
   std::fprintf(stderr, "loaded in %.1fs: %zu words\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), lex.WordCount());
   std::ios::sync_with_stdio(false);
   std::string line;
@@ -787,6 +925,12 @@ int main(int argc, char** argv) {
     for (size_t k = 0; k < cands.size(); ++k) { if (k) out += '|'; out += cands[k]; }
     out += "\t";
     for (size_t k = 0; k < scores.size(); ++k) { if (k) out += '|'; char b[32]; std::snprintf(b, sizeof b, "%.3f", scores[k]); out += b; }
+    out += "\t";
+    for (size_t k = 0; k < cands.size(); ++k) {  // reading of each candidate: syllables / key spans of its words
+      if (k) out += '|';
+      auto it = d.last_meta_.find(cands[k]);
+      if (it != d.last_meta_.end() && f[1] != "choice") out += it->second.first + "/" + it->second.second;
+    }
     std::cout << out << '\n';
     std::cout.flush();
     if (d.hit_cache.size() > 3000000) d.hit_cache.clear();

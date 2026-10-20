@@ -14,14 +14,16 @@ function(t9_replace old new)
   set(T9_SCRIPT_TRANSLATOR_CODE "${code}" PARENT_SCOPE)
 endfunction()
 
-t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>\n#include <fstream>\n#include <mutex>\n#include <limits>\n#include <cstring>\n#include <cylm.h>")
+t9_replace("#include <rime/gear/poet.h>" "#include <rime/gear/poet.h>\n#include <rime/gear/grammar.h>\n#include <t9_candidate_pool.h>\n#include <t9_decode_cache.h>\n#include <t9_lookup_trace.h>\n#include <tuple>\n#include <t9_sentence_scorer.h>\n#include <octagram.h>\n#include <gram_db.h>\n#include <gram_encoding.h>\n#include <utf8.h>\n#include <rime/resource.h>\n#include <rime/service.h>\n#include <t9_ngram_model.h>\n#include <t9_suppression.h>\n#include <unordered_map>\n#include <fstream>\n#include <mutex>\n#include <limits>\n#include <cstring>\n#include <cylm.h>\n#include <sstream>")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octagram/src")
 # CyLM decoder (cylm/cylm.cpp, also built alone as libcylm.so): used only when a schema names its files.
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm")
 target_sources(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm/cylm.cpp")
 # Source properties are per directory: set it where rime-static is defined, or main() gets linked in.
-set_source_files_properties("${CMAKE_SOURCE_DIR}/cylm/cylm.cpp" TARGET_DIRECTORY rime-static PROPERTIES COMPILE_DEFINITIONS CYLM_LIBRARY)
+set_source_files_properties("${CMAKE_SOURCE_DIR}/cylm/cylm.cpp" TARGET_DIRECTORY rime-static PROPERTIES COMPILE_DEFINITIONS "CYLM_LIBRARY;CYLM_ORT")
+# The reranker uses the onnxruntime C API; rime-static links onnxruntime already (jni CMakeLists).
+target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/onnxruntime/include")
 t9_replace("double sentence_cutoff_threshold)" "double sentence_cutoff_threshold, Config* config)")
 t9_replace("this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_);"
            "this, corrector_.get(), poet_.get(), input, segment.start, end_of_input,\n      max_sentences_, sentence_cutoff_threshold_, engine_->schema()->config());")
@@ -37,13 +39,17 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
       {
         // CyLM fills the sentence slot when the schema names its files (cylm/lexicon, cylm/model, optional
         // cylm/model2 and cylm/params). Nothing names them by default, so nothing is loaded.
-        string lexicon, model, model2, params;
+        // Optional cylm/reranker + cylm/vocab: the ONNX reranker runs inside the same keystroke.
+        string lexicon, model, model2, reranker, vocab, params;
         if (config->GetString("cylm/lexicon", &lexicon) && config->GetString("cylm/model", &model) &&
             !lexicon.empty() && !model.empty()) {
           config->GetString("cylm/model2", &model2);
+          config->GetString("cylm/reranker", &reranker);
+          config->GetString("cylm/vocab", &vocab);
           config->GetString("cylm/params", &params);
-          t9_cylm_ = T9CylmOpen(T9ResolveOnce("cylm", "", lexicon), T9ResolveOnce("cylm", "", model),
-                                model2.empty() ? string() : T9ResolveOnce("cylm", "", model2), params);
+          auto resolve = [](const string& name) { return name.empty() ? string() : T9ResolveOnce("cylm", "", name); };
+          t9_cylm_ = T9CylmOpen(resolve(lexicon), resolve(model), resolve(model2),
+                                vocab.empty() ? string() : resolve(reranker), resolve(vocab), params);
         }
       }
       if (t9_sentence_rescore_ && !t9_joint_) {
@@ -186,24 +192,43 @@ t9_replace("  bool CheckEmpty();" [=[
   bool t9_cache_with_correction_ = false;
   bool PrepareJointCandidates(Dictionary* dict, UserDictionary* user_dict);
   std::shared_ptr<CylmModel> t9_cylm_;
+  // Syllable text -> id of a dictionary's syllabary (CyLM returns pinyin as text), built once per dictionary.
+  static const std::unordered_map<string, SyllableId>& T9SyllableIds(Dictionary* dict) {
+    static std::mutex mutex;
+    static std::map<const void*, std::unordered_map<string, SyllableId>> tables;
+    std::lock_guard<std::mutex> lock(mutex);
+    auto& ids = tables[dict->primary_table().get()];
+    if (ids.empty()) {
+      for (SyllableId id = 0;; ++id) {
+        const string syllable = dict->primary_table()->GetSyllableById(id);
+        if (syllable.empty()) break;
+        ids.emplace(syllable, id);
+      }
+    }
+    return ids;
+  }
   // One CyLM model per set of files for the process (memory-mapped); a failed open is remembered too.
   static std::shared_ptr<CylmModel> T9CylmOpen(const string& lexicon, const string& model, const string& model2,
-                                               const string& params) {
+                                               const string& reranker, const string& vocab, const string& params) {
     static std::mutex mutex;
     static std::map<string, std::shared_ptr<CylmModel>> opened;
     std::lock_guard<std::mutex> lock(mutex);
-    const string key = lexicon + '\n' + model + '\n' + model2 + '\n' + params;
+    const string key = lexicon + '\n' + model + '\n' + model2 + '\n' + reranker + '\n' + vocab + '\n' + params;
     auto found = opened.find(key);
     if (found != opened.end()) return found->second;
     std::shared_ptr<CylmModel> handle(
-        cylm_open(lexicon.c_str(), model.c_str(), model2.empty() ? nullptr : model2.c_str(), params.c_str()),
+        reranker.empty()
+            ? cylm_open(lexicon.c_str(), model.c_str(), model2.empty() ? nullptr : model2.c_str(), params.c_str())
+            : cylm_open2(lexicon.c_str(), model.c_str(), model2.empty() ? nullptr : model2.c_str(), reranker.c_str(),
+                         vocab.c_str(), params.c_str()),
         [](CylmModel* m) { if (m) cylm_close(m); });
     if (!handle.get()) handle.reset();
     return opened[key] = handle;
   }
-  // CyLM's best sentence takes the place of Rime's sentence (words keep their places). Text only until the
-  // C API returns the syllables: the candidate has no language, so the user dictionary does not learn it.
-  void ApplyCylmSentence() {
+  // CyLM's best sentence takes the place of Rime's sentence (words keep their places). With its pinyin
+  // (cylm_decode2) it is one dictionary entry of the translator's language, learned like a typed phrase; a
+  // syllable the dictionary does not know leaves it as plain text that is not learned.
+  void ApplyCylmSentence(Dictionary* dict) {
     if (!t9_cylm_ || sentences_.empty()) return;
     const string& in = syllabifier_->input();
     if (in.empty()) return;
@@ -223,15 +248,34 @@ t9_replace("  bool CheckEmpty();" [=[
     if (!session) return;
     const string context = !t9_left_context_.empty() && t9_left_context_[0] == '\x1e' ? t9_left_context_.substr(1) : string();
     vector<char> out(16384);
-    const int n = cylm_decode(session, in.c_str(), digits ? 1 : 0, context.c_str(), out.data(), static_cast<int>(out.size()));
+    const int n = cylm_decode2(session, in.c_str(), digits ? 1 : 0, context.c_str(), out.data(), static_cast<int>(out.size()));
     if (n <= 0 || !out[0]) return;
-    const string text(out.data());
+    const string record(out.data());  // text \x1f pinyin \x1f spans
+    const auto unit = record.find('\x1f');
+    const string text = record.substr(0, unit);
     const auto& rime = sentences_.front();
-    if (text == rime->text()) return;
+    if (text.empty() || text == rime->text()) return;
     DictEntry entry;
     entry.text = text;
     entry.weight = rime->weight();
-    auto sentence = New<Sentence>(nullptr);
+    const Language* language = nullptr;
+    if (unit != string::npos && dict) {
+      const auto end = record.find('\x1f', unit + 1);
+      std::istringstream pinyin(record.substr(unit + 1, end == string::npos ? string::npos : end - unit - 1));
+      const auto& ids = T9SyllableIds(dict);
+      string syllable;
+      Code code;
+      while (pinyin >> syllable) {
+        const auto found = ids.find(syllable);
+        if (found == ids.end()) { code.clear(); break; }
+        code.push_back(found->second);
+      }
+      if (!code.empty() && code.size() == static_cast<size_t>(utf8::unchecked::distance(text.begin(), text.end()))) {
+        entry.code = code;
+        language = translator_->language();
+      }
+    }
+    auto sentence = New<Sentence>(language);
     sentence->Extend(entry, rime->end() - start_, rime->weight());
     sentence->Offset(start_);
     sentence->set_syllabifier(syllabifier_);
@@ -242,7 +286,7 @@ t9_replace("  bool CheckEmpty();" [=[
 t9_replace("  auto is_correction_match =" [=[
   if (t9_joint_) {
     PrepareJointCandidates(dict, user_dict);
-    ApplyCylmSentence();
+    ApplyCylmSentence(dict);
     return !CheckEmpty();
   }
 
@@ -334,7 +378,7 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
     sentences_.push_back(chosen);
     if (rime_best && rime_best != chosen && corrected(rime_best)) sentences_.push_back(rime_best);
   }
-  ApplyCylmSentence();
+  ApplyCylmSentence(dict);
   return !CheckEmpty();]=])
 t9_replace("set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_")
 t9_replace("#if defined(__ANDROID__)\n#include <android/log.h>\n#include <chrono>"

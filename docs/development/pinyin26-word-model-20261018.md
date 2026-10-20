@@ -149,3 +149,9 @@ Rime 26 键照原样组句，`translator/max_sentences: 4`（`sentence_cutoff_th
 引擎内接入（`T9PhraseBeforeSentence.cmake`）：方案写了 `cylm/lexicon` 和 `cylm/model`（可选 `cylm/model2`、`cylm/params`）时，`cylm.cpp` 随 rime 一起编译的解码器打开这些文件（每组文件一个进程只开一次），每个翻译器一个增量会话；26 键小写字母和九键数字输入时，CyLM 的第一条整句顶替 Rime 的整句那一格（同文字时不动），词和其他候选的位置不变，所有选择/上屏路径照旧。CyLM 的 C 接口还不返回拼音切分，所以顶替的整句先做成“纯文字候选”：没有 language，用户词库不学习它，预编辑区不显示它的拼音；等 Windows 线程把切分和 rs 重排做进 C 接口再补。默认方案不写这些键，什么都不加载：九键电脑回放逐条相同。
 
 电脑宿主功能自测（150 句 26 键，`ChatReplay --schema-patch` 写入轻量档 cy1-p4e-7 + export/lexicon.bin，参数用默认）：首选 136→146；逐键 p95 4.0→22.7 ms（默认束宽，未用轻量档收窄参数）。只证明接得通，速度和选词要等 C 接口定稿后按轻量档参数实测。
+
+### 接新接口（cylm_open2 带重排、cylm_decode2 带拼音；同日）
+
+CyLM 源码更新到 CyIME-Windows 20964b7。方案可加 `cylm/reranker`、`cylm/vocab`（有就用 `cylm_open2`，在同一次按键里重排）；顶替整句改用 `cylm_decode2`：拼音逐字转成词库音节编号，字数和音节数对得上时整句作为一个词条（带编码、方案语言），上屏照常进用户词库、预编辑区显示拼音；对不上才退回不学习的纯文字。`cylm.cpp` 按 `CYLM_ORT` 编译（rime 静态库和 libcylm 都链 onnxruntime）。
+
+电脑宿主实测（同 150 句，轻量档 cy1-p4e-7 + lexicon.bin + rs 重排 int8 + vocab.txt，参数 `mu=0.04;eos=0.6;abbrev_full=-4;beam=16;per_span=12;per_span_abbrev=24;per_span1=40;nbest=8;t9_beam=10;t9_per_span=8;rr_gamma=0.6;rr_short=0.4`）：26 键首选 136→145、逐键 p95 1.23→8.49 ms；九键首选 143→143、p95 13.8→25.0 ms。默认不配置时九键回放逐条相同（电脑宿主编译通过；安卓 NDK 待编）。

@@ -231,7 +231,8 @@ add_library(cylm SHARED
     cylm/cylm.cpp
     cylm/cylm_jni.cpp
 )
-target_compile_definitions(cylm PRIVATE CYLM_LIBRARY)
+target_compile_definitions(cylm PRIVATE CYLM_LIBRARY CYLM_ORT)
+target_link_libraries(cylm onnxruntime)
 target_compile_features(cylm PRIVATE cxx_std_17)
 target_compile_options(cylm PRIVATE -O2)
 target_link_options(cylm PRIVATE "-Wl,-z,max-page-size=16384")
