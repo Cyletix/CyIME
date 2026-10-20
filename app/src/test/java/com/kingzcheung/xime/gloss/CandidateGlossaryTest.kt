@@ -112,4 +112,35 @@ class CandidateGlossaryTest {
             CandidateGlossary.physicalShiftHeld.value = false
         }
     }
+
+    private val composeTable get() = table("我" to "I", "想" to "think", "吃" to "eat", "吃饭" to "have a meal",
+        "会" to "~meet", "昨天" to "yesterday", "你好" to "hello")
+
+    @Test
+    fun `word-by-word phrase glosses stay off by default`() {
+        assertEquals(listOf("", "hello"),
+            CandidateGlossary.annotate(composeTable, listOf("我想吃饭", "你好"), listOf("", "")))
+        // 单字照常显示，去掉不可靠标记。
+        assertEquals("meet", CandidateGlossary.annotate(composeTable, listOf("会"), listOf("")).first())
+    }
+
+    @Test
+    fun `when enabled, phrases are glossed from the longest dictionary words`() {
+        assertEquals("I think have a meal", CandidateGlossary.compose(composeTable, "我想吃饭"))
+        assertEquals("I yesterday eat", CandidateGlossary.compose(composeTable, "我昨天吃"))
+    }
+
+    @Test
+    fun `composition shows nothing when a character is unreliable or unknown`() {
+        // 会 只有不可靠的单字释义，拼进句子不用；拟 词典里没有。
+        assertNull(CandidateGlossary.compose(composeTable, "我会吃"))
+        assertNull(CandidateGlossary.compose(composeTable, "我拟吃"))
+    }
+
+    @Test
+    fun `shift only commits dictionary words, never a word-by-word phrase gloss`() {
+        assertNull(CandidateGlossary.englishFor(composeTable, "我想吃饭"))
+        assertEquals("meet", CandidateGlossary.englishFor(composeTable, "会"))
+        assertEquals("have a meal", CandidateGlossary.englishFor(composeTable, "吃饭"))
+    }
 }

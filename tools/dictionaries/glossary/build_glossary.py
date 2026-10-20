@@ -14,10 +14,11 @@
   - 义项优先选“英文译回中文正好是 / 含有这个词”的（用 ECDICT 反查），对不上用首义。
   - 单字只认主读音首义且正好译回本字，否则不显示（行 → row、被 → quilt 这类宁可不显示）。
 
+v4：不可靠的单字释义加 “~” 前缀，供 App 拼整句英文时跳过。
 v3：修 v2 反查时没拆开 ECDICT 多行释义的错误；单字改为“正好译回本字 → 按顺序第一个含本字的义项 → 首义”；
 “X 的异体 / 见 X” 借用 X 的释义；CC-CEDICT 没收的常用词组用 ECDICT 反查补（很多 → plenty，博客 → blog）。
 
-用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --output cyime_gloss-v3.tsv
+用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --output cyime_gloss-v4.tsv
 """
 from __future__ import annotations
 
@@ -40,13 +41,15 @@ EN_REGISTER = re.compile(r"\([^)]*\b(?:slang|vulgar|derog|offensive|pejorative|e
                          r"loanword|onom|neologism|Internet|chemistry|physics|math|mathematics|medicine|anatomy|zoology|botany|"
                          r"biology|geology|astronomy|TCM)\b[^)]*\)", re.I)
 EN_GLOSS_CHOICES = 4
+APPROX = "~"   # 释义前缀：不可靠的单字释义（见 clean_en），App 显示时去掉
 # “variant of 賬號|账号[zhang4 hao4]”、“see 深圳市[Shen1 zhen4 Shi4]” 指向的词
 CROSS_REF = re.compile(r"(?:^|/)(?:variant of|see) ([^\[\s/]+)\[")
 EN_SINGLE_CHOICES = 6    # 单字每个条目看前几个义项
 # 粗口义项不做候选释义（你妈 → “fuck you”）；字面直译说明（lit. …）也不是译文。
 EN_PROFANITY = re.compile(r"\b(?:fuck\w*|shit\w*|cunt|bitch\w*|dick|cock|piss\w*|bastard|whore\w*|motherfuck\w*)\b", re.I)
 EN_ALT_MAX_RANK = 20000   # 换用后面义项时，这个英文的词频名次上限
-COMMON_EN_RANK: dict[str, int] = {}   # load_ecdict 填：英文词 → 词频名次
+COMMON_EN_RANK: dict[str, int] = {}
+ORIGINAL_CASE: dict[str, str] = {}    # load_ecdict 填：小写英文 → ECDICT 原写法   # load_ecdict 填：英文词 → 词频名次
 CEDICT_LINE = re.compile(r"^(\S+) (\S+) \[([^\]]*)\] /(.*)/\s*$")
 
 ZH_GLOSS_MAX = 8
@@ -69,7 +72,7 @@ HEADER = [
     "#   SOFTWARE.",
     "# 中→英释义取自 CC-CEDICT（Creative Commons Attribution-ShareAlike 4.0，MDBG），https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
     "# 本文件是上述数据的裁剪改编，按 CC BY-SA 4.0 分发：https://creativecommons.org/licenses/by-sa/4.0/",
-    "# 格式：每行 词<TAB>释义，按 UTF-8 字节序排序；以 # 开头的行是说明。",
+    "# 格式：每行 词<TAB>释义，按 UTF-8 字节序排序；以 # 开头的行是说明；释义以 ~ 开头的是不可靠的单字释义，显示时去掉 ~。",
 ]
 
 
@@ -167,7 +170,9 @@ def clean_en(word: str, readings: list[list[str]], back: dict[str, str]) -> str:
             return exact[0]
         near = [text for text in candidates
                 if not text[:1].isupper() and en_rank(text) <= EN_ALT_MAX_RANK and back_match(word, text, back) == 1]
-        return near[0] if near else first
+        # 没能“正好译回本字”的单字释义只算参考：加 APPROX 前缀，App 照常显示，但拼整句英文时不用它
+        # （会 → meet、跟 → heel 拼进句子会变成 “I meet hard”）。
+        return APPROX + (near[0] if near else first)
     allowed = [text for choices in ordered for text in choices
                if text is first or not (text[:1].isupper() or en_rank(text) > EN_ALT_MAX_RANK)]
     # 先找译回来正好是这个词的（place → 地方），再找包含它的（talk → 谈话）。
@@ -186,6 +191,9 @@ def load_ecdict(path: str) -> tuple[dict[str, str], dict[str, str]]:
         for row in csv.DictReader(handle):
             word = row["word"]
             back[word.lower()] = back.get(word.lower(), "") + row["translation"]
+            # 反查补词时还原大小写（rodriguez → Rodriguez）：有原样小写写法就用小写。
+            if word.lower() not in ORIGINAL_CASE or word == word.lower():
+                ORIGINAL_CASE[word.lower()] = word
             frq, bnc = int(row["frq"] or 0), int(row["bnc"] or 0)
             if frq or bnc:
                 COMMON_EN_RANK[word.lower()] = min(COMMON_EN_RANK.get(word.lower(), 10 ** 9), frq or bnc)
@@ -231,7 +239,8 @@ def plain_pinyin(pinyin: str) -> str:
     return " ".join(re.sub(r"[0-9]", "", text).split())
 
 
-def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_weight: int) -> dict[str, str]:
+def load_cedict(path: str, back: dict[str, str], weights: dict[str, dict[str, int]], min_weight: int,
+                engine: dict[str, dict[str, int]] | None = None, engine_min: int = 100) -> dict[str, str]:
     """中文词 → 英文释义。多字词只收 Rime 词库里权重够高的常用词：CC-CEDICT 收了大量专门、罕见的词组，
     候选里由单字拼出来的 “在教” 会撞上 “to be a believer (in a religion)” 这类条目。单字不受限。"""
     opener = gzip.open if path.endswith(".gz") else open
@@ -256,6 +265,7 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_we
     # （常用读音义项多，如 东西 dong1xi5 “thing” 胜过 dong1xi1 “east and west”）。
     readings: dict[str, list[tuple[tuple[int, int], list[str], bool]]] = {}
     redirects: dict[str, str] = {}
+    strict: set[str] = set()
     with opener(path, "rt", encoding="utf-8") as handle:
         for line in handle:
             if line.startswith("#"):
@@ -266,10 +276,16 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_we
             trad, simp, pinyin, body = match.groups()
             rime = weights.get(simp, {})
             if len(simp) > 1 and max(rime.values(), default=0) < min_weight:
-                continue
+                # 输入法实际用的是 rime_ice 词库，pinyin_simp 没收或权重低的常用词（口罩、缆车）也会出现在候选里。
+                # 这类词只在 rime_ice 有这个读音时收，并且释义必须能用英汉词典反查回这个词（见 strict），
+                # 否则候选里由单字拼出的 在教 会撞上它的宗教义 “be a believer”。
+                lexicon = (engine or {}).get(simp, {})
+                if max(lexicon.values(), default=0) < engine_min or plain_pinyin(pinyin) not in lexicon:
+                    continue
+                strict.update((simp, trad))
             # 只用 Rime 里这个词最常用的那个读音对应的条目：重点 打出来是 zhong dian（emphasis），
             # 不能用 chong dian 的 “recount”；都会 是 dou hui，不能用 du hui 的 “city”。没有对应读音就不给释义。
-            if rime and plain_pinyin(pinyin) != max(rime, key=rime.get):
+            elif rime and plain_pinyin(pinyin) != max(rime, key=rime.get):
                 continue
             if pinyin[:1].isupper() and simp in common_reading or simp in restricted:
                 continue
@@ -290,7 +306,13 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_we
         # 本字形的条目排在别的繁体字形简化过来的条目前面（年 先看 年，再看 秊 “grain”）；
         # 简化字合并了几个繁体字时（后 ← 後，里 ← 裏）各条目都参与挑选。
         ordered = sorted(entries, key=lambda item: (not item[2], item[0]))
-        gloss = clean_en(key, [choices for _, choices, _ in ordered], back)
+        lists = [choices for _, choices, _ in ordered]
+        if key in strict:
+            # 只认能反查回这个词的义项，对不上就不给释义。
+            gloss = next((text for choices in lists for text in choices[:EN_GLOSS_CHOICES]
+                          if not text[:1].isupper() and back_match(key, text, back) >= 1), "")
+        else:
+            gloss = clean_en(key, lists, back)
         if gloss:
             result[key] = gloss
     for key, target in redirects.items():
@@ -300,15 +322,17 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, int], min_we
 
 
 def fill_from_english(result: dict[str, str], back: dict[str, str], weights: dict[str, dict[str, int]],
-                      min_weight: int) -> int:
+                      min_weight: int, engine: dict[str, dict[str, int]] | None = None, engine_min: int = 1000) -> int:
     """CC-CEDICT 没收、但 Rime 词库里常用的词（很多、博客、不同的）：用 ECDICT 反查，找中文释义里
     有一条正好是这个词的英文词，取最常用的（单词优先于词组）。返回补了多少条。"""
-    wanted = {word for word, readings in weights.items()
-              if word not in result and max(readings.values(), default=0) >= min_weight
+    wanted = {word for source, floor in ((weights, min_weight), (engine or {}, engine_min))
+              for word, readings in source.items()
+              if word not in result and max(readings.values(), default=0) >= floor
               and any("一" <= ch <= "鿿" for ch in word)}
     found: dict[str, tuple[tuple[int, int], str]] = {}
     for english, translation in back.items():
-        if not re.fullmatch(r"[a-z]+(?:[' ][a-z]+)*", english) or EN_PROFANITY.search(english):
+        # 最多四个词：再长多是俗语说明（刺死 → smite under the fifth rib）。
+        if not re.fullmatch(r"[a-z]+(?:[' ][a-z]+){0,3}", english) or EN_PROFANITY.search(english):
             continue
         rank = en_rank(english)
         if rank > EN_ALT_MAX_RANK:
@@ -323,7 +347,7 @@ def fill_from_english(result: dict[str, str], back: dict[str, str], weights: dic
                 if piece in wanted and (piece not in found or score < found[piece][0]):
                     found[piece] = (score, english)
     for word, (_, english) in found.items():
-        result[word] = re.sub(r"\bi\b", "I", english)  # ECDICT 的键是小写（i should think）
+        result[word] = re.sub(r"\bi\b", "I", ORIGINAL_CASE.get(english, english))  # ECDICT 的键是小写（i should think、Rodriguez）
     return len(found)
 
 
@@ -335,14 +359,17 @@ def main() -> int:
                         help="Rime 拼音词库（pinyin_simp.dict.yaml 等），可重复；用来筛常用中文词")
     parser.add_argument("--min-weight", type=int, default=500,
                         help="多字中文词在 Rime 词库里的最低权重")
+    parser.add_argument("--engine-dict", action="append", default=[],
+                        help="输入法实际用的 rime_ice 词库（cn_dicts/*.dict.yaml），可重复；补收 pinyin_simp 里没有的常用词")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
     entries, back = load_ecdict(args.ecdict)
     english = len(entries)
     weights = load_rime_weights(args.rime_dict)
-    chinese = load_cedict(args.cedict, back, weights, args.min_weight)
-    filled = fill_from_english(chinese, back, weights, args.min_weight)
+    engine = load_rime_weights(args.engine_dict) if args.engine_dict else None
+    chinese = load_cedict(args.cedict, back, weights, args.min_weight, engine)
+    filled = fill_from_english(chinese, back, weights, args.min_weight, engine)
     print(f"filled_from_english={filled}", file=sys.stderr)
     for key, gloss in chinese.items():
         entries.setdefault(key, gloss)
