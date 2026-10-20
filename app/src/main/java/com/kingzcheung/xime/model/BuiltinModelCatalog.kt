@@ -37,12 +37,12 @@ object BuiltinModelCatalog {
                     ModelFile("model_int8_dynamic.onnx", "https://www.modelscope.cn/models/bikeand/predictive-text-small/resolve/master/model_int8_dynamic.onnx", "85b9e8915bd22a5ac1312146df37d77ee3453b9c836c89e666977e7c118a4225", 19720256L, mirrors = listOf(RELEASE + "predictive-text-small-v1.0-model_int8_dynamic.onnx")),
                 )))),
         // 候选注释“释义”用的词典（tools/dictionaries/glossary/build_glossary.py 生成）；id 与 CandidateGlossary.MODEL_ID 一致。
-        ModelInfo("candidate-gloss", "候选中英释义词典", "设置里“候选注释内容”选释义后，中文候选旁显示英文，中文键盘里的英文候选旁显示中文。英→中取自 ECDICT，中→英取自 CC-CEDICT（MDBG）；整句、词组候选按词逐个显示英文。", ModelCategory.OTHER,
-            // v4：去掉俚语／粗口义项，多音字按 Rime 常用读音、义项按英文反查来选（v1 有 几号 → heroin），
-            // 补齐常用单字和词组（v2 常用字大多没有），不可靠的单字释义加 “~” 前缀供 App 拼整句英文时跳过。
-            versions = listOf(ModelVersion(version = "v4", size = "2.1 MB",
+        ModelInfo("candidate-gloss", "候选中英释义词典", "设置里“候选注释内容”选释义后，中文候选旁显示英文，中文键盘里的英文候选旁显示中文。英→中取自 ECDICT，中→英取自 CC-CEDICT（MDBG）；常见的日常短语也显示逐词英文。", ModelCategory.OTHER,
+            // v5：去掉俚语／粗口义项，多音字按 Rime 常用读音、义项按英文反查来选（v1 有 几号 → heroin）；
+            // 补齐常用单字和词组；不可靠的单字释义带 “~”；输入法词库里常见的日常短语预先逐词拼好英文（带 “+”，只显示）。
+            versions = listOf(ModelVersion(version = "v5", size = "2.1 MB",
                 files = listOf(
-                    ModelFile("cyime_gloss-v4.tsv", "https://github.com/Cyletix/CyIME/releases/download/models/cyime_gloss-v4.tsv", "262b6fe0eee16eb6d84c19d7b4fd062b8ba4f56097a31eb83fdc432b043fac42", 2078256L),
+                    ModelFile("cyime_gloss-v5.tsv", "https://github.com/Cyletix/CyIME/releases/download/models/cyime_gloss-v5.tsv", "e129bda7454ffeca8b0445c9791be67e027f0874952b5a0ef2ea8d4ccf8fc85b", 2127575L),
                 )))),
         // 字幕模式分说话人用的声纹模型（3D-Speaker CAM++ 中文，sherpa-onnx 导出，Apache-2.0）；不是语音识别模型。
         ModelInfo(SPEAKER_MODEL, "声纹模型 · 中文", "字幕模式用来区分不同说话人。", ModelCategory.SPEAKER,

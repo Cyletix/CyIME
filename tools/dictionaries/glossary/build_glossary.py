@@ -14,11 +14,12 @@
   - 义项优先选“英文译回中文正好是 / 含有这个词”的（用 ECDICT 反查），对不上用首义。
   - 单字只认主读音首义且正好译回本字，否则不显示（行 → row、被 → quilt 这类宁可不显示）。
 
+v5：词库里常见、没有整词英文的日常短语预先逐词拼好英文（+ 前缀，只显示不上屏）。
 v4：不可靠的单字释义加 “~” 前缀，供 App 拼整句英文时跳过。
 v3：修 v2 反查时没拆开 ECDICT 多行释义的错误；单字改为“正好译回本字 → 按顺序第一个含本字的义项 → 首义”；
 “X 的异体 / 见 X” 借用 X 的释义；CC-CEDICT 没收的常用词组用 ECDICT 反查补（很多 → plenty，博客 → blog）。
 
-用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --output cyime_gloss-v4.tsv
+用法：python -I build_glossary.py --ecdict ecdict.csv --cedict cedict.txt.gz         --rime-dict app/src/main/assets/rime/pinyin_simp.dict.yaml         --rime-dict app/src/main/assets/rime/pinyin_simp_ext.dict.yaml --output cyime_gloss-v5.tsv
 """
 from __future__ import annotations
 
@@ -72,7 +73,7 @@ HEADER = [
     "#   SOFTWARE.",
     "# 中→英释义取自 CC-CEDICT（Creative Commons Attribution-ShareAlike 4.0，MDBG），https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
     "# 本文件是上述数据的裁剪改编，按 CC BY-SA 4.0 分发：https://creativecommons.org/licenses/by-sa/4.0/",
-    "# 格式：每行 词<TAB>释义，按 UTF-8 字节序排序；以 # 开头的行是说明；释义以 ~ 开头的是不可靠的单字释义，显示时去掉 ~。",
+    "# 格式：每行 词<TAB>释义，按 UTF-8 字节序排序；以 # 开头的行是说明；释义以 ~ 开头的是不可靠的单字释义，以 + 开头的是逐词拼出的日常短语，显示时去掉前缀。",
 ]
 
 
@@ -351,6 +352,46 @@ def fill_from_english(result: dict[str, str], back: dict[str, str], weights: dic
     return len(found)
 
 
+# 拼日常短语时可单独用的字：意思固定、放进短语里不会错（宁少勿多）。其余单字多义，拼进去会出错。
+PHRASE_SAFE_CHARS = {"我": "I", "你": "you", "他": "he", "她": "she", "也": "also", "不": "not", "很": "very",
+                     "都": "all", "和": "and", "又": "again", "再": "again", "太": "too", "最": "most", "更": "more"}
+PHRASE = "+"   # 释义前缀：逐词拼出的日常短语英文，只做显示参考，App 不拿它上屏
+
+
+def add_everyday_phrases(entries: dict[str, str], engine: dict[str, dict[str, int]], min_weight: int) -> int:
+    """输入法词库里常见、但没有整词英文的 2~6 字短语（我估计、聊天记录、这个周末）：从左往右取两字以上的词典词，
+    单字只用 PHRASE_SAFE_CHARS，逐词拼出英文，加 PHRASE 前缀存进词典。按词库权重挑，日常说法优先，
+    生僻或说不通的组合（对付一口）不收；有一块拼不上、或拼出连续重复词（how how）就不收。"""
+    added = 0
+    for word, readings in engine.items():
+        if (word in entries or not 2 <= len(word) <= 6 or max(readings.values(), default=0) < min_weight
+                or not all("\u4e00" <= ch <= "\u9fff" for ch in word)):
+            continue
+        parts, start = [], 0
+        while start < len(word):
+            for length in range(min(6, len(word) - start), 1, -1):
+                if length == len(word):
+                    continue
+                gloss = entries.get(word[start:start + length])
+                if gloss and gloss[0] not in (APPROX, PHRASE) and not gloss.endswith("…"):
+                    parts.append(gloss)
+                    start += length
+                    break
+            else:
+                if word[start] not in PHRASE_SAFE_CHARS:
+                    break
+                parts.append(PHRASE_SAFE_CHARS[word[start]])
+                start += 1
+        if start < len(word) or len(parts) < 2:
+            continue
+        tokens = " ".join(parts).split()
+        if any(a.lower() == b.lower() for a, b in zip(tokens, tokens[1:])):
+            continue
+        entries[word] = PHRASE + " ".join(parts)
+        added += 1
+    return added
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ecdict", required=True)
@@ -361,6 +402,8 @@ def main() -> int:
                         help="多字中文词在 Rime 词库里的最低权重")
     parser.add_argument("--engine-dict", action="append", default=[],
                         help="输入法实际用的 rime_ice 词库（cn_dicts/*.dict.yaml），可重复；补收 pinyin_simp 里没有的常用词")
+    parser.add_argument("--phrase-min-weight", type=int, default=20000,
+                        help="日常短语在 rime_ice 词库里的最低权重")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -373,6 +416,8 @@ def main() -> int:
     print(f"filled_from_english={filled}", file=sys.stderr)
     for key, gloss in chinese.items():
         entries.setdefault(key, gloss)
+    if engine:
+        print(f"everyday_phrases={add_everyday_phrases(entries, engine, args.phrase_min_weight)}", file=sys.stderr)
     rows = sorted(((k, v) for k, v in entries.items() if "\t" not in k + v and "\n" not in k + v),
                   key=lambda item: item[0].encode("utf-8"))
     with open(args.output, "w", encoding="utf-8", newline="\n") as out:
