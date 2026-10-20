@@ -32,7 +32,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** 折叠的固定内容：分隔线上有带箭头的“还有 N 条固定”，点线即可展开/收起。深浅色、玻璃开关都截图。 */
+/** 折叠的固定内容：分隔线上有带箭头的“展开 N 条”，点线即可展开/收起。深浅色、玻璃开关都截图。 */
 class ClipboardPinsFoldArrowTest {
     @get:Rule val rule = createComposeRule()
 
@@ -64,12 +64,12 @@ class ClipboardPinsFoldArrowTest {
             rule.runOnIdle { dark = d; glass = g }
             rule.waitForIdle()
             val name = "${if (d) "dark" else "light"}-${if (g) "glass" else "plain"}"
-            rule.onNodeWithText("还有", substring = true, useUnmergedTree = true).assertIsDisplayed()
+            rule.onNodeWithText("展开 8 条", useUnmergedTree = true).assertIsDisplayed()
             rule.onNodeWithTag("clipboard-card:text:10").assertDoesNotExist()
             save("$name-collapsed")
             rule.onNodeWithTag("clipboard-pins-divider").performClick()
             rule.waitForIdle()
-            rule.onNodeWithText("收起固定", useUnmergedTree = true).assertExists()
+            rule.onAllNodesWithText("收起", useUnmergedTree = true).assertCountEquals(2)
             rule.onNodeWithTag("clipboard-records").performScrollToKey("pins-end")
             save("$name-expanded")
             rule.onNodeWithTag("clipboard-pins-divider").performClick()

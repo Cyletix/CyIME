@@ -343,11 +343,11 @@ internal fun ClipboardBoardView(
                         Box(Modifier.heightIn(min = PanelCategoryHeight).clip(RoundedCornerShape(50))
                             .semantics { stateDescription = if (pinsActuallyExpanded) "已展开" else "已收起" }
                             .clickable(role = Role.Button,
-                                onClickLabel = if (pinsActuallyExpanded) "收起固定内容" else "展开全部 ${content.pinnedCount} 条固定内容") {
+                                onClickLabel = if (pinsActuallyExpanded) "收起" else "展开全部 ${content.pinnedCount} 条固定内容") {
                                 changePinsExpansion(!pinsExpanded)
                             }.testTag("clipboard-pins-toggle").padding(horizontal = 2.dp),
                             contentAlignment = Alignment.Center) {
-                            PinsFoldPill(if (pinsActuallyExpanded) "收起固定"
+                            PinsFoldPill(if (pinsActuallyExpanded) "收起"
                                 else if (compactControls) "${content.pinnedCount}" else "固定 ${content.pinnedCount}",
                                 pinsActuallyExpanded, colors.onSurface)
                         }
@@ -614,7 +614,7 @@ private fun ClipboardCardBadge(icon: ImageVector, description: String, modifier:
 }
 
 /**
- * 固定内容折叠时，分隔线中间放一个带箭头的标签（“还有 N 条固定”），整条线都可点：
+ * 固定内容折叠时，分隔线中间放一个带箭头的标签（“展开 N 条”/“收起”），整条线都可点：
  * 一眼能看出下面还有内容、这里可以展开；展开后箭头朝上，点一下收起。
  */
 @androidx.compose.runtime.Composable
@@ -625,11 +625,11 @@ private fun PinsFoldDivider(expanded: Boolean, hidden: Int, content: androidx.co
         modifier.fillMaxWidth().heightIn(min = 24.dp).testTag("clipboard-pins-divider")
             .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
             .clickable(role = androidx.compose.ui.semantics.Role.Button,
-                onClickLabel = if (expanded) "收起固定内容" else "展开固定内容", onClick = onToggle),
+                onClickLabel = if (expanded) "收起" else "展开 $hidden 条", onClick = onToggle),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HorizontalDivider(Modifier.weight(1f), thickness = .5.dp, color = line)
-        PinsFoldPill(if (expanded) "收起固定" else "还有 $hidden 条固定", expanded, content,
+        PinsFoldPill(if (expanded) "收起" else "展开 $hidden 条", expanded, content,
             Modifier.padding(horizontal = 8.dp).testTag("clipboard-pins-fold"))
         HorizontalDivider(Modifier.weight(1f), thickness = .5.dp, color = line)
     }
