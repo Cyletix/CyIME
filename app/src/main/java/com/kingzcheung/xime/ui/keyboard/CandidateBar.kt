@@ -1031,7 +1031,13 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
             onClickLabel = "编辑拼音", onClick = onEdit) else Modifier),
         contentAlignment = Alignment.CenterStart) {
         val shownText = if (onEdit != null) com.kingzcheung.xime.rime.pinyinPreviewText(text) else text
-        Text(preeditWithCaret(shownText, visuals.accentColor, visuals.textColor, visuals.selectedTextColor),
+        // 光标像系统文字光标一样闪（530ms 一亮一灭，用户 10-21 同意）。节拍挂在拼音条上而不是光标位置上：
+        // 移动光标、光标暂时到末尾不显示时都接着原来的节拍走，不会每移一下又从头亮起。
+        val blink = androidx.compose.animation.core.rememberInfiniteTransition(label = "preedit-caret")
+        val caretAlpha by blink.animateFloat(1f, 0f, androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.keyframes { durationMillis = 1060; 1f at 0; 1f at 529; 0f at 530; 0f at 1059 }),
+            label = "preedit-caret-alpha")
+        Text(preeditWithCaret(shownText, visuals.accentColor, visuals.textColor, visuals.selectedTextColor, caretAlpha),
             color = visuals.textColor.copy(alpha = if (visuals.opaqueComments) 1f else 0.9f), fontSize = PreeditStyle.FontSize, maxLines = 1,
             softWrap = false, style = LocalTextStyle.current.copy(shadow = visuals.textShadow), modifier = Modifier.horizontalScroll(scrollState).testTag("candidate-preedit-text"))
     }
@@ -1226,15 +1232,16 @@ private val EDGE_STRETCH_FULL = 1400.dp
 /**
  * 拼音里的编辑光标“|”用主题强调色加粗画，和拼音字母区分开（用户 10-21）。其余文字照旧。
  * 柔和蓝、黑白这类强调色和拼音几乎同色的主题，改用首选候选的高亮：选中字色 + 同一层强调色底。
+ * [alpha] 是闪烁的当前亮度，字色和底一起亮灭。
  */
 internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Color.Unspecified,
-                              selectedText: Color = accent): AnnotatedString {
+                              selectedText: Color = accent, alpha: Float = 1f): AnnotatedString {
     val caret = text.indexOf(com.kingzcheung.xime.service.PREEDIT_CARET)
     if (caret < 0) return AnnotatedString(text)
     val style = if (textColor != Color.Unspecified && colorsClose(accent, textColor))
-        androidx.compose.ui.text.SpanStyle(color = selectedText, fontWeight = FontWeight.Bold,
-            background = accent.copy(alpha = 0.2f))
-    else androidx.compose.ui.text.SpanStyle(color = accent, fontWeight = FontWeight.Bold)
+        androidx.compose.ui.text.SpanStyle(color = selectedText.copy(alpha = selectedText.alpha * alpha),
+            fontWeight = FontWeight.Bold, background = accent.copy(alpha = 0.2f * alpha))
+    else androidx.compose.ui.text.SpanStyle(color = accent.copy(alpha = accent.alpha * alpha), fontWeight = FontWeight.Bold)
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text)
         addStyle(style, caret, caret + 1)
