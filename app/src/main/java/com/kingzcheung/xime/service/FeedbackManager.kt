@@ -58,6 +58,17 @@ class FeedbackManager(private val context: Context) {
     private var pressAmplitude = 0
     private var longPressAmplitude = 0
 
+    companion object {
+        /** 设置页「按键音色」写入的偏好键。 */
+        const val KEY_SOUND_STYLE = "key_sound_style"
+    }
+
+    /** 按键音色：default（原有）、mahjong（显示名「Rain75 紫薇轴」，用户实录）、crisp（清脆青轴）；只影响普通键、空格、回车、删除。 */
+    private var keySoundStyle = "default"
+
+    private fun readKeySoundStyle(): String =
+        SettingsPreferences.getPrefsPublic(context).getString(KEY_SOUND_STYLE, "default") ?: "default"
+
     private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     fun initialize() {
@@ -99,6 +110,15 @@ class FeedbackManager(private val context: Context) {
             soundIds["delete"] = pool.load(context, R.raw.kb_key_delete, 1)
             soundIds["space"] = pool.load(context, R.raw.kb_key_space, 1)
             soundIds["enter"] = pool.load(context, R.raw.kb_key_enter, 1)
+            // 机械音色全部预加载（每个仅几 KB），切换时不用等解码。
+            soundIds["mahjong:standard"] = pool.load(context, R.raw.kb_rec_normal, 1)
+            soundIds["mahjong:delete"] = pool.load(context, R.raw.kb_rec_backspace, 1)
+            soundIds["mahjong:space"] = pool.load(context, R.raw.kb_rec_space, 1)
+            soundIds["mahjong:enter"] = pool.load(context, R.raw.kb_rec_enter, 1)
+            soundIds["crisp:standard"] = pool.load(context, R.raw.kb_key_crisp_standard, 1)
+            soundIds["crisp:delete"] = pool.load(context, R.raw.kb_key_crisp_delete, 1)
+            soundIds["crisp:space"] = pool.load(context, R.raw.kb_key_crisp_space, 1)
+            soundIds["crisp:enter"] = pool.load(context, R.raw.kb_key_crisp_enter, 1)
             soundIds["voice_start"] = pool.load(context, R.raw.kb_voice_start, 1)
             soundIds["voice_end"] = pool.load(context, R.raw.kb_voice_end, 1)
             soundIds["handwriting_erase"] = pool.load(context, R.raw.kb_handwriting_erase, 1)
@@ -108,6 +128,7 @@ class FeedbackManager(private val context: Context) {
     private fun loadSettings() {
         soundEnabled = SettingsPreferences.isSoundEnabled(context)
         soundVolume = SettingsPreferences.getSoundVolume(context)
+        keySoundStyle = readKeySoundStyle()
         hapticMode = HapticMode.fromValue(SettingsPreferences.getHapticMode(context))
         hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context)
         pressDuration = SettingsPreferences.getVibrationPressDuration(context).toLong()
@@ -122,6 +143,7 @@ class FeedbackManager(private val context: Context) {
             when (key) {
                 "sound_enabled" -> soundEnabled = SettingsPreferences.isSoundEnabled(context)
                 "sound_volume" -> soundVolume = SettingsPreferences.getSoundVolume(context)
+                KEY_SOUND_STYLE -> keySoundStyle = readKeySoundStyle()
                 "haptic_mode" -> hapticMode = HapticMode.fromValue(SettingsPreferences.getHapticMode(context))
                 "haptic_on_keyup" -> hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context)
                 "vibration_press_duration" -> pressDuration = SettingsPreferences.getVibrationPressDuration(context).toLong()
@@ -137,7 +159,7 @@ class FeedbackManager(private val context: Context) {
         if (!soundEnabled) return
 
         val pool = soundPool ?: return
-        val soundId = soundIds[keyType] ?: soundIds["standard"] ?: return
+        val soundId = soundIds["$keySoundStyle:$keyType"] ?: soundIds[keyType] ?: soundIds["standard"] ?: return
         val volume = soundVolume / 100f
 
         pool.play(soundId, volume, volume, 1, 0, 1.0f)
