@@ -10,6 +10,9 @@
 --]]
 local FILE = "/cyime_en_memory.txt"
 local MAX_PREFIX = 2
+-- Same limit and compaction as EnglishWordMemory.kt: past twice the limit the file is rewritten with the
+-- latest spelling of each word, the newest MAX_WORDS kept.
+local MAX_WORDS = 2000
 
 local cache = { key = nil, words = {} }
 
@@ -51,10 +54,30 @@ local function remember(word)
     if not dir then return end
     local words = load_words()
     if words[#words] == word then return end
-    local f = io.open(dir .. FILE, "a")
-    if f then
-        f:write(word, "\n")
-        f:close()
+    if #words < MAX_WORDS * 2 then
+        local f = io.open(dir .. FILE, "a")
+        if f then
+            f:write(word, "\n")
+            f:close()
+        end
+        return
+    end
+    local kept, seen = {}, {}
+    for i = #words + 1, 1, -1 do
+        local w = words[i] or word
+        if not seen[w] and #kept < MAX_WORDS then
+            seen[w] = true
+            kept[#kept + 1] = w
+        end
+    end
+    local tmp = dir .. FILE .. ".tmp"
+    local f = io.open(tmp, "w")
+    if not f then return end
+    for i = #kept, 1, -1 do f:write(kept[i], "\n") end
+    f:close()
+    if not os.rename(tmp, dir .. FILE) then
+        os.remove(dir .. FILE)
+        os.rename(tmp, dir .. FILE)
     end
 end
 
