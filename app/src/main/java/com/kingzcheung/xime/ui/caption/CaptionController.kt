@@ -77,6 +77,10 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs = app.getSharedPreferences("caption_mode", Context.MODE_PRIVATE)
     private val client = CaptionInferenceClient(app)
+    private val flipMemory = ReplyFlipMemory(prefs)
+    /** Quick-reply card turned towards the other person; remembered across closing and restarts. */
+    var replyFlipped by mutableStateOf(flipMemory.read()); private set
+    fun turnReplyCard(flipped: Boolean) { replyFlipped = flipped; flipMemory.write(flipped) }
     private val transcript = CaptionTranscript()
     private val recorder = CaptionRecorder(
         onChunk = { pcm -> client.push(pcm) },
@@ -236,10 +240,12 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         val now = SystemClock.elapsedRealtime()
         main.post {
             val line = transcript.update(id, text, startMs, endMs, boundary, confirmed, event) ?: return@post
-            val ui = segments.firstOrNull { it.id == id } ?: SegmentUi(id, System.currentTimeMillis() - (endMs - startMs).coerceIn(0, 30_000)).also {
+            // Placed by when it was said (session time), not when its text arrived: split pieces of an
+            // earlier sentence come after SenseVoice and must not land behind the next sentence.
+            val ui = segments.firstOrNull { it.id == id } ?: SegmentUi(id, sessionStartedAt + startMs).also {
                 // The speaker label may arrive before the first text of a short sentence.
                 line.speakerId?.let { speaker -> ensureSpeaker(speaker); it.speakerId = speaker; it.confident = line.confident }
-                segments.add(it)
+                segments.add(insertionIndex(segments, it.wallMs), it)
             }
             if (text.isNotEmpty()) lastTextAt = now
             if (text.isNotEmpty() && firstPartialAt.put(id, now) == null) FileLogger.i(TAG, "seg=$id firstTextMs=${now - startAtElapsed()}")
