@@ -458,20 +458,11 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             return
         }
         val language = service.uiState.value.inputProfile.language
-        // 日语假名、英文字母：有公式模型包时用“边用边学”的模板识别（HandwritingTemplates），不需要汉字手写模型
-        val templateHandwriting = com.kingzcheung.xime.handwriting.HandwritingTemplates.Script.forLanguage(language) != null &&
-            com.kingzcheung.xime.handwriting.FormulaRecognizer.isAvailable(service)
+        // 中文、英文、日语都由内置汉字手写模型服务（英文取其中字母，假名拿它的输出比对模板），不需要公式模型
+        val templateHandwriting = com.kingzcheung.xime.handwriting.HandwritingTemplates.Script.forLanguage(language)
+            ?.available(service) == true
         val recognitionLanguage = com.kingzcheung.xime.handwriting.HandwritingLanguages.recognitionLanguageForKeyboard(language)
         if (recognitionLanguage == null && !templateHandwriting) {
-            if (com.kingzcheung.xime.handwriting.HandwritingTemplates.Script.forLanguage(language) != null) {
-                // 日语手写能用，只是缺公式手写模型（用它比对假名）：和缺汉字模型一样，直接带去模型管理下载。
-                Toast.makeText(service, "${language.displayName}手写要先下载「公式手写模型」", Toast.LENGTH_SHORT).show()
-                service.startActivity(android.content.Intent(service, com.kingzcheung.xime.MainActivity::class.java).apply {
-                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                    putExtra("open_fragment", "model_management")
-                })
-                return
-            }
             Toast.makeText(service, com.kingzcheung.xime.handwriting.HandwritingLanguages.unavailableMessage(language), Toast.LENGTH_SHORT).show()
             return
         }
