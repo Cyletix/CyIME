@@ -71,21 +71,23 @@ class FrostedKeyColorsTest {
         assertTrue(highlighted.red > normal.red)
     }
 
-    @Test fun blackThemeKeepsKeySeparationOverBothHostExtremes() {
-        val normalKey = Color(0xFF1C1C1C)
-        val functionKey = Color(0xFF353535)
+    @Test fun nearBlackKeysStayDarkUnderGlass() {
+        // 2026-10-22 用户选定：黑白主题深色的近黑键帽在玻璃下保持深色，不提成灰；字仍要清楚。
+        val normalKey = Color(0xFF1C1C1E)
+        val functionKey = Color(0xFF29292B)
         val glass = FrostedGlassConfig.defaults(true, true)
         for (host in listOf(Color.Black, Color.White)) {
             val panel = Color.Black.copy(alpha = glass.backgroundOpacity).compositeOver(host)
-            val normal = frostedKeyColor(normalKey, Color.White, glass).compositeOver(panel)
-            val function = frostedKeyColor(functionKey, Color.White, glass).compositeOver(panel)
-            assertTrue("key fill must remain distinct from the panel on $host", normal.red - panel.red >= 0.065f)
-            assertTrue("function keys retain their stronger fill on $host", function.red - normal.red >= 0.065f)
-            assertTrue(textContrast(Color.White, normal) >= 4.5f)
-            assertTrue(textContrast(Color.White, function) >= 4.5f)
+            for (key in listOf(normalKey, functionKey)) {
+                val fill = frostedKeyColor(key, Color.White, glass).compositeOver(panel)
+                assertTrue("near-black key is not raised to grey on $host", fill.red - panel.red < 0.065f)
+                assertTrue(textContrast(Color.White, fill) >= 4.5f)
+            }
         }
-        val overBlack = frostedKeyColor(normalKey, Color.White, glass).compositeOver(Color.Black)
-        assertEquals("transparent black-theme keys retain their original elevation", normalKey.red, overBlack.red, tolerance)
+        assertEquals(normalKey.red, frostedKeyColor(normalKey, Color.White, glass).red, tolerance)
+        // 其他主题的深色键帽仍按原规则提亮，保持层次。
+        val softBlueKey = Color(0xFF2E323A)
+        assertTrue(frostedKeyColor(softBlueKey, Color.White, glass).red > softBlueKey.red + 0.1f)
     }
 
     @Test fun zeroOpacityRemainsTransparentDuringAllInteractionStates() {

@@ -51,8 +51,7 @@ import java.io.File
 
 /**
  * 黑白主题：候选栏＋26 键、“布局 / 方案”面板；深浅色、玻璃开关。
- * 同一次运行先用 xime.custom.yaml 套上改前的深灰键色出“before”，再删掉出“after”（纯黑＋细白边），
- * 最后套近黑键色出备选“nearblack”。
+ * 同一次运行先用 xime.custom.yaml 套上改前的深灰键色出“before”，再删掉出“after”（近黑键帽）。
  * 只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
@@ -120,9 +119,8 @@ class BlackThemeRenderTest {
                 body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
             File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        for (stage in listOf("before", "after", "nearblack")) {
+        for (stage in listOf("before", "after")) {
             if (stage == "after") { custom.delete(); reload(); rule.runOnIdle { revision++ } }
-            if (stage == "nearblack") { custom.writeText(NEAR_BLACK); reload(); rule.runOnIdle { revision++ } }
             for (m in listOf("keys26", "panel")) for (d in listOf(true, false)) for (g in listOf(false, true)) {
                 val schema = if (m == "t9") "t9_pinyin" else "rime_ice"
                 KeysConfigHelper.setActiveKeyboardSchema(schema)
@@ -135,14 +133,6 @@ class BlackThemeRenderTest {
     }
 
     private companion object {
-        // 备选：键帽用近黑填充代替描边。
-        const val NEAR_BLACK = """
-color_schemes:
-  pure_black:
-    key_bg_color_dark: 0x1C1C1E
-    special_key_bg_color_dark: 0x29292B
-    enter_key_bg_color_dark: 0x29292B
-"""
         // 改前的黑白深色：深灰字母键、更浅的灰功能键与回车。
         const val BEFORE = """
 color_schemes:

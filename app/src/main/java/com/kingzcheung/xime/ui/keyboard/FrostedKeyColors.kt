@@ -43,6 +43,9 @@ internal fun frostedKeyColor(
     return tint.copy(alpha = opacity * opacityScale.coerceIn(0f, 1f))
 }
 
+/** 键帽最亮通道低于此值视为近黑（#29292B 以下）；其他主题的深色键帽都高于此值。 */
+internal const val NEAR_BLACK_KEY_PEAK = .18f
+
 private fun glassKeyTint(background: Color, foreground: Color, opacity: Float): Color {
     if (opacity <= 0f || opacity >= 1f) return background
     val darkSurface = foreground.luminance() > background.luminance()
@@ -51,6 +54,8 @@ private fun glassKeyTint(background: Color, foreground: Color, opacity: Float): 
     val b = if (darkSurface) background.blue else 1f - background.blue
     val peak = maxOf(r, g, b)
     if (peak <= 0f) return background
+    // 近黑键帽（黑白主题深色）在玻璃下保持近黑，不提成灰：键几乎透明、只见边缘（2026-10-22 用户选定的样子）。
+    if (darkSurface && peak < NEAR_BLACK_KEY_PEAK) return background
     val scale = minOf(1f / opacity, 1f / peak)
     fun channel(value: Float) = if (darkSurface) value * scale else 1f - value * scale
     return Color(channel(r), channel(g), channel(b), background.alpha)

@@ -46,16 +46,16 @@ object PureBlackTheme {
     const val ID = "pure_black"
 
     // 浅色：按键与底色对比 ≥1.2，功能键比字母键更突出；数值见 tools/theme_audit.py。
-    // 深色是纯黑（2026-10-22 用户：不要灰色大块）：底、字母键、功能键、回车都是黑色，
-    // 键边由一圈细白边画出（VisualStyle.blackKeyOutline）；面板卡片同样只描边不铺灰。
+    // 深色以黑为主（2026-10-22 用户选定）：底纯黑，按键近黑、功能键与回车再浅一档，靠填充看出键边；
+    // 玻璃下近黑键帽不提亮（FrostedKeyColors.NEAR_BLACK_KEY_PEAK），面板卡片只描边不铺灰。
     fun create() = SoftBlueTheme.create(ID, "黑白").copy(
         keyboardBgLight = Color(0xFFE8E8EA), keyboardBgDark = Color.Black,
         candidateBarBgLight = Color(0xFFE8E8EA), candidateBarBgDark = Color.Black,
         surfaceLight = Color(0xFFE8E8EA), surfaceDark = Color.Black,
-        keyBgLight = Color.White, keyBgDark = Color.Black,
-        specialKeyLight = Color(0xFFD4D4D8), specialKeyDark = Color.Black,
+        keyBgLight = Color.White, keyBgDark = Color(0xFF1C1C1E),
+        specialKeyLight = Color(0xFFD4D4D8), specialKeyDark = Color(0xFF29292B),
         specialKeyTextColorLight = Color(0xFF202020), specialKeyTextColorDark = Color.White,
-        enterKeyLight = Color(0xFFD4D4D8), enterKeyDark = Color.Black,
+        enterKeyLight = Color(0xFFD4D4D8), enterKeyDark = Color(0xFF29292B),
         keyTextColorLight = Color(0xFF202020), keyTextColorDark = Color.White,
         candidateTextColorLight = Color(0xFF454545), candidateTextColorDark = Color(0xFFE0E0E0),
         candidateSelectedTextColorLight = Color.Black, candidateSelectedTextColorDark = Color.White,
