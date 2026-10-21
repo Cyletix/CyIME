@@ -22,8 +22,10 @@ import kotlinx.coroutines.withContext
  * 承载按键派发（handleKeyPress）、长按退格合并、候选选择/翻页、计算器候选等逻辑。
  * 所有共享状态通过 service 引用访问（同模块 internal 成员）。
  */
-/** 26-key schemas whose speller alphabet has A–Z, so a capital joins the composition (rime-ice family). */
-private val RIME_ICE_CAPITAL_SCHEMAS = setOf("rime_ice", "pinyin_qwjrtk", "pinyin_cyletix10")
+/** 26-key schemas whose speller alphabet has A–Z, so a capital joins the composition (rime-ice family):
+ *  rime_ice and the layouts made from its schema (QWJRTK, Cyletix10 and the user's own custom_pinyin_*). */
+private fun isRimeIceCapitalSchema(id: String) =
+    id == "rime_ice" || com.kingzcheung.xime.settings.CustomKeyboardLayouts.isCustom(id)
 
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     @Volatile internal var letterNeighbors: Pair<String, String> = "" to ""
@@ -741,7 +743,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             val accepted = withEditor { service.submitText(input).accepted }
                             if (!accepted) return@command
                             // English typed by hand (Obsidian) is offered again next time, dictionary or not.
-                            if (!isT9 && state.currentSchemaId in RIME_ICE_CAPITAL_SCHEMAS &&
+                            if (!isT9 && isRimeIceCapitalSchema(state.currentSchemaId) &&
                                 !com.kingzcheung.xime.settings.IncognitoState.active) {
                                 com.kingzcheung.xime.settings.EnglishWordMemory.remember(
                                     com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service), input)
@@ -1049,7 +1051,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             // 参与组字：字母表含 A–Z，大写串进当前输入（zuogeDNAjiance → 做个DNA检测，
                             // Transformer、KFC 由英文词库和自动大写给出），已打的拼音不被顶上屏。
                             val capitalsInRime = isShiftedChinese && !mergedKey &&
-                                state.currentSchemaId in RIME_ICE_CAPITAL_SCHEMAS && service.t9PartialSegments.isEmpty()
+                                isRimeIceCapitalSchema(state.currentSchemaId) && service.t9PartialSegments.isEmpty()
                             // 其他方案（双拼、14 键合并键等）没有大写字母编码：已打的字母按原样连同大写字母上屏，
                             // 不丢弃拼音（与桌面端“整串按原样处理”一致）。
                             if (isShiftedChinese && !capitalsInRime && (service.rimeEngine.readQueuedComposition()?.input?.isNotEmpty() == true ||
@@ -2140,7 +2142,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
 
     /** A remembered hand-typed English word (lua/cyime_en_memory.lua) has no Rime record: forget it from its file. */
     private suspend fun forgetEnglishWord(text: String): Boolean {
-        if (service.uiState.value.currentSchemaId !in RIME_ICE_CAPITAL_SCHEMAS) return false
+        if (!isRimeIceCapitalSchema(service.uiState.value.currentSchemaId)) return false
         val rimeDir = com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service)
         if (!com.kingzcheung.xime.settings.EnglishWordMemory.forget(rimeDir, text)) return false
         // Translate the same input again so the forgotten word leaves the menu.
