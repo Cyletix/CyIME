@@ -136,7 +136,8 @@ object FormulaRecognizer {
         if (!ensureLoaded(context)) return null
         val m = meta ?: return null
         val e = env ?: return null
-        val feats = featurize(strokes, m) ?: return null
+        // 字母模板比对：点很稀的笔画（快速一划、只有几个采样点）先沿笔迹补点，否则特征几乎为空，什么都认成 c
+        val feats = featurize(densify(strokes, m), m) ?: return null
         val segs = segments(feats, m)
         if (segs.isEmpty()) return null
         val s = segs.size.toLong()
@@ -239,6 +240,32 @@ object FormulaRecognizer {
     // ── 预处理（与训练脚本逐项一致）──────────────────────────────────
 
     /** 每点 [x, y, dx, dy, 笔画结束, 笔画开始]；按笔画分组返回。 */
+    /**
+     * 相邻两点隔得比留点间距（[Meta.minStep]，按与 [featurize] 相同的缩放）的 4 倍还远时，在中间按该间距补点。
+     * 正常书写的点本来就密，碰不到这个门槛，结果不变；只影响点很稀的笔画。
+     */
+    internal fun densify(strokes: List<List<Pair<Float, Float>>>, m: Meta): List<List<Pair<Float, Float>>> {
+        val all = strokes.flatten()
+        if (all.size < 2) return strokes
+        val h = all.maxOf { it.second } - all.minOf { it.second }
+        val w = all.maxOf { it.first } - all.minOf { it.first }
+        val step = maxOf(h, w / m.wideRatio, 1e-3f) * m.minStep
+        return strokes.map { st ->
+            if (st.size < 2) return@map st
+            val out = ArrayList<Pair<Float, Float>>(st.size)
+            out += st[0]
+            for (i in 1 until st.size) {
+                val (x0, y0) = st[i - 1]
+                val (x1, y1) = st[i]
+                val gap = abs(x1 - x0) + abs(y1 - y0)
+                val n = if (gap > 4 * step) kotlin.math.ceil(gap / step).toInt() else 1
+                if (n > 1) for (j in 1 until n) out += (x0 + (x1 - x0) * j / n) to (y0 + (y1 - y0) * j / n)
+                out += st[i]
+            }
+            out
+        }
+    }
+
     internal fun featurize(strokes: List<List<Pair<Float, Float>>>, m: Meta): List<List<FloatArray>>? {
         val all = strokes.flatten()
         if (all.size < 2) return null

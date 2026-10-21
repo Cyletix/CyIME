@@ -61,4 +61,16 @@ class FormulaRecognizerPreprocessTest {
         assertEquals("\\frac{x}", FormulaRecognizer.detokenize(listOf(10, 7, 5, 9), table))
         assertEquals("\\cdot2", FormulaRecognizer.detokenize(listOf(11, 8), table))
     }
+
+    @Test fun sparseStrokesAreFilledInButDenseWritingIsLeftAlone() {
+        // 只有 3 个采样点的“L”：补到与正常书写相近的密度
+        val sparse = listOf(listOf(650f to 120f, 650f to 450f, 850f to 450f))
+        val filled = FormulaRecognizer.densify(sparse, meta).single()
+        assertEquals(650f to 120f, filled.first())
+        assertEquals(850f to 450f, filled.last())
+        assertEquals(true, filled.size > 50)
+        // 正常书写的点本来就密（这里每 2 像素一个点）：一点不变
+        val written = listOf((0..165).map { 650f to 120f + it * 2 } + (1..100).map { 650f + it * 2 to 450f })
+        assertEquals(written, FormulaRecognizer.densify(written, meta))
+    }
 }
