@@ -400,11 +400,14 @@ object HandwritingTemplates {
         val script = lastScript ?: return
         val feat = lastFeature ?: return
         lastFeature = null
-        if (!script.accepts(committed)) return
+        if (!learningAllowed() || !script.accepts(committed)) return
         val app = context.applicationContext
         // 写文件放后台，不卡上屏
         Thread { add(app, script, committed, feat, "pick:${System.currentTimeMillis()}") }.start()
     }
+
+    /** 无痕（手动开启、密码框、宿主声明不要个性化学习、剪贴板搜索）时不学，与打字同一规则。 */
+    internal fun learningAllowed(): Boolean = !com.kingzcheung.xime.settings.IncognitoState.active
 
     /** 这种文字的特征模型在、模板库里至少有一个字时，就开放模板手写。 */
     fun isUsable(context: Context, script: Script): Boolean = script.available(context) && count(context, script) > 0
