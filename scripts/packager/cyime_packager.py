@@ -541,8 +541,18 @@ class Packager(ad.Delivery):
                                 "（加 --bump patch，或在界面里勾选升版本）。")
         others = {v for v in built_variants(self.root, self.code) if v != self.variant_id()}
         if self.kind == "release" and others:
-            raise DeliveryError(f"版本 {self.version}/{self.code} 已经打过另一种内容的正式包，两个包不能同一个版本号；"
-                                "请升版本号（--bump auto 或 patch）。")
+            # One version, one release: the lite and full packages of the same commit share the version number
+            # (AGENTS.md: 普通版／内置版共用版本). Anything built from other source still needs a new number.
+            same_commit = set()
+            for receipt in (self.root / f"app/build/outputs/apk/editions/{self.version}").glob(f"*/{self.kind}/latest.json"):
+                data = ad.read_json(receipt)
+                if data.get("sourceCommit") == self.commit and data.get("versionCode") == self.code:
+                    same_commit.add((data.get("packager") or {}).get("variant"))
+            foreign = others - same_commit
+            if foreign:
+                raise DeliveryError(f"版本 {self.version}/{self.code} 已经打过另一种内容的正式包（不是同一提交的轻量/完整版），"
+                                    "两个包不能同一个版本号；请升版本号（--bump auto 或 patch）。")
+            say(f"[VARIANT] 同一提交 {self.commit[:8]} 的另一版安装包已打过，轻量版与完整版共用 {self.version}/{self.code}。")
         from storage_guard import check_storage
         check_storage(self.root)
         self.stage(f"BUILD-{self.kind.upper()}-{edition.upper()}")
