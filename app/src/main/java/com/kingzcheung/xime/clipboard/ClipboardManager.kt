@@ -44,15 +44,9 @@ class ClipboardManager private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "ClipboardManager"
-        /** Unfixed history kept; the oldest unfixed record goes first. Fixed records are never trimmed. */
-        internal const val MAX_ITEMS = 5000
-        /** Longer copies stay on the system clipboard but are not saved to history. */
-        internal const val MAX_TEXT_BYTES = 1024 * 1024
         /** The board reads unfixed history in pages of this many records. */
         internal const val HISTORY_PAGE = 300
 
-        internal fun fitsHistory(text: String): Boolean =
-            text.length <= MAX_TEXT_BYTES && text.encodeToByteArray().size <= MAX_TEXT_BYTES
         private const val PREFS_NAME = "clipboard_prefs"
         private const val KEY_CLIPBOARD_ITEMS = "clipboard_items"
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
@@ -168,6 +162,12 @@ class ClipboardManager private constructor(private val context: Context) {
     val quickSendItems: StateFlow<List<ClipboardItem>> = _quickSendItems.asStateFlow()
 
     private val historyWindow = MutableStateFlow(HISTORY_PAGE)
+    private val _room = MutableStateFlow(ClipboardRoom())
+    /** Stored size against what this device can hold; full means new copies are not saved. */
+    internal val room: StateFlow<ClipboardRoom> = _room.asStateFlow()
+    private var measuredAtBytes = 0L
+    private var scanBytesPerMs = ClipboardCapacity.UNMEASURED_BYTES_PER_MS
+
     private val _unpinnedCount = MutableStateFlow(0)
     /** All unfixed text records in the database, including pages not read yet. */
     val unpinnedCount: StateFlow<Int> = _unpinnedCount.asStateFlow()
@@ -210,6 +210,32 @@ class ClipboardManager private constructor(private val context: Context) {
 
     private fun searchKey(text: String) = ClipboardSearch.key(text, AndroidPinyinInitials::initialOf)
 
+    /**
+     * Times the searches a keystroke runs, over everything stored, and sets the capacity from this
+     * device's speed and free space. Runs in the background when the history has grown enough.
+     */
+    private suspend fun measureCapacity(stored: Long) {
+        val miss = "\u0001\u0002" // matches nothing, so every record is read
+        val start = System.nanoTime()
+        dao.search(ClipboardSearch.likePattern(miss), 1)
+        val text = (System.nanoTime() - start) / 1e6
+        val keyStart = System.nanoTime()
+        dao.searchKeyDigits(ClipboardSearch.keyPattern(miss), 1)
+        val keys = (System.nanoTime() - keyStart) / 1e6
+        ClipboardCapacity.scanRate(stored, maxOf(text, keys))?.let { scanBytesPerMs = it; measuredAtBytes = stored }
+        val capacity = ClipboardCapacity.capacity(scanBytesPerMs, context.filesDir.usableSpace)
+        Log.i(TAG, "clipboard capacity: stored=$stored bytes, scan=${scanBytesPerMs.toLong()} bytes/ms, capacity=$capacity bytes")
+        _room.value = _room.value.copy(capacityBytes = capacity)
+    }
+
+    /** False (and the board says full) when this record does not fit in the room left. */
+    private fun hasRoomFor(text: String, key: String): Boolean {
+        val room = _room.value
+        if (ClipboardCapacity.accepts(room.storedBytes, ClipboardCapacity.recordBytes(text, key), room.capacityBytes)) return true
+        _room.value = room.copy(refused = true)
+        return false
+    }
+
     private val _recentItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val recentItems: StateFlow<List<ClipboardItem>> = _recentItems.asStateFlow()
 
@@ -243,6 +269,16 @@ class ClipboardManager private constructor(private val context: Context) {
                 clipboardPinsReady.complete(Unit)
             }
             scope.launch { dao.observeUnpinnedCount().collect { _unpinnedCount.value = it } }
+            scope.launch {
+                dao.observeStoredBytes().collect { stored ->
+                    val previous = _room.value
+                    if (previous.capacityBytes == Long.MAX_VALUE || ClipboardCapacity.shouldRemeasure(stored, measuredAtBytes))
+                        measureCapacity(stored)
+                    // Removing records makes room again.
+                    _room.value = _room.value.copy(storedBytes = stored,
+                        refused = _room.value.refused && stored >= previous.storedBytes)
+                }
+            }
             scope.launch { backfillSearchKeys() }
             historyWindow.flatMapLatest { dao.observeWindow(it) }.collect { entries ->
                 _clipboardItems.value = entries.map { it.toClipboardItem() }
@@ -376,8 +412,11 @@ class ClipboardManager private constructor(private val context: Context) {
         if (text.isBlank()) return
         scope.launch {
             clipboardPinsReady.await()
-            if (!fitsHistory(text)) return@launch
-            dao.upsertAndTrim(text, System.currentTimeMillis(), MAX_ITEMS, searchKey(text))
+            if (!ClipboardCapacity.fitsRow(text)) return@launch
+            val key = searchKey(text)
+            // A copy already in history only moves up and needs no room; a full history saves nothing new.
+            if (dao.findByText(text) == null && !hasRoomFor(text, key)) return@launch
+            dao.upsert(text, System.currentTimeMillis(), key)
             _clipboardChanged.emit(
                 ClipboardItem(
                     text = text,
@@ -452,13 +491,19 @@ class ClipboardManager private constructor(private val context: Context) {
 
     /** Edit in place: preserve pin state and retain the code when it was not edited. */
     fun updateClipboardItem(id: Long, newText: String, newCode: String? = null): Boolean {
-        if (newText.isBlank() || !fitsHistory(newText)) return false
+        if (newText.isBlank() || !ClipboardCapacity.fitsRow(newText)) return false
         scope.launch {
             clipboardPinsReady.await()
             // A search result may lie outside the loaded page; the database decides whether it exists.
-            if (dao.findById(id) == null) return@launch
+            val old = dao.findById(id) ?: return@launch
+            val key = searchKey(newText)
+            val room = _room.value
+            val growth = ClipboardCapacity.recordBytes(newText, key) - ClipboardCapacity.recordBytes(old.text, old.searchKey)
+            if (growth > 0 && !ClipboardCapacity.accepts(room.storedBytes, growth, room.capacityBytes)) {
+                _room.value = room.copy(refused = true); return@launch
+            }
             dao.updateClipboardItem(id, newText, newCode?.trim(), System.currentTimeMillis())
-            dao.setSearchKey(id, searchKey(newText))
+            dao.setSearchKey(id, key)
         }
         return true
     }
@@ -468,10 +513,12 @@ class ClipboardManager private constructor(private val context: Context) {
     }
 
     fun addPinnedText(text: String, code: String = "") {
-        if (text.isBlank() || !fitsHistory(text)) return
+        if (text.isBlank() || !ClipboardCapacity.fitsRow(text)) return
         scope.launch {
             clipboardPinsReady.await()
-            dao.insertPinnedText(text, code.trim(), System.currentTimeMillis(), searchKey(text))
+            val key = searchKey(text)
+            if (!hasRoomFor(text, key)) return@launch
+            dao.insertPinnedText(text, code.trim(), System.currentTimeMillis(), key)
         }
     }
 

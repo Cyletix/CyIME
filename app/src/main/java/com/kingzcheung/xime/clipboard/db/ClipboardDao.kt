@@ -118,17 +118,29 @@ interface ClipboardDao {
 
     @Transaction
     suspend fun upsertAndTrim(text: String, now: Long, maxItems: Int, searchKey: String = "") {
-        val existing = findByText(text)
-        if (existing != null) {
-            refreshCopiedItem(existing.id, now)
-        } else {
-            insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey))
+        if (upsert(text, now, searchKey)) {
             val unpinned = countUnpinned()
             if (unpinned > maxItems) {
                 trimUnpinned(unpinned - maxItems)
             }
         }
     }
+
+    /** A copy already in history moves to the top; a new one is added. True when it was added. */
+    @Transaction
+    suspend fun upsert(text: String, now: Long, searchKey: String = ""): Boolean {
+        val existing = findByText(text)
+        if (existing != null) {
+            refreshCopiedItem(existing.id, now)
+            return false
+        }
+        insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey))
+        return true
+    }
+
+    /** Bytes of text and search keys stored (fixed and history), re-read whenever records change. */
+    @Query("SELECT COALESCE(SUM(length(CAST(text AS BLOB)) + length(searchKey)), 0) FROM clipboard_entries WHERE isQuickSend = 0")
+    fun observeStoredBytes(): Flow<Long>
 
     suspend fun insertPinnedText(text: String, code: String, now: Long, searchKey: String = ""): Long =
         insert(ClipboardEntry(text = text, code = code, timestamp = now, isPinned = true, searchKey = searchKey))
