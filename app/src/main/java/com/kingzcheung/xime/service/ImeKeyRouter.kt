@@ -360,8 +360,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             when (key) {
                 "enter" -> {
                     if (hasComposing) {
-                        // 组合态：先把拼音提交进面板输入框，再触发生成
-                        val input = candState.inputText
+                        // 组合态：先把拼音提交进面板输入框，再触发生成。剪贴板搜索提交拼音首字母，
+                        // 与边打边筛同一口径（"di'zhi" → dz）。
+                        val input = if (service.uiState.value.clipboardSearchVisible)
+                            com.kingzcheung.xime.clipboard.ClipboardSearch.composingInitials(candState.preeditText,
+                                com.kingzcheung.xime.clipboard.AndroidPinyinInitials::initialOf)
+                        else candState.inputText
                         service.mainHandler.post {
                             if (!service.inputReadiness.accepts(admission)) return@post
                             ToolPanelEditTextHolder.editText?.let { et ->

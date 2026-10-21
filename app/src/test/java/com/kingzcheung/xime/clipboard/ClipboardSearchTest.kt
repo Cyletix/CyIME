@@ -28,6 +28,38 @@ class ClipboardSearchTest {
         assertEquals("%50\\%\\_off\\\\%", ClipboardSearch.likePattern("50%_off\\"))
     }
 
+    private fun composing(preedit: String) = ClipboardSearch.composingInitials(preedit, initials::get)
+
+    @Test fun aComposingWordGivesTheInitialOfEachSyllable() {
+        assertEquals("dz", composing("di'zhi"))
+        assertEquals("dz", composing("di zh"))
+        assertEquals("dj", composing("dong jing"))
+    }
+
+    @Test fun abbreviationsGiveOneInitialPerLetterWithZhChShAsOne() {
+        assertEquals("dz", composing("dz"))
+        assertEquals("dz", composing("d'z"))
+        assertEquals("zc", composing("zhch"))
+        assertEquals("s", composing("sh"))
+    }
+
+    @Test fun hanAlreadyPickedInsideTheCompositionGivesItsInitial() {
+        assertEquals("dz", composing("地zhi"))
+        assertEquals("", composing("'' "))
+    }
+
+    @Test fun keypadDigitsFollowTheLettersOnEachKey() {
+        assertEquals("39", ClipboardSearch.t9Digits("dz"))
+        assertEquals("22233344455566677778889999", ClipboardSearch.t9Digits("abcdefghijklmnopqrstuvwxyz"))
+        assertEquals("39090", ClipboardSearch.t9Digits("DZ 090"))
+    }
+
+    @Test fun liveQueryIsBlankOnlyWithoutTextAndComposition() {
+        assertTrue(ClipboardLiveQuery("", "").isBlank)
+        assertFalse(ClipboardLiveQuery("", "d").isBlank)
+        assertEquals("地di'zhi", ClipboardLiveQuery("地", "di'zhi").display)
+    }
+
     @Test fun historyRejectsOnlyCopiesOverOneMegabyte() {
         assertTrue(ClipboardManager.fitsHistory("a".repeat(ClipboardManager.MAX_TEXT_BYTES)))
         assertFalse(ClipboardManager.fitsHistory("a".repeat(ClipboardManager.MAX_TEXT_BYTES + 1)))

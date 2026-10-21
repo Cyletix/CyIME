@@ -328,6 +328,11 @@ internal fun rememberImeKeyboardCallbacks(
             onClipboardSearchClose = { service.closeClipboardSearch(openBoard = true) },
             onClipboardSearchSubmit = { service.submitClipboardSearch() },
             onClipboardSearchSelect = { text -> service.selectClipboardSearchResult(text) },
+            onClipboardSearchImageSelect = { image ->
+                // Leave search first: an image never goes into the search field.
+                service.closeClipboardSearch(openBoard = false)
+                service.keyboardCallbacks?.onClipboardImageSelect?.invoke(image)
+            },
             onToolPanelFocusChange = { focused ->
                 service.uiState.value = service.uiState.value.copy(
                     toolPanelInputFocused = focused,
