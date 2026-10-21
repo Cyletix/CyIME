@@ -28,7 +28,8 @@ def gloss(zh, t):
     if g is not None: return g.lstrip('~+') if not (len(t) == 1 and g.startswith('~')) else g[1:]
     if len(t) < 2: return None
     s, last = t[:-1], t[-1]
-    if len(s) >= 2 and (last in MODAL or last in '吗么'):
+    single = len(s) == 1 and last not in '吗么' and s not in '是有在对我你他她它这那的了就也都还又不没'
+    if (len(s) >= 2 or single) and (last in MODAL or last in '吗么'):
         b = zh.get(s)
         if b is None or b.startswith('~'): b = number(s)
         if b is None: return None

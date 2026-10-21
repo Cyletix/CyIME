@@ -185,7 +185,9 @@ object CandidateGlossary {
         val stem = text.dropLast(1)
         val last = text.last()
         val question = last == '吗' || last == '么'   // 你知道么 = 你知道吗
-        if (stem.length >= 2 && (last in MODAL_PARTICLES || question)) {
+        // 单字加语气词（懒啊、好呀）只在这个字有可靠释义、又不是“是、有、在”和代词这类虚字时套（是啊 不是 “is”）。
+        val singleOk = stem.length == 1 && !question && stem[0] !in SINGLE_STEM_EXCLUDED
+        if ((stem.length >= 2 || singleOk) && (last in MODAL_PARTICLES || question)) {
             val base = table.lookup(stem)?.takeUnless { it.startsWith(APPROX) }?.removePrefix(PHRASE)
                 ?: numberGloss(stem) ?: return null
             return if (question) "${base.trimEnd('?', '!')}?" else base
@@ -194,6 +196,7 @@ object CandidateGlossary {
     }
 
     private const val MODAL_PARTICLES = "啊呀吧呢嘛哦啦呗喽"
+    private const val SINGLE_STEM_EXCLUDED = "是有在对我你他她它这那的了就也都还又不没"
     private val NUMBER_UNITS = listOf(
         "分钟" to ("minute" to "minutes"), "小时" to ("hour" to "hours"), "点" to ("o'clock" to "o'clock"),
         "天" to ("day" to "days"), "年" to ("year" to "years"), "次" to ("time" to "times"), "岁" to ("year old" to "years old"),

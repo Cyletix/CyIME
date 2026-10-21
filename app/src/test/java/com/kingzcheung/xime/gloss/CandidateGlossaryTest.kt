@@ -174,11 +174,13 @@ class CandidateGlossaryTest {
 
     @Test
     fun `sentence-final particles and numbers with units get a gloss, but are never committed`() {
-        val base = table("早上" to "morning", "好了" to "done", "会" to "~meet")
+        val base = table("早上" to "morning", "好了" to "done", "会" to "~meet", "懒" to "lazy", "是" to "is")
         assertEquals("morning", CandidateGlossary.gloss(base, "早上啊"))
         assertEquals("done?", CandidateGlossary.gloss(base, "好了吗"))
         assertEquals("done?", CandidateGlossary.gloss(base, "好了么"))
-        assertNull(CandidateGlossary.gloss(base, "会吧"))          // 单字词干不套
+        assertNull(CandidateGlossary.gloss(base, "会吧"))          // 单字只有不可靠释义，不套
+        assertEquals("lazy", CandidateGlossary.gloss(base, "懒啊"))
+        assertNull(CandidateGlossary.gloss(base, "是啊"))
         assertEquals("nine o'clock", CandidateGlossary.gloss(base, "九点"))
         assertEquals("half past six", CandidateGlossary.gloss(base, "六点半"))
         assertEquals("nine o'clock", CandidateGlossary.gloss(base, "九点喽"))
