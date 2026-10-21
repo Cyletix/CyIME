@@ -416,7 +416,11 @@ fun SwipeableKeyButton(
 
     // Keys whose flick directions are fixed letters (nine-key flick mode, fourteen-key pairs)
     // show the kana direction disc while held. Labels come from the live gesture mapping.
-    val discLabels = if (flick == null && letters == null) null else gestureActions.let { actions ->
+    // 14 键里落单的字母键（l、m，分体或 Shift 拖动时拆开的单字母）和双字母键用同一个方向盘，
+    // 不再一个出方向盘、一个键面渐变（用户 10-21）。
+    val fourteenSingle = LocalFourteenKeyLayout.current && inputPreferences.fourteenLetterSwipe &&
+        text.length == 1 && text[0].lowercaseChar() in 'a'..'z'
+    val discLabels = if (flick == null && letters == null && !fourteenSingle) null else gestureActions.let { actions ->
         buildMap {
             put(KanaFlickDirection.TAP, text)
             actions.leftText?.let { put(KanaFlickDirection.LEFT, it) }
