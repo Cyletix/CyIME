@@ -10,6 +10,8 @@ data class RimeCandidate(
     val comment: String,
     /** 用户以前打过的词（用户词库里上屏过的整词，两字以上），候选右上角标记。 */
     val learned: Boolean = false,
+    /** 纠错候选逐音节的“实际敲的=正确拼音”，非纠错为空；见 [CorrectionMarks]。 */
+    val correction: String = "",
 )
 
 /**

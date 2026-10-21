@@ -78,6 +78,8 @@ struct ProcessResult {
     std::vector<std::pair<std::string, std::string>> candidates;
     // 与 candidates 同序：该候选是用户以前打过的词（候选栏右上角标记）。
     std::vector<bool> learned;
+    // 与 candidates 同序：纠错候选逐音节的“实际敲的=正确拼音”，非纠错候选为空。
+    std::vector<std::string> corrections;
     bool isAsciiMode = false;
     bool hasNextPage = false;
     bool hasPrevPage = false;
@@ -93,6 +95,8 @@ struct CompositionResult {
     std::string committedText;
     std::vector<std::pair<std::string, std::string>> candidates;
     std::vector<bool> learned;
+    // 与 candidates 同序：纠错候选逐音节的“实际敲的=正确拼音”，非纠错候选为空。
+    std::vector<std::string> corrections;
     bool isAsciiMode = false;
     bool hasNextPage = false;
     bool hasPrevPage = false;
@@ -288,6 +292,7 @@ public:
                 ));
             }
             result.learned = learnedMarks(context.menu.page_no * context.menu.page_size, context.menu.num_candidates);
+            result.corrections = correctionMarks(context.menu.page_no * context.menu.page_size, context.menu.num_candidates);
         }
         result.hasNextPage = !context.menu.is_last_page;
         result.hasPrevPage = context.menu.page_no > 0;
@@ -440,6 +445,7 @@ public:
                 ));
             }
             result.learned = learnedMarks(context.menu.page_no * context.menu.page_size, context.menu.num_candidates);
+            result.corrections = correctionMarks(context.menu.page_no * context.menu.page_size, context.menu.num_candidates);
             result.hasNextPage = !context.menu.is_last_page;
             result.hasPrevPage = context.menu.page_no > 0;
             rime->free_context(&context);
@@ -522,6 +528,21 @@ public:
             size_t chars = 0;
             if (entry) for (unsigned char c : entry->text) chars += (c & 0xC0) != 0x80;
             marks[i] = entry && entry->commit_count > 0 && chars >= 2;
+        }
+        return marks;
+    }
+
+    // A candidate reached through spelling correction: its syllables as "typed=correct" for the
+    // corrected ones and "typed" for the rest, so the candidate bar can show how it was fixed.
+    std::vector<std::string> correctionMarks(size_t offset, size_t count) {
+        std::vector<std::string> marks(count);
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || session->context()->composition().empty()) return marks;
+        auto menu = session->context()->composition().back().menu;
+        if (!menu) return marks;
+        for (size_t i = 0; i < count && offset + i < menu->candidate_count(); ++i) {
+            auto genuine = rime::Candidate::GetGenuineCandidate(menu->GetCandidateAt(offset + i));
+            if (auto phrase = rime::As<rime::Phrase>(genuine)) marks[i] = phrase->correction_marks();
         }
         return marks;
     }
@@ -1264,7 +1285,7 @@ static void ensureJniCache(JNIEnv* env) {
         jclass cls = env->FindClass("com/kingzcheung/xime/rime/RimeCandidate");
         gRimeCandidateClass = (jclass)env->NewGlobalRef(cls);
         gRimeCandidateCtor = env->GetMethodID(gRimeCandidateClass, "<init>",
-            "(Ljava/lang/String;Ljava/lang/String;Z)V");
+            "(Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)V");
         env->DeleteLocalRef(cls);
     }
     if (!gRimeProcessResultClass) {
@@ -1393,11 +1414,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeProcessKeyAndGetResult(
     for (size_t i = 0; i < result.candidates.size(); ++i) {
         jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
         jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
+        jstring correction = env->NewStringUTF(
+            i < result.corrections.size() ? result.corrections[i].c_str() : "");
         jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
-            static_cast<jboolean>(i < result.learned.size() && result.learned[i]));
+            static_cast<jboolean>(i < result.learned.size() && result.learned[i]), correction);
         env->SetObjectArrayElement(candidateArray, i, candidate);
         env->DeleteLocalRef(text);
         env->DeleteLocalRef(comment);
+        env->DeleteLocalRef(correction);
         env->DeleteLocalRef(candidate);
     }
 
@@ -1445,11 +1469,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetProcessResult(
     for (size_t i = 0; i < result.candidates.size(); ++i) {
         jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
         jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
+        jstring correction = env->NewStringUTF(
+            i < result.corrections.size() ? result.corrections[i].c_str() : "");
         jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
-            static_cast<jboolean>(i < result.learned.size() && result.learned[i]));
+            static_cast<jboolean>(i < result.learned.size() && result.learned[i]), correction);
         env->SetObjectArrayElement(candidateArray, i, candidate);
         env->DeleteLocalRef(text);
         env->DeleteLocalRef(comment);
+        env->DeleteLocalRef(correction);
         env->DeleteLocalRef(candidate);
     }
 
@@ -1591,11 +1618,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetComposition(
     for (size_t i = 0; i < result.candidates.size(); ++i) {
         jstring text = env->NewStringUTF(result.candidates[i].first.c_str());
         jstring comment = env->NewStringUTF(result.candidates[i].second.c_str());
+        jstring correction = env->NewStringUTF(
+            i < result.corrections.size() ? result.corrections[i].c_str() : "");
         jobject candidate = env->NewObject(gRimeCandidateClass, gRimeCandidateCtor, text, comment,
-            static_cast<jboolean>(i < result.learned.size() && result.learned[i]));
+            static_cast<jboolean>(i < result.learned.size() && result.learned[i]), correction);
         env->SetObjectArrayElement(candidateArray, i, candidate);
         env->DeleteLocalRef(text);
         env->DeleteLocalRef(comment);
+        env->DeleteLocalRef(correction);
         env->DeleteLocalRef(candidate);
     }
 

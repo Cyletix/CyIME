@@ -835,7 +835,8 @@ fun KeyboardView(
             }
 
             androidx.compose.runtime.CompositionLocalProvider(
-                LocalLearnedCandidates provides candidateState.value.learnedCandidates) {
+                LocalLearnedCandidates provides candidateState.value.learnedCandidates,
+                LocalCorrectedCandidates provides candidateState.value.correctedCandidates) {
             CandidateBar(
                 modifier = Modifier.clipboardPanelExpandGesture().drawWithContent {
                     drawContent()
