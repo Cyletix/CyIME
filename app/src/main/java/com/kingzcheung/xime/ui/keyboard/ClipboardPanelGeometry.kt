@@ -33,6 +33,20 @@ internal fun clipboardPanelBounds(normal: Int, screen: Int, reserved: Int): Clip
     return ClipboardPanelBounds(collapsed, maxOf(collapsed, target))
 }
 
+/**
+ * Clipboard search results take the space the clipboard has when pulled up, above the unchanged
+ * keyboard and the search panel; 0 while search is closed.
+ */
+internal fun clipboardSearchResultsTarget(visible: Boolean, bounds: ClipboardPanelBounds, keyboardHeight: Int): Int =
+    if (!visible) 0 else (bounds.expanded - keyboardHeight - CLIPBOARD_SEARCH_PANEL_HEIGHT).coerceAtLeast(120)
+
+/**
+ * Height the IME container must add above the keyboard while clipboard search is open: the
+ * (animated) results plus the search panel. Without it the keyboard is pushed out of the window.
+ */
+internal fun clipboardSearchExtraHeight(visible: Boolean, overlayPage: Boolean, resultsHeight: Int): Int =
+    if (!visible || overlayPage) 0 else resultsHeight + CLIPBOARD_SEARCH_PANEL_HEIGHT
+
 /** Use screen coordinates: resizing the IME moves the toolbar's local coordinate origin. */
 internal class ClipboardPanelDrag(
     private val bounds: ClipboardPanelBounds,
