@@ -124,16 +124,18 @@ fun SpaceKeyButton(
                                 if (steps != 0) onMove?.invoke(steps)
                                 val rows = verticalSteps.move(dy).coerceIn(-1, 1)
                                 if (rows != 0) onMoveVertical?.invoke(rows)
+                                if (steps != 0 || rows != 0) SpaceAfterCursorGuard.mark(change.uptimeMillis)
                             }
                             change.consume()
                             if (!change.pressed) {
-                                if (!held && !movedBeforeHold) {
+                                if (!held && !movedBeforeHold && !SpaceAfterCursorGuard.blocksSpace(down.uptimeMillis)) {
                                     currentClick()
                                 }
                                 break
                             }
                         }
                     } finally {
+                        if (cursorActive) SpaceAfterCursorGuard.mark(android.os.SystemClock.uptimeMillis())
                         timer.cancel()
                         pressed = false
                         cursorActive = false
