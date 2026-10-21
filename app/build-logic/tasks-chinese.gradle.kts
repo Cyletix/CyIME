@@ -187,6 +187,9 @@ val prepareChineseDictionaries by tasks.registering {
         check(particles.isNotEmpty()) { "No sentence-final particles in ${finalParticles.name}" }
         val baseSchema = File(root, "rime_ice.schema.yaml").readText().replace("\ntranslator:\n",
             "\ntranslator:\n  enable_correction: true\n  cyime_neighbor_correction: true\n" +
+            // A doubled letter typed once where syllables meet (chengong → 成功 second, after the typed 陈宫), shown
+            // only when the corrected word is 20 times as common as the typed reading (docs/development/typo-correction-20261021.md).
+            "  cyime_doubled_letter_correction: true\n" +
             "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
             "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
             // 把/被 open a verb phrase and never end a sentence: shuoshuobei is 说说呗, not 说说被.
