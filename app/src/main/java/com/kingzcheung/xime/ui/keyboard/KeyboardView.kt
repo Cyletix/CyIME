@@ -2009,13 +2009,13 @@ private fun ClipboardSearchResults(
     val field by clipboard.boardQuery.collectAsStateWithLifecycle()
     val composing = candidateState.value.let { if (it.isComposing) it.preeditText else "" }
     val query = remember(field, composing, t9) { com.kingzcheung.xime.clipboard.ClipboardLiveQuery(field, composing, t9) }
-    com.kingzcheung.xime.ui.menubar.ConnectedClipboardBoard(
-        items, initialImages = false, expanded = false,
     // The space is there from the first frame; the results rise into it with the panel motion.
     // Only the layer moves, so nothing is measured or recomposed while it runs.
     val reveal = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(Unit) { reveal.animateTo(1f, keyboardPanelMotion(true)) }
     Box(modifier.clipToBounds()) {
+    com.kingzcheung.xime.ui.menubar.ConnectedClipboardBoard(
+        items, initialImages = false, expanded = false,
         onBack = {}, onQuickSend = {},
         onSelectText = { text -> callbacks.onClipboardSearchSelect?.invoke(text) },
         onRemoveText = onRemoveText, onAddQuick = {}, onSplit = { _, _ -> },
@@ -2027,5 +2027,5 @@ private fun ClipboardSearchResults(
             alpha = reveal.value
         },
     )
-}
     }
+}
