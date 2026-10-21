@@ -1213,6 +1213,7 @@ fun KeyboardView(
                                         if (!change.pressed) {
                                             if (isCursorGesture) {
                                                 event.changes.forEach { it.consume() }
+                                                SpaceAfterCursorGuard.mark(change.uptimeMillis)
                                             }
                                             break
                                         }
