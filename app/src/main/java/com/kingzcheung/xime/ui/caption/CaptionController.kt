@@ -6,6 +6,7 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.kingzcheung.xime.model.BuiltinModelCatalog
@@ -485,17 +486,20 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         CaptionLanguage.ENGLISH -> if (senseVoiceReady()) null else SpeechModelCatalog.SENSEVOICE to "228 MB"
     }
 
-    var languageDownload by mutableStateOf<ModelDownloadState>(ModelDownloadState.Idle); private set
+    // One state per language: picking English while Japanese downloads must not show Japanese's
+    // progress, or its "done", on the English banner.
+    private val languageDownloads = mutableStateMapOf<CaptionLanguage, ModelDownloadState>()
+    fun languageDownload(language: CaptionLanguage): ModelDownloadState = languageDownloads[language] ?: ModelDownloadState.Idle
 
     /** Downloads what [language] needs in the app (model management's own downloader), then listens in it. */
     fun downloadLanguage(language: CaptionLanguage) {
         val (modelId, _) = missingModel(language) ?: return
-        if (languageDownload is ModelDownloadState.Downloading) return
-        languageDownload = ModelDownloadState.Downloading(0f, 0, -1)
+        if (languageDownload(language) is ModelDownloadState.Downloading) return
+        languageDownloads[language] = ModelDownloadState.Downloading(0f, 0, -1)
         scope.launch {
             ModelManager.downloadModel(app, modelId) { state ->
                 main.post {
-                    languageDownload = state
+                    languageDownloads[language] = state
                     if (state is ModelDownloadState.Complete && language == this@CaptionController.language) { pause(); start() }
                 }
             }

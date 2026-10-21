@@ -153,8 +153,9 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
     }
     val banners: @Composable () -> Unit = {
         // 换成没下载过的语言时：在这里看下载进度，下完自动开始听。
-        if (controller.languageDownload !is ModelDownloadState.Idle && controller.missingModel(controller.language) != null)
-            ModelBanner("${controller.language.label}字幕要用的语音模型", "重新下载", controller.languageDownload) { controller.downloadLanguage(controller.language) }
+        val languageDownload = controller.languageDownload(controller.language)
+        if (languageDownload !is ModelDownloadState.Idle && controller.missingModel(controller.language) != null)
+            ModelBanner("${controller.language.label}字幕要用的语音模型", "重新下载", languageDownload) { controller.downloadLanguage(controller.language) }
         if (!controller.streamingReady) ModelBanner("没有实时出字模型：要等对方说完一句才整句出字", "下载实时出字模型（226 MB）",
             controller.streamingDownload) { controller.downloadStreaming() }
         if (!controller.refinementReady) ModelBanner("没有 SenseVoice 校正：字幕没有标点、错字多", "下载 SenseVoice（228 MB）",
