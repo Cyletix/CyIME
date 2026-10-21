@@ -65,7 +65,7 @@ class HandwritingLanguageHintRenderTest {
                             .then(if (glass) Modifier.background(Brush.linearGradient(
                                 listOf(Color(0xFF2E7D32), Color(0xFFF9A825), Color(0xFFC62828), Color(0xFF1565C0)))) else Modifier)
                             .keyboardBackground(KeyboardThemes.getRenderingScheme(id).keyboardBackground, dark, palette.background, config)) {
-                            HandwritingLanguageHint(hint, palette.text, Modifier.align(Alignment.TopStart))
+                            HandwritingLanguageHint(hint, palette.function, palette.functionText, Modifier.align(Alignment.TopStart))
                         }
                     }
                 }
