@@ -18,7 +18,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.PushPin
 import androidx.compose.material.icons.twotone.Sync
+import androidx.compose.material.icons.twotone.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -203,6 +205,7 @@ fun ClipboardSyncSettingsContent(
             // 验证码自动复制是首页这一项的主要用途之一，直接显示，不再折叠。
             VerificationCodeSettings()
             ClipboardCardLinesSetting()
+            ClipboardExportSetting()
         }
     }
 }
@@ -236,6 +239,79 @@ private fun ClipboardCardLinesSetting() {
                     Spacer(Modifier.width(12.dp))
                     Text("$option 行", style = MaterialTheme.typography.titleSmall)
                 }
+            }
+        }
+    })
+}
+
+/**
+ * 把剪贴板文字记录导出成用户自己保存的文件（TXT / Markdown / JSON），经系统的保存窗口；
+ * 图片不导出。固定内容默认包含，可关掉。只在用户点「导出」时读一次数据库。
+ */
+@Composable
+internal fun ClipboardExportSetting() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var format by remember { mutableStateOf(com.kingzcheung.xime.clipboard.ClipboardExportFormat.TXT) }
+    var includePinned by remember { mutableStateOf(true) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    fun export(uri: android.net.Uri?) {
+        if (uri == null) return
+        busy = true; message = null
+        scope.launch {
+            val chosen = format
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val now = System.currentTimeMillis()
+                    val items = com.kingzcheung.xime.clipboard.ClipboardExport.order(
+                        com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(context).exportItems(), includePinned)
+                    context.contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use {
+                        com.kingzcheung.xime.clipboard.ClipboardExport.write(items, chosen, it, now)
+                    }
+                    items.size
+                }
+            }
+            busy = false
+            message = result.fold({ "已导出 $it 条" }, { "导出失败：${it.message ?: "未知错误"}" })
+        }
+    }
+    val launchers = com.kingzcheung.xime.clipboard.ClipboardExportFormat.entries.associateWith { f ->
+        androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.CreateDocument(f.mimeType)) { uri -> export(uri) }
+    }
+    SettingsSection(title = "导出剪贴板", content = {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("导出格式", style = MaterialTheme.typography.titleSmall)
+            Text("只导出文字记录，不含图片", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            com.kingzcheung.xime.clipboard.ClipboardExportFormat.entries.forEach { option ->
+                Row(Modifier.fillMaxWidth().testTag("clipboard-export-format:${option.extension}")
+                    .selectable(format == option, role = androidx.compose.ui.semantics.Role.RadioButton) { format = option }
+                    .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = format == option, onClick = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("${option.label}（.${option.extension}）", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+        SettingsToggleItem(
+            icon = Icons.TwoTone.PushPin,
+            title = "包含固定内容",
+            subtitle = "固定内容常是地址、账号等，导出的文件请自己妥善保管",
+            checked = includePinned,
+            onCheckedChange = { includePinned = it },
+        )
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Button(onClick = {
+                launchers.getValue(format).launch(com.kingzcheung.xime.clipboard.ClipboardExport.fileName(format, System.currentTimeMillis()))
+            }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("clipboard-export")) {
+                Icon(Icons.TwoTone.Upload, contentDescription = null)
+                Text("导出", modifier = Modifier.padding(start = 6.dp))
+            }
+            message?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp))
             }
         }
     })
