@@ -2710,13 +2710,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
-        // Search belongs to the field it was opened in; another field starts without it.
-        if (!sameField) closeClipboardSearch(openBoard = false)
         super.onStartInput(attribute, restarting)
         // 新连接开始时旧组合区一律失效；同一输入框重启时撤掉被定格的拼音编码。
         val identity = attribute?.let { Triple(it.packageName, it.fieldId, it.inputType) }
         val sameField = restarting && identity != null && identity == lastEditorIdentity
         lastEditorIdentity = identity
+        // Search belongs to the field it was opened in; another field starts without it.
+        if (!sameField) closeClipboardSearch(openBoard = false)
         inlineComposition.detach()?.let { removeDetachedComposition(it, attribute, restarting, sameField) }
         englishEditorReadCapability.clear()
         if (inputStallWatchdog == null) inputStallWatchdog = InputStallWatchdog(serviceScope, mainHandler) { keyProcessingThread }
@@ -2946,13 +2946,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         currentResolvedKeyboardSize = null
         clearHardwareSurfaceBounds()
         uiState.value = uiState.value.copy(cursorAnchor = null, editorBounds = null)
-        // Its results were sized for the old screen; rotating closes search like other panels.
-        closeClipboardSearch(openBoard = false)
         updateHardwareKeyboardConnection()
         super.onConfigurationChanged(newConfig)
         if (newConfig.screenWidthDp > newConfig.screenHeightDp) {
             closeToolPanel()
         }
+        // Its results were sized for the old screen; rotating closes search like other panels.
+        closeClipboardSearch(openBoard = false)
         applyCompactMode()
         loadDarkModePreference()
         applyWindowBackground()
@@ -3048,13 +3048,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 "hasHardwareKeyboard=$hasHardwareKeyboard, isCompact=$isCompact (was ${current.isCompact})"
         )
         if (current.isCompact != isCompact) {
-                // The compact toolbar has no search bar: search would stay open but unseen.
-                closeClipboardSearch(openBoard = false)
             if (isCompact) {
                 // A keyboard may be attached while a full-screen editor/resize layer is open.
                 // Those layers must not keep a full-window touch region behind the toolbar.
                 cancelKeyboardResize()
                 keyboardCallbacks?.onDismissPreeditEditor?.invoke()
+                // The compact toolbar has no search bar: search would stay open but unseen.
+                closeClipboardSearch(openBoard = false)
                 if (uiState.value.isVoiceMode) endVoiceSession()
                 closeToolPanel()
                 keyboardViewModel.closeOverlay()
@@ -3493,12 +3493,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private fun canCollapseToVoicePill(): Boolean = uiState.value.let {
         it.isVoiceMode && it.voiceSticky && !it.voiceCollapsed && !it.isCompact
     }
-        closeClipboardSearch(openBoard = false)
 
     private fun collapseToVoicePill(): Boolean {
         if (!canCollapseToVoicePill()) return false
         keyboardViewModel.closeOverlay()
         closeToolPanel()
+        closeClipboardSearch(openBoard = false)
         // 键盘先淡出下沉，再换成悬浮条淡入上浮（用户 10-20：收起、弹出、消失都要动效）。
         swapKeyboardContent {
             uiState.value = uiState.value.copy(voiceCollapsed = true, handwritingExpanded = false)
