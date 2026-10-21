@@ -192,7 +192,7 @@ object CandidateGlossary {
         return numberGloss(text)
     }
 
-    private const val MODAL_PARTICLES = "啊呀吧呢嘛哦啦呗"
+    private const val MODAL_PARTICLES = "啊呀吧呢嘛哦啦呗喽"
     private val NUMBER_UNITS = listOf(
         "分钟" to ("minute" to "minutes"), "小时" to ("hour" to "hours"), "点" to ("o'clock" to "o'clock"),
         "天" to ("day" to "days"), "年" to ("year" to "years"), "次" to ("time" to "times"), "岁" to ("year old" to "years old"),
@@ -203,6 +203,10 @@ object CandidateGlossary {
 
     /** 一到九十九的中文数字（或阿拉伯数字）加单位：九点 → nine o'clock，两个小时 不算（中间有量词）。 */
     internal fun numberGloss(text: String): String? {
+        if (text.endsWith("点半")) {
+            val hour = chineseNumber(text.dropLast(2))?.takeIf { it in 1..12 } ?: return null
+            return "half past ${ENGLISH_ONES[hour]}"
+        }
         val (unit, words) = NUMBER_UNITS.firstOrNull { text.endsWith(it.first) } ?: return null
         val value = chineseNumber(text.dropLast(unit.length)) ?: return null
         if (unit == "点" && value !in 1..12) return null

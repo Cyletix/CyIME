@@ -1,5 +1,5 @@
 """与 App 的 CandidateGlossary.derived 同规则（语气词、吗、数字加单位），用来量。"""
-MODAL = "啊呀吧呢嘛哦啦呗"
+MODAL = "啊呀吧呢嘛哦啦呗喽"
 UNITS = [("分钟", "minute", "minutes"), ("小时", "hour", "hours"), ("点", "o'clock", "o'clock"), ("天", "day", "days"),
          ("年", "year", "years"), ("次", "time", "times"), ("岁", "year old", "years old")]
 ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
@@ -14,6 +14,8 @@ def cn(t):
     ones = 0 if i == len(t) - 1 else (dig(t[-1]) if i == len(t) - 2 and (dig(t[-1]) or 0) >= 1 else None)
     return None if tens is None or ones is None else tens * 10 + ones
 def number(t):
+    if t.endswith("点半"):
+        v = cn(t[:-2]); return f"half past {ONES[v]}" if v and 1 <= v <= 12 else None
     for u, one, many in UNITS:
         if t.endswith(u):
             v = cn(t[:-len(u)])
