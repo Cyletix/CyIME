@@ -1211,9 +1211,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
-    /** Learning state saved while the clipboard search bar keeps the engine incognito. */
-    private var clipboardSearchSavedSensitive: Boolean? = null
-
     /**
      * Opens the clipboard search bar above the keyboard. It types through the tool-panel input
      * channel; the engine is incognito meanwhile, so nothing typed into search is learned.
@@ -1221,11 +1218,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun openClipboardSearch() {
         if (uiState.value.toolPanelVisible) closeToolPanel()
         keyboardViewModel.closeOverlay()
-        if (clipboardSearchSavedSensitive == null) {
-            clipboardSearchSavedSensitive = com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor
-            com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor = true
-            applyIncognito()
-        }
+        // Its own flag: a new input field (restartInput, rotation) rewrites sensitiveEditor, and
+        // restoring a saved copy of it on close once let a password field learn.
+        com.kingzcheung.xime.settings.IncognitoState.clipboardSearch = true
+        applyIncognito()
         clipboardManager.boardQuery.value = ""
         uiState.value = uiState.value.copy(clipboardSearchVisible = true, toolPanelInputFocused = true, enterKeyText = "完成")
     }
@@ -1239,8 +1235,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         uiState.value = uiState.value.copy(clipboardSearchVisible = false, toolPanelInputFocused = false,
             enterKeyText = editorEnterKeyText())
         ToolPanelEditTextHolder.editText = null
-        clipboardSearchSavedSensitive?.let { com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor = it }
-        clipboardSearchSavedSensitive = null
+        com.kingzcheung.xime.settings.IncognitoState.clipboardSearch = false
         applyIncognito()
         if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
     }
