@@ -1397,8 +1397,9 @@ fun KeyboardView(
                                     "symbol" -> { clearHandwriting(); viewModel.showOverlay(OverlayRoute.Symbol) }
                                     "number" -> { clearHandwriting(); viewModel.enterPanel(PanelType.NUMBER) }
                                     "ime_switch" -> {
+                                        // 与其他键盘同一个语言键：按设置在语言间来回切（以前写死切到英文，切过去就回不来）
                                         clearHandwriting()
-                                        callbacks.onSwitchSchema?.invoke(com.kingzcheung.xime.settings.InputModes.ENGLISH)
+                                        callbacks.onKeyPress("ime_switch", false)
                                     }
                                     "space" -> { confirmHandwriting(); callbacks.onCommitText?.invoke(" ") }
                                     "enter" -> { confirmHandwriting(); callbacks.onKeyPress("enter", false) }
