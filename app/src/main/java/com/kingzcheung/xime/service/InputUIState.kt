@@ -80,6 +80,8 @@ data class InputUIState(
     val toolPanelInputFocused: Boolean = false,
     /** The clipboard search bar above the keyboard is open; it types through the tool-panel input channel. */
     val clipboardSearchVisible: Boolean = false,
+    /** > 0 while clipboard search runs in a minimized floating keyboard because the screen was too short. */
+    val clipboardSearchFloatingHeightDp: Int = 0,
     /** 当前打开面板的插件 id。 */
     val toolPanelPluginId: String = "",
     /** 面板标题（插件名）。 */

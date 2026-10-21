@@ -55,6 +55,19 @@ internal fun clipboardSearchResultsTarget(visible: Boolean, bounds: ClipboardPan
 internal fun clipboardSearchInline(keyboardHeight: Int, available: Int): Boolean =
     available - keyboardHeight - CLIPBOARD_SEARCH_PANEL_HEIGHT < CLIPBOARD_SEARCH_MIN_RESULTS
 
+/**
+ * True when even the one-row bar leaves less than one row of results ([CLIPBOARD_SEARCH_MIN_ROW]):
+ * search then opens in the minimized floating keyboard instead (user, 2026-10-22).
+ */
+internal fun clipboardSearchNeedsFloating(keyboardHeight: Int, available: Int): Boolean =
+    available - keyboardHeight - CLIPBOARD_SEARCH_INLINE_PANEL_HEIGHT < CLIPBOARD_SEARCH_MIN_ROW
+
+/** One row of result cards. */
+internal const val CLIPBOARD_SEARCH_MIN_ROW = 48
+
+/** A minimized floating keyboard for search on a short screen is a little see-through. */
+internal const val CLIPBOARD_SEARCH_FLOATING_OPACITY = 0.85f
+
 internal fun clipboardSearchPanelHeight(inline: Boolean): Int =
     if (inline) CLIPBOARD_SEARCH_INLINE_PANEL_HEIGHT else CLIPBOARD_SEARCH_PANEL_HEIGHT
 
