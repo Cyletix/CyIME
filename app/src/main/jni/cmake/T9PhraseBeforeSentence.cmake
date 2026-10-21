@@ -308,7 +308,11 @@ t9_replace("  // A corrected learned phrase can win the general sentence beam ev
 t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmpty();" [=[
     sentences_.push_front(exact_sentence_);
   }
-  if (t9_sentence_rescore_ && sentences_.size() > 1) {
+  // With doubled-letter correction on, a lone corrected sentence is checked too: the typed reading keeps
+  // the first place (aniu: 阿牛, not the corrected 按钮).
+  const bool lone_correction = translator_->doubled_letter_correction() && sentences_.size() == 1 &&
+      enable_correction_ && syllabifier_->IsCorrection(sentences_.front()->code(), sentences_.front()->end() - start_);
+  if (t9_sentence_rescore_ && (sentences_.size() > 1 || lone_correction)) {
     // translator/max_sentences gave the n-best to choose from; the menu keeps one sentence, as with
     // max_sentences: 1 (followed by Rime's best when that one is a correction).
     auto corrected = [&](const an<Sentence>& sentence) {
