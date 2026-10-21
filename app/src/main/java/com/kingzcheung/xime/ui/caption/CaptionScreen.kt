@@ -643,16 +643,17 @@ private const val DIAL_CHOICE = "#dial"
 @Composable
 private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
-    var flipped by remember { mutableStateOf(false) }
+    // The last thing already written into the conversation, so 发送 does not add it twice.
+    var sent by remember { mutableStateOf("") }
     // Turning to face the other person is animated (like a payment code being shown across the counter).
-    val turn by androidx.compose.animation.core.animateFloatAsState(if (flipped) 180f else 0f,
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (controller.replyFlipped) 180f else 0f,
         androidx.compose.animation.core.tween(450, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "flip")
     val context = androidx.compose.ui.platform.LocalContext.current
     val emergency = text == CaptionController.EMERGENCY_TEXT
     // A phrase is shown at once and kept in the conversation for the family.
     fun say(phrase: String) {
-        if (phrase == text) { text = ""; flipped = false; return }
-        text = phrase; controller.addReply(phrase)
+        if (phrase == text) { text = ""; return }
+        text = phrase; controller.addReply(phrase); sent = phrase
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // 比例：给对方看的大字卡片占剩下的全部高度；其余都是统一的 52 dp 小一号按钮，放在玻璃面板里。
@@ -663,14 +664,14 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("快捷回复", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             }
-            // The display card: upright by default; flipped only on request.
+            // The display card: turned the way the user last left it (remembered), upright at first.
             CaptionPanel(Modifier.weight(1f).fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // The holder can always read what the other person sees: it is the header itself,
                     // so the upside-down text keeps the card's whole height.
                     Text(when {
-                        flipped && text.isNotEmpty() -> "对方看到：$text"
-                        flipped -> "给对面的人看（已倒过来）"
+                        controller.replyFlipped && text.isNotEmpty() -> "对方看到：$text"
+                        controller.replyFlipped -> "给对面的人看（已倒过来）"
                         text.isNotEmpty() -> "点一下大字，倒过来给对面看"
                         else -> "屏幕上显示"
                     }, fontSize = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -678,7 +679,7 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
 
                 }
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(CaptionStyle.Corner))
-                    .clickable(enabled = text.isNotEmpty()) { flipped = !flipped }
+                    .clickable(enabled = text.isNotEmpty()) { controller.turnReplyCard(!controller.replyFlipped) }
                     .background(if (emergency) MaterialTheme.colorScheme.error.copy(alpha = .9f) else Color.Transparent),
                     contentAlignment = Alignment.Center) {
                     // 卡片矮时（小屏、横屏）字跟着缩，至少两行写得下，不被切掉。
@@ -741,7 +742,7 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                                             // 和其他话同样宽的格子里要写得下：不放图标，红底就是紧急。
                                             EMERGENCY_CHOICE -> CaptionButton("紧急求助", Modifier.weight(1f),
                                                 emphasis = CaptionEmphasis.Danger, height = 52.dp, fontSize = 17.sp) {
-                                                if (text != CaptionController.EMERGENCY_TEXT) { say(CaptionController.EMERGENCY_TEXT); flipped = true }
+                                                if (text != CaptionController.EMERGENCY_TEXT) { say(CaptionController.EMERGENCY_TEXT); controller.turnReplyCard(true) }
                                                 else say(CaptionController.EMERGENCY_TEXT)
                                             }
                                             DIAL_CHOICE -> CaptionButton("拨打120", Modifier.weight(1f),
@@ -763,7 +764,11 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CaptionButton("返回", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp, onClick = onDismiss)
-                    CaptionButton("保存到对话", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp) { if (text.isNotBlank()) controller.addReply(text) }
+                    // 发送：写进对话（点过的常用句已经记过，不重复），然后回到字幕；识别一直在跑。
+                    CaptionButton("发送", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp) {
+                        if (text.isNotBlank() && text != sent) controller.addReply(text)
+                        onDismiss()
+                    }
                 }
             }
         }
