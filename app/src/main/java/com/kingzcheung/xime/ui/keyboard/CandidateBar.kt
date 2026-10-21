@@ -1217,8 +1217,8 @@ private val EDGE_STRETCH_FULL = 1400.dp
 
 /**
  * 拼音里的编辑光标“|”用主题强调色加粗画，和拼音字母区分开（用户 10-21）。其余文字照旧。
- * 柔和蓝、黑白这类强调色和拼音几乎同色的主题，改用首选候选的高亮：选中字色 + 同一层强调色底。
- * [alpha] 是闪烁的当前亮度，字色和底一起亮灭。
+ * 柔和蓝、黑白这类强调色和拼音几乎同色的主题，改用首选候选的选中字色；光标只是一道线，不垫底色（用户 10-21）。
+ * [alpha] 是闪烁的当前亮度。
  */
 internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Color.Unspecified,
                               selectedText: Color = accent, alpha: Float = 1f): AnnotatedString {
@@ -1226,7 +1226,7 @@ internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Co
     if (caret < 0) return AnnotatedString(text)
     val style = if (textColor != Color.Unspecified && colorsClose(accent, textColor))
         androidx.compose.ui.text.SpanStyle(color = selectedText.copy(alpha = selectedText.alpha * alpha),
-            fontWeight = FontWeight.Bold, background = accent.copy(alpha = 0.2f * alpha))
+            fontWeight = FontWeight.Bold)
     else androidx.compose.ui.text.SpanStyle(color = accent.copy(alpha = accent.alpha * alpha), fontWeight = FontWeight.Bold)
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text)
