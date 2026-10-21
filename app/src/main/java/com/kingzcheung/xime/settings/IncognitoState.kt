@@ -11,7 +11,12 @@ import android.view.inputmethod.EditorInfo
 object IncognitoState {
     @Volatile var manual: Boolean = false
     @Volatile var sensitiveEditor: Boolean = false
-    val active: Boolean get() = manual || sensitiveEditor
+    /**
+     * Clipboard search is open: what is typed into it is never learned or sent to plugins. Kept
+     * apart from [sensitiveEditor], which every new input field rewrites.
+     */
+    @Volatile var clipboardSearch: Boolean = false
+    val active: Boolean get() = manual || sensitiveEditor || clipboardSearch
 
     fun isSensitiveEditor(attribute: EditorInfo?): Boolean {
         if (attribute == null) return false

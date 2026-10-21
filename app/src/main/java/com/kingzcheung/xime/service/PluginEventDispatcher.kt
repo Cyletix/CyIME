@@ -40,7 +40,8 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
 
     /** 当前输入会话是否敏感输入框（密码类 / 不学习标记）。
      *  供 hotPath 插件能力（候选词变换）在发起请求前短路。 */
-    val isCurrentEditorSensitive: Boolean get() = sensitiveInput || com.kingzcheung.xime.settings.IncognitoState.manual
+    val isCurrentEditorSensitive: Boolean get() = sensitiveInput || com.kingzcheung.xime.settings.IncognitoState.manual ||
+        com.kingzcheung.xime.settings.IncognitoState.clipboardSearch
 
     /** 新输入会话：刷新敏感标记并重置 composing 去重。 */
     fun onStartInput(attribute: EditorInfo?) {
