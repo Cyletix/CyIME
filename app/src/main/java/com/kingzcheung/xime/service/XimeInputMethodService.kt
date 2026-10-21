@@ -1224,6 +1224,43 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         applyIncognito()
         clipboardManager.boardQuery.value = ""
         uiState.value = uiState.value.copy(clipboardSearchVisible = true, toolPanelInputFocused = true, enterKeyText = "完成")
+        fitClipboardSearchOnShortScreen()
+    }
+
+    /** Search replaced the keyboard's mode and opacity on a short screen; put back when it closes. */
+    private var clipboardSearchFloated = false
+
+    /**
+     * When even the one-row search bar leaves no row of results (a short landscape screen or a very
+     * tall keyboard), search runs in the floating keyboard at its smallest height, a little see-through
+     * (user, 2026-10-22). Nothing is saved: closing search puts the keyboard back.
+     */
+    internal fun fitClipboardSearchOnShortScreen() {
+        val state = uiState.value
+        if (state.isCompact || state.showKeyboardResize) return
+        val density = resources.displayMetrics.density
+        val bottom = (if (state.isFloatingMode) 0 else state.keyboardBottomPaddingDp) +
+            imeBottomSpaceDp(bottomInsetPxState.value, density)
+        val available = resources.configuration.screenHeightDp - bottom
+        if (!com.kingzcheung.xime.ui.keyboard.clipboardSearchNeedsFloating(state.keyboardHeightDp, available)) return
+        val landscape = resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
+        val hostHeight = ((resources.displayMetrics.heightPixels / density).roundToInt() -
+            tryGetStatusBarHeightDp(this, window.window)).coerceAtLeast(1)
+        clipboardSearchFloated = true
+        uiState.value = state.copy(
+            clipboardSearchFloatingHeightDp = com.kingzcheung.xime.ui.keyboard.floatingStoredHeightBounds(hostHeight, landscape).first,
+            keyboardOpacity = minOf(state.keyboardOpacity, com.kingzcheung.xime.ui.keyboard.CLIPBOARD_SEARCH_FLOATING_OPACITY))
+        restoreKeyboardDisplayMode(true, persist = false)
+    }
+
+    private fun restoreDisplayAfterClipboardSearch() {
+        if (!clipboardSearchFloated) return
+        clipboardSearchFloated = false
+        uiState.value = uiState.value.copy(clipboardSearchFloatingHeightDp = 0)
+        // The saved mode and opacity of the current orientation: after a rotation the old ones no longer apply.
+        val landscape = resources.configuration.screenWidthDp > resources.configuration.screenHeightDp
+        restoreKeyboardDisplayMode(SettingsPreferences.isFloatingMode(this, landscape), persist = false)
+        uiState.value = uiState.value.copy(keyboardOpacity = SettingsPreferences.getKeyboardOpacity(this))
     }
 
     internal fun closeClipboardSearch(openBoard: Boolean, keepQuery: Boolean = false) {
@@ -1237,6 +1274,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         ToolPanelEditTextHolder.editText = null
         com.kingzcheung.xime.settings.IncognitoState.clipboardSearch = false
         applyIncognito()
+        restoreDisplayAfterClipboardSearch()
         if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
     }
 
@@ -2265,6 +2303,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val landscape = config.screenWidthDp > config.screenHeightDp
         val preview = state.showKeyboardResize && !reset
         val height = if (preview && state.resizePreviewHeightDp > 0) state.resizePreviewHeightDp else
+            if (floating && !reset && state.clipboardSearchFloatingHeightDp > 0) state.clipboardSearchFloatingHeightDp else
             if (reset) SettingsPreferences.getDefaultKeyboardHeightDp(this, landscape)
             else KeyboardHeightProfiles.selected(this, floating, landscape, hostHeightDp)
         // 悬浮：已存或预览中的高度可以低到方形吸附点（默认高度已在 KeyboardHeightProfiles 里按默认下限夹过）。
