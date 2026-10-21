@@ -58,6 +58,13 @@ internal fun CaptionThemed(dark: Boolean, content: @Composable () -> Unit) {
 
 private const val CAPTION_MIN_OPACITY = .75f
 
+/**
+ * Dialog cards: the panel colour laid over the page's opaque surface. Under glass the panel colour
+ * is see-through, and the captions behind showed through the language dialog's buttons (1.14.96).
+ */
+@Composable
+internal fun captionDialogColor(): Color = MaterialTheme.colorScheme.surfaceContainerHigh.compositeOver(MaterialTheme.colorScheme.surface)
+
 /** 玻璃键盘后面“透出来”的东西：字幕页后面没有别的应用，用一块和深浅色一致的中性底代替。 */
 internal fun captionBackstop(dark: Boolean) = if (dark) Color(0xFF0E0F12) else Color(0xFFF2F3F5)
 
