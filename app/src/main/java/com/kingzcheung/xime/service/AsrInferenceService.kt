@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
-import com.kingzcheung.xime.speech.SpeechModelCatalog
 import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.LocalSpeechSession
 import com.kingzcheung.xime.speech.ResidentSpeechSessionOwner
@@ -248,13 +247,12 @@ class AsrInferenceService : Service() {
             val owner = callback.asBinder()
             return try {
                 // The language is the user's choice on the caption page, never auto-detected: detection
-                // turned accented Mandarin into Japanese. Japanese uses SenseVoice (if present) only to
-                // punctuate the Zipformer text; English decodes with SenseVoice in English.
+                // turned accented Mandarin into Japanese. Japanese is ReazonSpeech Zipformer alone (user
+                // 2026-10-21: no SenseVoice pass, it still wrote other languages); English is SenseVoice in English.
                 val manager = AsrModelManager(this@AsrInferenceService)
                 val base = manager.selection(modelId, null)
                 val selection = when (languageId) {
-                    "ja" -> base.copy(secondDir = manager.selection(SpeechModelCatalog.SENSEVOICE, null)
-                        .takeIf { it.ready }?.secondDir, recognitionLanguage = "ja")
+                    "ja" -> base.copy(secondDir = null, recognitionLanguage = "ja")
                     "en" -> base.copy(recognitionLanguage = "en")
                     else -> base.copy(recognitionLanguage = "zh")
                 }
