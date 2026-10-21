@@ -12,10 +12,10 @@ index 5242f6d5..1420623f 100644
    // 疊加運算規則, 將運算規則產生的屬性應用到當前拼寫上
    void Compose(const SpellingProperties& delta);
 diff --git a/src/rime/algo/syllabifier.cc b/src/rime/algo/syllabifier.cc
-index a5751781..8f05d0d2 100644
+index a5751781..bc072889 100644
 --- a/src/rime/algo/syllabifier.cc
 +++ b/src/rime/algo/syllabifier.cc
-@@ -113,9 +113,26 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -113,9 +113,50 @@ int Syllabifier::BuildSyllableGraph(const string& input,
      std::string_view current_input(input.data() + begin_pos,
                                     input.length() - begin_pos);
      prism.CommonPrefixSearch(current_input, &matches);
@@ -36,6 +36,30 @@ index a5751781..8f05d0d2 100644
 +        }
 +      }
 +    }
++    // CyIME: one letter typed too many inside a syllable reads as that syllable spanning the extra
++    // letter, when the letter looks like an extra key press (zhonng: a key pressed twice; zhpng: o's
++    // neighbour p touched with it). Spans the typed letters already spell are left alone.
++    if (corrector_ && corrector_->CorrectsExtraLetters() && current_input.length() >= 3) {
++      set<size_t> typed_spans;
++      for (const auto& m : matches) typed_spans.insert(m.length);
++      const size_t last = (std::min)(current_input.length(), size_t{7}) - 1;
++      for (size_t k = 1; k < last; ++k) {
++        if (k >= 2 && current_input[k] == current_input[k - 1]) continue;  // same as dropping k - 1
++        if (!corrector_->IsExtraKeyPress(current_input[k], current_input[k - 1], current_input[k + 1]))
++          continue;
++        string shortened{current_input.substr(0, k)};
++        shortened.append(current_input.substr(k + 1));
++        vector<Prism::Match> found;
++        prism.CommonPrefixSearch(shortened, &found);
++        for (const auto& f : found) {
++          const size_t length = f.length + 1;
++          if (f.length <= k || typed_spans.count(length) || doubled.count({f.value, length}))
++            continue;
++          matches.push_back({f.value, length});
++          doubled.insert({f.value, length});
++        }
++      }
++    }
      if (corrector_) {
        for (auto& m : matches) {
 -        exact_match_syllables.insert(m.value);
@@ -43,7 +67,7 @@ index a5751781..8f05d0d2 100644
        }
        Corrections corrections;
        corrector_->ToleranceSearch(prism, string{current_input}, &corrections,
-@@ -161,14 +178,19 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -161,14 +202,19 @@ int Syllabifier::BuildSyllableGraph(const string& input,
              props.end_pos = end_pos;
              // add a syllable with properties to the edge's
              // spelling-to-syllable map
@@ -85,7 +109,6 @@ index e5dfaf9..35f26b0 100644
  #define RIME_THIS_CALL(f) (this->*(f))
  
 diff --git a/src/rime/dict/corrector.cc b/src/rime/dict/corrector.cc
-index 85cac5ce..64f699ce 100644
 --- a/src/rime/dict/corrector.cc
 +++ b/src/rime/dict/corrector.cc
 @@ -9,6 +9,9 @@
@@ -98,27 +121,47 @@ index 85cac5ce..64f699ce 100644
  #include <rime/schema.h>
  #include <rime/service.h>
  #include <rime/ticket.h>
-@@ -250,6 +253,34 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
+@@ -243,6 +246,32 @@ bool EditDistanceCorrector::Build(const Syllabary& syllabary,
+ EditDistanceCorrector::EditDistanceCorrector(const path& file_path)
+     : Prism(file_path) {}
+ 
++void NearSearchCorrector::RefreshNeighbors() {
++  const auto geometry = engine_->context()->get_property("cyime_neighbors");
++  if (geometry == geometry_) return;
++  geometry_ = geometry;
++  neighbors_.clear();
++  std::istringstream entries(geometry);
++  string entry;
++  while (std::getline(entries, entry, ';')) {
++    if (entry.size() < 2 || entry[1] != ':' || entry[0] < 'a' || entry[0] > 'z') continue;
++    for (size_t i = 2; i < entry.size() && i < 8; ++i) {
++      if (entry[i] >= 'a' && entry[i] <= 'z' && entry[i] != entry[0])
++        neighbors_[entry[0]].insert(entry[i]);
++    }
++  }
++}
++
++bool NearSearchCorrector::IsExtraKeyPress(char typed, char before, char after) {
++  // Like neighbour correction, no measured layout (a hardware keyboard) means no correction.
++  if (!engine_) return false;
++  RefreshNeighbors();
++  if (neighbors_.empty()) return false;
++  if (typed == before || typed == after) return true;
++  auto it = neighbors_.find(typed);
++  return it != neighbors_.end() && (it->second.count(before) || it->second.count(after));
++}
++
+ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
+                                           const string& key,
+                                           Corrections* results,
+@@ -250,6 +279,21 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
    if (key.empty())
      return;
  
 +  // CyIME supplies measured adjacency for the active layout. Missing geometry
 +  // deliberately means no correction, never a fallback to a different keyboard.
 +  if (engine_) {
-+    const auto geometry = engine_->context()->get_property("cyime_neighbors");
-+    if (geometry != geometry_) {
-+      geometry_ = geometry;
-+      neighbors_.clear();
-+      std::istringstream entries(geometry);
-+      string entry;
-+      while (std::getline(entries, entry, ';')) {
-+        if (entry.size() < 2 || entry[1] != ':' || entry[0] < 'a' || entry[0] > 'z') continue;
-+        for (size_t i = 2; i < entry.size() && i < 8; ++i) {
-+          if (entry[i] >= 'a' && entry[i] <= 'z' && entry[i] != entry[0])
-+            neighbors_[entry[0]].insert(entry[i]);
-+        }
-+      }
-+    }
++    RefreshNeighbors();
 +    if (neighbors_.empty() || key.size() > 32) return;
 +    threshold = std::min(threshold, size_t{1});
 +  }
@@ -133,7 +176,7 @@ index 85cac5ce..64f699ce 100644
    using record = struct {
      size_t node_pos;
      size_t idx;
-@@ -258,17 +289,42 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
+@@ -258,17 +302,42 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
    };
  
    std::queue<record> queue;
@@ -179,7 +222,7 @@ index 85cac5ce..64f699ce 100644
      std::swap(ch, exchange);
  
      if (val == -2)
-@@ -279,9 +335,10 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
+@@ -279,9 +348,10 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
      if (rec.idx < key.size()) {
        queue.push({rec.node_pos, rec.idx, rec.distance, key[rec.idx]});
        if (rec.distance < threshold) {
@@ -191,7 +234,7 @@ index 85cac5ce..64f699ce 100644
        }
      }
    }
-@@ -299,6 +356,13 @@ CorrectorComponent::CorrectorComponent()
+@@ -299,6 +369,15 @@ CorrectorComponent::CorrectorComponent()
            {"corrector", "", ".correction.bin"})) {}
  
  Corrector* CorrectorComponent::Create(const Ticket& ticket) noexcept {
@@ -200,13 +243,14 @@ index 85cac5ce..64f699ce 100644
 +      ticket.schema->config()->GetBool(ticket.name_space + "/cyime_neighbor_correction", &measured_neighbors) && measured_neighbors) {
 +    bool doubled_letters = false;
 +    ticket.schema->config()->GetBool(ticket.name_space + "/cyime_doubled_letter_correction", &doubled_letters);
-+    return new NearSearchCorrector(ticket.engine, doubled_letters);
++    bool extra_letters = false;
++    ticket.schema->config()->GetBool(ticket.name_space + "/cyime_extra_letter_correction", &extra_letters);
++    return new NearSearchCorrector(ticket.engine, doubled_letters, extra_letters);
 +  }
    // Don't use edit distance based correction for now.
  #if 0
    if (!ticket.schema) return nullptr;
 diff --git a/src/rime/dict/corrector.h b/src/rime/dict/corrector.h
-index f363419f..54ab08dd 100644
 --- a/src/rime/dict/corrector.h
 +++ b/src/rime/dict/corrector.h
 @@ -17,6 +17,7 @@
@@ -217,22 +261,30 @@ index f363419f..54ab08dd 100644
  
  class SymDeleteCollector {
   public:
-@@ -60,6 +61,8 @@ class Corrector : public Class<Corrector, const Ticket&> {
+@@ -60,6 +61,13 @@ class Corrector : public Class<Corrector, const Ticket&> {
                                          const string& key,
                                          corrector::Corrections* results,
                                          size_t tolerance) = 0;
 +  // CyIME: also read a doubled letter typed once at a syllable boundary (chengong) as a correction.
 +  virtual bool CorrectsDoubledLetters() const { return false; }
++  // CyIME: also read one letter typed too many inside a syllable (zhonng) as a correction.
++  virtual bool CorrectsExtraLetters() const { return false; }
++  // CyIME: whether `typed`, between `before` and `after`, looks like an extra key press: the
++  // same key pressed twice or a key next to one of its neighbours touched with it.
++  virtual bool IsExtraKeyPress(char typed, char before, char after) { return false; }
  };
  
  class CorrectorComponent : public Corrector::Component {
-@@ -115,11 +118,19 @@ class EditDistanceCorrector : public Corrector, public Prism {
+@@ -115,11 +123,24 @@ class EditDistanceCorrector : public Corrector, public Prism {
  class RIME_DLL NearSearchCorrector : public Corrector {
   public:
    NearSearchCorrector() = default;
-+  explicit NearSearchCorrector(Engine* engine, bool doubled_letters = false)
-+      : engine_(engine), doubled_letters_(doubled_letters) {}
++  explicit NearSearchCorrector(Engine* engine, bool doubled_letters = false,
++                               bool extra_letters = false)
++      : engine_(engine), doubled_letters_(doubled_letters), extra_letters_(extra_letters) {}
 +  bool CorrectsDoubledLetters() const override { return doubled_letters_; }
++  bool CorrectsExtraLetters() const override { return extra_letters_; }
++  bool IsExtraKeyPress(char typed, char before, char after) override;
    ~NearSearchCorrector() override = default;
    void ToleranceSearch(const Prism& prism,
                         const string& key,
@@ -241,6 +293,8 @@ index f363419f..54ab08dd 100644
 + private:
 +  Engine* engine_ = nullptr;
 +  bool doubled_letters_ = false;
++  bool extra_letters_ = false;
++  void RefreshNeighbors();
 +  string geometry_;
 +  hash_map<char, hash_set<char>> neighbors_;
  };
