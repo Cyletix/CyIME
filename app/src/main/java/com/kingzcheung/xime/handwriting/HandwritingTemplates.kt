@@ -343,7 +343,8 @@ object HandwritingTemplates {
      * 识别一个字：和模板逐个比，每个字取最像的那个模板的相似度，按相似度排序。
      * 返回 (字, 0~1 的分数)；模板库为空或特征算不出来时为空。
      */
-    fun recognize(context: Context, script: Script, strokes: List<List<Pair<Float, Float>>>, topK: Int = 8): List<Pair<String, Float>> {
+    fun recognize(context: Context, script: Script, strokes: List<List<Pair<Float, Float>>>, topK: Int = 8,
+                  remember: Boolean = true): List<Pair<String, Float>> {
         val list = synchronized(this) { entries(context, script).toList() }
         val builtin = synchronized(this) { defaults[script].orEmpty() }
         if (list.isEmpty() && builtin.isEmpty()) return emptyList()
@@ -351,8 +352,10 @@ object HandwritingTemplates {
         val raw = if (script == Script.KANA) kanaRaw(context, strokes) else emptyList()
         val query = (if (script == Script.KANA) raw.takeIf { it.isNotEmpty() }?.let { r -> Feature.fromProbabilities(r.map { it.index to it.score }) }
             else feature(context, script, strokes)) ?: return emptyList()
-        lastFeature = query
-        lastScript = script
+        if (remember) {
+            lastFeature = query
+            lastScript = script
+        }
         val kanji = if (script == Script.KANA) JapaneseKanji.tableFor(context) else null
         return rank(query, list.map { it.label to it.feat }, builtin.map { it.label to it.feat }, topK, raw, kanji)
     }
@@ -378,6 +381,15 @@ object HandwritingTemplates {
         }
         return best.entries.sortedByDescending { it.value }.take(topK)
             .map { it.key to ((it.value + 1f) / 2f).coerceIn(0.0001f, 1f) }
+    }
+
+    /**
+     * 一次写了多个字时逐段识别（[recognize] 带 remember = false），切分结束后只有整段就是一个字时才记下特征，
+     * 选候选时学进模板；切成多个字时不学（不知道哪段对应哪个字）。
+     */
+    fun rememberForLearning(context: Context, script: Script, strokes: List<List<Pair<Float, Float>>>?) {
+        lastFeature = strokes?.let { feature(context, script, it) }
+        lastScript = script.takeIf { lastFeature != null }
     }
 
     /**
