@@ -35,10 +35,19 @@ internal fun clipboardPanelBounds(normal: Int, screen: Int, reserved: Int): Clip
 
 /**
  * Clipboard search results take the space the clipboard has when pulled up, above the unchanged
- * keyboard and the search panel; 0 while search is closed.
+ * keyboard and the search panel; 0 while search is closed. At least [CLIPBOARD_SEARCH_MIN_RESULTS]
+ * when the screen has it, and never more than [available] (the height the IME may use: screen less
+ * bars and bottom space), so in landscape the window never grows past the screen.
  */
-internal fun clipboardSearchResultsTarget(visible: Boolean, bounds: ClipboardPanelBounds, keyboardHeight: Int): Int =
-    if (!visible) 0 else (bounds.expanded - keyboardHeight - CLIPBOARD_SEARCH_PANEL_HEIGHT).coerceAtLeast(120)
+internal fun clipboardSearchResultsTarget(visible: Boolean, bounds: ClipboardPanelBounds, keyboardHeight: Int,
+    available: Int = bounds.expanded): Int {
+    if (!visible) return 0
+    val room = (available - keyboardHeight - CLIPBOARD_SEARCH_PANEL_HEIGHT).coerceAtLeast(0)
+    return (bounds.expanded - keyboardHeight - CLIPBOARD_SEARCH_PANEL_HEIGHT)
+        .coerceAtLeast(minOf(CLIPBOARD_SEARCH_MIN_RESULTS, room)).coerceAtMost(room)
+}
+
+internal const val CLIPBOARD_SEARCH_MIN_RESULTS = 120
 
 /**
  * Height the IME container must add above the keyboard while clipboard search is open: the
