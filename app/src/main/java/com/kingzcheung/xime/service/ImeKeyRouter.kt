@@ -431,11 +431,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     }
                 }
                 else -> {
-                    if (key.length == 1) {
-                        val isLetter = key.matches(Regex("[a-zA-Z]"))
                     // The clipboard search field is one line: a hardware Tab (or other control
                     // character) has nothing to insert there.
                     if (key.length == 1 && key[0].isISOControl() && service.uiState.value.clipboardSearchVisible) return
+                    if (key.length == 1) {
+                        val isLetter = key.matches(Regex("[a-zA-Z]"))
                         val isChineseMode = !service.uiState.value.isAsciiMode
                         if (isLetter && isChineseMode) {
                             // 中文模式：字母进 Rime 拼音组合，候选栏选词后经 commitText 重定向进面板输入框
