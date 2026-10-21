@@ -336,7 +336,8 @@ internal class SpeakerTracker(strictness: Int = 1) {
         const val MAX_PRINTS = 30
         const val MAX_WINDOWS = 600
         const val MAX_SEGMENTS = 1000
-        const val IGNORED_SLACK = .05f
+        /** Kept at an absolute 0.35 for ignored voices (TV) when the standard threshold rose to 0.45 (2026-10-21). */
+        const val IGNORED_SLACK = .10f
         /** Below this a window is someone new straight away (no second window needed). */
         const val CLEARLY_DIFFERENT = .25f
         /** Through-air same-voice segments measured 0.43–0.86 on the tablet; averaged centroids sit higher. */

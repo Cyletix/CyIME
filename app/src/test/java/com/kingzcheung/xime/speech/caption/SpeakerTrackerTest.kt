@@ -95,7 +95,7 @@ class SpeakerTrackerTest {
         speak(t, 0, 3, 2.0)
         val tv = t.speakerIds.single()
         t.setIgnored(tv, true)
-        speak(t, 3000, 2, 2.0 + 1.14) // cos ≈ 0.42: below the 0.45 standard but within the ignored slack
+        speak(t, 3000, 2, 2.0 + 1.19) // cos ≈ 0.37: below the 0.45 standard but within the ignored slack
         assertEquals(listOf(tv), t.speakerIds)
     }
 
