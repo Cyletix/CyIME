@@ -1,7 +1,8 @@
 --[[
   CyIME：记住自己打的英文词（Obsidian）。
   中文 26 键里回车上屏的英文字母串由输入法记到用户目录的 cyime_en_memory.txt（一行一个，按打的大小写，新的在后，
-  见 EnglishWordMemory.kt）；词库里没有也能再打出来：
+  见 EnglishWordMemory.kt）；空格或点选上屏、拼写与所打字母相同（不分大小写）且带大写的英文词（打 Obsidian 选了
+  词库的 Obsidian）由这里记下，无痕时不记。词库里没有也能再打出来：
   - 输入与记住的词相同（打了大写时大小写也要相同）：打了大写或首选本来就是英文时放第一位，否则放第五位，
     前四个候选不动（回车也会上屏拼音字母，nihao、shi 被记住后不能挤到你好、是前面）。
   - 输入是记住的词的开头（3 个字母起）：同样的规则放第三位或前四个之后，最近打过的优先，最多两个。
@@ -41,6 +42,34 @@ end
 -- four candidates (Chinese words, the date for rq, …) keep their places.
 local function english_first(cand, upper)
     return upper or (cand ~= nil and cand.text:match("^%a[%a%p ]*$") ~= nil)
+end
+
+-- A committed English word the user typed with capitals is remembered as spelled (Obsidian), so typing obsidian
+-- offers it again. Enter on raw letters is remembered by the app (EnglishWordMemory.kt).
+local function remember(word)
+    local dir = rime_api and rime_api.get_user_data_dir and rime_api.get_user_data_dir()
+    if not dir then return end
+    local words = load_words()
+    if words[#words] == word then return end
+    local f = io.open(dir .. FILE, "a")
+    if f then
+        f:write(word, "\n")
+        f:close()
+    end
+end
+
+local function init(env)
+    env.commit_connection = env.engine.context.commit_notifier:connect(function(ctx)
+        if ctx:get_option("_cyime_incognito") then return end
+        local text, input = ctx:get_commit_text(), ctx.input
+        if #text >= 2 and #text <= 40 and text:match("^%a+$") and text:find("%u") and text:lower() == input:lower() then
+            remember(text)
+        end
+    end)
+end
+
+local function fini(env)
+    if env.commit_connection then env.commit_connection:disconnect() end
 end
 
 local function cyime_en_memory(input, env)
@@ -120,4 +149,4 @@ local function cyime_en_memory(input, env)
     if not rest_started then emit_head() end
 end
 
-return cyime_en_memory
+return { init = init, func = cyime_en_memory, fini = fini }
