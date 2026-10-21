@@ -25,6 +25,43 @@ internal object ClipboardCapacity {
     /** Below this much stored text a timing is mostly noise. */
     const val MIN_MEASURED_BYTES = 512L * 1024
 
+    /** Made-up text timed once when there is too little history to time the real one. */
+    const val CALIBRATION_BYTES = 2L * 1024 * 1024
+
+    /** One made-up record (~1 KB): Chinese with some Latin, digits and punctuation, like real copies. */
+    fun calibrationRow(): String = "明天下午三点在公司前台见，地址：东京都新宿区西新宿 2-8-1，电话 090-1234-5678。" +
+        "Meeting notes: https://example.com/order/12345 已发到群里，请确认后回复。" +
+        "送货地址改成公司前台，发票抬头和地址见附件，确认后再下单。".repeat(8)
+
+    /**
+     * Search speed of this phone, timed on [CALIBRATION_BYTES] of made-up text in a
+     * throwaway in-memory database with the same two searches a keystroke runs. Nothing is stored.
+     */
+    fun calibrate(searchKey: (String) -> String): Double? = runCatching {
+        val db = android.database.sqlite.SQLiteDatabase.create(null)
+        try {
+            db.execSQL("CREATE TABLE t (text TEXT NOT NULL, searchKey TEXT NOT NULL)")
+            val row = calibrationRow()
+            val key = searchKey(row)
+            val rows = (CALIBRATION_BYTES / recordBytes(row, key)).toInt().coerceAtLeast(1)
+            db.beginTransaction()
+            try {
+                val insert = db.compileStatement("INSERT INTO t VALUES (?, ?)")
+                repeat(rows) { insert.bindString(1, row); insert.bindString(2, key); insert.executeInsert() }
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+            val miss = ClipboardSearch.likePattern("\u0001\u0002")
+            fun time(sql: String, vararg args: String): Double = (1..3).map {
+                val start = System.nanoTime()
+                db.rawQuery(sql, args).use { it.moveToFirst() }
+                (System.nanoTime() - start) / 1e6
+            }.sorted()[1]
+            val slowest = maxOf(time("SELECT rowid FROM t WHERE text LIKE ? ESCAPE '\\' OR searchKey LIKE ? ESCAPE '\\' LIMIT 1", miss, miss),
+                time("SELECT rowid FROM t WHERE ${ClipboardSearch.T9_KEY_SQL} LIKE ? LIMIT 1", miss))
+            scanRate(rows * recordBytes(row, key), slowest)
+        } finally { db.close() }
+    }.getOrNull()
+
     /** Bytes one record costs: its text and its search key, as stored (UTF-8). */
     fun recordBytes(text: String, searchKey: String): Long =
         text.encodeToByteArray().size.toLong() + searchKey.length
@@ -41,6 +78,11 @@ internal object ClipboardCapacity {
 
     fun accepts(storedBytes: Long, addingBytes: Long, capacityBytes: Long): Boolean =
         storedBytes + addingBytes <= capacityBytes
+
+    /** A refused copy measures again, at most once a minute (the first measurement may have been slow). */
+    const val REMEASURE_AFTER_REFUSAL_MS = 60_000L
+
+    fun remeasureAfterRefusal(nowMs: Long, lastMeasuredMs: Long): Boolean = nowMs - lastMeasuredMs >= REMEASURE_AFTER_REFUSAL_MS
 
     /** Measure again once the history has grown a quarter beyond the last measurement. */
     fun shouldRemeasure(storedBytes: Long, measuredAtBytes: Long): Boolean =

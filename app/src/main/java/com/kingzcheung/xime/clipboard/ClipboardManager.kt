@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -168,6 +169,8 @@ class ClipboardManager private constructor(private val context: Context) {
     internal val room: StateFlow<ClipboardRoom> = _room.asStateFlow()
     private var measuredAtBytes = 0L
     private var scanBytesPerMs = ClipboardCapacity.UNMEASURED_BYTES_PER_MS
+    private var lastMeasuredAt = 0L
+    private val measureLock = kotlinx.coroutines.sync.Mutex()
 
     private val _unpinnedCount = MutableStateFlow(0)
     /** All unfixed text records in the database, including pages not read yet. */
@@ -219,20 +222,33 @@ class ClipboardManager private constructor(private val context: Context) {
 
     /**
      * Times the searches a keystroke runs, over everything stored, and sets the capacity from this
-     * device's speed and free space. Runs in the background when the history has grown enough.
+     * device's speed and free space. Runs in the background when the history has grown enough, and
+     * again when a copy was refused (a measurement taken on a cold cache can come out too slow).
      */
-    private suspend fun measureCapacity(stored: Long) {
+    private suspend fun measureCapacity(stored: Long) = measureLock.withLock {
         val miss = "\u0001\u0002" // matches nothing, so every record is read
-        val start = System.nanoTime()
-        dao.search(ClipboardSearch.likePattern(miss), 1)
-        val text = (System.nanoTime() - start) / 1e6
-        val keyStart = System.nanoTime()
-        dao.searchKeyDigits(ClipboardSearch.keyPattern(miss), 1)
-        val keys = (System.nanoTime() - keyStart) / 1e6
-        ClipboardCapacity.scanRate(stored, maxOf(text, keys))?.let { scanBytesPerMs = it; measuredAtBytes = stored }
+        // Each search twice; the faster run counts, so a cold disk cache right after an update or a
+        // restart does not set the capacity too low.
+        var text = Double.MAX_VALUE
+        var keys = Double.MAX_VALUE
+        repeat(2) {
+            val start = System.nanoTime()
+            dao.search(ClipboardSearch.likePattern(miss), 1)
+            text = minOf(text, (System.nanoTime() - start) / 1e6)
+            val keyStart = System.nanoTime()
+            dao.searchKeyDigits(ClipboardSearch.keyPattern(miss), 1)
+            keys = minOf(keys, (System.nanoTime() - keyStart) / 1e6)
+        }
+        val measured = ClipboardCapacity.scanRate(stored, maxOf(text, keys))
+        if (measured != null) { scanBytesPerMs = measured; measuredAtBytes = stored }
+        // Too little history to time: measure this phone on made-up text instead, once.
+        else if (measuredAtBytes == 0L) ClipboardCapacity.calibrate(::searchKey)?.let { scanBytesPerMs = it; measuredAtBytes = 1 }
+        lastMeasuredAt = android.os.SystemClock.elapsedRealtime()
         val capacity = ClipboardCapacity.capacity(scanBytesPerMs, context.filesDir.usableSpace)
         Log.i(TAG, "clipboard capacity: stored=$stored bytes, scan=${scanBytesPerMs.toLong()} bytes/ms, capacity=$capacity bytes")
-        _room.value = _room.value.copy(capacityBytes = capacity)
+        val before = _room.value
+        // More room than before: a refused copy no longer means the history is full.
+        _room.value = before.copy(capacityBytes = capacity, refused = before.refused && capacity <= before.capacityBytes)
     }
 
     /** False (and the board says full) when this record does not fit in the room left. */
@@ -240,6 +256,9 @@ class ClipboardManager private constructor(private val context: Context) {
         val room = _room.value
         if (ClipboardCapacity.accepts(room.storedBytes, ClipboardCapacity.recordBytes(text, key), room.capacityBytes)) return true
         _room.value = room.copy(refused = true)
+        // Full may come from a slow measurement; measure again (not more than once a minute).
+        if (ClipboardCapacity.remeasureAfterRefusal(android.os.SystemClock.elapsedRealtime(), lastMeasuredAt))
+            scope.launch { measureCapacity(_room.value.storedBytes) }
         return false
     }
 
