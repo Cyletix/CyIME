@@ -19,6 +19,10 @@ object HandwritingLanguages {
             .filter { it.score.isFinite() && it.score >= 0f }
             .distinctBy { it.char }.sortedByDescending { it.score }.take(limit.coerceAtLeast(0)).toList()
 
+    /** 手写打开时切换语言：新语言也能手写（内置手写模型在）就留在手写，换成新语言的识别。 */
+    fun keepsHandwritingOnSwitch(language: InputLanguage, hasBuiltinModel: Boolean): Boolean =
+        hasBuiltinModel && supports(language)
+
     fun unavailableMessage(language: InputLanguage): String = if (language == InputLanguage.UNSPECIFIED)
         "当前方案未标注语言，暂不能使用手写" else "暂不支持${language.displayName}手写，请先切换到中文"
 }

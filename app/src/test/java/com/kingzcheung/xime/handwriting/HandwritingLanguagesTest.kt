@@ -40,6 +40,13 @@ class HandwritingLanguagesTest {
         verifyNoInteractions(context)
     }
 
+    @Test fun switchingLanguageKeepsHandwritingWhenTheNewLanguageCanBeHandwritten() {
+        for (language in listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH, InputLanguage.JAPANESE))
+            assertTrue(language.name, HandwritingLanguages.keepsHandwritingOnSwitch(language, hasBuiltinModel = true))
+        assertFalse(HandwritingLanguages.keepsHandwritingOnSwitch(InputLanguage.JAPANESE, hasBuiltinModel = false))
+        assertFalse(HandwritingLanguages.keepsHandwritingOnSwitch(InputLanguage.UNSPECIFIED, hasBuiltinModel = true))
+    }
+
     @Test fun missingMetadataIsDistinctFromAnUnsupportedKnownLanguage() {
         assertTrue(HandwritingLanguages.unavailableMessage(InputLanguage.UNSPECIFIED).contains("未标注语言"))
     }
