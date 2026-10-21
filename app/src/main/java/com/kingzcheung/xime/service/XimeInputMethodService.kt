@@ -1901,6 +1901,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 state,
                                 isDarkTheme,
                                 effectiveKeyboardHeight,
+                                // The search results open with the container's animation; without this key the
+                                // keyboard view kept the first frame (0) and the keys stretched into the results.
+                                clipboardSearchResultsHeight,
                                 handwritingExpanded, handwritingWidth, handwritingOffsetX,
                                 protectedSize,
                                 floatingMinY,
