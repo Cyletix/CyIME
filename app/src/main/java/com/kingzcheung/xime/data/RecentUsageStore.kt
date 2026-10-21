@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.data
 
 import android.content.Context
+import com.kingzcheung.xime.settings.IncognitoState
 import org.json.JSONArray
 
 /**
@@ -31,8 +32,9 @@ object RecentUsageStore {
         }.getOrDefault(emptyList())
     }
 
-    /** 记录一次使用并持久化，返回更新后的列表（供 UI 状态直接刷新） */
+    /** 记录一次使用并持久化，返回更新后的列表（供 UI 状态直接刷新）；无痕时（含密码框）不记，原样返回。 */
     fun record(context: Context, key: String, value: String): List<String> {
+        if (IncognitoState.active) return get(context, key)
         val updated = record(get(context, key), value)
         val arr = JSONArray()
         updated.forEach { arr.put(it) }
