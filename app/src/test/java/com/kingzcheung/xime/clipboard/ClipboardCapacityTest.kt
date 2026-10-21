@@ -2,29 +2,14 @@ package com.kingzcheung.xime.clipboard
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ClipboardCapacityTest {
-    @Test fun capacityIsWhatThisDeviceSearchesWithinTheBudget() {
-        // 150 MB/s scanned: 40 ms reads 6 MB of text per keystroke.
-        assertEquals(6_000_000L, ClipboardCapacity.capacity(150_000.0, 100L shl 30))
-        // A nearly full phone: 2 % of 100 MB free is the tighter bound.
-        assertEquals(2_000_000L, ClipboardCapacity.capacity(150_000.0, 100_000_000L))
-    }
-
-    @Test fun aTimingOverTooLittleTextIsNotTrusted() {
-        assertNull(ClipboardCapacity.scanRate(100_000, 1.0))
-        assertNull(ClipboardCapacity.scanRate(10_000_000, 0.0))
-        assertEquals(100_000.0, ClipboardCapacity.scanRate(10_000_000, 100.0)!!, 0.0)
-    }
-
-    @Test fun measuredAgainAfterAQuarterMoreText() {
-        assertFalse(ClipboardCapacity.shouldRemeasure(100_000, 0))
-        assertTrue(ClipboardCapacity.shouldRemeasure(600_000, 0))
-        assertFalse(ClipboardCapacity.shouldRemeasure(1_200_000, 1_000_000))
-        assertTrue(ClipboardCapacity.shouldRemeasure(1_300_000, 1_000_000))
+    @Test fun aFixedCeilingUnlessThePhoneIsNearlyFull() {
+        assertEquals(ClipboardCapacity.CEILING_BYTES, ClipboardCapacity.capacity(100L shl 30))
+        // 2 % of 30 MB free is the tighter bound.
+        assertEquals(600_000L, ClipboardCapacity.capacity(30_000_000L))
     }
 
     @Test fun recordsCountTheirUtf8TextAndSearchKey() {
@@ -44,11 +29,5 @@ class ClipboardCapacityTest {
         assertFalse(ClipboardRoom(10, 100).full)
         assertTrue(ClipboardRoom(10, 100, refused = true).full)
         assertTrue(ClipboardRoom(100, 100).full)
-    }
-
-    @Test fun aRefusedCopyMeasuresAgainAtMostOnceAMinute() {
-        // A first measurement on a cold cache can set the capacity too low; a refused copy re-measures.
-        assertTrue(ClipboardCapacity.remeasureAfterRefusal(nowMs = 120_000, lastMeasuredMs = 0))
-        assertFalse(ClipboardCapacity.remeasureAfterRefusal(nowMs = 30_000, lastMeasuredMs = 0))
     }
 }
