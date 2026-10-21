@@ -1,0 +1,61 @@
+{
+ "note": "English word memory (app/data/cyime_en_memory.lua): Obsidian typed with a capital and committed by space must come back first when obsidian is typed in lowercase (and for obsi among the first five); Chinese commits are not remembered. Run with ChatReplay --variant letters --schema rime_ice; expected 2026-10-21: a2 [Obsidian, obsidian, ...], a3 has Obsidian 5th, memory file holds only Obsidian.",
+ "cases": [
+  {
+   "id": "a1",
+   "text": "Obsidian",
+   "pinyin": [
+    "O",
+    "b",
+    "s",
+    "i",
+    "d",
+    "i",
+    "a",
+    "n"
+   ],
+   "commit": "space"
+  },
+  {
+   "id": "a2",
+   "text": "obsidian",
+   "pinyin": [
+    "o",
+    "b",
+    "s",
+    "i",
+    "d",
+    "i",
+    "a",
+    "n"
+   ]
+  },
+  {
+   "id": "a3",
+   "text": "obsi",
+   "pinyin": [
+    "o",
+    "b",
+    "s",
+    "i"
+   ]
+  },
+  {
+   "id": "a4",
+   "text": "你好",
+   "pinyin": [
+    "ni",
+    "hao"
+   ],
+   "commit": "space"
+  },
+  {
+   "id": "a5",
+   "text": "你好",
+   "pinyin": [
+    "ni",
+    "hao"
+   ]
+  }
+ ]
+}
