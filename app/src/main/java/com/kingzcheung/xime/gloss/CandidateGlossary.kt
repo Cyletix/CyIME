@@ -172,7 +172,59 @@ object CandidateGlossary {
     /** 候选的释义：词典里有就用（去掉不可靠标记）；没有时只在 [composeEnabled] 打开后按词切开逐词拼英文。 */
     internal fun gloss(table: GlossTable, text: String): String? {
         if (isLetterAbbreviation(text)) return null
-        return table.lookup(keyOf(text))?.removePrefix(APPROX)?.removePrefix(PHRASE) ?: if (composeEnabled) compose(table, text) else null
+        return table.lookup(keyOf(text))?.removePrefix(APPROX)?.removePrefix(PHRASE) ?: derived(table, text)
+            ?: if (composeEnabled) compose(table, text) else null
+    }
+
+    /**
+     * 意思完全确定、词典里却不会逐条收的候选：句尾语气词不改意思（早啊 → morning，好了吗 → done?），
+     * 数字加时间或次数单位（九点 → nine o'clock，三天 → three days）。只显示，不拿来上屏（[englishFor] 只查词典）。
+     */
+    internal fun derived(table: GlossTable, text: String): String? {
+        if (text.length < 2 || text.any { it.code < 0x80 }) return null
+        val stem = text.dropLast(1)
+        val last = text.last()
+        if (stem.length >= 2 && (last in MODAL_PARTICLES || last == '吗')) {
+            val base = table.lookup(stem)?.takeUnless { it.startsWith(APPROX) }?.removePrefix(PHRASE) ?: return null
+            return if (last == '吗') "${base.trimEnd('?', '!')}?" else base
+        }
+        return numberGloss(text)
+    }
+
+    private const val MODAL_PARTICLES = "啊呀吧呢嘛哦啦呗"
+    private val NUMBER_UNITS = listOf(
+        "分钟" to ("minute" to "minutes"), "小时" to ("hour" to "hours"), "点" to ("o'clock" to "o'clock"),
+        "天" to ("day" to "days"), "年" to ("year" to "years"), "次" to ("time" to "times"), "岁" to ("year old" to "years old"),
+    )
+    private val ENGLISH_ONES = listOf("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
+    private val ENGLISH_TENS = listOf("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+
+    /** 一到九十九的中文数字（或阿拉伯数字）加单位：九点 → nine o'clock，两个小时 不算（中间有量词）。 */
+    internal fun numberGloss(text: String): String? {
+        val (unit, words) = NUMBER_UNITS.firstOrNull { text.endsWith(it.first) } ?: return null
+        val value = chineseNumber(text.dropLast(unit.length)) ?: return null
+        if (unit == "点" && value !in 1..12) return null
+        val number = if (value < 20) ENGLISH_ONES[value] else ENGLISH_TENS[value / 10] + if (value % 10 != 0) "-" + ENGLISH_ONES[value % 10] else ""
+        return "$number ${if (value == 1) words.first else words.second}"
+    }
+
+    private fun chineseNumber(text: String): Int? {
+        if (text.isEmpty() || text.length > 3) return null
+        if (text.all { it in '0'..'9' }) return text.toInt().takeIf { it in 1..99 }
+        val digits = "零一二三四五六七八九"
+        fun digit(ch: Char): Int? = if (ch == '两') 2 else digits.indexOf(ch).takeIf { it >= 0 }
+        val ten = text.indexOf('十')
+        val value = when {
+            ten < 0 -> if (text.length == 1 && text[0] != '零') digit(text[0]) else null
+            text.count { it == '十' } > 1 -> null
+            else -> {
+                val tens = if (ten == 0) 1 else if (ten == 1) digit(text[0])?.takeIf { it >= 2 } else null
+                val ones = if (ten == text.length - 1) 0 else if (ten == text.length - 2) digit(text.last())?.takeIf { it >= 1 } else null
+                if (tens == null || ones == null) null else tens * 10 + ones
+            }
+        }
+        return value?.takeIf { it in 1..99 }
     }
 
     /**
