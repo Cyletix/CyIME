@@ -2658,11 +2658,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_BACK && canCollapseToVoicePill()) {
-            if (event?.isCanceled != true) collapseToVoicePill()
+            if (event?.isCanceled != true) collapseToVoicePill(VoiceSessionEnd.BACK_KEY)
             return true
         }
-        // 悬浮条上再按返回是有意关闭：不再自动弹回。
-        if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.voiceCollapsed && event?.isCanceled != true) voicePillDismissed = true
         return super.onKeyUp(keyCode, event)
     }
 
@@ -2938,7 +2936,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
         // 悬浮条状态下再点输入框：App 会再次请求弹出键盘，换回完整键盘；语音照常听写，与展开按钮相同。
-        if (voicePillExpandsOnShowRequest(uiState.value.voiceCollapsed, pendingVoicePill, configChange)) expandFromVoicePill()
+        if (voicePillExpandsOnShowRequest(uiState.value.voiceCollapsed, configChange)) expandFromVoicePill()
         return true
     }
 
@@ -3159,10 +3157,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onFinishInput() {
         debugLog("onFinishInput page=${keyboardViewModel.page.value::class.simpleName}")
-        // 焦点离开输入框：不再自动弹回语音悬浮条。
-        mainHandler.removeCallbacks(reviveVoicePill)
-        voiceReviveCandidate = false
-        pendingVoicePill = false
         englishEditorReadCapability.clear()
         inputStallWatchdog?.stop()
         hardwareLanguageShortcuts.reset()
@@ -3201,9 +3195,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        val voiceState = uiState.value
-        voiceReviveCandidate = !finishingInput && !voicePillDismissed && voiceState.isVoiceMode && voiceState.voiceSticky &&
-            !voiceState.isCompact && !voiceState.voiceCollapsed
         discardInlinePinyinBeforeFrameworkFinish()
         // The search bar belongs to this keyboard session; leaving restores learning.
         closeClipboardSearch(openBoard = false)
@@ -3218,10 +3209,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowHidden() {
         super.onWindowHidden()
-        mainHandler.removeCallbacks(reviveVoicePill)
-        if (voiceReviveCandidate) mainHandler.postDelayed(reviveVoicePill, 300)
-        voiceReviveCandidate = false
-        voicePillDismissed = false
+        // 输入框失焦、发送后 App 收起键盘、锁屏等：本次听写到此结束，麦克风立即释放，不收成悬浮条。
+        voiceRecognitionHandler.endInputSession()
         glassWindowVisible = false
         glassBlurWindows.values.forEach { it.setVisible(false) }
         com.kingzcheung.xime.ocr.DocumentOcrActivity.finishHiddenHost()
@@ -3255,19 +3244,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowShown() {
         super.onWindowShown()
-        mainHandler.removeCallbacks(reviveVoicePill)
-        voicePillDismissed = false
-        if (pendingVoicePill) {
-            pendingVoicePill = false
-            mainHandler.post {
-                if (!uiState.value.isVoiceMode && !uiState.value.isCompact) {
-                    uiState.value = uiState.value.copy(voiceCollapsed = true)
-                    applyWindowBackground()
-                    animateVoicePillIn()
-                    keyboardCallbacks?.onVoiceStickyToggle?.invoke()
-                }
-            }
-        }
         glassWindowVisible = true
         glassBlurWindows.values.forEach { it.setVisible(true) }
         openPendingOcrPanel()
@@ -3485,7 +3461,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun hideKeyboard() {
         if (collapseScreenKeyboardToHardwareToolbar()) return
         // 语音听写中：收起成底部悬浮条，语音继续（仿 Gboard），不结束本次听写。
-        if (collapseToVoicePill()) return
+        if (collapseToVoicePill(VoiceSessionEnd.COLLAPSE_BUTTON)) return
         clearInputState()
         requestHideSelf(0)
     }
@@ -3494,8 +3470,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         it.isVoiceMode && it.voiceSticky && !it.voiceCollapsed && !it.isCompact
     }
 
-    private fun collapseToVoicePill(): Boolean {
-        if (!canCollapseToVoicePill()) return false
+    private fun collapseToVoicePill(end: VoiceSessionEnd): Boolean {
+        if (!voiceCollapsesInsteadOfEnding(end) || !canCollapseToVoicePill()) return false
         keyboardViewModel.closeOverlay()
         closeToolPanel()
         closeClipboardSearch(openBoard = false)
@@ -3539,17 +3515,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             }.start()
     }
 
-    /** 悬浮条出现（失焦后自动重新弹出等）：从下方淡入上浮。 */
-    internal fun animateVoicePillIn() {
-        if (!::keyboardContainer.isInitialized) return
-        keyboardContainer.animate().cancel()
-        keyboardContainer.alpha = 0f
-        keyboardContainer.translationY = CONTENT_SHIFT_DP * resources.displayMetrics.density
-        keyboardContainer.animate().alpha(1f).translationY(0f)
-            .setDuration(com.kingzcheung.xime.ui.theme.CyMotion.MEDIUM.toLong())
-            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
-    }
-
     /** 悬浮条在屏幕上时，窗口收起（点别处失焦、系统收起）先播退场再真正收起，不再一下子消失。 */
     override fun hideWindow() {
         if (!voicePillOnScreen || animatedHidePending || !::keyboardContainer.isInitialized || !isInputViewShown) {
@@ -3579,17 +3544,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             keyboardContainer.translationY = 0f
         }
         super.showWindow(showInput)
-    }
-
-    // 语音听写中输入框被意外收起（系统收起键或 App 隐藏键盘、焦点仍在）：重新弹出悬浮条继续听写。
-    private var voiceReviveCandidate = false
-    private var voicePillDismissed = false
-    private var pendingVoicePill = false
-    private val reviveVoicePill = Runnable {
-        if (!isInputViewShown && currentInputConnection != null) {
-            pendingVoicePill = true
-            requestShowSelf(0)
-        }
     }
 
     private var compositionRefreshJob: kotlinx.coroutines.Job? = null
