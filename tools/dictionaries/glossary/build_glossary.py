@@ -53,6 +53,9 @@ EN_PROFANITY = re.compile(r"\b(?:fuck\w*|shit\w*|cunt|bitch\w*|dick|cock|piss\w*
 EN_ALT_MAX_RANK = 20000   # 换用后面义项时，这个英文的词频名次上限
 COMMON_EN_RANK: dict[str, int] = {}
 ORIGINAL_CASE: dict[str, str] = {}    # load_ecdict 填：小写英文 → ECDICT 原写法   # load_ecdict 填：英文词 → 词频名次
+# 开头是这些虚字的低频词组多半是候选里临时拼出来的（在教 = 在 + 教），只认能用英汉词典反查回来的义项。
+RELAXED_MIN_WEIGHT = 3000   # 实词开头的词在 rime_ice 里至少这么常用才不从严（闲心 9129、下半夜 5010）
+FUNCTION_LEADS = set("在几你我他她它这那是有不没也都就才很好一的了又再还和跟把被给让对从向")
 CEDICT_LINE = re.compile(r"^(\S+) (\S+) \[([^\]]*)\] /(.*)/\s*$")
 
 ZH_GLOSS_MAX = 8
@@ -285,7 +288,10 @@ def load_cedict(path: str, back: dict[str, str], weights: dict[str, dict[str, in
                 lexicon = (engine or {}).get(simp, {})
                 if max(lexicon.values(), default=0) < engine_min or plain_pinyin(pinyin) not in lexicon:
                     continue
-                strict.update((simp, trad))
+                # 只有开头是代词、介词、副词这类虚字的才从严（在教、几号、你妈：候选里多半是两个词拼起来的）；
+                # 实词开头的常用词（闲心、拦车、小姨、下半夜）照常取首义，v10 之前也从严，大量常用词因此没有英文。
+                if simp[:1] in FUNCTION_LEADS or max(lexicon.values()) < RELAXED_MIN_WEIGHT:
+                    strict.update((simp, trad))
             # 只用 Rime 里这个词最常用的那个读音对应的条目：重点 打出来是 zhong dian（emphasis），
             # 不能用 chong dian 的 “recount”；都会 是 dou hui，不能用 du hui 的 “city”。没有对应读音就不给释义。
             elif rime and plain_pinyin(pinyin) != max(rime, key=rime.get):
@@ -394,6 +400,33 @@ def add_everyday_phrases(entries: dict[str, str], engine: dict[str, dict[str, in
     return added
 
 
+def add_de_forms(entries: dict[str, str], ecdict_path: str, engine: dict[str, dict[str, int]], min_weight: int = 1000) -> int:
+    """“X的”候选（简单的、热心的）：X 的英文是一个形容词时同样显示它。英汉词典里这个英文词的第一行释义必须
+    是形容词且写着这个中文词（simple → a. 简单的）；转载 → forward（a. 向前的）对不上就不做；名词、动词不做。返回补了多少条。"""
+    lines_of: dict[str, list[str]] = {}
+    with open(ecdict_path, encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            word = row["word"]
+            if word.isalpha() and word.islower():
+                lines_of[word] = row["translation"].split("\\n")
+    added = 0
+    for key, gloss in list(entries.items()):
+        if not (2 <= len(key) <= 4) or key.endswith("的") or not all("一" <= ch <= "鿿" for ch in key):
+            continue
+        if gloss[:1] in (APPROX, PHRASE) or " " in gloss or max((engine.get(key) or {0: 0}).values()) < min_weight:
+            continue
+        lines = lines_of.get(gloss) or []
+        target = key + "的"
+        if target in entries or not lines or key not in lines[0]:
+            continue
+        # 名词加“的”多半是“……方面的”（羊毛的 woolen，浴室的），写成 wool's、bathroom's 是错英文，不做。
+        if not lines[0].startswith("a."):
+            continue
+        entries[target] = gloss
+        added += 1
+    return added
+
+
 def load_curated(path: str) -> dict[str, str]:
     """人工表：词<TAB>英文；只有词没有英文表示不显示释义（值为空串）。"""
     curated: dict[str, str] = {}
@@ -473,6 +506,8 @@ def main() -> int:
     if engine and args.word_by_word_phrases:
         # v5 的逐词拼短语读不通（很有道理 → very make sense，你怎么知道 → you how? know），v7 起默认不收。
         print(f"everyday_phrases={add_everyday_phrases(entries, engine, args.phrase_min_weight)}", file=sys.stderr)
+    if engine:
+        print(f"de_forms={add_de_forms(entries, args.ecdict, engine)}", file=sys.stderr)
     if args.curated_singles and engine:
         removed = apply_single_policy(entries, load_curated(args.curated_singles), engine, args.single_max_rank)
         print(f"singles_removed={removed}", file=sys.stderr)
