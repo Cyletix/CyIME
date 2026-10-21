@@ -186,7 +186,8 @@ object CandidateGlossary {
         val last = text.last()
         val question = last == '吗' || last == '么'   // 你知道么 = 你知道吗
         if (stem.length >= 2 && (last in MODAL_PARTICLES || question)) {
-            val base = table.lookup(stem)?.takeUnless { it.startsWith(APPROX) }?.removePrefix(PHRASE) ?: return null
+            val base = table.lookup(stem)?.takeUnless { it.startsWith(APPROX) }?.removePrefix(PHRASE)
+                ?: numberGloss(stem) ?: return null
             return if (question) "${base.trimEnd('?', '!')}?" else base
         }
         return numberGloss(text)
