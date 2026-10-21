@@ -503,7 +503,9 @@ bool ScriptTranslation::PrepareJointCandidates(Dictionary* dict,
     for (const auto& state : states) for (const auto& line : state.second)
       bytes += sizeof(T9Line) + 128 + line->text.capacity() + line->code.capacity() * sizeof(SyllableId);
     for (const auto& row : syllables.edges) for (const auto& end : row.second) bytes += 128 + end.second.size() * 256;
-    if (total <= 128 && bytes <= 16 * 1024 * 1024) {
+    // Frames are kept for any input length; the byte limits below bound the memory. A 128-key cap made
+    // every key past it (about 45 syllables) decode the whole input again: 150 syllables took 90 ms a key.
+    if (bytes <= 16 * 1024 * 1024) {
       // Retain distinct prefix shapes, rather than filling the budget with
       // near-identical consecutive suffixes and evicting a recurring shape.
       // Discarding a frame only affects reuse: every surviving frame still
