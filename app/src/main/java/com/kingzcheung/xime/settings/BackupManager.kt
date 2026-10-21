@@ -40,6 +40,16 @@ object BackupManager {
     /** 除 kime_settings 外随备份保存的设置文件（字幕显示、手写公式模式、模型下载源）。 */
     internal val SETTINGS_PREFS = listOf("caption_mode", "handwriting", "model_download_source")
 
+    /** 只带其中几个键的设置文件：clipboard_board 里还存着固定条目（pins），备份只带卡片行数。 */
+    internal val PARTIAL_PREFS = mapOf("clipboard_board" to setOf("card_max_lines"))
+
+    /** 只留 [keys] 里的键（[prefsToJson] 格式）。 */
+    internal fun keepKeys(json: String, keys: Set<String>): String {
+        val root = org.json.JSONObject(json)
+        root.keys().asSequence().toList().filter { it !in keys }.forEach { root.remove(it) }
+        return root.toString()
+    }
+
     /** 描述本机部署/安装状态或指向未备份插件的键：导出不写，导入不覆盖（另含 `device_` 前缀的本机硬件判定）。 */
     internal val DEVICE_STATE_KEYS = setOf(
         "deployment_done", "builtin_schemas_merged", "deployment_hash", "rime_assets_version",
@@ -49,12 +59,19 @@ object BackupManager {
 
     private const val MAX_ARCHIVE_BYTES = 256L * 1024 * 1024
 
+    private val BACKUP_SUBDIRS = setOf("learning-profiles", "handwriting_templates", "handwriting_training")
+
+    private val HANDWRITING_FILES = setOf(
+        "handwriting_templates/latin.json", "handwriting_templates/kana_och.json", "handwriting_training/samples.jsonl")
+
     /** filesDir 下允许经 `_xime_backup/files/` 往返的文件。 */
     internal fun isFilesEntry(relative: String, personal: Boolean): Boolean = when {
         relative == "custom-keyboard-layouts.json" -> true
         relative == "user_ngram_cache.json" -> personal
         relative.startsWith("learning-profiles/") && relative.endsWith(".json") &&
             relative.count { it == '/' } == 1 -> personal
+        // 手写：边写边学的模板和训练页录的样本
+        relative in HANDWRITING_FILES -> personal
         else -> false
     }
 
@@ -88,7 +105,7 @@ object BackupManager {
             }
         }
         filesDir.walkTopDown()
-            .onEnter { it == filesDir || (it.parentFile == filesDir && it.name == "learning-profiles") }
+            .onEnter { it == filesDir || (it.parentFile == filesDir && it.name in BACKUP_SUBDIRS) }
             .filter { it.isFile }
             .forEach { file ->
                 val relative = file.relativeTo(filesDir).path.replace('\\', '/')
@@ -125,6 +142,11 @@ object BackupManager {
             SETTINGS_PREFS.forEach { name ->
                 val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
                 if (prefs.all.isNotEmpty()) put(META_PREFIX + "prefs/$name.json", prefsToJson(prefs).toByteArray(Charsets.UTF_8))
+            }
+            PARTIAL_PREFS.forEach { (name, keys) ->
+                val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+                if (prefs.all.keys.any { it in keys })
+                    put(META_PREFIX + "prefs/$name.json", keepKeys(prefsToJson(prefs), keys).toByteArray(Charsets.UTF_8))
             }
             files.forEach { (name, file) ->
                 zos.putNextEntry(ZipEntry(name))
@@ -185,8 +207,13 @@ object BackupManager {
             override fun snapshot(name: String) = prefsToJson(context.getSharedPreferences(name, Context.MODE_PRIVATE)).toByteArray()
             override fun restore(name: String, json: ByteArray, replace: Boolean) {
                 // 回滚快照（replace）原样写回；备份内容不覆盖本机部署状态
-                val data = if (!replace && name == PREFS_NAME_SETTINGS)
-                    stripDeviceState(json.toString(Charsets.UTF_8)).toByteArray(Charsets.UTF_8) else json
+                val data = when {
+                    replace -> json
+                    name == PREFS_NAME_SETTINGS -> stripDeviceState(json.toString(Charsets.UTF_8)).toByteArray(Charsets.UTF_8)
+                    // 只认允许的键，备份包写不进固定条目
+                    name in PARTIAL_PREFS -> keepKeys(json.toString(Charsets.UTF_8), PARTIAL_PREFS.getValue(name)).toByteArray(Charsets.UTF_8)
+                    else -> json
+                }
                 restorePrefsJson(context.getSharedPreferences(name, Context.MODE_PRIVATE), data, replace)
             }
         }

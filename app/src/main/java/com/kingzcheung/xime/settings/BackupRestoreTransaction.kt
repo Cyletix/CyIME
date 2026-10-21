@@ -52,7 +52,7 @@ internal object BackupRestoreTransaction {
                         }
                         metadata && rel.startsWith("prefs/") && rel.endsWith(".json") ->
                             rel.removePrefix("prefs/").removeSuffix(".json")
-                                .takeIf { it in BackupManager.SETTINGS_PREFS }
+                                .takeIf { it in BackupManager.SETTINGS_PREFS || it in BackupManager.PARTIAL_PREFS }
                         else -> null
                     }
                     if (prefsName != null) {
