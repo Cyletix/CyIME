@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -206,6 +207,12 @@ class ClipboardManager private constructor(private val context: Context) {
         val found = if (query.t9) dao.searchKeyDigits(ClipboardSearch.keyPattern(ClipboardSearch.t9Digits(key)), ClipboardSearch.RESULT_LIMIT)
             else dao.searchKey(ClipboardSearch.keyPattern(key), ClipboardSearch.RESULT_LIMIT)
         return found.map { it.toClipboardItem() }
+    }
+
+    /** Every text record (fixed and history) for a user-started export; read once from the database. */
+    suspend fun exportItems(): List<ClipboardItem> {
+        clipboardPinsReady.await()
+        return dao.observeAll().first().map { it.toClipboardItem() }
     }
 
     private fun searchKey(text: String) = ClipboardSearch.key(text, AndroidPinyinInitials::initialOf)
