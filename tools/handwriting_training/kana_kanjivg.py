@@ -75,9 +75,9 @@ def path_points(d: str, step: float = 2.0) -> list[tuple[float, float]]:
     return [(round(float(x), 1), round(float(y), 1)) for x, y in pts]
 
 
-def load_kanjivg(directory: pathlib.Path) -> dict[str, list[list[tuple[float, float]]]]:
+def load_kanjivg(directory: pathlib.Path, wanted=None) -> dict[str, list[list[tuple[float, float]]]]:
     out = {}
-    for ch in KANA:
+    for ch in (wanted or KANA):
         f = directory / f"{ord(ch):05x}.svg"
         if not f.is_file():
             continue
@@ -150,7 +150,7 @@ def write_vectors(strokes_json: pathlib.Path, formula_dir: str):
     print(f"预算特征 {mat.shape}，模型 {sha[:12]}…，写入 {base}.bin / .json")
 
 
-def write_och_vectors(strokes_json: pathlib.Path, och_dir: str, top_n: int = 320):
+def write_och_vectors(strokes_json: pathlib.Path, och_dir: str, top_n: int = 320, name: str = "kana_default_och"):
     """用内置汉字手写模型（ochwpro）的输出当假名特征：每份模板取概率最高的 top_n 类，值为开方后的概率并归一化。
     这样日语手写不需要公式模型。存成 [uint16 类序号, float16 值] × top_n 的小端二进制 + 记录模型哈希与标签顺序的 json。
     App 用同一模型且没启用个人模型时直接读，否则在设备上现算。"""
@@ -175,7 +175,7 @@ def write_och_vectors(strokes_json: pathlib.Path, och_dir: str, top_n: int = 320
             out += rec.tobytes()
             labels.append(ch)
     sha = hashlib.sha256((pathlib.Path(och_dir) / "ochwpro.onnx").read_bytes()).hexdigest()
-    base = strokes_json.with_name("kana_default_och")
+    base = strokes_json.with_name(name)
     base.with_suffix(".bin").write_bytes(bytes(out))
     base.with_suffix(".json").write_text(json.dumps(
         {"model_sha256": sha, "n": top_n, "labels": labels}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -190,9 +190,27 @@ def main() -> int:
     ap.add_argument("--aug", type=int, default=8)
     ap.add_argument("--vectors", help="公式模型 onnx 目录：给 --out 写出的模板预算特征")
     ap.add_argument("--och-vectors", help="内置汉字手写模型目录（ochwpro.onnx + char_index.json）：预算不靠公式模型的假名特征")
+    ap.add_argument("--extra-kanji", help="japanese_kanji_map.py 输出的 json：把其中 extra（模型认不出的日本字）也做成模板")
+    ap.add_argument("--kanjivg-kanji", help="这些日本字的 KanjiVG 笔画目录")
+    ap.add_argument("--kanji-out", help="日本字模板单独写到这个 json（与假名模板分开），特征写到同目录 japanese_kanji_och.*")
     args = ap.parse_args()
     templates = load_kanjivg(pathlib.Path(args.kanjivg))
     print(f"KanjiVG 假名 {len(templates)} 个")
+    if args.extra_kanji and args.kanjivg_kanji and args.kanji_out:
+        # 模型认不出的日本字单独成一组模板，不混进假名模板
+        extra = json.loads(pathlib.Path(args.extra_kanji).read_text(encoding="utf-8"))["extra"]
+        kanji = load_kanjivg(pathlib.Path(args.kanjivg_kanji), extra)
+        import finetune_ochwpro as och
+        rnd = random.Random(0)
+        variants = {ch: [st] + [[[(round(x, 1), round(y, 1)) for x, y in q] for q in och.augment(st, rnd)] for _ in range(args.aug)]
+                    for ch, st in kanji.items()}
+        kout = pathlib.Path(args.kanji_out)
+        kout.write_text(json.dumps({"source": "KanjiVG", "canvas": 109, "chars": variants}, ensure_ascii=False,
+                                   separators=(",", ":")), encoding="utf-8")
+        print(f"KanjiVG 日本字 {len(kanji)} 个，写入 {kout}（{kout.stat().st_size // 1024} KB）")
+        if args.och_vectors:
+            write_och_vectors(kout, args.och_vectors, name="japanese_kanji_och")
+        return 0
     if args.eval:
         evaluate(templates, args.eval, args.aug)
     if args.out:
