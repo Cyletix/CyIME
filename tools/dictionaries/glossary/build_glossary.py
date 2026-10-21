@@ -51,6 +51,7 @@ EN_SINGLE_CHOICES = 6    # 单字每个条目看前几个义项
 # 粗口义项不做候选释义（你妈 → “fuck you”）；字面直译说明（lit. …）也不是译文。
 EN_PROFANITY = re.compile(r"\b(?:fuck\w*|shit\w*|cunt|bitch\w*|dick|cock|piss\w*|bastard|whore\w*|motherfuck\w*)\b", re.I)
 EN_ALT_MAX_RANK = 20000   # 换用后面义项时，这个英文的词频名次上限
+COMMON_FIRST_RANK = 5000   # 首义在这个名次以内算常用英文，反查对上的冷僻词不替换它
 COMMON_EN_RANK: dict[str, int] = {}
 ORIGINAL_CASE: dict[str, str] = {}    # load_ecdict 填：小写英文 → ECDICT 原写法   # load_ecdict 填：英文词 → 词频名次
 # 开头是这些虚字的低频词组多半是候选里临时拼出来的（在教 = 在 + 教），只认能用英汉词典反查回来的义项。
@@ -195,6 +196,10 @@ def clean_en(word: str, readings: list[list[str]], back: dict[str, str]) -> str:
     for level in (2, 1):
         for text in allowed:
             if back_match(word, text, back) >= level:
+                # 首义是常用英文、反查对上的却是冷僻词时用首义（伤感 → sad，不用 pathos）。
+                if (text is not first and " " not in first and en_rank(first) <= COMMON_FIRST_RANK
+                        and en_rank(text) > COMMON_FIRST_RANK):
+                    return first
                 return text
     return first
 
