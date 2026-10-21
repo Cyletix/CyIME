@@ -1401,7 +1401,8 @@ fun KeyboardView(
                                         clearHandwriting()
                                         callbacks.onKeyPress("ime_switch", false)
                                     }
-                                    "space" -> { confirmHandwriting(); callbacks.onCommitText?.invoke(" ") }
+                                    // 有候选时空格只确认候选，不再多打一个空格；没有候选才打空格
+                                    "space" -> if (handwritingPending.size > 0) confirmHandwriting() else callbacks.onCommitText?.invoke(" ")
                                     "enter" -> { confirmHandwriting(); callbacks.onKeyPress("enter", false) }
                                     else -> { confirmHandwriting(); callbacks.onCommitText?.invoke(key) }
                                 }
