@@ -60,6 +60,7 @@ CEDICT_LINE = re.compile(r"^(\S+) (\S+) \[([^\]]*)\] /(.*)/\s*$")
 
 ZH_GLOSS_MAX = 8
 EN_GLOSS_MAX = 24
+EN_GLOSS_FULL_MAX = 28   # 不超过这个长度的释义整条保留；更长的才截断，截断的只在没有更短义项时才用（见 clean_en）
 
 HEADER = [
     "# CyIME 候选中英释义词典 cyime_gloss",
@@ -119,7 +120,10 @@ def en_candidates(senses: list[str]) -> list[str]:
         text = text.split(", ")[0]
         if not text or re.search(r"[\u4e00-\u9fff]", text):
             continue
-        if len(text) > EN_GLOSS_MAX:
+        # 词组前的冠词不要（the Mid-Autumn Festival → Mid-Autumn Festival），省下的长度留给意思。
+        if " " in text:
+            text = re.sub(r"^the ", "", text)
+        if len(text) > EN_GLOSS_FULL_MAX:
             cut = text[:EN_GLOSS_MAX].rsplit(" ", 1)[0]
             text = (cut or text[:EN_GLOSS_MAX]) + "…"
         result.append(text)
@@ -181,6 +185,12 @@ def clean_en(word: str, readings: list[list[str]], back: dict[str, str]) -> str:
         return APPROX + (near[0] if near else first)
     allowed = [text for choices in ordered for text in choices
                if text is first or not (text[:1].isupper() or en_rank(text) > EN_ALT_MAX_RANK)]
+    # 截断的释义（遥控 → direct operations from…）看不出意思：有完整的义项就先用完整的（遥控 → remote control）。
+    whole = [text for text in allowed if not text.endswith("…")]
+    if whole:
+        allowed = whole + [text for text in allowed if text.endswith("…")]
+        if first.endswith("…"):
+            first = whole[0]
     # 先找译回来正好是这个词的（place → 地方），再找包含它的（talk → 谈话）。
     for level in (2, 1):
         for text in allowed:
