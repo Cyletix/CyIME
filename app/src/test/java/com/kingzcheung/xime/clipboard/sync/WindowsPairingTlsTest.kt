@@ -5,6 +5,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import org.junit.Assert.*
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
@@ -23,6 +25,25 @@ import javax.net.ssl.SSLSocket
 
 /** Real loopback TLS exchanges with throwaway test certificates; never reads a real clipboard. */
 class WindowsPairingTlsTest {
+    /**
+     * Robolectric tests that ran earlier in the same JVM leave Conscrypt installed as the first
+     * security provider. With it in front, the fixture's TLS server dropped every connection (and the
+     * JDK's own TLS cannot even start), so this class failed inside the suite but passed alone. Each
+     * test runs on the JDK providers, as it does alone, and puts the list back afterwards.
+     */
+    private val setAside = mutableListOf<Pair<Int, java.security.Provider>>()
+
+    @Before fun useJdkProviders() {
+        java.security.Security.getProviders().withIndex().filter { it.value.name.contains("Conscrypt", ignoreCase = true) }
+            .forEach { setAside += (it.index + 1) to it.value }
+        setAside.forEach { java.security.Security.removeProvider(it.second.name) }
+    }
+
+    @After fun restoreProviders() {
+        setAside.sortedBy { it.first }.forEach { java.security.Security.insertProviderAt(it.second, it.first) }
+        setAside.clear()
+    }
+
     private val serverId = "00112233-4455-6677-8899-aabbccddeeff"
     private val token = "b".repeat(43)
 
