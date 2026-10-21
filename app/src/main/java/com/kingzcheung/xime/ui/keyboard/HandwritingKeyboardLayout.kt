@@ -95,7 +95,7 @@ fun HandwritingKeyboardLayout(
     val rowSymbols = LocalKeyboardInputPreferences.current.symbolsFor(SideSymbolTarget.HANDWRITING_ROW)
     // 假名、英文字母：有公式模型包时走“边用边学”的模板比对（HandwritingTemplates），日语手写也因此可用
     val templateScript = HandwritingTemplates.Script.forLanguage(language)
-        ?.takeIf { FormulaRecognizer.isAvailable(LocalContext.current) }
+        ?.takeIf { it.available(LocalContext.current) }
     val recognitionLanguage = HandwritingLanguages.recognitionLanguageForKeyboard(language)
         ?: if (templateScript != null) language else null
     if (recognitionLanguage == null) {
@@ -148,6 +148,8 @@ fun HandwritingKeyboardLayout(
     val formulaPrefs = remember(context) { context.getSharedPreferences("handwriting", android.content.Context.MODE_PRIVATE) }
     // 公式只在英文手写里提供：中文、日语手写不显示公式按钮，也不沿用上次的公式模式。
     val formulaAvailable = remember(context, language) { language == InputLanguage.ENGLISH && FormulaRecognizer.isAvailable(context) }
+    // 英文手写里总显示公式按钮；还没有公式模型时点它走模型管理的下载
+    val formulaShown = language == InputLanguage.ENGLISH
     var formulaMode by remember(formulaAvailable) { mutableStateOf(formulaAvailable && formulaPrefs.getBoolean("formula_mode", false)) }
     val formulaActive by rememberUpdatedState(formulaMode && formulaAvailable)
     val delimiter by rememberUpdatedState(LocalKeyboardInputPreferences.current.formulaDelimiter)
@@ -257,14 +259,22 @@ fun HandwritingKeyboardLayout(
                     useTemplates -> "英文手写 · 边写边学"
                     templateScript != null && importingTemplates -> "正在准备手写模板（只在第一次较慢）…"
                     templateScript != null && language == InputLanguage.JAPANESE -> "还没有你的假名样本：去 设置 → 手写训练模式 写几个，或在右上角菜单导入样本备份"
-                    templateScript != null -> "还没有你的字母样本：去 设置 → 手写训练模式 写几个，或在右上角菜单导入样本备份"
+                    // 没有字母模板时英文照样能写（内置模型里的字母），不提示缺样本
+                    templateScript != null -> "英文手写"
                     else -> "中文手写"
                 }, color = keyTextColor.copy(alpha = 0.6f),
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp, end = 96.dp).testTag("handwriting-language"))
             // 公式开关是浮在画板右上角的实心小按钮，不用对钩：开启时强调色填满、文字在黑白里取反差大的；
             // 关闭时用主题功能键的底色（强制不透明）和文字色，不加描边。
-            if (formulaAvailable) Surface(
+            if (formulaShown) Surface(
                 onClick = {
+                    if (!formulaAvailable) {
+                        context.startActivity(android.content.Intent(context, com.kingzcheung.xime.MainActivity::class.java).apply {
+                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            putExtra("open_fragment", "model_management")
+                        })
+                        return@Surface
+                    }
                     session.clear()
                     keyAction("clear_composition")
                     formulaMode = !formulaMode
