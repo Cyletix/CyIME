@@ -120,6 +120,8 @@ object HandwritingEngine {
         if (enabled && disabled.isFile && !active.exists()) disabled.renameTo(active)
         if (!enabled && active.isFile) active.renameTo(disabled)
         release()
+        // 日语假名模板用的是这个模型的输出，换模型后立刻按新模型重来（不用重启进程）
+        HandwritingTemplates.onRecognizerChanged(context)
         appContext = context.applicationContext
         return active.isFile
     }

@@ -424,6 +424,16 @@ object HandwritingTemplates {
         removed
     }
 
+    /**
+     * 汉字手写模型换了（训练页开关个人模型）：假名特征就是这个模型的输出，旧特征对不上。
+     * 内置模板下次按新模型重新准备；自己的假名模板清掉，训练样本下次打开日语手写时按新模型补回。
+     */
+    fun onRecognizerChanged(context: Context): Unit = synchronized(this) {
+        defaults.remove(Script.KANA)
+        cache.remove(Script.KANA)
+        File(dir(context), Script.KANA.fileName).delete()
+    }
+
     /** 无痕（手动开启、密码框、宿主声明不要个性化学习、剪贴板搜索）时不学，与打字同一规则。 */
     internal fun learningAllowed(): Boolean = !com.kingzcheung.xime.settings.IncognitoState.active
 
