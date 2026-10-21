@@ -1,0 +1,19 @@
+# Characters LCCC's blacklist removed whose main single-character use is profane or sexual (corpus_holes.py
+# --keep-single): their single-character entries keep the chat-blended weight, so typing cao or 226 does not
+# lead with them. Words holding them (操作, 操场, 逼迫) are re-estimated like other words. Reviewed by hand, 2026-10-21.
+操
+肏
+屄
+逼
+艹
+屌
+淫
+骚
+妓
+嫖
+娼
+婊
+睾
+鸨
+姘
+媾

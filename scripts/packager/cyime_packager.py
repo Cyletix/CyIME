@@ -295,7 +295,7 @@ class BuildOptions(SimpleNamespace):
     """Everything the GUI can choose. Field names match the CLI flags."""
     DEFAULTS = dict(build_type="release", offline_models=False, offline_ids=(), t9_model=None, exclude_dicts=(),
                     install=True, push_banks=False, serial="", rebuild=False, bump="none", publish=False,
-                    latest=False, prerelease=False, notes="", yes=False, dry_run=False, check=False,
+                    latest=False, prerelease=False, keep_draft=False, notes="", yes=False, dry_run=False, check=False,
                     audience="",  # "elder" / "friend": a bundled-model package checked against its spec
                     dev_tools=False,  # developer-only features (handwriting training); only 装到我的设备
                     private_gloss=False)  # bundle the private gloss add-on (config privateGloss); only 装到我的设备
@@ -692,6 +692,14 @@ class Packager(ad.Delivery):
             item = next((a for a in info["assets"] if a["name"] == name), None)
             if not item or not self.remote_asset_matches(item, artifact):
                 raise DeliveryError(f"上传后校验失败：{name}")
+        if info.get("draft") and self.p.keep_draft:
+            # One release per version: the lite and full packages share the tag, so the first build leaves
+            # the draft open and the second build (without --keep-draft) publishes it with both assets.
+            self.state["published"] = {"tag": self.version, "commit": self.commit, "url": info["html_url"], "draft": True}
+            ad.write_json(self.state_path, self.state)
+            say(f"[PUBLISH] 草稿 {self.version} 已上传本包，保持草稿等另一版安装包；之后不带 --keep-draft 再发布即公开。")
+            say(info["html_url"])
+            return
         if info.get("draft"):
             flags = ["--draft=false", "--latest" if self.p.latest else "--latest=false"]
             if self.p.prerelease:
@@ -1010,6 +1018,8 @@ def main(argv=None) -> int:
     lt.add_argument("--latest", action="store_true", default=None, help="发布时设为 Latest")
     lt.add_argument("--not-latest", action="store_true", help="发布时不设为 Latest（默认）")
     b.add_argument("--prerelease", action="store_true", default=None)
+    b.add_argument("--keep-draft", dest="keep_draft", action="store_true", default=None,
+                   help="发布时保持草稿：同一版本的轻量版和完整版共用一个 Release，先发的包用它，后发的包不带它即公开")
     b.add_argument("--notes", help="Release 说明文件（默认 docs/<版本>.md）")
     b.add_argument("--yes", action="store_true", default=None, help="确认对外发布")
     b.add_argument("--dry-run", action="store_true", default=None, help="只列出计划，不做任何改动")

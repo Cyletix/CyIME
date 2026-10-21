@@ -44,6 +44,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(acronymFilter)
     val englishMemory = file("data/cyime_en_memory.lua")
     inputs.file(englishMemory)
+    val singleSyllable = file("data/cyime_single_syllable.lua")
+    inputs.file(singleSyllable)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
     val measureWords = file("data/sentence_measure_words.txt")
@@ -119,6 +121,8 @@ val prepareChineseDictionaries by tasks.registering {
         acronymFilter.copyTo(File(root, "lua/cyime_acronym_filter.lua"), overwrite = true)
         // English words the user typed by hand come back as candidates (EnglishWordMemory.kt).
         englishMemory.copyTo(File(root, "lua/cyime_en_memory.lua"), overwrite = true)
+        // One complete syllable (an, ai, en) keeps its single characters ahead of initial-letter words.
+        singleSyllable.copyTo(File(root, "lua/cyime_single_syllable.lua"), overwrite = true)
         val corrector = File(root, "lua/corrector.lua")
         val source = corrector.readText()
         val commentGate = "if env.keep_comment then"
@@ -191,7 +195,8 @@ val prepareChineseDictionaries by tasks.registering {
             // keeps Rime from dropping alternatives whose weight is a word penalty away.
             "  max_sentences: 4\n  sentence_cutoff_threshold: 100\n")
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }
-            .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_acronym_filter", "    - lua_filter@*cyime_en_memory") else sequenceOf(it) }
+            .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_acronym_filter",
+                "    - lua_filter@*cyime_single_syllable", "    - lua_filter@*cyime_en_memory") else sequenceOf(it) }
             .joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
             "\ncyime:\n  candidate_policy: true\n" +

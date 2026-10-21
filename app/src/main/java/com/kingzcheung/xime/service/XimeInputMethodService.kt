@@ -1592,9 +1592,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 // Clipboard search keeps the keyboard as it is: the results take the space the clipboard
                 // would take when pulled up, above the keyboard and the search bar.
-                val clipboardSearchResultsHeight = if (!state.clipboardSearchVisible) 0 else
-                    (clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace).expanded - keyboardHeight -
-                        com.kingzcheung.xime.ui.keyboard.CLIPBOARD_SEARCH_PANEL_HEIGHT).coerceAtLeast(120)
+                // The container grows with the same pull-up animation, so the keyboard below never moves.
+                val clipboardSearchTarget = com.kingzcheung.xime.ui.keyboard.clipboardSearchResultsTarget(
+                    state.clipboardSearchVisible, clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace), keyboardHeight)
+                val clipboardSearchResultsHeight = androidx.compose.animation.core.animateIntAsState(clipboardSearchTarget,
+                    com.kingzcheung.xime.ui.keyboard.keyboardPanelMotion(clipboardSearchTarget > 0), label = "clipboardSearch").value
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
                 val effectiveKeyboardHeight = when {
                     handwritingExpanded -> handwritingSize(keyboardHeight, (effectiveScreenH - floatingMinY).coerceAtLeast(1))
@@ -1623,7 +1625,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     state.toolPanelDisplay != "PASSIVE" &&
                     !isOverlayPage
                 ) 170 else 0
-                val overlayPanelExtra = toolPanelExtra
+                // Clipboard search adds its results and search panel above the keyboard like the tool panel.
+                val overlayPanelExtra = toolPanelExtra + com.kingzcheung.xime.ui.keyboard.clipboardSearchExtraHeight(
+                    state.clipboardSearchVisible, isOverlayPage, clipboardSearchResultsHeight)
 
                 val isDark = isDarkTheme
                 val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
@@ -2927,6 +2931,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        // 悬浮条状态下再点输入框：App 会再次请求弹出键盘，换回完整键盘；语音照常听写，与展开按钮相同。
+        if (voicePillExpandsOnShowRequest(uiState.value.voiceCollapsed, pendingVoicePill, configChange)) expandFromVoicePill()
         return true
     }
 

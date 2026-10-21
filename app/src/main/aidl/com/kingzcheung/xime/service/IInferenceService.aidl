@@ -15,4 +15,8 @@ interface IInferenceService {
 
     /** 语音前处理（AGC 等） */
     byte[] processAudioBytes(in byte[] input, int sampleRate);
+
+    /** 手写模型的原始输出：概率最高的 n 类，不按汉字过滤，返回交替 [字, 类序号, 概率, …]。
+        英文从中取字母，日语假名把它当特征比对模板。 */
+    List<String> recognizeHandwritingRaw(String modelId, in float[] points, in int[] strokePointCounts, int n);
 }

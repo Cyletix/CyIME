@@ -104,6 +104,10 @@ t9_replace("    set_exhausted(true);\n  }\n  bool Evaluate" [=[
 t9_replace("  bool CheckEmpty();" [=[
   bool t9_joint_ = false;
   bool t9_sentence_rescore_ = false;
+  // The word graph the last MakeSentences used (the incremental cache or a kept copy), so the
+  // sentence rescoring can make a second n-best without corrected words.
+  const WordGraph* t9_sentence_graph_ = nullptr;
+  WordGraph t9_own_sentence_graph_;
   using T9Readings = std::unordered_map<string, vector<std::pair<string, double>>>;
   std::shared_ptr<const T9Readings> t9_readings_;
   // Resource paths resolved once per type and name. Resolving stats files in the user and shared
@@ -212,9 +216,12 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
         ids.emplace(word, id);
         return id;
       };
-      // ln P(text): best split into model words (unigram Viterbi, words up to 8 characters), chained
-      // with bigram/trigram history, so 被嫌弃了 and 被掀起了 compare as text whatever words Rime used;
-      // plus the sentence-position rules Rime applied while making it (吧 not first, 被 not last).
+      // ln P(text): summed over its splits into model words (words up to 8 characters) under the
+      // bigram/trigram chain, so 被嫌弃了 and 被掀起了 compare as text whatever words Rime used; plus the
+      // sentence-position rules Rime applied while making it (吧 not first, 被 not last). A small beam of
+      // last-word states per position carries the chain. A single unigram-chosen split read 他也会来的 as
+      // 他也|会|来|的 (-26.4) against 他也|回来|的 (-25.4); its best split 他|也会|来|的 (-20.75) still trails
+      // 他也|回来的 (-20.69), but the text's other readings add up (-20.56 against -20.67).
       auto score = [&](const Sentence& sentence) {
         const string& text = sentence.text();
         vector<size_t> at{0};
@@ -224,27 +231,43 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
           at.push_back(std::min(i, text.size()));
         }
         const size_t n = at.size() - 1;
-        vector<double> best(n + 1, -std::numeric_limits<double>::infinity());
-        vector<size_t> from(n + 1, 0);
-        vector<int32_t> word(n + 1, ::T9NgramModel::kUnseen);
-        best[0] = 0;
+        struct State { double value; int32_t prev2, prev1; bool started; };
+        constexpr size_t kStates = 4;
+        auto log_add = [](double a, double b) {
+          if (!std::isfinite(a)) return b;
+          if (!std::isfinite(b)) return a;
+          return std::max(a, b) + std::log1p(std::exp(-std::fabs(a - b)));
+        };
+        const int32_t root = t9_ngram_sentence_start_ ? t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
+        vector<vector<State>> states(n + 1);
+        states[0].push_back({0, root, root, false});
         for (size_t end = 1; end <= n; ++end) {
+          auto& here = states[end];
           for (size_t start = end > 8 ? end - 8 : 0; start < end; ++start) {
-            if (!std::isfinite(best[start])) continue;
+            if (states[start].empty()) continue;
             const int32_t id = word_id(text.substr(at[start], at[end] - at[start]));
             if (id == ::T9NgramModel::kUnseen && end - start > 1) continue;
-            const double value = best[start] + t9_ngram_->Start(id, false);
-            if (value > best[end]) { best[end] = value; from[end] = start; word[end] = id; }
+            for (const State& from : states[start]) {
+              const double value = from.value + (from.started
+                  ? t9_ngram_->LogProb3(from.prev2, from.prev1, id) : t9_ngram_->Start(id, t9_ngram_sentence_start_));
+              const State next{value, from.started ? from.prev1 : root, id, true};
+              // One state per last word (it decides the next transition), the best kStates kept.
+              auto same = std::find_if(here.begin(), here.end(), [&](const State& s) { return s.prev1 == id; });
+              if (same != here.end()) {
+                const double sum = log_add(same->value, value);
+                if (value > same->value) *same = next;
+                same->value = sum;
+                continue;
+              }
+              if (here.size() < kStates) { here.push_back(next); continue; }
+              auto worst = std::min_element(here.begin(), here.end(),
+                                            [](const State& a, const State& b) { return a.value < b.value; });
+              if (value > worst->value) *worst = next;
+            }
           }
         }
-        vector<int32_t> chain;
-        for (size_t end = n; end > 0; end = from[end]) chain.push_back(word[end]);
-        std::reverse(chain.begin(), chain.end());
-        double total = 0;
-        const int32_t root = t9_ngram_sentence_start_ ? t9_ngram_->Bos() : ::T9NgramModel::kUnseen;
-        for (size_t k = 0; k < chain.size(); ++k)
-          total += k == 0 ? t9_ngram_->Start(chain[0], t9_ngram_sentence_start_)
-                          : t9_ngram_->LogProb3(k >= 2 ? chain[k - 2] : root, chain[k - 1], chain[k]);
+        double total = -std::numeric_limits<double>::infinity();
+        for (const State& s : states[n]) total = log_add(total, s.value);
         const auto& words = sentence.components();
         if (!words.empty() && poet_) {
           total += poet_->PositionAdjust(words.front().text, true, words.size() == 1);
@@ -252,9 +275,44 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
         }
         return total;
       };
+      // A typo correction never wins on the word model alone. Corrected sentences would also take
+      // n-best places from typed readings (qunawanle lost 你去哪玩了 to 你去哪完了 once swapped letters
+      // were corrections), so the choice is among sentences made from the same graph without
+      // corrected words: the typed n-best, made again when corrections left two typed sentences or
+      // fewer (rebuilding whenever one place was taken cost a per-key p95 of +3.5%, this +1.6%).
+      deque<an<Sentence>> pool;
+      for (const auto& sentence : sentences_)
+        if (!corrected(sentence)) pool.push_back(sentence);
+      if (pool.size() <= 2 && pool.size() < sentences_.size() && t9_sentence_graph_ && poet_) {
+        // Spans holding no corrected syllable keep all their words without looking at each one.
+        vector<std::pair<size_t, size_t>> corrected_edges;
+        for (const auto& from : syllabifier_->syllable_graph().edges)
+          for (const auto& to : from.second)
+            for (const auto& spelling : to.second)
+              if (spelling.second.is_correction) { corrected_edges.emplace_back(from.first, to.first); break; }
+        WordGraph typed;
+        for (const auto& from : *t9_sentence_graph_)
+          for (const auto& to : from.second) {
+            const bool clean = std::none_of(corrected_edges.begin(), corrected_edges.end(), [&](const auto& edge) {
+              return edge.first >= from.first && edge.second <= to.first;
+            });
+            auto& bucket = typed[from.first][to.first];
+            if (clean) { bucket = to.second; continue; }
+            for (const auto& entry : to.second)
+              if (!syllabifier_->IsCorrection(entry->code, to.first, from.first)) bucket.push_back(entry);
+          }
+        auto remade = poet_->MakeSentences(typed, syllabifier_->syllable_graph().interpreted_length,
+                                           translator_->GetPrecedingText(start_), max_sentences_,
+                                           sentence_cutoff_threshold_);
+        for (auto& sentence : remade) {
+          sentence->Offset(start_);
+          sentence->set_syllabifier(syllabifier_);
+        }
+        if (exact_sentence_ && !corrected(exact_sentence_)) remade.push_front(exact_sentence_);
+        if (!remade.empty()) pool = std::move(remade);
+      }
       double chosen_score = -std::numeric_limits<double>::infinity();
-      for (const auto& sentence : sentences_) {
-        if (corrected(sentence)) continue;  // a typo correction never wins on the word model alone
+      for (const auto& sentence : pool) {
         const double value = score(*sentence);
         if (value > chosen_score) { chosen_score = value; chosen = sentence; }
       }
@@ -265,6 +323,11 @@ t9_replace("    sentences_.push_front(exact_sentence_);\n  }\n  return !CheckEmp
   }
   return !CheckEmpty();]=])
 t9_replace("set_exhausted((!phrase_" "set_exhausted(sentences_.empty() && (!phrase_")
+# Keep the graph the n-best came from: the 26-key rescoring makes a second n-best from it without corrections.
+t9_replace("        max_sentences_, sentence_cutoff_threshold_);\n    for (auto& sentence : sentences) {\n      sentence->Offset(start_);\n      sentence->set_syllabifier(syllabifier_);\n    }\n    translator_->CommitIncremental("
+           "        max_sentences_, sentence_cutoff_threshold_);\n    t9_sentence_graph_ = &inc->graph;\n    for (auto& sentence : sentences) {\n      sentence->Offset(start_);\n      sentence->set_syllabifier(syllabifier_);\n    }\n    translator_->CommitIncremental(")
+t9_replace("      max_sentences_, sentence_cutoff_threshold_);\n  for (auto& sentence : sentences) {\n    sentence->Offset(start_);\n    sentence->set_syllabifier(syllabifier_);\n  }\n  return sentences;\n}"
+           "      max_sentences_, sentence_cutoff_threshold_);\n  if (inc && cacheable) {\n    t9_sentence_graph_ = &inc->graph;\n  } else {\n    t9_own_sentence_graph_ = std::move(graph);\n    t9_sentence_graph_ = &t9_own_sentence_graph_;\n  }\n  for (auto& sentence : sentences) {\n    sentence->Offset(start_);\n    sentence->set_syllabifier(syllabifier_);\n  }\n  return sentences;\n}")
 t9_replace("#if defined(__ANDROID__)\n#include <android/log.h>\n#include <chrono>"
            "#if defined(__ANDROID__) && defined(CYIME_ENABLE_DIAGNOSTICS)\n#include <android/log.h>")
 file(READ "${T9_JOINT_DECODER}" T9_JOINT_CODE)

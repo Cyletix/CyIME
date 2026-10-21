@@ -7,7 +7,7 @@ import org.junit.Test
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Unit-circle voiceprints: angle = voice; cos(angle difference) = similarity (standard threshold 0.40 ≈ 1.16 rad). */
+/** Unit-circle voiceprints: angle = voice; cos(angle difference) = similarity (standard threshold 0.45 ≈ 1.10 rad). */
 class SpeakerTrackerTest {
     private fun print(angle: Double) = floatArrayOf(cos(angle).toFloat(), sin(angle).toFloat(), 0f)
 
@@ -95,7 +95,7 @@ class SpeakerTrackerTest {
         speak(t, 0, 3, 2.0)
         val tv = t.speakerIds.single()
         t.setIgnored(tv, true)
-        speak(t, 3000, 2, 2.0 + 1.19) // cos ≈ 0.37: below 0.40 but within the ignored slack
+        speak(t, 3000, 2, 2.0 + 1.19) // cos ≈ 0.37: below the 0.45 standard but within the ignored slack
         assertEquals(listOf(tv), t.speakerIds)
     }
 

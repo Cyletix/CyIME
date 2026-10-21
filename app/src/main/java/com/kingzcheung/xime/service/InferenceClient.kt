@@ -168,6 +168,26 @@ class InferenceClient(context: Context) {
         }
     }
 
+    /** 手写模型原始输出（不按汉字过滤）：字、类序号、概率。 */
+    suspend fun recognizeHandwritingRaw(points: FloatArray, strokePointCounts: IntArray, n: Int): List<com.kingzcheung.xime.handwriting.HandwritingRawCandidate> = withContext(Dispatchers.IO) {
+        try {
+            val result = requireService().recognizeHandwritingRaw(MODEL_HANDWRITING, points, strokePointCounts, n)
+            (0 until result.size / 3).mapNotNull { i ->
+                val ch = result[i * 3]
+                val idx = result[i * 3 + 1].toIntOrNull() ?: return@mapNotNull null
+                val score = result[i * 3 + 2].toFloatOrNull() ?: return@mapNotNull null
+                com.kingzcheung.xime.handwriting.HandwritingRawCandidate(ch, idx, score)
+            }
+        } catch (e: DeadObjectException) {
+            invalidateBinding()
+            FileLogger.e(TAG, "recognizeHandwritingRaw failed: service died", e)
+            emptyList()
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "recognizeHandwritingRaw failed", e)
+            emptyList()
+        }
+    }
+
     suspend fun processAudioBytes(input: ByteArray, sampleRate: Int = 16000): ByteArray = withContext(Dispatchers.IO) {
         try {
             requireService().processAudioBytes(input, sampleRate)

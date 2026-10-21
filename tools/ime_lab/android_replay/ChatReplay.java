@@ -318,6 +318,8 @@ public final class ChatReplay {
                     true, endpoint, true, 0, wait, 0, takeWork());
             }
         }
+        // "commit": "space" picks the first candidate as the user would, so later cases see what was learned.
+        if ("space".equals(item.optString("commit"))) engine.nativeProcessKey(' ', 0);
     }
 
     private JSONObject settle() throws Exception {

@@ -8,6 +8,8 @@ import java.io.File
 internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManager.Selection) : LocalSpeechEngine {
     private var online: OnlineRecognizer? = null
     private var offline: OfflineRecognizer? = null
+    /** Japanese captions: SenseVoice in Japanese, used only for its punctuation (see projectPunctuation). */
+    private var punctuator: OfflineRecognizer? = null
     private var stream: OnlineStream? = null
     private var vad: Vad? = null
     private var japaneseVad: Vad? = null // Refinement worker only; capture owns the other VAD.
@@ -47,7 +49,9 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
                 )
                 online = OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model, enableEndpoint = false))
             }
-            if (selection.secondDir != null) offline = createSenseVoice(selection.secondDir)
+            if (selection.secondDir != null) {
+                if (japanese) punctuator = createSenseVoice(selection.secondDir) else offline = createSenseVoice(selection.secondDir)
+            }
             vad = Vad(context.assets, if (japanese) japaneseVadConfig() else VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(
                 model = "speech/silero_vad.onnx", threshold = .6f, minSilenceDuration = .064f,
                 minSpeechDuration = .15f, windowSize = 512, maxSpeechDuration = 30f)))
@@ -136,7 +140,16 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
         } finally { s.release() }
     }
     override fun refineRich(samples: FloatArray): RichTranscript {
-        if (japanese) return RichTranscript(refine(samples))
+        if (japanese) {
+            val words = refine(samples)
+            val marks = punctuator ?: return RichTranscript(words, "ja")
+            val s = marks.createStream()
+            return try {
+                s.acceptWaveform(samples, 16000)
+                marks.decode(s)
+                RichTranscript(com.kingzcheung.xime.speech.caption.projectPunctuation(words, marks.getResult(s).text), "ja")
+            } finally { s.release() }
+        }
         val recognizer = refiner()
         val s = recognizer.createStream()
         try {
@@ -146,9 +159,20 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
             return RichTranscript(result.text, result.lang, result.event, result.tokens, result.timestamps)
         } finally { s.release() }
     }
+    /** Captions without a streaming model (English SenseVoice, Japanese Zipformer) re-read the sentence so far. */
+    override val hasCaptionPreview get() = online == null && offline != null
+
     override fun preview(samples: FloatArray): String {
-        check(japanese)
         val recognizer = checkNotNull(offline)
+        if (!japanese) {
+            val s = recognizer.createStream()
+            return try {
+                s.acceptWaveform(samples, 16000)
+                recognizer.decode(s)
+                val r = recognizer.getResult(s)
+                cleanSenseVoiceText(r.text, r.lang)
+            } finally { s.release() }
+        }
         val s = recognizer.createStream()
         try {
             val padded = FloatArray(samples.size + JapaneseZipformerDecoding.paddingSamples * 2)
@@ -178,7 +202,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
         // Runs only at a pause/stop, beside the one streaming thread; two threads shorten the final wait.
         tokens = requireFile(dir, "tokens.txt"), numThreads = 2,
     )))
-    override fun close() { reset(); online?.release(); online = null; offline?.release(); offline = null; vad?.release(); vad = null; japaneseVad?.release(); japaneseVad = null }
+    override fun close() { reset(); online?.release(); online = null; offline?.release(); offline = null; punctuator?.release(); punctuator = null; vad?.release(); vad = null; japaneseVad?.release(); japaneseVad = null }
     private fun japaneseVadConfig() = VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(
         model = "speech/silero_vad.onnx", threshold = .5f, minSilenceDuration = .2f,
         minSpeechDuration = .15f, windowSize = 512, maxSpeechDuration = 30f))
