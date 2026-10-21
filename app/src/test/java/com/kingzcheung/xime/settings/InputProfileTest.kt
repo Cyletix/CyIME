@@ -106,8 +106,11 @@ class InputProfileTest {
             assertEquals(InputMode.HANDWRITING, ink.mode)
             assertEquals(InputLayout.HANDWRITING, ink.layout)
             assertFalse(ink.capabilities.editablePinyin)
-            assertEquals(keys.language == InputLanguage.CHINESE, HandwritingLanguages.supports(ink.language))
+            // 中文、英文、日语都有手写识别（内置手写模型：汉字、其中的字母、假名模板比对）
+            assertTrue(HandwritingLanguages.supports(ink.language))
         }
+        // 没有识别器的语言（未标注语言的方案）仍然不能手写
+        assertFalse(HandwritingLanguages.supports(InputLanguage.UNSPECIFIED))
     }
 
     @Test fun `third party IDs are not guessed as Chinese or Japanese`() {
