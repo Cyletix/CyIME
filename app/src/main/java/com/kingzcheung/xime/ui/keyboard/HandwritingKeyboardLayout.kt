@@ -206,13 +206,21 @@ fun HandwritingKeyboardLayout(
                 else listOf(OverlappedHandwritingRecognizer.Segment(0, strokes.size,
                     results.map { (latex, score) -> HandwritingCandidate(delimiter.wrap(latex), score) }, replacesPending = true))
             } else if (useTemplates) recognitionMutex.withLock {
-                // 假名 / 字母：每次停顿算一个字，和模板比，最像的几个当候选
+                // 假名 / 漢字 / 字母：一次可以写多个字，和中文一样按停顿与笔画切分，每段和模板比，最像的几个当候选
                 withContext(Dispatchers.Default) {
                     val script = templateScript ?: return@withContext emptyList()
-                    val results = HandwritingTemplates.recognize(context, script, strokes.map { stroke -> stroke.map { it.x to it.y } })
-                    if (results.isEmpty()) emptyList()
-                    else listOf(OverlappedHandwritingRecognizer.Segment(0, strokes.size,
-                        results.map { (text, score) -> HandwritingCandidate(text, score) }))
+                    val points = strokes.map { stroke -> stroke.map { it.x to it.y } }
+                    val gaps = HandwritingStrokeFx.windowGaps(strokes).map { it * OverlappedHandwritingRecognizer.GAP_SPLIT_MS / pauseMs }
+                    // 字母最多 4 笔；日语有漢字，沿用中文的上限
+                    val recognizer = if (script == HandwritingTemplates.Script.LATIN) OverlappedHandwritingRecognizer(maxStrokesPerSegment = 4)
+                        else OverlappedHandwritingRecognizer()
+                    val segments = recognizer.recognize(points, gaps, predictFn = { seg, k ->
+                        // 模板分数 (cos+1)/2 换回余弦，乱切的段明显更低，切分才分得开
+                        HandwritingTemplates.recognize(context, script, seg, k, remember = false)
+                            .map { (text, score) -> HandwritingCandidate(text, (2f * score - 1f).coerceAtLeast(0.0001f)) }
+                    }).segments
+                    HandwritingTemplates.rememberForLearning(context, script, points.takeIf { segments.size == 1 })
+                    segments
                 }
             } else {
                 // 只传不可变快照；每次创建新窗口，取消的本地推理不会污染下一字缓存。
