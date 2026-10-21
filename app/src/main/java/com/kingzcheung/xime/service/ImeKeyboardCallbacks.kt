@@ -144,6 +144,7 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onClipboardSelect = { text -> service.textCommit.selectClipboardItem(text) },
+            onClipboardRecordCommitted = { service.feedbackManager.playClipboardCommitSound() },
             onClipboardImageSelect = { image ->
                 service.serviceScope.launch {
                     try {
@@ -329,6 +330,7 @@ internal fun rememberImeKeyboardCallbacks(
             onClipboardSearchSubmit = { service.submitClipboardSearch() },
             onClipboardSearchSelect = { text -> service.selectClipboardSearchResult(text) },
             onClipboardSearchImageSelect = { image ->
+                service.feedbackManager.playClipboardCommitSound()
                 // Leave search first: an image never goes into the search field.
                 service.closeClipboardSearch(openBoard = false)
                 service.keyboardCallbacks?.onClipboardImageSelect?.invoke(image)

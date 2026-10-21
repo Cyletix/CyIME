@@ -53,6 +53,8 @@ data class KeyboardCallbacks(
     val onClipboard: (() -> Unit)? = null,
     val onDismissClipboardPreview: (() -> Unit)? = null,
     val onClipboardSelect: ((String) -> Unit)? = null,
+    /** A clipboard record (text or picture) was put into the text from the clipboard board. */
+    val onClipboardRecordCommitted: (() -> Unit)? = null,
     val onVerificationCodeSelect: ((String, Boolean) -> Unit)? = null,
     val onClipboardImageSelect: ((com.kingzcheung.xime.clipboard.ClipboardImage) -> Unit)? = null,
     val onClipboardImageShare: ((com.kingzcheung.xime.clipboard.ClipboardImage, String?) -> Unit)? = null,
