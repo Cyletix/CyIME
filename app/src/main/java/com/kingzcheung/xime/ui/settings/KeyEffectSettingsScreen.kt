@@ -141,6 +141,12 @@ fun KeyEffectSettingsContent(
                                 steps = 19
                             )
                         }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        KeySoundCapturableSetting()
                     }
                 })
             }
@@ -403,6 +409,32 @@ private fun KeyVisualEffectToggle(title: String, description: String, enabled: B
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = enabled, onCheckedChange = null)
+    }
+}
+
+/**
+ * 录屏时包含按键音：按键音的从属行，按键音关掉时一起隐藏；默认关。
+ * 键名与 FeedbackManager.KEY_SOUND_CAPTURABLE 相同，FeedbackManager 监听这个键即时切换。
+ */
+@Composable
+private fun KeySoundCapturableSetting() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context)
+    var capturable by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(prefs.getBoolean("key_sound_capturable", false))
+    }
+    val onChange: (Boolean) -> Unit = {
+        capturable = it
+        prefs.edit().putBoolean("key_sound_capturable", it).apply()
+    }
+    Row(Modifier.fillMaxWidth().toggleable(value = capturable, role = Role.Switch, onValueChange = onChange).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text("录屏时包含按键音", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text("开启后录屏能录到按键音；按键音改跟随媒体音量，静音和振动模式下仍不出声",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = capturable, onCheckedChange = null)
     }
 }
 
