@@ -66,11 +66,17 @@ internal fun handwritingLanguageHint(language: InputLanguage, useTemplates: Bool
     else -> "${language.displayName}手写"
 }
 
-/** 与手写板原有提示同一样式：按键文字色 60% 不透明，左上角，右侧让出公式按钮。 */
+/**
+ * 当前语言做成与公式按钮（关闭时）同样的实心小胶囊：主题功能键底色（不透明）＋功能键文字色，
+ * 任何主题、玻璃和壁纸上都看得清。左上角，右侧让出公式按钮。
+ */
 @Composable
-internal fun HandwritingLanguageHint(text: String, keyTextColor: Color, modifier: Modifier = Modifier) {
-    Text(text, color = keyTextColor.copy(alpha = 0.6f),
-        modifier = modifier.padding(start = 12.dp, top = 12.dp, end = 96.dp).testTag("handwriting-language"))
+internal fun HandwritingLanguageHint(text: String, background: Color, foreground: Color, modifier: Modifier = Modifier) {
+    // 不用 Surface：它会挡住落笔；这里只是显示，笔从胶囊上也能写下去
+    Text(text, color = foreground, fontSize = 13.sp,
+        modifier = modifier.padding(start = 8.dp, top = 8.dp, end = 96.dp)
+            .background(background.copy(alpha = 1f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 4.dp).testTag("handwriting-language"))
 }
 
 @Composable
@@ -274,7 +280,7 @@ fun HandwritingKeyboardLayout(
             HandwritingLanguageHint(handwritingLanguageHint(language, useTemplates,
                     preparing = templateScript != null && importingTemplates,
                     missingKana = templateScript == HandwritingTemplates.Script.KANA && !useTemplates),
-                keyTextColor, Modifier.align(Alignment.TopStart))
+                specialKeyBackgroundColor, specialKeyTextColor, Modifier.align(Alignment.TopStart))
             // 公式开关是浮在画板右上角的实心小按钮，不用对钩：开启时强调色填满、文字在黑白里取反差大的；
             // 关闭时用主题功能键的底色（强制不透明）和文字色，不加描边。
             if (formulaShown) Surface(
