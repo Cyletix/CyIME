@@ -239,14 +239,23 @@ class AsrInferenceService : Service() {
         }
     }
     private val captionBinder = object : ICaptionService.Stub() {
-        override fun start(modelId: String, speakerModelPath: String, callback: ICaptionCallback): Boolean {
+        override fun start(modelId: String, speakerModelPath: String, callback: ICaptionCallback): Boolean =
+            startLanguage(modelId, "zh", speakerModelPath, callback)
+        override fun startLanguage(modelId: String, languageId: String, speakerModelPath: String, callback: ICaptionCallback): Boolean {
             cancelIdleRelease()
             val token = captionGeneration.incrementAndGet()
             val owner = callback.asBinder()
             return try {
-                // Captions transcribe the Chinese people around the user. SenseVoice's automatic
-                // language detection turned accented Mandarin into Japanese, so captions always decode Chinese.
-                val selection = AsrModelManager(this@AsrInferenceService).selection(modelId, null).copy(recognitionLanguage = "zh")
+                // The language is the user's choice on the caption page, never auto-detected: detection
+                // turned accented Mandarin into Japanese. Japanese is ReazonSpeech Zipformer alone (user
+                // 2026-10-21: no SenseVoice pass, it still wrote other languages); English is SenseVoice in English.
+                val manager = AsrModelManager(this@AsrInferenceService)
+                val base = manager.selection(modelId, null)
+                val selection = when (languageId) {
+                    "ja" -> base.copy(secondDir = null, recognitionLanguage = "ja")
+                    "en" -> base.copy(recognitionLanguage = "en")
+                    else -> base.copy(recognitionLanguage = "zh")
+                }
                 check(selection.ready) { "所选语音模型尚未完整下载" }
                 val tracker = if (speakerModelPath.isNotEmpty() && java.io.File(speakerModelPath).isFile) {
                     loadSpeakerModel(speakerModelPath)

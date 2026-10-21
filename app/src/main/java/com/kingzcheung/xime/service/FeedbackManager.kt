@@ -68,9 +68,22 @@ class FeedbackManager(private val context: Context) {
          */
         fun resolveKeySoundStyle(stored: String?, hardware: Boolean): String =
             if (hardware || stored == "mahjong") "mahjong" else "default"
+
+        /** 设置页「录屏时包含按键音」写入的偏好键，默认关。 */
+        const val KEY_SOUND_CAPTURABLE = "key_sound_capturable"
+
+        /** 系统只允许录屏抓取媒体/游戏类声音；默认仍按系统提示音播放（录不到、跟系统音量）。 */
+        fun soundUsage(capturable: Boolean): Int =
+            if (capturable) AudioAttributes.USAGE_GAME else AudioAttributes.USAGE_ASSISTANCE_SONIFICATION
+
+        /** 游戏类声音不会被系统静音，静音/振动模式下由我们自己不出声，保持与提示音一致。 */
+        fun mutedByRinger(capturable: Boolean, ringerMode: Int): Boolean =
+            capturable && ringerMode != AudioManager.RINGER_MODE_NORMAL
     }
 
     private var keySoundStyle: String? = null
+    private var soundCapturable = false
+    private val audioManager by lazy { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     private fun readKeySoundStyle(): String? =
         SettingsPreferences.getPrefsPublic(context).getString(KEY_SOUND_STYLE, null)
@@ -87,6 +100,7 @@ class FeedbackManager(private val context: Context) {
                     "effectTick=${vibrator.areAllEffectsSupported(VibrationEffect.EFFECT_TICK)} amp=$hasAmplitudeControl"
             )
         }
+        soundCapturable = SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_SOUND_CAPTURABLE, false)
         initSoundPool()
         loadSettings()
         registerPrefsListener()
@@ -103,7 +117,7 @@ class FeedbackManager(private val context: Context) {
 
     private fun initSoundPool() {
         val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setUsage(soundUsage(soundCapturable))
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
         soundPool = SoundPool.Builder()
@@ -146,6 +160,16 @@ class FeedbackManager(private val context: Context) {
                 "sound_enabled" -> soundEnabled = SettingsPreferences.isSoundEnabled(context)
                 "sound_volume" -> soundVolume = SettingsPreferences.getSoundVolume(context)
                 KEY_SOUND_STYLE -> keySoundStyle = readKeySoundStyle()
+                KEY_SOUND_CAPTURABLE -> {
+                    val capturable = SettingsPreferences.getPrefsPublic(context).getBoolean(KEY_SOUND_CAPTURABLE, false)
+                    if (capturable != soundCapturable) {
+                        // 音频用途在 SoundPool 建立时固定，切换时重建（十几个小文件，重新加载很快）。
+                        soundCapturable = capturable
+                        soundPool?.release()
+                        soundIds.clear()
+                        initSoundPool()
+                    }
+                }
                 "haptic_mode" -> hapticMode = HapticMode.fromValue(SettingsPreferences.getHapticMode(context))
                 "haptic_on_keyup" -> hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context)
                 "vibration_press_duration" -> pressDuration = SettingsPreferences.getVibrationPressDuration(context).toLong()
@@ -159,6 +183,7 @@ class FeedbackManager(private val context: Context) {
 
     fun playKeySound(keyType: String = "standard", hardware: Boolean = false) {
         if (!soundEnabled) return
+        if (soundCapturable && mutedByRinger(true, audioManager.ringerMode)) return
 
         val pool = soundPool ?: return
         val style = resolveKeySoundStyle(keySoundStyle, hardware)

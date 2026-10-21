@@ -70,10 +70,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.layout.boundsInRoot
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -1043,6 +1042,13 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
     }
 }
 
+/** 选中底色上一次对应的候选组和选中项；只是记录，不触发重组。 */
+private class HighlightMove {
+    var candidates: List<String>? = null
+    var index = -1
+    var animateNext = false
+}
+
 /** Layout history only; updating it after composition must not schedule another recomposition. */
 private class CandidateStripViewport { var firstIndex: Int = 0 }
 
@@ -1063,8 +1069,40 @@ internal fun FixedCandidateStrip(
     val density = LocalDensity.current
     val inheritedTextStyle = LocalTextStyle.current
     val commentsAllowed = rememberCandidateCommentsAllowed()
+    // 选中底色由整条统一画，换选中的候选时从旧候选滑到新候选（用户 10-21 选 1）；
+    // 候选一变（打字、翻页）就直接落到新位置，打字时什么都不动。
+    var stripRootOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var focusedBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val highlightBox = remember { androidx.compose.animation.core.Animatable(androidx.compose.ui.geometry.Rect.Zero,
+        androidx.compose.ui.geometry.Rect.VectorConverter) }
+    var highlightShown by remember { mutableStateOf(false) }
+    // 只有同一组候选里换了选中项才滑；在组合时记下，等新位置量出来再决定滑还是直接落。
+    val highlightMove = remember { HighlightMove() }
+    if (highlightMove.candidates != candidates) highlightMove.animateNext = false
+    else if (highlightMove.index != highlightIndex) highlightMove.animateNext = true
+    highlightMove.candidates = candidates
+    highlightMove.index = highlightIndex
+    // 位置只在这里读，不让候选栏因为量位置而多重组一次。
+    androidx.compose.runtime.LaunchedEffect(highlightBox) {
+        androidx.compose.runtime.snapshotFlow { focusedBounds }.collectLatest { target ->
+            if (target == null) return@collectLatest
+            if (highlightShown && highlightMove.animateNext) {
+                highlightMove.animateNext = false
+                highlightBox.animateTo(target, androidx.compose.animation.core.tween(CANDIDATE_SLIDE_MS * 2,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            } else { highlightBox.snapTo(target); highlightShown = true }
+        }
+    }
+    val highlightAccent = visuals.accentColor
+    val highlightVisible = candidates.isNotEmpty()
     BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")
-        .onGloballyPositioned { stripOriginX = it.positionInWindow().x }) {
+        .onGloballyPositioned { stripOriginX = it.positionInWindow().x; stripRootOrigin = it.boundsInRoot().topLeft }
+        .drawBehind {
+            val rect = highlightBox.value
+            if (highlightShown && highlightVisible && CandidateDropTargets.shared.hoveredBounds == null && rect.width > 0f)
+                drawRoundRect(highlightAccent.copy(alpha = 0.2f), rect.topLeft - stripRootOrigin, rect.size,
+                    androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
+        }) {
         val panelWidth = maxWidth
         // 中缝在本条内的位置（像素）；未测到位置前按整条排。
         val localGap = gapWindowX?.takeUnless { stripOriginX.isNaN() }?.let { (l, r) ->
@@ -1110,20 +1148,10 @@ internal fun FixedCandidateStrip(
         val leftCount = splitLeftCount
         val segments = if (localGap == null) listOf(visibleIndices.toList() to 0)
             else listOf(visibleIndices.take(leftCount) to 0, visibleIndices.drop(leftCount) to localGap.second)
-        // 候选换了时整排从右边 8dp 滑入并淡入（用户 10-21 选 A）。只在绘制时位移，点击区域从第一帧起
-        // 就在最终位置，动画中途点照样选中；不延迟出现，也不改候选顺序。
-        val slideIn = remember(candidates) { androidx.compose.animation.core.Animatable(0f) }
-        androidx.compose.runtime.LaunchedEffect(slideIn) {
-            slideIn.animateTo(1f, androidx.compose.animation.core.tween(CANDIDATE_SLIDE_MS,
-                easing = androidx.compose.animation.core.LinearOutSlowInEasing))
-        }
-        val slidePx = with(density) { CANDIDATE_SLIDE_DP.dp.toPx() }
         // Shift 拖动指着候选时，选中底色改由候选栏画在手指指着的那个上，原来的先不画。
         val shiftDragFree = CandidateDropTargets.shared.hoveredBounds == null
         segments.forEach { (segmentIndices, offsetPx) ->
-        Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) }
-            .graphicsLayer { alpha = CANDIDATE_SLIDE_FROM_ALPHA + (1f - CANDIDATE_SLIDE_FROM_ALPHA) * slideIn.value }
-            .drawWithContent { translate(left = (1f - slideIn.value) * slidePx) { this@drawWithContent.drawContent() } },
+        Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) },
             horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
             segmentIndices.forEach { index ->
                 CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && index < candidates.size), index, {
@@ -1136,10 +1164,11 @@ internal fun FixedCandidateStrip(
                     textShadow = visuals.textShadow,
                     fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
                     commentFontFamily = AppFonts.commentFontFamily,
-                    modifier = Modifier.widthIn(max = panelWidth).testTag("bar-candidate:$index"),
+                    modifier = Modifier.widthIn(max = panelWidth).testTag("bar-candidate:$index")
+                        .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     learned = index < candidates.size && all[index] in LocalLearnedCandidates.current,
-                    selectionFill = shiftDragFree)
+                    selectionFill = shiftDragFree && !highlightShown)
             }
         }
         }
@@ -1187,10 +1216,8 @@ internal val LocalEdgeButtonStrength = androidx.compose.runtime.staticCompositio
 internal enum class EdgeButtonStyle { CIRCLE, CAPSULE, CONCENTRIC }
 internal val LocalEdgeButtonStyle = androidx.compose.runtime.staticCompositionLocalOf { EdgeButtonStyle.CAPSULE }
 
-/** 候选换词滑入：起点在右边 8dp、六成透明，120ms 到位。 */
+/** Shift 拖到候选时选中底色滑过去的时长；换选中候选时用它的两倍。 */
 private const val CANDIDATE_SLIDE_MS = 120
-private const val CANDIDATE_SLIDE_DP = 8f
-private const val CANDIDATE_SLIDE_FROM_ALPHA = 0.6f
 
 /**
  * Shift 拖到候选上时（用户 10-21）：在候选栏里画出拖线的那一段（键盘那边只画到字母区为止），
@@ -1231,8 +1258,8 @@ private val EDGE_STRETCH_FULL = 1400.dp
 
 /**
  * 拼音里的编辑光标“|”用主题强调色加粗画，和拼音字母区分开（用户 10-21）。其余文字照旧。
- * 柔和蓝、黑白这类强调色和拼音几乎同色的主题，改用首选候选的高亮：选中字色 + 同一层强调色底。
- * [alpha] 是闪烁的当前亮度，字色和底一起亮灭。
+ * 柔和蓝、黑白这类强调色和拼音几乎同色的主题，改用首选候选的选中字色；光标只是一道线，不垫底色（用户 10-21）。
+ * [alpha] 是闪烁的当前亮度。
  */
 internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Color.Unspecified,
                               selectedText: Color = accent, alpha: Float = 1f): AnnotatedString {
@@ -1240,7 +1267,7 @@ internal fun preeditWithCaret(text: String, accent: Color, textColor: Color = Co
     if (caret < 0) return AnnotatedString(text)
     val style = if (textColor != Color.Unspecified && colorsClose(accent, textColor))
         androidx.compose.ui.text.SpanStyle(color = selectedText.copy(alpha = selectedText.alpha * alpha),
-            fontWeight = FontWeight.Bold, background = accent.copy(alpha = 0.2f * alpha))
+            fontWeight = FontWeight.Bold)
     else androidx.compose.ui.text.SpanStyle(color = accent.copy(alpha = accent.alpha * alpha), fontWeight = FontWeight.Bold)
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text)

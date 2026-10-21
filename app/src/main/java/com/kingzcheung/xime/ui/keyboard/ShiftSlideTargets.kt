@@ -14,6 +14,9 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         private set
     var drag by mutableStateOf<Drag?>(null)
         private set
+    /** 这次按住 Shift 已经拖出过 Shift 键：14 键据此把双字母键拆成单字母键，直到松开 Shift（用户 10-21）。 */
+    var dragging by mutableStateOf(false)
+        private set
 
     /** 合并字母键按左右半区选单个字母，绝不调用它的长按或符号手势。 */
     fun put(id: Any, letters: String, bounds: Rect, commit: (String) -> Unit) {
@@ -47,12 +50,18 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
             return null
         }
         drag = Drag(shiftBounds.center, pointer)
+        dragging = true
         val target = at(pointer)
         // Pointer motion redraws the line; keys recompose only when the target changes.
         if (hovered?.key != target?.key || hovered?.bounds != target?.bounds) hovered = target
         candidates.dragLine = drag?.let { it.origin to it.pointer }
         candidates.hoveredBounds = target?.takeIf { it.key == CANDIDATE_KEY }?.bounds
         return target
+    }
+    /** 松开 Shift：清掉拖线，键盘回到原来的布局。 */
+    fun finish() {
+        clearDrag()
+        dragging = false
     }
     fun clearDrag() {
         drag = null

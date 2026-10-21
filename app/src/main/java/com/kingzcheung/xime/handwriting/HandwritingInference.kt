@@ -183,6 +183,17 @@ object HandwritingInference {
         return mask
     }
 
+    /** 原始输出：概率最高的 [n] 类（字、类序号、概率），不按汉字过滤。 */
+    fun recognizeRaw(strokes: List<List<Pair<Float, Float>>>, n: Int): List<Triple<String, Int, Float>> {
+        if (n <= 0 || chars.isEmpty()) return emptyList()
+        val simplified = simplifyStrokes(strokes)
+        if (simplified.isEmpty()) return emptyList()
+        val seqData = strokesToSequence(simplified)
+        val raw = HandwritingNativeEngine.predict(seqData.data, buildMask(seqData.originalLen), min(chars.size, n))
+        return raw.filter { (idx, _) -> idx in chars.indices && chars[idx].isNotEmpty() }
+            .map { (idx, score) -> Triple(chars[idx], idx, score) }
+    }
+
     /** 完整推理：预处理 → native ONNX → idx→汉字映射（去重、截断）。 */
     fun recognize(
         strokes: List<List<Pair<Float, Float>>>,

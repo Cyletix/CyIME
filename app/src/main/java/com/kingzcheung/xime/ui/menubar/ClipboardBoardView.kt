@@ -51,7 +51,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-private data class ClipboardMenuAnchor(val bounds: Rect = Rect.Zero, val occupied: List<Rect> = emptyList(), val preferSide: Boolean = true)
+private data class ClipboardMenuAnchor(val bounds: Rect = Rect.Zero, val occupied: List<Rect> = emptyList(),
+    val preferSide: Boolean = true, val corner: Dp = 8.dp)
+
+/** Corner of a record card; the long-press highlight uses the same one so its outline matches the card. */
+internal fun clipboardCardCorner(oneLine: Boolean): Dp = if (oneLine) 10.dp else 12.dp
 private data class ClipboardItemMenuAnchor(val card: ClipboardCard, val position: ClipboardMenuAnchor)
 
 @Composable
@@ -192,6 +196,12 @@ internal fun ClipboardBoardView(
     val recordsCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val moreBounds = remember { arrayOf(Rect.Zero) }
     val deleteBounds = remember { arrayOf(Rect.Zero) }
+    // Each record's drawn bounds, so the long-press highlight is exactly the card (grid cell offsets
+    // leave out the grid's content padding).
+    val cardBounds = remember { mutableMapOf<String, Rect>() }
+    // Deleted records leave at once. Unpinning them first would move a pin into recent history before
+    // the delete lands, and the grid would scroll after it.
+    var removing by remember { mutableStateOf(emptySet<String>()) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var selecting by remember { mutableStateOf(false) }
     var pinsExpanded by remember(initialImages) { mutableStateOf(false) }
@@ -202,7 +212,13 @@ internal fun ClipboardBoardView(
     var deleting by remember { mutableStateOf<List<ClipboardCard>?>(null) }
     // True while the delete confirmation is the "clear all unfixed" one.
     var clearingAll by remember { mutableStateOf(false) }
-    val all = remember(textItems, images, pins) { clipboardCards(textItems, images, ClipboardFilter.ALL, pins) }
+    val all = remember(textItems, images, pins, removing) {
+        clipboardCards(textItems, images, ClipboardFilter.ALL, pins).filterNot { it.key in removing }
+    }
+    LaunchedEffect(textItems, images) {
+        if (removing.isNotEmpty()) removing = removing.intersect(
+            clipboardCards(textItems, images, ClipboardFilter.ALL, pins).mapTo(mutableSetOf()) { it.key })
+    }
     val cards = remember(all, filter) { all.filter { clipboardMatches(it, filter) } }
     val keyboard = LocalClipboardKeyboardNavigation.current
     var focusedKey by remember(keyboard?.active, filter) { mutableStateOf<String?>(null) }
@@ -279,14 +295,14 @@ internal fun ClipboardBoardView(
                     visible.offset.y + visible.size.height > gridState.layoutInfo.viewportEndOffset)) gridState.scrollToItem(index)
             }
         }
-        fun openItemMenu(card: ClipboardCard) {
+        fun openItemMenu(card: ClipboardCard, oneLine: Boolean) {
             val cell = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == card.key } ?: return
             val region = recordsCoordinates[0]?.boundsInRoot() ?: return
-            val bounds = Rect(region.left + cell.offset.x, region.top + cell.offset.y,
-                region.left + cell.offset.x + cell.size.width, region.top + cell.offset.y + cell.size.height)
+            val bounds = (cardBounds[card.key] ?: Rect(region.left + cell.offset.x, region.top + cell.offset.y,
+                region.left + cell.offset.x + cell.size.width, region.top + cell.offset.y + cell.size.height))
                 .intersect(region)
             menuFocus = 0
-            itemMenu = ClipboardItemMenuAnchor(card, menuPosition(bounds, true))
+            itemMenu = ClipboardItemMenuAnchor(card, menuPosition(bounds, true).copy(corner = clipboardCardCorner(oneLine)))
         }
         SideEffect {
             keyboard?.attach { action ->
@@ -311,7 +327,7 @@ internal fun ClipboardBoardView(
                 }
                 if (menu && action == ClipboardNavigation.CANCEL) { menu = false; return@attach true }
                 if (!menu && !selecting && action == ClipboardNavigation.MENU) {
-                    focusedCard?.let(::openItemMenu)
+                    focusedCard?.let { card -> openItemMenu(card, content.pinned.any { it.key == card.key }) }
                     return@attach true
                 }
                 if (!menu && !selecting && action == ClipboardNavigation.DELETE) {
@@ -460,7 +476,8 @@ internal fun ClipboardBoardView(
                                 modifier = Modifier.animateItem(
                                     fadeInSpec = keyboardPanelMotion(true),
                                     placementSpec = keyboardPanelMotion(pinsActuallyExpanded),
-                                    fadeOutSpec = keyboardPanelMotion(false)),
+                                    fadeOutSpec = keyboardPanelMotion(false))
+                                    .onGloballyPositioned { cardBounds[card.key] = it.boundsInRoot() },
                                 onClick = {
                                     focusedKey = card.key
                                     if (selecting) selected = if (chosen) selected - card.key else selected + card.key
@@ -471,7 +488,7 @@ internal fun ClipboardBoardView(
                                 }, onLongClick = {
                                     if (selecting) {
                                         selected = if (chosen) selected - card.key else selected + card.key
-                                    } else openItemMenu(card)
+                                    } else openItemMenu(card, fixedRecords)
                                 })
                         }
                     }
@@ -510,7 +527,7 @@ internal fun ClipboardBoardView(
             }
             keyboardMenuEntries[0] = actions
             LongPressMenuOverlay(anchor.position.bounds, anchor.position.occupied,
-                onDismiss = { itemMenu = null }, menuItems = actions,
+                onDismiss = { itemMenu = null }, menuItems = actions, highlightCorner = anchor.position.corner,
                 focusedIndex = menuFocus.takeIf { keyboard?.active == true })
         }
         if (menu) {
@@ -548,8 +565,10 @@ internal fun ClipboardBoardView(
                 CompactActionMenuEntry(Icons.Default.DeleteOutline, "删除", colors.error, tag = "clipboard-confirm-delete") {
                     val clearAll = clearingAll && onClearUnpinned != null
                     clearingAll = false
+                    val keys = records.mapTo(mutableSetOf()) { it.key }
+                    removing = removing + keys
                     if (clearAll) onClearUnpinned?.invoke(records) else onRemove(records)
-                    onPinsChange(pins - records.map { it.key }.toSet())
+                    onPinsChange(pins - keys)
                     selected = emptySet(); selecting = false
                 },
                 CompactActionMenuEntry(Icons.Default.Close, "取消", tag = "clipboard-cancel-delete") {},
@@ -558,6 +577,7 @@ internal fun ClipboardBoardView(
             if (itemMenu == null) keyboardMenuEntries[0] = actions
             LongPressMenuOverlay(deleteAnchor.bounds, deleteAnchor.occupied, onDismiss = { deleting = null; clearingAll = false },
                 menuItems = actions, title = title, focusedIndex = menuFocus.takeIf { keyboard?.active == true },
+                highlightCorner = deleteAnchor.corner,
                 message = if (imageCount > 0) "只移除剪贴板记录，保留原始图片。" else null,
                 tag = "clipboard-delete-menu", surfaceTag = "clipboard-board-action-card")
         }
@@ -592,7 +612,7 @@ private fun ClipboardRecordCard(
     val colors = MaterialTheme.colorScheme
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
     val highlighted = chosen || keyboardFocused
-    val shape = RoundedCornerShape(if (previewHeight == ClipboardPinnedRowHeight) 10.dp else 12.dp)
+    val shape = RoundedCornerShape(clipboardCardCorner(previewHeight == ClipboardPinnedRowHeight))
     val oneLine = previewHeight == ClipboardPinnedRowHeight
     BoxWithConstraints(modifier.fillMaxWidth()
         .then(if (previewHeight != null) Modifier.height(previewHeight) else Modifier)

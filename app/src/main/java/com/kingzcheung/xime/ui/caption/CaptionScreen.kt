@@ -152,6 +152,9 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
             android.widget.Toast.LENGTH_LONG).show()
     }
     val banners: @Composable () -> Unit = {
+        // 换成没下载过的语言时：在这里看下载进度，下完自动开始听。
+        if (controller.languageDownload !is ModelDownloadState.Idle && controller.missingModel(controller.language) != null)
+            ModelBanner("${controller.language.label}字幕要用的语音模型", "重新下载", controller.languageDownload) { controller.downloadLanguage(controller.language) }
         if (!controller.streamingReady) ModelBanner("没有实时出字模型：要等对方说完一句才整句出字", "下载实时出字模型（226 MB）",
             controller.streamingDownload) { controller.downloadStreaming() }
         if (!controller.refinementReady) ModelBanner("没有 SenseVoice 校正：字幕没有标点、错字多", "下载 SenseVoice（228 MB）",
@@ -282,12 +285,42 @@ private fun SlimRail(controller: CaptionController, onSave: () -> Unit, onExit: 
 @Composable
 private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -> Unit) {
     val (dotColor, text) = statusOf(controller)
-    Row(Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    var choosing by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // 听哪种语言：放在状态这一行最前面，一眼看得到、一点就换；字幕区和按钮都不挤。
+        CaptionButton(controller.language.label + " ▾", height = 40.dp, fontSize = 17.sp) { choosing = true }
+        Spacer(Modifier.width(10.dp))
         Box(Modifier.size(12.dp).clip(CircleShape).background(dotColor))
         Spacer(Modifier.width(8.dp))
         Text(text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 280.dp))
         Spacer(Modifier.width(12.dp))
         Box(Modifier.weight(1f)) { ribbon(24.dp) }
+    }
+    if (choosing) LanguageDialog(controller.language, missing = { controller.missingModel(it)?.second },
+        onPick = { picked ->
+            controller.chooseLanguage(picked)
+            // 没下载的语言：在应用里直接下（和模型管理同一个下载器），下完自动开始听。
+            if (controller.missingModel(picked) != null) controller.downloadLanguage(picked)
+            choosing = false
+        }, onDismiss = { choosing = false })
+}
+
+/** 字幕语言：三个整行大按钮，当前的那个打勾；没下载的模型写明要下多大。 */
+@Composable
+private fun LanguageDialog(current: CaptionLanguage, missing: (CaptionLanguage) -> String?, onPick: (CaptionLanguage) -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("字幕听哪种语言？", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                for (language in CaptionLanguage.entries) {
+                    val size = missing(language)
+                    val label = (if (language == current) "✓ " else "") + language.label + (size?.let { "（先下载 $it）" } ?: "")
+                    CaptionButton(label, Modifier.fillMaxWidth(),
+                        emphasis = if (language == current) CaptionEmphasis.Primary else CaptionEmphasis.Normal) { onPick(language) }
+                }
+                BigButton("取消", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
+            }
+        }
     }
 }
 
@@ -643,16 +676,17 @@ private const val DIAL_CHOICE = "#dial"
 @Composable
 private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
-    var flipped by remember { mutableStateOf(false) }
+    // The last thing already written into the conversation, so 发送 does not add it twice.
+    var sent by remember { mutableStateOf("") }
     // Turning to face the other person is animated (like a payment code being shown across the counter).
-    val turn by androidx.compose.animation.core.animateFloatAsState(if (flipped) 180f else 0f,
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (controller.replyFlipped) 180f else 0f,
         androidx.compose.animation.core.tween(450, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "flip")
     val context = androidx.compose.ui.platform.LocalContext.current
     val emergency = text == CaptionController.EMERGENCY_TEXT
     // A phrase is shown at once and kept in the conversation for the family.
     fun say(phrase: String) {
-        if (phrase == text) { text = ""; flipped = false; return }
-        text = phrase; controller.addReply(phrase)
+        if (phrase == text) { text = ""; return }
+        text = phrase; controller.addReply(phrase); sent = phrase
     }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         // 比例：给对方看的大字卡片占剩下的全部高度；其余都是统一的 52 dp 小一号按钮，放在玻璃面板里。
@@ -663,14 +697,14 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("快捷回复", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             }
-            // The display card: upright by default; flipped only on request.
+            // The display card: turned the way the user last left it (remembered), upright at first.
             CaptionPanel(Modifier.weight(1f).fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // The holder can always read what the other person sees: it is the header itself,
                     // so the upside-down text keeps the card's whole height.
                     Text(when {
-                        flipped && text.isNotEmpty() -> "对方看到：$text"
-                        flipped -> "给对面的人看（已倒过来）"
+                        controller.replyFlipped && text.isNotEmpty() -> "对方看到：$text"
+                        controller.replyFlipped -> "给对面的人看（已倒过来）"
                         text.isNotEmpty() -> "点一下大字，倒过来给对面看"
                         else -> "屏幕上显示"
                     }, fontSize = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -678,7 +712,7 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
 
                 }
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(CaptionStyle.Corner))
-                    .clickable(enabled = text.isNotEmpty()) { flipped = !flipped }
+                    .clickable(enabled = text.isNotEmpty()) { controller.turnReplyCard(!controller.replyFlipped) }
                     .background(if (emergency) MaterialTheme.colorScheme.error.copy(alpha = .9f) else Color.Transparent),
                     contentAlignment = Alignment.Center) {
                     // 卡片矮时（小屏、横屏）字跟着缩，至少两行写得下，不被切掉。
@@ -741,7 +775,7 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                                             // 和其他话同样宽的格子里要写得下：不放图标，红底就是紧急。
                                             EMERGENCY_CHOICE -> CaptionButton("紧急求助", Modifier.weight(1f),
                                                 emphasis = CaptionEmphasis.Danger, height = 52.dp, fontSize = 17.sp) {
-                                                if (text != CaptionController.EMERGENCY_TEXT) { say(CaptionController.EMERGENCY_TEXT); flipped = true }
+                                                if (text != CaptionController.EMERGENCY_TEXT) { say(CaptionController.EMERGENCY_TEXT); controller.turnReplyCard(true) }
                                                 else say(CaptionController.EMERGENCY_TEXT)
                                             }
                                             DIAL_CHOICE -> CaptionButton("拨打120", Modifier.weight(1f),
@@ -763,7 +797,11 @@ private fun ReplyDialog(controller: CaptionController, fontSp: Int, onDismiss: (
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CaptionButton("返回", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp, onClick = onDismiss)
-                    CaptionButton("保存到对话", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp) { if (text.isNotBlank()) controller.addReply(text) }
+                    // 发送：写进对话（点过的常用句已经记过，不重复），然后回到字幕；识别一直在跑。
+                    CaptionButton("发送", Modifier.weight(1f), height = 52.dp, fontSize = 19.sp) {
+                        if (text.isNotBlank() && text != sent) controller.addReply(text)
+                        onDismiss()
+                    }
                 }
             }
         }

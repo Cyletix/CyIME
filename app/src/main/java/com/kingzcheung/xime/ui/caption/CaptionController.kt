@@ -77,6 +77,20 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs = app.getSharedPreferences("caption_mode", Context.MODE_PRIVATE)
     private val client = CaptionInferenceClient(app)
+    private val flipMemory = ReplyFlipMemory(prefs)
+    /** Quick-reply card turned towards the other person; remembered across closing and restarts. */
+    var replyFlipped by mutableStateOf(flipMemory.read()); private set
+    /** What the captions listen for; remembered. Switching restarts the session with that language's models. */
+    var language by mutableStateOf(CaptionLanguage.of(prefs.getString("language", null))); private set
+    fun chooseLanguage(next: CaptionLanguage) {
+        if (next == language) return
+        language = next
+        prefs.edit().putString("language", next.id).apply()
+        if (status == Status.Listening || status == Status.Starting) { pause(); start() }
+        // An error (e.g. the previous language's model missing) must not keep the new language from starting.
+        else if (status == Status.Error) start()
+    }
+    fun turnReplyCard(flipped: Boolean) { replyFlipped = flipped; flipMemory.write(flipped) }
     private val transcript = CaptionTranscript()
     private val recorder = CaptionRecorder(
         onChunk = { pcm -> client.push(pcm) },
@@ -161,11 +175,17 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         val epoch = ++sessionEpoch
         io.execute {
             val result = runCatching {
-                val mode = captionMode()
-                main.post { refinementReady = usesSenseVoice(mode); streamingReady = mode != SpeechModelCatalog.SENSEVOICE }
+                val chosen = language
+                val mode = captionMode(chosen)
+                main.post {
+                    // Chinese: SenseVoice corrects; English: it is the model; Japanese never uses it.
+                    refinementReady = chosen == CaptionLanguage.JAPANESE || usesSenseVoice(mode)
+                    // Only Chinese has a streaming model to offer; the others re-read the sentence instead.
+                    streamingReady = chosen != CaptionLanguage.CHINESE || mode != SpeechModelCatalog.SENSEVOICE
+                }
                 val speakerPath = speakerModelFile()?.absolutePath.orEmpty()
                 check(client.bind()) { "无法连接语音服务" }
-                check(client.start(mode, speakerPath, sessionListener(epoch))) { "语音模型启动失败" }
+                check(client.start(mode, speakerPath, sessionListener(epoch), chosen.id)) { "语音模型启动失败" }
                 check(recorder.start()) { "麦克风启动失败" }
             }
             main.post {
@@ -236,10 +256,12 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         val now = SystemClock.elapsedRealtime()
         main.post {
             val line = transcript.update(id, text, startMs, endMs, boundary, confirmed, event) ?: return@post
-            val ui = segments.firstOrNull { it.id == id } ?: SegmentUi(id, System.currentTimeMillis() - (endMs - startMs).coerceIn(0, 30_000)).also {
+            // Placed by when it was said (session time), not when its text arrived: split pieces of an
+            // earlier sentence come after SenseVoice and must not land behind the next sentence.
+            val ui = segments.firstOrNull { it.id == id } ?: SegmentUi(id, sessionStartedAt + startMs).also {
                 // The speaker label may arrive before the first text of a short sentence.
                 line.speakerId?.let { speaker -> ensureSpeaker(speaker); it.speakerId = speaker; it.confident = line.confident }
-                segments.add(it)
+                segments.add(insertionIndex(segments, it.wallMs), it)
             }
             if (text.isNotEmpty()) lastTextAt = now
             if (text.isNotEmpty() && firstPartialAt.put(id, now) == null) FileLogger.i(TAG, "seg=$id firstTextMs=${now - startAtElapsed()}")
@@ -441,9 +463,49 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
      * whatever the keyboard's voice setting says; without it they fall back to the keyboard's own
      * model and the page offers the download.
      */
-    private fun captionMode(): String {
+    private fun ready(mode: String) = runCatching { AsrModelManager(app).selection(mode, null).ready }.getOrDefault(false)
+    private fun senseVoiceReady() = ready(SpeechModelCatalog.SENSEVOICE)
+
+    /**
+     * The model a caption language needs that is not on the phone yet, with its download size;
+     * null when the language is ready. Japanese: ReazonSpeech int8 (the fp32 is used if that is what
+     * the keyboard already downloaded); English: SenseVoice in English.
+     */
+    fun missingModel(language: CaptionLanguage): Pair<String, String>? = when (language) {
+        CaptionLanguage.CHINESE -> if (ready(SpeechModelCatalog.TWO_PASS) || ready(SpeechModelCatalog.SENSEVOICE) ||
+            ready(SpeechModelCatalog.PARAFORMER)) null else SpeechModelCatalog.PARAFORMER to "226 MB"
+        CaptionLanguage.JAPANESE -> if (ready(SpeechModelCatalog.ZIPFORMER_JA_INT8) || ready(SpeechModelCatalog.ZIPFORMER_JA)) null
+            else SpeechModelCatalog.ZIPFORMER_JA_INT8 to "153 MB"
+        CaptionLanguage.ENGLISH -> if (senseVoiceReady()) null else SpeechModelCatalog.SENSEVOICE to "228 MB"
+    }
+
+    var languageDownload by mutableStateOf<ModelDownloadState>(ModelDownloadState.Idle); private set
+
+    /** Downloads what [language] needs in the app (model management's own downloader), then listens in it. */
+    fun downloadLanguage(language: CaptionLanguage) {
+        val (modelId, _) = missingModel(language) ?: return
+        if (languageDownload is ModelDownloadState.Downloading) return
+        languageDownload = ModelDownloadState.Downloading(0f, 0, -1)
+        scope.launch {
+            ModelManager.downloadModel(app, modelId) { state ->
+                main.post {
+                    languageDownload = state
+                    if (state is ModelDownloadState.Complete && language == this@CaptionController.language) { pause(); start() }
+                }
+            }
+        }
+    }
+
+    private fun captionMode(language: CaptionLanguage): String = when (language) {
+        CaptionLanguage.JAPANESE -> listOf(SpeechModelCatalog.ZIPFORMER_JA_INT8, SpeechModelCatalog.ZIPFORMER_JA).firstOrNull { ready(it) }
+            ?: error("日语字幕要先下载日语语音模型（153 MB）")
+        CaptionLanguage.ENGLISH -> SpeechModelCatalog.SENSEVOICE.takeIf { ready(it) }
+            ?: error("英语字幕要先下载 SenseVoice（228 MB）")
+        CaptionLanguage.CHINESE -> chineseMode()
+    }
+
+    private fun chineseMode(): String {
         val manager = AsrModelManager(app)
-        fun ready(mode: String) = runCatching { manager.selection(mode, null).ready }.getOrDefault(false)
         if (ready(SpeechModelCatalog.TWO_PASS)) return SpeechModelCatalog.TWO_PASS
         if (ready(SpeechModelCatalog.SENSEVOICE)) return SpeechModelCatalog.SENSEVOICE
         val keyboard = runCatching { manager.getSelectedModelId(InputLanguage.CHINESE) }.getOrNull()

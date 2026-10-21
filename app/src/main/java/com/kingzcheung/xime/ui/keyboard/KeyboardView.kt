@@ -722,10 +722,6 @@ fun KeyboardView(
                 val clipboardContext = androidx.compose.ui.platform.LocalContext.current
                 val clipboard = remember(clipboardContext) {
                     com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(clipboardContext) }
-                val resultsHeight = remember { androidx.compose.animation.core.Animatable(0f) }
-                LaunchedEffect(state.clipboardSearchResultsHeight) {
-                    resultsHeight.animateTo(state.clipboardSearchResultsHeight.toFloat(), keyboardPanelMotion(true))
-                }
                 com.kingzcheung.xime.ui.menubar.ConnectedClipboardBoard(
                     state.clipboardItems, initialImages = false, expanded = false,
                     onBack = {}, onQuickSend = {},
@@ -733,7 +729,8 @@ fun KeyboardView(
                     onRemoveText = viewModel::removeClipboardItems, onAddQuick = {}, onSplit = { _, _ -> },
                     onImageSelect = {}, onImageShare = { _, _ -> }, onSystemPaste = {}, onPullRemote = null,
                     keepQueryOnDispose = true,
-                    modifier = Modifier.fillMaxWidth().height(resultsHeight.value.dp),
+                    // Height animates in the service together with the IME container (pull-up motion).
+                    modifier = Modifier.fillMaxWidth().height(state.clipboardSearchResultsHeight.dp),
                 )
                 ToolPanel(
                     title = "搜索剪贴板",

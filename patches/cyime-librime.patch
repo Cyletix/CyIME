@@ -18,7 +18,7 @@ index e5dfaf9..35f26b0 100644
  #define RIME_THIS_CALL(f) (this->*(f))
  
 diff --git a/src/rime/dict/corrector.cc b/src/rime/dict/corrector.cc
-index 85cac5c..b0040e8 100644
+index 85cac5ce..40734538 100644
 --- a/src/rime/dict/corrector.cc
 +++ b/src/rime/dict/corrector.cc
 @@ -9,6 +9,9 @@
@@ -66,14 +66,40 @@ index 85cac5c..b0040e8 100644
    using record = struct {
      size_t node_pos;
      size_t idx;
-@@ -259,16 +290,16 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
+@@ -258,17 +289,42 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
+   };
  
    std::queue<record> queue;
++  // CyIME: two neighbouring letters typed in swapped order (lnu for lun) cost one edit, as a
++  // neighbour-key slip does, and rank after typed words like any correction.
++  auto transpose = [&](size_t node, size_t point, size_t distance) {
++    // Only the last letters typed: a swap shows up while typing it and is corrected then; earlier
++    // syllables are not searched again on every key (each search adds spellings to the whole graph).
++    if (!engine_ || point + 1 >= key.size() || point + 3 < key.size() || key[point] == key[point + 1]) return;
++    {
++      // Only where the typed letters stop spelling anything within three keys (lnu, tain, quna):
++      // inside a spelling that goes on (zhong, xian) a swap is no likelier than the typed letters.
++      size_t typed_node = node, typed_point = point;
++      bool typed_fails = false;
++      for (size_t end = point + 1; end <= std::min(key.size(), point + 3); ++end) {
++        if (prism.trie().traverse(key.c_str(), typed_node, typed_point, end) == -2) { typed_fails = true; break; }
++      }
++      if (!typed_fails) return;
++    }
++    const char swapped[2] = {key[point + 1], key[point]};
++    size_t at = 0;
++    if (prism.trie().traverse(swapped, node, at, 1) == -2) return;
++    auto val = prism.trie().traverse(swapped, node, at, 2);
++    point += 2;
++    if (val >= 0) results->Alter(val, {distance + 1, val, point});
++    if (val != -2 && point < key.size()) queue.push({node, point, distance + 1, key[point]});
++  };
    queue.push({0, 0, 0, key[0]});
 -  for (auto subst : keyboard_map[key[0]]) {
 +  for (auto subst : (threshold > 0 ? near(key[0]) : empty)) {
      queue.push({0, 0, 1, subst});
    }
++  if (threshold > 0) transpose(0, 0, 0);
    for (; !queue.empty(); queue.pop()) {
      auto& rec = queue.front();
      char ch = rec.ch;
@@ -86,7 +112,7 @@ index 85cac5c..b0040e8 100644
      std::swap(ch, exchange);
  
      if (val == -2)
-@@ -279,7 +310,7 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
+@@ -279,9 +335,10 @@ void NearSearchCorrector::ToleranceSearch(const Prism& prism,
      if (rec.idx < key.size()) {
        queue.push({rec.node_pos, rec.idx, rec.distance, key[rec.idx]});
        if (rec.distance < threshold) {
@@ -94,8 +120,11 @@ index 85cac5c..b0040e8 100644
 +        for (auto subst : near(key[rec.idx])) {
            queue.push({rec.node_pos, rec.idx, rec.distance + 1, subst});
          }
++        transpose(rec.node_pos, rec.idx, rec.distance);
        }
-@@ -299,6 +330,10 @@ CorrectorComponent::CorrectorComponent()
+     }
+   }
+@@ -299,6 +356,10 @@ CorrectorComponent::CorrectorComponent()
            {"corrector", "", ".correction.bin"})) {}
  
  Corrector* CorrectorComponent::Create(const Ticket& ticket) noexcept {

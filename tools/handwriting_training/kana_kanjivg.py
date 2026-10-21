@@ -150,6 +150,38 @@ def write_vectors(strokes_json: pathlib.Path, formula_dir: str):
     print(f"预算特征 {mat.shape}，模型 {sha[:12]}…，写入 {base}.bin / .json")
 
 
+def write_och_vectors(strokes_json: pathlib.Path, och_dir: str, top_n: int = 320):
+    """用内置汉字手写模型（ochwpro）的输出当假名特征：每份模板取概率最高的 top_n 类，值为开方后的概率并归一化。
+    这样日语手写不需要公式模型。存成 [uint16 类序号, float16 值] × top_n 的小端二进制 + 记录模型哈希与标签顺序的 json。
+    App 用同一模型且没启用个人模型时直接读，否则在设备上现算。"""
+    import hashlib
+    import fewshot_eval as fe
+    data = json.loads(strokes_json.read_text(encoding="utf-8"))
+    feats = fe.Feats("D:/CyIME-Data/handwriting_training/latex-c-t/20261014/onnx", och_dir)
+    labels, out = [], bytearray()
+    for ch, variants in data["chars"].items():
+        for st in variants:
+            strokes = [[tuple(p) for p in q] for q in st]
+            x, m = fe.och.to_sequence(strokes)
+            if not m.any():
+                continue
+            mm = m[None] if feats.och_bool else m[None].astype(np.uint8)
+            lg = feats.och.run(None, {feats.och_in[0]: x[None], feats.och_in[1]: mm})[0][0]
+            p = np.exp(lg - lg.max()); p /= p.sum()
+            idx = np.argsort(-p)[:top_n]
+            v = np.sqrt(p[idx]); v /= np.linalg.norm(v) + 1e-9
+            rec = np.zeros(top_n, dtype=[("i", "<u2"), ("v", "<f2")])
+            rec["i"], rec["v"] = idx, v
+            out += rec.tobytes()
+            labels.append(ch)
+    sha = hashlib.sha256((pathlib.Path(och_dir) / "ochwpro.onnx").read_bytes()).hexdigest()
+    base = strokes_json.with_name("kana_default_och")
+    base.with_suffix(".bin").write_bytes(bytes(out))
+    base.with_suffix(".json").write_text(json.dumps(
+        {"model_sha256": sha, "n": top_n, "labels": labels}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"汉字模型特征 {len(labels)} 份 × top{top_n}，模型 {sha[:12]}…，写入 {base}.bin / .json")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--kanjivg", required=True)
@@ -157,6 +189,7 @@ def main() -> int:
     ap.add_argument("--eval")
     ap.add_argument("--aug", type=int, default=8)
     ap.add_argument("--vectors", help="公式模型 onnx 目录：给 --out 写出的模板预算特征")
+    ap.add_argument("--och-vectors", help="内置汉字手写模型目录（ochwpro.onnx + char_index.json）：预算不靠公式模型的假名特征")
     args = ap.parse_args()
     templates = load_kanjivg(pathlib.Path(args.kanjivg))
     print(f"KanjiVG 假名 {len(templates)} 个")
@@ -177,6 +210,8 @@ def main() -> int:
         print(f"写入 {out}（{out.stat().st_size // 1024} KB）")
         if args.vectors:
             write_vectors(out, args.vectors)
+        if args.och_vectors:
+            write_och_vectors(out, args.och_vectors)
     return 0
 
 
