@@ -36,10 +36,20 @@ class SPenSounds(private val context: Context) {
 
     val active: Boolean get() = write != null && enabled()
 
+    /** 与按键音同一设置：「录屏时包含按键音」打开时按媒体声音播放（录屏录得到），静音 / 振动模式和勿扰时自己不出声。 */
+    private val capturable: Boolean by lazy {
+        com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(context)
+            .getBoolean(com.kingzcheung.xime.service.FeedbackManager.KEY_SOUND_CAPTURABLE, false)
+    }
+
+    private fun muted(): Boolean = runCatching {
+        com.kingzcheung.xime.service.FeedbackManager.mutedForCapture(context, capturable)
+    }.getOrDefault(false)
+
     /** 笔每一帧移动时调用；速度单位 px/ms，[fullSpeed] 为满音量的速度。 */
     fun onMotion(erasing: Boolean, speed: Float, fullSpeed: Float) {
         val track = (if (erasing) erase else write) ?: return
-        if (!enabled()) return stop()
+        if (!enabled() || muted()) return stop()
         if (playing !== track) {
             stop()
             playing = track
@@ -70,7 +80,7 @@ class SPenSounds(private val context: Context) {
         val frames = samples.size / 2
         AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setUsage(com.kingzcheung.xime.service.FeedbackManager.soundUsage(capturable))
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
             .setAudioFormat(AudioFormat.Builder().setSampleRate(44_100)
                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
