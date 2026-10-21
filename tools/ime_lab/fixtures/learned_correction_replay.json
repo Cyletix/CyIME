@@ -1,0 +1,13 @@
+{
+ "note": "A learned correction never takes the first place (run ChatReplay --variant letters --schema rime_ice --user-dict tools/ime_lab/fixtures/learned_correction.userdb.txt). The user dictionary has 成功 picked once; typing chengong must still list the typed 陈宫 first and 成功 second (2026-10-21; before the fix 成功 came first and 陈宫 third).",
+ "cases": [
+  {
+   "id": "c1",
+   "text": "陈宫",
+   "pinyin": [
+    "chen",
+    "gong"
+   ]
+  }
+ ]
+}
