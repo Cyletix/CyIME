@@ -61,6 +61,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("按键与手势", input, layoutPage("gestures"), "手势 角标 光标 空格 长按"),
         SettingsSearchEntry("按键效果", look, SettingsRoutes.KeyEffect, "按键音 声音 音效 振动 震动 反馈 发光 动画"),
         SettingsSearchEntry("按键音色", "$look › 按键效果", SettingsRoutes.KeyEffect, "音色 Rain75 紫薇轴 机械键盘 实体键盘 按键声音 音效"),
+        SettingsSearchEntry("录屏时包含按键音", "$look › 按键效果", SettingsRoutes.KeyEffect, "录屏 录制 屏幕录制 按键音 媒体音量 声音"),
         SettingsSearchEntry("物理键盘", input, SettingsRoutes.HardwareKeyboard, "实体键盘 蓝牙键盘 外接键盘 语言切换快捷键 候选跟随 浮条"),
         SettingsSearchEntry("智能联想", "智能", SettingsRoutes.SmartPrediction, "联想 预测 个人学习 模型增强 下一个词"),
         SettingsSearchEntry("语音转文本", "智能", SettingsRoutes.SpeechToText, "语音 识别 麦克风 说话 听写 在线 本地 语音输入 开关"),
