@@ -26,8 +26,9 @@ internal class CaptionRecorder(
     private var record: AudioRecord? = null
     private var thread: Thread? = null
 
+    // start() runs on the caption page's worker, stop() on the main thread.
     @SuppressLint("MissingPermission")
-    fun start(): Boolean {
+    @Synchronized fun start(): Boolean {
         if (running.get()) return true
         val minimum = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val buffer = maxOf(minimum, SAMPLE_RATE * 2 * 2) // two seconds
@@ -66,7 +67,7 @@ internal class CaptionRecorder(
         return true
     }
 
-    fun stop() {
+    @Synchronized fun stop() {
         running.set(false)
         val audio = record ?: return
         record = null

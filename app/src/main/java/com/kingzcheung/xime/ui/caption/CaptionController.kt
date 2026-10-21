@@ -151,7 +151,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     var resumeOnForeground = false
 
     @Volatile private var lastLoudAt = SystemClock.elapsedRealtime()
-    private var sessionEpoch = 0L
+    @Volatile private var sessionEpoch = 0L
     private var nextOrdinal = 1
     private val firstPartialAt = HashMap<Long, Long>()
     private val muteCheck = object : Runnable {
@@ -186,7 +186,9 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
                 val speakerPath = speakerModelFile()?.absolutePath.orEmpty()
                 check(client.bind()) { "无法连接语音服务" }
                 check(client.start(mode, speakerPath, sessionListener(epoch), chosen.id)) { "语音模型启动失败" }
-                check(recorder.start()) { "麦克风启动失败" }
+                // Closed or paused while the model loaded: the page already stopped the recorder, so
+                // a microphone opened now would stay on with nobody to close it.
+                check(startUnlessStale({ epoch == sessionEpoch }, recorder::start, recorder::stop)) { "麦克风启动失败" }
             }
             main.post {
                 if (epoch != sessionEpoch) return@post
@@ -610,4 +612,16 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         const val EMERGENCY_TEXT = "请马上帮我打120！"
 
     }
+}
+
+/**
+ * Opens the microphone for a session that may have been closed while its model loaded. A session
+ * that is already stale never opens it; one that goes stale during the open closes it again at
+ * once, so the close that already ran on the main thread cannot be outrun.
+ */
+internal fun startUnlessStale(current: () -> Boolean, start: () -> Boolean, stop: () -> Unit): Boolean {
+    if (!current()) return false
+    val started = start()
+    if (started && !current()) { stop(); return false }
+    return started
 }
