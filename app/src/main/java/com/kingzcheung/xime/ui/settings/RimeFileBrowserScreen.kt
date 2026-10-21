@@ -293,14 +293,18 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
                             exportInProgress = false
                             result.fold(
                                 onSuccess = { exportResult ->
-                                    val msg = if (exportResult.savedToDownloads)
-                                        "已保存到 Downloads/${exportResult.fileName}"
-                                    else
-                                        "导出完成"
-                                    snackbarHostState.showSnackbar(msg)
+                                    snackbarHostState.showSnackbar("已保存到 Downloads/${exportResult.fileName}")
                                 },
                                 onFailure = { error ->
-                                    snackbarHostState.showSnackbar("导出失败: ${error.message}")
+                                    val kept = (error as? com.kingzcheung.xime.settings.ExportSaveException)?.kept
+                                    if (kept != null) {
+                                        // 没存进「下载」：说清楚，并让用户把留在应用里的备份包分享出去
+                                        val action = snackbarHostState.showSnackbar(
+                                            "没能保存到「下载」文件夹，备份包已留在应用里", actionLabel = "分享",
+                                            duration = androidx.compose.material3.SnackbarDuration.Long)
+                                        if (action == androidx.compose.material3.SnackbarResult.ActionPerformed)
+                                            runCatching { RimeExportManager.shareSingleFile(context, kept) }
+                                    } else snackbarHostState.showSnackbar("导出失败: ${error.message}")
                                 }
                             )
                         }

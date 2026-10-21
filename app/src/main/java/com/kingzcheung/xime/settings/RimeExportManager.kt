@@ -26,6 +26,9 @@ data class ExportResult(
     val savedToDownloads: Boolean
 )
 
+/** 没能存进「下载」文件夹：备份包留在应用里的 [kept]，可以分享出去；不能当成导出成功。 */
+class ExportSaveException(val kept: File) : Exception("没能保存到「下载」文件夹")
+
 object RimeExportManager {
 
     private const val TAG = "RimeExportManager"
@@ -52,15 +55,10 @@ object RimeExportManager {
             val tempZip = File(context.cacheDir, fileName)
             tempZip.writeBytes(zipBytes)
             val savedToDownloads = saveToDownloads(context, tempZip, fileName)
-            tempZip.delete()
+            settleTempArchive(tempZip, savedToDownloads, File(context.filesDir, "exports"))
+                ?.let { return Result.failure(it) }
 
-            val resultUri = if (savedToDownloads) {
-                resolveDownloadsUri(context, fileName)
-            } else {
-                null
-            }
-
-            return Result.success(ExportResult(resultUri, fileName, savedToDownloads))
+            return Result.success(ExportResult(resolveDownloadsUri(context, fileName), fileName, savedToDownloads = true))
         } catch (e: Exception) {
             android.util.Log.e(TAG, "exportArchive failed", e)
             return Result.failure(e)
@@ -113,6 +111,16 @@ object RimeExportManager {
         }
     }
 
+    /** 存「下载」之后：成功就删掉临时包；失败把它挪进 [keepDir] 留着，返回要报给用户的失败。 */
+    internal fun settleTempArchive(tempZip: File, saved: Boolean, keepDir: File): ExportSaveException? {
+        if (saved) { tempZip.delete(); return null }
+        keepDir.mkdirs()
+        val kept = File(keepDir, tempZip.name)
+        tempZip.copyTo(kept, overwrite = true)
+        tempZip.delete()
+        return ExportSaveException(kept)
+    }
+
     private fun saveToDownloads(context: Context, zipFile: File, fileName: String): Boolean {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -125,10 +133,14 @@ object RimeExportManager {
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
                 )
                 if (uri == null) return false
-                context.contentResolver.openOutputStream(uri)?.use { output ->
-                    zipFile.inputStream().use { it.copyTo(output) }
-                }
-                true
+                // 打不开或写到一半出错：删掉这个空条目，如实报失败
+                val written = runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        zipFile.inputStream().use { it.copyTo(output) }
+                    } != null
+                }.getOrElse { android.util.Log.e(TAG, "saveToDownloads write failed", it); false }
+                if (!written) runCatching { context.contentResolver.delete(uri, null, null) }
+                written
             } else {
                 @Suppress("DEPRECATION")
                 val destDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
