@@ -186,11 +186,19 @@ fun KeyboardLayout(
     val splitRow1InsetDp = standardRowInset
         ?: if ((if (splitWeighted) baseRow1.sumOf { it.length } else baseRow1.size) > 9) 0.dp else 16.dp
     // 14 键分体：跨中线的双字母键拆成两个单字母键，其余行与键不变。
-    val renderRows = if (splitKeyboard && fourteenKey && keyRows.size >= 3) listOf(
+    val pairedRows = if (splitKeyboard && fourteenKey && keyRows.size >= 3) listOf(
         SplitKeyboardGeometry.splitStraddlingPairs(keyRows[0], 0f),
         SplitKeyboardGeometry.splitStraddlingPairs(keyRows[1], splitRow1InsetDp.value / splitCellDp.coerceAtLeast(1f)),
         SplitKeyboardGeometry.splitStraddlingPairs(keyRows[2], letterSideKeyWeight),
     ) + keyRows.drop(3) else keyRows
+    val shiftSlideTargets = remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() }
+    // 14 键按住 Shift 拖动时，双字母键拆回单字母键，键帽显示手指实际停的那个字母；松开 Shift 恢复（用户 10-21）。
+    // 按字母数定宽，拆开后每个字母的位置和宽度不变。
+    val renderRows = if (fourteenKey && shiftSlideTargets.dragging) pairedRows.mapIndexed { index, row ->
+        if (index > 2) row else row.flatMap { key ->
+            if (key.length == 2 && key.all { it.lowercaseChar() in 'a'..'z' }) listOf(key.take(1), key.drop(1)) else listOf(key)
+        }
+    } else pairedRows
     val splitRow0 = renderRows.getOrElse(0) { listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p") }
     val splitRow1 = renderRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
     val splitRow2 = renderRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
@@ -361,7 +369,6 @@ fun KeyboardLayout(
     )
 
 
-    val shiftSlideTargets = remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() }
     CompositionLocalProvider(
         LocalFourteenKeyLayout provides fourteenKey,
         LocalLetterGeometry provides geometry,
@@ -1417,7 +1424,7 @@ internal fun ShiftCapsKeyButton(
                         }
                     } finally {
                         val used = viewModel.endShiftHold()
-                        targets?.clearDrag()
+                        targets?.finish()
                         isPressed = false
                         suppressCursorMove.value = false
                         if (released && !dragged && !used && upTime - down.uptimeMillis < 350L) {
