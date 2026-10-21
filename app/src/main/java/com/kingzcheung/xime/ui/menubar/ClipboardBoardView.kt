@@ -87,6 +87,7 @@ internal fun ConnectedClipboardBoard(
     LaunchedEffect(Unit) { store.refresh() }
     val manager = remember(context) { ClipboardManager.getInstance(context) }
     val unpinnedTotal by manager.unpinnedCount.collectAsState()
+    val room by manager.room.collectAsState()
     // Older history is read page by page while open; closing returns to the first page.
     DisposableEffect(manager) { onDispose { manager.resetHistoryWindow() } }
     val cardMaxLines = remember(prefs) { clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4)) }
@@ -163,7 +164,7 @@ internal fun ConnectedClipboardBoard(
         }, cardMaxLines = cardMaxLines,
         searchQuery = (liveQuery?.display ?: boardQuery).takeIf { it.isNotBlank() },
         onClearSearch = { manager.boardQuery.value = "" }, searchChip = liveQuery == null,
-        onOpenSearch = onOpenSearch)
+        onOpenSearch = onOpenSearch, full = room.full)
 }
 
 /** Preference (board prefs) for how many lines a history card shows: 2, 4 or 8. */
@@ -196,6 +197,8 @@ internal fun ClipboardBoardView(
     onOpenSearch: (() -> Unit)? = null,
     /** False while the keyboard search field above shows the query: no second copy of it here. */
     searchChip: Boolean = true,
+    /** History is as large as this device can search smoothly: new copies are not being saved. */
+    full: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     var filter by remember(initialImages) { mutableStateOf(if (initialImages) ClipboardFilter.IMAGE else ClipboardFilter.ALL) }
@@ -289,8 +292,9 @@ internal fun ClipboardBoardView(
         val visibleCards = remember(content) { content.visible }
         val focused = focusedKey?.takeIf { key -> visibleCards.any { it.key == key } }
             ?: visibleCards.firstOrNull()?.key
-        val gridKeys = remember(content, failure != null) {
+        val gridKeys = remember(content, failure != null, full) {
             buildList {
+                if (full) add("full")
                 if (failure != null) add("failure")
                 addAll(content.pinned.map { it.key })
                 if (content.pinned.isNotEmpty() && content.recent.isNotEmpty()) add("pins-end")
@@ -464,6 +468,11 @@ internal fun ClipboardBoardView(
                     state = gridState,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp), verticalItemSpacing = 6.dp) {
+                    if (full) item(key = "full", span = StaggeredGridItemSpan.FullLine) {
+                        Text("剪贴板已满，新复制的内容不再保存。删掉一些记录后恢复。",
+                            Modifier.padding(horizontal = 4.dp, vertical = 6.dp).testTag("clipboard-full"),
+                            color = colors.error, fontSize = 13.sp)
+                    }
                     if (failure != null) item(key = "failure", span = StaggeredGridItemSpan.FullLine) {
                         ClipboardImageFailureNotice(failure, onSystemPaste, onShare, onDismissFailure)
                     }

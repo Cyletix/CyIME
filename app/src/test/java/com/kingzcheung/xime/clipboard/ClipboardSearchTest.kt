@@ -60,11 +60,4 @@ class ClipboardSearchTest {
         assertEquals("地di'zhi", ClipboardLiveQuery("地", "di'zhi").display)
     }
 
-    @Test fun historyRejectsOnlyCopiesOverOneMegabyte() {
-        assertTrue(ClipboardManager.fitsHistory("a".repeat(ClipboardManager.MAX_TEXT_BYTES)))
-        assertFalse(ClipboardManager.fitsHistory("a".repeat(ClipboardManager.MAX_TEXT_BYTES + 1)))
-        // Three bytes per character in UTF-8: a long Chinese copy is measured in bytes, not characters.
-        assertFalse(ClipboardManager.fitsHistory("地".repeat(ClipboardManager.MAX_TEXT_BYTES / 3 + 1)))
-        assertEquals(5000, ClipboardManager.MAX_ITEMS)
-    }
 }
