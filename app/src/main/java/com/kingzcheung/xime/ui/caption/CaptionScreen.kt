@@ -308,18 +308,22 @@ private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -
 /** 字幕语言：三个整行大按钮，当前的那个打勾；没下载的模型写明要下多大。 */
 @Composable
 private fun LanguageDialog(current: CaptionLanguage, missing: (CaptionLanguage) -> String?, onPick: (CaptionLanguage) -> Unit, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("字幕听哪种语言？", fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                for (language in CaptionLanguage.entries) {
-                    val size = missing(language)
-                    val label = (if (language == current) "✓ " else "") + language.label + (size?.let { "（先下载 $it）" } ?: "")
-                    CaptionButton(label, Modifier.fillMaxWidth(),
-                        emphasis = if (language == current) CaptionEmphasis.Primary else CaptionEmphasis.Normal) { onPick(language) }
-                }
-                BigButton("取消", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
+    Dialog(onDismissRequest = onDismiss) { LanguagePickerCard(current, missing, onPick, onDismiss) }
+}
+
+/** The language picker's card, on its own so it can be drawn without a dialog window. */
+@Composable
+internal fun LanguagePickerCard(current: CaptionLanguage, missing: (CaptionLanguage) -> String?, onPick: (CaptionLanguage) -> Unit, onDismiss: () -> Unit) {
+    Surface(shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("字幕听哪种语言？", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            for (language in CaptionLanguage.entries) {
+                val size = missing(language)
+                val label = (if (language == current) "✓ " else "") + language.label + (size?.let { "（先下载 $it）" } ?: "")
+                CaptionButton(label, Modifier.fillMaxWidth(),
+                    emphasis = if (language == current) CaptionEmphasis.Primary else CaptionEmphasis.Normal) { onPick(language) }
             }
+            BigButton("取消", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
         }
     }
 }
@@ -522,7 +526,7 @@ private fun SpeakerMenu(speaker: SpeakerUi, controller: CaptionController, onDis
     val others = controller.speakers.filter { it.id != speaker.id && it.id != CaptionController.REPLY_SPEAKER }
     fun name(value: String) { controller.rename(speaker.id, value, remember); onDismiss() }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(.9f).padding(16.dp), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(Modifier.fillMaxWidth(.9f).padding(16.dp), shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
             // 横屏高度不够时整页可滚动，确认按钮永远够得着。
             Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("这是谁？", fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -568,7 +572,7 @@ private fun SpeakerMenu(speaker: SpeakerUi, controller: CaptionController, onDis
 @Composable
 private fun ReassignDialog(turn: Turn, controller: CaptionController, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(.9f).padding(16.dp), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(Modifier.fillMaxWidth(.9f).padding(16.dp), shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("这句话是谁说的？", fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Text(turn.text, fontSize = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -586,7 +590,7 @@ private fun ReassignDialog(turn: Turn, controller: CaptionController, onDismiss:
 @Composable
 private fun BigChoiceDialog(title: String, yes: String, no: String, onYes: () -> Unit, onNo: () -> Unit) {
     Dialog(onDismissRequest = onNo) {
-        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(title, fontSize = 28.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
