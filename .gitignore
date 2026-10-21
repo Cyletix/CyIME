@@ -70,3 +70,6 @@ zipformer识别测试.txt
 .codex-artifacts/
 # 私人释义补充包：打包器临时放入，只进“装到我的设备”，不得提交
 app/src/main/assets/gloss/cyime_gloss-private.tsv
+# Python 字节码缓存、JVM 崩溃日志
+__pycache__/
+hs_err_pid*.log
