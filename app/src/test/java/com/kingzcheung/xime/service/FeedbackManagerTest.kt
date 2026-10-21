@@ -20,6 +20,17 @@ class FeedbackManagerTest {
         verifyNoInteractions(view)
     }
 
+    @Test fun `caret step vibration follows its own switch`() {
+        val view = mock<View>()
+        val m = manager(HapticMode.Enabled)
+        m.cursorStepFeedback(view)
+        verify(view).performHapticFeedback(eq(HapticFeedbackConstants.TEXT_HANDLE_MOVE), any())
+        clearInvocations(view)
+        FeedbackManager::class.java.getDeclaredField("cursorStepHaptic").apply { isAccessible = true }.set(m, false)
+        m.cursorStepFeedback(view)
+        verifyNoInteractions(view)
+    }
+
     @Test fun `pen erasing plays its own sound with a light tick`() {
         org.junit.Assert.assertEquals("handwriting_erase", KeyFeedbackType.HANDWRITING_ERASE.sound)
         val view = mock<View>()

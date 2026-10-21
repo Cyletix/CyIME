@@ -57,6 +57,8 @@ class FeedbackManager(private val context: Context) {
     private var longPressDuration = 0L
     private var pressAmplitude = 0
     private var longPressAmplitude = 0
+    private var cursorStepHaptic = true
+    private var cursorStepSound = false
 
     companion object {
         /** 设置页「按键音色」写入的偏好键。 */
@@ -71,6 +73,9 @@ class FeedbackManager(private val context: Context) {
 
         /** 设置页「录屏时包含按键音」写入的偏好键，默认关。 */
         const val KEY_SOUND_CAPTURABLE = "key_sound_capturable"
+
+        const val KEY_CURSOR_STEP_HAPTIC = "cursor_step_haptic"
+        const val KEY_CURSOR_STEP_SOUND = "cursor_step_sound"
 
         /** 系统只允许录屏抓取媒体/游戏类声音；默认仍按系统提示音播放（录不到、跟系统音量）。 */
         fun soundUsage(capturable: Boolean): Int =
@@ -151,6 +156,14 @@ class FeedbackManager(private val context: Context) {
         longPressDuration = SettingsPreferences.getVibrationLongPressDuration(context).toLong()
         pressAmplitude = SettingsPreferences.getVibrationPressAmplitude(context)
         longPressAmplitude = SettingsPreferences.getVibrationLongPressAmplitude(context)
+        readCursorStepSettings()
+    }
+
+    /** 「移动光标时振动 / 播放按键音」两个开关，键名与 KeyboardInputPreferences 一致。 */
+    private fun readCursorStepSettings() {
+        val prefs = SettingsPreferences.getPrefsPublic(context)
+        cursorStepHaptic = prefs.getBoolean(KEY_CURSOR_STEP_HAPTIC, true)
+        cursorStepSound = prefs.getBoolean(KEY_CURSOR_STEP_SOUND, false)
     }
 
     private fun registerPrefsListener() {
@@ -171,6 +184,7 @@ class FeedbackManager(private val context: Context) {
                     }
                 }
                 "haptic_mode" -> hapticMode = HapticMode.fromValue(SettingsPreferences.getHapticMode(context))
+                KEY_CURSOR_STEP_HAPTIC, KEY_CURSOR_STEP_SOUND -> readCursorStepSettings()
                 "haptic_on_keyup" -> hapticOnKeyUp = SettingsPreferences.isHapticOnKeyUp(context)
                 "vibration_press_duration" -> pressDuration = SettingsPreferences.getVibrationPressDuration(context).toLong()
                 "vibration_long_press_duration" -> longPressDuration = SettingsPreferences.getVibrationLongPressDuration(context).toLong()
@@ -258,6 +272,12 @@ class FeedbackManager(private val context: Context) {
             }
             view.performHapticFeedback(hfc, flags)
         }
+    }
+
+    /** 移动光标每走一字：按两个开关分别轻震、出声，仍受全局振动模式和按键音开关约束。 */
+    fun cursorStepFeedback(view: View) {
+        if (cursorStepSound) playKeySound(KeyFeedbackType.CURSOR_STEP.sound)
+        if (cursorStepHaptic) hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
     }
 
     fun performKeyPressEffect(keyType: String = "toolbar", view: View) {

@@ -20,6 +20,8 @@ import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.InputGestureLock
 import com.kingzcheung.xime.ui.keyboard.InputGestureLocks
+import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
+import com.kingzcheung.xime.settings.SettingsPreferences
 
 /** Groups of [InputExperienceSettings]; the 布局与显示 sub-pages each show some of them. */
 internal enum class InputExperiencePart { SYMBOLS, FLICK_DISC, KANA, CURSOR, LANGUAGE_HOLD, HANDWRITING, KEY_TEXT }
@@ -163,6 +165,23 @@ internal fun InputExperienceSettings(
                 Text("距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
                 Slider(value = settings.cursorStepDp, onValueChange = { settings = settings.copy(cursorStepDp = it) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
+                // 只在总开关打开时显示：「按键效果」里关了振动或按键音，这里的开关不起作用。
+                @Composable fun cursorStepSwitch(title: String, description: String, checked: Boolean, tag: String,
+                    update: (Boolean) -> KeyboardInputPreferences) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(title, style = MaterialTheme.typography.titleSmall)
+                            Text(description, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(checked = checked, modifier = Modifier.testTag(tag), onCheckedChange = {
+                            settings = update(it); settings.save(context)
+                        })
+                    }
+                }
+                if (SettingsPreferences.getHapticMode(context) != "disabled") cursorStepSwitch("移动光标时振动",
+                    "光标每移动一字轻震一下。", settings.cursorStepHaptic, "cursor-step-haptic") { settings.copy(cursorStepHaptic = it) }
+                if (SettingsPreferences.isSoundEnabled(context)) cursorStepSwitch("移动光标时播放按键音",
+                    "光标每移动一字响一下按键音。", settings.cursorStepSound, "cursor-step-sound") { settings.copy(cursorStepSound = it) }
             }
             if (settings.cursorGesture != CursorGestureMode.SPACE) {
                 HorizontalDivider()
