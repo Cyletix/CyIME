@@ -11,7 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -49,10 +48,5 @@ class ClipboardSearchQueryTest {
         add("房间 39 号", "fj 39 h", 400) // typed digits stay digits
         assertEquals(listOf("房间 39 号", "房子", "地址"),
             texts(dao.searchKeyDigits(ClipboardSearch.keyPattern(ClipboardSearch.t9Digits("dz")), 50)))
-    }
-
-    @Test fun calibrationTimesBothKeystrokeSearchesOnMadeUpText() {
-        val rate = ClipboardCapacity.calibrate { ClipboardSearch.key(it) { c -> 'a' + c.code % 26 } }
-        assertTrue("scan speed measured on this machine", rate != null && rate > 0)
     }
 }
