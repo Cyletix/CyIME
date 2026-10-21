@@ -643,6 +643,10 @@ fun KeyboardView(
                 handwritingPending.confirmAll().takeIf { it.isNotEmpty() }?.let { callbacks.onCommitText?.invoke(it) }
                 clearHandwriting()
             }
+            DisposableEffect(handwritingPending) {
+                viewModel.confirmPendingHandwriting = { if (handwritingPending.size > 0) confirmHandwriting() }
+                onDispose { viewModel.confirmPendingHandwriting = null }
+            }
 
             // 数据源（展开与否即切换点）：展开态下候选栏与展开页同吃全量列表
             // （expandedCandidates，展开时服务层重新拉取）；非展开态候选栏保持

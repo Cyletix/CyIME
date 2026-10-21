@@ -218,6 +218,9 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
 
     fun discardTemporaryHandwriting() { handwritingReturn = null }
 
+    /** 手写板挂上来的“把还没确认的手写字上屏”，实体键盘 Tab 先调它；手写板不在时为 null。 */
+    @Volatile var confirmPendingHandwriting: (() -> Unit)? = null
+
     /** 键盘 ascii 状态机（顶层统一管理各键盘上下文的 ascii 记忆） */
     val asciiStateMachine = KeyboardAsciiStateMachine()
 
