@@ -15,7 +15,12 @@ internal fun floatingDockEdge(
     return if ((offsetY - bottomInset).coerceAtLeast(0f) <= tolerance) FloatingDockEdge.BOTTOM else null
 }
 
-internal const val FLOATING_DOCK_DURATION_MILLIS = 500L
+/**
+ * How long a dragged floating card must rest on the bottom edge before it docks, and how long its
+ * outline takes to morph into the docked shape. One second (was half): with clipboard search open the
+ * card is tall and touched the edge easily while being dragged (user, 2026-10-22).
+ */
+internal const val FLOATING_DOCK_DURATION_MILLIS = 1_000L
 internal const val FLOATING_DRAG_BAR_HEIGHT_DP = 28
 
 /** 移动条覆盖键帽以下的完整空白，卡片本身仍只额外预留原来的 28dp。 */
