@@ -320,6 +320,9 @@ public final class ChatReplay {
         }
         // "commit": "space" picks the first candidate as the user would, so later cases see what was learned.
         if ("space".equals(item.optString("commit"))) engine.nativeProcessKey(' ', 0);
+        // "select": [4, 0] picks those candidates in turn (a phrase made of several picks is learned as one).
+        org.json.JSONArray picks = item.optJSONArray("select");
+        if (picks != null) for (int k = 0; k < picks.length(); k++) engine.nativeSelectCandidateByGlobalIndex(picks.getInt(k));
     }
 
     private JSONObject settle() throws Exception {
