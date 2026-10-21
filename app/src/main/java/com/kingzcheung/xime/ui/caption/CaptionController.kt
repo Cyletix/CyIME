@@ -83,7 +83,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     /** What the captions listen for; remembered. Switching restarts the session with that language's models. */
     var language by mutableStateOf(CaptionLanguage.of(prefs.getString("language", null))); private set
     fun chooseLanguage(next: CaptionLanguage) {
-        if (next == language) return
+        if (next == language || next !in CaptionLanguage.supported) return
         language = next
         prefs.edit().putString("language", next.id).apply()
         if (status == Status.Listening || status == Status.Starting) { pause(); start() }

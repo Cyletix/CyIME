@@ -288,8 +288,10 @@ private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -
     var choosing by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         // 听哪种语言：放在状态这一行最前面，一眼看得到、一点就换；字幕区和按钮都不挤。
-        CaptionButton(controller.language.label + " ▾", height = 40.dp, fontSize = 17.sp) { choosing = true }
-        Spacer(Modifier.width(10.dp))
+        if (CaptionLanguage.supported.size > 1) {
+            CaptionButton(controller.language.label + " ▾", height = 40.dp, fontSize = 17.sp) { choosing = true }
+            Spacer(Modifier.width(10.dp))
+        }
         Box(Modifier.size(12.dp).clip(CircleShape).background(dotColor))
         Spacer(Modifier.width(8.dp))
         Text(text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 280.dp))
@@ -317,7 +319,7 @@ internal fun LanguagePickerCard(current: CaptionLanguage, missing: (CaptionLangu
     Surface(shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("字幕听哪种语言？", fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            for (language in CaptionLanguage.entries) {
+            for (language in CaptionLanguage.supported) {
                 val size = missing(language)
                 val label = (if (language == current) "✓ " else "") + language.label + (size?.let { "（先下载 $it）" } ?: "")
                 CaptionButton(label, Modifier.fillMaxWidth(),

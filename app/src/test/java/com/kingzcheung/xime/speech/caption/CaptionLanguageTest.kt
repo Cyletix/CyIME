@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.speech.caption
 
 import org.junit.Assert.assertEquals
+import com.kingzcheung.xime.ui.caption.CaptionLanguage
 import org.junit.Test
 
 class CaptionLanguageTest {
@@ -21,5 +22,15 @@ class CaptionLanguageTest {
         assertEquals("はい、そうです。", chooseFinal("はいそうです", "はい、そうです。", chineseOnly = false))
         assertEquals("Nice to meet you.", chooseFinal("nice to meet you", "Nice to meet you.", chineseOnly = false))
         assertEquals("你好", chooseFinal("你好", "こんにちは", chineseOnly = true))
+    }
+
+    @Test fun `elder package captions offer only Chinese, and a restored Japanese choice reads as Chinese`() {
+        val elder = CaptionLanguage.forPackage(elder = true)
+        assertEquals(listOf(CaptionLanguage.CHINESE), elder)
+        assertEquals(CaptionLanguage.CHINESE, CaptionLanguage.of("ja", elder))
+        assertEquals(CaptionLanguage.CHINESE, CaptionLanguage.of("en", elder))
+        val normal = CaptionLanguage.forPackage(elder = false)
+        assertEquals(CaptionLanguage.JAPANESE, CaptionLanguage.of("ja", normal))
+        assertEquals(CaptionLanguage.CHINESE, CaptionLanguage.of(null, normal))
     }
 }
