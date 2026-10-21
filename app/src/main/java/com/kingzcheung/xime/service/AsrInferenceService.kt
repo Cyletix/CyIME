@@ -173,7 +173,7 @@ class AsrInferenceService : Service() {
                             if (generation.get() == token) try { callback.onError(message) } catch (_: Exception) { }
                         },
                         onRegion = { id, samples, boundary -> recorder?.region(id, samples, boundary) }) },
-                    owner = callback.asBinder(), isActive = { generation.get() == token })
+                    owner = callback.asBinder(), isActive = { generation.get() == token && captionOwner == null })
                 val readyAt = SystemClock.elapsedRealtime()
                 val modelState = if (constructed) "loaded" else if (ready) "resident" else "superseded"
                 FileLogger.i("AsrInferenceService", "start ready=$ready model=$modelState " +
@@ -245,6 +245,17 @@ class AsrInferenceService : Service() {
             cancelIdleRelease()
             val token = captionGeneration.incrementAndGet()
             val owner = callback.asBinder()
+            // Captions and keyboard dictation never take the engine from each other: a start would
+            // cancel the other's session. Dictation in use refuses captions (call captions retry);
+            // captions hold their claim from the start of the model load, so dictation cannot slip in.
+            val claimed = sessions.atomically {
+                // Busy with no caption claim means dictation; another caption owner is still replaced.
+                if (sessions.busyWithOther(owner) && captionOwner == null) false else { captionOwner = owner; true }
+            }
+            if (!claimed) {
+                try { callback.onError("键盘语音正在用，说完再开字幕") } catch (_: Exception) { }
+                return false
+            }
             return try {
                 // The language is the user's choice on the caption page, never auto-detected: detection
                 // turned accented Mandarin into Japanese. Japanese is ReazonSpeech Zipformer alone (user
@@ -283,18 +294,24 @@ class AsrInferenceService : Service() {
                 if (ready) {
                     captionOwner = owner
                     try { owner.linkToDeath({ if (captionOwner == owner) { captionOwner = null; sessions.cancel(owner); scheduleRelease() } }, 0) } catch (_: Exception) { }
-                } else scheduleRelease()
+                } else { releaseCaptionClaim(owner, token); scheduleRelease() }
                 ready
             } catch (e: Exception) {
+                releaseCaptionClaim(owner, token)
                 FileLogger.e("AsrInferenceService", "caption start failed", e)
                 if (captionGeneration.get() == token) try { callback.onError(e.message ?: "离线语音模型加载失败") } catch (_: Exception) { }
                 scheduleRelease()
                 false
             } catch (e: LinkageError) {
+                releaseCaptionClaim(owner, token)
                 if (captionGeneration.get() == token) try { callback.onError("识别运行库无法加载：${e.message}") } catch (_: Exception) { }
                 scheduleRelease()
                 false
             }
+        }
+        /** A failed or superseded caption start gives its claim back, unless a newer start took it over. */
+        private fun releaseCaptionClaim(owner: IBinder, token: Long) = sessions.atomically {
+            if (captionOwner == owner && captionGeneration.get() == token) captionOwner = null
         }
         override fun push(session: IBinder, audioData: ByteArray) = sessions.acceptPcm(audioData, session)
         override fun stop(session: IBinder) {
