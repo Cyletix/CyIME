@@ -99,11 +99,16 @@ object HandwritingTemplates {
 
     /** 内置默认模板（只读，不参与 [MAX_PER_LABEL] 淘汰，不写进个人模板文件）。 */
     private val defaults = HashMap<Script, List<Entry>>()
-    private const val DEFAULT_ASSET = "handwriting/kana_default_strokes.json"
-    private const val DEFAULT_CACHE = "kana_default_och_v1.json"
-    /** 电脑上用内置汉字手写模型预先算好的假名特征（[uint16 类序号, float16 值] × n）及模型哈希、标签顺序。 */
-    private const val DEFAULT_VECTORS = "handwriting/kana_default_och.bin"
-    private const val DEFAULT_VECTORS_META = "handwriting/kana_default_och.json"
+    /**
+     * 内置模板组：假名，以及内置汉字模型认不出的日本字（込、働…，见 [JapaneseKanji]）。两组分开存放，
+     * 每组 = 笔画（现算用）+ 预算特征 + 特征的模型哈希与标签。
+     */
+    private class BuiltinSet(val strokes: String, val vectors: String, val meta: String)
+    private val BUILTIN_SETS = listOf(
+        BuiltinSet("handwriting/kana_default_strokes.json", "handwriting/kana_default_och.bin", "handwriting/kana_default_och.json"),
+        BuiltinSet("handwriting/japanese_kanji_strokes.json", "handwriting/japanese_kanji_och.bin", "handwriting/japanese_kanji_och.json"),
+    )
+    private const val DEFAULT_CACHE = "kana_default_och_v2.json"
     /** 自己写的模板比内置模板多算的相似度，同样像时排在前面。 */
     private const val PERSONAL_BONUS = 0.03f
 
@@ -160,12 +165,15 @@ object HandwritingTemplates {
 
     /** 一个字的笔迹算成特征；在后台线程调用（假名要走手写服务进程）。 */
     private fun feature(context: Context, script: Script, strokes: List<List<Pair<Float, Float>>>): Feature? = when (script) {
-        Script.KANA -> {
-            HandwritingEngine.initialize(context, InputLanguage.JAPANESE)
-            HandwritingEngine.predictRaw(strokes, OCH_TOP_N).takeIf { it.isNotEmpty() }
-                ?.let { raw -> Feature.fromProbabilities(raw.map { it.index to it.score }) }
-        }
+        Script.KANA -> kanaRaw(context, strokes).takeIf { it.isNotEmpty() }
+            ?.let { raw -> Feature.fromProbabilities(raw.map { it.index to it.score }) }
         Script.LATIN -> FormulaRecognizer.embed(context, strokes)?.let { Feature(dense = it) }
+    }
+
+    /** 假名特征的来源：内置汉字手写模型概率最高的若干类（同一份结果也给出模型认出的漢字）。 */
+    private fun kanaRaw(context: Context, strokes: List<List<Pair<Float, Float>>>): List<HandwritingRawCandidate> {
+        HandwritingEngine.initialize(context, InputLanguage.JAPANESE)
+        return HandwritingEngine.predictRaw(strokes, OCH_TOP_N)
     }
 
     private fun sha256(file: File): String {
@@ -237,13 +245,17 @@ object HandwritingTemplates {
             }
         }.getOrNull()
         val list = cached ?: runCatching {
-            decodePrecomputed(context.assets.open(DEFAULT_VECTORS_META).bufferedReader(Charsets.UTF_8).use { it.readText() },
-                context.assets.open(DEFAULT_VECTORS).use { it.readBytes() }, sha256(model))
-                ?.map { (label, feat) -> Entry(label, feat, "builtin") }
+            val sha = sha256(model)
+            BUILTIN_SETS.flatMap { set ->
+                decodePrecomputed(context.assets.open(set.meta).bufferedReader(Charsets.UTF_8).use { it.readText() },
+                    context.assets.open(set.vectors).use { it.readBytes() }, sha)
+                    ?.map { (label, feat) -> Entry(label, feat, "builtin") } ?: return@runCatching null
+            }
         }.onFailure { Log.w(TAG, "precomputed kana templates unreadable", it) }.getOrNull() ?: runCatching {
-            val chars = JSONObject(context.assets.open(DEFAULT_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() })
-                .getJSONObject("chars")
             val out = mutableListOf<Entry>()
+            for (set in BUILTIN_SETS) {
+            val chars = JSONObject(context.assets.open(set.strokes).bufferedReader(Charsets.UTF_8).use { it.readText() })
+                .getJSONObject("chars")
             for (label in chars.keys()) {
                 val variants = chars.getJSONArray(label)
                 for (i in 0 until variants.length()) {
@@ -255,6 +267,7 @@ object HandwritingTemplates {
                     }
                     feature(context, script, strokes)?.let { out += Entry(label, it, "builtin") }
                 }
+            }
             }
             if (out.isEmpty()) return
             val arr = JSONArray()
@@ -334,14 +347,22 @@ object HandwritingTemplates {
         val list = synchronized(this) { entries(context, script).toList() }
         val builtin = synchronized(this) { defaults[script].orEmpty() }
         if (list.isEmpty() && builtin.isEmpty()) return emptyList()
-        val query = feature(context, script, strokes) ?: return emptyList()
+        // 日语：同一次模型输出既当假名特征，也直接给出漢字（换成日语字形、按日语常用度）
+        val raw = if (script == Script.KANA) kanaRaw(context, strokes) else emptyList()
+        val query = (if (script == Script.KANA) raw.takeIf { it.isNotEmpty() }?.let { r -> Feature.fromProbabilities(r.map { it.index to it.score }) }
+            else feature(context, script, strokes)) ?: return emptyList()
         lastFeature = query
         lastScript = script
-        return rank(query, list.map { it.label to it.feat }, builtin.map { it.label to it.feat }, topK)
+        val kanji = if (script == Script.KANA) JapaneseKanji.tableFor(context) else null
+        return rank(query, list.map { it.label to it.feat }, builtin.map { it.label to it.feat }, topK, raw, kanji)
     }
 
-    /** 每个字取最像的模板；自己的模板加 [PERSONAL_BONUS]。分数换算到 0~1。 */
-    internal fun rank(query: Feature, personal: List<Pair<String, Feature>>, builtin: List<Pair<String, Feature>>, topK: Int): List<Pair<String, Float>> {
+    /**
+     * 每个字取最像的模板；自己的模板加 [PERSONAL_BONUS]。日语另加模型认出的漢字并按常用度微调。
+     * 分数换算到 0~1。
+     */
+    internal fun rank(query: Feature, personal: List<Pair<String, Feature>>, builtin: List<Pair<String, Feature>>, topK: Int,
+                      raw: List<HandwritingRawCandidate> = emptyList(), kanji: JapaneseKanji.Table? = null): List<Pair<String, Float>> {
         val best = HashMap<String, Float>()
         for ((label, feat) in personal) {
             val s = query.dot(feat) + PERSONAL_BONUS
@@ -350,6 +371,10 @@ object HandwritingTemplates {
         for ((label, feat) in builtin) {
             val s = query.dot(feat)
             if (s > (best[label] ?: -2f)) best[label] = s
+        }
+        if (kanji != null) {
+            JapaneseKanji.addModelKanji(best, raw, query, kanji)
+            JapaneseKanji.applyFrequency(best, kanji)
         }
         return best.entries.sortedByDescending { it.value }.take(topK)
             .map { it.key to ((it.value + 1f) / 2f).coerceIn(0.0001f, 1f) }
