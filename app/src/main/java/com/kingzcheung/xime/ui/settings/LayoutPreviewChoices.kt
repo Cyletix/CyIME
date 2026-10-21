@@ -86,7 +86,7 @@ internal fun LayoutPreviewChoices(
                         containerColor, contentColor, accentColor, "$itemTagPrefix${layout.id}", { onSelect(layout.id) }) {
                                 if (rows.isEmpty()) Icon(Icons.Outlined.Keyboard, "${layout.displayName}布局", tint = contentColor)
                                 else MiniatureKeyboard(rows, layout.kind in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED),
-                                    contentColor, Modifier.testTag("layout-preview:${layout.id}"), fillKeys = !containerColor.isPureBlack(),
+                                    contentColor, Modifier.testTag("layout-preview:${layout.id}"), fillKeys = !containerColor.isNearBlack(),
                                     equalMergedKeys = layout.kind == LayoutKind.MERGED && CustomKeyboardLayouts.find(layout.id) == null,
                                     qwertyStagger = qwertyPreviewStagger)
                     }
@@ -108,7 +108,7 @@ internal fun PreviewChoiceCard(label: String, chosen: Boolean, width: Dp, previe
     onSelect: () -> Unit, isAction: Boolean = false, preview: @Composable BoxScope.() -> Unit) {
     Surface(shape = RoundedCornerShape(14.dp), color = containerColor,
         border = BorderStroke(if (chosen) 1.5.dp else 1.dp,
-            if (chosen) accentColor else contentColor.copy(alpha = .12f))) {
+            if (chosen) accentColor else contentColor.copy(alpha = idleBorderAlpha(containerColor)))) {
         Column(Modifier.width(width).testTag(tag).then(if (isAction) Modifier.clickable(role = Role.Button, onClick = onSelect)
             else Modifier.selectable(chosen, role = Role.RadioButton, onClick = onSelect))) {
             Box(Modifier.fillMaxWidth().height(previewHeight).padding(4.dp), contentAlignment = Alignment.Center) {
@@ -173,6 +173,8 @@ private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, c
                 val w = if (equalMergedKeys) (rowWidth - gap * (row.size - 1)) / row.size else rowUnit * span + gap * (span - 1)
                 val y = r * (h + gap)
                 if (fillKeys) drawRoundRect(contentColor.copy(alpha = .10f), Offset(x, y), Size(w, h), CornerRadius(3.dp.toPx()))
+                else drawRoundRect(contentColor.copy(alpha = .30f), Offset(x, y), Size(w, h), CornerRadius(3.dp.toPx()),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx() / 2))
                 paint.color = contentColor.copy(alpha = .90f).toArgb()
                 paint.textSize = minOf(h * .40f, w / ((if (equalMergedKeys) 2 else key.length) * .65f + .6f), 13.dp.toPx())
                 drawContext.canvas.nativeCanvas.drawText(key, x + w / 2, y + h / 2 - (paint.ascent() + paint.descent()) / 2, paint)
@@ -183,8 +185,11 @@ private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, c
     }
 }
 
-/** 纯黑底（黑白主题深色）不铺任何灰色：选中只靠描边和对勾，缩略键盘只画字。 */
-internal fun Color.isPureBlack(): Boolean = alpha > .99f && red < .01f && green < .01f && blue < .01f
+/** 近黑底（黑白主题深色）不铺灰：卡片和缩略键盘只描边，选中靠亮描边和对勾。 */
+internal fun Color.isNearBlack(): Boolean = alpha > .99f && maxOf(red, green, blue) < .14f
 
 internal fun chosenFill(containerColor: Color, accentColor: Color): Color =
-    if (containerColor.isPureBlack()) containerColor else accentColor.copy(alpha = .16f).compositeOver(containerColor)
+    if (containerColor.isNearBlack()) containerColor else accentColor.copy(alpha = .16f).compositeOver(containerColor)
+
+/** 未选中卡片的边：近黑底上加亮到看得出（与键盘的细白边一致）。 */
+internal fun idleBorderAlpha(containerColor: Color): Float = if (containerColor.isNearBlack()) .30f else .12f

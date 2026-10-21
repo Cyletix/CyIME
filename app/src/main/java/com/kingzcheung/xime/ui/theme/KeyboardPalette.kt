@@ -46,8 +46,8 @@ object PureBlackTheme {
     const val ID = "pure_black"
 
     // 浅色：按键与底色对比 ≥1.2，功能键比字母键更突出；数值见 tools/theme_audit.py。
-    // 深色是纯黑（2026-10-22 用户要求不要任何灰色大块）：底、字母键、功能键、回车都是黑色，
-    // 按键靠空隙和白字区分；只留选中标记、分隔线这类细小的深灰。
+    // 深色是纯黑（2026-10-22 用户：不要灰色大块）：底、字母键、功能键、回车都是黑色，
+    // 键边由一圈细白边画出（VisualStyle.blackKeyOutline）；面板卡片同样只描边不铺灰。
     fun create() = SoftBlueTheme.create(ID, "黑白").copy(
         keyboardBgLight = Color(0xFFE8E8EA), keyboardBgDark = Color.Black,
         candidateBarBgLight = Color(0xFFE8E8EA), candidateBarBgDark = Color.Black,
