@@ -29,6 +29,32 @@ class ResidentSpeechSessionOwnerTest {
         } finally { owner.release() }
     }
 
+    @Test fun `a caption claim keeps dictation from replacing it, and live dictation shows as busy`() {
+        val engine = Engine().also { it.allowDecode.countDown() }
+        val owner = ResidentSpeechSessionOwner { it() }
+        val dictation = Any()
+        val caption = Any()
+        var captionClaim: Any? = null
+        try {
+            assertTrue(owner.start("same", { engine }, ::session, owner = dictation))
+            // Dictation is using the engine: a caption start sees it and must not take over.
+            assertTrue(owner.busyWithOther(caption))
+            assertFalse(owner.busyWithOther(dictation))
+            owner.acceptPcm(pcm(16000), dictation)
+            assertEquals("识别结果", owner.finish(dictation))
+            assertFalse(owner.busyWithOther(caption))
+        } finally { owner.release() }
+        val second = ResidentSpeechSessionOwner { it() }
+        try {
+            assertFalse(second.busyWithOther(caption))
+            second.atomically { captionClaim = caption }
+            // Dictation's start checks the claim first and leaves the caption alone.
+            assertFalse(second.start("same", { engine }, ::session, owner = dictation, isActive = { captionClaim == null }))
+            assertTrue(second.start("same", { engine }, ::session, owner = caption))
+            assertTrue(second.busyWithOther(dictation))
+        } finally { second.release() }
+    }
+
     private open class Engine : LocalSpeechEngine {
         override val hasRefinement = false
         override val isStreaming = false

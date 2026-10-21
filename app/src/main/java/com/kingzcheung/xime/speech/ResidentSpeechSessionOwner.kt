@@ -30,6 +30,17 @@ internal class ResidentSpeechSessionOwner(
 
     val isIdle: Boolean get() = synchronized(stateLock) { current == null && starting == null }
 
+    /** Another owner is loading or using the engine (a session already finishing does not count). */
+    fun busyWithOther(owner: Any?): Boolean = synchronized(stateLock) {
+        (starting != null && startingOwner != owner) || current?.let { !it.finishing && it.owner != owner } == true
+    }
+
+    /**
+     * Runs [claim] atomically with every start's first check: a claim made here is seen by a
+     * concurrent [start]'s isActive before that start can replace anything.
+     */
+    fun <T> atomically(claim: () -> T): T = synchronized(stateLock) { claim() }
+
     fun start(
         key: String,
         createEngine: () -> LocalSpeechEngine,
