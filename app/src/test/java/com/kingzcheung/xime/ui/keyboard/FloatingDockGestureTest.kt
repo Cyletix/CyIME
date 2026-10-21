@@ -15,58 +15,61 @@ class FloatingDockGestureTest {
     }
 
     @Test
-    fun holdingAnEdgeArmsAfterHalfASecondAndOnlyReleaseConfirms() {
+    fun holdingAnEdgeArmsAfterASecondAndOnlyReleaseConfirms() {
+        // One second (twice the earlier half second): a tall floating card, e.g. with clipboard search
+        // open, reaches the bottom edge easily while being dragged and must not dock by accident.
+        assertEquals(1_000L, FLOATING_DOCK_DURATION_MILLIS)
         val gesture = FloatingDockGesture()
         gesture.start(FloatingDockEdge.BOTTOM, 100L)
-        assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 599L))
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 600L))
-        assertTrue(gesture.release(FloatingDockEdge.BOTTOM, 700L))
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 800L))
+        assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 1_099L))
+        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 1_100L))
+        assertTrue(gesture.release(FloatingDockEdge.BOTTOM, 1_200L))
+        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 1_300L))
     }
 
     @Test
     fun releasingBeforeTheThresholdKeepsFloating() {
         val gesture = FloatingDockGesture()
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 499L))
+        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 999L))
     }
 
     @Test
     fun leavingAnEdgeClearsThePreviewAndRestartsTheTimerOnReentry() {
         val gesture = FloatingDockGesture()
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 1_000L))
-        assertFalse(gesture.update(null, 1_100L))
-        assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 1_200L))
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 1_699L))
+        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
+        assertFalse(gesture.update(null, 2_100L))
+        assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 2_200L))
+        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 3_199L))
     }
 
     @Test
     fun movingToAnotherEdgeDoesNotCarryOverTheElapsedTime() {
         val gesture = FloatingDockGesture()
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 1_000L))
-        assertFalse(gesture.update(FloatingDockEdge.TOP, 1_100L))
-        assertFalse(gesture.release(FloatingDockEdge.TOP, 1_500L))
+        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
+        assertFalse(gesture.update(FloatingDockEdge.TOP, 2_100L))
+        assertFalse(gesture.release(FloatingDockEdge.TOP, 3_000L))
     }
 
     @Test
     fun cancellationClearsAnArmedGesture() {
         val gesture = FloatingDockGesture()
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 1_000L))
+        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
         gesture.cancel()
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 2_000L))
-        gesture.start(FloatingDockEdge.BOTTOM, 3_000L)
-        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 3_499L))
+        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 3_000L))
+        gesture.start(FloatingDockEdge.BOTTOM, 4_000L)
+        assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 4_999L))
     }
 
     @Test
     fun releaseOutsideTheEdgeRejectsAStalePreview() {
         val gesture = FloatingDockGesture()
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
-        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 1_000L))
-        assertFalse(gesture.release(null, 1_100L))
+        assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
+        assertFalse(gesture.release(null, 2_100L))
     }
 
     @Test
