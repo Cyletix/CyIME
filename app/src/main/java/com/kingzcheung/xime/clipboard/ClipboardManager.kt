@@ -191,6 +191,23 @@ class ClipboardManager private constructor(private val context: Context) {
         return dao.search(ClipboardSearch.likePattern(query), ClipboardSearch.RESULT_LIMIT).map { it.toClipboardItem() }
     }
 
+    /**
+     * The keyboard search field while it is being typed. Without a composition this is [search];
+     * with one, the committed text and the composition are matched together as pinyin initials
+     * (on the 9-key keypad, as the digits of those initials).
+     */
+    internal suspend fun search(query: ClipboardLiveQuery): List<ClipboardItem> {
+        if (query.isBlank) return emptyList()
+        if (query.composing.isBlank()) return search(query.text)
+        val typed = searchKey(query.text).takeIf { it != ClipboardSearch.EMPTY_KEY }.orEmpty().replace(" ", "")
+        val key = typed + ClipboardSearch.composingInitials(query.composing, AndroidPinyinInitials::initialOf)
+        if (key.isEmpty()) return search(query.text)
+        clipboardPinsReady.await()
+        val found = if (query.t9) dao.searchKeyDigits(ClipboardSearch.keyPattern(ClipboardSearch.t9Digits(key)), ClipboardSearch.RESULT_LIMIT)
+            else dao.searchKey(ClipboardSearch.keyPattern(key), ClipboardSearch.RESULT_LIMIT)
+        return found.map { it.toClipboardItem() }
+    }
+
     private fun searchKey(text: String) = ClipboardSearch.key(text, AndroidPinyinInitials::initialOf)
 
     private val _recentItems = MutableStateFlow<List<ClipboardItem>>(emptyList())

@@ -65,8 +65,16 @@ class ClipboardSearchRenderTest {
         ClipboardItem(14, "地址确认后再下单", timestamp = 600),
     )
 
+    private val history = matches + listOf(
+        ClipboardItem(21, "https://example.com/order/12345", timestamp = 1000),
+        ClipboardItem(22, "明天下午三点开会", timestamp = 990),
+        ClipboardItem(23, "090-1234-5678", timestamp = 980),
+    )
+
+    /** [field] is what the search field holds, [composing] the word still being typed (candidate bar). */
     @Composable
-    private fun SearchScene(theme: String, dark: Boolean, glass: Boolean, width: Int, floating: Boolean, label: String) {
+    private fun SearchScene(theme: String, dark: Boolean, glass: Boolean, width: Int, floating: Boolean, label: String,
+        field: String = "", composing: String = "di'zhi", shown: List<ClipboardItem> = matches) {
         val palette = resolveKeyboardPalette(theme, dark)
         Column(Modifier.padding(4.dp)) {
             Text(label, fontSize = 10.sp, color = Color.White)
@@ -79,20 +87,26 @@ class ClipboardSearchRenderTest {
                     Box(Modifier.width(width.dp).background(wallpaper), contentAlignment = Alignment.BottomCenter) {
                         Column(Modifier.width(if (floating) (width * .82f).dp else width.dp)
                             .then(if (floating) Modifier.padding(bottom = 24.dp).clip(RoundedCornerShape(16.dp)) else Modifier)) {
-                            ClipboardBoardView(matches, emptyList(), false, false, setOf("text:1"), false, null,
+                            ClipboardBoardView(shown, emptyList(), false, false, setOf("text:1"), false, null,
                                 onBack = {}, onQuickSend = {}, onSelectText = {}, onSelectImage = {},
                                 onSplit = { _, _ -> }, onAddQuick = {}, onPinsChange = {}, onRemove = {},
                                 onPhotoAccess = {}, onPick = {}, onSystemPaste = {}, onShare = { _, _ -> },
-                                onPullRemote = null, onAddPinned = {}, searchQuery = "dz", onOpenSearch = {},
+                                onPullRemote = null, searchQuery = (field + composing).takeIf { it.isNotBlank() },
+                                searchChip = false,
                                 modifier = Modifier.fillMaxWidth().height(200.dp))
                             // 搜索框：就是工具面板（同一组件、同一位置）。
-                            ToolPanel(title = "搜索剪贴板", isFocused = false, initialText = "dz",
+                            ToolPanel(title = "搜索剪贴板", isFocused = false, initialText = field,
                                 backgroundColor = Color.Transparent, textColor = palette.text, accentColor = palette.accent,
                                 cardBgColor = palette.key, onClose = {}, onFocusChange = {},
                                 heightDp = CLIPBOARD_SEARCH_PANEL_HEIGHT, hint = "文字或拼音首字母", statusText = "",
                                 singleLine = true, modifier = Modifier.background(palette.background))
-                            // 键盘：尺寸和位置不变（占位）。
-                            Box(Modifier.fillMaxWidth().height(220.dp).background(palette.background),
+                            // 候选栏与键盘：尺寸和位置不变（占位，真实键盘不变）。
+                            Box(Modifier.fillMaxWidth().height(36.dp).background(palette.background).padding(horizontal = 10.dp),
+                                contentAlignment = Alignment.CenterStart) {
+                                Text(if (composing.isEmpty()) "（候选栏）" else "$composing   地址  弟子  底账 …（候选栏占位）",
+                                    fontSize = 12.sp, color = palette.text.copy(alpha = .6f))
+                            }
+                            Box(Modifier.fillMaxWidth().height(184.dp).background(palette.background),
                                 contentAlignment = Alignment.Center) {
                                 Text("键盘（26 键 / 九键，尺寸位置不变）", fontSize = 12.sp, color = palette.text.copy(alpha = .6f))
                             }
@@ -119,6 +133,12 @@ class ClipboardSearchRenderTest {
                     SearchScene("soft_blue", true, false, 800, false, "平板 固定 深色")
                     SearchScene("pure_black", false, true, 360, true, "手机 悬浮 纯白 玻璃")
                 }
+                Row {
+                    SearchScene("soft_blue", false, false, 360, false, "刚打开：全部记录", composing = "", shown = history)
+                    SearchScene("soft_blue", false, false, 360, false, "选了「地址」", field = "地址", composing = "")
+                    SearchScene("soft_blue", false, false, 360, false, "没有匹配", composing = "xyz", shown = emptyList())
+                    SearchScene("soft_blue", true, true, 360, false, "剪贴板为空", composing = "", shown = emptyList())
+                }
                 Text("搜索面板高 $CLIPBOARD_SEARCH_PANEL_HEIGHT dp", fontSize = 10.sp, color = Color.White)
             }
         }
@@ -127,6 +147,6 @@ class ClipboardSearchRenderTest {
         val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
         rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
         File(out!!).mkdirs()
-        File(out, "clipboard-search-v2.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(out, "clipboard-search-v3.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

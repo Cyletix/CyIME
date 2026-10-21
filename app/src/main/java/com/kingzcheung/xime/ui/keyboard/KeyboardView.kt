@@ -722,16 +722,10 @@ fun KeyboardView(
                 val clipboardContext = androidx.compose.ui.platform.LocalContext.current
                 val clipboard = remember(clipboardContext) {
                     com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(clipboardContext) }
-                com.kingzcheung.xime.ui.menubar.ConnectedClipboardBoard(
-                    state.clipboardItems, initialImages = false, expanded = false,
-                    onBack = {}, onQuickSend = {},
-                    onSelectText = { text -> callbacks.onClipboardSearchSelect?.invoke(text) },
-                    onRemoveText = viewModel::removeClipboardItems, onAddQuick = {}, onSplit = { _, _ -> },
-                    onImageSelect = {}, onImageShare = { _, _ -> }, onSystemPaste = {}, onPullRemote = null,
-                    keepQueryOnDispose = true,
+                ClipboardSearchResults(clipboard, candidateState, isT9Schema(state.currentSchemaId),
+                    state.clipboardItems, callbacks, viewModel::removeClipboardItems,
                     // Height animates in the service together with the IME container (pull-up motion).
-                    modifier = Modifier.fillMaxWidth().height(state.clipboardSearchResultsHeight.dp),
-                )
+                    Modifier.fillMaxWidth().height(state.clipboardSearchResultsHeight.dp))
                 ToolPanel(
                     title = "搜索剪贴板",
                     isFocused = true,
@@ -1994,3 +1988,32 @@ private data class DeletePendingWord(
     val word: String,
     val onConfirm: () -> Unit,
 )
+
+/**
+ * The clipboard above the search field, showing what the field matches as it is typed: committed
+ * text, plus the word still being composed (its pinyin initials; on the 9-key keypad, its keys).
+ * The composition is read here, so each key recomposes only this board, not the whole keyboard.
+ */
+@Composable
+private fun ClipboardSearchResults(
+    clipboard: com.kingzcheung.xime.clipboard.ClipboardManager,
+    candidateState: State<CandidateState>,
+    t9: Boolean,
+    items: List<com.kingzcheung.xime.clipboard.ClipboardItem>,
+    callbacks: KeyboardCallbacks,
+    onRemoveText: (List<Long>) -> Unit,
+    modifier: Modifier,
+) {
+    val field by clipboard.boardQuery.collectAsStateWithLifecycle()
+    val composing = candidateState.value.let { if (it.isComposing) it.preeditText else "" }
+    val query = remember(field, composing, t9) { com.kingzcheung.xime.clipboard.ClipboardLiveQuery(field, composing, t9) }
+    com.kingzcheung.xime.ui.menubar.ConnectedClipboardBoard(
+        items, initialImages = false, expanded = false,
+        onBack = {}, onQuickSend = {},
+        onSelectText = { text -> callbacks.onClipboardSearchSelect?.invoke(text) },
+        onRemoveText = onRemoveText, onAddQuick = {}, onSplit = { _, _ -> },
+        onImageSelect = { image -> callbacks.onClipboardSearchImageSelect?.invoke(image) },
+        onImageShare = { _, _ -> }, onSystemPaste = {}, onPullRemote = null,
+        keepQueryOnDispose = true, liveQuery = query, modifier = modifier,
+    )
+}

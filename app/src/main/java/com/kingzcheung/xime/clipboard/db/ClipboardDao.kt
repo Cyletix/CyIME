@@ -31,6 +31,26 @@ interface ClipboardDao {
         "ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
     suspend fun search(pattern: String, limit: Int): List<ClipboardEntry>
 
+    /** Pinyin initials only (a word still being typed); fixed records first, then newest. */
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND searchKey LIKE :pattern " +
+        "ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
+    suspend fun searchKey(pattern: String, limit: Int): List<ClipboardEntry>
+
+    /** Initials as 9-key digits ([pattern] holds digits): the search key read through the keypad. */
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND " +
+        "replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(" +
+        "searchKey, " +
+        "'a', '2'), 'b', '2'), 'c', '2'), " +
+        "'d', '3'), 'e', '3'), 'f', '3'), " +
+        "'g', '4'), 'h', '4'), 'i', '4'), " +
+        "'j', '5'), 'k', '5'), 'l', '5'), " +
+        "'m', '6'), 'n', '6'), 'o', '6'), " +
+        "'p', '7'), 'q', '7'), 'r', '7'), 's', '7'), " +
+        "'t', '8'), 'u', '8'), 'v', '8'), " +
+        "'w', '9'), 'x', '9'), 'y', '9'), 'z', '9')" +
+        " LIKE :pattern ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
+    suspend fun searchKeyDigits(pattern: String, limit: Int): List<ClipboardEntry>
+
     @Query("SELECT id, substr(text, 1, 2000) AS text FROM clipboard_entries WHERE searchKey = '' AND isQuickSend = 0 LIMIT :limit")
     suspend fun missingSearchKeys(limit: Int): List<SearchKeySource>
 

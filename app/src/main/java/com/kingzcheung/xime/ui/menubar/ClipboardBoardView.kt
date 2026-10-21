@@ -70,6 +70,8 @@ internal fun ConnectedClipboardBoard(
     onOpenSearch: (() -> Unit)? = null,
     /** The search view above the keyboard hands its query on to the board when Enter is pressed. */
     keepQueryOnDispose: Boolean = false,
+    /** The keyboard search field, typed live (composition included); null when the board is not searching from it. */
+    liveQuery: ClipboardLiveQuery? = null,
 ) {
     val context = LocalContext.current
     val store = remember(context) { ClipboardImages.getInstance(context) }
@@ -91,7 +93,12 @@ internal fun ConnectedClipboardBoard(
     // A search submitted from the keyboard search bar shows only its matches (fixed records too).
     val boardQuery by manager.boardQuery.collectAsState()
     var searchResults by remember { mutableStateOf<List<ClipboardItem>?>(null) }
-    LaunchedEffect(boardQuery, textItems) {
+    LaunchedEffect(boardQuery, liveQuery, textItems) {
+        if (liveQuery != null) {
+            if (!liveQuery.isBlank) kotlinx.coroutines.delay(120) // Typing a word does not query per key.
+            searchResults = if (liveQuery.isBlank) null else manager.search(liveQuery)
+            return@LaunchedEffect
+        }
         if (boardQuery.isNotBlank()) kotlinx.coroutines.delay(120) // Typing a word does not query per key.
         searchResults = if (boardQuery.isBlank()) null else manager.search(boardQuery)
     }
@@ -154,7 +161,8 @@ internal fun ConnectedClipboardBoard(
             manager.clearAll()
             store.removeImages(images.filterIsInstance<ClipboardCard.Image>().map { it.item.uri }.toSet())
         }, cardMaxLines = cardMaxLines,
-        searchQuery = boardQuery.takeIf { it.isNotBlank() }, onClearSearch = { manager.boardQuery.value = "" },
+        searchQuery = (liveQuery?.display ?: boardQuery).takeIf { it.isNotBlank() },
+        onClearSearch = { manager.boardQuery.value = "" }, searchChip = liveQuery == null,
         onOpenSearch = onOpenSearch)
 }
 
@@ -186,6 +194,8 @@ internal fun ClipboardBoardView(
     searchQuery: String? = null,
     onClearSearch: () -> Unit = {},
     onOpenSearch: (() -> Unit)? = null,
+    /** False while the keyboard search field above shows the query: no second copy of it here. */
+    searchChip: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
     var filter by remember(initialImages) { mutableStateOf(if (initialImages) ClipboardFilter.IMAGE else ClipboardFilter.ALL) }
@@ -399,7 +409,7 @@ internal fun ClipboardBoardView(
                 } else {
                     Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        searchQuery?.let { query ->
+                        searchQuery?.takeIf { searchChip }?.let { query ->
                             CompactClipboardFilter("🔍 $query ✕", true, onClearSearch,
                                 Modifier.testTag("clipboard-search-chip"))
                         }

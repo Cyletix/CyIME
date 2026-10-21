@@ -109,6 +109,7 @@ data class KeyboardCallbacks(
     val onClipboardSearchClose: (() -> Unit)? = null,
     val onClipboardSearchSubmit: (() -> Unit)? = null,
     val onClipboardSearchSelect: ((String) -> Unit)? = null,
+    val onClipboardSearchImageSelect: ((com.kingzcheung.xime.clipboard.ClipboardImage) -> Unit)? = null,
     val onKeyboardModeChange: ((Boolean) -> Unit)? = null,
     val onDismissDeploying: (() -> Unit)? = null,
     val onFloatingModeChange: ((Boolean) -> Unit)? = null,

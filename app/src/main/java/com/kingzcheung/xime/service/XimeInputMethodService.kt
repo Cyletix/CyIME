@@ -2493,7 +2493,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         if (keyCode == KeyEvent.KEYCODE_BACK &&
             (keyboardViewModel.page.value is KeyboardPage.Overlay || keyboardCallbacks?.onDismissPreeditEditor != null ||
-                uiState.value.showKeyboardResize || uiState.value.handwritingExpanded ||
+                uiState.value.showKeyboardResize || uiState.value.handwritingExpanded || uiState.value.clipboardSearchVisible ||
                 (hasHardwareKeyboard && hardwareKeyboardDisplay.screenKeyboardRequested) || canCollapseToVoicePill())) {
             event?.startTracking()
             return true
@@ -2629,6 +2629,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) return true
         }
         if (clipboardConsumed || candidateConsumed) return true
+        // Back leaves clipboard search the way its X does: back to the clipboard, keyboard kept.
+        if (keyCode == KeyEvent.KEYCODE_BACK && uiState.value.clipboardSearchVisible) {
+            if (event?.isCanceled != true) closeClipboardSearch(openBoard = true)
+            return true
+        }
         val overlay = keyboardViewModel.page.value as? KeyboardPage.Overlay
         if (keyCode == KeyEvent.KEYCODE_BACK && overlay != null) {
             if (event?.isCanceled != true) {
