@@ -32,6 +32,10 @@ internal class SpeakerTracker(strictness: Int = 1) {
         var centroid: FloatArray? = null
         var ignored = false
         var named = false
+        /** Born from short probes: keeps learning from its sure probes until a 2 s window matches it. */
+        var fromProbes = false
+        /** Session time it first appeared; fragments are judged only once they are old enough. */
+        var bornMs = 0L
         fun add(print: FloatArray) {
             prints.addLast(print)
             while (prints.size > MAX_PRINTS) prints.removeFirst()
@@ -67,6 +71,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     /** One window of speech ending at [endMs]; returns labels of sentences this window settles or changes. */
     @Synchronized fun addWindow(startMs: Long, endMs: Long, rawPrint: FloatArray): List<Label> {
+        nowMs = endMs
         val print = normalized(rawPrint)
         val scored = speakers.values.map { it to similarity(print, it.centroid) }.maxByOrNull { it.second }
         val window: Window
@@ -77,6 +82,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
             val (best, score) = scored
             val limit = if (best.ignored) threshold - IGNORED_SLACK else threshold
             if (score >= limit) {
+                best.fromProbes = false
                 best.add(print)
                 window = Window(startMs, endMs, print, best.id)
                 unmatched = null
@@ -127,6 +133,14 @@ internal class SpeakerTracker(strictness: Int = 1) {
         val second = ranked.getOrNull(1)?.second ?: -1f
         val sure = best.second >= threshold - PROBE_SLACK && best.second - second >= PROBE_MARGIN
         probes.addLast(Window(startMs, endMs, print, if (sure) best.first.id else -1))
+        nowMs = endMs
+        // A probe-born voice is judged on more and more of its own audio: as its average steadies,
+        // a split of one person (one noisy short probe) drifts back to that person and merges.
+        if (sure && best.first.fromProbes) {
+            best.first.add(print)
+            val merged = mergeSimilar()
+            if (merged.isNotEmpty()) return merged
+        }
         while (probes.size > MAX_WINDOWS * 2) probes.removeFirst()
         // A short reply never fills a 2 s window: two probes in a row unlike everyone known but
         // alike each other are a new person (1.5 s of that voice). PC replay 2026-10-21, 20 tight
@@ -137,6 +151,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
             if (last.size == PROBE_RUN && last.all { p -> (speakers.values.maxOfOrNull { similarity(p.print, it.centroid) } ?: 0f) < PROBE_NEW } &&
                 (0 until PROBE_RUN).all { i -> (i + 1 until PROBE_RUN).all { j -> similarity(last[i].print, last[j].print) >= threshold } }) {
                 val speaker = newSpeaker(last[0].print)
+                speaker.fromProbes = true
                 for (p in last.drop(1)) speaker.add(p.print)
                 for (p in last) p.speaker = speaker.id
                 return revote(last.first().startMs, endMs) + mergeSimilar()
@@ -322,7 +337,47 @@ internal class SpeakerTracker(strictness: Int = 1) {
         nextId = 1; unmatched = null
     }
 
-    private fun newSpeaker(print: FloatArray): Speaker = Speaker(nextId++).also { it.add(print); speakers[it.id] = it }
+    private var nowMs = 0L
+    private fun newSpeaker(print: FloatArray): Speaker = Speaker(nextId++).also { it.add(print); it.bornMs = nowMs; speakers[it.id] = it }
+
+    /** Every labelled sentence or piece as (start, end, speaker), for the after-the-fact re-check. */
+    @Synchronized fun spans(): List<Triple<Long, Long, Int>> =
+        segmentSpan.mapNotNull { (id, span) -> segmentSpeaker[id]?.let { Triple(span[0], span[1], it) } }
+
+    /** Automatic people (not named, not ignored, not the holder or a remembered person). */
+    @Synchronized fun automatic(speakerId: Int): Boolean =
+        speakers[speakerId]?.let { !it.named && !it.ignored && it.id < SELF } == true
+
+    /**
+     * An automatic person who after [FRAGMENT_AGE_MS] still owns under [FRAGMENT_MS] of speech is a
+     * fragment (a sentence tail, a cough, one noisy probe): each of their sentences goes to whoever
+     * spoke nearest in time, and the person disappears.
+     */
+    @Synchronized fun absorbFragments(): List<Label> {
+        val owned = HashMap<Int, Long>()
+        for ((id, span) in segmentSpan) segmentSpeaker[id]?.let { owned[it] = (owned[it] ?: 0) + span[1] - span[0] }
+        if (owned.size < 2) return emptyList()
+        val fragments = speakers.values.filter { sp -> sp.id < SELF && !sp.named && !sp.ignored &&
+            nowMs - sp.bornMs >= FRAGMENT_AGE_MS && (owned[sp.id] ?: 0) < FRAGMENT_MS }.map { it.id }.toSet()
+        if (fragments.isEmpty()) return emptyList()
+        val changed = ArrayList<Label>()
+        val ordered = segmentSpan.entries.sortedBy { it.value[0] }
+        for ((k, entry) in ordered.withIndex()) {
+            val who = segmentSpeaker[entry.key] ?: continue
+            if (who !in fragments) continue
+            val near = (k - 1 downTo 0).asSequence().map { segmentSpeaker[ordered[it].key] }.firstOrNull { it != null && it !in fragments }
+                ?: (k + 1 until ordered.size).asSequence().map { segmentSpeaker[ordered[it].key] }.firstOrNull { it != null && it !in fragments }
+                ?: continue
+            segmentSpeaker[entry.key] = near
+            changed += Label(entry.key, near)
+        }
+        for (id in fragments) speakers.remove(id)
+        // Their windows go to the closest remaining voice (a window must always name someone);
+        // their probes become "unsure", which only defers to the windows.
+        for (w in windows) if (w.speaker in fragments) w.speaker = speakers.values.maxByOrNull { similarity(w.print, it.centroid) }?.id ?: w.speaker
+        for (p in probes) if (p.speaker in fragments) p.speaker = -1
+        return changed
+    }
 
     companion object {
         /** The phone holder (see [seedSelf]); far above any automatic number. */
@@ -330,6 +385,8 @@ internal class SpeakerTracker(strictness: Int = 1) {
         const val PROBE_SLACK = .05f
         const val PROBE_NEW = .32f
         const val PROBE_RUN = 2
+        const val FRAGMENT_MS = 1000L
+        const val FRAGMENT_AGE_MS = 20_000L
         const val PROBE_MARGIN = .08f
         const val WINDOW_MS = 2000L
         const val HOP_MS = 1000L
