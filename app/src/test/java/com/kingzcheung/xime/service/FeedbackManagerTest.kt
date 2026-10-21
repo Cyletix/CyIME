@@ -67,6 +67,19 @@ class FeedbackManagerTest {
         org.junit.Assert.assertEquals("mahjong", FeedbackManager.resolveKeySoundStyle("crisp", hardware = true))
     }
 
+    @Test fun `key sounds stay system sounds unless screen-recording capture is switched on`() {
+        org.junit.Assert.assertEquals(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION, FeedbackManager.soundUsage(false))
+        org.junit.Assert.assertEquals(android.media.AudioAttributes.USAGE_GAME, FeedbackManager.soundUsage(true))
+    }
+
+    @Test fun `capturable key sounds stay quiet in silent and vibrate mode`() {
+        org.junit.Assert.assertTrue(FeedbackManager.mutedByRinger(true, android.media.AudioManager.RINGER_MODE_SILENT))
+        org.junit.Assert.assertTrue(FeedbackManager.mutedByRinger(true, android.media.AudioManager.RINGER_MODE_VIBRATE))
+        org.junit.Assert.assertFalse(FeedbackManager.mutedByRinger(true, android.media.AudioManager.RINGER_MODE_NORMAL))
+        // 默认的系统提示音由系统自己静音，这里不重复拦截。
+        org.junit.Assert.assertFalse(FeedbackManager.mutedByRinger(false, android.media.AudioManager.RINGER_MODE_SILENT))
+    }
+
     @Test fun `feedback actions retain semantic types across keyboard layouts`() {
         mapOf(
             "a" to KeyFeedbackType.CHARACTER, "あ" to KeyFeedbackType.CHARACTER,
