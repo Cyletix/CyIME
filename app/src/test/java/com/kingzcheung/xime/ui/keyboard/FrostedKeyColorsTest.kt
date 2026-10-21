@@ -72,7 +72,7 @@ class FrostedKeyColorsTest {
     }
 
     @Test fun nearBlackKeysStayDarkUnderGlass() {
-        // 2026-10-22 用户选定：黑白主题深色的近黑键帽在玻璃下保持深色，不提成灰；字仍要清楚。
+        // 2026-10-22 用户：黑白主题深色的近黑键帽在玻璃下只稍微提亮——比背景亮一档，不发灰；字仍要清楚。
         val normalKey = Color(0xFF1C1C1E)
         val functionKey = Color(0xFF29292B)
         val glass = FrostedGlassConfig.defaults(true, true)
@@ -80,11 +80,12 @@ class FrostedKeyColorsTest {
             val panel = Color.Black.copy(alpha = glass.backgroundOpacity).compositeOver(host)
             for (key in listOf(normalKey, functionKey)) {
                 val fill = frostedKeyColor(key, Color.White, glass).compositeOver(panel)
-                assertTrue("near-black key is not raised to grey on $host", fill.red - panel.red < 0.065f)
+                assertTrue("near-black key stays dark on $host", fill.red - panel.red < 0.1f)
+                assertTrue("but is still told apart from the panel on $host", fill.red - panel.red > 0.01f)
                 assertTrue(textContrast(Color.White, fill) >= 4.5f)
             }
         }
-        assertEquals(normalKey.red, frostedKeyColor(normalKey, Color.White, glass).red, tolerance)
+        assertEquals(normalKey.red * glassNearBlackLift, frostedKeyColor(normalKey, Color.White, glass).red, tolerance)
         // 其他主题的深色键帽仍按原规则提亮，保持层次。
         val softBlueKey = Color(0xFF2E323A)
         assertTrue(frostedKeyColor(softBlueKey, Color.White, glass).red > softBlueKey.red + 0.1f)
