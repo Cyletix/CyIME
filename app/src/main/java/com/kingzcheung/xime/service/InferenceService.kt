@@ -107,6 +107,15 @@ class InferenceService : Service() {
             return result
         }
 
+        override fun recognizeHandwritingRaw(modelId: String, points: FloatArray, strokePointCounts: IntArray, n: Int): MutableList<String> {
+            if (modelId != MODEL_HANDWRITING || !HandwritingNativeEngine.isInitialized()) return mutableListOf()
+            val result = mutableListOf<String>()
+            for ((ch, idx, score) in HandwritingInference.recognizeRaw(HandwritingInference.decodeStrokes(points, strokePointCounts), n)) {
+                result.add(ch); result.add(idx.toString()); result.add(score.toString())
+            }
+            return result
+        }
+
         override fun processAudioBytes(input: ByteArray, sampleRate: Int): ByteArray {
             var maxSample = 0
             for (i in input.indices step 2) {

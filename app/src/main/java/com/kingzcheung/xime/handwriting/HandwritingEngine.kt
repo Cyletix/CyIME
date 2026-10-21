@@ -16,6 +16,13 @@ data class HandwritingCandidate(
     val score: Float,
 )
 
+/** 手写模型的原始输出：字、模型里的类序号、概率（未按汉字过滤）。 */
+data class HandwritingRawCandidate(
+    val char: String,
+    val index: Int,
+    val score: Float,
+)
+
 /**
  * 手写识别客户端（主进程）：只负责模型生命周期管理与 IPC 代理。
  * 笔画预处理、ONNX 推理与 idx→汉字映射全部在 :inference 进程完成
@@ -132,6 +139,14 @@ object HandwritingEngine {
     ): List<HandwritingCandidate> {
         if (!HandwritingLanguages.supports(language)) return emptyList()
         if (strokes.isEmpty()) return emptyList()
+        when (language) {
+            // 英文：同一个模型里的英文字母和数字（汉字过滤会把它们全部去掉）
+            InputLanguage.ENGLISH -> return HandwritingLanguages.latinCandidates(
+                predictRaw(strokes, HandwritingTemplates.OCH_TOP_N).map { HandwritingCandidate(it.char, it.score) }, topK)
+            // 日语假名由模板比对（HandwritingTemplates），这里不出汉字
+            InputLanguage.JAPANESE -> return emptyList()
+            else -> {}
+        }
         if (!ensureEngineReady()) return emptyList()
         val client = inferenceClient ?: return emptyList()
 
@@ -158,6 +173,25 @@ object HandwritingEngine {
             return emptyList()
         }
         return candidates
+    }
+
+    /** 模型原始输出（概率最高的 [n] 类，不过滤汉字）。在后台线程调用。 */
+    fun predictRaw(strokes: List<List<Pair<Float, Float>>>, n: Int): List<HandwritingRawCandidate> {
+        if (strokes.isEmpty() || n <= 0) return emptyList()
+        if (!ensureEngineReady()) return emptyList()
+        val client = inferenceClient ?: return emptyList()
+        var total = 0
+        for (stroke in strokes) total += stroke.size
+        val points = FloatArray(total * 2)
+        val counts = IntArray(strokes.size)
+        var pi = 0
+        strokes.forEachIndexed { i, stroke ->
+            counts[i] = stroke.size
+            for (pt in stroke) { points[pi++] = pt.first; points[pi++] = pt.second }
+        }
+        val raw = runBlocking { client.recognizeHandwritingRaw(points, counts, n) }
+        if (!client.isBound()) { release(); return emptyList() }
+        return raw
     }
 
     /**
