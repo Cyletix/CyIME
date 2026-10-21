@@ -640,7 +640,11 @@ fun KeyboardView(
                 }
             }
             fun confirmHandwriting() {
-                handwritingPending.confirmAll().takeIf { it.isNotEmpty() }?.let { callbacks.onCommitText?.invoke(it) }
+                handwritingPending.confirmAll().takeIf { it.isNotEmpty() }?.let {
+                    callbacks.onCommitText?.invoke(it)
+                    // 空格确认的首选和点选一样学（只有整段是一个字时才学，无痕时不学）
+                    com.kingzcheung.xime.handwriting.HandwritingTemplates.learnSelection(handwritingContext, it)
+                }
                 clearHandwriting()
             }
             DisposableEffect(handwritingPending) {
