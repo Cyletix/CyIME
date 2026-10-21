@@ -119,8 +119,11 @@ class BlackThemeRenderTest {
                 body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
             File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        for (stage in listOf("before", "after")) {
+        val defaultLift = com.kingzcheung.xime.ui.keyboard.glassNearBlackLift
+        for (stage in listOf("before", "after", "lift2", "lift4")) {
             if (stage == "after") { custom.delete(); reload(); rule.runOnIdle { revision++ } }
+            // 玻璃下近黑按键的提亮倍数对比（默认值为 after）。
+            com.kingzcheung.xime.ui.keyboard.glassNearBlackLift = when (stage) { "lift2" -> 2f; "lift4" -> 4f; else -> defaultLift }
             for (m in listOf("keys26", "panel")) for (d in listOf(true, false)) for (g in listOf(false, true)) {
                 val schema = if (m == "t9") "t9_pinyin" else "rime_ice"
                 KeysConfigHelper.setActiveKeyboardSchema(schema)
@@ -129,6 +132,7 @@ class BlackThemeRenderTest {
                 shot("$stage-$m-${if (d) "dark" else "light"}-${if (g) "glass" else "solid"}")
             }
         }
+        com.kingzcheung.xime.ui.keyboard.glassNearBlackLift = defaultLift
         custom.delete()
     }
 
