@@ -87,6 +87,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         language = next
         prefs.edit().putString("language", next.id).apply()
         if (status == Status.Listening || status == Status.Starting) { pause(); start() }
+        // An error (e.g. the previous language's model missing) must not keep the new language from starting.
+        else if (status == Status.Error) start()
     }
     fun turnReplyCard(flipped: Boolean) { replyFlipped = flipped; flipMemory.write(flipped) }
     private val transcript = CaptionTranscript()
@@ -176,8 +178,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
                 val chosen = language
                 val mode = captionMode(chosen)
                 main.post {
-                    // Chinese: SenseVoice corrects; Japanese: it adds punctuation; English: it is the model.
-                    refinementReady = if (chosen == CaptionLanguage.JAPANESE) senseVoiceReady() else usesSenseVoice(mode)
+                    // Chinese: SenseVoice corrects; English: it is the model; Japanese never uses it.
+                    refinementReady = chosen == CaptionLanguage.JAPANESE || usesSenseVoice(mode)
                     // Only Chinese has a streaming model to offer; the others re-read the sentence instead.
                     streamingReady = chosen != CaptionLanguage.CHINESE || mode != SpeechModelCatalog.SENSEVOICE
                 }
