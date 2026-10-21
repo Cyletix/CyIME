@@ -65,6 +65,8 @@ class ClipboardManager private constructor(private val context: Context) {
 
     private val androidClipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as AndroidClipboardManager
     private var lastSmsClipTimestamp = -1L
+    /** Clips first read while private; reading them again later (another field, incognito off) never saves them. */
+    private val privateClips = PrivateClipMemory()
     val images = ClipboardImages.getInstance(context)
 
     private val clipboardListener = AndroidClipboardManager.OnPrimaryClipChangedListener {
@@ -77,9 +79,15 @@ class ClipboardManager private constructor(private val context: Context) {
             if (clipData != null && clipData.itemCount > 0) {
                 val item = clipData.getItemAt(0)
                 // 系统标记为敏感（如密码管理器复制的密码）或无痕中：不进入历史、图片预览与同步。
-                val private = clipData.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
+                val clipKey = PrivateClipMemory.key(clipData.description.timestamp,
+                    item.text ?: item.uri?.toString() ?: item.intent?.toUri(0))
+                val privateNow = clipData.description.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true ||
                     com.kingzcheung.xime.settings.IncognitoState.active ||
                     com.kingzcheung.xime.settings.SettingsPreferences.isIncognito(context)
+                // A clip copied in a password field (or incognito) stays private: re-reading it within
+                // the next 30 s from a normal field once saved it to history.
+                if (privateNow) privateClips.remember(clipKey)
+                val private = privateNow || clipKey in privateClips
                 val imageMime = (0 until clipData.description.mimeTypeCount).map { clipData.description.getMimeType(it) }
                     .firstOrNull { it.startsWith("image/") }
                 val imageSource = copiedImageSource((0 until clipData.itemCount).mapNotNull { index ->
@@ -630,5 +638,26 @@ class ClipboardManager private constructor(private val context: Context) {
             Log.e(TAG, "MediaStore insert failed", e)
             null
         }
+    }
+}
+
+/**
+ * Clips read while the keyboard was private (password field, incognito, a clip marked sensitive).
+ * Keyed by the clip's own timestamp and content, so the same clip read again later is recognised
+ * and a new copy of the same text (a new timestamp) is not.
+ */
+internal class PrivateClipMemory(private val capacity: Int = 16) {
+    private val keys = ArrayDeque<String>()
+
+    @Synchronized fun remember(key: String) {
+        if (key in keys) return
+        keys.addLast(key)
+        while (keys.size > capacity) keys.removeFirst()
+    }
+
+    @Synchronized operator fun contains(key: String): Boolean = key in keys
+
+    companion object {
+        fun key(timestamp: Long, content: CharSequence?): String = "$timestamp:${content?.toString()?.hashCode() ?: 0}"
     }
 }
