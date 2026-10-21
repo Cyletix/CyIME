@@ -51,6 +51,9 @@ EN_SINGLE_CHOICES = 6    # 单字每个条目看前几个义项
 # 粗口义项不做候选释义（你妈 → “fuck you”）；字面直译说明（lit. …）也不是译文。
 EN_PROFANITY = re.compile(r"\b(?:fuck\w*|shit\w*|cunt|bitch\w*|dick|cock|piss\w*|bastard|whore\w*|motherfuck\w*)\b", re.I)
 EN_ALT_MAX_RANK = 20000   # 换用后面义项时，这个英文的词频名次上限
+LE_MAX_RANK = 8000   # “X了”只给这个名次以内的常用英文动词做过去式（slinked、cribbed 这类不要）
+LE_PAST_MAX_RANK = 20000   # 过去式本身也要在这个名次以内（shallowed、blued 不要）
+LE_MIN_WEIGHT = 20000   # 多字动词在 rime_ice 里至少这么常用才补“X了”：冷僻词本身的英文就常选错（挨近 → draw）
 COMMON_FIRST_RANK = 5000   # 首义在这个名次以内算常用英文，反查对上的冷僻词不替换它
 COMMON_EN_RANK: dict[str, int] = {}
 ORIGINAL_CASE: dict[str, str] = {}    # load_ecdict 填：小写英文 → ECDICT 原写法   # load_ecdict 填：英文词 → 词频名次
@@ -442,6 +445,48 @@ def add_de_forms(entries: dict[str, str], ecdict_path: str, engine: dict[str, di
     return added
 
 
+def add_le_forms(entries: dict[str, str], ecdict_path: str, engine: dict[str, dict[str, int]], min_weight: int = 1000) -> int:
+    """“X了”候选（开了、骂了、删了）：X 的英文是常用动词时显示它的过去式（open → opened，只显示，不上屏），
+    过去式取 ECDICT 的词形变化；已有释义的（算了、好了）不动。返回补了多少条。
+    名词、形容词不能变成动词（鸟 → birded，花 → flowered，勇敢 → braved）：多字词要求动词义项里有一条正好是它；
+    单字要求这个英文词在英汉词典里首先是动词、动词义项里有这个字（名 → name 首先是名词，不做 “named”）；
+    常见单字动词首义是名词的（开 → open）放人工表。"""
+    verbs: dict[str, tuple[set[str], str, list[str], set[str]]] = {}
+
+    def pieces(lines: list[str]) -> set[str]:
+        return {PARENS.sub("", piece).strip(" .。") for line in lines
+                for piece in ZH_SPLIT.split(POS_PREFIX.sub("", line.strip()))}
+
+    with open(ecdict_path, encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            word = row["word"]
+            past = next((part[2:] for part in row["exchange"].split("/") if part.startswith("p:")), "")
+            # 过去式本身也要常见（shallowed、blued、walled 这类是名词、形容词硬变的动词）。
+            if (not (word.isalpha() and word.islower() and past.isalpha()) or en_rank(word) > LE_MAX_RANK
+                    or en_rank(past) > LE_PAST_MAX_RANK):
+                continue
+            lines = row["translation"].split("\\n")
+            verb_lines = [line for line in lines if re.match(r"v[ti]?\.", line)]
+            if verb_lines:
+                verbs[word] = (pieces(verb_lines), past, verb_lines, lines[0].startswith("v"))
+    added = 0
+    for key, gloss in list(entries.items()):
+        if not (1 <= len(key) <= 2) or not all("一" <= ch <= "鿿" for ch in key) or key.endswith("了"):
+            continue
+        target = key + "了"
+        if target in entries or gloss[:1] in (APPROX, PHRASE) or gloss not in verbs:
+            continue
+        exact, past, verb_lines, verb_first = verbs[gloss]
+        if len(key) > 1:
+            if max((engine.get(key) or {0: 0}).values()) < min_weight or key not in exact:
+                continue
+        elif not verb_first or not any(key in line for line in verb_lines):
+            continue
+        entries[target] = PHRASE + past
+        added += 1
+    return added
+
+
 def load_curated(path: str) -> dict[str, str]:
     """人工表：词<TAB>英文；只有词没有英文表示不显示释义（值为空串）。"""
     curated: dict[str, str] = {}
@@ -526,6 +571,9 @@ def main() -> int:
     if args.curated_singles and engine:
         removed = apply_single_policy(entries, load_curated(args.curated_singles), engine, args.single_max_rank)
         print(f"singles_removed={removed}", file=sys.stderr)
+    if engine:
+        # 在人工表之前做：人工表能改正或去掉它补的条目（说谎了 → lied，不是 “lay”）。
+        print(f"le_forms={add_le_forms(entries, args.ecdict, engine, LE_MIN_WEIGHT)}", file=sys.stderr)
     if args.curated_phrases:
         curated = load_curated(args.curated_phrases)
         for key, gloss in curated.items():
