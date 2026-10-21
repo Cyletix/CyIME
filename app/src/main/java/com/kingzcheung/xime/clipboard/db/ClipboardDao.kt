@@ -38,16 +38,7 @@ interface ClipboardDao {
 
     /** Initials as 9-key digits ([pattern] holds digits): the search key read through the keypad. */
     @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND " +
-        "replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(" +
-        "searchKey, " +
-        "'a', '2'), 'b', '2'), 'c', '2'), " +
-        "'d', '3'), 'e', '3'), 'f', '3'), " +
-        "'g', '4'), 'h', '4'), 'i', '4'), " +
-        "'j', '5'), 'k', '5'), 'l', '5'), " +
-        "'m', '6'), 'n', '6'), 'o', '6'), " +
-        "'p', '7'), 'q', '7'), 'r', '7'), 's', '7'), " +
-        "'t', '8'), 'u', '8'), 'v', '8'), " +
-        "'w', '9'), 'x', '9'), 'y', '9'), 'z', '9')" +
+        com.kingzcheung.xime.clipboard.ClipboardSearch.T9_KEY_SQL +
         " LIKE :pattern ORDER BY isPinned DESC, timestamp DESC LIMIT :limit")
     suspend fun searchKeyDigits(pattern: String, limit: Int): List<ClipboardEntry>
 

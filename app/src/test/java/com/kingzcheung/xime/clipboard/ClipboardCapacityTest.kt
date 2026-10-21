@@ -45,4 +45,10 @@ class ClipboardCapacityTest {
         assertTrue(ClipboardRoom(10, 100, refused = true).full)
         assertTrue(ClipboardRoom(100, 100).full)
     }
+
+    @Test fun aRefusedCopyMeasuresAgainAtMostOnceAMinute() {
+        // A first measurement on a cold cache can set the capacity too low; a refused copy re-measures.
+        assertTrue(ClipboardCapacity.remeasureAfterRefusal(nowMs = 120_000, lastMeasuredMs = 0))
+        assertFalse(ClipboardCapacity.remeasureAfterRefusal(nowMs = 30_000, lastMeasuredMs = 0))
+    }
 }
