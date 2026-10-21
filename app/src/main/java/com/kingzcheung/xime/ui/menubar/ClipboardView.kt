@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.testTag
@@ -191,6 +192,8 @@ internal fun LongPressMenuOverlay(
     surfaceTag: String = "clipboard-item-actions",
     /** Row highlighted for physical-keyboard navigation; null when navigating by touch. */
     focusedIndex: Int? = null,
+    /** Corner of the bright area left around [anchor]; the pressed card's own corner. */
+    highlightCorner: androidx.compose.ui.unit.Dp = 8.dp,
 ) {
     val colors = MaterialTheme.colorScheme
     // Keyboard palette, not the Material surface: the card looks like the keys of every theme
@@ -212,10 +215,14 @@ internal fun LongPressMenuOverlay(
             .clickable(onClick = onDismiss)) {
             val hole = androidx.compose.ui.graphics.Path().apply {
                 addRoundRect(androidx.compose.ui.geometry.RoundRect(anchor,
-                    androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())))
+                    androidx.compose.ui.geometry.CornerRadius(highlightCorner.toPx())))
             }
             clipPath(hole, clipOp = androidx.compose.ui.graphics.ClipOp.Difference) { drawRect(scrim) }
         }
+        // Draws nothing; marks the bright area so tests can compare it with the pressed card.
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(anchor.left.toInt(), anchor.top.toInt()) }
+            .size(with(density) { anchor.width.toDp() }, with(density) { anchor.height.toDp() })
+            .testTag("$tag-highlight"))
         val margin = with(density) { 6.dp.toPx() }
         val gap = with(density) { 6.dp.toPx() }
         val minWidth = with(density) { (if (title != null) 220.dp else 150.dp).toPx() }
