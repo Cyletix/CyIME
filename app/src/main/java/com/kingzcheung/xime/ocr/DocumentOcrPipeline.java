@@ -176,8 +176,9 @@ public final class DocumentOcrPipeline implements AutoCloseable {
             for (int i = 1; i < Math.min(count, 400); i++) {
                 int x = (int)stats.get(i, Imgproc.CC_STAT_LEFT)[0], y = (int)stats.get(i, Imgproc.CC_STAT_TOP)[0];
                 int w = (int)stats.get(i, Imgproc.CC_STAT_WIDTH)[0], h = (int)stats.get(i, Imgproc.CC_STAT_HEIGHT)[0];
-                int extent = Math.max(w, h);
-                if (extent < Math.max(3, rows * .03) || h > rows * .45 || w > cols * .25 || w > h * 8 || h > w * 8) continue;
+                // Glyph-sized only: keycap edges are thin slivers and sensor specks a few pixels,
+                // and each surviving row costs one more recognizer pass on the device.
+                if (h < Math.max(5, rows * .05) || h > rows * .45 || w > cols * .25 || w > h * 4 || h > w * 8) continue;
                 if (x == 0 || y == 0 || x + w >= cols || y + h >= rows) continue;
                 Point center = new Point(x + w / 2.0, y + h / 2.0);
                 boolean covered = false;
@@ -198,7 +199,7 @@ public final class DocumentOcrPipeline implements AutoCloseable {
         // missed: detected text is never re-read, replaced or duplicated.
         marks.sort(Comparator.comparingDouble(r -> r.y + r.height / 2.0));
         int rowsRead = 0;
-        while (!marks.isEmpty() && rowsRead++ < 4) {
+        while (!marks.isEmpty() && rowsRead++ < 2) {
             Rect seed = marks.remove(0);
             List<Rect> row = new ArrayList<>(); row.add(seed);
             int top = seed.y, bottom = seed.y + seed.height;
