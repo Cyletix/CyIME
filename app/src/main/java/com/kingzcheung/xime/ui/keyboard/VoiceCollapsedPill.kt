@@ -77,6 +77,10 @@ internal fun VoiceCollapsedPill(
     frostedGlass: com.kingzcheung.xime.settings.FrostedGlassConfig,
     surface: @Composable () -> Modifier,
     onBoundsChanged: (Rect?) -> Unit,
+    /** 与实体键盘浮条共用的比例位置：拖动、吸边、记住位置都同一套。 */
+    position: HardwareToolbarPosition = HardwareToolbarPosition(),
+    onPositionChange: (HardwareToolbarPosition) -> Unit = {},
+    dockAtEdge: Boolean = true,
 ) {
     val themeKey = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current?.key ?: backgroundColor
     val shadowRadius = with(LocalDensity.current) { 1.dp.toPx() }
@@ -86,10 +90,13 @@ internal fun VoiceCollapsedPill(
     val color = textSurface?.text ?: contentColor
     val currentBoundsCallback by rememberUpdatedState(onBoundsChanged)
     DisposableEffect(Unit) { onDispose { currentBoundsCallback(null) } }
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // 宽度同原来：两侧各留 16dp，最宽 400dp；位置交给拖动宿主（默认贴底居中）。
+        val barWidth = minOf(400.dp, (maxWidth - 32.dp).coerceAtLeast(0.dp))
+        DraggableFloatingBar(position, onPositionChange, barWidth, dockAtEdge = dockAtEdge) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr, LocalFrostedTextSurface provides textSurface) {
             Row(
-                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp).widthIn(max = 400.dp).fillMaxWidth()
+                Modifier.fillMaxWidth()
                     .onGloballyPositioned { coordinates ->
                         val bounds = coordinates.boundsInWindow()
                         currentBoundsCallback(Rect(floor(bounds.left).toInt(), floor(bounds.top).toInt(), ceil(bounds.right).toInt(), ceil(bounds.bottom).toInt()))
@@ -108,6 +115,7 @@ internal fun VoiceCollapsedPill(
                 VoicePillMic(listening, amplitude, color, accentColor, onMic)
                 VoicePillBackspace(color, onBackspace, onBackspacePress, onBackspaceRelease)
             }
+        }
         }
     }
 }

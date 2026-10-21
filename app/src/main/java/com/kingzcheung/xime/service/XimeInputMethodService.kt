@@ -1843,6 +1843,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                         frostedGlass = glass, translucentSurface = true)
                                 },
                                 onBoundsChanged = { updateHardwareSurfaceBounds(toolbar = true, it) },
+                                position = hardwareToolbarPosition.value,
+                                onPositionChange = { hardwareToolbarPosition.value = it },
+                                dockAtEdge = state.hardwareOptions.dockAtEdge,
                             )
                           }
                           }
@@ -3652,7 +3655,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // A toolbar resting on the bottom edge (Samsung bar or the Gboard pill) is reported as
             // occupied space, so apps lift their input field above it rather than under it.
             val bottomReserve = hardwareToolbarBounds.value?.takeIf {
-                state.voiceCollapsed || height - it.bottom <= (24 * resources.displayMetrics.density).roundToInt()
+                (state.voiceCollapsed && hardwareToolbarPosition.value.yFraction >= 1f) ||
+                    height - it.bottom <= (24 * resources.displayMetrics.density).roundToInt()
             }?.top ?: height
             outInsets.contentTopInsets = bottomReserve.coerceIn(0, height)
             outInsets.visibleTopInsets = bottomReserve.coerceIn(0, height)
