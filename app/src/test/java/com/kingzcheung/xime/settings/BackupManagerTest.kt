@@ -246,7 +246,9 @@ class BackupManagerTest {
             "rime/t9_digit.userdb/000001.log", "rime/rime_ice.userdb.txt",
             "rime/custom_phrase.txt", "rime/user_rime_ice.dict.yaml", "rime/user_cyime_cells_0123456789abcdef.dict.yaml",
             "custom-keyboard-layouts.json", "user_ngram_cache.json", "learning-profiles/abc.json",
-            "plugins.xml", "models/x.bin", "logs/a.log"
+            "plugins.xml", "models/x.bin", "logs/a.log",
+            "handwriting_templates/latin.json", "handwriting_templates/kana_och.json",
+            "handwriting_templates/kana_default_och_v2.json", "handwriting_training/samples.jsonl"
         ).forEach { write(files, it) }
 
         val plain = BackupManager.localBackupFiles(files, includePersonal = false).map { it.first }
@@ -261,6 +263,9 @@ class BackupManagerTest {
         val personal = BackupManager.localBackupFiles(files, includePersonal = true).map { it.first }
         assertEquals(
             (plain + listOf(
+                "${BackupManager.META_PREFIX}files/handwriting_templates/kana_och.json",
+                "${BackupManager.META_PREFIX}files/handwriting_templates/latin.json",
+                "${BackupManager.META_PREFIX}files/handwriting_training/samples.jsonl",
                 "${BackupManager.META_PREFIX}files/learning-profiles/abc.json",
                 "${BackupManager.META_PREFIX}files/user_ngram_cache.json",
                 "custom_phrase.txt", "rime_ice.userdb.txt", "rime_ice.userdb/CURRENT",
@@ -291,6 +296,19 @@ class BackupManagerTest {
         assertEquals("[]", File(filesDir, "custom-keyboard-layouts.json").readText())
         assertEquals("{}", File(filesDir, "learning-profiles/abc.json").readText())
         assertEquals("MANIFEST-1", File(filesDir, "rime/rime.userdb/CURRENT").readText())
+    }
+
+    @Test
+    fun `clipboard card lines travel alone, the fixed records never do`() {
+        val json = """{"card_max_lines":{"t":"i","v":8},"pins":{"t":"ss","v":["secret"]}}"""
+        val kept = org.json.JSONObject(BackupManager.keepKeys(json, BackupManager.PARTIAL_PREFS.getValue("clipboard_board")))
+        assertEquals(setOf("card_max_lines"), kept.keys().asSequence().toSet())
+        assertEquals(8, kept.getJSONObject("card_max_lines").getInt("v"))
+
+        val filesDir = tempDir.newFolder("files")
+        val bytes = zipOfText(mapOf("${BackupManager.META_PREFIX}prefs/clipboard_board.json" to json))
+        assertTrue(restore(filesDir, bytes).isSuccess)
+        assertEquals(setOf("clipboard_board"), restoredPrefs.keys)
     }
 
     @Test
