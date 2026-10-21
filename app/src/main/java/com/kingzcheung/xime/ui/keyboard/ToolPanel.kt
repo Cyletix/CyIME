@@ -25,6 +25,9 @@ internal val TOOL_PANEL_HEIGHT = 170
 /** The same tool panel used as the clipboard search field: one line, no status row. */
 internal const val CLIPBOARD_SEARCH_PANEL_HEIGHT = 96
 
+/** Clipboard search on a short screen (landscape): close button and field share one row. */
+internal const val CLIPBOARD_SEARCH_INLINE_PANEL_HEIGHT = 48
+
 /**
  * AI 工具插件输入面板（候选栏上方）。
  *
@@ -50,6 +53,8 @@ fun ToolPanel(
     statusText: String? = null,
     singleLine: Boolean = false,
     onTextChange: ((String) -> Unit)? = null,
+    /** Close button and field on one row, no title (see [CandidateBarOverlayPanel]). */
+    inline: Boolean = false,
 ) {
     val closeButtonBg = androidx.compose.ui.graphics.lerp(
         MaterialTheme.colorScheme.surface,
@@ -67,6 +72,7 @@ fun ToolPanel(
         titleColor = textColor,
         modifier = modifier,
         onCloseClick = onClose,
+        inline = inline,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             AndroidView(

@@ -72,6 +72,8 @@ internal fun ConnectedClipboardBoard(
     keepQueryOnDispose: Boolean = false,
     /** The keyboard search field, typed live (composition included); null when the board is not searching from it. */
     liveQuery: ClipboardLiveQuery? = null,
+    /** False in a short search results area (phone landscape): no category row, records only. */
+    showControls: Boolean = true,
 ) {
     val context = LocalContext.current
     val store = remember(context) { ClipboardImages.getInstance(context) }
@@ -164,7 +166,7 @@ internal fun ConnectedClipboardBoard(
         }, cardMaxLines = cardMaxLines,
         searchQuery = (liveQuery?.display ?: boardQuery).takeIf { it.isNotBlank() },
         onClearSearch = { manager.boardQuery.value = "" }, searchChip = liveQuery == null,
-        onOpenSearch = onOpenSearch, full = room.full)
+        onOpenSearch = onOpenSearch, full = room.full, showControls = showControls)
 }
 
 /** Preference (board prefs) for how many lines a history card shows: 2, 4 or 8. */
@@ -197,8 +199,10 @@ internal fun ClipboardBoardView(
     onOpenSearch: (() -> Unit)? = null,
     /** False while the keyboard search field above shows the query: no second copy of it here. */
     searchChip: Boolean = true,
-    /** History is as large as this device can search smoothly: new copies are not being saved. */
+    /** History has reached its capacity: new copies are not being saved. */
     full: Boolean = false,
+    /** False hides the category / actions row (a short search results area). */
+    showControls: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
     var filter by remember(initialImages) { mutableStateOf(if (initialImages) ClipboardFilter.IMAGE else ClipboardFilter.ALL) }
@@ -378,7 +382,7 @@ internal fun ClipboardBoardView(
         }
 
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture()
+            if (showControls) Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture()
                 .testTag("clipboard-controls").padding(horizontal = 6.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 if (selecting) {

@@ -1593,6 +1593,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 val clipboardSearchResultsHeight = com.kingzcheung.xime.ui.keyboard.clipboardSearchResultsTarget(
                     state.clipboardSearchVisible, clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace), keyboardHeight,
                     available = effectiveScreenH - clipboardBottomSpace)
+                // Too short for the two-row bar (phone landscape): one-row bar, no category row in the results.
+                val clipboardSearchInline = state.clipboardSearchVisible && com.kingzcheung.xime.ui.keyboard.clipboardSearchInline(
+                    keyboardHeight, effectiveScreenH - clipboardBottomSpace)
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
                 val effectiveKeyboardHeight = when {
                     handwritingExpanded -> handwritingSize(keyboardHeight, (effectiveScreenH - floatingMinY).coerceAtLeast(1))
@@ -1623,7 +1626,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 ) 170 else 0
                 // Clipboard search adds its results and search panel above the keyboard like the tool panel.
                 val overlayPanelExtra = toolPanelExtra + com.kingzcheung.xime.ui.keyboard.clipboardSearchExtraHeight(
-                    state.clipboardSearchVisible, isOverlayPage, clipboardSearchResultsHeight)
+                    state.clipboardSearchVisible, isOverlayPage, clipboardSearchResultsHeight, clipboardSearchInline)
 
                 val isDark = isDarkTheme
                 val hardwarePalette = com.kingzcheung.xime.ui.theme.resolveKeyboardPalette(state.themeId, isDark)
@@ -1899,7 +1902,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 effectiveKeyboardHeight,
                                 // Without this key the keyboard view kept a stale results height (0) and the keys
                                 // stretched into the results.
-                                clipboardSearchResultsHeight,
+                                clipboardSearchResultsHeight, clipboardSearchInline,
                                 handwritingExpanded, handwritingWidth, handwritingOffsetX,
                                 protectedSize,
                                 floatingMinY,
@@ -1973,6 +1976,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     toolPanelInputFocused = state.toolPanelInputFocused,
                                     clipboardSearchVisible = state.clipboardSearchVisible,
                                     clipboardSearchResultsHeight = clipboardSearchResultsHeight,
+                                    clipboardSearchInline = clipboardSearchInline,
                                     toolPanelPluginId = state.toolPanelPluginId,
                                     toolPanelTitle = state.toolPanelTitle,
                                     toolPanelPrefillText = state.toolPanelPrefillText,

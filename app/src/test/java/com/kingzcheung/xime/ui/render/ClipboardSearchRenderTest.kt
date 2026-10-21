@@ -31,6 +31,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.settings.FrostedGlassConfig
 import com.kingzcheung.xime.ui.keyboard.CLIPBOARD_SEARCH_PANEL_HEIGHT
+import com.kingzcheung.xime.ui.keyboard.clipboardPanelBounds
+import com.kingzcheung.xime.ui.keyboard.clipboardSearchInline
+import com.kingzcheung.xime.ui.keyboard.clipboardSearchPanelHeight
+import com.kingzcheung.xime.ui.keyboard.clipboardSearchResultsTarget
 import com.kingzcheung.xime.ui.keyboard.ToolPanel
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
@@ -52,7 +56,7 @@ import java.io.File
  * 键盘区用一块同色占位表示（真实键盘不变）。只在设置了 CYIME_RENDER_OUT=<目录> 时出图。
  */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1500dp-h3000dp-hdpi")
+@Config(sdk = [34], application = android.app.Application::class, qualifiers = "w1800dp-h3000dp-hdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ClipboardSearchRenderTest {
     @get:Rule val rule = createAndroidComposeRule<androidx.activity.ComponentActivity>()
@@ -74,7 +78,8 @@ class ClipboardSearchRenderTest {
     /** [field] is what the search field holds, [composing] the word still being typed (candidate bar). */
     @Composable
     private fun SearchScene(theme: String, dark: Boolean, glass: Boolean, width: Int, floating: Boolean, label: String,
-        field: String = "", composing: String = "di'zhi", shown: List<ClipboardItem> = matches) {
+        field: String = "", composing: String = "di'zhi", shown: List<ClipboardItem> = matches,
+        inline: Boolean = false, resultsHeight: Int = 200, keyboardHeight: Int = 220, keyboardLabel: String = "26 键 / 九键") {
         val palette = resolveKeyboardPalette(theme, dark)
         Column(Modifier.padding(4.dp)) {
             Text(label, fontSize = 10.sp, color = Color.White)
@@ -92,23 +97,23 @@ class ClipboardSearchRenderTest {
                                 onSplit = { _, _ -> }, onAddQuick = {}, onPinsChange = {}, onRemove = {},
                                 onPhotoAccess = {}, onPick = {}, onSystemPaste = {}, onShare = { _, _ -> },
                                 onPullRemote = null, searchQuery = (field + composing).takeIf { it.isNotBlank() },
-                                searchChip = false,
-                                modifier = Modifier.fillMaxWidth().height(200.dp))
+                                searchChip = false, showControls = !inline,
+                                modifier = Modifier.fillMaxWidth().height(resultsHeight.dp))
                             // 搜索框：就是工具面板（同一组件、同一位置）。
                             ToolPanel(title = "搜索剪贴板", isFocused = false, initialText = field,
                                 backgroundColor = Color.Transparent, textColor = palette.text, accentColor = palette.accent,
                                 cardBgColor = palette.key, onClose = {}, onFocusChange = {},
-                                heightDp = CLIPBOARD_SEARCH_PANEL_HEIGHT, hint = "文字或拼音首字母", statusText = "",
-                                singleLine = true, modifier = Modifier.background(palette.background))
+                                heightDp = clipboardSearchPanelHeight(inline), hint = "文字或拼音首字母", statusText = "",
+                                singleLine = true, inline = inline, modifier = Modifier.background(palette.background))
                             // 候选栏与键盘：尺寸和位置不变（占位，真实键盘不变）。
                             Box(Modifier.fillMaxWidth().height(36.dp).background(palette.background).padding(horizontal = 10.dp),
                                 contentAlignment = Alignment.CenterStart) {
                                 Text(if (composing.isEmpty()) "（候选栏）" else "$composing   地址  弟子  底账 …（候选栏占位）",
                                     fontSize = 12.sp, color = palette.text.copy(alpha = .6f))
                             }
-                            Box(Modifier.fillMaxWidth().height(184.dp).background(palette.background),
+                            Box(Modifier.fillMaxWidth().height((keyboardHeight - 36).dp).background(palette.background),
                                 contentAlignment = Alignment.Center) {
-                                Text("键盘（26 键 / 九键，尺寸位置不变）", fontSize = 12.sp, color = palette.text.copy(alpha = .6f))
+                                Text("键盘（$keyboardLabel，尺寸位置不变）", fontSize = 12.sp, color = palette.text.copy(alpha = .6f))
                             }
                         }
                     }
@@ -148,5 +153,38 @@ class ClipboardSearchRenderTest {
         rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
         File(out!!).mkdirs()
         File(out, "clipboard-search-v3.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    /**
+     * 手机横屏（约 390 dp 高、键盘 230 dp）：两行搜索栏只剩 64 dp，于是搜索栏并成一行、结果区不显示分类行。
+     * 浅色 / 深色 / 纯白 / 纯黑 × 实色 / 玻璃，26 键与九键各一行（键盘区为占位）。
+     */
+    @Test fun renderLandscape() {
+        val out = System.getenv("CYIME_RENDER_OUT")
+        assumeTrue(!out.isNullOrEmpty())
+        KeyboardThemes.initFromConfig(ApplicationProvider.getApplicationContext<Context>())
+        val screen = 390
+        val keyboard = 230
+        val inline = clipboardSearchInline(keyboard, screen)
+        val results = clipboardSearchResultsTarget(true, clipboardPanelBounds(keyboard, screen, 0), keyboard, screen)
+        val themes = listOf(Triple("soft_blue", false, "浅色"), Triple("soft_blue", true, "深色"),
+            Triple("pure_black", false, "纯白"), Triple("pure_black", true, "纯黑"))
+        rule.setContent {
+            Column(Modifier.background(Color(0xFF606060)).padding(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("手机横屏 屏高 $screen dp，键盘 $keyboard dp：搜索栏一行=$inline，结果区 $results dp", fontSize = 10.sp, color = Color.White)
+                for ((label, composing) in listOf("26 键" to "d'z", "九键" to "dz")) for (glass in listOf(false, true)) Row {
+                    for ((id, dark, name) in themes)
+                        SearchScene(id, dark, glass, 420, false, "$label $name ${if (glass) "玻璃" else "实色"}",
+                            composing = composing, inline = inline, resultsHeight = results, keyboardHeight = keyboard,
+                            keyboardLabel = label)
+                }
+            }
+        }
+        rule.waitForIdle()
+        val root = rule.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
+        File(out!!).mkdirs()
+        File(out, "clipboard-search-landscape.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

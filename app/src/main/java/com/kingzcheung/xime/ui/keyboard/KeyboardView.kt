@@ -392,7 +392,8 @@ fun KeyboardView(
         // A floating card holds the search results and bar above its keys; without them in its height
         // the results squeezed the keys.
         contentHeightDp = state.keyboardHeightDp + clipboardSearchExtraHeight(
-            state.isFloatingMode && state.clipboardSearchVisible, overlayPage = false, state.clipboardSearchResultsHeight),
+            state.isFloatingMode && state.clipboardSearchVisible, overlayPage = false, state.clipboardSearchResultsHeight,
+            state.clipboardSearchInline),
         bottomContentPaddingDp = renderedBottomPaddingDp,
         bottomKeyClearance = floatingBottomClearance,
         fixedWidthDp = state.fixedWidthDp,
@@ -736,7 +737,8 @@ fun KeyboardView(
                     com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(clipboardContext) }
                 ClipboardSearchResults(clipboard, candidateState, isT9Schema(state.currentSchemaId),
                     state.clipboardItems, callbacks, viewModel::removeClipboardItems,
-                    Modifier.fillMaxWidth().height(state.clipboardSearchResultsHeight.dp))
+                    Modifier.fillMaxWidth().height(state.clipboardSearchResultsHeight.dp),
+                    showControls = !state.clipboardSearchInline)
                 ToolPanel(
                     title = "搜索剪贴板",
                     isFocused = true,
@@ -746,11 +748,12 @@ fun KeyboardView(
                     cardBgColor = keyBgColor,
                     onClose = { callbacks.onClipboardSearchClose?.invoke() },
                     onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
-                    heightDp = CLIPBOARD_SEARCH_PANEL_HEIGHT,
+                    heightDp = clipboardSearchPanelHeight(state.clipboardSearchInline),
                     hint = "文字或拼音首字母",
                     statusText = "",
                     singleLine = true,
                     onTextChange = { clipboard.boardQuery.value = it },
+                    inline = state.clipboardSearchInline,
                 )
             }
 
@@ -2027,6 +2030,7 @@ private fun ClipboardSearchResults(
     callbacks: KeyboardCallbacks,
     onRemoveText: (List<Long>) -> Unit,
     modifier: Modifier,
+    showControls: Boolean = true,
 ) {
     val field by clipboard.boardQuery.collectAsStateWithLifecycle()
     val composing = candidateState.value.let { if (it.isComposing) it.preeditText else "" }
@@ -2043,7 +2047,7 @@ private fun ClipboardSearchResults(
         onRemoveText = onRemoveText, onAddQuick = {}, onSplit = { _, _ -> },
         onImageSelect = { image -> callbacks.onClipboardSearchImageSelect?.invoke(image) },
         onImageShare = { _, _ -> }, onSystemPaste = {}, onPullRemote = null,
-        keepQueryOnDispose = true, liveQuery = query,
+        keepQueryOnDispose = true, liveQuery = query, showControls = showControls,
         modifier = Modifier.fillMaxSize().graphicsLayer {
             translationY = (1f - reveal.value) * size.height
             alpha = reveal.value

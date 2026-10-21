@@ -40,8 +40,21 @@ fun CandidateBarOverlayPanel(
     titleColor: Color = closeButtonColor,
     modifier: Modifier = Modifier,
     headerActions: (@Composable () -> Unit)? = null,
+    /** One row: the close button, then [content] in its card; no title (short screens, e.g. landscape). */
+    inline: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val card: @Composable (Modifier) -> Unit = { boxModifier ->
+        Box(
+            modifier = boxModifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(cardBgColor.copy(alpha = 0.5f))
+                .padding(horizontal = 14.dp, vertical = if (inline) 0.dp else 10.dp),
+            contentAlignment = if (inline) Alignment.CenterStart else Alignment.TopStart,
+        ) {
+            content()
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -81,7 +94,10 @@ fun CandidateBarOverlayPanel(
                 }
             }
 
-            if (title.isNotEmpty()) {
+            if (inline) {
+                Spacer(modifier = Modifier.width(8.dp))
+                card(Modifier.weight(1f).fillMaxSize())
+            } else if (title.isNotEmpty()) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = title,
@@ -96,21 +112,13 @@ fun CandidateBarOverlayPanel(
             }
         }
 
-        Box(
+        if (!inline) Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(top = 4.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(cardBgColor.copy(alpha = 0.5f))
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                content()
-            }
+            card(Modifier.fillMaxSize())
         }
     }
 }

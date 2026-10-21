@@ -114,6 +114,8 @@ data class KeyboardUiState(
     val clipboardSearchVisible: Boolean = false,
     /** Height of the clipboard results above the search bar: the board's pulled-up height minus keyboard and bar. */
     val clipboardSearchResultsHeight: Int = 0,
+    /** Search bar on one row and results without their category row (short screens). */
+    val clipboardSearchInline: Boolean = false,
     val toolPanelPluginId: String = "",
     val toolPanelTitle: String = "",
     val toolPanelPrefillText: String = "",
