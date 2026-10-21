@@ -6,6 +6,8 @@ import com.kingzcheung.xime.service.ICaptionCallback;
 interface ICaptionService {
     /** 加载模型并开始；speakerModelPath 为空时不分说话人。返回 false 表示模型缺失或加载失败。 */
     boolean start(String modelId, String speakerModelPath, ICaptionCallback callback);
+    /** 同上，指定字幕语言：zh 中文 / ja 日语 / en 英语 */
+    boolean startLanguage(String modelId, String languageId, String speakerModelPath, ICaptionCallback callback);
     /** 16 kHz / 16 bit / 单声道 PCM */
     void push(IBinder session, in byte[] audioData);
     /** 收尾：未结束的句子按“停止”边界定稿 */

@@ -68,7 +68,7 @@ class CaptionInferenceClient(context: Context) {
     private fun requireService(): ICaptionService = service ?: throw IllegalStateException("字幕服务未连接")
 
     /** Blocking (model load); call off the main thread. */
-    fun start(modelId: String, speakerModelPath: String, listener: Listener): Boolean {
+    fun start(modelId: String, speakerModelPath: String, listener: Listener, languageId: String = "zh"): Boolean {
         this.listener = listener
         val stub = object : ICaptionCallback.Stub() {
             override fun onSegment(id: Long, text: String, startMs: Long, endMs: Long, boundary: Int, confirmed: Boolean, event: String) {
@@ -80,7 +80,7 @@ class CaptionInferenceClient(context: Context) {
             override fun onError(message: String) { if (callback === this) listener.onError(message) }
         }
         callback = stub
-        return try { requireService().start(modelId, speakerModelPath, stub) }
+        return try { requireService().startLanguage(modelId, languageId, speakerModelPath, stub) }
         catch (e: Exception) { FileLogger.e(TAG, "start failed", e); callback = null; false }
     }
 
