@@ -199,6 +199,9 @@ internal fun ClipboardBoardView(
     // Each record's drawn bounds, so the long-press highlight is exactly the card (grid cell offsets
     // leave out the grid's content padding).
     val cardBounds = remember { mutableMapOf<String, Rect>() }
+    // Deleted records leave at once. Unpinning them first would move a pin into recent history before
+    // the delete lands, and the grid would scroll after it.
+    var removing by remember { mutableStateOf(emptySet<String>()) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var selecting by remember { mutableStateOf(false) }
     var pinsExpanded by remember(initialImages) { mutableStateOf(false) }
@@ -209,7 +212,13 @@ internal fun ClipboardBoardView(
     var deleting by remember { mutableStateOf<List<ClipboardCard>?>(null) }
     // True while the delete confirmation is the "clear all unfixed" one.
     var clearingAll by remember { mutableStateOf(false) }
-    val all = remember(textItems, images, pins) { clipboardCards(textItems, images, ClipboardFilter.ALL, pins) }
+    val all = remember(textItems, images, pins, removing) {
+        clipboardCards(textItems, images, ClipboardFilter.ALL, pins).filterNot { it.key in removing }
+    }
+    LaunchedEffect(textItems, images) {
+        if (removing.isNotEmpty()) removing = removing.intersect(
+            clipboardCards(textItems, images, ClipboardFilter.ALL, pins).mapTo(mutableSetOf()) { it.key })
+    }
     val cards = remember(all, filter) { all.filter { clipboardMatches(it, filter) } }
     val keyboard = LocalClipboardKeyboardNavigation.current
     var focusedKey by remember(keyboard?.active, filter) { mutableStateOf<String?>(null) }
@@ -556,8 +565,10 @@ internal fun ClipboardBoardView(
                 CompactActionMenuEntry(Icons.Default.DeleteOutline, "删除", colors.error, tag = "clipboard-confirm-delete") {
                     val clearAll = clearingAll && onClearUnpinned != null
                     clearingAll = false
+                    val keys = records.mapTo(mutableSetOf()) { it.key }
+                    removing = removing + keys
                     if (clearAll) onClearUnpinned?.invoke(records) else onRemove(records)
-                    onPinsChange(pins - records.map { it.key }.toSet())
+                    onPinsChange(pins - keys)
                     selected = emptySet(); selecting = false
                 },
                 CompactActionMenuEntry(Icons.Default.Close, "取消", tag = "clipboard-cancel-delete") {},
