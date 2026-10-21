@@ -112,7 +112,7 @@ private fun SchemeTextCard(label: String, preview: String, chosen: Boolean, tag:
     width: Dp? = null, height: Dp? = null, onClick: () -> Unit) {
     Surface(shape = RoundedCornerShape(14.dp),
         border = BorderStroke(if (chosen) 1.5.dp else 1.dp, if (chosen) accentColor else contentColor.copy(alpha = .12f)),
-        color = if (chosen) accentColor.copy(alpha = .16f).compositeOver(containerColor) else containerColor) {
+        color = if (chosen) chosenFill(containerColor, accentColor) else containerColor) {
         Box(Modifier.then(if (width != null) Modifier.width(width) else Modifier)
             .then(if (height != null) Modifier.height(height) else Modifier.heightIn(min = 48.dp)).testTag(tag)
             .then(if (isAction) Modifier.clickable(role = Role.Button, onClick = onClick)

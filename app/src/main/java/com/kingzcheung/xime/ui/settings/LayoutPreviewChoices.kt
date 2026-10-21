@@ -86,7 +86,7 @@ internal fun LayoutPreviewChoices(
                         containerColor, contentColor, accentColor, "$itemTagPrefix${layout.id}", { onSelect(layout.id) }) {
                                 if (rows.isEmpty()) Icon(Icons.Outlined.Keyboard, "${layout.displayName}布局", tint = contentColor)
                                 else MiniatureKeyboard(rows, layout.kind in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED),
-                                    contentColor, Modifier.testTag("layout-preview:${layout.id}"),
+                                    contentColor, Modifier.testTag("layout-preview:${layout.id}"), fillKeys = !containerColor.isPureBlack(),
                                     equalMergedKeys = layout.kind == LayoutKind.MERGED && CustomKeyboardLayouts.find(layout.id) == null,
                                     qwertyStagger = qwertyPreviewStagger)
                     }
@@ -117,7 +117,7 @@ internal fun PreviewChoiceCard(label: String, chosen: Boolean, width: Dp, previe
             }
             HorizontalDivider(Modifier.testTag("$tag:divider"), color = contentColor.copy(alpha = .22f))
             Row(Modifier.fillMaxWidth()
-                .background(if (chosen) accentColor.copy(alpha = .16f).compositeOver(containerColor) else Color.Transparent)
+                .background(if (chosen) chosenFill(containerColor, accentColor) else Color.Transparent)
                 .padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(label, Modifier.weight(1f), color = contentColor,
@@ -138,7 +138,7 @@ private fun previewRows(layout: InputLayout, language: InputLanguage, @Suppress(
 
 @Composable
 private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, contentColor: Color, modifier: Modifier,
-    equalMergedKeys: Boolean = false, qwertyStagger: Float = 0f) {
+    fillKeys: Boolean = true, equalMergedKeys: Boolean = false, qwertyStagger: Float = 0f) {
     val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER } }
     val frame = if (letterLayout) letterKeyboardFrame(rows) else null
     val columns = rows.maxOfOrNull { it.sumOf { key -> if (letterLayout) key.length.coerceAtLeast(1) else 1 } } ?: 1
@@ -172,7 +172,7 @@ private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, c
                 val span = if (letterLayout) key.length.coerceAtLeast(1) else 1
                 val w = if (equalMergedKeys) (rowWidth - gap * (row.size - 1)) / row.size else rowUnit * span + gap * (span - 1)
                 val y = r * (h + gap)
-                drawRoundRect(contentColor.copy(alpha = .10f), Offset(x, y), Size(w, h), CornerRadius(3.dp.toPx()))
+                if (fillKeys) drawRoundRect(contentColor.copy(alpha = .10f), Offset(x, y), Size(w, h), CornerRadius(3.dp.toPx()))
                 paint.color = contentColor.copy(alpha = .90f).toArgb()
                 paint.textSize = minOf(h * .40f, w / ((if (equalMergedKeys) 2 else key.length) * .65f + .6f), 13.dp.toPx())
                 drawContext.canvas.nativeCanvas.drawText(key, x + w / 2, y + h / 2 - (paint.ascent() + paint.descent()) / 2, paint)
@@ -182,3 +182,9 @@ private fun MiniatureKeyboard(rows: List<List<String>>, letterLayout: Boolean, c
     }
     }
 }
+
+/** 纯黑底（黑白主题深色）不铺任何灰色：选中只靠描边和对勾，缩略键盘只画字。 */
+internal fun Color.isPureBlack(): Boolean = alpha > .99f && red < .01f && green < .01f && blue < .01f
+
+internal fun chosenFill(containerColor: Color, accentColor: Color): Color =
+    if (containerColor.isPureBlack()) containerColor else accentColor.copy(alpha = .16f).compositeOver(containerColor)
