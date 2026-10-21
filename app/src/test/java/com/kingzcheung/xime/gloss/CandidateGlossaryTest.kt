@@ -180,6 +180,8 @@ class CandidateGlossaryTest {
         assertEquals("done?", CandidateGlossary.gloss(base, "好了么"))
         assertNull(CandidateGlossary.gloss(base, "会吧"))          // 单字词干不套
         assertEquals("nine o'clock", CandidateGlossary.gloss(base, "九点"))
+        assertEquals("half past six", CandidateGlossary.gloss(base, "六点半"))
+        assertEquals("nine o'clock", CandidateGlossary.gloss(base, "九点喽"))
         assertEquals("twenty-one days", CandidateGlossary.gloss(base, "二十一天"))
         assertEquals("one year", CandidateGlossary.gloss(base, "一年"))
         assertEquals("two times", CandidateGlossary.gloss(base, "两次"))
