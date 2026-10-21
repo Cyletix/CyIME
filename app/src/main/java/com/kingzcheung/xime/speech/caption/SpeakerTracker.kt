@@ -128,8 +128,10 @@ internal class SpeakerTracker(strictness: Int = 1) {
         val sure = best.second >= threshold - PROBE_SLACK && best.second - second >= PROBE_MARGIN
         probes.addLast(Window(startMs, endMs, print, if (sure) best.first.id else -1))
         while (probes.size > MAX_WINDOWS * 2) probes.removeFirst()
-        // A short reply never fills a 2 s window: three probes in a row unlike everyone known but
-        // alike each other are a new person (probes overlap by half, so this is 2 s of that voice).
+        // A short reply never fills a 2 s window: two probes in a row unlike everyone known but
+        // alike each other are a new person (1.5 s of that voice). PC replay 2026-10-21, 20 tight
+        // two-person dialogues: missed turn changes 49% → 25% clean, 68% → 52% with room echo;
+        // 60 single-voice sessions (up to 50 s, with echo) still never split.
         if (best.second < PROBE_NEW) {
             val last = probes.takeLast(PROBE_RUN)
             if (last.size == PROBE_RUN && last.all { p -> (speakers.values.maxOfOrNull { similarity(p.print, it.centroid) } ?: 0f) < PROBE_NEW } &&
@@ -326,8 +328,8 @@ internal class SpeakerTracker(strictness: Int = 1) {
         /** The phone holder (see [seedSelf]); far above any automatic number. */
         const val SELF = 999
         const val PROBE_SLACK = .05f
-        const val PROBE_NEW = .25f
-        const val PROBE_RUN = 3
+        const val PROBE_NEW = .32f
+        const val PROBE_RUN = 2
         const val PROBE_MARGIN = .08f
         const val WINDOW_MS = 2000L
         const val HOP_MS = 1000L
@@ -342,7 +344,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
         fun thresholdFor(level: Int): Float = when {
             level <= 0 -> .35f
-            level == 1 -> .40f
+            level == 1 -> .45f
             else -> .45f
         }
 
