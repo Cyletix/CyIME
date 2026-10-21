@@ -232,8 +232,21 @@ class FeedbackManager(private val context: Context) {
         pool.play(soundId, volume, volume, 1, 0, 1.0f)
     }
 
+    /** When a physical key last went down (uptime ms), sounding or not. */
+    @Volatile var lastHardwareKeyUptime = 0L
+        private set
+
+    /**
+     * Enter sound for a clipboard record put into the text; skipped when a physical key just chose it
+     * (that key already made its own sound).
+     */
+    fun playClipboardCommitSound(nowUptime: Long = android.os.SystemClock.uptimeMillis()) {
+        if (clipboardCommitNeedsSound(nowUptime, lastHardwareKeyUptime)) playKeySound("enter")
+    }
+
     /** 外接实体键盘按下时调用；只出声，不振动。 */
     fun playHardwareKeySound(event: android.view.KeyEvent) {
+        lastHardwareKeyUptime = event.eventTime
         val sound = HardwareKeySound.soundFor(event.keyCode, event.repeatCount,
             event.isCtrlPressed, event.isAltPressed, event.isMetaPressed) ?: return
         playKeySound(sound, hardware = true)
@@ -360,3 +373,9 @@ class FeedbackManager(private val context: Context) {
         }
     }
 }
+
+/** A clipboard record chosen within this long after a physical key press was chosen by that key. */
+internal const val HARDWARE_PICK_WINDOW_MS = 400L
+
+internal fun clipboardCommitNeedsSound(nowUptime: Long, lastHardwareKeyUptime: Long): Boolean =
+    lastHardwareKeyUptime <= 0L || nowUptime - lastHardwareKeyUptime > HARDWARE_PICK_WINDOW_MS

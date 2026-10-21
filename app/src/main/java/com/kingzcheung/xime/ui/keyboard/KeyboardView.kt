@@ -1775,6 +1775,7 @@ fun KeyboardView(
                         keyBgColor = keyBgColor,
                         viewModel = viewModel,
                         onSelectItem = { text ->
+                            callbacks.onClipboardRecordCommitted?.invoke()
                             callbacks.onClipboardSelect?.invoke(text)
                             viewModel.leaveClipboard()
                         },
@@ -1793,7 +1794,10 @@ fun KeyboardView(
                         },
                         onPullRemote = callbacks.onClipboardPullRemote,
                         pullRemoteAvailable = state.clipboardSyncEnabled,
-                        onImageSelect = callbacks.onClipboardImageSelect,
+                        onImageSelect = { image ->
+                            callbacks.onClipboardRecordCommitted?.invoke()
+                            callbacks.onClipboardImageSelect?.invoke(image)
+                        },
                         onImageShare = callbacks.onClipboardImageShare,
                         onSystemImagePaste = callbacks.onClipboardImageSystemPaste,
                         imagesExpanded = state.clipboardImagesExpanded,
