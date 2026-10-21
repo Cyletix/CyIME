@@ -912,10 +912,17 @@ fun KeyboardView(
                         }
                     },
                     onCandidateLongPress = { index ->
-                        val railEntry = if (expandedDataMode) railExpanded.getOrNull(index) else null
+                        // 手写候选：读手写列表（不是引擎列表），长按＝忘掉这个字从手写里学到的笔迹
+                        val handwritingWord = if (showHandwritingCandidates) handwritingCandidates.getOrNull(index) else null
+                        val railEntry = if (expandedDataMode && !showHandwritingCandidates) railExpanded.getOrNull(index) else null
                         val word = railEntry?.second?.text
                             ?: cs.candidates.getOrNull(index)
-                        if (!word.isNullOrEmpty()) {
+                        if (showHandwritingCandidates) {
+                            if (!handwritingWord.isNullOrEmpty()) deletePending = DeletePendingWord(handwritingWord,
+                                "忘掉「$handwritingWord」从手写里学到的笔迹？内置的写法和训练样本照常能认。") {
+                                com.kingzcheung.xime.handwriting.HandwritingTemplates.forget(handwritingContext, handwritingWord)
+                            }
+                        } else if (!word.isNullOrEmpty()) {
                             deletePending = DeletePendingWord(word) {
                                 if (!callbacks.isCandidateSnapshotCurrent(cs)) return@DeletePendingWord
                                 if (railEntry != null) {
@@ -1673,7 +1680,7 @@ fun KeyboardView(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "忘掉「${pending.word}」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。",
+                            text = pending.message ?: "忘掉「${pending.word}」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1993,6 +2000,8 @@ private fun KeyboardResizeControlsHost(
 /** 长按删除待确认项：词文本 + 用户确认后执行的删除动作（候选栏/展开页共用）。 */
 private data class DeletePendingWord(
     val word: String,
+    /** 弹窗说明；为空时用词库学习的说明。 */
+    val message: String? = null,
     val onConfirm: () -> Unit,
 )
 

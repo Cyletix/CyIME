@@ -406,6 +406,24 @@ object HandwritingTemplates {
         Thread { add(app, script, committed, feat, "pick:${System.currentTimeMillis()}") }.start()
     }
 
+    /**
+     * 长按手写候选＝忘掉学习：删掉这个字在选候选时学到的笔迹模板，回到内置模板和训练样本的排序。
+     * 训练页的样本不删（它们是刻意录的，下次打开手写还会从样本文件补回来）。返回删掉的个数。
+     */
+    fun forget(context: Context, label: String): Int = synchronized(this) {
+        var removed = 0
+        for (script in Script.entries) {
+            val list = entries(context, script)
+            val before = list.size
+            list.removeAll { it.label == label && it.source.startsWith("pick:") }
+            if (list.size != before) {
+                removed += before - list.size
+                save(context, script)
+            }
+        }
+        removed
+    }
+
     /** 无痕（手动开启、密码框、宿主声明不要个性化学习、剪贴板搜索）时不学，与打字同一规则。 */
     internal fun learningAllowed(): Boolean = !com.kingzcheung.xime.settings.IncognitoState.active
 
