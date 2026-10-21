@@ -117,7 +117,9 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
         val next = currentRoute()
         if (next != route) FileLogger.i(TAG, "route=$next")
         route = next
-        val listening = c.status == CaptionController.Status.Listening || c.status == CaptionController.Status.Starting
+        // Held: waiting for keyboard dictation to end; the service restarts it, so no start or retry here.
+        val listening = c.status == CaptionController.Status.Listening || c.status == CaptionController.Status.Starting ||
+            c.status == CaptionController.Status.Held
         val now = android.os.SystemClock.elapsedRealtime()
         // A failed start (speech service busy, model still loading) is retried every 10 s during the
         // call instead of leaving the bar dead until hang-up.

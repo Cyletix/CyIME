@@ -82,7 +82,8 @@ class CaptionActivity : ComponentActivity() {
 
     override fun onStop() {
         // Background: release the microphone (no foreground service in this version); resume on return.
-        if (controller.status == CaptionController.Status.Listening || controller.status == CaptionController.Status.Starting) {
+        if (controller.status == CaptionController.Status.Listening || controller.status == CaptionController.Status.Starting ||
+            controller.status == CaptionController.Status.Held) {
             controller.resumeOnForeground = true
             controller.pause()
         }

@@ -341,6 +341,7 @@ private fun statusOf(controller: CaptionController) = when {
     controller.status == CaptionController.Status.Listening -> MaterialTheme.colorScheme.primary to "正在听 · 只记字，不录音"
     controller.status == CaptionController.Status.Starting -> MaterialTheme.colorScheme.tertiary to controller.message.ifEmpty { "正在准备…" }
     controller.status == CaptionController.Status.Paused -> MaterialTheme.colorScheme.outline to "已暂停"
+    controller.status == CaptionController.Status.Held -> MaterialTheme.colorScheme.outline to controller.message
     controller.status == CaptionController.Status.Error -> MaterialTheme.colorScheme.error to controller.message
     else -> MaterialTheme.colorScheme.outline to ""
 }

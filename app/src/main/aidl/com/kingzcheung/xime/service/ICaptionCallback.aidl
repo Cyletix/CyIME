@@ -7,4 +7,6 @@ oneway interface ICaptionCallback {
     /** 声纹算完后到达；confident=false 表示“可能是” */
     void onSpeaker(long id, int speakerId, boolean confident);
     void onError(String message);
+    /** true：用户点了键盘语音，字幕先让出麦克风和模型；false：键盘语音说完了，字幕自己重新开始 */
+    void onHold(boolean held);
 }

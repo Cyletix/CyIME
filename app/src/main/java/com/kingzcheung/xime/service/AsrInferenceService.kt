@@ -8,6 +8,7 @@ import android.os.Looper
 import android.os.SystemClock
 import com.kingzcheung.xime.speech.AsrModelManager
 import com.kingzcheung.xime.speech.LocalSpeechSession
+import com.kingzcheung.xime.speech.CaptionDictationArbiter
 import com.kingzcheung.xime.speech.ResidentSpeechSessionOwner
 import com.kingzcheung.xime.speech.SherpaSpeechEngine
 import com.kingzcheung.xime.speech.SpeechBoundary
@@ -38,8 +39,9 @@ class AsrInferenceService : Service() {
     // Opt-in only; keyed by the client's session binder, like pushed PCM.
     private val recorders = ConcurrentHashMap<IBinder, SpeechTuningRecorder>()
     private val generation = AtomicLong()
-    // Captions and dictation share one engine slot; while a caption session owns it, dictation is refused.
-    @Volatile private var captionOwner: IBinder? = null
+    // Captions and dictation share one engine slot; the keyboard mic wins, automatic captions wait.
+    private val arbiter = CaptionDictationArbiter<ICaptionCallback>(sessions) { it.asBinder() }
+    private val captionOwner get() = arbiter.captionOwner
     private val captionGeneration = AtomicLong()
     private val speakerTracker = SpeakerTracker()
     private val embeddingSource = EmbeddingSource { samples -> embed(samples) }
@@ -136,10 +138,15 @@ class AsrInferenceService : Service() {
             return startSession(modelId, language, callback)
         }
         private fun startSession(modelId: String, language: InputLanguage?, callback: IInferenceAsrCallback): Boolean {
-            if (captionOwner != null) {
-                try { callback.onError("字幕模式使用中，键盘语音暂不可用") } catch (_: Exception) { }
-                return false
+            arbiter.dictationStarting()?.let { yielded ->
+                captionGeneration.incrementAndGet()
+                sessions.cancel(yielded.asBinder())
+                try { yielded.onHold(true) } catch (_: Exception) { }
             }
+            try { return startDictation(modelId, language, callback) }
+            finally { arbiter.dictationStartDone(); resumeHeldCaption() }
+        }
+        private fun startDictation(modelId: String, language: InputLanguage?, callback: IInferenceAsrCallback): Boolean {
             cancelIdleRelease()
             val token = generation.incrementAndGet()
             val startedAt = SystemClock.elapsedRealtime()
@@ -173,7 +180,7 @@ class AsrInferenceService : Service() {
                             if (generation.get() == token) try { callback.onError(message) } catch (_: Exception) { }
                         },
                         onRegion = { id, samples, boundary -> recorder?.region(id, samples, boundary) }) },
-                    owner = callback.asBinder(), isActive = { generation.get() == token && captionOwner == null })
+                    owner = callback.asBinder(), isActive = { generation.get() == token })
                 val readyAt = SystemClock.elapsedRealtime()
                 val modelState = if (constructed) "loaded" else if (ready) "resident" else "superseded"
                 FileLogger.i("AsrInferenceService", "start ready=$ready model=$modelState " +
@@ -205,6 +212,7 @@ class AsrInferenceService : Service() {
                 scheduleRelease()
             } ?: ""
             recorders.remove(session)?.close("stop", text)
+            resumeHeldCaption()
             return text
         }
         override fun cancelAsr(session: IBinder) {
@@ -213,6 +221,7 @@ class AsrInferenceService : Service() {
             if (sessions.cancel(session)) generation.compareAndSet(token, token + 1)
             recorders.remove(session)?.close("cancel", "")
             scheduleRelease()
+            resumeHeldCaption()
         }
         override fun releaseAsr(session: IBinder) {
             FileLogger.d("AsrInferenceService", "release generation=${generation.get()} idle=${sessions.isIdle}")
@@ -221,6 +230,7 @@ class AsrInferenceService : Service() {
                 generation.compareAndSet(token, token + 1)
                 cancelIdleRelease()
             }
+            resumeHeldCaption()
         }
         override fun setSaveTuningAudio(enabled: Boolean) {
             saveTuningAudio = enabled
@@ -238,6 +248,12 @@ class AsrInferenceService : Service() {
             if (sessions.isIdle) scheduleRelease()
         }
     }
+    /** Dictation is over: captions put on hold for it start again (they restart themselves). */
+    private fun resumeHeldCaption() {
+        val held = arbiter.takeResumable() ?: return
+        try { held.onHold(false) } catch (_: Exception) { }
+    }
+
     private val captionBinder = object : ICaptionService.Stub() {
         override fun start(modelId: String, speakerModelPath: String, callback: ICaptionCallback): Boolean =
             startLanguage(modelId, "zh", speakerModelPath, callback)
@@ -245,15 +261,11 @@ class AsrInferenceService : Service() {
             cancelIdleRelease()
             val token = captionGeneration.incrementAndGet()
             val owner = callback.asBinder()
-            // Captions and keyboard dictation never take the engine from each other: a start would
-            // cancel the other's session. Dictation in use refuses captions (call captions retry);
-            // captions hold their claim from the start of the model load, so dictation cannot slip in.
-            val claimed = sessions.atomically {
-                // Busy with no caption claim means dictation; another caption owner is still replaced.
-                if (sessions.busyWithOther(owner) && captionOwner == null) false else { captionOwner = owner; true }
-            }
-            if (!claimed) {
-                try { callback.onError("键盘语音正在用，说完再开字幕") } catch (_: Exception) { }
+            // Claimed before the model load, so dictation sees captions from the start.
+            if (!arbiter.claimCaption(callback)) {
+                try { callback.onHold(true) } catch (_: Exception) { }
+                // Dictation may have ended between the check and the hold.
+                resumeHeldCaption()
                 return false
             }
             return try {
@@ -292,8 +304,7 @@ class AsrInferenceService : Service() {
                     owner = owner, isActive = { captionGeneration.get() == token })
                 FileLogger.i("AsrInferenceService", "caption start ready=$ready speaker=${tracker != null} totalMs=${SystemClock.elapsedRealtime() - startedAt}")
                 if (ready) {
-                    captionOwner = owner
-                    try { owner.linkToDeath({ if (captionOwner == owner) { captionOwner = null; sessions.cancel(owner); scheduleRelease() } }, 0) } catch (_: Exception) { }
+                    try { owner.linkToDeath({ if (captionOwner == owner) { arbiter.dropCaption(owner); sessions.cancel(owner); scheduleRelease() } }, 0) } catch (_: Exception) { }
                 } else { releaseCaptionClaim(owner, token); scheduleRelease() }
                 ready
             } catch (e: Exception) {
@@ -309,17 +320,17 @@ class AsrInferenceService : Service() {
                 false
             }
         }
-        /** A failed or superseded caption start gives its claim back, unless a newer start took it over. */
-        private fun releaseCaptionClaim(owner: IBinder, token: Long) = sessions.atomically {
-            if (captionOwner == owner && captionGeneration.get() == token) captionOwner = null
-        }
+        private fun dropCaption(session: IBinder) = arbiter.dropCaption(session)
+        private fun releaseCaptionClaim(owner: IBinder, token: Long) = arbiter.releaseClaim(owner) { captionGeneration.get() == token }
         override fun push(session: IBinder, audioData: ByteArray) = sessions.acceptPcm(audioData, session)
+        override fun isHeld(session: IBinder): Boolean = arbiter.isHeld(session)
         override fun stop(session: IBinder) {
-            sessions.finish(session) { if (captionOwner == session) captionOwner = null; scheduleRelease() }
+            dropCaption(session)
+            sessions.finish(session) { scheduleRelease() }
         }
         override fun cancel(session: IBinder) {
             if (sessions.cancel(session)) captionGeneration.incrementAndGet()
-            if (captionOwner == session) captionOwner = null
+            dropCaption(session)
             scheduleRelease()
         }
         override fun mergeSpeakers(from: Int, into: Int): Boolean = speakerTracker.merge(from, into).isNotEmpty() || from in speakerTracker.speakerIds
@@ -363,7 +374,7 @@ class AsrInferenceService : Service() {
     override fun onDestroy() {
         generation.incrementAndGet()
         captionGeneration.incrementAndGet()
-        captionOwner = null
+        arbiter.clear()
         cancelIdleRelease()
         sessions.release()
         releaseSpeakerModel()
