@@ -35,7 +35,7 @@ internal class CaptionSpeechSession(
         ArrayBlockingQueue(capacity), { task -> Thread(task, name).apply { isDaemon = true } })
     private val audio = worker("CyIME-Caption", 100)
     private val refinement = worker("CyIME-CaptionRefine", 4)
-    private val speaker = worker("CyIME-Speaker", 8) // windows and probes
+    private val speaker = worker("CyIME-Speaker", 12) // windows and probes
     private val lifecycle = Any()
     private val abandoned = AtomicBoolean(false)
     private var accepting = true
@@ -140,16 +140,37 @@ internal class CaptionSpeechSession(
         try {
             speaker.execute {
                 if (abandoned.get()) return@execute
-                val print = try { embed.embed(audio) } catch (e: Exception) { null } ?: return@execute
+                val print = timedEmbed(embed, audio) ?: return@execute
                 publish(tracker.addWindow(endMs - SpeakerTracker.WINDOW_MS, endMs, print))
             }
-        } catch (_: RejectedExecutionException) { /* a skipped window only delays labels */ }
+        } catch (_: RejectedExecutionException) { speakerDrops.incrementAndGet() /* a skipped window only delays labels */ }
     }
 
     private var lastProbeEnd = 0L
 
+    // Speaker-thread load, logged every 30 s as numbers only (no text, no audio): checks on the device
+    // that windows plus 0.25 s probes keep up, i.e. busy time well under the 30 s and few drops.
+    private val speakerDrops = java.util.concurrent.atomic.AtomicInteger()
+    private var speakerBusyNanos = 0L
+    private var speakerEmbeds = 0
+    private var speakerLogAt = System.nanoTime()
+
+    /** Speaker worker only. */
+    private fun timedEmbed(embed: EmbeddingSource, audio: FloatArray): FloatArray? {
+        val started = System.nanoTime()
+        val print = try { embed.embed(audio) } catch (e: Exception) { null }
+        val now = System.nanoTime()
+        speakerBusyNanos += now - started; speakerEmbeds++
+        if (now - speakerLogAt >= 30_000_000_000L) {
+            com.kingzcheung.xime.util.FileLogger.i("CaptionSpeaker", "30s embeds=$speakerEmbeds busyMs=${speakerBusyNanos / 1_000_000} " +
+                "avgMs=${if (speakerEmbeds == 0) 0 else speakerBusyNanos / 1_000_000 / speakerEmbeds} dropped=${speakerDrops.getAndSet(0)}")
+            speakerBusyNanos = 0L; speakerEmbeds = 0; speakerLogAt = now
+        }
+        return print
+    }
+
     /**
-     * The last 1 s, every 0.5 s, if mostly speech: matched against known voices to place quick turn
+     * The last 1 s, every 0.25 s, if mostly speech: matched against known voices to place quick turn
      * changes (2 s windows straddle them). PC replay of 20 tight two-person dialogues: speaker
      * errors 17.1% → 11.4%, a single voice still never split (docs/development/caption-mode-20261016.md).
      */
@@ -168,10 +189,10 @@ internal class CaptionSpeechSession(
         try {
             speaker.execute {
                 if (abandoned.get()) return@execute
-                val print = try { embed.embed(audio) } catch (e: Exception) { null } ?: return@execute
+                val print = timedEmbed(embed, audio) ?: return@execute
                 publish(tracker.addProbe(endMs - PROBE_MS, endMs, print))
             }
-        } catch (_: RejectedExecutionException) { /* a skipped probe falls back to the 2 s windows */ }
+        } catch (_: RejectedExecutionException) { speakerDrops.incrementAndGet() /* a skipped probe falls back to the 2 s windows */ }
     }
 
     private var provisionalFor = 0L
@@ -366,7 +387,13 @@ internal object CaptionSpeakers { const val SINGLE = 0 }
 /** Ids of sentence pieces split off at a change of voice; far above anything the segmenter numbers. */
 internal const val SPLIT_BASE = 1L shl 40
 private const val PROBE_MS = 1000L
-private const val PROBE_HOP_MS = 500L
+/**
+ * Every 0.25 s: a 0.6–1.6 s reply held only one or two probes at 0.5 s and was absorbed by the
+ * previous voice. PC replay 2026-10-21 (20 tight dialogues): missed turn changes 25% → 14% quiet,
+ * 52% → 29% with room echo; 2 of 20 long single-voice echo sessions gained a brief extra lane (0.6%
+ * of their speech), fixable with "这是谁" → merge.
+ */
+private const val PROBE_HOP_MS = 250L
 
 /**
  * Two-pass choice per sentence. SenseVoice normally wins (CER 7.6 % vs 15.1 % on FLEURS), but when
