@@ -57,6 +57,22 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/** 手写板左上角的当前语言提示。 */
+internal fun handwritingLanguageHint(language: InputLanguage, useTemplates: Boolean, preparing: Boolean, missingKana: Boolean): String = when {
+    preparing -> "${language.displayName}手写 · 正在准备（只在第一次较慢）…"
+    language == InputLanguage.JAPANESE && missingKana -> "日语手写 · 假名模板没读到，去 设置 → 手写训练模式 导入样本备份"
+    language == InputLanguage.JAPANESE -> "日语手写 · 假名＋漢字"
+    language == InputLanguage.ENGLISH && useTemplates -> "英文手写 · 边写边学"
+    else -> "${language.displayName}手写"
+}
+
+/** 与手写板原有提示同一样式：按键文字色 60% 不透明，左上角，右侧让出公式按钮。 */
+@Composable
+internal fun HandwritingLanguageHint(text: String, keyTextColor: Color, modifier: Modifier = Modifier) {
+    Text(text, color = keyTextColor.copy(alpha = 0.6f),
+        modifier = modifier.padding(start = 12.dp, top = 12.dp, end = 96.dp).testTag("handwriting-language"))
+}
+
 @Composable
 internal fun HandwritingUnavailable(language: InputLanguage, modifier: Modifier, onExit: () -> Unit,
     exitLabel: String = "返回键盘", message: String = HandwritingLanguages.unavailableMessage(language)) {
@@ -254,16 +270,11 @@ fun HandwritingKeyboardLayout(
                     onPenLifted = { penSounds.stop() })) {
                 renderStrokes(session.strokes + listOfNotNull(session.currentStroke.takeIf { it.isNotEmpty() }), emptyList(), inkColor, transparentPaper = expanded, penColor = penInkColor)
             }
-            if (language != recognitionLanguage || templateScript != null) Text(when {
-                    useTemplates && language == InputLanguage.JAPANESE -> "日语手写 · 边写边学"
-                    useTemplates -> "英文手写 · 边写边学"
-                    templateScript != null && importingTemplates -> "正在准备手写模板（只在第一次较慢）…"
-                    templateScript != null && language == InputLanguage.JAPANESE -> "还没有你的假名样本：去 设置 → 手写训练模式 写几个，或在右上角菜单导入样本备份"
-                    // 没有字母模板时英文照样能写（内置模型里的字母），不提示缺样本
-                    templateScript != null -> "英文手写"
-                    else -> "中文手写"
-                }, color = keyTextColor.copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp, end = 96.dp).testTag("handwriting-language"))
+            // 一直显示正在写的语言（用户 10-21：除了公式按钮完全看不出在写什么语言）
+            HandwritingLanguageHint(handwritingLanguageHint(language, useTemplates,
+                    preparing = templateScript != null && importingTemplates,
+                    missingKana = templateScript == HandwritingTemplates.Script.KANA && !useTemplates),
+                keyTextColor, Modifier.align(Alignment.TopStart))
             // 公式开关是浮在画板右上角的实心小按钮，不用对钩：开启时强调色填满、文字在黑白里取反差大的；
             // 关闭时用主题功能键的底色（强制不透明）和文字色，不加描边。
             if (formulaShown) Surface(
