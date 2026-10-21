@@ -30,7 +30,8 @@ def gloss(zh, t):
     s, last = t[:-1], t[-1]
     if len(s) >= 2 and (last in MODAL or last in '吗么'):
         b = zh.get(s)
-        if b is None or b.startswith('~'): return None
+        if b is None or b.startswith('~'): b = number(s)
+        if b is None: return None
         b = b.lstrip('+'); return b.rstrip('?!') + '?' if last in '吗么' else b
     return number(t)
 def load(p):
