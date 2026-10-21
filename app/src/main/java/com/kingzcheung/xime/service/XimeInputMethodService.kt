@@ -1596,7 +1596,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // Growing the window frame by frame re-laid out the keyboard and the app behind it on
                 // every frame, and opening stuttered on the phone.
                 val clipboardSearchResultsHeight = com.kingzcheung.xime.ui.keyboard.clipboardSearchResultsTarget(
-                    state.clipboardSearchVisible, clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace), keyboardHeight)
+                    state.clipboardSearchVisible, clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace), keyboardHeight,
+                    available = effectiveScreenH - clipboardBottomSpace)
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
                 val effectiveKeyboardHeight = when {
                     handwritingExpanded -> handwritingSize(keyboardHeight, (effectiveScreenH - floatingMinY).coerceAtLeast(1))

@@ -389,7 +389,10 @@ fun KeyboardView(
         offsetY = state.floatingOffsetY,
         minOffsetY = state.floatingMinOffsetY,
         availableHeightDp = state.floatingScreenHeightDp,
-        contentHeightDp = state.keyboardHeightDp,
+        // A floating card holds the search results and bar above its keys; without them in its height
+        // the results squeezed the keys.
+        contentHeightDp = state.keyboardHeightDp + clipboardSearchExtraHeight(
+            state.isFloatingMode && state.clipboardSearchVisible, overlayPage = false, state.clipboardSearchResultsHeight),
         bottomContentPaddingDp = renderedBottomPaddingDp,
         bottomKeyClearance = floatingBottomClearance,
         fixedWidthDp = state.fixedWidthDp,
