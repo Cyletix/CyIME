@@ -61,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -724,7 +725,6 @@ fun KeyboardView(
                     com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(clipboardContext) }
                 ClipboardSearchResults(clipboard, candidateState, isT9Schema(state.currentSchemaId),
                     state.clipboardItems, callbacks, viewModel::removeClipboardItems,
-                    // Height animates in the service together with the IME container (pull-up motion).
                     Modifier.fillMaxWidth().height(state.clipboardSearchResultsHeight.dp))
                 ToolPanel(
                     title = "搜索剪贴板",
@@ -2009,11 +2009,21 @@ private fun ClipboardSearchResults(
     val query = remember(field, composing, t9) { com.kingzcheung.xime.clipboard.ClipboardLiveQuery(field, composing, t9) }
     com.kingzcheung.xime.ui.menubar.ConnectedClipboardBoard(
         items, initialImages = false, expanded = false,
+    // The space is there from the first frame; the results rise into it with the panel motion.
+    // Only the layer moves, so nothing is measured or recomposed while it runs.
+    val reveal = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) { reveal.animateTo(1f, keyboardPanelMotion(true)) }
+    Box(modifier.clipToBounds()) {
         onBack = {}, onQuickSend = {},
         onSelectText = { text -> callbacks.onClipboardSearchSelect?.invoke(text) },
         onRemoveText = onRemoveText, onAddQuick = {}, onSplit = { _, _ -> },
         onImageSelect = { image -> callbacks.onClipboardSearchImageSelect?.invoke(image) },
         onImageShare = { _, _ -> }, onSystemPaste = {}, onPullRemote = null,
-        keepQueryOnDispose = true, liveQuery = query, modifier = modifier,
+        keepQueryOnDispose = true, liveQuery = query,
+        modifier = Modifier.fillMaxSize().graphicsLayer {
+            translationY = (1f - reveal.value) * size.height
+            alpha = reveal.value
+        },
     )
 }
+    }

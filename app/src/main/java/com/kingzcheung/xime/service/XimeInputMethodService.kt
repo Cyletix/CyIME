@@ -1592,11 +1592,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 // Clipboard search keeps the keyboard as it is: the results take the space the clipboard
                 // would take when pulled up, above the keyboard and the search bar.
-                // The container grows with the same pull-up animation, so the keyboard below never moves.
-                val clipboardSearchTarget = com.kingzcheung.xime.ui.keyboard.clipboardSearchResultsTarget(
+                // The container takes that height at once; the results slide in inside it (drawing only).
+                // Growing the window frame by frame re-laid out the keyboard and the app behind it on
+                // every frame, and opening stuttered on the phone.
+                val clipboardSearchResultsHeight = com.kingzcheung.xime.ui.keyboard.clipboardSearchResultsTarget(
                     state.clipboardSearchVisible, clipboardPanelBounds(keyboardHeight, effectiveScreenH, clipboardBottomSpace), keyboardHeight)
-                val clipboardSearchResultsHeight = androidx.compose.animation.core.animateIntAsState(clipboardSearchTarget,
-                    com.kingzcheung.xime.ui.keyboard.keyboardPanelMotion(clipboardSearchTarget > 0), label = "clipboardSearch").value
                 // 浮动只收窄宽度，不再压缩按键行高或带入普通模式的底部留白。
                 val effectiveKeyboardHeight = when {
                     handwritingExpanded -> handwritingSize(keyboardHeight, (effectiveScreenH - floatingMinY).coerceAtLeast(1))
@@ -1901,8 +1901,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 state,
                                 isDarkTheme,
                                 effectiveKeyboardHeight,
-                                // The search results open with the container's animation; without this key the
-                                // keyboard view kept the first frame (0) and the keys stretched into the results.
+                                // Without this key the keyboard view kept a stale results height (0) and the keys
+                                // stretched into the results.
                                 clipboardSearchResultsHeight,
                                 handwritingExpanded, handwritingWidth, handwritingOffsetX,
                                 protectedSize,
