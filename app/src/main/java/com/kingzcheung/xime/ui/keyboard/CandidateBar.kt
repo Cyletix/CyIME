@@ -111,6 +111,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
 import com.kingzcheung.xime.keyboard.MainType
@@ -525,6 +527,7 @@ fun CandidateBar(
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily,
                             learned = state is CandidateBarState.ChineseCandidates && candidate in LocalLearnedCandidates.current,
+                            correction = if (state is CandidateBarState.ChineseCandidates) LocalCorrectedCandidates.current[candidate].orEmpty() else "",
                         )
                     }
 
@@ -872,6 +875,30 @@ internal fun candidatePrimaryTextStyle(
 
 /** 当前候选中用户以前打过的词（按文字），由键盘根部提供。 */
 internal val LocalLearnedCandidates = androidx.compose.runtime.compositionLocalOf<Set<String>> { emptySet() }
+internal val LocalCorrectedCandidates = androidx.compose.runtime.compositionLocalOf<Map<String, String>> { emptyMap() }
+
+private val CorrectionRed = Color(0xFFE53935)
+
+/** 纠错候选的拼音：多打的划掉，少打的红字补上，打错的划掉并在右上角写正确字母，打反的两个字母标红加下划线。 */
+internal fun correctionAnnotatedString(marks: String, plain: Color): androidx.compose.ui.text.AnnotatedString =
+    androidx.compose.ui.text.buildAnnotatedString {
+        val struck = androidx.compose.ui.text.SpanStyle(color = CorrectionRed, textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough)
+        val added = androidx.compose.ui.text.SpanStyle(color = CorrectionRed)
+        val above = androidx.compose.ui.text.SpanStyle(color = CorrectionRed, fontSize = 0.75.em,
+            baselineShift = androidx.compose.ui.text.style.BaselineShift.Superscript)
+        val swapped = androidx.compose.ui.text.SpanStyle(color = CorrectionRed, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
+        for (mark in com.kingzcheung.xime.rime.CorrectionMarks.parse(marks)) when (mark) {
+            is com.kingzcheung.xime.rime.CorrectionMark.Keep -> withStyle(androidx.compose.ui.text.SpanStyle(color = plain)) { append(mark.letter) }
+            is com.kingzcheung.xime.rime.CorrectionMark.Extra -> withStyle(struck) { append(mark.letter) }
+            is com.kingzcheung.xime.rime.CorrectionMark.Missing -> withStyle(added) { append(mark.letter) }
+            is com.kingzcheung.xime.rime.CorrectionMark.Replace -> {
+                withStyle(struck) { append(mark.typed) }
+                withStyle(above) { append(mark.correct) }
+            }
+            is com.kingzcheung.xime.rime.CorrectionMark.Swap -> withStyle(swapped) { append(mark.correct) }
+            com.kingzcheung.xime.rime.CorrectionMark.Gap -> withStyle(androidx.compose.ui.text.SpanStyle(color = plain)) { append(' ') }
+        }
+    }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -893,6 +920,8 @@ fun CandidateItem(
     textShadow: androidx.compose.ui.graphics.Shadow? = null,
     /** 用户以前打过的词：文字右上角画一个小编辑图标。 */
     learned: Boolean = false,
+    /** 纠错来的候选：引擎给的逐音节纠正，代替拼音注释标出怎么改的。 */
+    correction: String = "",
     /** Shift 拖动指着别的候选时由候选栏统一画底色，这里先不画，保证只亮一个。 */
     selectionFill: Boolean = true,
 ) {
@@ -937,12 +966,14 @@ fun CandidateItem(
                     .testTag("candidate-learned:$index"),
             )
         }
-        if (comment.isNotEmpty()) {
+        if (correction.isNotEmpty() || comment.isNotEmpty()) {
             Spacer(modifier = Modifier.width(3.dp))
+            val commentColor = if (isSelected) selectedTextColor.copy(alpha = if (opaqueComment) 1f else 0.6f) else textColor.copy(alpha = if (opaqueComment) 1f else 0.5f)
             Text(
-                text = comment,
+                text = if (correction.isNotEmpty()) correctionAnnotatedString(correction, commentColor)
+                    else androidx.compose.ui.text.AnnotatedString(comment),
                 modifier = Modifier.candidateBaseline(fontSize),
-                color = if (isSelected) selectedTextColor.copy(alpha = if (opaqueComment) 1f else 0.6f) else textColor.copy(alpha = if (opaqueComment) 1f else 0.5f),
+                color = commentColor,
                 fontSize = (fontSize.value * 11f / 19f).sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
@@ -1168,6 +1199,7 @@ internal fun FixedCandidateStrip(
                         .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     learned = index < candidates.size && all[index] in LocalLearnedCandidates.current,
+                    correction = if (index < candidates.size) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
                     selectionFill = shiftDragFree && !highlightShown)
             }
         }
