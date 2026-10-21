@@ -298,9 +298,9 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onCursorMove = { direction ->
                 if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$direction") == true) {
-                    service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
+                    service.feedbackManager.cursorStepFeedback(view)
                 } else service.schemaController.moveEditorCursor(direction) {
-                    service.feedbackManager.hapticFeedback(view, type = KeyFeedbackType.CURSOR_STEP)
+                    service.feedbackManager.cursorStepFeedback(view)
                 }
             },
             onCursorMoveVertical = { steps ->

@@ -63,6 +63,10 @@ data class KeyboardInputPreferences(
     val symbolInputMode: SymbolInputMode = SymbolInputMode.SWIPE_UP,
     val reverseSymbolSwipe: Boolean = false,
     val cursorHoldSeconds: Float = 0.2f,
+    /** 移动光标时每走一字轻震一下；原来一直有，默认开保持手感（2026-10-22 起可关）。 */
+    val cursorStepHaptic: Boolean = true,
+    /** 移动光标时每走一字播放按键音；新加，默认关。 */
+    val cursorStepSound: Boolean = false,
     val fourteenLetterSwipe: Boolean = true,
     val fourteenLetterSwipeDp: Float = 24f,
     val kanaDirectionHints: Boolean = false,
@@ -91,7 +95,7 @@ data class KeyboardInputPreferences(
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "key_text_scale", "fixed_symbols",
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
@@ -134,6 +138,8 @@ data class KeyboardInputPreferences(
                     ?: if (hold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,
                 cursorHoldSeconds = normalizeCursorHoldSeconds(prefs.getFloat("cursor_hold_seconds", 0.2f)),
+                cursorStepHaptic = prefs.getBoolean("cursor_step_haptic", true),
+                cursorStepSound = prefs.getBoolean("cursor_step_sound", false),
                 languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(languageHold),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
@@ -179,6 +185,8 @@ data class KeyboardInputPreferences(
             .putBoolean("glide_typing", glideTyping)
             .putBoolean("t9_flick_letters", t9FlickLetters)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
+            .putBoolean("cursor_step_haptic", cursorStepHaptic)
+            .putBoolean("cursor_step_sound", cursorStepSound)
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))
             .putFloat("handwriting_pause_seconds_v2", normalizeHandwritingPause(handwritingPauseSeconds))
             .putFloat("handwriting_pause_seconds", normalizeHandwritingPause(handwritingPauseSeconds))
