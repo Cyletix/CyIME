@@ -95,3 +95,12 @@ internal fun KeyboardBackdropHost(
             LocalClipboardBackdropMotion provides clipboardInMotion) { content() }
     }
 }
+
+/**
+ * A panel (clipboard, emoji, symbols, editing, clipboard search) on a see-through keyboard gets the
+ * glass blur window behind it even with glass off: at 50% (landscape's default) the app's own text
+ * showed sharply through the panel's text and neither could be read (user, 2026-10-22: add a blur).
+ * The letter keyboard keeps its plain transparency.
+ */
+internal fun panelNeedsBackdropBlur(glassEnabled: Boolean, panelOpen: Boolean, keyboardOpacity: Float): Boolean =
+    !glassEnabled && panelOpen && keyboardOpacity < 1f

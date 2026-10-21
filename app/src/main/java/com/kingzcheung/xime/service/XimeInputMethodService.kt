@@ -1531,9 +1531,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 val isDarkTheme = isDarkTheme()
                 val roundedKeyboardBottom = com.kingzcheung.xime.ui.keyboard.rememberRoundedKeyboardBottom()
+                // A see-through keyboard showing a panel (clipboard, emoji, symbols, editing, clipboard
+                // search) blurs the app behind it, so the panel's text is not read through the app's.
+                val panelBackdrop = com.kingzcheung.xime.ui.theme.panelNeedsBackdropBlur(frostedGlass.enabled,
+                    page is KeyboardPage.Overlay || state.clipboardSearchVisible, keyboardLayerOpacity)
                 SideEffect {
-                    updateGlassOpacity(if (state.isCompact || state.voiceCollapsed) 1f else keyboardLayerOpacity)
-                    updateGlassConfiguration(frostedGlass, when {
+                    updateGlassOpacity(if (state.isCompact || state.voiceCollapsed || panelBackdrop) 1f else keyboardLayerOpacity)
+                    updateGlassConfiguration(if (panelBackdrop) frostedGlass.copy(enabled = true) else frostedGlass, when {
                         state.isCompact || state.voiceCollapsed -> "hardware"
                         state.isFloatingMode -> "floating"
                         else -> "fixed"
