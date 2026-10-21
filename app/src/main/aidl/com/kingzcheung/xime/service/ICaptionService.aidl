@@ -33,4 +33,6 @@ interface ICaptionService {
     int rememberSpeaker(int speakerId, String name);
     /** 忘掉记住的人 */
     void forgetSpeaker(int knownId);
+    /** start 返回 false 是因为键盘语音在用：字幕在等，键盘语音说完会收到 onHold(false) */
+    boolean isHeld(IBinder session);
 }

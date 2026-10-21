@@ -23,6 +23,8 @@ class CaptionInferenceClient(context: Context) {
         fun onError(message: String)
         /** The :asr process died or unbound: the session is gone, speakers are forgotten. */
         fun onLost()
+        /** Keyboard dictation took the engine (true) or finished with it (false); see ICaptionCallback.onHold. */
+        fun onHold(held: Boolean) {}
     }
 
     @Volatile private var service: ICaptionService? = null
@@ -78,10 +80,17 @@ class CaptionInferenceClient(context: Context) {
                 if (callback === this) listener.onSpeaker(id, speakerId, confident)
             }
             override fun onError(message: String) { if (callback === this) listener.onError(message) }
+            override fun onHold(held: Boolean) { if (callback === this) listener.onHold(held) }
         }
         callback = stub
         return try { requireService().startLanguage(modelId, languageId, speakerModelPath, stub) }
         catch (e: Exception) { FileLogger.e(TAG, "start failed", e); callback = null; false }
+    }
+
+    /** After a refused [start]: true when the refusal is a hold for keyboard dictation, not a failure. */
+    fun isHeld(): Boolean {
+        val stub = callback ?: return false
+        return try { requireService().isHeld(stub.asBinder()) } catch (_: Exception) { false }
     }
 
     fun push(pcm: ByteArray) {

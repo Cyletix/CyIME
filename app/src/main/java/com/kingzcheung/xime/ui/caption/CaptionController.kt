@@ -70,7 +70,8 @@ class SegmentUi(val id: Long, val wallMs: Long) {
  * to the main thread before touching Compose state; blocking service calls run on [io].
  */
 class CaptionController(context: Context) : CaptionInferenceClient.Listener {
-    enum class Status { Idle, Starting, Listening, Paused, Error }
+    /** Held: the user tapped the keyboard mic; captions gave it the microphone and resume after dictation. */
+    enum class Status { Idle, Starting, Listening, Paused, Held, Error }
 
     private val app = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
@@ -186,7 +187,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
                 }
                 val speakerPath = speakerModelFile()?.absolutePath.orEmpty()
                 check(client.bind()) { "无法连接语音服务" }
-                check(client.start(mode, speakerPath, sessionListener(epoch), chosen.id)) { "语音模型启动失败" }
+                check(client.start(mode, speakerPath, sessionListener(epoch), chosen.id)) {
+                    if (client.isHeld()) HELD_FOR_DICTATION else "语音模型启动失败" }
                 // Closed or paused while the model loaded: the page already stopped the recorder, so
                 // a microphone opened now would stay on with nobody to close it.
                 check(startUnlessStale({ epoch == sessionEpoch }, recorder::start, recorder::stop)) { "麦克风启动失败" }
@@ -201,7 +203,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
                     main.removeCallbacks(diagnostics); main.postDelayed(diagnostics, 5_000)
                     recordingCallback?.let { callback -> audioManager.registerAudioRecordingCallback(callback, main) }
                     FileLogger.i(TAG, "session started speakerModel=${speakerModelReady}")
-                }.onFailure { fail(it.message ?: "字幕启动失败") }
+                }.onFailure { if (it.message == HELD_FOR_DICTATION) hold() else fail(it.message ?: "字幕启动失败") }
             }
         }
     }
@@ -217,7 +219,36 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         FileLogger.w(TAG, "session failed: $message")
     }
 
+    /**
+     * Keyboard dictation has the engine: let go of the microphone and wait. Nothing is cancelled on
+     * the service side, which already ended this session and will call [onHold] false when done.
+     */
+    private fun hold() {
+        if (status == Status.Idle || status == Status.Paused) return
+        ++sessionEpoch
+        recorder.stop()
+        stopDiagnostics()
+        main.removeCallbacks(muteCheck)
+        status = Status.Held
+        message = "键盘语音在用，说完字幕自动继续"
+        FileLogger.i(TAG, "held for dictation")
+    }
+
+    override fun onHold(held: Boolean) {
+        main.post {
+            if (held) hold()
+            else if (status == Status.Held) { status = Status.Paused; start() }
+        }
+    }
+
     fun pause() {
+        if (status == Status.Held) {
+            // The user paused while waiting: stay paused after dictation instead of restarting.
+            io.execute { client.cancel() }
+            status = Status.Paused
+            message = ""
+            return
+        }
         if (status != Status.Listening && status != Status.Starting) return
         ++sessionEpoch
         recorder.stop()
@@ -252,6 +283,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
             this@CaptionController.onSpeaker(key(id), speakerId, confident)
         override fun onError(message: String) = this@CaptionController.onError(message)
         override fun onLost() = this@CaptionController.onLost()
+        override fun onHold(held: Boolean) = this@CaptionController.onHold(held)
     }
 
     // ---- callbacks (binder threads) ----
@@ -591,6 +623,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
 
     companion object {
         private const val TAG = "Caption"
+        /** Start refused because keyboard dictation is on; not an error. */
+        private const val HELD_FOR_DICTATION = "held-for-dictation"
         const val REPLY_SPEAKER = -1
         /** The phone holder's remembered voice (same id as the :asr tracker). */
         const val SELF_SPEAKER = com.kingzcheung.xime.speech.caption.SpeakerTracker.SELF
