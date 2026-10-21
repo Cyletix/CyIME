@@ -1,5 +1,5 @@
 diff --git a/src/rime/algo/syllabifier.cc b/src/rime/algo/syllabifier.cc
-index a5751781..e78ea59a 100644
+index a5751781..b8f512c4 100644
 --- a/src/rime/algo/syllabifier.cc
 +++ b/src/rime/algo/syllabifier.cc
 @@ -113,9 +113,26 @@ int Syllabifier::BuildSyllableGraph(const string& input,
@@ -30,7 +30,7 @@ index a5751781..e78ea59a 100644
        }
        Corrections corrections;
        corrector_->ToleranceSearch(prism, string{current_input}, &corrections,
-@@ -161,8 +178,9 @@ int Syllabifier::BuildSyllableGraph(const string& input,
+@@ -161,14 +178,18 @@ int Syllabifier::BuildSyllableGraph(const string& input,
              props.end_pos = end_pos;
              // add a syllable with properties to the edge's
              // spelling-to-syllable map
@@ -41,6 +41,15 @@ index a5751781..e78ea59a 100644
 +                               doubled.count({m.value, m.length}))) {
                props.is_correction = true;
                props.credibility = kCorrectionCredibility;
+             }
+             auto it = spellings.find(syllable_id);
+             if (it == spellings.end()) {
+               spellings.insert({syllable_id, props});
++            } else if (doubled.count({m.value, m.length})) {
++              // The typed letters already reach this syllable here (a as an abbreviation of an):
++              // a doubled-letter reading must not turn that into a full spelling.
+             } else {
+               it->second.type = (std::min)(it->second.type, props.type);
              }
 diff --git a/src/rime/common.h b/src/rime/common.h
 index e5dfaf9..35f26b0 100644
