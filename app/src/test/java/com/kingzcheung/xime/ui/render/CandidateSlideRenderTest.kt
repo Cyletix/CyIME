@@ -41,7 +41,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 候选换词滑入的关键帧：候选从「这到底…」换成「是什么…」后第 0/30/60/120ms 的样子，
+ * 候选换词（打字）后第 0/30/60/120ms 应该一动不动；换选中项时高亮底色滑过去的关键帧。
  * 用真实 CandidateBar 代码在电脑上渲染。只在设了环境变量 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
@@ -62,6 +62,7 @@ class CandidateSlideRenderTest {
         val first = listOf("这到底", "这道题", "折倒", "这到底是什么原理")
         val second = listOf("是什么", "什么", "是", "是什么原理")
         val words = mutableStateOf(first)
+        val focus = mutableStateOf(0)
         rule.mainClock.autoAdvance = false
         rule.setContent {
             Column(Modifier.background(Color(0xFF808080)).padding(4.dp)) {
@@ -78,7 +79,8 @@ class CandidateSlideRenderTest {
                             CompositionLocalProvider(LocalKeyboardPalette provides palette,
                                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(frostedGlass = config)) {
                                 CandidateBar(
-                                    state = CandidateBarState.ChineseCandidates(words.value, inputText = "zhedaodi", hasMore = true),
+                                    state = CandidateBarState.ChineseCandidates(words.value, inputText = "zhedaodi", hasMore = true,
+                                        highlightIndex = focus.value),
                                     visuals = CandidateBarVisuals(Color.Transparent, palette.candidateText,
                                         if (dark) Color(0xFF3C4043) else Color(0xFFDADCE0), palette.accent,
                                         palette.selectedText, dark, palette.key),
@@ -105,6 +107,21 @@ class CandidateSlideRenderTest {
             val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
             File(out, "slide-${t}ms.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        // 换选中项（Tab、方向键）：高亮底色从「是什么」滑到「什么」，再滑到「是什么原理」。
+        for ((step, index) in listOf(1, 3).withIndex()) {
+            rule.mainClock.advanceTimeBy(1000)
+            rule.runOnIdle { focus.value = index }
+            rule.mainClock.advanceTimeByFrame()
+            elapsed = 0L
+            for (t in listOf(0L, 60L, 120L, 240L)) {
+                rule.mainClock.advanceTimeBy(t - elapsed)
+                elapsed = t
+                val root = rule.activity.window.decorView
+                val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+                rule.runOnIdle { root.draw(android.graphics.Canvas(bitmap)) }
+                File(out, "focus${step + 1}-${t}ms.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
         }
     }
 }

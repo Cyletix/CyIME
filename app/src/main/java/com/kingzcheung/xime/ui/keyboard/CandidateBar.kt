@@ -72,6 +72,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.layout.boundsInRoot
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -1041,6 +1042,13 @@ internal fun PreeditLabel(text: String, visuals: CandidateBarVisuals, onEdit: ((
     }
 }
 
+/** 选中底色上一次对应的候选组和选中项；只是记录，不触发重组。 */
+private class HighlightMove {
+    var candidates: List<String>? = null
+    var index = -1
+    var animateNext = false
+}
+
 /** Layout history only; updating it after composition must not schedule another recomposition. */
 private class CandidateStripViewport { var firstIndex: Int = 0 }
 
@@ -1061,8 +1069,40 @@ internal fun FixedCandidateStrip(
     val density = LocalDensity.current
     val inheritedTextStyle = LocalTextStyle.current
     val commentsAllowed = rememberCandidateCommentsAllowed()
+    // 选中底色由整条统一画，换选中的候选时从旧候选滑到新候选（用户 10-21 选 1）；
+    // 候选一变（打字、翻页）就直接落到新位置，打字时什么都不动。
+    var stripRootOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var focusedBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val highlightBox = remember { androidx.compose.animation.core.Animatable(androidx.compose.ui.geometry.Rect.Zero,
+        androidx.compose.ui.geometry.Rect.VectorConverter) }
+    var highlightShown by remember { mutableStateOf(false) }
+    // 只有同一组候选里换了选中项才滑；在组合时记下，等新位置量出来再决定滑还是直接落。
+    val highlightMove = remember { HighlightMove() }
+    if (highlightMove.candidates != candidates) highlightMove.animateNext = false
+    else if (highlightMove.index != highlightIndex) highlightMove.animateNext = true
+    highlightMove.candidates = candidates
+    highlightMove.index = highlightIndex
+    // 位置只在这里读，不让候选栏因为量位置而多重组一次。
+    androidx.compose.runtime.LaunchedEffect(highlightBox) {
+        androidx.compose.runtime.snapshotFlow { focusedBounds }.collectLatest { target ->
+            if (target == null) return@collectLatest
+            if (highlightShown && highlightMove.animateNext) {
+                highlightMove.animateNext = false
+                highlightBox.animateTo(target, androidx.compose.animation.core.tween(CANDIDATE_SLIDE_MS * 2,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            } else { highlightBox.snapTo(target); highlightShown = true }
+        }
+    }
+    val highlightAccent = visuals.accentColor
+    val highlightVisible = candidates.isNotEmpty()
     BoxWithConstraints(modifier.clipToBounds().testTag("candidate-fixed-strip")
-        .onGloballyPositioned { stripOriginX = it.positionInWindow().x }) {
+        .onGloballyPositioned { stripOriginX = it.positionInWindow().x; stripRootOrigin = it.boundsInRoot().topLeft }
+        .drawBehind {
+            val rect = highlightBox.value
+            if (highlightShown && highlightVisible && CandidateDropTargets.shared.hoveredBounds == null && rect.width > 0f)
+                drawRoundRect(highlightAccent.copy(alpha = 0.2f), rect.topLeft - stripRootOrigin, rect.size,
+                    androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
+        }) {
         val panelWidth = maxWidth
         // 中缝在本条内的位置（像素）；未测到位置前按整条排。
         val localGap = gapWindowX?.takeUnless { stripOriginX.isNaN() }?.let { (l, r) ->
@@ -1124,10 +1164,11 @@ internal fun FixedCandidateStrip(
                     textShadow = visuals.textShadow,
                     fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
                     commentFontFamily = AppFonts.commentFontFamily,
-                    modifier = Modifier.widthIn(max = panelWidth).testTag("bar-candidate:$index"),
+                    modifier = Modifier.widthIn(max = panelWidth).testTag("bar-candidate:$index")
+                        .then(if (index == focused) Modifier.onGloballyPositioned { focusedBounds = it.boundsInRoot() } else Modifier),
                     onLongClick = if (index < candidates.size) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
                     learned = index < candidates.size && all[index] in LocalLearnedCandidates.current,
-                    selectionFill = shiftDragFree)
+                    selectionFill = shiftDragFree && !highlightShown)
             }
         }
         }
@@ -1175,7 +1216,7 @@ internal val LocalEdgeButtonStrength = androidx.compose.runtime.staticCompositio
 internal enum class EdgeButtonStyle { CIRCLE, CAPSULE, CONCENTRIC }
 internal val LocalEdgeButtonStyle = androidx.compose.runtime.staticCompositionLocalOf { EdgeButtonStyle.CAPSULE }
 
-/** Shift 拖到候选时选中底色滑过去的时长。 */
+/** Shift 拖到候选时选中底色滑过去的时长；换选中候选时用它的两倍。 */
 private const val CANDIDATE_SLIDE_MS = 120
 
 /**
