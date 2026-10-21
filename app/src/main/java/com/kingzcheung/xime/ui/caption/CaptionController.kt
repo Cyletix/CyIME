@@ -286,8 +286,12 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
             transcript.assign(id, speakerId, confident)
             val ui = segments.firstOrNull { it.id == id } ?: return@post
             ensureSpeaker(speakerId)
+            val before = ui.speakerId
             ui.speakerId = speakerId
             ui.confident = confident
+            // A voice merged away by the re-check leaves no sentences: drop its empty lane.
+            if (before != null && before != speakerId && before in 1 until SELF_SPEAKER && segments.none { it.speakerId == before })
+                speakers.removeAll { it.id == before && !it.named }
             FileLogger.i(TAG, "seg=$id speaker=$speakerId confident=$confident")
         }
     }
