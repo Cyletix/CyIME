@@ -152,6 +152,9 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
             android.widget.Toast.LENGTH_LONG).show()
     }
     val banners: @Composable () -> Unit = {
+        // 换成没下载过的语言时：在这里看下载进度，下完自动开始听。
+        if (controller.languageDownload !is ModelDownloadState.Idle && controller.missingModel(controller.language) != null)
+            ModelBanner("${controller.language.label}字幕要用的语音模型", "重新下载", controller.languageDownload) { controller.downloadLanguage(controller.language) }
         if (!controller.streamingReady) ModelBanner("没有实时出字模型：要等对方说完一句才整句出字", "下载实时出字模型（226 MB）",
             controller.streamingDownload) { controller.downloadStreaming() }
         if (!controller.refinementReady) ModelBanner("没有 SenseVoice 校正：字幕没有标点、错字多", "下载 SenseVoice（228 MB）",
@@ -282,12 +285,42 @@ private fun SlimRail(controller: CaptionController, onSave: () -> Unit, onExit: 
 @Composable
 private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -> Unit) {
     val (dotColor, text) = statusOf(controller)
-    Row(Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    var choosing by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // 听哪种语言：放在状态这一行最前面，一眼看得到、一点就换；字幕区和按钮都不挤。
+        CaptionButton(controller.language.label + " ▾", height = 40.dp, fontSize = 17.sp) { choosing = true }
+        Spacer(Modifier.width(10.dp))
         Box(Modifier.size(12.dp).clip(CircleShape).background(dotColor))
         Spacer(Modifier.width(8.dp))
         Text(text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 280.dp))
         Spacer(Modifier.width(12.dp))
         Box(Modifier.weight(1f)) { ribbon(24.dp) }
+    }
+    if (choosing) LanguageDialog(controller.language, missing = { controller.missingModel(it)?.second },
+        onPick = { picked ->
+            controller.chooseLanguage(picked)
+            // 没下载的语言：在应用里直接下（和模型管理同一个下载器），下完自动开始听。
+            if (controller.missingModel(picked) != null) controller.downloadLanguage(picked)
+            choosing = false
+        }, onDismiss = { choosing = false })
+}
+
+/** 字幕语言：三个整行大按钮，当前的那个打勾；没下载的模型写明要下多大。 */
+@Composable
+private fun LanguageDialog(current: CaptionLanguage, missing: (CaptionLanguage) -> String?, onPick: (CaptionLanguage) -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("字幕听哪种语言？", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                for (language in CaptionLanguage.entries) {
+                    val size = missing(language)
+                    val label = (if (language == current) "✓ " else "") + language.label + (size?.let { "（先下载 $it）" } ?: "")
+                    CaptionButton(label, Modifier.fillMaxWidth(),
+                        emphasis = if (language == current) CaptionEmphasis.Primary else CaptionEmphasis.Normal) { onPick(language) }
+                }
+                BigButton("取消", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
+            }
+        }
     }
 }
 
