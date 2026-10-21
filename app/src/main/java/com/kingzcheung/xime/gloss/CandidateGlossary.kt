@@ -184,9 +184,10 @@ object CandidateGlossary {
         if (text.length < 2 || text.any { it.code < 0x80 }) return null
         val stem = text.dropLast(1)
         val last = text.last()
-        if (stem.length >= 2 && (last in MODAL_PARTICLES || last == '吗')) {
+        val question = last == '吗' || last == '么'   // 你知道么 = 你知道吗
+        if (stem.length >= 2 && (last in MODAL_PARTICLES || question)) {
             val base = table.lookup(stem)?.takeUnless { it.startsWith(APPROX) }?.removePrefix(PHRASE) ?: return null
-            return if (last == '吗') "${base.trimEnd('?', '!')}?" else base
+            return if (question) "${base.trimEnd('?', '!')}?" else base
         }
         return numberGloss(text)
     }

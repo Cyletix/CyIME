@@ -177,6 +177,7 @@ class CandidateGlossaryTest {
         val base = table("早上" to "morning", "好了" to "done", "会" to "~meet")
         assertEquals("morning", CandidateGlossary.gloss(base, "早上啊"))
         assertEquals("done?", CandidateGlossary.gloss(base, "好了吗"))
+        assertEquals("done?", CandidateGlossary.gloss(base, "好了么"))
         assertNull(CandidateGlossary.gloss(base, "会吧"))          // 单字词干不套
         assertEquals("nine o'clock", CandidateGlossary.gloss(base, "九点"))
         assertEquals("twenty-one days", CandidateGlossary.gloss(base, "二十一天"))
