@@ -109,6 +109,7 @@ index e5dfaf9..35f26b0 100644
  #define RIME_THIS_CALL(f) (this->*(f))
  
 diff --git a/src/rime/dict/corrector.cc b/src/rime/dict/corrector.cc
+index 85cac5ce..689d40d7 100644
 --- a/src/rime/dict/corrector.cc
 +++ b/src/rime/dict/corrector.cc
 @@ -9,6 +9,9 @@
@@ -185,7 +186,7 @@ diff --git a/src/rime/dict/corrector.cc b/src/rime/dict/corrector.cc
 +  auto transpose = [&](size_t node, size_t point, size_t distance) {
 +    // Only the last letters typed: a swap shows up while typing it and is corrected then; earlier
 +    // syllables are not searched again on every key (each search adds spellings to the whole graph).
-+    if (!engine_ || point + 1 >= key.size() || point + 3 < key.size() || key[point] == key[point + 1]) return;
++    if (!engine_ || !transpositions_ || point + 1 >= key.size() || point + 3 < key.size() || key[point] == key[point + 1]) return;
 +    {
 +      // Only where the typed letters stop spelling anything within three keys (lnu, tain, quna):
 +      // inside a spelling that goes on (zhong, xian) a swap is no likelier than the typed letters.
@@ -234,7 +235,7 @@ diff --git a/src/rime/dict/corrector.cc b/src/rime/dict/corrector.cc
        }
      }
    }
-@@ -299,6 +369,15 @@ CorrectorComponent::CorrectorComponent()
+@@ -299,6 +369,17 @@ CorrectorComponent::CorrectorComponent()
            {"corrector", "", ".correction.bin"})) {}
  
  Corrector* CorrectorComponent::Create(const Ticket& ticket) noexcept {
@@ -245,12 +246,15 @@ diff --git a/src/rime/dict/corrector.cc b/src/rime/dict/corrector.cc
 +    ticket.schema->config()->GetBool(ticket.name_space + "/cyime_doubled_letter_correction", &doubled_letters);
 +    bool extra_letters = false;
 +    ticket.schema->config()->GetBool(ticket.name_space + "/cyime_extra_letter_correction", &extra_letters);
-+    return new NearSearchCorrector(ticket.engine, doubled_letters, extra_letters);
++    bool transpositions = false;
++    ticket.schema->config()->GetBool(ticket.name_space + "/cyime_transposition_correction", &transpositions);
++    return new NearSearchCorrector(ticket.engine, doubled_letters, extra_letters, transpositions);
 +  }
    // Don't use edit distance based correction for now.
  #if 0
    if (!ticket.schema) return nullptr;
 diff --git a/src/rime/dict/corrector.h b/src/rime/dict/corrector.h
+index f363419f..fdcd01ea 100644
 --- a/src/rime/dict/corrector.h
 +++ b/src/rime/dict/corrector.h
 @@ -17,6 +17,7 @@
@@ -275,13 +279,16 @@ diff --git a/src/rime/dict/corrector.h b/src/rime/dict/corrector.h
  };
  
  class CorrectorComponent : public Corrector::Component {
-@@ -115,11 +123,24 @@ class EditDistanceCorrector : public Corrector, public Prism {
+@@ -115,11 +123,28 @@ class EditDistanceCorrector : public Corrector, public Prism {
  class RIME_DLL NearSearchCorrector : public Corrector {
   public:
    NearSearchCorrector() = default;
++  // transpositions: two neighbouring letters typed swapped (lnu) are read as one edit; full pinyin only,
++  // in double pinyin a swapped pair is usually another valid syllable.
 +  explicit NearSearchCorrector(Engine* engine, bool doubled_letters = false,
-+                               bool extra_letters = false)
-+      : engine_(engine), doubled_letters_(doubled_letters), extra_letters_(extra_letters) {}
++                               bool extra_letters = false, bool transpositions = false)
++      : engine_(engine), doubled_letters_(doubled_letters), extra_letters_(extra_letters),
++        transpositions_(transpositions) {}
 +  bool CorrectsDoubledLetters() const override { return doubled_letters_; }
 +  bool CorrectsExtraLetters() const override { return extra_letters_; }
 +  bool IsExtraKeyPress(char typed, char before, char after) override;
@@ -294,6 +301,7 @@ diff --git a/src/rime/dict/corrector.h b/src/rime/dict/corrector.h
 +  Engine* engine_ = nullptr;
 +  bool doubled_letters_ = false;
 +  bool extra_letters_ = false;
++  bool transpositions_ = false;
 +  void RefreshNeighbors();
 +  string geometry_;
 +  hash_map<char, hash_set<char>> neighbors_;
