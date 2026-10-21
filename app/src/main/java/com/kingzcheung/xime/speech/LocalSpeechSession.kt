@@ -17,6 +17,8 @@ internal interface LocalSpeechEngine : AutoCloseable {
     val decodeTimeoutMs: Long get() = 5000
     val hasRollingPreview: Boolean get() = false
     fun preview(samples: FloatArray): String = error("This recognizer has no rolling preview")
+    /** Captions may re-read the sentence so far for a live line when there is no streaming model. */
+    val hasCaptionPreview: Boolean get() = false
     fun detector(): SpeechDetector
     /** Captions: the VAD-only quiet-speech gain on every engine (the keyboard applies it to Paraformer). */
     fun captionDetector(): SpeechDetector = detector()

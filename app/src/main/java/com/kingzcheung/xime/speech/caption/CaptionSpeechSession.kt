@@ -51,8 +51,12 @@ internal class CaptionSpeechSession(
     private var burstSamples = 0
     private var lastFrameSpeech = false
     private var speechFrames = 0
-    private var lastPreview = ""
-    private val ended = HashSet<Long>()
+    @Volatile private var lastPreview = ""
+    private val ended: MutableSet<Long> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    // Region audio for the re-read preview of engines without a streaming model (audio worker only).
+    private val regionAudio = ArrayList<FloatArray>()
+    private var previewedSamples = 0
+    private val previewBusy = AtomicBoolean(false)
 
     // Last 3 s of audio and per-frame VAD flags for the speaker windows (audio worker only).
     private val ring = FloatArray(48000)
@@ -81,6 +85,7 @@ internal class CaptionSpeechSession(
     private fun onAudio(id: Long, samples: FloatArray) {
         if (id != activeId) {
             activeId = id; regionSamples = 0; burstCall = detectorCalls; burstSamples = 0; lastPreview = ""
+            regionAudio.clear(); previewedSamples = 0
             speechFrames = if (lastFrameSpeech) 1 else 0
             lastFrameSpeech = false
         } else if (lastFrameSpeech) { speechFrames++; lastFrameSpeech = false }
@@ -89,6 +94,31 @@ internal class CaptionSpeechSession(
         regionSamples += samples.size
         if (inBurst) regionStartSample = processedSamples - burstSamples
         provisionalSpeaker(id)
+        if (!engine.isStreaming && engine.hasCaptionPreview) {
+            regionAudio.add(samples)
+            // Japanese (Zipformer) and English (SenseVoice) have no streaming model: the sentence so far
+            // is re-read about every 0.6 s while the worker is free, so words still appear while spoken.
+            if (regionSamples - previewedSamples >= PREVIEW_STEP && refinement.queue.isEmpty() && previewBusy.compareAndSet(false, true)) {
+                previewedSamples = regionSamples
+                val snapshot = FloatArray(regionSamples)
+                var offset = 0
+                for (chunk in regionAudio) { chunk.copyInto(snapshot, offset); offset += chunk.size }
+                val fromMs = regionStartSample / 16
+                val toMs = processedSamples / 16
+                try {
+                    refinement.execute {
+                        try {
+                            if (abandoned.get() || id in ended) return@execute
+                            val text = cleanCaptionText(engine.preview(snapshot))
+                            if (id !in ended && text.isNotEmpty() && text != lastPreview) {
+                                lastPreview = text
+                                listener.onSegment(id, text, fromMs, toMs, SpeechBoundary.PAUSE, false, "")
+                            }
+                        } catch (_: Exception) { } finally { previewBusy.set(false) }
+                    }
+                } catch (_: RejectedExecutionException) { previewBusy.set(false) }
+            }
+        }
         if (engine.isStreaming) {
             val text = cleanCaptionText(engine.accept(samples))
             segmenter.charactersPerSecond = text.length / (regionSamples / 16000f).coerceAtLeast(.5f)
@@ -303,7 +333,8 @@ internal class CaptionSpeechSession(
         ended.add(id)
         val startMs = regionStartSample / 16
         val endMs = processedSamples / 16
-        val preview = if (engine.isStreaming) cleanCaptionText(engine.finishStream()) else ""
+        val preview = if (engine.isStreaming) cleanCaptionText(engine.finishStream()) else lastPreview
+        regionAudio.clear()
         val needsRefine = engine.hasRefinement || !engine.isStreaming
         // The preview stays live (not closed) until the final text and its speaker are both known.
         listener.onSegment(id, preview, startMs, endMs, boundary, false, "")
@@ -318,7 +349,7 @@ internal class CaptionSpeechSession(
                         val rich = engine.refineRich(samples)
                         val refined = cleanCaptionText(rich.text, rich.language)
                         val event = captionEvent(rich.event)
-                        val text = chooseFinal(preview, refined)
+                        val text = chooseFinal(preview, refined, chineseOnly = engine.lockedChinese)
                         // Token times only describe SenseVoice's own text.
                         val timed = text == refined
                         deliverFinal(id, Final(text, if (timed) rich.tokens else emptyArray(), if (timed) rich.timestamps else FloatArray(0),
@@ -387,6 +418,8 @@ internal object CaptionSpeakers { const val SINGLE = 0 }
 /** Ids of sentence pieces split off at a change of voice; far above anything the segmenter numbers. */
 internal const val SPLIT_BASE = 1L shl 40
 private const val PROBE_MS = 1000L
+/** Re-read the sentence after this much new audio (0.6 s) on engines without streaming. */
+private const val PREVIEW_STEP = 9600
 /**
  * Every 0.25 s: a 0.6–1.6 s reply held only one or two probes at 0.5 s and was absorbed by the
  * previous voice. PC replay 2026-10-21 (20 tight dialogues): missed turn changes 25% → 14% quiet,
@@ -399,9 +432,10 @@ private const val PROBE_HOP_MS = 250L
  * Two-pass choice per sentence. SenseVoice normally wins (CER 7.6 % vs 15.1 % on FLEURS), but when
  * it returns far fewer characters than the streaming pass heard, it dropped speech: keep the preview.
  */
-internal fun chooseFinal(preview: String, refined: String): String {
-    // Captions are Chinese only: a second pass in another script (kana, Hangul…) never replaces the Mandarin preview.
-    if (com.kingzcheung.xime.speech.hasForeignScript(refined)) return preview
+internal fun chooseFinal(preview: String, refined: String, chineseOnly: Boolean = true): String {
+    // Chinese captions: a second pass in another script (kana, Hangul…) never replaces the Mandarin preview.
+    // Japanese and English captions want exactly that script.
+    if (chineseOnly && com.kingzcheung.xime.speech.hasForeignScript(refined)) return preview
     fun count(text: String) = text.count { it.isLetterOrDigit() }
     val heard = count(preview)
     return if (heard >= 4 && count(refined) * 2 < heard) preview else refined
