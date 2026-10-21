@@ -81,7 +81,9 @@ fun SpaceKeyButton(
                     val down = awaitFirstDown()
                     down.consume()
                     pressed = true
-                    currentPress?.invoke()
+                    // 刚移完光标的这一下不输入空格，也就不该有按键音和振动（按住照常进入移动光标）。
+                    val guarded = SpaceAfterCursorGuard.blocksSpace(down.uptimeMillis)
+                    if (!guarded) currentPress?.invoke()
                     var held = false
                     var movedBeforeHold = false
                     var lastX = down.position.x
@@ -128,7 +130,7 @@ fun SpaceKeyButton(
                             }
                             change.consume()
                             if (!change.pressed) {
-                                if (!held && !movedBeforeHold && !SpaceAfterCursorGuard.blocksSpace(down.uptimeMillis)) {
+                                if (!held && !movedBeforeHold && !guarded) {
                                     currentClick()
                                 }
                                 break
@@ -140,7 +142,7 @@ fun SpaceKeyButton(
                         pressed = false
                         cursorActive = false
                         onCursorMode?.invoke(false)
-                        currentRelease?.invoke()
+                        if (!guarded) currentRelease?.invoke()
                     }
                 }
             }
