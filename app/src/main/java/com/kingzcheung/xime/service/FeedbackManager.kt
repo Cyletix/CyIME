@@ -84,11 +84,36 @@ class FeedbackManager(private val context: Context) {
         /** 游戏类声音不会被系统静音，静音/振动模式下由我们自己不出声，保持与提示音一致。 */
         fun mutedByRinger(capturable: Boolean, ringerMode: Int): Boolean =
             capturable && ringerMode != AudioManager.RINGER_MODE_NORMAL
+
+        /**
+         * 勿扰模式会静音系统提示音，却放过游戏类声音；可录屏时也由我们自己按勿扰不出声：
+         * 只有「全部允许」，或优先模式里放行了系统声音，才出声。
+         */
+        fun mutedByDnd(capturable: Boolean, interruptionFilter: Int, systemSoundsAllowed: Boolean): Boolean =
+            capturable && when (interruptionFilter) {
+                android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY -> !systemSoundsAllowed
+                android.app.NotificationManager.INTERRUPTION_FILTER_NONE,
+                android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS -> true
+                else -> false
+            }
+
+        /** 可录屏的声音此刻该不该静音：静音 / 振动模式和勿扰都看；不可录屏时交给系统。 */
+        fun mutedForCapture(context: Context, capturable: Boolean): Boolean {
+            if (!capturable) return false
+            val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (mutedByRinger(true, audio.ringerMode)) return true
+            val notifications = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            val filter = notifications.currentInterruptionFilter
+            val systemAllowed = filter == android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY && runCatching {
+                notifications.notificationPolicy.priorityCategories and
+                    android.app.NotificationManager.Policy.PRIORITY_CATEGORY_SYSTEM != 0
+            }.getOrDefault(false)
+            return mutedByDnd(true, filter, systemAllowed)
+        }
     }
 
     private var keySoundStyle: String? = null
     private var soundCapturable = false
-    private val audioManager by lazy { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     private fun readKeySoundStyle(): String? =
         SettingsPreferences.getPrefsPublic(context).getString(KEY_SOUND_STYLE, null)
@@ -197,7 +222,7 @@ class FeedbackManager(private val context: Context) {
 
     fun playKeySound(keyType: String = "standard", hardware: Boolean = false) {
         if (!soundEnabled) return
-        if (soundCapturable && mutedByRinger(true, audioManager.ringerMode)) return
+        if (soundCapturable && runCatching { mutedForCapture(context, true) }.getOrDefault(false)) return
 
         val pool = soundPool ?: return
         val style = resolveKeySoundStyle(keySoundStyle, hardware)

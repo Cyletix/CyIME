@@ -91,6 +91,20 @@ class FeedbackManagerTest {
         org.junit.Assert.assertFalse(FeedbackManager.mutedByRinger(false, android.media.AudioManager.RINGER_MODE_SILENT))
     }
 
+    @Test fun `capturable key sounds follow do not disturb like system sounds`() {
+        val all = android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+        val priority = android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY
+        val none = android.app.NotificationManager.INTERRUPTION_FILTER_NONE
+        val alarms = android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS
+        org.junit.Assert.assertFalse(FeedbackManager.mutedByDnd(true, all, systemSoundsAllowed = false))
+        org.junit.Assert.assertTrue(FeedbackManager.mutedByDnd(true, priority, systemSoundsAllowed = false))
+        org.junit.Assert.assertFalse(FeedbackManager.mutedByDnd(true, priority, systemSoundsAllowed = true))
+        org.junit.Assert.assertTrue(FeedbackManager.mutedByDnd(true, none, systemSoundsAllowed = true))
+        org.junit.Assert.assertTrue(FeedbackManager.mutedByDnd(true, alarms, systemSoundsAllowed = true))
+        // 不可录屏时是系统提示音，勿扰由系统处理。
+        org.junit.Assert.assertFalse(FeedbackManager.mutedByDnd(false, none, systemSoundsAllowed = false))
+    }
+
     @Test fun `feedback actions retain semantic types across keyboard layouts`() {
         mapOf(
             "a" to KeyFeedbackType.CHARACTER, "あ" to KeyFeedbackType.CHARACTER,
