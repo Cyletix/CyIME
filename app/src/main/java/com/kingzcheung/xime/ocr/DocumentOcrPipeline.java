@@ -14,12 +14,15 @@ import java.nio.FloatBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.Normalizer;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.opencv.core.*;
 import org.opencv.imgproc.Imgproc;
 
@@ -92,28 +95,11 @@ public final class DocumentOcrPipeline implements AutoCloseable {
         for (Point[] box : boxes.subList(0, Math.min(64, boxes.size()))) {
             Mat crop = crop(bgr, box);
             try {
-                int contentWidth = Math.max(1, Math.min(1600, (int)Math.ceil(48.0 * crop.cols() / crop.rows())));
-                int tensorWidth = Math.max(320, contentWidth);
-                TensorOutput output = run(recognition, normalize(crop, contentWidth, 48, tensorWidth, false),
-                        new long[]{1, 3, 48, tensorWidth});
-                if (output.shape.length != 3 || output.shape[2] != alphabet.length) {
-                    throw new IllegalArgumentException("OCR alphabet " + alphabet.length + " does not match output " + Arrays.toString(output.shape));
-                }
-                StringBuilder value = new StringBuilder();
-                float confidence = 0;
-                int count = 0, previous = -1, classes = alphabet.length;
-                for (int t = 0; t < output.shape[1]; t++) {
-                    int best = 0, offset = t * classes;
-                    for (int c = 1; c < classes; c++) if (output.data[offset + c] > output.data[offset + best]) best = c;
-                    if (best != 0 && best != previous) {
-                        value.append(alphabet[best]); confidence += output.data[offset + best]; count++;
-                    }
-                    previous = best;
-                }
-                String result = value.toString().trim();
-                if (Boolean.getBoolean("cyime.ocr.diagnostics")) System.err.println(Arrays.toString(box) + " => " + result + " " + confidence / Math.max(1, count));
-                if (count > 0 && confidence / count >= .65f && !result.isEmpty()) {
-                    text.add(new TextRegion(box, result, confidence / count));
+                Line line = read(crop);
+                String result = line.text;
+                if (Boolean.getBoolean("cyime.ocr.diagnostics")) System.err.println(Arrays.toString(box) + " => " + result + " " + line.confidence);
+                if (line.accepted()) {
+                    text.add(new TextRegion(box, result, line.confidence));
                 } else if (refineTiltedRegion && !refined && crop.cols() > crop.rows() * 3 &&
                         Math.abs(box[1].y - box[0].y) > distance(box[0], box[1]) * .04) {
                     // A sloping background can merge separated text into one large detection.
@@ -127,7 +113,160 @@ public final class DocumentOcrPipeline implements AutoCloseable {
                 }
             } finally { crop.release(); }
         }
+        if (refineTiltedRegion) {
+            List<Point[]> read = new ArrayList<>();
+            for (TextRegion region : text) read.add(region.points);
+            recoverIsolatedMarks(bgr, read, text);
+        }
         return readingOrder(text);
+    }
+
+    private static final class Line {
+        final String text; final float confidence;
+        Line(String text, float confidence) { this.text = text; this.confidence = confidence; }
+        boolean accepted() { return !text.isEmpty() && confidence >= .65f; }
+    }
+
+    private Line read(Mat crop) throws OrtException {
+        int contentWidth = Math.max(1, Math.min(1600, (int)Math.ceil(48.0 * crop.cols() / crop.rows())));
+        int tensorWidth = Math.max(320, contentWidth);
+        TensorOutput output = run(recognition, normalize(crop, contentWidth, 48, tensorWidth, false),
+                new long[]{1, 3, 48, tensorWidth});
+        if (output.shape.length != 3 || output.shape[2] != alphabet.length) {
+            throw new IllegalArgumentException("OCR alphabet " + alphabet.length + " does not match output " + Arrays.toString(output.shape));
+        }
+        StringBuilder value = new StringBuilder();
+        float confidence = 0;
+        int count = 0, previous = -1, classes = alphabet.length;
+        for (int t = 0; t < output.shape[1]; t++) {
+            int best = 0, offset = t * classes;
+            for (int c = 1; c < classes; c++) if (output.data[offset + c] > output.data[offset + best]) best = c;
+            if (best != 0 && best != previous) {
+                value.append(alphabet[best]); confidence += output.data[offset + best]; count++;
+            }
+            previous = best;
+        }
+        return new Line(value.toString().trim(), count > 0 ? confidence / count : 0);
+    }
+
+    /**
+     * PP-OCR's DB detector is trained on text lines and gives no box to lone marks such as the
+     * "<", "," legends on keycaps, although the recognizer reads them inside a line. Find small
+     * high-contrast marks that no accepted text covers and add the symbols read for them.
+     */
+    private void recoverIsolatedMarks(Mat bgr, List<Point[]> boxes, List<TextRegion> text) throws OrtException {
+        int rows = bgr.rows(), cols = bgr.cols();
+        List<Rect> marks = new ArrayList<>();
+        int k = Math.max(9, (int)(Math.min(rows, cols) * .3)) | 1;
+        Mat gray = new Mat(), map = new Mat(), otsu = new Mat();
+        Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(k, k));
+        Mat labels = new Mat(), stats = new Mat(), centroids = new Mat();
+        try {
+            Imgproc.cvtColor(bgr, gray, Imgproc.COLOR_BGR2GRAY);
+            // Thin strokes darker than a light surface (or lighter than a dark one). Only one
+            // polarity: the other turns whole key faces around a legend into false marks.
+            MatOfDouble mean = new MatOfDouble(), deviation = new MatOfDouble();
+            try { Core.meanStdDev(gray, mean, deviation); } finally { deviation.release(); }
+            boolean lightSurface = mean.get(0, 0)[0] >= 128;
+            mean.release();
+            Imgproc.morphologyEx(gray, map, lightSurface ? Imgproc.MORPH_BLACKHAT : Imgproc.MORPH_TOPHAT, kernel);
+            double level = Imgproc.threshold(map, otsu, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+            Imgproc.threshold(map, map, Math.max(48, level), 255, Imgproc.THRESH_BINARY);
+            int count = Imgproc.connectedComponentsWithStats(map, labels, stats, centroids, 8, CvType.CV_32S);
+            for (int i = 1; i < Math.min(count, 400); i++) {
+                int x = (int)stats.get(i, Imgproc.CC_STAT_LEFT)[0], y = (int)stats.get(i, Imgproc.CC_STAT_TOP)[0];
+                int w = (int)stats.get(i, Imgproc.CC_STAT_WIDTH)[0], h = (int)stats.get(i, Imgproc.CC_STAT_HEIGHT)[0];
+                int extent = Math.max(w, h);
+                if (extent < Math.max(3, rows * .03) || h > rows * .45 || w > cols * .25 || w > h * 8 || h > w * 8) continue;
+                if (x == 0 || y == 0 || x + w >= cols || y + h >= rows) continue;
+                Point center = new Point(x + w / 2.0, y + h / 2.0);
+                boolean covered = false;
+                for (Point[] box : boxes) {
+                    MatOfPoint2f polygon = new MatOfPoint2f(box);
+                    try { covered = Imgproc.pointPolygonTest(polygon, center, false) >= 0; } finally { polygon.release(); }
+                    if (covered) break;
+                }
+                if (!covered) marks.add(new Rect(x, y, w, h));
+            }
+        } finally {
+            kernel.release(); centroids.release(); stats.release(); labels.release();
+            otsu.release(); map.release(); gray.release();
+        }
+        if (Boolean.getBoolean("cyime.ocr.diagnostics")) System.err.println("isolated marks=" + marks);
+        // A lone glyph has no line context ("<" reads as "く", ">" as "V"). Read each row of marks
+        // together with the detected words beside it, and keep only the symbols the detector
+        // missed: detected text is never re-read, replaced or duplicated.
+        marks.sort(Comparator.comparingDouble(r -> r.y + r.height / 2.0));
+        int rowsRead = 0;
+        while (!marks.isEmpty() && rowsRead++ < 4) {
+            Rect seed = marks.remove(0);
+            List<Rect> row = new ArrayList<>(); row.add(seed);
+            int top = seed.y, bottom = seed.y + seed.height;
+            for (int i = 0; i < marks.size();) {
+                Rect r = marks.get(i);
+                double center = r.y + r.height / 2.0, slack = (bottom - top) * .5;
+                if (center >= top - slack && center <= bottom + slack) {
+                    row.add(r); marks.remove(i);
+                    top = Math.min(top, r.y); bottom = Math.max(bottom, r.y + r.height);
+                } else i++;
+            }
+            row.sort(Comparator.comparingInt(r -> r.x));
+            int left = row.get(0).x, right = row.get(row.size() - 1).x + row.get(row.size() - 1).width;
+            double slack = (bottom - top) * .5;
+            StringBuilder known = new StringBuilder();
+            for (TextRegion region : text) {
+                double center = region.centerY();
+                if (center < top - slack || center > bottom + slack) continue;
+                known.append(region.text);
+                // Words widen the line; its height stays the marks' own, since detected boxes
+                // are padded and can be tilted or merged with a keycap edge.
+                for (Point p : region.points) {
+                    left = Math.min(left, (int)p.x); right = Math.max(right, (int)Math.ceil(p.x));
+                }
+            }
+            int pad = Math.max(2, (int)Math.round((bottom - top) * .6));
+            Rect band = new Rect(new Point(Math.max(0, left - pad), Math.max(0, top - pad)),
+                    new Point(Math.min(cols, right + pad), Math.min(rows, bottom + pad)));
+            if (band.width < 4 || band.height < 4) continue;
+            Mat crop = bgr.submat(band);
+            Line line;
+            try { line = read(crop); } finally { crop.release(); }
+            if (Boolean.getBoolean("cyime.ocr.diagnostics")) System.err.println("row " + band + " => " + line.text + " " + line.confidence);
+            if (!line.accepted()) continue;
+            String missed = missedSymbols(line.text, known.toString());
+            if (missed.isEmpty()) continue;
+            // One region per mark when the counts agree, so reading order follows the image.
+            int[] symbols = missed.codePoints().toArray();
+            if (symbols.length == row.size()) {
+                for (int i = 0; i < symbols.length; i++) text.add(markRegion(row.get(i), new String(symbols, i, 1), line.confidence));
+            } else {
+                Rect all = new Rect(new Point(row.get(0).x, Math.min(row.get(0).y, row.get(row.size() - 1).y)),
+                        new Point(right, Math.max(row.get(0).y + row.get(0).height, row.get(row.size() - 1).y + row.get(row.size() - 1).height)));
+                text.add(markRegion(all, missed, line.confidence));
+            }
+        }
+    }
+
+    /** Symbols in the row reading that the detected words of that row do not already contain. */
+    static String missedSymbols(String reading, String known) {
+        // "？" in the row reading is the same mark as a detected "?".
+        Map<String, Integer> have = new HashMap<>();
+        known.codePoints().filter(DocumentOcrPipeline::isSymbol).forEach(c -> have.merge(width(c), 1, Integer::sum));
+        StringBuilder missed = new StringBuilder();
+        reading.codePoints().filter(DocumentOcrPipeline::isSymbol).forEach(c -> {
+            if (have.getOrDefault(width(c), 0) > 0) have.merge(width(c), -1, Integer::sum);
+            else missed.appendCodePoint(c);
+        });
+        return missed.toString();
+    }
+
+    private static String width(int c) { return Normalizer.normalize(new String(Character.toChars(c)), Normalizer.Form.NFKC); }
+
+    private static boolean isSymbol(int c) { return !Character.isLetterOrDigit(c) && !Character.isWhitespace(c); }
+
+    private static TextRegion markRegion(Rect r, String text, float confidence) {
+        return new TextRegion(new Point[]{new Point(r.x, r.y), new Point(r.x + r.width, r.y),
+                new Point(r.x + r.width, r.y + r.height), new Point(r.x, r.y + r.height)}, text, confidence);
     }
 
     public static String assemble(List<TextRegion> regions) {

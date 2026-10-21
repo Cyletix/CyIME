@@ -5,7 +5,7 @@ Run: python tools/ocr_lab/run.py --output .codex-artifacts/ocr-host-regression
 """
 import argparse, hashlib, json, os, random, shutil, subprocess, urllib.request
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -61,6 +61,27 @@ for inverse in (False, True):
     im=Image.new('RGB',(1000,160),'black' if inverse else 'white')
     ImageDraw.Draw(im).text((30,40),'Hello, world! 123',font=font,fill='white' if inverse else 'black')
     add('punctuation-dark' if inverse else 'punctuation-light', im, 'Hello, world! 123')
+# Keycap legends: the detector gives lone symbols no box; they must still be read.
+def keycaps(legends, scale, blur=0):
+    kw, kh, gap = int(110*scale), int(100*scale), int(14*scale)
+    im = Image.new('RGB', ((kw+gap)*len(legends)+kw+40, kh+40), (70,70,72)); draw = ImageDraw.Draw(im)
+    big = ImageFont.truetype('C:/Windows/Fonts/arial.ttf', int(30*scale)); small = ImageFont.truetype('C:/Windows/Fonts/arial.ttf', int(22*scale))
+    x = 20
+    for upper, lower in legends:
+        w = kw*2 if upper == 'Shift' else kw
+        draw.rounded_rectangle((x,20,x+w,20+kh), radius=int(12*scale), fill=(222,222,220))
+        draw.text((x+int(22*scale),20+int(8*scale)), upper, font=small if upper == 'Shift' else big, fill=(40,40,40))
+        if lower: draw.text((x+int(26*scale),20+int(50*scale)), lower, font=big, fill=(40,40,40))
+        x += w+gap
+    return im.filter(ImageFilter.GaussianBlur(blur*scale)) if blur else im
+symbol_row = [('M',None),('<',None),('>',None),('?',None),('Shift',None)]
+for scale, blur in ((.5,0),(.5,1.2),(.7,1.2),(1,1.2)):
+    add(f'keycaps-symbols-{scale}-{blur}', keycaps(symbol_row, scale, blur), 'M < > ? Shift')
+if args.exploratory:
+    # Known misses: a lone ">" the detector does box is read as "V"; lower legends (, . /)
+    # are a few pixels tall with no word beside them.
+    add('keycaps-symbols-1-0', keycaps(symbol_row, 1), 'M < > ? Shift')
+    add('keycaps-two-legends', keycaps([('M',None),('<',','),('>','.'),('?','/'),('Shift',None)], 1), 'M < , > . ? / Shift')
 im=Image.new('RGB',(1000,260),'white'); draw=ImageDraw.Draw(im)
 draw.text((30,25),'中文文字识别',font=font,fill='black'); draw.text((30,145),'Hello world 12345',font=font,fill='black')
 add('chinese-english-multiline', im, '中文文字识别 Hello world 12345')
