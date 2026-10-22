@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 黑白主题图标底板：中间近黑，四边渐亮成亮黑色，在黑色桌面上也看得出图标边缘（2026-10-23 用户要求）。
+     IconLab 生成的其他配色底板仍是斜向渐变。 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:angle="315" android:startColor="#FF262528" android:endColor="#FF0F0F11" />
+    <gradient android:type="radial" android:gradientRadius="48dp"
+        android:startColor="#FF121214" android:centerColor="#FF161618" android:endColor="#FF555558" />
 </shape>
