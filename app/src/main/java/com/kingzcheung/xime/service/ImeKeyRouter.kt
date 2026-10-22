@@ -32,7 +32,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     private val hardwareNavigation = HardwareCandidateNavigation()
     private val hardwareSelectionRevision = androidx.compose.runtime.mutableIntStateOf(0)
     internal val usesDirectFieldInput: Boolean get() = service.editorInputPolicy.directInput &&
-        !service.uiState.value.quickSendFormFocused && !service.uiState.value.toolPanelInputFocused
+        !service.uiState.value.inputTarget.isInternal
 
     /** Literal field input bypasses the decoder, calculator, learning and candidate snapshots. */
     private suspend fun routeDirectFieldKey(key: String, shifted: Boolean, event: KeyEvent?): Boolean {
@@ -1387,7 +1387,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val text = raw + suffix
         if (text.isNotEmpty() && !withEditor { service.commitTextAndPredict(text, false, allowPrediction = false).accepted }) return false
         if (text.isNotEmpty()) withEditor {
-            if (!service.uiState.value.quickSendFormFocused && !service.uiState.value.toolPanelInputFocused)
+            if (!service.uiState.value.inputTarget.isInternal)
                 service.finishComposingInputBoxKeepingText()
         }
         service.japaneseInputController.handleKey("clear_composition")
