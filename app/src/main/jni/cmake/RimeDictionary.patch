@@ -1012,8 +1012,32 @@ index 56d4eef..6d057fe 100644
    RIME_DLL string GetEntryText(const table::Entry& entry);
  
    uint32_t dict_file_checksum() const;
+diff --git a/src/rime/dict/user_dictionary.h b/src/rime/dict/user_dictionary.h
+index 7886e494..bfd074c8 100644
+--- a/src/rime/dict/user_dictionary.h
++++ b/src/rime/dict/user_dictionary.h
+@@ -95,6 +95,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+                  size_t current_pos,
+                  const string& current_prefix,
+                  DfsState* state);
++  // CyIME: whether any entry's code starts with these whole syllables ("shu ju "), from an in-memory
++  // set rebuilt when the tick changes or the dictionary is loaded again.
++  bool MayHavePrefix(const string& prefix);
+ 
+  private:
+   string name_;
+@@ -105,6 +108,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+   hash_map<SyllableId, string> rev_syllabary_;
+   TickCount tick_ = 0;
+   time_t transaction_time_ = 0;
++  hash_set<string> code_prefixes_;
++  TickCount code_prefixes_tick_ = 0;
++  bool code_prefixes_ready_ = false;
+ };
+ 
+ class UserDictionaryComponent : public UserDictionary::Component {
 diff --git a/src/rime/dict/user_dictionary.cc b/src/rime/dict/user_dictionary.cc
-index 953c59c..95a546c 100644
+index 953c59cf..6d0fc90f 100644
 --- a/src/rime/dict/user_dictionary.cc
 +++ b/src/rime/dict/user_dictionary.cc
 @@ -10,6 +10,7 @@
@@ -1024,7 +1048,15 @@ index 953c59c..95a546c 100644
  #include <rime/language.h>
  #include <rime/schema.h>
  #include <rime/service.h>
-@@ -74,7 +75,7 @@ struct DfsState {
+@@ -21,6 +22,7 @@
+ #include <rime/dict/table.h>
+ #include <rime/dict/user_dictionary.h>
+ #include <rime/dict/vocabulary.h>
++#include <t9_decode_cache.h>
+ 
+ namespace rime {
+ 
+@@ -74,7 +76,7 @@ struct DfsState {
  };
  
  void DfsState::RecruitEntry(size_t pos,
@@ -1033,7 +1065,23 @@ index 953c59c..95a546c 100644
    string full_code;
    auto e = UserDictionary::CreateDictEntry(
        key, value, present_tick, credibility.back(), quality_len.back(),
-@@ -220,7 +221,8 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
+@@ -170,6 +172,7 @@ void UserDictionary::Attach(const an<Table>& table, const an<Prism>& prism) {
+ }
+ 
+ bool UserDictionary::Load() {
++  T9InvalidateUserDictionary();
+   if (!db_ || db_->disabled())
+     return false;
+   if (!db_->loaded() && !db_->Open()) {
+@@ -182,6 +185,7 @@ bool UserDictionary::Load() {
+     }
+     return false;
+   }
++  code_prefixes_ready_ = false;
+   return FetchTickCount() || Initialize();
+ }
+ 
+@@ -220,7 +224,8 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
                                 size_t current_pos,
                                 const string& current_prefix,
                                 DfsState* state) {
@@ -1043,7 +1091,7 @@ index 953c59c..95a546c 100644
    if (index == syll_graph.indices.end()) {
      return;
    }
-@@ -237,10 +239,16 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
+@@ -237,10 +242,16 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
      BOOST_SCOPE_EXIT_END
      if (!TranslateCodeToString(state->code, &prefix))
        continue;
@@ -1061,7 +1109,19 @@ index 953c59c..95a546c 100644
        state->credibility.push_back(state->credibility.back() +
                                     props->credibility);
        size_t end_pos = props->end_pos;
-@@ -268,6 +276,7 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
+@@ -256,6 +267,11 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
+       }
+       BOOST_SCOPE_EXIT_END
+       DLOG(INFO) << "edge: [" << current_pos << ", " << end_pos << ")";
++      // CyIME: an abbreviated edge stands for dozens of syllables; seeking the database for each one
++      // that no entry starts with made sentence making with a few thousand learned words several
++      // times slower. Skipping them finds the same entries.
++      if (!MayHavePrefix(prefix))
++        continue;
+       if (prefix != state->key) {  // 'a b c |d ' > 'a b c \tabracadabra'
+         DLOG(INFO) << "forward scanning for '" << prefix << "'.";
+         if (!state->ForwardScan(prefix))  // reached the end of db
+@@ -268,6 +284,7 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
          if (!state->NextEntry())  // reached the end of db
            break;
        }
@@ -1069,7 +1129,33 @@ index 953c59c..95a546c 100644
        auto next_index = syll_graph.indices.find(end_pos);
        if (next_index == syll_graph.indices.end()) {
          // reached the end of input, predict word if requested
-@@ -327,7 +336,7 @@ an<UserDictEntryCollector> UserDictionary::Lookup(
+@@ -308,6 +325,25 @@ void UserDictionary::DfsLookup(const SyllableGraph& syll_graph,
+   }
+ }
+ 
++bool UserDictionary::MayHavePrefix(const string& prefix) {
++  if (!code_prefixes_ready_ || code_prefixes_tick_ != tick_) {
++    code_prefixes_.clear();
++    auto accessor = db_->Query("");
++    accessor->Jump(" ");  // skip metadata
++    string key, value;
++    while (accessor->GetNextRecord(&key, &value)) {
++      const size_t tab = key.find('\t');
++      for (size_t i = 0; i < tab && i < key.size(); ++i) {
++        if (key[i] == ' ')
++          code_prefixes_.insert(key.substr(0, i + 1));
++      }
++    }
++    code_prefixes_tick_ = tick_;
++    code_prefixes_ready_ = true;
++  }
++  return code_prefixes_.count(prefix) > 0;
++}
++
+ static an<UserDictEntryCollector> collect(
+     hash_map<int, DictEntryList>* source) {
+   auto result = New<UserDictEntryCollector>();
+@@ -327,7 +363,7 @@ an<UserDictEntryCollector> UserDictionary::Lookup(
    if (!table_ || !prism_ || !loaded() ||
        start_pos >= syll_graph.interpreted_length)
      return nullptr;
@@ -1078,6 +1164,61 @@ index 953c59c..95a546c 100644
    state.depth_limit = depth_limit;
    state.predict_word_from_depth = predict_word_from_depth;
    state.min_end_pos = min_end_pos;
+@@ -368,6 +404,9 @@ size_t UserDictionary::LookupWords(UserDictEntryIterator* result,
+                                    bool predictive,
+                                    size_t limit,
+                                    string* resume_key) {
++  // T9 accepts host commits through another UserDictionary sharing this DB.
++  // Refresh ranking time without reloading or invalidating decoded caches.
++  FetchTickCount();
+   TickCount present_tick = tick_ + 1;
+   size_t len = input.length();
+   size_t start = result->cache_size();
+@@ -433,10 +472,13 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry, int commits) {
+ bool UserDictionary::UpdateEntry(const DictEntry& entry,
+                                  int commits,
+                                  const string& new_entry_prefix) {
++  T9InvalidateUserDictionary();
+   string code_str(entry.custom_code);
+   if (code_str.empty() && !TranslateCodeToString(entry.code, &code_str))
+     return false;
+   string key(code_str + '\t' + entry.text);
++  // Kept current by this update rather than rebuilt from the database on the next key.
++  const bool prefixes_in_sync = code_prefixes_ready_ && code_prefixes_tick_ == tick_;
+   string value;
+   UserDbValue v;
+   if (db_->Fetch(key, &value)) {
+@@ -461,10 +503,21 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry,
+     v.dee = algo::formula_d(0.0, (double)tick_, v.dee, (double)v.tick);
+   }
+   v.tick = tick_;
+-  return db_->Update(key, v.Pack());
++  if (!db_->Update(key, v.Pack()))
++    return false;
++  if (prefixes_in_sync) {
++    const size_t tab = key.find('\t');
++    for (size_t i = 0; i < tab && i < key.size(); ++i) {
++      if (key[i] == ' ')
++        code_prefixes_.insert(key.substr(0, i + 1));
++    }
++    code_prefixes_tick_ = tick_;
++  }
++  return true;
+ }
+ 
+ bool UserDictionary::UpdateTickCount(TickCount increment) {
++  T9InvalidateUserDictionary();
+   tick_ += increment;
+   try {
+     return db_->MetaUpdate("/tick", std::to_string(tick_));
+@@ -506,6 +559,7 @@ bool UserDictionary::RevertRecentTransaction() {
+     return false;
+   if (time(NULL) - transaction_time_ > 3 /*seconds*/)
+     return false;
++  T9InvalidateUserDictionary();
+   return db->AbortTransaction();
+ }
+ 
 diff --git a/src/rime/engine.cc b/src/rime/engine.cc
 index 4a54f64..4a3188b 100644
 --- a/src/rime/engine.cc
@@ -1187,7 +1328,7 @@ index 459f31d..9ae464c 100644
  
  }  // namespace rime
 diff --git a/src/rime/gear/script_translator.cc b/src/rime/gear/script_translator.cc
-index 99e4511..feb7002 100644
+index 99e45117..feb70024 100644
 --- a/src/rime/gear/script_translator.cc
 +++ b/src/rime/gear/script_translator.cc
 @@ -25,6 +25,12 @@
