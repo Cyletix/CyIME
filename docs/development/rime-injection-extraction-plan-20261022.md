@@ -45,12 +45,12 @@
 
 ## 2. 目标形态
 
-- 我们的逻辑放在 `app/src/main/jni/librime-t9/src/` 下新文件（已有的 `t9_*` 同一目录，免新增目录和包含路径），作为普通源文件编进 `rime-static`：
-  - `t9_script_options.{h,cc}`：读 `t9/*`、`cylm/*` 配置，资源路径解析与模型、读音表的进程级缓存。
+- 我们的逻辑放在新目录 `app/src/main/jni/cyime_rime/`，作为普通源文件编进 `rime-static`。不放 `librime-t9/src`：那里的 `*.cc` 会被整目录收进九键插件，而这些代码属于 Rime 的拼音翻译器本身。
+  - `t9_script_options.{h,cc}`：读 `t9/*`、`cylm/*` 配置，资源路径解析与模型、读音表的进程级缓存。`ScriptTranslation` 以它为基类，原来的成员名不变，所以其余代码一个字都不用改名。
   - `t9_cylm_sentence.{h,cc}`：CyLM 整句替换。
   - `t9_sentence_rescore.{h,cc}`：26 键整句重排。
   - `t9_joint_decoder.{h,cc}`：由 `T9JointDecoder.inc` 改成独立编译单元。
-- 它们通过一个小接口拿 Rime 的东西：`ScriptTranslator` 公开方法（`GetPrecedingText`、`blacklist`、`language`、`t9_joint_cache` 等，本来就在头文件里），以及 `ScriptSyllabifier` 的 `input()`、`syllable_graph()`、`IsCorrection()`。`ScriptSyllabifier` 现在只在 `script_translator.cc` 里声明，需要把它的类声明挪进补丁里新增的头文件（只挪声明，不改实现）。
+  - `t9_script_query.h`：这几块从 Rime 拿的东西放在一个小结构里：`ScriptTranslator` 公开方法（`GetPrecedingText`、`blacklist`、`language`、`t9_joint_cache` 等，本来就在头文件里），以及 `ScriptSyllabifier` 的 `input()`、`syllable_graph()`、`IsCorrection()`。`ScriptSyllabifier` 只在 `script_translator.cc` 里声明，A 段先用函数指针传 `IsCorrection`；B 段再看要不要把它的声明挪进补丁里的头文件。
 - Rime 里留下的只有显式补丁中的几行调用：构造时 `options.Load(config, context)`，`Evaluate` 里联合解码分支、整句重排、CyLM 替换各一个调用，造句处记住词图，以及拼音选音节和引擎生命周期钩子。
 - `CMake` 里不再有对源码的 `string(REPLACE)`；Rime 和 octagram 的改动全部是补丁文件。
 
@@ -63,7 +63,7 @@
 钩子暂时仍由 CMake 注入，但每处注入缩成一行调用，代码本体搬到独立文件。
 
 1. **建基线**：用当前 main 跑全部门禁（见第 4 节），留存结果目录作后续对比；同时跑一次“基线对基线”，量出计时的自然波动。
-2. **读配置和资源函数**：约 300 行成员与读配置块搬到 `t9_script_options.*`，生成副本里只剩一个成员和一个 `Load` 调用。
+2. **读配置和资源函数**：约 300 行成员与读配置块搬到 `t9_script_options.*`，生成副本里只剩基类和一个 `LoadT9Options` 调用。
 3. **CyLM 整句替换**搬到 `t9_cylm_sentence.*`。
 4. **26 键整句重排**搬到 `t9_sentence_rescore.*`。
 5. **联合解码**：`T9JointDecoder.inc` 改成 `t9_joint_decoder.cc` 独立编译。这一步最可能影响速度（原来与 Rime 同一编译单元，编译器可内联）。如果计时超出波动，退回为“在补丁里明文 `#include` 这份 `.cc`”，代码仍是独立文件，编译结果与现在相同。
@@ -103,3 +103,22 @@
 - `RimeDictionary.patch` 和 librime 选词相关文件归“词库和词权问题”线程。A 段不碰这些文件；B 段每一步先经协调线程约定由谁改、何时改，避免两边同时改同一补丁。
 - 每次 librime 改动同时进 Android 补丁和 `CyIME-Windows/third_party/cyime-engine/librime`。
 - A 段完成后，Windows 版可以直接复制这几个独立文件，不再手抄 CMake 字符串里的代码。
+
+## 6. A 段结果（2026-10-22）
+
+第 2~5 步都是机械搬移，在一个引擎里一起编、一起过门禁，作为一个提交。基线是 ea6f5595 的源码（`source-files.json` 里 `T9PhraseBeforeSentence.cmake` 哈希与该提交相同）；所有结果、比较脚本在 `D:/CyIME-Data/eval/rime-extract-20261022/`。
+
+- 生成副本里留下的注入：一个基类 `T9ScriptOptions`、一个 `LoadT9Options` 调用、`T9Query` 和 `T9IsCorrection` 两个小函数、`ApplyCylmSentence` 包装，以及联合解码、26 键重排各一个调用；`T9JointDecoder.inc` 删除。其余注入（头文件、构造参数、`rime_best`、记住词图、`set_exhausted`、诊断日志）不变，留给 B 段。
+- 九键回放无学习词、预置学习词：4374 条记录（`same_candidates.py`，只去掉耗时、路径、引擎哈希和每次部署的文件时间戳）逐字节相同，逐键工作量计数也完全相同。新引擎的第二次运行、基线的第三次运行与第一次也都相同。
+- 26 键回归无学习词、学过 `learn.tsv`：5950 条用例只有显示当前时间的候选（`sj`、`ts`、`dt` 等）不同，基线自己两次之间也是这些不同；遮掉时间后完全相同，各组命中数一致。
+- 速度（逐键处理耗时，ms，同一时段交替运行）：
+
+| 场景 | 基线 p50 | 新 p50 | 基线 p95 | 新 p95 |
+|---|---|---|---|---|
+| 九键无学习词，三次/两次 | 2.395 / 2.483 / 2.406 | 2.411 / 2.508 | 19.24 / 20.31 / 19.87 | 18.34 / 19.56 |
+| 九键预置学习词 | 2.901 | 2.926 | 36.51 | 35.05 |
+| 26 键无学习词，三次/三次 | 0.939 / 0.897 / 0.923 | 0.868 / 0.910 / 0.899 | 4.73 / 4.36 / 4.52 | 4.21 / 4.35 / 4.25 |
+| 26 键学过的词 | 1.099 | 1.109 | 6.78 | 6.74 |
+
+九键 p50 每对都高约 1%（约 20 微秒），在基线自身 3.7% 的波动以内；p95 和平均值都更低。`t9_replay.py compare` 判定 `speed_gate: passed`，工作量增长 0%。按第 4 节的规则合格。
+- Android：`./gradlew assembleDebug --quiet --max-workers=2` 通过，四个 ABI 的 `librime_jni.so` 都重新编译并含新目录的目标文件。没有打包装机（按协调安排随下一次合并安装）。
