@@ -70,11 +70,11 @@
 
 ### B. 把剩下的注入写进补丁（经协调线程，交给“词库和词权问题”线程或由其同意后统一改）
 
-每次同时改 Android 的补丁和 Windows 的 librime 副本。
+每次同时改 librime 的两份补丁：Gradle 先打的 `patches/cyime-librime.patch` 和 CMake 检查的 `cmake/RimeDictionary.patch`。Windows 引擎没有联合解码、拼音选音节这些功能，它的 librime 副本不用跟着改。
 
 6. **script_translator / engine 钩子**：`T9PhraseBeforeSentence.cmake` 与 `PinyinSyllableSelection.cmake` 剩下的一行调用写进 `RimeDictionary.patch`，两个 CMake 文件删掉替换逻辑。额外门禁：新补丁打完后的 `script_translator.cc`、`engine.cc` 与原生成副本逐字相同（允许只差 `#line` 与空白），候选不同就不可能。
 7. **音节图剪枝**：`T9SingleKeyRecall.cmake` 的 3 处并入 `RimeDictionary.patch` 的 `syllabifier.cc` 部分，同样比对生成文本。
-8. **查询位置记录与计数**：`T9LookupTrace.cmake` 的钩子并入补丁。计数宏在 Android 上展开为空，直接写进补丁即可，`T9WorkCounters.cmake` 的替换函数随之删除。
+8. **查询位置记录与计数**：`T9LookupTrace.cmake` 的钩子并入补丁。计数宏在 Android 上展开为空，直接写进补丁即可。`T9WorkCounters.cmake` 的替换函数还给第 9 步的 octagram 用，到那一步再删。
 9. **octagram 整词匹配**：`T9Grammar.cmake` 改成 `OctagramT9.patch`，仍打在构建目录副本上，不改子模块。
 10. **收尾**：几个补丁统一一个应用函数；Lua 的 `liolib.c` 修正改成小补丁（与解码无关，最后做）。
 
@@ -122,3 +122,20 @@
 
 九键 p50 每对都高约 1%（约 20 微秒），在基线自身 3.7% 的波动以内；p95 和平均值都更低。`t9_replay.py compare` 判定 `speed_gate: passed`，工作量增长 0%。按第 4 节的规则合格。
 - Android：`./gradlew assembleDebug --quiet --max-workers=2` 通过，四个 ABI 的 `librime_jni.so` 都重新编译并含新目录的目标文件。没有打包装机（按协调安排随下一次合并安装）。
+
+## 7. B 段第 6~8 步结果（2026-10-22）
+
+- 做法：把前半段 Android 构建生成的 `cyime-script-translator.cc`、`cyime-pinyin-engine.cc`、`cyime-syllabifier.cc`、`cyime-dictionary.cc`、`cyime-table.cc`、`cyime-user_dictionary.cc` 原样写回 librime 工作区（每个文件保留原来的换行符）。只有三处不同：`script_translator.cc` 的头文件只留实际用到的 5 个；`syllabifier.cc` 恢复上游的 `#include "syllabifier.h"`；三个词典文件加上原来只在主机构建里插入的 `T9_WORK_*` 计数宏，Android 上这些宏展开为空。
+- 两份补丁同步重写：`RimeDictionary.patch` 多了 `engine.cc`、`user_dictionary.cc` 两段，`cyime-librime.patch` 多了 `engine.cc`；共有的 18 个文件逐段相同，`cyime-librime.patch` 照旧多一个 `memory.cc`。`RimeDictionary.patch` 的 `user_dictionary.cc` 一段直接取自 `cyime-librime.patch`，所以连带收进了那边早已有的“纠错边不挡住学过的打字原词”一处修正。
+- CMake：删掉 `PinyinSyllableSelection.cmake`、`T9SingleKeyRecall.cmake`、`T9LookupTrace.cmake`；`T9PhraseBeforeSentence.cmake` 改名为 `CyimeRimeSources.cmake`，只剩包含目录、源文件和 CyLM 编译选项，外加一道检查：librime 里找不到 `T9DecodeJoint(` 就停止构建（补丁没打上时不会悄悄少功能）。librime 的源码现在原样编译，不再生成副本；只剩 octagram（第 9 步）还用生成副本。
+- 离线核对：两份补丁都能在工作区反向通过；用干净子模块加一份补丁、再加三个小补丁，得到的文件与工作区逐字节相同（只比换行统一后的内容）。
+- 顺带发现一个早就存在的问题：在干净子模块上打完任一份 librime 补丁后，`T9DecodeCache.patch` 正向打不上，因为它的 `script_translator.h` 两行已经在大补丁里了，而它的 `user_dictionary.cc` 几行又不在。现有工作区不受影响（已全部打上，反向检查通过）；从零检出时 CMake 会在这一步报错停下。留给第 10 步收尾时把小补丁并进大补丁一起解决。
+- 电脑端门禁（新引擎 `2fa4c321…`）：九键无学习词、预置学习词，以及另外两次重复运行，4374 条记录逐字节相同，工作量计数也相同；26 键无学习词、学过的词，遮掉当前时间候选后 5950 条全部相同。
+- 速度（这一时段机器上同时有别的线程在跑模型，绝对值整体偏高；同一时段交替运行）：
+
+| 场景 | 基线 p50 | B 段 p50 | 基线 p95 | B 段 p95 |
+|---|---|---|---|---|
+| 九键无学习词，两次/两次 | 2.744 / 2.832 | 2.865 / 2.420 | 22.12 / 22.32 | 22.39 / 19.60 |
+| 26 键无学习词，两次/两次 | 1.212 / 1.138 | 1.170 / 1.104 | 5.77 / 5.35 | 5.62 / 5.31 |
+
+九键两次平均 p50 2.79 → 2.64、p95 22.2 → 21.0；26 键中位数和 p95 两次都更低。参与编译的源码文本与前半段相同（计数宏原本就在主机构建里），没有逐个比对目标文件；按此推断这些差别是负载波动。
