@@ -653,7 +653,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     private fun registerSharedPrefsListener() {
         val prefs = SettingsPreferences.getPrefsPublic(this)
-        com.kingzcheung.xime.settings.IncognitoState.manual = SettingsPreferences.isIncognito(this)
+        privacy.loadManual(SettingsPreferences.isIncognito(this))
         sharedPrefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key?.startsWith(com.kingzcheung.xime.settings.HardwareKeyboardPreferences.PREFIX) == true) {
                 uiState.value = uiState.value.copy(hardwareOptions = com.kingzcheung.xime.settings.HardwareKeyboardPreferences.read(this))
@@ -671,8 +671,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 }
                 com.kingzcheung.xime.settings.CustomKeyboardLayouts.REVISION -> schemaController.applyCustomLayouts()
                 SettingsPreferences.KEY_INCOGNITO -> {
-                    com.kingzcheung.xime.settings.IncognitoState.manual = SettingsPreferences.isIncognito(this)
-                    applyIncognito()
+                    privacy.setManual(SettingsPreferences.isIncognito(this))
                 }
                 SettingsPreferences.KEY_VISUAL_STYLE, SettingsPreferences.KEY_ROUNDED_KEYBOARD_BOTTOM, "dark_mode", "keyboard_theme", "show_bottom_buttons", "keyboard_height_dp", "keyboard_height_dp_landscape", "keyboard_bottom_padding_dp", "keyboard_opacity" -> {
                     com.kingzcheung.xime.ui.theme.VisualStyles.current = SettingsPreferences.getVisualStyle(this@XimeInputMethodService)
@@ -1220,8 +1219,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         keyboardViewModel.closeOverlay()
         // Its own flag: a new input field (restartInput, rotation) rewrites sensitiveEditor, and
         // restoring a saved copy of it on close once let a password field learn.
-        com.kingzcheung.xime.settings.IncognitoState.clipboardSearch = true
-        applyIncognito()
+        privacy.setClipboardSearch(true)
         clipboardManager.boardQuery.value = ""
         uiState.value = uiState.value.copy(clipboardSearchVisible = true, toolPanelInputFocused = true, enterKeyText = "完成")
         fitClipboardSearchOnShortScreen()
@@ -1272,8 +1270,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         uiState.value = uiState.value.copy(clipboardSearchVisible = false, toolPanelInputFocused = false,
             enterKeyText = editorEnterKeyText())
         ToolPanelEditTextHolder.editText = null
-        com.kingzcheung.xime.settings.IncognitoState.clipboardSearch = false
-        applyIncognito()
+        privacy.setClipboardSearch(false)
         restoreDisplayAfterClipboardSearch()
         if (openBoard) keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
     }
@@ -2799,11 +2796,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         loadDarkModePreference()
 
-        // 敏感输入框（密码等）判定 + composing 去重标志重置（详见 PluginEventDispatcher）
-        pluginEvents.onStartInput(attribute)
-        com.kingzcheung.xime.settings.IncognitoState.sensitiveEditor =
-            com.kingzcheung.xime.settings.IncognitoState.isSensitiveEditor(attribute)
-        applyIncognito()
+        // 敏感输入框（密码等）判定；插件派发读同一结果，这里只重置 composing 去重
+        pluginEvents.onStartInput()
+        privacy.beginEditor(attribute)
 
         // 受限输入框判定（密码/终端/NO_SUGGESTIONS）：供英文联想等补全功能短路
         editorRestricted = EditorInfoClassifier.isRestrictedEditor(attribute)
@@ -3008,15 +3003,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         requestHardwareCursorUpdates()
     }
 
-    private var appliedIncognito: Boolean? = null
-
     /** 引擎学习开关跟随生效中的无痕；在输入队列中执行，与按键保持先后顺序。 */
-    private fun applyIncognito() {
-        val active = com.kingzcheung.xime.settings.IncognitoState.active
-        if (appliedIncognito == active) return
-        appliedIncognito = active
-        inputCommands.submit { rimeEngine.setIncognito(active) }
-    }
+    internal val privacy = InputPrivacy { active -> inputCommands.submit { rimeEngine.setIncognito(active) } }
 
     internal fun applyWindowBackground() {
         val state = uiState.value
