@@ -141,6 +141,7 @@ internal fun standardLetterRowGeometry(
     stagger: Float? = null,
 ): LetterRowGeometry? {
     if (isSplit || !cellWidthDp.isFinite() || cellWidthDp <= 0f) return null
+    if (isHoneycomb(keyRows)) return HoneycombRowGeometry
     return letterKeyboardFrame(keyRows)?.geometry(cellWidthDp,
         stagger ?: wideQwertyStagger(cellWidthDp, physicalTargetCellDp))
 }

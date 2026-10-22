@@ -12,6 +12,8 @@ import androidx.compose.ui.text.withStyle
 import com.kingzcheung.xime.settings.CustomKeyboardLayout
 
 internal val LocalCustomLayout = staticCompositionLocalOf<CustomKeyboardLayout?> { null }
+/** Letter caps are drawn as interlocking hexagons (Typewise); the touch area stays the key's own cell. */
+internal val LocalHoneycombKeys = staticCompositionLocalOf { false }
 internal val LocalCustomAccent = staticCompositionLocalOf { Color(0xFF6750A4) }
 internal fun layoutContrast(a: Color, b: Color): Float =
     (maxOf(a.luminance(), b.luminance()) + .05f) / (minOf(a.luminance(), b.luminance()) + .05f)

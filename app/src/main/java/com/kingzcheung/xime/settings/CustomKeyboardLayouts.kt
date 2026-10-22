@@ -18,9 +18,14 @@ data class CustomKeyboardLayout(
 ) {
     /** Precomputed for the per-key preedit path; copies rebuild it with the new rows. */
     val mergedGroups: List<String> = rows.flatten().filter { it.length > 1 }
+    /** Four staggered rows of single letters (6/7/6/7, Typewise): a honeycomb, not the ten-unit frame. */
+    val honeycomb: Boolean get() = rows.map { it.size } == HONEYCOMB_ROWS
 
     fun valid(): Boolean {
         if (name.isBlank() || name.length > 32) return false
+        if (honeycomb) return (id in BuiltinLetterLayouts.ids || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
+            rows.flatten().all { it.length == 1 && it[0] in 'a'..'z' } &&
+            rows.flatten().joinToString("").toSet() == ('a'..'z').toSet()
         // 内置排列（QWJRTK、Cyletix10、Colemak）是起点，按键可以像自定义布局一样调整（方案由当前排列生成）。
         return (id in BuiltinLetterLayouts.ids || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
             rows.map { row -> row.sumOf { it.length } } == (if (hasExtraSlot()) listOf(10, 10, 7) else listOf(10, 9, 7)) &&
@@ -34,7 +39,7 @@ data class CustomKeyboardLayout(
     fun typingRows(): List<List<String>> = rows.map { row -> row.filterNot { it == EMPTY_SLOT } }
     fun hasSemicolon() = rows.any { ";" in it }
     private fun hasExtraSlot() = hasSemicolon() || rows.any { EMPTY_SLOT in it }
-    fun withSpareSlot(): CustomKeyboardLayout = if (hasExtraSlot()) this else
+    fun withSpareSlot(): CustomKeyboardLayout = if (hasExtraSlot() || honeycomb) this else
         copy(rows = rows.mapIndexed { index, row -> if (index == 1) row + EMPTY_SLOT else row })
     fun setSemicolonEnabled(enabled: Boolean): CustomKeyboardLayout {
         val layout = withSpareSlot()
@@ -47,7 +52,8 @@ data class CustomKeyboardLayout(
         hasExtraSlot() -> listOf(BASE[0], BASE[1] + ";", BASE[2])
         else -> BASE
     }
-    fun movedLetters(): Set<Char> = rows.zip(referenceRows()).flatMap { (row, original) ->
+    /** A honeycomb has no QWERTY position to compare with, so no letter counts as moved. */
+    fun movedLetters(): Set<Char> = if (honeycomb) emptySet() else rows.zip(referenceRows()).flatMap { (row, original) ->
         row.joinToString("").zip(original).filter { (letter, base) -> letter != base && letter in 'a'..'z' }.map { it.first }
     }.toSet()
     fun isRed(letter: Char): Boolean = letter.lowercaseChar().let {
@@ -74,7 +80,8 @@ data class CustomKeyboardLayout(
             row.forEach { key ->
                 if (key == EMPTY_SLOT) { column++; return@forEach }
                 val source = base[key.first().toString()] ?: KeyGestureConfig()
-                val hint = base[referenceRows()[rowIndex][column].toString()]?.swipeUp
+                // Swipes keep their physical position; a honeycomb has none to keep, so each letter keeps its own.
+                val hint = if (honeycomb) source.swipeUp else base[referenceRows()[rowIndex][column].toString()]?.swipeUp
                 result[key] = source.copy(
                     tap = GestureDef(label = key, value = key.first().toString()), swipeUp = hint,
                     longPress = if (key.length == 1) source.longPress else LongPressConfig("bubble", key.map { GestureDef(label = it.toString(), value = it.toString()) })
@@ -102,6 +109,7 @@ data class CustomKeyboardLayout(
     }
     companion object {
         const val EMPTY_SLOT = "_"
+        val HONEYCOMB_ROWS = listOf(6, 7, 6, 7)
         val BASE = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
         fun fresh() = CustomKeyboardLayout("custom_pinyin_" + UUID.randomUUID().toString().replace("-", ""), "我的布局", BASE.map { it.map(Char::toString) })
     }

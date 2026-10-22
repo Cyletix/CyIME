@@ -26,6 +26,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("qwjrtkPreset", 1)
     inputs.property("cyletix10Preset", 1)
     inputs.property("colemakPreset", 1)
+    inputs.property("typewisePreset", 1)
     inputs.property("t9EnglishIndex", 6)
     inputs.file(file("src/main/assets/english.txt"))
     inputs.property("measuredNeighborCorrection", 2)
@@ -237,7 +238,7 @@ val prepareChineseDictionaries by tasks.registering {
             .replace("enable_correction: false", "enable_correction: true"))
         // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
         for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",
-                "pinyin_colemak" to "Colemak")) {
+                "pinyin_colemak" to "Colemak", "pinyin_typewise" to "Typewise")) {
             File(root, "$id.schema.yaml").writeText(baseSchema
                 .replace("schema_id: rime_ice", "schema_id: $id")
                 .replace("name: 雾凇拼音", "name: $name"))

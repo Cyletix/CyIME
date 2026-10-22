@@ -123,8 +123,9 @@ fun isStrokeSchema(schemaId: String): Boolean =
 fun isHandwritingSchema(schemaId: String): Boolean =
     InputProfiles.current(schemaId).layout.kind == LayoutKind.HANDWRITING
 
-/** 分体只适用于26键，不能把14键、九键、手写或日语九键拆开。 */
+/** 分体只适用于26键，不能把14键、九键、手写、日语九键或蜂窝布局拆开。 */
 internal fun supportsSplitKeyboard(schemaId: String, asciiMode: Boolean): Boolean =
     InputProfiles.current(schemaId, asciiMode).layout.let {
-        it.kind == LayoutKind.ALPHABETIC || it == com.kingzcheung.xime.settings.InputLayout.MERGED14
+        (it.kind == LayoutKind.ALPHABETIC || it == com.kingzcheung.xime.settings.InputLayout.MERGED14) &&
+            com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(it.id)?.honeycomb != true
     }

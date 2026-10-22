@@ -123,6 +123,8 @@ fun KeyboardLayout(
     val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId, letterLayout) {
         letterLayout?.typingRows() ?: KeysConfigHelper.getKeyRows(isAsciiMode)
     }
+    // Typewise honeycomb: a fourth letter row, short rows offset half a key, hexagonal letter caps.
+    val honeycomb = letterLayout?.honeycomb == true
     val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
         supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
     val correctionEnabled = LocalKeyboardInputPreferences.current.neighborCorrection && !isAsciiMode
@@ -152,6 +154,7 @@ fun KeyboardLayout(
     BoxWithConstraints(modifier.then(if (splitKeyboard && splitGap != null)
         Modifier.onGloballyPositioned { splitGap.reportAreaTop(it.boundsInWindow().top) } else Modifier)) {
     val splitGutterDp = SplitKeyboardGeometry.gutterDp(uiState.isFloatingMode)
+    val keyboardHeight = maxHeight
     val splitGapFraction = if (splitKeyboard) SplitKeyboardGeometry.resolvedGap(
         splitGapSetting, maxWidth.value, splitGutterDp, physicalTargetCellDp) else 0f
     val splitGapDp = (splitGapFraction * maxWidth.value).dp
@@ -374,6 +377,7 @@ fun KeyboardLayout(
         LocalFourteenKeyLayout provides fourteenKey,
         LocalLetterGeometry provides geometry,
         LocalCustomLayout provides letterLayout,
+        LocalHoneycombKeys provides honeycomb,
         LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
         LocalShiftSlideTargets provides shiftSlideTargets,
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
@@ -404,11 +408,15 @@ fun KeyboardLayout(
                         .padding(bottom = 8.dp)
                         .then(if (splitKeyboard) Modifier.testTag("split-keyboard") else Modifier),
             ) {
+                // Hexagon caps reach a sixth of a row beyond their cell; keep that room above the
+                // first row and below the last letter row (five equal rows share the height).
+                val honeycombOverhang = if (honeycomb) (keyboardHeight - 8.dp) / 32 else 0.dp
 
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .padding(top = honeycombOverhang),
                     verticalArrangement = Arrangement.Top,
                 ) {
                     // 第一行
@@ -427,6 +435,7 @@ fun KeyboardLayout(
                             val row0 = renderRows.getOrElse(0) { listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p") }
                             KeyboardRowWithConfig(
                                 keys = row0,
+                                edgeInset = if (honeycomb) (splitCellDp / 2f).dp else 0.dp,
                                 onKeyPress = onKeyPress,
                                 config = KeyboardRowConfig(
                                     keyBackgroundColor = keyBackgroundColor,
@@ -701,6 +710,39 @@ fun KeyboardLayout(
                                 shadowShapeRadius = shadowShapeRadius,
                             )
                         }
+                    }
+
+                    // 蜂窝布局的第四行字母（zxcvbnm），与第二行同宽对齐。
+                    renderRows.getOrNull(3)?.let { row3 ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (isVoiceMode && !isVoiceSticky) DummyKeyboardRow(
+                                keys = row3, weightedLetters = true,
+                                keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
+                                keyboardBackgroundColor = keyboardBackgroundColor,
+                            ) else KeyboardRowWithConfig(
+                                keys = row3,
+                                onKeyPress = onKeyPress,
+                                config = KeyboardRowConfig(
+                                    keyBackgroundColor = keyBackgroundColor,
+                                    keyTextColor = keyTextColor,
+                                    keyboardBackgroundColor = keyboardBackgroundColor,
+                                    shadowEnabled = shadowEnabled,
+                                    shadowElevation = shadowElevation,
+                                    shadowShapeRadius = shadowShapeRadius,
+                                ),
+                                isShifted = isShifted,
+                                isAsciiMode = isAsciiMode,
+                                onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
+                                onKeyPressDown = onKeyPressDown,
+                                onKeyRelease = onKeyRelease,
+                                swipeDownHintsEnabled = effectiveSwipeDownHintsEnabled,
+                                swipeUpHintsEnabled = swipeUpHintsEnabled,
+                                onCommitText = onCommitText,
+                                onGestureAction = onGestureAction,
+                                configVersion = cfgVer,
+                            )
+                        }
+                        Spacer(Modifier.height(honeycombOverhang))
                     }
 
                     // 底排保留共用权重及逗号/地球等宽；宽屏实体字母错位不移动底排。

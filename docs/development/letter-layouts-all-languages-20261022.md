@@ -21,3 +21,11 @@
 - 单元测试：新增 `LetterLayoutsTest` 5 项、`SchemaForLayoutTest` 1 项；`testDebugUnitTest` 全量 2070 项，0 失败，24 跳过。`compileDebugAndroidTestKotlin` 通过（`ChineseSchemasTest`、`ChineseDefaultsImeTest` 改为按内置排列集合检查）。
 - 截图（Robolectric 原生绘制，`LetterLayoutRenderTest`，设 `CYIME_RENDER_OUT` 才出图）：Cyletix10、Colemak × 中文/英文/日文罗马字 × 透明玻璃、黑白、薰衣草紫、柔和蓝 × 不透明/玻璃 × 手机 400dp / 平板 900dp，共 96 张，另有英文、日文的布局选择器 4 张，逐张看过：按键排列与中文一致，改位字母强调、上滑提示位置一致，文字可读。图在 `.codex-artifacts/letter-layouts-20261022/`。
 - 未打包、未安装、未真机验收。
+
+## Typewise 蜂窝布局（同日追加）
+
+- 字母：`wetyio` / `qsrgukp` / `adfhjl` / `zxcvbnm`（6/7/6/7），照 Typewise 原图。短行错开半个键，Shift 和删除放在第三行两侧各半个键宽；底排沿用 CyIME 自己的 !@#、123、标点、空格、地球、回车。和其他内置排列一样进 `BuiltinLetterLayouts`，中文生成 `pinyin_typewise` 方案，英文和日文罗马字随中文启用后可选。
+- 键盘：四行字母仍走原来的行组件（`KeyboardRowWithConfig`、第三行的 Shift／删除），只在 `isHoneycomb` 时改成 7 列、半键错位，并多出第四行字母；不分体。
+- 键帽：字母键画成尖顶六边形（`HoneycombKeys.kt`），比所在格高三分之一、上下各伸进相邻行的缺口，所以六边形能咬合；触摸区仍是各自的格子（砖格），不重叠。键面文字收进六边形内；六边形字母键不画投影。
+- 上滑符号：蜂窝布局和 QWERTY 没有位置对应，符号跟着字母走（q 上滑仍是 1），不按位置换。改位字母强调对蜂窝布局不适用（没有可比较的原位置）。
+- 截图：中文/英文/日文罗马字 × 4 主题 × 不透明/玻璃 × 手机/平板 48 张，加选择器 4 张，在 `.codex-artifacts/typewise-20261022/`，逐张看过。平板上格子更宽，六边形偏扁。
