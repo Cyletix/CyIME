@@ -96,9 +96,7 @@ if(T9_MENU_METHOD EQUAL -1)
 endif()
 add_subdirectory(librime)
 include("${CMAKE_CURRENT_LIST_DIR}/T9Grammar.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/T9SingleKeyRecall.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/T9PhraseBeforeSentence.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/T9LookupTrace.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/CyimeRimeSources.cmake")
 target_compile_options(
   rime-static PRIVATE "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." "-Wno-error=deprecated-declarations")
 
