@@ -40,7 +40,7 @@ class ChineseDefaultsImeTest {
         assertTrue(engine.ensureSession())
         val initiallyEnabled = SchemaManager.getEnabledSchemas(context)
         assertTrue(initiallyEnabled.containsAll(CyimeInputDefaults.recommended))
-        assertFalse(initiallyEnabled.any { it in setOf(QwjrtkLayout.ID, Cyletix10Layout.ID) })
+        assertFalse(initiallyEnabled.any { it in com.kingzcheung.xime.settings.BuiltinLetterLayouts.ids })
         val discovered = SchemaManager.discoverSchemas(context).associateBy { it.schemaId }
         assertEquals("中文26键", discovered["rime_ice"]?.name)
         assertEquals("中文14键", discovered["pinyin_14jian"]?.name)

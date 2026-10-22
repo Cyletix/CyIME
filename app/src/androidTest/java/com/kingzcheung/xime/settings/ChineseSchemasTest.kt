@@ -95,11 +95,10 @@ class ChineseSchemasTest {
         ChineseSchemas.installAssets(context, rime)
         File(rime, SchemaManager.ASSET_INSTALL_MARKER).delete()
         val available = SchemaManager.discoverSchemas(context).map { it.schemaId }
-        assertTrue(QwjrtkLayout.ID in available)
-        assertTrue(Cyletix10Layout.ID in available)
+        assertTrue(available.containsAll(BuiltinLetterLayouts.ids))
         assertEquals(CyimeInputDefaults.recommended, SchemaManager.getEnabledSchemas(context))
         assertFalse(SchemaManager.getEnabledSchemas(context).any {
-            it in JapaneseSchemas.ids || it == "pinyin_14jian" || it in setOf(QwjrtkLayout.ID, Cyletix10Layout.ID)
+            it in JapaneseSchemas.ids || it == "pinyin_14jian" || it in BuiltinLetterLayouts.ids
         })
         SchemaManager.setEnabledSchemas(context, listOf("t9_pinyin", "japanese"))
         assertEquals(listOf("t9_pinyin", "japanese"), SchemaManager.getEnabledSchemas(context))

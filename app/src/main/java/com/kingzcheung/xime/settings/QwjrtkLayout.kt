@@ -5,6 +5,8 @@ internal object QwjrtkLayout {
     const val ID = "pinyin_qwjrtk"
     private val replacements = mapOf("e" to "j", "y" to "k", "j" to "e", "k" to "n", "v" to "y", "n" to "v")
     fun rows(base: List<List<String>>) = base.map { row -> row.map { replacements[it] ?: it } }
+    val preset = CustomKeyboardLayout(ID, "QWJRTK（双拇指）",
+        listOf("qwjrtkuiop", "asdfghenl", "zxcybvm").map { it.map(Char::toString) })
 
     // Keep digit/symbol swipes in their familiar physical positions. Letter long-press
     // variants and radical hints still belong to the letter printed on the key.
