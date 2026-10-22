@@ -32,6 +32,7 @@ import argparse
 import ctypes as C
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -325,7 +326,8 @@ def run(dll_dir, data, jobs):
             rime.RimeProcessKey(session, ord(ch), 0)
             candidates(session, 5)
             times.append((time.perf_counter_ns() - start) / 1e6)
-        return candidates(session, 10), times
+        # CYIME_REPORT_TOP: keep more candidates per case (to tell a deep rank from a word never offered).
+        return candidates(session, int(os.environ.get("CYIME_REPORT_TOP", "10"))), times
 
     def learn(schema, neighbors, rows):
         """Type each word's full pinyin and pick the word, as a user would; the user dictionary is shared by
@@ -352,8 +354,18 @@ def run(dll_dir, data, jobs):
     for schema, neighbors, cases, variant in jobs:
         learn_files = [p for p in os.environ.get("CYIME_LEARN", "").split(";") if p]
         if learn_files and schema == "rime_ice":
-            learn(schema, neighbors, [tuple(line.split("\t")[:2]) for path in learn_files
-                                      for line in Path(path).read_text(encoding="utf-8").splitlines() if line])
+            rows = [line.split("\t") for path in learn_files
+                    for line in Path(path).read_text(encoding="utf-8").splitlines() if line]
+            commits = int(os.environ.get("CYIME_LEARN_COMMITS", "0") or 0)
+            if commits and all(len(r) > 2 and r[2].strip().isdigit() for r in rows):
+                # As used: each word picked in proportion to its count (at least once), in a shuffled order. Picked
+                # once each in file order, the rarest word is the newest and leads every abbreviation it shares.
+                total = sum(int(r[2]) for r in rows)
+                sequence = [(r[0], r[1]) for r in rows for _ in range(max(1, round(commits * int(r[2]) / total)))]
+                random.Random(0).shuffle(sequence)
+                learn(schema, neighbors, sequence)
+            else:
+                learn(schema, neighbors, [tuple(r[:2]) for r in rows])
         sessions = []
         for name in (schema, variant) if variant else (schema,):
             session = C.c_size_t(rime.RimeCreateSession())
@@ -404,9 +416,14 @@ def main():
     parser.add_argument("--learn", type=Path, nargs="*", default=[],
                         help="TSV files (typed pinyin, word, ...) picked once each in the 26-key schema before "
                              "the cases, so they are typed with those words learned (personal_holdout.py learn.tsv)")
+    parser.add_argument("--learn-commits", type=int, default=0,
+                        help="With a count column in --learn: about this many picks in all, each word in proportion "
+                             "to its count, shuffled (default: each word once, in file order)")
     args = parser.parse_args()
     if args.learn:
         os.environ["CYIME_LEARN"] = ";".join(map(str, args.learn))
+    if args.learn_commits:
+        os.environ["CYIME_LEARN_COMMITS"] = str(args.learn_commits)
     if args.set_label:
         os.environ["CYIME_SET_LABEL"] = args.set_label
     if args.ab_replace:
