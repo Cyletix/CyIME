@@ -892,7 +892,10 @@ fun SwipeableIconKeyButton(
         } else Modifier
     }
     val keyCornerRadius = LocalKeyCornerRadius.current
-    val keyClipShape = remember(keyCornerRadius) { RoundedCornerShape(keyCornerRadius) }
+    val honeycombEdge = LocalHoneycombEdge.current
+    val keyClipShape = remember(keyCornerRadius, honeycombEdge) {
+        honeycombEdge?.let(::HalfHexagonShape) ?: RoundedCornerShape(keyCornerRadius)
+    }
     
     fun darkenColor(color: Color, factor: Float = 0.15f): Color {
         return Color(
@@ -945,11 +948,13 @@ fun SwipeableIconKeyButton(
                 buttonBounds = coordinates.boundsInRoot()
             }
             .padding(visualPadding ?: scaledKeyVisualPadding())
-            .keyGlow(Modifier.then(shadowModifier)
+            .then(if (honeycombEdge != null) Modifier.honeycombCap() else Modifier)
+            .keyGlow(Modifier.then(if (honeycombEdge != null) Modifier else shadowModifier)
             .clip(keyClipShape)
             .background(feedbackColors.background)
             .keyHeldHighlight(isPressed && feedback == KeyFlickFeedback.NORMAL), materialLevel = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED,
-                glowVisibility = if (feedback == KeyFlickFeedback.NORMAL) 1f else 1f - (flickPreview?.progress ?: 0f)),
+                glowVisibility = if (feedback == KeyFlickFeedback.NORMAL) 1f else 1f - (flickPreview?.progress ?: 0f))
+            .then(if (honeycombEdge != null) Modifier.honeycombLabelArea(half = true) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)
@@ -967,7 +972,8 @@ fun SwipeableIconKeyButton(
         )
         
         // Like a character key's corner hint: the hint itself becomes the moving label.
-        if (!swipeText.isNullOrEmpty() && flickPreview?.text != swipeText) {
+        // A half-hexagon edge key has no corner left for it; the swipe still works.
+        if (!swipeText.isNullOrEmpty() && flickPreview?.text != swipeText && honeycombEdge == null) {
             Text(
                 text = punctuationKeyLabel(swipeText),
                 color = keyHintColor(iconColor, frostedGlass, 0.5f),
