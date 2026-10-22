@@ -71,6 +71,9 @@ class FeedbackManager(private val context: Context) {
         fun resolveKeySoundStyle(stored: String?, hardware: Boolean): String =
             if (hardware || stored == "mahjong") "mahjong" else "default"
 
+        /** 删除音连发时只保留最新一层；其他按键音照常可以重叠。 */
+        fun chokesPrevious(keyType: String): Boolean = keyType == "delete"
+
         /** 设置页「录屏时包含按键音」写入的偏好键，默认关。 */
         const val KEY_SOUND_CAPTURABLE = "key_sound_capturable"
 
@@ -229,8 +232,13 @@ class FeedbackManager(private val context: Context) {
         val soundId = soundIds["$style:$keyType"] ?: soundIds[keyType] ?: soundIds["standard"] ?: return
         val volume = soundVolume / 100f
 
-        pool.play(soundId, volume, volume, 1, 0, 1.0f)
+        // 长按删除每 30 ms 连发一次：新的一下切断上一下删除音，避免多层叠成刺耳的嗡声。
+        if (chokesPrevious(keyType)) lastDeleteStream.takeIf { it != 0 }?.let { pool.stop(it) }
+        val stream = pool.play(soundId, volume, volume, 1, 0, 1.0f)
+        if (chokesPrevious(keyType)) lastDeleteStream = stream
     }
+
+    private var lastDeleteStream = 0
 
     /** When a physical key last went down (uptime ms), sounding or not. */
     @Volatile var lastHardwareKeyUptime = 0L

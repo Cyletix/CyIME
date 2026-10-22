@@ -105,6 +105,13 @@ class FeedbackManagerTest {
         org.junit.Assert.assertFalse(FeedbackManager.mutedByDnd(false, none, systemSoundsAllowed = false))
     }
 
+    @Test fun `only repeated delete sounds cut off the previous one`() {
+        org.junit.Assert.assertTrue(FeedbackManager.chokesPrevious("delete"))
+        listOf("standard", "space", "enter", "voice_start").forEach {
+            org.junit.Assert.assertFalse(it, FeedbackManager.chokesPrevious(it))
+        }
+    }
+
     @Test fun `feedback actions retain semantic types across keyboard layouts`() {
         mapOf(
             "a" to KeyFeedbackType.CHARACTER, "あ" to KeyFeedbackType.CHARACTER,
