@@ -1,7 +1,6 @@
 package com.kingzcheung.xime.service
 
 import android.text.InputType
-import android.view.inputmethod.EditorInfo
 import com.kingzcheung.xime.plugin.core.lua.PluginEvent
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 
@@ -33,19 +32,12 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
     private var pastedChars = 0L
     private var pastedCommits = 0L
 
-    /** 当前输入会话是否敏感输入框（密码类 / 不学习标记）。
-     *  主线程写（onStartInput）、key-processing 线程读（候选词变换短路），volatile 保证可见性。 */
-    @Volatile
-    private var sensitiveInput: Boolean = false
-
-    /** 当前输入会话是否敏感输入框（密码类 / 不学习标记）。
+    /** 无痕生效中（手动、密码类 / 不学习标记的输入框、剪贴板搜索）：与学习同一来源（InputPrivacy 写）。
      *  供 hotPath 插件能力（候选词变换）在发起请求前短路。 */
-    val isCurrentEditorSensitive: Boolean get() = sensitiveInput || com.kingzcheung.xime.settings.IncognitoState.manual ||
-        com.kingzcheung.xime.settings.IncognitoState.clipboardSearch
+    val isCurrentEditorSensitive: Boolean get() = com.kingzcheung.xime.settings.IncognitoState.active
 
-    /** 新输入会话：刷新敏感标记并重置 composing 去重。 */
-    fun onStartInput(attribute: EditorInfo?) {
-        sensitiveInput = isSensitiveEditor(attribute)
+    /** 新输入会话：重置 composing 去重。 */
+    fun onStartInput() {
         lastDispatchedInputText = null
     }
 
@@ -102,7 +94,4 @@ internal class PluginEventDispatcher(private val service: XimeInputMethodService
             )
         )
     }
-
-    private fun isSensitiveEditor(attribute: EditorInfo?): Boolean =
-        com.kingzcheung.xime.settings.IncognitoState.isSensitiveEditor(attribute)
 }

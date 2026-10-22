@@ -2,6 +2,8 @@ package com.kingzcheung.xime.service
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import com.kingzcheung.xime.settings.IncognitoState
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -19,17 +21,33 @@ import org.mockito.junit.MockitoJUnitRunner
 class PluginEventDispatcherTest {
 
     private lateinit var dispatcher: PluginEventDispatcher
+    private val privacy = InputPrivacy {}
+    private val saved = Triple(IncognitoState.manual, IncognitoState.sensitiveEditor, IncognitoState.clipboardSearch)
 
     @Before
     fun setup() {
         dispatcher = PluginEventDispatcher(mock(XimeInputMethodService::class.java))
+        privacy.loadManual(false)
+    }
+
+    @After
+    fun restore() {
+        IncognitoState.manual = saved.first
+        IncognitoState.sensitiveEditor = saved.second
+        IncognitoState.clipboardSearch = saved.third
     }
 
     private fun editorInfo(inputType: Int): EditorInfo = EditorInfo().apply { this.inputType = inputType }
 
+    /** The service's order: the field's privacy first, then the dispatcher's new session. */
+    private fun startInput(inputType: Int) {
+        privacy.beginEditor(editorInfo(inputType))
+        dispatcher.onStartInput()
+    }
+
     @Test
     fun `普通汉字按字数累计`() {
-        dispatcher.onStartInput(editorInfo(InputType.TYPE_CLASS_TEXT))
+        startInput(InputType.TYPE_CLASS_TEXT)
         val text = "你好世界再见你好世界再见" // 12 个汉字
         assertEquals(12, text.length)
         dispatcher.onTextCommitted(text)
@@ -38,7 +56,7 @@ class PluginEventDispatcherTest {
 
     @Test
     fun `emoji按一个字计数而非两个UTF16单元`() {
-        dispatcher.onStartInput(editorInfo(InputType.TYPE_CLASS_TEXT))
+        startInput(InputType.TYPE_CLASS_TEXT)
         // 12 个用户感知字符，其中 1 个 emoji：String.length 为 13，代码点计数应为 12
         val text = "复制粘贴测试文本😊" // 8 汉字 + 1 emoji = 9
         assertEquals(10, text.length) // 验证 emoji 确实占 2 个 UTF-16 单元
@@ -49,7 +67,7 @@ class PluginEventDispatcherTest {
 
     @Test
     fun `增补平面生僻字按一个字计数`() {
-        dispatcher.onStartInput(editorInfo(InputType.TYPE_CLASS_TEXT))
+        startInput(InputType.TYPE_CLASS_TEXT)
         val text = "𠮷" // U+20BB7，String.length == 2
         assertEquals(2, text.length)
         dispatcher.onTextCommitted(text)
@@ -58,7 +76,7 @@ class PluginEventDispatcherTest {
 
     @Test
     fun `多次提交跨emoji混合累计`() {
-        dispatcher.onStartInput(editorInfo(InputType.TYPE_CLASS_TEXT))
+        startInput(InputType.TYPE_CLASS_TEXT)
         dispatcher.onTextCommitted("你好")
         dispatcher.onTextCommitted("👍") // 代理对
         dispatcher.onTextCommitted("abc")
@@ -69,7 +87,7 @@ class PluginEventDispatcherTest {
     @Test
     fun `敏感输入框不计数`() {
         val passwordType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        dispatcher.onStartInput(editorInfo(passwordType))
+        startInput(passwordType)
         dispatcher.onTextCommitted("secret")
         assertEquals(0L, dispatcher.sessionCommittedCharsForTest)
     }
@@ -77,9 +95,9 @@ class PluginEventDispatcherTest {
     @Test
     fun `离开敏感输入框后恢复计数`() {
         val passwordType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        dispatcher.onStartInput(editorInfo(passwordType))
+        startInput(passwordType)
         dispatcher.onTextCommitted("secret")
-        dispatcher.onStartInput(editorInfo(InputType.TYPE_CLASS_TEXT))
+        startInput(InputType.TYPE_CLASS_TEXT)
         dispatcher.onTextCommitted("你好")
         assertEquals(2L, dispatcher.sessionCommittedCharsForTest)
     }
