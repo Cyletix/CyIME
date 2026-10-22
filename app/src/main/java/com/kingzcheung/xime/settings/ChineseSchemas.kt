@@ -7,7 +7,7 @@ import org.json.JSONObject
 
 /** 统一中文词库；标准 Rime ID 不变，现有市场版本和个人补丁优先。 */
 object ChineseSchemas {
-    val ids = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "double_pinyin_flypy_14jian", QwjrtkLayout.ID, Cyletix10Layout.ID)
+    val ids = listOf("t9_pinyin", "rime_ice", "pinyin_14jian", "double_pinyin_flypy", "double_pinyin_flypy_14jian") + BuiltinLetterLayouts.ids
     private const val ADDED = "cyime_chinese_defaults_v1"
 
     /** Only known, unedited predecessor bytes may migrate; personal/market ownership wins above. */
@@ -99,7 +99,7 @@ object ChineseSchemas {
     @Synchronized
     fun installOptionalLayoutSchemas(context: Context, target: File) {
         target.mkdirs()
-        for (id in listOf(QwjrtkLayout.ID, Cyletix10Layout.ID)) {
+        for (id in BuiltinLetterLayouts.ids) {
             val destination = File(target, "$id.schema.yaml")
             if (destination.isFile) {
                 val old = destination.readText()

@@ -44,7 +44,8 @@ def resource_files(repo):
                 continue
             relative = path.relative_to(root).as_posix()
             if (relative.endswith(".md") or relative.startswith("LICENSE") or relative.endswith(".custom.yaml")
-                    or (name == "rime_ice" and relative in ("pinyin_qwjrtk.schema.yaml", "pinyin_cyletix10.schema.yaml"))):
+                    or (name == "rime_ice" and relative in ("pinyin_qwjrtk.schema.yaml", "pinyin_cyletix10.schema.yaml",
+                                                         "pinyin_colemak.schema.yaml"))):
                 continue
             targets[relative] = ("assets/" + name + "/" + relative, path)
     for destination, (entry, path) in targets.items():

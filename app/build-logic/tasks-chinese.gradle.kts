@@ -25,6 +25,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("files", chineseTopFiles)
     inputs.property("qwjrtkPreset", 1)
     inputs.property("cyletix10Preset", 1)
+    inputs.property("colemakPreset", 1)
     inputs.property("t9EnglishIndex", 6)
     inputs.file(file("src/main/assets/english.txt"))
     inputs.property("measuredNeighborCorrection", 2)
@@ -234,12 +235,13 @@ val prepareChineseDictionaries by tasks.registering {
             "\ntranslator:\n  cyime_neighbor_correction: true\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n")
             .replace("enable_correction: false", "enable_correction: true"))
-        File(root, "pinyin_qwjrtk.schema.yaml").writeText(baseSchema
-            .replace("schema_id: rime_ice", "schema_id: pinyin_qwjrtk")
-            .replace("name: 雾凇拼音", "name: QWJRTK（双拇指）"))
-        File(root, "pinyin_cyletix10.schema.yaml").writeText(baseSchema
-            .replace("schema_id: rime_ice", "schema_id: pinyin_cyletix10")
-            .replace("name: 雾凇拼音", "name: Cyletix10（实验）"))
+        // Built-in letter arrangements (settings/BuiltinLetterLayouts.kt): same schema, own ID and name.
+        for ((id, name) in listOf("pinyin_qwjrtk" to "QWJRTK（双拇指）", "pinyin_cyletix10" to "Cyletix10（实验）",
+                "pinyin_colemak" to "Colemak")) {
+            File(root, "$id.schema.yaml").writeText(baseSchema
+                .replace("schema_id: rime_ice", "schema_id: $id")
+                .replace("name: 雾凇拼音", "name: $name"))
+        }
 
         // Same IME vocabulary as CyIME-Windows data/rime/cyime_terms.dict.yaml; imported after upstream
         // tables so upstream weights win on duplicates.

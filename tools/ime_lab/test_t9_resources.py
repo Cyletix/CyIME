@@ -67,7 +67,8 @@ class ResourceSnapshotTest(unittest.TestCase):
                              "app/src/main/assets/rime_chinese/LICENSE.txt",
                              "app/src/main/assets/rime_chinese/default.custom.yaml",
                              "app/build/generated/chinese-assets/rime_ice/pinyin_qwjrtk.schema.yaml",
-                             "app/build/generated/chinese-assets/rime_ice/pinyin_cyletix10.schema.yaml"):
+                             "app/build/generated/chinese-assets/rime_ice/pinyin_cyletix10.schema.yaml",
+                             "app/build/generated/chinese-assets/rime_ice/pinyin_colemak.schema.yaml"):
                 write(root, relative, b"excluded")
             files = resources.resource_files(root)
             self.assertEqual(len(files), len(REQUIRED))

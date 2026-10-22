@@ -21,8 +21,8 @@ data class CustomKeyboardLayout(
 
     fun valid(): Boolean {
         if (name.isBlank() || name.length > 32) return false
-        // Cyletix10 是内置起点，按键可以像自定义布局一样调整（方案由当前排列生成）。
-        return (id == QwjrtkLayout.ID || id == Cyletix10Layout.ID || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
+        // 内置排列（QWJRTK、Cyletix10、Colemak）是起点，按键可以像自定义布局一样调整（方案由当前排列生成）。
+        return (id in BuiltinLetterLayouts.ids || id.matches(Regex("custom_pinyin_[a-f0-9]{32}"))) &&
             rows.map { row -> row.sumOf { it.length } } == (if (hasExtraSlot()) listOf(10, 10, 7) else listOf(10, 9, 7)) &&
             rows.flatten().count { it == EMPTY_SLOT || it == ";" } <= 1 &&
             rows.flatten().all { it == EMPTY_SLOT || it == ";" || it.length in 1..2 && it.all { c -> c in 'a'..'z' } } &&
@@ -112,14 +112,8 @@ object CustomKeyboardLayouts {
     const val REVISION = "custom_keyboard_layout_revision"
     const val STATUS = "custom_keyboard_layout_status"
     private var cached: List<CustomKeyboardLayout> by mutableStateOf(emptyList())
-    private val qwjrtkPreset = CustomKeyboardLayout(QwjrtkLayout.ID, "QWJRTK（双拇指）",
-        listOf("qwjrtkuiop", "asdfghenl", "zxcybvm").map { it.map(Char::toString) })
-    fun find(id: String) = cached.firstOrNull { it.id == id } ?: when (id) {
-        QwjrtkLayout.ID -> qwjrtkPreset
-        Cyletix10Layout.ID -> Cyletix10Layout.preset
-        else -> null
-    }
-    fun isCustom(id: String) = id == QwjrtkLayout.ID || id == Cyletix10Layout.ID || id.startsWith("custom_pinyin_")
+    fun find(id: String) = cached.firstOrNull { it.id == id } ?: BuiltinLetterLayouts.find(id)
+    fun isCustom(id: String) = id in BuiltinLetterLayouts.ids || id.startsWith("custom_pinyin_")
     @Synchronized fun load(context: Context): List<CustomKeyboardLayout> {
         val file = File(context.filesDir, "custom-keyboard-layouts.json")
         if (!file.exists()) {
