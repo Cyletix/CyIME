@@ -4,7 +4,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
-import android.view.Choreographer
 import android.view.FrameMetrics
 import android.view.MotionEvent
 import android.view.ViewTreeObserver
@@ -37,7 +36,7 @@ internal object KeyLatencyProbe {
     private var length = 0
     private var engineNanos = 0L
     private var dropped = 0
-    // fired, started, posted, handed, applied, composed, drawn, vsync
+    // fired, started, posted, handed, applied, composed, drawn, frame vsync
     private val t = LongArray(8)
     private var touchUp = false
     private var touchEvent = 0L
@@ -127,6 +126,7 @@ internal object KeyLatencyProbe {
 
     /** 后台把结果投给主线程；同一按键多次投递取最后一次。 */
     fun posted(compositionLength: Int) {
+        if (!enabled) return
         val engine = com.kingzcheung.xime.rime.EngineTimeMeter.current.get()?.get(0) ?: 0L
         step(STARTED, POSTED, 2) { length = compositionLength; engineNanos = engine }
     }
@@ -140,20 +140,19 @@ internal object KeyLatencyProbe {
     /** 键盘根组合应用了这次变化。 */
     fun composed() = step(APPLIED, COMPOSED, 5)
 
-    private fun drawn() {
-        val vsync = runCatching { Choreographer.getInstance().frameTimeNanos }.getOrDefault(0L)
-        step(COMPOSED, DRAWN, 6) { t[7] = vsync }
-    }
+    private fun drawn() = step(COMPOSED, DRAWN, 6)
 
     private fun frame(metrics: FrameMetrics) {
         val vsync = metrics.getMetric(FrameMetrics.VSYNC_TIMESTAMP)
+        val done = metrics.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP) + metrics.getMetric(FrameMetrics.TOTAL_DURATION)
         val line: String
         synchronized(lock) {
             if (phase != DRAWN) return
-            if (t[7] != 0L && vsync < t[7]) return
-            if (t[7] != 0L && vsync > t[7]) { dropped++; phase = IDLE; return }
+            // 绘制时刻落在这一帧的 vsync 和完成之间才是这次按键的帧；更早的帧跳过，更晚说明漏了。
+            if (done < t[6]) return
+            if (vsync > t[6]) { dropped++; phase = IDLE; return }
             phase = IDLE
-            val done = metrics.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP) + metrics.getMetric(FrameMetrics.TOTAL_DURATION)
+            t[7] = vsync
             val gpu = if (Build.VERSION.SDK_INT >= 31) metrics.getMetric(FrameMetrics.GPU_DURATION) else -1_000L
             fun us(nanos: Long) = nanos / 1_000
             val frameStart = maxOf(t[7], t[4])
