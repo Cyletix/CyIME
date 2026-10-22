@@ -1,0 +1,2 @@
+id	keyboard	input	expect	top_k	source	date	note
+learned-bucket-tongyong	26	tongyong	通用	1	learned-prefix-bucket	2026-10-22	after 通过 is picked once, a shorter word group emptied by the correction gate crashed the engine (0b9350ae); run with --learn tools/ime_lab/fixtures/learned_prefix_bucket_learn.tsv
