@@ -541,6 +541,7 @@ fun KeyboardLayout(
                                 .weight(1f)
                                 .fillMaxHeight(),
                         ) {
+                            CompositionLocalProvider(LocalHoneycombEdge provides if (honeycomb) HoneycombEdge.START else null) {
                             ShiftCapsKeyButton(
                                 viewModel = viewModel,
                                 shiftMode = shiftMode,
@@ -557,6 +558,7 @@ fun KeyboardLayout(
                                 shadowElevation = shadowElevation,
                                 shadowShapeRadius = shadowShapeRadius,
                             )
+                            }
 
                                 val bottomKeys = renderRows.getOrElse(2) { listOf("z", "x", "c", "v", "b", "n", "m") }
                                 val bottomWeighted = LocalCustomLayout.current != null || fourteenKey
@@ -678,6 +680,7 @@ fun KeyboardLayout(
                             }
                             }
 
+                            CompositionLocalProvider(LocalHoneycombEdge provides if (honeycomb) HoneycombEdge.END else null) {
                             SwipeableIconKeyButton(
                                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
                                 onClick = { onKeyPress("delete") },
@@ -709,6 +712,7 @@ fun KeyboardLayout(
                                 shadowElevation = shadowElevation,
                                 shadowShapeRadius = shadowShapeRadius,
                             )
+                            }
                         }
                     }
 
@@ -1411,7 +1415,10 @@ internal fun ShiftCapsKeyButton(
         } else Modifier
     }
     val keyCornerRadius = LocalKeyCornerRadius.current
-    val keyClipShape = remember(keyCornerRadius) { RoundedCornerShape(keyCornerRadius) }
+    val honeycombEdge = LocalHoneycombEdge.current
+    val keyClipShape = remember(keyCornerRadius, honeycombEdge) {
+        honeycombEdge?.let(::HalfHexagonShape) ?: RoundedCornerShape(keyCornerRadius)
+    }
 
     fun darkenColor(color: Color, factor: Float = 0.15f): Color {
         return Color(
@@ -1483,7 +1490,7 @@ internal fun ShiftCapsKeyButton(
                 }
             }
             .padding(scaledKeyVisualPadding())
-            .then(shadowModifier)
+            .then(if (honeycombEdge != null) Modifier.honeycombCap() else shadowModifier)
             .clip(keyClipShape)
             .background(colors.background).visualMaterial(VisualStyles.current, keyCornerRadius, com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED),
         contentAlignment = Alignment.Center
