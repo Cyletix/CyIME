@@ -154,7 +154,7 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
                     TextButton(onClick = { symbols = true }) { Text("编辑符号") }
                 }
             }
-            Text("中文按键布局：调整字母排列，保留词库和功能键。")
+            Text("按键布局：调整字母排列，保留词库和功能键；中文启用的字母布局，英文和日文罗马字也能选。")
             Button(onClick = { edit(CustomKeyboardLayout.fresh()) }, enabled = !busy) { Text("新建布局") }
             layouts.forEach { layout ->
                 OutlinedCard(Modifier.fillMaxWidth()) {

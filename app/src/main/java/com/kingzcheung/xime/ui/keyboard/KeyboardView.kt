@@ -1073,8 +1073,7 @@ fun KeyboardView(
                                 com.kingzcheung.xime.settings.LayoutKind.ALPHABETIC,
                                 com.kingzcheung.xime.settings.LayoutKind.MERGED))
                     if (!usesQwerty) null else {
-                        val custom = if (ascii) null else
-                            com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(state.currentSchemaId)
+                        val custom = KeysConfigHelper.letterLayout(state.currentSchemaId, ascii)
                         candidateQwertyGeometry(custom?.typingRows() ?: KeysConfigHelper.getKeyRows(ascii),
                             fourteenKey = !ascii && state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14,
                             custom = custom != null,

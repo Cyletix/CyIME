@@ -29,8 +29,10 @@ data class SchemaInfo(
     val scheme: InputScheme = InputProfiles.describe(schemaId).scheme,
 ) {
     /** Rime/package identity is retained for compatibility, not exposed as an encoding scheme. */
-    val profile: InputProfile get() = if (KeysConfigHelper.hasLoadedLayoutBindings)
-        InputProfiles.current(schemaId, language = language, scheme = scheme)
+    val profile: InputProfile get() = InputProfiles.arranged(baseProfile)
+    /** Before English/Japanese romaji take their language's letter arrangement: the layout is the language's own. */
+    val baseProfile: InputProfile get() = if (KeysConfigHelper.hasLoadedLayoutBindings)
+        InputProfiles.current(schemaId, language = language, scheme = scheme, arranged = false)
         else InputProfiles.describe(schemaId, language, scheme)
     /** Encoding choices must not inherit legacy keyboard labels such as 中文26键. */
     val schemeLabel: String get() = when (scheme) {

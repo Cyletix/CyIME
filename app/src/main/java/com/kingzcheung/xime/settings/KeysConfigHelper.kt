@@ -602,6 +602,7 @@ object KeysConfigHelper {
     // 英文键盘（qwerty_en）手势配置缓存
     private val _keyGestureConfigEn = mutableStateOf<Map<String, KeyGestureConfig>>(emptyMap())
     val keyGestureConfigEn: Map<String, KeyGestureConfig> get() = _keyGestureConfigEn.value
+    private var _keyGestureConfigEnBase: Map<String, KeyGestureConfig> = emptyMap()
     
     // 键盘颜色配置缓存
     private var keyboardColorsConfig: KeyboardColorsConfig = KeyboardColorsConfig()
@@ -641,6 +642,7 @@ object KeysConfigHelper {
     // 键盘行布局缓存（中文 / 英文）
     private var _zhRows: List<List<String>> = DEFAULT_ZH_ROWS
     private var _enRows: List<List<String>> = DEFAULT_EN_ROWS
+    private var _enRowsBase: List<List<String>> = DEFAULT_EN_ROWS
 
     // 标准 26 键的基线缓存（合并键布局切换退出时恢复）
     private var _zhRowsBase: List<List<String>> = DEFAULT_ZH_ROWS
@@ -718,12 +720,36 @@ object KeysConfigHelper {
             _zhRows = custom.typingRows()
             _keyGestureConfig.value = custom.gestures(_keyGestureConfigZhBase)
         } else if (section != null) {
-            _zhRows = _mergedRows[section] ?: DEFAULT_ZH_ROWS
-            _keyGestureConfig.value = _mergedGestureConfigs[section] ?: emptyMap()
+            // Japanese romaji types on the arrangement chosen for Japanese; its own section keeps the swipes.
+            val arranged = letterLayout(schemaId, false)
+            val gestures = _mergedGestureConfigs[section] ?: emptyMap()
+            _zhRows = arranged?.typingRows() ?: _mergedRows[section] ?: DEFAULT_ZH_ROWS
+            _keyGestureConfig.value = arranged?.gestures(gestures) ?: gestures
         } else {
             _zhRows = _zhRowsBase
             _keyGestureConfig.value = _keyGestureConfigZhBase
         }
+    }
+
+    /**
+     * The letter layout the keyboard is typing on: a Chinese layout schema, or the arrangement chosen
+     * for English / Japanese romaji ([LetterLayouts]). null is the plain 26/14 keys of the section.
+     */
+    fun letterLayout(schemaId: String, isAsciiMode: Boolean): CustomKeyboardLayout? =
+        CustomKeyboardLayouts.find(InputProfiles.current(schemaId, isAsciiMode).layout.id)
+
+    /** Re-apply the per-language arrangements after a choice changes. */
+    fun applyLetterLayouts() {
+        applyEnglishLetterLayout()
+        _appliedLayoutSchemaId = null
+        setActiveKeyboardSchema(_activeSchemaId)
+        _configVersion.value++
+    }
+
+    private fun applyEnglishLetterLayout() {
+        val english = LetterLayouts.chosen(InputLanguage.ENGLISH)
+        _enRows = english?.typingRows() ?: _enRowsBase
+        _keyGestureConfigEn.value = english?.gestures(_keyGestureConfigEnBase) ?: _keyGestureConfigEnBase
     }
 
     /** 获取键盘行布局，每个子 List 为一行的按键 ID 列表，索引 0=第一行。
@@ -735,7 +761,7 @@ object KeysConfigHelper {
     fun previewKeyRows(layout: InputLayout, language: InputLanguage): List<List<String>> =
         CustomKeyboardLayouts.find(layout.id)?.typingRows() ?: when {
             layout.kind == LayoutKind.MERGED -> _mergedRows[layout.id].orEmpty()
-            layout.kind == LayoutKind.ALPHABETIC -> if (language == InputLanguage.ENGLISH) _enRows else _zhRowsBase
+            layout.kind == LayoutKind.ALPHABETIC -> if (language == InputLanguage.ENGLISH) _enRowsBase else _zhRowsBase
             else -> emptyList()
         }
     
@@ -778,6 +804,7 @@ object KeysConfigHelper {
     private fun loadXimeConfig(context: Context) {
         try {
             CustomKeyboardLayouts.load(context)
+            LetterLayouts.load(context)
             val symbolCustomText = readCustomText(context)
             symbolCustomZh = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty") } ?: emptyMap()
             symbolCustomEn = symbolCustomText?.let { parseKeyboardYamlSection(it, "qwerty_en") } ?: emptyMap()
@@ -791,7 +818,7 @@ object KeysConfigHelper {
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
             _keyGestureConfigZhBase = parsed?.first ?: emptyMap()
-            _keyGestureConfigEn.value = parsed?.second ?: emptyMap()
+            _keyGestureConfigEnBase = parsed?.second ?: emptyMap()
             // 键盘颜色（从原始 YAML 手动解析）
             keyboardColorsConfig = parseKeyboardColorsFromAssets(context)
             // 键盘阴影（从原始 YAML 手动解析）
@@ -812,7 +839,8 @@ object KeysConfigHelper {
             // 键盘行布局
             val parsedRows = parseKeyboardLayoutFromAssets(context)
             _zhRowsBase = parsedRows.first
-            _enRows = parsedRows.second
+            _enRowsBase = parsedRows.second
+            applyEnglishLetterLayout()
             // 合并键绑定（keyboard.<section>.schemas，custom 覆盖 builtIn 同名方案的绑定）
             val builtInBindings = readAssetText(context, XIME_CONFIG_FILE)
                 ?.let { parseSchemaBindingsYamlText(it) } ?: emptyMap()
@@ -1666,7 +1694,7 @@ object KeysConfigHelper {
         // Rearranged custom layouts bind digits to physical positions. Keep those
         // generated gestures unless the user explicitly edits a symbol in the panel.
         val customGesture = (if (isAsciiMode) symbolCustomEn else symbolCustomZh)[normalized]
-            ?: config[normalized].takeIf { !isAsciiMode && CustomKeyboardLayouts.find(_activeSchemaId) != null }
+            ?: config[normalized].takeIf { letterLayout(_activeSchemaId, isAsciiMode) != null }
         return QwertySwipeSymbols.apply(normalized, config[normalized],
             if (isAsciiMode) symbolOverridesEn else symbolOverridesZh, customGesture, isAsciiMode)
     }

@@ -36,13 +36,17 @@ internal fun InputProfileSelectors(
     accentColor: Color = MaterialTheme.colorScheme.primary,
     onSelect: (SchemaInfo) -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val profile = selected.profile
     val schemes = InputProfileSelection.schemeEntries(entries, selected)
     val layouts = InputProfileSelection.layouts(entries, selected)
     Column(modifier.fillMaxWidth().testTag("profile-settings-selectors")) {
         LayoutPreviewChoices(layouts, profile.language, profile.layout.id, "layout-choice:${profile.language.id}",
             containerColor = containerColor, contentColor = contentColor, accentColor = accentColor) { id ->
-            InputProfileSelection.changeLayout(entries, selected, id)?.let(onSelect)
+            InputProfileSelection.changeLayout(entries, selected, id)?.let { entry ->
+                LetterLayouts.selectFor(context, entry, id)
+                onSelect(entry)
+            }
         }
         HorizontalDivider(Modifier.padding(vertical = 4.dp), color = contentColor.copy(alpha = .15f))
         ProfileChoiceRow("方案", "scheme-choice:${profile.language.id}",

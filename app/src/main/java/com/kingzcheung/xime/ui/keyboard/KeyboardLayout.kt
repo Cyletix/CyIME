@@ -116,10 +116,12 @@ fun KeyboardLayout(
 ) {
     // 配置或方案变化时，行列与间距一起更新。
     val cfgVer by KeysConfigHelper.configVersion.collectAsState()
-    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) {
-        if (isAsciiMode) KeysConfigHelper.getKeyRows(true)
-        else com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId)?.typingRows()
-            ?: KeysConfigHelper.getKeyRows(false)
+    // Chinese layout schemas, and the arrangement English / Japanese romaji chose, share one component.
+    val letterLayout = remember(cfgVer, isAsciiMode, uiState.currentSchemaId) {
+        KeysConfigHelper.letterLayout(uiState.currentSchemaId, isAsciiMode)
+    }
+    val keyRows = remember(cfgVer, isAsciiMode, uiState.currentSchemaId, letterLayout) {
+        letterLayout?.typingRows() ?: KeysConfigHelper.getKeyRows(isAsciiMode)
     }
     val splitKeyboard = LocalKeyboardInputPreferences.current.splitKeyboardEnabled &&
         supportsSplitKeyboard(uiState.currentSchemaId, isAsciiMode)
@@ -168,7 +170,7 @@ fun KeyboardLayout(
     val letterRowGeometry = standardLetterRowGeometry(
         keyRows = keyRows,
         cellWidthDp = splitCellDp,
-        hasCustomLayout = !isAsciiMode && com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId) != null,
+        hasCustomLayout = letterLayout != null,
         isSplit = false,
         physicalTargetCellDp = physicalTargetCellDp,
         stagger = LocalKeyboardInputPreferences.current.let {
@@ -180,8 +182,7 @@ fun KeyboardLayout(
     val letterSideKeyWeight = letterRowGeometry?.outerKeyWeight ?: 1.4f
     val letterDeleteKeyWeight = letterRowGeometry?.deleteKeyWeight ?: 1.4f
     val letterBottomWeight = letterRowGeometry?.bottomLetterWeight ?: 7f
-    val splitWeighted = !isAsciiMode && com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId) != null ||
-        fourteenKey
+    val splitWeighted = letterLayout != null || fourteenKey
     val baseRow1 = keyRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
     val splitRow1InsetDp = standardRowInset
         ?: if ((if (splitWeighted) baseRow1.sumOf { it.length } else baseRow1.size) > 9) 0.dp else 16.dp
@@ -372,7 +373,7 @@ fun KeyboardLayout(
     CompositionLocalProvider(
         LocalFourteenKeyLayout provides fourteenKey,
         LocalLetterGeometry provides geometry,
-        LocalCustomLayout provides if (isAsciiMode) null else com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(uiState.currentSchemaId),
+        LocalCustomLayout provides letterLayout,
         LocalCustomAccent provides KeyboardThemes.getPrimaryColor(uiState.themeId, uiState.isDarkTheme),
         LocalShiftSlideTargets provides shiftSlideTargets,
         LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
