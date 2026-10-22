@@ -2,6 +2,7 @@ package com.kingzcheung.xime.rime
 
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.util.InputLatencyTrace
+import com.kingzcheung.xime.service.KeyLatencyProbe
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -224,15 +225,18 @@ class T9InputController(
         val (finalResult, injections) = InputLatencyTrace.phase(traceId, "candidate-transform") { transformInjections(data.result) }
         val composition = finalResult.toComposition().also { it.traceEventId = traceId }
         val gen = uiGeneration.incrementAndGet()
+        KeyLatencyProbe.posted(finalResult.inputText.length)
         mainHandler.post {
             if (!accepts(admission, epoch) || gen != uiGeneration.get()) {
                 InputLatencyTrace.finish(traceId, "superseded")
                 return@post
             }
+            KeyLatencyProbe.handed()
             InputLatencyTrace.phase(traceId, "state-publish") {
                 onCompositionRefresh?.invoke(composition, injections)
                 applyCandidates(finalResult, data.panel, data.options)
             }
+            KeyLatencyProbe.applied()
             if (refineWhenIdle && onCompositionRefresh != null)
                 scheduleRefinement(finalResult.engineRevision, gen, admission, epoch)
         }
@@ -369,7 +373,9 @@ class T9InputController(
         val traceId = InputLatencyTrace.begin()
         // Read before queuing: the engine uses it only if this digit starts a composition.
         val context = leftContext()
+        KeyLatencyProbe.fired("t9")
         enqueueInput("t9-digit") { admission, epoch ->
+            KeyLatencyProbe.started()
             try {
                 val transaction = InputLatencyTrace.phase(traceId, "engine-jni-flush") {
                     rimeEngine.processQueuedT9KeyAndGetResult(code, context)

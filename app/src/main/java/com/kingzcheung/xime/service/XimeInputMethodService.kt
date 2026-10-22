@@ -1538,6 +1538,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
               androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                 val inputWindowWidthDp = maxWidth.value.roundToInt().coerceAtLeast(1)
                 val cand = candidateState.value
+                androidx.compose.runtime.SideEffect { KeyLatencyProbe.composed() }
                 val state = uiState.value
                 // Reloaded key gaps/rows and split changes affect automatic geometry even
                 // when the active input profile and stored dimensions remain unchanged.
@@ -2890,6 +2891,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        KeyLatencyProbe.refresh(window.window)
         startRuntimeObservation()
         info?.let { updateEnterKeyText(it) }
         updateHardwareKeyboardConnection()

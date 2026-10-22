@@ -272,7 +272,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val owner = InputCommandOwner.requireOwner()
         service.uiEventChannel.trySend {
             if (service.inputReadiness.accepts(owner.admission) && service.uiState.value.inputSessionId == owner.editor) {
+                KeyLatencyProbe.handed()
                 withContext(owner.context()) { block() }
+                KeyLatencyProbe.applied()
             }
         }
     }
@@ -288,6 +290,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     ) {
         // 日语罗马音的显示归一化收口在 updateUIWithResult（刷新路径同样生效），此处不再单独加工
         val transformed = service.candidateTransform.transformFor(result)
+        KeyLatencyProbe.posted(result.inputText.length)
         publishUi {
             if (!service.rimeEngine.isCandidateRevisionCurrent(result.engineRevision)) return@publishUi
             service.sessionController.updateUIWithResult(
@@ -503,7 +506,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             key.length == 1 && key[0].isDigit() -> "digit"
             else -> "key"
         }
+        if (latencyKind == "letter" && hardwareEvent == null) KeyLatencyProbe.fired(service.uiState.value.inputProfile.layout.id)
         service.inputCommands.submit(InputCommandOwner.requireOwner().context(), kind = latencyKind) command@{
+            KeyLatencyProbe.started()
             InputCommandOwner.requireOwner().requireCurrent(service.inputReadiness, service.uiState.value.inputSessionId)
             if (!service.inputReadiness.accepts(admission) || hasPendingCandidateCommit) return@command
             if (usesDirectFieldInput && routeDirectFieldKey(key, isShifted, hardwareEvent)) return@command

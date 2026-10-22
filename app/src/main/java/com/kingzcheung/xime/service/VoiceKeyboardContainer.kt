@@ -53,6 +53,7 @@ class VoiceKeyboardContainer(
             if (ev?.actionMasked == MotionEvent.ACTION_UP || ev?.actionMasked == MotionEvent.ACTION_CANCEL) discardTouchGesture = false
             return true
         }
+        ev?.let(KeyLatencyProbe::touch)
         ev?.let {
             when (it.action) {
                 MotionEvent.ACTION_DOWN -> {
