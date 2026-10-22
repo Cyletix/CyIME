@@ -517,7 +517,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     /** Late engine snapshots cannot reopen composition in a field that requires literal input. */
     private fun suppressFieldComposition(): Boolean {
         val state = service.uiState.value
-        if (!service.editorInputPolicy.directInput || state.quickSendFormFocused || state.toolPanelInputFocused) return false
+        if (!service.editorInputPolicy.directInput || state.inputTarget.isInternal) return false
         service.uiState.value = state.copy(isAsciiMode = true)
         val candidates = service.candidateState.value
         if (!candidates.isShowingRecentClipboard) service.candidateState.value = CandidateState()

@@ -347,13 +347,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
      * 工具栏等明确的编辑命令不传 [preeditKey]，沿用原行为。
      */
     private fun editCursor(finishComposition: Boolean = true, preeditKey: String? = null, action: (InputConnection) -> Unit) {
-        val state = service.uiState.value
-        if (state.quickSendFormFocused || state.toolPanelInputFocused) {
-            val editor = when {
-                state.quickSendFormFocused && state.quickSendCodeFocused -> QuickSendFormCodeEditTextHolder.editText
-                state.quickSendFormFocused -> QuickSendFormEditTextHolder.editText
-                else -> ToolPanelEditTextHolder.editText
-            } ?: return // Never fall back to the host when an internal editor owns input.
+        val target = service.uiState.value.inputTarget
+        if (target.isInternal) {
+            val editor = target.editText() ?: return // Never fall back to the host when an internal editor owns input.
             val connection = editor.onCreateInputConnection(android.view.inputmethod.EditorInfo()) ?: return
             editorCursor.observeSelection(connection, editor.selectionStart, editor.selectionEnd)
             action(connection)
@@ -366,7 +362,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 // 焦点/会话检查与清理必须在同一个主线程任务内，中间不可挂起，
                 // 否则队列里旧输入框的编辑操作可能清掉新输入框的组合串。
                 if (service.currentInputConnection !== original || service.uiState.value.inputSessionId != inputSession ||
-                    service.uiState.value.quickSendFormFocused || service.uiState.value.toolPanelInputFocused) {
+                    service.uiState.value.inputTarget.isInternal) {
                     return@withContext
                 }
                 val composing = service.candidateState.value.let { it.isComposing || it.inputText.isNotEmpty() }
@@ -396,14 +392,9 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
 
     /** Main thread, called inside the existing key FIFO; never enqueue a second cursor job. */
     internal fun moveHardwareCursor(event: KeyEvent) {
-        val state = service.uiState.value
-        val internalEditor = when {
-            state.quickSendFormFocused && state.quickSendCodeFocused -> QuickSendFormCodeEditTextHolder.editText
-            state.quickSendFormFocused -> QuickSendFormEditTextHolder.editText
-            state.toolPanelInputFocused -> ToolPanelEditTextHolder.editText
-            else -> null
-        }
-        val ic = if (state.quickSendFormFocused || state.toolPanelInputFocused) {
+        val target = service.uiState.value.inputTarget
+        val internalEditor = target.editText()
+        val ic = if (target.isInternal) {
             internalEditor?.onCreateInputConnection(android.view.inputmethod.EditorInfo()) ?: return
         } else service.currentInputConnection ?: return
         if (internalEditor != null) editorCursor.observeSelection(ic, internalEditor.selectionStart, internalEditor.selectionEnd)

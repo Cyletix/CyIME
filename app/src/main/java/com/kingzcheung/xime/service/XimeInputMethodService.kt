@@ -3468,7 +3468,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     internal fun supportsEnglishCandidateReplace(): Boolean {
         if (isSecretEditor()) return false
-        if (uiState.value.quickSendFormFocused || uiState.value.toolPanelInputFocused) return true
+        if (uiState.value.inputTarget.isInternal) return true
         val ic = currentInputConnection ?: return false
         return englishEditorReadCapability.supports(uiState.value.inputSessionId, ic) {
             runCatching { ic.getTextBeforeCursor(1, 0) != null }.getOrDefault(false)
@@ -3835,7 +3835,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal fun fillVerificationCode(code: String, sequential: Boolean) {
         if (!com.kingzcheung.xime.clipboard.VerificationCodeExtractor.isCode(code) ||
             candidateState.value.isComposing || keyRouter.hasPendingCandidateCommit ||
-            uiState.value.quickSendFormFocused || uiState.value.toolPanelInputFocused) return
+            uiState.value.inputTarget.isInternal) return
         cancelVerificationCodeInput()
         predictionManager.invalidatePendingPredictions()
         verificationCodeJob = serviceScope.launch {
@@ -3848,7 +3848,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             val accepted = if (digitMode) VerificationCodeInput.fill(code, target = {
                 val info = currentInputEditorInfo
                 if (info == null || currentInputConnection == null || !isInputViewShown ||
-                    uiState.value.quickSendFormFocused || uiState.value.toolPanelInputFocused ||
+                    uiState.value.inputTarget.isInternal ||
                     candidateState.value.isComposing || keyRouter.hasPendingCandidateCommit) null
                 else VerificationCodeInput.Target(info.packageName, info.fieldId, info.inputType, uiState.value.inputSessionId)
             }, commit = commit, content = {
@@ -3949,13 +3949,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return owner.runInline { commitTextSilently(text, isPaste, isSensitive) }
         }
         InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
-        val state = uiState.value
-        if (state.quickSendFormFocused || state.toolPanelInputFocused) {
-            val editor = when {
-                state.quickSendFormFocused && state.quickSendCodeFocused -> QuickSendFormCodeEditTextHolder.editText
-                state.quickSendFormFocused -> QuickSendFormEditTextHolder.editText
-                else -> ToolPanelEditTextHolder.editText
-            } ?: return TextCommitResult.NO_CONNECTION
+        val target = uiState.value.inputTarget
+        if (target.isInternal) {
+            val editor = target.editText() ?: return TextCommitResult.NO_CONNECTION
             val editable = editor.text ?: return TextCommitResult.NO_CONNECTION
             val start = editor.selectionStart.coerceIn(0, editable.length)
             val end = editor.selectionEnd.coerceIn(start, editable.length)
@@ -3978,13 +3974,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     /** 当前编辑目标的绝对光标位置，供手写候选验证文字所属位置。 */
     internal fun currentEditorCursorPosition(): Int? {
-        val state = uiState.value
-        val editor = when {
-            state.quickSendFormFocused && state.quickSendCodeFocused -> QuickSendFormCodeEditTextHolder.editText
-            state.quickSendFormFocused -> QuickSendFormEditTextHolder.editText
-            state.toolPanelInputFocused -> ToolPanelEditTextHolder.editText
-            else -> null
-        }
+        val editor = uiState.value.inputTarget.editText()
         if (editor != null) return editor.selectionEnd.takeIf { it >= 0 }
         val extracted = currentInputConnection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
         return extracted?.takeIf { it.startOffset >= 0 && it.selectionEnd >= 0 }
@@ -3997,14 +3987,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 不匹配时不做任何操作（调用方决定降级策略）。需在主线程调用。
      */
     internal fun replaceBeforeCursor(expected: String, replacement: String): Boolean {
-        val quickSendFocused = uiState.value.quickSendFormFocused
-        if (quickSendFocused || uiState.value.toolPanelInputFocused) {
-            val et = when {
-                quickSendFocused && uiState.value.quickSendCodeFocused ->
-                    QuickSendFormCodeEditTextHolder.editText
-                quickSendFocused -> QuickSendFormEditTextHolder.editText
-                else -> ToolPanelEditTextHolder.editText
-            } ?: return false
+        val target = uiState.value.inputTarget
+        if (target.isInternal) {
+            val et = target.editText() ?: return false
             if (et.selectionStart != et.selectionEnd) return false
             val selStart = et.selectionStart.coerceAtLeast(0)
             val start = (selStart - expected.length).coerceAtLeast(0)

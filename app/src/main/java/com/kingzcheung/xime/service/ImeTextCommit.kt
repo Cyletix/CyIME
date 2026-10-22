@@ -30,7 +30,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         val connection = service.currentInputConnection ?: return null
         val editor = service.currentInputEditorInfo ?: return null
         val session = service.uiState.value.inputSessionId
-        if (service.uiState.value.quickSendFormFocused || service.uiState.value.toolPanelInputFocused) return null
+        if (service.uiState.value.inputTarget.isInternal) return null
         service.dismissPredictionsForPaste()
         val cached = service.clipboardManager.images.prepare(image)
         if (service.uiState.value.inputSessionId != session || service.currentInputConnection !== connection) return null
