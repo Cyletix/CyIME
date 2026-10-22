@@ -72,6 +72,8 @@
 
 把 `onStartInput` 和 `clearInputState` 里关于会话的步骤收进 `beginEditorSession(attribute, restarting)` 和 `endEditorSession()`：换代（`InputReadiness` + `inputSessionId`）、关面板、结束语音并释放麦克风、字段策略、学习许可，按固定顺序执行。`InputCommandQueue`、`InputCommandOwner` 的检查保持原样。这一步会改动 `XimeInputMethodService.kt` 的 `onStartInput`，需要先和改语音悬浮条的线程错开。
 
+实际做法（保守版）：`newInputGeneration()` 统一做“换代、丢弃待上屏候选、结束语音输入会话（释放麦克风）”，`onStartInput` 和 `clearInputState` 都只调它；`beginEditorField(attribute, restarting)` 一处读输入框属性，得出学习许可、补全限制和字段策略。`inputSessionId` 换值的位置没挪：`onStartInput` 里它在语音收尾（`restoreAfterVoiceFinish`）之后，提前会让收尾时投递的任务落进新会话，属于行为变化。以后新增“换输入框时要清掉的东西”放进这两个函数。
+
 ## 不做的事
 
 不改输入队列和会话过期检查；不改 `IncognitoState` 的读取方；不改快捷发送“表单开着但没聚焦时，退格删表单里的字”这类现有行为（第 1 步原样保留，要改另外问）；不声称提速。
@@ -82,7 +84,7 @@
 
 ## 进度
 
-- [ ] 第 1 步
+- [x] 第 1 步（e1b3ab45）
 - [ ] 第 2 步（等确认）
-- [ ] 第 3 步
+- [x] 第 3 步（ac590aec，第 2 步等确认时先做）
 - [ ] 第 4 步
