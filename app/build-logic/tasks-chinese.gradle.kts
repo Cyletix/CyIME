@@ -192,6 +192,9 @@ val prepareChineseDictionaries by tasks.registering {
             "  cyime_doubled_letter_correction: true\n" +
             // Two neighbouring letters typed swapped (lnu → 论) read as one edit; full pinyin only, not double pinyin.
             "  cyime_transposition_correction: true\n" +
+            // One letter typed too many inside a syllable (zhonng → 中, shhi → 是), only as an extra key press
+            // (same key twice or a neighbour); same 20x gate, never first (docs/development/typo-correction-20261021.md).
+            "  cyime_extra_letter_correction: true\n" +
             "  sentence_char_homophones: 4\n  sentence_position_penalty: -2.0\n" +
             "  sentence_position_final_only: [${particles.joinToString(", ")}]\n" +
             // 把/被 open a verb phrase and never end a sentence: shuoshuobei is 说说呗, not 说说被.
