@@ -2783,9 +2783,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         updateHardwareKeyboardConnection()
         applyCompactMode()
         requestHardwareCursorUpdates()
-        inputReadiness.newEditorSession()
-        keyRouter.discardPendingCandidateCommit()
-        voiceRecognitionHandler.endInputSession()
+        newInputGeneration()
         if (uiState.value.isVoiceMode || voiceRecordingStarted) {
             voiceRecognitionHandler.abandonSession()
             voiceRecognitionHandler.cancelPreStart()
@@ -2796,16 +2794,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         loadDarkModePreference()
 
-        // 敏感输入框（密码等）判定；插件派发读同一结果，这里只重置 composing 去重
-        pluginEvents.onStartInput()
-        privacy.beginEditor(attribute)
-
-        // 受限输入框判定（密码/终端/NO_SUGGESTIONS）：供英文联想等补全功能短路
-        editorRestricted = EditorInfoClassifier.isRestrictedEditor(attribute)
-        // 秘密输入框判定（密码/终端，不含 NO_SUGGESTIONS）：英文联想/回删替换的禁用线
-        editorSecret = EditorInfoClassifier.isSecretEditor(attribute)
-        val editorPresentation = editorInputPolicy.begin(attribute, restarting,
-            uiState.value.isAsciiMode, uiState.value.currentSchemaId)
+        val editorPresentation = beginEditorField(attribute, restarting)
         lastClearedText = ""
 
         // 旧组合区已在 onStartInput 开头脱离（重启输入时框架也会定格它），此处不再保留标记，
@@ -3310,12 +3299,38 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         )
     }
 
-    private fun clearInputState() {
+    /**
+     * A new editor generation, for a new field ([onStartInput]) and for the end of input
+     * ([clearInputState]) alike: queued work of the old field is refused, its pending candidate
+     * commit is dropped and its voice input session ends, releasing the microphone. Each caller
+     * then gives [InputUIState.inputSessionId] a new value once its own cleanup is done.
+     */
+    private fun newInputGeneration() {
         inputReadiness.newEditorSession()
         keyRouter.discardPendingCandidateCommit()
+        voiceRecognitionHandler.endInputSession()
+    }
+
+    /**
+     * What the new field allows, read from [attribute] in one place: learning and plugin events
+     * ([privacy]), completions ([editorRestricted], [editorSecret]) and literal field input
+     * ([editorInputPolicy], whose language/schema presentation is returned).
+     */
+    private fun beginEditorField(attribute: EditorInfo?, restarting: Boolean): EditorSessionPresentation {
+        // 敏感输入框（密码等）判定；插件派发读同一结果，这里只重置 composing 去重
+        pluginEvents.onStartInput()
+        privacy.beginEditor(attribute)
+        // 受限输入框判定（密码/终端/NO_SUGGESTIONS）：供英文联想等补全功能短路
+        editorRestricted = EditorInfoClassifier.isRestrictedEditor(attribute)
+        // 秘密输入框判定（密码/终端，不含 NO_SUGGESTIONS）：英文联想/回删替换的禁用线
+        editorSecret = EditorInfoClassifier.isSecretEditor(attribute)
+        return editorInputPolicy.begin(attribute, restarting, uiState.value.isAsciiMode, uiState.value.currentSchemaId)
+    }
+
+    private fun clearInputState() {
+        newInputGeneration()
         if (uiState.value.handwritingExpanded) uiState.value = uiState.value.copy(handwritingExpanded = false)
         if (uiState.value.voiceCollapsed) uiState.value = uiState.value.copy(voiceCollapsed = false)
-        voiceRecognitionHandler.endInputSession()
         // 即使 Compose 在隐藏时尚未销毁，旧手写回调也不能再写入宿主。
         uiState.value = uiState.value.copy(inputSessionId = System.nanoTime())
         closeToolPanel()
