@@ -35,7 +35,21 @@ object InputProfileSelection {
     fun layouts(entries: List<SchemaInfo>, current: SchemaInfo): List<InputLayout> = entries
         .filter { it.profile.language == current.profile.language && it.profile.scheme == current.profile.scheme &&
             it.profile.mode == InputMode.KEYBOARD }
-        .map { it.profile.layout }.distinctBy { it.id }
+        .flatMap { layoutsOf(it, entries) }.distinctBy { it.id }
+
+    /**
+     * Layouts one entry can be typed on. Chinese entries carry theirs in the schema; English and
+     * Japanese romaji offer their own 26 keys plus every letter layout the Chinese entries offer.
+     */
+    fun layoutsOf(entry: SchemaInfo, entries: List<SchemaInfo>): List<InputLayout> {
+        val base = entry.baseProfile
+        if (base.layout.kind != LayoutKind.ALPHABETIC || !LetterLayouts.appliesTo(base.language, base.scheme))
+            return listOf(entry.profile.layout)
+        return listOf(base.layout) + LetterLayouts.choices(entries, base.language).map(InputProfiles::customLayout)
+    }
+
+    fun offers(entry: SchemaInfo, layoutId: String, entries: List<SchemaInfo>): Boolean =
+        layoutsOf(entry, entries).any { it.id == layoutId }
 
     fun variants(entries: List<SchemaInfo>, current: SchemaInfo): List<SchemaInfo> = entries.filter {
         it.profile.mode == InputMode.KEYBOARD && it.profile.language == current.profile.language &&
@@ -45,6 +59,6 @@ object InputProfileSelection {
     /** Changing shape cannot silently change language or encoding. Missing combinations stay unavailable. */
     fun changeLayout(entries: List<SchemaInfo>, current: SchemaInfo, layoutId: String): SchemaInfo? = entries
         .filter { it.profile.mode == InputMode.KEYBOARD && it.profile.language == current.profile.language &&
-            it.profile.scheme == current.profile.scheme && it.profile.layout.id == layoutId }
+            it.profile.scheme == current.profile.scheme && offers(it, layoutId, entries) }
         .let { group -> group.firstOrNull { it.schemaId == current.schemaId } ?: group.firstOrNull() }
 }

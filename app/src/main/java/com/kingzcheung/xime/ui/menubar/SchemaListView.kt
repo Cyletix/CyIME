@@ -35,8 +35,8 @@ fun SchemaListView(
     val current = all.firstOrNull { it.schemaId == currentSchemaId }
     val entries = all.filter { current != null && it.profile.language == current.profile.language }
     var layoutId by remember(currentSchemaId, current?.profile) { mutableStateOf(current?.profile?.layout?.id) }
-    val layouts = entries.map { it.profile.layout }.distinctBy { it.id }
-    val schemes = entries.filter { it.profile.layout.id == layoutId }
+    val layouts = entries.flatMap { InputProfileSelection.layoutsOf(it, all) }.distinctBy { it.id }
+    val schemes = entries.filter { entry -> layoutId?.let { InputProfileSelection.offers(entry, it, all) } == true }
     BoxWithConstraints(modifier.fillMaxWidth().keyboardPanelBackground(backgroundColor).testTag("input-profile-panel")) {
     val density = LocalDensity.current
     val display = LocalView.current.display
@@ -79,7 +79,10 @@ fun SchemaListView(
                 layoutId = id
                 // This is an explicit combination choice, not a layout rebind: one tap switches,
                 // keeping the current scheme when the layout offers it (拼音 26 → 拼音 14).
-                schemaForLayout(entries, id, current.profile.scheme)?.let(onSelectSchema)
+                schemaForLayout(entries, id, current.profile.scheme, all)?.let { schemaId ->
+                    entries.firstOrNull { it.schemaId == schemaId }?.let { LetterLayouts.selectFor(context, it, id) }
+                    onSelectSchema(schemaId)
+                }
             }
             HorizontalDivider(Modifier.padding(vertical = 2.dp), color = keyTextColor.copy(alpha = .15f))
             ProfileChoiceRow("方案", "profile-scheme-list",
@@ -98,7 +101,8 @@ fun SchemaListView(
 }
 
 /** 点布局即切换：优先保持当前方案（如拼音），该布局没有时取排在最前的方案。 */
-internal fun schemaForLayout(entries: List<SchemaInfo>, layoutId: String, currentScheme: InputScheme): String? {
-    val candidates = entries.filter { it.profile.layout.id == layoutId }
+internal fun schemaForLayout(entries: List<SchemaInfo>, layoutId: String, currentScheme: InputScheme,
+    all: List<SchemaInfo> = entries): String? {
+    val candidates = entries.filter { InputProfileSelection.offers(it, layoutId, all) }
     return (candidates.firstOrNull { it.profile.scheme == currentScheme } ?: candidates.firstOrNull())?.schemaId
 }

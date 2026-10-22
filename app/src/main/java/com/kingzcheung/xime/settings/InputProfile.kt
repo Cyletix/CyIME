@@ -158,8 +158,14 @@ object InputProfiles {
             capabilities = capabilities(inputScheme)).let { if (id == "handwriting") it.handwriting() else it }
     }
 
-    private fun customLayout(layout: CustomKeyboardLayout) = InputLayout(layout.id, layout.name,
+    internal fun customLayout(layout: CustomKeyboardLayout) = InputLayout(layout.id, layout.name,
         if (layout.mergedGroups.isEmpty()) LayoutKind.ALPHABETIC else LayoutKind.MERGED)
+
+    /** English direct input and Japanese romaji type on the letter arrangement chosen for their language. */
+    fun arranged(profile: InputProfile): InputProfile {
+        if (profile.layout.kind != LayoutKind.ALPHABETIC || !LetterLayouts.appliesTo(profile.language, profile.scheme)) return profile
+        return LetterLayouts.chosen(profile.language)?.let { profile.copy(layout = customLayout(it)) } ?: profile
+    }
 
     /** Actual layout bindings win over built-in defaults, including an explicitly unbound schema. */
     fun resolveLayout(section: String?, custom: CustomKeyboardLayout? = null): InputLayout = when (section) {
@@ -179,14 +185,15 @@ object InputProfiles {
 
     /** Runtime projection. Legacy schema storage stays at this boundary during migration. */
     fun current(id: String, asciiMode: Boolean = false, language: InputLanguage? = null,
-        scheme: InputScheme? = null): InputProfile {
-        if (asciiMode || id == InputModes.ENGLISH) return describe(InputModes.ENGLISH)
+        scheme: InputScheme? = null, arranged: Boolean = true): InputProfile {
+        if (asciiMode || id == InputModes.ENGLISH) return describe(InputModes.ENGLISH).let { if (arranged) arranged(it) else it }
         val profile = describe(id, language, scheme)
         val layout = resolveLayout(KeysConfigHelper.boundSectionForSchema(id), CustomKeyboardLayouts.find(id))
-        return if (layout.kind == LayoutKind.HANDWRITING) profile.handwriting()
+        val bound = if (layout.kind == LayoutKind.HANDWRITING) profile.handwriting()
             else if (profile.mode == InputMode.HANDWRITING) profile.copy(layout = layout,
                 mode = InputMode.KEYBOARD, engineProfile = EngineProfile.Rime(id))
             else if (layout == profile.layout) profile else profile.copy(layout = layout)
+        return if (arranged) arranged(bound) else bound
     }
 
     /** A combination only exists when a corresponding installed entry exists. Never invent a schema ID. */

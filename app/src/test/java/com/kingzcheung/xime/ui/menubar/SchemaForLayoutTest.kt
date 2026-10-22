@@ -20,6 +20,17 @@ class SchemaForLayoutTest {
         assertEquals("t9_pinyin", schemaForLayout(entries, "t9", InputScheme.DOUBLE_PINYIN))
     }
 
+    /** English and Japanese romaji stay on their own entry when a Chinese letter layout is tapped. */
+    @Test fun letterLayoutKeepsEnglishAndRomajiEntries() {
+        val all = entries + listOf("pinyin_cyletix10", "pinyin_colemak", "japanese").map { SchemaInfo(it, it, "", "", "") } +
+            com.kingzcheung.xime.settings.InputModes.english
+        assertEquals(com.kingzcheung.xime.settings.InputModes.ENGLISH, schemaForLayout(listOf(com.kingzcheung.xime.settings.InputModes.english),
+            "pinyin_cyletix10", InputScheme.DIRECT, all))
+        assertEquals("japanese", schemaForLayout(all.filter { it.schemaId == "japanese" }, "pinyin_colemak", InputScheme.ROMAJI, all))
+        assertEquals("pinyin_cyletix10", schemaForLayout(all.filter { it.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE },
+            "pinyin_cyletix10", InputScheme.PINYIN, all))
+    }
+
     @Test fun unknownLayoutSwitchesNothing() {
         assertNull(schemaForLayout(entries, "japanese_kana", InputScheme.PINYIN))
     }

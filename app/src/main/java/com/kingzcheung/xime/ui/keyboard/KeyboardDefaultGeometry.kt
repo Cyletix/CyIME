@@ -1,6 +1,5 @@
 package com.kingzcheung.xime.ui.keyboard
 
-import com.kingzcheung.xime.settings.CustomKeyboardLayouts
 import com.kingzcheung.xime.settings.EngineProfile
 import com.kingzcheung.xime.settings.InputProfile
 import com.kingzcheung.xime.settings.KeysConfigHelper
@@ -26,8 +25,7 @@ internal fun letterKeyboardDefaults(
     maximumHeightDp: Int? = null,
 ): LetterKeyboardDefaults? {
     if ((!isAsciiMode && profile.layout.kind !in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED)) || split) return null
-    val custom = if (isAsciiMode) null else
-        (profile.engineProfile as? EngineProfile.Rime)?.schemaId?.let(CustomKeyboardLayouts::find)
+    val custom = KeysConfigHelper.letterLayout((profile.engineProfile as? EngineProfile.Rime)?.schemaId.orEmpty(), isAsciiMode)
     val rows = custom?.typingRows() ?: KeysConfigHelper.getKeyRows(isAsciiMode)
     if (standardLetterRowGeometry(rows, 1f, custom != null, false) == null) return null
     val (x, y) = KeysConfigHelper.getKeyboardKeyConfig().spacingFor("qwerty")
