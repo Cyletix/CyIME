@@ -1,0 +1,105 @@
+# 解码逻辑从构建时注入迁到独立源码（1.15 第 3 项）
+
+2026-10-22。目标：我们自己的九键联合解码、26 键整句重排、CyLM 接入和相关读配置代码，不再由 CMake 在构建时用字符串替换塞进 Rime 源码的生成副本，而是写成普通的独立 `.h/.cc`；Rime 里只留几行调用入口。Rime 内部确实要改的地方继续用看得见的补丁文件，不硬塞成插件。
+
+不能变的东西：每一步候选逐字节相同、速度不降。用户看不到任何变化。
+
+## 1. 现状清点
+
+`app/src/main/jni/cmake/Rime.cmake` 在 `add_subdirectory(librime)` 前后做了三类事。
+
+### 1.1 显式补丁（`git apply` 到 librime 子模块工作区）
+
+| 文件 | 改的 Rime 文件 | 内容 | 性质 |
+| --- | --- | --- | --- |
+| `RimeDictionary.patch`（`RimeDictionary.cmake` 应用） | 16 个：`algo/spelling.h`、`algo/syllabifier.cc`、`common.h`、`dict/corrector.*`、`dict/dictionary.*`、`dict/table.*`、`gear/poet.*`、`gear/script_translator.*`、`gear/table_translator.cc`、`gear/translator_commons.*`，约 775 行新增 | 增量音节图、桶查询、邻键纠错、句首句尾位置惩罚、整词优先与叠字纠错门槛、学过的纠错不抢首位、造句同音单字等 | Rime 内部确需改动 + 一部分我们的选词策略（`script_translator.cc` +319 行）。归“词库和词权问题”线程 |
+| `T9DecodeCache.patch` | `script_translator.h`、`user_dictionary.cc` | 译者上挂 `t9_joint_cache`；用户词库变化时调 `T9InvalidateUserDictionary()` | 入口钩子，已经是最小形态 |
+| `T9EnglishLearning.patch` | `user_dictionary.cc` | 查询前 `FetchTickCount()` | Rime 内部小改，保留 |
+| `T9MenuSuppression.patch` | `menu.h/.cc` | `Menu::SuppressText` 隐藏被删候选 | Rime 内部小改，保留 |
+
+### 1.2 字符串替换生成副本（本次要拆掉的主体）
+
+做法：读 Rime 源文件（已打过上面的补丁）→ `string(REPLACE)` 插代码 → 写到构建目录 `cyime-*.cc` → 从 `rime-static` 里换掉原文件。锚点找不到就报错停构建。
+
+| 文件 | 生成副本 | 插入内容 | 是否我们的逻辑 |
+| --- | --- | --- | --- |
+| `T9PhraseBeforeSentence.cmake` | `cyime-script-translator.cc` | 13 处：22 个头文件；构造参数加 `Config*`；约 95 行读配置（九键联合解码预算、词组模型、读音表、CyLM 文件）；约 210 行成员和资源函数（`T9ResolveOnce`、`T9LoadReadings`、`T9CylmOpen`、`T9SyllableIds`、`ApplyCylmSentence`）；联合解码分支；26 键整句重排约 150 行（词组模型给 n-best 打分、去掉纠错词重造句）；`set_exhausted` 条件；两处记住造句用的词图；关掉 Android 诊断日志；整段插入 `T9JointDecoder.inc`（577 行，`PrepareJointCandidates`） | 是，全部 |
+| 同上 | — | 把 `cylm/cylm.cpp` 编进 `rime-static`，加 librime-t9、octagram、cylm、onnxruntime 头文件目录 | 构建配置，改为普通 `target_sources` 即可 |
+| `PinyinSyllableSelection.cmake` | 同一份 `cyime-script-translator.cc` | 9 处：`ScriptSyllabifier` 带上 `Context*/Schema*`，`BuildSyllableGraph` 改调 `cyime::pinyin_selection::BuildGraph`，两处增量缓存加“选了音节就不缓存” | 逻辑已在独立头文件 `librime-t9/src/pinyin_syllable_selection.h`，这里只剩钩子 |
+| 同上 | `cyime-pinyin-engine.cc` | `engine.cc` 两处生命周期钩子（`BeforeContextUpdate`、`BeforeCandidateSelection`） | 只剩钩子 |
+| `T9SingleKeyRecall.cmake` | `cyime-syllabifier.cc` | 3 处：单个数字键保留声母缩写、九键末尾缩写不被剪掉、保留还有出边的顶点 | Rime 音节图剪枝，确需改 Rime；而 `syllabifier.cc` 同时被 `RimeDictionary.patch` 改，两层叠在一起 |
+| `T9LookupTrace.cmake` | `cyime-dictionary.cc`、`cyime-table.cc`、`cyime-user_dictionary.cc` | 记录查询走到的位置（`T9ObservePosition/T9ObserveExtra/T9OriginScope`），联合解码缓存据此判断能否复用；主机构建另加工作量计数 | 钩子。注意这三个文件也同时被 `RimeDictionary.patch` 改 |
+| `T9Grammar.cmake` | `cyime-octagram.cc` | octagram 加 `full_word`：九键只认整词匹配；主机构建加计数 | 语法插件内部小改 |
+| `T9WorkCounters.cmake` | — | 只提供 `t9_work_replace` 函数，主机回放才用（Android 不开，生成代码不变） | 测速工具 |
+| `Rime.cmake` 开头 | 原地改 `librime-lua-deps/lua5.4/liolib.c` | Android 旧 API 下 `fseeko` 的条件 | 第三方构建修正，与解码无关 |
+
+已经是独立源码、不在本次范围：`librime_jni/candidate_policy.cc`（候选策略）、`librime-t9/src` 下的词组模型、句子评分、候选池、解码缓存、删词隐藏等。
+
+主机回放（`tools/ime_lab/host_replay/build_host.py`）复制同一套 CMake 和补丁来构建，所以改动对 Android 和电脑回放同时生效，不用另改。Windows 版 `CyIME-Windows/third_party/cyime-engine/librime` 是另一份已打好改动的 librime，每次改 Rime 源码都要同时折进 Android 补丁和这份副本。
+
+### 1.3 现状的问题
+
+- 代码在构建前看不到完整样子：要读 `T9PhraseBeforeSentence.cmake` 里的 CMake 字符串才知道最后编的是什么，IDE 跳转、编译报错行号都指向构建目录里的副本。
+- 同一个 Rime 文件被改两层：先打补丁，再在打完补丁的文本上字符串替换（`syllabifier.cc`、`dictionary.cc`、`table.cc`、`user_dictionary.cc`、`script_translator.cc`）。另一线程改补丁时，很容易把后一层的锚点改没，构建才报错。
+- Windows 版拿不到同一份解码源码，只能手抄。
+
+## 2. 目标形态
+
+- 我们的逻辑放在 `app/src/main/jni/librime-t9/src/` 下新文件（已有的 `t9_*` 同一目录，免新增目录和包含路径），作为普通源文件编进 `rime-static`：
+  - `t9_script_options.{h,cc}`：读 `t9/*`、`cylm/*` 配置，资源路径解析与模型、读音表的进程级缓存。
+  - `t9_cylm_sentence.{h,cc}`：CyLM 整句替换。
+  - `t9_sentence_rescore.{h,cc}`：26 键整句重排。
+  - `t9_joint_decoder.{h,cc}`：由 `T9JointDecoder.inc` 改成独立编译单元。
+- 它们通过一个小接口拿 Rime 的东西：`ScriptTranslator` 公开方法（`GetPrecedingText`、`blacklist`、`language`、`t9_joint_cache` 等，本来就在头文件里），以及 `ScriptSyllabifier` 的 `input()`、`syllable_graph()`、`IsCorrection()`。`ScriptSyllabifier` 现在只在 `script_translator.cc` 里声明，需要把它的类声明挪进补丁里新增的头文件（只挪声明，不改实现）。
+- Rime 里留下的只有显式补丁中的几行调用：构造时 `options.Load(config, context)`，`Evaluate` 里联合解码分支、整句重排、CyLM 替换各一个调用，造句处记住词图，以及拼音选音节和引擎生命周期钩子。
+- `CMake` 里不再有对源码的 `string(REPLACE)`；Rime 和 octagram 的改动全部是补丁文件。
+
+## 3. 分步
+
+每步一个提交，单独过门禁；某步不过就回到上一步，不叠下一步。
+
+### A. 不碰 Rime 补丁，只动我自己的文件（可以马上开始）
+
+钩子暂时仍由 CMake 注入，但每处注入缩成一行调用，代码本体搬到独立文件。
+
+1. **建基线**：用当前 main 跑全部门禁（见第 4 节），留存结果目录作后续对比；同时跑一次“基线对基线”，量出计时的自然波动。
+2. **读配置和资源函数**：约 300 行成员与读配置块搬到 `t9_script_options.*`，生成副本里只剩一个成员和一个 `Load` 调用。
+3. **CyLM 整句替换**搬到 `t9_cylm_sentence.*`。
+4. **26 键整句重排**搬到 `t9_sentence_rescore.*`。
+5. **联合解码**：`T9JointDecoder.inc` 改成 `t9_joint_decoder.cc` 独立编译。这一步最可能影响速度（原来与 Rime 同一编译单元，编译器可内联）。如果计时超出波动，退回为“在补丁里明文 `#include` 这份 `.cc`”，代码仍是独立文件，编译结果与现在相同。
+
+### B. 把剩下的注入写进补丁（经协调线程，交给“词库和词权问题”线程或由其同意后统一改）
+
+每次同时改 Android 的补丁和 Windows 的 librime 副本。
+
+6. **script_translator / engine 钩子**：`T9PhraseBeforeSentence.cmake` 与 `PinyinSyllableSelection.cmake` 剩下的一行调用写进 `RimeDictionary.patch`，两个 CMake 文件删掉替换逻辑。额外门禁：新补丁打完后的 `script_translator.cc`、`engine.cc` 与原生成副本逐字相同（允许只差 `#line` 与空白），候选不同就不可能。
+7. **音节图剪枝**：`T9SingleKeyRecall.cmake` 的 3 处并入 `RimeDictionary.patch` 的 `syllabifier.cc` 部分，同样比对生成文本。
+8. **查询位置记录与计数**：`T9LookupTrace.cmake` 的钩子并入补丁。计数宏在 Android 上展开为空，直接写进补丁即可，`T9WorkCounters.cmake` 的替换函数随之删除。
+9. **octagram 整词匹配**：`T9Grammar.cmake` 改成 `OctagramT9.patch`，仍打在构建目录副本上，不改子模块。
+10. **收尾**：几个补丁统一一个应用函数；Lua 的 `liolib.c` 修正改成小补丁（与解码无关，最后做）。
+
+### C. 可选，看“词库和词权问题”线程
+
+`RimeDictionary.patch` 里 `script_translator.cc` 的 +319 行有一部分是我们的选词策略（整词优先门槛、叠字纠错门槛、造句同音单字），能抽成独立函数的再抽；与 Rime 候选循环交织的部分保持补丁。这部分正在被那边改选词，等它稳定后再定，不在本次承诺里。
+
+## 4. 每步门禁
+
+全部在电脑本地跑，不用平板。构建经协调线程排队（Gradle、WSL、MSVC 同一时间只一个）。
+
+| 门禁 | 怎么跑 | 通过条件 |
+| --- | --- | --- |
+| 九键候选，无学习词 | `python tools/ime_lab/t9_replay.py run --output <新目录> --baseline <基线目录>` | 每个按键的完整候选列表与基线逐字节相同（比原始逐键记录，不只看质量汇总） |
+| 九键候选，有学习词 | 同上加 `--user-dict tools/ime_lab/fixtures/user_dict_seed_20261009.userdb.txt` | 同上 |
+| 26 键候选，无学习词 | `python tools/ime_lab/lexicon_regression.py --dll <本步主机引擎>` | 每条用例候选与基线逐字节相同 |
+| 26 键候选，有学习词 | 同上加 `--learn learn.tsv` | 同上 |
+| 工作量 | 主机回放的逐键计数（`CYIME_T9_WORK_COUNTERS`），`t9_replay.py compare` 默认 `--work-tolerance-percent 0` | 与基线完全相等（搬代码不该多查一次） |
+| 速度 | 主机回放逐键耗时：基线与新引擎用 `--engine-from` 在同一时段交替各跑至少两次，`compare --noise-baseline … --candidate-repeat …` | 中位数和 p95 都不比基线差，超出基线自身两次之间的波动即不合格 |
+| Android 构建 | 协调线程排到时 `./gradlew assembleDebug --quiet` | 四个 ABI 都能编过 |
+
+搬代码属于“用起来不变”的内部整理，全部通过才提交；按项目规则，每轮应用改动后照常打包装机，版本升 PATCH。
+
+## 5. 与其他线程的分工
+
+- `RimeDictionary.patch` 和 librime 选词相关文件归“词库和词权问题”线程。A 段不碰这些文件；B 段每一步先经协调线程约定由谁改、何时改，避免两边同时改同一补丁。
+- 每次 librime 改动同时进 Android 补丁和 `CyIME-Windows/third_party/cyime-engine/librime`。
+- A 段完成后，Windows 版可以直接复制这几个独立文件，不再手抄 CMake 字符串里的代码。
