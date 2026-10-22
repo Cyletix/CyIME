@@ -465,8 +465,9 @@ fun SwipeableKeyButton(
     val shiftHovered = shiftLetters != null && shiftTargets?.hovered?.bounds?.center?.let(buttonBounds::contains) == true
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, resolvedBackground, frostedGlass.enabled) {
-        if (shadowEnabled && !frostedGlass.enabled) {
+    val hexagonal = LocalHoneycombKeys.current && (letterGroup ?: text).let { it.length == 1 && it[0].lowercaseChar() in 'a'..'z' }
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, resolvedBackground, frostedGlass.enabled, hexagonal) {
+        if (shadowEnabled && !frostedGlass.enabled && !hexagonal) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(resolvedBackground)
@@ -481,7 +482,7 @@ fun SwipeableKeyButton(
         } else Modifier
     }
     val keyCornerRadius = LocalKeyCornerRadius.current
-    val keyClipShape = remember(keyCornerRadius) { RoundedCornerShape(keyCornerRadius) }
+    val keyClipShape = remember(keyCornerRadius, hexagonal) { if (hexagonal) HexagonShape else RoundedCornerShape(keyCornerRadius) }
     val keyLabelFontFamily = AppFonts.keyLabelFontFamily
     val keyFontFamily = AppFonts.keyFontFamily
 
@@ -496,6 +497,7 @@ fun SwipeableKeyButton(
                 letterGeometry?.place(text, buttonBounds)
             }
             .padding(scaledKeyVisualPadding())
+            .then(if (hexagonal) Modifier.honeycombCap() else Modifier)
             .keyGlow(Modifier.then(shadowModifier)
             .clip(keyClipShape)
             .background(frostedKeyColor(
@@ -505,7 +507,8 @@ fun SwipeableKeyButton(
                 else resolvedBackground,
                 pressed = isPressed || shiftHovered, highlighted = isHighlighted,
                 opacityScale = glassFunctionKeyScale(resolvedBackground),
-            )).keyHeldHighlight(isPressed || shiftHovered)),
+            )).keyHeldHighlight(isPressed || shiftHovered))
+            .then(if (hexagonal) Modifier.honeycombLabelArea() else Modifier),
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
         val contentScale = keyContentScale(maxWidth.value, maxHeight.value)

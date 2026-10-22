@@ -38,9 +38,17 @@ internal fun letterKeyboardFrame(rows: List<List<String>>): LetterKeyboardFrame?
 internal fun fourteenMBorrowedWeight(sideKeyWeight: Float, deleteKeyWeight: Float): Float =
     ((deleteKeyWeight - sideKeyWeight) / 2f).coerceIn(0f, 1f)
 
+/** Typewise-style honeycomb: 6/7/6/7 single letters, the short rows offset by half a key. */
+internal fun isHoneycomb(rows: List<List<String>>): Boolean =
+    rows.map { it.size } == com.kingzcheung.xime.settings.CustomKeyboardLayout.HONEYCOMB_ROWS
+
+/** Seven columns; the third row puts Shift and delete in the two half-key margins. */
+internal val HoneycombRowGeometry = LetterRowGeometry(0f, .5f, deleteKeyWeight = .5f, bottomLetterWeight = 6f)
+
 internal fun letterKeyboardColumns(rows: List<List<String>>, fourteenKey: Boolean): Float =
-    letterKeyboardFrame(rows)?.columns ?: if (fourteenKey) 10f else rows.firstOrNull()?.size?.toFloat() ?: 10f
+    letterKeyboardFrame(rows)?.columns ?: if (isHoneycomb(rows)) 7f
+    else if (fourteenKey) 10f else rows.firstOrNull()?.size?.toFloat() ?: 10f
 
 internal fun letterKeyboardBottomRow(rows: List<List<String>>, fourteenKey: Boolean): QwertyBottomRowWeights =
-    if (fourteenKey || letterKeyboardFrame(rows) != null || rows.firstOrNull()?.size == 10)
+    if (fourteenKey || letterKeyboardFrame(rows) != null || isHoneycomb(rows) || rows.firstOrNull()?.size == 10)
         QwertyBottomRowWeights.Standard else QwertyBottomRowWeights.Legacy

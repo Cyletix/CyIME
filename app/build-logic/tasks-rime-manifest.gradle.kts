@@ -22,7 +22,7 @@ val prepareRimeManifest by tasks.registering {
             if (assetRoot == "rime_chinese" && relative == "t9_sentence.onnx") return@forEach
             if (relative.endsWith(".md") || relative.startsWith("LICENSE") || relative.endsWith(".custom.yaml")) return@forEach
             // Optional layouts are installed only when missing; a user's edited schema stays theirs.
-            if (assetRoot == "rime_ice" && relative in setOf("pinyin_qwjrtk.schema.yaml", "pinyin_cyletix10.schema.yaml", "pinyin_colemak.schema.yaml")) return@forEach
+            if (assetRoot == "rime_ice" && relative in setOf("pinyin_qwjrtk.schema.yaml", "pinyin_cyletix10.schema.yaml", "pinyin_colemak.schema.yaml", "pinyin_typewise.schema.yaml")) return@forEach
             val target = if (assetRoot == "rime_japanese" && relative.endsWith(".lua")) "lua/$relative" else relative
             val digest = MessageDigest.getInstance("SHA-256")
             source.inputStream().use { input ->

@@ -31,7 +31,8 @@ class LetterLayoutsTest {
         assertTrue(colemak.valid())
         assertEquals("Colemak", colemak.name)
         assertEquals("Cyletix10（实验）", Cyletix10Layout.preset.name)
-        assertEquals(listOf(QwjrtkLayout.ID, Cyletix10Layout.ID, ColemakLayout.ID), BuiltinLetterLayouts.ids.toList())
+        assertEquals(listOf(QwjrtkLayout.ID, Cyletix10Layout.ID, ColemakLayout.ID, TypewiseLayout.ID),
+            BuiltinLetterLayouts.ids.toList())
         for (id in BuiltinLetterLayouts.ids) {
             assertTrue(id in ChineseSchemas.ids)
             assertTrue(CustomKeyboardLayouts.isCustom(id))
@@ -110,6 +111,29 @@ class LetterLayoutsTest {
         }
     }
 
+    /** Typewise: four staggered rows, offered like any other letter layout, swipes stay with their letters. */
+    @Test fun typewiseIsAHoneycombLetterLayout() {
+        val typewise = TypewiseLayout.preset
+        assertEquals(listOf("wetyio", "qsrgukp", "adfhjl", "zxcvbnm"), typewise.rows.map { it.joinToString("") })
+        assertTrue(typewise.honeycomb)
+        assertTrue(typewise.valid())
+        assertFalse(Cyletix10Layout.preset.honeycomb)
+        assertEquals("Typewise", typewise.name)
+        assertSame(typewise, typewise.withSpareSlot())
+        assertTrue(typewise.movedLetters().isEmpty())
+        assertTrue(LetterLayouts.typable(typewise))
+        assertFalse(typewise.copy(rows = typewise.rows.mapIndexed { i, r -> if (i == 3) r.dropLast(1) else r }).valid())
+        val base = mapOf("q" to KeyGestureConfig(swipeUp = GestureDef(label = "1", value = "1")),
+            "w" to KeyGestureConfig(swipeUp = GestureDef(label = "2", value = "2")))
+        assertEquals("1", typewise.gestures(base)["q"]?.swipeUp?.label)
+        assertEquals("2", typewise.gestures(base)["w"]?.swipeUp?.label)
+        val all = entries + SchemaInfo(TypewiseLayout.ID, "Typewise", "", "", "")
+        for (id in listOf(InputModes.ENGLISH, "japanese"))
+            assertTrue(InputProfileSelection.layouts(all, all.first { it.schemaId == id }).any { it.id == TypewiseLayout.ID })
+        LetterLayouts.setForTest(InputLanguage.ENGLISH, TypewiseLayout.ID)
+        assertEquals(typewise.typingRows(), KeysConfigHelper.letterLayout("rime_ice", true)?.typingRows())
+    }
+
     /** Romaji needs only letters: each arrangement has all 26, and swipes stay where the finger expects them. */
     @Test fun romajiKeepsEveryLetterAndPositionalSwipes() {
         val base = mapOf(
@@ -120,10 +144,11 @@ class LetterLayoutsTest {
         for (layout in BuiltinLetterLayouts.all) {
             assertEquals(('a'..'z').toSet(), layout.typingRows().flatten().joinToString("").filter(Char::isLetter).toSet())
             val gestures = layout.gestures(base)
+            for (key in layout.typingRows().flatten()) assertEquals(key, gestures[key]?.tap?.value)
+            if (layout.honeycomb) continue
             val bottom = layout.typingRows()[2]
             assertEquals("ー", gestures[bottom[6]]?.swipeUp?.label)
             assertEquals("1", gestures[layout.typingRows()[0][0]]?.swipeUp?.label)
-            for (key in layout.typingRows().flatten()) assertEquals(key, gestures[key]?.tap?.value)
         }
         // Colemak puts i where QWERTY has l: the swipe follows the position.
         assertEquals("-", ColemakLayout.preset.gestures(base)["i"]?.swipeUp?.label)

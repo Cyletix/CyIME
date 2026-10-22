@@ -29,6 +29,7 @@ import com.kingzcheung.xime.settings.InputModes
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.LetterLayouts
 import com.kingzcheung.xime.settings.SchemaInfo
+import com.kingzcheung.xime.settings.TypewiseLayout
 import com.kingzcheung.xime.ui.keyboard.KeyboardCallbacks
 import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayout
@@ -50,7 +51,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Cyletix10 / Colemak typed in Chinese, English and Japanese romaji: 4 themes × glass, phone and tablet,
+ * Cyletix10 / Colemak / Typewise typed in Chinese, English and Japanese romaji: 4 themes × glass, phone and tablet,
  * plus the layout picker for English and Japanese. Only renders when CYIME_RENDER_OUT is set.
  */
 @RunWith(AndroidJUnit4::class)
@@ -66,7 +67,7 @@ class LetterLayoutRenderTest {
         KeysConfigHelper.loadConfig(app); KeyboardThemes.reload(app)
         com.kingzcheung.xime.ui.keyboard.AppFonts.initialize(app)
         val vm = KeyboardViewModel(app)
-        val schemas = listOf("rime_ice", "t9_pinyin", Cyletix10Layout.ID, ColemakLayout.ID, "japanese", "japanese_kana")
+        val schemas = listOf("rime_ice", "t9_pinyin", Cyletix10Layout.ID, ColemakLayout.ID, TypewiseLayout.ID, "japanese", "japanese_kana")
             .map { SchemaInfo(it, it, "", "", "") } + InputModes.english
         var theme by mutableStateOf("soft_blue")
         var glass by mutableStateOf(false)
@@ -125,14 +126,16 @@ class LetterLayoutRenderTest {
             rule.runOnIdle { vm.resetKeyboard(a, s); schema = s; ascii = a; theme = t; glass = g; tablet = tab; panel = picker; revision++ }
             rule.waitForIdle()
         }
-        for (layout in listOf(Cyletix10Layout.ID, ColemakLayout.ID)) for (language in listOf("zh", "en", "ja"))
+        val only = System.getenv("CYIME_RENDER_LAYOUTS")?.split(',')?.map { "pinyin_$it" }
+        for (layout in listOf(Cyletix10Layout.ID, ColemakLayout.ID, TypewiseLayout.ID).filter { only == null || it in only })
+            for (language in listOf("zh", "en", "ja"))
             for (t in listOf("transparent_glass", "pure_black", "lavender_purple", "soft_blue"))
                 for (g in listOf(false, true)) for (tab in listOf(false, true)) {
                     show(language, layout, t, g, tab)
                     shot("${layout.removePrefix("pinyin_")}-$language-$t-${if (g) "glass" else "solid"}-${if (tab) "tablet" else "phone"}")
                 }
         for (language in listOf("en", "ja")) for (tab in listOf(false, true)) {
-            show(language, Cyletix10Layout.ID, "soft_blue", false, tab, picker = true)
+            show(language, TypewiseLayout.ID, "soft_blue", false, tab, picker = true)
             shot("picker-$language-${if (tab) "tablet" else "phone"}")
         }
         LetterLayouts.setForTest(InputLanguage.ENGLISH, null)
