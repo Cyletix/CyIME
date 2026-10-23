@@ -8,6 +8,7 @@ import android.view.inputmethod.InputConnection
 import android.widget.Toast
 import com.kingzcheung.xime.MainActivity
 import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
+import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.ui.keyboard.JapaneseKanaAction
 import com.kingzcheung.xime.ui.keyboard.japaneseKanaRomaji
 import com.kingzcheung.xime.rime.RimeProcessResult
@@ -109,7 +110,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     withContext(Dispatchers.Main) {
                         service.commitText(input)
                     }
-                    service.rimeEngine.clearComposition()
+                    service.keyRouter.endQueuedComposition()
                 }
             }
         }
@@ -375,7 +376,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     service.candidateState.value.isComposing
                 if (preserveComposition) {
                     service.finishComposingInputBoxKeepingText()
-                    service.rimeEngine.clearComposition()
+                    service.rimeEngine.endComposition(isT9Schema(service.uiState.value.currentSchemaId))
                 }
                 action(original)
                 if (preserveComposition) service.updateUI()

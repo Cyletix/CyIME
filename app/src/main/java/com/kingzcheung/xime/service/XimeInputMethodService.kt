@@ -1146,7 +1146,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 避免旧组合混入面板输入、或面板关闭后覆盖宿主输入框中段文字。
         val pending = candidateState.value
         if (pending.isComposing || pending.inputText.isNotEmpty() || pending.pendingEnglishText.isNotEmpty()) {
-            rimeEngine.clearComposition()
+            rimeEngine.endComposition(isT9Schema(uiState.value.currentSchemaId))
             endComposingInputBox()
             candidateState.value = candidateState.value.copy(
                 candidates = emptyList(),
@@ -1277,7 +1277,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (!uiState.value.clipboardSearchVisible) return
         if (!keepQuery) clipboardManager.boardQuery.value = ""
         if (candidateState.value.isComposing) {
-            keyRouter.postRimeJob { rimeEngine.clearComposition(); withContext(Dispatchers.Main) { updateUI() } }
+            keyRouter.postRimeJob { keyRouter.endQueuedComposition(); withContext(Dispatchers.Main) { updateUI() } }
         }
         uiState.value = uiState.value.copy(clipboardSearchVisible = false, toolPanelInputFocused = false,
             enterKeyText = editorEnterKeyText())
@@ -2738,7 +2738,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         when (name) {
             "clear_composition" -> {
                 keyRouter.postRimeJob {
-                    rimeEngine.clearComposition()
+                    keyRouter.endQueuedComposition()
                     withContext(Dispatchers.Main) {
                         mainHandler.post { updateUI() }
                     }
