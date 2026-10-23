@@ -39,7 +39,7 @@ fun SettingsScreen(
 
     LaunchedEffect(initialPluginId) {
         if (initialPluginId != null) {
-            navController.navigate("plugin_market_detail/$initialPluginId")
+            navController.navigate("plugin_detail/$initialPluginId")
         }
     }
 
@@ -122,12 +122,16 @@ fun SettingsScreen(
                     navController.navigate("model_market_detail/$modelId")
                 },
                 onNavigateToPluginDetail = { pluginId ->
-                    navController.navigate("plugin_market_detail/$pluginId")
+                    navController.navigate("plugin_detail/$pluginId")
                 },
                 // 方案的已安装管理与「语言与方案 › 已安装的方案」是同一页，不再另开一份本地方案页。
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.Schema) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
+                onNavigateToPluginSettings = { pluginId ->
+                    navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
+                },
+                onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
+                onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) },
             )
         }
         composable(SettingsRoutes.ModelLocal) {
@@ -156,11 +160,11 @@ fun SettingsScreen(
             )
         }
         composable(
-            route = SettingsRoutes.PluginMarketDetail,
+            route = SettingsRoutes.PluginDetail,
             arguments = listOf(navArgument("pluginId") { type = NavType.StringType }),
         ) { backStackEntry ->
             val pluginId = backStackEntry.arguments?.getString("pluginId") ?: return@composable
-            PluginMarketDetailContent(
+            PluginDetailContent(
                 pluginId = pluginId,
                 onBack = { navController.popBackStack() },
             )
@@ -173,13 +177,12 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.Plugins) {
             PluginsSettingsContent(
-                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
                 onBack = { navController.popBackStack() },
                 onNavigateToPluginSettings = { pluginId ->
                     navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
                 },
-                onNavigateToPluginMarketDetail = { pluginId ->
-                    navController.navigate("plugin_market_detail/$pluginId")
+                onNavigateToPluginDetail = { pluginId ->
+                    navController.navigate("plugin_detail/$pluginId")
                 },
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) }
@@ -225,12 +228,10 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.SpeechToText) {
             SpeechToTextSettingsContent(
-                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
                 onBack = { navController.popBackStack() },
                 onNavigateToPluginSettings = { pluginId ->
                     navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
                 },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
             )
         }
         composable(SettingsRoutes.Dictionary) {
@@ -249,7 +250,6 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.ClipboardSync) {
             ClipboardSyncSettingsContent(
-                onNavigateToPluginMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
                 onBack = { navController.popBackStack() },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
             )
@@ -271,25 +271,6 @@ fun SettingsScreen(
             StorageSpaceScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
-            )
-        }
-        composable(SettingsRoutes.MarketPlugins) {
-            MarketHubContent(
-                onBack = { navController.popBackStack() },
-                onNavigateToDetail = { schemeId ->
-                    navController.navigate("schema_market_detail/$schemeId")
-                },
-                onNavigateToModelDetail = { modelId ->
-                    navController.navigate("model_market_detail/$modelId")
-                },
-                onNavigateToPluginDetail = { pluginId ->
-                    navController.navigate("plugin_market_detail/$pluginId")
-                },
-                // 方案的已安装管理与「语言与方案 › 已安装的方案」是同一页，不再另开一份本地方案页。
-                onNavigateToLocal = { navController.navigate(SettingsRoutes.Schema) },
-                onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
-                initialTab = 2,
             )
         }
         composable(SettingsRoutes.LogViewer) {

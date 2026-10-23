@@ -107,44 +107,11 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PluginsSettingsContent(
     onBack: () -> Unit,
-    onNavigateToPluginMarket: () -> Unit = {},
     onNavigateToPluginSettings: (String) -> Unit = {},
-    onNavigateToPluginMarketDetail: (String) -> Unit = {},
+    onNavigateToPluginDetail: (String) -> Unit = {},
     onNavigateToSpeechToText: () -> Unit = {},
     onNavigateToClipboardSync: () -> Unit = {}
 ) {
-    val context = LocalContext.current
-    val viewModel: PluginsSettingsViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val importMessage by viewModel.importMessage.collectAsState()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshPlugins() }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris ->
-        uris.forEach { viewModel.installPluginFromUri(it) }
-    }
-
-    var showWirelessSheet by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
-
-    LaunchedEffect(importMessage) {
-        if (importMessage != null) {
-            Toast.makeText(context, importMessage, Toast.LENGTH_SHORT).show()
-            viewModel.consumeImportMessage()
-        }
-    }
-
-    if (showWirelessSheet) {
-        WirelessImportSheet(
-            onDismiss = {
-                showWirelessSheet = false
-                viewModel.refreshPlugins()
-            },
-            onRefresh = { viewModel.refreshPlugins() }
-        )
-    }
-    
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
@@ -158,40 +125,7 @@ fun PluginsSettingsContent(
                         )
                     }
                 },
-                actions = {
-                    TextButton(onClick = onNavigateToPluginMarket) { Text("安装插件") }
-                    IconButton(onClick = { viewModel.refreshPlugins() }) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "刷新"
-                        )
-                    }
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "更多")
-                        }
-                        CompactDropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                            offset = DpOffset(0.dp, 4.dp)
-                        ) {
-                            CompactMenuRow(
-                                label = "从文件安装插件", icon = Icons.Default.FileOpen,
-                                onClick = {
-                                    showMenu = false
-                                    importLauncher.launch(arrayOf("*/*"))
-                                }
-                            )
-                            CompactMenuRow(
-                                label = "浏览器导入", icon = Icons.Default.Wifi,
-                                onClick = {
-                                    showMenu = false
-                                    showWirelessSheet = true
-                                }
-                            )
-                        }
-                    }
-                },
+                actions = { InstalledPluginActions() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -199,99 +133,184 @@ fun PluginsSettingsContent(
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.surface),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+        InstalledPluginsList(
+            modifier = Modifier.padding(padding),
+            onNavigateToPluginSettings = onNavigateToPluginSettings,
+            onNavigateToPluginDetail = onNavigateToPluginDetail,
+            onNavigateToSpeechToText = onNavigateToSpeechToText,
+            onNavigateToClipboardSync = onNavigateToClipboardSync,
+        )
+    }
+}
+
+/** 已安装插件的右上角操作：刷新、从文件安装、浏览器导入。插件管理页和「扩展 › 插件」共用。 */
+@Composable
+internal fun InstalledPluginActions() {
+    val viewModel: PluginsSettingsViewModel = viewModel()
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        uris.forEach { viewModel.installPluginFromUri(it) }
+    }
+
+    var showWirelessSheet by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    if (showWirelessSheet) {
+        WirelessImportSheet(
+            onDismiss = {
+                showWirelessSheet = false
+                viewModel.refreshPlugins()
+            },
+            onRefresh = { viewModel.refreshPlugins() }
+        )
+    }
+    IconButton(onClick = { viewModel.refreshPlugins() }) {
+        Icon(
+            imageVector = Icons.Default.Refresh,
+            contentDescription = "刷新"
+        )
+    }
+    Box {
+        IconButton(onClick = { showMenu = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "更多")
+        }
+        CompactDropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false },
+            offset = DpOffset(0.dp, 4.dp)
         ) {
-            if (uiState.isLoading) {
+            CompactMenuRow(
+                label = "从文件安装插件", icon = Icons.Default.FileOpen,
+                onClick = {
+                    showMenu = false
+                    importLauncher.launch(arrayOf("*/*"))
+                }
+            )
+            CompactMenuRow(
+                label = "浏览器导入", icon = Icons.Default.Wifi,
+                onClick = {
+                    showMenu = false
+                    showWirelessSheet = true
+                }
+            )
+        }
+    }
+}
+
+/** 已安装的插件列表（没有商店，插件只从文件或浏览器导入）。 */
+@Composable
+internal fun InstalledPluginsList(
+    modifier: Modifier = Modifier,
+    onNavigateToPluginSettings: (String) -> Unit = {},
+    onNavigateToPluginDetail: (String) -> Unit = {},
+    onNavigateToSpeechToText: () -> Unit = {},
+    onNavigateToClipboardSync: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val viewModel: PluginsSettingsViewModel = viewModel()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val importMessage by viewModel.importMessage.collectAsState()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshPlugins() }
+
+    LaunchedEffect(importMessage) {
+        if (importMessage != null) {
+            Toast.makeText(context, importMessage, Toast.LENGTH_SHORT).show()
+            viewModel.consumeImportMessage()
+        }
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        if (uiState.isLoading) {
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else if (uiState.errorMsg != null) {
+            item {
+                Text(
+                    text = "加载失败: ${uiState.errorMsg}",
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        } else {
+            if (uiState.extensions.isEmpty()) {
                 item {
                     Box(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
-                    }
-                }
-            } else if (uiState.errorMsg != null) {
-                item {
-                    Text(
-                        text = "加载失败: ${uiState.errorMsg}",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            } else {
-                if (uiState.extensions.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AddBox,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                )
-                                Text(
-                                    text = "暂无已安装的插件",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "安装插件后将在此显示",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.AddBox,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = "暂无已安装的插件",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "安装插件后将在此显示",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
                         }
                     }
-                } else {
-                    val activeAsrPluginId = SettingsPreferences.getSttOnlinePluginId(context)
-                    val activeClipboardSyncPluginId = SettingsPreferences.getClipboardSyncPluginId(context)
-                    items(uiState.extensions, key = { it.id }) { extension ->
-                        ExtensionItem(
-                            extension = extension,
-                            pluginInstance = PluginManager.getPluginInstance(extension.id),
-                            icon = uiState.icons[extension.id],
-                            viewModel = viewModel,
-                            onClick = { onNavigateToPluginSettings(extension.id) },
-                            onOpenMarketDetail = { onNavigateToPluginMarketDetail(extension.id) },
-                            isActive = when (extension.category) {
-                                PluginCategory.ASR ->
-                                    extension.id == activeAsrPluginId
-                                PluginCategory.CLIPBOARD_SYNC ->
-                                    extension.id == activeClipboardSyncPluginId
-                                else -> false
-                            },
-                            onActivate = when (extension.category) {
-                                PluginCategory.ASR -> onNavigateToSpeechToText
-                                PluginCategory.CLIPBOARD_SYNC -> onNavigateToClipboardSync
-                                else -> null
-                            }
-                        )
-                    }
                 }
-                
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "提示: 安装插件后点击右上角刷新按钮生效",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            } else {
+                val activeAsrPluginId = SettingsPreferences.getSttOnlinePluginId(context)
+                val activeClipboardSyncPluginId = SettingsPreferences.getClipboardSyncPluginId(context)
+                items(uiState.extensions, key = { it.id }) { extension ->
+                    ExtensionItem(
+                        extension = extension,
+                        pluginInstance = PluginManager.getPluginInstance(extension.id),
+                        icon = uiState.icons[extension.id],
+                        viewModel = viewModel,
+                        onClick = { onNavigateToPluginSettings(extension.id) },
+                        onOpenMarketDetail = { onNavigateToPluginDetail(extension.id) },
+                        isActive = when (extension.category) {
+                            PluginCategory.ASR ->
+                                extension.id == activeAsrPluginId
+                            PluginCategory.CLIPBOARD_SYNC ->
+                                extension.id == activeClipboardSyncPluginId
+                            else -> false
+                        },
+                        onActivate = when (extension.category) {
+                            PluginCategory.ASR -> onNavigateToSpeechToText
+                            PluginCategory.CLIPBOARD_SYNC -> onNavigateToClipboardSync
+                            else -> null
+                        }
                     )
                 }
+            }
+            
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "提示: 安装插件后点击右上角刷新按钮生效",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
             }
         }
     }

@@ -21,10 +21,6 @@ object XimeIndexParser {
     fun parseDirectIndex(text: String): SchemasDirectIndex =
         yaml.decodeFromString(SchemasDirectIndex.serializer(), text)
 
-    /** 解析插件扁平索引（plugins/index.yaml）。 */
-    fun parsePluginsDirectIndex(text: String): PluginsDirectIndex =
-        yaml.decodeFromString(PluginsDirectIndex.serializer(), text)
-
     fun parseScheme(text: String): MarketScheme =
         yaml.decodeFromString(MarketScheme.serializer(), migrateDownloadUrl(text))
 
@@ -97,22 +93,6 @@ object XimeIndexParser {
             minAppVersion = minAppVersionLabel(scheme.appVersion),
             installedVersion = installedVersion,
         )
-
-    /** 插件条目：兼容性判定与方案一致（appVersion 约束）。[installedVersions] 为本地已安装版本表（id → versionName）。 */
-    fun toPluginItem(
-        plugin: MarketPlugin,
-        appVersion: String,
-        installedVersions: Map<String, String>,
-    ): MarketPluginItem {
-        val installedVersion = installedVersions[plugin.id]
-        return MarketPluginItem(
-            plugin = plugin,
-            compatible = isCompatible(appVersion, plugin.appVersion),
-            minAppVersion = minAppVersionLabel(plugin.appVersion),
-            installed = installedVersion != null,
-            installedVersion = installedVersion,
-        )
-    }
 
     /** 取版本号的数值核心 major.minor.patch（忽略 -beta/+build 后缀，缺位补 0）；无法解析返回 null。 */
     private fun numericCore(v: String): List<Int>? {
