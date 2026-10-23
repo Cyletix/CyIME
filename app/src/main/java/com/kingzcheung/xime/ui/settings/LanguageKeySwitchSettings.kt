@@ -52,7 +52,7 @@ internal fun LanguageKeySwitchSettings(
     }
     val selectedLanguage = options.language?.takeIf { it in nativeLanguages }
         ?: currentNative.takeIf { it in nativeLanguages } ?: nativeLanguages.firstOrNull()
-    Surface(modifier = Modifier.testTag("language-key-switch-settings"), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(modifier = Modifier.settingsSearchAnchor("语言键切换方式").testTag("language-key-switch-settings"), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("语言键切换方式", style = MaterialTheme.typography.titleSmall)
             Text("屏幕键盘和物理浮条共用此设置；点按语言键切换，长按打开语言列表。物理键盘的 Shift 和 Ctrl + 空格快捷键保持各自功能。",

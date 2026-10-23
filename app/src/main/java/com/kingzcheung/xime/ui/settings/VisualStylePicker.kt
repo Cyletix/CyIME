@@ -28,7 +28,7 @@ import com.kingzcheung.xime.ui.theme.MaterialPalette
 @Composable
 internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) -> Unit) {
     val keyboard = LocalKeyboardPalette.current
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.settingsSearchAnchor("视觉样式", bleed = 6.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("视觉样式", style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary)
         Text("只改变材质。明暗、配色和背景始终跟随主题设置。",

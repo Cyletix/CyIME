@@ -69,6 +69,7 @@ fun KeyEffectSettingsContent(
         }
     ) { paddingValues ->
         LazyColumn(
+            state = rememberSettingsSearchListState(),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -78,7 +79,7 @@ fun KeyEffectSettingsContent(
             item {
                 SettingsSection(title = "按键音效", content = {
                     Row(
-                        modifier = Modifier
+                        modifier = Modifier.settingsSearchAnchor("启用按键音")
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -115,7 +116,7 @@ fun KeyEffectSettingsContent(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         Column(
-                            modifier = Modifier.padding(16.dp)
+                            modifier = Modifier.settingsSearchAnchor("音量大小").padding(16.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -153,7 +154,7 @@ fun KeyEffectSettingsContent(
 
             item {
                 SettingsSection(title = "振动反馈", content = {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.settingsSearchAnchor("触觉反馈模式").padding(16.dp)) {
                         Text(
                             text = "触觉反馈模式",
                             style = MaterialTheme.typography.bodyLarge,
@@ -194,7 +195,7 @@ fun KeyEffectSettingsContent(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         Row(
-                            modifier = Modifier
+                            modifier = Modifier.settingsSearchAnchor("按键抬起振动")
                                 .fillMaxWidth()
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -226,7 +227,7 @@ fun KeyEffectSettingsContent(
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.settingsSearchAnchor("按键振动时长").padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
@@ -257,7 +258,7 @@ fun KeyEffectSettingsContent(
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.settingsSearchAnchor("长按振动时长").padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
@@ -290,7 +291,7 @@ fun KeyEffectSettingsContent(
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                             )
-                            Column(modifier = Modifier.padding(16.dp)) {
+                            Column(modifier = Modifier.settingsSearchAnchor("按键振动振幅").padding(16.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
@@ -321,7 +322,7 @@ fun KeyEffectSettingsContent(
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                             )
-                            Column(modifier = Modifier.padding(16.dp)) {
+                            Column(modifier = Modifier.settingsSearchAnchor("长按振动振幅").padding(16.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
@@ -401,7 +402,7 @@ internal fun KeyVisualEffectSettings(
 
 @Composable
 private fun KeyVisualEffectToggle(title: String, description: String, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+    Row(Modifier.settingsSearchAnchor(title, bleed = 16.dp).fillMaxWidth().heightIn(min = 48.dp)
         .toggleable(value = enabled, role = Role.Switch, onValueChange = onChange),
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
@@ -427,7 +428,7 @@ private fun KeySoundCapturableSetting() {
         capturable = it
         prefs.edit().putBoolean("key_sound_capturable", it).apply()
     }
-    Row(Modifier.fillMaxWidth().toggleable(value = capturable, role = Role.Switch, onValueChange = onChange).padding(16.dp),
+    Row(Modifier.settingsSearchAnchor("录屏时包含按键音").fillMaxWidth().toggleable(value = capturable, role = Role.Switch, onValueChange = onChange).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text("录屏时包含按键音", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -448,7 +449,7 @@ private fun KeySoundStyleSetting() {
     var style by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf((prefs.getString(key, "default") ?: "default").takeIf { it == "mahjong" } ?: "default")
     }
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.settingsSearchAnchor("按键音色").padding(16.dp)) {
         Text(text = "按键音色", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         Text(text = "换一种按键声音，选好立即生效", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)

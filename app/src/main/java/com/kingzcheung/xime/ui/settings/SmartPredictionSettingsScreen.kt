@@ -130,6 +130,7 @@ fun SmartPredictionSettingsContent(
         }
     ) { padding ->
         LazyColumn(
+            state = rememberSettingsSearchListState(),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -140,7 +141,7 @@ fun SmartPredictionSettingsContent(
             item {
                 SettingsSection(title = "功能开关", content = {
                     Row(
-                        modifier = Modifier
+                        modifier = Modifier.settingsSearchAnchor("启用智能联想")
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -300,7 +301,7 @@ private fun AssociationModeRow(
     onClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier
+        modifier = Modifier.settingsSearchAnchor(title)
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(16.dp),

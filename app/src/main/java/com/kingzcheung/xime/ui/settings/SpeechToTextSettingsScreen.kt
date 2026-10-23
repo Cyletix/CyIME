@@ -209,7 +209,7 @@ fun SpeechToTextSettingsContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
                         )
-                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Column(Modifier.settingsSearchAnchor("保存语音调优录音").fillMaxWidth().padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "保存语音调优录音",
@@ -240,7 +240,7 @@ fun SpeechToTextSettingsContent(
 
             SettingsSection(title = "字幕") {
                 var captionIcon by remember { mutableStateOf(CaptionLauncherIcon.isEnabled(context)) }
-                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Column(Modifier.settingsSearchAnchor("桌面显示“字幕”图标").fillMaxWidth().padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "桌面显示“字幕”图标",

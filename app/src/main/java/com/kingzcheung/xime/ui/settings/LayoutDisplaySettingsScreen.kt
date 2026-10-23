@@ -94,6 +94,7 @@ private fun LayoutDisplayPage(
         }
     ) { paddingValues ->
         LazyColumn(
+            state = rememberSettingsSearchListState(),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -132,7 +133,7 @@ private fun LayoutDisplayPage(
                         mutableStateOf(SettingsPreferences.isAutoNumberKeyboardEnabled(context))
                     }
                     Row(
-                        modifier = Modifier
+                        modifier = Modifier.settingsSearchAnchor("数字框自动数字键盘")
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -167,7 +168,7 @@ private fun LayoutDisplayPage(
                     }
 
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.settingsSearchAnchor("候选字大小").padding(16.dp)
                     ) {
                         Text(
                             text = "候选字大小",
@@ -201,7 +202,7 @@ private fun LayoutDisplayPage(
                         mutableStateOf(SettingsPreferences.shouldShowCandidateCancelButton(context))
                     }
                     Row(
-                        modifier = Modifier
+                        modifier = Modifier.settingsSearchAnchor("候选栏取消按钮")
                             .fillMaxWidth()
                             .testTag("candidate-cancel-setting")
                             .toggleable(
@@ -232,26 +233,28 @@ private fun LayoutDisplayPage(
                     )
 
                     var commentMode by remember { mutableStateOf(SettingsPreferences.candidateCommentMode(context)) }
-                    Text("候选注释", style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
-                    Text("26／14／九键共用。显示：始终显示；自动：宽时显示、窄时隐藏；隐藏：始终不显示。",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp))
-                    Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        com.kingzcheung.xime.settings.CandidateCommentMode.entries.forEach { mode ->
-                            IllustratedChoiceCard(when (mode) {
-                                com.kingzcheung.xime.settings.CandidateCommentMode.AUTO -> "自动"
-                                com.kingzcheung.xime.settings.CandidateCommentMode.SHOW -> "显示"
-                                com.kingzcheung.xime.settings.CandidateCommentMode.HIDE -> "隐藏"
-                            }, commentMode == mode,
-                                onClick = {
-                                    commentMode = mode
-                                    SettingsPreferences.setCandidateCommentMode(context, mode)
-                                    com.kingzcheung.xime.gloss.CandidateGlossary.prepare(context)
-                                },
-                                modifier = Modifier.weight(1f), tag = "candidate-comments:${mode.name}") {
-                                CandidateCommentIllustration(mode)
+                    Column(Modifier.settingsSearchAnchor("候选注释")) {
+                        Text("候选注释", style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
+                        Text("26／14／九键共用。显示：始终显示；自动：宽时显示、窄时隐藏；隐藏：始终不显示。",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp))
+                        Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.kingzcheung.xime.settings.CandidateCommentMode.entries.forEach { mode ->
+                                IllustratedChoiceCard(when (mode) {
+                                    com.kingzcheung.xime.settings.CandidateCommentMode.AUTO -> "自动"
+                                    com.kingzcheung.xime.settings.CandidateCommentMode.SHOW -> "显示"
+                                    com.kingzcheung.xime.settings.CandidateCommentMode.HIDE -> "隐藏"
+                                }, commentMode == mode,
+                                    onClick = {
+                                        commentMode = mode
+                                        SettingsPreferences.setCandidateCommentMode(context, mode)
+                                        com.kingzcheung.xime.gloss.CandidateGlossary.prepare(context)
+                                    },
+                                    modifier = Modifier.weight(1f), tag = "candidate-comments:${mode.name}") {
+                                    CandidateCommentIllustration(mode)
+                                }
                             }
                         }
                     }
@@ -259,32 +262,34 @@ private fun LayoutDisplayPage(
                     // 注释隐藏时内容选项无意义：整段不显示，也不会触发释义词典下载。
                     if (commentMode != com.kingzcheung.xime.settings.CandidateCommentMode.HIDE) {
                         var commentContent by remember { mutableStateOf(SettingsPreferences.candidateCommentContent(context)) }
-                        Text("候选注释内容", style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
-                        Text("拼音：显示拼音或编码。释义：中文候选显示英文，中文键盘里混出的英文候选显示中文；选释义时会自动下载释义词典（也在扩展商店的模型“其他”里），查不到的候选仍显示拼音。",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp))
-                        var glossDownloadRequest by remember { mutableStateOf(0) }
-                        if (commentContent == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS) {
-                            GlossDictionaryStatus(glossDownloadRequest)
-                        }
-                        Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            com.kingzcheung.xime.settings.CandidateCommentContent.entries.forEach { content ->
-                                IllustratedChoiceCard(when (content) {
-                                    com.kingzcheung.xime.settings.CandidateCommentContent.PINYIN -> "拼音"
-                                    com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS -> "释义"
-                                }, commentContent == content,
-                                    onClick = {
-                                        // 刚选释义且词典没下载：直接开始下载，不让用户去商店找。
-                                        if (content == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS &&
-                                            commentContent != content) glossDownloadRequest++
-                                        commentContent = content
-                                        SettingsPreferences.setCandidateCommentContent(context, content)
-                                        com.kingzcheung.xime.gloss.CandidateGlossary.prepare(context)
-                                    },
-                                    modifier = Modifier.weight(1f), tag = "candidate-comment-content:${content.name}") {
-                                    CandidateCommentContentIllustration(content)
+                        Column(Modifier.settingsSearchAnchor("候选注释内容")) {
+                            Text("候选注释内容", style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
+                            Text("拼音：显示拼音或编码。释义：中文候选显示英文，中文键盘里混出的英文候选显示中文；选释义时会自动下载释义词典（也在扩展商店的模型“其他”里），查不到的候选仍显示拼音。",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp))
+                            var glossDownloadRequest by remember { mutableStateOf(0) }
+                            if (commentContent == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS) {
+                                GlossDictionaryStatus(glossDownloadRequest)
+                            }
+                            Row(Modifier.fillMaxWidth().height(136.dp).padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                com.kingzcheung.xime.settings.CandidateCommentContent.entries.forEach { content ->
+                                    IllustratedChoiceCard(when (content) {
+                                        com.kingzcheung.xime.settings.CandidateCommentContent.PINYIN -> "拼音"
+                                        com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS -> "释义"
+                                    }, commentContent == content,
+                                        onClick = {
+                                            // 刚选释义且词典没下载：直接开始下载，不让用户去商店找。
+                                            if (content == com.kingzcheung.xime.settings.CandidateCommentContent.GLOSS &&
+                                                commentContent != content) glossDownloadRequest++
+                                            commentContent = content
+                                            SettingsPreferences.setCandidateCommentContent(context, content)
+                                            com.kingzcheung.xime.gloss.CandidateGlossary.prepare(context)
+                                        },
+                                        modifier = Modifier.weight(1f), tag = "candidate-comment-content:${content.name}") {
+                                        CandidateCommentContentIllustration(content)
+                                    }
                                 }
                             }
                         }
@@ -302,46 +307,48 @@ private fun LayoutDisplayPage(
                         mutableStateOf(SettingsPreferences.getInputTextLocation(context))
                     }
 
-                    Text(
-                        text = "编码显示",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
-                    )
-                    Text(
-                        text = "选择输入编码的显示位置",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, bottom = 12.dp)
-                    )
+                    Column(Modifier.settingsSearchAnchor("编码显示")) {
+                        Text(
+                            text = "编码显示",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp)
+                        )
+                        Text(
+                            text = "选择输入编码的显示位置",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, bottom = 12.dp)
+                        )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp)
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CodeDisplayCard(
-                            title = "显示在输入框",
-                            isSelected = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX,
-                            showCodeInInputBox = true,
-                            onClick = {
-                                inputTextLocation = SettingsPreferences.INPUT_TEXT_INPUT_BOX
-                                SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        CodeDisplayCard(
-                            title = "显示在候选栏",
-                            isSelected = inputTextLocation == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR,
-                            showCodeInInputBox = false,
-                            onClick = {
-                                inputTextLocation = SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR
-                                SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CodeDisplayCard(
+                                title = "显示在输入框",
+                                isSelected = inputTextLocation == SettingsPreferences.INPUT_TEXT_INPUT_BOX,
+                                showCodeInInputBox = true,
+                                onClick = {
+                                    inputTextLocation = SettingsPreferences.INPUT_TEXT_INPUT_BOX
+                                    SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_INPUT_BOX)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            CodeDisplayCard(
+                                title = "显示在候选栏",
+                                isSelected = inputTextLocation == SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR,
+                                showCodeInInputBox = false,
+                                onClick = {
+                                    inputTextLocation = SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR
+                                    SettingsPreferences.setInputTextLocation(context, SettingsPreferences.INPUT_TEXT_CANDIDATE_BAR)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -359,7 +366,7 @@ private fun LayoutDisplayPage(
                     }
 
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.settingsSearchAnchor("每页候选词数").padding(16.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -424,7 +431,7 @@ internal fun KeyboardAppearanceSettings() {
                         mutableStateOf(SettingsPreferences.isSwipeUpHintsEnabled(context))
                     }
                     Row(
-                        modifier = Modifier
+                        modifier = Modifier.settingsSearchAnchor("上方角标提示")
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -458,7 +465,7 @@ internal fun KeyboardAppearanceSettings() {
                         mutableStateOf(SettingsPreferences.isSwipeDownHintsEnabled(context))
                     }
                     Row(
-                        modifier = Modifier
+                        modifier = Modifier.settingsSearchAnchor("下方角标提示")
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -492,7 +499,7 @@ internal fun KeyboardAppearanceSettings() {
                         mutableStateOf(SettingsPreferences.shouldShowPressBubble(context))
                     }
                     Row(
-                        modifier = Modifier
+                        modifier = Modifier.settingsSearchAnchor("点按弹出气泡")
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -521,7 +528,7 @@ internal fun KeyboardAppearanceSettings() {
                 SettingsSection(title = "键盘底部样式", content = {
                     var rounded by remember { mutableStateOf(SettingsPreferences.roundedKeyboardBottom(context)) }
                     Row(
-                        Modifier.fillMaxWidth().testTag("rounded-keyboard-bottom-setting")
+                        Modifier.settingsSearchAnchor("底部圆角与透明导航栏").fillMaxWidth().testTag("rounded-keyboard-bottom-setting")
                             .toggleable(value = rounded, role = Role.Switch, onValueChange = {
                                 rounded = it
                                 SettingsPreferences.setRoundedKeyboardBottom(context, it)

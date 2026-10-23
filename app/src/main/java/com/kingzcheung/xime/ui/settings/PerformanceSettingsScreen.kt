@@ -79,7 +79,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), state = rememberSettingsSearchListState(),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Text("本机：${describe(device)} · 本机配置推荐：${tierNames.getValue(detected)}",
@@ -165,19 +165,21 @@ private fun IdleLevelSlider(title: String, minutes: Int, description: String, ta
     var position by remember(minutes) { mutableStateOf(index.toFloat()) }
     val shown = idleLevels[position.roundToInt().coerceIn(idleLevels.indices)]
     // 和「按键效果」里的滑条同一写法：标题 + 主题色当前值一行，说明，滑条；两端标出最短和“永不”。
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.width(8.dp))
-        Text(idleLabel(shown), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-    }
-    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(Modifier.height(8.dp))
-    Slider(value = position, onValueChange = { position = it }, modifier = Modifier.testTag(tag),
-        onValueChangeFinished = { if (shown != minutes) onChoose(shown) },
-        valueRange = 0f..(idleLevels.size - 1).toFloat(), steps = idleLevels.size - 2)
-    Row(Modifier.fillMaxWidth()) {
-        Text(idleLabel(idleLevels.first()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.weight(1f))
-        Text(idleLabel(idleLevels.last()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(Modifier.settingsSearchAnchor(title, bleed = 16.dp, bleedVertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.width(8.dp))
+            Text(idleLabel(shown), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        }
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        Slider(value = position, onValueChange = { position = it }, modifier = Modifier.testTag(tag),
+            onValueChangeFinished = { if (shown != minutes) onChoose(shown) },
+            valueRange = 0f..(idleLevels.size - 1).toFloat(), steps = idleLevels.size - 2)
+        Row(Modifier.fillMaxWidth()) {
+            Text(idleLabel(idleLevels.first()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            Text(idleLabel(idleLevels.last()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

@@ -97,6 +97,7 @@ private fun ThemeSettingsPage(
         var showGlassSettings by remember { mutableStateOf(false) }
 
         LazyColumn(
+            state = rememberSettingsSearchListState(),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -116,7 +117,7 @@ private fun ThemeSettingsPage(
                 val currentTheme = uiState.colorThemes.firstOrNull { it.id == uiState.colorTheme }
                     ?: com.kingzcheung.xime.ui.theme.KeyboardThemes.getThemeById(uiState.colorTheme)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.settingsSearchAnchor("显示模式", bleed = 6.dp, bleedVertical = 6.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     KeyboardThemeCard(
@@ -180,7 +181,7 @@ private fun ThemeSettingsPage(
                     text = "配色方案",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 6.dp)
+                    modifier = Modifier.settingsSearchAnchor("配色方案", bleed = 6.dp, bleedVertical = 4.dp).fillMaxWidth().padding(bottom = 6.dp)
                 )
             }
             

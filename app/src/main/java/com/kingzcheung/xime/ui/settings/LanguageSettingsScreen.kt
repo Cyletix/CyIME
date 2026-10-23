@@ -60,6 +60,7 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onBack: () -
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) }
     ) { padding ->
+        SettingsSearchAutoScroll(dragOrder.list)
         LazyColumn(Modifier.fillMaxSize().testTag("language-settings-list").padding(padding)
             .padding(horizontal = 16.dp, vertical = 8.dp),
             state = dragOrder.list, verticalArrangement = Arrangement.spacedBy(16.dp)) {
