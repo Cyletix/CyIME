@@ -31,6 +31,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,8 @@ internal fun LayoutPreviewChoices(
     rowHeight: Dp? = null,
     qwertyPreviewStagger: Float = 0f,
     onManage: (() -> Unit)? = null,
+    /** 没有当前方案的布局：标灰，仍可点（点了换方案，由调用方提示）。 */
+    unavailableIds: Set<String> = emptySet(),
     onSelect: (String) -> Unit,
 ) {
     val revision by KeysConfigHelper.configVersion.collectAsState()
@@ -83,7 +87,8 @@ internal fun LayoutPreviewChoices(
                     // Custom layouts are observable; do not cache their rows across an edit.
                     val rows = previewRows(layout, language, revision)
                     PreviewChoiceCard(layout.displayName, chosen, width, previewHeight,
-                        containerColor, contentColor, accentColor, "$itemTagPrefix${layout.id}", { onSelect(layout.id) }) {
+                        containerColor, contentColor, accentColor, "$itemTagPrefix${layout.id}", { onSelect(layout.id) },
+                        unavailable = layout.id in unavailableIds) {
                                 if (rows.isEmpty()) Icon(Icons.Outlined.Keyboard, "${layout.displayName}布局", tint = contentColor)
                                 else MiniatureKeyboard(rows, layout.kind in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED),
                                     contentColor, Modifier.testTag("layout-preview:${layout.id}"), fillKeys = !containerColor.isNearBlack(),
@@ -105,8 +110,10 @@ internal fun LayoutPreviewChoices(
 @Composable
 internal fun PreviewChoiceCard(label: String, chosen: Boolean, width: Dp, previewHeight: Dp,
     containerColor: Color, contentColor: Color, accentColor: Color, tag: String,
-    onSelect: () -> Unit, isAction: Boolean = false, preview: @Composable BoxScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(14.dp), color = containerColor,
+    onSelect: () -> Unit, isAction: Boolean = false, unavailable: Boolean = false,
+    preview: @Composable BoxScope.() -> Unit) {
+    Surface(modifier = if (unavailable) Modifier.alpha(.4f).semantics { stateDescription = "没有当前方案" } else Modifier,
+        shape = RoundedCornerShape(14.dp), color = containerColor,
         border = BorderStroke(if (chosen) 1.5.dp else 1.dp,
             if (chosen) accentColor else contentColor.copy(alpha = idleBorderAlpha(containerColor)))) {
         Column(Modifier.width(width).testTag(tag).then(if (isAction) Modifier.clickable(role = Role.Button, onClick = onSelect)

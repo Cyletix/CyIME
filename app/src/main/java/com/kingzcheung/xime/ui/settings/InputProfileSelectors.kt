@@ -39,13 +39,20 @@ internal fun InputProfileSelectors(
     val context = androidx.compose.ui.platform.LocalContext.current
     val profile = selected.profile
     val schemes = InputProfileSelection.schemeEntries(entries, selected)
-    val layouts = InputProfileSelection.layouts(entries, selected)
+    val layouts = InputProfileSelection.languageLayouts(entries, selected)
+    val switches = layouts.associate { it.id to InputProfileSelection.switchLayout(entries, selected, it.id) }
     Column(modifier.fillMaxWidth().testTag("profile-settings-selectors")) {
         LayoutPreviewChoices(layouts, profile.language, profile.layout.id, "layout-choice:${profile.language.id}",
-            containerColor = containerColor, contentColor = contentColor, accentColor = accentColor) { id ->
-            InputProfileSelection.changeLayout(entries, selected, id)?.let { entry ->
-                LetterLayouts.selectFor(context, entry, id)
-                onSelect(entry)
+            containerColor = containerColor, contentColor = contentColor, accentColor = accentColor,
+            unavailableIds = switches.filterValues { it?.keepsScheme == false }.keys) { id ->
+            // 与键盘里的选择面板一致：没有当前方案的布局标灰，点了换成它有的方案并提示。
+            switches[id]?.let { switch ->
+                if (!switch.keepsScheme) layouts.firstOrNull { it.id == id }?.let { layout ->
+                    android.widget.Toast.makeText(context, InputProfileSelection.switchHint(layout, selected, switch.entry),
+                        android.widget.Toast.LENGTH_LONG).show()
+                }
+                LetterLayouts.selectFor(context, switch.entry, id)
+                onSelect(switch.entry)
             }
         }
         HorizontalDivider(Modifier.padding(vertical = 4.dp), color = contentColor.copy(alpha = .15f))
