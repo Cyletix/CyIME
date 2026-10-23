@@ -1,0 +1,60 @@
+diff --git a/src/octagram.cc b/src/octagram.cc
+index 98ace59..f9a5c96 100644
+--- a/src/octagram.cc
++++ b/src/octagram.cc
+@@ -1,6 +1,7 @@
+ #include "gram_db.h"
+ #include "gram_encoding.h"
+ #include "octagram.h"
++#include <t9_lookup_trace.h>
+ #include <algorithm>
+ #include <rime/config.h>
+ #include <rime/resource.h>
+@@ -10,6 +11,7 @@
+ namespace rime {
+ 
+ struct GrammarConfig {
++  bool full_word = false;
+   int collocation_max_length = 4;
+   int collocation_min_length = 3;
+   double collocation_penalty = -12;
+@@ -30,6 +32,7 @@ Octagram::Octagram(Config* config, OctagramComponent* component)
+     } else {
+       return;
+     }
++    config->GetBool("t9/joint_decoder", &config_->full_word);
+     config->GetInt("grammar/collocation_max_length",
+                   &config_->collocation_max_length);
+     config->GetInt("grammar/collocation_min_length",
+@@ -106,7 +109,7 @@ inline static bool matches_whole_query(const char* context_ptr,
+ 
+ double Octagram::Query(const string& context,
+                        const string& word,
+-                       bool is_rear) {
++                       bool is_rear) { T9_WORK_COUNT(grammar_queries);
+   if (!db_ || context.empty()) {
+     return config_->non_collocation_penalty;
+   }
+@@ -125,11 +128,12 @@ double Octagram::Query(const string& context,
+   for (const char* context_ptr = str_begin(context_query);
+        context_len > 0;
+        --context_len, context_ptr = grammar::next_unicode(context_ptr)) {
+-    int num_results = db_->Lookup(context_ptr, word_query, matches);
++    T9_WORK_COUNT(gram_lookups); int num_results = db_->Lookup(context_ptr, word_query, matches);
+     DLOG(INFO) << "Lookup(" << context_ptr << " + " << word_query << ") returns "
+                << num_results << " results";
+     for (auto i = 0; i < num_results; ++i) {
+       const auto& match(matches[i]);
++      if (config_->full_word && match.length != word_query.size()) continue;
+       const int match_len = grammar::unicode_length(word_query, match.length);
+       DLOG(INFO) << "match[" << match.length << "] = "
+                  << scale_value(match.value);
+@@ -150,7 +154,7 @@ double Octagram::Query(const string& context,
+     int word_len = utf8::unchecked::distance(word.c_str(),
+                                              word.c_str() + word.length());
+     if (word_query_len == word_len &&
+-        db_->Lookup(word_query, "$", matches) > 0 &&
++        (T9_WORK_COUNT(gram_lookups), db_->Lookup(word_query, "$", matches)) > 0 &&
+         update_result(result,
+                       scale_value(matches[0].value) + config_->rear_penalty)) {
+       DLOG(INFO) << "update: " << word << "$ / " << result;

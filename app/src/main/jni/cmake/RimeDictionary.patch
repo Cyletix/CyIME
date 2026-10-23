@@ -202,7 +202,7 @@ index a5751781..d9993454 100644
        graph->edges.erase(i);
        continue;
 diff --git a/src/rime/common.h b/src/rime/common.h
-index e5dfaf9..35f26b0 100644
+index e5dfaf9c..35f26b04 100644
 --- a/src/rime/common.h
 +++ b/src/rime/common.h
 @@ -31,6 +31,14 @@
@@ -221,7 +221,7 @@ index e5dfaf9..35f26b0 100644
  #define RIME_THIS_CALL(f) (this->*(f))
  
 diff --git a/src/rime/dict/corrector.cc b/src/rime/dict/corrector.cc
-index 85cac5c..689d40d 100644
+index 85cac5ce..689d40d7 100644
 --- a/src/rime/dict/corrector.cc
 +++ b/src/rime/dict/corrector.cc
 @@ -9,6 +9,9 @@
@@ -366,7 +366,7 @@ index 85cac5c..689d40d 100644
  #if 0
    if (!ticket.schema) return nullptr;
 diff --git a/src/rime/dict/corrector.h b/src/rime/dict/corrector.h
-index f363419..fdcd01e 100644
+index f363419f..fdcd01ea 100644
 --- a/src/rime/dict/corrector.h
 +++ b/src/rime/dict/corrector.h
 @@ -17,6 +17,7 @@
@@ -421,7 +421,7 @@ index f363419..fdcd01e 100644
  
  template <class... Cs>
 diff --git a/src/rime/dict/dictionary.cc b/src/rime/dict/dictionary.cc
-index 1dc47f8..99ca7c5 100644
+index 1dc47f8f..99ca7c57 100644
 --- a/src/rime/dict/dictionary.cc
 +++ b/src/rime/dict/dictionary.cc
 @@ -8,6 +8,7 @@
@@ -672,7 +672,7 @@ index 1dc47f8..99ca7c5 100644
    }
    for (auto it = result.begin(); it != result.end();) {
 diff --git a/src/rime/dict/dictionary.h b/src/rime/dict/dictionary.h
-index 8a85400..63c7aa9 100644
+index 8a854007..63c7aa91 100644
 --- a/src/rime/dict/dictionary.h
 +++ b/src/rime/dict/dictionary.h
 @@ -35,6 +35,9 @@ class RIME_DLL DictEntryIterator : public DictEntryFilterBinder {
@@ -718,7 +718,7 @@ index 8a85400..63c7aa9 100644
    // otherwise do an exact match.
    // return num of matching keys.
 diff --git a/src/rime/dict/table.cc b/src/rime/dict/table.cc
-index 1b38958..474e702 100644
+index 1b38958e..474e7023 100644
 --- a/src/rime/dict/table.cc
 +++ b/src/rime/dict/table.cc
 @@ -10,6 +10,7 @@
@@ -963,7 +963,7 @@ index 1b38958..474e702 100644
          }
        }
 diff --git a/src/rime/dict/table.h b/src/rime/dict/table.h
-index 56d4eef..6d057fe 100644
+index 56d4eef1..6d057fe2 100644
 --- a/src/rime/dict/table.h
 +++ b/src/rime/dict/table.h
 @@ -9,6 +9,7 @@
@@ -1050,30 +1050,6 @@ index 56d4eef..6d057fe 100644
    RIME_DLL string GetEntryText(const table::Entry& entry);
  
    uint32_t dict_file_checksum() const;
-diff --git a/src/rime/dict/user_dictionary.h b/src/rime/dict/user_dictionary.h
-index 7886e494..bfd074c8 100644
---- a/src/rime/dict/user_dictionary.h
-+++ b/src/rime/dict/user_dictionary.h
-@@ -95,6 +95,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
-                  size_t current_pos,
-                  const string& current_prefix,
-                  DfsState* state);
-+  // CyIME: whether any entry's code starts with these whole syllables ("shu ju "), from an in-memory
-+  // set rebuilt when the tick changes or the dictionary is loaded again.
-+  bool MayHavePrefix(const string& prefix);
- 
-  private:
-   string name_;
-@@ -105,6 +108,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
-   hash_map<SyllableId, string> rev_syllabary_;
-   TickCount tick_ = 0;
-   time_t transaction_time_ = 0;
-+  hash_set<string> code_prefixes_;
-+  TickCount code_prefixes_tick_ = 0;
-+  bool code_prefixes_ready_ = false;
- };
- 
- class UserDictionaryComponent : public UserDictionary::Component {
 diff --git a/src/rime/dict/user_dictionary.cc b/src/rime/dict/user_dictionary.cc
 index 953c59cf..6d0fc90f 100644
 --- a/src/rime/dict/user_dictionary.cc
@@ -1257,8 +1233,32 @@ index 953c59cf..6d0fc90f 100644
    return db->AbortTransaction();
  }
  
+diff --git a/src/rime/dict/user_dictionary.h b/src/rime/dict/user_dictionary.h
+index 7886e494..bfd074c8 100644
+--- a/src/rime/dict/user_dictionary.h
++++ b/src/rime/dict/user_dictionary.h
+@@ -95,6 +95,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+                  size_t current_pos,
+                  const string& current_prefix,
+                  DfsState* state);
++  // CyIME: whether any entry's code starts with these whole syllables ("shu ju "), from an in-memory
++  // set rebuilt when the tick changes or the dictionary is loaded again.
++  bool MayHavePrefix(const string& prefix);
+ 
+  private:
+   string name_;
+@@ -105,6 +108,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+   hash_map<SyllableId, string> rev_syllabary_;
+   TickCount tick_ = 0;
+   time_t transaction_time_ = 0;
++  hash_set<string> code_prefixes_;
++  TickCount code_prefixes_tick_ = 0;
++  bool code_prefixes_ready_ = false;
+ };
+ 
+ class UserDictionaryComponent : public UserDictionary::Component {
 diff --git a/src/rime/engine.cc b/src/rime/engine.cc
-index 4a54f64..4a3188b 100644
+index 4a54f64c..4a3188bb 100644
 --- a/src/rime/engine.cc
 +++ b/src/rime/engine.cc
 @@ -8,6 +8,7 @@
@@ -1285,8 +1285,22 @@ index 4a54f64..4a3188b 100644
    Segment& seg(ctx->composition().back());
    seg.Close();
    if (seg.end == ctx->input().length()) {
+diff --git a/src/rime/gear/memory.cc b/src/rime/gear/memory.cc
+index 9da80fa9..d6443783 100644
+--- a/src/rime/gear/memory.cc
++++ b/src/rime/gear/memory.cc
+@@ -128,6 +128,9 @@ bool Memory::ProcessSegmentOnCommit(CommitEntry& commit_entry,
+ void Memory::OnCommit(Context* ctx) {
+   if (!user_dict_ || user_dict_->readonly())
+     return;
++  // CyIME incognito: keep using the dictionary but never learn from commits.
++  if (ctx && ctx->get_option("_cyime_incognito"))
++    return;
+   StartSession();
+   CommitEntry commit_entry(this);
+   for (auto& seg : ctx->composition()) {
 diff --git a/src/rime/gear/poet.cc b/src/rime/gear/poet.cc
-index dc647cd..f3df32e 100644
+index dc647cd3..f3df32e7 100644
 --- a/src/rime/gear/poet.cc
 +++ b/src/rime/gear/poet.cc
 @@ -81,7 +81,25 @@ inline static Grammar* create_grammar(Config* config) {
@@ -1337,7 +1351,7 @@ index dc647cd..f3df32e 100644
            for (char c : entry->text) {
              new_hash = new_hash * 31 + c;
 diff --git a/src/rime/gear/poet.h b/src/rime/gear/poet.h
-index 459f31d..9ae464c 100644
+index 459f31da..9ae464c0 100644
 --- a/src/rime/gear/poet.h
 +++ b/src/rime/gear/poet.h
 @@ -25,6 +25,8 @@ struct Line;
@@ -2124,7 +2138,7 @@ index 99e45117..6b0182a4 100644
    return result;
  }
 diff --git a/src/rime/gear/script_translator.h b/src/rime/gear/script_translator.h
-index 28e4f3b..aea4a2e 100644
+index 28e4f3bf..aea4a2ec 100644
 --- a/src/rime/gear/script_translator.h
 +++ b/src/rime/gear/script_translator.h
 @@ -23,6 +23,7 @@ struct DictEntry;
@@ -2219,7 +2233,7 @@ index 28e4f3b..aea4a2e 100644
  
  }  // namespace rime
 diff --git a/src/rime/gear/table_translator.cc b/src/rime/gear/table_translator.cc
-index 67bc229..e917a34 100644
+index 67bc2292..e917a348 100644
 --- a/src/rime/gear/table_translator.cc
 +++ b/src/rime/gear/table_translator.cc
 @@ -76,6 +76,12 @@ an<Candidate> TableTranslation::Peek() {
@@ -2236,7 +2250,7 @@ index 67bc229..e917a34 100644
      options_->comment_formatter().Apply(&comment);
    }
 diff --git a/src/rime/gear/translator_commons.cc b/src/rime/gear/translator_commons.cc
-index 7fc0f27..0ec0623 100644
+index 7fc0f272..0ec06237 100644
 --- a/src/rime/gear/translator_commons.cc
 +++ b/src/rime/gear/translator_commons.cc
 @@ -7,6 +7,8 @@
@@ -2269,7 +2283,7 @@ index 7fc0f27..0ec0623 100644
    if (user_dict_disabling_patterns_.empty())
      return false;
 diff --git a/src/rime/gear/translator_commons.h b/src/rime/gear/translator_commons.h
-index 6217e5a..534e39b 100644
+index 6217e5a7..534e39bd 100644
 --- a/src/rime/gear/translator_commons.h
 +++ b/src/rime/gear/translator_commons.h
 @@ -54,6 +54,10 @@ class PhraseSyllabifier {
@@ -2315,3 +2329,56 @@ index 6217e5a..534e39b 100644
    string delimiters_;
    vector<string> tags_{"abc"};  // invariant: non-empty
    bool contextual_suggestions_ = false;
+diff --git a/src/rime/menu.cc b/src/rime/menu.cc
+index f5cef685..6f7fcbe2 100644
+--- a/src/rime/menu.cc
++++ b/src/rime/menu.cc
+@@ -27,7 +27,8 @@ size_t Menu::Prepare(size_t requested) {
+   DLOG(INFO) << "preparing " << requested << " candidates.";
+   while (candidates_.size() < requested && !result_->exhausted()) {
+     if (auto cand = result_->Peek()) {
+-      candidates_.push_back(cand);
++      if (!IsSuppressed(cand->text()))
++        candidates_.push_back(cand);
+     }
+     result_->Next();
+   }
+diff --git a/src/rime/menu.h b/src/rime/menu.h
+index 49a19479..a788c70d 100644
+--- a/src/rime/menu.h
++++ b/src/rime/menu.h
+@@ -8,6 +8,7 @@
+ #define RIME_MENU_H_
+ 
+ #include <rime_api.h>
++#include <algorithm>
+ #include <rime/candidate.h>
+ #include <rime/common.h>
+ 
+@@ -39,12 +40,26 @@ class Menu {
+   // rather than the total number of available candidates.
+   size_t candidate_count() const { return candidates_.size(); }
+ 
++  // Keep materialized survivors in place; lazy refill only appends at the tail.
++  // Do not refresh composition or delete/learn dictionary entries here.
++  void SuppressText(const string& text) {
++    suppressed_.insert(text);
++    candidates_.erase(std::remove_if(candidates_.begin(), candidates_.end(),
++        [&](const auto& candidate) { return candidate->text() == text; }),
++        candidates_.end());
++  }
++
++  bool IsSuppressed(const string& text) const {
++    return suppressed_.count(text) != 0;
++  }
++
+   bool empty() const;
+ 
+  private:
+   an<MergedTranslation> merged_;
+   an<Translation> result_;
+   CandidateList candidates_;
++  set<string> suppressed_;
+ };
+ 
+ }  // namespace rime
