@@ -27,7 +27,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("cyletix10Preset", 1)
     inputs.property("colemakPreset", 1)
     inputs.property("typewisePreset", 1)
-    inputs.property("t9EnglishIndex", 6)
+    inputs.property("t9EnglishIndex", 8)
     inputs.file(file("src/main/assets/english.txt"))
     inputs.property("measuredNeighborCorrection", 2)
     inputs.property("candidatePolicy", 3)
@@ -133,11 +133,14 @@ val prepareChineseDictionaries by tasks.registering {
             "if env.keep_comment or env.engine.context:get_option(\"_cyime_candidate_comments\") then"))
         // Re-index the pinned English word sources; never lowercase the displayed text.
         // Exact whole-word digits only: no abbreviation/completion collisions with Chinese.
-        // Only very common words (top of the bundled frequency-ordered english.txt), upstream's
-        // curated internet/brand list and two-letter capitals are offered in Chinese T9, weighted by
-        // frequency rank; other words would crowd out Chinese.
+        // Words of the bundled frequency-ordered english.txt, upstream's curated internet/brand list and
+        // two-letter capitals are offered in Chinese T9, weighted by frequency rank. Beyond the 3000 most
+        // common only words of five letters and more, at weight 1, so they never come before a commoner
+        // word on the same keys and short ones (zoo, xi) do not sit among Chinese candidates of short
+        // inputs (terminal used to be missing on nine keys).
         val commonEnglish = file("src/main/assets/english.txt").readLines().map { it.trim().lowercase(java.util.Locale.ROOT) }
-            .filter { it.isNotEmpty() }.take(3000).withIndex().associate { it.value to 3000 - it.index }
+            .filter { it.isNotEmpty() }.withIndex().filter { it.index < 3000 || it.value.length >= 5 }
+            .associate { it.value to maxOf(1, 3000 - it.index) }
         val english = linkedMapOf<String, String>()
         val digits = "22233344455566677778889999"
         for (source in listOf("en_ext", "en")) {
