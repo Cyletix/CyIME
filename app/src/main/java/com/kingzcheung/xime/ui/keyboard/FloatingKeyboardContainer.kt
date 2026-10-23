@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,9 +48,6 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -186,7 +184,6 @@ internal fun FloatingKeyboardContainer(
         val dockGesture = remember(maxWidth, cardTotalHeight, screenHeightDp, minOffsetY) { FloatingDockGesture() }
         var isDragging by remember(dockGesture) { mutableStateOf(false) }
         var dockReady by remember(dockGesture) { mutableStateOf(false) }
-        var armedDestination by remember(dockGesture) { mutableStateOf<ResizeRect?>(null) }
         var dragX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
         var dragY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
         // 拖动期间卡片只按本地的 dragX/dragY 摆放，不每一下都写回状态重建整个键盘；
@@ -205,19 +202,15 @@ internal fun FloatingKeyboardContainer(
         val dockProgress = remember(dockGesture) { Animatable(0f) }
         LaunchedEffect(isDragging, edge, dockGesture, effectEpoch, destination) {
             dockReady = false
-            armedDestination = null
             dockProgress.snapTo(0f)
             if (isDragging && destination != null) {
                 dockGesture.update(edge, 0L)
                 if (edge != null) {
-                    coroutineScope {
-                        launch { dockProgress.animateTo(1f, tween(FLOATING_DOCK_DURATION_MILLIS.toInt())) }
-                        delay(FLOATING_DOCK_DURATION_MILLIS)
-                        // 停留时间由可取消的协程延时确定，避免与动画使用不同的时钟。
-                        if (effectEpoch == dockEpoch && isDragging && dragEdge == edge) {
-                            dockReady = dockGesture.update(edge, FLOATING_DOCK_DURATION_MILLIS)
-                            if (dockReady) armedDestination = destination
-                        }
+                    // Linear, so how far the outline has morphed is how long the card has rested; the
+                    // moment it reaches the docked shape, releasing docks (see onDragEnd).
+                    dockProgress.animateTo(1f, tween(FLOATING_DOCK_DURATION_MILLIS.toInt(), easing = LinearEasing))
+                    if (effectEpoch == dockEpoch && isDragging && dragEdge == edge) {
+                        dockReady = true
                     }
                 }
             }
@@ -293,7 +286,6 @@ internal fun FloatingKeyboardContainer(
                 onDragStart = {
                     dockEpoch++
                     dockReady = false
-                    armedDestination = null
                     dragX = safeOffsetX
                     dragY = safeOffsetY
                     dragStartX = safeOffsetX
@@ -319,15 +311,15 @@ internal fun FloatingKeyboardContainer(
                     }
                 },
                 onDragEnd = {
-                    val restore = destination != null && armedDestination == destination && dockReady &&
-                        dockGesture.release(dragEdge, FLOATING_DOCK_DURATION_MILLIS)
+                    // Dock exactly when the preview shows it docked; the old separate timer could end a
+                    // frame after the outline looked finished, and releasing then left the card floating.
+                    val restore = floatingDockOnRelease(dockProgress.value, dragEdge != null, destination != null)
                     dockGesture.cancel()
                     dockEpoch++
                     // 松手时把整段位移一次交给后台，按原规矩限位、取整、保存。
                     onDrag(dragX - dragStartX, dragY - dragStartY)
                     isDragging = false
                     dockReady = false
-                    armedDestination = null
                     onDragEnd()
                     if (restore) onDock()
                 },
@@ -337,7 +329,6 @@ internal fun FloatingKeyboardContainer(
                     onDrag(dragX - dragStartX, dragY - dragStartY)
                     isDragging = false
                     dockReady = false
-                    armedDestination = null
                     onDragEnd()
                 },
             )

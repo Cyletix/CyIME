@@ -16,11 +16,18 @@ internal fun floatingDockEdge(
 }
 
 /**
- * How long a dragged floating card must rest on the bottom edge before it docks, and how long its
- * outline takes to morph into the docked shape. One second (was half): with clipboard search open the
- * card is tall and touched the edge easily while being dragged (user, 2026-10-22).
+ * How long a dragged floating card must rest on the bottom edge before it docks, which is also how
+ * long its outline takes to morph into the docked shape. 0.75 s: 0.5 s docked a tall card (clipboard
+ * search open) by accident, 1 s was too slow (user, 2026-10-22 and 10-23).
  */
-internal const val FLOATING_DOCK_DURATION_MILLIS = 1_000L
+internal const val FLOATING_DOCK_DURATION_MILLIS = 750L
+
+/**
+ * Releasing docks exactly when the preview shows the docked shape: the outline has reached it and the
+ * card is still on the bottom edge. The preview, not a separate timer, decides.
+ */
+internal fun floatingDockOnRelease(previewProgress: Float, onBottomEdge: Boolean, hasDestination: Boolean): Boolean =
+    hasDestination && onBottomEdge && previewProgress >= 1f
 internal const val FLOATING_DRAG_BAR_HEIGHT_DP = 28
 
 /** 移动条覆盖键帽以下的完整空白，卡片本身仍只额外预留原来的 28dp。 */
