@@ -444,84 +444,26 @@ internal fun rememberImeKeyboardCallbacks(
                 }
             },
             onShowQuickSendForm = {
-                service.closeToolPanel()
                 // 从 Overlay 页面（剪贴板面板）打开表单时必须退出 Overlay：
                 // Overlay 渲染为全屏 clickable Box（吞点击），若不退出，表单会被
-                // 盖在其下——可见但关闭按钮等点击全部失效（时灵时不灵的根源：
-                // 从主键盘打开则无叠加）。
-                service.keyboardViewModel.closeOverlay()
-                val current = service.uiState.value
-                service.uiState.value = current.copy(
-                    showQuickSendForm = true,
-                    ocrDraft = false,
-                    quickSendFormFocused = true,
-                    quickSendCodeFocused = false,
-                    quickSendEditingItemId = null,
-                    quickSendEditingItemText = "",
-                    quickSendEditingItemCode = "",
-                    enterKeyText = "换行",
-                )
+                // 盖在其下——可见但关闭按钮等点击全部失效（openQuickSend 统一处理）。
                 // The floating editor reuses IME input without adding height to the keyboard.
+                service.openQuickSend()
             },
-            onQuickSendEditItem = { id, text, code ->
-                service.closeToolPanel()
-                // 同 onShowQuickSendForm：编辑入口在剪贴板面板内，先退出 Overlay 防表单被盖
-                service.keyboardViewModel.closeOverlay()
-                service.uiState.value = service.uiState.value.copy(
-                    showQuickSendForm = true,
-                    ocrDraft = false,
-                    quickSendFormFocused = true,
-                    quickSendCodeFocused = false,
-                    quickSendEditingItemId = id,
-                    quickSendEditingItemText = text,
-                    quickSendEditingItemCode = code,
-                    enterKeyText = "换行",
-                )
-            },
-            onReviewOcrText = { text ->
-                service.closeToolPanel()
-                service.keyboardViewModel.closeOverlay()
-                service.uiState.value = service.uiState.value.copy(
-                    showQuickSendForm = true, ocrDraft = true, quickSendFormFocused = true,
-                    quickSendCodeFocused = false, quickSendEditingItemId = null,
-                    quickSendEditingItemText = text, quickSendEditingItemCode = "", enterKeyText = "换行",
-                )
-            },
+            // 同 onShowQuickSendForm：编辑入口在剪贴板面板内，先退出 Overlay 防表单被盖
+            onQuickSendEditItem = { id, text, code -> service.openQuickSend(itemId = id, text = text, code = code) },
+            onReviewOcrText = { text -> service.openQuickSend(text = text, ocr = true) },
             onHideQuickSendForm = {
                 android.util.Log.d("QuickSendForm", "onHideQuickSendForm invoked")
-                service.uiState.value = service.uiState.value.copy(
-                    showQuickSendForm = false,
-                    ocrDraft = false,
-                    quickSendFormFocused = false,
-                    quickSendCodeFocused = false,
-                    quickSendEditingItemId = null,
-                    quickSendEditingItemText = "",
-                    quickSendEditingItemCode = "",
-                    enterKeyText = service.editorEnterKeyText(),
-                )
-                QuickSendFormEditTextHolder.editText = null
-                QuickSendFormCodeEditTextHolder.editText = null
+                service.closeQuickSend()
                 service.keyboardViewModel.showOverlay(OverlayRoute.Clipboard(0))
             },
+            // 关闭表单时由 closeQuickSend 统一还原回车键。
             onQuickSendFormFocusChange = { focused: Boolean ->
-                // Draft text always uses a newline key; focus changes never submit the form.
-                // 关闭表单时由 onHideQuickSendForm / onWindowHidden 统一还原回车键。
-                val s = service.uiState.value
-                service.uiState.value = if (focused) {
-                    // 文本框抢回焦点：编码焦点清除，按键输入回到文本框
-                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = false, enterKeyText = "换行")
-                } else {
-                    s.copy(quickSendFormFocused = false, quickSendCodeFocused = false)
-                }
+                service.uiState.value = QuickSendTransitions.textFocus(service.uiState.value, focused)
             },
             onQuickSendCodeFocusChange = { focused: Boolean ->
-                val s = service.uiState.value
-                service.uiState.value = if (focused) {
-                    // 编码框的回车只返回正文，不保存。
-                    s.copy(quickSendFormFocused = true, quickSendCodeFocused = true, enterKeyText = "下一步")
-                } else {
-                    s.copy(quickSendCodeFocused = false)
-                }
+                service.uiState.value = QuickSendTransitions.codeFocus(service.uiState.value, focused)
             },
         )
     }
