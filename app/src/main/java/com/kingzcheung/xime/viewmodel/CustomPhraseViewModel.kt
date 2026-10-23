@@ -69,6 +69,7 @@ class CustomPhraseViewModel(application: Application) : AndroidViewModel(applica
                 val query = it.searchQuery
                 it.copy(entries = updated, filteredEntries = filterEntries(updated, query))
             }
+            withContext(Dispatchers.IO) { PersonalDictManager.applyCustomPhrases(context, schemaId) }
         }
     }
 
@@ -85,6 +86,7 @@ class CustomPhraseViewModel(application: Application) : AndroidViewModel(applica
                 val query = it.searchQuery
                 it.copy(entries = current, filteredEntries = filterEntries(current, query))
             }
+            withContext(Dispatchers.IO) { PersonalDictManager.applyCustomPhrases(context, schemaId) }
         }
     }
 
@@ -98,6 +100,7 @@ class CustomPhraseViewModel(application: Application) : AndroidViewModel(applica
                 val query = it.searchQuery
                 it.copy(entries = current, filteredEntries = filterEntries(current, query))
             }
+            withContext(Dispatchers.IO) { PersonalDictManager.applyCustomPhrases(context, schemaId) }
         }
     }
 

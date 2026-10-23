@@ -768,6 +768,18 @@ class RimeEngine {
         }
     }
 
+    /**
+     * Re-selects the current schema so its translators re-read phrase files saved since: an open
+     * session never sees a phrase added to custom_phrase.txt (host engine probe, 2026-10-23).
+     * Input FIFO only; any unfinished composition is dropped, like a schema switch.
+     */
+    internal fun reloadQueuedSchema(): Boolean = mutateLocked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@mutateLocked false
+        val current = nativeGetCurrentSchema().orEmpty()
+        mergedAlphabet = null
+        current.isNotEmpty() && nativeSwitchSchema(current)
+    }
+
     fun startMaintenance(full: Boolean): Boolean {
         if (!isInitialized) return false
         mutateLocked {
