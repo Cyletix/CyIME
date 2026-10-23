@@ -30,3 +30,10 @@
 - Shift 和删除（用户追加）：画成以键盘左右边缘为中线的半个六边形，正好补上第三行两侧的半键缺口并与相邻字母咬合；图标收在中间一半高度里，删除键不再显示“清空”角标（上滑清空照旧）。底排不改。
 - 上滑符号：蜂窝布局和 QWERTY 没有位置对应，符号跟着字母走（q 上滑仍是 1），不按位置换。改位字母强调对蜂窝布局不适用（没有可比较的原位置）。
 - 截图：中文/英文/日文罗马字 × 4 主题 × 不透明/玻璃 × 手机/平板 48 张，加选择器 4 张，在 `.codex-artifacts/typewise-20261022/`，逐张看过。平板上格子更宽，六边形偏扁。
+
+## Cyletix10 换成不动符号的排列（2026-10-23，用户同意替换）
+
+- 原研究版 `qwdrf;jkyp / asetghliou / zxcvbnm` 把 `;` 放在首行 y 位；手机上首行要 10 个字母键，用户自己把 u 挪到 p 后面。现在内置 Cyletix10 改为 `qwbrtydfpu / aseoghjin / zxckvlm`：符号全部留在 QWERTY 原键，字母只在 26 个字母格里换，10/9/7 三行，名字不变。
+- 来源：Cyletix-Keyboard `research/nosymbol-20261023`，用户自己的聊天按键流，在“同指连击、手指停在原处移动、回主行移动”三项相对 QWERTY 的比值里压最差一项，最多改 12 个字母、小指负荷不超过原 Cyletix10。比原研究版和用户手机修法在三项和小指上都更好，手机双拇指模型与 QWERTY 打平。数字都是模型结果，不是实打速度。
+- 用户在手机上保存过的 Cyletix10 改版（`custom-keyboard-layouts.json` 里同 ID 的条目）仍优先于内置排列，不被覆盖。
+- 验证：`testDebugUnitTest` 2085 项 0 失败；`LayoutGeometryGateTest` 的 Cyletix10 用例改为点首行末键 u（原先点首行的 `;`）。`compileDebugAndroidTestKotlin` 本轮失败在 `PluginSettingsNavigationTest`（另一线程的插件设置改动，与本改动无关），该用例未运行。截图：中英日 × 4 主题 × 玻璃开关 × 手机/平板 48 张，`.codex-artifacts/cyletix10-nosymbol-20261023/`，逐张看过。未打包、未安装、未真机验收。

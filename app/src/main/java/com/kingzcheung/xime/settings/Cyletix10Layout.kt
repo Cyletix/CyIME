@@ -1,11 +1,13 @@
 package com.kingzcheung.xime.settings
 
-/** Mobile adaptation of the historical 10/10/10 research layout. */
+/**
+ * Cyletix10 with every symbol on its QWERTY key: the letters only move among QWERTY's 26 letter
+ * keys, so the phone keeps 10/9/7 letter rows. Chosen 2026-10-23 by a constrained search on the
+ * user's own typing (Cyletix-Keyboard research/nosymbol-20261023); it replaces the research
+ * version that put ";" on the top row.
+ */
 internal object Cyletix10Layout {
     const val ID = "pinyin_cyletix10"
-    // The research rows end with "zxcvbnm,./". CyIME keeps ,./ on its control row
-    // and punctuation gestures, so the seven letters retain usable key widths.
-    val rows = listOf("qwdrf;jkyp", "asetghliou", "zxcvbnm").map { it.map(Char::toString) }
-    val referenceRows = listOf("qwertyuiop", "asdfghjkl;", "zxcvbnm")
+    val rows = listOf("qwbrtydfpu", "aseoghjin", "zxckvlm").map { it.map(Char::toString) }
     val preset = CustomKeyboardLayout(ID, "Cyletix10（实验）", rows)
 }
