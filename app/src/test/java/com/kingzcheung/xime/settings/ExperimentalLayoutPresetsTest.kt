@@ -12,14 +12,16 @@ import org.mockito.kotlin.whenever
 class ExperimentalLayoutPresetsTest {
     @get:Rule val temporary = TemporaryFolder()
 
-    @Test fun cyletix10RetainsResearchLettersAndSemicolonInMobileRows() {
+    /** Every symbol stays on its QWERTY key: only the 26 letters move, in the phone's 10/9/7 rows. */
+    @Test fun cyletix10MovesOnlyLettersAndKeepsSymbolsHome() {
         val layout = Cyletix10Layout.preset
-        assertEquals(listOf("qwdrf;jkyp", "asetghliou", "zxcvbnm"),
+        assertEquals(listOf("qwbrtydfpu", "aseoghjin", "zxckvlm"),
             layout.rows.map { it.joinToString("") })
-        assertEquals(('a'..'z').toSet(), layout.rows.flatten().joinToString("").filter { it.isLetter() }.toSet())
-        assertEquals(1, layout.rows.flatten().count { it == ";" })
+        assertEquals(listOf(10, 9, 7), layout.rows.map { it.size })
+        assertEquals(('a'..'z').toList(), layout.rows.flatten().joinToString("").toList().sorted())
+        assertFalse(layout.hasSemicolon())
         assertTrue(layout.valid())
-        assertEquals(";", layout.gestures(emptyMap())[";"]?.tap?.value)
+        assertEquals("Cyletix10（实验）", layout.name)
         assertTrue(CustomKeyboardLayouts.isCustom(Cyletix10Layout.ID))
     }
 

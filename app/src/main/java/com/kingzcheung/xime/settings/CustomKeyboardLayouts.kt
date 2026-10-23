@@ -48,7 +48,6 @@ data class CustomKeyboardLayout(
         } })
     }
     private fun referenceRows() = when {
-        id == Cyletix10Layout.ID -> Cyletix10Layout.referenceRows
         hasExtraSlot() -> listOf(BASE[0], BASE[1] + ";", BASE[2])
         else -> BASE
     }
