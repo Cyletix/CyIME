@@ -163,6 +163,14 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /** 收起的候选栏滑到后面时接着显示展开列表（不打开展开页）；换了编码由服务层复位。 */
+    private val _candidateStripExtended = MutableStateFlow(false)
+    val candidateStripExtended: StateFlow<Boolean> = _candidateStripExtended.asStateFlow()
+
+    fun setCandidateStripExtended(extended: Boolean) {
+        _candidateStripExtended.value = extended
+    }
+
     // ── 展开页翻页联动 ──
     // 硬件键盘 DPAD 上/下经此事件流驱动展开页滚动一屏
 
@@ -743,6 +751,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     fun resetKeyboard(isAsciiMode: Boolean, schemaId: String = "", forceNumberPanel: Boolean = false) {
         resetShift()
         _candidatePageExpanded.value = false
+        _candidateStripExtended.value = false
         KeysConfigHelper.setActiveKeyboardSchema(schemaId)
         if (forceNumberPanel) {
             // 数字输入框自动进入数字面板：记录默认主布局，供面板"abc"返回键恢复

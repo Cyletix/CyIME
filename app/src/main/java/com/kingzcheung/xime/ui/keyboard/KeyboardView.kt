@@ -155,6 +155,7 @@ fun KeyboardView(
     (page as? KeyboardPage.Overlay)?.let { if (retainedOverlay != it) retainedOverlay = it }
     val textLayout by viewModel.lastMainLayout.collectAsStateWithLifecycle()
     val candidatePageExpanded by viewModel.candidatePageExpanded.collectAsStateWithLifecycle()
+    val candidateStripExtended by viewModel.candidateStripExtended.collectAsStateWithLifecycle()
     // 符号页与数字页同属键盘页：直接换页，不走工具覆盖层的揭幕动画，也不在动画期间吞掉点击。
     val symbolPageSwap = ((page as? KeyboardPage.Overlay) ?: retainedOverlay)?.route is OverlayRoute.Symbol
     val overlayReveal = rememberKeyboardPanelRevealState(page is KeyboardPage.Overlay, overlayVisibility,
@@ -776,7 +777,8 @@ fun KeyboardView(
             // 候选状态只在候选栏自己的组合范围里读：每次按键只重组候选栏，不再连带整块键盘
             // （Box/Column 是内联的，在外层读候选状态会让整个键盘一起重组）。
             val renderCandidateBar: @Composable (KeyboardPage) -> Unit = { barPage ->
-            val expandedDataMode = candidatePageExpanded &&
+            // 收起的候选栏滑到后面接上展开列表时，数据源同展开态（不打开展开页）。
+            val expandedDataMode = (candidatePageExpanded || candidateStripExtended) &&
                 candidateState.value.expandedCandidatesLoaded
 
             val cs = candidateState.value
@@ -921,6 +923,18 @@ fun KeyboardView(
                         } else {
                             callbacks.onCandidateSelect(index)
                         }
+                    },
+                    onCandidateStripScrolled = {
+                        // 展开着滑候选栏：收起展开页，候选栏接着用展开列表滑下去，同一个候选不出现两次。
+                        if (candidatePageExpanded) {
+                            viewModel.setCandidateStripExtended(true)
+                            viewModel.setCandidatePageExpanded(false)
+                        }
+                    },
+                    onCandidateStripNearEnd = {
+                        // 只在引擎第一页、没有键盘焦点时接：展开列表从第一个候选排起，位置才对得上。
+                        if (!candidatePageExpanded && !showHandwritingCandidates && cs.hasNextPage &&
+                            !cs.hasPrevPage && cs.candidateFocus == null) callbacks.onExtendCandidateStrip?.invoke()
                     },
                     onCandidateLongPress = { index ->
                         // 手写候选：读手写列表（不是引擎列表），长按＝忘掉这个字从手写里学到的笔迹

@@ -65,7 +65,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -503,7 +502,7 @@ private fun CandidatePageContent(
 
 /**
  * 候选条目：候选词与拼音注释拼进同一文本（注释用次级色 + 注释字体），
- * 与候选栏共用用户字号，超宽时省略号截断。
+ * 与候选栏共用用户字号；比一整行还长的候选折成多行，全文都能看到（用户 10-23）。
  * 主候选与联想都按真实文字宽度流式排布，余量均分给条目。
  */
 @Composable
@@ -563,8 +562,6 @@ private fun CandidatePageItem(
             text = annotated,
             style = TextStyle(fontWeight = FontWeight.Normal, lineHeight = 25.sp,
                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
         )
     }
 }
