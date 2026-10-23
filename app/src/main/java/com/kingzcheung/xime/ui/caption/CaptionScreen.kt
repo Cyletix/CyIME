@@ -282,15 +282,13 @@ private fun SlimRail(controller: CaptionController, onSave: () -> Unit, onExit: 
     }
 }
 
-/** Landscape status: one line under the captions, the sound ribbon taking the rest of it. */
+/** The status line itself; [language] null hides the language button (one language offered). */
 @Composable
-private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -> Unit) {
-    val (dotColor, text) = statusOf(controller)
-    var choosing by remember { mutableStateOf(false) }
+internal fun StatusRow(language: String?, dotColor: Color, text: String, onPickLanguage: () -> Unit, ribbon: @Composable (Dp) -> Unit) {
     Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         // 听哪种语言：放在状态这一行最前面，一眼看得到、一点就换；字幕区和按钮都不挤。
-        if (CaptionLanguage.supported.size > 1) {
-            CaptionButton(controller.language.label + " ▾", height = 40.dp, fontSize = 17.sp) { choosing = true }
+        if (language != null) {
+            CaptionButton("$language ▾", height = 40.dp, fontSize = 17.sp, onClick = onPickLanguage)
             Spacer(Modifier.width(10.dp))
         }
         Box(Modifier.size(12.dp).clip(CircleShape).background(dotColor))
@@ -299,6 +297,15 @@ private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -
         Spacer(Modifier.width(12.dp))
         Box(Modifier.weight(1f)) { ribbon(24.dp) }
     }
+}
+
+/** Landscape status: one line under the captions, the sound ribbon taking the rest of it. */
+@Composable
+private fun RailStatus(controller: CaptionController, ribbon: @Composable (Dp) -> Unit) {
+    val (dotColor, text) = statusOf(controller)
+    var choosing by remember { mutableStateOf(false) }
+    StatusRow(controller.language.label.takeIf { CaptionLanguage.supported.size > 1 }, dotColor, text,
+        onPickLanguage = { choosing = true }, ribbon = ribbon)
     if (choosing) LanguageDialog(controller.language, missing = { controller.missingModel(it)?.second },
         onPick = { picked ->
             controller.chooseLanguage(picked)
@@ -338,7 +345,7 @@ private val RAIL_BUTTON = 48.dp
 private fun statusOf(controller: CaptionController) = when {
     controller.micTaken -> MaterialTheme.colorScheme.error to "麦克风被别的应用占着（比如带声音的录屏），这会儿听不到"
     controller.micMuted -> MaterialTheme.colorScheme.error to "手机的麦克风被关了，请家人看一下"
-    controller.status == CaptionController.Status.Listening -> MaterialTheme.colorScheme.primary to "正在听 · 只记字，不录音"
+    controller.status == CaptionController.Status.Listening -> MaterialTheme.colorScheme.primary to "正在听"
     controller.status == CaptionController.Status.Starting -> MaterialTheme.colorScheme.tertiary to controller.message.ifEmpty { "正在准备…" }
     controller.status == CaptionController.Status.Paused -> MaterialTheme.colorScheme.outline to "已暂停"
     controller.status == CaptionController.Status.Held -> MaterialTheme.colorScheme.outline to controller.message
