@@ -1224,6 +1224,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     internal fun openClipboardSearch() {
         if (uiState.value.toolPanelVisible) closeToolPanel()
+        // One keyboard editor at a time: an open edit form would take the chosen candidates, and
+        // closing it later reopened the board under the search (two clipboards, user 10-23).
+        closeQuickSend()
         keyboardViewModel.closeOverlay()
         // Its own flag: a new input field (restartInput, rotation) rewrites sensitiveEditor, and
         // restoring a saved copy of it on close once let a password field learn.
