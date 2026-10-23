@@ -198,6 +198,31 @@ translator:
         assertTrue(PersonalDictManager.loadEntries(context, "pinyin_simp").isEmpty())
     }
 
+    // ── applyCustomPhrases：保存后让正在用的键盘读到 ──
+
+    @Test
+    fun `applyCustomPhrases deploys only when the first phrase adds the translator, and always tells the keyboard`() {
+        val context = mockContext()
+        val rimeDir = java.io.File(context.filesDir, "rime")
+        rimeDir.mkdirs()
+        java.io.File(rimeDir, "pinyin_simp.schema.yaml").writeText("speller:\n  alphabet: abc\n")
+        createCustomPhraseFile(rimeDir, "pinyin_simp")
+        var deploys = 0
+        var notices = 0
+        runBlocking {
+            PersonalDictManager.applyCustomPhrases(context, "pinyin_simp", { deploys++ }, { notices++ })
+        }
+        assertTrue(java.io.File(rimeDir, "pinyin_simp.custom.yaml").readText().contains("table_translator@custom_phrase"))
+        assertEquals(1, deploys)
+        assertEquals(1, notices)
+        // Later edits change only the phrase file: no deployment, but the open session must still re-read it.
+        runBlocking {
+            PersonalDictManager.applyCustomPhrases(context, "pinyin_simp", { deploys++ }, { notices++ })
+        }
+        assertEquals(1, deploys)
+        assertEquals(2, notices)
+    }
+
     // ── ensureSchemaPack：仅自定义短语 + 清理旧 merged patch ──
 
     @Test

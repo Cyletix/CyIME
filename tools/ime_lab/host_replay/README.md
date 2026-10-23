@@ -65,3 +65,7 @@ syllable choices before selecting Chinese text.
 root's `user` directory) checks that ending a T9 composition after a partial choice starts the next
 code fresh: 9447426926, choose 至少, clear, then 64 must read `64`. It also prints what a Rime-only
 clear leaves, which is the 2026-10-23 report (old digits came back after Enter).
+
+`CustomPhraseReloadProbe.java` (same arguments, on a copy whose `default.custom.yaml` lists
+`rime_ice`) adds a phrase to `custom_phrase.txt` while a session is open and reports which step makes
+it appear. 2026-10-23: nothing until the schema is selected again; maintenance is not needed.

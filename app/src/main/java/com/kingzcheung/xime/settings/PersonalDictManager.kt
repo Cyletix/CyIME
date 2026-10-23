@@ -129,6 +129,34 @@ object PersonalDictManager {
         file.writeText(buildStableDbText(STABLEDB_HEADER, entries), Charsets.UTF_8)
     }
 
+    /** Bumped after saved phrases are ready; the keyboard then re-selects its schema in its input queue. */
+    const val CUSTOM_PHRASE_REVISION = "custom_phrase_revision"
+
+    /**
+     * Saved phrases reach the running keyboard. A schema's first phrase adds its phrase translator
+     * (deployed incrementally); then the keyboard re-selects its schema, since an open session never
+     * re-reads custom_phrase.txt. Not on Main: the first phrase may deploy.
+     */
+    suspend fun applyCustomPhrases(
+        context: Context,
+        schemaId: String?,
+        deploy: () -> Unit = {
+            if (com.kingzcheung.xime.rime.RimeEngine.isInitialized()) com.kingzcheung.xime.rime.RimeConfigHelper.ensureDeployment(context)
+        },
+        notifyKeyboard: () -> Unit = {
+            val prefs = SettingsPreferences.getPrefsPublic(context)
+            prefs.edit().putLong(CUSTOM_PHRASE_REVISION, prefs.getLong(CUSTOM_PHRASE_REVISION, 0L) + 1L).apply()
+        },
+    ) {
+        val rimeDir = SchemaManager.getRimeDir(context)
+        val schemas = schemaId?.let(::listOf) ?: SchemaManager.getEnabledSchemas(context)
+        fun patches() = schemas.map { File(rimeDir, "$it.custom.yaml").takeIf(File::exists)?.readText(Charsets.UTF_8) }
+        val before = patches()
+        if (schemaId != null) ensureSchemaPack(context, schemaId) else ensureSchemaPacks(context)
+        if (patches() != before) deploy()
+        notifyKeyboard()
+    }
+
     /** 清理 custom_phrase 文件（仅当文件为空时删除，避免丢失用户数据）。 */
     fun removeCustomPhraseFile(context: Context, schemaId: String? = null) {
         val file = getCustomPhraseFile(context, schemaId)
