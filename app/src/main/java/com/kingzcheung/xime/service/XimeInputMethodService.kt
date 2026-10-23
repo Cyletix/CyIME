@@ -1130,18 +1130,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             Toast.makeText(this, "工具面板不支持在悬浮/横屏模式下使用", Toast.LENGTH_SHORT).show()
             return
         }
-        if (uiState.value.showQuickSendForm) {
-            uiState.value = uiState.value.copy(
-                showQuickSendForm = false,
-                quickSendFormFocused = false,
-                quickSendCodeFocused = false,
-                quickSendEditingItemId = null,
-                quickSendEditingItemText = "",
-                quickSendEditingItemCode = "",
-            )
-            QuickSendFormEditTextHolder.editText = null
-            QuickSendFormCodeEditTextHolder.editText = null
-        }
+        closeQuickSend()
         // 打开面板前清理宿主输入框残留输入态（未上屏的拼音/英文），
         // 避免旧组合混入面板输入、或面板关闭后覆盖宿主输入框中段文字。
         val pending = candidateState.value
@@ -3097,11 +3086,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 closeClipboardSearch(openBoard = false)
                 if (uiState.value.isVoiceMode) endVoiceSession()
                 closeToolPanel()
+                closeQuickSend()
                 keyboardViewModel.closeOverlay()
                 keyboardViewModel.setCandidatePageExpanded(false)
                 uiState.value = uiState.value.copy(
                     isCompact = true, voiceCollapsed = false, handwritingExpanded = false, clipboardImagesExpanded = false,
-                    showQuickSendForm = false, quickSendFormFocused = false, quickSendCodeFocused = false,
                 )
             } else uiState.value = uiState.value.copy(isCompact = false)
             refreshKeyboardGeometry()
@@ -3267,21 +3256,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         mainHandler.postDelayed(releaseIdlePredictionModel, PREDICTION_MODEL_IDLE_RELEASE_MS)
         // 键盘隐藏时重置快捷发送表单临时态：表单开启状态下直接隐藏键盘（未走 onClose）
         // 会把 showQuickSendForm 残留到下次弹窗，候选栏上方渲染出残留表单背景造成遮挡；
-        // 回车键文案也需一并还原（打开表单时被改为"确定"）。
-        if (uiState.value.showQuickSendForm || uiState.value.quickSendFormFocused) {
-            uiState.value = uiState.value.copy(
-                showQuickSendForm = false,
-                ocrDraft = false,
-                quickSendFormFocused = false,
-                quickSendCodeFocused = false,
-                quickSendEditingItemId = null,
-                quickSendEditingItemText = "",
-                quickSendEditingItemCode = "",
-                enterKeyText = "发送",
-            )
-            QuickSendFormEditTextHolder.editText = null
-            QuickSendFormCodeEditTextHolder.editText = null
-        }
+        // 回车键文案也需一并还原（打开表单时被改为"换行"）。
+        closeQuickSend()
     }
 
     override fun onWindowShown() {
