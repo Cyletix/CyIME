@@ -327,9 +327,9 @@ private fun CandidatePageContent(
                         opacityScale = if (state.singleCharFilter) 0.28f else 1f,
                         modifier = Modifier.weight(1f).testTag("expanded-filter-key")
                     ) {
-                        // 显示当前模式：候选（全部）/ 单字（筛选中，高亮底色）
+                        // 写的是点了以后去哪（用户 10-23）：平时「单字」，筛选中（高亮底色）「候选」回到全部
                         Text(
-                            text = if (state.singleCharFilter) "单字" else "候选",
+                            text = if (state.singleCharFilter) "候选" else "单字",
                             color = state.textColor,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Normal,
@@ -902,7 +902,7 @@ private fun SizedExpandedLeftRail(state: CandidatePageState, callbacks: Candidat
                 }
             }
         }
-        KeyButton(text = if (state.singleCharFilter) "单字" else "候选",
+        KeyButton(text = if (state.singleCharFilter) "候选" else "单字",
             onClick = { callbacks.onToggleSingleCharFilter?.invoke() },
             backgroundColor = LocalFunctionKeyColors.current?.background ?: keyBg,
             textColor = LocalFunctionKeyColors.current?.foreground ?: state.textColor,
