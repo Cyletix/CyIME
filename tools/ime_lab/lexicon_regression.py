@@ -94,6 +94,12 @@ def prepare_android(work):
             chr(10) + "translator:" + chr(10) + "  max_sentences: 4" + chr(10) + "  sentence_cutoff_threshold: 100" + chr(10), 1)
         path.write_text(text + chr(10) + "t9:" + chr(10) + "  sentence_rescore: true" + chr(10) + "  ngram_model: t9_ngram"
                         + chr(10) + "  ngram_sentence_start: false" + chr(10), encoding="utf-8")
+    k14_add = os.environ.get("CYIME_K14_TRANSLATOR_ADD")
+    if k14_add:  # "enable_word_completion: true": extra lines at the top of the 14-key translator block
+        path = data / "pinyin_14jian.schema.yaml"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace(chr(10) + "translator:" + chr(10),
+                                     chr(10) + "translator:" + chr(10) + "  " + k14_add + chr(10), 1), encoding="utf-8")
     for name in ("default.yaml", "symbols.yaml"):
         shutil.copy(REPO / "app/src/main/assets/rime" / name, data / name)
     text = (data / "default.yaml").read_text(encoding="utf-8")
