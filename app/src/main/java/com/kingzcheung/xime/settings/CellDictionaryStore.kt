@@ -69,8 +69,13 @@ class CellDictionaryStore(val directory: File) {
             if (dictionaryFile(id).isFile) return@synchronized it
             require(it.sha256 == hash) { "来源词库已更新，请作为本地新词库导入" }
         }
-        val parsed = if (offer == null && bytes.firstOrNull { it.toInt().toChar() !in " \r\n\t" } == '{'.code.toByte())
-            JsonCellDictionary.parse(bytes) else ScelDictionary.parse(bytes)
+        val scel = bytes.size >= 4 && bytes[0] == 0x40.toByte() && bytes[1] == 0x15.toByte() &&
+            bytes[2] == 0.toByte() && bytes[3] == 0.toByte()
+        val parsed = when {
+            offer != null || scel -> ScelDictionary.parse(bytes)
+            bytes.firstOrNull { it.toInt().toChar() !in " \r\n\t" } == '{'.code.toByte() -> JsonCellDictionary.parse(bytes)
+            else -> TxtCellDictionary.parse(bytes)  // 词 拼音 / 拼音 词 / Rime .dict.yaml
+        }
         val entry = InstalledCellDictionary(id, offer?.name ?: parsed.name.ifBlank { "本地词库" },
             offer?.category ?: "本地导入", parsed.entries.size, parsed.skipped, offer?.sourceUrl.orEmpty(), hash)
         writeAtomic(dictionaryFile(id), ScelDictionary.toRime("cell_$id", parsed.entries))
