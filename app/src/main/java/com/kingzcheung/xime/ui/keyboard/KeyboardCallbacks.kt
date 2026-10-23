@@ -44,6 +44,8 @@ data class KeyboardCallbacks(
     val onGlobalCandidateDelete: ((Int) -> Unit)? = null,
     /** 用户展开候选页时请求服务层拉取跨页全量候选（本地分页数据源）。 */
     val onRequestExpandedCandidates: (() -> Unit)? = null,
+    /** 收起的候选栏滑到最后几个：服务层把展开列表接到候选栏后面。 */
+    val onExtendCandidateStrip: (() -> Unit)? = null,
     val onRequestPinyinSyllables: ((Long, (com.kingzcheung.xime.rime.PinyinSyllableChoices?) -> Unit) -> Unit)? = null,
     val onSelectPinyinSyllable: ((com.kingzcheung.xime.rime.PinyinSyllableChoices, Int,
         (com.kingzcheung.xime.rime.PinyinSyllableChoices?) -> Unit) -> Unit)? = null,

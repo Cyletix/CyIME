@@ -86,6 +86,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -157,7 +159,11 @@ data class CandidateBarCallbacks(
     val onReorderToolbar: ((List<String>) -> Unit)? = null,
     // 长按候选：抛事件给宿主（键盘视图内弹确认覆盖层，不弹独立窗口——
     // 焦点型弹窗会抢焦点导致 IME 被系统收起）。
-    val onCandidateLongPress: ((Int) -> Unit)? = null
+    val onCandidateLongPress: ((Int) -> Unit)? = null,
+    /** 手指开始左右滑打字候选。 */
+    val onCandidateStripScrolled: (() -> Unit)? = null,
+    /** 打字候选滑到最后几个了。 */
+    val onCandidateStripNearEnd: (() -> Unit)? = null,
 )
 
 /** 空间充足时均匀排布，项目溢出时保留完整触控尺寸并允许滚动。 */
@@ -284,11 +290,8 @@ fun CandidateBar(
             showLeftIcon = true
         }
         is CandidateBarState.ChineseCandidates -> {
-            // Expanded candidates share this rail. Keep a hardware-selected item
-            // beyond the usual first page available to the fixed strip's viewport.
-            val taken = s.candidates.take(maxOf(20, s.highlightIndex + 1))
-            // 候选栏按设置的"每页候选词数"显示引擎当前页，可左右滑动查看放不下的候选
-            displayCandidates = taken
+            // 候选栏只排放得下的几个，其余可左右滑动查看；展开列表接到候选栏时也全部可滑到（只排可见的几个）。
+            displayCandidates = s.candidates
             displayComments = s.comments
 
             hasAnyMore = s.hasMore || s.candidates.size > 1
@@ -493,6 +496,10 @@ fun CandidateBar(
                     highlightIndex = (state as? CandidateBarState.ChineseCandidates)?.highlightIndex ?: 0,
                     showNumberLabels = showNumberLabels,
                     gapWindowX = splitGapX,
+                    scrollable = state is CandidateBarState.ChineseCandidates,
+                    onUserScroll = callbacks.onCandidateStripScrolled,
+                    onNearEnd = callbacks.onCandidateStripNearEnd,
+                    scrollKey = (state as? CandidateBarState.ChineseCandidates)?.let { it.inputText to it.candidates.firstOrNull() },
                 )
             } else if (state !is CandidateBarState.Idle) BoxWithConstraints(Modifier.weight(1f)) {
                 val showComments = candidateCommentsVisible(maxWidth.value, density.fontScale,
@@ -924,14 +931,18 @@ fun CandidateItem(
     correction: String = "",
     /** Shift 拖动指着别的候选时由候选栏统一画底色，这里先不画，保证只亮一个。 */
     selectionFill: Boolean = true,
+    /** 候选栏还没滑动时藏起来的候选：不能点，也不接 Shift 拖动。 */
+    interactive: Boolean = true,
 ) {
     // 登记位置给 Shift 拖动：从 Shift 拖到这里松手，按住 Shift 选它（释义模式上屏英文）。
     val dropId = remember { Any() }
     val currentClick by rememberUpdatedState(onClick)
     DisposableEffect(dropId) { onDispose { CandidateDropTargets.shared.remove(dropId) } }
+    if (!interactive) SideEffect { CandidateDropTargets.shared.remove(dropId) }
     Row(
         modifier = modifier
-            .onGloballyPositioned { CandidateDropTargets.shared.put(dropId, it.boundsInRoot()) { currentClick() } }
+            .then(if (interactive) Modifier.onGloballyPositioned {
+                CandidateDropTargets.shared.put(dropId, it.boundsInRoot()) { currentClick() } } else Modifier)
             .height(candidateItemHeight(fontSize))
             .clip(RoundedCornerShape(5.dp))
             .background(
@@ -939,10 +950,10 @@ fun CandidateItem(
                 else Color.Transparent
             )
             .semantics { selected = isSelected }
-            .combinedClickable(
+            .then(if (interactive) Modifier.combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
-            )
+            ) else Modifier)
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1083,6 +1094,9 @@ private class HighlightMove {
 /** Layout history only; updating it after composition must not schedule another recomposition. */
 private class CandidateStripViewport { var firstIndex: Int = 0 }
 
+/** 平时显示的那几个候选；[oversized]：只有一个且比整条还宽（放不全，展开页里要再给它完整的一格）。 */
+private class CandidateStripWindow(val split: CandidateWindowSplit, val oversized: Boolean)
+
 /** One measured row. Keyboard focus can move its window without changing candidate identities. */
 @Composable
 internal fun FixedCandidateStrip(
@@ -1094,6 +1108,14 @@ internal fun FixedCandidateStrip(
     itemSpacing: androidx.compose.ui.unit.Dp = 4.dp,
     /** 分体中缝（窗口横坐标）；候选先排左侧，越过中缝接着排右侧。 */
     gapWindowX: Pair<Float, Float>? = null,
+    /** 能左右滑动看后面的候选；平时仍只显示放得下的那几个，手指一滑才露出后面的。分体中缝时不滑。 */
+    scrollable: Boolean = false,
+    /** 手指开始滑候选栏（展开着的话收起展开页，免得同一个候选出现两次）。 */
+    onUserScroll: (() -> Unit)? = null,
+    /** 滑到最后几个候选了（接着加载展开列表）。 */
+    onNearEnd: (() -> Unit)? = null,
+    /** 换了这个值（新的编码）就回到最前面。 */
+    scrollKey: Any? = null,
 ) {
     val measurer = rememberTextMeasurer()
     var stripOriginX by remember { mutableStateOf(Float.NaN) }
@@ -1104,6 +1126,8 @@ internal fun FixedCandidateStrip(
     // 候选一变（打字、翻页）就直接落到新位置，打字时什么都不动。
     var stripRootOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var focusedBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    // 滑动时选中的候选滑出了候选栏：底色先不画，滑回来再画。
+    var focusedOnScreen by remember { mutableStateOf(true) }
     val highlightBox = remember { androidx.compose.animation.core.Animatable(androidx.compose.ui.geometry.Rect.Zero,
         androidx.compose.ui.geometry.Rect.VectorConverter) }
     var highlightShown by remember { mutableStateOf(false) }
@@ -1130,7 +1154,7 @@ internal fun FixedCandidateStrip(
         .onGloballyPositioned { stripOriginX = it.positionInWindow().x; stripRootOrigin = it.boundsInRoot().topLeft }
         .drawBehind {
             val rect = highlightBox.value
-            if (highlightShown && highlightVisible && CandidateDropTargets.shared.hoveredBounds == null && rect.width > 0f)
+            if (highlightShown && highlightVisible && focusedOnScreen && CandidateDropTargets.shared.hoveredBounds == null && rect.width > 0f)
                 drawRoundRect(highlightAccent.copy(alpha = 0.2f), rect.topLeft - stripRootOrigin, rect.size,
                     androidx.compose.ui.geometry.CornerRadius(5.dp.toPx()))
         }) {
@@ -1160,17 +1184,22 @@ internal fun FixedCandidateStrip(
                 primary + secondary + with(density) { 2 * 4.dp.roundToPx() }
             }
             if (localGap != null) {
-                splitCandidateWindow(all.size, focused, localGap.first, constraints.maxWidth - localGap.second,
-                    with(density) { itemSpacing.roundToPx() }, viewport.firstIndex, widthAt)
-            } else CandidateWindowSplit(candidateWindow(all.size, focused, constraints.maxWidth,
-                with(density) { itemSpacing.roundToPx() }, windowStart = viewport.firstIndex, widthAt = widthAt), Int.MAX_VALUE)
+                CandidateStripWindow(splitCandidateWindow(all.size, focused, localGap.first, constraints.maxWidth - localGap.second,
+                    with(density) { itemSpacing.roundToPx() }, viewport.firstIndex, widthAt), oversized = false)
+            } else {
+                val range = candidateWindow(all.size, focused, constraints.maxWidth,
+                    with(density) { itemSpacing.roundToPx() }, windowStart = viewport.firstIndex, widthAt = widthAt)
+                CandidateStripWindow(CandidateWindowSplit(range, Int.MAX_VALUE),
+                    oversized = range.count() == 1 && widthAt(range.first) > constraints.maxWidth)
+            }
         }
-        val visibleIndices = window.range
-        val splitLeftCount = window.leftCount
+        val visibleIndices = window.split.range
+        val splitLeftCount = window.split.leftCount
         androidx.compose.runtime.SideEffect {
             viewport.firstIndex = visibleIndices.first.takeUnless { visibleIndices.isEmpty() } ?: 0
             // Expanded pagination removes a prefix only. A shifted window must not hide earlier items.
-            callbacks.onVisibleCandidatesChanged?.invoke(if (visibleIndices.first == 0)
+            // 栏里放不全的长候选不算已显示：展开页从它开始排，能看到全文。
+            callbacks.onVisibleCandidatesChanged?.invoke(if (visibleIndices.first == 0 && !window.oversized)
                 candidates.take(visibleIndices.count()) else emptyList())
             callbacks.onVisibleAssociationsChanged?.invoke(visibleIndices.filter { it >= candidates.size }
                 .map { all[it] })
@@ -1181,6 +1210,14 @@ internal fun FixedCandidateStrip(
             else listOf(visibleIndices.take(leftCount) to 0, visibleIndices.drop(leftCount) to localGap.second)
         // Shift 拖动指着候选时，选中底色改由候选栏画在手指指着的那个上，原来的先不画。
         val shiftDragFree = CandidateDropTargets.shared.hoveredBounds == null
+        if (scrollable && localGap == null) {
+            ScrollableCandidateRow(candidates, all, shownComments, visuals, callbacks, fontSize, focused, showNumberLabels,
+                itemSpacing, visibleIndices, scrollKey, onUserScroll, onNearEnd,
+                selectionFill = shiftDragFree && !highlightShown,
+                onFocusedBounds = { focusedBounds = it; focusedOnScreen = true },
+                onFocusedGone = { focusedOnScreen = false })
+            return@BoxWithConstraints
+        }
         segments.forEach { (segmentIndices, offsetPx) ->
         Row(Modifier.offset { androidx.compose.ui.unit.IntOffset(offsetPx, 0) },
             horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
@@ -1203,6 +1240,66 @@ internal fun FixedCandidateStrip(
                     selectionFill = shiftDragFree && !highlightShown)
             }
         }
+        }
+    }
+}
+
+/**
+ * 能左右滑的候选行（用户 10-23）：平时和原来一样只显示放得下的那几个（[shown]），后面的先藏着；
+ * 手指一滑就全部露出来，可以一直滑到展开列表里的候选。长候选不截断，滑过去就能看完。
+ */
+@Composable
+private fun ScrollableCandidateRow(
+    candidates: List<String>, all: List<String>, comments: List<String>, visuals: CandidateBarVisuals,
+    callbacks: CandidateBarCallbacks, fontSize: androidx.compose.ui.unit.TextUnit, focused: Int,
+    showNumberLabels: Boolean, itemSpacing: androidx.compose.ui.unit.Dp, shown: IntRange, scrollKey: Any?,
+    onUserScroll: (() -> Unit)?, onNearEnd: (() -> Unit)?, selectionFill: Boolean,
+    onFocusedBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
+    onFocusedGone: () -> Unit,
+) {
+    val start = shown.first.takeUnless { shown.isEmpty() } ?: 0
+    // 新编码或键盘焦点换了一屏：直接从那一屏开始，不带上一次滑到的位置。
+    val listState = remember(scrollKey, start) { androidx.compose.foundation.lazy.LazyListState(start) }
+    var revealed by remember(listState) { mutableStateOf(false) }
+    val currentUserScroll by rememberUpdatedState(onUserScroll)
+    val currentNearEnd by rememberUpdatedState(onNearEnd)
+    val candidateCount by rememberUpdatedState(candidates.size)
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect {
+            if (it is androidx.compose.foundation.interaction.DragInteraction.Start) {
+                revealed = true
+                currentUserScroll?.invoke()
+            }
+        }
+    }
+    LaunchedEffect(listState) {
+        androidx.compose.runtime.snapshotFlow {
+            revealed && (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= candidateCount - 4
+        }.collect { if (it) currentNearEnd?.invoke() }
+    }
+    LazyRow(Modifier.fillMaxWidth().testTag("candidate-scroll-row"), state = listState,
+        horizontalArrangement = Arrangement.spacedBy(itemSpacing), verticalAlignment = Alignment.CenterVertically) {
+        items(all.size) { index ->
+            val hidden = !revealed && index !in shown
+            val numbered = index < candidates.size
+            if (index == focused) DisposableEffect(Unit) { onDispose { onFocusedGone() } }
+            CandidateItem(candidateNumberedText(all[index], index, showNumberLabels && numbered), index, {
+                if (numbered) callbacks.onCandidateSelect(index)
+                else callbacks.onAssociationSelect?.invoke(index - candidates.size)
+            }, visuals.textColor,
+                comment = comments.getOrElse(index) { "" }, isSelected = index == focused,
+                accentColor = visuals.accentColor, selectedTextColor = visuals.selectedTextColor,
+                opaqueComment = visuals.opaqueComments,
+                textShadow = visuals.textShadow,
+                fontSize = fontSize, candidateFontFamily = AppFonts.candidateFontFamily,
+                commentFontFamily = AppFonts.commentFontFamily,
+                modifier = if (hidden) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier.testTag("bar-candidate:$index")
+                    .then(if (index == focused) Modifier.onGloballyPositioned { onFocusedBounds(it.boundsInRoot()) } else Modifier),
+                onLongClick = if (numbered) callbacks.onCandidateLongPress?.let { action -> { action(index) } } else null,
+                learned = numbered && all[index] in LocalLearnedCandidates.current,
+                correction = if (numbered) LocalCorrectedCandidates.current[all[index]].orEmpty() else "",
+                selectionFill = selectionFill,
+                interactive = !hidden)
         }
     }
 }

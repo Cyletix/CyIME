@@ -476,8 +476,20 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** Expanded candidates belong to an engine revision and editor session, never display text. */
     internal fun refreshExpandedCandidates() {
         expandedCandidateLoader.cancel()
+        keyboardViewModel.setCandidateStripExtended(false)
         candidateState.value = candidateState.value.copy(expandedCandidates = emptyList(), expandedCandidatesLoaded = false)
         if (!keyboardViewModel.candidatePageExpanded.value) return
+        loadExpandedCandidates()
+    }
+
+    /** 收起的候选栏滑到最后几个：把展开列表接在候选栏后面，展开页不打开。 */
+    internal fun extendCandidateStrip() {
+        if (keyboardViewModel.candidateStripExtended.value) return
+        keyboardViewModel.setCandidateStripExtended(true)
+        if (!candidateState.value.expandedCandidatesLoaded) loadExpandedCandidates()
+    }
+
+    private fun loadExpandedCandidates() {
         val snapshot = candidateState.value
         val session = uiState.value.inputSessionId
         val admission = inputReadiness.ticket() ?: return
@@ -487,7 +499,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
         expandedCandidateLoader.load(snapshot.engineRevision, isCurrent = {
             inputReadiness.accepts(admission) && uiState.value.inputSessionId == session &&
-                keyboardViewModel.candidatePageExpanded.value &&
+                (keyboardViewModel.candidatePageExpanded.value || keyboardViewModel.candidateStripExtended.value) &&
                 candidateState.value.engineRevision == snapshot.engineRevision
         }) { candidates ->
             candidateState.value = candidateState.value.copy(expandedCandidates = candidates, expandedCandidatesLoaded = true)

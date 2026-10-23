@@ -297,6 +297,7 @@ internal fun rememberImeKeyboardCallbacks(
                 service.candidateState.value = service.candidateState.value.copy(candidateFocus = null)
                 service.refreshExpandedCandidates()
             },
+            onExtendCandidateStrip = { service.extendCandidateStrip() },
             onCursorMove = { direction ->
                 if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$direction") == true) {
                     service.feedbackManager.cursorStepFeedback(view)
