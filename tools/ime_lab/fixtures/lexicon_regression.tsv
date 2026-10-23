@@ -1120,3 +1120,7 @@ user-momodi	26	momodi	默默地	1	user	2026-10-19	同上
 user-haohaodi	26	haohaodi	好好地	1	user	2026-10-19	同上
 user-nishuode	26	nishuode	你说的	1	user	2026-10-19	原来“你说得”权重远高于“你说的”
 user-shenghuode	26	shenghuode	生活的	1	user	2026-10-19	同上
+k14-tail-woyes	14	QOTEA	我也是	5	k14-tail	2026-10-23	最后一个合并键 A（a/s）也按声母读：打一半时出“我也是”
+k14-tail-jius	14	JUUA	就是	5	k14-tail	2026-10-23	同上，“就啊”仍排在前
+k14-tail-zhendea	14	ZGEBDEA	真的啊	1	k14-tail	2026-10-23	打全时完整音节“啊”的读法仍排第一
+k14-tail-zhishanga	14	ZGUAGABGA	智商啊	1	k14-tail	2026-10-23	声母读法拼出的整词（猪上树）不抢第一
