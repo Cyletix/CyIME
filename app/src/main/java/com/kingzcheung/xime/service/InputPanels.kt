@@ -33,11 +33,12 @@ internal object QuickSendTransitions {
 }
 
 /**
- * Opens the quick-send form. Only one keyboard editor takes typed text at a time: the tool panel
- * closes, and an overlay (the clipboard board) is left, since its full-screen layer would swallow
- * the form's touches.
+ * Opens the quick-send form. Only one keyboard editor takes typed text at a time: clipboard search
+ * and the tool panel close, and an overlay (the clipboard board) is left, since its full-screen
+ * layer would swallow the form's touches.
  */
 internal fun XimeInputMethodService.openQuickSend(itemId: Long? = null, text: String = "", code: String = "", ocr: Boolean = false) {
+    closeClipboardSearch(openBoard = false)
     closeToolPanel()
     keyboardViewModel.closeOverlay()
     uiState.value = QuickSendTransitions.open(uiState.value, itemId, text, code, ocr)
