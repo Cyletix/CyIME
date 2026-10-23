@@ -56,6 +56,35 @@ object InputProfileSelection {
             it.profile.scheme == current.profile.scheme && it.profile.layout.id == current.profile.layout.id
     }
 
+    /** 同一方案：编码相同且是同一变体（小鹤双拼的 26 键和 14 键条目算同一个，微软双拼不算）。 */
+    fun sameScheme(a: SchemaInfo, b: SchemaInfo): Boolean = a.profile.scheme == b.profile.scheme &&
+        (a.schemeLabel == b.schemeLabel || variantId(a) == variantId(b))
+
+    private fun variantId(entry: SchemaInfo): String = CyimeInputDefaults.companions[entry.schemaId]
+        ?.firstOrNull { InputProfiles.describe(it).scheme == entry.profile.scheme } ?: entry.schemaId
+
+    /** 换到某布局后用的条目；[keepsScheme] 为假表示这个布局没有当前方案，只能换成它有的方案。 */
+    data class LayoutSwitch(val entry: SchemaInfo, val keepsScheme: Boolean)
+
+    /** 点布局即切换：优先保持当前方案（含变体），没有时取同类编码，再没有取排在最前的方案。 */
+    fun switchLayout(entries: List<SchemaInfo>, current: SchemaInfo, layoutId: String,
+        all: List<SchemaInfo> = entries): LayoutSwitch? {
+        val offering = entries.filter { it.profile.mode == InputMode.KEYBOARD &&
+            it.profile.language == current.profile.language && offers(it, layoutId, all) }
+        (offering.firstOrNull { it.schemaId == current.schemaId } ?: offering.firstOrNull { sameScheme(it, current) })
+            ?.let { return LayoutSwitch(it, true) }
+        return (offering.firstOrNull { it.profile.scheme == current.profile.scheme } ?: offering.firstOrNull())
+            ?.let { LayoutSwitch(it, false) }
+    }
+
+    /** 当前语言所有方案提供的布局；没有当前方案的布局由界面标灰，点了换方案并提示。 */
+    fun languageLayouts(entries: List<SchemaInfo>, current: SchemaInfo): List<InputLayout> = entries
+        .filter { it.profile.language == current.profile.language && it.profile.mode == InputMode.KEYBOARD }
+        .flatMap { layoutsOf(it, entries) }.distinctBy { it.id }
+
+    fun switchHint(layout: InputLayout, current: SchemaInfo, target: SchemaInfo): String =
+        "${layout.displayName}没有${current.schemeLabel}，已换成${target.schemeLabel}"
+
     /** Changing shape cannot silently change language or encoding. Missing combinations stay unavailable. */
     fun changeLayout(entries: List<SchemaInfo>, current: SchemaInfo, layoutId: String): SchemaInfo? = entries
         .filter { it.profile.mode == InputMode.KEYBOARD && it.profile.language == current.profile.language &&

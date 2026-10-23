@@ -67,8 +67,10 @@ fun SchemaListView(
         if (current == null) {
             Text("正在读取当前输入方式…", color = keyTextColor)
         } else {
+            val switches = layouts.associate { it.id to InputProfileSelection.switchLayout(entries, current, it.id, all) }
             LayoutPreviewChoices(layouts, current.profile.language, layoutId,
                 "profile-layout-list", itemTagPrefix = "panel-layout:",
+                unavailableIds = switches.filterValues { it?.keepsScheme == false }.keys,
                 rowHeight = layoutHeight,
                 qwertyPreviewStagger = qwertyStagger,
                 onManage = {
@@ -79,9 +81,14 @@ fun SchemaListView(
                 layoutId = id
                 // This is an explicit combination choice, not a layout rebind: one tap switches,
                 // keeping the current scheme when the layout offers it (拼音 26 → 拼音 14).
-                schemaForLayout(entries, id, current.profile.scheme, all)?.let { schemaId ->
-                    entries.firstOrNull { it.schemaId == schemaId }?.let { LetterLayouts.selectFor(context, it, id) }
-                    onSelectSchema(schemaId)
+                // 布局没有当前方案（小鹤双拼 → 九键）时照样切换，但要说出换成了什么方案。
+                switches[id]?.let { switch ->
+                    if (!switch.keepsScheme) layouts.firstOrNull { it.id == id }?.let { layout ->
+                        android.widget.Toast.makeText(context, InputProfileSelection.switchHint(layout, current, switch.entry),
+                            android.widget.Toast.LENGTH_LONG).show()
+                    }
+                    LetterLayouts.selectFor(context, switch.entry, id)
+                    onSelectSchema(switch.entry.schemaId)
                 }
             }
             HorizontalDivider(Modifier.padding(vertical = 2.dp), color = keyTextColor.copy(alpha = .15f))
@@ -98,11 +105,4 @@ fun SchemaListView(
         }
     }
     }
-}
-
-/** 点布局即切换：优先保持当前方案（如拼音），该布局没有时取排在最前的方案。 */
-internal fun schemaForLayout(entries: List<SchemaInfo>, layoutId: String, currentScheme: InputScheme,
-    all: List<SchemaInfo> = entries): String? {
-    val candidates = entries.filter { InputProfileSelection.offers(it, layoutId, all) }
-    return (candidates.firstOrNull { it.profile.scheme == currentScheme } ?: candidates.firstOrNull())?.schemaId
 }
