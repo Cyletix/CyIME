@@ -1545,8 +1545,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             setContent {
               androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                 val inputWindowWidthDp = maxWidth.value.roundToInt().coerceAtLeast(1)
-                val cand = candidateState.value
-                androidx.compose.runtime.SideEffect { KeyLatencyProbe.composed() }
                 val state = uiState.value
                 // Reloaded key gaps/rows and split changes affect automatic geometry even
                 // when the active input profile and stored dimensions remain unchanged.
@@ -1730,6 +1728,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             val hardwareEnglish = state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH
                             val pendingPrediction by predictionManager.pendingRequest.collectAsState()
                             // The toolbar numbers 10 candidates; a longer engine page is shown in windows of 10.
+                            // 候选只在实体键盘浮条这里读；放在外层会让每次候选变化都重组整个键盘。
+                            val cand = candidateState.value
                             val hardwareWindow = keyRouter.hardwareWindowStart(cand)
                             com.kingzcheung.xime.gloss.CandidateGlossary.revision // 词典加载完成后重组
                             val hardwareCandidates = hardwareCandidatePresentation(cand, hardwareEnglish,
@@ -2163,7 +2163,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             KeyboardView(
                                 hardwareKeyboardConnected = hasHardwareKeyboard,
                                 hardwareCandidateHighlight = if (hasHardwareKeyboard) keyRouter.hardwareCandidateSelection(
-                                    cand, state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH,
+                                    candidateState.value, state.isAsciiMode || state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH,
                                     predictionManager.hasPendingPrediction) else null,
                                 inputSessionManagedByHost = true,
                                 resizeOverlay = resizeControls,
