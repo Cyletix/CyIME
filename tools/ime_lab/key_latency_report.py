@@ -38,6 +38,8 @@ def parse(path):
                 if stage in fields:
                     row[stage] = int(fields[stage])
             row["dropped"] = int(fields.get("dropped", 0))
+            row["inflight"] = int(fields.get("inflight", 0))
+            row["at"] = int(fields.get("at", 0))
             rows.append(row)
     return rows
 
@@ -67,11 +69,17 @@ def main():
     if not rows:
         sys.exit("no CyIMELatency lines")
     summary = summarize(rows)
+    stamps = sorted(r["at"] for r in rows if r["at"])
+    gaps = [b - a for a, b in zip(stamps, stamps[1:]) if 0 < b - a < 1000]
+    inflight = [r["inflight"] for r in rows]
     print("group".ljust(16) + "n".rjust(5) + "".join(s.rjust(14) for s in STAGES))
     for group, stats in summary.items():
         cells = "".join((f"{stats[s]['p50']:.1f}/{stats[s]['p95']:.1f}" if s in stats else "-").rjust(14) for s in STAGES)
         print(group.ljust(16) + str(stats["n"]).rjust(5) + cells)
     print(f"rows={len(rows)} last_dropped={rows[-1]['dropped']} (p50/p95 ms)")
+    if gaps:
+        print(f"key interval p50={percentile(gaps, 50)} ms p5={percentile(gaps, 5)} ms; "
+              f"keys already in flight at fire p50={percentile(inflight, 50)} p95={percentile(inflight, 95)}")
     if args.json:
         with open(args.json, "w", encoding="utf-8") as out:
             json.dump(summary, out, ensure_ascii=False, indent=2)

@@ -12,7 +12,7 @@ import android.view.Window
 /**
  * 触摸到候选画完一帧的分段计时，默认关闭。
  * 打开：`adb shell setprop log.tag.CyIMELatency DEBUG`，再重新点进输入框；关闭：把该属性设回空或 INFO。
- * 同一时刻只跟一次按键；上一次还没画完就来了新按键，上一次作废并计入 dropped。
+ * 快速连按时多个按键同时在途：一次主线程应用的结果覆盖它之前已投递的按键，这些按键都以同一帧为终点。
  * 每次只记阶段耗时、布局、编码长度，不记按键、候选或输入框内容。
  * 终点是本帧交给显示合成（HWUI 帧完成），之后合成上屏通常再加 1～2 个刷新周期，这里不含。
  */
@@ -21,7 +21,6 @@ internal object KeyLatencyProbe {
     @Volatile var enabled = false
         private set
 
-    private const val IDLE = 0
     private const val FIRED = 1
     private const val STARTED = 2
     private const val POSTED = 3
@@ -30,22 +29,23 @@ internal object KeyLatencyProbe {
     private const val COMPOSED = 6
     private const val DRAWN = 7
 
+    private class Probe(val layout: String, val inflight: Int, val touchUp: Boolean, val touchEvent: Long,
+        val touchReceived: Long, val touchDown: Long) {
+        var phase = FIRED
+        var length = 0
+        var engineNanos = 0L
+        // fired, started, posted, handed, applied, composed, drawn, frame vsync
+        val t = LongArray(8)
+    }
+
+    private const val MAX_INFLIGHT = 64
     private val lock = Any()
-    private var phase = IDLE
-    private var layout = ""
-    private var length = 0
-    private var engineNanos = 0L
+    private val probes = ArrayDeque<Probe>()
     private var dropped = 0
-    // fired, started, posted, handed, applied, composed, drawn, frame vsync
-    private val t = LongArray(8)
     private var touchUp = false
     private var touchEvent = 0L
     private var touchReceived = 0L
     private var touchDown = 0L
-    private var probeTouchUp = false
-    private var probeTouchEvent = 0L
-    private var probeTouchReceived = 0L
-    private var probeTouchDown = 0L
 
     private var window: Window? = null
     private var handlerThread: HandlerThread? = null
@@ -73,7 +73,7 @@ internal object KeyLatencyProbe {
         window = null
         runCatching { old.decorView.viewTreeObserver.removeOnDrawListener(drawListener) }
         runCatching { old.removeOnFrameMetricsAvailableListener(frameListener) }
-        synchronized(lock) { phase = IDLE }
+        synchronized(lock) { probes.clear() }
     }
 
     /** 键盘容器收到触摸，记最后一次按下/松开的事件时间和到达时间。 */
@@ -96,74 +96,88 @@ internal object KeyLatencyProbe {
         if (!enabled) return
         val now = System.nanoTime()
         synchronized(lock) {
-            if (phase != IDLE) dropped++
-            phase = FIRED
-            layout = layoutId
-            length = 0
-            engineNanos = 0
-            t.fill(0)
-            t[0] = now
-            probeTouchUp = touchUp
-            probeTouchEvent = touchEvent
-            probeTouchReceived = touchReceived
-            probeTouchDown = touchDown
+            if (probes.size >= MAX_INFLIGHT) { probes.removeFirst(); dropped++ }
+            probes.addLast(Probe(layoutId, probes.size, touchUp, touchEvent, touchReceived, touchDown).also { it.t[0] = now })
         }
     }
 
-    private inline fun step(from: Int, to: Int, index: Int, also: () -> Unit = {}) {
+    /** 最早一个处于 [from] 的按键进入 [to]。 */
+    private inline fun advanceFirst(from: Int, to: Int, index: Int, also: (Probe) -> Unit = {}) {
         if (!enabled) return
         val now = System.nanoTime()
         synchronized(lock) {
-            if (phase != from && !(from == STARTED && phase == POSTED && to == POSTED)) return
-            phase = to
-            t[index] = now
-            also()
+            val probe = probes.firstOrNull { it.phase == from } ?: return
+            probe.phase = to
+            probe.t[index] = now
+            also(probe)
+        }
+    }
+
+    /** 所有处于 [from] 的按键一起进入 [to]：后一次状态已包含前面按键的结果。 */
+    private fun advanceAll(from: Int, to: Int, index: Int) {
+        if (!enabled) return
+        val now = System.nanoTime()
+        synchronized(lock) {
+            for (probe in probes) if (probe.phase == from) { probe.phase = to; probe.t[index] = now }
         }
     }
 
     /** 队列开始执行这次按键。 */
-    fun started() = step(FIRED, STARTED, 1)
+    fun started() = advanceFirst(FIRED, STARTED, 1)
 
     /** 后台把结果投给主线程；同一按键多次投递取最后一次。 */
     fun posted(compositionLength: Int) {
         if (!enabled) return
         val engine = com.kingzcheung.xime.rime.EngineTimeMeter.current.get()?.get(0) ?: 0L
-        step(STARTED, POSTED, 2) { length = compositionLength; engineNanos = engine }
+        val now = System.nanoTime()
+        synchronized(lock) {
+            val probe = probes.lastOrNull { it.phase == STARTED || it.phase == POSTED } ?: return
+            probe.phase = POSTED
+            probe.t[2] = now
+            probe.length = compositionLength
+            probe.engineNanos = engine
+        }
     }
 
     /** 主线程开始应用结果。 */
-    fun handed() = step(POSTED, HANDED, 3)
+    fun handed() = advanceAll(POSTED, HANDED, 3)
 
     /** 主线程写完候选状态。 */
-    fun applied() = step(HANDED, APPLIED, 4)
+    fun applied() = advanceAll(HANDED, APPLIED, 4)
 
     /** 键盘根组合应用了这次变化。 */
-    fun composed() = step(APPLIED, COMPOSED, 5)
+    fun composed() = advanceAll(APPLIED, COMPOSED, 5)
 
-    private fun drawn() = step(COMPOSED, DRAWN, 6)
+    private fun drawn() = advanceAll(COMPOSED, DRAWN, 6)
 
     private fun frame(metrics: FrameMetrics) {
         val vsync = metrics.getMetric(FrameMetrics.VSYNC_TIMESTAMP)
         val done = metrics.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP) + metrics.getMetric(FrameMetrics.TOTAL_DURATION)
-        val line: String
+        val gpu = if (Build.VERSION.SDK_INT >= 31) metrics.getMetric(FrameMetrics.GPU_DURATION) else -1_000L
+        val lines = mutableListOf<String>()
         synchronized(lock) {
-            if (phase != DRAWN) return
-            // 绘制时刻落在这一帧的 vsync 和完成之间才是这次按键的帧；更早的帧跳过，更晚说明漏了。
-            if (done < t[6]) return
-            if (vsync > t[6]) { dropped++; phase = IDLE; return }
-            phase = IDLE
-            t[7] = vsync
-            val gpu = if (Build.VERSION.SDK_INT >= 31) metrics.getMetric(FrameMetrics.GPU_DURATION) else -1_000L
-            fun us(nanos: Long) = nanos / 1_000
-            val frameStart = maxOf(t[7], t[4])
-            line = "layout=$layout len=$length trigger=${if (probeTouchUp) "up" else "down"} " +
-                "hold=${us(probeTouchEvent - probeTouchDown)} dispatch=${us(probeTouchReceived - probeTouchEvent)} " +
-                "main=${us(t[0] - probeTouchReceived)} queue=${us(t[1] - t[0])} bg=${us(t[2] - t[1])} " +
-                "engine=${us(engineNanos)} handoff=${us(t[3] - t[2])} apply=${us(t[4] - t[3])} " +
-                "vsyncwait=${us(frameStart - t[4])} recompose=${us(t[5] - frameStart)} " +
-                "layoutdraw=${us(t[6] - t[5])} render=${us(done - t[6])} gpu=${us(gpu)} " +
-                "total=${us(done - probeTouchEvent)} dropped=$dropped"
+            val iterator = probes.iterator()
+            while (iterator.hasNext()) {
+                val probe = iterator.next()
+                if (probe.phase != DRAWN) continue
+                val t = probe.t
+                // 绘制时刻落在这一帧的 vsync 和完成之间才是这次按键的帧；更早的帧跳过，更晚说明漏了。
+                if (done < t[6]) continue
+                iterator.remove()
+                if (vsync > t[6]) { dropped++; continue }
+                t[7] = vsync
+                fun us(nanos: Long) = nanos / 1_000
+                val frameStart = maxOf(t[7], t[4])
+                lines += "layout=${probe.layout} len=${probe.length} inflight=${probe.inflight} " +
+                    "trigger=${if (probe.touchUp) "up" else "down"} at=${probe.touchEvent / 1_000_000} " +
+                    "hold=${us(probe.touchEvent - probe.touchDown)} dispatch=${us(probe.touchReceived - probe.touchEvent)} " +
+                    "main=${us(t[0] - probe.touchReceived)} queue=${us(t[1] - t[0])} bg=${us(t[2] - t[1])} " +
+                    "engine=${us(probe.engineNanos)} handoff=${us(t[3] - t[2])} apply=${us(t[4] - t[3])} " +
+                    "vsyncwait=${us(frameStart - t[4])} recompose=${us(t[5] - frameStart)} " +
+                    "layoutdraw=${us(t[6] - t[5])} render=${us(done - t[6])} gpu=${us(gpu)} " +
+                    "total=${us(done - probe.touchEvent)} dropped=$dropped"
+            }
         }
-        Log.d(TAG, line)
+        lines.forEach { Log.d(TAG, it) }
     }
 }
