@@ -13,28 +13,25 @@ import org.junit.Test
 class PluginSettingsNavigationTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun pluginManagementInstallOpensPluginStoreTabAndBackReturns() {
+    @Test fun pluginManagementHasNoStoreAndImportsFromFile() {
         rule.setContent { XimeTheme { SettingsScreen(initialRoute = "plugins") } }
-        rule.onNodeWithText("安装插件").performClick()
-        rule.onNodeWithText("扩展商店").assertIsDisplayed()
-        rule.onNodeWithText("插件").assertIsSelected()
-        rule.onNodeWithContentDescription("返回").performClick()
         rule.onNodeWithText("插件管理").assertIsDisplayed()
+        rule.onNodeWithText("安装插件").assertDoesNotExist()
+        rule.onNodeWithContentDescription("更多").performClick()
+        rule.onNodeWithText("从文件安装插件").assertIsDisplayed()
     }
 
     @Test fun clipboardSetupIsReachableBeforeSyncIsEnabled() {
         val original = SettingsPreferences.isClipboardSyncEnabled(rule.activity)
-        var installs = 0
         var manages = 0
         try {
             SettingsPreferences.setClipboardSyncEnabled(rule.activity, false)
-            rule.setContent { XimeTheme { ClipboardSyncSettingsContent({}, { manages++ }, { installs++ }) } }
+            rule.setContent { XimeTheme { ClipboardSyncSettingsContent({}, { manages++ }) } }
             rule.onNodeWithText("附近电脑").assertExists()
             rule.onNodeWithText("安装插件").assertDoesNotExist()
             rule.onNodeWithText("其他服务与旧版兼容连接").performScrollTo().performClick()
             rule.onNodeWithText("管理其他同步服务").performScrollTo().performClick()
             rule.onNodeWithText("同步服务").assertExists()
-            assertEquals(0, installs)
             assertEquals(1, manages)
         } finally { SettingsPreferences.setClipboardSyncEnabled(rule.activity, original) }
     }
@@ -45,11 +42,10 @@ class PluginSettingsNavigationTest {
         rule.onNodeWithText("从备份恢复").assertIsDisplayed()
         rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
-    @Test fun onlineSpeechInstallDoesNotLeadToInstalledOnlyPage() {
-        var installs = 0
-        rule.setContent { XimeTheme { OnlineAsrTab(emptyList(), {}, onInstallPlugins = { installs++ }) } }
-        rule.onNodeWithText("安装插件").assertIsDisplayed().performClick()
-        assertEquals(1, installs)
+    @Test fun onlineSpeechHasNoPluginStoreEntry() {
+        rule.setContent { XimeTheme { OnlineAsrTab(emptyList(), {}) } }
+        rule.onNodeWithText("尚未安装在线语音插件；也可以返回上方选择本地模型。").assertIsDisplayed()
+        rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
 
 }
