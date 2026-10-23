@@ -15,11 +15,11 @@ class FloatingDockGestureTest {
     }
 
     @Test
-    fun holdingAnEdgeArmsAfterASecondAndOnlyReleaseConfirms() {
-        // One second (twice the earlier half second): a tall floating card, e.g. with clipboard search
-        // open, reaches the bottom edge easily while being dragged and must not dock by accident.
-        assertEquals(1_000L, FLOATING_DOCK_DURATION_MILLIS)
-        val gesture = FloatingDockGesture()
+    fun holdingAnEdgeArmsAfterTheHoldAndOnlyReleaseConfirms() {
+        // The holds below use one second; the real hold is 0.75 s (0.5 s docked a tall card by
+        // accident, 1 s was too slow).
+        assertEquals(750L, FLOATING_DOCK_DURATION_MILLIS)
+        val gesture = FloatingDockGesture(holdMillis = 1_000L)
         gesture.start(FloatingDockEdge.BOTTOM, 100L)
         assertFalse(gesture.update(FloatingDockEdge.BOTTOM, 1_099L))
         assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 1_100L))
@@ -29,14 +29,14 @@ class FloatingDockGestureTest {
 
     @Test
     fun releasingBeforeTheThresholdKeepsFloating() {
-        val gesture = FloatingDockGesture()
+        val gesture = FloatingDockGesture(holdMillis = 1_000L)
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
         assertFalse(gesture.release(FloatingDockEdge.BOTTOM, 999L))
     }
 
     @Test
     fun leavingAnEdgeClearsThePreviewAndRestartsTheTimerOnReentry() {
-        val gesture = FloatingDockGesture()
+        val gesture = FloatingDockGesture(holdMillis = 1_000L)
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
         assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
         assertFalse(gesture.update(null, 2_100L))
@@ -46,7 +46,7 @@ class FloatingDockGestureTest {
 
     @Test
     fun movingToAnotherEdgeDoesNotCarryOverTheElapsedTime() {
-        val gesture = FloatingDockGesture()
+        val gesture = FloatingDockGesture(holdMillis = 1_000L)
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
         assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
         assertFalse(gesture.update(FloatingDockEdge.TOP, 2_100L))
@@ -55,7 +55,7 @@ class FloatingDockGestureTest {
 
     @Test
     fun cancellationClearsAnArmedGesture() {
-        val gesture = FloatingDockGesture()
+        val gesture = FloatingDockGesture(holdMillis = 1_000L)
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
         assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
         gesture.cancel()
@@ -66,7 +66,7 @@ class FloatingDockGestureTest {
 
     @Test
     fun releaseOutsideTheEdgeRejectsAStalePreview() {
-        val gesture = FloatingDockGesture()
+        val gesture = FloatingDockGesture(holdMillis = 1_000L)
         gesture.start(FloatingDockEdge.BOTTOM, 0L)
         assertTrue(gesture.update(FloatingDockEdge.BOTTOM, 2_000L))
         assertFalse(gesture.release(null, 2_100L))
@@ -92,4 +92,14 @@ class FloatingDockGestureTest {
         }
     }
 
+
+    @Test fun releasingDocksExactlyWhenThePreviewShowsTheDockedShape() {
+        // The outline has reached the docked shape and the card is on the edge: docks.
+        assertTrue(floatingDockOnRelease(previewProgress = 1f, onBottomEdge = true, hasDestination = true))
+        // Still morphing: stays floating, as the half-drawn outline shows.
+        assertFalse(floatingDockOnRelease(previewProgress = 0.9f, onBottomEdge = true, hasDestination = true))
+        // Moved off the edge after the preview finished: no dock.
+        assertFalse(floatingDockOnRelease(previewProgress = 1f, onBottomEdge = false, hasDestination = true))
+        assertFalse(floatingDockOnRelease(previewProgress = 1f, onBottomEdge = true, hasDestination = false))
+    }
 }
