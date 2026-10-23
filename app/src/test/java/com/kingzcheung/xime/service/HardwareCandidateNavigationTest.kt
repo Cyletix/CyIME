@@ -443,4 +443,24 @@ class HardwareCandidateNavigationTest {
         assertEquals(HardwareCandidateDecision.Confirm(0, false),
             physicalCandidateDecision(HardwareCandidateKey.SPACE, source, true))
     }
+
+    /** A spelling the engine has nothing for: Space leaves the letters as typed and never adds a space (user, 10-24). */
+    @Test fun spaceWithNoCandidateCommitsTheLettersAsTypedWithoutASpace() {
+        val nothing = snapshot(CandidateState(inputText = "xqzk", isComposing = true, engineRevision = 9L))
+        assertEquals(HardwareCandidateDecision.CommitTyped,
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, nothing, true))
+        // The engine could not be read: keep the composition rather than guess.
+        assertEquals(HardwareCandidateDecision.Consume,
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, nothing, null))
+        // The engine has candidates but the expanded single-character filter shows none: not "nothing".
+        val filtered = snapshot(composition.copy(expandedCandidates = listOf(RimeCandidate("测试", "ce shi")),
+            expandedCandidatesLoaded = true)).copy(expanded = true, singleCharOnly = true)
+        assertEquals(HardwareCandidateDecision.Consume,
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, filtered, true))
+        // With candidates Space still confirms, and English still types a plain space.
+        assertEquals(HardwareCandidateDecision.Confirm(0, false),
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, snapshot(), true))
+        assertEquals(HardwareCandidateDecision.LiteralSpace,
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, snapshot(CandidateState(), english = true), false))
+    }
 }

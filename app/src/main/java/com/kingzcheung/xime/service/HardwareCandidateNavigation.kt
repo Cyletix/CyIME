@@ -84,6 +84,8 @@ internal sealed interface HardwareCandidateDecision {
     data object DefaultInput : HardwareCandidateDecision
     data object MoveCursor : HardwareCandidateDecision
     data object LiteralSpace : HardwareCandidateDecision
+    /** Commit the composition exactly as typed, adding nothing. */
+    data object CommitTyped : HardwareCandidateDecision
 }
 
 /**
@@ -113,8 +115,15 @@ internal fun physicalCandidateDecision(
                 val index = if (snapshot.expandedGlobalIndices != null || snapshot.windowStart > 0) 0
                     else snapshot.state.spaceCandidateIndex(snapshot.profile)
                 HardwareCandidateDecision.Confirm(index, false)
+            } else if (engineHasInput == true && !snapshot.presentation.association &&
+                !snapshot.state.isShowingRecentClipboard && snapshot.state.isComposing &&
+                snapshot.state.candidates.isEmpty() && snapshot.state.expandedCandidates.isEmpty()) {
+                // The engine itself has nothing for this spelling (the list was refreshed in the
+                // FIFO): Space leaves the letters as typed and adds no space, since Space selects
+                // and never sometimes inserts one (user, 2026-10-24).
+                HardwareCandidateDecision.CommitTyped
             } else {
-                // Missing/stale candidates must not turn Space into raw-letter Enter.
+                // Missing/stale or filtered-out candidates must not turn Space into raw-letter Enter.
                 HardwareCandidateDecision.Consume
             }
         }
