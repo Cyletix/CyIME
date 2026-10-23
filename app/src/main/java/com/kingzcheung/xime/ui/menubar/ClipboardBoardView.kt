@@ -93,6 +93,7 @@ internal fun ConnectedClipboardBoard(
     // Older history is read page by page while open; closing returns to the first page.
     DisposableEffect(manager) { onDispose { manager.resetHistoryWindow() } }
     val cardMaxLines = remember(prefs) { clipboardCardMaxLines(prefs.getInt(CLIPBOARD_CARD_MAX_LINES_KEY, 4)) }
+    var closeAfterPaste by remember(prefs) { mutableStateOf(clipboardClosesAfterPaste(prefs)) }
     // A search submitted from the keyboard search bar shows only its matches (fixed records too).
     val boardQuery by manager.boardQuery.collectAsState()
     var searchResults by remember { mutableStateOf<List<ClipboardItem>?>(null) }
@@ -166,13 +167,29 @@ internal fun ConnectedClipboardBoard(
         }, cardMaxLines = cardMaxLines,
         searchQuery = (liveQuery?.display ?: boardQuery).takeIf { it.isNotBlank() },
         onClearSearch = { manager.boardQuery.value = "" }, searchChip = liveQuery == null,
-        onOpenSearch = onOpenSearch, full = room.full, showControls = showControls)
+        onOpenSearch = onOpenSearch, full = room.full, showControls = showControls,
+        closeAfterPaste = closeAfterPaste, onCloseAfterPasteChange = { value ->
+            closeAfterPaste = value
+            prefs.edit().putBoolean(CLIPBOARD_CLOSE_AFTER_PASTE_KEY, value).apply()
+        })
 }
 
 /** Preference (board prefs) for how many lines a history card shows: 2, 4 or 8. */
 internal const val CLIPBOARD_CARD_MAX_LINES_KEY = "card_max_lines"
 
 internal fun clipboardCardMaxLines(stored: Int): Int = if (stored in setOf(2, 4, 8)) stored else 4
+
+/**
+ * Preference (board prefs): close the clipboard after a text record is put into the text. On by
+ * default, as before; off keeps the clipboard (or the search's matches) open to paste several.
+ */
+internal const val CLIPBOARD_CLOSE_AFTER_PASTE_KEY = "close_after_paste"
+
+internal fun clipboardClosesAfterPaste(prefs: android.content.SharedPreferences): Boolean =
+    prefs.getBoolean(CLIPBOARD_CLOSE_AFTER_PASTE_KEY, true)
+
+internal fun clipboardClosesAfterPaste(context: Context): Boolean =
+    clipboardClosesAfterPaste(context.getSharedPreferences("clipboard_board", Context.MODE_PRIVATE))
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -203,6 +220,9 @@ internal fun ClipboardBoardView(
     full: Boolean = false,
     /** False hides the category / actions row (a short search results area). */
     showControls: Boolean = true,
+    /** The "close after paste" switch shown in the more menu; null hides it. */
+    closeAfterPaste: Boolean? = null,
+    onCloseAfterPasteChange: (Boolean) -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     var filter by remember(initialImages) { mutableStateOf(if (initialImages) ClipboardFilter.IMAGE else ClipboardFilter.ALL) }
@@ -565,6 +585,9 @@ internal fun ClipboardBoardView(
                 add(CompactActionMenuEntry(Icons.Default.PhotoLibrary, if (photoAccess) "关闭最近截图" else "启用最近截图",
                     tag = "clipboard-photos", onClick = onPhotoAccess))
                 onPullRemote?.let { action -> add(CompactActionMenuEntry(Icons.Default.Sync, "同步", tag = "clipboard-sync", onClick = action)) }
+                closeAfterPaste?.let { on -> add(CompactActionMenuEntry(
+                    if (on) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, "上屏后自动关闭剪贴板",
+                    tag = "clipboard-close-after-paste") { onCloseAfterPasteChange(!on) }) }
                 add(CompactActionMenuEntry(Icons.Default.DeleteOutline, "清空未固定", colors.error,
                     enabled = all.any { it.key !in pins }, tag = "clipboard-clear") {
                     deleteAnchor = moreAnchor; clearingAll = onClearUnpinned != null; deleting = all.filterNot { it.key in pins }

@@ -1292,7 +1292,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** A result goes through the normal clipboard paste, so a fixed record stays private. */
     internal fun selectClipboardSearchResult(text: String) {
         feedbackManager.playClipboardCommitSound()
-        closeClipboardSearch(openBoard = false)
+        // "Close after paste" off: back to the clipboard still showing these matches, to paste more.
+        val stay = !com.kingzcheung.xime.ui.menubar.clipboardClosesAfterPaste(this)
+        closeClipboardSearch(openBoard = stay, keepQuery = stay)
         textCommit.selectClipboardItem(text)
     }
 

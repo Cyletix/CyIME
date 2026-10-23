@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.twotone.ContentPaste
 import androidx.compose.material.icons.twotone.PushPin
 import androidx.compose.material.icons.twotone.Sync
 import androidx.compose.material.icons.twotone.Upload
@@ -223,7 +224,19 @@ private fun ClipboardCardLinesSetting() {
     val prefs = remember(context) { context.getSharedPreferences("clipboard_board", android.content.Context.MODE_PRIVATE) }
     val key = com.kingzcheung.xime.ui.menubar.CLIPBOARD_CARD_MAX_LINES_KEY
     var lines by remember { mutableStateOf(prefs.getInt(key, 4)) }
+    // Same switch as the clipboard's own more menu (same preference).
+    var closeAfterPaste by remember { mutableStateOf(com.kingzcheung.xime.ui.menubar.clipboardClosesAfterPaste(prefs)) }
     SettingsSection(title = "剪贴板面板", content = {
+        SettingsToggleItem(
+            icon = Icons.TwoTone.ContentPaste,
+            title = "上屏后自动关闭剪贴板",
+            subtitle = "关掉后留在剪贴板里，可以连续贴多条",
+            checked = closeAfterPaste,
+            onCheckedChange = {
+                closeAfterPaste = it
+                prefs.edit().putBoolean(com.kingzcheung.xime.ui.menubar.CLIPBOARD_CLOSE_AFTER_PASTE_KEY, it).apply()
+            },
+        )
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text("剪贴板卡片最多显示", style = MaterialTheme.typography.titleSmall)
             Text("每条记录最多显示几行文字", style = MaterialTheme.typography.bodySmall,

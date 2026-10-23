@@ -255,6 +255,7 @@ fun KeyboardView(
     val screenW = LocalConfiguration.current.screenWidthDp
     val screenH = LocalConfiguration.current.screenHeightDp
     val wideFloating = !isT9Schema(state.currentSchemaId) && state.inputProfile.layout.kind != com.kingzcheung.xime.settings.LayoutKind.KANA_KEYPAD && keyboardState !is KeyboardLayoutState.Stroke
+    val keyboardContext = androidx.compose.ui.platform.LocalContext.current
     val portraitHeight = SettingsPreferences.getKeyboardHeightDp(androidx.compose.ui.platform.LocalContext.current, false)
     // Service resolves normal geometry before sizing the IME window; expanded panels keep that width.
     val cardWidthDp = state.keyboardWidthDp.takeIf { it > 0 } ?: resolvedFloatingWidth(
@@ -1791,7 +1792,8 @@ fun KeyboardView(
                         onSelectItem = { text ->
                             callbacks.onClipboardRecordCommitted?.invoke()
                             callbacks.onClipboardSelect?.invoke(text)
-                            viewModel.leaveClipboard()
+                            // The board's "close after paste" switch (also in settings); off keeps it open.
+                            if (com.kingzcheung.xime.ui.menubar.clipboardClosesAfterPaste(keyboardContext)) viewModel.leaveClipboard()
                         },
                         onSplitWords = { text, _ -> viewModel.pushOverlay(OverlayRoute.SplitWords(text)) },
                         onBack = { viewModel.leaveClipboard() },
