@@ -190,6 +190,8 @@ Agent 的实际检查和用户体验验收分别记录。尺寸整套打包门�
 
 脚本不自行提交代码、推送或修改版本。用户要求发布后，这些由 Agent 按功能完成，再调用发布入口；先草稿、上传核对再公开，不覆盖已公开资产。模拟检查及本轮真实入口验证的范围见[工作流审查](development/workflow-review-20261004.md)。
 
+每个公开版本打完包后，用 `python scripts/release_evidence.py --github` 写这一版的证据记录（源码提交、包内模型和词库哈希、检查结果、设备），见[每版证据记录](releases/evidence/README.md)。
+
 安装前会检查 SuperDisplay 私有 ADB 与 SDK 的协议版本，以及其 1445 转发端口是否被 Windows 保留。发现冲突时先停止交付，避免客户端互相重启；复用 `scripts/repair-adb-conflict.ps1` 修复，端口范围修复需显式加 `-RepairDynamicPorts`。保留 SuperDisplay 的 ADB 连接，具体备份、根因及验证见[共存修复记录](development/adb-superdisplay-coexistence-20261006.md)。
 
 下列脚本是统一入口调用的底层工具，只有需要单独执行某一步时使用：
