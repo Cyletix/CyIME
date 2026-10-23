@@ -1292,6 +1292,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 }
             }
             HardwareCandidateDecision.LiteralSpace -> commitHardwareLiteral(" ")
+            HardwareCandidateDecision.CommitTyped -> commitHardwareLiteral("")
             is HardwareCandidateDecision.Highlight -> withEditor { publishHardwareCandidateSelection() }
             is HardwareCandidateDecision.Page -> {
                 if (snapshot.expanded) {

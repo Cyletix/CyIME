@@ -66,11 +66,14 @@ class PhysicalKeyboardPolicyTest {
             assertEquals(HardwareCandidateDecision.Consume,
                 physicalCandidateDecision(HardwareCandidateKey.SPACE, source(composing), ready))
         }
-        for (state in listOf(source(composing.copy(candidates = emptyList())), source(),
-            source(composing.copy(isShowingRecentClipboard = true)))) {
+        // The engine has input the UI does not show yet, or the bar still shows clipboard records.
+        for (state in listOf(source(), source(composing.copy(isShowingRecentClipboard = true)))) {
             assertEquals(HardwareCandidateDecision.Consume,
                 physicalCandidateDecision(HardwareCandidateKey.SPACE, state, true))
         }
+        // A current composition the engine has no candidate for is committed as typed, without a space (user, 10-24).
+        assertEquals(HardwareCandidateDecision.CommitTyped,
+            physicalCandidateDecision(HardwareCandidateKey.SPACE, source(composing.copy(candidates = emptyList())), true))
     }
 
     @Test fun `idle association and English spaces stay literal and never select predictions`() {
