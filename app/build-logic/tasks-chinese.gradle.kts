@@ -246,6 +246,11 @@ val prepareChineseDictionaries by tasks.registering {
             "  ngram_sentence_start: false\n  ngram_eos_weight: 0\n  ngram_user_weight: 0.3\n" +
             "  ngram_dictionary_prior: 0.02\n  ngram_merge_segmentations: false\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
+        // The 14-key schema (assets/rime_chinese) repeats these sentence rules; keep them the same list.
+        check(file("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText()
+            .contains("  sentence_position_final_only: [${particles.joinToString(", ")}]\n")) {
+            "pinyin_14jian.schema.yaml sentence_position_final_only differs from app/data particle lists"
+        }
         File(root, "rime_ice.schema.yaml").writeText(baseSchema)
         val doublePinyin = File(root, "double_pinyin_flypy.schema.yaml")
         doublePinyin.writeText(doublePinyin.readText().replace("\ntranslator:\n",
