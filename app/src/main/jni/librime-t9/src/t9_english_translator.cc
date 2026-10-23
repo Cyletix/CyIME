@@ -27,7 +27,7 @@ an<Translation> T9EnglishTranslator::Query(const string& input, const Segment& s
   // CyIME: a few common words starting with the typed keys, after the whole words: English typed
   // half way shows up as on 26 keys. From 4 keys on, so short inputs stay Chinese.
   if (completion_limit_ > 0 && input.size() >= 4 && input.size() <= 32 &&
-      input.find_first_not_of("23456789") == string::npos && segment.HasAnyTagIn(tags_) &&
+      input.find_first_not_of(completion_keys_) == string::npos && segment.HasAnyTagIn(tags_) &&
       dict_ && dict_->loaded()) {
     DictEntryIterator iter;
     dict_->LookupWords(&iter, input, true, 64, &blacklist());

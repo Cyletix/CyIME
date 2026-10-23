@@ -4,6 +4,8 @@ schema:
   schema_id: pinyin_14jian
   name: 中文14键
   version: "1.1"
+  dependencies:
+    - cyime_k14_english
   description: |
     拼音 14 键方案，字母两两合并（qw/er/ty/ui/op、as/df/gh/jk/l、zx/cv/bn/m），
     键宽更大误触更少，与九键同为词库消歧。
@@ -38,6 +40,7 @@ engine:
     - punct_translator
     - script_translator
     - reverse_lookup_translator
+    - t9_english_translator@k14_english
     - lua_translator@*uuid
 
 speller:
@@ -192,3 +195,14 @@ t9:
   sentence_rescore: true
   ngram_model: t9_ngram
   ngram_sentence_start: false
+
+# 英文词（同九键英文词表，按 14 键合并键编码）：整词排在中文后，按到第 4 个键起再给出最多 3 个开头相符的词。
+k14_english:
+  dictionary: cyime_k14_english
+  enable_completion: false
+  enable_sentence: false
+  enable_user_dict: false
+  initial_quality: -1
+  comment_format: []
+  completion_limit: 3
+  completion_keys: "QETUOADGJZCBlm"

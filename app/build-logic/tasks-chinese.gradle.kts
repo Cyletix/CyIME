@@ -27,7 +27,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("cyletix10Preset", 1)
     inputs.property("colemakPreset", 1)
     inputs.property("typewisePreset", 1)
-    inputs.property("t9EnglishIndex", 8)
+    inputs.property("t9EnglishIndex", 9)
     inputs.file(file("src/main/assets/english.txt"))
     inputs.property("measuredNeighborCorrection", 2)
     inputs.property("candidatePolicy", 3)
@@ -142,7 +142,10 @@ val prepareChineseDictionaries by tasks.registering {
             .filter { it.isNotEmpty() }.withIndex().filter { it.index < 3000 || it.value.length >= 5 }
             .associate { it.value to maxOf(1, 3000 - it.index) }
         val english = linkedMapOf<String, String>()
+        val english14 = linkedMapOf<String, String>()
         val digits = "22233344455566677778889999"
+        // 14 keys: letter pairs share a key sent as its capital (qw → Q …); l and m are keys of their own.
+        val keys14 = "ABCDEDGGUJJlmBOOQEATUCQZTZ"
         for (source in listOf("en_ext", "en")) {
             File(root, "en_dicts/$source.dict.yaml").useLines { lines ->
                 var body = false
@@ -170,6 +173,12 @@ val prepareChineseDictionaries by tasks.registering {
                                 if (code.length < 2) continue
                                 val row = fields[0] + "\t" + code + "\t" + weight
                                 english.putIfAbsent(fields[0] + "\t" + code, row)
+                                // 14 keys have no digit keys in letter mode: letters only.
+                                val letters = spelling.lowercase(java.util.Locale.ROOT).filter { it in 'a'..'z' || it in '0'..'9' }
+                                if (letters.all { it in 'a'..'z' }) {
+                                    val code14 = letters.map { keys14[it - 'a'] }.joinToString("")
+                                    english14.putIfAbsent(fields[0] + "\t" + code14, fields[0] + "\t" + code14 + "\t" + weight)
+                                }
                             }
                         }
                     }
@@ -180,6 +189,10 @@ val prepareChineseDictionaries by tasks.registering {
             "# Generated from bundled rime-ice en_dicts; licenses retained alongside sources.\n" +
             "---\nname: cyime_t9_english\nversion: \"1\"\nsort: by_weight\n...\n" +
             english.values.joinToString("\n", postfix = "\n"))
+        File(root, "cyime_k14_english.dict.yaml").writeText(
+            "# Generated from bundled rime-ice en_dicts; licenses retained alongside sources.\n" +
+            "---\nname: cyime_k14_english\nversion: \"1\"\nsort: by_weight\n...\n" +
+            english14.values.joinToString("\n", postfix = "\n"))
 
         // Same engine, dictionary and options as Chinese26; only the keyboard arrangement differs.
         // A sentence-final particle (吧, 呗, 呢…, app/data/sentence_final_particles.txt) is penalised as the first
