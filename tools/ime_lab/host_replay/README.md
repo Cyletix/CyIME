@@ -69,3 +69,10 @@ clear leaves, which is the 2026-10-23 report (old digits came back after Enter).
 `CustomPhraseReloadProbe.java` (same arguments, on a copy whose `default.custom.yaml` lists
 `rime_ice`) adds a phrase to `custom_phrase.txt` while a session is open and reports which step makes
 it appear. 2026-10-23: nothing until the schema is selected again; maintenance is not needed.
+
+`ChaosInputProbe.java` (library dir, a deployed user copy listing `t9_pinyin`, `rime_ice` and
+`pinyin_14jian`, seed, rounds) types seeded random sequences: half-typed codes, partial choices,
+deletes and new keys, capitals/digits/punctuation inside pinyin, separators, space, the app's clear
+or Enter followed by new keys. It fails on a thrown error, a code left after a clear, new keys that
+join an old code, or backspace that cannot empty the code. It drives the engine the way the app
+calls it, not the Kotlin keyboard code. 2026-10-23, seed 20261023 × 150 rounds: 15690 steps, none.
