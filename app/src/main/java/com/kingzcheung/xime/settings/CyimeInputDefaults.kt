@@ -4,7 +4,7 @@ package com.kingzcheung.xime.settings
 object CyimeInputDefaults {
     val recommended = listOf("rime_ice", "t9_pinyin")
     val legacyDefaults = setOf("wubi86", "wubi86_pinyin", "wubi86_trad", "wubi86_trad_pinyin")
-    val dependencies = setOf("cyime_t9_english", "melt_eng", "radical_pinyin", "numbers", "handwriting")
+    val dependencies = setOf("cyime_t9_english", "cyime_k14_english", "melt_eng", "radical_pinyin", "numbers", "handwriting")
 
     /**
      * 方案 × 布局的组合配置：所需的方案和布局都启用时自动启用，不作为独立条目单独开关。
