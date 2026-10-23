@@ -380,7 +380,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                 et.text?.replace(start, et.selectionEnd.coerceAtLeast(start), input)
                                 try { et.setSelection(start + input.length) } catch (_: Exception) {}
                             }
-                            service.rimeEngine.clearComposition()
+                            service.rimeEngine.endComposition(isT9Schema(service.uiState.value.currentSchemaId))
                             service.candidateState.value = service.candidateState.value.copy(
                                 inputText = "",
                                 preeditText = "",
@@ -679,7 +679,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                         // 清空 partial 累积，避免残留词被 buildT9DisplayState 拼进下一轮 preedit。
                         service.t9PartialSegments.clear()
-                        service.rimeEngine.clearComposition()
+                        endQueuedComposition()
                         service.candidateState.value = service.candidateState.value.copy(
                             candidates = emptyList(),
                             candidateComments = emptyList(),
@@ -756,14 +756,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     com.kingzcheung.xime.settings.SchemaManager.getRimeDir(service), input)
                             }
                         }
-                        if (isT9) {
-                            // 同步清空，避免异步 postRimeJob 延迟导致后续 backspace 拿到旧状态。
-                            service.t9PartialSegments.clear()
-                            service.rimeEngine.setInput("")
-                            service.rimeEngine.clearComposition()
-                        } else {
-                            service.rimeEngine.clearComposition()
-                        }
+                        // 同步清空，避免异步 postRimeJob 延迟导致后续 backspace 拿到旧状态。
+                        if (isT9) service.t9PartialSegments.clear()
+                        endQueuedComposition()
                         withEditor { service.endComposingInputBox() }
                         needsUIUpdate = true
                     } else {
@@ -849,7 +844,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                         candidateActions = emptyList()
                                     )
                                 }
-                                service.rimeEngine.clearComposition()
+                                endQueuedComposition()
                                 // T9模式：清空partialCommit累积文本，避免下一轮输入
                                 // preedit中残留上一轮的提交内容（如"看"→下一轮"看jihua"）
                                 if (isT9Schema(state.currentSchemaId)) {
@@ -1830,6 +1825,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             candState.associationCandidates.isNotEmpty() || candState.isShowingRecentClipboard ||
             service.predictionManager.hasPendingPrediction
 
+    /** Ends the composition in the input FIFO, T9's own digit state included (see [com.kingzcheung.xime.rime.RimeEngine.endQueuedComposition]). */
+    internal fun endQueuedComposition() =
+        service.rimeEngine.endQueuedComposition(isT9Schema(service.uiState.value.currentSchemaId))
+
     /**
      * 清空输入态（预编辑/候选/联想/partial 累积/计算器），不动已上屏文本。
      * 供 clear_composition 与 clear_all 输入态分支共用。
@@ -1842,7 +1841,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.calculatorEngine.clear()
         updateCalculatorCandidates()
         service.t9PartialSegments.clear()
-        service.rimeEngine.clearQueuedComposition()
+        endQueuedComposition()
         service.candidateState.value = service.candidateState.value.copy(
             candidates = emptyList(),
             candidateComments = emptyList(),

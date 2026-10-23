@@ -60,3 +60,8 @@ pronunciation checks use actual Chinese dictionary syllable IDs, not displayed
 labels or another dictionary's English word IDs. This verifies one unconfirmed
 syllable constraint; it does not claim nine-key-style chaining of several
 syllable choices before selecting Chinese text.
+
+`T9PartialClearProbe.java` (same arguments as `MergedLetterProbe`, run on a copy of a deployed replay
+root's `user` directory) checks that ending a T9 composition after a partial choice starts the next
+code fresh: 9447426926, choose 至少, clear, then 64 must read `64`. It also prints what a Rime-only
+clear leaves, which is the 2026-10-23 report (old digits came back after Enter).

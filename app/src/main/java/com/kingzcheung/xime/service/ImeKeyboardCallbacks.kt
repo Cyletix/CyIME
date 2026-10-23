@@ -388,8 +388,7 @@ internal fun rememberImeKeyboardCallbacks(
                         }
                         pinyin == T9InputController.CLEAR_ALL -> {
                             service.t9PartialSegments.clear()
-                            service.rimeEngine.setInput("")
-                            service.rimeEngine.clearComposition()
+                            service.rimeEngine.endQueuedComposition(t9 = true)
                         }
                         pinyin.isEmpty() -> {
                             service.rimeEngine.clearComposition()

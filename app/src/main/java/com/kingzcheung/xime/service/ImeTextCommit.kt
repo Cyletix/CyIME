@@ -143,7 +143,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
     internal fun selectClipboardItem(text: String) {
         if (service.candidateState.value.isComposing) {
             service.keyRouter.postRimeJob {
-                service.rimeEngine.clearComposition()
+                service.keyRouter.endQueuedComposition()
                 withContext(Dispatchers.Main) {
                     service.updateUI()
                 }

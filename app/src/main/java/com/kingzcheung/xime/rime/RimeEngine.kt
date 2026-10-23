@@ -553,6 +553,27 @@ class RimeEngine {
     }
 
     /**
+     * Ends the composition from the input FIFO. T9 keeps its own digit buffer and segments beside
+     * Rime's input, and after a partial choice it no longer resets them from an empty Rime input:
+     * clearing only Rime brought the old digits back with the next key (至少 chosen from
+     * zhishaoyao, Enter, then 64 showed zhi'qian'yao'ni). [t9] clears that state too.
+     */
+    internal fun endQueuedComposition(t9: Boolean) = mutateLocked {
+        if (!nativeHasSession()) return@mutateLocked
+        if (t9 && isInitialized) nativeT9ClearComposition(1)
+        nativeClearComposition()
+    }
+
+    /** [endQueuedComposition] for Main-thread callers: skipped, like [clearComposition], while the engine is busy. */
+    fun endComposition(t9: Boolean) {
+        if (!nativeHasSession()) return
+        tryMutating(Unit) {
+            if (t9 && isInitialized) nativeT9ClearComposition(1)
+            nativeClearComposition()
+        }
+    }
+
+    /**
      * 设置 RIME 引擎的输入字符串。
      *
      * 一次 JNI 调用完成整个输入设置，替代逐字符 processKey。
