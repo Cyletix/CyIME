@@ -24,6 +24,27 @@ class EnglishLearningTranslation : public CacheTranslation {
 }  // namespace
 an<Translation> T9EnglishTranslator::Query(const string& input, const Segment& segment) {
   an<Translation> exact = New<EnglishLearningTranslation>(TableTranslator::Query(input, segment));
+  // CyIME: a few common words starting with the typed keys, after the whole words: English typed
+  // half way shows up as on 26 keys. From 4 keys on, so short inputs stay Chinese.
+  if (completion_limit_ > 0 && input.size() >= 4 && input.size() <= 32 &&
+      input.find_first_not_of("23456789") == string::npos && segment.HasAnyTagIn(tags_) &&
+      dict_ && dict_->loaded()) {
+    DictEntryIterator iter;
+    dict_->LookupWords(&iter, input, true, 64, &blacklist());
+    auto completions = New<FifoTranslation>();
+    for (int taken = 0; taken < completion_limit_ && !iter.exhausted(); iter.Next()) {
+      auto entry = iter.Peek();
+      if (!entry || entry->remaining_code_length <= 0) continue;
+      auto word = New<DictEntry>(*entry);
+      word->comment.clear();
+      auto phrase = New<Phrase>(language(), "completion", segment.start,
+                                segment.start + input.size(), word);
+      phrase->set_quality(initial_quality_ - 0.5);
+      completions->Append(phrase);
+      ++taken;
+    }
+    if (!completions->exhausted()) exact = New<DistinctTranslation>(exact + completions);
+  }
   // Bounded exact prefix lookups, never scan the word list or enumerate letter
   // combinations. Learned full codes naturally come back through the base query.
   if (!digit_suffixes_ || input.size() < 4 || input.size() > 64 ||

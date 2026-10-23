@@ -10,13 +10,18 @@ namespace rime {
 class T9EnglishTranslator : public TableTranslator {
  public:
   explicit T9EnglishTranslator(const Ticket& ticket) : TableTranslator(ticket) {
-    if (ticket.schema) ticket.schema->config()->GetBool(name_space_ + "/digit_suffixes", &digit_suffixes_);
+    if (ticket.schema) {
+      ticket.schema->config()->GetBool(name_space_ + "/digit_suffixes", &digit_suffixes_);
+      ticket.schema->config()->GetInt(name_space_ + "/completion_limit", &completion_limit_);
+    }
   }
   an<Translation> Query(const string& input, const Segment& segment) override;
 
  private:
   // "word" + remaining digits (steam42); off by default, they crowd out Chinese words.
   bool digit_suffixes_ = false;
+  // Words that start with the typed keys (termin… for terminal), most common first; 0 = whole words only.
+  int completion_limit_ = 0;
 };
 }  // namespace rime
 #endif

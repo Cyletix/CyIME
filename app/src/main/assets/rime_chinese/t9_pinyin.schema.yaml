@@ -192,3 +192,5 @@ t9_english:
   comment_format: []
   # 英文词后接剩余数字（steam42 这类）会挤掉中文候选，默认不生成。
   digit_suffixes: false
+  # 按到第 4 个键起，给出以所按键开头的最常用的 3 个英文词（termin… 出 terminal），排在整词英文之后。
+  completion_limit: 3
