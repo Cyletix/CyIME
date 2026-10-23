@@ -237,7 +237,7 @@ private fun ClipboardCardLinesSetting() {
                 prefs.edit().putBoolean(com.kingzcheung.xime.ui.menubar.CLIPBOARD_CLOSE_AFTER_PASTE_KEY, it).apply()
             },
         )
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(Modifier.settingsSearchAnchor("剪贴板卡片最多显示").fillMaxWidth().padding(16.dp)) {
             Text("剪贴板卡片最多显示", style = MaterialTheme.typography.titleSmall)
             Text("每条记录最多显示几行文字", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)

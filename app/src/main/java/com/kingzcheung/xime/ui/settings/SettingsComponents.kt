@@ -74,7 +74,8 @@ fun SettingsSection(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shadowElevation = 0.dp
         ) {
-            Column(Modifier.visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED), content = content)
+            Column(Modifier.settingsSearchAnchor(title)
+                .visualMaterial(VisualStyles.current, 12.dp, level = com.kingzcheung.xime.ui.theme.MaterialLevel.RAISED), content = content)
         }
     }
 }
@@ -92,6 +93,7 @@ fun SettingsItem(
 ) {
     Row(
         modifier = Modifier
+            .settingsSearchAnchor(title)
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(16.dp),
@@ -168,6 +170,7 @@ fun SettingsToggleItem(
     val locked = lockMessage != null
     Row(
         modifier = Modifier
+            .settingsSearchAnchor(title)
             .fillMaxWidth()
             .then(
                 if (locked) Modifier

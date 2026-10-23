@@ -71,25 +71,27 @@ fun SettingsScreen(
         popExitTransition = { if (motion) SettingsPageMotion.popExit else ExitTransition.None },
     ) {
         composable(SettingsRoutes.Main) {
-            SettingsMainContent(
-                onNavigateToHardwareKeyboard = { navController.navigate(SettingsRoutes.HardwareKeyboard) },
-                onNavigateToLanguages = { navController.navigate("languages") },
-                onNavigateToSchema = { navController.navigate(SettingsRoutes.Schema) },
-                onNavigateToMarket = { navController.navigate(SettingsRoutes.Market) },
-                onNavigateToTheme = { navController.navigate(SettingsRoutes.Theme) },
-                onNavigateToKeyEffect = { navController.navigate(SettingsRoutes.KeyEffect) },
-                onNavigateToLayoutDisplay = { navController.navigate(SettingsRoutes.LayoutDisplay) },
-                onNavigateToDictionary = { navController.navigate(SettingsRoutes.Dictionary) },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
-                onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
-                onNavigateToHandwritingTraining = { navController.navigate(SettingsRoutes.HandwritingTraining) },
-                onNavigateToSmartPrediction = { navController.navigate(SettingsRoutes.SmartPrediction) },
-                onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
-                onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
-                onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) },
-                onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) },
-                onNavigateToRoute = { navController.navigate(it) },
-            )
+            androidx.compose.runtime.CompositionLocalProvider(LocalSettingsSearchAnchors provides false) {
+                SettingsMainContent(
+                    onNavigateToHardwareKeyboard = { navController.navigate(SettingsRoutes.HardwareKeyboard) },
+                    onNavigateToLanguages = { navController.navigate("languages") },
+                    onNavigateToSchema = { navController.navigate(SettingsRoutes.Schema) },
+                    onNavigateToMarket = { navController.navigate(SettingsRoutes.Market) },
+                    onNavigateToTheme = { navController.navigate(SettingsRoutes.Theme) },
+                    onNavigateToKeyEffect = { navController.navigate(SettingsRoutes.KeyEffect) },
+                    onNavigateToLayoutDisplay = { navController.navigate(SettingsRoutes.LayoutDisplay) },
+                    onNavigateToDictionary = { navController.navigate(SettingsRoutes.Dictionary) },
+                    onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
+                    onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
+                    onNavigateToHandwritingTraining = { navController.navigate(SettingsRoutes.HandwritingTraining) },
+                    onNavigateToSmartPrediction = { navController.navigate(SettingsRoutes.SmartPrediction) },
+                    onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
+                    onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
+                    onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) },
+                    onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) },
+                    onNavigateToRoute = { navController.navigate(it) },
+                )
+            }
         }
         composable(SettingsRoutes.HardwareKeyboard) { HardwareKeyboardSettingsContent { navController.popBackStack() } }
         composable("languages") {

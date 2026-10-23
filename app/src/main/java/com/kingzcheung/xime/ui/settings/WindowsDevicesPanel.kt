@@ -116,7 +116,7 @@ internal fun WindowsDevicesPanelContent(
                 }
             }
             HorizontalDivider()
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            Row(Modifier.settingsSearchAnchor("同步剪贴板", bleed = 16.dp, bleedVertical = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text("同步剪贴板")

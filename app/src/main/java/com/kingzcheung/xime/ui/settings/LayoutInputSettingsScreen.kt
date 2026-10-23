@@ -55,7 +55,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                     HorizontalDivider()
                     QwertyStaggerSettings(settings) { settings = it; it.save(context) }
                     HorizontalDivider()
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Column(Modifier.settingsSearchAnchor("空格两侧的标点").padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text("空格两侧的标点", style = MaterialTheme.typography.titleSmall)
                         Text("只开句号：原逗号键移到空格右侧，点按句号、滑动逗号。两个都开：滑动输入另一种宽度，" +
                             "全角时点按全角、半角时点按半角。", style = MaterialTheme.typography.bodySmall,
@@ -123,7 +123,7 @@ private fun QwertyStaggerSettings(
     onChange: (com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences) -> Unit,
 ) {
     val modes = com.kingzcheung.xime.ui.keyboard.QwertyStaggerMode.entries
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.settingsSearchAnchor("三行字母错位").padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("三行字母错位", style = MaterialTheme.typography.titleSmall)
         Text("实体键盘：A 行右移 1/4 键、Z 行右移 3/4 键；手机常见：Z 与 S 上下对齐；按尺寸自动：手机用手机排布，" +
             "平板逐渐过渡到实体排布（原有行为）。分体与 14 键同样遵循。", style = MaterialTheme.typography.bodySmall,

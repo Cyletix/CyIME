@@ -33,9 +33,11 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
             Text("语言切换", style = MaterialTheme.typography.titleMedium)
             HardwareOption("Ctrl + 空格", "按已启用语言的顺序循环切换，不输入空格", options.ctrlSpace) { save("ctrl_space", it) }
             HardwareOption("单独轻按 Shift", "当前非英语语言与英语互切；半秒内松开，与其他按键组合时不切换", options.shiftTap) { save("shift_tap", it) }
-            Text("工具快捷键", style = MaterialTheme.typography.titleMedium)
+            Text("工具快捷键", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.settingsSearchAnchor("工具快捷键", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())
             Text("Ctrl + .：切换中英文标点（英文模式固定半角）。\nAlt + V：打开或关闭剪贴板，方向键选择，回车粘贴并关闭，Esc 取消。\nAlt + H：开始或停止语音输入。", style = MaterialTheme.typography.bodyMedium)
-            Text("候选翻页", style = MaterialTheme.typography.titleMedium)
+            Text("候选翻页", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.settingsSearchAnchor("候选翻页", bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth())
             Text("可多选。有待选内容时翻页，没有待选内容时输入符号；取消勾选后按普通符号处理。",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             CandidatePageOption("减号和等号", "− 上一页 / = 下一页", "page_minus_equals", options.pageMinusEquals) {
@@ -61,7 +63,7 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
 @Composable
 private fun HardwareOption(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange)
+        Row(Modifier.settingsSearchAnchor(title, bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange)
             .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
@@ -75,7 +77,7 @@ private fun HardwareOption(title: String, detail: String, checked: Boolean, onCh
 @Composable
 private fun CandidatePageOption(title: String, detail: String, key: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(Modifier.fillMaxWidth().testTag("hardware-$key")
+        Row(Modifier.settingsSearchAnchor(title, bleed = 8.dp, bleedVertical = 4.dp).fillMaxWidth().testTag("hardware-$key")
             .toggleable(checked, role = Role.Checkbox, onValueChange = onChange)
             .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 12.dp)) {

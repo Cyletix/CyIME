@@ -1,6 +1,8 @@
 package com.kingzcheung.xime.ui.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -19,7 +21,8 @@ class SettingsSearchTest {
     }
 
     @Test fun allTermsMustMatchAndBlankFindsNothing() {
-        assertEquals(listOf("假名方向提示"), titles("假名 方向"))
+        assertEquals("假名方向提示", titles("假名 方向").first())
+        assertTrue(titles("假名 方向").none { it == "按键效果" })
         assertTrue(titles("   ").isEmpty())
         assertTrue(titles("不存在的设置词").isEmpty())
     }
@@ -37,5 +40,63 @@ class SettingsSearchTest {
         val groups = setOf("配置选择", "输入", "外观", "智能", "系统")
         val stray = SettingsSearchIndex.filter { it.path.substringBefore(" › ") !in groups }.map { it.title }
         assertTrue("不在新分组下：$stray", stray.isEmpty())
+    }
+
+    /** 说明里的词、同义说法、语音输入常见的同音错字都能找到。 */
+    @Test fun descriptionsSynonymsAndVoiceTypos() {
+        assertEquals("触觉反馈模式", titles("触觉反馈").first())
+        assertTrue("触觉反馈模式" in titles("震动"))
+        assertTrue("按键振动振幅" in titles("震动强度"))
+        assertTrue("空格两侧的标点" in titles("拳角"))
+        assertTrue("空格两侧的标点" in titles("板角"))
+        assertTrue("靠边停靠" in titles("扶窗"))
+        assertTrue("显示模式" in titles("夜间模式"))
+        assertTrue("玻璃效果" in titles("毛玻璃"))
+        assertTrue("剪贴板卡片最多显示" in titles("剪切板"))
+        assertTrue("性能与省电" in titles("卡顿"))
+        assertTrue("自定义短语" in titles("快捷短语"))
+        assertTrue("Ctrl + 空格" in titles("ctrl"))
+        assertTrue("Ctrl + 空格" in titles("ＣＴＲＬ"))
+    }
+
+    /** 词没有连着出现时按相邻两字近似匹配：“候选字号”“按键声音大小”这类自己组的说法。 */
+    @Test fun nearMatchesFindSettingsWithoutExactWords() {
+        assertEquals("候选字大小", titles("候选字号").first())
+        assertTrue("音量大小" in titles("按键声音大小"))
+        assertTrue("长按语言键弹出列表" in titles("语言键长按时间"))
+        // 只沾一个字的不算：太宽的近似会把整张列表都翻出来。
+        assertTrue(titles("键盘高度调节").size < 5)
+    }
+
+    /** 定位的锚点必须真在页面源码里，改了行标题而没改索引会在这里失败。 */
+    @Test fun everyAnchorExistsOnItsPage() {
+        val dir = java.io.File("src/main/java/com/kingzcheung/xime/ui/settings")
+        val source = dir.listFiles { f -> f.extension == "kt" && f.name != "SettingsSearch.kt" }!!
+            .joinToString("\n") { it.readText() }
+        val missing = SettingsSearchIndex.flatMap { listOfNotNull(it.anchor, it.section) }.distinct()
+            .filter { "\"$it\"" !in source }
+        assertTrue("页面上找不到：$missing", missing.isEmpty())
+    }
+
+    @Test fun focusPrefersTheRowAndFallsBackToItsGroup() {
+        val entry = SettingsSearchIndex.first { it.title == "移动光标时振动" }
+        // 行此刻不显示（滑动移动光标已关）：只有组在页面上，组亮。
+        SettingsSearchFocus.open(entry)
+        val first = SettingsSearchFocus.request!!
+        SettingsSearchFocus.register("光标与空格")
+        assertTrue(SettingsSearchFocus.claim("光标与空格", first))
+        assertNull(SettingsSearchFocus.request)
+        // 行和组都在：组让给行，行亮一次后请求清空。
+        SettingsSearchFocus.open(entry)
+        val second = SettingsSearchFocus.request!!
+        SettingsSearchFocus.register("移动光标时振动")
+        assertFalse(SettingsSearchFocus.claim("光标与空格", second))
+        assertTrue(SettingsSearchFocus.claim("移动光标时振动", second))
+        assertFalse(SettingsSearchFocus.claim("移动光标时振动", second))
+        SettingsSearchFocus.unregister("光标与空格")
+        SettingsSearchFocus.unregister("移动光标时振动")
+        // 整页条目不带定位。
+        SettingsSearchFocus.open(SettingsSearchIndex.first { it.title == "主题与外观" })
+        assertNull(SettingsSearchFocus.request)
     }
 }
