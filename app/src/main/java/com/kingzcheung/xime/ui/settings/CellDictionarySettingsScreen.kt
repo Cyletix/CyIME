@@ -116,7 +116,7 @@ fun CellDictionarySettingsPanel(
             }
             item {
                 OutlinedButton(onClick = onImport, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                    Text("导入词库（SCEL / JSON）")
+                    Text("导入词库（搜狗 SCEL / TXT / JSON）")
                 }
                 TextButton(onClick = { onSource(CellDictionaryCatalog.SOURCE_URL) }, modifier = Modifier.fillMaxWidth()) {
                     Text("到搜狗官网查找更多词库")
