@@ -7,6 +7,8 @@ if(CYIME_DECODER_HOOK EQUAL -1)
 endif()
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/librime-octagram/src")
+# OctagramT9.patch includes t9_lookup_trace.h (work counters, empty outside the host replay).
+target_include_directories(rime-octagram-objs PRIVATE "${CMAKE_SOURCE_DIR}/librime-t9/src")
 # CyLM decoder (cylm/cylm.cpp, also built alone as libcylm.so): used only when a schema names its files.
 target_include_directories(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm")
 target_sources(rime-static PRIVATE "${CMAKE_SOURCE_DIR}/cylm/cylm.cpp")
