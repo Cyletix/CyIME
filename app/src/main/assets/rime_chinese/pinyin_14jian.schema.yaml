@@ -152,6 +152,13 @@ speller:
 translator:
   dictionary: rime_ice
   prism: pinyin_14jian
+  # 整句规则同 26 键（tasks-chinese.gradle.kts 由 app/data/sentence_final_particles.txt、sentence_measure_words.txt
+  # 生成的那几行）：每个音节留 4 个单字同音备选，合并键读音多时“已”这类字才进得了整句（woyijiancha 出 我已检查）；
+  # 语气词、量词不当句首，把/被不当句末。
+  sentence_char_homophones: 4
+  sentence_position_penalty: -2.0
+  sentence_position_final_only: [吧, 呗, 呢, 吗, 啊, 嘛, 啦, 呀, 哦, 咯, 哟, 哇, 嘞, 喽, 个, 只, 条, 张, 件, 位, 块]
+  sentence_position_initial_only: [把, 被]
   # 四条整句备选，由词组模型挑最自然的一条放第一（菜单仍只显示一条），同 26 键（t9/sentence_rescore）。
   max_sentences: 4
   sentence_cutoff_threshold: 100
