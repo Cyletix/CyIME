@@ -41,7 +41,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 纠错候选的拼音标注：少打补红字、多打划掉、打错划掉写正确字母、打反标红，各主题深浅色和玻璃下各一行。
+ * 纠错候选的拼音只显示改正后的读音，改动的字母标红（少打、多打、打错、打反各一个），各主题深浅色和玻璃下各一行。
  * 用真实 CandidateBar 代码在电脑上渲染。只在设了环境变量 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)

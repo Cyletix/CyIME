@@ -113,7 +113,6 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
@@ -886,24 +885,18 @@ internal val LocalCorrectedCandidates = androidx.compose.runtime.compositionLoca
 
 private val CorrectionRed = Color(0xFFE53935)
 
-/** 纠错候选的拼音：多打的划掉，少打的红字补上，打错的划掉并在右上角写正确字母，打反的两个字母标红加下划线。 */
+/** 纠错候选的拼音只显示改正后的读音（所打字母已在输入框里），改动的字母标红：补上的、换成的、对调的；多打的不再显示。 */
 internal fun correctionAnnotatedString(marks: String, plain: Color): androidx.compose.ui.text.AnnotatedString =
     androidx.compose.ui.text.buildAnnotatedString {
-        val struck = androidx.compose.ui.text.SpanStyle(color = CorrectionRed, textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough)
-        val added = androidx.compose.ui.text.SpanStyle(color = CorrectionRed)
-        val above = androidx.compose.ui.text.SpanStyle(color = CorrectionRed, fontSize = 0.75.em,
-            baselineShift = androidx.compose.ui.text.style.BaselineShift.Superscript)
-        val swapped = androidx.compose.ui.text.SpanStyle(color = CorrectionRed, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
+        val keep = androidx.compose.ui.text.SpanStyle(color = plain)
+        val changed = androidx.compose.ui.text.SpanStyle(color = CorrectionRed)
         for (mark in com.kingzcheung.xime.rime.CorrectionMarks.parse(marks)) when (mark) {
-            is com.kingzcheung.xime.rime.CorrectionMark.Keep -> withStyle(androidx.compose.ui.text.SpanStyle(color = plain)) { append(mark.letter) }
-            is com.kingzcheung.xime.rime.CorrectionMark.Extra -> withStyle(struck) { append(mark.letter) }
-            is com.kingzcheung.xime.rime.CorrectionMark.Missing -> withStyle(added) { append(mark.letter) }
-            is com.kingzcheung.xime.rime.CorrectionMark.Replace -> {
-                withStyle(struck) { append(mark.typed) }
-                withStyle(above) { append(mark.correct) }
-            }
-            is com.kingzcheung.xime.rime.CorrectionMark.Swap -> withStyle(swapped) { append(mark.correct) }
-            com.kingzcheung.xime.rime.CorrectionMark.Gap -> withStyle(androidx.compose.ui.text.SpanStyle(color = plain)) { append(' ') }
+            is com.kingzcheung.xime.rime.CorrectionMark.Keep -> withStyle(keep) { append(mark.letter) }
+            is com.kingzcheung.xime.rime.CorrectionMark.Extra -> Unit
+            is com.kingzcheung.xime.rime.CorrectionMark.Missing -> withStyle(changed) { append(mark.letter) }
+            is com.kingzcheung.xime.rime.CorrectionMark.Replace -> withStyle(changed) { append(mark.correct) }
+            is com.kingzcheung.xime.rime.CorrectionMark.Swap -> withStyle(changed) { append(mark.correct) }
+            com.kingzcheung.xime.rime.CorrectionMark.Gap -> withStyle(keep) { append(' ') }
         }
     }
 
