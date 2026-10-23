@@ -94,6 +94,14 @@ def prepare_android(work):
             chr(10) + "translator:" + chr(10) + "  max_sentences: 4" + chr(10) + "  sentence_cutoff_threshold: 100" + chr(10), 1)
         path.write_text(text + chr(10) + "t9:" + chr(10) + "  sentence_rescore: true" + chr(10) + "  ngram_model: t9_ngram"
                         + chr(10) + "  ngram_sentence_start: false" + chr(10), encoding="utf-8")
+    for item in filter(None, os.environ.get("CYIME_K14_REPLACE", "").split(";")):
+        # experiments: "max_sentences: 4=>max_sentences: 8" replaces text in the copied 14-key schema
+        old, new = item.split("=>", 1)
+        path = data / "pinyin_14jian.schema.yaml"
+        text = path.read_text(encoding="utf-8")
+        if old not in text:
+            raise ValueError(f"CYIME_K14_REPLACE: {old!r} not in the schema")
+        path.write_text(text.replace(old, new, 1), encoding="utf-8")
     k14_add = os.environ.get("CYIME_K14_TRANSLATOR_ADD")
     if k14_add:  # "enable_word_completion: true": extra lines at the top of the 14-key translator block
         path = data / "pinyin_14jian.schema.yaml"
