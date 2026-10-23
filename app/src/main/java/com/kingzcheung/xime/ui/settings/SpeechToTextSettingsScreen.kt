@@ -77,8 +77,6 @@ data class AsrProvider(
 fun SpeechToTextSettingsContent(
     onBack: () -> Unit,
     onNavigateToPluginSettings: (String) -> Unit = {},
-    onNavigateToPlugins: () -> Unit = {},
-    onNavigateToPluginMarket: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -291,8 +289,6 @@ fun SpeechToTextSettingsContent(
                             }
                         }
                     },
-                    onManagePlugins = onNavigateToPlugins,
-                    onInstallPlugins = onNavigateToPluginMarket,
                     onSettings = onNavigateToPluginSettings
                 )
             }
@@ -305,16 +301,12 @@ fun SpeechToTextSettingsContent(
 fun OnlineAsrTab(
     providers: List<AsrProvider>,
     onProviderClick: (AsrProvider) -> Unit,
-    onManagePlugins: () -> Unit = {},
-    onInstallPlugins: () -> Unit = {},
     onSettings: (String) -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        PluginSetupCard("在线语音", onInstallPlugins, onManagePlugins)
-
         SettingsSection(title = "在线服务") {
             if (providers.isEmpty()) {
                 Text(

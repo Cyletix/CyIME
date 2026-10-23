@@ -93,25 +93,19 @@ import com.kingzcheung.xime.model.ModelInfo
 import com.kingzcheung.xime.model.ModelVersion
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.runtime.PluginManager
-import com.kingzcheung.xime.settings.MarketPlugin
 import com.kingzcheung.xime.settings.MarketScheme
 import com.kingzcheung.xime.settings.MarketSchemeItem
-import com.kingzcheung.xime.settings.MarketPluginItem
-import com.kingzcheung.xime.settings.PluginVersion
 import com.kingzcheung.xime.settings.SchemeVersion
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.viewmodel.ModelManagementUiState
 import com.kingzcheung.xime.viewmodel.ModelManagementViewModel
 import com.kingzcheung.xime.viewmodel.ModelItemState
-import com.kingzcheung.xime.viewmodel.PluginMarketUiState
-import com.kingzcheung.xime.viewmodel.PluginMarketViewModel
 import com.kingzcheung.xime.viewmodel.SchemaMarketUiState
 import com.kingzcheung.xime.viewmodel.SchemaMarketViewModel
 
 /**
- * 扩展商店：商店式统一入口。
- * 一级导航 Tab（方案 / 模型），二级分类 chips 过滤，列表使用商店卡片，下拉刷新。
- * 插件 Tab 待插件市场索引完成后接入。
+ * 扩展：方案、模型、插件的统一入口，三页左右滑动。
+ * 方案、模型页是商店（二级分类 chips 过滤、商店卡片、下拉刷新）；插件页只列已安装的插件。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,9 +114,11 @@ fun MarketHubContent(
     onNavigateToDetail: (String) -> Unit = {},
     onNavigateToModelDetail: (String) -> Unit = {},
     onNavigateToPluginDetail: (String) -> Unit = {},
+    onNavigateToPluginSettings: (String) -> Unit = {},
+    onNavigateToSpeechToText: () -> Unit = {},
+    onNavigateToClipboardSync: () -> Unit = {},
     onNavigateToLocal: () -> Unit = {},
     onNavigateToModelLocal: () -> Unit = {},
-    onNavigateToPlugins: () -> Unit = {},
     initialTab: Int = 0,
 ) {
     // 三页可左右滑动切换，标签跟随；分页状态随返回栈保存，进详情再返回仍回到刚才那页。
@@ -140,11 +136,14 @@ fun MarketHubContent(
                     }
                 },
                 actions = {
-                    // 扩展是方案、模型、插件的唯一入口；每页右上角进本页类型的已安装管理。
-                    TextButton(
-                        onClick = when (tabIndex) { 0 -> onNavigateToLocal; 1 -> onNavigateToModelLocal; else -> onNavigateToPlugins },
-                    ) {
-                        Text("已安装", style = MaterialTheme.typography.labelMedium)
+                    // 扩展是方案、模型、插件的唯一入口。方案、模型页右上角进已安装管理；
+                    // 插件没有商店，插件页本身就是已安装列表，右上角是刷新和从文件/浏览器导入。
+                    if (tabIndex == 2) {
+                        InstalledPluginActions()
+                    } else {
+                        TextButton(onClick = if (tabIndex == 0) onNavigateToLocal else onNavigateToModelLocal) {
+                            Text("已安装", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -188,8 +187,11 @@ fun MarketHubContent(
                     1 -> ModelsMarketTab(
                         onNavigateToDetail = onNavigateToModelDetail,
                     )
-                    else -> PluginsMarketTab(
-                        onNavigateToDetail = onNavigateToPluginDetail,
+                    else -> InstalledPluginsList(
+                        onNavigateToPluginSettings = onNavigateToPluginSettings,
+                        onNavigateToPluginDetail = onNavigateToPluginDetail,
+                        onNavigateToSpeechToText = onNavigateToSpeechToText,
+                        onNavigateToClipboardSync = onNavigateToClipboardSync,
                     )
                 }
             }
@@ -641,236 +643,6 @@ private fun ModelTrailingButton(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
         ) {
             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text("获取")
-        }
-    }
-}
-
-/* ------------------------------- 插件 Tab ------------------------------- */
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PluginsMarketTab(
-    onNavigateToDetail: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    val viewModel: PluginMarketViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    var isRefreshing by remember { mutableStateOf(false) }
-    val pullRefreshState = rememberPullToRefreshState()
-
-    // 每次进入插件 Tab 时刷新本地已安装状态（如从插件设置页卸载后返回），
-    // 不重新拉取网络索引，避免缓存 installed=true 残留
-    LaunchedEffect(Unit) {
-        viewModel.refreshInstalledState()
-    }
-
-    LaunchedEffect(uiState.toastMessage) {
-        uiState.toastMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            viewModel.clearToast()
-        }
-    }
-    LaunchedEffect(uiState.isLoading) {
-        if (!uiState.isLoading) isRefreshing = false
-    }
-
-    val categories = listOf("全部") + uiState.availableCategories
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.refresh()
-        },
-        state = pullRefreshState,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (categories.size > 1) {
-                CategoryChips(
-                    categories = categories,
-                    selected = uiState.selectedCategory,
-                    onSelect = { label ->
-                        viewModel.selectCategory(if (label == uiState.selectedCategory) null else label)
-                    },
-                )
-            }
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                when {
-                    uiState.isLoading && uiState.plugins.isEmpty() -> item {
-                        MarketCenterBox(
-                            modifier = Modifier.fillParentMaxSize(),
-                            content = {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator()
-                                    Spacer(Modifier.height(12.dp))
-                                    Text("正在加载插件市场…", style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                        )
-                    }
-
-                    uiState.errorMessage != null && uiState.plugins.isEmpty() -> item {
-                        MarketCenterBox(
-                            modifier = Modifier.fillParentMaxSize(),
-                            content = {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        uiState.errorMessage ?: "加载失败",
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                    Spacer(Modifier.height(12.dp))
-                                    Button(onClick = { viewModel.loadPlugins() }) { Text("重试") }
-                                }
-                            }
-                        )
-                    }
-
-                    uiState.filteredPlugins.isEmpty() -> item {
-                        MarketCenterBox(
-                            modifier = Modifier.fillParentMaxSize(),
-                            content = {
-                                Text("暂无插件", style = MaterialTheme.typography.bodyMedium)
-                            }
-                        )
-                    }
-
-                    else -> {
-                        // 同一页上面是已安装、下面是可安装；哪段为空就不显示。
-                        val (installedGroup, availableGroup) = uiState.filteredPlugins.partition { it.installed }
-                        listOf("已安装" to installedGroup, "可安装" to availableGroup).forEach { (sectionLabel, group) ->
-                            if (group.isNotEmpty()) {
-                                item(key = "section:$sectionLabel") { MarketSectionLabel(sectionLabel) }
-                                items(group, key = { it.plugin.id }) { item ->
-                            val icon = pluginCategoryIcon(item.plugin.pluginType)
-                            val (iconContainer, iconContent) = pluginCategoryColors(item.plugin.pluginType)
-                            MarketStoreCard(
-                                icon = icon,
-                                iconContainerColor = iconContainer,
-                                iconContentColor = iconContent,
-                                title = item.plugin.name.ifEmpty { item.plugin.id },
-                                subtitle = item.plugin.description,
-                                metaLine = buildString {
-                                    if (item.plugin.author.isNotEmpty()) append("作者：${item.plugin.author}")
-                                    val typeLabel = pluginCategoryLabel(item.plugin.pluginType)
-                                    if (typeLabel.isNotEmpty()) {
-                                        if (item.plugin.author.isNotEmpty()) append("  ·  ")
-                                        append(typeLabel)
-                                    }
-                                },
-                                versions = item.plugin.versions.map { it.version },
-                                selectedVersion = uiState.selectedVersions[item.plugin.id]
-                                    ?: item.plugin.currentVersion,
-                                onSelectVersion = { viewModel.selectVersion(item.plugin.id, it) },
-                                onCardClick = { onNavigateToDetail(item.plugin.id) },
-                                trailing = {
-                                    PluginTrailingButton(
-                                        item = item,
-                                        uiState = uiState,
-                                        onDownload = {
-                                            viewModel.downloadPlugin(item.plugin.id)
-                                        },
-                                    )
-                                },
-                            )
-                        }
-                            }
-                        }
-                        item {
-                            Spacer(Modifier.height(8.dp))
-                            val updatedAt = uiState.updatedAt.takeIf { it.isNotBlank() }
-                            val sourceLabel = if (uiState.source.isNotBlank()) "来源：${uiState.source}" else "来自 Xime 官方源"
-                            val footerText = buildString {
-                                append("共 ${uiState.filteredPlugins.size} 个插件（$sourceLabel")
-                                if (updatedAt != null) append(" · 更新于 $updatedAt")
-                                append("）")
-                            }
-                            Text(
-                                footerText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 16.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PluginTrailingButton(
-    item: MarketPluginItem,
-    uiState: PluginMarketUiState,
-    onDownload: () -> Unit,
-) {
-    val plugin = item.plugin
-    when {
-        uiState.downloadingId == plugin.id -> {
-            OutlinedButton(onClick = onDownload, enabled = false) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(6.dp))
-                    Text("${(uiState.downloadProgress * 100).toInt()}%")
-                }
-            }
-        }
-
-        !item.compatible -> OutlinedButton(onClick = {}, enabled = false) {
-            Text("需 App ≥ ${item.minAppVersion}")
-        }
-
-        item.installed && item.hasUpdate -> Button(
-            onClick = onDownload,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-        ) {
-            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text("更新")
-        }
-
-        item.installed -> {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    "已安装",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-                item.installedVersion?.let { version ->
-                    Text(
-                        "$version",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
-                }
-            }
-        }
-
-        else -> Button(
-            onClick = onDownload,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-        ) {
-            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
             Text("获取")
         }
@@ -1881,56 +1653,15 @@ internal fun modelFormatSize(bytes: Long): String {
 
 /* ---------------------------- 插件详情页 ---------------------------- */
 
+/** 已安装插件的详情：基本信息与网络权限。插件不再有商店，只从文件或浏览器导入。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PluginMarketDetailContent(
+fun PluginDetailContent(
     pluginId: String,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val viewModel: PluginMarketViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    // 进入详情页时刷新本地已安装状态（卸载后返回不再残留 installed=true）
-    LaunchedEffect(Unit) {
-        viewModel.refreshInstalledState()
-    }
-
-    LaunchedEffect(uiState.toastMessage) {
-        uiState.toastMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            viewModel.clearToast()
-        }
-    }
-
-    val item = uiState.plugins.firstOrNull { it.plugin.id == pluginId }
-    val localItem = remember(item, pluginId) {
-        if (item == null) {
-            com.kingzcheung.xime.plugin.ExtensionManager.getAllInstalledPlugins()
-                .find { it.id == pluginId }
-                ?.let { info ->
-                    MarketPluginItem(
-                        plugin = MarketPlugin(
-                            id = info.id,
-                            name = info.name,
-                            author = "",
-                            description = info.description,
-                            pluginType = info.category.id,
-                            currentVersion = info.versionName,
-                            versions = listOf(PluginVersion(version = info.versionName)),
-                        ),
-                        compatible = true,
-                        minAppVersion = info.minHostVersion.orEmpty(),
-                        installed = true,
-                        installedVersion = info.versionName,
-                    )
-                }
-        } else {
-            null
-        }
-    }
-    val displayItem = item ?: localItem
-
+    val plugin = remember(pluginId) { PluginManager.getAllInstallPlugins().find { it.id == pluginId } }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1947,338 +1678,95 @@ fun PluginMarketDetailContent(
             )
         },
     ) { padding ->
-        when {
-            uiState.isLoading && displayItem == null -> MarketCenterBox {
-                CircularProgressIndicator()
-            }
-
-            displayItem == null -> MarketCenterBox {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "未找到该插件",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { viewModel.loadPlugins() }) { Text("重新加载") }
-                }
-            }
-
-            else -> PluginDetailBody(
-                item = displayItem,
-                uiState = uiState,
-                viewModel = viewModel,
-                modifier = Modifier.padding(padding),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PluginDetailBody(
-    item: MarketPluginItem,
-    uiState: PluginMarketUiState,
-    viewModel: PluginMarketViewModel,
-    modifier: Modifier = Modifier,
-) {
-    val plugin = item.plugin
-    val (iconContainer, iconContent) = pluginCategoryColors(plugin.pluginType)
-    val selectedVersion = uiState.selectedVersions[plugin.id]
-        ?: plugin.resolvedVersion()?.version.orEmpty()
-
-    val installedPlugin = remember(item.plugin.id, item.installed) {
-        if (item.installed) {
-            PluginManager.getAllInstallPlugins().find { it.id == item.plugin.id }
-        } else {
-            null
-        }
-    }
-    val context = LocalContext.current
-    val declaredHosts = installedPlugin?.declaredHosts.orEmpty()
-    val networkHosts = remember(installedPlugin?.id) {
-        if (installedPlugin != null) {
-            (declaredHosts +
-                ExtensionManager.getConfiguredNetworkHosts(context, installedPlugin.id) +
-                SettingsPreferences.getPluginPendingHosts(context, installedPlugin.id)).distinct()
-        } else {
-            declaredHosts
-        }
-    }
-
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(iconContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        pluginCategoryIcon(plugin.pluginType),
-                        contentDescription = null,
-                        tint = iconContent,
-                        modifier = Modifier.size(36.dp),
-                    )
-                }
-                Spacer(Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        plugin.name.ifEmpty { plugin.id },
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        pluginCategoryLabel(plugin.pluginType).ifEmpty { "插件" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
-        if (plugin.description.isNotEmpty()) {
-            item {
+        if (plugin == null) {
+            MarketCenterBox {
                 Text(
-                    plugin.description,
+                    "未找到该插件",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            return@Scaffold
         }
-
-        if (plugin.author.isNotEmpty()) {
-            item {
-                DetailMetaRow("作者", plugin.author)
-            }
+        val pluginType = plugin.category.id
+        val (iconContainer, iconContent) = pluginCategoryColors(pluginType)
+        val networkHosts = remember(plugin.id) {
+            (plugin.declaredHosts +
+                ExtensionManager.getConfiguredNetworkHosts(context, plugin.id) +
+                SettingsPreferences.getPluginPendingHosts(context, plugin.id)).distinct()
         }
-
-        val typeLabel = pluginCategoryLabel(plugin.pluginType)
-        if (typeLabel.isNotEmpty()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             item {
-                DetailMetaRow("类型", typeLabel)
-            }
-        }
-
-        if (plugin.warning.isNotEmpty()) {
-            item {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                ) {
-                    Text(
-                        plugin.warning,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-
-        if (plugin.tags.isNotEmpty()) {
-            item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    plugin.tags.forEach { tag -> MarketTag(tag) }
-                }
-            }
-        }
-
-        if (networkHosts.isNotEmpty()) {
-            item {
-                Text(
-                    "网络权限",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        NetworkAccessSection(
-                            pluginId = item.plugin.id,
-                            pluginName = plugin.name.ifEmpty { plugin.id },
-                            hosts = networkHosts,
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(iconContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            pluginCategoryIcon(pluginType),
+                            contentDescription = null,
+                            tint = iconContent,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            plugin.name.ifEmpty { plugin.id },
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            pluginCategoryLabel(pluginType).ifEmpty { "插件" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
-        }
-
-        item {
-            Text(
-                "版本历史",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-
-        if (plugin.versions.isEmpty()) {
-            item {
-                Text(
-                    "暂无版本信息",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-        } else {
-            items(plugin.versions, key = { it.version }) { v ->
-                PluginVersionCard(
-                    version = v,
-                    selected = v.version == selectedVersion,
-                    onClick = { viewModel.selectVersion(plugin.id, v.version) },
-                    trailing = {
-                        PluginVersionDownloadButton(
-                            item = item,
-                            uiState = uiState,
-                            version = v,
-                            onDownload = { viewModel.downloadPlugin(plugin.id, v.version) },
-                        )
-                    },
-                )
-            }
-        }
-
-        item {
-            Spacer(Modifier.height(8.dp))
-        }
-    }
-}
-
-/** 插件版本卡片内嵌下载按钮（对齐模型版本卡）。 */
-@Composable
-private fun PluginVersionDownloadButton(
-    item: MarketPluginItem,
-    uiState: PluginMarketUiState,
-    version: PluginVersion,
-    onDownload: () -> Unit,
-) {
-    when {
-        uiState.downloadingId == item.plugin.id -> {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "${(uiState.downloadProgress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-
-        !item.compatible -> Text(
-            "需 App ≥ ${item.minAppVersion}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-        )
-
-        item.installed && item.hasUpdate -> Button(
-            onClick = onDownload,
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-        ) {
-            Text("更新", style = MaterialTheme.typography.labelSmall)
-        }
-
-        item.installed -> Text(
-            "已安装",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-        )
-
-        else -> Button(
-            onClick = onDownload,
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-        ) {
-            Text("下载", style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
-private fun PluginVersionCard(
-    version: PluginVersion,
-    selected: Boolean,
-    onClick: () -> Unit,
-    trailing: @Composable () -> Unit = {},
-) {
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-    }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() }
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${version.version}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                if (selected) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "当前版本",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(16.dp),
+            if (plugin.description.isNotEmpty()) {
+                item {
+                    Text(
+                        plugin.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                trailing()
             }
-            if (version.date.isNotEmpty()) {
-                Text(
-                    version.date,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (plugin.versionName.isNotEmpty()) {
+                item { DetailMetaRow("版本", plugin.versionName) }
             }
-            if (version.changelog.isNotEmpty()) {
-                Text(
-                    version.changelog,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (version.size.isNotEmpty()) {
-                Text(
-                    version.size,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
+            if (networkHosts.isNotEmpty()) {
+                item {
+                    Text(
+                        "网络权限",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            NetworkAccessSection(
+                                pluginId = plugin.id,
+                                pluginName = plugin.name.ifEmpty { plugin.id },
+                                hosts = networkHosts,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

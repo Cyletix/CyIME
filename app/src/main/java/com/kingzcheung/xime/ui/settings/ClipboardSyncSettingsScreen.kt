@@ -57,7 +57,6 @@ import com.kingzcheung.xime.plugin.core.runtime.PluginManager
 fun ClipboardSyncSettingsContent(
     onBack: () -> Unit,
     onNavigateToPlugins: () -> Unit,
-    onNavigateToPluginMarket: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

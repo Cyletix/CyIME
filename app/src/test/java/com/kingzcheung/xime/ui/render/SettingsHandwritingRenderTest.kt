@@ -60,6 +60,9 @@ class SettingsHandwritingRenderTest {
         "handwriting" -> HandwritingSettingsContent(onBack = {}, devTools = true)
         "gestures" -> com.kingzcheung.xime.ui.settings.LayoutDisplaySettingsContent(onBack = {}, initialPage = "gestures")
         "clipboard" -> com.kingzcheung.xime.ui.settings.ClipboardSyncSettingsContent(onBack = {}, onNavigateToPlugins = {})
+        "plugins" -> com.kingzcheung.xime.ui.settings.PluginsSettingsContent(onBack = {})
+        "extension-plugins" -> com.kingzcheung.xime.ui.settings.MarketHubContent(onBack = {}, initialTab = 2)
+        "speech" -> com.kingzcheung.xime.ui.settings.SpeechToTextSettingsContent(onBack = {})
         else -> KeyEffectSettingsContent(onBack = {})
     }
 
@@ -72,7 +75,8 @@ class SettingsHandwritingRenderTest {
         // 按键效果页的示意按键用 ChaiPUA 字体，应用启动时才初始化；渲染前手动初始化。
         com.kingzcheung.xime.ui.keyboard.AppFonts.initialize(context)
         // 剪贴板页一打开就列同步插件，要先有插件框架（应用启动时初始化）。
-        if ("clipboard" in pages) com.kingzcheung.xime.plugin.core.runtime.PluginManager.initialize(context as android.app.Application)
+        if (pages.any { it in setOf("clipboard", "plugins", "extension-plugins", "speech") })
+            com.kingzcheung.xime.plugin.core.runtime.PluginManager.initialize(context as android.app.Application)
         val frames = pages.flatMap { p -> listOf(false, true).map { p to it } }
         val shown = mutableIntStateOf(0)
         rule.setContent {
