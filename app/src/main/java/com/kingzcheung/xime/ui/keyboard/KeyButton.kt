@@ -311,6 +311,10 @@ fun SwipeableKeyButton(
     swipeLeftText: String? = null,
     /** 左滑预览用的图标（有主图标的键用，如 0 键「上一项」左箭头）；null 时显示 [swipeLeftText]。 */
     swipeLeftIcon: Painter? = null,
+    /** 右滑动作（与左滑成对，如 0 键右滑「下一项」）；14 键字母对的右半字母优先。 */
+    onSwipeRight: (() -> Unit)? = null,
+    swipeRightText: String? = null,
+    swipeRightIcon: Painter? = null,
     letterGroup: String? = null,
     onLetterSelection: ((String) -> Unit)? = null,
     onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
@@ -406,8 +410,8 @@ fun SwipeableKeyButton(
         longPressItems = longPressItems.orEmpty(),
         onLeft = letters?.let { { onLetterSelection?.invoke(it.first); Unit } } ?: onSwipeLeft,
         leftText = letters?.first ?: swipeLeftText,
-        onRight = letters?.let { { onLetterSelection?.invoke(it.second); Unit } },
-        rightText = letters?.second,
+        onRight = letters?.let { { onLetterSelection?.invoke(it.second); Unit } } ?: onSwipeRight,
+        rightText = letters?.second ?: swipeRightText,
         horizontalThresholdDp = if (letters != null) normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp) else 50f,
         reserveHorizontalSwipe = letters != null,
         // With the four-way disc shown, 14-key pairs re-aim freely like kana and nine-key flicks;
@@ -691,7 +695,10 @@ fun SwipeableKeyButton(
             KanaDirectionIndicator(discDirection, MaterialTheme.colorScheme.primary.copy(alpha = .6f))
             DirectionDiscPreview(discLabels, discDirection, resolvedBackground, resolvedText, contentScale)
         } else KeyFlickLabels(flickFade, resolvedText, maxWidth.value, maxHeight.value, effectiveSwipeFontSize.value, labelSize,
-            icons = swipeLeftIcon?.let { mapOf(KeyFlickOrigin.LEFT to it) }.orEmpty(), iconSizeDp = mainIconSize.value)
+            icons = buildMap {
+                swipeLeftIcon?.let { put(KeyFlickOrigin.LEFT, it) }
+                swipeRightIcon?.let { put(KeyFlickOrigin.RIGHT, it) }
+            }, iconSizeDp = mainIconSize.value)
     }
 }
 
