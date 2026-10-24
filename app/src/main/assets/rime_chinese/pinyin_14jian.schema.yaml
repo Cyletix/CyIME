@@ -54,7 +54,7 @@ speller:
     - abbrev/^([a-z]).+$/$1/
     - abbrev/^([zcs]h).+$/$1/
     - derive/^([nl])ue$/$1ve/
-    - derive/^([jqxy])u/$1v/
+    # 不派生 ju/qu/xu/yu 的 v 写法：14 键上 v 和 c 同键，QC 会被读成“去”，C 就当不了声母（JQC 出不来讲清楚）。
     - derive/un$/uen/
     - derive/ui$/uei/
     - derive/iu$/iou/
