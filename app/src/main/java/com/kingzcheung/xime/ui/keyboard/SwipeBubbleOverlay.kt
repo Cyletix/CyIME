@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import com.kingzcheung.xime.ui.theme.cyPopupEnter
 import androidx.compose.ui.platform.testTag
@@ -13,7 +14,55 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import kotlin.math.ceil
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
+
+/** 悬浮键盘当前的旋转角；独立窗口里的气泡要跟着转，尖角才对得上按键。 */
+internal val LocalFloatingKeyboardRotation = compositionLocalOf { 0f }
+
+/**
+ * 键盘转过时：Popup 的锚点是转过后的布局原点，气泡在布局里的位置也按同一角度转到窗口坐标；
+ * 窗口取转后气泡的外接框，画布里再把气泡转回去。
+ */
+@Composable
+private fun RotatedSwipeBubble(data: BubbleDrawData, shadow: Float, width: Int, height: Int, rotation: Float) {
+    val density = LocalDensity.current
+    val radians = Math.toRadians(rotation.toDouble())
+    val c = cos(radians).toFloat()
+    val s = sin(radians).toFloat()
+    val xs = floatArrayOf(0f, width * c, width * c - height * s, -height * s)
+    val ys = floatArrayOf(0f, width * s, width * s + height * c, height * c)
+    val minX = xs.min()
+    val minY = ys.min()
+    val boxWidth = ceil(xs.max() - minX).toInt().coerceAtLeast(1)
+    val boxHeight = ceil(ys.max() - minY).toInt().coerceAtLeast(1)
+    val localX = data.boxLeft - shadow
+    val localY = data.boxTop - shadow
+    val offsetX = localX * c - localY * s + minX
+    val offsetY = localX * s + localY * c + minY
+    val provider = remember(offsetX, offsetY) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
+                layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset =
+                IntOffset((anchorBounds.left + offsetX).roundToInt(), (anchorBounds.top + offsetY).roundToInt())
+        }
+    }
+    Popup(popupPositionProvider = provider, properties = PopupProperties(
+        focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false,
+        clippingEnabled = false,
+    )) {
+        Canvas(Modifier.size(with(density) { boxWidth.toDp() }, with(density) { boxHeight.toDp() })
+            .testTag("key-choice-popup")) {
+            withTransform({
+                translate(-minX, -minY)
+                rotate(rotation, androidx.compose.ui.geometry.Offset.Zero)
+            }) {
+                drawSwipeBubble(data.copy(boxLeft = shadow, boxTop = shadow))
+            }
+        }
+    }
+}
 
 internal fun swipeBubbleWindowPosition(anchor: IntRect, window: IntSize, popup: IntSize,
     left: Float, top: Float, shadow: Float): IntOffset = IntOffset(
@@ -30,6 +79,11 @@ internal fun SwipeBubbleOverlay(data: BubbleDrawData?) {
     val width = ceil(maxOf(data.pathBodyLeft + data.pathBodyWidth,
         data.pointerLeftInBox + data.keyWidthPx) + shadow * 2).toInt()
     val height = ceil(data.bodyHeightPx + data.pointerHeightPx + shadow * 2).toInt()
+    val rotation = LocalFloatingKeyboardRotation.current
+    if (isFloatingRotated(rotation)) {
+        RotatedSwipeBubble(data, shadow, width, height, rotation)
+        return
+    }
     var displacedY by remember { mutableFloatStateOf(0f) }
     val currentData by rememberUpdatedState(data)
     val provider = remember(shadow) {

@@ -762,6 +762,8 @@ object SettingsPreferences {
     private const val KEY_FLOATING_OFFSET_X_LANDSCAPE = "floating_offset_x_landscape"
     private const val KEY_FLOATING_OFFSET_Y = "floating_offset_y"
     private const val KEY_FLOATING_OFFSET_Y_LANDSCAPE = "floating_offset_y_landscape"
+    private const val KEY_FLOATING_ROTATION = "floating_rotation"
+    private const val KEY_FLOATING_ROTATION_LANDSCAPE = "floating_rotation_landscape"
     private const val KEY_FLOATING_WIDTH_DP = "floating_width_dp"
     private const val KEY_FLOATING_WIDTH_DP_LANDSCAPE = "floating_width_dp_landscape"
     private const val KEY_KEYBOARD_OPACITY = "keyboard_opacity"
@@ -813,6 +815,17 @@ object SettingsPreferences {
     fun setFloatingOffsetY(context: Context, offset: Int, isLandscape: Boolean = false) {
         val key = if (isLandscape) KEY_FLOATING_OFFSET_Y_LANDSCAPE else KEY_FLOATING_OFFSET_Y
         getPrefs(context).edit().putInt(key, offset).apply()
+    }
+
+    /** 悬浮键盘旋转角（度，顺时针为正，-90..90），和位置一样横竖屏各存一份。 */
+    fun getFloatingRotation(context: Context, isLandscape: Boolean = false): Float {
+        val key = if (isLandscape) KEY_FLOATING_ROTATION_LANDSCAPE else KEY_FLOATING_ROTATION
+        return getPrefs(context).getFloat(key, 0f).coerceIn(-90f, 90f)
+    }
+
+    fun setFloatingRotation(context: Context, degrees: Float, isLandscape: Boolean = false) {
+        val key = if (isLandscape) KEY_FLOATING_ROTATION_LANDSCAPE else KEY_FLOATING_ROTATION
+        getPrefs(context).edit().putFloat(key, degrees.coerceIn(-90f, 90f)).apply()
     }
 
     /**

@@ -361,14 +361,31 @@ internal fun rememberImeKeyboardCallbacks(
                 val cardWidth = service.currentFloatingCardWidthDp.takeIf { it > 0 }
                     ?: s.floatingWidthDp.takeIf { it > 0 } ?: screenW
                 val halfMargin = ((screenW - cardWidth) / 2f).roundToInt().coerceAtLeast(0)
-                val newX = floatingDragX.move(s.floatingOffsetX.coerceIn(-halfMargin, halfMargin), dx, -halfMargin, halfMargin)
                 val actualCardH = if (service.currentFloatingCardHeightDp > 0) service.currentFloatingCardHeightDp else service.currentEffectiveKeyboardHeight
+                // 转着的卡片与界面用同一套旋转限位：顶部条和拖动按钮在屏内，底角可以略出屏。
+                val rotated = com.kingzcheung.xime.ui.keyboard.floatingRotatedOffsetBounds(screenW.toFloat(), screenH.toFloat(),
+                    cardWidth.toFloat(), actualCardH.toFloat(), s.floatingRotation, floatingMinY.toFloat())
+                    .takeIf { com.kingzcheung.xime.ui.keyboard.isFloatingRotated(s.floatingRotation) && it.feasible }
                 val maxOffsetY = (screenH - actualCardH).coerceAtLeast(floatingMinY)
-                val newY = floatingDragY.move(s.floatingOffsetY.coerceIn(floatingMinY, maxOffsetY), dy, floatingMinY, maxOffsetY)
+                val newX = if (rotated != null) rotated.clampX(s.floatingOffsetX + dx).roundToInt()
+                    else floatingDragX.move(s.floatingOffsetX.coerceIn(-halfMargin, halfMargin), dx, -halfMargin, halfMargin)
+                val newY = if (rotated != null) rotated.clampY(s.floatingOffsetY + dy).roundToInt()
+                    else floatingDragY.move(s.floatingOffsetY.coerceIn(floatingMinY, maxOffsetY), dy, floatingMinY, maxOffsetY)
                 service.uiState.value = s.copy(
                     floatingOffsetX = newX,
                     floatingOffsetY = newY,
                 )
+            },
+            onFloatingKeyboardRotate = { degrees ->
+                val s = service.uiState.value
+                val angle = degrees.coerceIn(-90f, 90f)
+                service.uiState.value = s.copy(floatingRotation = angle)
+                if (!s.showKeyboardResize) {
+                    val isLandscape = service.resources.configuration.screenWidthDp > service.resources.configuration.screenHeightDp
+                    SettingsPreferences.setFloatingRotation(service, angle, isLandscape)
+                }
+                // 卡片矩形可能没变，触摸区却要按新角度重算。
+                service.keyboardContainer.requestLayout()
             },
             onFloatingKeyboardDragEnd = {
                 floatingDragX.reset()

@@ -89,6 +89,8 @@ data class KeyboardUiState(
     val isHandwritingMode: Boolean = false,
     val floatingOffsetX: Int = 0,
     val floatingOffsetY: Int = 0,
+    /** 悬浮卡片绕中心的旋转角（度，顺时针为正）。 */
+    val floatingRotation: Float = 0f,
     val floatingMinOffsetY: Int = 0,
     val floatingScreenHeightDp: Int = 0,
     /** 调节中的悬浮宽度（dp）；0 = 本次没在调宽度。 */
