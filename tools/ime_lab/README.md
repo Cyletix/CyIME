@@ -9,6 +9,7 @@
 - `inspect_backup.py backup.bak inventory.json`：只读哈希/ZIP目录/数据库头，不解压、恢复或修改账户。
 - `neighbors.alternatives(text, keys)`：使用每个布局实际测得的按键矩形，限定一次替换、有距离惩罚、原输入首位、最多16个候选；当前仅离线实验，不改变正在使用的键盘。
 - `chat_corpus.py --user-home C:/Users/Administrator --output D:/CyIME-Data/corpora/codex-cline/chat_corpus.sqlite3`：从本地 Codex 会话与 Cline CLI、VS Code 扩展历史分别提取人工用户消息，合入一个 SQLite；同时导出清理后的 `*.learning.jsonl` 和 jieba 分词的 `*.word_frequency.tsv`。再次生成需指定新路径或加 `--force`。`messages` 保留原文及清理后文本，`codex_user_messages`、`cline_user_messages` 是分来源视图，`message_terms` 保留逐条词频，`word_frequency` 分来源及汇总统计出现次数和消息数。仅输出至少两个字的汉语词和至少两个字母的英文词；TSV 默认只列出现两次以上的词，完整统计仍在 SQLite 中。此数据只是本地学习语料，尚未导入 Rime 词典或用户词库。
+- `project_messages.py` + `project_testset.py`（2026-10-24）：从本机 Claude Code 会话记录（`<wake>` 正文、协调者转发的 `<cited author="user">`、任何会话读过的项目接口列表）按项目消息 id 去重，提取用户在 CyIME 项目里写的全部消息；再按私有目录里的手工纠错表（`edits.tsv`：语音听错、选错候选、粘贴内容）和已报问题表（`reported.tsv`）生成个人习惯测试集：`holdout/`（`--after` 之后，未参与训练）、`seen/`、`fixes/`（纠正后的词句，`wrong` 是当时打出来的样子）、`reported/`，格式同 `personal_holdout.py`。数据和纠错表只放 `D:/CyIME-Data`，不进仓库。
 - `chat_corpus_claude.py`（2026-10-13 加入 `chat_corpus.py`，platform=`claude`）：从 `~/.claude/projects/*/*.jsonl` 只取人工输入的 `type=user` 记录（`userType=external`、非旁线），去掉工具结果、系统提醒、任务通知、续接摘要和协调转发，Projects 会话只取 `<wake>` 里 `from="human"` 的正文。`ngram/private_corpus.py learning.jsonl OUT_DIR` 再把清理后的文本切成汉字串，按会话切 9:1 训练／留出，只打印条数；输出必须在仓库和 OneDrive 之外。
 
 私有聊天、数据库、sender-ID 映射、统计产物放在仓库与 OneDrive 外。本轮指定备份的检查报告放在 D:/QQ-Transfer/cyime-private-analysis。字数/次数筛选不是匿名化。
