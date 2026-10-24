@@ -22,6 +22,10 @@ internal fun normalizeCursorHoldSeconds(value: Float): Float =
 internal fun normalizeLanguageMenuHoldSeconds(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.15f).coerceIn(0.05f, 1f) * 20).roundToInt() / 20f
 
+/** 26 键符号键点按的时限：0.3–2 秒，每档 0.1 秒，默认 1 秒；不拖动且在时限内松手才打开符号。 */
+internal fun normalizeSymbolKeyHoldSeconds(value: Float): Float =
+    ((value.takeIf { it.isFinite() } ?: 1f).coerceIn(0.3f, 2f) * 10).roundToInt() / 10f
+
 /** 手写公式上屏时两边加的 LaTeX 标记。 */
 enum class FormulaDelimiter(val label: String, val open: String, val close: String) {
     NONE("不加", "", ""), DOLLAR("\$…\$", "\$", "\$"), DISPLAY("\\[ … \\]", "\\[", "\\]");
@@ -83,6 +87,8 @@ data class KeyboardInputPreferences(
     val t9FlickLetters: Boolean = false,
     /** 长按语言键弹出列表，与空格长按分开设置；默认 0.15 秒（2026-10-13 用户要求）。 */
     val languageMenuHoldSeconds: Float = 0.15f,
+    /** 按住符号键当 Ctrl；不拖动且在这个时限内松手才打开符号面板，超过时限松手什么都不做；默认 1 秒（2026-10-24 用户要求）。 */
+    val symbolKeyHoldSeconds: Float = 1f,
     /** 手写公式上屏时两边的标记，默认 $…$。 */
     val formulaDelimiter: FormulaDelimiter = FormulaDelimiter.DOLLAR,
 ) {
@@ -90,6 +96,7 @@ data class KeyboardInputPreferences(
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
     /** 空格的所有长按行为（移动光标、连续空格、语音）共用“空格长按触发”时长，默认 0.2 秒。 */
     val spaceHoldDelayMs: Long get() = (normalizeCursorHoldSeconds(cursorHoldSeconds) * 1000).roundToInt().toLong()
+    val symbolKeyHoldMs: Long get() = (normalizeSymbolKeyHoldSeconds(symbolKeyHoldSeconds) * 1000).roundToInt().toLong()
     companion object {
         /** 正在显示的键盘监听这些键，改了就重新读取；[save] 写入的每个键都必须在内，否则设置页的改动要等输入法重启才生效。 */
         internal val watchedKeys: Set<String> by lazy {
@@ -97,7 +104,7 @@ data class KeyboardInputPreferences(
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
                 "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
-                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2",
+                "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
                 *SideSymbolTarget.entries.map { it.prefKey }.toTypedArray(),
                 "handwriting_pause_seconds", "handwriting_pause_seconds_v2", "handwriting_formula_delimiter") + FrostedGlassPreferences.keys
@@ -141,6 +148,7 @@ data class KeyboardInputPreferences(
                 cursorStepHaptic = prefs.getBoolean("cursor_step_haptic", true),
                 cursorStepSound = prefs.getBoolean("cursor_step_sound", false),
                 languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(languageHold),
+                symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(prefs.getFloat("symbol_key_hold_seconds", 1f)),
                 neighborCorrection = prefs.getBoolean("neighbor_correction", true),
                 fourteenLetterSwipe = prefs.getBoolean("fourteen_letter_swipe", true),
                 fourteenLetterSwipeDp = normalizeLetterSwipeDistance(prefs.getFloat("fourteen_letter_swipe_dp", 24f)),
@@ -172,6 +180,7 @@ data class KeyboardInputPreferences(
             .putFloat("cursor_hold_seconds", normalizeCursorHoldSeconds(cursorHoldSeconds))
             .putFloat("language_key_hold_seconds_v2", normalizeLanguageMenuHoldSeconds(languageMenuHoldSeconds))
             .putFloat("language_key_hold_seconds", normalizeLanguageMenuHoldSeconds(languageMenuHoldSeconds))
+            .putFloat("symbol_key_hold_seconds", normalizeSymbolKeyHoldSeconds(symbolKeyHoldSeconds))
             .putBoolean("neighbor_correction", neighborCorrection)
             .putBoolean("fourteen_letter_swipe", fourteenLetterSwipe)
             .putFloat("fourteen_letter_swipe_dp", normalizeLetterSwipeDistance(fourteenLetterSwipeDp))

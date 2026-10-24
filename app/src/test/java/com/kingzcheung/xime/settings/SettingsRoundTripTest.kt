@@ -74,7 +74,7 @@ class SettingsRoundTripTest {
     @Test fun keyboardInputSettingsReadBackEveryField() {
         val changed = KeyboardInputPreferences().copy(
             spaceHold = SpaceHoldAction.VOICE_TOGGLE, cursorGesture = CursorGestureMode.KEYBOARD,
-            cursorHoldSeconds = 0.5f, languageMenuHoldSeconds = 0.3f, neighborCorrection = false,
+            cursorHoldSeconds = 0.5f, languageMenuHoldSeconds = 0.3f, symbolKeyHoldSeconds = 1.5f, neighborCorrection = false,
             fourteenLetterSwipe = false, fourteenLetterSwipeDp = 30f, symbolInputMode = SymbolInputMode.LONG_PRESS,
             reverseSymbolSwipe = true, kanaDirectionHints = true, flickDirectionDisc = false, glideTyping = true,
             t9FlickLetters = true, letterLongPressMenu = true, cursorStepDp = 14f, keyTextScale = 1.3f, handwritingPauseSeconds = 0.8f,

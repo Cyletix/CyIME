@@ -151,6 +151,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("长按弹出字母气泡", gestures, gesturePage, "长按 字母 大写 小写 音调 气泡 弹出 拼音声调 九键 字母键长按弹出大小写 字母菜单"),
         SettingsSearchEntry("反转上下滑方向", gestures, gesturePage, "反转 方向 上滑 下滑 上拉 下拉 删除键 清空 撤销"),
         SettingsSearchEntry("长按语言键弹出列表", gestures, gesturePage, "语言键 切换语言 长按 时长 语言列表 秒"),
+        SettingsSearchEntry("符号键松手打开符号的时限", gestures, gesturePage, "符号键 !@# Ctrl 控制键 快捷键 复制 粘贴 剪切 撤销 全选 长按 时长 时限 过期 秒"),
         SettingsSearchEntry("滑动移动光标", gestures, gesturePage, "光标 移动 滑动 空格 整个键盘 关闭", section = "光标与空格"),
         SettingsSearchEntry("长按空格多久开始", gestures, gesturePage, "长按空格 时长 秒 延迟 移动光标 连续输入空格 开关语音", section = "光标与空格"),
         SettingsSearchEntry("光标每移动一字所需距离", gestures, gesturePage, "光标 距离 灵敏 灵敏度 速度 dp", section = "光标与空格"),

@@ -2788,7 +2788,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 @Suppress("DEPRECATION")
                 imm.showInputMethodPicker()
             }
-            else -> FileLogger.w(TAG, "Unknown command: $name")
+            else -> com.kingzcheung.xime.keyboard.CtrlShortcuts.letterOf(name)?.let { letter ->
+                // 屏幕上的符号键按住当 Ctrl：和实体键盘一样把 Ctrl+字母交给应用，编码中的拼音不动。
+                val now = SystemClock.uptimeMillis()
+                com.kingzcheung.xime.keyboard.CtrlShortcuts.keyEvents(letter, now).forEach { currentInputConnection?.sendKeyEvent(it) }
+            } ?: FileLogger.w(TAG, "Unknown command: $name")
         }
     }
 

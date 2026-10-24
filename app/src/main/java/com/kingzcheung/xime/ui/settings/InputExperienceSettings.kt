@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.testTag
 import com.kingzcheung.xime.ui.keyboard.normalizeHandwritingPause
 import com.kingzcheung.xime.ui.keyboard.normalizeCursorHoldSeconds
 import com.kingzcheung.xime.ui.keyboard.normalizeLanguageMenuHoldSeconds
+import com.kingzcheung.xime.ui.keyboard.normalizeSymbolKeyHoldSeconds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -218,6 +219,13 @@ internal fun InputExperienceSettings(
                 Slider(value = settings.languageMenuHoldSeconds, modifier = Modifier.testTag("language-menu-hold-slider"),
                     onValueChange = { settings = settings.copy(languageMenuHoldSeconds = normalizeLanguageMenuHoldSeconds(it)) },
                     onValueChangeFinished = { settings.save(context) }, valueRange = 0.05f..1f, steps = 18)
+            }
+            Column(Modifier.settingsSearchAnchor("符号键松手打开符号的时限", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("符号键松手打开符号的时限：${"%.1f".format(settings.symbolKeyHoldSeconds)} 秒")
+                Text("默认 1 秒，每档 0.1 秒；26 键按住 !@# 是 Ctrl，拖到字母上松手发快捷键（如 C 复制）。不拖动并在时限内松手才打开符号，超过时限或拖出去后松手不打开。", style = MaterialTheme.typography.bodySmall)
+                Slider(value = settings.symbolKeyHoldSeconds, modifier = Modifier.testTag("symbol-key-hold-slider"),
+                    onValueChange = { settings = settings.copy(symbolKeyHoldSeconds = normalizeSymbolKeyHoldSeconds(it)) },
+                    onValueChangeFinished = { settings.save(context) }, valueRange = 0.3f..2f, steps = 16)
             }
             }
             if (InputExperiencePart.HANDWRITING in parts) {
