@@ -76,4 +76,27 @@ class SideBySideSegmentationTest {
         }
         assertEquals(listOf("い"), result.segments.map { it.candidates.first().char })
     }
+    @Test fun kanaWithASeparateLeftStrokeIsNotSplitIntoFragments() {
+        // に：左边一竖，右边两横；拆成「ト」「し」时后一段压回前面笔迹里，拆成「丨」「こ」时左边太窄
+        val strokes = listOf(listOf(0f to 0f, 4f to 100f), listOf(25f to 20f, 75f to 18f), listOf(25f to 80f, 75f to 82f))
+        val names = mapOf(listOf(0, 1, 2) to ("に" to .85f), listOf(0) to ("丨" to .95f), listOf(1, 2) to ("こ" to .95f),
+            listOf(0, 1) to ("ト" to .9f), listOf(2) to ("し" to .9f), listOf(1) to ("一" to .9f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, sideBySide = true).recognize(strokes, noPauses.take(3)) { seg, _ ->
+            val (name, score) = names.getValue(seg.map { strokes.indexOf(it) })
+            listOf(HandwritingCandidate(name, score))
+        }
+        assertEquals(listOf("に"), result.segments.map { it.candidates.first().char })
+    }
+    @Test fun dotOfIIsNotTakenAsANextLetterEvenWhenItLooksLikeOne() {
+        // h 后面写 i：竖和点单看都像「1」，但点没往右推进，不是下一个字母
+        val strokes = listOf(listOf(0f to 0f, 0f to 100f), listOf(0f to 60f, 30f to 55f, 30f to 100f),
+            listOf(60f to 40f, 60f to 100f), listOf(60f to 15f, 61f to 17f))
+        val names = mapOf(listOf(0, 1) to ("h" to .9f), listOf(2, 3) to ("i" to .85f), listOf(2) to ("1" to .95f), listOf(3) to ("1" to .9f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, noPauses) { seg, _ ->
+                val (name, score) = names[seg.map { strokes.indexOf(it) }] ?: ("?" to .1f)
+                listOf(HandwritingCandidate(name, score))
+            }
+        assertEquals(listOf("h", "i"), result.segments.map { it.candidates.first().char })
+    }
 }

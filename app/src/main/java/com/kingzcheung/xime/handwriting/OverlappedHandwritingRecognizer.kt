@@ -110,7 +110,10 @@ class OverlappedHandwritingRecognizer(
                     val spanPenalty = if (lettersApart && layout?.spansGap(j, i) == true) LETTER_SPAN_PENALTY else 0f
                     // 假名、汉字大致方正：比行高窄很多的一段多半是半个字（い 的一笔被认成 し）
                     val narrowPenalty = if (!lettersApart) layout?.narrowPenalty(j, i) ?: 0f else 0f
-                    val score = prev + candidates[0].score + gapBias + spaceBias - spanPenalty - narrowPenalty
+                    // 从左往右写时，下一个字不会退回去压在前面的字上（に 的右半被认成 ト、し）；停顿后叠写不算
+                    val pausedHere = j < gaps.size && gaps[j] >= GAP_SPLIT_MS
+                    val overlapPenalty = if (j > 0 && !pausedHere) layout?.overlapPenalty(j, i) ?: 0f else 0f
+                    val score = prev + candidates[0].score + gapBias + spaceBias - spanPenalty - narrowPenalty - overlapPenalty
                     if (best[k][i] == neg || score > best[k][i]) {
                         best[k][i] = score
                         back[k][i] = j
@@ -147,8 +150,8 @@ class OverlappedHandwritingRecognizer(
         //   快写者字间间隔虽小但相对突出，仍能正确检出）。
         // 无显著停顿时按单字处理（合并段识别），输入框始终只显示一个字；
         // 连笔写多字词时合并段分数必然极低（跨字笔迹不成字），仍尊重 DP 切分。
-        if (bestK >= 2 && !hasPauseBoundary(gaps) && layout?.hasBoundary() != true &&
-            !(lettersApart && layout?.spansGap(0, n) == true)) {
+        // 并排书写（日语、英文）不走这条：靠上面的位置判断（空隙、偏窄、压回前字）切分。
+        if (bestK >= 2 && !hasPauseBoundary(gaps) && layout == null) {
             val merged = segmentCandidates(0, n, bounded, predictFn)
             val mergedScore = merged.firstOrNull()?.score ?: 0f
             var end = n
@@ -274,6 +277,17 @@ class OverlappedHandwritingRecognizer(
         private val lineHeight = gapNeeded / SIDE_GAP_RATIO
         private val letterGap = lineHeight * LETTER_GAP_RATIO
 
+        /** 这一段没往右推进，或最左边退回到前面笔迹最右边以内超过 [OVERLAP_FREE_RATIO] 行高时，退得越多罚得越多（最多 [OVERLAP_PENALTY]）。 */
+        fun overlapPenalty(j: Int, i: Int): Float {
+            var left = Float.MAX_VALUE
+            var right = -Float.MAX_VALUE
+            for (s in j until i) { left = minOf(left, minX[s]); right = maxOf(right, maxX[s]) }
+            // 整段都没越过前面笔迹的右边（i 上的点、字里补的一笔），不是下一个字
+            if (right - prefixMaxX[j] < ADVANCE_MIN_RATIO * lineHeight) return OVERLAP_PENALTY
+            val back = (prefixMaxX[j] - left) / lineHeight - OVERLAP_FREE_RATIO
+            return if (back <= 0f) 0f else OVERLAP_PENALTY * (back / OVERLAP_FULL_RATIO).coerceAtMost(1f)
+        }
+
         /** 这一段的宽度不到行高的 [NARROW_RATIO] 时，越窄罚得越多（最多 [NARROW_PENALTY]）。 */
         fun narrowPenalty(j: Int, i: Int): Float {
             var left = Float.MAX_VALUE
@@ -307,13 +321,25 @@ class OverlappedHandwritingRecognizer(
 
     companion object {
         /** 并排书写时，字与字之间的空隙至少为整行高度的这个比例才算换字。 */
-        const val SIDE_GAP_RATIO = 0.25f
+        const val SIDE_GAP_RATIO = 0.4f
 
         /** 假名、汉字：一段的宽度不到行高的这个比例就算偏窄（小写的っゃ约 0.4，几乎不罚）。 */
         const val NARROW_RATIO = 0.4f
 
         /** 偏窄的最大罚分（宽度趋近 0 时）。 */
         const val NARROW_PENALTY = 0.3f
+
+        /** 后一个字压回前面笔迹里不超过行高的这个比例不罚（前一个字的收笔常伸到下一个字下面）。 */
+        const val OVERLAP_FREE_RATIO = 0.15f
+
+        /** 压回超出免罚部分达到行高的这个比例时罚满。 */
+        const val OVERLAP_FULL_RATIO = 0.3f
+
+        /** 后一个字至少要越过前面笔迹右边行高的这个比例。 */
+        const val ADVANCE_MIN_RATIO = 0.1f
+
+        /** 压回前面笔迹的最大罚分。 */
+        const val OVERLAP_PENALTY = 0.3f
 
         /** 英文字母之间：空隙到整行高度的这个比例就算两个字母。 */
         const val LETTER_GAP_RATIO = 0.08f
