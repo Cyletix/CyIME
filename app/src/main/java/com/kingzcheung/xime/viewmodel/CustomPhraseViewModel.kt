@@ -40,6 +40,12 @@ class CustomPhraseViewModel(application: Application) : AndroidViewModel(applica
         loadEntries()
     }
 
+    /** The phrases every keyboard shares (custom_phrase.txt); saving applies them to all enabled schemas. */
+    fun loadShared() {
+        schemaId = null
+        loadEntries()
+    }
+
     private fun loadEntries() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }

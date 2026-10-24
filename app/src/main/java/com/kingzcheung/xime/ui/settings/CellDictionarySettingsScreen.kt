@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.settings.CellDictionaryCatalog
+import com.kingzcheung.xime.settings.CellDictionaryCost
 import com.kingzcheung.xime.settings.CellDictionaryOffer
 import com.kingzcheung.xime.settings.InstalledCellDictionary
 import com.kingzcheung.xime.viewmodel.CellDictionaryUiState
@@ -27,7 +28,7 @@ import com.kingzcheung.xime.ui.common.CompactDropdownMenu
 import com.kingzcheung.xime.ui.common.CompactMenuRow
 
 @Composable
-fun CellDictionarySettingsContent(onBack: () -> Unit) {
+fun CellDictionarySettingsContent(onBack: () -> Unit, embedded: Boolean = false) {
     val model: CellDictionaryViewModel = viewModel()
     val state by model.uiState.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
@@ -39,7 +40,8 @@ fun CellDictionarySettingsContent(onBack: () -> Unit) {
         onImport = { importer.launch(arrayOf("*/*")) },
         onSource = { url ->
             runCatching { uriHandler.openUri(url) }.onFailure { linkError = "无法打开浏览器" }
-        })
+        },
+        onRemove = model::remove, embedded = embedded)
     linkError?.let { message ->
         AlertDialog(onDismissRequest = { linkError = null }, text = { Text(message) },
             confirmButton = { TextButton(onClick = { linkError = null }) { Text("知道了") } })
@@ -56,7 +58,11 @@ fun CellDictionarySettingsPanel(
     onApply: () -> Unit,
     onImport: () -> Unit,
     onSource: (String) -> Unit,
+    onRemove: (String) -> Unit = {},
+    /** Inside the 词库 page: no own top bar. */
+    embedded: Boolean = false,
 ) {
+    var confirmLarge by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("全部") }
     var categoryMenu by remember { mutableStateOf(false) }
@@ -74,8 +80,16 @@ fun CellDictionarySettingsPanel(
     val builtins = dictionaries.installed.filter { it.id in builtinIds && matches(it.name, it.category, it.id) }
     val visibleOffers = offers.filter { matches(it.name, it.category, it.id) }
     val locals = dictionaries.installed.filter { it.id !in catalogIds && matches(it.name, it.category, it.id) }
+    // The cost of what is switched on, shown before it is applied (CellDictionaryCost).
+    val selectedEntries = dictionaries.installed.filter { it.id in dictionaries.selected }.sumOf { it.count }
+    val large = selectedEntries > CellDictionaryCost.WARN_ENTRIES
+    // Per row: the total cost with this dictionary on, so each switch shows what it adds.
+    fun costWith(id: String, entries: Int): String {
+        val total = if (id in dictionaries.selected) selectedEntries else selectedEntries + entries
+        return (if (id in dictionaries.selected) "已计入 · " else "开启后 · ") + CellDictionaryCost.describe(total)
+    }
     Scaffold(topBar = {
-        TopAppBar(title = { Text("分类词库") }, navigationIcon = {
+        if (!embedded) TopAppBar(title = { Text("导入的词库") }, navigationIcon = {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         })
     }, bottomBar = {
@@ -83,7 +97,9 @@ fun CellDictionarySettingsPanel(
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text("已选 ${dictionaries.selected.size} 个 · 已应用 ${dictionaries.applied.size} 个",
                     style = MaterialTheme.typography.bodySmall)
-                Button(onClick = onApply, enabled = !state.busy && dictionaries.pending,
+                Text(CellDictionaryCost.describe(selectedEntries), style = MaterialTheme.typography.bodySmall,
+                    color = if (large) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = { if (large) confirmLarge = true else onApply() }, enabled = !state.busy && dictionaries.pending,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(if (dictionaries.pending) "应用词库更改" else "词库已同步")
                 }
@@ -93,11 +109,12 @@ fun CellDictionarySettingsPanel(
         LazyColumn(Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                Text("为中文拼音、九键和双拼补充候选词。按需下载，选好后统一应用。词库越多，首次应用耗时和占用空间越大。",
+                Text("为中文拼音、九键和双拼补充候选词。按需下载或导入，选好后统一应用。补充的词排在内置词后面，" +
+                    "但词越多打字越慢、生僻词越容易出现在候选里：页面底部会先算出开启后的代价。",
                     style = MaterialTheme.typography.bodyMedium)
             }
             item {
-                Text("推荐词库来自搜狗细胞词库，也可导入本地 SCEL 或 CyIME JSON 词库。按原作者及来源页约定使用。关闭后不再加载该词库，已学入个人词库的词仍会保留。",
+                Text("推荐词库来自搜狗细胞词库，也可导入本地搜狗 SCEL、TXT（每行“词 拼音”或“拼音 词”）或 CyIME JSON 词库。按原作者及来源页约定使用。关闭后不再加载该词库，已学入个人词库的词仍会保留。",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item {
@@ -131,20 +148,32 @@ fun CellDictionarySettingsPanel(
             items(builtins, key = { it.id }) { entry ->
                 CellDictionaryRow(entry.name, entry.category, entry,
                     entry.id in dictionaries.selected, entry.id in dictionaries.applied, state.busy,
-                    { onSelect(entry.id, it) }, {}, entry.sourceUrl.takeIf { it.isNotBlank() }?.let { url -> { onSource(url) } })
+                    { onSelect(entry.id, it) }, {}, entry.sourceUrl.takeIf { it.isNotBlank() }?.let { url -> { onSource(url) } },
+                    cost = costWith(entry.id, entry.count))
             }
             items(visibleOffers, key = { it.id }) { offer ->
                 CellDictionaryRow(offer.name, offer.category, installed[offer.id],
                     offer.id in dictionaries.selected, offer.id in dictionaries.applied, state.busy,
                     { onSelect(offer.id, it) }, { onDownload(offer) }, { onSource(offer.sourceUrl) },
-                    estimate = "约 ${offer.entryCount} 条 · ${offer.downloadBytes / 1024} KB")
+                    estimate = "约 ${offer.entryCount} 条 · ${offer.downloadBytes / 1024} KB",
+                    onRemove = { onRemove(offer.id) },
+                    cost = costWith(offer.id, installed[offer.id]?.count ?: offer.entryCount))
             }
             items(locals, key = { it.id }) { entry ->
                 CellDictionaryRow(entry.name, entry.category, entry,
                     entry.id in dictionaries.selected, entry.id in dictionaries.applied, state.busy,
-                    { onSelect(entry.id, it) }, {}, null)
+                    { onSelect(entry.id, it) }, {}, null, onRemove = { onRemove(entry.id) },
+                    cost = costWith(entry.id, entry.count))
             }
         }
+    }
+    if (confirmLarge) {
+        AlertDialog(onDismissRequest = { confirmLarge = false },
+            title = { Text("词库很大") },
+            text = { Text(CellDictionaryCost.describe(selectedEntries) + "。这是全是生僻词时的最坏估计，真实词库通常更小；" +
+                "生僻词也可能出现在候选的后几位。仍要应用吗？") },
+            confirmButton = { TextButton(onClick = { confirmLarge = false; onApply() }) { Text("仍然应用") } },
+            dismissButton = { TextButton(onClick = { confirmLarge = false }) { Text("取消") } })
     }
 }
 
@@ -154,13 +183,15 @@ private fun CellDictionaryRow(
     applied: Boolean, busy: Boolean, onSelect: (Boolean) -> Unit, onDownload: () -> Unit,
     onSource: (() -> Unit)?,
     estimate: String = "",
+    onRemove: (() -> Unit)? = null,
+    cost: String = "",
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
             Text(category, style = MaterialTheme.typography.labelMedium)
             if (installed != null) {
-                Text("${installed.count} 条" + if (installed.skipped > 0) " · 跳过 ${installed.skipped} 条无效内容" else "",
+                Text((if (installed.english > 0) "中文 ${installed.count} 条 · 英文 ${installed.english} 个" else "${installed.count} 条") + if (installed.skipped > 0) " · 跳过 ${installed.skipped} 条无效内容" else "",
                     style = MaterialTheme.typography.bodySmall)
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(if (selected != applied) { if (selected) "待开启" else "待关闭" }
@@ -174,7 +205,14 @@ private fun CellDictionaryRow(
                     Text("下载并选用")
                 }
             }
-            if (onSource != null) TextButton(onClick = onSource) { Text("查看来源") }
+            if (cost.isNotBlank()) Text(cost, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row {
+                if (onSource != null) TextButton(onClick = onSource) { Text("查看来源") }
+                // Only when not in use: switch it off and apply first.
+                if (installed != null && onRemove != null && !applied && !selected)
+                    TextButton(onClick = onRemove, enabled = !busy) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            }
         }
     }
 }

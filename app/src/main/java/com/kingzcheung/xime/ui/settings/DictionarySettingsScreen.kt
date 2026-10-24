@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -28,8 +27,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import com.kingzcheung.xime.ui.common.CompactDropdownMenu
-import com.kingzcheung.xime.ui.common.CompactMenuRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -57,63 +54,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kingzcheung.xime.settings.DictEntry
 import com.kingzcheung.xime.viewmodel.CustomPhraseUiState
 import com.kingzcheung.xime.viewmodel.CustomPhraseViewModel
-import com.kingzcheung.xime.viewmodel.PersonalDictViewModel
 
+/**
+ * 词库：我的短语（打编码出固定短语）、导入的词库（下载/导入、开关、删除、开启前的代价）、删掉的候选（长按删过的词）、
+ * 查词（一个词在内置词库、导入词库、我的短语里有没有，编码是什么）。短语对所有键盘通用，不再按方案选择。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DictionarySettingsContent(
     onBack: () -> Unit,
-    onCellDictionaries: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onCellDictionaries: () -> Unit = {},
 ) {
-    val viewModel: PersonalDictViewModel = viewModel()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedDictTab by remember { mutableIntStateOf(0) }
-    var showSchemaMenu by remember { mutableStateOf(false) }
     val customPhraseVM: CustomPhraseViewModel = viewModel(key = "dict_custom_phrase")
     val customPhraseState by customPhraseVM.uiState.collectAsStateWithLifecycle()
-    LaunchedEffect(uiState.selectedSchema) { customPhraseVM.setSchema(uiState.selectedSchema) }
-    LaunchedEffect(uiState.selectedSchema) {
-        if (uiState.selectedSchema != "t9_pinyin" && selectedDictTab == 3) selectedDictTab = 0
-    }
+    LaunchedEffect(Unit) { customPhraseVM.loadShared() }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    val schema = uiState.availableSchemas.find { it.schemaId == uiState.selectedSchema }
-                    Text("词库 - ${schema?.name ?: uiState.selectedSchema}", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
+                title = { Text("词库") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                actions = {
-                    Row(
-                        modifier = Modifier.clickable { showSchemaMenu = true },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val schema = uiState.availableSchemas.find { it.schemaId == uiState.selectedSchema }
-                        Text(schema?.name ?: uiState.selectedSchema, style = MaterialTheme.typography.bodyMedium)
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                    CompactDropdownMenu(
-                        expanded = showSchemaMenu,
-                        onDismissRequest = { showSchemaMenu = false },
-                        offset = DpOffset(0.dp, 4.dp)
-                    ) {
-                        for (s in uiState.availableSchemas) {
-                            CompactMenuRow(
-                                label = s.name, selected = s.schemaId == uiState.selectedSchema,
-                                onClick = { showSchemaMenu = false; viewModel.selectSchema(s.schemaId) }
-                            )
-                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -123,7 +91,6 @@ fun DictionarySettingsContent(
             )
         },
         floatingActionButton = {
-            // 个人词库已改为只读，仅自定义短语支持增删改
             if (selectedDictTab == 0) {
                 FloatingActionButton(
                     onClick = { customPhraseVM.showAddDialog() },
@@ -135,22 +102,24 @@ fun DictionarySettingsContent(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            TextButton(onClick = onCellDictionaries, modifier = Modifier.fillMaxWidth()) {
-                Text("分类词库 · 下载与开关")
-            }
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                // 个人词库标签去掉：只读且总是空的；屏蔽的候选和其他内容一样做成标签。
-                TabButton("自定义短语", selected = selectedDictTab == 0, onClick = { selectedDictTab = 0 }, modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.width(8.dp))
-                TabButton("方案词库", selected = selectedDictTab == 2, onClick = { selectedDictTab = 2 }, modifier = Modifier.weight(1f))
-                if (uiState.selectedSchema == "t9_pinyin") {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TabButton("屏蔽的候选", selected = selectedDictTab == 3, onClick = { selectedDictTab = 3 }, modifier = Modifier.weight(1f))
-                }
+                TabButton("我的短语", selected = selectedDictTab == 0, onClick = { selectedDictTab = 0 }, modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.width(6.dp))
+                TabButton("导入的词库", selected = selectedDictTab == 1, onClick = { selectedDictTab = 1 }, modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.width(6.dp))
+                TabButton("删掉的候选", selected = selectedDictTab == 2, onClick = { selectedDictTab = 2 }, modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.width(6.dp))
+                TabButton("查词", selected = selectedDictTab == 3, onClick = { selectedDictTab = 3 }, modifier = Modifier.weight(1f))
             }
             when (selectedDictTab) {
-                2 -> SchemaDictBrowserPanel()
-                3 -> T9SuppressionPanel()
+                1 -> CellDictionarySettingsContent(onBack = onBack, embedded = true)
+                2 -> Column {
+                    Text("旧版本长按删除会把候选永久隐藏，这里可以放回去。现在长按删除只忘掉学习，不再隐藏。",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    T9SuppressionPanel()
+                }
+                3 -> DictionaryLookupPanel()
                 else -> CustomPhraseTabContent(viewModel = customPhraseVM, uiState = customPhraseState)
             }
         }
@@ -177,7 +146,7 @@ private fun UsageHint() {
     val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier
-            .clickable { uriHandler.openUri("https://github.com/Cyletix/CyIME/blob/main/docs/usage.md#词库与升级") }
+            .clickable { uriHandler.openUri("https://github.com/Cyletix/CyIME/blob/main/docs/usage.md#词库") }
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -200,7 +169,9 @@ private fun CustomPhraseTabContent(
     uiState: CustomPhraseUiState,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Spacer(Modifier.height(12.dp))
+        Text("打编码，固定出你设定的短语，排在候选第一位（例如 dz → 你的地址）。所有键盘通用。",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         Surface(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             shape = RoundedCornerShape(28.dp),
@@ -251,7 +222,7 @@ private fun CustomPhraseTabContent(
                                 Spacer(Modifier.height(2.dp))
                                 Text(entry.code, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                                 if (entry.weight != null) {
-                                    Text("权重: ${entry.weight}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text("顺序 ${entry.weight}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                                 }
                             }
                             IconButton(onClick = {
@@ -272,7 +243,7 @@ private fun CustomPhraseTabContent(
 
     if (uiState.showAddDialog) {
         PhraseEditDialog(
-            title = "添加快捷短语",
+            title = "添加短语",
             word = uiState.editWord,
             code = uiState.editCode,
             weight = uiState.editWeight,
@@ -285,7 +256,7 @@ private fun CustomPhraseTabContent(
     }
     if (uiState.showEditDialog) {
         PhraseEditDialog(
-            title = "编辑快捷短语",
+            title = "编辑短语",
             word = uiState.editWord,
             code = uiState.editCode,
             weight = uiState.editWeight,
@@ -326,7 +297,7 @@ private fun PhraseEditDialog(
                 label = { Text("编码") }, shape = RoundedCornerShape(12.dp), singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(value = weight, onValueChange = onWeightChange,
-                label = { Text("权重（可选，越大越优先）") }, shape = RoundedCornerShape(12.dp), singleLine = true, modifier = Modifier.fillMaxWidth())
+                label = { Text("顺序（可选：同一编码有几条短语时，数字大的在前）") }, shape = RoundedCornerShape(12.dp), singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(24.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text("取消") }

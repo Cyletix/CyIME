@@ -338,7 +338,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.Ballot,
                         title = "词库",
-                        subtitle = "自定义短语、方案词库、分类词库",
+                        subtitle = "我的短语、导入的词库、删掉的候选、查词",
                         onClick = onNavigateToDictionary,
                         showArrow = true
                     )

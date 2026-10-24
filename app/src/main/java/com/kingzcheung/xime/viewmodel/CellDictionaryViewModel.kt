@@ -58,12 +58,18 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
             .use(ScelDictionary::readBounded)
         val entry = store.install(bytes)
         store.select(entry.id, true)
-        "已导入「${entry.name}」${entry.count} 条，点击「应用词库更改」生效"
+        "已导入「${entry.name}」${entry.count} 条" + (if (entry.english > 0) "、英文 ${entry.english} 个" else "") + "（最坏情况下最慢的按键约慢 " +
+            "${com.kingzcheung.xime.settings.CellDictionaryCost.slowdownPercent(entry.count)}%），点击「应用词库更改」生效"
     }
 
     fun select(id: String, selected: Boolean) = work("保存选择…") {
         store.select(id, selected)
         null
+    }
+
+    fun remove(id: String) = work("删除词库…") {
+        store.remove(id)
+        "已删除"
     }
 
     fun apply() = work("正在应用词库，输入法会短暂暂停…") {
