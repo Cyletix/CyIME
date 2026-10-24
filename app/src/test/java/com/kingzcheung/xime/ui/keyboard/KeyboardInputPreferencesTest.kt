@@ -174,7 +174,7 @@ class KeyboardInputPreferencesTest {
 
     @Test
     fun `saved input preferences can be read without restarting the app`() {
-        val changed = KeyboardInputPreferences(SpaceHoldAction.REPEAT, 6f, 1.4f, "…\n→")
+        val changed = KeyboardInputPreferences(spaceHold = SpaceHoldAction.REPEAT, cursorStepDp = 6f, keyTextScale = 1.4f, fixedSymbols = "…\n→")
         changed.save(context)
         assertEquals(changed, KeyboardInputPreferences.read(context))
         changed.copy(spaceHold = SpaceHoldAction.CURSOR, cursorStepDp = 24f).save(context)

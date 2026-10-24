@@ -18,6 +18,7 @@ import com.kingzcheung.xime.ui.keyboard.FormulaDelimiter
 import androidx.compose.foundation.clickable
 import com.kingzcheung.xime.ui.keyboard.CursorGestureMode
 import com.kingzcheung.xime.ui.keyboard.cursorDistanceMillimeters
+import com.kingzcheung.xime.ui.keyboard.normalizeCursorSwipeLines
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.InputGestureLock
@@ -169,9 +170,15 @@ internal fun InputExperienceSettings(
                 spaceHoldSlider()
             }
             if (settings.cursorGesture != CursorGestureMode.NONE) {
+                Column(Modifier.settingsSearchAnchor("从中间滑到边缘走几行", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("从中间滑到屏幕边缘走：${"%.2f".format(settings.cursorSwipeLines).trimEnd('0').trimEnd('.')} 行")
+                    Text("按当前输入框一行能放几个字换算，字号、屏幕大小、横竖屏自动对上，手机和平板不用分别调", style = MaterialTheme.typography.bodySmall)
+                    Slider(value = settings.cursorSwipeLines, onValueChange = { settings = settings.copy(cursorSwipeLines = normalizeCursorSwipeLines(it)) },
+                        onValueChangeFinished = { settings.save(context) }, valueRange = 0.5f..3f, steps = 9)
+                }
                 Column(Modifier.settingsSearchAnchor("光标每移动一字所需距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} 档（约 ${"%.1f".format(cursorDistanceMillimeters(settings.cursorStepDp))} 毫米）")
-                    Text("按屏幕实际尺寸计算，手机和平板同一档手感相同；距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
+                    Text("少数输入框不提供排版，读不到一行几个字时用这个距离；距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
                     Slider(value = settings.cursorStepDp, onValueChange = { settings = settings.copy(cursorStepDp = it) },
                         onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
                 }

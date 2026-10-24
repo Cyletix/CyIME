@@ -75,7 +75,7 @@ fun SpaceKeyButton(
     }
     BoxWithConstraints(
         modifier.fillMaxSize().testTag("space-key")
-            .pointerInput(holdAction, settings.cursorStepDp, cursorUnitPx, settings.spaceHoldDelayMs) {
+            .pointerInput(holdAction, settings.cursorStepDp, settings.cursorSwipeLines, cursorUnitPx, settings.spaceHoldDelayMs) {
                 val step = settings.cursorStepDp * cursorUnitPx
                 val tapTolerance = maxOf(viewConfiguration.touchSlop, 24.dp.toPx())
                 awaitEachGesture {
@@ -98,7 +98,12 @@ fun SpaceKeyButton(
                         held = true
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                         when (holdAction) {
-                            SpaceHoldAction.CURSOR -> { cursorActive = true; SpaceCursorShift.begin(); onCursorMode?.invoke(true) }
+                            SpaceHoldAction.CURSOR -> {
+                                cursorActive = true
+                                SpaceCursorShift.begin()
+                                CursorLineMetrics.request()
+                                onCursorMode?.invoke(true)
+                            }
                             SpaceHoldAction.REPEAT -> while (true) { currentClick(); delay(70L) }
                             SpaceHoldAction.VOICE_TOGGLE -> onVoiceToggle?.invoke()
                         }
@@ -123,6 +128,8 @@ fun SpaceKeyButton(
                                 timer.cancel()
                             }
                             if (cursorActive) {
+                                cursorSteps.stepPx = lineCursorStepPx(view.rootView.width / 2f, settings.cursorSwipeLines,
+                                    CursorLineMetrics.charsPerLine, step, cursorUnitPx)
                                 val steps = cursorSteps.move(dx)
                                 if (steps != 0) onMove?.invoke(steps)
                                 val rows = verticalSteps.move(dy).coerceIn(-1, 1)
