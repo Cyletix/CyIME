@@ -290,6 +290,8 @@ fun SwipeableKeyButton(
     isHighlighted: Boolean = false,
     layoutMode: ButtonLayout = ButtonLayout.STANDARD,
     icon: Painter? = null,
+    /** 主图标基准尺寸，随键帽缩放；细小的图标（如箭头）可调大。 */
+    iconSizeDp: Float = KeyboardKeyMetrics.FunctionIconSize.value,
     swipeText: String? = null,
     swipeDownText: String? = null,
     /** 下滑文本显示在按键上（气泡为空，用于 display:key） */
@@ -403,7 +405,8 @@ fun SwipeableKeyButton(
         // With the four-way disc shown, 14-key pairs re-aim freely like kana and nine-key flicks;
         // the in-key mode keeps the 26-key axis lock.
         freeDirection = letters != null && inputPreferences.flickDirectionDisc,
-        inlineHorizontalPreview = letters != null,
+        // 横滑动作（如九键 0 键左滑「上一项」）和上下滑一样在键内渐变，不再弹旧的滑动浮窗（用户 10-24）。
+        inlineHorizontalPreview = true,
         longPressDrawableIds = longPressDrawableIds.orEmpty(),
         keyWidth = buttonBounds.width,
         onLongPressSelect = onLongPressSelect,
@@ -522,7 +525,7 @@ fun SwipeableKeyButton(
         // 实际键帽太小时只留主字符，灰色上下滑提示不再挤在键面上。
         val hintsVisible = showKeyHints(maxWidth.value, maxHeight.value, LocalDpPerMillimeter.current)
         val compactIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, 16f).dp
-        val mainIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value).dp
+        val mainIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, iconSizeDp).dp
         val keyHeight = maxHeight
         Box(Modifier.fillMaxSize().graphicsLayer {
             alpha = if (showDisc) 1f else 1f - flickFade.strongest

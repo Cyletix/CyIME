@@ -726,6 +726,8 @@ private fun T9KeyboardContent(
             NineKeyButton(
                 digit = "", letters = if (nextCandidate) "下一项" else "0",
                 icon = if (nextCandidate) rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowRight) else null,
+                // 箭头只占图标框中间一小块，按退格等功能图标的视觉高度放大（用户 10-24：太小看不清）。
+                iconSizeDp = T9NextCandidateIconDp,
                 onClick = {
                     if (glossHoldUsed) glossHoldUsed = false
                     else if (nextCandidate) {
@@ -770,7 +772,7 @@ private fun T9KeyboardContent(
 // ─── 九键数字键（可长按） ──────────────────────────────────────────────
 
 /** 九键数字键的滑动配置：回调 + 提示文本（均受 keyboard.t9.keys 配置与提示开关控制）。 */
-private data class T9KeySwipes(
+internal data class T9KeySwipes(
     val symbolInputText: String? = null,
     val onSwipeUp: (() -> Unit)? = null,
     val onSwipeDown: (() -> Unit)? = null,
@@ -915,9 +917,12 @@ internal fun T9CandidateItem(
     }
 }
 
+/** 0 键「下一项」箭头的基准尺寸。 */
+internal const val T9NextCandidateIconDp = 32f
+
 /** 数字 1 分词键，与 [T9DigitKey] 统一使用 [SwipeableKeyButton] 保持角标位置一致 */
 @Composable
-private fun NineKeyButton(
+internal fun NineKeyButton(
     digit: String,
     letters: String,
     onClick: () -> Unit,
@@ -932,6 +937,7 @@ private fun NineKeyButton(
     fontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
     swipes: T9KeySwipes = T9KeySwipes(),
     icon: androidx.compose.ui.graphics.painter.Painter? = null,
+    iconSizeDp: Float = KeyboardKeyMetrics.FunctionIconSize.value,
     onSwipeLeft: (() -> Unit)? = null,
     /** 九键拂动模式下与 2~9 一致：长按弹出本键数字，松手输入。 */
     flickDigitLongPress: Boolean = false,
@@ -945,6 +951,7 @@ private fun NineKeyButton(
         onLongPressSelect = digitLongPress?.let { handler -> { _: String -> handler() } },
         longPressTimeoutMillis = digitLongPress?.let { 300L },
         icon = icon,
+        iconSizeDp = iconSizeDp,
         onSwipeLeft = onSwipeLeft,
         swipeLeftText = if (onSwipeLeft != null) "上一项" else null,
         onClick = onClick,
