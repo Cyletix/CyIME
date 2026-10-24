@@ -301,14 +301,14 @@ internal fun rememberImeKeyboardCallbacks(
             onCursorMove = { direction ->
                 if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$direction") == true) {
                     service.feedbackManager.cursorStepFeedback(view)
-                } else service.schemaController.moveEditorCursor(direction) {
+                } else service.schemaController.moveEditorCursor(direction, spaceCursorSelecting(service)) {
                     service.feedbackManager.cursorStepFeedback(view)
                 }
             },
             onCursorMoveVertical = { steps ->
                 val edge = if (steps < 0) "start" else "end"
                 if (service.keyboardCallbacks?.onPreeditCursorMove?.invoke("preedit_cursor:$edge") != true)
-                    service.schemaController.moveEditorCursorVertical(steps)
+                    service.schemaController.moveEditorCursorVertical(steps, spaceCursorSelecting(service))
             },
             onGestureAction = { action, value ->
                 action.execute(service, value)
@@ -485,3 +485,9 @@ internal fun rememberImeKeyboardCallbacks(
         )
     }
 }
+
+/** 空格移光标时按 Shift 扩选；扩选算用掉了 Shift：按住的松开后不切成单次大写，单次大写随即取消。 */
+private fun spaceCursorSelecting(service: XimeInputMethodService): Boolean =
+    com.kingzcheung.xime.ui.keyboard.SpaceCursorShift.selecting(service.keyboardViewModel.shiftMode.value).also {
+        if (it) service.keyboardViewModel.onCharacterTyped()
+    }
