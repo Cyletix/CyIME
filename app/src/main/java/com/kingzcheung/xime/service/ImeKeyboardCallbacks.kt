@@ -380,10 +380,9 @@ internal fun rememberImeKeyboardCallbacks(
                 val s = service.uiState.value
                 val angle = degrees.coerceIn(-90f, 90f)
                 service.uiState.value = s.copy(floatingRotation = angle)
-                if (!s.showKeyboardResize) {
-                    val isLandscape = service.resources.configuration.screenWidthDp > service.resources.configuration.screenHeightDp
-                    SettingsPreferences.setFloatingRotation(service, angle, isLandscape)
-                }
+                // 只在调节界面点确认时调用，直接保存。
+                val isLandscape = service.resources.configuration.screenWidthDp > service.resources.configuration.screenHeightDp
+                SettingsPreferences.setFloatingRotation(service, angle, isLandscape)
                 // 卡片矩形可能没变，触摸区却要按新角度重算。
                 service.keyboardContainer.requestLayout()
             },

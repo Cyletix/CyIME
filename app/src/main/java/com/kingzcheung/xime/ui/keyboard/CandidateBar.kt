@@ -1023,6 +1023,11 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
     val screenWidth = (LocalConfiguration.current.screenWidthDp / LocalCandidateBarScale.current).dp
     val margin = with(density) { 4.dp.roundToPx() }
     val gap = with(density) { 2.dp.roundToPx() }
+    val rotation = LocalFloatingKeyboardRotation.current
+    if (isFloatingRotated(rotation)) {
+        RotatedPreeditPreview(text, visuals, onEdit, rotation, gap, screenWidth)
+        return
+    }
     // 气泡贴着键盘左边（用户 10-20 要求恢复）：不跟光标，所有应用位置一样。
     val positionProvider = remember(margin, gap) {
         object : PopupPositionProvider {
@@ -1043,6 +1048,47 @@ private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (
         PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
             .height(44.dp).padding(vertical = 6.dp)
         )
+    }
+}
+
+/**
+ * 悬浮键盘转过时的拼音气泡：仍贴在候选栏左上方，但跟键盘一起倾斜。
+ * Popup 的锚点是转过后的候选栏原点，气泡中心按同一角度转到窗口坐标；窗口取转后的外接框，里面再把气泡转过去。
+ */
+@Composable
+private fun RotatedPreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?,
+    rotation: Float, gap: Int, screenWidth: androidx.compose.ui.unit.Dp) {
+    val labelSize = remember { IntArray(2) }
+    val positionProvider = remember(rotation, gap) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
+                layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
+                val (cx, cy) = rotatePoint(labelSize[0] / 2f, -(labelSize[1] / 2f + gap), 0f, 0f, rotation)
+                return IntOffset((anchorBounds.left + cx - popupContentSize.width / 2f).roundToInt(),
+                    (anchorBounds.top + cy - popupContentSize.height / 2f).roundToInt())
+            }
+        }
+    }
+    Popup(popupPositionProvider = positionProvider,
+        properties = PopupProperties(focusable = false, dismissOnBackPress = false,
+            dismissOnClickOutside = false, clippingEnabled = false)) {
+        Box(Modifier.layout { measurable, _ ->
+            val placeable = measurable.measure(androidx.compose.ui.unit.Constraints())
+            labelSize[0] = placeable.width
+            labelSize[1] = placeable.height
+            val c = kotlin.math.abs(kotlin.math.cos(Math.toRadians(rotation.toDouble()))).toFloat()
+            val s = kotlin.math.abs(kotlin.math.sin(Math.toRadians(rotation.toDouble()))).toFloat()
+            val boxWidth = kotlin.math.ceil(placeable.width * c + placeable.height * s).toInt().coerceAtLeast(1)
+            val boxHeight = kotlin.math.ceil(placeable.width * s + placeable.height * c).toInt().coerceAtLeast(1)
+            layout(boxWidth, boxHeight) {
+                placeable.placeWithLayer((boxWidth - placeable.width) / 2, (boxHeight - placeable.height) / 2) {
+                    rotationZ = rotation
+                }
+            }
+        }) {
+            PreeditLabel(text, visuals, onEdit, Modifier.widthIn(max = screenWidth - 16.dp)
+                .height(44.dp).padding(vertical = 6.dp))
+        }
     }
 }
 

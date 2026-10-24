@@ -5,8 +5,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,9 +29,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.RotateRight
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
@@ -44,11 +39,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -60,7 +52,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 
-import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -102,10 +93,10 @@ internal fun FloatingKeyboardContainer(
     dockTarget: KeyboardDockTarget? = null,
     bottomContentPaddingDp: Int = 0,
     bottomKeyClearance: State<Float>? = null,
-    /** 悬浮卡片绕自身中心的旋转角（顺时针为正，-90..90）；调节尺寸时不转。 */
+    /** 悬浮卡片绕自身中心的旋转角（顺时针为正，-90..90）。 */
     rotationDegrees: Float = 0f,
-    /** 松开旋转手柄时交给后台保存的角度。 */
-    onRotate: (Float) -> Unit = {},
+    /** 调节界面里正在调的旋转角；非空时代替 [rotationDegrees]，只在图层里读，转动时不重组键盘。 */
+    previewRotationState: State<Float>? = null,
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -184,23 +175,16 @@ internal fun FloatingKeyboardContainer(
             offsetX * density.density, offsetY * density.density,
             minOffsetY.coerceAtLeast(0) * density.density,
         )
-        // 旋转时只守顶部条、旋转手柄和底部拖动按钮在屏内，卡片本身不再按直角整块限位。
-        val hostWidthDp = maxWidth.value
-        val hostHeightDp = maxHeight.value
-        val cardWidthDp = normalRect.width / density.density
-        val cardHeightDp = normalRect.height / density.density
+        // 旋转时只守顶部条和底部拖动按钮在屏内，卡片本身不再按直角整块限位；这个角度放不下就摆正显示。
         val bottomInsetDp = minOffsetY.coerceAtLeast(0).toFloat()
-        fun rotatedBounds(degrees: Float) = floatingRotatedOffsetBounds(hostWidthDp, hostHeightDp,
-            cardWidthDp, cardHeightDp, degrees, bottomInsetDp)
-        fun rotationFits(degrees: Float) = !isFloatingRotated(degrees) || rotatedBounds(degrees).feasible
-        val restingRotation = rotationDegrees.coerceIn(-FLOATING_ROTATION_MAX_DEGREES, FLOATING_ROTATION_MAX_DEGREES)
-            .takeIf { previewRect == null && isFloatingRotated(it) && rotationFits(it) } ?: 0f
-        val rotatedRect = if (isFloatingRotated(restingRotation)) {
-            val bounds = rotatedBounds(restingRotation)
-            val left = (hostWidthDp / 2f + bounds.clampX(offsetX.toFloat())) * density.density - normalRect.width / 2f
-            val bottom = (hostHeightDp - bounds.clampY(offsetY.toFloat())) * density.density
-            ResizeRect(left, bottom - normalRect.height, left + normalRect.width, bottom)
-        } else null
+        fun rotatedBounds(degrees: Float) = floatingRotatedOffsetBounds(maxWidth.value, maxHeight.value,
+            normalRect.width / density.density, normalRect.height / density.density, degrees, bottomInsetDp)
+        val rotatedRect = if (previewRect != null) null else floatingRotatedCardRect(
+            maxWidth.value * density.density, maxHeight.value * density.density, normalRect.width, normalRect.height,
+            offsetX.toFloat(), offsetY.toFloat(), bottomInsetDp,
+            rotationDegrees.coerceIn(-FLOATING_ROTATION_MAX_DEGREES, FLOATING_ROTATION_MAX_DEGREES), density.density)
+        val restingRotation = if (rotatedRect != null) rotationDegrees.coerceIn(
+            -FLOATING_ROTATION_MAX_DEGREES, FLOATING_ROTATION_MAX_DEGREES) else 0f
         val baseRect = rotatedRect ?: normalRect
         // 转着的卡片不参与贴底恢复固定：底部本来就允许略出屏，贴底不代表想变回固定。
         val destination = dockTarget?.takeIf { it.widthDp > 0 && it.contentHeightDp > 0 && rotatedRect == null }
@@ -225,12 +209,7 @@ internal fun FloatingKeyboardContainer(
         // 松手时再把总位移一次性交给后台限位、取整、保存。
         var dragStartX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
         var dragStartY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
-        var rotating by remember(dockGesture) { mutableStateOf(false) }
-        var liveRotation by remember(dockGesture) { mutableFloatStateOf(restingRotation) }
-        var rotateStartAngle by remember(dockGesture) { mutableFloatStateOf(0f) }
-        var rotateStartPointer by remember(dockGesture) { mutableFloatStateOf(0f) }
-        // 转动中的角度只在图层里读：手指每动一下只重画，不重组键盘。
-        val dragging = isDragging || rotating
+        val dragging = isDragging
         fun liveShiftPx(): Offset = if (dragging)
             Offset((dragX.roundToInt() - dragStartX.roundToInt()) * density.density,
                 -(dragY.roundToInt() - dragStartY.roundToInt()) * density.density)
@@ -266,89 +245,29 @@ internal fun FloatingKeyboardContainer(
                 "floating-dock-preview")
         }
         // 正常态和调节态共用 TopStart 放置，不在确认时重新换坐标系。
-        // 外层不旋转，比卡片多出顶上的旋转手柄；卡片按未旋转的矩形上报，触摸区由后台按角度转过去。
-        val handleSpacePx = if (previewRect == null) with(density) { FLOATING_ROTATE_HANDLE_HEIGHT_DP.dp.toPx() } else 0f
-        var hostCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-        var handleCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-        fun pointerAngle(local: Offset): Float? {
-            val host = hostCoords?.takeIf { it.isAttached } ?: return null
-            val handle = handleCoords?.takeIf { it.isAttached } ?: return null
-            val pointer = handle.localToWindow(local)
-            val center = host.localToWindow(Offset(cardRect.width / 2f, handleSpacePx + cardRect.height / 2f))
-            return Math.toDegrees(atan2((pointer.y - center.y).toDouble(), (pointer.x - center.x).toDouble())).toFloat()
-        }
+        val cardPlacement = Modifier
+            .align(Alignment.TopStart)
+            // 拖动位移只在摆放 lambda 里读：手指每动一下只改位置，不重组键盘。
+            .absoluteOffset {
+                val shift = liveShiftPx()
+                IntOffset((cardRect.left + shift.x).roundToInt(), (cardRect.top + shift.y).roundToInt())
+            }
+            .size(with(density) { cardRect.width.toDp() }, with(density) { cardRect.height.toDp() })
         Box(
-            Modifier
-                .align(Alignment.TopStart)
-                // 拖动位移只在摆放 lambda 里读：手指每动一下只改位置，不重组键盘。
-                .absoluteOffset {
-                    val shift = liveShiftPx()
-                    IntOffset((cardRect.left + shift.x).roundToInt(), (cardRect.top - handleSpacePx + shift.y).roundToInt())
-                }
-                .size(with(density) { cardRect.width.toDp() }, with(density) { (cardRect.height + handleSpacePx).toDp() })
+            modifier = cardPlacement
+                // 按未旋转的矩形上报；触摸区由后台按角度转过去。
                 .onGloballyPositioned { coords ->
-                    hostCoords = coords
                     val pos = coords.positionInWindow()
                     val size = coords.size
                     onCardPositioned(
                         pos.x.roundToInt(),
-                        (pos.y + handleSpacePx).roundToInt(),
+                        pos.y.roundToInt(),
                         (pos.x + size.width).roundToInt(),
                         (pos.y + size.height).roundToInt()
                     )
                 }
-        ) {
-        Column(Modifier.fillMaxSize().graphicsLayer {
-            rotationZ = if (rotating) liveRotation else restingRotation
-            transformOrigin = TransformOrigin(0.5f,
-                (handleSpacePx + cardRect.height / 2f) / (handleSpacePx + cardRect.height).coerceAtLeast(1f))
-        }) {
-        if (previewRect == null) RotateHandle(
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-                .size(FLOATING_ROTATE_HANDLE_WIDTH_DP.dp, FLOATING_ROTATE_HANDLE_HEIGHT_DP.dp)
-                .graphicsLayer { alpha = opacity.coerceIn(0.3f, 1f) }
-                .onGloballyPositioned { handleCoords = it },
-            backgroundColor = backgroundColor,
-            indicatorColor = dragIndicatorColor,
-            onStart = start@{ local ->
-                val angle = pointerAngle(local) ?: return@start false
-                dragX = safeOffsetX
-                dragY = safeOffsetY
-                dragStartX = safeOffsetX
-                dragStartY = safeOffsetY
-                liveRotation = restingRotation
-                rotateStartAngle = restingRotation
-                rotateStartPointer = angle
-                rotating = true
-                true
-            },
-            onMove = move@{ local ->
-                val angle = pointerAngle(local) ?: return@move
-                val target = snapFloatingRotation(rotateStartAngle + floatingAngleDelta(rotateStartPointer, angle))
-                val next = limitFloatingRotation(liveRotation, target, ::rotationFits)
-                liveRotation = next
-                // 每次都从按下时的位置推：转回去时卡片也回到原处，不会一路被挤走。
-                if (isFloatingRotated(next)) {
-                    val bounds = rotatedBounds(next)
-                    dragX = bounds.clampX(dragStartX)
-                    dragY = bounds.clampY(dragStartY)
-                } else {
-                    dragX = dragStartX
-                    dragY = dragStartY
-                }
-            },
-            onEnd = {
-                if (rotating) {
-                    onRotate(liveRotation)
-                    onDrag(dragX - dragStartX, dragY - dragStartY)
-                    rotating = false
-                    onDragEnd()
-                }
-            },
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f).fillMaxWidth()
+                // 绕卡片中心转；调节界面的角度只在图层里读。
+                .graphicsLayer { rotationZ = previewRotationState?.value ?: restingRotation }
                 .clip(FloatingKeyboardCardShape)
                 .graphicsLayer {
                     alpha = opacity.coerceIn(0.3f, 1f)
@@ -435,8 +354,6 @@ internal fun FloatingKeyboardContainer(
                 },
             )
         }
-        }
-        }
 
     }
 }
@@ -468,58 +385,6 @@ internal fun KeyboardModeMorphOutline(
             )), shape)
             .testTag(tag).semantics { stateDescription = if (ready) "ready" else "expanding" },
     )
-}
-
-/** 顶边正上方的旋转手柄：按住拖动，键盘按手指绕它中心转过的角度旋转。 */
-@Composable
-private fun RotateHandle(
-    modifier: Modifier,
-    backgroundColor: Color,
-    indicatorColor: Color,
-    onStart: (Offset) -> Boolean,
-    onMove: (Offset) -> Unit,
-    onEnd: () -> Unit,
-) {
-    val currentOnStart by rememberUpdatedState(onStart)
-    val currentOnMove by rememberUpdatedState(onMove)
-    val currentOnEnd by rememberUpdatedState(onEnd)
-    val fill = backgroundColor.takeIf { it.alpha > 0f } ?: MaterialTheme.colorScheme.surface
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(topStart = 11.dp, topEnd = 11.dp))
-            .background(fill)
-            .testTag("floating-rotate-handle")
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    if (!currentOnStart(down.position)) return@awaitEachGesture
-                    down.consume()
-                    try {
-                        while (true) {
-                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) {
-                                change.consume()
-                                break
-                            }
-                            if (change.positionChanged()) {
-                                change.consume()
-                                currentOnMove(change.position)
-                            }
-                        }
-                    } finally {
-                        currentOnEnd()
-                    }
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.RotateRight,
-            contentDescription = "旋转键盘",
-            tint = indicatorColor,
-            modifier = Modifier.size(16.dp),
-        )
-    }
 }
 
 @Composable

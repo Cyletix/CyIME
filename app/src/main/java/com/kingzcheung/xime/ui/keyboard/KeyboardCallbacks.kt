@@ -119,7 +119,7 @@ data class KeyboardCallbacks(
     val onFloatingModeChange: ((Boolean) -> Unit)? = null,
     val onFloatingKeyboardDrag: ((dx: Float, dy: Float) -> Unit)? = null,
     val onFloatingKeyboardDragEnd: (() -> Unit)? = null,
-    /** 松开旋转手柄：新的悬浮旋转角（度）。位置随后经 onFloatingKeyboardDrag 一起交回。 */
+    /** 调节界面确认：保存新的悬浮旋转角（度）。位置随调节结果一起保存。 */
     val onFloatingKeyboardRotate: ((degrees: Float) -> Unit)? = null,
     val onT9ReplaceFullPinyin: ((String) -> Unit)? = null,
     /**
