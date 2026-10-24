@@ -20,7 +20,23 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
     /** 按住符号键当 Ctrl：字母键改显示快捷键，拖到字母上松手发 Ctrl+字母，不选候选（用户 10-24）。 */
     var ctrl by mutableStateOf(false)
         private set
-    fun beginCtrl() { ctrl = true }
+    private var ctrlShortcut: ((Char) -> Unit)? = null
+    /** 这次按住符号键已经用另一根手指点过字母：松手不再当点按打开符号。 */
+    var ctrlUsed = false
+        private set
+    fun beginCtrl(shortcut: (Char) -> Unit) {
+        ctrl = true
+        ctrlShortcut = shortcut
+        ctrlUsed = false
+    }
+    /** 按住符号键时另一根手指点字母：和按住 Shift 再点一样，发 Ctrl+这个字母（用户 10-24）。 */
+    fun ctrlTap(letters: String): Boolean {
+        val letter = letters.singleOrNull()?.takeIf { ctrl && it.lowercaseChar() in 'a'..'z' } ?: return false
+        val send = ctrlShortcut ?: return false
+        ctrlUsed = true
+        send(letter)
+        return true
+    }
 
     /** 合并字母键按左右半区选单个字母，绝不调用它的长按或符号手势。 */
     fun put(id: Any, letters: String, bounds: Rect, commit: (String) -> Unit) {
@@ -69,6 +85,7 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         clearDrag()
         dragging = false
         ctrl = false
+        ctrlShortcut = null
     }
     fun clearDrag() {
         drag = null
