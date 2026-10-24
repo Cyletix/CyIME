@@ -384,8 +384,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
 
-    internal fun moveEditorCursorVertical(steps: Int) =
-        editCursor(preeditKey = "preedit_cursor:${if (steps < 0) "start" else "end"}") { editorCursor.moveVertical(it, steps) }
+    internal fun moveEditorCursorVertical(steps: Int, selecting: Boolean = false) =
+        editCursor(preeditKey = "preedit_cursor:${if (steps < 0) "start" else "end"}") { editorCursor.moveVertical(it, steps, selecting) }
 
     internal fun observeEditorSelection(start: Int, end: Int) {
         service.currentInputConnection?.let { editorCursor.observeSelection(it, start, end) }
@@ -403,8 +403,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             byWord = event.isCtrlPressed, toBoundary = event.isAltPressed || event.isMetaPressed)
     }
 
-    internal fun moveEditorCursor(steps: Int, onStep: () -> Unit = {}) =
-        editCursor(preeditKey = "preedit_cursor:$steps") { editorCursor.moveWithFeedback(it, steps, onStep) }
+    internal fun moveEditorCursor(steps: Int, selecting: Boolean = false, onStep: () -> Unit = {}) =
+        editCursor(preeditKey = "preedit_cursor:$steps") { editorCursor.moveWithFeedback(it, steps, selecting, onStep) }
 
     /** 已在按键队列中，不能再次排队，否则长按方向键会积压到后续操作之后。 */
     internal suspend fun moveJapaneseCursorFromKeyQueue(steps: Int) {

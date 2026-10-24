@@ -106,6 +106,22 @@ class EditorCursorTest {
         verify(ic, never()).sendKeyEvent(any())
     }
 
+    @Test fun `space drag with shift extends from the anchor and collapses once shift is released`() {
+        val ic = editor(2, text = "hello world")
+        val cursor = EditorCursor()
+        var ticks = 0
+        cursor.moveWithFeedback(ic, 3, selecting = true) { ticks++ }
+        verify(ic).setSelection(2, 3)
+        verify(ic).setSelection(2, 5)
+        cursor.moveWithFeedback(ic, -1, selecting = true) { ticks++ }
+        verify(ic, times(2)).setSelection(2, 4)
+        cursor.moveWithFeedback(ic, 1) { ticks++ }
+        verify(ic).setSelection(4, 4)
+        cursor.moveWithFeedback(ic, 2, selecting = true) { ticks++ }
+        verify(ic).setSelection(4, 6)
+        assertEquals(7, ticks)
+    }
+
     @Test fun `rejected editor operations do not report cursor feedback`() {
         val ic = editor(1)
         doReturn(false).whenever(ic).setSelection(any(), any())

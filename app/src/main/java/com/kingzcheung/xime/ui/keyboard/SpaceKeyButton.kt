@@ -97,7 +97,7 @@ fun SpaceKeyButton(
                         held = true
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                         when (holdAction) {
-                            SpaceHoldAction.CURSOR -> { cursorActive = true; onCursorMode?.invoke(true) }
+                            SpaceHoldAction.CURSOR -> { cursorActive = true; SpaceCursorShift.begin(); onCursorMode?.invoke(true) }
                             SpaceHoldAction.REPEAT -> while (true) { currentClick(); delay(70L) }
                             SpaceHoldAction.VOICE_TOGGLE -> onVoiceToggle?.invoke()
                         }
@@ -137,7 +137,10 @@ fun SpaceKeyButton(
                             }
                         }
                     } finally {
-                        if (cursorActive) SpaceAfterCursorGuard.mark(android.os.SystemClock.uptimeMillis())
+                        if (cursorActive) {
+                            SpaceAfterCursorGuard.mark(android.os.SystemClock.uptimeMillis())
+                            SpaceCursorShift.end()
+                        }
                         timer.cancel()
                         pressed = false
                         cursorActive = false

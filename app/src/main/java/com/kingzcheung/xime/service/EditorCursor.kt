@@ -115,9 +115,9 @@ internal class EditorCursor {
     }
 
     /** 每一个成功的字符步长独立通知，边界和失败不产生额外触觉。 */
-    fun moveWithFeedback(ic: InputConnection, steps: Int, onStep: () -> Unit) {
+    fun moveWithFeedback(ic: InputConnection, steps: Int, selecting: Boolean = false, onStep: () -> Unit) {
         repeat(abs(steps)) {
-            if (!move(ic, steps.compareTo(0))) return
+            if (!move(ic, steps.compareTo(0), selecting)) return
             onStep()
         }
     }
