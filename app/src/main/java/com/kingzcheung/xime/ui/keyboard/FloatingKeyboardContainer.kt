@@ -262,20 +262,8 @@ internal fun FloatingKeyboardContainer(
             val liveRect = liveShiftPx().let { normalRect.translated(it.x, it.y) }
             val shown = ResizeRect(between(liveRect.left, destination.left), between(liveRect.top, destination.top),
                 between(liveRect.right, destination.right), between(liveRect.bottom, destination.bottom))
-            val previewColor = MaterialTheme.colorScheme.primary
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .absoluteOffset { IntOffset(shown.left.roundToInt(), shown.top.roundToInt()) }
-                    .size(with(density) { shown.width.toDp() }, with(density) { shown.height.toDp() })
-                    .background(previewColor.copy(alpha = 0.12f * progress), fixedCardShape)
-                    .border(2.dp, Brush.horizontalGradient(listOf(
-                        previewColor.copy(alpha = progress * 0.4f),
-                        previewColor.copy(alpha = progress),
-                        previewColor.copy(alpha = progress * 0.4f),
-                    )), fixedCardShape)
-                    .testTag("floating-dock-preview").semantics { stateDescription = if (dockReady) "ready" else "expanding" },
-            )
+            KeyboardModeMorphOutline(Modifier.align(Alignment.TopStart), shown, progress, fixedCardShape, dockReady,
+                "floating-dock-preview")
         }
         // 正常态和调节态共用 TopStart 放置，不在确认时重新换坐标系。
         // 外层不旋转，比卡片多出顶上的旋转手柄；卡片按未旋转的矩形上报，触摸区由后台按角度转过去。
@@ -451,6 +439,35 @@ internal fun FloatingKeyboardContainer(
         }
 
     }
+}
+
+/**
+ * 悬浮、固定互相切换时的渐变框：从键盘当前位置按 [progress] 变到目标位置，满了（[ready]）松手即切换。
+ * 普通悬浮贴底和调节界面里的两个方向共用这一个样子。
+ */
+@Composable
+internal fun KeyboardModeMorphOutline(
+    modifier: Modifier,
+    shown: ResizeRect,
+    progress: Float,
+    shape: androidx.compose.ui.graphics.Shape,
+    ready: Boolean,
+    tag: String,
+) {
+    val density = LocalDensity.current
+    val previewColor = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = modifier
+            .absoluteOffset { IntOffset(shown.left.roundToInt(), shown.top.roundToInt()) }
+            .size(with(density) { shown.width.toDp() }, with(density) { shown.height.toDp() })
+            .background(previewColor.copy(alpha = 0.12f * progress), shape)
+            .border(2.dp, Brush.horizontalGradient(listOf(
+                previewColor.copy(alpha = progress * 0.4f),
+                previewColor.copy(alpha = progress),
+                previewColor.copy(alpha = progress * 0.4f),
+            )), shape)
+            .testTag(tag).semantics { stateDescription = if (ready) "ready" else "expanding" },
+    )
 }
 
 /** 顶边正上方的旋转手柄：按住拖动，键盘按手指绕它中心转过的角度旋转。 */

@@ -30,6 +30,13 @@ internal fun floatingDockOnRelease(previewProgress: Float, onBottomEdge: Boolean
     hasDestination && onBottomEdge && previewProgress >= 1f
 internal const val FLOATING_DRAG_BAR_HEIGHT_DP = 28
 
+/** 调节界面里固定键盘上拖变悬浮：先有 [FIXED_TO_FLOATING_DEAD_ZONE_DP] 不动的阻力，再拉 [FIXED_TO_FLOATING_PULL_DP] 才满。 */
+internal const val FIXED_TO_FLOATING_DEAD_ZONE_DP = 24f
+internal const val FIXED_TO_FLOATING_PULL_DP = 96f
+
+internal fun fixedToFloatingPullProgress(pulledUpDp: Float): Float =
+    ((pulledUpDp - FIXED_TO_FLOATING_DEAD_ZONE_DP) / FIXED_TO_FLOATING_PULL_DP).coerceIn(0f, 1f)
+
 /** 移动条覆盖键帽以下的完整空白，卡片本身仍只额外预留原来的 28dp。 */
 internal fun floatingDragAreaHeightDp(contentPaddingDp: Int, keyClearanceDp: Float, totalHeightDp: Float): Float =
     (FLOATING_DRAG_BAR_HEIGHT_DP + contentPaddingDp.coerceAtLeast(0) + keyClearanceDp.coerceAtLeast(0f))

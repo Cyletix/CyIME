@@ -102,4 +102,12 @@ class FloatingDockGestureTest {
         assertFalse(floatingDockOnRelease(previewProgress = 1f, onBottomEdge = false, hasDestination = true))
         assertFalse(floatingDockOnRelease(previewProgress = 1f, onBottomEdge = true, hasDestination = false))
     }
+
+    @Test fun pullingAFixedKeyboardUpHasResistanceBeforeItTurnsFloating() {
+        // 轻轻一拖不动；过了死区才开始变，拉满一整段才算可以松手变悬浮。
+        assertEquals(0f, fixedToFloatingPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP), 0f)
+        assertEquals(0.5f, fixedToFloatingPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP + FIXED_TO_FLOATING_PULL_DP / 2f), 0.001f)
+        assertTrue(fixedToFloatingPullProgress(FIXED_TO_FLOATING_DEAD_ZONE_DP + FIXED_TO_FLOATING_PULL_DP - 1f) < 1f)
+        assertEquals(1f, fixedToFloatingPullProgress(400f), 0f)
+    }
 }
