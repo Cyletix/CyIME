@@ -32,7 +32,8 @@ import com.kingzcheung.xime.settings.FrostedGlassConfig
 
 /**
  * 符号键按住当 Ctrl（用户 10-24）。按下字母键立刻换成快捷键键面；拖到字母上松手发 Ctrl+字母，
- * 拖法和 Shift 拖动一样。没拖动、在 [holdMillis] 内松手才是点按，打开符号面板；
+ * 拖法和 Shift 拖动一样；也可以另一根手指直接点字母（见 [ShiftSlideTargets.ctrlTap]）。
+ * 没拖动、没点过字母、在 [holdMillis] 内松手才是点按，打开符号面板；
  * 超过时限或拖出去以后松手都不打开，没落在字母上就什么都不做。
  */
 internal fun Modifier.ctrlSymbolKeyGesture(
@@ -56,7 +57,7 @@ internal fun Modifier.ctrlSymbolKeyGesture(
             first.consume()
             pressed(true)
             down()
-            targets.beginCtrl()
+            targets.beginCtrl { shortcut(it) }
             var dragged = false
             var tap = false
             try {
@@ -70,7 +71,7 @@ internal fun Modifier.ctrlSymbolKeyGesture(
                     val target = if (dragged) targets.move(bounds, pointer) else null
                     if (!change.pressed) {
                         if (dragged) target?.key?.singleOrNull()?.let(shortcut)
-                        else tap = change.uptimeMillis - first.uptimeMillis < hold
+                        else tap = !targets.ctrlUsed && change.uptimeMillis - first.uptimeMillis < hold
                         break
                     }
                 }

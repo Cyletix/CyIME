@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -22,7 +23,6 @@ import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,9 +40,10 @@ class CtrlSymbolKeyTest {
     private val keys = mutableListOf<String>()
     private val commands = mutableListOf<String>()
 
-    @Before fun setUp() {
+    private fun show(schema: String = "") {
         val app = ApplicationProvider.getApplicationContext<Application>()
         KeysConfigHelper.loadConfig(app)
+        KeysConfigHelper.setActiveKeyboardSchema(schema)
         com.kingzcheung.xime.ui.theme.KeyboardThemes.initFromConfig(app)
         AppFonts.initialize(app)
         val vm = KeyboardViewModel(app)
@@ -53,7 +54,7 @@ class CtrlSymbolKeyTest {
                     Box(Modifier.requiredSize(360.dp, 240.dp)) {
                         KeyboardLayout({ keys += it }, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {},
                             onGestureAction = { action, value -> if (action == GestureAction.COMMAND) commands += value }),
-                            KeyboardUiState(), false, Modifier.requiredSize(360.dp, 240.dp))
+                            KeyboardUiState(currentSchemaId = schema), false, Modifier.requiredSize(360.dp, 240.dp))
                     }
                 }
             }
@@ -65,6 +66,7 @@ class CtrlSymbolKeyTest {
     private fun labelShown(text: String) = rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     @Test fun holdShowsShortcutsAndDragSendsCtrlLetter() {
+        show()
         assertTrue(!labelShown("复制"))
         val symbol = bounds("mode-slot-1")
         val c = bounds("qwerty-key:c")
@@ -83,6 +85,7 @@ class CtrlSymbolKeyTest {
     }
 
     @Test fun tapOpensSymbols() {
+        show()
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center); up() }
         rule.waitForIdle()
         assertEquals(listOf("symbol"), keys)
@@ -90,6 +93,7 @@ class CtrlSymbolKeyTest {
     }
 
     @Test fun releaseWithinTheLimitOpensSymbols() {
+        show()
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(900)
@@ -100,6 +104,7 @@ class CtrlSymbolKeyTest {
     }
 
     @Test fun releaseAfterTheLimitDoesNothing() {
+        show()
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(1200)
@@ -111,6 +116,7 @@ class CtrlSymbolKeyTest {
     }
 
     @Test fun releasingOffTheLettersDoesNothing() {
+        show()
         val symbol = bounds("mode-slot-1")
         val space = bounds("qwerty-enter-key")
         rule.onNodeWithTag("mode-slot-1", true).performTouchInput {
@@ -121,6 +127,60 @@ class CtrlSymbolKeyTest {
         }
         rule.waitForIdle()
         assertEquals(emptyList<String>(), keys)
+        assertEquals(emptyList<String>(), commands)
+    }
+
+    /** 一根手指按住 !@#，另一根手指点字母：和按住 Shift 再点一样，发 Ctrl+字母、不打字，松开 !@# 也不开符号。 */
+    private fun tapEachLetterWhileHolding(letters: List<Char>) {
+        val symbol = bounds("mode-slot-1").center
+        rule.onRoot().performTouchInput { down(0, symbol) }
+        rule.waitForIdle()
+        for (letter in letters) {
+            val key = bounds("qwerty-key:$letter").center
+            rule.onRoot().performTouchInput { down(1, key); up(1) }
+            rule.waitForIdle()
+        }
+        rule.onRoot().performTouchInput { up(0) }
+        rule.waitForIdle()
+        assertEquals(letters.map { "ctrl:$it" }, commands)
+        assertEquals("不打字也不开符号", emptyList<String>(), keys)
+    }
+
+    private val shortcutLetters = "acvxzysfwtnorpbi".toList()
+
+    @Test fun secondFingerTapSendsEveryShortcut() {
+        show()
+        tapEachLetterWhileHolding(shortcutLetters + listOf('q', 'k'))
+    }
+
+    @Test fun fourteenKeySecondFingerTapSendsEveryShortcut() {
+        show("pinyin_14jian")
+        tapEachLetterWhileHolding(shortcutLetters + listOf('q', 'k', 'm', 'l'))
+    }
+
+    @Test fun fourteenKeyDragSendsEveryShortcut() {
+        show("pinyin_14jian")
+        for (letter in shortcutLetters) {
+            val symbol = bounds("mode-slot-1")
+            rule.onNodeWithTag("mode-slot-1", true).performTouchInput { down(center) }
+            rule.waitForIdle()
+            val key = bounds("qwerty-key:$letter")
+            rule.onNodeWithTag("mode-slot-1", true).performTouchInput {
+                val target = key.center - symbol.topLeft
+                for (step in 1..8) moveTo(center + (target - center) * (step / 8f))
+                up()
+            }
+            rule.waitForIdle()
+        }
+        assertEquals(shortcutLetters.map { "ctrl:$it" }, commands)
+        assertEquals(emptyList<String>(), keys)
+    }
+
+    @Test fun lettersTypeNormallyOnceTheSymbolKeyIsReleased() {
+        show()
+        rule.onNodeWithTag("qwerty-key:v", true).performTouchInput { down(center); up() }
+        rule.waitForIdle()
+        assertEquals(listOf("v"), keys)
         assertEquals(emptyList<String>(), commands)
     }
 

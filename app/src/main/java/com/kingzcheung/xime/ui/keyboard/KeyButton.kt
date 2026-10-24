@@ -361,10 +361,13 @@ fun SwipeableKeyButton(
     val flickLongPressLabel = (badgeText ?: swipeText ?: text).takeIf { onFlickLongPress != null }
     fun flickAt(index: Int): String? = flick?.getOrNull(index)
     fun flickAction(index: Int): (() -> Unit)? = flickAt(index)?.let { letter -> { onFlickLetter?.invoke(letter); Unit } }
+    // 按住符号键当 Ctrl 时，另一根手指点字母发 Ctrl+字母，不打字（用户 10-24）。
+    val ctrlTargets = LocalShiftSlideTargets.current
+    val tapOrCtrl: () -> Unit = { if (ctrlTargets?.ctrlTap(letterGroup ?: text) != true) onClick() }
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
-        onTap = onClick,
+        onTap = tapOrCtrl,
         onPress = { isPressed = true; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
         onPreview = { flickPreview = it.keyFlick; longPressShown = it.isLongPress; onSwipeStateChange?.invoke(it, buttonBounds) },
@@ -387,7 +390,7 @@ fun SwipeableKeyButton(
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
     ) else KeyGestureActions(
         text = text,
-        onTap = onClick,
+        onTap = tapOrCtrl,
         onPress = { isPressed = true; onPress?.invoke() },
         onRelease = { isPressed = false; onRelease?.invoke() },
         onPreview = { flickPreview = it.keyFlick; onSwipeStateChange?.invoke(it, buttonBounds) },
