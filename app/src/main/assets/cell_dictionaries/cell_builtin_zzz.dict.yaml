@@ -1,0 +1,296 @@
+# CyIME 绝区零词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_zzz
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+安比	an bi	600
+比利	bi li	600
+猫又	mao you	600
+可琳	ke lin	600
+艾莲	ai lian	600
+丽娜	li na	600
+莱卡恩	lai ka en	600
+珂蕾妲	ke lei da	600
+本比格	ben bi ge	600
+安东	an dong	600
+格莉丝	ge li si	600
+朱鸢	zhu yuan	600
+苍角	cang jiao	600
+星见雅	xing jian ya	600
+月城柳	yue cheng liu	600
+浅羽悠真	qian yu you zhen	600
+莱特	lai te	600
+派派	pai pai	600
+柏妮思	bai ni si	600
+波可娜	bo ke na	600
+耀嘉音	yao jia yin	600
+伊芙琳	yi fu lin	600
+薇薇安	wei wei an	600
+仪玄	yi xuan	600
+橘福福	ju fu fu	600
+潘引壶	pan yin hu	600
+浮波柚叶	fu bo you ye	600
+席德	xi de	600
+奥菲丝	ao fei si	600
+简杜	jian du	600
+赛斯	sai si	600
+洛威尔	luo wei er	600
+悠真	you zhen	600
+零号安比	ling hao an bi	600
+德玛拉	de ma la	600
+舒瓦利耶	shu wa li ye	600
+威克斯	wei ke si	600
+贝洛伯格	bei luo bo ge	600
+费雷	fei lei	600
+泰姆菲尔德	tai mu fei er de	600
+班希	ban xi	600
+维拉德	wei la de	600
+狡兔屋	jiao tu wu	600
+维多利亚家政	wei duo li ya jia zheng	600
+白祇重工	bai qi zhong gong	600
+对空洞特别行动部	dui kong dong te bie xing dong bu	600
+特别行动部	te bie xing dong bu	600
+卡吕冬之子	ka lv dong zhi zi	600
+奥波勒斯小队	ao bo le si xiao dui	600
+新艾利都治安局	xin ai li du zhi an ju	600
+刑侦特勤组	xing zhen te qin zu	600
+怪啖屋	guai dan wu	600
+云岿山	yun kui shan	600
+防卫军	fang wei jun	600
+空洞调查协会	kong dong diao cha xie hui	600
+新艾利都	xin ai li du	600
+旧艾利都	jiu ai li du	600
+六分街	liu fen jie	600
+光映广场	guang ying guang chang	600
+录像店	lu xiang dian	600
+拉面店	la mian dian	600
+电玩店	dian wan dian	600
+改装店	gai zhuang dian	600
+邦布商店	bang bu shang dian	600
+旧都	jiu du	600
+零号空洞	ling hao kong dong	600
+空洞灾害	kong dong zai hai	600
+空洞侵蚀	kong dong qin shi	600
+以太适应	yi tai shi ying	600
+以太适性	yi tai shi xing	600
+适格者	shi ge zhe	600
+以骸	yi hai	600
+侵蚀体	qin shi ti	600
+畸变体	ji bian ti	600
+虚境	xu jing	600
+迷失之地	mi shi zhi di	600
+枯萎之都	ku wei zhi du	600
+断层之谜	duan ceng zhi mi	600
+凋亡之径	diao wang zhi jing	600
+邦布	bang bu	600
+绳匠	sheng jiang	600
+绳网	sheng wang	600
+法厄同	fa e tong	600
+邦布券	bang bu quan	600
+邦布改装	bang bu gai zhuang	600
+邦布插件	bang bu cha jian	600
+邦布技能	bang bu ji neng	600
+邦布等级	bang bu deng ji	600
+邦布天赋	bang bu tian fu	600
+邦布维修	bang bu wei xiu	600
+邦布探险	bang bu tan xian	600
+邦布小队	bang bu xiao dui	600
+音擎	yin qing	600
+音擎能源模块	yin qing neng yuan mo kuai	600
+音擎突破	yin qing tu po	600
+音擎等级	yin qing deng ji	600
+音擎改装	yin qing gai zhuang	600
+钢铁肉垫	gang tie rou dian	600
+深海访客	shen hai fang ke	600
+拘缚者	ju fu zhe	600
+燃狱齿轮	ran yu chi lun	600
+硫磺石	liu huang shi	600
+啜泣摇篮	chuo qi yao lan	600
+嵌合编译器	qian he bian yi qi	600
+玲珑妆匣	ling long zhuang xia	600
+时流贤者	shi liu xian zhe	600
+焰心桂冠	yan xin gui guan	600
+心弦夜曲	xin xian ye qu	600
+街头巨星	jie tou ju xing	600
+星徽引擎	xing hui yin qing	600
+仿制星徽引擎	fang zhi xing hui yin qing	600
+双生泣星	shuang sheng qi xing	600
+鎏金花信	liu jin hua xin	600
+春日融雪	chun ri rong xue	600
+一跃冲天	yi yue chong tian	600
+幽夜新星	you ye xin xing	600
+轰鸣座驾	hong ming zuo jia	600
+电磁暴	dian ci bao	600
+德拉格诺夫	de la ge nuo fu	600
+驱动盘套装	qu dong pan tao zhuang	600
+啄木鸟电音	zhuo mu niao dian yin	600
+静听嘉音	jing ting jia yin	600
+激素朋克	ji su peng ke	600
+自由蓝调	zi you lan diao	600
+摇摆爵士	yao bai jue shi	600
+灵魂摇滚	ling hun yao gun	600
+混沌爵士	hun dun jue shi	600
+炎狱重金属	yan yu zhong jin shu	600
+雷暴重金属	lei bao zhong jin shu	600
+极地重金属	ji di zhong jin shu	600
+河豚电音	he tun dian yin	600
+折枝剑歌	zhe zhi jian ge	600
+云岿如我	yun kui ru wo	600
+拂晓生花	fu xiao sheng hua	600
+震星迪斯科	zhen xing di si ke	600
+原始朋克	yuan shi peng ke	600
+死路屠夫	si lu tu fu	600
+双生舞伶	shuang sheng wu ling	600
+杜拉罕	du la han	600
+尼尼微	ni ni wei	600
+杰佩托	jie pei tuo	600
+庞培	pang pei	600
+布林格	bu lin ge	600
+游荡者	you dang zhe	600
+群怪	qun guai	600
+霸体	ba ti	600
+索敌	suo di	600
+机械兵	ji xie bing	600
+人形怪	ren xing guai	600
+精英怪	jing ying guai	600
+首领战	shou ling zhan	600
+式舆防卫战	shi yu fang wei zhan	600
+危局强袭战	wei ju qiang xi zhan	600
+每日委托	mei ri wei tuo	600
+挑战模式	tiao zhan mo shi	600
+无尽模式	wu jin mo shi	600
+满星	man xing	600
+速通	su tong	600
+单通	dan tong	600
+鸣徽	ming hui	600
+齿轮硬币	chi lun ying bi	600
+命破	ming po	600
+火属性	huo shu xing	600
+冰属性	bing shu xing	600
+电属性	dian shu xing	600
+以太属性	yi tai shu xing	600
+烈霜	lie shuang	600
+玄墨	xuan mo	600
+霜寒	shuang han	600
+感电	gan dian	600
+强击	qiang ji	600
+失衡值	shi heng zhi	600
+喧响值	xuan xiang zhi	600
+极限闪避	ji xian shan bi	600
+闪避反击	shan bi fan ji	600
+弹刀	tan dao	600
+弹反	tan fan	600
+连携技	lian xie ji	600
+支援技	zhi yuan ji	600
+特殊技	te shu ji	600
+强化特殊技	qiang hua te shu ji	600
+终结技	zhong jie ji	600
+普通攻击	pu tong gong ji	600
+冲刺攻击	chong ci gong ji	600
+蓄力攻击	xu li gong ji	600
+核心技	he xin ji	600
+额外能力	e wai neng li	600
+影画	ying hua	600
+主词条	zhu ci tiao	600
+副词条	fu ci tiao	600
+暴击率	bao ji lv	600
+暴击伤害	bao ji shang hai	600
+穿透率	chuan tou lv	600
+穿透值	chuan tou zhi	600
+异常掌控	yi chang zhang kong	600
+异常精通	yi chang jing tong	600
+能量自动回复	neng liang zi dong hui fu	600
+属性伤害	shu xing shang hai	600
+伤害加成	shang hai jia cheng	600
+减抗	jian kang	600
+增伤	zeng shang	600
+配队	pei dui	600
+站场	zhan chang	600
+速切	su qie	600
+切人	qie ren	600
+无敌帧	wu di zhen	600
+聚怪	ju guai	600
+持续伤害	chi xu shang hai	600
+范围伤害	fan wei shang hai	600
+叠层	die ceng	600
+能量回复	neng liang hui fu	600
+暴伤	bao shang	600
+回能	hui neng	600
+加密母带	jia mi mu dai	600
+原装母带	yuan zhuang mu dai	600
+丁尼	ding ni	600
+月卡	yue ka	600
+大月卡	da yue ka	600
+兑换码	dui huan ma	600
+调查员记录	diao cha yuan ji lu	600
+资深调查员记录	zi shen diao cha yuan ji lu	600
+音擎蓄电池	yin qing xu dian chi	600
+以太电池	yi tai dian chi	600
+大保底	da bao di	600
+小保底	xiao bao di	600
+单抽	dan chou	600
+抽卡	chou ka	600
+垫抽	dian chou	600
+双黄	shuang huang	600
+满影画	man ying hua	600
+专武	zhuan wu	600
+刷本	shua ben	600
+周本	zhou ben	600
+绝区零	jue qu ling	600
+绝宝	jue bao	600
+米哈游	mi ha you	600
+米游社	mi you she	600
+欧皇	ou huang	600
+肝帝	gan di	600
+亲女儿	qin nv er	600
+鲨鱼妹	sha yu mei	600
+狼哥	lang ge	600
+熊哥	xiong ge	600
+锤妹	chui mei	600
+电锯妹	dian ju mei	600
+钻头哥	zuan tou ge	600
+盾姐	dun jie	600
+虎妹	hu mei	600
+女仆长	nv pu zhang	600
+喷火妹	pen huo mei	600
+属性克制	shu xing ke zhi	600
+物理伤害	wu li shang hai	600
+火伤害	huo shang hai	600
+冰伤害	bing shang hai	600
+电伤害	dian shang hai	600
+以太伤害	yi tai shang hai	600
+烈霜伤害	lie shuang shang hai	600
+玄墨伤害	xuan mo shang hai	600
+异常伤害	yi chang shang hai	600
+直伤	zhi shang	600
+乘区	cheng qu	600
+独立乘区	du li cheng qu	600
+攻略组	gong lve zu	600
+测试服	ce shi fu	600
+体验服	ti yan fu	600
+正式服	zheng shi fu	600
+限时活动	xian shi huo dong	600
+常驻活动	chang zhu huo dong	600
+长草	zhang cao	600
+厨力	chu li	600
+单推	dan tui	600
+角色厨	jue se chu	600
+强度党	qiang du dang	600
+毕业装	bi ye zhuang	600
+重氪	zhong ke	600
+月卡党	yue ka dang	600
+氪佬	ke lao	600
+晒卡	shai ka	600
+歪保底	wai bao di	600
+常驻池	chang zhu chi	600
+限定池	xian ding chi	600
+新手池	xin shou chi	600
+武器池	wu qi chi	600
+角色池	jue se chi	600
+抽卡记录	chou ka ji lu	600
+保底水位	bao di shui wei	600
+跨池	kua chi	600
+更新补偿	geng xin bu chang	600

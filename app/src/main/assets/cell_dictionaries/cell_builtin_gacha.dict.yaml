@@ -6,83 +6,186 @@ version: "1"
 sort: by_weight
 use_preset_vocabulary: false
 ...
-崩坏星穹铁道	beng huai xing qiong tie dao	600
-星穹铁道	xing qiong tie dao	600
-崩铁	beng tie	600
-鸣潮	ming chao	600
-绝区零	jue qu ling	600
-明日方舟终末地	ming ri fang zhou zhong mo di	600
-终末地	zhong mo di	600
-崩坏三	beng huai san	600
-崩坏学园	beng huai xue yuan	600
-蔚蓝档案	wei lan dang an	600
-碧蓝档案	bi lan dang an	600
-少女前线	shao nv qian xian	600
-少前追放	shao qian zhui fang	600
-碧蓝航线	bi lan hang xian	600
-恋与深空	lian yu shen kong	600
-无限暖暖	wu xian nuan nuan	600
-闪耀暖暖	shan yao nuan nuan	600
-奇迹暖暖	qi ji nuan nuan	600
-重返未来	chong fan wei lai	600
-战双帕弥什	zhan shuang pa mi shi	600
-深空之眼	shen kong zhi yan	600
-尘白禁区	chen bai jin qu	600
-命运冠位指定	ming yun guan wei zhi ding	600
-公主连结	gong zhu lian jie	600
-赛马娘	sai ma niang	600
-幻塔	huan ta	600
-白荆回廊	bai jing hui lang	600
-无期迷途	wu qi mi tu	600
-光与夜之恋	guang yu ye zhi lian	600
-未定事件簿	wei ding shi jian bu	600
-时空中的绘旅人	shi kong zhong de hui lv ren	600
-世界之外	shi jie zhi wai	600
-恋与制作人	lian yu zhi zuo ren	600
-米哈游	mi ha you	600
-库洛游戏	ku luo you xi	600
-鹰角网络	ying jiao wang luo	600
-散爆网络	san bao wang luo	600
-蛮啾网络	man jiu wang luo	600
-勇仕网络	yong shi wang luo	600
-叠纸游戏	die zhi you xi	600
-深蓝互动	shen lan hu dong	600
-悠星网络	you xing wang luo	600
-网易游戏	wang yi you xi	600
-烛龙	zhu long	600
-二次元手游	er ci yuan shou you	600
-二游	er you	600
 抽卡	chou ka	600
-常驻池	chang zhu chi	600
-限定池	xian ding chi	600
-武器池	wu qi chi	600
-光锥池	guang zhui chi	600
-新手池	xin shou chi	600
-复刻池	fu ke chi	600
-混池	hun chi	600
 单抽	dan chou	600
 十连抽	shi lian chou	600
-双黄	shuang huang	600
-三黄	san huang	600
-十连双黄	shi lian shuang huang	600
+连抽	lian chou	600
+一抽	yi chou	600
+百连	bai lian	600
+新手池	xin shou chi	600
+常驻池	chang zhu chi	600
+限定池	xian ding chi	600
+限时卡池	xian shi ka chi	600
+武器池	wu qi chi	600
+角色池	jue se chi	600
+复刻池	fu ke chi	600
+混池	hun chi	600
+当期卡池	dang qi ka chi	600
 小保底	xiao bao di	600
 大保底	da bao di	600
 软保底	ruan bao di	600
 硬保底	ying bao di	600
-吃满保底	chi man bao di	600
+保底机制	bao di ji zhi	600
+保底次数	bao di ci shu	600
+十连保底	shi lian bao di	600
+垫抽	dian chou	600
 垫池子	dian chi zi	600
+垫刀	dian dao	600
 没歪	mei wai	600
-定轨	ding gui	600
-满定轨	man ding gui	600
+保底歪了	bao di wai le	600
+歪卡	wai ka	600
 出金	chu jin	600
-吃井	chi jing	600
+出金动画	chu jin dong hua	600
+双黄	shuang huang	600
+三黄	san huang	600
+十连双黄	shi lian shuang huang	600
 一井	yi jing	600
+吃井	chi jing	600
+攒井	zan jing	600
+抽数	chou shu	600
+出率	chu lv	600
+出货率	chu huo lv	600
+概率公示	gai lv gong shi	600
+抽卡机制	chou ka ji zhi	600
+抽卡记录	chou ka ji lu	600
+抽卡动画	chou ka dong hua	600
+跳过动画	tiao guo dong hua	600
+单抽出奇迹	dan chou chu qi ji	600
+玄学抽卡	xuan xue chou ka	600
+抽卡券	chou ka quan	600
+单抽券	dan chou quan	600
+十连券	shi lian quan	600
+免费单抽	mian fei dan chou	600
+每日单抽	mei ri dan chou	600
+首抽	shou chou	600
+初始号	chu shi hao	600
+刷初始	shua chu shi	600
+自抽号	zi chou hao	600
+初始十连	chu shi shi lian	600
+没抽到	mei chou dao	600
+出卡	chu ka	600
+接回家	jie hui jia	600
+抽爆	chou bao	600
+攒票	zan piao	600
+抽卡资源	chou ka zi yuan	600
+抽卡概率	chou ka gai lv	600
+抽卡成本	chou ka cheng ben	600
+抽卡手游	chou ka shou you	600
+抽卡游戏	chou ka you xi	600
+抽卡体验	chou ka ti yan	600
+欧皇	ou huang	600
+非气	fei qi	600
+晒卡	shai ka	600
+晒欧	shai ou	600
+玄不改非	xuan bu gai fei	600
+氪不改命	ke bu gai ming	600
+脱非入欧	tuo fei ru ou	600
+人品爆发	ren pin bao fa	600
+吃保底	chi bao di	600
+暴死	bao si	600
+欧非守恒	ou fei shou heng	600
+欧皇附体	ou huang fu ti	600
+非酋附体	fei qiu fu ti	600
+欧气爆棚	ou qi bao peng	600
+保底出货	bao di chu huo	600
+中氪	zhong ke	600
+重氪	zhong ke	600
+白嫖党	bai piao dang	600
+氪佬	ke lao	600
+钞能力	chao neng li	600
+首充双倍	shou chong shuang bei	600
+首充礼包	shou chong li bao	600
+首充奖励	shou chong jiang li	600
+月卡	yue ka	600
+小月卡	xiao yue ka	600
+大月卡	da yue ka	600
+月卡党	yue ka dang	600
+大小月卡	da xiao yue ka	600
+战令	zhan ling	600
+纪行	ji xing	600
+礼包码	li bao ma	600
+兑换码	dui huan ma	600
+代充	dai chong	600
+双倍充值	shuang bei chong zhi	600
+累充	lei chong	600
+累充奖励	lei chong jiang li	600
+六四八	liu si ba	600
+三二八	san er ba	600
+一九八	yi jiu ba	600
+免费玩家	mian fei wan jia	600
+付费玩家	fu fei wan jia	600
+氪金体验	ke jin ti yan	600
+囤资源	tun zi yuan	600
+囤石	tun shi	600
 攒石	zan shi	600
 攒抽	zan chou	600
-抽一命	chou yi ming	600
-补命座	bu ming zuo	600
-补专武	bu zhuan wu	600
-专武	zhuan wu	600
+攒钻	zan zuan	600
+抽卡货币	chou ka huo bi	600
+体力药	ti li yao	600
+养成资源	yang cheng zi yuan	600
+资源规划	zi yuan gui hua	600
+福利码	fu li ma	600
+停服补偿	ting fu bu chang	600
+维护补偿	wei hu bu chang	600
+限时礼包	xian shi li bao	600
+超值礼包	chao zhi li bao	600
+每日礼包	mei ri li bao	600
+新手礼包	xin shou li bao	600
+新手福利	xin shou fu li	600
+登录奖励	deng lu jiang li	600
+累计登录	lei ji deng lu	600
+签到奖励	qian dao jiang li	600
+邮件奖励	you jian jiang li	600
+离线奖励	li xian jiang li	600
+挂机奖励	gua ji jiang li	600
+大版本	da ban ben	600
+小版本	xiao ban ben	600
+前瞻直播	qian zhan zhi bo	600
+版本前瞻	ban ben qian zhan	600
+复刻卡池	fu ke ka chi	600
+限定角色	xian ding jue se	600
+限定皮肤	xian ding pi fu	600
+常驻角色	chang zhu jue se	600
+联动角色	lian dong jue se	600
+联动活动	lian dong huo dong	600
+联动复刻	lian dong fu ke	600
+限时活动	xian shi huo dong	600
+版本活动	ban ben huo dong	600
+卡池预告	ka chi yu gao	600
+开池	kai chi	600
+关池	guan chi	600
+策划面对面	ce hua mian dui mian	600
+更新公告	geng xin gong gao	600
+版本之子	ban ben zhi zi	600
+版本答案	ban ben da an	600
+退环境	tui huan jing	600
+数值膨胀	shu zhi peng zhang	600
+强度膨胀	qiang du peng zhang	600
+平衡性调整	ping heng xing tiao zheng	600
+卡池轮换	ka chi lun huan	600
+概率提升	gai lv ti sheng	600
+限定返场	xian ding fan chang	600
+新卡	xin ka	600
+新池	xin chi	600
+限时签到	xian shi qian dao	600
+炸服	zha fu	600
+回档	hui dang	600
+预下载	yu xia zai	600
+删档测试	shan dang ce shi	600
+不删档	bu shan dang	600
+合服	he fu	600
+开服活动	kai fu huo dong	600
+角色养成	jue se yang cheng	600
+练度	lian du	600
+满练度	man lian du	600
+升阶	sheng jie	600
+满破	man po	600
+满觉	man jue	600
+等级上限	deng ji shang xian	600
+经验书	jing yan shu	600
+突破材料	tu po cai liao	600
+技能书	ji neng shu	600
+被动技能	bei dong ji neng	600
 命座	ming zuo	600
 命之座	ming zhi zuo	600
 满命	man ming	600
@@ -90,24 +193,38 @@ use_preset_vocabulary: false
 一命	yi ming	600
 二命	er ming	600
 六命	liu ming	600
-满命满精	man ming man jing	600
+补命座	bu ming zuo	600
+抽一命	chou yi ming	600
+专武	zhuan wu	600
+补专武	bu zhuan wu	600
 满精	man jing	600
 星魂	xing hun	600
 满魂	man hun	600
-零魂	ling hun	600
-共鸣链	gong ming lian	600
-满链	man lian	600
-影画	ying hua	600
-满影	man ying	600
 满潜	man qian	600
-满破	man po	600
-圣遗物	sheng yi wu	600
-遗器	yi qi	600
-声骸	sheng hai	600
-圣痕	sheng hen	600
+亲密度	qin mi du	600
+信赖度	xin lai du	600
+满信赖	man xin lai	600
+满好感	man hao gan	600
+小毕业	xiao bi ye	600
+大毕业	da bi ye	600
+毕业面板	bi ye mian ban	600
+基础属性	ji chu shu xing	600
+白值	bai zhi	600
+培养成本	pei yang cheng ben	600
+养成成本	yang cheng cheng ben	600
+满星	man xing	600
+天赋树	tian fu shu	600
+技能升级	ji neng sheng ji	600
+等级突破	deng ji tu po	600
+毕业词条	bi ye ci tiao	600
+角色碎片	jue se sui pian	600
+升星材料	sheng xing cai liao	600
+觉醒材料	jue xing cai liao	600
+套装效果	tao zhuang xiao guo	600
 主词条	zhu ci tiao	600
 副词条	fu ci tiao	600
 有效词条	you xiao ci tiao	600
+极品词条	ji pin ci tiao	600
 双暴	shuang bao	600
 暴击率	bao ji lv	600
 暴击伤害	bao ji shang hai	600
@@ -120,99 +237,179 @@ use_preset_vocabulary: false
 效果抵抗	xiao guo di kang	600
 属性伤害	shu xing shang hai	600
 物理伤害	wu li shang hai	600
-极品胚子	ji pin pei zi	600
+伤害加成	shang hai jia cheng	600
+治疗加成	zhi liao jia cheng	600
+装备强化	zhuang bei qiang hua	600
 强化拉满	qiang hua la man	600
+满强化	man qiang hua	600
+洗词条	xi ci tiao	600
+刷词条	shua ci tiao	600
 赌词条	du ci tiao	600
+歪词条	wai ci tiao	600
 全歪防御	quan wai fang yu	600
-毕业面板	bi ye mian ban	600
-小毕业	xiao bi ye	600
-大毕业	da bi ye	600
-清体力	qing ti li	600
-爆体力	bao ti li	600
-买体力	mai ti li	600
-刷本	shua ben	600
-满星	man xing	600
-深渊满星	shen yuan man xing	600
-凹深渊	ao shen yuan	600
-凹分	ao fen	600
+极品胚子	ji pin pei zi	600
+强化歪了	qiang hua wai le	600
+专属武器	zhuan shu wu qi	600
+武器精炼	wu qi jing lian	600
+毕业装	bi ye zhuang	600
+毕业武器	bi ye wu qi	600
+过渡装	guo du zhuang	600
+品阶	pin jie	600
+稀有度	xi you du	600
+白装	bai zhuang	600
+蓝装	lan zhuang	600
+紫装	zi zhuang	600
+橙装	cheng zhuang	600
+红装	hong zhuang	600
+强化石	qiang hua shi	600
+属性面板	shu xing mian ban	600
 配队	pei dui	600
-双核队	shuang he dui	600
-三保一	san bao yi	600
 主输出	zhu shu chu	600
 副输出	fu shu chu	600
 站场输出	zhan chang shu chu	600
 后台输出	hou tai shu chu	600
 速切	su qie	600
-拐力	guai li	600
-增伤拐	zeng shang guai	600
 盾辅	dun fu	600
+增伤拐	zeng shang guai	600
+拐力	guai li	600
 聚怪	ju guai	600
 破盾	po dun	600
 削韧	xue ren	600
-打断抗性	da duan kang xing	600
 霸体	ba ti	600
 无敌帧	wu di zhen	600
-闪避反击	shan bi fan ji	600
 弹反	tan fan	600
 合轴	he zhou	600
 排轴	pai zhou	600
+输出循环	shu chu xun huan	600
+技能循环	ji neng xun huan	600
+持续输出	chi xu shu chu	600
+范围伤害	fan wei shang hai	600
+元素反应	yuan su fan ying	600
+元素战技	yuan su zhan ji	600
+元素爆发	yuan su bao fa	600
+下落攻击	xia luo gong ji	600
+战技	zhan ji	600
+终结技	zhong jie ji	600
+连携	lian xie	600
+协战	xie zhan	600
+切人	qie ren	600
+站场	zhan chang	600
+双核队	shuang he dui	600
+三保一	san bao yi	600
 轮椅配队	lun yi pei dui	600
-强度党	qiang du dang	600
-厨力党	chu li dang	600
-图鉴党	tu jian dang	600
-剧情党	ju qing dang	600
-跳过党	tiao guo dang	600
-考据党	kao ju dang	600
-月卡党	yue ka dang	600
-大小月卡	da xiao yue ka	600
-小月卡	xiao yue ka	600
-大月卡	da yue ka	600
-纪行	ji xing	600
-战令	zhan ling	600
-白嫖党	bai piao dang	600
-氪佬	ke lao	600
-重氪	zhong ke	600
-首充双倍	shou chong shuang bei	600
-六四八	liu si ba	600
-欧皇	ou huang	600
-晒卡	shai ka	600
-代肝	dai gan	600
-长草期	zhang cao qi	600
-开荒期	kai huang qi	600
-前瞻直播	qian zhan zhi bo	600
-兑换码	dui huan ma	600
-停服维护	ting fu wei hu	600
-炸服	zha fu	600
-补偿原石	bu chang yuan shi	600
-朋友费	peng you fei	600
-节奏榜	jie zou bang	600
-退环境	tui huan jing	600
-数值膨胀	shu zhi peng zhang	600
+纯色队	chun se dui	600
+混色队	hun se dui	600
+物理队	wu li dui	600
+元素队	yuan su dui	600
+速攻队	su gong dui	600
+数值怪	shu zhi guai	600
+机制怪	ji zhi guai	600
+对策卡	dui ce ka	600
 人权卡	ren quan ka	600
 体系卡	ti xi ka	600
-对策卡	dui ce ka	600
 下位替代	xia wei ti dai	600
 上位替代	shang wei ti dai	600
 未来可期	wei lai ke qi	600
-开服角色	kai fu jue se	600
-限定角色	xian ding jue se	600
-常驻角色	chang zhu jue se	600
-四星战神	si xing zhan shen	600
-六星战神	liu xing zhan shen	600
-看板娘	kan ban niang	600
-绊礼装	ban li zhuang	600
-个人剧情	ge ren ju qing	600
-传说任务	chuan shuo ren wu	600
-同行任务	tong xing ren wu	600
-伴星任务	ban xing ren wu	600
-主线剧情	zhu xian ju qing	600
-支线任务	zhi xian ren wu	600
-世界任务	shi jie ren wu	600
-每日委托	mei ri wei tuo	600
+辅助角色	fu zhu jue se	600
+输出角色	shu chu jue se	600
+减抗	jian kang	600
+增伤	zeng shang	600
+易伤	yi shang	600
+暴击流	bao ji liu	600
+速通	su tong	600
 日常任务	ri chang ren wu	600
+周常	zhou chang	600
+周常任务	zhou chang ren wu	600
+每周任务	mei zhou ren wu	600
 周本	zhou ben	600
+每日委托	mei ri wei tuo	600
+每日签到	mei ri qian dao	600
+清体力	qing ti li	600
+爆体力	bao ti li	600
+买体力	mai ti li	600
+体力上限	ti li shang xian	600
+刷本	shua ben	600
+自动战斗	zi dong zhan dou	600
+一键扫荡	yi jian sao dang	600
+跳过战斗	tiao guo zhan dou	600
+开荒期	kai huang qi	600
+长草期	zhang cao qi	600
+长草	zhang cao	600
+肝度	gan du	600
+代肝	dai gan	600
 开图	kai tu	600
+探索度	tan suo du	600
 满探索度	man tan suo du	600
 全收集	quan shou ji	600
 找宝箱	zhao bao xiang	600
-神瞳	shen tong	600
+捡材料	jian cai liao	600
+活动本	huo dong ben	600
+限时副本	xian shi fu ben	600
+每日副本	mei ri fu ben	600
+经验副本	jing yan fu ben	600
+金币副本	jin bi fu ben	600
+素材副本	su cai fu ben	600
+深渊满星	shen yuan man xing	600
+凹深渊	ao shen yuan	600
+凹分	ao fen	600
+赛季奖励	sai ji jiang li	600
+公会战	gong hui zhan	600
+主线剧情	zhu xian ju qing	600
+支线任务	zhi xian ren wu	600
+世界任务	shi jie ren wu	600
+传说任务	chuan shuo ren wu	600
+同行任务	tong xing ren wu	600
+伴星任务	ban xing ren wu	600
+活动剧情	huo dong ju qing	600
+个人剧情	ge ren ju qing	600
+首通	shou tong	600
+满星通关	man xing tong guan	600
+限时玩法	xian shi wan fa	600
+自动寻路	zi dong xun lu	600
+一键领取	yi jian ling qu	600
+领取奖励	ling qu jiang li	600
+放置玩法	fang zhi wan fa	600
+离线挂机	li xian gua ji	600
+多人副本	duo ren fu ben	600
+肝帝	gan di	600
+强度党	qiang du dang	600
+厨力党	chu li dang	600
+图鉴党	tu jian dang	600
+考据党	kao ju dang	600
+剧情党	ju qing dang	600
+跳过党	tiao guo dang	600
+休闲玩家	xiu xian wan jia	600
+休闲党	xiu xian dang	600
+硬核玩家	ying he wan jia	600
+咸鱼玩家	xian yu wan jia	600
+退坑	tui keng	600
+回坑	hui keng	600
+云玩家	yun wan jia	600
+云通关	yun tong guan	600
+真爱党	zhen ai dang	600
+老婆党	lao po dang	600
+老公党	lao gong dang	600
+女儿党	nv er dang	600
+女玩家	nv wan jia	600
+男玩家	nan wan jia	600
+看板娘	kan ban niang	600
+抽卡模拟器	chou ka mo ni qi	600
+抽卡视频	chou ka shi pin	600
+老玩家	lao wan jia	600
+新玩家	xin wan jia	600
+单推	dan tui	600
+单推人	dan tui ren	600
+厨力	chu li	600
+角色厨	jue se chu	600
+同人图	tong ren tu	600
+二创	er chuang	600
+名场面	ming chang mian	600
+人设崩塌	ren she beng ta	600
+剧情杀	ju qing sha	600
+发刀	fa dao	600
+二游	er you	600
+二次元手游	er ci yuan shou you	600
+纸片人	zhi pian ren	600
+数值策划	shu zhi ce hua	600
+剧情文案	ju qing wen an	600
+角色设定	jue se she ding	600

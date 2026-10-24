@@ -1,0 +1,433 @@
+# CyIME 崩坏：星穹铁道词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_hsr
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+三月七	san yue qi	600
+丹恒	dan heng	600
+丹恒饮月	dan heng yin yue	600
+饮月君	yin yue jun	600
+丹恒腾荒	dan heng teng huang	600
+姬子	ji zi	600
+卡芙卡	ka fu ka	600
+卡妈	ka ma	600
+银狼	yin lang	600
+应星	ying xing	600
+布洛妮娅	bu luo ni ya	600
+希儿	xi er	600
+杰帕德	jie pa de	600
+希露瓦	xi lu wa	600
+佩拉	pei la	600
+虎克	hu ke	600
+桑博	sang bo	600
+艾丝妲	ai si da	600
+阿兰	a lan	600
+卢卡	lu ka	600
+素裳	su chang	600
+停云	ting yun	600
+忘归人	wang gui ren	600
+青雀	qing que	600
+彦卿	yan qing	600
+景元	jing yuan	600
+景元将军	jing yuan jiang jun	600
+符玄	fu xuan	600
+罗刹	luo cha	600
+驭空	yu kong	600
+玲可	ling ke	600
+托帕	tuo pa	600
+镜流	jing liu	600
+桂乃芬	gui nai fen	600
+雪衣	xue yi	600
+藿藿	huo huo	600
+银枝	yin zhi	600
+阮梅	ruan mei	600
+真理医生	zhen li yi sheng	600
+花火	hua huo	600
+米沙	mi sha	600
+加拉赫	jia la he	600
+砂金	sha jin	600
+卡卡瓦夏	ka ka wa xia	600
+波提欧	bo ti ou	600
+萤宝	ying bao	600
+云璃	yun li	600
+椒丘	jiao qiu	600
+飞霄	fei xiao	600
+灵砂	ling sha	600
+貘泽	mo ze	600
+乱破	luan po	600
+周天哥	zhou tian ge	600
+黑塔	hei ta	600
+大黑塔	da hei ta	600
+小黑塔	xiao hei ta	600
+阿格莱雅	a ge lai ya	600
+缇宝	ti bao	600
+万敌	wan di	600
+遐蝶	xia die	600
+那刻夏	na ke xia	600
+风堇	feng jin	600
+赛飞儿	sai fei er	600
+白厄	bai e	600
+海瑟音	hai se yin	600
+刻律德菈	ke lv de la	600
+长夜月	chang ye yue	600
+昔涟	xi lian	600
+空间站黑塔	kong jian zhan hei ta	600
+黑塔空间站	hei ta kong jian zhan	600
+主控舱段	zhu kong cang duan	600
+收容舱段	shou rong cang duan	600
+支援舱段	zhi yuan cang duan	600
+雅利洛	ya li luo	600
+贝洛伯格	bei luo bo ge	600
+上层区	shang ceng qu	600
+下层区	xia ceng qu	600
+裂界	lie jie	600
+城郊雪原	cheng jiao xue yuan	600
+机械聚落	ji xie ju luo	600
+铆钉镇	mao ding zhen	600
+磐岩镇	pan yan zhen	600
+大矿区	da kuang qu	600
+永冬岭	yong dong ling	600
+残响回廊	can xiang hui lang	600
+克里珀堡	ke li po bao	600
+歌德大饭店	ge de da fan dian	600
+历史文化博物馆	li shi wen hua bo wu guan	600
+仙舟	xian zhou	600
+仙舟罗浮	xian zhou luo fu	600
+罗浮	luo fu	600
+星槎海中枢	xing cha hai zhong shu	600
+长乐天	chang le tian	600
+流云渡	liu yun du	600
+鳞渊境	lin yuan jing	600
+绥园	sui yuan	600
+建木	jian mu	600
+金人巷	jin ren xiang	600
+宣夜大街	xuan ye da jie	600
+匹诺康尼	pi nuo kang ni	600
+黄金的时刻	huang jin de shi ke	600
+白日梦酒店	bai ri meng jiu dian	600
+朝露公馆	zhao lu gong guan	600
+筑梦边境	zhu meng bian jing	600
+流梦礁	liu meng jiao	600
+匹诺康尼大剧院	pi nuo kang ni da ju yuan	600
+晖长石号	hui chang shi hao	600
+翁法罗斯	weng fa luo si	600
+奥赫玛	ao he ma	600
+永恒圣城	yong heng sheng cheng	600
+神悟树庭	shen wu shu ting	600
+悬锋城	xuan feng cheng	600
+呓语密林	yi yu mi lin	600
+星穹列车	xing qiong lie che	600
+列车组	lie che zu	600
+观景车厢	guan jing che xiang	600
+巡猎	xun lie	600
+智识	zhi shi	600
+同谐	tong xie	600
+存护	cun hu	600
+终末	zhong mo	600
+贪饕	tan tao	600
+纳努克	na nu ke	600
+博识尊	bo shi zun	600
+希佩	xi pei	600
+克里珀	ke li po	600
+浮黎	fu li	600
+阿哈	a ha	600
+伊德莉拉	yi de li la	600
+塔伊兹育罗斯	ta yi zi yu luo si	600
+末王	mo wang	600
+阿基维利	a ji wei li	600
+奥博洛斯	ao bo luo si	600
+太一	tai yi	600
+星神	xing shen	600
+雅努斯	ya nu si	600
+塔兰顿	ta lan dun	600
+墨涅塔	mo nie ta	600
+尼卡多利	ni ka duo li	600
+扎格列斯	zha ge lie si	600
+欧洛尼斯	ou luo ni si	600
+塞纳托斯	sai na tuo si	600
+刻法勒	ke fa le	600
+黄金裔	huang jin yi	600
+星核猎手	xing he lie shou	600
+无名客	wu ming ke	600
+星际和平公司	xing ji he ping gong si	600
+战略投资部	zhan lve tou zi bu	600
+市场开拓部	shi chang kai tuo bu	600
+业务巩固部	ye wu gong gu bu	600
+技术研发部	ji shu yan fa bu	600
+人才激励部	ren cai ji li bu	600
+传统项目部	chuan tong xiang mu bu	600
+石心十人	shi xin shi ren	600
+天才俱乐部	tian cai ju le bu	600
+博识学会	bo shi xue hui	600
+流光忆庭	liu guang yi ting	600
+假面愚者	jia mian yu zhe	600
+悲悼伶人	bei dao ling ren	600
+纯美骑士团	chun mei qi shi tuan	600
+巡海游侠	xun hai you xia	600
+反物质军团	fan wu zhi jun tuan	600
+泯灭帮	min mie bang	600
+仙舟联盟	xian zhou lian meng	600
+丰饶民	feng rao min	600
+云骑军	yun qi jun	600
+太卜司	tai bu si	600
+丹鼎司	dan ding si	600
+天舶司	tian bo si	600
+十王司	shi wang si	600
+持明族	chi ming zu	600
+狐人族	hu ren zu	600
+步离人	bu li ren	600
+药王秘传	yao wang mi chuan	600
+云上五骁	yun shang wu xiao	600
+银鬃铁卫	yin zong tie wei	600
+筑城者	zhu cheng zhe	600
+大守护者	da shou hu zhe	600
+橡木家系	xiang mu jia xi	600
+苜蓿草家系	mu xu cao jia xi	600
+隐夜鸫家系	yin ye dong jia xi	600
+筑梦师	zhu meng shi	600
+令使	ling shi	600
+衔药龙女	xian yao long nv	600
+闭目将军	bi mu jiang jun	600
+剑首	jian shou	600
+龙尊	long zun	600
+于夜色中	yu ye se zhong	600
+银河铁道之夜	yin he tie dao zhi ye	600
+无可取代的东西	wu ke qu dai de dong xi	600
+但战斗还未结束	dan zhan dou hai wei jie shu	600
+以世界之名	yi shi jie zhi ming	600
+如泥酣眠	ru ni han mian	600
+烦恼着幸福着	fan nao zhe xing fu zhe	600
+拂晓之前	fu xiao zhi qian	600
+夜色流光溢彩	ye se liu guang yi cai	600
+棺的回响	guan de hui xiang	600
+比阳光更明亮的	bi yang guang geng ming liang de	600
+她已闭上双眼	ta yi bi shang shuang yan	600
+何物为真	he wu wei zhen	600
+只需等待	zhi xu deng dai	600
+游戏尘寰	you xi chen huan	600
+无边曼舞	wu bian man wu	600
+梦应归于何处	meng ying gui yu he chu	600
+行于流逝的岸	xing yu liu shi de an	600
+此身为剑	ci shen wei jian	600
+到不了的彼岸	dao bu liao de bi an	600
+命运从未公平	ming yun cong wei gong ping	600
+纯粹思维的洗礼	chun cui si wei de xi li	600
+镜中故我	jing zhong gu wo	600
+唯有沉默	wei you chen mo	600
+片刻留在眼底	pian ke liu zai yan di	600
+惊魂夜	jing hun ye	600
+重塑时光之忆	chong su shi guang zhi yi	600
+别让世界静下来	bie rang shi jie jing xia lai	600
+朗道的选择	lang dao de xuan ze	600
+秘密誓心	mi mi shi xin	600
+一样的月光	yi yang de yue guang	600
+晚安与睡颜	wan an yu shui yan	600
+与行星相会	yu xing xing xiang hui	600
+过往未来	guo wang wei lai	600
+好戏开演	hao xi kai yan	600
+宇宙市场趋势	yu zhou shi chang qu shi	600
+假日浴场大冒险	jia ri yu chang da mao xian	600
+为了明日的旅途	wei le ming ri de lv tu	600
+记忆中的模样	ji yi zhong de mu yang	600
+春水初生	chun shui chu sheng	600
+余生的第一天	yu sheng de di yi tian	600
+猎物的视线	lie wu de shi xian	600
+天才们的休憩	tian cai men de xiu qi	600
+重返幽冥	chong fan you ming	600
+点个关注吧	dian ge guan zhu ba	600
+云无留迹的过客	yun wu liu ji de guo ke	600
+戍卫风雪的铁卫	shu wei feng xue de tie wei	600
+野穗伴行的快枪手	ye sui ban xing de kuai qiang shou	600
+净庭教宗的圣骑士	jing ting jiao zong de sheng qi shi	600
+密林卧雪的猎人	mi lin wo xue de lie ren	600
+激奏雷电的乐队	ji zou lei dian de yue dui	600
+流星追迹的怪盗	liu xing zhui ji de guai dao	600
+晨昏交界的翔鹰	chen hun jiao jie de xiang ying	600
+熔岩锻铸的火匠	rong yan duan zhu de huo jiang	600
+盗匪荒漠的废土客	dao fei huang mo de fei tu ke	600
+幽锁深牢的系囚	you suo shen lao de xi qiu	600
+死水深潜的先驱	si shui shen qian de xian qu	600
+毁烬焚骨的大公	hui jin fen gu de da gong	600
+机心戏梦的钟表匠	ji xin xi meng de zhong biao jiang	600
+苍穹战线格拉默	cang qiong zhan xian ge la mo	600
+繁星竞技场	fan xing jing ji chang	600
+盗贼公国塔利亚	dao zei gong guo ta li ya	600
+停转的萨尔索图	ting zhuan de sa er suo tu	600
+太空封印站	tai kong feng yin zhan	600
+不老者的仙舟	bu lao zhe de xian zhou	600
+泛银河商业公司	fan yin he shang ye gong si	600
+筑城者的贝洛伯格	zhu cheng zhe de bei luo bo ge	600
+星体差分机	xing ti cha fen ji	600
+生命的翁瓦克	sheng ming de weng wa ke	600
+折断的龙骨	zhe duan de long gu	600
+出云显世与高天神国	chu yun xian shi yu gao tian shen guo	600
+无主荒星茨冈尼亚	wu zhu huang xing ci gang ni ya	600
+沉陆海域露莎卡	chen lu hai yu lu sha ka	600
+识海迷坠的学者	shi hai mi zhui de xue zhe	600
+哀歌覆国的诗人	ai ge fu guo de shi ren	600
+烈阳惊雷的女武神	lie yang jing lei de nv wu shen	600
+末日兽	mo ri shou	600
+可可利亚	ke ke li ya	600
+幻胧	huan long	600
+齐响诗班	qi xiang shi ban	600
+神主日	shen zhu ri	600
+忽雷	hu lei	600
+忆域迷因	yi yu mi yin	600
+惊梦剧团	jing meng ju tuan	600
+岁阳	sui yang	600
+丰饶玄鹿	feng rao xuan lu	600
+虚卒	xu zu	600
+湮灭者	yan mie zhe	600
+自动机兵	zi dong ji bing	600
+齿狼	chi lang	600
+次元扑满	ci yuan pu man	600
+裂界造物	lie jie zao wu	600
+黑潮	hei chao	600
+模拟宇宙	mo ni yu zhou	600
+差分宇宙	cha fen yu zhou	600
+寰宇蝗灾	huan yu huang zai	600
+黄金与机械	huang jin yu ji xie	600
+不可知域	bu ke zhi yu	600
+混沌回忆	hun dun hui yi	600
+忘却之庭	wang que zhi ting	600
+虚构叙事	xu gou xu shi	600
+末日幻影	mo ri huan ying	600
+奇物	qi wu	600
+命途回响	ming tu hui xiang	600
+宇宙碎片	yu zhou sui pian	600
+传送锚点	chuan song mao dian	600
+开拓任务	kai tuo ren wu	600
+同行任务	tong xing ren wu	600
+冒险任务	mao xian ren wu	600
+每日实训	mei ri shi xun	600
+开拓等级	kai tuo deng ji	600
+均衡等级	jun heng deng ji	600
+支援角色	zhi yuan jiao se	600
+星际和平指南	xing ji he ping zhi nan	600
+无名勋礼	wu ming xun li	600
+列车补给凭证	lie che bu ji ping zheng	600
+古老梦华	gu lao meng hua	600
+流光余晖	liu guang yu hui	600
+星琼	xing qiong	600
+星轨专票	xing gui zhuan piao	600
+星轨通票	xing gui tong piao	600
+专票	zhuan piao	600
+开拓力	kai tuo li	600
+信用点	xin yong dian	600
+梦华	meng hua	600
+群星跃迁	qun xing yue qian	600
+角色活动跃迁	jiao se huo dong yue qian	600
+光锥活动跃迁	guang zhui huo dong yue qian	600
+限定池	xian ding chi	600
+常驻池	chang zhu chi	600
+大保底	da bao di	600
+小保底	xiao bao di	600
+单抽	dan chou	600
+抽卡	chou ka	600
+抽卡记录	chou ka ji lu	600
+星魂	xing hun	600
+行迹	xing ji	600
+光锥	guang zhui	600
+遗器	yi qi	600
+星核	xing he	600
+忆灵	yi ling	600
+忆师	yi shi	600
+忆者	yi zhe	600
+忆质	yi zhi	600
+忆域	yi yu	600
+终结技	zhong jie ji	600
+战技	zhan ji	600
+秘技	mi ji	600
+追加攻击	zhui jia gong ji	600
+持续伤害	chi xu shang hai	600
+弱点击破	ruo dian ji po	600
+击破特攻	ji po te gong	600
+超击破	chao ji po	600
+效果命中	xiao guo ming zhong	600
+效果抵抗	xiao guo di kang	600
+暴击率	bao ji lv	600
+暴击伤害	bao ji shang hai	600
+速度值	su du zhi	600
+能量回复	neng liang hui fu	600
+治疗量	zhi liao liang	600
+战技点	zhan ji dian	600
+秘技点	mi ji dian	600
+行动条	xing dong tiao	600
+主词条	zhu ci tiao	600
+副词条	fu ci tiao	600
+叠影	die ying	600
+晋阶	jin jie	600
+位面饰品	wei mian shi pin	600
+隧洞遗器	sui dong yi qi	600
+侵蚀隧洞	qin shi sui dong	600
+历战余响	li zhan yu xiang	600
+凝滞虚影	ning zhi xu ying	600
+拟造花萼	ni zao hua e	600
+饰品提取	shi pin ti qu	600
+存护之蕾	cun hu zhi lei	600
+巡猎之蕾	xun lie zhi lei	600
+毁灭之蕾	hui mie zhi lei	600
+智识之蕾	zhi shi zhi lei	600
+同谐之蕾	tong xie zhi lei	600
+虚无之蕾	xu wu zhi lei	600
+丰饶之蕾	feng rao zhi lei	600
+行迹材料	xing ji cai liao	600
+晋阶材料	jin jie cai liao	600
+区域首领	qu yu shou ling	600
+周本首领	zhou ben shou ling	600
+精英敌人	jing ying di ren	600
+回合制	hui he zhi	600
+火属性	huo shu xing	600
+冰属性	bing shu xing	600
+雷属性	lei shu xing	600
+风属性	feng shu xing	600
+裂伤	lie shang	600
+增伤	zeng shang	600
+易伤	yi shang	600
+减防	jian fang	600
+削韧	xue ren	600
+控制效果	kong zhi xiao guo	600
+减益	jian yi	600
+钟表小子	zhong biao xiao zi	600
+哈努兄弟	ha nu xiong di	600
+折纸小鸟	zhe zhi xiao niao	600
+枘凿六合	rui zao liu he	600
+筑梦拼图	zhu meng pin tu	600
+苏乐达	su le da	600
+狐斋志异	hu zhai zhi yi	600
+捉鬼小队	zhuo gui xiao dui	600
+梦境护照	meng jing hu zhao	600
+梦境迷钟	meng jing mi zhong	600
+半神	ban shen	600
+满命	man ming	600
+满魂	man hun	600
+零魂	ling hun	600
+零命	ling ming	600
+专武	zhuan wu	600
+人权卡	ren quan ka	600
+仓管	cang guan	600
+氪佬	ke lao	600
+月卡党	yue ka dang	600
+欧皇	ou huang	600
+凹分	ao fen	600
+配队	pei dui	600
+练度	lian du	600
+盾辅	dun fu	600
+工具人	gong ju ren	600
+周本	zhou ben	600
+遗器本	yi qi ben	600
+材料本	cai liao ben	600
+刷本	shua ben	600
+速通	su tong	600
+满星	man xing	600
+自动战斗	zi dong zhan dou	600
+手操	shou cao	600
+翻垃圾桶	fan la ji tong	600
+强度党	qiang du dang	600
+厨力	chu li	600
+云玩家	yun wan jia	600
+双黄	shuang huang	600
+出金	chu jin	600

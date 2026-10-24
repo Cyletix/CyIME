@@ -1,0 +1,397 @@
+# CyIME 明日方舟：终末地词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_endfield
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+梨诺	li nuo	600
+汤汤	shang shang	600
+伊冯	yi feng	600
+余烬	yu jin	600
+别礼	bie li	600
+洁尔佩塔	jie er pei ta	600
+艾尔黛拉	ai er dai la	600
+莱万汀	lai wan ting	600
+骏卫	jun wei	600
+黎风	li feng	600
+佩丽卡	pei li ka	600
+大潘	da pan	600
+弧光	hu guang	600
+昼雪	zhou xue	600
+狼卫	lang wei	600
+艾维文娜	ai wei wen na	600
+赛希	sai xi	600
+阿列什	a lie shi	600
+陈千语	chen qian yu	600
+卡契尔	ka qi er	600
+埃特拉	ai te la	600
+安塔尔	an ta er	600
+秋栗	qiu li	600
+萤石	ying shi	600
+卡缪	ka miu	600
+弭弗	mi fu	600
+庄方宜	zhuang fang yi	600
+洛茜	luo qian	600
+六星	liu xing	600
+六星干员	liu xing gan yuan	600
+五星干员	wu xing gan yuan	600
+四星干员	si xing gan yuan	600
+限定干员	xian ding gan yuan	600
+常驻干员	chang zhu gan yuan	600
+术师	shu shi	600
+稀有度	xi you du	600
+智识	zhi shi	600
+技能等级	ji neng deng ji	600
+主能力	zhu neng li	600
+副能力	fu neng li	600
+阿纳缇	a na ti	600
+卡普里尼	ka pu li ni	600
+卡特斯	ka te si	600
+库兰塔	ku lan ta	600
+黎博利	li bo li	600
+鲁珀	lu po	600
+佩洛	pei luo	600
+斐迪亚	fei di ya	600
+萨弗拉	sa fu la	600
+乌萨斯	wu sa si	600
+瓦伊凡	wa yi fan	600
+沃尔珀	wo er po	600
+萨卡兹	sa ka zi	600
+萨科塔	sa ke ta	600
+阿纳萨	a na sa	600
+塔卫二	ta wei er	600
+四号谷地	si hao gu di	600
+枢纽区	shu niu qu	600
+谷地通道	gu di tong dao	600
+源石研究园	yuan shi yan jiu yuan	600
+矿脉源区	kuang mai yuan qu	600
+阿伯莉采石场	a bo li cai shi chang	600
+供能高地	gong neng gao di	600
+武陵城	wu ling cheng	600
+景玉谷	jing yu gu	600
+协议空间	xie yi kong jian	600
+帝江号	di jiang hao	600
+开拓区	kai tuo qu	600
+矿洞	kuang dong	600
+侵蚀区	qin shi qu	600
+探索点	tan suo dian	600
+采集点	cai ji dian	600
+资源点	zi yuan dian	600
+开放世界	kai fang shi jie	600
+武陵	wu ling	600
+终末地工业	zhong mo di gong ye	600
+罗德岛	luo de dao	600
+宏山科学院	hong shan ke xue yuan	600
+联盟工团	lian meng gong tuan	600
+环塔商会	huan ta shang hui	600
+铁誓军	tie shi jun	600
+寂语修会	ji yu xiu hui	600
+众生长地	zhong sheng chang di	600
+裂地者	lie di zhe	600
+沧贼	cang zei	600
+野外生物	ye wai sheng wu	600
+匪帮	fei bang	600
+工团	gong tuan	600
+修会	xiu hui	600
+源石	yuan shi	600
+源石技艺	yuan shi ji yi	600
+矿石病	kuang shi bing	600
+移动城市	yi dong cheng shi	600
+协议技术	xie yi ji shu	600
+协议核心	xie yi he xin	600
+协议锚点	xie yi mao dian	600
+协议供电	xie yi gong dian	600
+息壤	xi rang	600
+息壤技术	xi rang ji shu	600
+集成工业	ji cheng gong ye	600
+集成工业系统	ji cheng gong ye xi tong	600
+源矿	yuan kuang	600
+紫晶矿	zi jing kuang	600
+蓝铁矿	lan tie kuang	600
+醚质	mi zhi	600
+醚质结晶	mi zhi jie jing	600
+能量淤积点	neng liang yu ji dian	600
+天使战争	tian shi zhan zheng	600
+泰拉	tai la	600
+炎国	yan guo	600
+终末地	zhong mo di	600
+源石虫	yuan shi chong	600
+电驱矿机	dian qu kuang ji	600
+二型电驱矿机	er xing dian qu kuang ji	600
+便携源石矿机	bian xie yuan shi kuang ji	600
+砂叶田块	sha ye tian kuai	600
+琼叶参田块	qiong ye shen tian kuai	600
+酮化灌木田块	tong hua guan mu tian kuai	600
+金石稻田块	jin shi dao tian kuai	600
+锦草田块	jin cao tian kuai	600
+芽针田块	ya zhen tian kuai	600
+荞花田块	qiao hua tian kuai	600
+灰芦麦田块	hui lu mai tian kuai	600
+柑实田块	gan shi tian kuai	600
+苦叶椒田块	ku ye jiao tian kuai	600
+中继器	zhong ji qi	600
+息壤中继器	xi rang zhong ji qi	600
+热能池	re neng chi	600
+供电桩	gong dian zhuang	600
+息壤供电桩	xi rang gong dian zhuang	600
+物流桥	wu liu qiao	600
+汇流器	hui liu qi	600
+管道准入口	guan dao zhun ru kou	600
+管道分流器	guan dao fen liu qi	600
+物品准入口	wu pin zhun ru kou	600
+管道桥	guan dao qiao	600
+管道汇流器	guan dao hui liu qi	600
+电涌塔	dian yong ta	600
+榴弹塔	liu dan ta	600
+哨戒塔	shao jie ta	600
+液氮塔	ye dan ta	600
+高爆榴弹塔	gao bao liu dan ta	600
+扩装铳械塔	kuo zhuang chong xie ta	600
+全向声波塔	quan xiang sheng bo ta	600
+铳械塔	chong xie ta	600
+射线塔	she xian ta	600
+医疗塔	yi liao ta	600
+种植机	zhong zhi ji	600
+采种机	cai zhong ji	600
+精炼炉	jing lian lu	600
+配件机	pei jian ji	600
+塑形机	su xing ji	600
+反应池	fan ying chi	600
+天有洪炉	tian you hong lu	600
+装备原件机	zhuang bei yuan jian ji	600
+拆解机	chai jie ji	600
+封装机	feng zhuang ji	600
+研磨机	yan mo ji	600
+滑索架	hua suo jia	600
+长距滑索架	chang ju hua suo jia	600
+洒水机	sa shui ji	600
+给水器	ji shui qi	600
+便捷存取站	bian jie cun qu zhan	600
+留言信标	liu yan xin biao	600
+仓库存取线源桩	cang ku cun qu xian yuan zhuang	600
+协议储存箱	xie yi chu cun xiang	600
+仓库存货口	cang ku cun huo kou	600
+仓库取货口	cang ku qu huo kou	600
+储液罐	chu ye guan	600
+仓库存取线基段	cang ku cun qu xian ji duan	600
+集成核心区	ji cheng he xin qu	600
+集成核心	ji cheng he xin	600
+耗电功率	hao dian gong lv	600
+物流设备	wu liu she bei	600
+战斗辅助	zhan dou fu zhu	600
+基础生产	ji chu sheng chan	600
+合成制造	he cheng zhi zao	600
+资源开采	zi yuan kai cai	600
+仓储存取	cang chu cun qu	600
+功能设备	gong neng she bei	600
+种植调配	zhong zhi tiao pei	600
+产线	chan xian	600
+工业计划	gong ye ji hua	600
+建设等级	jian she deng ji	600
+地区建设	di qu jian she	600
+物资调度	wu zi diao du	600
+仓储节点	cang chu jie dian	600
+预警终端	yu jing zhong duan	600
+总控中枢	zong kong zhong shu	600
+制造舱	zhi zao cang	600
+培养舱	pei yang cang	600
+后勤技能	hou qin ji neng	600
+干员送礼	gan yuan song li	600
+权限等阶	quan xian deng jie	600
+探索等级	tan suo deng ji	600
+个人名片	ge ren ming pian	600
+行动手册	xing dong shou ce	600
+模拟空间	mo ni kong jian	600
+危境再现	wei jing zai xian	600
+蚀像寻遗	shi xiang xun yi	600
+影拓丰碑	ying tuo feng bei	600
+密境行者	mi jing xing zhe	600
+支线任务	zhi xian ren wu	600
+探索任务	tan suo ren wu	600
+委派任务	wei pai ren wu	600
+日常任务	ri chang ren wu	600
+寻访凭证	xun fang ping zheng	600
+蚀刻章	shi ke zhang	600
+档案库	dang an ku	600
+物品图鉴	wu pin tu jian	600
+设备图鉴	she bei tu jian	600
+武器图鉴	wu qi tu jian	600
+装备图鉴	zhuang bei tu jian	600
+威胁图鉴	wei xie tu jian	600
+干员图鉴	gan yuan tu jian	600
+基质	ji zhi	600
+装备原件	zhuang bei yuan jian	600
+精英化	jing ying hua	600
+战技	zhan ji	600
+终结技	zhong jie ji	600
+连携技	lian xie ji	600
+技力	ji li	600
+技力恢复	ji li hui fu	600
+物理脆弱	wu li cui ruo	600
+法术脆弱	fa shu cui ruo	600
+大量伤害	da liang shang hai	600
+碎甲	sui jia	600
+灼热附着	zhuo re fu zhuo	600
+电磁附着	dian ci fu zhuo	600
+寒冷附着	han leng fu zhuo	600
+自然附着	zi ran fu zhuo	600
+减益	jian yi	600
+配队	pei dui	600
+辅助角色	fu zhu jue se	600
+治疗角色	zhi liao jue se	600
+首领战	shou ling zhan	600
+滑索	hua suo	600
+稀有敌人	xi you di ren	600
+隐藏宝箱	yin cang bao xiang	600
+砂叶	sha ye	600
+琼叶参	qiong ye shen	600
+酮化灌木	tong hua guan mu	600
+金石稻	jin shi dao	600
+锦草	jin cao	600
+蓬茸锦草	peng rong jin cao	600
+芽针	ya zhen	600
+荆刺芽针	jing ci ya zhen	600
+荞花	qiao hua	600
+映火荞花	ying huo qiao hua	600
+灰芦麦	hui lu mai	600
+柑实	gan shi	600
+黯银柑实	an yin gan shi	600
+苦叶椒	ku ye jiao	600
+虫肉	chong rou	600
+兽肉	shou rou	600
+异香石	yi xiang shi	600
+坚硬异香石	jian ying yi xiang shi	600
+高能异香石	gao neng yi xiang shi	600
+中空异香石	zhong kong yi xiang shi	600
+天然晶城锭	tian ran jing cheng ding	600
+大斧角	da fu jiao	600
+浸雾大弩	jin wu da nu	600
+破城者拳甲	po cheng zhe quan jia	600
+崩碎斧刃	beng sui fu ren	600
+甜腻黑水	tian ni hei shui	600
+导能肖像石	dao neng xiao xiang shi	600
+球刺兽的肝脏	qiu ci shou de gan zang	600
+虬兽的须	qiu shou de xu	600
+水灯虫的灯坠	shui deng chong de deng zhui	600
+草籽干粉	cao zi gan fen	600
+苦涩麦粉	ku se mai fen	600
+刺鼻干肉	ci bi gan rou	600
+新笋	xin sun	600
+天然气泡水	tian ran qi pao shui	600
+坚韧的水	jian ren de shui	600
+异色油脂	yi se you zhi	600
+软骨碎屑	ruan gu sui xie	600
+源石碎片	yuan shi sui pian	600
+源石结晶	yuan shi jie jing	600
+使命必达	shi ming bi da	600
+艺术暴君	yi shu bao jun	600
+爆破单元	bao po dan yuan	600
+不知归	bu zhi gui	600
+同类相食	tong lei xiang shi	600
+大雷斑	da lei ban	600
+昔日精品	xi ri jing pin	600
+显赫声名	xian he sheng ming	600
+沧溟星梦	cang ming xing meng	600
+热熔切割器	re rong qie ge qi	600
+熔铸火焰	rong zhu huo yan	600
+白夜新星	bai ye xin xing	600
+破碎君王	po sui jun wang	600
+负山	fu shan	600
+赫拉芬格	he la fen ge	600
+领航者	ling hang zhe	600
+骁勇	xiao yong	600
+黯色火炬	an se huo ju	600
+嵌合正义	qian he zheng yi	600
+十二问	shi er wen	600
+古渠	gu qu	600
+向心之引	xiang xin zhi yin	600
+坚城铸造者	jian cheng zhu zao zhe	600
+布道自由	bu dao zi you	600
+悼亡诗	dao wang shi	600
+探骊	tan li	600
+理性告别	li xing gao bie	600
+终点之声	zhong dian zhi sheng	600
+莫奈何	mo nai he	600
+迷失荒野	mi shi huang ye	600
+钢铁余音	gang tie yu yin	600
+天使杀手	tian shi sha shou	600
+寻路者道标	xun lu zhe dao biao	600
+应急手段	ying ji shou duan	600
+呼啸守卫	hu xiao shou wei	600
+工业零点一	gong ye ling dian yi	600
+淬火者	cui huo zhe	600
+荧光雷羽	ying guang lei yu	600
+白垩界卫	bai e jie wei	600
+跂步晶城	qi bu jing cheng	600
+斧甲兽	fu jia shou	600
+雾火斧甲兽	wu huo fu jia shou	600
+碾骨射手	nian gu she shou	600
+碾骨破城者	nian gu po cheng zhe	600
+碾骨行刑人	nian gu xing xing ren	600
+精锐行刑人	jing rui xing xing ren	600
+潮行天使	chao xing tian shi	600
+肖像天使	xiao xiang tian shi	600
+充能球刺兽	chong neng qiu ci shou	600
+潜地虬兽	qian di qiu shou	600
+球刺兽	qiu ci shou	600
+碾骨清道夫	nian gu qing dao fu	600
+碾骨焰术师	nian gu yan shu shi	600
+刚角天使	gang jiao tian shi	600
+重刺天使	zhong ci tian shi	600
+原生钳兽	yuan sheng qian shou	600
+残暴原生钳兽	can bao yuan sheng qian shou	600
+水灯虫	shui deng chong	600
+火雾源石虫	huo wu yuan shi chong	600
+焚雾源石虫	fen wu yuan shi chong	600
+酸液源石虫	suan ye yuan shi chong	600
+碾骨伏击射手	nian gu fu ji she shou	600
+碾骨先锋	nian gu xian feng	600
+碾骨劫掠者	nian gu jie lve zhe	600
+碾骨撕裂牙兽	nian gu si lie ya shou	600
+碾骨渗透者	nian gu shen tou zhe	600
+精锐伏击射手	jing rui fu ji she shou	600
+精锐劫掠者	jing rui jie lve zhe	600
+精锐撕裂牙兽	jing rui si lie ya shou	600
+雾火爪牙	wu huo zhao ya	600
+雾火牙兽	wu huo ya shou	600
+穿林箭	chuan lin jian	600
+莫留财	mo liu cai	600
+仿生翅天使	fang sheng chi tian shi	600
+大角天使	da jiao tian shi	600
+晶锥天使	jing zhui tian shi	600
+棱镜天使	leng jing tian shi	600
+浊流天使	zhuo liu tian shi	600
+钉刺天使	ding ci tian shi	600
+罗丹	luo dan	600
+碾骨之拳	nian gu zhi quan	600
+钳兽	qian shou	600
+牙兽	ya shou	600
+精英敌人	jing ying di ren	600
+头目敌人	tou mu di ren	600
+领袖敌人	ling xiu di ren	600
+普通敌人	pu tong di ren	600
+进阶敌人	jin jie di ren	600
+方舟终末地	fang zhou zhong mo di	600
+终末	zhong mo	600
+长草	zhang cao	600
+长草期	zhang cao qi	600
+抽卡	chou ka	600
+单抽	dan chou	600
+小保底	xiao bao di	600
+大保底	da bao di	600
+欧皇	ou huang	600
+幻神	huan shen	600
+速通	su tong	600
+刷本	shua ben	600
+打本	da ben	600
+自动战斗	zi dong zhan dou	600
+探索度	tan suo du	600
+每日任务	mei ri ren wu	600
+周常	zhou chang	600
+活动本	huo dong ben	600
+限定池	xian ding chi	600
+常驻池	chang zhu chi	600
+新手池	xin shou chi	600
+抽卡资源	chou ka zi yuan	600
