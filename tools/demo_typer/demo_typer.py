@@ -171,6 +171,18 @@ class Runner:
             else:
                 self.press_spec(self.key(ALIASES.get(ch, ch)))
 
+    def slide(self, start, end, hold):
+        p = self.pointer
+        p.press(start[0], start[1])
+        p.wait(hold)
+        for step in range(1, 13):
+            p.wait(20)
+            p.move(start[0] + (end[0] - start[0]) * step / 12, start[1] + (end[1] - start[1]) * step / 12)
+        p.wait(60)
+        p.release(end[0], end[1])
+        p.wait(self.pace["ui"])
+        self.taps += 1
+
     def glide(self, word):
         points, t = [], 0
         centers = [self.key(ch)[:2] for ch in word]
@@ -239,6 +251,13 @@ class Runner:
         elif token.startswith("<") and token.endswith(">"):
             name, _, gesture = token[1:-1].partition(":")
             self.press_spec(self.key(name), gesture or None)
+        elif token.startswith("drag:"):  # drag:a>b - press a, slide onto b, release there
+            start, end = (self.key(name) for name in token[5:].split(">"))
+            self.slide(start, end, 150)
+        elif token.startswith("swipe:"):  # swipe:key:dx:dy:hold_ms - hold, then slide by (dx, dy)
+            name, dx, dy, hold = token[6:].split(":")
+            start = self.key(name)
+            self.slide(start, (start[0] + int(dx), start[1] + int(dy)), int(hold))
         elif token.startswith("glide:"):
             self.glide(token[6:])
         elif token.startswith("ink:"):
