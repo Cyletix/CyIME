@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -280,6 +281,7 @@ private fun T9KeyboardSwipeOverlay(
                         compactMode = true,
                         candidateState = candidateState,
                         onGestureAction = onGestureAction,
+                        dragArea = { keyboardBounds },
                     )
                 }
             }
@@ -314,10 +316,13 @@ private fun T9KeyboardSwipeOverlay(
                         compactMode = false,
                         candidateState = candidateState,
                         onGestureAction = onGestureAction,
+                        dragArea = { keyboardBounds },
                     )
                 }
             }
         }
+        CandidateDragLine(CandidateDropTargets.shared, { keyboardBounds.topLeft },
+            KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme), Modifier.matchParentSize())
     }
     }
 }
@@ -344,6 +349,8 @@ private fun T9KeyboardContent(
     compactMode: Boolean = false,
     candidateState: State<CandidateState> = remember { mutableStateOf(CandidateState()) },
     onGestureAction: ((GestureAction, String) -> Unit)? = null,
+    /** 键盘区在根布局里的位置：0 键拖动超过它宽或高的一半才算拖动选词。 */
+    dragArea: () -> Rect = { Rect.Zero },
 ) {
     val t9DigitFontSize = if (compactMode) 13.sp else 16.sp
     val ctrlFontSize = if (compactMode) 11.sp else androidx.compose.ui.unit.TextUnit.Unspecified
@@ -736,8 +743,9 @@ private fun T9KeyboardContent(
                     } else commitDirect("0")
                 },
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                // 从这里拖到候选上松手：等于按住 Shift 选它（有英文上屏英文）；松手不在候选上，左滑等原手势照旧。
-                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(glossHoldEnabled).glossHold(glossHoldEnabled,
+                // 拖出超过键盘一半宽或高才算拖动选词（画出拖线），拖到候选上松手等于按住 Shift 选它（有英文上屏英文）；
+                // 没拖那么远仍是本键的左滑「上一项」等手势（用户 10-25）。
+                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(glossHoldEnabled, dragArea).glossHold(glossHoldEnabled,
                     onDown = { glossHoldUsed = false }) { holding ->
                     if (holding) {
                         glossHoldUsed = true
@@ -954,6 +962,9 @@ internal fun NineKeyButton(
         iconSizeDp = iconSizeDp,
         onSwipeLeft = onSwipeLeft,
         swipeLeftText = if (onSwipeLeft != null) "上一项" else null,
+        // 有箭头图标时左滑预览也是箭头（左箭头 = 上一项），不出汉字（用户 10-25）。
+        swipeLeftIcon = if (onSwipeLeft != null && icon != null)
+            rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft) else null,
         onClick = onClick,
         backgroundColor = backgroundColor,
         textColor = textColor,

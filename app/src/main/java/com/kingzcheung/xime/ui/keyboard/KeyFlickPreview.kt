@@ -4,8 +4,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.State
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,8 +89,48 @@ internal fun rememberKeyFlickFade(preview: KeyFlickPreview?): KeyFlickFade {
 @Composable
 internal fun BoxScope.KeyFlickLabels(
     fade: KeyFlickFade, color: Color, widthDp: Float, heightDp: Float, hintSizeSp: Float, labelSizeSp: Float,
+    /** 用图标代替文字的方向（如 0 键左滑「上一项」用左箭头），图标最终大小为 [iconSizeDp]。 */
+    icons: Map<KeyFlickOrigin, Painter> = emptyMap(),
+    iconSizeDp: Float = KeyboardKeyMetrics.FunctionIconSize.value,
 ) {
-    for (label in fade.labels()) KeyFlickLabel(label, color, widthDp, heightDp, hintSizeSp, labelSizeSp)
+    for (label in fade.labels()) {
+        val icon = icons[label.origin]
+        if (icon != null) KeyFlickIcon(label, icon, color, widthDp, heightDp, iconSizeDp)
+        else KeyFlickLabel(label, color, widthDp, heightDp, hintSizeSp, labelSizeSp)
+    }
+}
+
+/** 和 [KeyFlickLabel] 一样从原来那一侧移到键中央、由小变大，只是画的是图标。 */
+@Composable
+internal fun BoxScope.KeyFlickIcon(
+    preview: KeyFlickPreview,
+    icon: Painter,
+    color: Color,
+    widthDp: Float,
+    heightDp: Float,
+    iconSizeDp: Float,
+) {
+    val progress = preview.progress
+    val size = iconSizeDp * (0.6f + 0.4f * progress)
+    Icon(
+        painter = icon,
+        contentDescription = preview.text,
+        tint = keyHintColor(color, LocalKeyboardInputPreferences.current.frostedGlass, color.alpha * (0.6f + 0.4f * progress)),
+        modifier = Modifier.align(Alignment.Center).size(size.dp).testTag("key-flick-preview").graphicsLayer {
+            val x = ((widthDp - size) / 2f - 2f).coerceAtLeast(0f).dp.toPx() * (1f - progress)
+            val y = ((heightDp - size) / 2f - 2f).coerceAtLeast(0f).dp.toPx() * (1f - progress)
+            translationX = when (preview.origin) {
+                KeyFlickOrigin.TOP_END, KeyFlickOrigin.RIGHT -> x
+                KeyFlickOrigin.BOTTOM_START, KeyFlickOrigin.LEFT -> -x
+                else -> 0f
+            }
+            translationY = when (preview.origin) {
+                KeyFlickOrigin.TOP_END, KeyFlickOrigin.TOP -> -y
+                KeyFlickOrigin.BOTTOM_START, KeyFlickOrigin.BOTTOM -> y
+                else -> 0f
+            }
+        },
+    )
 }
 
 /** Move the existing corner hint into the key's centre, without changing its bounds. */

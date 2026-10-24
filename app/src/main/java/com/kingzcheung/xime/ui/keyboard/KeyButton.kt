@@ -309,6 +309,8 @@ fun SwipeableKeyButton(
     onSwipeDown: ((String) -> Unit)? = null,
     onSwipeLeft: (() -> Unit)? = null,
     swipeLeftText: String? = null,
+    /** 左滑预览用的图标（有主图标的键用，如 0 键「上一项」左箭头）；null 时显示 [swipeLeftText]。 */
+    swipeLeftIcon: Painter? = null,
     letterGroup: String? = null,
     onLetterSelection: ((String) -> Unit)? = null,
     onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
@@ -688,7 +690,8 @@ fun SwipeableKeyButton(
         else if (showDisc && discLabels != null) {
             KanaDirectionIndicator(discDirection, MaterialTheme.colorScheme.primary.copy(alpha = .6f))
             DirectionDiscPreview(discLabels, discDirection, resolvedBackground, resolvedText, contentScale)
-        } else KeyFlickLabels(flickFade, resolvedText, maxWidth.value, maxHeight.value, effectiveSwipeFontSize.value, labelSize)
+        } else KeyFlickLabels(flickFade, resolvedText, maxWidth.value, maxHeight.value, effectiveSwipeFontSize.value, labelSize,
+            icons = swipeLeftIcon?.let { mapOf(KeyFlickOrigin.LEFT to it) }.orEmpty(), iconSizeDp = mainIconSize.value)
     }
 }
 

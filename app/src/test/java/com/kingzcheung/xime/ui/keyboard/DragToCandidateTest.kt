@@ -30,8 +30,8 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 /**
- * 九键“下一项”拖到候选：松手在候选上就选它（按住 Shift 的规则），键自己的左滑、点按不触发；
- * 松手不在候选上，键原来的手势照旧。键的手势用与 ExclusiveKeyGesture 相同的“松手时判定、被消费就放弃”写法模拟。
+ * 九键“下一项”拖到候选：拖出键盘区一半高后松手在候选上就选它（按住 Shift 的规则），键自己的左滑、点按不触发；
+ * 没拖那么远，键原来的手势照旧。键的手势用与 ExclusiveKeyGesture 相同的“松手时判定、被消费就放弃”写法模拟。
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34], application = android.app.Application::class)
@@ -46,6 +46,9 @@ class DragToCandidateTest {
 
     private fun setContent() {
         rule.setContent {
+            // 键盘区 400×200dp：拖动超过半宽 200dp 或半高 100dp 才算拖动选词。
+            val area = with(androidx.compose.ui.platform.LocalDensity.current) {
+                androidx.compose.ui.geometry.Rect(0f, 0f, 400.dp.toPx(), 200.dp.toPx()) }
             Column {
                 Row {
                     repeat(3) { index ->
@@ -60,7 +63,7 @@ class DragToCandidateTest {
                 Spacer(Modifier.height(120.dp))
                 Row {
                     Spacer(Modifier.width(160.dp))
-                    Box(Modifier.size(80.dp, 60.dp).testTag("key").dragToCandidate(true, targets).pointerInput(Unit) {
+                    Box(Modifier.size(80.dp, 60.dp).testTag("key").dragToCandidate(true, { area }, targets).pointerInput(Unit) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
                             while (true) {
