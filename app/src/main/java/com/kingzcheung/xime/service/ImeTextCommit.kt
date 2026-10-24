@@ -218,7 +218,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
                 withContext(Dispatchers.Main) { Unit }
             }
             if (owner != service.uiState.value.inputSessionId) return@literal
-            commitCompositionAndLiteral(literal)
+            commitCompositionAndLiteral(literal, asTyped = true)
         }
         val t9Queue = if (isT9Schema(service.uiState.value.currentSchemaId) && !service.uiState.value.isAsciiMode) {
             service.keyboardCallbacks?.onT9RunLiteralInput
@@ -226,8 +226,9 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         if (t9Queue != null) t9Queue(submit) else service.keyRouter.postRimeJob { submit() }
     }
 
-    /** One editor transaction for prefix + literal, reused when leaving a typing panel. */
-    internal suspend fun commitCompositionAndLiteral(literal: String = ""): Boolean {
+    /** One editor transaction for prefix + literal, reused when leaving a typing panel.
+     * [asTyped]: symbols, panels and the language key keep the letters, not the first candidate. */
+    internal suspend fun commitCompositionAndLiteral(literal: String = "", asTyped: Boolean = false): Boolean {
         InputCommandOwner.requireOwner().validate()
         if (service.keyRouter.usesDirectFieldInput) return service.keyRouter.commitDirectFieldLiteral(literal)
         if (service.keyRouter.hasPendingCandidateCommit) return false
@@ -238,13 +239,12 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         val t9 = isT9Schema(engine.getCurrentSchema())
         val partial = if (t9) service.t9PartialSegments.joinToString("") { it.text } else ""
         val action = candidates.candidateActions.firstOrNull()
-        val prefix = when {
-            // English has already been delivered character by character.
-            candidates.pendingEnglishText.isNotEmpty() && input.isEmpty() -> ""
-            input.isEmpty() -> partial
-            else -> partial + (service.japaneseInputController.conversionPreview()
-                ?: if (action?.isPluginCandidate == true && !t9) action.commitText
-                else engine.conversionPreview().ifEmpty { input })
+        val prefix = compositionCommitPrefix(asTyped, input, candidates.preeditText, t9,
+            state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14, partial,
+            englishDelivered = candidates.pendingEnglishText.isNotEmpty(),
+            japanesePreview = service.japaneseInputController.conversionPreview()) {
+            if (action?.isPluginCandidate == true && !t9) action.commitText
+            else engine.conversionPreview().ifEmpty { input }
         }
         val text = prefix + literal
         if (text.isEmpty()) return true
