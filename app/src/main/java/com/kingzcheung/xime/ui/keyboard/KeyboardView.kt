@@ -1255,9 +1255,10 @@ fun KeyboardView(
                     MainType.FULL -> {
                         val currentOnCursorMove = rememberUpdatedState(callbacks.onCursorMove)
                         val suppressCursorMove = remember { mutableStateOf(false) }
+                        val cursorUnitPx = rememberCursorUnitPx()
                         val cursorMod = if (callbacks.onCursorMove != null && inputPreferences.cursorGesture == CursorGestureMode.KEYBOARD) {
-                            Modifier.pointerInput(inputPreferences.cursorStepDp) {
-                                val stepThresholdPx = inputPreferences.cursorStepDp.dp.toPx()
+                            Modifier.pointerInput(inputPreferences.cursorStepDp, cursorUnitPx) {
+                                val stepThresholdPx = inputPreferences.cursorStepDp * cursorUnitPx
                                 val activationThresholdPx = 60.dp.toPx()
                                 awaitEachGesture {
                                     suppressCursorMove.value = false

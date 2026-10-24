@@ -17,6 +17,7 @@ import com.kingzcheung.xime.ui.keyboard.SpaceHoldAction
 import com.kingzcheung.xime.ui.keyboard.FormulaDelimiter
 import androidx.compose.foundation.clickable
 import com.kingzcheung.xime.ui.keyboard.CursorGestureMode
+import com.kingzcheung.xime.ui.keyboard.cursorDistanceMillimeters
 import com.kingzcheung.xime.ui.keyboard.SymbolInputMode
 import com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.InputGestureLock
@@ -169,8 +170,8 @@ internal fun InputExperienceSettings(
             }
             if (settings.cursorGesture != CursorGestureMode.NONE) {
                 Column(Modifier.settingsSearchAnchor("光标每移动一字所需距离", bleed = 16.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} dp")
-                    Text("距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
+                    Text("光标每移动一字所需距离：${settings.cursorStepDp.toInt()} 档（约 ${"%.1f".format(cursorDistanceMillimeters(settings.cursorStepDp))} 毫米）")
+                    Text("按屏幕实际尺寸计算，手机和平板同一档手感相同；距离越小越灵敏", style = MaterialTheme.typography.bodySmall)
                     Slider(value = settings.cursorStepDp, onValueChange = { settings = settings.copy(cursorStepDp = it) },
                         onValueChangeFinished = { settings.save(context) }, valueRange = 6f..24f, steps = 17)
                 }
