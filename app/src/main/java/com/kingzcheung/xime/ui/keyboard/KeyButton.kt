@@ -151,8 +151,11 @@ fun KeyButton(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    /** 手势由外层接管时（符号键按住当 Ctrl），按下的样子由外层给。 */
+    externalPressed: Boolean = false,
 ) {
-    var isPressed by remember { mutableStateOf(false) }
+    var ownPressed by remember { mutableStateOf(false) }
+    val isPressed = ownPressed || externalPressed
     var flickPreview by remember { mutableStateOf<KeyFlickPreview?>(null) }
     val density = LocalDensity.current
     val view = LocalView.current
@@ -161,8 +164,8 @@ fun KeyButton(
     val currentActions by rememberUpdatedState(KeyGestureActions(
         text = text,
         onTap = onClick,
-        onPress = { isPressed = true; onPress?.invoke() },
-        onRelease = { isPressed = false; onRelease?.invoke() },
+        onPress = { ownPressed = true; onPress?.invoke() },
+        onRelease = { ownPressed = false; onRelease?.invoke() },
         onPreview = { flickPreview = it.keyFlick; onSwipeStateChange?.invoke(it) },
         inlineVerticalPreview = true,
         upText = swipeText,
@@ -466,6 +469,8 @@ fun SwipeableKeyButton(
         } else shiftTargets?.remove(shiftToken)
     }
     val shiftHovered = shiftLetters != null && shiftTargets?.hovered?.bounds?.center?.let(buttonBounds::contains) == true
+    // 按住符号键当 Ctrl：单字母键换成快捷键键面（用户 10-24）。
+    val ctrlLetter = shiftLetters?.singleOrNull()?.takeIf { shiftTargets?.ctrl == true }
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val hexagonal = LocalHoneycombKeys.current && (letterGroup ?: text).let { it.length == 1 && it[0].lowercaseChar() in 'a'..'z' }
@@ -528,7 +533,7 @@ fun SwipeableKeyButton(
         val mainIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, iconSizeDp).dp
         val keyHeight = maxHeight
         Box(Modifier.fillMaxSize().graphicsLayer {
-            alpha = if (showDisc) 1f else 1f - flickFade.strongest
+            alpha = if (ctrlLetter != null) 0f else if (showDisc) 1f else 1f - flickFade.strongest
         }, contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center) {
             if (layoutMode == ButtonLayout.COMPACT) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -675,7 +680,9 @@ fun SwipeableKeyButton(
                 }
             }
         }
-        if (showDisc && discLabels != null) {
+        if (ctrlLetter != null) CtrlShortcutFace(ctrlLetter, resolvedText, frostedGlass, labelSize,
+            effectiveSwipeFontSize, hintsVisible, maxWidth.value, keyFontFamily)
+        else if (showDisc && discLabels != null) {
             KanaDirectionIndicator(discDirection, MaterialTheme.colorScheme.primary.copy(alpha = .6f))
             DirectionDiscPreview(discLabels, discDirection, resolvedBackground, resolvedText, contentScale)
         } else KeyFlickLabels(flickFade, resolvedText, maxWidth.value, maxHeight.value, effectiveSwipeFontSize.value, labelSize)

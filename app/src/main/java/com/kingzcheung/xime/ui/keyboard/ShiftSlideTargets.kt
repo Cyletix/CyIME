@@ -17,6 +17,10 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
     /** 这次按住 Shift 已经拖出过 Shift 键：14 键据此把双字母键拆成单字母键，直到松开 Shift（用户 10-21）。 */
     var dragging by mutableStateOf(false)
         private set
+    /** 按住符号键当 Ctrl：字母键改显示快捷键，拖到字母上松手发 Ctrl+字母，不选候选（用户 10-24）。 */
+    var ctrl by mutableStateOf(false)
+        private set
+    fun beginCtrl() { ctrl = true }
 
     /** 合并字母键按左右半区选单个字母，绝不调用它的长按或符号手势。 */
     fun put(id: Any, letters: String, bounds: Rect, commit: (String) -> Unit) {
@@ -32,7 +36,7 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         }
     }
     fun remove(id: Any) { targets.remove(id) }
-    fun at(point: Offset): Target? = if (!keyboardBounds.contains(point)) candidateAt(point)
+    fun at(point: Offset): Target? = if (!keyboardBounds.contains(point)) candidateAt(point)?.takeUnless { ctrl }
         else targets.values.asSequence().flatten().firstOrNull { it.bounds.contains(point) }
 
     /** 拖出键盘、落在候选上：松手等于按住 Shift 点这个候选（释义模式上屏英文）。 */
@@ -54,14 +58,17 @@ internal class ShiftSlideTargets(private val candidates: CandidateDropTargets = 
         val target = at(pointer)
         // Pointer motion redraws the line; keys recompose only when the target changes.
         if (hovered?.key != target?.key || hovered?.bounds != target?.bounds) hovered = target
-        candidates.dragLine = drag?.let { it.origin to it.pointer }
-        candidates.hoveredBounds = target?.takeIf { it.key == CANDIDATE_KEY }?.bounds
+        if (!ctrl) {
+            candidates.dragLine = drag?.let { it.origin to it.pointer }
+            candidates.hoveredBounds = target?.takeIf { it.key == CANDIDATE_KEY }?.bounds
+        }
         return target
     }
     /** 松开 Shift：清掉拖线，键盘回到原来的布局。 */
     fun finish() {
         clearDrag()
         dragging = false
+        ctrl = false
     }
     fun clearDrag() {
         drag = null

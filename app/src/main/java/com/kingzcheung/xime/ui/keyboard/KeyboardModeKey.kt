@@ -18,7 +18,7 @@ val LocalTextModeLabel = staticCompositionLocalOf { "中文" }
 
 /** A mode key is deliberately a text key, never a language/globe key. */
 @Composable
-fun KeyboardModeKey(
+internal fun KeyboardModeKey(
     slot: Int,
     page: KeyboardInputPage = KeyboardInputPage.TEXT,
     onKeyPress: (String) -> Unit,
@@ -29,10 +29,26 @@ fun KeyboardModeKey(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    /** 26 键传入：符号键按住当 Ctrl，拖到字母上发 Ctrl+字母（用户 10-24）。 */
+    ctrlTargets: ShiftSlideTargets? = null,
+    onCtrlShortcut: ((Char) -> Unit)? = null,
 ) {
     val target = modeSlotTarget(page, slot, LocalTextModeLabel.current)
     androidx.compose.runtime.CompositionLocalProvider(LocalKeyboardPunctuation provides null) {
-    KeyButton(
+    if (ctrlTargets != null && onCtrlShortcut != null && target.action == "symbol") CtrlSymbolKeyButton(
+        text = target.label,
+        targets = ctrlTargets,
+        holdMillis = LocalKeyboardInputPreferences.current.symbolKeyHoldMs,
+        onOpenSymbols = { onKeyPress(target.action) },
+        onShortcut = onCtrlShortcut,
+        onPressDown = { onKeyPressDown?.invoke("mode_change") },
+        backgroundColor = backgroundColor,
+        textColor = textColor,
+        modifier = modifier.testTag("mode-slot-$slot"),
+        shadowEnabled = shadowEnabled,
+        shadowElevation = shadowElevation,
+        shadowShapeRadius = shadowShapeRadius,
+    ) else KeyButton(
         text = target.label,
         fontSize = 16.sp,
         onClick = { onKeyPress(target.action) },
