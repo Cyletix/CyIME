@@ -25,7 +25,7 @@ class FloatingRotationTest {
     private fun onScreen(p: Pair<Float, Float>) =
         p.first >= -0.01f && p.first <= hostW + 0.01f && p.second >= -0.01f && p.second <= hostH - inset + 0.01f
 
-    @Test fun toolbarHandleAndDragButtonStayOnScreenAtEveryExtreme() {
+    @Test fun toolbarAndDragButtonStayOnScreenAtEveryExtreme() {
         for (deg in listOf(-90f, -60f, -30f, 15f, 45f, 90f)) {
             val b = floatingRotatedOffsetBounds(hostW, hostH, cardW, cardH, deg, inset)
             assertTrue("$deg feasible", b.feasible)
@@ -35,7 +35,6 @@ class FloatingRotationTest {
                     assertTrue("toolbar $deg", onScreen(point(x, y, deg, vx, top)))
                     assertTrue("toolbar bottom $deg", onScreen(point(x, y, deg, vx, top + FLOATING_ROTATE_TOP_STRIP_DP)))
                 }
-                assertTrue("handle $deg", onScreen(point(x, y, deg, 0f, top - FLOATING_ROTATE_HANDLE_HEIGHT_DP)))
                 assertTrue("drag button $deg", onScreen(point(x, y, deg, 0f, cardH / 2f - FLOATING_DRAG_BAR_HEIGHT_DP / 2f)))
             }
         }
@@ -74,12 +73,26 @@ class FloatingRotationTest {
 
     @Test fun touchQuadFollowsRotation() {
         val card = ResizeRect(100f, 200f, 500f, 400f)
-        val quads = floatingRotatedTouchQuads(card, 90f, 1f)
-        val body = quads[0]
+        val body = floatingRotatedTouchQuad(card, 90f)
         // 转 90°：左上角 (100,200) 转到 (400,100)。
         assertEquals(400f, body[0], 0.01f)
         assertEquals(100f, body[1], 0.01f)
-        val upright = floatingRotatedTouchQuads(card, 0f, 1f)[1]
-        assertEquals(200f - FLOATING_ROTATE_HANDLE_HEIGHT_DP, upright[1], 0.01f)
+    }
+
+    @Test fun touchStripsCoverTheRotatedCardWithFewRects() {
+        val card = ResizeRect(100f, 200f, 700f, 500f)
+        val strips = floatingRotatedTouchStrips(card, 30f)
+        assertTrue(strips.size <= 12)
+        // 卡片里的点都在某一条里：斜边处不会漏触摸。
+        for (u in listOf(0.02f, 0.5f, 0.98f)) for (v in listOf(0.02f, 0.5f, 0.98f)) {
+            val (x, y) = rotatePoint(card.left + card.width * u, card.top + card.height * v, card.centerX, card.centerY, 30f)
+            assertTrue("$u,$v", strips.any { x >= it.left && x <= it.right && y >= it.top && y <= it.bottom })
+        }
+        // 外接框的角落不在任何一条里：露出的空角留给应用。
+        val quad = floatingRotatedTouchQuad(card, 30f)
+        val minX = minOf(quad[0], quad[2], quad[4], quad[6]) + 2f
+        val minY = minOf(quad[1], quad[3], quad[5], quad[7]) + 2f
+        assertFalse(strips.any { minX >= it.left && minX <= it.right && minY >= it.top && minY <= it.bottom })
+        assertEquals(listOf(card), floatingRotatedTouchStrips(card, 0f))
     }
 }

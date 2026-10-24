@@ -364,7 +364,12 @@ fun KeyboardView(
             bottomOffsetPx = state.floatingOffsetY * resizeControlDensity.density,
             minBottomInsetPx = minBottomPx,
         )
-        val seedPreviewRect = if (state.isFloatingMode) normalFloatingRect else fixedKeyboardRect(
+        // 转着的悬浮键盘按旋转规则摆的位置可能超出直角限位；调节从它真实所在的位置开始。
+        val rotatedFloatingRect = if (state.isFloatingMode) floatingRotatedCardRect(hostWidthPx, hostHeightPx,
+            normalFloatingRect.width, normalFloatingRect.height, state.floatingOffsetX.toFloat(),
+            state.floatingOffsetY.toFloat(), state.floatingMinOffsetY.coerceAtLeast(0).toFloat(),
+            state.floatingRotation, resizeControlDensity.density) else null
+        val seedPreviewRect = if (state.isFloatingMode) rotatedFloatingRect ?: normalFloatingRect else fixedKeyboardRect(
             hostWidthPx, hostHeightPx,
             state.keyboardHeightDp * resizeControlDensity.density,
             state.keyboardBottomPaddingDp.coerceAtLeast(0) * resizeControlDensity.density,
@@ -379,6 +384,8 @@ fun KeyboardView(
         val initialPadding = remember(sessionKey) { state.keyboardBottomPaddingDp }
         val resizePreviewRect = remember(sessionKey) { mutableStateOf(initialPreviewRect) }
         val previewPaddingDp = remember(sessionKey) { mutableIntStateOf(initialPadding) }
+        // 调节界面里转动的角度：只在本次调节里改，确认才写回，取消即丢。
+        val resizeRotation = remember(sessionKey) { mutableFloatStateOf(if (state.isFloatingMode) state.floatingRotation else 0f) }
         val renderedBottomPaddingDp = if (resizeActive && !state.isFloatingMode)
             previewPaddingDp.intValue else state.keyboardBottomPaddingDp
 
@@ -409,7 +416,7 @@ fun KeyboardView(
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
         rotationDegrees = state.floatingRotation,
-        onRotate = { callbacks.onFloatingKeyboardRotate?.invoke(it) },
+        previewRotationState = if (resizeActive && state.isFloatingMode) resizeRotation else null,
         previewRectState = if (resizeActive) resizePreviewRect else null,
         onCardPositioned = onCardPositioned,
     ) {
@@ -1996,6 +2003,7 @@ fun KeyboardView(
             onSplitGapCommit = {
                 splitGapPreview.value?.let { SettingsPreferences.setSplitGapFraction(splitContext, splitLandscape, it) }
             },
+            rotation = if (state.isFloatingMode) resizeRotation else null,
             controls = controls,
         )
     }
@@ -2020,6 +2028,7 @@ private fun KeyboardResizeControlsHost(
     splitPitchDp: Float?,
     onSplitGapChange: (Float) -> Unit,
     onSplitGapCommit: () -> Unit,
+    rotation: androidx.compose.runtime.MutableFloatState?,
     controls: @Composable () -> Unit,
 ) {
     // The controls and measured keyboard share one live rectangle.
@@ -2040,6 +2049,7 @@ private fun KeyboardResizeControlsHost(
         splitPitchDp = splitPitchDp,
         onSplitGapChange = onSplitGapChange,
         onSplitGapCommit = onSplitGapCommit,
+        rotation = rotation,
     )
     CompositionLocalProvider(
         LocalDensity provides density,

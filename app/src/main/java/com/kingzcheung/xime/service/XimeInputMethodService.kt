@@ -2091,6 +2091,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                      onPositionDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
                                      onPositionDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
                                      onSnapFeedback = { feedbackManager.hapticFeedback(hapticView) },
+                                     onRotationConfirm = { degrees -> callbacks.onFloatingKeyboardRotate?.invoke(degrees) },
                                      modeSwitchTarget = { toFloating, hostW, hostH ->
                                          val d = resources.displayMetrics.density
                                          if (toFloating) resolveFloatingSwitchRect(hostW, hostH, floatingMinY)
@@ -2416,6 +2417,23 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             page !is KeyboardPage.Overlay) 170 else 0
         return KeyboardDockTarget(normal.width, contentHeight + toolExtra, normal.offsetX,
             fixed.keyboardBottomPaddingDp, bottom)
+    }
+
+    private var rotatedTouchKey: Pair<android.graphics.Rect, Float>? = null
+    private val rotatedTouchCache = android.graphics.Region()
+
+    /** 转过的悬浮卡片的触摸区域（横条近似）；同一卡片和角度直接复用。 */
+    private fun rotatedTouchRegion(card: android.graphics.Rect, degrees: Float): android.graphics.Region {
+        val key = android.graphics.Rect(card) to degrees
+        if (rotatedTouchKey == key) return rotatedTouchCache
+        rotatedTouchCache.setEmpty()
+        com.kingzcheung.xime.ui.keyboard.floatingRotatedTouchStrips(com.kingzcheung.xime.ui.keyboard.ResizeRect(
+            card.left.toFloat(), card.top.toFloat(), card.right.toFloat(), card.bottom.toFloat()), degrees).forEach {
+            rotatedTouchCache.op(kotlin.math.floor(it.left).toInt(), kotlin.math.floor(it.top).toInt(),
+                kotlin.math.ceil(it.right).toInt(), kotlin.math.ceil(it.bottom).toInt(), android.graphics.Region.Op.UNION)
+        }
+        rotatedTouchKey = key
+        return rotatedTouchCache
     }
 
     /** 调节界面里从固定拖成悬浮时，悬浮卡片会落到的矩形（宿主 px）；与 restoreKeyboardDisplayMode(true) 同一套尺寸和位置。 */
@@ -3865,23 +3883,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 卡片已测量到就直接用它；只有还没测到时才去算一次兜底尺寸（resolveKeyboardSize 不便宜）。
                 val measuredCard = floatingCardBounds
                 if (measuredCard != null) {
-                    // 卡片和顶上的旋转手柄按当前角度转过去；只有它们真正盖住的地方吃触摸。
-                    val clip = android.graphics.Region(0, 0, decor.width.coerceAtLeast(1), decor.height.coerceAtLeast(1))
-                    touchableRegion.setEmpty()
-                    com.kingzcheung.xime.ui.keyboard.floatingRotatedTouchQuads(
-                        com.kingzcheung.xime.ui.keyboard.ResizeRect(measuredCard.left.toFloat(), measuredCard.top.toFloat(),
-                            measuredCard.right.toFloat(), measuredCard.bottom.toFloat()),
-                        state.floatingRotation, density,
-                    ).forEach { quad ->
-                        val path = android.graphics.Path().apply {
-                            moveTo(quad[0], quad[1])
-                            for (i in 1 until 4) lineTo(quad[i * 2], quad[i * 2 + 1])
-                            close()
-                        }
-                        val piece = android.graphics.Region()
-                        piece.setPath(path, clip)
-                        touchableRegion.op(piece, android.graphics.Region.Op.UNION)
-                    }
+                    if (com.kingzcheung.xime.ui.keyboard.isFloatingRotated(state.floatingRotation)) {
+                        // 卡片按当前角度转过去，用十几条横条近似；只在卡片或角度变了才重算。
+                        touchableRegion.set(rotatedTouchRegion(measuredCard, state.floatingRotation))
+                    } else touchableRegion.set(measuredCard)
                 } else {
                     val minimumBottom = maxOf(
                         tryGetVisibleNavBarHeightDp(this@XimeInputMethodService, window.window) * density,

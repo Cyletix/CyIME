@@ -1,5 +1,10 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.runtime.MutableFloatState
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.material.icons.automirrored.rounded.RotateRight
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
@@ -135,6 +140,8 @@ internal fun KeyboardResizeOverlay(
      * 和点「悬浮」按钮切过去的结果相同。为空时不支持拖动切换。
      */
     modeSwitchTarget: ((toFloating: Boolean, hostWidthPx: Float, hostHeightPx: Float) -> ResizeRect?)? = null,
+    /** 确认时保存悬浮键盘旋转角（度）；取消时不调用。 */
+    onRotationConfirm: ((Float) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val hostView = LocalView.current
@@ -187,13 +194,21 @@ internal fun KeyboardResizeOverlay(
         val previewState = LocalKeyboardResizePreviewState.current
         var dragRect by remember(floatingMode, maxWidth, maxHeight) { mutableStateOf<ResizeRect?>(null) }
         var dragEdge by remember { mutableStateOf(ResizeHandle.NONE) }
-        val frame = dragRect ?: previewState.rect ?: viewRect
+        // 悬浮键盘转着时，边框、把手和按钮跟键盘一起绕键盘中心转；手势在键盘自己的（未旋转）坐标里算。
+        // 手势进行中以按下时的中心为轴：手势坐标 = 把真实矩形的中心绕轴转回去，写回时再转过来。
+        val rotationState = previewState.rotation?.takeIf { floatingMode }
+        val rotation = rotationState?.floatValue ?: 0f
+        var gesturePivot by remember { mutableStateOf<Offset?>(null) }
+        val frame = dragRect ?: previewState.rect?.let { rotateRectCenter(it, gesturePivot, -rotation) } ?: viewRect
         val dragAreaHeightDp = floatingDragAreaHeightDp(previewState.bottomPaddingDp,
             previewState.floatingBottomClearanceDp, frame.height / density.density)
         val dragAreaHeightPx = dragAreaHeightDp * density.density
-        val currentPreviewRect by rememberUpdatedState(previewState.rect)
+        val currentPreviewRect by rememberUpdatedState(previewState.rect?.let { rotateRectCenter(it, gesturePivot, -rotation) })
         val currentInitialPreviewRect by rememberUpdatedState(previewState.initialRect)
-        val currentOnPreviewRectChange by rememberUpdatedState(previewState.onRectChange)
+        val currentPreviewRectSink by rememberUpdatedState(previewState.onRectChange)
+        val currentOnPreviewRectChange: (ResizeRect) -> Unit = { rect ->
+            currentPreviewRectSink(rotateRectCenter(rect, gesturePivot, rotationState?.floatValue ?: 0f))
+        }
         val currentViewRect by rememberUpdatedState(viewRect)
         val currentPreviewState by rememberUpdatedState(previewState)
         fun splitGapFraction(rect: ResizeRect): Float = SplitKeyboardGeometry.resolvedGap(
@@ -252,10 +267,18 @@ internal fun KeyboardResizeOverlay(
         // This full-size pointer layer catches uncovered hits below the controls.
         // Do not consume down events on their common parent: that cancels Slider drags.
         // 一层只负责暗背景、边框和手势。真实键盘由同一个 previewRect 驱动。
+        if (!editingOpacity) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)))
+        val hostMaxWidth = maxWidth
+        val hostMaxHeight = maxHeight
+        val layerPivot = gesturePivot ?: Offset(frame.centerX, frame.centerY)
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            rotationZ = rotation
+            transformOrigin = TransformOrigin(layerPivot.x / size.width.coerceAtLeast(1f),
+                layerPivot.y / size.height.coerceAtLeast(1f))
+        }) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (editingOpacity) Color.Transparent else Color.Black.copy(alpha = 0.5f))
                 .testTag(if (editingOpacity) "keyboard-opacity-backdrop" else "keyboard-resize-frame")
                 .semantics { contentDescription = if (editingOpacity) "透明度调整" else "拖动边框调整大小，拖动内部移动悬浮键盘" }
                 .drawBehind {
@@ -342,7 +365,7 @@ internal fun KeyboardResizeOverlay(
                         corner(cardRight, cardBottom, -1f, -1f, bottomRadius, emphasis(ResizeHandle.BOTTOM_RIGHT))
                     }
                 }
-                .pointerInput(editingOpacity, floatingMode, isLandscape, maxWidth, maxHeight, splitActive) {
+                .pointerInput(editingOpacity, floatingMode, isLandscape, hostMaxWidth, hostMaxHeight, splitActive) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         if (editingOpacity) {
@@ -388,7 +411,7 @@ internal fun KeyboardResizeOverlay(
                                 down.position.y < gestureRect.top || down.position.y > gestureRect.bottom)) {
                             return@awaitEachGesture
                         }
-                        val floatingHeightRange = floatingResizeHeightBounds(maxHeight.value.roundToInt(), isLandscape)
+                        val floatingHeightRange = floatingResizeHeightBounds(hostMaxHeight.value.roundToInt(), isLandscape)
                         val dragBarDp = if (gestureFloating) FLOATING_DRAG_BAR_HEIGHT_DP else 0
                         // 手机基准下限与可用区域取小：平板横屏不允许因为"按比例算"反而比手机更小。
                         val availableWidthDp = (stableBounds.width / density.density).roundToInt()
@@ -556,6 +579,7 @@ internal fun KeyboardResizeOverlay(
                             }
                         }
 
+                        if (isFloatingRotated(rotationState?.floatValue ?: 0f)) gesturePivot = Offset(gestureRect.centerX, gestureRect.centerY)
                         try {
                             val start = awaitTouchSlopOrCancellation(down.id) { change, over ->
                                 change.consume()
@@ -569,6 +593,7 @@ internal fun KeyboardResizeOverlay(
                             }
                         } finally {
                             dragRect = null
+                            gesturePivot = null
                             dragEdge = ResizeHandle.NONE
                             if (didDrag) currentPreviewState.onDragEnd()
                         }
@@ -617,6 +642,7 @@ internal fun KeyboardResizeOverlay(
                 currentOnGeometryChange(finalRect.toGeometry(viewRect.width, viewRect.height, 0f, density.density))
             }
             if (splitActive) previewState.onSplitGapCommit()
+            if (floatingMode) rotationState?.let { onRotationConfirm?.invoke(it.floatValue) }
             onConfirm(currentHeightDp.roundToInt(), previewState.bottomPaddingDp, floatingMode, opacity)
         }
         Box(
@@ -783,6 +809,7 @@ internal fun KeyboardResizeOverlay(
                         currentOnPreviewOpacity(opacity)
                         if (splitActive) previewState.onSplitGapChange(-1f)
                         if (floatingMode) {
+                            rotationState?.floatValue = 0f
                             val initial = currentInitialPreviewRect ?: frame
                             if (defaultSize != null) {
                                 val bounds = previewState.bounds ?: viewRect
@@ -879,7 +906,8 @@ internal fun KeyboardResizeOverlay(
                 currentOnPreviewRectChange(moved)
                 if (floatingMode) {
                     // 和普通悬浮一样：贴住底边停够时长，渐变框变成固定键盘的位置。
-                    val onBottom = moveBounds.bottom - moved.bottom <= 12f * density.density
+                    val onBottom = moveBounds.bottom - moved.bottom <= 12f * density.density &&
+                        !isFloatingRotated(rotationState?.floatValue ?: 0f)
                     if (onBottom && morphTarget == null) morphTarget = currentModeSwitchTarget?.invoke(false,
                         currentViewRect.width, currentViewRect.height)
                     val armed = onBottom && morphTarget != null
@@ -939,7 +967,13 @@ internal fun KeyboardResizeOverlay(
         }
         val floatingMoveGesture = Modifier.pointerInput(floatingMode) {
             detectDragGestures(
+                onDragStart = {
+                    val base = dragRect ?: currentPreviewRect
+                    gesturePivot = base?.takeIf { isFloatingRotated(rotationState?.floatValue ?: 0f) }
+                        ?.let { Offset(it.centerX, it.centerY) }
+                },
                 onDragEnd = {
+                    gesturePivot = null
                     val dock = dockArmed && morphProgress >= 1f
                     endMorph()
                     dragRect = null
@@ -948,6 +982,7 @@ internal fun KeyboardResizeOverlay(
                     if (dock) switchFloating(false)
                 },
                 onDragCancel = {
+                    gesturePivot = null
                     endMorph()
                     dragRect = null
                     currentPreviewState.onDragEnd()
@@ -969,7 +1004,7 @@ internal fun KeyboardResizeOverlay(
             }.size(with(density) { (frame.width.toDp() - (RESIZE_CORNER_HIT_DP * 2).dp).coerceAtLeast(1.dp) }, 28.dp)
                 .zIndex(1f).testTag("keyboard-resize-fixed-move-bar")
                 .semantics { stateDescription = alignmentLabel }
-                .pointerInput(floatingMode, maxWidth, maxHeight) {
+                .pointerInput(floatingMode, hostMaxWidth, hostMaxHeight) {
                     var movement: FixedKeyboardMoveGesture? = null
                     var moveSnapped = false
                     var pulledUp = 0f
@@ -1036,6 +1071,123 @@ internal fun KeyboardResizeOverlay(
                     .then(floatingMoveGesture),
             )
         }
+        if (!editingOpacity && floatingMode && rotationState != null) {
+            RotateHandle(frame, rotationState, overlayOrigin, viewRect, previewState, functionColor, functionTextColor,
+                accentColor, currentPreviewRectSink, onEnd = { currentPreviewState.onDragEnd() })
+        }
+        }
+    }
+}
+
+/** 绕 [pivot] 转 [degrees] 后矩形中心所在处（尺寸不变）；没有轴或没转时原样返回。 */
+private fun rotateRectCenter(rect: ResizeRect, pivot: Offset?, degrees: Float): ResizeRect {
+    if (pivot == null || !isFloatingRotated(degrees)) return rect
+    val (x, y) = rotatePoint(rect.centerX, rect.centerY, pivot.x, pivot.y, degrees)
+    return rect.translated(x - rect.centerX, y - rect.centerY)
+}
+
+/**
+ * 调节界面顶边正上方的旋转手柄（顶上放不下时放在「拖动移动」右边）：按住拖动，键盘按手指绕键盘中心转过的角度旋转，
+ * ±90°，靠近 0°/±90° 吸附；转到放不下顶部条的角度就停住，位置按旋转规则推回屏内，转回去时回到原处。
+ */
+@Composable
+private fun RotateHandle(
+    frame: ResizeRect,
+    rotationState: MutableFloatState,
+    overlayOrigin: Offset,
+    viewRect: ResizeRect,
+    previewState: KeyboardResizePreviewState,
+    functionColor: Color,
+    functionTextColor: Color,
+    accentColor: Color,
+    onRectChange: (ResizeRect) -> Unit,
+    onEnd: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val handleSize = FLOATING_ROTATE_HANDLE_SIZE_DP.dp
+    val handlePx = with(density) { handleSize.toPx() }
+    val gapPx = with(density) { FLOATING_ROTATE_HANDLE_GAP_DP.dp.toPx() }
+    val above = frame.top - gapPx - handlePx >= 0f
+    val handleLeft = if (above) frame.centerX - handlePx / 2f else frame.centerX + with(density) { 72.dp.toPx() }
+    val handleTop = if (above) frame.top - gapPx - handlePx else frame.top + with(density) { 42.dp.toPx() } - handlePx / 2f
+    var rotating by remember { mutableStateOf(false) }
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val currentFrame by rememberUpdatedState(frame)
+    val currentOrigin by rememberUpdatedState(overlayOrigin)
+    val currentView by rememberUpdatedState(viewRect)
+    val currentPreview by rememberUpdatedState(previewState)
+    val currentOnRectChange by rememberUpdatedState(onRectChange)
+    val currentOnEnd by rememberUpdatedState(onEnd)
+    val degrees = rotationState.floatValue
+    Box(
+        Modifier
+            .absoluteOffset { IntOffset(handleLeft.roundToInt(), handleTop.roundToInt()) }
+            .size(handleSize)
+            .zIndex(3f)
+            .clip(CircleShape)
+            .background(if (rotating) accentColor else functionColor)
+            .onGloballyPositioned { coords = it }
+            .testTag("keyboard-resize-rotate-handle")
+            .semantics {
+                contentDescription = "按住拖动旋转键盘"
+                stateDescription = "${degrees.roundToInt()}°"
+            }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val handle = coords?.takeIf { it.isAttached } ?: return@awaitEachGesture
+                    down.consume()
+                    val start = currentPreview.rect ?: currentFrame
+                    val view = currentView
+                    val d = density.density
+                    val bottomInsetDp = (view.height - (currentPreview.bounds ?: view).bottom).coerceAtLeast(0f) / d
+                    fun bounds(deg: Float) = floatingRotatedOffsetBounds(view.width / d, view.height / d,
+                        start.width / d, start.height / d, deg, bottomInsetDp)
+                    fun fits(deg: Float) = !isFloatingRotated(deg) || bounds(deg).feasible
+                    val centerX = currentOrigin.x + start.centerX
+                    val centerY = currentOrigin.y + start.centerY
+                    fun angleOf(local: Offset): Float {
+                        val p = handle.localToWindow(local)
+                        return Math.toDegrees(kotlin.math.atan2((p.y - centerY).toDouble(), (p.x - centerX).toDouble())).toFloat()
+                    }
+                    val startPointer = angleOf(down.position)
+                    val startAngle = rotationState.floatValue
+                    rotating = true
+                    try {
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                change.consume()
+                                break
+                            }
+                            if (!change.positionChanged()) continue
+                            change.consume()
+                            val target = snapFloatingRotation(startAngle + floatingAngleDelta(startPointer, angleOf(change.position)))
+                            val next = limitFloatingRotation(rotationState.floatValue, target, ::fits)
+                            rotationState.floatValue = next
+                            // 每次都从按下时的位置推：转回去时键盘也回到原处，不会一路被挤走。
+                            currentOnRectChange(if (!isFloatingRotated(next)) start else {
+                                val b = bounds(next)
+                                val cx = view.width / 2f + b.clampX((start.centerX - view.width / 2f) / d) * d
+                                val bottom = view.height - b.clampY((view.height - start.bottom) / d) * d
+                                ResizeRect(cx - start.width / 2f, bottom - start.height, cx + start.width / 2f, bottom)
+                            })
+                        }
+                    } finally {
+                        rotating = false
+                        currentOnEnd()
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (rotating || isFloatingRotated(degrees)) {
+            Text("${degrees.roundToInt()}°", color = if (rotating) readableOn(accentColor) else functionTextColor,
+                fontSize = 11.sp, maxLines = 1, softWrap = false)
+        } else {
+            Icon(Icons.AutoMirrored.Rounded.RotateRight, contentDescription = null,
+                tint = functionTextColor, modifier = Modifier.size(20.dp))
+        }
     }
 }
 
@@ -1059,6 +1211,8 @@ internal data class KeyboardResizePreviewState(
     val splitPitchDp: Float? = null,
     val onSplitGapChange: (Float) -> Unit = {},
     val onSplitGapCommit: () -> Unit = {},
+    /** 悬浮键盘本次调节中的旋转角；只在悬浮调节时有。 */
+    val rotation: MutableFloatState? = null,
 )
 
 internal val LocalKeyboardResizePreviewState = compositionLocalOf { KeyboardResizePreviewState() }
