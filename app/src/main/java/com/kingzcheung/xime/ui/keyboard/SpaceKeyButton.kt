@@ -56,6 +56,7 @@ fun SpaceKeyButton(
     val onCursorMode by rememberUpdatedState(actions.onCursorModeChange)
     val onVoiceToggle by rememberUpdatedState(actions.onVoiceToggle)
     val holdAction = settings.effectiveSpaceHold
+    val cursorUnitPx = rememberCursorUnitPx()
     DisposableEffect(Unit) { onDispose { onCursorMode?.invoke(false) } }
     val currentClick by rememberUpdatedState(onClick)
     val currentPress by rememberUpdatedState(onPress)
@@ -74,8 +75,8 @@ fun SpaceKeyButton(
     }
     BoxWithConstraints(
         modifier.fillMaxSize().testTag("space-key")
-            .pointerInput(holdAction, settings.cursorStepDp, settings.spaceHoldDelayMs) {
-                val step = settings.cursorStepDp.dp.toPx()
+            .pointerInput(holdAction, settings.cursorStepDp, cursorUnitPx, settings.spaceHoldDelayMs) {
+                val step = settings.cursorStepDp * cursorUnitPx
                 val tapTolerance = maxOf(viewConfiguration.touchSlop, 24.dp.toPx())
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -91,7 +92,7 @@ fun SpaceKeyButton(
                     val cursorSteps = CursorStepAccumulator(step)
                     // A line is a much larger edit than a character. Keep its threshold
                     // independent of fast horizontal settings; coalesced events never skip rows.
-                    val verticalSteps = CursorStepAccumulator(maxOf(48.dp.toPx(), step * 5f))
+                    val verticalSteps = CursorStepAccumulator(maxOf(48f * cursorUnitPx, step * 5f))
                     val timer = scope.launch {
                         delay(settings.spaceHoldDelayMs)
                         held = true
