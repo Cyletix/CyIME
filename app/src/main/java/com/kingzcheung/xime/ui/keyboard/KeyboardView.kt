@@ -1303,17 +1303,15 @@ fun KeyboardView(
                                 "shift" -> viewModel.toggleShift()
                                 "shift_single" -> viewModel.singleTapShift()
                                 "shift_caps" -> viewModel.doubleTapShift()
-                                "symbol", "mode_change", "mode_change_symbol" -> {
-                                    callbacks.onCommitCandidateBeforeModeChange?.invoke()
-                                    viewModel.showOverlay(OverlayRoute.Symbol)
-                                }
+                                // 拼音留在候选栏，点符号时连同字母原样上屏（和九键一致）。
+                                "symbol", "mode_change", "mode_change_symbol" -> viewModel.showOverlay(OverlayRoute.Symbol)
                                 "number", "mode_change_number" -> {
-                                    callbacks.onCommitCandidateBeforeModeChange?.invoke()
+                                    callbacks.onCommitTypedBeforeModeChange?.invoke()
                                     viewModel.enterPanel(PanelType.NUMBER)
                                 }
                                 // Keep legacy configuration commands compatible; default keys use the direct symbol route.
                                 "mode_change_common_symbol" -> {
-                                    callbacks.onCommitCandidateBeforeModeChange?.invoke()
+                                    callbacks.onCommitTypedBeforeModeChange?.invoke()
                                     viewModel.enterPanel(PanelType.COMMON_SYMBOL)
                                 }
                                 "emoji" -> viewModel.showOverlay(OverlayRoute.Emoji)
@@ -1344,7 +1342,7 @@ fun KeyboardView(
                             when (key) {
                                 "abc" -> viewModel.returnToTextKeyboard()
                                 "?123" -> {
-                                    callbacks.onCommitCandidateBeforeModeChange?.invoke()
+                                    callbacks.onCommitTypedBeforeModeChange?.invoke()
                                     viewModel.enterPanel(PanelType.NUMBER)
                                     callbacks.onKeyPress("clear_composition", false)
                                 }
@@ -1383,13 +1381,13 @@ fun KeyboardView(
                                     initialKeyboardLayoutState(state.isAsciiMode, state.currentSchemaId)
                                 )
                                 "number" -> {
-                                    callbacks.onT9SwitchAway?.invoke()
+                                    callbacks.onCommitTypedBeforeModeChange?.invoke()
                                     viewModel.enterPanel(PanelType.NUMBER)
                                 }
                                 "symbol" -> viewModel.showOverlay(OverlayRoute.Symbol)
                                 "emoji" -> viewModel.showOverlay(OverlayRoute.Emoji)
                                 "ime_switch" -> {
-                                    callbacks.onT9SwitchAway?.invoke()
+                                    callbacks.onCommitTypedBeforeModeChange?.invoke()
                                     callbacks.onKeyPress(key, false)
                                 }
                                 else -> callbacks.onKeyPress(key, false)
@@ -1917,7 +1915,10 @@ fun KeyboardView(
                             }
                         },
                         onBack = { viewModel.returnToTextKeyboard() },
-                        onNumber = { viewModel.enterPanel(PanelType.NUMBER) },
+                        onNumber = {
+                            callbacks.onCommitTypedBeforeModeChange?.invoke()
+                            viewModel.enterPanel(PanelType.NUMBER)
+                        },
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp,
                         shadowShapeRadius = kbShadow.shapeRadius.dp,

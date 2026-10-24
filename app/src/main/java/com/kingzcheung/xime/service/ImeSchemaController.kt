@@ -101,18 +101,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     associationCandidates = emptyList()
                 )
             }
-        } else if (candState.isComposing) {
-            if (candState.candidates.isNotEmpty()) {
-                service.keyRouter.selectCandidateAsync(0)
-            } else if (!changesSchema) {
-                val input = candState.inputText
-                if (input.isNotEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        service.commitText(input)
-                    }
-                    service.keyRouter.endQueuedComposition()
-                }
-            }
+        } else if (candState.isComposing || service.rimeEngine.getInput().isNotEmpty() ||
+            service.t9PartialSegments.isNotEmpty()) {
+            // 打拼音时切语言：字母原样上屏，不上屏首选（Gboard 规则，用户 2026-10-24）。
+            if (!service.textCommit.commitCompositionAndLiteral(asTyped = true)) return false
         }
         if (changesSchema) {
             // Selecting a first T9/native candidate may only consume a prefix. Preserve the

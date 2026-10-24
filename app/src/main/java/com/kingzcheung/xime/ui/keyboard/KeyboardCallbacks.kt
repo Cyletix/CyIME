@@ -178,10 +178,12 @@ data class KeyboardCallbacks(
     /** 快捷发送表单"触发编码"输入框焦点变化（决定按键输入路由到编码框）。 */
     val onQuickSendCodeFocusChange: ((Boolean) -> Unit)? = null,
     /**
-     * 全键盘（中文/英文）切离至其他键盘（数字/符号）时调用。
+     * 切到语音/手写前调用。
      * 服务层负责上屏首位候选词或待确认英文，再由键盘层切换布局。
      */
     val onCommitCandidateBeforeModeChange: (() -> Unit)? = null,
+    /** 打拼音时切到数字面板、按中/英键：按打的字母原样上屏（不上屏首选，Gboard 规则，用户 2026-10-24）。 */
+    val onCommitTypedBeforeModeChange: (() -> Unit)? = null,
     /** 假名按序进入 Rime；变音仅修改仍在组合中的末尾编码。 */
     val onJapaneseKanaAction: ((JapaneseKanaAction) -> Unit)? = null,
     /** Explicit symbol categories commit the chosen glyph without width conversion. */

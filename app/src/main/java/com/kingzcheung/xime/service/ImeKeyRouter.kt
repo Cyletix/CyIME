@@ -548,6 +548,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     commitHardwareLiteral(key)
                     return@command
                 }
+                // 打拼音时不按 Shift 的 ; / \ 等：先把字母原样上屏（不上屏首选，Gboard 规则，用户 2026-10-24），
+                // 再按空闲时的标点规则出符号。翻页键另有入口，拼音分隔符 ' 照旧。
+                if (hardwarePageDirection == 0 && key.length == 1 && key != "'" && isLiteralPunctuation(key) &&
+                    !service.uiState.value.isAsciiMode &&
+                    service.uiState.value.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.CHINESE &&
+                    (service.rimeEngine.readQueuedComposition()?.input?.isNotEmpty() == true ||
+                        service.t9PartialSegments.isNotEmpty()) && !commitHardwareLiteral("")) return@command
             } else {
                 hardwareNavigation.clear()
             }

@@ -460,6 +460,11 @@ internal fun rememberImeKeyboardCallbacks(
                     service.textCommit.commitCompositionAndLiteral()
                 }
             },
+            onCommitTypedBeforeModeChange = {
+                service.keyRouter.postRimeJob {
+                    service.textCommit.commitCompositionAndLiteral(asTyped = true)
+                }
+            },
             onShowQuickSendForm = {
                 // 从 Overlay 页面（剪贴板面板）打开表单时必须退出 Overlay：
                 // Overlay 渲染为全屏 clickable Box（吞点击），若不退出，表单会被
