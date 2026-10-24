@@ -1,0 +1,1538 @@
+# CyIME 编程常用词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_programming
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+高级语言	gao ji yu yan	600
+强类型	qiang lei xing	600
+弱类型	ruo lei xing	600
+静态类型	jing tai lei xing	600
+动态类型	dong tai lei xing	600
+类型推导	lei xing tui dao	600
+类型检查	lei xing jian cha	600
+隐式转换	yin shi zhuan huan	600
+显式转换	xian shi zhuan huan	600
+类型安全	lei xing an quan	600
+类型断言	lei xing duan yan	600
+类型擦除	lei xing ca chu	600
+类型别名	lei xing bie ming	600
+泛型编程	fan xing bian cheng	600
+元编程	yuan bian cheng	600
+函数式编程	han shu shi bian cheng	600
+面向过程	mian xiang guo cheng	600
+面向切面	mian xiang qie mian	600
+声明式编程	sheng ming shi bian cheng	600
+命令式编程	ming ling shi bian cheng	600
+响应式编程	xiang ying shi bian cheng	600
+并发编程	bing fa bian cheng	600
+异步编程	yi bu bian cheng	600
+封装继承	feng zhuang ji cheng	600
+多态性	duo tai xing	600
+接口定义	jie kou ding yi	600
+拷贝构造	kao bei gou zao	600
+移动语义	yi dong yu yi	600
+智能指针	zhi neng zhi zhen	600
+内存溢出	nei cun yi chu	600
+空指针	kong zhi zhen	600
+悬垂指针	xuan chui zhi zhen	600
+指针数组	zhi zhen shu zu	600
+匿名函数	ni ming han shu	600
+箭头函数	jian tou han shu	600
+高阶函数	gao jie han shu	600
+纯函数	chun han shu	600
+递归函数	di gui han shu	600
+尾递归	wei di gui	600
+内联函数	nei lian han shu	600
+纯虚函数	chun xu han shu	600
+虚函数表	xu han shu biao	600
+函数重载	han shu zhong zai	600
+运算符重载	yun suan fu chong zai	600
+方法重写	fang fa chong xie	600
+方法签名	fang fa qian ming	600
+默认参数	mo ren can shu	600
+可变参数	ke bian can shu	600
+关键字参数	guan jian zi can shu	600
+位置参数	wei zhi can shu	600
+词法作用域	ci fa zuo yong yu	600
+动态作用域	dong tai zuo yong yu	600
+常量定义	chang liang ding yi	600
+字面量	zi mian liang	600
+枚举类型	mei ju lei xing	600
+结构体	jie gou ti	600
+位域定义	wei yu ding yi	600
+布尔类型	bu er lei xing	600
+双精度	shuang jing du	600
+单精度	dan jing du	600
+无符号数	wu fu hao shu	600
+有符号数	you fu hao shu	600
+模式匹配	mo shi pi pei	600
+解构赋值	jie gou fu zhi	600
+展开运算符	zhan kai yun suan fu	600
+三元运算符	san yuan yun suan fu	600
+位运算符	wei yun suan fu	600
+逻辑运算符	luo ji yun suan fu	600
+比较运算符	bi jiao yun suan fu	600
+赋值运算符	fu zhi yun suan fu	600
+自增自减	zi zeng zi jian	600
+短路求值	duan lu qiu zhi	600
+惰性求值	duo xing qiu zhi	600
+条件语句	tiao jian yu ju	600
+分支结构	fen zhi jie gou	600
+循环结构	xun huan jie gou	600
+嵌套循环	qian tao xun huan	600
+捕获异常	bu huo yi chang	600
+调用栈	diao yong zhan	600
+栈展开	zhan zhan kai	600
+可迭代对象	ke die dai dui xiang	600
+列表推导式	lie biao tui dao shi	600
+装饰器	zhuang shi qi	600
+上下文管理	shang xia wen guan li	600
+注解处理器	zhu jie chu li qi	600
+反序列化	fan xu lie hua	600
+深拷贝	shen kao bei	600
+浅拷贝	qian kao bei	600
+值传递	zhi chuan di	600
+引用传递	yin yong chuan di	600
+传值调用	chuan zhi diao yong	600
+传引用	chuan yin yong	600
+借用检查	jie yong jian cha	600
+不可变性	bu ke bian xing	600
+可变引用	ke bian yin yong	600
+解释器	jie shi qi	600
+即时编译	ji shi bian yi	600
+提前编译	ti qian bian yi	600
+交叉编译	jiao cha bian yi	600
+前端编译	qian duan bian yi	600
+后端优化	hou duan you hua	600
+词法分析	ci fa fen xi	600
+语义分析	yu yi fen xi	600
+抽象语法树	chou xiang yu fa shu	600
+中间表示	zhong jian biao shi	600
+中间代码	zhong jian dai ma	600
+目标代码	mu biao dai ma	600
+符号表	fu hao biao	600
+静态链接	jing tai lian jie	600
+动态链接	dong tai lian jie	600
+动态链接库	dong tai lian jie ku	600
+静态库	jing tai ku	600
+宏展开	hong zhan kai	600
+预处理器	yu chu li qi	600
+条件编译	tiao jian bian yi	600
+运行时环境	yun xing shi huan jing	600
+标记清除	biao ji qing chu	600
+复制算法	fu zhi suan fa	600
+标记整理	biao ji zheng li	600
+分代收集	fen dai shou ji	600
+老年代	lao nian dai	600
+永久代	yong jiu dai	600
+元空间	yuan kong jian	600
+类加载器	lei jia zai qi	600
+双亲委派	shuang qin wei pai	600
+空间复杂度	kong jian fu za du	600
+渐近复杂度	jian jin fu za du	600
+最优解	zui you jie	600
+局部最优	ju bu zui you	600
+全局最优	quan ju zui you	600
+线性表	xian xing biao	600
+动态数组	dong tai shu zu	600
+多维数组	duo wei shu zu	600
+稀疏矩阵	xi shu ju zhen	600
+单向链表	dan xiang lian biao	600
+双向链表	shuang xiang lian biao	600
+循环链表	xun huan lian biao	600
+静态链表	jing tai lian biao	600
+跳表结构	tiao biao jie gou	600
+链表反转	lian biao fan zhuan	600
+快慢指针	kuai man zhi zhen	600
+虚拟头节点	xu ni tou jie dian	600
+先进先出	xian jin xian chu	600
+单调栈	dan diao zhan	600
+单调队列	dan diao dui lie	600
+双端队列	shuang duan dui lie	600
+优先队列	you xian dui lie	600
+循环队列	xun huan dui lie	600
+阻塞队列	zu se dui lie	600
+无锁队列	wu suo dui lie	600
+哈希表	ha xi biao	600
+散列表	san lie biao	600
+哈希函数	ha xi han shu	600
+哈希冲突	ha xi chong tu	600
+链地址法	lian di zhi fa	600
+开放寻址法	kai fang xun zhi fa	600
+线性探测	xian xing tan ce	600
+二次探测	er ci tan ce	600
+再哈希法	zai ha xi fa	600
+一致性哈希	yi zhi xing ha xi	600
+布隆过滤器	bu long guo lv qi	600
+位图算法	wei tu suan fa	600
+满二叉树	man er cha shu	600
+完全二叉树	wan quan er cha shu	600
+平衡二叉树	ping heng er cha shu	600
+二叉搜索树	er cha sou suo shu	600
+红黑树	hong hei shu	600
+伸展树	shen zhan shu	600
+字典树	zi dian shu	600
+前缀树	qian zhui shu	600
+后缀树	hou zhui shu	600
+后缀数组	hou zhui shu zu	600
+树状数组	shu zhuang shu zu	600
+哈夫曼树	ha fu man shu	600
+哈夫曼编码	ha fu man bian ma	600
+最优二叉树	zui you er cha shu	600
+多叉树	duo cha shu	600
+并查集	bing cha ji	600
+路径压缩	lu jing ya suo	600
+按秩合并	an zhi he bing	600
+前序遍历	qian xu bian li	600
+中序遍历	zhong xu bian li	600
+后序遍历	hou xu bian li	600
+层序遍历	ceng xu bian li	600
+二叉堆	er cha dui	600
+大顶堆	da ding dui	600
+小顶堆	xiao ding dui	600
+斐波那契堆	fei bo na qi dui	600
+左偏树	zuo pian shu	600
+有向图	you xiang tu	600
+无向图	wu xiang tu	600
+有权图	you quan tu	600
+有向无环图	you xiang wu huan tu	600
+连通图	lian tong tu	600
+强连通分量	qiang lian tong fen liang	600
+双连通分量	shuang lian tong fen liang	600
+生成树	sheng cheng shu	600
+最小生成树	zui xiao sheng cheng shu	600
+邻接矩阵	lin jie ju zhen	600
+邻接表	lin jie biao	600
+十字链表	shi zi lian biao	600
+链式前向星	lian shi qian xiang xing	600
+拓扑排序	tuo pu pai xu	600
+入度出度	ru du chu du	600
+单源最短路	dan yuan zui duan lu	600
+多源最短路	duo yuan zui duan lu	600
+松弛操作	song chi cao zuo	600
+负权环	fu quan huan	600
+二分图	er fen tu	600
+最大匹配	zui da pi pei	600
+匈牙利算法	xiong ya li suan fa	600
+网络流	wang luo liu	600
+最大流	zui da liu	600
+最小割	zui xiao ge	600
+费用流	fei yong liu	600
+增广路	zeng guang lu	600
+冒泡排序	mao pao pai xu	600
+希尔排序	xi er pai xu	600
+归并排序	gui bing pai xu	600
+快速排序	kuai su pai xu	600
+堆排序	dui pai xu	600
+计数排序	ji shu pai xu	600
+桶排序	tong pai xu	600
+基数排序	ji shu pai xu	600
+稳定排序	wen ding pai xu	600
+原地排序	yuan di pai xu	600
+外部排序	wai bu pai xu	600
+顺序查找	shun xu cha zhao	600
+二分查找	er fen cha zhao	600
+折半查找	zhe ban cha zhao	600
+插值查找	cha zhi cha zhao	600
+分块查找	fen kuai cha zhao	600
+深度优先	shen du you xian	600
+广度优先	guang du you xian	600
+宽度优先	kuan du you xian	600
+回溯算法	hui su suan fa	600
+剪枝优化	jian zhi you hua	600
+启发式搜索	qi fa shi sou suo	600
+双向搜索	shuang xiang sou suo	600
+迭代加深	die dai jia shen	600
+记忆化搜索	ji yi hua sou suo	600
+状态转移	zhuang tai zhuan yi	600
+状态压缩	zhuang tai ya suo	600
+区间动规	qu jian dong gui	600
+树形动规	shu xing dong gui	600
+数位动规	shu wei dong gui	600
+背包问题	bei bao wen ti	600
+零一背包	ling yi bei bao	600
+完全背包	wan quan bei bao	600
+多重背包	duo chong bei bao	600
+分组背包	fen zu bei bao	600
+最长公共子序列	zui chang gong gong zi xu lie	600
+最长递增子序列	zui chang di zeng zi xu lie	600
+编辑距离	bian ji ju li	600
+分治算法	fen zhi suan fa	600
+滑动窗口	hua dong chuang kou	600
+双指针	shuang zhi zhen	600
+对撞指针	dui zhuang zhi zhen	600
+前缀和	qian zhui he	600
+差分数组	cha fen shu zu	600
+离散化	li san hua	600
+摩尔投票	mo er tou piao	600
+蓄水池抽样	xu shui chi chou yang	600
+洗牌算法	xi pai suan fa	600
+辗转相除法	zhan zhuan xiang chu fa	600
+最大公约数	zui da gong yue shu	600
+最小公倍数	zui xiao gong bei shu	600
+快速幂	kuai su mi	600
+矩阵快速幂	ju zhen kuai su mi	600
+素数筛法	su shu shai fa	600
+线性筛	xian xing shai	600
+埃氏筛	ai shi shai	600
+中国剩余定理	zhong guo sheng yu ding li	600
+博弈论	bo yi lun	600
+计算几何	ji suan ji he	600
+凸包算法	tu bao suan fa	600
+旋转卡壳	xuan zhuan qia ke	600
+扫描线	sao miao xian	600
+字符串匹配	zi fu chuan pi pei	600
+马拉车算法	ma la che suan fa	600
+回文串	hui wen chuan	600
+有限状态机	you xian zhuang tai ji	600
+状态机	zhuang tai ji	600
+位运算	wei yun suan	600
+状压动规	zhuang ya dong gui	600
+分块算法	fen kuai suan fa	600
+莫队算法	mo dui suan fa	600
+倍增算法	bei zeng suan fa	600
+最近公共祖先	zui jin gong gong zu xian	600
+树链剖分	shu lian pou fen	600
+点分治	dian fen zhi	600
+模拟退火	mo ni tui huo	600
+遗传算法	yi chuan suan fa	600
+蚁群算法	yi qun suan fa	600
+粒子群算法	li zi qun suan fa	600
+梯度下降	ti du xia jiang	600
+随机算法	sui ji suan fa	600
+近似算法	jin si suan fa	600
+并行算法	bing xing suan fa	600
+加密算法	jia mi suan fa	600
+摘要算法	zhai yao suan fa	600
+对称加密	dui chen jia mi	600
+非对称加密	fei dui chen jia mi	600
+数字签名	shu zi qian ming	600
+椭圆曲线	tuo yuan qu xian	600
+内核态	nei he tai	600
+用户态	yong hu tai	600
+上下文切换	shang xia wen qie huan	600
+中断处理	zhong duan chu li	600
+软中断	ruan zhong duan	600
+硬中断	ying zhong duan	600
+中断向量表	zhong duan xiang liang biao	600
+特权指令	te quan zhi ling	600
+系统内核	xi tong nei he	600
+微内核	wei nei he	600
+宏内核	hong nei he	600
+混合内核	hun he nei he	600
+外核架构	wai he jia gou	600
+进程管理	jin cheng guan li	600
+进程控制块	jin cheng kong zhi kuai	600
+进程调度	jin cheng diao du	600
+进程状态	jin cheng zhuang tai	600
+就绪状态	jiu xu zhuang tai	600
+阻塞状态	zu se zhuang tai	600
+挂起状态	gua qi zhuang tai	600
+僵尸进程	jiang shi jin cheng	600
+孤儿进程	gu er jin cheng	600
+守护进程	shou hu jin cheng	600
+前台进程	qian tai jin cheng	600
+父进程	fu jin cheng	600
+进程组	jin cheng zu	600
+进程间通信	jin cheng jian tong xin	600
+匿名管道	ni ming guan dao	600
+命名管道	ming ming guan dao	600
+共享内存	gong xiang nei cun	600
+信号量	xin hao liang	600
+信号处理	xin hao chu li	600
+本地套接字	ben di tao jie zi	600
+多线程编程	duo xian cheng bian cheng	600
+用户级线程	yong hu ji xian cheng	600
+内核级线程	nei he ji xian cheng	600
+轻量级进程	qing liang ji jin cheng	600
+协程调度	xie cheng diao du	600
+有栈协程	you zhan xie cheng	600
+无栈协程	wu zhan xie cheng	600
+纤程技术	xian cheng ji shu	600
+线程同步	xian cheng tong bu	600
+互斥锁	hu chi suo	600
+读写锁	du xie suo	600
+自旋锁	zi xuan suo	600
+递归锁	di gui suo	600
+可重入锁	ke chong ru suo	600
+公平锁	gong ping suo	600
+非公平锁	fei gong ping suo	600
+悲观锁	bei guan suo	600
+乐观锁	le guan suo	600
+共享锁	gong xiang suo	600
+排他锁	pai ta suo	600
+独占锁	du zhan suo	600
+分段锁	fen duan suo	600
+偏向锁	pian xiang suo	600
+轻量级锁	qing liang ji suo	600
+重量级锁	zhong liang ji suo	600
+锁升级	suo sheng ji	600
+锁消除	suo xiao chu	600
+锁粗化	suo cu hua	600
+死锁检测	si suo jian ce	600
+死锁预防	si suo yu fang	600
+死锁避免	si suo bi mian	600
+死锁恢复	si suo hui fu	600
+银行家算法	yin hang jia suan fa	600
+活锁问题	huo suo wen ti	600
+饥饿现象	ji e xian xiang	600
+优先级反转	you xian ji fan zhuan	600
+临界区	lin jie qu	600
+临界资源	lin jie zi yuan	600
+条件变量	tiao jian bian liang	600
+屏障同步	ping zhang tong bu	600
+比较并交换	bi jiao bing jiao huan	600
+内存屏障	nei cun ping zhang	600
+指令重排	zhi ling chong pai	600
+缓存一致性	huan cun yi zhi xing	600
+伪共享	wei gong xiang	600
+抢占式调度	qiang zhan shi diao du	600
+非抢占式	fei qiang zhan shi	600
+时间片轮转	shi jian pian lun zhuan	600
+多级反馈队列	duo ji fan kui dui lie	600
+最短作业优先	zui duan zuo ye you xian	600
+高响应比优先	gao xiang ying bi you xian	600
+实时调度	shi shi diao du	600
+虚拟地址	xu ni di zhi	600
+物理地址	wu li di zhi	600
+逻辑地址	luo ji di zhi	600
+线性地址	xian xing di zhi	600
+地址映射	di zhi ying she	600
+地址转换	di zhi zhuan huan	600
+内存管理单元	nei cun guan li dan yuan	600
+分页存储	fen ye cun chu	600
+分段存储	fen duan cun chu	600
+段页式	duan ye shi	600
+页表项	ye biao xiang	600
+多级页表	duo ji ye biao	600
+快表缓存	kuai biao huan cun	600
+缺页中断	que ye zhong duan	600
+页面置换	ye mian zhi huan	600
+最近最少使用	zui jin zui shao shi yong	600
+最不经常使用	zui bu jing chang shi yong	600
+最佳置换算法	zui jia zhi huan suan fa	600
+时钟置换算法	shi zhong zhi huan suan fa	600
+工作集	gong zuo ji	600
+内存抖动	nei cun dou dong	600
+内存碎片	nei cun sui pian	600
+内部碎片	nei bu sui pian	600
+外部碎片	wai bu sui pian	600
+伙伴系统	huo ban xi tong	600
+内存分配器	nei cun fen pei qi	600
+内存对齐	nei cun dui qi	600
+栈内存	zhan nei cun	600
+栈溢出	zhan yi chu	600
+段错误	duan cuo wu	600
+缓冲区溢出	huan chong qu yi chu	600
+写时复制	xie shi fu zhi	600
+内存映射	nei cun ying she	600
+零拷贝	ling kao bei	600
+直接内存访问	zhi jie nei cun fang wen	600
+虚拟文件系统	xu ni wen jian xi tong	600
+索引节点	suo yin jie dian	600
+目录项	mu lu xiang	600
+硬链接	ying lian jie	600
+软链接	ruan lian jie	600
+符号链接	fu hao lian jie	600
+文件句柄	wen jian ju bing	600
+标准输入	biao zhun shu ru	600
+标准错误	biao zhun cuo wu	600
+磁盘调度	ci pan diao du	600
+最短寻道时间	zui duan xun dao shi jian	600
+电梯算法	dian ti suan fa	600
+机械硬盘	ji xie ying pan	600
+块设备	kuai she bei	600
+字符设备	zi fu she bei	600
+设备驱动	she bei qu dong	600
+阻塞调用	zu se diao yong	600
+非阻塞调用	fei zu se diao yong	600
+同步阻塞	tong bu zu se	600
+同步非阻塞	tong bu fei zu se	600
+多路复用	duo lu fu yong	600
+信号驱动	xin hao qu dong	600
+异步非阻塞	yi bu fei zu se	600
+事件驱动	shi jian qu dong	600
+水平触发	shui ping chu fa	600
+边缘触发	bian yuan chu fa	600
+惊群效应	jing qun xiao ying	600
+反应器模式	fan ying qi mo shi	600
+前摄器模式	qian she qi mo shi	600
+指令集架构	zhi ling ji jia gou	600
+复杂指令集	fu za zhi ling ji	600
+精简指令集	jing jian zhi ling ji	600
+流水线技术	liu shui xian ji shu	600
+分支预测	fen zhi yu ce	600
+乱序执行	luan xu zhi xing	600
+多核处理器	duo he chu li qi	600
+对称多处理	dui chen duo chu li	600
+非一致性内存	fei yi zhi xing nei cun	600
+程序计数器	cheng xu ji shu qi	600
+缓存命中率	huan cun ming zhong lv	600
+缓存行	huan cun hang	600
+大端序	da duan xu	600
+小端序	xiao duan xu	600
+字节序	zi jie xu	600
+主机字节序	zhu ji zi jie xu	600
+网络字节序	wang luo zi jie xu	600
+补码表示	bu ma biao shi	600
+反码表示	fan ma biao shi	600
+原码表示	yuan ma biao shi	600
+七层模型	qi ceng mo xing	600
+五层模型	wu ceng mo xing	600
+四层模型	si ceng mo xing	600
+物理层	wu li ceng	600
+数据链路层	shu ju lian lu ceng	600
+网络层	wang luo ceng	600
+传输层	chuan shu ceng	600
+会话层	hui hua ceng	600
+表示层	biao shi ceng	600
+虚拟局域网	xu ni ju yu wang	600
+虚拟专用网	xu ni zhuan yong wang	600
+内网穿透	nei wang chuan tou	600
+网卡地址	wang ka di zhi	600
+物理地址解析	wu li di zhi jie xi	600
+地址解析协议	di zhi jie xi xie yi	600
+逆地址解析	ni di zhi jie xi	600
+最大传输单元	zui da chuan shu dan yuan	600
+帧检验序列	zhen jian yan xu lie	600
+循环冗余校验	xun huan rong yu jiao yan	600
+奇偶校验	ji ou jiao yan	600
+网际协议	wang ji xie yi	600
+无类别域间路由	wu lei bie yu jian lu you	600
+默认网关	mo ren wang guan	600
+公网地址	gong wang di zhi	600
+私网地址	si wang di zhi	600
+环回地址	huan hui di zhi	600
+广播地址	guang bo di zhi	600
+组播地址	zu bo di zhi	600
+单播通信	dan bo tong xin	600
+多播通信	duo bo tong xin	600
+广播风暴	guang bo feng bao	600
+网络地址转换	wang luo di zhi zhuan huan	600
+端口映射	duan kou ying she	600
+端口转发	duan kou zhuan fa	600
+动态主机配置	dong tai zhu ji pei zhi	600
+网际控制报文	wang ji kong zhi bao wen	600
+路由表	lu you biao	600
+网桥设备	wang qiao she bei	600
+静态路由	jing tai lu you	600
+动态路由	dong tai lu you	600
+自治系统	zi zhi xi tong	600
+内部网关协议	nei bu wang guan xie yi	600
+边界网关协议	bian jie wang guan xie yi	600
+开放最短路径	kai fang zui duan lu jing	600
+传输控制协议	chuan shu kong zhi xie yi	600
+用户数据报	yong hu shu ju bao	600
+三次握手	san ci wo shou	600
+四次挥手	si ci hui shou	600
+半连接队列	ban lian jie dui lie	600
+全连接队列	quan lian jie dui lie	600
+报文段	bao wen duan	600
+确认号	que ren hao	600
+确认应答	que ren ying da	600
+超时重传	chao shi chong chuan	600
+快速重传	kuai su chong chuan	600
+拥塞控制	yong se kong zhi	600
+慢启动	man qi dong	600
+拥塞避免	yong se bi mian	600
+快恢复	kuai hui fu	600
+拥塞窗口	yong se chuang kou	600
+接收窗口	jie shou chuang kou	600
+粘包拆包	zhan bao chai bao	600
+长连接	chang lian jie	600
+短连接	duan lian jie	600
+保活机制	bao huo ji zhi	600
+心跳检测	xin tiao jian ce	600
+心跳包	xin tiao bao	600
+连接复用	lian jie fu yong	600
+队头阻塞	dui tou zu se	600
+域名系统	yu ming xi tong	600
+根域名服务器	gen yu ming fu wu qi	600
+权威域名	quan wei yu ming	600
+递归查询	di gui cha xun	600
+迭代查询	die dai cha xun	600
+域名劫持	yu ming jie chi	600
+域名污染	yu ming wu ran	600
+超文本传输	chao wen ben chuan shu	600
+安全超文本	an quan chao wen ben	600
+请求方法	qing qiu fang fa	600
+请求头	qing qiu tou	600
+响应头	xiang ying tou	600
+重定向状态	chong ding xiang zhuang tai	600
+客户端错误	ke hu duan cuo wu	600
+服务端错误	fu wu duan cuo wu	600
+无状态协议	wu zhuang tai xie yi	600
+会话跟踪	hui hua gen zong	600
+会话标识	hui hua biao shi	600
+令牌认证	ling pai ren zheng	600
+单点登录	dan dian deng lu	600
+统一认证	tong yi ren zheng	600
+授权码模式	shou quan ma mo shi	600
+访问令牌	fang wen ling pai	600
+刷新令牌	shua xin ling pai	600
+跨域资源共享	kua yu zi yuan gong xiang	600
+同源策略	tong yuan ce lve	600
+预检请求	yu jian qing qiu	600
+简单请求	jian dan qing qiu	600
+反向代理	fan xiang dai li	600
+正向代理	zheng xiang dai li	600
+透明代理	tou ming dai li	600
+轮询算法	lun xun suan fa	600
+加权轮询	jia quan lun xun	600
+最少连接	zui shao lian jie	600
+源地址哈希	yuan di zhi ha xi	600
+内容分发网络	nei rong fen fa wang luo	600
+边缘节点	bian yuan jie dian	600
+回源请求	hui yuan qing qiu	600
+入侵防御	ru qin fang yu	600
+应用防火墙	ying yong fang huo qiang	600
+安全外壳协议	an quan wai ke xie yi	600
+传输层安全	chuan shu ceng an quan	600
+证书颁发机构	zheng shu ban fa ji gou	600
+公钥基础设施	gong yao ji chu she shi	600
+公钥私钥	gong yao si yao	600
+会话密钥	hui hua mi yue	600
+握手协议	wo shou xie yi	600
+中间人攻击	zhong jian ren gong ji	600
+跨站脚本攻击	kua zhan jiao ben gong ji	600
+跨站请求伪造	kua zhan qing qiu wei zao	600
+注入攻击	zhu ru gong ji	600
+拒绝服务攻击	ju jue fu wu gong ji	600
+分布式拒绝服务	fen bu shi ju jue fu wu	600
+洪水攻击	hong shui gong ji	600
+重放攻击	zhong fang gong ji	600
+暴力破解	bao li po jie	600
+撞库攻击	zhuang ku gong ji	600
+字典攻击	zi dian gong ji	600
+社会工程学	she hui gong cheng xue	600
+钓鱼网站	diao yu wang zhan	600
+勒索软件	le suo ruan jian	600
+后门程序	hou men cheng xu	600
+零日漏洞	ling ri lou dong	600
+高危漏洞	gao wei lou dong	600
+渗透测试	shen tou ce shi	600
+漏洞扫描	lou dong sao miao	600
+安全审计	an quan shen ji	600
+抓包分析	zhua bao fen xi	600
+数据包嗅探	shu ju bao xiu tan	600
+基于角色	ji yu jue se	600
+最小权限原则	zui xiao quan xian yuan ze	600
+数据脱敏	shu ju tuo min	600
+端到端加密	duan dao duan jia mi	600
+加盐哈希	jia yan ha xi	600
+数据库系统	shu ju ku xi tong	600
+关系型数据库	guan xi xing shu ju ku	600
+非关系型数据库	fei guan xi xing shu ju ku	600
+内存数据库	nei cun shu ju ku	600
+时序数据库	shi xu shu ju ku	600
+图数据库	tu shu ju ku	600
+文档数据库	wen dang shu ju ku	600
+键值数据库	jian zhi shu ju ku	600
+列式数据库	lie shi shu ju ku	600
+向量数据库	xiang liang shu ju ku	600
+分布式数据库	fen bu shi shu ju ku	600
+云数据库	yun shu ju ku	600
+字段类型	zi duan lei xing	600
+主键索引	zhu jian suo yin	600
+唯一索引	wei yi suo yin	600
+普通索引	pu tong suo yin	600
+联合索引	lian he suo yin	600
+复合索引	fu he suo yin	600
+全文索引	quan wen suo yin	600
+空间索引	kong jian suo yin	600
+前缀索引	qian zhui suo yin	600
+哈希索引	ha xi suo yin	600
+聚簇索引	ju cu suo yin	600
+非聚簇索引	fei ju cu suo yin	600
+二级索引	er ji suo yin	600
+辅助索引	fu zhu suo yin	600
+覆盖索引	fu gai suo yin	600
+索引下推	suo yin xia tui	600
+回表查询	hui biao cha xun	600
+最左前缀原则	zui zuo qian zhui yuan ze	600
+索引失效	suo yin shi xiao	600
+外键约束	wai jian yue shu	600
+唯一约束	wei yi yue shu	600
+非空约束	fei kong yue shu	600
+默认约束	mo ren yue shu	600
+检查约束	jian cha yue shu	600
+自增主键	zi zeng zhu jian	600
+全局唯一标识	quan ju wei yi biao shi	600
+雪花算法	xue hua suan fa	600
+范式理论	fan shi li lun	600
+第一范式	di yi fan shi	600
+第二范式	di er fan shi	600
+第三范式	di san fan shi	600
+巴斯范式	ba si fan shi	600
+反范式化	fan fan shi hua	600
+字段冗余	zi duan rong yu	600
+结构化查询语言	jie gou hua cha xun yu yan	600
+数据定义语言	shu ju ding yi yu yan	600
+数据操纵语言	shu ju cao zong yu yan	600
+数据查询语言	shu ju cha xun yu yan	600
+数据控制语言	shu ju kong zhi yu yan	600
+增删改查	zeng shan gai cha	600
+联表查询	lian biao cha xun	600
+内连接	nei lian jie	600
+左连接	zuo lian jie	600
+右连接	you lian jie	600
+全外连接	quan wai lian jie	600
+交叉连接	jiao cha lian jie	600
+自连接	zi lian jie	600
+子查询	zi cha xun	600
+关联子查询	guan lian zi cha xun	600
+窗口函数	chuang kou han shu	600
+分组查询	fen zu cha xun	600
+排序查询	pai xu cha xun	600
+分页查询	fen ye cha xun	600
+游标查询	you biao cha xun	600
+数据库视图	shu ju ku shi tu	600
+物化视图	wu hua shi tu	600
+临时表	lin shi biao	600
+表空间	biao kong jian	600
+数据页	shu ju ye	600
+缓冲池	huan chong chi	600
+存储引擎	cun chu yin qing	600
+原子性	yuan zi xing	600
+隔离性	ge li xing	600
+事务隔离级别	shi wu ge li ji bie	600
+读未提交	du wei ti jiao	600
+读已提交	du yi ti jiao	600
+可重复读	ke chong fu du	600
+串行化	chuan xing hua	600
+脏读问题	zang du wen ti	600
+不可重复读	bu ke chong fu du	600
+幻读问题	huan du wen ti	600
+多版本并发控制	duo ban ben bing fa kong zhi	600
+快照读	kuai zhao du	600
+当前读	dang qian du	600
+读视图	du shi tu	600
+隐藏列	yin cang lie	600
+回滚段	hui gun duan	600
+回滚日志	hui gun ri zhi	600
+重做日志	chong zuo ri zhi	600
+二进制日志	er jin zhi ri zhi	600
+慢查询日志	man cha xun ri zhi	600
+中继日志	zhong ji ri zhi	600
+预写式日志	yu xie shi ri zhi	600
+两阶段提交	liang jie duan ti jiao	600
+三阶段提交	san jie duan ti jiao	600
+补偿事务	bu chang shi wu	600
+分布式事务	fen bu shi shi wu	600
+最终一致性	zui zhong yi zhi xing	600
+强一致性	qiang yi zhi xing	600
+弱一致性	ruo yi zhi xing	600
+柔性事务	rou xing shi wu	600
+本地消息表	ben di xiao xi biao	600
+最大努力通知	zui da nu li tong zhi	600
+行级锁	hang ji suo	600
+表级锁	biao ji suo	600
+页级锁	ye ji suo	600
+意向锁	yi xiang suo	600
+记录锁	ji lu suo	600
+间隙锁	jian xi suo	600
+临键锁	lin jian suo	600
+插入意向锁	cha ru yi xiang suo	600
+元数据锁	yuan shu ju suo	600
+全局锁	quan ju suo	600
+查询优化器	cha xun you hua qi	600
+成本优化器	cheng ben you hua qi	600
+慢查询优化	man cha xun you hua	600
+全表扫描	quan biao sao miao	600
+索引扫描	suo yin sao miao	600
+连接池	lian jie chi	600
+主从复制	zhu cong fu zhi	600
+读写分离	du xie fen li	600
+主备切换	zhu bei qie huan	600
+双主架构	shuang zhu jia gou	600
+一主多从	yi zhu duo cong	600
+主从延迟	zhu cong yan chi	600
+分库分表	fen ku fen biao	600
+垂直分库	chui zhi fen ku	600
+垂直分表	chui zhi fen biao	600
+水平分库	shui ping fen ku	600
+水平分表	shui ping fen biao	600
+数据分片	shu ju fen pian	600
+分片键	fen pian jian	600
+冷热分离	leng re fen li	600
+数据归档	shu ju gui dang	600
+数据迁移	shu ju qian yi	600
+数据同步	shu ju tong bu	600
+全量备份	quan liang bei fen	600
+增量备份	zeng liang bei fen	600
+差异备份	cha yi bei fen	600
+冷备份	leng bei fen	600
+热备份	re bei fen	600
+容灾恢复	rong zai hui fu	600
+两地三中心	liang di san zhong xin	600
+异地多活	yi di duo huo	600
+同城双活	tong cheng shuang huo	600
+缓存穿透	huan cun chuan tou	600
+缓存击穿	huan cun ji chuan	600
+缓存雪崩	huan cun xue beng	600
+缓存预热	huan cun yu re	600
+缓存降级	huan cun jiang ji	600
+缓存淘汰	huan cun tao tai	600
+缓存更新	huan cun geng xin	600
+旁路缓存	pang lu huan cun	600
+读写穿透	du xie chuan tou	600
+异步回写	yi bu hui xie	600
+延时双删	yan shi shuang shan	600
+分布式锁	fen bu shi suo	600
+分布式缓存	fen bu shi huan cun	600
+持久化机制	chi jiu hua ji zhi	600
+内存快照	nei cun kuai zhao	600
+追加文件	zhui jia wen jian	600
+过期删除	guo qi shan chu	600
+惰性删除	duo xing shan chu	600
+定期删除	ding qi shan chu	600
+内存淘汰策略	nei cun tao tai ce lve	600
+发布订阅	fa bu ding yue	600
+哨兵模式	shao bing mo shi	600
+集群模式	ji qun mo shi	600
+哈希槽	ha xi cao	600
+故障转移	gu zhang zhuan yi	600
+主节点	zhu jie dian	600
+从节点	cong jie dian	600
+脑裂问题	nao lie wen ti	600
+倒排索引	dao pai suo yin	600
+分词器	fen ci qi	600
+相关性算分	xiang guan xing suan fen	600
+数据湖	shu ju hu	600
+数据集市	shu ju ji shi	600
+数据清洗	shu ju qing xi	600
+数据抽取	shu ju chou qu	600
+数据转换	shu ju zhuan huan	600
+数据加载	shu ju jia zai	600
+流处理	liu chu li	600
+实时计算	shi shi ji suan	600
+离线计算	li xian ji suan	600
+对象存储	dui xiang cun chu	600
+块存储	kuai cun chu	600
+文件存储	wen jian cun chu	600
+分布式文件系统	fen bu shi wen jian xi tong	600
+副本机制	fu ben ji zhi	600
+纠删码	jiu shan ma	600
+共识算法	gong shi suan fa	600
+拜占庭容错	bai zhan ting rong cuo	600
+领导者选举	ling dao zhe xuan ju	600
+日志复制	ri zhi fu zhi	600
+前端开发	qian duan kai fa	600
+后端开发	hou duan kai fa	600
+全栈开发	quan zhan kai fa	600
+客户端开发	ke hu duan kai fa	600
+服务端开发	fu wu duan kai fa	600
+移动端开发	yi dong duan kai fa	600
+跨平台开发	kua ping tai kai fa	600
+混合开发	hun he kai fa	600
+原生开发	yuan sheng kai fa	600
+小程序开发	xiao cheng xu kai fa	600
+桌面端开发	zhuo mian duan kai fa	600
+文档对象模型	wen dang dui xiang mo xing	600
+浏览器对象模型	liu lan qi dui xiang mo xing	600
+虚拟节点	xu ni jie dian	600
+差异对比	cha yi dui bi	600
+组件化开发	zu jian hua kai fa	600
+模块化开发	mo kuai hua kai fa	600
+单文件组件	dan wen jian zu jian	600
+受控组件	shou kong zu jian	600
+非受控组件	fei shou kong zu jian	600
+高阶组件	gao jie zu jian	600
+函数组件	han shu zu jian	600
+类组件	lei zu jian	600
+异步组件	yi bu zu jian	600
+插槽机制	cha cao ji zhi	600
+具名插槽	ju ming cha cao	600
+作用域插槽	zuo yong yu cha cao	600
+单向数据流	dan xiang shu ju liu	600
+双向数据绑定	shuang xiang shu ju bang ding	600
+数据劫持	shu ju jie chi	600
+响应式原理	xiang ying shi yuan li	600
+计算属性	ji suan shu xing	600
+侦听器	zhen ting qi	600
+钩子函数	gou zi han shu	600
+自定义指令	zi ding yi zhi ling	600
+状态管理	zhuang tai guan li	600
+全局状态	quan ju zhuang tai	600
+路由守卫	lu you shou wei	600
+前端路由	qian duan lu you	600
+动态路由匹配	dong tai lu you pi pei	600
+嵌套路由	qian tao lu you	600
+编程式导航	bian cheng shi dao hang	600
+历史记录模式	li shi ji lu mo shi	600
+哈希模式	ha xi mo shi	600
+单页应用	dan ye ying yong	600
+多页应用	duo ye ying yong	600
+服务端渲染	fu wu duan xuan ran	600
+客户端渲染	ke hu duan xuan ran	600
+静态站点生成	jing tai zhan dian sheng cheng	600
+增量静态再生	zeng liang jing tai zai sheng	600
+同构渲染	tong gou xuan ran	600
+水合过程	shui he guo cheng	600
+流式渲染	liu shi xuan ran	600
+微前端	wei qian duan	600
+沙箱隔离	sha xiang ge li	600
+样式隔离	yang shi ge li	600
+应用通信	ying yong tong xin	600
+盒模型	he mo xing	600
+标准盒模型	biao zhun he mo xing	600
+怪异盒模型	guai yi he mo xing	600
+弹性布局	tan xing bu ju	600
+网格布局	wang ge bu ju	600
+流式布局	liu shi bu ju	600
+瀑布流布局	pu bu liu bu ju	600
+响应式布局	xiang ying shi bu ju	600
+自适应布局	zi shi ying bu ju	600
+圣杯布局	sheng bei bu ju	600
+双飞翼布局	shuang fei yi bu ju	600
+浮动布局	fu dong bu ju	600
+清除浮动	qing chu fu dong	600
+块级格式化	kuai ji ge shi hua	600
+层叠上下文	ceng die shang xia wen	600
+文档流	wen dang liu	600
+绝对定位	jue dui ding wei	600
+相对定位	xiang dui ding wei	600
+固定定位	gu ding ding wei	600
+粘性定位	zhan xing ding wei	600
+媒体查询	mei ti cha xun	600
+视口单位	shi kou dan wei	600
+像素密度	xiang su mi du	600
+设备像素比	she bei xiang su bi	600
+重排重绘	chong pai chong hui	600
+回流重绘	hui liu chong hui	600
+合成层	he cheng ceng	600
+事件冒泡	shi jian mao pao	600
+事件捕获	shi jian bu huo	600
+事件委托	shi jian wei tuo	600
+事件代理	shi jian dai li	600
+事件循环	shi jian xun huan	600
+宏任务	hong ren wu	600
+微任务	wei ren wu	600
+执行栈	zhi xing zhan	600
+任务队列	ren wu dui lie	600
+异步请求	yi bu qing qiu	600
+异步等待	yi bu deng dai	600
+防抖函数	fang dou han shu	600
+节流函数	jie liu han shu	600
+函数柯里化	han shu ke li hua	600
+偏函数	pian han shu	600
+原型链	yuan xing lian	600
+原型继承	yuan xing ji cheng	600
+闭包特性	bi bao te xing	600
+变量提升	bian liang ti sheng	600
+暂时性死区	zan shi xing si qu	600
+严格模式	yan ge mo shi	600
+摇树优化	yao shu you hua	600
+代码分割	dai ma fen ge	600
+按需加载	an xu jia zai	600
+懒加载	lan jia zai	600
+预加载	yu jia zai	600
+预渲染	yu xuan ran	600
+骨架屏	gu jia ping	600
+虚拟列表	xu ni lie biao	600
+无限滚动	wu xian gun dong	600
+雪碧图	xue bi tu	600
+字体图标	zi ti tu biao	600
+矢量图形	shi liang tu xing	600
+画布绘图	hua bu hui tu	600
+暗黑模式	an hei mo shi	600
+主题切换	zhu ti qie huan	600
+无障碍访问	wu zhang ai fang wen	600
+搜索引擎优化	sou suo yin qing you hua	600
+首屏加载	shou ping jia zai	600
+白屏时间	bai ping shi jian	600
+首字节时间	shou zi jie shi jian	600
+最大内容绘制	zui da nei rong hui zhi	600
+首次输入延迟	shou ci shu ru yan chi	600
+累积布局偏移	lei ji bu ju pian yi	600
+本地存储	ben di cun chu	600
+会话存储	hui hua cun chu	600
+强缓存	qiang huan cun	600
+协商缓存	xie shang huan cun	600
+服务工作线程	fu wu gong zuo xian cheng	600
+渐进式应用	jian jin shi ying yong	600
+后台工作线程	hou tai gong zuo xian cheng	600
+控制器层	kong zhi qi ceng	600
+业务逻辑层	ye wu luo ji ceng	600
+数据访问层	shu ju fang wen ceng	600
+持久层	chi jiu ceng	600
+表现层	biao xian ceng	600
+对象关系映射	dui xiang guan xi ying she	600
+数据传输对象	shu ju chuan shu dui xiang	600
+数据访问对象	shu ju fang wen dui xiang	600
+值对象	zhi dui xiang	600
+控制反转	kong zhi fan zhuan	600
+依赖注入	yi lai zhu ru	600
+依赖查找	yi lai cha zhao	600
+切面编程	qie mian bian cheng	600
+连接点	lian jie dian	600
+通知增强	tong zhi zeng qiang	600
+动态代理	dong tai dai li	600
+静态代理	jing tai dai li	600
+字节码增强	zi jie ma zeng qiang	600
+拦截器	lan jie qi	600
+管道流	guan dao liu	600
+路由分发	lu you fen fa	600
+参数校验	can shu jiao yan	600
+数据绑定	shu ju bang ding	600
+统一异常处理	tong yi yi chang chu li	600
+接口文档	jie kou wen dang	600
+接口联调	jie kou lian tiao	600
+远程过程调用	yuan cheng guo cheng diao yong	600
+表现层状态转换	biao xian ceng zhuang tai zhuan huan	600
+开放平台	kai fang ping tai	600
+接口网关	jie kou wang guan	600
+协议转换	xie yi zhuan huan	600
+服务注册	fu wu zhu ce	600
+服务发现	fu wu fa xian	600
+配置中心	pei zhi zhong xin	600
+注册中心	zhu ce zhong xin	600
+服务治理	fu wu zhi li	600
+服务熔断	fu wu rong duan	600
+服务降级	fu wu jiang ji	600
+服务限流	fu wu xian liu	600
+熔断器	rong duan qi	600
+限流算法	xian liu suan fa	600
+令牌桶算法	ling pai tong suan fa	600
+漏桶算法	lou tong suan fa	600
+计数器限流	ji shu qi xian liu	600
+滑动窗口限流	hua dong chuang kou xian liu	600
+超时控制	chao shi kong zhi	600
+重试机制	chong shi ji zhi	600
+退避策略	tui bi ce lve	600
+指数退避	zhi shu tui bi	600
+幂等性	mi deng xing	600
+接口幂等	jie kou mi deng	600
+防重放	fang chong fang	600
+防抖提交	fang dou ti jiao	600
+消息中间件	xiao xi zhong jian jian	600
+消费者组	xiao fei zhe zu	600
+消息主题	xiao xi zhu ti	600
+消息分区	xiao xi fen qu	600
+死信队列	si xin dui lie	600
+延迟队列	yan chi dui lie	600
+优先级队列	you xian ji dui lie	600
+事务消息	shi wu xiao xi	600
+顺序消息	shun xu xiao xi	600
+消息积压	xiao xi ji ya	600
+消息丢失	xiao xi diu shi	600
+重复消费	chong fu xiao fei	600
+消息确认	xiao xi que ren	600
+流量削峰	liu liang xue feng	600
+异步解耦	yi bu jie ou	600
+事件总线	shi jian zong xian	600
+定时任务	ding shi ren wu	600
+分布式调度	fen bu shi diao du	600
+任务分片	ren wu fen pian	600
+工作流引擎	gong zuo liu yin qing	600
+规则引擎	gui ze yin qing	600
+模板引擎	mu ban yin qing	600
+报表引擎	bao biao yin qing	600
+系统架构	xi tong jia gou	600
+架构设计	jia gou she ji	600
+技术选型	ji shu xuan xing	600
+需求规格说明	xu qiu gui ge shuo ming	600
+概要设计	gai yao she ji	600
+详细设计	xiang xi she ji	600
+领域驱动设计	ling yu qu dong she ji	600
+限界上下文	xian jie shang xia wen	600
+聚合根	ju he gen	600
+领域事件	ling yu shi jian	600
+领域服务	ling yu fu wu	600
+基础设施层	ji chu she shi ceng	600
+防腐层	fang fu ceng	600
+统一语言	tong yi yu yan	600
+贫血模型	pin xue mo xing	600
+充血模型	chong xue mo xing	600
+六边形架构	liu bian xing jia gou	600
+洋葱架构	yang cong jia gou	600
+整洁架构	zheng jie jia gou	600
+分层架构	fen ceng jia gou	600
+单体架构	dan ti jia gou	600
+分布式架构	fen bu shi jia gou	600
+微服务架构	wei fu wu jia gou	600
+面向服务架构	mian xiang fu wu jia gou	600
+无服务器架构	wu fu wu qi jia gou	600
+事件驱动架构	shi jian qu dong jia gou	600
+插件化架构	cha jian hua jia gou	600
+微内核架构	wei nei he jia gou	600
+读写分离架构	du xie fen li jia gou	600
+命令查询分离	ming ling cha xun fen li	600
+事件溯源	shi jian su yuan	600
+高并发	gao bing fa	600
+高可用	gao ke yong	600
+可伸缩性	ke shen suo xing	600
+可维护性	ke wei hu xing	600
+可观测性	ke guan ce xing	600
+可测试性	ke ce shi xing	600
+高内聚低耦合	gao nei ju di ou he	600
+单一职责原则	dan yi zhi ze yuan ze	600
+开闭原则	kai bi yuan ze	600
+里氏替换原则	li shi ti huan yuan ze	600
+接口隔离原则	jie kou ge li yuan ze	600
+依赖倒置原则	yi lai dao zhi yuan ze	600
+迪米特法则	di mi te fa ze	600
+合成复用原则	he cheng fu yong yuan ze	600
+创建型模式	chuang jian xing mo shi	600
+结构型模式	jie gou xing mo shi	600
+行为型模式	xing wei xing mo shi	600
+懒汉式	lan han shi	600
+饿汉式	e han shi	600
+双重检查锁	shuang chong jian cha suo	600
+工厂方法模式	gong chang fang fa mo shi	600
+抽象工厂模式	chou xiang gong chang mo shi	600
+简单工厂	jian dan gong chang	600
+建造者模式	jian zao zhe mo shi	600
+原型模式	yuan xing mo shi	600
+适配器模式	shi pei qi mo shi	600
+桥接模式	qiao jie mo shi	600
+组合模式	zu he mo shi	600
+装饰器模式	zhuang shi qi mo shi	600
+外观模式	wai guan mo shi	600
+门面模式	men mian mo shi	600
+享元模式	xiang yuan mo shi	600
+代理模式	dai li mo shi	600
+责任链模式	ze ren lian mo shi	600
+命令模式	ming ling mo shi	600
+解释器模式	jie shi qi mo shi	600
+迭代器模式	die dai qi mo shi	600
+中介者模式	zhong jie zhe mo shi	600
+备忘录模式	bei wang lu mo shi	600
+观察者模式	guan cha zhe mo shi	600
+状态模式	zhuang tai mo shi	600
+策略模式	ce lve mo shi	600
+模板方法模式	mu ban fang fa mo shi	600
+访问者模式	fang wen zhe mo shi	600
+敏捷开发	min jie kai fa	600
+极限编程	ji xian bian cheng	600
+测试驱动开发	ce shi qu dong kai fa	600
+行为驱动开发	xing wei qu dong kai fa	600
+结对编程	jie dui bian cheng	600
+瀑布模型	pu bu mo xing	600
+螺旋模型	luo xuan mo xing	600
+迭代开发	die dai kai fa	600
+增量开发	zeng liang kai fa	600
+每日站会	mei ri zhan hui	600
+迭代计划会	die dai ji hua hui	600
+迭代评审会	die dai ping shen hui	600
+迭代回顾会	die dai hui gu hui	600
+用户故事	yong hu gu shi	600
+任务看板	ren wu kan ban	600
+燃尽图	ran jin tu	600
+产品待办列表	chan pin dai ban lie biao	600
+代码审查	dai ma shen cha	600
+代码走查	dai ma zou cha	600
+代码规范	dai ma gui fan	600
+编码规范	bian ma gui fan	600
+静态代码分析	jing tai dai ma fen xi	600
+代码重构	dai ma chong gou	600
+技术债务	ji shu zhai wu	600
+坏味道	huai wei dao	600
+重复代码	chong fu dai ma	600
+圈复杂度	quan fu za du	600
+认知复杂度	ren zhi fu za du	600
+集成测试	ji cheng ce shi	600
+验收测试	yan shou ce shi	600
+回归测试	hui gui ce shi	600
+冒烟测试	mao yan ce shi	600
+黑盒测试	hei he ce shi	600
+白盒测试	bai he ce shi	600
+灰盒测试	hui he ce shi	600
+边界值分析	bian jie zhi fen xi	600
+等价类划分	deng jia lei hua fen	600
+基准测试	ji zhun ce shi	600
+负载测试	fu zai ce shi	600
+并发测试	bing fa ce shi	600
+稳定性测试	wen ding xing ce shi	600
+自动化测试	zi dong hua ce shi	600
+端到端测试	duan dao duan ce shi	600
+测试覆盖率	ce shi fu gai lv	600
+行覆盖率	hang fu gai lv	600
+分支覆盖率	fen zhi fu gai lv	600
+断言库	duan yan ku	600
+桩函数	zhuang han shu	600
+模拟对象	mo ni dui xiang	600
+测试夹具	ce shi jia ju	600
+测试套件	ce shi tao jian	600
+测试报告	ce shi bao gao	600
+缺陷跟踪	que xian gen zong	600
+最小可行产品	zui xiao ke xing chan pin	600
+概念验证	gai nian yan zheng	600
+统一建模语言	tong yi jian mo yu yan	600
+类图设计	lei tu she ji	600
+时序图	shi xu tu	600
+用例图	yong li tu	600
+状态图	zhuang tai tu	600
+架构图	jia gou tu	600
+实体关系图	shi ti guan xi tu	600
+开源许可证	kai yuan xu ke zheng	600
+知识共享协议	zhi shi gong xiang xie yi	600
+向后兼容	xiang hou jian rong	600
+向前兼容	xiang qian jian rong	600
+破坏性更新	po huai xing geng xin	600
+语义化版本	yu yi hua ban ben	600
+版本控制	ban ben kong zhi	600
+分布式版本控制	fen bu shi ban ben kong zhi	600
+集中式版本控制	ji zhong shi ban ben kong zhi	600
+代码仓库	dai ma cang ku	600
+远程仓库	yuan cheng cang ku	600
+本地仓库	ben di cang ku	600
+暂存区	zan cun qu	600
+版本库	ban ben ku	600
+克隆仓库	ke long cang ku	600
+拉取代码	la qu dai ma	600
+推送代码	tui song dai ma	600
+抓取更新	zhua qu geng xin	600
+提交记录	ti jiao ji lu	600
+提交信息	ti jiao xin xi	600
+哈希值	ha xi zhi	600
+分支管理	fen zhi guan li	600
+主分支	zhu fen zhi	600
+开发分支	kai fa fen zhi	600
+特性分支	te xing fen zhi	600
+功能分支	gong neng fen zhi	600
+发布分支	fa bu fen zhi	600
+热修复分支	re xiu fu fen zhi	600
+创建分支	chuang jian fen zhi	600
+切换分支	qie huan fen zhi	600
+合并分支	he bing fen zhi	600
+快进合并	kuai jin he bing	600
+三方合并	san fang he bing	600
+变基操作	bian ji cao zuo	600
+交互式变基	jiao hu shi bian ji	600
+压缩提交	ya suo ti jiao	600
+拣选提交	jian xuan ti jiao	600
+合并冲突	he bing chong tu	600
+解决冲突	jie jue chong tu	600
+冲突标记	chong tu biao ji	600
+代码回滚	dai ma hui gun	600
+版本回退	ban ben hui tui	600
+重置操作	chong zhi cao zuo	600
+撤销提交	che xiao ti jiao	600
+暂存修改	zan cun xiu gai	600
+储藏更改	chu cang geng gai	600
+标签管理	biao qian guan li	600
+打标签	da biao qian	600
+合并请求	he bing qing qiu	600
+拉取请求	la qu qing qiu	600
+派生仓库	pai sheng cang ku	600
+同步上游	tong bu shang you	600
+子模块	zi mo kuai	600
+子树合并	zi shu he bing	600
+工作树	gong zuo shu	600
+忽略文件	hu lve wen jian	600
+钩子脚本	gou zi jiao ben	600
+提交历史	ti jiao li shi	600
+二分排查	er fen pai cha	600
+代码追溯	dai ma zhui su	600
+差异比较	cha yi bi jiao	600
+补丁文件	bu ding wen jian	600
+单一代码库	dan yi dai ma ku	600
+多代码库	duo dai ma ku	600
+集成开发环境	ji cheng kai fa huan jing	600
+代码编辑器	dai ma bian ji qi	600
+命令行工具	ming ling hang gong ju	600
+终端模拟器	zhong duan mo ni qi	600
+包管理器	bao guan li qi	600
+依赖管理	yi lai guan li	600
+锁文件	suo wen jian	600
+幽灵依赖	you ling yi lai	600
+循环依赖	xun huan yi lai	600
+版本冲突	ban ben chong tu	600
+镜像源	jing xiang yuan	600
+私有仓库	si you cang ku	600
+构建工具	gou jian gong ju	600
+打包工具	da bao gong ju	600
+增量构建	zeng liang gou jian	600
+热模块替换	re mo kuai ti huan	600
+热更新	re geng xin	600
+热重载	re chong zai	600
+实时重载	shi shi chong zai	600
+源码映射	yuan ma ying she	600
+代码压缩	dai ma ya suo	600
+代码混淆	dai ma hun xiao	600
+代码格式化	dai ma ge shi hua	600
+语法高亮	yu fa gao liang	600
+智能补全	zhi neng bu quan	600
+断点调试	duan dian tiao shi	600
+条件断点	tiao jian duan dian	600
+单步调试	dan bu tiao shi	600
+单步跳过	dan bu tiao guo	600
+单步进入	dan bu jin ru	600
+单步跳出	dan bu tiao chu	600
+调用堆栈	diao yong dui zhan	600
+变量监视	bian liang jian shi	600
+内存分析	nei cun fen xi	600
+性能剖析	xing neng pou xi	600
+火焰图	huo yan tu	600
+抓包工具	zhua bao gong ju	600
+代理工具	dai li gong ju	600
+接口测试工具	jie kou ce shi gong ju	600
+数据库客户端	shu ju ku ke hu duan	600
+远程连接	yuan cheng lian jie	600
+虚拟环境	xu ni huan jing	600
+命令行参数	ming ling hang can shu	600
+正则表达式测试	zheng ze biao da shi ce shi	600
+内联提示	nei lian ti shi	600
+跳转定义	tiao zhuan ding yi	600
+查找引用	cha zhao yin yong	600
+全局搜索	quan ju sou suo	600
+批量重命名	pi liang chong ming ming	600
+多光标编辑	duo guang biao bian ji	600
+宏录制	hong lu zhi	600
+快捷键绑定	kuai jie jian bang ding	600
+插件市场	cha jian shi chang	600
+扩展插件	kuo zhan cha jian	600
+语言服务器协议	yu yan fu wu qi xie yi	600
+调试器适配器	tiao shi qi shi pei qi	600
+云原生	yun yuan sheng	600
+公有云	gong you yun	600
+私有云	si you yun	600
+混合云	hun he yun	600
+多云部署	duo yun bu shu	600
+基础设施即服务	ji chu she shi ji fu wu	600
+平台即服务	ping tai ji fu wu	600
+软件即服务	ruan jian ji fu wu	600
+函数即服务	han shu ji fu wu	600
+基础设施即代码	ji chu she shi ji dai ma	600
+不可变基础设施	bu ke bian ji chu she shi	600
+虚拟化技术	xu ni hua ji shu	600
+虚拟机监控器	xu ni ji jian kong qi	600
+宿主机	su zhu ji	600
+热迁移	re qian yi	600
+容器化	rong qi hua	600
+容器技术	rong qi ji shu	600
+容器镜像	rong qi jing xiang	600
+基础镜像	ji chu jing xiang	600
+镜像仓库	jing xiang cang ku	600
+镜像分层	jing xiang fen ceng	600
+多阶段构建	duo jie duan gou jian	600
+联合文件系统	lian he wen jian xi tong	600
+控制组	kong zhi zu	600
+资源隔离	zi yuan ge li	600
+资源限制	zi yuan xian zhi	600
+数据卷	shu ju juan	600
+挂载目录	gua zai mu lu	600
+容器编排	rong qi bian pai	600
+容器集群	rong qi ji qun	600
+控制平面	kong zhi ping mian	600
+工作节点	gong zuo jie dian	600
+管理节点	guan li jie dian	600
+容器组	rong qi zu	600
+副本集	fu ben ji	600
+无状态工作负载	wu zhuang tai gong zuo fu zai	600
+有状态工作负载	you zhuang tai gong zuo fu zai	600
+守护进程集	shou hu jin cheng ji	600
+定时任务集	ding shi ren wu ji	600
+服务暴露	fu wu bao lu	600
+集群内部地址	ji qun nei bu di zhi	600
+节点端口	jie dian duan kou	600
+入口网关	ru kou wang guan	600
+入口控制器	ru kou kong zhi qi	600
+配置映射	pei zhi ying she	600
+保密字典	bao mi zi dian	600
+持久卷	chi jiu juan	600
+持久卷声明	chi jiu juan sheng ming	600
+存储类	cun chu lei	600
+动态卷供应	dong tai juan gong ying	600
+服务账户	fu wu zhang hu	600
+网络策略	wang luo ce lve	600
+资源配额	zi yuan pei e	600
+水平自动扩缩容	shui ping zi dong kuo suo rong	600
+垂直自动扩缩容	chui zhi zi dong kuo suo rong	600
+集群自动扩缩容	ji qun zi dong kuo suo rong	600
+弹性伸缩	tan xing shen suo	600
+扩容缩容	kuo rong suo rong	600
+节点亲和性	jie dian qin he xing	600
+反亲和性	fan qin he xing	600
+污点容忍	wu dian rong ren	600
+节点选择器	jie dian xuan ze qi	600
+存活探针	cun huo tan zhen	600
+就绪探针	jiu xu tan zhen	600
+启动探针	qi dong tan zhen	600
+健康检查	jian kang jian cha	600
+优雅停机	you ya ting ji	600
+优雅下线	you ya xia xian	600
+平滑重启	ping hua chong qi	600
+服务网格	fu wu wang ge	600
+边车模式	bian che mo shi	600
+数据平面	shu ju ping mian	600
+流量镜像	liu liang jing xiang	600
+流量染色	liu liang ran se	600
+全链路压测	quan lian lu ya ce	600
+全链路追踪	quan lian lu zhui zong	600
+分布式追踪	fen bu shi zhui zong	600
+调用链追踪	diao yong lian zhui zong	600
+链路追踪	lian lu zhui zong	600
+持续集成	chi xu ji cheng	600
+持续交付	chi xu jiao fu	600
+持续部署	chi xu bu shu	600
+构建流水线	gou jian liu shui xian	600
+制品库	zhi pin ku	600
+灰度发布	hui du fa bu	600
+金丝雀发布	jin si que fa bu	600
+蓝绿部署	lan lv bu shu	600
+滚动更新	gun dong geng xin	600
+暗发布	an fa bu	600
+分批发布	fen pi fa bu	600
+一键回滚	yi jian hui gun	600
+开发运维一体化	kai fa yun wei yi ti hua	600
+站点可靠性工程	zhan dian ke kao xing gong cheng	600
+混沌工程	hun dun gong cheng	600
+故障注入	gu zhang zhu ru	600
+故障演练	gu zhang yan lian	600
+服务等级协议	fu wu deng ji xie yi	600
+服务等级目标	fu wu deng ji mu biao	600
+服务等级指标	fu wu deng ji zhi biao	600
+平均无故障时间	ping jun wu gu zhang shi jian	600
+平均修复时间	ping jun xiu fu shi jian	600
+恢复时间目标	hui fu shi jian mu biao	600
+恢复点目标	hui fu dian mu biao	600
+监控告警	jian kong gao jing	600
+指标采集	zhi biao cai ji	600
+日志收集	ri zhi shou ji	600
+日志聚合	ri zhi ju he	600
+告警风暴	gao jing feng bao	600
+告警收敛	gao jing shou lian	600
+告警升级	gao jing sheng ji	600
+值班轮换	zhi ban lun huan	600
+应急响应	ying ji xiang ying	600
+故障排查	gu zhang pai cha	600
+根因分析	gen yin fen xi	600
+事后复盘	shi hou fu pan	600
+堡垒机	bao lei ji	600
+跳板机	tiao ban ji	600
+物理机	wu li ji	600
+裸金属服务器	luo jin shu fu wu qi	600
+云主机	yun zhu ji	600
+虚拟私有云	xu ni si you yun	600
+安全组	an quan zu	600
+弹性公网	tan xing gong wang	600
+按量计费	an liang ji fei	600
+包年包月	bao nian bao yue	600
+热启动	re qi dong	600
+前后端	qian hou duan	600
+前后端分离	qian hou duan fen li	600
+全栈工程师	quan zhan gong cheng shi	600
+全栈	quan zhan	600
+架构师	jia gou shi	600
+首席技术官	shou xi ji shu guan	600
+运维工程师	yun wei gong cheng shi	600
+算法工程师	suan fa gong cheng shi	600
+造轮子	zao lun zi	600
+重复造轮子	chong fu zao lun zi	600
+不要重复造轮子	bu yao chong fu zao lun zi	600
+屎山代码	shi shan dai ma	600
+祖传代码	zu chuan dai ma	600
+面条代码	mian tiao dai ma	600
+防御性编程	fang yu xing bian cheng	600
+面向接口编程	mian xiang jie kou bian cheng	600
+面向搜索引擎编程	mian xiang sou suo yin qing bian cheng	600
+面向复制粘贴编程	mian xiang fu zhi zhan tie bian cheng	600
+面向工资编程	mian xiang gong zi bian cheng	600
+面向监狱编程	mian xiang jian yu bian cheng	600
+摸鱼式重构	mo yu shi chong gou	600
+删库跑路	shan ku pao lu	600
+从入门到放弃	cong ru men dao fang qi	600
+从入门到精通	cong ru men dao jing tong	600
+调包侠	diao bao xia	600
+脚本小子	jiao ben xiao zi	600
+切图仔	qie tu zai	600
+背锅侠	bei guo xia	600
+救火队员	jiu huo dui yuan	600
+手撕代码	shou si dai ma	600
+白板编程	bai ban bian cheng	600
+技术面	ji shu mian	600
+终面	zhong mian	600
+发版	fa ban	600
+封版	feng ban	600
+提测	ti ce	600
+估时	gu shi	600
+需求评审	xu qiu ping shen	600
+需求变更	xu qiu bian geng	600
+砍需求	kan xu qiu	600
+加需求	jia xu qiu	600
+伪需求	wei xu qiu	600
+一句话需求	yi ju hua xu qiu	600
+画大饼	hua da bing	600
+对齐颗粒度	dui qi ke li du	600
+闭环	bi huan	600
+赋能	fu neng	600
+颗粒度	ke li du	600
+底层逻辑	di ceng luo ji	600
+顶层设计	ding ceng she ji	600
+降本增效	jiang ben zeng xiao	600
+跑通流程	pao tong liu cheng	600
+主流程	zhu liu cheng	600
+边界条件	bian jie tiao jian	600
+兜底方案	dou di fang an	600
+兜底逻辑	dou di luo ji	600
+容错处理	rong cuo chu li	600
+硬编码	ying bian ma	600
+魔术数字	mo shu shu zi	600
+魔法值	mo fa zhi	600
+语法糖	yu fa tang	600
+语法盐	yu fa yan	600
+全家桶	quan jia tong	600
+开箱即用	kai xiang ji yong	600
+杀鸡用牛刀	sha ji yong niu dao	600
+没有银弹	mei you yin dan	600
+过早优化	guo zao you hua	600
+奥卡姆剃刀	ao ka mu ti dao	600
+墨菲定律	mo fei ding lv	600
+康威定律	kang wei ding lv	600
+摩尔定律	mo er ding lv	600
+二八定律	er ba ding lv	600
+破窗效应	po chuang xiao ying	600
+小黄鸭调试法	xiao huang ya tiao shi fa	600
+橡皮鸭调试	xiang pi ya tiao shi	600
+玄学问题	xuan xue wen ti	600
+偶现问题	ou xian wen ti	600
+必现问题	bi xian wen ti	600
+无法复现	wu fa fu xian	600
+本地正常	ben di zheng chang	600
+线上故障	xian shang gu zhang	600
+生产事故	sheng chan shi gu	600
+预发环境	yu fa huan jing	600
+灰度环境	hui du huan jing	600
+测试环境	ce shi huan jing	600
+沙箱环境	sha xiang huan jing	600
+本地环境	ben di huan jing	600
+打断点	da duan dian	600
+打日志	da ri zhi	600
+看日志	kan ri zhi	600
+查日志	cha ri zhi	600
+清缓存	qing huan cun	600
+强刷	qiang shua	600
+重启大法	chong qi da fa	600
+重装系统	chong zhuang xi tong	600
+拧螺丝	ning luo si	600
+开源社区	kai yuan she qu	600
+闭源	bi yuan	600
+二开	er kai	600
+重构火葬场	chong gou huo zang chang	600
+能跑就行	neng pao jiu xing	600
+又不是不能用	you bu shi bu neng yong	600
+不要动它	bu yao dong ta	600
+注释掉	zhu shi diao	600
+写注释	xie zhu shi	600
+文档驱动开发	wen dang qu dong kai fa	600
+简历驱动开发	jian li qu dong kai fa	600
+重构代码	chong gou dai ma	600
+代码洁癖	dai ma jie pi	600
+命名困难症	ming ming kun nan zheng	600
+驼峰命名法	tuo feng ming ming fa	600
+大驼峰	da tuo feng	600
+小驼峰	xiao tuo feng	600
+蛇形命名法	she xing ming ming fa	600
+烤串命名法	kao chuan ming ming fa	600
+匈牙利命名法	xiong ya li ming ming fa	600
+缩进风格	suo jin feng ge	600
+空格党	kong ge dang	600
+制表符	zhi biao fu	600
+换行符	huan hang fu	600
+乱码问题	luan ma wen ti	600
+内存暴涨	nei cun bao zhang	600

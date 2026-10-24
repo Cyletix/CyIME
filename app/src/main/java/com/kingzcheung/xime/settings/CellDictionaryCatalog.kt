@@ -7,15 +7,34 @@ data class CellDictionaryOffer(val sourceId: Int, val name: String, val category
     val downloadUrl: String get() = "https://pinyin.sogou.com/d/dict/download_cell.php?id=$sourceId&name=$id"
 }
 
-/** Dictionaries shipped in the APK (assets/cell_dictionaries/cell_<id>.dict.yaml), enabled by default. */
-data class BuiltinCellDictionary(val id: String, val name: String, val category: String, val sourceUrl: String) {
+/**
+ * Dictionaries shipped in the APK: assets/cell_dictionaries/cell_<id>.dict.yaml, and cell_<id>.en.txt for
+ * their English words. Only [defaultOn] ones are switched on by themselves (once).
+ */
+data class BuiltinCellDictionary(
+    val id: String, val name: String, val category: String, val sourceUrl: String = "", val defaultOn: Boolean = false,
+) {
     val asset: String get() = "cell_dictionaries/cell_$id.dict.yaml"
+    val englishAsset: String get() = "cell_dictionaries/cell_$id.en.txt"
 }
 
 object CellDictionaryCatalog {
     const val BUILTIN_CATEGORY = "内置词库"
+    const val AI_CATEGORY = "编程与 AI"
+    // Built-ins share the big categories of the Sogou offers, so a category lists both.
     val builtins = listOf(
-        BuiltinCellDictionary("builtin_arknights", "明日方舟", BUILTIN_CATEGORY, "https://wiki.arkrec.com/"),
+        BuiltinCellDictionary("builtin_arknights", "明日方舟", "电子游戏", "https://wiki.arkrec.com/", defaultOn = true),
+        // tools/dictionaries/topics/build_topic_dict.py; Chinese words with their English names and IDs.
+        BuiltinCellDictionary("builtin_dota2", "Dota2", "电子游戏"),
+        BuiltinCellDictionary("builtin_cs2", "CS2 / CSGO", "电子游戏"),
+        BuiltinCellDictionary("builtin_acg", "二次元游戏（原神、星铁、鸣潮、终末地等）", "电子游戏"),
+        BuiltinCellDictionary("builtin_programming", "编程常用", AI_CATEGORY),
+        BuiltinCellDictionary("builtin_llm", "大模型", AI_CATEGORY),
+        BuiltinCellDictionary("builtin_ml", "机器学习", AI_CATEGORY),
+        BuiltinCellDictionary("builtin_math", "数学", "自然科学"),
+        BuiltinCellDictionary("builtin_wenshi", "文史", "人文科学"),
+        BuiltinCellDictionary("builtin_movie", "电影", "娱乐"),
+        BuiltinCellDictionary("builtin_anime", "动漫", "娱乐"),
     )
     const val SOURCE_URL = "https://pinyin.sogou.com/dict/"
     val offers = listOf(
@@ -23,6 +42,18 @@ object CellDictionaryCatalog {
         CellDictionaryOffer(11508, "风景名胜精选", "城市信息大全", 1279, 53140),
         CellDictionaryOffer(73918, "王者荣耀", "电子游戏", 740, 33810),
         CellDictionaryOffer(53593, "英雄联盟", "电子游戏", 1173, 45970),
+        // Added 2026-10-24 (counts and sizes from each detail page; downloads checked).
+        CellDictionaryOffer(180520, "原神（按版本更新）", "电子游戏", 22029, 812586),
+        CellDictionaryOffer(171143, "崩坏：星穹铁道", "电子游戏", 1525, 66354),
+        CellDictionaryOffer(170111, "鸣潮", "电子游戏", 546, 28266),
+        CellDictionaryOffer(169333, "绝区零", "电子游戏", 432, 24202),
+        CellDictionaryOffer(177728, "明日方舟：终末地", "电子游戏", 312, 20564),
+        CellDictionaryOffer(15202, "数学词汇大全", "自然科学", 15992, 557880),
+        CellDictionaryOffer(15130, "中国历史词汇大全", "人文科学", 20526, 586860),
+        CellDictionaryOffer(97640, "人工智能常用词", CellDictionaryCatalog.AI_CATEGORY, 737, 35898),
+        CellDictionaryOffer(176192, "AI 编程（Vibe coding）", CellDictionaryCatalog.AI_CATEGORY, 747, 33120),
+        CellDictionaryOffer(20652, "热门电影大全", "娱乐", 67101, 2240626),
+        CellDictionaryOffer(22537, "动漫名称大全", "娱乐", 65654, 575134),
         CellDictionaryOffer(15203, "物理词汇大全", "自然科学", 13107, 455528),
         CellDictionaryOffer(15205, "化学化工词汇大全", "自然科学", 13264, 479284),
         CellDictionaryOffer(15097, "成语俗语", "人文科学", 46785, 1645056),

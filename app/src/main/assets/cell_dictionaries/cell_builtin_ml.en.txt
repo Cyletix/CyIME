@@ -1,0 +1,647 @@
+PyTorch
+TensorFlow
+JAX
+Keras
+scikit-learn
+sklearn
+NumPy
+SciPy
+pandas
+Matplotlib
+Seaborn
+Plotly
+OpenCV
+Pillow
+torchvision
+torchaudio
+torchtext
+PyTorch Lightning
+Hugging Face
+Transformers
+Diffusers
+Datasets
+Tokenizers
+Accelerate
+PEFT
+TRL
+BitsAndBytes
+Optimum
+vLLM
+SGLang
+TensorRT
+TensorRT-LLM
+ONNX
+ONNX Runtime
+OpenVINO
+TVM
+Triton
+XLA
+CUDA
+cuDNN
+cuBLAS
+NCCL
+ROCm
+OpenCL
+Vulkan
+CoreML
+TFLite
+NCNN
+MNN
+TNN
+PaddlePaddle
+PaddleOCR
+PaddleDetection
+MindSpore
+MegEngine
+Jittor
+OneFlow
+Caffe
+Caffe2
+Theano
+MXNet
+Chainer
+CNTK
+Darknet
+FastAI
+Flax
+Haiku
+Optax
+Equinox
+einops
+timm
+MMCV
+MMDetection
+MMSegmentation
+MMPreTrain
+MMClassification
+MMAction2
+MMOCR
+MMPose
+MMDetection3D
+Detectron2
+Ultralytics
+Albumentations
+kornia
+spaCy
+NLTK
+Gensim
+FastText
+SentencePiece
+tiktoken
+Jieba
+HanLP
+Stanza
+Fairseq
+AllenNLP
+LangChain
+LlamaIndex
+AutoGen
+CrewAI
+Dify
+Ollama
+llama.cpp
+GGUF
+GGML
+ExLlamaV2
+AutoGPTQ
+AutoAWQ
+DeepSpeed
+Megatron-LM
+Colossal-AI
+Horovod
+Ray
+Weights & Biases
+wandb
+TensorBoard
+MLflow
+Optuna
+Hyperopt
+Ray Tune
+XGBoost
+LightGBM
+CatBoost
+Statsmodels
+Prophet
+PyG
+PyTorch Geometric
+DGL
+NetworkX
+Faiss
+Milvus
+Qdrant
+Chroma
+Weaviate
+Pinecone
+Annoy
+HNSW
+ScaNN
+Gymnasium
+OpenAI Gym
+Stable Baselines3
+RLlib
+MuJoCo
+Isaac Gym
+Gradio
+Streamlit
+FastAPI
+BentoML
+KServe
+Docker
+Kubernetes
+Slurm
+LeNet
+AlexNet
+VGG
+VGGNet
+GoogLeNet
+Inception
+ResNet
+ResNeXt
+WideResNet
+DenseNet
+SENet
+SqueezeNet
+MobileNet
+MobileNetV2
+MobileNetV3
+ShuffleNet
+EfficientNet
+ConvNeXt
+RegNet
+GhostNet
+RepVGG
+HRNet
+U-Net
+UNet++
+V-Net
+FCN
+SegNet
+PSPNet
+DeepLab
+DeepLabV3
+DeepLabV3+
+Mask R-CNN
+Faster R-CNN
+Fast R-CNN
+R-CNN
+Cascade R-CNN
+SSD
+RetinaNet
+CenterNet
+CornerNet
+FCOS
+YOLO
+YOLOv3
+YOLOv4
+YOLOv5
+YOLOv7
+YOLOv8
+YOLOv9
+YOLOv10
+YOLOX
+RT-DETR
+DETR
+Deformable DETR
+DINO
+Grounding DINO
+SAM
+Segment Anything
+ViT
+DeiT
+Swin Transformer
+SwinV2
+BEiT
+MAE
+Eva
+ConvViT
+MobileViT
+CLIP
+SigLIP
+ALIGN
+BLIP
+BLIP-2
+InstructBLIP
+LLaVA
+Flamingo
+Kosmos
+Qwen-VL
+InternVL
+CogVLM
+MiniGPT-4
+NeRF
+3DGS
+PointNet
+PointNet++
+PointTransformer
+VoxelNet
+PointPillars
+BEVFormer
+OpenPose
+AlphaPose
+MediaPipe
+ArcFace
+CosFace
+SphereFace
+FaceNet
+RetinaFace
+MTCNN
+CRNN
+DBNet
+LayoutLM
+Donut
+Word2Vec
+CBOW
+Skip-gram
+GloVe
+ELMo
+BERT
+RoBERTa
+ALBERT
+DistilBERT
+DeBERTa
+Electra
+SpanBERT
+MacBERT
+ERNIE
+XLNet
+T5
+Flan-T5
+mT5
+BART
+mBART
+Pegasus
+GPT
+GPT-2
+GPT-3
+GPT-3.5
+GPT-4
+GPT-4o
+ChatGPT
+InstructGPT
+Claude
+Gemini
+PaLM
+Gopher
+Chinchilla
+LLaMA
+Llama 2
+Llama 3
+Mistral
+Mixtral
+Falcon
+Gemma
+Phi-3
+Qwen
+Yi
+Baichuan
+ChatGLM
+GLM-4
+InternLM
+DeepSeek
+DeepSeek-V2
+DeepSeek-R1
+Command R
+RWKV
+Mamba
+RetNet
+Hyena
+Jamba
+Whisper
+Wav2Vec
+Wav2Vec 2.0
+HuBERT
+Conformer
+Tacotron
+FastSpeech
+VITS
+Vall-E
+HiFi-GAN
+SoundStream
+EnCodec
+Bark
+AudioLM
+MusicGen
+Sora
+Runway
+Pika
+Kling
+AnimateDiff
+SVD
+VAE
+VQ-VAE
+VQ-GAN
+GAN
+DCGAN
+WGAN
+WGAN-GP
+cGAN
+CycleGAN
+Pix2Pix
+StyleGAN
+StyleGAN2
+StyleGAN3
+BigGAN
+SRGAN
+ESRGAN
+Real-ESRGAN
+SwinIR
+Restormer
+Diffusion
+DDPM
+DDIM
+LDM
+Stable Diffusion
+SDXL
+DiT
+PixArt
+ControlNet
+IP-Adapter
+DreamBooth
+Textual Inversion
+Consistency Models
+Flow Matching
+Rectified Flow
+DALL-E
+Midjourney
+Imagen
+AlphaGo
+AlphaZero
+MuZero
+AlphaFold
+AlphaFold2
+AlphaFold3
+DQN
+DDQN
+Dueling DQN
+Rainbow
+DDPG
+TD3
+SAC
+A2C
+A3C
+PPO
+TRPO
+GRPO
+RLHF
+RLAIF
+DPO
+IPO
+KTO
+ORPO
+SimPO
+GCN
+GAT
+GraphSAGE
+GIN
+MPNN
+RGCN
+Node2Vec
+DeepWalk
+Wide & Deep
+DeepFM
+xDeepFM
+DCN
+DIN
+DIEN
+MMoE
+PLE
+ESMM
+SimCLR
+MoCo
+BYOL
+SwAV
+Barlow Twins
+SimSiam
+VicReg
+InfoNCE
+LoRA
+QLoRA
+DoRA
+AdaLoRA
+IA3
+Adapter
+Prefix-Tuning
+Prompt-Tuning
+P-Tuning
+FlashAttention
+FlashAttention-2
+PagedAttention
+MQA
+GQA
+MLA
+RoPE
+ALiBi
+SwiGLU
+GeGLU
+ReLU
+LeakyReLU
+PReLU
+ELU
+SELU
+GELU
+SiLU
+Swish
+Mish
+Softplus
+Softmax
+LogSoftmax
+Sigmoid
+Tanh
+Hardswish
+Hardsigmoid
+Maxout
+BatchNorm
+LayerNorm
+InstanceNorm
+GroupNorm
+RMSNorm
+WeightNorm
+SpectralNorm
+AdaIN
+SGD
+Momentum
+Nesterov
+AdaGrad
+Adadelta
+RMSprop
+Adam
+AdamW
+RAdam
+NAdam
+Adamax
+LAMB
+LARS
+Lion
+Sophia
+Muon
+Adafactor
+Shampoo
+K-FAC
+L-BFGS
+SAM Optimizer
+Dropout
+DropConnect
+DropBlock
+DropPath
+Stochastic Depth
+Label Smoothing
+Mixup
+CutMix
+Cutout
+RandAugment
+AutoAugment
+Early Stopping
+Weight Decay
+Gradient Clipping
+Gradient Accumulation
+Gradient Checkpointing
+Warmup
+Cosine Annealing
+OneCycleLR
+ReduceLROnPlateau
+Xavier
+Kaiming
+He Initialization
+Orthogonal Initialization
+MSE
+MAE Loss
+RMSE
+Huber Loss
+Smooth L1
+CrossEntropy
+BCE
+BCEWithLogits
+Focal Loss
+Hinge Loss
+KL Divergence
+JS Divergence
+Wasserstein
+Triplet Loss
+Contrastive Loss
+CTC Loss
+Dice Loss
+GIoU
+DIoU
+CIoU
+epoch
+batch
+mini-batch
+batch size
+iteration
+step
+learning rate
+hyperparameter
+overfitting
+underfitting
+regularization
+backpropagation
+forward pass
+backward pass
+gradient
+jacobian
+hessian
+tensor
+embedding
+logit
+logits
+token
+tokenizer
+vocabulary
+context length
+prompt
+in-context learning
+Chain-of-Thought
+RAG
+zero-shot
+few-shot
+one-shot
+fine-tuning
+pre-training
+post-training
+alignment
+hallucination
+agent
+kv cache
+beam search
+greedy search
+top-k
+top-p
+temperature
+perplexity
+BLEU
+ROUGE
+METEOR
+CIDEr
+WER
+CER
+IoU
+mIoU
+AP
+mAP
+NMS
+Soft-NMS
+RoI
+RoIAlign
+RPN
+Anchor
+Bounding Box
+Ground Truth
+ROC
+AUC
+PR Curve
+F1-score
+Precision
+Recall
+Accuracy
+Confusion Matrix
+PSNR
+SSIM
+LPIPS
+FID
+Inception Score
+FLOPs
+MACs
+TOPS
+FP32
+FP16
+BF16
+FP8
+INT8
+INT4
+NF4
+GPTQ
+AWQ
+SmoothQuant
+BitNet
+Zero-Redundancy Optimizer
+ZeRO
+FSDP
+DDP
+AllReduce
+AllGather
+ReduceScatter
+NVLink
+PCIe
+InfiniBand
+RDMA
+HBM
+ImageNet
+COCO
+Pascal VOC
+ADE20K
+Cityscapes
+Kinetics
+LibriSpeech
+SQuAD
+GLUE
+SuperGLUE
+MMLU
+C-Eval
+GSM8K
+HumanEval
+MBPP
+MATH
+Kaggle
+arXiv
+OpenReview
+PapersWithCode

@@ -1,0 +1,1327 @@
+# CyIME 电影词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_movie
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+大红灯笼高高挂	da hong deng long gao gao gua	600
+秋菊打官司	qiu ju da guan si	600
+菊豆	ju dou	600
+我的父亲母亲	wo de fu qin mu qin	600
+满城尽带黄金甲	man cheng jin dai huang jin jia	600
+金陵十三钗	jin ling shi san chai	600
+悬崖之上	xuan ya zhi shang	600
+阳光灿烂的日子	yang guang can lan de ri zi	600
+鬼子来了	gui zi lai le	600
+太阳照常升起	tai yang zhao chang sheng qi	600
+让子弹飞	rang zi dan fei	600
+甲方乙方	jia fang yi fang	600
+天下无贼	tian xia wu zei	600
+集结号	ji jie hao	600
+非诚勿扰	fei cheng wu rao	600
+唐山大地震	tang shan da di zhen	600
+一九四二	yi jiu si er	600
+私人订制	si ren ding zhi	600
+我不是潘金莲	wo bu shi pan jin lian	600
+南京南京	nan jing nan jing	600
+寻枪	xun qiang	600
+疯狂的石头	feng kuang de shi tou	600
+疯狂的赛车	feng kuang de sai che	600
+心花路放	xin hua lu fang	600
+疯狂的外星人	feng kuang de wai xing ren	600
+孩子王	hai zi wang	600
+赵氏孤儿	zhao shi gu er	600
+道士下山	dao shi xia shan	600
+妖猫传	yao mao zhuan	600
+芙蓉镇	fu rong zhen	600
+天云山传奇	tian yun shan chuan qi	600
+高山下的花环	gao shan xia de hua huan	600
+小城之春	xiao cheng zhi chun	600
+一江春水向东流	yi jiang chun shui xiang dong liu	600
+乌鸦与麻雀	wu ya yu ma que	600
+渔光曲	yu guang qu	600
+风云儿女	feng yun er nv	600
+定军山	ding jun shan	600
+小兵张嘎	xiao bing zhang ga	600
+铁道游击队	tie dao you ji dui	600
+英雄儿女	ying xiong er nv	600
+红色娘子军	hong se niang zi jun	600
+冰山上的来客	bing shan shang de lai ke	600
+刘三姐	liu san jie	600
+庐山恋	lu shan lian	600
+哪吒闹海	ne zha nao hai	600
+山水情	shan shui qing	600
+黑炮事件	hei pao shi jian	600
+背靠背脸对脸	bei kao bei lian dui lian	600
+香魂女	xiang hun nv	600
+北京杂种	bei jing za zhong	600
+那山那人那狗	na shan na ren na gou	600
+东宫西宫	dong gong xi gong	600
+蓝风筝	lan feng zheng	600
+小武	xiao wu	600
+任逍遥	ren xiao yao	600
+三峡好人	san xia hao ren	600
+二十四城记	er shi si cheng ji	600
+天注定	tian zhu ding	600
+山河故人	shan he gu ren	600
+江湖儿女	jiang hu er nv	600
+风流一代	feng liu yi dai	600
+紫蝴蝶	zi hu die	600
+春风沉醉的夜晚	chun feng chen zui de ye wan	600
+浮城谜事	fu cheng mi shi	600
+风中有朵雨做的云	feng zhong you duo yu zuo de yun	600
+兰心大剧院	lan xin da ju yuan	600
+日照重庆	ri zhao chong qing	600
+盲山	mang shan	600
+桃姐	tao jie	600
+女人四十	nv ren si shi	600
+天水围的日与夜	tian shui wei de ri yu ye	600
+投奔怒海	tou ben nu hai	600
+榴莲飘飘	liu lian piao piao	600
+香港制造	xiang gang zhi zao	600
+阿飞正传	a fei zheng zhuan	600
+旺角卡门	wang jiao ka men	600
+蓝莓之夜	lan mei zhi ye	600
+头文字	tou wen zi	600
+伤城	shang cheng	600
+喋血双雄	die xue shuang xiong	600
+辣手神探	la shou shen tan	600
+大圣娶亲	da sheng qu qin	600
+月光宝盒	yue guang bao he	600
+少林足球	shao lin zu qiu	600
+唐伯虎点秋香	tang bo hu dian qiu xiang	600
+九品芝麻官	jiu pin zhi ma guan	600
+国产凌凌漆	guo chan ling ling qi	600
+审死官	shen si guan	600
+逃学威龙	tao xue wei long	600
+赌侠	du xia	600
+长江七号	chang jiang qi hao	600
+西游降魔篇	xi you xiang mo pian	600
+新喜剧之王	xin xi ju zhi wang	600
+东成西就	dong cheng xi jiu	600
+投名状	tou ming zhuang	600
+中国合伙人	zhong guo he huo ren	600
+酱园弄	jiang yuan nong	600
+蛇形刁手	she xing diao shou	600
+红番区	hong fan qu	600
+我是谁	wo shi shui	600
+宝贝计划	bao bei ji hua	600
+狮王争霸	shi wang zheng ba	600
+方世玉	fang shi yu	600
+太极张三丰	tai ji zhang san feng	600
+中南海保镖	zhong nan hai bao biao	600
+精武英雄	jing wu ying xiong	600
+一个人的武林	yi ge ren de wu lin	600
+追龙	zhui long	600
+怒火重案	nu huo zhong an	600
+新龙门客栈	xin long men ke zhan	600
+龙门飞甲	long men fei jia	600
+蜀山传	shu shan zhuan	600
+狄仁杰之通天帝国	di ren jie zhi tong tian di guo	600
+夺命金	duo ming jin	600
+毒战	du zhan	600
+新不了情	xin bu liao qing	600
+旺角黑夜	wang jiao hei ye	600
+窃听风云	qie ting feng yun	600
+使徒行者	shi tu xing zhe	600
+反贪风暴	fan tan feng bao	600
+湄公河行动	mei gong he xing dong	600
+红海行动	hong hai xing dong	600
+紧急救援	jin ji jiu yuan	600
+岁月神偷	sui yue shen tou	600
+七月与安生	qi yue yu an sheng	600
+少年的你	shao nian de ni	600
+一念无明	yi nian wu ming	600
+踏血寻梅	ta xue xun mei	600
+浊水漂流	zhuo shui piao liu	600
+白日之下	bai ri zhi xia	600
+年少日记	nian shao ri ji	600
+毒舌律师	du she lv shi	600
+破地狱	po di yu	600
+九龙城寨之围城	jiu long cheng zhai zhi wei cheng	600
+九龙城寨	jiu long cheng zhai	600
+悲情城市	bei qing cheng shi	600
+童年往事	tong nian wang shi	600
+恋恋风尘	lian lian feng chen	600
+戏梦人生	xi meng ren sheng	600
+海上花	hai shang hua	600
+最好的时光	zui hao de shi guang	600
+刺客聂隐娘	ci ke nie yin niang	600
+牯岭街少年杀人事件	gu ling jie shao nian sha ren shi jian	600
+独立时代	du li shi dai	600
+饮食男女	yin shi nan nv	600
+喜福会	xi fu hui	600
+青少年哪吒	qing shao nian ne zha	600
+爱情万岁	ai qing wan sui	600
+你那边几点	ni na bian ji dian	600
+天边一朵云	tian bian yi duo yun	600
+蓝色大门	lan se da men	600
+海角七号	hai jiao qi hao	600
+艋舺	meng jia	600
+那些年我们一起追的女孩	na xie nian wo men yi qi zhui de nv hai	600
+我的少女时代	wo de shao nv shi dai	600
+盛夏光年	sheng xia guang nian	600
+大佛普拉斯	da fo pu la si	600
+血观音	xue guan yin	600
+谁先爱上他的	shei xian ai shang ta de	600
+孤味	gu wei	600
+当男人恋爱时	dang nan ren lian ai shi	600
+周处除三害	zhou chu chu san hai	600
+流浪地球	liu lang di qiu	600
+小破球	xiao po qiu	600
+长津湖	chang jin hu	600
+水门桥	shui men qiao	600
+哪吒之魔童降世	ne zha zhi mo tong jiang shi	600
+哪吒之魔童闹海	ne zha zhi mo tong nao hai	600
+你好李焕英	ni hao li huan ying	600
+唐人街探案	tang ren jie tan an	600
+唐探	tang tan	600
+我不是药神	wo bu shi yao shen	600
+西虹市首富	xi hong shi shou fu	600
+夏洛特烦恼	xia luo te fan nao	600
+羞羞的铁拳	xiu xiu de tie quan	600
+独行月球	du xing yue qiu	600
+抓娃娃	zhua wa wa	600
+飞驰人生	fei chi ren sheng	600
+八佰	ba bai	600
+金刚川	jin gang chuan	600
+我和我的祖国	wo he wo de zu guo	600
+我和我的家乡	wo he wo de jia xiang	600
+我和我的父辈	wo he wo de fu bei	600
+中国机长	zhong guo ji zhang	600
+中国医生	zhong guo yi sheng	600
+烈火英雄	lie huo ying xiong	600
+消失的她	xiao shi de ta	600
+默杀	mo sha	600
+八角笼中	ba jiao long zhong	600
+热辣滚烫	re la gun tang	600
+送你一朵小红花	song ni yi duo xiao hong hua	600
+奇迹笨小孩	qi ji ben xiao hai	600
+万里归途	wan li gui tu	600
+封神第一部	feng shen di yi bu	600
+封神朝歌风云	feng shen zhao ge feng yun	600
+封神	feng shen	600
+长安三万里	chang an san wan li	600
+白蛇缘起	bai she yuan qi	600
+白蛇青蛇劫起	bai she qing she jie qi	600
+白蛇浮生	bai she fu sheng	600
+新神榜杨戬	xin shen bang yang jian	600
+新神榜哪吒重生	xin shen bang ne zha chong sheng	600
+西游记之大圣归来	xi you ji zhi da sheng gui lai	600
+大圣归来	da sheng gui lai	600
+大鱼海棠	da yu hai tang	600
+姜子牙	jiang zi ya	600
+雄狮少年	xiong shi shao nian	600
+罗小黑战记	luo xiao hei zhan ji	600
+中国奇谭	zhong guo qi tan	600
+浪浪山小妖怪	lang lang shan xiao yao guai	600
+熊出没逆转时空	xiong chu mei ni zhuan shi kong	600
+刺杀小说家	ci sha xiao shuo jia	600
+绣春刀	xiu chun dao	600
+修罗战场	xiu luo zhan chang	600
+白日焰火	bai ri yan huo	600
+南方车站的聚会	nan fang che zhan de ju hui	600
+烈日灼心	lie ri zhuo xin	600
+追凶者也	zhui xiong zhe ye	600
+涉过愤怒的海	she guo fen nu de hai	600
+心迷宫	xin mi gong	600
+暴裂无声	bao lie wu sheng	600
+平原上的摩西	ping yuan shang de mo xi	600
+河边的错误	he bian de cuo wu	600
+白塔之光	bai ta zhi guang	600
+宇宙探索编辑部	yu zhou tan suo bian ji bu	600
+路边野餐	lu bian ye can	600
+地球最后的夜晚	di qiu zui hou de ye wan	600
+狂野时代	kuang ye shi dai	600
+冬春的日子	dong chun de ri zi	600
+大象席地而坐	da xiang xi di er zuo	600
+春江水暖	chun jiang shui nuan	600
+保你平安	bao ni ping an	600
+年会不能停	nian hui bu neng ting	600
+人生路不熟	ren sheng lu bu shu	600
+无名之辈	wu ming zhi bei	600
+驴得水	lv de shui	600
+半个喜剧	ban ge xi ju	600
+失恋三十三天	shi lian san shi san tian	600
+人在囧途	ren zai jiong tu	600
+囧妈	jiong ma	600
+煎饼侠	jian bing xia	600
+缝纫机乐队	feng ren ji yue dui	600
+超时空同居	chao shi kong tong ju	600
+前任攻略	qian ren gong lve	600
+后来的我们	hou lai de wo men	600
+比悲伤更悲伤的故事	bi bei shang geng bei shang de gu shi	600
+一闪一闪亮星星	yi shan yi shan liang xing xing	600
+暗恋橘生淮南	an lian ju sheng huai nan	600
+致我们终将逝去的青春	zhi wo men zhong jiang shi qu de qing chun	600
+匆匆那年	cong cong na nian	600
+同桌的你	tong zhuo de ni	600
+小时代	xiao shi dai	600
+北京遇上西雅图	bei jing yu shang xi ya tu	600
+春娇与志明	chun jiao yu zhi ming	600
+志明与春娇	zhi ming yu chun jiao	600
+爱情神话	ai qing shen hua	600
+出走的决心	chu zou de jue xin	600
+隐入尘烟	yin ru chen yan	600
+草木人间	cao mu ren jian	600
+只此青绿	zhi ci qing lv	600
+照明商店	zhao ming shang dian	600
+志愿军雄兵出击	zhi yuan jun xiong bing chu ji	600
+志愿军存亡之战	zhi yuan jun cun wang zhi zhan	600
+莫斯科行动	mo si ke xing dong	600
+维和防暴队	wei he fang bao dui	600
+逆行人生	ni xing ren sheng	600
+云边有个小卖部	yun bian you ge xiao mai bu	600
+从二十一世纪安全撤离	cong er shi yi shi ji an quan che li	600
+异人之下	yi ren zhi xia	600
+唐探一九零零	tang tan yi jiu ling ling	600
+射雕英雄传侠之大者	she diao ying xiong zhuan xia zhi da zhe	600
+蛟龙行动	jiao long xing dong	600
+罗曼蒂克消亡史	luo man di ke xiao wang shi	600
+建国大业	jian guo da ye	600
+建党伟业	jian dang wei ye	600
+建军大业	jian jun da ye	600
+觉醒年代	jue xing nian dai	600
+一九二一	yi jiu er yi	600
+寻龙诀	xun long jue	600
+九层妖塔	jiu ceng yao ta	600
+捉妖记	zhuo yao ji	600
+西游伏妖篇	xi you fu yao pian	600
+悟空传	wu kong zhuan	600
+爵迹	jue ji	600
+上海堡垒	shang hai bao lei	600
+攀登者	pan deng zhe	600
+老男孩	lao nan hai	600
+滚蛋吧肿瘤君	gun dan ba zhong liu jun	600
+送我上青云	song wo shang qing yun	600
+相爱相亲	xiang ai xiang qin	600
+再见李可乐	zai jian li ke le	600
+关于我妈的一切	guan yu wo ma de yi qie	600
+穿过寒冬拥抱你	chuan guo han dong yong bao ni	600
+峰爆	feng bao	600
+一点就到家	yi dian jiu dao jia	600
+长空之王	chang kong zhi wang	600
+惊天救援	jing tian jiu yuan	600
+检察风云	jian cha feng yun	600
+前任四英年早婚	qian ren si ying nian zao hun	600
+好像也没那么热血沸腾	hao xiang ye mei na me re xue fei teng	600
+末路狂花钱	mo lu kuang hua qian	600
+拯救嫌疑人	zheng jiu xian yi ren	600
+临时劫案	lin shi jie an	600
+海关战线	hai guan zhan xian	600
+焚城	fen cheng	600
+危机航线	wei ji hang xian	600
+浴火之路	yu huo zhi lu	600
+乔妍的心事	qiao yan de xin shi	600
+骗骗喜欢你	pian pian xi huan ni	600
+唐探三	tang tan san	600
+流浪地球二	liu lang di qiu er	600
+战狼二	zhan lang er	600
+长津湖之水门桥	chang jin hu zhi shui men qiao	600
+哪吒二	ne zha er	600
+封神二	feng shen er	600
+封神第二部	feng shen di er bu	600
+飞驰人生二	fei chi ren sheng er	600
+肖申克的救赎	xiao shen ke de jiu shu	600
+辛德勒的名单	xin de le de ming dan	600
+星际穿越	xing ji chuan yue	600
+蝙蝠侠黑暗骑士	bian fu xia hei an qi shi	600
+黑暗骑士	hei an qi shi	600
+黑暗骑士崛起	hei an qi shi jue qi	600
+侠影之谜	xia ying zhi mi	600
+奥本海默	ao ben hai mo	600
+致命魔术	zhi ming mo shu	600
+楚门的世界	chu men de shi jie	600
+海上钢琴师	hai shang gang qin shi	600
+天堂电影院	tian tang dian ying yuan	600
+西西里的美丽传说	xi xi li de mei li chuan shuo	600
+这个杀手不太冷	zhe ge sha shou bu tai leng	600
+杀死比尔	sha si bi er	600
+无耻混蛋	wu chi hun dan	600
+被解救的姜戈	bei jie jiu de jiang ge	600
+八恶人	ba e ren	600
+好莱坞往事	hao lai wu wang shi	600
+搏击俱乐部	bo ji ju le bu	600
+七宗罪	qi zong zui	600
+消失的爱人	xiao shi de ai ren	600
+本杰明巴顿奇事	ben jie ming ba dun qi shi	600
+大卫戈尔的一生	da wei ge er de yi sheng	600
+拯救大兵瑞恩	zheng jiu da bing rui en	600
+侏罗纪公园	zhu luo ji gong yuan	600
+侏罗纪世界	zhu luo ji shi jie	600
+猫鼠游戏	mao shu you xi	600
+幸福终点站	xing fu zhong dian zhan	600
+头号玩家	tou hao wan jia	600
+少数派报告	shao shu pai bao gao	600
+太阳帝国	tai yang di guo	600
+造梦之家	zao meng zhi jia	600
+阿凡达	a fan da	600
+水之道	shui zhi dao	600
+真实的谎言	zhen shi de huang yan	600
+银翼杀手	yin yi sha shou	600
+天国王朝	tian guo wang chao	600
+火星救援	huo xing jiu yuan	600
+末路狂花	mo lu kuang hua	600
+护戒使者	hu jie shi zhe	600
+双塔奇兵	shuang ta qi bing	600
+王者无敌	wang zhe wu di	600
+霍比特人	huo bi te ren	600
+意外之旅	yi wai zhi lv	600
+史矛革之战	shi mao ge zhi zhan	600
+五军之战	wu jun zhi zhan	600
+哈利波特	ha li bo te	600
+阿兹卡班的囚徒	a zi ka ban de qiu tu	600
+火焰杯	huo yan bei	600
+凤凰社	feng huang she	600
+混血王子	hun xue wang zi	600
+死亡圣器	si wang sheng qi	600
+神奇动物在哪里	shen qi dong wu zai na li	600
+黑珍珠号的诅咒	hei zhen zhu hao de zu zhou	600
+速度与激情	su du yu ji qing	600
+速激	su ji	600
+变四	bian si	600
+碟中谍	die zhong die	600
+不可能的任务	bu ke neng de ren wu	600
+零零七	ling ling qi	600
+皇家赌场	huang jia du chang	600
+天幕杀机	tian mu sha ji	600
+无暇赴死	wu xia fu si	600
+王牌特工	wang pai te gong	600
+博物馆奇妙夜	bo wu guan qi miao ye	600
+猩球崛起	xing qiu jue qi	600
+人猿星球	ren yuan xing qiu	600
+哥斯拉大战金刚	ge si la da zhan jin gang	600
+环太平洋	huan tai ping yang	600
+边境杀手	bian jing sha shou	600
+焦土之城	jiao tu zhi cheng	600
+疯狂的麦克斯	feng kuang de mai ke si	600
+狂暴之路	kuang bao zhi lu	600
+狂暴女神	kuang bao nv shen	600
+复仇者联盟	fu chou zhe lian meng	600
+复联四	fu lian si	600
+终局之战	zhong ju zhi zhan	600
+无限战争	wu xian zhan zheng	600
+奥创纪元	ao chuang ji yuan	600
+美国队长	mei guo dui zhang	600
+英雄无归	ying xiong wu gui	600
+纵横宇宙	zong heng yu zhou	600
+平行宇宙	ping xing yu zhou	600
+奇异博士	qi yi bo shi	600
+银河护卫队	yin he hu wei dui	600
+金刚狼	jin gang lang	600
+死侍与金刚狼	si shi yu jin gang lang	600
+逆转未来	ni zhuan wei lai	600
+殊死一战	shu si yi zhan	600
+正义联盟	zheng yi lian meng	600
+正联	zheng lian	600
+钢铁之躯	gang tie zhi qu	600
+神奇女侠	shen qi nv xia	600
+闪电侠	shan dian xia	600
+字仇杀队	zi chou sha dui	600
+剪刀手爱德华	jian dao shou ai de hua	600
+查理和巧克力工厂	cha li he qiao ke li gong chang	600
+爱丽丝梦游仙境	ai li si meng you xian jing	600
+回到未来	hui dao wei lai	600
+地心引力	di xin yin li	600
+明日边缘	ming ri bian yuan	600
+遗落战境	yi luo zhan jing	600
+机械姬	ji xie ji	600
+超体	chao ti	600
+蝴蝶效应	hu die xiao ying	600
+恐怖游轮	kong bu you lun	600
+彗星来的那一夜	hui xing lai de na yi ye	600
+穆赫兰道	mu he lan dao	600
+禁闭岛	jin bi dao	600
+致命身份	zhi ming shen fen	600
+小岛惊魂	xiao dao jing hun	600
+看不见的客人	kan bu jian de ke ren	600
+控方证人	kong fang zheng ren	600
+十二怒汉	shi er nu han	600
+淘金记	tao jin ji	600
+大独裁者	da du cai zhe	600
+公民凯恩	gong min kai en	600
+卡萨布兰卡	ka sa bu lan ka	600
+蒂凡尼的早餐	di fan ni de zao can	600
+雨中曲	yu zhong qu	600
+风月俏佳人	feng yue qiao jia ren	600
+真爱至上	zhen ai zhi shang	600
+理智与情感	li zhi yu qing gan	600
+恋恋笔记本	lian lian bi ji ben	600
+时空恋旅人	shi kong lian lv ren	600
+爱在黎明破晓前	ai zai li ming po xiao qian	600
+爱在日落黄昏时	ai zai ri luo huang hun shi	600
+爱在午夜降临前	ai zai wu ye jiang lin qian	600
+爱乐之城	ai yue zhi cheng	600
+爆裂鼓手	bao lie gu shou	600
+少年派的奇幻漂流	shao nian pai de qi huan piao liu	600
+少年派	shao nian pai	600
+比利林恩的中场战事	bi li lin en de zhong chang zhan shi	600
+波西米亚狂想曲	bo xi mi ya kuang xiang qu	600
+国王的演讲	guo wang de yan jiang	600
+心灵捕手	xin ling bu shou	600
+死亡诗社	si wang shi she	600
+闻香识女人	wen xiang shi nv ren	600
+飞越疯人院	fei yue feng ren yuan	600
+发条橙	fa tiao cheng	600
+太空漫游	tai kong man you	600
+全金属外壳	quan jin shu wai ke	600
+大开眼戒	da kai yan jie	600
+愤怒的公牛	fen nu de gong niu	600
+华尔街之狼	hua er jie zhi lang	600
+无间行者	wu jian xing zhe	600
+花月杀手	hua yue sha shou	600
+美国往事	mei guo wang shi	600
+荒野猎人	huang ye lie ren	600
+水形物语	shui xing wu yu	600
+潘神的迷宫	pan shen de mi gong	600
+幸福来敲门	xing fu lai qiao men	600
+当幸福来敲门	dang xing fu lai qiao men	600
+风雨哈佛路	feng yu ha fo lu	600
+放牛班的春天	fang niu ban de chun tian	600
+触不可及	chu bu ke ji	600
+天使爱美丽	tian shi ai mei li	600
+四百击	si bai ji	600
+去年在马里昂巴德	qu nian zai ma li ang ba de	600
+八部半	ba bu ban	600
+甜蜜的生活	tian mi de sheng huo	600
+偷自行车的人	tou zi xing che de ren	600
+野草莓	ye cao mei	600
+第七封印	di qi feng yin	600
+安德烈卢布廖夫	an de lie lu bu liao fu	600
+战舰波将金号	zhan jian bo jiang jin hao	600
+冰血暴	bing xue bao	600
+醉乡民谣	zui xiang min yao	600
+血战钢锯岭	xue zhan gang ju ling	600
+宾虚	bin xu	600
+教父二	jiao fu er	600
+教父三	jiao fu san	600
+沉默的羔羊	chen mo de gao yang	600
+电锯惊魂	dian ju jing hun	600
+死神来了	si shen lai le	600
+寂静之地	ji jing zhi di	600
+逃出绝命镇	tao chu jue ming zhen	600
+小丑回魂	xiao chou hui hun	600
+釜山行	fu shan xing	600
+杀人回忆	sha ren hui yi	600
+汉江怪物	han jiang guai wu	600
+雪国列车	xue guo lie che	600
+分手的决心	fen shou de jue xin	600
+亲切的金子	qin qie de jin zi	600
+共同警备区	gong tong jing bei qu	600
+薄荷糖	bo he tang	600
+密阳	mi yang	600
+素媛	su yuan	600
+追击者	zhui ji zhe	600
+破墓	po mu	600
+首尔之春	shou er zhi chun	600
+南山的部长们	nan shan de bu zhang men	600
+犯罪都市	fan zui du shi	600
+极限职业	ji xian zhi ye	600
+阳光姐妹淘	yang guang jie mei tao	600
+假如爱有天意	jia ru ai you tian yi	600
+我的野蛮女友	wo de ye man nv you	600
+脑海中的橡皮擦	nao hai zhong de xiang pi ca	600
+七号房的礼物	qi hao fang de li wu	600
+外婆的家	wai po de jia	600
+七武士	qi wu shi	600
+影武者	ying wu zhe	600
+用心棒	yong xin bang	600
+生之欲	sheng zhi yu	600
+东京物语	dong jing wu yu	600
+秋刀鱼之味	qiu dao yu zhi wei	600
+雨月物语	yu yue wu yu	600
+切腹	qie fu	600
+四月物语	si yue wu yu	600
+关于莉莉周的一切	guan yu li li zhou de yi qie	600
+花与爱丽丝	hua yu ai li si	600
+菊次郎的夏天	ju ci lang de xia tian	600
+花火	hua huo	600
+座头市	zuo tou shi	600
+大逃杀	da tao sha	600
+小偷家族	xiao tou jia zu	600
+步履不停	bu lv bu ting	600
+海街日记	hai jie ri ji	600
+如父如子	ru fu ru zi	600
+入殓师	ru lian shi	600
+被嫌弃的松子的一生	bei xian qi de song zi de yi sheng	600
+花束般的恋爱	hua shu ban de lian ai	600
+垫底辣妹	dian di la mei	600
+忠犬八公的故事	zhong quan ba gong de gu shi	600
+忠犬八公	zhong quan ba gong	600
+摔跤吧爸爸	shuai jiao ba ba ba	600
+三傻大闹宝莱坞	san sha da nao bao lai wu	600
+神秘巨星	shen mi ju xing	600
+调音师	tiao yin shi	600
+贫民窟的百万富翁	pin min ku de bai wan fu weng	600
+一次别离	yi ci bie li	600
+何以为家	he yi wei jia	600
+坠落的审判	zhui luo de shen pan	600
+可怜的东西	ke lian de dong xi	600
+瞬息全宇宙	shun xi quan yu zhou	600
+壮志凌云	zhuang zhi ling yun	600
+布达佩斯大饭店	bu da pei si da fan dian	600
+了不起的狐狸爸爸	liao bu qi de hu li ba ba	600
+犬之岛	quan zhi dao	600
+月升王国	yue sheng wang guo	600
+菊石	ju shi	600
+穿普拉达的女王	chuan pu la da de nv wang	600
+利刃出鞘	li ren chu qiao	600
+遗传厄运	yi chuan e yun	600
+仲夏夜惊魂	zhong xia ye jing hun	600
+小丑二	xiao chou er	600
+千与千寻	qian yu qian xun	600
+哈尔的移动城堡	ha er de yi dong cheng bao	600
+风之谷	feng zhi gu	600
+魔女宅急便	mo nv zhai ji bian	600
+悬崖上的金鱼姬	xuan ya shang de jin yu ji	600
+你想活出怎样的人生	ni xiang huo chu zen yang de ren sheng	600
+借东西的小人阿莉埃蒂	jie dong xi de xiao ren a li ai di	600
+萤火虫之墓	ying huo chong zhi mu	600
+辉夜姬物语	hui ye ji wu yu	600
+天气之子	tian qi zhi zi	600
+铃芽之旅	ling ya zhi lv	600
+秒速五厘米	miao su wu li mi	600
+言叶之庭	yan ye zhi ting	600
+千年女优	qian nian nv you	600
+未麻的部屋	wei ma de bu wu	600
+东京教父	dong jing jiao fu	600
+攻壳机动队	gong qiao ji dong dui	600
+阿基拉	a ji la	600
+新世纪福音战士	xin shi ji fu yin zhan shi	600
+名侦探柯南	ming zhen tan ke nan	600
+哆啦梦	duo la meng	600
+夏日大作战	xia ri da zuo zhan	600
+狼的孩子雨和雪	lang de hai zi yu he xue	600
+穿越时空的少女	chuan yue shi kong de shao nv	600
+萤火之森	ying huo zhi sen	600
+声之形	sheng zhi xing	600
+玩具总动员	wan ju zong dong yuan	600
+海底总动员	hai di zong dong yuan	600
+飞屋环游记	fei wu huan you ji	600
+机器人总动员	ji qi ren zong dong yuan	600
+寻梦环游记	xun meng huan you ji	600
+头脑特工队	tou nao te gong dui	600
+心灵奇旅	xin ling qi lv	600
+疯狂动物城	feng kuang dong wu cheng	600
+冰雪奇缘	bing xue qi yuan	600
+超能陆战队	chao neng lu zhan dui	600
+怪兽电力公司	guai shou dian li gong si	600
+怪兽大学	guai shou da xue	600
+超人总动员	chao ren zong dong yuan	600
+料理鼠王	liao li shu wang	600
+赛车总动员	sai che zong dong yuan	600
+青春变形记	qing chun bian xing ji	600
+夏日友晴天	xia ri you qing tian	600
+疯狂元素城	feng kuang yuan su cheng	600
+魔发奇缘	mo fa qi yuan	600
+无敌破坏王	wu di po huai wang	600
+海洋奇缘	hai yang qi yuan	600
+美女与野兽	mei nv yu ye shou	600
+神偷奶爸	shen tou nai ba	600
+小黄人	xiao huang ren	600
+功夫熊猫	gong fu xiong mao	600
+驯龙高手	xun long gao shou	600
+怪物史瑞克	guai wu shi rui ke	600
+疯狂原始人	feng kuang yuan shi ren	600
+里约大冒险	li yue da mao xian	600
+欢乐好声音	huan le hao sheng yin	600
+爱宠大机密	ai chong da ji mi	600
+坏蛋联盟	huai dan lian meng	600
+穿靴子的猫	chuan xue zi de mao	600
+荒野机器人	huang ye ji qi ren	600
+变形金刚起源	bian xing jin gang qi yuan	600
+超级马力欧兄弟大电影	chao ji ma li ou xiong di da dian ying	600
+犬王	quan wang	600
+娄烨	lou ye	600
+王小帅	wang xiao shuai	600
+陆川	lu chuan	600
+管虎	guan hu	600
+乌尔善	wu er shan	600
+郭帆	guo fan	600
+文牧野	wen mu ye	600
+陈思诚	chen si cheng	600
+徐峥	xu zheng	600
+毕赣	bi gan	600
+刁亦男	diao yi nan	600
+曹保平	cao bao ping	600
+忻钰坤	xin yu kun	600
+饶晓志	rao xiao zhi	600
+董成鹏	dong cheng peng	600
+路阳	lu yang	600
+田晓鹏	tian xiao peng	600
+程耳	cheng er	600
+韩延	han yan	600
+魏书钧	wei shu jun	600
+顾晓刚	gu xiao gang	600
+张律	zhang lv	600
+万玛才旦	wan ma cai dan	600
+谢晋	xie jin	600
+吴贻弓	wu yi gong	600
+谢飞	xie fei	600
+黄建新	huang jian xin	600
+田壮壮	tian zhuang zhuang	600
+顾长卫	gu chang wei	600
+霍建起	huo jian qi	600
+王全安	wang quan an	600
+李杨	li yang	600
+高群书	gao qun shu	600
+刘伟强	liu wei qiang	600
+麦兆辉	mai zhao hui	600
+庄文强	zhuang wen qiang	600
+杜琪峰	du qi feng	600
+徐克	xu ke	600
+吴宇森	wu yu sen	600
+许鞍华	xu an hua	600
+陈可辛	chen ke xin	600
+尔冬升	er dong sheng	600
+林超贤	lin chao xian	600
+陈木胜	chen mu sheng	600
+刘镇伟	liu zhen wei	600
+关锦鹏	guan jin peng	600
+陈果	chen guo	600
+韦家辉	wei jia hui	600
+叶伟信	ye wei xin	600
+郑保瑞	zheng bao rui	600
+翁子光	weng zi guang	600
+曾国祥	zeng guo xiang	600
+邱礼涛	qiu li tao	600
+袁和平	yuan he ping	600
+程小东	cheng xiao dong	600
+胡金铨	hu jin quan	600
+张彻	zhang che	600
+楚原	chu yuan	600
+李翰祥	li han xiang	600
+杨德昌	yang de chang	600
+侯孝贤	hou xiao xian	600
+蔡明亮	cai ming liang	600
+魏德圣	wei de sheng	600
+钮承泽	niu cheng ze	600
+陈正道	chen zheng dao	600
+钟孟宏	zhong meng hong	600
+黄信尧	huang xin yao	600
+程伟豪	cheng wei hao	600
+九把刀	jiu ba dao	600
+克里斯托弗诺兰	ke li si tuo fu nuo lan	600
+史蒂文斯皮尔伯格	shi di wen si pi er bo ge	600
+卡梅隆	ka mei long	600
+詹姆斯卡梅隆	zhan mu si ka mei long	600
+昆汀塔伦蒂诺	kun ting ta lun di nuo	600
+塔伦蒂诺	ta lun di nuo	600
+斯科塞斯	si ke sai si	600
+马丁斯科塞斯	ma ding si ke sai si	600
+大卫芬奇	da wei fen qi	600
+芬奇	fen qi	600
+库布里克	ku bu li ke	600
+斯坦利库布里克	si tan li ku bu li ke	600
+科波拉	ke bo la	600
+雷德利斯科特	lei de li si ke te	600
+维伦纽瓦	wei lun niu wa	600
+丹尼斯维伦纽瓦	dan ni si wei lun niu wa	600
+彼得杰克逊	bi de jie ke xun	600
+蒂姆伯顿	di mu bo dun	600
+乔治卢卡斯	qiao zhi lu ka si	600
+泽米吉斯	ze mi ji si	600
+克林特伊斯特伍德	ke lin te yi si te wu de	600
+伍迪艾伦	wu di ai lun	600
+韦斯安德森	wei si an de sen	600
+达米恩查泽雷	da mi en cha ze lei	600
+吉尔莫德尔托罗	ji er mo de er tuo luo	600
+阿方索卡隆	a fang suo ka long	600
+伊纳里图	yi na li tu	600
+林克莱特	lin ke lai te	600
+科恩兄弟	ke en xiong di	600
+沃卓斯基	wo zhuo si ji	600
+乔治米勒	qiao zhi mi le	600
+温子仁	wen zi ren	600
+扎克施奈德	zha ke shi nai de	600
+迈克尔贝	mai ke er bei	600
+罗兰艾默里奇	luo lan ai mo li qi	600
+大卫林奇	da wei lin qi	600
+达伦阿罗诺夫斯基	da lun a luo nuo fu si ji	600
+索菲亚科波拉	suo fei ya ke bo la	600
+格蕾塔葛韦格	ge lei ta ge wei ge	600
+兰斯莫斯	lan si mo si	600
+欧容	ou rong	600
+吕克贝松	lv ke bei song	600
+戈达尔	ge da er	600
+特吕弗	te lv fu	600
+侯麦	hou mai	600
+阿伦雷乃	a lun lei nai	600
+瓦尔达	wa er da	600
+阿涅斯瓦尔达	a nie si wa er da	600
+布列松	bu lie song	600
+基耶斯洛夫斯基	ji ye si luo fu si ji	600
+费里尼	fei li ni	600
+安东尼奥尼	an dong ni ao ni	600
+托纳多雷	tuo na duo lei	600
+贝托鲁奇	bei tuo lu qi	600
+维斯康蒂	wei si kang di	600
+德西卡	de xi ka	600
+帕索里尼	pa suo li ni	600
+伯格曼	bo ge man	600
+英格玛伯格曼	ying ge ma bo ge man	600
+塔可夫斯基	ta ke fu si ji	600
+爱森斯坦	ai sen si tan	600
+哈内克	ha nei ke	600
+文德斯	wen de si	600
+赫尔佐格	he er zuo ge	600
+阿莫多瓦	a mo duo wa	600
+肯洛奇	ken luo qi	600
+盖里奇	gai li qi	600
+丹尼博伊尔	dan ni bo yi er	600
+黑泽明	hei ze ming	600
+小津安二郎	xiao jin an er lang	600
+沟口健二	gou kou jian er	600
+成濑巳喜男	cheng lai si xi nan	600
+北野武	bei ye wu	600
+是枝裕和	shi zhi yu he	600
+宫崎骏	gong qi jun	600
+高畑勋	gao tian xun	600
+新海诚	xin hai cheng	600
+今敏	jin min	600
+押井守	ya jing shou	600
+庵野秀明	an ye xiu ming	600
+大友克洋	da you ke yang	600
+细田守	xi tian shou	600
+滨口龙介	bin kou long jie	600
+中岛哲也	zhong dao zhe ye	600
+三池崇史	san chi chong shi	600
+大岛渚	da dao zhu	600
+今村昌平	jin cun chang ping	600
+山田洋次	shan tian yang ci	600
+奉俊昊	feng jun hao	600
+朴赞郁	piao zan yu	600
+李沧东	li cang dong	600
+洪常秀	hong chang xiu	600
+金基德	jin ji de	600
+罗泓轸	luo hong zhen	600
+姜帝圭	jiang di gui	600
+法哈蒂	fa ha di	600
+张国立	zhang guo li	600
+李雪健	li xue jian	600
+唐国强	tang guo qiang	600
+陈宝国	chen bao guo	600
+王志文	wang zhi wen	600
+洪金宝	hong jin bao	600
+元彪	yuan biao	600
+林正英	lin zheng ying	600
+梁家辉	liang jia hui	600
+刘青云	liu qing yun	600
+黄秋生	huang qiu sheng	600
+任达华	ren da hua	600
+张家辉	zhang jia hui	600
+张震	zhang zhen	600
+林家栋	lin jia dong	600
+黄子华	huang zi hua	600
+郑伊健	zheng yi jian	600
+吴孟达	wu meng da	600
+周海媚	zhou hai mei	600
+马丽	ma li	600
+王宝强	wang bao qiang	600
+张译	zhang yi	600
+于和伟	yu he wei	600
+雷佳音	lei jia yin	600
+朱一龙	zhu yi long	600
+王一博	wang yi bo	600
+刘昊然	liu hao ran	600
+黄晓明	huang xiao ming	600
+段奕宏	duan yi hong	600
+王千源	wang qian yuan	600
+王景春	wang jing chun	600
+范伟	fan wei	600
+郭涛	guo tao	600
+张颂文	zhang song wen	600
+王传君	wang chuan jun	600
+章宇	zhang yu	600
+乔杉	qiao shan	600
+常远	chang yuan	600
+魏翔	wei xiang	600
+尹正	yin zheng	600
+黄轩	huang xuan	600
+井柏然	jing bo ran	600
+张若昀	zhang ruo yun	600
+白敬亭	bai jing ting	600
+范丞丞	fan cheng cheng	600
+檀健次	tan jian ci	600
+于适	yu shi	600
+陈牧驰	chen mu chi	600
+巩俐	gong li	600
+周冬雨	zhou dong yu	600
+马思纯	ma si chun	600
+郝蕾	hao lei	600
+袁泉	yuan quan	600
+梅婷	mei ting	600
+斯琴高娃	si qin gao wa	600
+刘晓庆	liu xiao qing	600
+陈冲	chen chong	600
+邬君梅	wu jun mei	600
+余男	yu nan	600
+颜丙燕	yan bing yan	600
+惠英红	hui ying hong	600
+叶德娴	ye de xian	600
+萧芳芳	xiao fang fang	600
+张艾嘉	zhang ai jia	600
+吴君如	wu jun ru	600
+袁咏仪	yuan yong yi	600
+邱淑贞	qiu shu zhen	600
+关之琳	guan zhi lin	600
+张敏	zhang min	600
+蔡卓妍	cai zhuo yan	600
+钟欣潼	zhong xin tong	600
+桂纶镁	gui lun mei	600
+张小斐	zhang xiao fei	600
+高叶	gao ye	600
+文淇	wen qi	600
+张子枫	zhang zi feng	600
+刘浩存	liu hao cun	600
+赵丽颖	zhao li ying	600
+杨紫	yang zi	600
+迪丽热巴	di li re ba	600
+王智	wang zhi	600
+齐溪	qi xi	600
+万茜	wan qian	600
+谭卓	tan zhuo	600
+任素汐	ren su xi	600
+辛芷蕾	xin zhi lei	600
+钟楚曦	zhong chu xi	600
+周也	zhou ye	600
+庄达菲	zhuang da fei	600
+李庚希	li geng xi	600
+宋芸桦	song yun hua	600
+王净	wang jing	600
+许光汉	xu guang han	600
+阮经天	ruan jing tian	600
+赵又廷	zhao you ting	600
+陈柏霖	chen bai lin	600
+杨紫琼	yang zi qiong	600
+关继威	guan ji wei	600
+刘玉玲	liu yu ling	600
+莱昂纳多	lai ang na duo	600
+汤姆汉克斯	tang mu han ke si	600
+汤姆克鲁斯	tang mu ke lu si	600
+阿汤哥	a tang ge	600
+布拉德皮特	bu la de pi te	600
+摩根弗里曼	mo gen fu li man	600
+罗伯特德尼罗	luo bo te de ni luo	600
+德尼罗	de ni luo	600
+阿尔帕西诺	a er pa xi nuo	600
+马龙白兰度	ma long bai lan du	600
+约翰尼德普	yue han ni de pu	600
+德普	de pu	600
+威尔史密斯	wei er shi mi si	600
+尼古拉斯凯奇	ni gu la si kai qi	600
+马特达蒙	ma te da meng	600
+克里斯蒂安贝尔	ke li si di an bei er	600
+贝尔	bei er	600
+小罗伯特唐尼	xiao luo bo te tang ni	600
+唐尼	tang ni	600
+休杰克曼	xiu jie ke man	600
+基努里维斯	ji nu li wei si	600
+金凯瑞	jin kai rui	600
+安东尼霍普金斯	an dong ni huo pu jin si	600
+丹泽尔华盛顿	dan ze er hua sheng dun	600
+加里奥德曼	jia li ao de man	600
+科林费尔斯	ke lin fei er si	600
+本尼迪克特康伯巴奇	ben ni di ke te kang bo ba qi	600
+汤姆哈迪	tang mu ha di	600
+汤老湿	tang lao shi	600
+基里安墨菲	ji li an mo fei	600
+高司令	gao si ling	600
+瑞恩高斯林	rui en gao si lin	600
+小雀斑	xiao que ban	600
+埃迪雷德梅恩	ai di lei de mei en	600
+甜茶	tian cha	600
+提莫西查拉梅	ti mo xi cha la mei	600
+荷兰弟	he lan di	600
+汤姆赫兰德	tang mu he lan de	600
+抖森	dou sen	600
+汤姆希德勒斯顿	tang mu xi de le si dun	600
+海总	hai zong	600
+克里斯海姆斯沃斯	ke li si hai mu si wo si	600
+桃总	tao zong	600
+克里斯埃文斯	ke li si ai wen si	600
+法鲨	fa sha	600
+迈克尔法斯宾德	mai ke er fa si bin de	600
+一美	yi mei	600
+詹姆斯麦卡沃伊	zhan mu si mai ka wo yi	600
+巨石强森	ju shi qiang sen	600
+道恩强森	dao en qiang sen	600
+范迪塞尔	fan di sai er	600
+杰森斯坦森	jie sen si tan sen	600
+史泰龙	shi tai long	600
+布鲁斯威利斯	bu lu si wei li si	600
+连姆尼森	lian mu ni sen	600
+哈里森福特	ha li sen fu te	600
+奥黛丽赫本	ao dai li he ben	600
+费雯丽	fei wen li	600
+玛丽莲梦露	ma li lian meng lu	600
+梅丽尔斯特里普	mei li er si te li pu	600
+梅姨	mei yi	600
+凯特布兰切特	kai te bu lan qie te	600
+凯特温斯莱特	kai te wen si lai te	600
+妮可基德曼	ni ke ji de man	600
+朱莉娅罗伯茨	zhu li ya luo bo ci	600
+安吉丽娜朱莉	an ji li na zhu li	600
+娜塔莉波特曼	na ta li bo te man	600
+安妮海瑟薇	an ni hai se wei	600
+斯嘉丽约翰逊	si jia li yue han xun	600
+寡姐	gua jie	600
+艾玛斯通	ai ma si tong	600
+石头姐	shi tou jie	600
+艾玛沃特森	ai ma wo te sen	600
+詹妮弗劳伦斯	zhan ni fu lao lun si	600
+大表姐	da biao jie	600
+查理兹塞隆	cha li zi sai long	600
+塞隆	sai long	600
+玛格特罗比	ma ge te luo bi	600
+苏菲玛索	su fei ma suo	600
+伊莎贝尔于佩尔	yi sha bei er yu pei er	600
+于佩尔	yu pei er	600
+朱丽叶比诺什	zhu li ye bi nuo shi	600
+莫妮卡贝鲁奇	mo ni ka bei lu qi	600
+宋康昊	song kang hao	600
+崔岷植	cui min zhi	600
+河正宇	he zheng yu	600
+黄政民	huang zheng min	600
+李政宰	li zheng zai	600
+马东锡	ma dong xi	600
+孔刘	kong liu	600
+元斌	yuan bin	600
+孙艺珍	sun yi zhen	600
+全度妍	quan du yan	600
+金敏喜	jin min xi	600
+树木希林	shu mu xi lin	600
+高仓健	gao cang jian	600
+三船敏郎	san chuan min lang	600
+笠智众	li zhi zhong	600
+役所广司	yi suo guang si	600
+木村拓哉	mu cun tuo zai	600
+阿部宽	a bu kuan	600
+堺雅人	jie ya ren	600
+菅田将晖	jian tian jiang hui	600
+松隆子	song long zi	600
+长泽雅美	chang ze ya mei	600
+新垣结衣	xin yuan jie yi	600
+苍井优	cang jing you	600
+安藤樱	an teng ying	600
+满岛光	man dao guang	600
+阿米尔汗	a mi er han	600
+平行蒙太奇	ping xing meng tai qi	600
+交叉蒙太奇	jiao cha meng tai qi	600
+隐喻蒙太奇	yin yu meng tai qi	600
+空镜头	kong jing tou	600
+空镜	kong jing	600
+主观镜头	zhu guan jing tou	600
+客观镜头	ke guan jing tou	600
+摇镜头	yao jing tou	600
+推镜头	tui jing tou	600
+拉镜头	la jing tou	600
+移镜头	yi jing tou	600
+仰拍	yang pai	600
+手持摄影	shou chi she ying	600
+大远景	da yuan jing	600
+侧光	ce guang	600
+顶光	ding guang	600
+冷色调	leng se diao	600
+暖色调	nuan se diao	600
+彩色片	cai se pian	600
+对称构图	dui chen gou tu	600
+黄金分割	huang jin fen ge	600
+巨幕	ju mu	600
+高帧率	gao zhen lv	600
+延时摄影	yan shi she ying	600
+定格动画	ding ge dong hua	600
+分镜脚本	fen jing jiao ben	600
+故事板	gu shi ban	600
+场面调度	chang mian diao du	600
+越轴	yue zhou	600
+跳切	tiao qie	600
+叠化	die hua	600
+粗剪	cu jian	600
+精剪	jing jian	600
+最终剪辑权	zui zhong jian ji quan	600
+导演剪辑版	dao yan jian ji ban	600
+导剪版	dao jian ban	600
+未删减版	wei shan jian ban	600
+剧场版	ju chang ban	600
+先导预告	xian dao yu gao	600
+终极预告	zhong ji yu gao	600
+幕后花絮	mu hou hua xu	600
+原声带	yuan sheng dai	600
+后期配音	hou qi pei yin	600
+双语字幕	shuang yu zi mu	600
+译制片	yi zhi pian	600
+原创剧本	yuan chuang ju ben	600
+改编剧本	gai bian ju ben	600
+线性叙事	xian xing xu shi	600
+非线性叙事	fei xian xing xu shi	600
+插叙	cha xu	600
+多线叙事	duo xian xu shi	600
+环形叙事	huan xing xu shi	600
+群像戏	qun xiang xi	600
+开放式结局	kai fang shi jie ju	600
+剧情反转	ju qing fan zhuan	600
+麦格芬	mai ge fen	600
+片尾彩蛋	pian wei cai dan	600
+友情客串	you qing ke chuan	600
+武替	wu ti	600
+文替	wen ti	600
+光替	guang ti	600
+特技演员	te ji yan yuan	600
+动作指导	dong zuo zhi dao	600
+武术指导	wu shu zhi dao	600
+定妆	ding zhuang	600
+定妆照	ding zhuang zhao	600
+开机仪式	kai ji yi shi	600
+执行导演	zhi xing dao yan	600
+总制片人	zong zhi pian ren	600
+摄影指导	she ying zhi dao	600
+美术指导	mei shu zhi dao	600
+艺术指导	yi shu zhi dao	600
+造型指导	zao xing zhi dao	600
+绿幕	lv mu	600
+蓝幕	lan mu	600
+抠像	kou xiang	600
+动作捕捉	dong zuo bu zhuo	600
+动捕	dong bu	600
+面部捕捉	mian bu bu zhuo	600
+视觉特效	shi jue te xiao	600
+五毛特效	wu mao te xiao	600
+杜比全景声	du bi quan jing sheng	600
+杜比视界	du bi shi jie	600
+杜比影院	du bi ying yuan	600
+中国巨幕	zhong guo ju mu	600
+激光厅	ji guang ting	600
+胶片电影	jiao pian dian ying	600
+修复版	xiu fu ban	600
+改档	gai dang	600
+超前点映	chao qian dian ying	600
+密钥延期	mi yue yan qi	600
+龙标	long biao	600
+公映许可证	gong ying xu ke zheng	600
+院线电影	yuan xian dian ying	600
+网络大电影	wang luo da dian ying	600
+网大	wang da	600
+排片率	pai pian lv	600
+黄金场	huang jin chang	600
+午夜场	wu ye chang	600
+零点场	ling dian chang	600
+总票房	zong piao fang	600
+首日票房	shou ri piao fang	600
+首周票房	shou zhou piao fang	600
+单日票房	dan ri piao fang	600
+累计票房	lei ji piao fang	600
+预售票房	yu shou piao fang	600
+实时票房	shi shi piao fang	600
+分账票房	fen zhang piao fang	600
+分账片	fen zhang pian	600
+批片	pi pian	600
+买断片	mai duan pian	600
+引进片	yin jin pian	600
+合拍片	he pai pian	600
+商业片	shang ye pian	600
+文艺片	wen yi pian	600
+作者电影	zuo zhe dian ying	600
+独立电影	du li dian ying	600
+地下电影	di xia dian ying	600
+主旋律电影	zhu xuan lv dian ying	600
+春节档	chun jie dang	600
+暑期档	shu qi dang	600
+国庆档	guo qing dang	600
+五一档	wu yi dang	600
+端午档	duan wu dang	600
+中秋档	zhong qiu dang	600
+清明档	qing ming dang	600
+情人节档	qing ren jie dang	600
+跨年档	kua nian dang	600
+票房黑马	piao fang hei ma	600
+逆跌	ni die	600
+票房逆跌	piao fang ni die	600
+骨灰级影迷	gu hui ji ying mi	600
+豆瓣评分	dou ban ping fen	600
+爆米花电影	bao mi hua dian ying	600
+公路片	gong lu pian	600
+推理片	tui li pian	600
+犯罪片	fan zui pian	600
+警匪片	jing fei pian	600
+黑帮片	hei bang pian	600
+功夫片	gong fu pian	600
+奇幻片	qi huan pian	600
+灾难片	zai nan pian	600
+历史片	li shi pian	600
+传记片	zhuan ji pian	600
+伪纪录片	wei ji lu pian	600
+家庭片	jia ting pian	600
+伦理片	lun li pian	600
+音乐片	yin yue pian	600
+邪典电影	xie dian dian ying	600
+无声电影	wu sheng dian ying	600
+微电影	wei dian ying	600
+封神之作	feng shen zhi zuo	600
+遗作	yi zuo	600
+衍生片	yan sheng pian	600
+电影宇宙	dian ying yu zhou	600
+漫威电影宇宙	man wei dian ying yu zhou	600
+法国新浪潮	fa guo xin lang chao	600
+新浪潮	xin lang chao	600
+新现实主义	xin xian shi zhu yi	600
+表现主义	biao xian zhu yi	600
+黑色电影	hei se dian ying	600
+奥斯卡金像奖	ao si ka jin xiang jiang	600
+小金人	xiao jin ren	600
+戛纳国际电影节	ga na guo ji dian ying jie	600
+金棕榈奖	jin zong lv jiang	600
+评审团大奖	ping shen tuan da jiang	600
+一种关注	yi zhong guan zhu	600
+威尼斯电影节	wei ni si dian ying jie	600
+威尼斯国际电影节	wei ni si guo ji dian ying jie	600
+金狮奖	jin shi jiang	600
+银狮奖	yin shi jiang	600
+柏林电影节	bo lin dian ying jie	600
+柏林国际电影节	bo lin guo ji dian ying jie	600
+金熊奖	jin xiong jiang	600
+银熊奖	yin xiong jiang	600
+多伦多电影节	duo lun duo dian ying jie	600
+圣丹斯电影节	sheng dan si dian ying jie	600
+洛迦诺电影节	luo jia nuo dian ying jie	600
+金豹奖	jin bao jiang	600
+圣塞巴斯蒂安电影节	sheng sai ba si di an dian ying jie	600
+卡罗维发利电影节	ka luo wei fa li dian ying jie	600
+东京国际电影节	dong jing guo ji dian ying jie	600
+釜山国际电影节	fu shan guo ji dian ying jie	600
+上海国际电影节	shang hai guo ji dian ying jie	600
+上影节	shang ying jie	600
+金爵奖	jin jue jiang	600
+北京国际电影节	bei jing guo ji dian ying jie	600
+北影节	bei ying jie	600
+天坛奖	tian tan jiang	600
+海南岛国际电影节	hai nan dao guo ji dian ying jie	600
+平遥国际电影展	ping yao guo ji dian ying zhan	600
+青年电影展	qing nian dian ying zhan	600
+长春电影节	chang chun dian ying jie	600
+金鹿奖	jin lu jiang	600
+丝绸之路国际电影节	si chou zhi lu guo ji dian ying jie	600
+香港国际电影节	xiang gang guo ji dian ying jie	600
+台北电影节	tai bei dian ying jie	600
+金鸡奖	jin ji jiang	600
+中国电影金鸡奖	zhong guo dian ying jin ji jiang	600
+百花奖	bai hua jiang	600
+大众电影百花奖	da zhong dian ying bai hua jiang	600
+金鸡百花电影节	jin ji bai hua dian ying jie	600
+华表奖	hua biao jiang	600
+中国电影华表奖	zhong guo dian ying hua biao jiang	600
+香港电影金像奖	xiang gang dian ying jin xiang jiang	600
+金马奖	jin ma jiang	600
+台湾电影金马奖	tai wan dian ying jin ma jiang	600
+美国电影金球奖	mei guo dian ying jin qiu jiang	600
+英国电影学院奖	ying guo dian ying xue yuan jiang	600
+凯撒奖	kai sa jiang	600
+法国凯撒奖	fa guo kai sa jiang	600
+大卫奖	da wei jiang	600
+戈雅奖	ge ya jiang	600
+日本电影学院奖	ri ben dian ying xue yuan jiang	600
+蓝丝带奖	lan si dai jiang	600
+电影旬报奖	dian ying xun bao jiang	600
+报知电影奖	bao zhi dian ying jiang	600
+青龙电影奖	qing long dian ying jiang	600
+青龙奖	qing long jiang	600
+大钟奖	da zhong jiang	600
+百想艺术大赏	bai xiang yi shu da shang	600
+金酸莓奖	jin suan mei jiang	600
+土星奖	tu xing jiang	600
+安妮奖	an ni jiang	600
+金扫帚奖	jin sao zhou jiang	600
+中国电影导演协会	zhong guo dian ying dao yan xie hui	600
+主竞赛单元	zhu jing sai dan yuan	600
+最佳男主角	zui jia nan zhu jue	600
+最佳男配角	zui jia nan pei jue	600
+最佳女配角	zui jia nv pei jue	600
+最佳原创剧本	zui jia yuan chuang ju ben	600
+最佳改编剧本	zui jia gai bian ju ben	600
+最佳摄影	zui jia she ying	600
+最佳剪辑	zui jia jian ji	600
+最佳视觉效果	zui jia shi jue xiao guo	600
+最佳美术指导	zui jia mei shu zhi dao	600
+最佳服装设计	zui jia fu zhuang she ji	600
+最佳原创配乐	zui jia yuan chuang pei yue	600
+最佳原创歌曲	zui jia yuan chuang ge qu	600
+最佳音效	zui jia yin xiao	600
+最佳国际影片	zui jia guo ji ying pian	600
+最佳外语片	zui jia wai yu pian	600
+最佳动画长片	zui jia dong hua chang pian	600
+最佳纪录长片	zui jia ji lu chang pian	600
+最佳新导演	zui jia xin dao yan	600
+终身成就奖	zhong shen cheng jiu jiang	600
+三金影帝	san jin ying di	600
+三金影后	san jin ying hou	600
+走红毯	zou hong tan	600
+开幕片	kai mu pian	600
+闭幕片	bi mu pian	600
+中国电影集团	zhong guo dian ying ji tuan	600
+中影	zhong ying	600
+华夏电影	hua xia dian ying	600
+上海电影制片厂	shang hai dian ying zhi pian chang	600
+上影	shang ying	600
+上海美术电影制片厂	shang hai mei shu dian ying zhi pian chang	600
+上美影	shang mei ying	600
+长春电影制片厂	chang chun dian ying zhi pian chang	600
+长影	chang ying	600
+北京电影制片厂	bei jing dian ying zhi pian chang	600
+北影厂	bei ying chang	600
+西安电影制片厂	xi an dian ying zhi pian chang	600
+西影	xi ying	600
+八一电影制片厂	ba yi dian ying zhi pian chang	600
+八一厂	ba yi chang	600
+峨眉电影制片厂	e mei dian ying zhi pian chang	600
+珠江电影制片厂	zhu jiang dian ying zhi pian chang	600
+潇湘电影集团	xiao xiang dian ying ji tuan	600
+华谊兄弟	hua yi xiong di	600
+光线传媒	guang xian chuan mei	600
+彩条屋	cai tiao wu	600
+追光动画	zhui guang dong hua	600
+博纳影业	bo na ying ye	600
+万达影业	wan da ying ye	600
+万达电影	wan da dian ying	600
+欢喜传媒	huan xi chuan mei	600
+北京文化	bei jing wen hua	600
+坏猴子影业	huai hou zi ying ye	600
+亭东影业	ting dong ying ye	600
+猫眼电影	mao yan dian ying	600
+猫眼娱乐	mao yan yu le	600
+淘票票	tao piao piao	600
+阿里影业	a li ying ye	600
+腾讯影业	teng xun ying ye	600
+爱奇艺影业	ai qi yi ying ye	600
+英皇电影	ying huang dian ying	600
+寰亚电影	huan ya dian ying	600
+安乐影片	an le ying pian	600
+邵氏	shao shi	600
+邵氏兄弟	shao shi xiong di	600
+新艺城	xin yi cheng	600
+银河映像	yin he ying xiang	600
+泽东电影	ze dong dian ying	600
+中国电影资料馆	zhong guo dian ying zi liao guan	600
+北电	bei dian	600
+中央戏剧学院	zhong yang xi ju xue yuan	600
+华特迪士尼	hua te di shi ni	600
+漫威影业	man wei ying ye	600
+华纳兄弟	hua na xiong di	600
+环球影业	huan qiu ying ye	600
+哥伦比亚影业	ge lun bi ya ying ye	600
+索尼影业	suo ni ying ye	600
+二十世纪福斯	er shi shi ji fu si	600
+二十世纪影业	er shi shi ji ying ye	600
+狮门影业	shi men ying ye	600
+照明娱乐	zhao ming yu le	600
+蓝天工作室	lan tian gong zuo shi	600
+吉卜力	ji bo li	600
+吉卜力工作室	ji bu li gong zuo shi	600
+东映	dong ying	600
+角川映画	jiao chuan ying hua	600
+奈飞	nai fei	600
+苹果流媒体	ping guo liu mei ti	600
+亚马逊影业	ya ma xun ying ye	600
+工业光魔	gong ye guang mo	600
+维塔数码	wei ta shu ma	600

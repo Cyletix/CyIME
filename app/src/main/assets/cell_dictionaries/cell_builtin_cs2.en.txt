@@ -1,0 +1,333 @@
+CS2
+CSGO
+Counter-Strike
+Mirage
+Inferno
+Dust2
+Nuke
+Ancient
+Anubis
+Overpass
+Vertigo
+Cobblestone
+Train
+Cache
+Tuscan
+Office
+Italy
+Assault
+Lake
+Baggage
+Safehouse
+St. Marc
+Shoots
+Monastery
+Canals
+Biome
+Subzero
+Breach
+Basalt
+Iris
+Thera
+Mills
+AWP
+AK-47
+M4A4
+M4A1-S
+Deagle
+Desert Eagle
+USP-S
+Glock-18
+P2000
+P250
+Five-SeveN
+Tec-9
+CZ75-Auto
+Dual Berettas
+R8 Revolver
+Zeus x27
+MAC-10
+MP9
+MP7
+MP5-SD
+UMP-45
+P90
+PP-Bizon
+Galil AR
+FAMAS
+SG 553
+AUG
+SSG 08
+SCAR-20
+G3SG1
+Nova
+XM1014
+MAG-7
+Sawed-Off
+M249
+Negev
+HE Grenade
+Flashbang
+Smoke Grenade
+Molotov
+Incendiary
+Decoy
+Kevlar
+Defuse Kit
+C4
+StatTrak
+Souvenir
+Karambit
+Butterfly Knife
+M9 Bayonet
+Bayonet
+Flip Knife
+Gut Knife
+Huntsman Knife
+Falchion Knife
+Shadow Daggers
+Bowie Knife
+Ursus Knife
+Navaja Knife
+Stiletto Knife
+Talon Knife
+Classic Knife
+Paracord Knife
+Survival Knife
+Nomad Knife
+Skeleton Knife
+Kukri Knife
+Dragon Lore
+Gungnir
+Medusa
+Howl
+Asiimov
+Fire Serpent
+Wild Lotus
+Printstream
+Redline
+Vulcan
+Doppler
+Gamma Doppler
+Marble Fade
+Case Hardened
+Crimson Web
+Tiger Tooth
+Fade
+Autotronic
+Lore
+Black Laminate
+eco
+force buy
+full buy
+half buy
+save
+retake
+clutch
+ace
+peek
+wide peek
+shoulder peek
+jiggle peek
+prefire
+preaim
+wallbang
+headshot
+one tap
+spray
+burst
+tap
+bunnyhop
+bhop
+air strafe
+jumpthrow
+runboost
+boost
+flash
+smoke
+molly
+nade
+drop
+rush
+rotate
+lurk
+entry
+awper
+IGL
+rifler
+support
+bait
+trade
+refragger
+anti-eco
+pistol round
+overtime
+match point
+hltv
+FACEIT
+ESEA
+Major
+IEM
+BLAST
+ESL
+PGL
+RMR
+MVP
+EVP
+ADR
+KAST
+Rating
+fps
+ping
+tickrate
+subtick
+VAC
+Overwatch
+NAVI
+Natus Vincere
+Vitality
+FaZe
+FaZe Clan
+G2
+G2 Esports
+Spirit
+Team Spirit
+MOUZ
+mousesports
+Astralis
+Liquid
+Team Liquid
+FURIA
+Virtus.pro
+Heroic
+Cloud9
+ENCE
+Eternal Fire
+The MongolZ
+Complexity
+NIP
+Ninjas in Pyjamas
+fnatic
+BIG
+Falcons
+Imperial
+MIBR
+Monte
+GamerLegion
+SAW
+3DMAX
+9z
+Lynn Vision
+LVG
+TYLOO
+Rare Atom
+Wings Up
+s1mple
+ZywOo
+NiKo
+donk
+m0NESY
+ropz
+sh1ro
+device
+dev1ce
+Twistzz
+karrigan
+rain
+broky
+frozen
+electronic
+b1t
+jL
+Aleksib
+iM
+w0nderful
+apEX
+Spinx
+flameZ
+mezii
+huNter-
+malbsMd
+Snax
+chopper
+magixx
+zont1x
+siuhy
+torzsi
+xertioN
+Jimpphat
+Brollan
+EliGE
+NAF
+YEKINDAR
+ultimate
+jks
+stavn
+jabbi
+cadiaN
+br0
+Staehr
+KSCERATO
+yuurih
+FalleN
+chelo
+skullz
+Jame
+FL1T
+fame
+n0rb3r7
+XANTARES
+woxic
+Calyx
+MAJ3R
+bLitz
+Senzu
+mzinho
+Techno4K
+f0rest
+GeT_RiGhT
+olofmeister
+JW
+flusha
+KRIMZ
+kennyS
+shox
+NBK-
+dupreeh
+Magisk
+Xyp9x
+gla1ve
+coldzera
+fer
+TACO
+Stewie2K
+tarik
+autimatic
+Skadoodle
+Hiko
+shroud
+GuardiaN
+Edward
+flamie
+Zeus
+Boombl4
+Perfecto
+Hobbit
+AdreN
+Dosia
+pashaBiceps
+NEO
+TaZ
+byali
+somebody
+Summer
+Attacker
+Freeman
+Kaze
+JamYoung
+Mercury
+Jee
+Starry
+dank1ng
+DANK1NG
+CSBOY

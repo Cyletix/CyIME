@@ -1,0 +1,738 @@
+# CyIME CS2词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_cs2
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+全球攻势	quan qiu gong shi	600
+炙热沙城	zhi re sha cheng	600
+荒漠迷城	huang mo mi cheng	600
+炼狱小镇	lian yu xiao zhen	600
+核子危机	he zi wei ji	600
+远古遗迹	yuan gu yi ji	600
+阿努比斯	a nu bi si	600
+死亡游乐园	si wang you le yuan	600
+殒命大厦	yun ming da sha	600
+古堡激战	gu bao ji zhan	600
+列车停放站	lie che ting fang zhan	600
+死城之谜	si cheng zhi mi	600
+死水	si shui	600
+意大利小镇	yi da li xiao zhen	600
+突击点	tu ji dian	600
+湖畔激战	hu pan ji zhan	600
+行李仓库	xing li cang ku	600
+圣马克镇	sheng ma ke zhen	600
+蔗糖工厂	zhe tang gong chang	600
+安全处所	an quan chu suo	600
+狂牙大行动	kuang ya da xing dong	600
+裂网大行动	lie wang da xing dong	600
+激流大行动	ji liu da xing dong	600
+九头蛇大行动	jiu tou she da xing dong	600
+野火大行动	ye huo da xing dong	600
+血猎大行动	xue lie da xing dong	600
+先锋大行动	xian feng da xing dong	600
+突围大行动	tu wei da xing dong	600
+凤凰大行动	feng huang da xing dong	600
+英勇大行动	ying yong da xing dong	600
+回防模式	hui fang mo shi	600
+搭档模式	da dang mo shi	600
+爆破模式	bao po mo shi	600
+死亡竞赛	si wang jing sai	600
+休闲模式	xiu xian mo shi	600
+竞技模式	jing ji mo shi	600
+优先模式	you xian mo shi	600
+头号特训	tou hao te xun	600
+创意工坊	chuang yi gong fang	600
+练枪图	lian qiang tu	600
+沙二	sha er	600
+核子	he zi	600
+死城	si cheng	600
+匪家	fei jia	600
+警家	jing jia	600
+包点	bao dian	600
+侧道	ce dao	600
+香蕉道	xiang jiao dao	600
+草车	cao che	600
+死点	si dian	600
+马棚	ma peng	600
+长管	chang guan	600
+短管	duan guan	600
+蓝门	lan men	600
+蓝箱	lan xiang	600
+忍者位	ren zhe wei	600
+狙击位	ju ji wei	600
+拱门烟	gong men yan	600
+警家烟	jing jia yan	600
+过点烟	guo dian yan	600
+单向烟	dan xiang yan	600
+灭火烟	mie huo yan	600
+黄房	huang fang	600
+红箱	hong xiang	600
+三楼上	san lou shang	600
+三楼下	san lou xia	600
+外场一线烟	wai chang yi xian yan	600
+白房	bai fang	600
+红房	hong fang	600
+绿通	lv tong	600
+红楼梯	hong lou ti	600
+绿箱	lv xiang	600
+低坡	di po	600
+遗迹中路	yi ji zhong lu	600
+匪口	fei kou	600
+警中	jing zhong	600
+匪中	fei zhong	600
+长箱	chang xiang	600
+短箱	duan xiang	600
+二楼平台	er lou ping tai	600
+一楼平台	yi lou ping tai	600
+旋转楼梯	xuan zhuan lou ti	600
+狙击房	ju ji fang	600
+梯子房	ti zi fang	600
+高坡	gao po	600
+斜台	xie tai	600
+大坡	da po	600
+地图池	di tu chi	600
+服役生涯	fu yi sheng ya	600
+后备生涯	hou bei sheng ya	600
+地图控制	di tu kong zhi	600
+区域控制	qu yu kong zhi	600
+前压点	qian ya dian	600
+默认位	mo ren wei	600
+常规位	chang gui wei	600
+非常规位	fei chang gui wei	600
+老六位	lao liu wei	600
+阴人位	yin ren wei	600
+双架位	shuang jia wei	600
+三架位	san jia wei	600
+反清点	fan qing dian	600
+出生点	chu sheng dian	600
+第一身位	di yi shen wei	600
+复活位	fu huo wei	600
+下包位	xia bao wei	600
+安全包	an quan bao	600
+开放包	kai fang bao	600
+默认包	mo ren bao	600
+一线烟	yi xian yan	600
+假门	jia men	600
+真门	zhen men	600
+箱子后	xiang zi hou	600
+柱子后	zhu zi hou	600
+水泥墙	shui ni qiang	600
+木墙	mu qiang	600
+储油罐	chu you guan	600
+导弹井	dao dan jing	600
+仓库区	cang ku qu	600
+人质房	ren zhi fang	600
+救援区	jiu yuan qu	600
+撤离点	che li dian	600
+购买区	gou mai qu	600
+出生区	chu sheng qu	600
+爆炸点	bao zha dian	600
+边缘区	bian yuan qu	600
+斜墙	xie qiang	600
+遗迹包点	yi ji bao dian	600
+迷城中路	mi cheng zhong lu	600
+小镇香蕉道	xiao zhen xiang jiao dao	600
+沙二中门	sha er zhong men	600
+沙二小道	sha er xiao dao	600
+核子外场	he zi wai chang	600
+核子铁板	he zi tie ban	600
+大厦大坡	da sha da po	600
+大厦中路	da sha zhong lu	600
+游乐园工地	you le yuan gong di	600
+游乐园厕所	you le yuan ce suo	600
+古堡跳台	gu bao tiao tai	600
+火车绿通	huo che lv tong	600
+火车红楼梯	huo che hong lou ti	600
+死城中路	si cheng zhong lu	600
+阿努比斯水下	a nu bi si shui xia	600
+阿努比斯中路	a nu bi si zhong lu	600
+远古遗迹黑屋	yuan gu yi ji hei wu	600
+远古遗迹甜甜圈	yuan gu yi ji tian tian quan	600
+大狙	da ju	600
+鸟狙	niao ju	600
+连狙	lian ju	600
+瞬狙	shun ju	600
+跳狙	tiao ju	600
+甩狙	shuai ju	600
+架狙	jia ju	600
+主狙	zhu ju	600
+副狙	fu ju	600
+双狙	shuang ju	600
+沙鹰	sha ying	600
+沙漠之鹰	sha mo zhi ying	600
+格洛克	ge luo ke	600
+双持贝瑞塔	shuang chi bei rui ta	600
+左轮	zuo lun	600
+电击枪	dian ji qiang	600
+泰瑟枪	tai se qiang	600
+微冲	wei chong	600
+加利尔	jia li er	600
+法玛斯	fa ma si	600
+消音步枪	xiao yin bu qiang	600
+消音手枪	xiao yin shou qiang	600
+内格夫	nei ge fu	600
+轻机枪	qing ji qiang	600
+警喷	jing pen	600
+匪喷	fei pen	600
+连喷	lian pen	600
+短喷	duan pen	600
+重喷	zhong pen	600
+截短霰弹枪	jie duan xian dan qiang	600
+自动步枪	zi dong bu qiang	600
+半自动步枪	ban zi dong bu qiang	600
+全自动手枪	quan zi dong shou qiang	600
+半甲	ban jia	600
+全甲	quan jia	600
+小甲	xiao jia	600
+大甲	da jia	600
+拆弹器	chai dan qi	600
+雷包	lei bao	600
+高爆手雷	gao bao shou lei	600
+烟雾弹	yan wu dan	600
+燃烧瓶	ran shao ping	600
+诱饵弹	you er dan	600
+假闪	jia shan	600
+高闪	gao shan	600
+低闪	di shan	600
+瞬爆闪	shun bao shan	600
+半白	ban bai	600
+背闪	bei shan	600
+反清闪	fan qing shan	600
+自助闪	zi zhu shan	600
+弹墙闪	tan qiang shan	600
+封烟	feng yan	600
+混烟	hun yan	600
+穿烟	chuan yan	600
+散烟	san yan	600
+炸烟	zha yan	600
+单向火	dan xiang huo	600
+死点火	si dian huo	600
+拦路火	lan lu huo	600
+投掷物	tou zhi wu	600
+道具包	dao ju bao	600
+满道具	man dao ju	600
+一颗雷	yi ke lei	600
+一颗烟	yi ke yan	600
+一颗闪	yi ke shan	600
+医疗针	yi liao zhen	600
+战术盾牌	zhan shu dun pai	600
+暗金	an jin	600
+磨损度	mo sun du	600
+崭新出厂	zhan xin chu chang	600
+略有磨损	lve you mo sun	600
+破损不堪	po sun bu kan	600
+战痕累累	zhan hen lei lei	600
+极限磨损	ji xian mo sun	600
+高磨	gao mo	600
+低磨	di mo	600
+卡磨损	ka mo sun	600
+全息印花	quan xi yin hua	600
+闪亮印花	shan liang yin hua	600
+金色印花	jin se yin hua	600
+透镜印花	tou jing yin hua	600
+普通印花	pu tong yin hua	600
+纪念章	ji nian zhang	600
+刀皮	dao pi	600
+枪皮	qiang pi	600
+蝴蝶刀	hu die dao	600
+爪子刀	zhua zi dao	600
+折叠刀	zhe die dao	600
+猎杀者匕首	lie sha zhe bi shou	600
+暗影双匕	an ying shuang bi	600
+鲍伊猎刀	bao yi lie dao	600
+熊刀	xiong dao	600
+折刀	zhe dao	600
+锯齿爪刀	ju chi zhua dao	600
+海豹短刀	hai bao duan dao	600
+系绳匕首	xi sheng bi shou	600
+求生匕首	qiu sheng bi shou	600
+流浪者匕首	liu lang zhe bi shou	600
+骷髅匕首	ku lou bi shou	600
+廓尔喀刀	kuo er ka dao	600
+穿肠刀	chuan chang dao	600
+原版刀	yuan ban dao	600
+运动手套	yun dong shou tao	600
+专业手套	zhuan ye shou tao	600
+驾驶手套	jia shi shou tao	600
+裹手	guo shou	600
+摩托手套	mo tuo shou tao	600
+血猎手套	xue lie shou tao	600
+九头蛇手套	jiu tou she shou tao	600
+狂牙手套	kuang ya shou tao	600
+巨龙传说	ju long chuan shuo	600
+龙狙	long ju	600
+永恒之枪	yong heng zhi qiang	600
+九头金蛇	jiu tou jin she	600
+沙漠九头蛇	sha mo jiu tou she	600
+二西莫夫	er xi mo fu	600
+野荷	ye he	600
+黄金藤蔓	huang jin teng man	600
+水栽竹	shui zai zhu	600
+血腥运动	xue xing yun dong	600
+霓虹革命	ni hong ge ming	600
+霓虹骑士	ni hong qi shi	600
+燃料喷射器	ran liao pen she qi	600
+表面淬火	biao mian cui huo	600
+蓝顶	lan ding	600
+渐变之色	jian bian zhi se	600
+满渐变	man jian bian	600
+大理石渐变	da li shi jian bian	600
+冰火档	bing huo dang	600
+伽马多普勒	jia ma duo pu le	600
+深红之网	shen hong zhi wang	600
+澄澈之水	cheng che zhi shui	600
+传说皮肤	chuan shuo pi fu	600
+隐秘级	yin mi ji	600
+保密级	bao mi ji	600
+受限级	shou xian ji	600
+军规级	jun gui ji	600
+工业级	gong ye ji	600
+消费级	xiao fei ji	600
+违禁级	wei jin ji	600
+非凡级	fei fan ji	600
+迈阿密风云	mai a mi feng yun	600
+潘多拉魔盒	pan duo la mo he	600
+树篱迷宫	shu li mi gong	600
+超导体	chao dao ti	600
+深红和服	shen hong he fu	600
+渐变大理石	jian bian da li shi	600
+帝国格子	di guo ge zi	600
+青铜形态	qing tong xing tai	600
+王蛇	wang she	600
+翡翠网	fei cui wang	600
+印花集	yin hua ji	600
+黑色魅影	hei se mei ying	600
+暴怒野兽	bao nu ye shou	600
+杀意大名	sha yi da ming	600
+精英之作	jing ying zhi zuo	600
+复古流行	fu gu liu xing	600
+极地孤狼	ji di gu lang	600
+前线迷雾	qian xian mi wu	600
+混沌点阵	hun dun dian zhen	600
+夜愿	ye yuan	600
+鬼退治	gui tui zhi	600
+树蝰	shu kui	600
+瘟疫之源	wen yi zhi yuan	600
+浮生如梦	fu sheng ru meng	600
+毛细血管	mao xi xue guan	600
+蠕虫之神	ru chong zhi shen	600
+猫猫狗狗	mao mao gou gou	600
+炽热之炎	chi re zhi yan	600
+火沙鹰	huo sha ying	600
+红色代号	hong se dai hao	600
+纵横波涛	zong heng bo tao	600
+大佬龙	da lao long	600
+核子威慑	he zi wei she	600
+辐射警告	fu she jing gao	600
+地狱烈焰	di yu lie yan	600
+次时代	ci shi dai	600
+皇家圣骑士	huang jia sheng qi shi	600
+金库危机	jin ku wei ji	600
+齿仙	chi xian	600
+活色生香	huo se sheng xiang	600
+赛博朋克	sai bo peng ke	600
+翼蜥	yi xi	600
+外骨骼	wai gu ge	600
+伊卡洛斯	yi ka luo si	600
+武器箱	wu qi xiang	600
+纪念包	ji nian bao	600
+汰换合同	tai huan he tong	600
+十合一	shi he yi	600
+挂刀	gua dao	600
+饰品交易	shi pin jiao yi	600
+磨损值	mo sun zhi	600
+模板号	mo ban hao	600
+图案模板	tu an mo ban	600
+四连贴纸	si lian tie zhi	600
+全息贴纸	quan xi tie zhi	600
+闪亮贴纸	shan liang tie zhi	600
+金色贴纸	jin se tie zhi	600
+战队贴纸	zhan dui tie zhi	600
+选手签名	xuan shou qian ming	600
+刮贴纸	gua tie zhi	600
+默认皮肤	mo ren pi fu	600
+检视武器	jian shi wu qi	600
+切刀	qie dao	600
+转刀	zhuan dao	600
+检视动画	jian shi dong hua	600
+切枪动画	qie qiang dong hua	600
+换弹动画	huan dan dong hua	600
+稀有动画	xi you dong hua	600
+架点	jia dian	600
+拉枪	la qiang	600
+拼枪	pin qiang	600
+控枪	kong qiang	600
+压枪	ya qiang	600
+跟枪	gen qiang	600
+甩枪	shuai qiang	600
+预瞄	yu miao	600
+提前枪	ti qian qiang	600
+穿射	chuan she	600
+穿箱	chuan xiang	600
+一发入魂	yi fa ru hun	600
+爆头线	bao tou xian	600
+爆头率	bao tou lv	600
+反向急停	fan xiang ji ting	600
+下蹲急停	xia dun ji ting	600
+静步	jing bu	600
+静音走	jing yin zou	600
+搜点	sou dian	600
+排点	pai dian	600
+反清	fan qing	600
+前压	qian ya	600
+顶防	ding fang	600
+退防	tui fang	600
+交叉火力	jiao cha huo li	600
+双架	shuang jia	600
+高空双架	gao kong shuang jia	600
+旋转跳	xuan zhuan tiao	600
+蹲跳	dun tiao	600
+跑投	pao tou	600
+走投	zou tou	600
+蹲投	dun tou	600
+左键投掷	zuo jian tou zhi	600
+右键投掷	you jian tou zhi	600
+双键投掷	shuang jian tou zhi	600
+道具投掷	dao ju tou zhi	600
+道具配合	dao ju pei he	600
+同步率	tong bu lv	600
+闪光配合	shan guang pei he	600
+要闪	yao shan	600
+吃闪	chi shan	600
+送首杀	song shou sha	600
+首杀	shou sha	600
+灭队	mie dui	600
+残局大师	can ju da shi	600
+一打一	yi da yi	600
+一打二	yi da er	600
+一打三	yi da san	600
+一打四	yi da si	600
+一打五	yi da wu	600
+惊天残局	jing tian can ju	600
+手枪局	shou qiang ju	600
+经济局	jing ji ju	600
+全空局	quan kong ju	600
+半起局	ban qi ju	600
+半起	ban qi	600
+强起局	qiang qi ju	600
+强起	qiang qi	600
+长枪局	chang qiang ju	600
+全起局	quan qi ju	600
+福利局	fu li ju	600
+赛点局	sai dian ju	600
+选边刀局	xuan bian dao ju	600
+拼刀	pin dao	600
+刀局	dao ju	600
+刀杀	dao sha	600
+保枪	bao qiang	600
+发枪	fa qiang	600
+掉枪	diao qiang	600
+捡枪	jian qiang	600
+换枪	huan qiang	600
+借火	jie huo	600
+攒经济	zan jing ji	600
+经济重置	jing ji chong zhi	600
+经济崩盘	jing ji beng pan	600
+连败奖励	lian bai jiang li	600
+击杀奖励	ji sha jiang li	600
+下包奖励	xia bao jiang li	600
+假拆	jia chai	600
+十秒拆包	shi miao chai bao	600
+五秒拆包	wu miao chai bao	600
+滴包	di bao	600
+守包	shou bao	600
+掉包	diao bao	600
+看包	kan bao	600
+带包	dai bao	600
+下包	xia bao	600
+默认战术	mo ren zhan shu	600
+打默认	da mo ren	600
+控图	kong tu	600
+慢摸	man mo	600
+干拉	gan la	600
+大拉	da la	600
+小身位	xiao shen wei	600
+晃身	huang shen	600
+骗枪	pian qiang	600
+骗道具	pian dao ju	600
+转点	zhuan dian	600
+绕后	rao hou	600
+偷背身	tou bei shen	600
+背身	bei shen	600
+赌点	du dian	600
+重防	zhong fang	600
+单防	dan fang	600
+卖队友	mai dui you	600
+拉枪线	la qiang xian	600
+破点	po dian	600
+突破手	tu po shou	600
+断后位	duan hou wei	600
+战神位	zhan shen wei	600
+主点人	zhu dian ren	600
+副点人	fu dian ren	600
+报点	bao dian	600
+假报点	jia bao dian	600
+听脚步	ting jiao bu	600
+切枪声	qie qiang sheng	600
+换弹声	huan dan sheng	600
+开镜声	kai jing sheng	600
+落地声	luo di sheng	600
+假脚步	jia jiao bu	600
+点射	dian she	600
+扫射转移	sao she zhuan yi	600
+描边	miao bian	600
+马枪	ma qiang	600
+大残	da can	600
+一滴血	yi di xue	600
+头甲	tou jia	600
+穿甲伤害	chuan jia shang hai	600
+距离衰减	ju li shuai jian	600
+后坐力	hou zuo li	600
+静态准星	jing tai zhun xing	600
+动态准星	dong tai zhun xing	600
+十字准星	shi zi zhun xing	600
+圆点准星	yuan dian zhun xing	600
+准星代码	zhun xing dai ma	600
+持枪视角	chi qiang shi jiao	600
+左手持枪	zuo shou chi qiang	600
+右手持枪	you shou chi qiang	600
+鼠标速度	shu biao su du	600
+手臂流	shou bi liu	600
+手腕流	shou wan liu	600
+官方匹配	guan fang pi pei	600
+官匹	guan pi	600
+完美平台	wan mei ping tai	600
+天梯分	tian ti fen	600
+白银局	bai yin ju	600
+黄金新星	huang jin xin xing	600
+大老鹰	da lao ying	600
+小地球	xiao di qiu	600
+大地球	da di qiu	600
+优先状态	you xian zhuang tai	600
+绿色信任	lv se xin ren	600
+红色信任	hong se xin ren	600
+反作弊	fan zuo bi	600
+监管系统	jian guan xi tong	600
+透视挂	tou shi gua	600
+自瞄挂	zi miao gua	600
+锁头	suo tou	600
+暴力锁头	bao li suo tou	600
+微自瞄	wei zi miao	600
+大陀螺	da tuo luo	600
+小陀螺	xiao tuo luo	600
+路人局	lu ren ju	600
+训练赛	xun lian sai	600
+第一视角	di yi shi jiao	600
+自由视角	zi you shi jiao	600
+击杀集锦	ji sha ji jin	600
+高光时刻	gao guang shi ke	600
+名场面	ming chang mian	600
+冥场面	ming chang mian	600
+下饭操作	xia fan cao zuo	600
+蹲逼	dun bi	600
+起狙	qi ju	600
+刷钱	shua qian	600
+送包	song bao	600
+架死	jia si	600
+双拉	shuang la	600
+同步拉	tong bu la	600
+道具全交	dao ju quan jiao	600
+省道具	sheng dao ju	600
+留道具	liu dao ju	600
+战术暂停	zhan shu zan ting	600
+技术暂停	ji shu zan ting	600
+投票踢人	tou piao ti ren	600
+让一追二	rang yi zhui er	600
+让二追三	rang er zhui san	600
+零封	ling feng	600
+进攻方	jin gong fang	600
+防守方	fang shou fang	600
+人质救援	ren zhi jiu yuan	600
+全员存活	quan yuan cun huo	600
+无甲	wu jia	600
+起沙鹰	qi sha ying	600
+沙鹰翻盘	sha ying fan pan	600
+手撕大狙	shou si da ju	600
+混烟击杀	hun yan ji sha	600
+盲狙击杀	mang ju ji sha	600
+跳狙击杀	tiao ju ji sha	600
+穿墙击杀	chuan qiang ji sha	600
+手雷击杀	shou lei ji sha	600
+燃烧弹击杀	ran shao dan ji sha	600
+电击枪击杀	dian ji qiang ji sha	600
+闪光弹击杀	shan guang dan ji sha	600
+烟雾弹击杀	yan wu dan ji sha	600
+拆包得分	chai bao de fen	600
+下包得分	xia bao de fen	600
+闪光助攻	shan guang zhu gong	600
+伤害量	shang hai liang	600
+场均伤害	chang jun shang hai	600
+局均击杀	ju jun ji sha	600
+多杀率	duo sha lv	600
+首杀率	shou sha lv	600
+首死率	shou si lv	600
+战绩表	zhan ji biao	600
+计分板	ji fen ban	600
+大哥位	da ge wei	600
+工具人	gong ju ren	600
+闪光人	shan guang ren	600
+背锅位	bei guo wei	600
+指挥位	zhi hui wei	600
+辅助位	fu zhu wei	600
+自由人位	zi you ren wei	600
+突破位	tu po wei	600
+主狙位	zhu ju wei	600
+天生赢家	tian sheng ying jia	600
+百星战队	bai xing zhan dui	600
+银河战舰	yin he zhan jian	600
+液体战队	ye ti zhan dui	600
+绿龙	lv long	600
+绿龙战队	lv long zhan dui	600
+老鼠战队	lao shu zhan dui	600
+黑豹战队	hei bao zhan dui	600
+忍睡	ren shui	600
+睡衣忍者	shui yi ren zhe	600
+天禄	tian lu	600
+天禄战队	tian lu zhan dui	600
+蒙古队	meng gu dui	600
+红星战队	hong xing zhan dui	600
+蓝星战队	lan xing zhan dui	600
+狂热战队	kuang re zhan dui	600
+帝国战队	di guo zhan dui	600
+光环战队	guang huan zhan dui	600
+邪恶天才	xie e tian cai	600
+猎鹰战队	lie ying zhan dui	600
+永恒之火	yong heng zhi huo	600
+英雄战队	ying xiong zhan dui	600
+泰坦战队	tai tan zhan dui	600
+贴纸赛	tie zhi sai	600
+挑战者组	tiao zhan zhe zu	600
+传奇组	chuan qi zu	600
+冠军组	guan jun zu	600
+新挑战者组	xin tiao zhan zhe zu	600
+新传奇组	xin chuan qi zu	600
+新冠军组	xin guan jun zu	600
+封闭预选赛	feng bi yu xuan sai	600
+公开预选赛	gong kai yu xuan sai	600
+英特尔大满贯	ying te er da man guan	600
+卡托维兹	ka tuo wei zi	600
+科隆锦标赛	ke long jin biao sai	600
+里约锦标赛	li yue jin biao sai	600
+上海锦标赛	shang hai jin biao sai	600
+巴黎锦标赛	ba li jin biao sai	600
+柏林锦标赛	bo lin jin biao sai	600
+伦敦锦标赛	lun dun jin biao sai	600
+波士顿锦标赛	bo shi dun jin biao sai	600
+克卢日	ke lu ri	600
+延雪平	yan xue ping	600
+巅峰联赛	dian feng lian sai	600
+别墅杯	bie shu bei	600
+震中杯	zhen zhong bei	600
+群星联赛	qun xing lian sai	600
+极限之地	ji xian zhi di	600
+亚洲杯	ya zhou bei	600
+年度最佳选手	nian du zui jia xuan shou	600
+年度前二十	nian du qian er shi	600
+最有价值选手	zui you jia zhi xuan shou	600
+赛事奖杯	sai shi jiang bei	600
+冠军戒指	guan jun jie zhi	600
+鸡哥	ji ge	600
+电子哥	dian zi ge	600
+胖球	pang qiu	600
+小吉米	xiao ji mi	600
+寒王	han wang	600
+奥拉夫	ao la fu	600
+冷神	leng shen	600
+狙神	ju shen	600
+阿汤哥	a tang ge	600
+魔男	mo nan	600
+大光头	da guang tou	600
+呼吸哥	hu xi ge	600
+老猎人	lao lie ren	600
+狂哥	kuang ge	600
+爆头哥	bao tou ge	600
+肯尼	ken ni	600
+瓜皇	gua huang	600
+森林哥	sen lin ge	600
+狗头人	gou tou ren	600
+老帅哥	lao shuai ge	600
+点子哥	dian zi ge	600
+汉堡王	han bao wang	600
+小菊	xiao ju	600
+汉森	han sen	600
+茂名刀客	mao ming dao ke	600
+玩机器	wan ji qi	600
+马西西	ma xi xi	600
+冬瓜强	dong gua qiang	600
+老冕	lao mian	600
+死水主播	si shui zhu bo	600
+大茄子	da qie zi	600
+白给王	bai gei wang	600
+蒸汽平台	zheng qi ping tai	600
+国际服	guo ji fu	600
+起源二	qi yuan er	600
+起源引擎	qi yuan yin qing	600
+体积烟	ti ji yan	600
+子刷新	zi shua xin	600
+半买局	ban mai ju	600
+手枪王	shou qiang wang	600
+残局王	can ju wang	600
+道具王	dao ju wang	600
+枪男	qiang nan	600
+神经刀	shen jing dao	600
+大厦之主	da sha zhi zhu	600
+小镇之王	xiao zhen zhi wang	600
+沙二之神	sha er zhi shen	600
+核子王者	he zi wang zhe	600
+炼狱魔王	lian yu mo wang	600
+教练位	jiao lian wei	600
+替补位	ti bu wei	600
+青训队	qing xun dui	600
+转会期	zhuan hui qi	600
+买断费	mai duan fei	600
+下放替补	xia fang ti bu	600
+全华班	quan hua ban	600
+国际纵队	guo ji zong dui	600
+丹麦核心	dan mai he xin	600
+欧洲赛区	ou zhou sai qu	600
+美洲赛区	mei zhou sai qu	600
+亚洲赛区	ya zhou sai qu	600
+大洋洲赛区	da yang zhou sai qu	600
+中国赛区	zhong guo sai qu	600
+选图阶段	xuan tu jie duan	600
+禁图	jin tu	600
+选图	xuan tu	600
+图三	tu san	600
+图四	tu si	600
+图五	tu wu	600
+决胜图	jue sheng tu	600
+拼刀选边	pin dao xuan bian	600
+线下赛	xian xia sai	600
+线上赛	xian shang sai	600
+场馆赛	chang guan sai	600
+隔音房	ge yin fang	600
+裁判暂停	cai pan zan ting	600
+赛后握手	sai hou wo shou	600
+赛后采访	sai hou cai fang	600
+败者组	bai zhe zu	600
+胜者组	sheng zhe zu	600
+双败淘汰	shuang bai tao tai	600
+单败淘汰	dan bai tao tai	600
+瑞士轮	rui shi lun	600
+四强赛	si qiang sai	600
+季军赛	ji jun sai	600
+竞猜硬币	jing cai ying bi	600
+钻石币	zuan shi bi	600
+黄金币	huang jin bi	600
+白银币	bai yin bi	600
+青铜币	qing tong bi	600
+观众通行证	guan zhong tong xing zheng	600
+大行动通行证	da xing dong tong xing zheng	600
+大行动之星	da xing dong zhi xing	600
+服务勋章	fu wu xun zhang	600
+五年老兵	wu nian lao bing	600
+十年老兵	shi nian lao bing	600
+忠诚徽章	zhong cheng hui zhang	600

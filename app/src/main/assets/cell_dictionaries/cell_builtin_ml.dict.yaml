@@ -1,0 +1,1763 @@
+# CyIME 机器学习词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_ml
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+统计学习	tong ji xue xi	600
+表征学习	biao zheng xue xi	600
+表示学习	biao shi xue xi	600
+特征学习	te zheng xue xi	600
+监督学习	jian du xue xi	600
+有监督学习	you jian du xue xi	600
+无监督学习	wu jian du xue xi	600
+非监督学习	fei jian du xue xi	600
+半监督学习	ban jian du xue xi	600
+自监督学习	zi jian du xue xi	600
+弱监督学习	ruo jian du xue xi	600
+强化学习	qiang hua xue xi	600
+深度强化学习	shen du qiang hua xue xi	600
+逆强化学习	ni qiang hua xue xi	600
+模仿学习	mo fang xue xi	600
+迁移学习	qian yi xue xi	600
+多任务学习	duo ren wu xue xi	600
+元学习	yuan xue xi	600
+小样本学习	xiao yang ben xue xi	600
+少样本学习	shao yang ben xue xi	600
+零样本学习	ling yang ben xue xi	600
+单样本学习	dan yang ben xue xi	600
+持续学习	chi xu xue xi	600
+连续学习	lian xu xue xi	600
+增量学习	zeng liang xue xi	600
+在线学习	zai xian xue xi	600
+离线学习	li xian xue xi	600
+批量学习	pi liang xue xi	600
+主动学习	zhu dong xue xi	600
+课程学习	ke cheng xue xi	600
+自步学习	zi bu xue xi	600
+对比学习	dui bi xue xi	600
+度量学习	du liang xue xi	600
+流形学习	liu xing xue xi	600
+集成学习	ji cheng xue xi	600
+联邦学习	lian bang xue xi	600
+分布式学习	fen bu shi xue xi	600
+协同学习	xie tong xue xi	600
+互学习	hu xue xi	600
+知识蒸馏	zhi shi zheng liu	600
+自训练	zi xun lian	600
+协同训练	xie tong xun lian	600
+伪标签	wei biao qian	600
+多示例学习	duo shi li xue xi	600
+多标签学习	duo biao qian xue xi	600
+多视图学习	duo shi tu xue xi	600
+多模态学习	duo mo tai xue xi	600
+跨模态学习	kua mo tai xue xi	600
+领域自适应	ling yu zi shi ying	600
+域自适应	yu zi shi ying	600
+领域泛化	ling yu fan hua	600
+域泛化	yu fan hua	600
+提示学习	ti shi xue xi	600
+上下文学习	shang xia wen xue xi	600
+情境学习	qing jing xue xi	600
+指令微调	zhi ling wei tiao	600
+人类反馈强化学习	ren lei fan kui qiang hua xue xi	600
+偏好优化	pian hao you hua	600
+直接偏好优化	zhi jie pian hao you hua	600
+因果推断	yin guo tui duan	600
+因果学习	yin guo xue xi	600
+因果发现	yin guo fa xian	600
+可解释人工智能	ke jie shi ren gong zhi neng	600
+可信人工智能	ke xin ren gong zhi neng	600
+隐私计算	yin si ji suan	600
+差分隐私	cha fen yin si	600
+同态加密	tong tai jia mi	600
+机器遗忘	ji qi yi wang	600
+神经符号学习	shen jing fu hao xue xi	600
+归纳偏置	gui na pian zhi	600
+先验知识	xian yan zhi shi	600
+泛化能力	fan hua neng li	600
+泛化误差	fan hua wu cha	600
+泛化界	fan hua jie	600
+经验风险	jing yan feng xian	600
+结构风险	jie gou feng xian	600
+期望风险	qi wang feng xian	600
+经验风险最小化	jing yan feng xian zui xiao hua	600
+结构风险最小化	jie gou feng xian zui xiao hua	600
+奥卡姆剃刀	ao ka mu ti dao	600
+没有免费午餐定理	mei you mian fei wu can ding li	600
+丑小鸭定理	chou xiao ya ding li	600
+维度灾难	wei du zai nan	600
+维数灾难	wei shu zai nan	600
+偏差方差权衡	pian cha fang cha quan heng	600
+偏差方差分解	pian cha fang cha fen jie	600
+过拟合	guo ni he	600
+欠拟合	qian ni he	600
+假设空间	jia she kong jian	600
+版本空间	ban ben kong jian	600
+特征空间	te zheng kong jian	600
+样本空间	yang ben kong jian	600
+输入空间	shu ru kong jian	600
+输出空间	shu chu kong jian	600
+标签空间	biao qian kong jian	600
+隐空间	yin kong jian	600
+潜在空间	qian zai kong jian	600
+嵌入空间	qian ru kong jian	600
+度量空间	du liang kong jian	600
+希尔伯特空间	xi er bo te kong jian	600
+再生核希尔伯特空间	zai sheng he xi er bo te kong jian	600
+流形假设	liu xing jia she	600
+聚类假设	ju lei jia she	600
+平滑假设	ping hua jia she	600
+独立同分布	du li tong fen bu	600
+分布外泛化	fen bu wai fan hua	600
+分布外检测	fen bu wai jian ce	600
+分布偏移	fen bu pian yi	600
+协变量偏移	xie bian liang pian yi	600
+概念漂移	gai nian piao yi	600
+标签偏移	biao qian pian yi	600
+开放集识别	kai fang ji shi bie	600
+长尾分布	chang wei fen bu	600
+类别不平衡	lei bie bu ping heng	600
+样本不均衡	yang ben bu jun heng	600
+噪声标签	zao sheng biao qian	600
+对抗样本	dui kang yang ben	600
+对抗攻击	dui kang gong ji	600
+对抗训练	dui kang xun lian	600
+对抗防御	dui kang fang yu	600
+白盒攻击	bai he gong ji	600
+黑盒攻击	hei he gong ji	600
+后门攻击	hou men gong ji	600
+数据投毒	shu ju tou du	600
+模型窃取	mo xing qie qu	600
+成员推理攻击	cheng yuan tui li gong ji	600
+模型反演攻击	mo xing fan yan gong ji	600
+鲁棒性	lu bang xing	600
+稳健性	wen jian xing	600
+可解释性	ke jie shi xing	600
+算法偏见	suan fa pian jian	600
+最优化理论	zui you hua li lun	600
+凸优化	tu you hua	600
+非凸优化	fei tu you hua	600
+信息论	xin xi lun	600
+标量	biao liang	600
+张量	zhang liang	600
+特征值	te zheng zhi	600
+特征向量	te zheng xiang liang	600
+奇异值	qi yi zhi	600
+奇异值分解	qi yi zhi fen jie	600
+特征值分解	te zheng zhi fen jie	600
+主成分	zhu cheng fen	600
+正交矩阵	zheng jiao ju zhen	600
+对称矩阵	dui chen ju zhen	600
+正定矩阵	zheng ding ju zhen	600
+半正定矩阵	ban zheng ding ju zhen	600
+稀疏矩阵	xi shu ju zhen	600
+对角矩阵	dui jiao ju zhen	600
+单位矩阵	dan wei ju zhen	600
+逆矩阵	ni ju zhen	600
+伪逆矩阵	wei ni ju zhen	600
+广义逆矩阵	guang yi ni ju zhen	600
+矩阵转置	ju zhen zhuan zhi	600
+矩阵求逆	ju zhen qiu ni	600
+矩阵分解	ju zhen fen jie	600
+非负矩阵分解	fei fu ju zhen fen jie	600
+张量分解	zhang liang fen jie	600
+矩阵乘法	ju zhen cheng fa	600
+哈达玛积	ha da ma ji	600
+克罗内克积	ke luo nei ke ji	600
+内积	nei ji	600
+外积	wai ji	600
+叉积	cha ji	600
+范数	fan shu	600
+零范数	ling fan shu	600
+一范数	yi fan shu	600
+二范数	er fan shu	600
+无穷范数	wu qiong fan shu	600
+弗罗贝尼乌斯范数	fu luo bei ni wu si fan shu	600
+核范数	he fan shu	600
+谱范数	pu fan shu	600
+行列式	hang lie shi	600
+矩阵的迹	ju zhen de ji	600
+矩阵的秩	ju zhen de zhi	600
+低秩近似	di zhi jin si	600
+低秩矩阵	di zhi ju zhen	600
+线性相关	xian xing xiang guan	600
+线性无关	xian xing wu guan	600
+正交基	zheng jiao ji	600
+标准正交基	biao zhun zheng jiao ji	600
+投影矩阵	tou ying ju zhen	600
+余弦相似度	yu xian xiang si du	600
+欧氏距离	ou shi ju li	600
+欧几里得距离	ou ji li de ju li	600
+曼哈顿距离	man ha dun ju li	600
+切比雪夫距离	qie bi xue fu ju li	600
+闵可夫斯基距离	min ke fu si ji ju li	600
+马氏距离	ma shi ju li	600
+汉明距离	han ming ju li	600
+编辑距离	bian ji ju li	600
+杰卡德相似系数	jie ka de xiang si xi shu	600
+皮尔逊相关系数	pi er xun xiang guan xi shu	600
+斯皮尔曼相关系数	si pi er man xiang guan xi shu	600
+协方差	xie fang cha	600
+协方差矩阵	xie fang cha ju zhen	600
+相关矩阵	xiang guan ju zhen	600
+偏导数	pian dao shu	600
+方向导数	fang xiang dao shu	600
+梯度向量	ti du xiang liang	600
+雅可比矩阵	ya ke bi ju zhen	600
+海森矩阵	hai sen ju zhen	600
+黑塞矩阵	hei sai ju zhen	600
+泰勒展开	tai le zhan kai	600
+链式法则	lian shi fa ze	600
+拉格朗日乘子法	la ge lang ri cheng zi fa	600
+对偶问题	dui ou wen ti	600
+强对偶性	qiang dui ou xing	600
+弱对偶性	ruo dui ou xing	600
+鞍点	an dian	600
+局部最优	ju bu zui you	600
+全局最优	quan ju zui you	600
+局部极小值	ju bu ji xiao zhi	600
+全局极小值	quan ju ji xiao zhi	600
+凸函数	tu han shu	600
+凹函数	ao han shu	600
+凸集	tu ji	600
+利普希茨连续	li pu xi ci lian xu	600
+随机变量	sui ji bian liang	600
+概率分布	gai lv fen bu	600
+概率密度函数	gai lv mi du han shu	600
+概率质量函数	gai lv zhi liang han shu	600
+累积分布函数	lei ji fen bu han shu	600
+联合分布	lian he fen bu	600
+边缘分布	bian yuan fen bu	600
+条件分布	tiao jian fen bu	600
+条件概率	tiao jian gai lv	600
+全概率公式	quan gai lv gong shi	600
+贝叶斯定理	bei ye si ding li	600
+贝叶斯公式	bei ye si gong shi	600
+先验概率	xian yan gai lv	600
+后验概率	hou yan gai lv	600
+似然函数	si ran han shu	600
+对数似然	dui shu si ran	600
+极大似然估计	ji da si ran gu ji	600
+最大似然估计	zui da si ran gu ji	600
+最大后验估计	zui da hou yan gu ji	600
+贝叶斯估计	bei ye si gu ji	600
+共轭先验	gong e xian yan	600
+数学期望	shu xue qi wang	600
+方差	fang cha	600
+标准差	biao zhun cha	600
+中位数	zhong wei shu	600
+分位数	fen wei shu	600
+矩估计	ju gu ji	600
+置信区间	zhi xin qu jian	600
+假设检验	jia she jian yan	600
+显著性水平	xian zhu xing shui ping	600
+正态分布	zheng tai fen bu	600
+高斯分布	gao si fen bu	600
+多维高斯分布	duo wei gao si fen bu	600
+多元正态分布	duo yuan zheng tai fen bu	600
+伯努利分布	bo nu li fen bu	600
+二项分布	er xiang fen bu	600
+多项分布	duo xiang fen bu	600
+分类分布	fen lei fen bu	600
+泊松分布	po song fen bu	600
+指数分布	zhi shu fen bu	600
+均匀分布	jun yun fen bu	600
+拉普拉斯分布	la pu la si fen bu	600
+狄利克雷分布	di li ke lei fen bu	600
+伽马分布	ga ma fen bu	600
+贝塔分布	bei ta fen bu	600
+卡方分布	ka fang fen bu	600
+学生分布	xue sheng fen bu	600
+大数定律	da shu ding lv	600
+中心极限定理	zhong xin ji xian ding li	600
+马尔可夫链	ma er ke fu lian	600
+马尔可夫性质	ma er ke fu xing zhi	600
+转移概率	zhuan yi gai lv	600
+状态转移矩阵	zhuang tai zhuan yi ju zhen	600
+平稳分布	ping wen fen bu	600
+遍历性	bian li xing	600
+蒙特卡洛方法	meng te ka luo fang fa	600
+蒙特卡洛采样	meng te ka luo cai yang	600
+拒绝采样	ju jue cai yang	600
+重要性采样	zhong yao xing cai yang	600
+吉布斯采样	ji bu si cai yang	600
+马尔可夫链蒙特卡洛	ma er ke fu lian meng te ka luo	600
+变分推断	bian fen tui duan	600
+证据下界	zheng ju xia jie	600
+期望最大化算法	qi wang zui da hua suan fa	600
+信息熵	xin xi shang	600
+香农熵	xiang nong shang	600
+条件熵	tiao jian shang	600
+联合熵	lian he shang	600
+相对熵	xiang dui shang	600
+交叉熵	jiao cha shang	600
+散度	san du	600
+互信息	hu xin xi	600
+点互信息	dian hu xin xi	600
+信息增益	xin xi zeng yi	600
+信息增益率	xin xi zeng yi lv	600
+基尼指数	ji ni zhi shu	600
+基尼不纯度	ji ni bu chun du	600
+推土机距离	tui tu ji ju li	600
+瓦瑟斯坦距离	wa se si tan ju li	600
+最优传输	zui you chuan shu	600
+核函数	he han shu	600
+核技巧	he ji qiao	600
+核方法	he fang fa	600
+线性核	xian xing he	600
+多项式核	duo xiang shi he	600
+高斯核	gao si he	600
+径向基核函数	jing xiang ji he han shu	600
+拉普拉斯核	la pu la si he	600
+线性回归	xian xing hui gui	600
+一元线性回归	yi yuan xian xing hui gui	600
+多元线性回归	duo yuan xian xing hui gui	600
+多项式回归	duo xiang shi hui gui	600
+岭回归	ling hui gui	600
+套索回归	tao suo hui gui	600
+弹性网络	tan xing wang luo	600
+逻辑回归	luo ji hui gui	600
+对数几率回归	dui shu ji lv hui gui	600
+广义线性模型	guang yi xian xing mo xing	600
+最小二乘法	zui xiao er cheng fa	600
+普通最小二乘	pu tong zui xiao er cheng	600
+加权最小二乘	jia quan zui xiao er cheng	600
+偏最小二乘	pian zui xiao er cheng	600
+逻辑斯蒂回归	luo ji si di hui gui	600
+软最大化回归	ruan zui da hua hui gui	600
+分位数回归	fen wei shu hui gui	600
+泊松回归	po song hui gui	600
+支持向量机	zhi chi xiang liang ji	600
+支持向量分类	zhi chi xiang liang fen lei	600
+支持向量回归	zhi chi xiang liang hui gui	600
+支持向量	zhi chi xiang liang	600
+最大间隔超平面	zui da jian ge chao ping mian	600
+硬间隔	ying jian ge	600
+软间隔	ruan jian ge	600
+松弛变量	song chi bian liang	600
+序列最小优化	xu lie zui xiao you hua	600
+单类支持向量机	dan lei zhi chi xiang liang ji	600
+决策树	jue ce shu	600
+分类树	fen lei shu	600
+回归树	hui gui shu	600
+分类与回归树	fen lei yu hui gui shu	600
+决策树剪枝	jue ce shu jian zhi	600
+预剪枝	yu jian zhi	600
+后剪枝	hou jian zhi	600
+条件推理树	tiao jian tui li shu	600
+随机森林	sui ji sen lin	600
+极端随机树	ji duan sui ji shu	600
+孤立森林	gu li sen lin	600
+旋转森林	xuan zhuan sen lin	600
+深度森林	shen du sen lin	600
+提升方法	ti sheng fang fa	600
+提升树	ti sheng shu	600
+自适应提升	zi shi ying ti sheng	600
+梯度提升	ti du ti sheng	600
+梯度提升决策树	ti du ti sheng jue ce shu	600
+梯度提升机	ti du ti sheng ji	600
+极端梯度提升	ji duan ti du ti sheng	600
+轻量梯度提升机	qing liang ti du ti sheng ji	600
+类别梯度提升	lei bie ti du ti sheng	600
+袋装法	dai zhuang fa	600
+自助采样法	zi zhu cai yang fa	600
+堆叠法	dui die fa	600
+混合专家模型	hun he zhuan jia mo xing	600
+稀疏混合专家	xi shu hun he zhuan jia	600
+投票分类器	tou piao fen lei qi	600
+硬投票	ying tou piao	600
+软投票	ruan tou piao	600
+朴素贝叶斯	pu su bei ye si	600
+高斯朴素贝叶斯	gao si pu su bei ye si	600
+多项式朴素贝叶斯	duo xiang shi pu su bei ye si	600
+伯努利朴素贝叶斯	bo nu li pu su bei ye si	600
+半朴素贝叶斯	ban pu su bei ye si	600
+贝叶斯网络	bei ye si wang luo	600
+信念网络	xin nian wang luo	600
+有向无环图	you xiang wu huan tu	600
+马尔可夫随机场	ma er ke fu sui ji chang	600
+条件随机场	tiao jian sui ji chang	600
+线性链条件随机场	xian xing lian tiao jian sui ji chang	600
+隐马尔可夫模型	yin ma er ke fu mo xing	600
+维特比算法	wei te bi suan fa	600
+前向后向算法	qian xiang hou xiang suan fa	600
+鲍姆韦尔奇算法	bao mu wei er qi suan fa	600
+概率图模型	gai lv tu mo xing	600
+因子图	yin zi tu	600
+置信传播	zhi xin chuan bo	600
+近邻算法	jin lin suan fa	600
+最近邻算法	zui jin lin suan fa	600
+近似最近邻	jin si zui jin lin	600
+局部敏感哈希	ju bu min gan ha xi	600
+倒排索引	dao pai suo yin	600
+乘积量化	cheng ji liang hua	600
+球树	qiu shu	600
+维诺图	wei nuo tu	600
+判别分析	pan bie fen xi	600
+线性判别分析	xian xing pan bie fen xi	600
+二次判别分析	er ci pan bie fen xi	600
+费舍尔判别分析	fei she er pan bie fen xi	600
+高斯过程	gao si guo cheng	600
+高斯过程回归	gao si guo cheng hui gui	600
+贝叶斯优化	bei ye si you hua	600
+采集函数	cai ji han shu	600
+代理模型	dai li mo xing	600
+聚类算法	ju lei suan fa	600
+均值聚类	jun zhi ju lei	600
+中心点聚类	zhong xin dian ju lei	600
+二分均值聚类	er fen jun zhi ju lei	600
+模糊均值聚类	mo hu jun zhi ju lei	600
+层次聚类	ceng ci ju lei	600
+凝聚层次聚类	ning ju ceng ci ju lei	600
+分裂层次聚类	fen lie ceng ci ju lei	600
+密度聚类	mi du ju lei	600
+谱聚类	pu ju lei	600
+高斯混合模型	gao si hun he mo xing	600
+亲和力传播	qin he li chuan bo	600
+均值漂移	jun zhi piao yi	600
+双聚类	shuang ju lei	600
+聚类中心	ju lei zhong xin	600
+质心	zhi xin	600
+簇内平方和	cu nei ping fang he	600
+轮廓系数	lun kuo xi shu	600
+兰德指数	lan de zhi shu	600
+调整兰德指数	tiao zheng lan de zhi shu	600
+归一化互信息	gui yi hua hu xin xi	600
+降维算法	jiang wei suan fa	600
+主成分分析	zhu cheng fen fen xi	600
+核主成分分析	he zhu cheng fen fen xi	600
+增量主成分分析	zeng liang zhu cheng fen fen xi	600
+稀疏主成分分析	xi shu zhu cheng fen fen xi	600
+独立成分分析	du li cheng fen fen xi	600
+因子分析	yin zi fen xi	600
+典型相关分析	dian xing xiang guan fen xi	600
+多维尺度分析	duo wei chi du fen xi	600
+等距特征映射	deng ju te zheng ying she	600
+局部线性嵌入	ju bu xian xing qian ru	600
+拉普拉斯特征映射	la pu la si te zheng ying she	600
+随机近邻嵌入	sui ji jin lin qian ru	600
+分布随机近邻嵌入	fen bu sui ji jin lin qian ru	600
+均匀流形近似与投影	jun yun liu xing jin si yu tou ying	600
+关联规则学习	guan lian gui ze xue xi	600
+先验算法	xian yan suan fa	600
+频繁项集	pin fan xiang ji	600
+频繁模式树	pin fan mo shi shu	600
+置信度	zhi xin du	600
+提升度	ti sheng du	600
+协同过滤	xie tong guo lv	600
+基于用户的协同过滤	ji yu yong hu de xie tong guo lv	600
+基于物品的协同过滤	ji yu wu pin de xie tong guo lv	600
+矩阵补全	ju zhen bu quan	600
+隐语义模型	yin yu yi mo xing	600
+因子分解机	yin zi fen jie ji	600
+场感知因子分解机	chang gan zhi yin zi fen jie ji	600
+异常检测	yi chang jian ce	600
+离群点检测	li qun dian jian ce	600
+局部离群因子	ju bu li qun yin zi	600
+新奇检测	xin qi jian ce	600
+时间序列分析	shi jian xu lie fen xi	600
+时间序列预测	shi jian xu lie yu ce	600
+自回归模型	zi hui gui mo xing	600
+移动平均模型	yi dong ping jun mo xing	600
+自回归移动平均	zi hui gui yi dong ping jun	600
+差分整合移动平均自回归	cha fen zheng he yi dong ping jun zi hui gui	600
+指数平滑	zhi shu ping hua	600
+霍尔特温特斯法	huo er te wen te si fa	600
+卡尔曼滤波	ka er man lv bo	600
+扩展卡尔曼滤波	kuo zhan ka er man lv bo	600
+无迹卡尔曼滤波	wu ji ka er man lv bo	600
+粒子滤波	li zi lv bo	600
+动态时间规整	dong tai shi jian gui zheng	600
+特征工程	te zheng gong cheng	600
+特征提取	te zheng ti qu	600
+特征选择	te zheng xuan ze	600
+特征构造	te zheng gou zao	600
+特征交叉	te zheng jiao cha	600
+特征组合	te zheng zu he	600
+特征变换	te zheng bian huan	600
+特征缩放	te zheng suo fang	600
+特征归一化	te zheng gui yi hua	600
+特征标准化	te zheng biao zhun hua	600
+最小最大归一化	zui xiao zui da gui yi hua	600
+零均值标准化	ling jun zhi biao zhun hua	600
+小数定标标准化	xiao shu ding biao biao zhun hua	600
+分箱	fen xiang	600
+等宽分箱	deng kuan fen xiang	600
+等频分箱	deng pin fen xiang	600
+卡方分箱	ka fang fen xiang	600
+独热编码	du re bian ma	600
+一位有效编码	yi wei you xiao bian ma	600
+标签编码	biao qian bian ma	600
+序号编码	xu hao bian ma	600
+目标编码	mu biao bian ma	600
+频率编码	pin lv bian ma	600
+二进制编码	er jin zhi bian ma	600
+哈希编码	ha xi bian ma	600
+证据权重	zheng ju quan zhong	600
+信息价值	xin xi jia zhi	600
+过滤式特征选择	guo lv shi te zheng xuan ze	600
+包裹式特征选择	bao guo shi te zheng xuan ze	600
+嵌入式特征选择	qian ru shi te zheng xuan ze	600
+递归特征消除	di gui te zheng xiao chu	600
+方差选择法	fang cha xuan ze fa	600
+卡方检验	ka fang jian yan	600
+互信息法	hu xin xi fa	600
+数据清洗	shu ju qing xi	600
+数据预处理	shu ju yu chu li	600
+缺失值插补	que shi zhi cha bu	600
+多重插补	duo chong cha bu	600
+均值填充	jun zhi tian chong	600
+中位数填充	zhong wei shu tian chong	600
+众数填充	zhong shu tian chong	600
+异常值处理	yi chang zhi chu li	600
+过采样	guo cai yang	600
+欠采样	qian cai yang	600
+合成少数类过采样	he cheng shao shu lei guo cai yang	600
+分层采样	fen ceng cai yang	600
+留出法	liu chu fa	600
+交叉验证	jiao cha yan zheng	600
+折交叉验证	zhe jiao cha yan zheng	600
+留一法	liu yi fa	600
+留一交叉验证	liu yi jiao cha yan zheng	600
+自助法	zi zhu fa	600
+网格搜索	wang ge sou suo	600
+随机搜索	sui ji sou suo	600
+超参数调优	chao can shu tiao you	600
+超参数优化	chao can shu you hua	600
+自动机器学习	zi dong ji qi xue xi	600
+神经架构搜索	shen jing jia gou sou suo	600
+人工神经网络	ren gong shen jing wang luo	600
+深度神经网络	shen du shen jing wang luo	600
+前馈神经网络	qian kui shen jing wang luo	600
+感知机	gan zhi ji	600
+单层感知机	dan ceng gan zhi ji	600
+多层感知机	duo ceng gan zhi ji	600
+全连接层	quan lian jie ceng	600
+全连接网络	quan lian jie wang luo	600
+线性层	xian xing ceng	600
+稠密层	chou mi ceng	600
+隐藏层	yin cang ceng	600
+隐含层	yin han ceng	600
+输入层	shu ru ceng	600
+输出层	shu chu ceng	600
+人工神经元	ren gong shen jing yuan	600
+激活值	ji huo zhi	600
+权重矩阵	quan zhong ju zhen	600
+偏置项	pian zhi xiang	600
+偏置向量	pian zhi xiang liang	600
+网络宽度	wang luo kuan du	600
+网络深度	wang luo shen du	600
+通用近似定理	tong yong jin si ding li	600
+万能近似定理	wan neng jin si ding li	600
+卷积神经网络	juan ji shen jing wang luo	600
+卷积	juan ji	600
+卷积层	juan ji ceng	600
+卷积核	juan ji he	600
+特征图	te zheng tu	600
+感受野	gan shou ye	600
+有效感受野	you xiao gan shou ye	600
+步幅	bu fu	600
+零填充	ling tian chong	600
+边缘填充	bian yuan tian chong	600
+反射填充	fan she tian chong	600
+有效卷积	you xiao juan ji	600
+等宽卷积	deng kuan juan ji	600
+一维卷积	yi wei juan ji	600
+二维卷积	er wei juan ji	600
+三维卷积	san wei juan ji	600
+空洞卷积	kong dong juan ji	600
+膨胀卷积	peng zhang juan ji	600
+扩张卷积	kuo zhang juan ji	600
+转置卷积	zhuan zhi juan ji	600
+反卷积	fan juan ji	600
+微步卷积	wei bu juan ji	600
+分组卷积	fen zu juan ji	600
+深度可分离卷积	shen du ke fen li juan ji	600
+逐深度卷积	zhu shen du juan ji	600
+逐点卷积	zhu dian juan ji	600
+可变形卷积	ke bian xing juan ji	600
+动态卷积	dong tai juan ji	600
+图卷积	tu juan ji	600
+空间卷积	kong jian juan ji	600
+频域卷积	pin yu juan ji	600
+局部连接	ju bu lian jie	600
+权值共享	quan zhi gong xiang	600
+参数共享	can shu gong xiang	600
+平移不变性	ping yi bu bian xing	600
+平移等变性	ping yi deng bian xing	600
+池化	chi hua	600
+池化层	chi hua ceng	600
+最大池化	zui da chi hua	600
+平均池化	ping jun chi hua	600
+全局池化	quan ju chi hua	600
+全局平均池化	quan ju ping jun chi hua	600
+全局最大池化	quan ju zui da chi hua	600
+自适应池化	zi shi ying chi hua	600
+空间金字塔池化	kong jian jin zi ta chi hua	600
+感兴趣区域池化	gan xing qu qu yu chi hua	600
+感兴趣区域对齐	gan xing qu qu yu dui qi	600
+上采样	shang cai yang	600
+下采样	xia cai yang	600
+双线性插值	shuang xian xing cha zhi	600
+双三次插值	shuang san ci cha zhi	600
+最近邻插值	zui jin lin cha zhi	600
+亚像素卷积	ya xiang su juan ji	600
+像素重排	xiang su chong pai	600
+残差连接	can cha lian jie	600
+跳跃连接	tiao yue lian jie	600
+捷径连接	jie jing lian jie	600
+恒等映射	heng deng ying she	600
+残差块	can cha kuai	600
+瓶颈结构	ping jing jie gou	600
+倒残差结构	dao can cha jie gou	600
+稠密连接	chou mi lian jie	600
+残差网络	can cha wang luo	600
+深度残差网络	shen du can cha wang luo	600
+宽残差网络	kuan can cha wang luo	600
+稠密连接网络	chou mi lian jie wang luo	600
+金字塔网络	jin zi ta wang luo	600
+特征金字塔网络	te zheng jin zi ta wang luo	600
+沙漏网络	sha lou wang luo	600
+编码器解码器	bian ma qi jie ma qi	600
+自编码器	zi bian ma qi	600
+降噪自编码器	jiang zao zi bian ma qi	600
+去噪自编码器	qu zao zi bian ma qi	600
+稀疏自编码器	xi shu zi bian ma qi	600
+收缩自编码器	shou suo zi bian ma qi	600
+变分自编码器	bian fen zi bian ma qi	600
+向量量化变分自编码器	xiang liang liang hua bian fen zi bian ma qi	600
+掩码自编码器	yan ma zi bian ma qi	600
+循环神经网络	xun huan shen jing wang luo	600
+递归神经网络	di gui shen jing wang luo	600
+长短期记忆网络	chang duan qi ji yi wang luo	600
+长短期记忆	chang duan qi ji yi	600
+门控循环单元	men kong xun huan dan yuan	600
+双向循环神经网络	shuang xiang xun huan shen jing wang luo	600
+双向长短期记忆	shuang xiang chang duan qi ji yi	600
+遗忘门	yi wang men	600
+输入门	shu ru men	600
+输出门	shu chu men	600
+更新门	geng xin men	600
+重置门	chong zhi men	600
+门控机制	men kong ji zhi	600
+门控线性单元	men kong xian xing dan yuan	600
+细胞状态	xi bao zhuang tai	600
+隐藏状态	yin cang zhuang tai	600
+隐状态	yin zhuang tai	600
+随时间反向传播	sui shi jian fan xiang chuan bo	600
+截断随时间反向传播	jie duan sui shi jian fan xiang chuan bo	600
+序列到序列	xu lie dao xu lie	600
+注意力机制	zhu yi li ji zhi	600
+自注意力	zi zhu yi li	600
+自注意力机制	zi zhu yi li ji zhi	600
+多头注意力	duo tou zhu yi li	600
+多头自注意力	duo tou zi zhu yi li	600
+交叉注意力	jiao cha zhu yi li	600
+缩放点积注意力	suo fang dian ji zhu yi li	600
+加性注意力	jia xing zhu yi li	600
+乘性注意力	cheng xing zhu yi li	600
+全局注意力	quan ju zhu yi li	600
+局部注意力	ju bu zhu yi li	600
+软注意力	ruan zhu yi li	600
+硬注意力	ying zhu yi li	600
+通道注意力	tong dao zhu yi li	600
+空间注意力	kong jian zhu yi li	600
+混合注意力	hun he zhu yi li	600
+挤压与激励网络	ji ya yu ji li wang luo	600
+轴向注意力	zhou xiang zhu yi li	600
+稀疏注意力	xi shu zhu yi li	600
+线性注意力	xian xing zhu yi li	600
+滑动窗口注意力	hua dong chuang kou zhu yi li	600
+分组查询注意力	fen zu cha xun zhu yi li	600
+多查询注意力	duo cha xun zhu yi li	600
+多头潜在注意力	duo tou qian zai zhu yi li	600
+闪电注意力	shan dian zhu yi li	600
+因果注意力	yin guo zhu yi li	600
+掩码注意力	yan ma zhu yi li	600
+查询向量	cha xun xiang liang	600
+键向量	jian xiang liang	600
+值向量	zhi xiang liang	600
+注意力权重	zhu yi li quan zhong	600
+注意力分数	zhu yi li fen shu	600
+注意力矩阵	zhu yi li ju zhen	600
+注意力图	zhu yi li tu	600
+位置编码	wei zhi bian ma	600
+绝对位置编码	jue dui wei zhi bian ma	600
+相对位置编码	xiang dui wei zhi bian ma	600
+正弦位置编码	zheng xian wei zhi bian ma	600
+可学习位置编码	ke xue xi wei zhi bian ma	600
+旋转位置编码	xuan zhuan wei zhi bian ma	600
+线性偏置注意力	xian xing pian zhi zhu yi li	600
+变换器模型	bian huan qi mo xing	600
+视觉变换器	shi jue bian huan qi	600
+移动窗口变换器	yi dong chuang kou bian huan qi	600
+检测变换器	jian ce bian huan qi	600
+状态空间模型	zhuang tai kong jian mo xing	600
+结构化状态空间模型	jie gou hua zhuang tai kong jian mo xing	600
+选择性状态空间模型	xuan ze xing zhuang tai kong jian mo xing	600
+生成模型	sheng cheng mo xing	600
+判别模型	pan bie mo xing	600
+深度生成模型	shen du sheng cheng mo xing	600
+生成对抗网络	sheng cheng dui kang wang luo	600
+条件生成对抗网络	tiao jian sheng cheng dui kang wang luo	600
+深度卷积生成对抗网络	shen du juan ji sheng cheng dui kang wang luo	600
+循环一致性生成对抗网络	xun huan yi zhi xing sheng cheng dui kang wang luo	600
+风格生成对抗网络	feng ge sheng cheng dui kang wang luo	600
+图像超分辨率生成对抗网络	tu xiang chao fen bian lv sheng cheng dui kang wang luo	600
+判别器	pan bie qi	600
+纳什均衡	na shi jun heng	600
+模式崩溃	mo shi beng kui	600
+模式坍塌	mo shi tan ta	600
+梯度惩罚	ti du cheng fa	600
+谱归一化	pu gui yi hua	600
+扩散模型	kuo san mo xing	600
+去噪扩散概率模型	qu zao kuo san gai lv mo xing	600
+去噪扩散隐式模型	qu zao kuo san yin shi mo xing	600
+潜在扩散模型	qian zai kuo san mo xing	600
+隐式扩散模型	yin shi kuo san mo xing	600
+稳定扩散模型	wen ding kuo san mo xing	600
+分数匹配	fen shu pi pei	600
+随机微分方程	sui ji wei fen fang cheng	600
+神经常微分方程	shen jing chang wei fen fang cheng	600
+前向扩散过程	qian xiang kuo san guo cheng	600
+反向去噪过程	fan xiang qu zao guo cheng	600
+噪声预测网络	zao sheng yu ce wang luo	600
+噪声调度	zao sheng diao du	600
+无分类器引导	wu fen lei qi yin dao	600
+分类器引导	fen lei qi yin dao	600
+条件控制扩散	tiao jian kong zhi kuo san	600
+一致性模型	yi zhi xing mo xing	600
+流匹配	liu pi pei	600
+矫正流	jiao zheng liu	600
+归一化流	gui yi hua liu	600
+自回归生成模型	zi hui gui sheng cheng mo xing	600
+能量基模型	neng liang ji mo xing	600
+玻尔兹曼机	bo er zi man ji	600
+受限玻尔兹曼机	shou xian bo er zi man ji	600
+深度信念网络	shen du xin nian wang luo	600
+深度玻尔兹曼机	shen du bo er zi man ji	600
+胶囊网络	jiao nang wang luo	600
+动态路由	dong tai lu you	600
+孪生网络	luan sheng wang luo	600
+三元组网络	san yuan zu wang luo	600
+原型网络	yuan xing wang luo	600
+匹配网络	pi pei wang luo	600
+关系网络	guan xi wang luo	600
+记忆网络	ji yi wang luo	600
+神经图灵机	shen jing tu ling ji	600
+可微分神经计算机	ke wei fen shen jing ji suan ji	600
+脉冲神经网络	mai chong shen jing wang luo	600
+液态神经网络	ye tai shen jing wang luo	600
+物理信息神经网络	wu li xin xi shen jing wang luo	600
+神经算子	shen jing suan zi	600
+傅里叶神经算子	fu li ye shen jing suan zi	600
+柯尔莫哥洛夫阿诺德网络	ke er mo ge luo fu a nuo de wang luo	600
+径向基函数网络	jing xiang ji han shu wang luo	600
+霍普菲尔德网络	huo pu fei er de wang luo	600
+自组织映射	zi zu zhi ying she	600
+竞争学习	jing zheng xue xi	600
+赫布学习	he bu xue xi	600
+激活函数	ji huo han shu	600
+非线性激活函数	fei xian xing ji huo han shu	600
+阶跃函数	jie yue han shu	600
+符号函数	fu hao han shu	600
+逻辑斯蒂函数	luo ji si di han shu	600
+型激活函数	xing ji huo han shu	600
+双曲正切函数	shuang qu zheng qie han shu	600
+硬双曲正切函数	ying shuang qu zheng qie han shu	600
+整流线性单元	zheng liu xian xing dan yuan	600
+线性整流函数	xian xing zheng liu han shu	600
+修正线性单元	xiu zheng xian xing dan yuan	600
+带泄露整流线性单元	dai xie lou zheng liu xian xing dan yuan	600
+渗漏整流线性单元	shen lou zheng liu xian xing dan yuan	600
+参数化整流线性单元	can shu hua zheng liu xian xing dan yuan	600
+随机整流线性单元	sui ji zheng liu xian xing dan yuan	600
+指数线性单元	zhi shu xian xing dan yuan	600
+缩放指数线性单元	suo fang zhi shu xian xing dan yuan	600
+高斯误差线性单元	gao si wu cha xian xing dan yuan	600
+自门控激活函数	zi men kong ji huo han shu	600
+平滑激活函数	ping hua ji huo han shu	600
+软加函数	ruan jia han shu	600
+软最大函数	ruan zui da han shu	600
+归一化指数函数	gui yi hua zhi shu han shu	600
+对数软最大	dui shu ruan zui da	600
+稀疏软最大	xi shu ruan zui da	600
+球面软最大	qiu mian ruan zui da	600
+最大化激活单元	zui da hua ji huo dan yuan	600
+神经元死亡	shen jing yuan si wang	600
+死区问题	si qu wen ti	600
+梯度饱和	ti du bao he	600
+归一化	gui yi hua	600
+批归一化	pi gui yi hua	600
+批量归一化	pi liang gui yi hua	600
+批标准化	pi biao zhun hua	600
+层归一化	ceng gui yi hua	600
+实例归一化	shi li gui yi hua	600
+组归一化	zu gui yi hua	600
+权重归一化	quan zhong gui yi hua	600
+可切换归一化	ke qie huan gui yi hua	600
+自适应实例归一化	zi shi ying shi li gui yi hua	600
+条件批归一化	tiao jian pi gui yi hua	600
+同步批归一化	tong bu pi gui yi hua	600
+跨卡批归一化	kua ka pi gui yi hua	600
+均方根层归一化	jun fang gen ceng gui yi hua	600
+前置层归一化	qian zhi ceng gui yi hua	600
+后置层归一化	hou zhi ceng gui yi hua	600
+内部协变量偏移	nei bu xie bian liang pian yi	600
+移动平均	yi dong ping jun	600
+指数移动平均	zhi shu yi dong ping jun	600
+滑动平均	hua dong ping jun	600
+缩放参数	suo fang can shu	600
+偏移参数	pian yi can shu	600
+仿射变换	fang she bian huan	600
+损失函数	sun shi han shu	600
+代价函数	dai jia han shu	600
+目标函数	mu biao han shu	600
+成本函数	cheng ben han shu	600
+准则函数	zhun ze han shu	600
+均方误差	jun fang wu cha	600
+平均绝对误差	ping jun jue dui wu cha	600
+均方根误差	jun fang gen wu cha	600
+平均绝对百分比误差	ping jun jue dui bai fen bi wu cha	600
+平滑一范数损失	ping hua yi fan shu sun shi	600
+胡伯损失	hu bo sun shi	600
+分位数损失	fen wei shu sun shi	600
+对数双曲余弦损失	dui shu shuang qu yu xian sun shi	600
+交叉熵损失	jiao cha shang sun shi	600
+二元交叉熵	er yuan jiao cha shang	600
+二分类交叉熵	er fen lei jiao cha shang	600
+多分类交叉熵	duo fen lei jiao cha shang	600
+稀疏分类交叉熵	xi shu fen lei jiao cha shang	600
+负对数似然损失	fu dui shu si ran sun shi	600
+焦点损失	jiao dian sun shi	600
+合页损失	he ye sun shi	600
+铰链损失	jiao lian sun shi	600
+指数损失	zhi shu sun shi	600
+逻辑损失	luo ji sun shi	600
+零一损失	ling yi sun shi	600
+散度损失	san du sun shi	600
+对比损失	dui bi sun shi	600
+三元组损失	san yuan zu sun shi	600
+中心损失	zhong xin sun shi	600
+圆损失	yuan sun shi	600
+弧度损失	hu du sun shi	600
+余弦间隔损失	yu xian jian ge sun shi	600
+大间隔余弦损失	da jian ge yu xian sun shi	600
+加性角度间隔损失	jia xing jiao du jian ge sun shi	600
+噪声对比估计	zao sheng dui bi gu ji	600
+信息噪声对比估计	xin xi zao sheng dui bi gu ji	600
+感知损失	gan zhi sun shi	600
+风格损失	feng ge sun shi	600
+对抗损失	dui kang sun shi	600
+重构损失	chong gou sun shi	600
+重建损失	chong jian sun shi	600
+循环一致性损失	xun huan yi zhi xing sun shi	600
+交并比损失	jiao bing bi sun shi	600
+广义交并比损失	guang yi jiao bing bi sun shi	600
+距离交并比损失	ju li jiao bing bi sun shi	600
+完整交并比损失	wan zheng jiao bing bi sun shi	600
+戴斯损失	dai si sun shi	600
+特沃斯基损失	te wo si ji sun shi	600
+连接时序分类损失	lian jie shi xu fen lei sun shi	600
+排序损失	pai xu sun shi	600
+边际排序损失	bian ji pai xu sun shi	600
+贝叶斯个性化排序	bei ye si ge xing hua pai xu	600
+知识蒸馏损失	zhi shi zheng liu sun shi	600
+全变分损失	quan bian fen sun shi	600
+前向传播	qian xiang chuan bo	600
+正向传播	zheng xiang chuan bo	600
+反向传播	fan xiang chuan bo	600
+误差反向传播	wu cha fan xiang chuan bo	600
+反向传播算法	fan xiang chuan bo suan fa	600
+计算图	ji suan tu	600
+动态计算图	dong tai ji suan tu	600
+静态计算图	jing tai ji suan tu	600
+自动微分	zi dong wei fen	600
+前向模式自动微分	qian xiang mo shi zi dong wei fen	600
+反向模式自动微分	fan xiang mo shi zi dong wei fen	600
+梯度计算	ti du ji suan	600
+梯度累积	ti du lei ji	600
+梯度裁剪	ti du cai jian	600
+梯度截断	ti du jie duan	600
+梯度消失	ti du xiao shi	600
+梯度爆炸	ti du bao zha	600
+梯度检查	ti du jian cha	600
+梯度清零	ti du qing ling	600
+梯度反传	ti du fan chuan	600
+梯度检查点	ti du jian cha dian	600
+重计算	chong ji suan	600
+激活检查点	ji huo jian cha dian	600
+直通估计器	zhi tong gu ji qi	600
+重参数化技巧	chong can shu hua ji qiao	600
+温度系数	wen du xi shu	600
+优化器	you hua qi	600
+优化算法	you hua suan fa	600
+一阶优化算法	yi jie you hua suan fa	600
+二阶优化算法	er jie you hua suan fa	600
+梯度下降	ti du xia jiang	600
+梯度下降法	ti du xia jiang fa	600
+批量梯度下降	pi liang ti du xia jiang	600
+全批量梯度下降	quan pi liang ti du xia jiang	600
+随机梯度下降	sui ji ti du xia jiang	600
+小批量梯度下降	xiao pi liang ti du xia jiang	600
+动量法	dong liang fa	600
+动量梯度下降	dong liang ti du xia jiang	600
+牛顿动量法	niu dun dong liang fa	600
+涅斯捷罗夫动量	nie si jie luo fu dong liang	600
+自适应学习率	zi shi ying xue xi lv	600
+自适应梯度算法	zi shi ying ti du suan fa	600
+自适应增量算法	zi shi ying zeng liang suan fa	600
+均方根传播	jun fang gen chuan bo	600
+自适应矩估计	zi shi ying ju gu ji	600
+解耦权重衰减自适应矩估计	jie ou quan zhong shuai jian zi shi ying ju gu ji	600
+惰性自适应矩估计	duo xing zi shi ying ju gu ji	600
+整流自适应矩估计	zheng liu zi shi ying ju gu ji	600
+大批量自适应优化	da pi liang zi shi ying you hua	600
+逐层自适应速率缩放	zhu ceng zi shi ying su lv suo fang	600
+狮式优化器	shi shi you hua qi	600
+二阶裁剪优化器	er jie cai jian you hua qi	600
+前瞻优化器	qian zhan you hua qi	600
+随机权重平均	sui ji quan zhong ping jun	600
+锐度感知最小化	rui du gan zhi zui xiao hua	600
+牛顿法	niu dun fa	600
+拟牛顿法	ni niu dun fa	600
+高斯牛顿法	gao si niu dun fa	600
+列文伯格马夸尔特法	lie wen bo ge ma kua er te fa	600
+有限内存拟牛顿法	you xian nei cun ni niu dun fa	600
+共轭梯度法	gong e ti du fa	600
+坐标下降法	zuo biao xia jiang fa	600
+近端梯度下降	jin duan ti du xia jiang	600
+次梯度法	ci ti du fa	600
+交替方向乘子法	jiao ti fang xiang cheng zi fa	600
+自然梯度下降	zi ran ti du xia jiang	600
+克罗内克分解近似曲率	ke luo nei ke fen jie jin si qu lv	600
+模拟退火	mo ni tui huo	600
+遗传算法	yi chuan suan fa	600
+粒子群优化	li zi qun you hua	600
+蚁群算法	yi qun suan fa	600
+差分进化	cha fen jin hua	600
+演化策略	yan hua ce lve	600
+进化计算	jin hua ji suan	600
+学习率	xue xi lv	600
+初始学习率	chu shi xue xi lv	600
+基础学习率	ji chu xue xi lv	600
+学习率调度	xue xi lv diao du	600
+学习率调度器	xue xi lv diao du qi	600
+学习率衰减	xue xi lv shuai jian	600
+学习率退火	xue xi lv tui huo	600
+学习率预热	xue xi lv yu re	600
+线性预热	xian xing yu re	600
+阶梯衰减	jie ti shuai jian	600
+多步衰减	duo bu shuai jian	600
+指数衰减	zhi shu shuai jian	600
+多项式衰减	duo xiang shi shuai jian	600
+余弦退火	yu xian tui huo	600
+带重启的余弦退火	dai chong qi de yu xian tui huo	600
+周期学习率	zhou qi xue xi lv	600
+单周期策略	dan zhou qi ce lve	600
+验证集指标衰减	yan zheng ji zhi biao shuai jian	600
+权重初始化	quan zhong chu shi hua	600
+参数初始化	can shu chu shi hua	600
+零初始化	ling chu shi hua	600
+随机初始化	sui ji chu shi hua	600
+正态初始化	zheng tai chu shi hua	600
+均匀初始化	jun yun chu shi hua	600
+泽维尔初始化	ze wei er chu shi hua	600
+格洛罗特初始化	ge luo luo te chu shi hua	600
+何恺明初始化	he kai ming chu shi hua	600
+凯明初始化	kai ming chu shi hua	600
+正交初始化	zheng jiao chu shi hua	600
+预训练权重	yu xun lian quan zhong	600
+正则化	zheng ze hua	600
+正则化项	zheng ze hua xiang	600
+惩罚项	cheng fa xiang	600
+一范数正则化	yi fan shu zheng ze hua	600
+二范数正则化	er fan shu zheng ze hua	600
+稀疏正则化	xi shu zheng ze hua	600
+权重衰减	quan zhong shuai jian	600
+暂退法	zan tui fa	600
+随机失活	sui ji shi huo	600
+丢弃法	diu qi fa	600
+空间随机失活	kong jian sui ji shi huo	600
+通道随机失活	tong dao sui ji shi huo	600
+路径随机失活	lu jing sui ji shi huo	600
+随机深度	sui ji shen du	600
+块随机失活	kuai sui ji shi huo	600
+连接随机失活	lian jie sui ji shi huo	600
+早停	zao ting	600
+早停法	zao ting fa	600
+提前停止	ti qian ting zhi	600
+标签平滑	biao qian ping hua	600
+知识蒸馏正则	zhi shi zheng liu zheng ze	600
+一致性正则	yi zhi xing zheng ze	600
+流形正则化	liu xing zheng ze hua	600
+谱正则化	pu zheng ze hua	600
+正交正则化	zheng jiao zheng ze hua	600
+数据增强	shu ju zeng qiang	600
+数据扩增	shu ju kuo zeng	600
+图像增强	tu xiang zeng qiang	600
+文本增强	wen ben zeng qiang	600
+音频增强	yin pin zeng qiang	600
+随机裁剪	sui ji cai jian	600
+中心裁剪	zhong xin cai jian	600
+随机翻转	sui ji fan zhuan	600
+垂直翻转	chui zhi fan zhuan	600
+随机旋转	sui ji xuan zhuan	600
+随机缩放	sui ji suo fang	600
+色彩抖动	se cai dou dong	600
+颜色抖动	yan se dou dong	600
+随机擦除	sui ji ca chu	600
+网格掩码	wang ge yan ma	600
+混合样本	hun he yang ben	600
+区域混合	qu yu hun he	600
+马赛克增强	ma sai ke zeng qiang	600
+复制粘贴增强	fu zhi zhan tie zeng qiang	600
+自动增强	zi dong zeng qiang	600
+随机增强	sui ji zeng qiang	600
+测试时增强	ce shi shi zeng qiang	600
+测试时自适应	ce shi shi zi shi ying	600
+训练集	xun lian ji	600
+验证集	yan zheng ji	600
+测试集	ce shi ji	600
+开发集	kai fa ji	600
+训练样本	xun lian yang ben	600
+测试样本	ce shi yang ben	600
+正样本	zheng yang ben	600
+负样本	fu yang ben	600
+困难样本	kun nan yang ben	600
+难例挖掘	nan li wa jue	600
+在线难例挖掘	zai xian nan li wa jue	600
+困难负样本	kun nan fu yang ben	600
+锚点样本	mao dian yang ben	600
+小批次	xiao pi ci	600
+批大小	pi da xiao	600
+批量大小	pi liang da xiao	600
+训练轮数	xun lian lun shu	600
+迭代次数	die dai ci shu	600
+训练步数	xun lian bu shu	600
+数据加载器	shu ju jia zai qi	600
+采样器	cai yang qi	600
+收敛速度	shou lian su du	600
+模型容量	mo xing rong liang	600
+参数量	can shu liang	600
+计算量	ji suan liang	600
+浮点运算次数	fu dian yun suan ci shu	600
+乘加运算	cheng jia yun suan	600
+推理延迟	tui li yan chi	600
+显存占用	xian cun zhan yong	600
+双下降现象	shuang xia jiang xian xiang	600
+顿悟现象	dun wu xian xiang	600
+彩票假设	cai piao jia she	600
+神经正切核	shen jing zheng qie he	600
+灾难性遗忘	zai nan xing yi wang	600
+混淆矩阵	hun xiao ju zhen	600
+真正例	zhen zheng li	600
+真阳性	zhen yang xing	600
+假正例	jia zheng li	600
+假阳性	jia yang xing	600
+真反例	zhen fan li	600
+真阴性	zhen yin xing	600
+假反例	jia fan li	600
+假阴性	jia yin xing	600
+第一类错误	di yi lei cuo wu	600
+第二类错误	di er lei cuo wu	600
+弃真错误	qi zhen cuo wu	600
+取伪错误	qu wei cuo wu	600
+精确率	jing que lv	600
+查准率	cha zhun lv	600
+召回率	zhao hui lv	600
+查全率	cha quan lv	600
+特异度	te yi du	600
+真阳性率	zhen yang xing lv	600
+假阳性率	jia yang xing lv	600
+调和平均数	tiao he ping jun shu	600
+宏平均	hong ping jun	600
+微平均	wei ping jun	600
+精确率召回率曲线	jing que lv zhao hui lv qu xian	600
+受试者工作特征曲线	shou shi zhe gong zuo te zheng qu xian	600
+曲线下面积	qu xian xia mian ji	600
+平均精度	ping jun jing du	600
+平均精度均值	ping jun jing du jun zhi	600
+对数损失	dui shu sun shi	600
+布里尔分数	bu li er fen shu	600
+科恩卡帕系数	ke en ka pa xi shu	600
+马修斯相关系数	ma xiu si xiang guan xi shu	600
+决定系数	jue ding xi shu	600
+拟合优度	ni he you du	600
+修正决定系数	xiu zheng jue ding xi shu	600
+解释方差分	jie shi fang cha fen	600
+交并比	jiao bing bi	600
+平均交并比	ping jun jiao bing bi	600
+频权交并比	pin quan jiao bing bi	600
+像素准确率	xiang su zhun que lv	600
+平均像素准确率	ping jun xiang su zhun que lv	600
+戴斯相似系数	dai si xiang si xi shu	600
+全景质量	quan jing zhi liang	600
+峰值信噪比	feng zhi xin zao bi	600
+结构相似性	jie gou xiang si xing	600
+多尺度结构相似性	duo chi du jie gou xiang si xing	600
+学习感知图像块相似度	xue xi gan zhi tu xiang kuai xiang si du	600
+弗雷歇距离	fu lei xie ju li	600
+初始分数	chu shi fen shu	600
+困惑度	kun huo du	600
+双语评估替补	shuang yu ping gu ti bu	600
+词错率	ci cuo lv	600
+字错率	zi cuo lv	600
+平均倒数排名	ping jun dao shu pai ming	600
+归一化折损累计增益	gui yi hua zhe sun lei ji zeng yi	600
+折损累计增益	zhe sun lei ji zeng yi	600
+转化率	zhuan hua lv	600
+校准曲线	jiao zhun qu xian	600
+期望校准误差	qi wang xiao zhun wu cha	600
+消融实验	xiao rong shi yan	600
+基线模型	ji xian mo xing	600
+基准测试	ji zhun ce shi	600
+显著性检验	xian zhu xing jian yan	600
+线上测试	xian shang ce shi	600
+分流测试	fen liu ce shi	600
+计算机视觉	ji suan ji shi jue	600
+机器视觉	ji qi shi jue	600
+数字图像处理	shu zi tu xiang chu li	600
+图像分类	tu xiang fen lei	600
+细粒度图像分类	xi li du tu xiang fen lei	600
+目标检测	mu biao jian ce	600
+物体检测	wu ti jian ce	600
+显著性目标检测	xian zhu xing mu biao jian ce	600
+小目标检测	xiao mu biao jian ce	600
+旋转目标检测	xuan zhuan mu biao jian ce	600
+三维目标检测	san wei mu biao jian ce	600
+开放词汇目标检测	kai fang ci hui mu biao jian ce	600
+两阶段检测器	liang jie duan jian ce qi	600
+单阶段检测器	dan jie duan jian ce qi	600
+无锚框检测	wu mao kuang jian ce	600
+有锚框检测	you mao kuang jian ce	600
+候选区域	hou xuan qu yu	600
+区域提议网络	qu yu ti yi wang luo	600
+选择性搜索	xuan ze xing sou suo	600
+锚框	mao kuang	600
+先验框	xian yan kuang	600
+边界框	bian jie kuang	600
+包围盒	bao wei he	600
+真实框	zhen shi kuang	600
+预测框	yu ce kuang	600
+边界框回归	bian jie kuang hui gui	600
+非极大值抑制	fei ji da zhi yi zhi	600
+软非极大值抑制	ruan fei ji da zhi yi zhi	600
+图像分割	tu xiang fen ge	600
+语义分割	yu yi fen ge	600
+实例分割	shi li fen ge	600
+全景分割	quan jing fen ge	600
+交互式分割	jiao hu shi fen ge	600
+视频目标分割	shi pin mu biao fen ge	600
+万物分割模型	wan wu fen ge mo xing	600
+全卷积网络	quan juan ji wang luo	600
+超像素	chao xiang su	600
+分水岭算法	fen shui ling suan fa	600
+图割算法	tu ge suan fa	600
+主动轮廓模型	zhu dong lun kuo mo xing	600
+姿态估计	zi tai gu ji	600
+人体姿态估计	ren ti zi tai gu ji	600
+多人姿态估计	duo ren zi tai gu ji	600
+三维人体重建	san wei ren ti chong jian	600
+关键点检测	guan jian dian jian ce	600
+骨骼关键点	gu ge guan jian dian	600
+热力图	re li tu	600
+手势识别	shou shi shi bie	600
+动作识别	dong zuo shi bie	600
+行为识别	xing wei shi bie	600
+时序动作定位	shi xu dong zuo ding wei	600
+异常行为检测	yi chang xing wei jian ce	600
+目标跟踪	mu biao gen zong	600
+单目标跟踪	dan mu biao gen zong	600
+多目标跟踪	duo mu biao gen zong	600
+相关滤波	xiang guan lv bo	600
+匈牙利算法	xiong ya li suan fa	600
+人脸检测	ren lian jian ce	600
+人脸验证	ren lian yan zheng	600
+人脸对齐	ren lian dui qi	600
+人脸关键点	ren lian guan jian dian	600
+人脸超分辨率	ren lian chao fen bian lv	600
+人脸伪造检测	ren lian wei zao jian ce	600
+活体检测	huo ti jian ce	600
+深度伪造	shen du wei zao	600
+表情识别	biao qing shi bie	600
+行人检测	xing ren jian ce	600
+行人重识别	xing ren chong shi bie	600
+车辆重识别	che liang chong shi bie	600
+人群计数	ren qun ji shu	600
+密度图估计	mi du tu gu ji	600
+光学字符识别	guang xue zi fu shi bie	600
+文字检测	wen zi jian ce	600
+文字识别	wen zi shi bie	600
+场景文本检测	chang jing wen ben jian ce	600
+场景文本识别	chang jing wen ben shi bie	600
+版面分析	ban mian fen xi	600
+表格识别	biao ge shi bie	600
+文档理解	wen dang li jie	600
+图像超分辨率	tu xiang chao fen bian lv	600
+超分辨率重建	chao fen bian lv chong jian	600
+图像去噪	tu xiang qu zao	600
+图像去模糊	tu xiang qu mo hu	600
+图像去雨	tu xiang qu yu	600
+图像去雾	tu xiang qu wu	600
+图像修复	tu xiang xiu fu	600
+图像补全	tu xiang bu quan	600
+图像上色	tu xiang shang se	600
+图像着色	tu xiang zhuo se	600
+图像抠图	tu xiang kou tu	600
+背景移除	bei jing yi chu	600
+风格迁移	feng ge qian yi	600
+神经风格迁移	shen jing feng ge qian yi	600
+图像翻译	tu xiang fan yi	600
+图像生成	tu xiang sheng cheng	600
+文生图	wen sheng tu	600
+图生图	tu sheng tu	600
+文生视频	wen sheng shi pin	600
+图生视频	tu sheng shi pin	600
+视频生成	shi pin sheng cheng	600
+视频插帧	shi pin cha zhen	600
+视频超分辨率	shi pin chao fen bian lv	600
+图像检索	tu xiang jian suo	600
+以图搜图	yi tu sou tu	600
+图像配准	tu xiang pei zhun	600
+图像拼接	tu xiang pin jie	600
+单目深度估计	dan mu shen du gu ji	600
+双目立体匹配	shuang mu li ti pi pei	600
+视差估计	shi cha gu ji	600
+光流估计	guang liu gu ji	600
+稠密光流	chou mi guang liu	600
+稀疏光流	xi shu guang liu	600
+三维重建	san wei chong jian	600
+多视图几何	duo shi tu ji he	600
+运动恢复结构	yun dong hui fu jie gou	600
+同时定位与建图	tong shi ding wei yu jian tu	600
+视觉里程计	shi jue li cheng ji	600
+点云处理	dian yun chu li	600
+点云分类	dian yun fen lei	600
+点云分割	dian yun fen ge	600
+点云配准	dian yun pei zhun	600
+体素化	ti su hua	600
+三维网格	san wei wang ge	600
+隐式神经表示	yin shi shen jing biao shi	600
+符号距离函数	fu hao ju li han shu	600
+神经辐射场	shen jing fu she chang	600
+三维高斯泼溅	san wei gao si po jian	600
+鸟瞰图感知	niao kan tu gan zhi	600
+占用网络	zhan yong wang luo	600
+尺度不变特征变换	chi du bu bian te zheng bian huan	600
+加速稳健特征	jia su wen jian te zheng	600
+方向梯度直方图	fang xiang ti du zhi fang tu	600
+局部二值模式	ju bu er zhi mo shi	600
+哈尔特征	ha er te zheng	600
+级联分类器	ji lian fen lei qi	600
+边缘检测	bian yuan jian ce	600
+角点检测	jiao dian jian ce	600
+坎尼算子	kan ni suan zi	600
+索贝尔算子	suo bei er suan zi	600
+拉普拉斯算子	la pu la si suan zi	600
+霍夫变换	huo fu bian huan	600
+傅里叶变换	fu li ye bian huan	600
+快速傅里叶变换	kuai su fu li ye bian huan	600
+离散余弦变换	li san yu xian bian huan	600
+小波变换	xiao bo bian huan	600
+直方图均衡化	zhi fang tu jun heng hua	600
+自适应直方图均衡化	zi shi ying zhi fang tu jun heng hua	600
+高斯滤波	gao si lv bo	600
+中值滤波	zhong zhi lv bo	600
+均值滤波	jun zhi lv bo	600
+双边滤波	shuang bian lv bo	600
+形态学操作	xing tai xue cao zuo	600
+膨胀操作	peng zhang cao zuo	600
+腐蚀操作	fu shi cao zuo	600
+开运算	kai yun suan	600
+闭运算	bi yun suan	600
+医学图像分析	yi xue tu xiang fen xi	600
+医学图像分割	yi xue tu xiang fen ge	600
+遥感图像解译	yao gan tu xiang jie yi	600
+计算摄影学	ji suan she ying xue	600
+计算语言学	ji suan yu yan xue	600
+自然语言理解	zi ran yu yan li jie	600
+自然语言生成	zi ran yu yan sheng cheng	600
+大语言模型	da yu yan mo xing	600
+大型语言模型	da xing yu yan mo xing	600
+语言模型	yu yan mo xing	600
+统计语言模型	tong ji yu yan mo xing	600
+神经语言模型	shen jing yu yan mo xing	600
+掩码语言模型	yan ma yu yan mo xing	600
+自回归语言模型	zi hui gui yu yan mo xing	600
+因果语言模型	yin guo yu yan mo xing	600
+双向语言模型	shuang xiang yu yan mo xing	600
+预训练语言模型	yu xun lian yu yan mo xing	600
+基础模型	ji chu mo xing	600
+基座模型	ji zuo mo xing	600
+前沿模型	qian yan mo xing	600
+开源大模型	kai yuan da mo xing	600
+闭源大模型	bi yuan da mo xing	600
+多模态大模型	duo mo tai da mo xing	600
+视觉语言模型	shi jue yu yan mo xing	600
+中文分词	zhong wen fen ci	600
+分词器	fen ci qi	600
+词元	ci yuan	600
+子词分词	zi ci fen ci	600
+字节对编码	zi jie dui bian ma	600
+词片分词	ci pian fen ci	600
+句片分词	ju pian fen ci	600
+词汇表	ci hui biao	600
+未登录词	wei deng lu ci	600
+集外词	ji wai ci	600
+停用词	ting yong ci	600
+词干提取	ci gan ti qu	600
+词形还原	ci xing hai yuan	600
+词性标注	ci xing biao zhu	600
+命名实体识别	ming ming shi ti shi bie	600
+实体链接	shi ti lian jie	600
+实体消歧	shi ti xiao qi	600
+指代消解	zhi dai xiao jie	600
+共指消解	gong zhi xiao jie	600
+关系抽取	guan xi chou qu	600
+事件抽取	shi jian chou qu	600
+信息抽取	xin xi chou qu	600
+句法分析	ju fa fen xi	600
+依存句法分析	yi cun ju fa fen xi	600
+成分句法分析	cheng fen ju fa fen xi	600
+语义角色标注	yu yi jue se biao zhu	600
+语义分析	yu yi fen xi	600
+观点挖掘	guan dian wa jue	600
+立场检测	li chang jian ce	600
+意图识别	yi tu shi bie	600
+槽位填充	cao wei tian chong	600
+文本分类	wen ben fen lei	600
+文本聚类	wen ben ju lei	600
+文本匹配	wen ben pi pei	600
+语义相似度	yu yi xiang si du	600
+自然语言推理	zi ran yu yan tui li	600
+文本蕴含	wen ben yun han	600
+机器阅读理解	ji qi yue du li jie	600
+问答系统	wen da xi tong	600
+开放域问答	kai fang yu wen da	600
+自动文摘	zi dong wen zhai	600
+文本摘要	wen ben zhai yao	600
+抽取式摘要	chou qu shi zhai yao	600
+生成式摘要	sheng cheng shi zhai yao	600
+统计机器翻译	tong ji ji qi fan yi	600
+神经机器翻译	shen jing ji qi fan yi	600
+多语言翻译	duo yu yan fan yi	600
+对话系统	dui hua xi tong	600
+任务型对话	ren wu xing dui hua	600
+闲聊对话	xian liao dui hua	600
+多轮对话	duo lun dui hua	600
+语法纠错	yu fa jiu cuo	600
+拼写纠错	pin xie jiu cuo	600
+文本纠错	wen ben jiu cuo	600
+代码生成	dai ma sheng cheng	600
+代码补全	dai ma bu quan	600
+数学推理	shu xue tui li	600
+词袋模型	ci dai mo xing	600
+词频逆文档频率	ci pin ni wen dang pin lv	600
+文档频率	wen dang pin lv	600
+逆文档频率	ni wen dang pin lv	600
+元语法模型	yuan yu fa mo xing	600
+词向量	ci xiang liang	600
+词嵌入	ci qian ru	600
+字向量	zi xiang liang	600
+句向量	ju xiang liang	600
+文本嵌入	wen ben qian ru	600
+上下文词向量	shang xia wen ci xiang liang	600
+连续词袋模型	lian xu ci dai mo xing	600
+跳字模型	tiao zi mo xing	600
+负采样	fu cai yang	600
+层次软最大	ceng ci ruan zui da	600
+全局词向量	quan ju ci xiang liang	600
+主题模型	zhu ti mo xing	600
+潜在语义分析	qian zai yu yi fen xi	600
+概率潜在语义分析	gai lv qian zai yu yi fen xi	600
+隐含狄利克雷分布	yin han di li ke lei fen bu	600
+知识图谱	zhi shi tu pu	600
+知识表示学习	zhi shi biao shi xue xi	600
+知识图谱嵌入	zhi shi tu pu qian ru	600
+知识融合	zhi shi rong he	600
+知识推理	zhi shi tui li	600
+三元组抽取	san yuan zu chou qu	600
+头实体	tou shi ti	600
+尾实体	wei shi ti	600
+预训练	yu xun lian	600
+继续预训练	ji xu yu xun lian	600
+增量预训练	zeng liang yu xun lian	600
+全参数微调	quan can shu wei tiao	600
+全量微调	quan liang wei tiao	600
+参数高效微调	can shu gao xiao wei tiao	600
+有监督微调	you jian du wei tiao	600
+指令遵循	zhi ling zun xun	600
+适配器微调	shi pei qi wei tiao	600
+前缀微调	qian zhui wei tiao	600
+提示微调	ti shi wei tiao	600
+深度提示微调	shen du ti shi wei tiao	600
+低秩自适应	di zhi zi shi ying	600
+量化低秩自适应	liang hua di zhi zi shi ying	600
+权重分解低秩自适应	quan zhong fen jie di zhi zi shi ying	600
+对齐技术	dui qi ji shu	600
+大模型对齐	da mo xing dui qi	600
+价值对齐	jia zhi dui qi	600
+安全对齐	an quan dui qi	600
+奖励模型	jiang li mo xing	600
+过程奖励模型	guo cheng jiang li mo xing	600
+结果奖励模型	jie guo jiang li mo xing	600
+拒绝采样微调	ju jue cai yang wei tiao	600
+群组相对策略优化	qun zu xiang dui ce lve you hua	600
+近端策略优化	jin duan ce lve you hua	600
+宪法人工智能	xian fa ren gong zhi neng	600
+红队测试	hong dui ce shi	600
+越狱攻击	yue yu gong ji	600
+提示词注入	ti shi ci zhu ru	600
+大模型幻觉	da mo xing huan jue	600
+事实性幻觉	shi shi xing huan jue	600
+忠实性幻觉	zhong shi xing huan jue	600
+提示工程	ti shi gong cheng	600
+系统提示词	xi tong ti shi ci	600
+思维链	si wei lian	600
+零样本思维链	ling yang ben si wei lian	600
+自洽性解码	zi qia xing jie ma	600
+思维树	si wei shu	600
+思维图	si wei tu	600
+推理与行动	tui li yu xing dong	600
+反思机制	fan si ji zhi	600
+检索增强生成	jian suo zeng qiang sheng cheng	600
+向量检索	xiang liang jian suo	600
+稠密检索	chou mi jian suo	600
+稀疏检索	xi shu jian suo	600
+混合检索	hun he jian suo	600
+重排序	chong pai xu	600
+重排序模型	chong pai xu mo xing	600
+文档切分	wen dang qie fen	600
+文本分块	wen ben fen kuai	600
+上下文窗口	shang xia wen chuang kou	600
+长上下文	chang shang xia wen	600
+长度外推	chang du wai tui	600
+位置插值	wei zhi cha zhi	600
+大海捞针测试	da hai lao zhen ce shi	600
+工具调用	gong ju diao yong	600
+结构化输出	jie gou hua shu chu	600
+智能体	zhi neng ti	600
+大模型智能体	da mo xing zhi neng ti	600
+多智能体系统	duo zhi neng ti xi tong	600
+多智能体协作	duo zhi neng ti xie zuo	600
+贪心解码	tan xin jie ma	600
+束搜索	shu sou suo	600
+集束搜索	ji shu sou suo	600
+随机采样	sui ji cai yang	600
+温度采样	wen du cai yang	600
+核采样	he cai yang	600
+顶层采样	ding ceng cai yang	600
+重复惩罚	chong fu cheng fa	600
+频率惩罚	pin lv cheng fa	600
+存在惩罚	cun zai cheng fa	600
+投机解码	tou ji jie ma	600
+投机采样	tou ji cai yang	600
+键值缓存	jian zhi huan cun	600
+前缀缓存	qian zhui huan cun	600
+分页注意力	fen ye zhu yi li	600
+连续批处理	lian xu pi chu li	600
+首字延迟	shou zi yan chi	600
+规模法则	gui mo fa ze	600
+缩放定律	suo fang ding lv	600
+涌现能力	yong xian neng li	600
+深度思考	shen du si kao	600
+慢思考	man si kao	600
+文心一言	wen xin yi yan	600
+文心大模型	wen xin da mo xing	600
+通义千问	tong yi qian wen	600
+通义万相	tong yi wan xiang	600
+混元大模型	hun yuan da mo xing	600
+腾讯混元	teng xun hun yuan	600
+豆包大模型	dou bao da mo xing	600
+云雀大模型	yun que da mo xing	600
+星火认知大模型	xing huo ren zhi da mo xing	600
+讯飞星火	xun fei xing huo	600
+智谱清言	zhi pu qing yan	600
+盘古大模型	pan gu da mo xing	600
+华为盘古	hua wei pan gu	600
+百川大模型	bai chuan da mo xing	600
+月之暗面	yue zhi an mian	600
+深度求索	shen du qiu suo	600
+阶跃星辰	jie yue xing chen	600
+零一万物	ling yi wan wu	600
+书生浦语	shu sheng pu yu	600
+书生万象	shu sheng wan xiang	600
+天工大模型	tian gong da mo xing	600
+日日新大模型	ri ri xin da mo xing	600
+商量大模型	shang liang da mo xing	600
+紫东太初	zi dong tai chu	600
+悟道大模型	wu dao da mo xing	600
+源大模型	yuan da mo xing	600
+山海大模型	shan hai da mo xing	600
+蓝心大模型	lan xin da mo xing	600
+安第斯大模型	an di si da mo xing	600
+魔法大模型	mo fa da mo xing	600
+魔搭社区	mo da she qu	600
+飞桨框架	fei jiang kuang jia	600
+百度飞桨	bai du fei jiang	600
+昇思框架	sheng si kuang jia	600
+天元框架	tian yuan kuang jia	600
+计图框架	ji tu kuang jia	600
+一流框架	yi liu kuang jia	600
+自动语音识别	zi dong yu yin shi bie	600
+端到端语音识别	duan dao duan yu yin shi bie	600
+文语转换	wen yu zhuan huan	600
+声学模型	sheng xue mo xing	600
+声码器	sheng ma qi	600
+说话人识别	shuo hua ren shi bie	600
+声纹识别	sheng wen shi bie	600
+说话人日志	shuo hua ren ri zhi	600
+说话人分离	shuo hua ren fen li	600
+语音唤醒	yu yin huan xing	600
+关键词检测	guan jian ci jian ce	600
+语音增强	yu yin zeng qiang	600
+语音降噪	yu yin jiang zao	600
+语音分离	yu yin fen li	600
+语音转换	yu yin zhuan huan	600
+音色克隆	yin se ke long	600
+语音情感识别	yu yin qing gan shi bie	600
+梅尔频率倒谱系数	mei er pin lv dao pu xi shu	600
+梅尔频谱图	mei er pin pu tu	600
+短时傅里叶变换	duan shi fu li ye bian huan	600
+声谱图	sheng pu tu	600
+多模态融合	duo mo tai rong he	600
+早期融合	zao qi rong he	600
+晚期融合	wan qi rong he	600
+跨模态对齐	kua mo tai dui qi	600
+跨模态检索	kua mo tai jian suo	600
+图文检索	tu wen jian suo	600
+图像描述生成	tu xiang miao shu sheng cheng	600
+视觉问答	shi jue wen da	600
+视觉定位	shi jue ding wei	600
+指代分割	zhi dai fen ge	600
+音视频理解	yin shi pin li jie	600
+具身智能	ju shen zhi neng	600
+视觉语言动作模型	shi jue yu yan dong zuo mo xing	600
+世界模型	shi jie mo xing	600
+马尔可夫决策过程	ma er ke fu jue ce guo cheng	600
+部分可观测马尔可夫过程	bu fen ke guan ce ma er ke fu guo cheng	600
+环境状态	huan jing zhuang tai	600
+动作空间	dong zuo kong jian	600
+连续动作空间	lian xu dong zuo kong jian	600
+离散动作空间	li san dong zuo kong jian	600
+状态转移	zhuang tai zhuan yi	600
+奖励函数	jiang li han shu	600
+回报函数	hui bao han shu	600
+折扣因子	zhe kou yin zi	600
+累积回报	lei ji hui bao	600
+策略函数	ce lve han shu	600
+确定性策略	que ding xing ce lve	600
+随机性策略	sui ji xing ce lve	600
+状态价值函数	zhuang tai jia zhi han shu	600
+动作价值函数	dong zuo jia zhi han shu	600
+优势函数	you shi han shu	600
+广义优势估计	guang yi you shi gu ji	600
+贝尔曼方程	bei er man fang cheng	600
+贝尔曼最优方程	bei er man zui you fang cheng	600
+策略迭代	ce lve die dai	600
+价值迭代	jia zhi die dai	600
+时序差分学习	shi xu cha fen xue xi	600
+时序差分误差	shi xu cha fen wu cha	600
+同策略学习	tong ce lve xue xi	600
+异策略学习	yi ce lve xue xi	600
+在线策略	zai xian ce lve	600
+离线策略	li xian ce lve	600
+离线强化学习	li xian qiang hua xue xi	600
+分层强化学习	fen ceng qiang hua xue xi	600
+多智能体强化学习	duo zhi neng ti qiang hua xue xi	600
+基于模型的强化学习	ji yu mo xing de qiang hua xue xi	600
+无模型强化学习	wu mo xing qiang hua xue xi	600
+探索与利用	tan suo yu li yong	600
+贪心策略	tan xin ce lve	600
+上限置信区间	shang xian zhi xin qu jian	600
+汤普森采样	tang pu sen cai yang	600
+多臂赌博机	duo bi du bo ji	600
+上下文赌博机	shang xia wen du bo ji	600
+深度价值网络	shen du jia zhi wang luo	600
+双深度价值网络	shuang shen du jia zhi wang luo	600
+竞争深度价值网络	jing zheng shen du jia zhi wang luo	600
+经验回放	jing yan hui fang	600
+优先经验回放	you xian jing yan hui fang	600
+目标网络	mu biao wang luo	600
+策略梯度	ce lve ti du	600
+策略梯度定理	ce lve ti du ding li	600
+演员评论家算法	yan yuan ping lun jia suan fa	600
+优势演员评论家	you shi yan yuan ping lun jia	600
+异步优势演员评论家	yi bu you shi yan yuan ping lun jia	600
+深度确定性策略梯度	shen du que ding xing ce lve ti du	600
+双延迟深度确定性策略梯度	shuang yan chi shen du que ding xing ce lve ti du	600
+软演员评论家	ruan yan yuan ping lun jia	600
+信赖域策略优化	xin lai yu ce lve you hua	600
+蒙特卡洛树搜索	meng te ka luo shu sou suo	600
+自我博弈	zi wo bo yi	600
+行为克隆	xing wei ke long	600
+奖励塑形	jiang li su xing	600
+稀疏奖励	xi shu jiang li	600
+内在奖励	nei zai jiang li	600
+好奇心驱动	hao qi xin qu dong	600
+图神经网络	tu shen jing wang luo	600
+图卷积网络	tu juan ji wang luo	600
+图注意力网络	tu zhu yi li wang luo	600
+图采样聚合网络	tu cai yang ju he wang luo	600
+图同构网络	tu tong gou wang luo	600
+消息传递神经网络	xiao xi chuan di shen jing wang luo	600
+异构图神经网络	yi gou tu shen jing wang luo	600
+时空图神经网络	shi kong tu shen jing wang luo	600
+动态图神经网络	dong tai tu shen jing wang luo	600
+超图神经网络	chao tu shen jing wang luo	600
+邻接矩阵	lin jie ju zhen	600
+度矩阵	du ju zhen	600
+拉普拉斯矩阵	la pu la si ju zhen	600
+归一化拉普拉斯矩阵	gui yi hua la pu la si ju zhen	600
+节点分类	jie dian fen lei	600
+链接预测	lian jie yu ce	600
+图分类	tu fen lei	600
+社区发现	she qu fa xian	600
+社团检测	she tuan jian ce	600
+节点嵌入	jie dian qian ru	600
+图嵌入	tu qian ru	600
+随机游走	sui ji you zou	600
+深度游走	shen du you zou	600
+消息传递	xiao xi chuan di	600
+邻域聚合	lin yu ju he	600
+读出函数	du chu han shu	600
+过度平滑	guo du ping hua	600
+过平滑问题	guo ping hua wen ti	600
+过挤压问题	guo ji ya wen ti	600
+个性化推荐	ge xing hua tui jian	600
+召回模型	zhao hui mo xing	600
+粗排模型	cu pai mo xing	600
+精排模型	jing pai mo xing	600
+重排模型	chong pai mo xing	600
+多路召回	duo lu zhao hui	600
+向量召回	xiang liang zhao hui	600
+双塔模型	shuang ta mo xing	600
+深度兴趣网络	shen du xing qu wang luo	600
+深度兴趣演化网络	shen du xing qu yan hua wang luo	600
+宽深模型	kuan shen mo xing	600
+深度交叉网络	shen du jiao cha wang luo	600
+多门混合专家模型	duo men hun he zhuan jia mo xing	600
+点击率预估	dian ji lv yu gu	600
+转化率预估	zhuan hua lv yu gu	600
+全空间多任务模型	quan kong jian duo ren wu mo xing	600
+冷启动问题	leng qi dong wen ti	600
+信息茧房	xin xi jian fang	600
+序列推荐	xu lie tui jian	600
+会话推荐	hui hua tui jian	600
+分布式训练	fen bu shi xun lian	600
+数据并行	shu ju bing xing	600
+分布式数据并行	fen bu shi shu ju bing xing	600
+模型并行	mo xing bing xing	600
+张量并行	zhang liang bing xing	600
+流水线并行	liu shui xian bing xing	600
+序列并行	xu lie bing xing	600
+上下文并行	shang xia wen bing xing	600
+专家并行	zhuan jia bing xing	600
+三维并行	san wei bing xing	600
+混合并行	hun he bing xing	600
+零冗余优化器	ling rong yu you hua qi	600
+全分片数据并行	quan fen pian shu ju bing xing	600
+参数服务器	can shu fu wu qi	600
+环形全归约	huan xing quan gui yue	600
+集合通信	ji he tong xin	600
+全归约	quan gui yue	600
+全收集	quan shou ji	600
+归约散播	gui yue san bo	600
+广播通信	guang bo tong xin	600
+点对点通信	dian dui dian tong xin	600
+同步训练	tong bu xun lian	600
+异步训练	yi bu xun lian	600
+混合精度训练	hun he jing du xun lian	600
+自动混合精度	zi dong hun he jing du	600
+半精度浮点数	ban jing du fu dian shu	600
+单精度浮点数	dan jing du fu dian shu	600
+双精度浮点数	shuang jing du fu dian shu	600
+脑浮点数	nao fu dian shu	600
+八位浮点数	ba wei fu dian shu	600
+动态损失缩放	dong tai sun shi suo fang	600
+算子融合	suan zi rong he	600
+内核融合	nei he rong he	600
+计算图优化	ji suan tu you hua	600
+常量折叠	chang liang zhe die	600
+死代码消除	si dai ma xiao chu	600
+即时编译	ji shi bian yi	600
+提前编译	ti qian bian yi	600
+显存优化	xian cun you hua	600
+显存卸载	xian cun xie zai	600
+零拷贝	ling kao bei	600
+模型压缩	mo xing ya suo	600
+模型轻量化	mo xing qing liang hua	600
+模型加速	mo xing jia su	600
+模型量化	mo xing liang hua	600
+权重量化	quan zhong liang hua	600
+激活量化	ji huo liang hua	600
+训练后量化	xun lian hou liang hua	600
+量化感知训练	liang hua gan zhi xun lian	600
+动态量化	dong tai liang hua	600
+静态量化	jing tai liang hua	600
+对称量化	dui chen liang hua	600
+非对称量化	fei dui chen liang hua	600
+逐通道量化	zhu tong dao liang hua	600
+逐张量量化	zhu zhang liang liang hua	600
+八位整型量化	ba wei zheng xing liang hua	600
+四位整型量化	si wei zheng xing liang hua	600
+二值神经网络	er zhi shen jing wang luo	600
+三值神经网络	san zhi shen jing wang luo	600
+极端量化	ji duan liang hua	600
+平滑量化	ping hua liang hua	600
+激活感知权重量化	ji huo gan zhi quan zhong liang hua	600
+模型剪枝	mo xing jian zhi	600
+网络剪枝	wang luo jian zhi	600
+结构化剪枝	jie gou hua jian zhi	600
+非结构化剪枝	fei jie gou hua jian zhi	600
+通道剪枝	tong dao jian zhi	600
+滤波器剪枝	lv bo qi jian zhi	600
+权重剪枝	quan zhong jian zhi	600
+稀疏训练	xi shu xun lian	600
+动态稀疏	dong tai xi shu	600
+教师模型	jiao shi mo xing	600
+学生模型	xue sheng mo xing	600
+暗知识	an zhi shi	600
+软标签	ruan biao qian	600
+硬标签	ying biao qian	600
+特征蒸馏	te zheng zheng liu	600
+关系蒸馏	guan xi zheng liu	600
+自蒸馏	zi zheng liu	600
+低秩分解	di zhi fen jie	600
+模型部署	mo xing bu shu	600
+模型推理	mo xing tui li	600
+推理引擎	tui li yin qing	600
+推理加速	tui li jia su	600
+推理服务	tui li fu wu	600
+端侧推理	duan ce tui li	600
+边缘计算	bian yuan ji suan	600
+端云协同	duan yun xie tong	600
+动态批处理	dong tai pi chu li	600
+模型导出	mo xing dao chu	600
+模型转换	mo xing zhuan huan	600
+模型序列化	mo xing xu lie hua	600
+检查点保存	jian cha dian bao cun	600
+权重合并	quan zhong he bing	600
+模型融合	mo xing rong he	600
+机器学习运维	ji qi xue xi yun wei	600
+大模型运维	da mo xing yun wei	600
+特征存储	te zheng cun chu	600
+模型仓库	mo xing cang ku	600
+实验追踪	shi yan zhui zong	600
+数据标注	shu ju biao zhu	600
+众包标注	zhong bao biao zhu	600
+数据治理	shu ju zhi li	600
+合成数据	he cheng shu ju	600
+数据去重	shu ju qu zhong	600
+数据蒸馏	shu ju zheng liu	600
+图形处理器	tu xing chu li qi	600
+张量处理器	zhang liang chu li qi	600
+神经网络处理器	shen jing wang luo chu li qi	600
+统一计算设备架构	tong yi ji suan she bei jia gou	600
+高带宽内存	gao dai kuan nei cun	600
+高速互联总线	gao su hu lian zong xian	600
+远程直接内存访问	yuan cheng zhi jie nei cun fang wen	600

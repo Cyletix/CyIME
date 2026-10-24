@@ -68,7 +68,8 @@ fun CellDictionarySettingsPanel(
     val categories = listOf("全部", "已下载", CellDictionaryCatalog.BUILTIN_CATEGORY) +
         offers.map { it.category }.distinct() + "本地导入"
     fun matches(name: String, group: String, id: String) =
-        (category == "全部" || category == group || category == "已下载" && id in installed) &&
+        (category == "全部" || category == group || category == "已下载" && id in installed ||
+            category == CellDictionaryCatalog.BUILTIN_CATEGORY && id in builtinIds) &&
             (query.isBlank() || name.contains(query.trim(), ignoreCase = true) || group.contains(query.trim()))
     val builtins = dictionaries.installed.filter { it.id in builtinIds && matches(it.name, it.category, it.id) }
     val visibleOffers = offers.filter { matches(it.name, it.category, it.id) }

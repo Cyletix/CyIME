@@ -1,0 +1,1110 @@
+# CyIME 大模型词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_llm
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+通用人工智能	tong yong ren gong zhi neng	600
+超级人工智能	chao ji ren gong zhi neng	600
+生成式人工智能	sheng cheng shi ren gong zhi neng	600
+大语言模型	da yu yan mo xing	600
+大型语言模型	da xing yu yan mo xing	600
+大模型	da mo xing	600
+基础模型	ji chu mo xing	600
+基座模型	ji zuo mo xing	600
+底座模型	di zuo mo xing	600
+语言模型	yu yan mo xing	600
+统计语言模型	tong ji yu yan mo xing	600
+神经语言模型	shen jing yu yan mo xing	600
+预训练模型	yu xun lian mo xing	600
+预训练大语言模型	yu xun lian da yu yan mo xing	600
+前沿模型	qian yan mo xing	600
+开源模型	kai yuan mo xing	600
+开源大模型	kai yuan da mo xing	600
+闭源模型	bi yuan mo xing	600
+闭源大模型	bi yuan da mo xing	600
+商用模型	shang yong mo xing	600
+专有模型	zhuan you mo xing	600
+原生多模态模型	yuan sheng duo mo tai mo xing	600
+世界模型	shi jie mo xing	600
+具身智能	ju shen zhi neng	600
+深度神经网络	shen du shen jing wang luo	600
+人工神经网络	ren gong shen jing wang luo	600
+前馈神经网络	qian kui shen jing wang luo	600
+循环神经网络	xun huan shen jing wang luo	600
+卷积神经网络	juan ji shen jing wang luo	600
+图神经网络	tu shen jing wang luo	600
+长短期记忆网络	chang duan qi ji yi wang luo	600
+门控循环单元	men kong xun huan dan yuan	600
+生成对抗网络	sheng cheng dui kang wang luo	600
+变分自编码器	bian fen zi bian ma qi	600
+自编码器	zi bian ma qi	600
+去噪自编码器	qu zao zi bian ma qi	600
+掩码自编码器	yan ma zi bian ma qi	600
+变换器	bian huan qi	600
+仅编码器架构	jin bian ma qi jia gou	600
+仅解码器架构	jin jie ma qi jia gou	600
+编码器解码器架构	bian ma qi jie ma qi jia gou	600
+自回归模型	zi hui gui mo xing	600
+自回归生成	zi hui gui sheng cheng	600
+非自回归生成	fei zi hui gui sheng cheng	600
+自注意力机制	zi zhu yi li ji zhi	600
+注意力机制	zhu yi li ji zhi	600
+多头注意力	duo tou zhu yi li	600
+多头自注意力	duo tou zi zhu yi li	600
+交叉注意力	jiao cha zhu yi li	600
+多查询注意力	duo cha xun zhu yi li	600
+分组查询注意力	fen zu cha xun zhu yi li	600
+多头潜在注意力	duo tou qian zai zhu yi li	600
+闪电注意力	shan dian zhu yi li	600
+稀疏注意力	xi shu zhu yi li	600
+线性注意力	xian xing zhu yi li	600
+滑动窗口注意力	hua dong chuang kou zhu yi li	600
+局部注意力	ju bu zhu yi li	600
+全局注意力	quan ju zhu yi li	600
+双向注意力	shuang xiang zhu yi li	600
+因果注意力	yin guo zhu yi li	600
+因果掩码	yin guo yan ma	600
+注意力掩码	zhu yi li yan ma	600
+注意力权重	zhu yi li quan zhong	600
+注意力分数	zhu yi li fen shu	600
+注意力头	zhu yi li tou	600
+注意力汇聚	zhu yi li hui ju	600
+注意力下沉	zhu yi li xia chen	600
+查询向量	cha xun xiang liang	600
+键向量	jian xiang liang	600
+值向量	zhi xiang liang	600
+查询键值	cha xun jian zhi	600
+缩放点积注意力	suo fang dian ji zhu yi li	600
+点积注意力	dian ji zhu yi li	600
+加性注意力	jia xing zhu yi li	600
+混合专家模型	hun he zhuan jia mo xing	600
+稀疏混合专家	xi shu hun he zhuan jia	600
+混合专家架构	hun he zhuan jia jia gou	600
+门控网络	men kong wang luo	600
+专家路由	zhuan jia lu you	600
+路由机制	lu you ji zhi	600
+共享专家	gong xiang zhuan jia	600
+细粒度专家	xi li du zhuan jia	600
+专家并行	zhuan jia bing xing	600
+专家负载均衡	zhuan jia fu zai jun heng	600
+激活参数	ji huo can shu	600
+总参数量	zong can shu liang	600
+参数量	can shu liang	600
+参数规模	can shu gui mo	600
+百亿参数	bai yi can shu	600
+千亿参数	qian yi can shu	600
+万亿参数	wan yi can shu	600
+十亿参数	shi yi can shu	600
+稠密模型	chou mi mo xing	600
+稀疏模型	xi shu mo xing	600
+状态空间模型	zhuang tai kong jian mo xing	600
+选择性状态空间模型	xuan ze xing zhuang tai kong jian mo xing	600
+残差连接	can cha lian jie	600
+跳跃连接	tiao yue lian jie	600
+层归一化	ceng gui yi hua	600
+批归一化	pi gui yi hua	600
+均方根归一化	jun fang gen gui yi hua	600
+前置归一化	qian zhi gui yi hua	600
+后置归一化	hou zhi gui yi hua	600
+激活函数	ji huo han shu	600
+修正线性单元	xiu zheng xian xing dan yuan	600
+高斯误差线性单元	gao si wu cha xian xing dan yuan	600
+门控线性单元	men kong xian xing dan yuan	600
+位置编码	wei zhi bian ma	600
+绝对位置编码	jue dui wei zhi bian ma	600
+相对位置编码	xiang dui wei zhi bian ma	600
+旋转位置编码	xuan zhuan wei zhi bian ma	600
+可学习位置编码	ke xue xi wei zhi bian ma	600
+正弦位置编码	zheng xian wei zhi bian ma	600
+线性偏置注意力	xian xing pian zhi zhu yi li	600
+长度外推	chang du wai tui	600
+上下文长度外推	shang xia wen chang du wai tui	600
+位置插值	wei zhi cha zhi	600
+神经正切核	shen jing zheng qie he	600
+词嵌入	ci qian ru	600
+词向量	ci xiang liang	600
+向量嵌入	xiang liang qian ru	600
+嵌入层	qian ru ceng	600
+嵌入空间	qian ru kong jian	600
+语义空间	yu yi kong jian	600
+隐空间	yin kong jian	600
+潜在空间	qian zai kong jian	600
+隐状态	yin zhuang tai	600
+隐藏层	yin cang ceng	600
+前馈网络	qian kui wang luo	600
+前馈层	qian kui ceng	600
+多层感知机	duo ceng gan zhi ji	600
+线性投影	xian xing tou ying	600
+投影层	tou ying ceng	600
+输出层	shu chu ceng	600
+词表层	ci biao ceng	600
+分类头	fen lei tou	600
+语言模型头	yu yan mo xing tou	600
+权重共享	quan zhong gong xiang	600
+嵌入权重绑定	qian ru quan zhong bang ding	600
+分词器	fen ci qi	600
+子词分词	zi ci fen ci	600
+字节对编码	zi jie dui bian ma	600
+字节级字节对编码	zi jie ji zi jie dui bian ma	600
+词片分词	ci pian fen ci	600
+一元分词	yi yuan fen ci	600
+词元	ci yuan	600
+词元化	ci yuan hua	600
+视觉词元	shi jue ci yuan	600
+音频词元	yin pin ci yuan	600
+特殊词元	te shu ci yuan	600
+起始词元	qi shi ci yuan	600
+结束词元	jie shu ci yuan	600
+填充词元	tian chong ci yuan	600
+未知词元	wei zhi ci yuan	600
+掩码词元	yan ma ci yuan	600
+词表大小	ci biao da xiao	600
+词表扩充	ci biao kuo chong	600
+词表裁剪	ci biao cai jian	600
+对数几率	dui shu ji lv	600
+归一化指数函数	gui yi hua zhi shu han shu	600
+交叉熵损失	jiao cha shang sun shi	600
+损失函数	sun shi han shu	600
+困惑度	kun huo du	600
+似然函数	si ran han shu	600
+对数似然	dui shu si ran	600
+负对数似然	fu dui shu si ran	600
+信息熵	xin xi shang	600
+相对熵	xiang dui shang	600
+散度惩罚	san du cheng fa	600
+概率分布	gai lv fen bu	600
+条件概率	tiao jian gai lv	600
+联合概率	lian he gai lv	600
+先验概率	xian yan gai lv	600
+后验概率	hou yan gai lv	600
+表征学习	biao zheng xue xi	600
+特征提取	te zheng ti qu	600
+特征映射	te zheng ying she	600
+高维向量	gao wei xiang liang	600
+余弦相似度	yu xian xiang si du	600
+欧氏距离	ou shi ju li	600
+点积相似度	dian ji xiang si du	600
+语义相似度	yu yi xiang si du	600
+预训练	yu xun lian	600
+自监督学习	zi jian du xue xi	600
+无监督学习	wu jian du xue xi	600
+有监督学习	you jian du xue xi	600
+半监督学习	ban jian du xue xi	600
+强化学习	qiang hua xue xi	600
+深度强化学习	shen du qiang hua xue xi	600
+对比学习	dui bi xue xi	600
+迁移学习	qian yi xue xi	600
+元学习	yuan xue xi	600
+持续学习	chi xu xue xi	600
+联邦学习	lian bang xue xi	600
+课程学习	ke cheng xue xi	600
+主动学习	zhu dong xue xi	600
+模仿学习	mo fang xue xi	600
+逆强化学习	ni qiang hua xue xi	600
+下一词元预测	xia yi ci yuan yu ce	600
+掩码语言建模	yan ma yu yan jian mo	600
+因果语言建模	yin guo yu yan jian mo	600
+前缀语言建模	qian zhui yu yan jian mo	600
+序列到序列	xu lie dao xu lie	600
+双向上下文	shuang xiang shang xia wen	600
+单向上下文	dan xiang shang xia wen	600
+继续预训练	ji xu yu xun lian	600
+增量预训练	zeng liang yu xun lian	600
+领域自适应预训练	ling yu zi shi ying yu xun lian	600
+长文本预训练	chang wen ben yu xun lian	600
+退火训练	tui huo xun lian	600
+稳定训练阶段	wen ding xun lian jie duan	600
+学习率衰减	xue xi lv shuai jian	600
+全参数微调	quan can shu wei tiao	600
+全量微调	quan liang wei tiao	600
+指令微调	zhi ling wei tiao	600
+有监督微调	you jian du wei tiao	600
+监督微调	jian du wei tiao	600
+对话微调	dui hua wei tiao	600
+多任务微调	duo ren wu wei tiao	600
+领域微调	ling yu wei tiao	600
+参数高效微调	can shu gao xiao wei tiao	600
+高效参数微调	gao xiao can shu wei tiao	600
+低秩自适应	di zhi zi shi ying	600
+低秩适配	di zhi shi pei	600
+量化低秩自适应	liang hua di zhi zi shi ying	600
+低秩矩阵分解	di zhi ju zhen fen jie	600
+权重分解低秩适配	quan zhong fen jie di zhi shi pei	600
+适配器微调	shi pei qi wei tiao	600
+前缀微调	qian zhui wei tiao	600
+提示微调	ti shi wei tiao	600
+软提示	ruan ti shi	600
+硬提示	ying ti shi	600
+冻结权重	dong jie quan zhong	600
+主干网络冻结	zhu gan wang luo dong jie	600
+可训练参数	ke xun lian can shu	600
+灾难性遗忘	zai nan xing yi wang	600
+过拟合	guo ni he	600
+欠拟合	qian ni he	600
+泛化能力	fan hua neng li	600
+泛化误差	fan hua wu cha	600
+分布外泛化	fen bu wai fan hua	600
+零样本泛化	ling yang ben fan hua	600
+跨任务泛化	kua ren wu fan hua	600
+对齐税	dui qi shui	600
+人类反馈强化学习	ren lei fan kui qiang hua xue xi	600
+人工智能反馈强化学习	ren gong zhi neng fan kui qiang hua xue xi	600
+可验证奖励强化学习	ke yan zheng jiang li qiang hua xue xi	600
+直接偏好优化	zhi jie pian hao you hua	600
+近端策略优化	jin duan ce lve you hua	600
+群组相对策略优化	qun zu xiang dui ce lve you hua	600
+组相对策略优化	zu xiang dui ce lve you hua	600
+拒绝采样	ju jue cai yang	600
+拒绝采样微调	ju jue cai yang wei tiao	600
+偏好对齐	pian hao dui qi	600
+人类偏好对齐	ren lei pian hao dui qi	600
+价值对齐	jia zhi dui qi	600
+安全对齐	an quan dui qi	600
+超级对齐	chao ji dui qi	600
+宪法人工智能	xian fa ren gong zhi neng	600
+奖励模型	jiang li mo xing	600
+奖励建模	jiang li jian mo	600
+结果奖励模型	jie guo jiang li mo xing	600
+过程奖励模型	guo cheng jiang li mo xing	600
+过程监督	guo cheng jian du	600
+结果监督	jie guo jian du	600
+奖励黑客	jiang li hei ke	600
+奖励篡改	jiang li cuan gai	600
+奖励稀疏	jiang li xi shu	600
+奖励塑形	jiang li su xing	600
+策略模型	ce lve mo xing	600
+参考模型	can kao mo xing	600
+评论家模型	ping lun jia mo xing	600
+演员评论家算法	yan yuan ping lun jia suan fa	600
+优势函数	you shi han shu	600
+广义优势估计	guang yi you shi gu ji	600
+价值函数	jia zhi han shu	600
+状态价值函数	zhuang tai jia zhi han shu	600
+动作价值函数	dong zuo jia zhi han shu	600
+偏好数据集	pian hao shu ju ji	600
+成对偏好数据	cheng dui pian hao shu ju	600
+正样本	zheng yang ben	600
+负样本	fu yang ben	600
+知识蒸馏	zhi shi zheng liu	600
+模型蒸馏	mo xing zheng liu	600
+白盒蒸馏	bai he zheng liu	600
+黑盒蒸馏	hei he zheng liu	600
+思维链蒸馏	si wei lian zheng liu	600
+数据蒸馏	shu ju zheng liu	600
+上下文蒸馏	shang xia wen zheng liu	600
+步数蒸馏	bu shu zheng liu	600
+自蒸馏	zi zheng liu	600
+教师模型	jiao shi mo xing	600
+学生模型	xue sheng mo xing	600
+软标签	ruan biao qian	600
+硬标签	ying biao qian	600
+蒸馏温度	zheng liu wen du	600
+模型合并	mo xing he bing	600
+权重融合	quan zhong rong he	600
+模型平均	mo xing ping jun	600
+球面线性插值	qiu mian xian xing cha zhi	600
+任务向量	ren wu xiang liang	600
+模型剪枝	mo xing jian zhi	600
+结构化剪枝	jie gou hua jian zhi	600
+非结构化剪枝	fei jie gou hua jian zhi	600
+通道剪枝	tong dao jian zhi	600
+注意力头剪枝	zhu yi li tou jian zhi	600
+层剪枝	ceng jian zhi	600
+彩票假说	cai piao jia shuo	600
+缩放定律	suo fang ding lv	600
+尺度定律	chi du ding lv	600
+测试时缩放	ce shi shi suo fang	600
+推理时缩放	tui li shi suo fang	600
+计算最优缩放	ji suan zui you suo fang	600
+涌现能力	yong xian neng li	600
+智能涌现	zhi neng yong xian	600
+顿悟现象	dun wu xian xiang	600
+双下降现象	shuang xia jiang xian xiang	600
+反向传播	fan xiang chuan bo	600
+前向传播	qian xiang chuan bo	600
+梯度下降	ti du xia jiang	600
+随机梯度下降	sui ji ti du xia jiang	600
+自适应矩估计	zi shi ying ju gu ji	600
+权重衰减	quan zhong shuai jian	600
+梯度裁剪	ti du cai jian	600
+梯度累积	ti du lei ji	600
+梯度消失	ti du xiao shi	600
+梯度爆炸	ti du bao zha	600
+梯度检查点	ti du jian cha dian	600
+激活重计算	ji huo chong ji suan	600
+学习率预热	xue xi lv yu re	600
+余弦退火	yu xian tui huo	600
+批量大小	pi liang da xiao	600
+全局批量大小	quan ju pi liang da xiao	600
+微批量大小	wei pi liang da xiao	600
+训练轮数	xun lian lun shu	600
+训练步数	xun lian bu shu	600
+检查点	jian cha dian	600
+模型权重	mo xing quan zhong	600
+优化器状态	you hua qi zhuang tai	600
+早停法	zao ting fa	600
+正则化	zheng ze hua	600
+随机失活	sui ji shi huo	600
+标签平滑	biao qian ping hua	600
+混合精度训练	hun he jing du xun lian	600
+自动混合精度	zi dong hun he jing du	600
+半精度浮点数	ban jing du fu dian shu	600
+脑浮点数	nao fu dian shu	600
+单精度浮点数	dan jing du fu dian shu	600
+八位浮点数	ba wei fu dian shu	600
+分布式训练	fen bu shi xun lian	600
+数据并行	shu ju bing xing	600
+张量并行	zhang liang bing xing	600
+流水线并行	liu shui xian bing xing	600
+序列并行	xu lie bing xing	600
+上下文并行	shang xia wen bing xing	600
+三维并行	san wei bing xing	600
+零冗余优化器	ling rong yu you hua qi	600
+全分片数据并行	quan fen pian shu ju bing xing	600
+通信开销	tong xin kai xiao	600
+全归约	quan gui yue	600
+全收集	quan shou ji	600
+规约散射	gui yue san she	600
+集合通信	ji he tong xin	600
+算力集群	suan li ji qun	600
+万卡集群	wan ka ji qun	600
+高速互联	gao su hu lian	600
+显存占用	xian cun zhan yong	600
+显存墙	xian cun qiang	600
+通信墙	tong xin qiang	600
+算力利用率	suan li li yong lv	600
+模型算力利用率	mo xing suan li li yong lv	600
+每秒浮点运算次数	mei miao fu dian yun suan ci shu	600
+训练吞吐量	xun lian tun tu liang	600
+容错训练	rong cuo xun lian	600
+断点续训	duan dian xu xun	600
+训练不稳定性	xun lian bu wen ding xing	600
+损失尖峰	sun shi jian feng	600
+模型推理	mo xing tui li	600
+推理引擎	tui li yin qing	600
+推理加速	tui li jia su	600
+推理延迟	tui li yan chi	600
+首字延迟	shou zi yan chi	600
+首词元延迟	shou ci yuan yan chi	600
+生成速度	sheng cheng su du	600
+词元间延迟	ci yuan jian yan chi	600
+推理吞吐量	tui li tun tu liang	600
+并发请求	bing fa qing qiu	600
+流式输出	liu shi shu chu	600
+流式生成	liu shi sheng cheng	600
+打字机效果	da zi ji xiao guo	600
+预填充阶段	yu tian chong jie duan	600
+解码阶段	jie ma jie duan	600
+键值缓存	jian zhi huan cun	600
+前缀缓存	qian zhui huan cun	600
+上下文缓存	shang xia wen huan cun	600
+分页注意力	fen ye zhu yi li	600
+基数注意力	ji shu zhu yi li	600
+连续批处理	lian xu pi chu li	600
+动态批处理	dong tai pi chu li	600
+静态批处理	jing tai pi chu li	600
+投机解码	tou ji jie ma	600
+推测解码	tui ce jie ma	600
+草稿模型	cao gao mo xing	600
+目标模型	mu biao mo xing	600
+多词元预测	duo ci yuan yu ce	600
+美杜莎解码	mei du sha jie ma	600
+前瞻解码	qian zhan jie ma	600
+预填充解码分离	yu tian chong jie ma fen li	600
+分布式推理	fen bu shi tui li	600
+端侧推理	duan ce tui li	600
+端侧大模型	duan ce da mo xing	600
+边缘推理	bian yuan tui li	600
+端云协同	duan yun xie tong	600
+本地部署	ben di bu shu	600
+私有化部署	si you hua bu shu	600
+云端部署	yun duan bu shu	600
+无服务器推理	wu fu wu qi tui li	600
+模型服务	mo xing fu wu	600
+容器化部署	rong qi hua bu shu	600
+算子融合	suan zi rong he	600
+内核融合	nei he rong he	600
+计算图优化	ji suan tu you hua	600
+静态计算图	jing tai ji suan tu	600
+动态计算图	dong tai ji suan tu	600
+显存卸载	xian cun xie zai	600
+内存卸载	nei cun xie zai	600
+统一内存	tong yi nei cun	600
+高带宽显存	gao dai kuan xian cun	600
+模型量化	mo xing liang hua	600
+训练后量化	xun lian hou liang hua	600
+量化感知训练	liang hua gan zhi xun lian	600
+权重量化	quan zhong liang hua	600
+激活量化	ji huo liang hua	600
+键值缓存量化	jian zhi huan cun liang hua	600
+仅权重量化	jin quan zhong liang hua	600
+权重激活同时量化	quan zhong ji huo tong shi liang hua	600
+激活感知权重量化	ji huo gan zhi quan zhong liang hua	600
+平滑量化	ping hua liang hua	600
+八位整型量化	ba wei zheng xing liang hua	600
+四位整型量化	si wei zheng xing liang hua	600
+二值化网络	er zhi hua wang luo	600
+三值权重网络	san zhi quan zhong wang luo	600
+一比特大模型	yi bi te da mo xing	600
+极低比特量化	ji di bi te liang hua	600
+对称量化	dui chen liang hua	600
+非对称量化	fei dui chen liang hua	600
+逐通道量化	zhu tong dao liang hua	600
+逐张量量化	zhu zhang liang liang hua	600
+逐词元量化	zhu ci yuan liang hua	600
+分组量化	fen zu liang hua	600
+零点偏移	ling dian pian yi	600
+量化缩放因子	liang hua suo fang yin zi	600
+反量化	fan liang hua	600
+校准数据集	xiao zhun shu ju ji	600
+精度损失	jing du sun shi	600
+无损压缩	wu sun ya suo	600
+有损压缩	you sun ya suo	600
+模型压缩	mo xing ya suo	600
+稀疏化	xi shu hua	600
+半结构化稀疏	ban jie gou hua xi shu	600
+解码策略	jie ma ce lve	600
+贪婪解码	tan lan jie ma	600
+贪心搜索	tan xin sou suo	600
+集束搜索	ji shu sou suo	600
+束搜索	shu sou suo	600
+束宽	shu kuan	600
+随机采样	sui ji cai yang	600
+温度采样	wen du cai yang	600
+采样温度	cai yang wen du	600
+核采样	he cai yang	600
+概率阈值采样	gai lv yu zhi cai yang	600
+候选词采样	hou xuan ci cai yang	600
+最小概率采样	zui xiao gai lv cai yang	600
+局部典型采样	ju bu dian xing cai yang	600
+对比搜索	dui bi sou suo	600
+对比解码	dui bi jie ma	600
+重复惩罚	chong fu cheng fa	600
+频率惩罚	pin lv cheng fa	600
+存在惩罚	cun zai cheng fa	600
+长度惩罚	chang du cheng fa	600
+停止词	ting zhi ci	600
+结束符	jie shu fu	600
+最大生成长度	zui da sheng cheng chang du	600
+最大新词元数	zui da xin ci yuan shu	600
+结构化输出	jie gou hua shu chu	600
+格式化输出	ge shi hua shu chu	600
+约束解码	yue shu jie ma	600
+受限解码	shou xian jie ma	600
+语法约束生成	yu fa yue shu sheng cheng	600
+正则约束解码	zheng ze yue shu jie ma	600
+状态机解码	zhuang tai ji jie ma	600
+逻辑偏置	luo ji pian zhi	600
+引导生成	yin dao sheng cheng	600
+提示词工程	ti shi ci gong cheng	600
+提示工程	ti shi gong cheng	600
+系统提示词	xi tong ti shi ci	600
+用户提示词	yong hu ti shi ci	600
+助手回复	zhu shou hui fu	600
+提示词模板	ti shi ci mo ban	600
+提示词优化	ti shi ci you hua	600
+自动提示词工程	zi dong ti shi ci gong cheng	600
+元提示词	yuan ti shi ci	600
+反向提示词	fan xiang ti shi ci	600
+负面提示词	fu mian ti shi ci	600
+正面提示词	zheng mian ti shi ci	600
+人设定制	ren she ding zhi	600
+预设指令	yu she zhi ling	600
+上下文学习	shang xia wen xue xi	600
+情境学习	qing jing xue xi	600
+零样本提示	ling yang ben ti shi	600
+零样本学习	ling yang ben xue xi	600
+单样本提示	dan yang ben ti shi	600
+少样本提示	shao yang ben ti shi	600
+少样本学习	shao yang ben xue xi	600
+多样本提示	duo yang ben ti shi	600
+示例选择	shi li xuan ze	600
+动态少样本	dong tai shao yang ben	600
+思维链	si wei lian	600
+思维链提示	si wei lian ti shi	600
+零样本思维链	ling yang ben si wei lian	600
+自洽性思维链	zi qia xing si wei lian	600
+多路径推理	duo lu jing tui li	600
+思维树	si wei shu	600
+思维图	si wei tu	600
+思维森林	si wei sen lin	600
+思维骨架	si wei gu jia	600
+思维程序	si wei cheng xu	600
+分步推理	fen bu tui li	600
+链式思考	lian shi si kao	600
+深度思考	shen du si kao	600
+慢思考	man si kao	600
+快思考	kuai si kao	600
+推理模型	tui li mo xing	600
+长思维链	chang si wei lian	600
+隐式思维链	yin shi si wei lian	600
+自我反思	zi wo fan si	600
+自我修正	zi wo xiu zheng	600
+自我验证	zi wo yan zheng	600
+自我博弈	zi wo bo yi	600
+自洽性采样	zi qia xing cai yang	600
+多数投票	duo shu tou piao	600
+加权投票	jia quan tou piao	600
+最佳采样	zui jia cai yang	600
+蒙特卡洛树搜索	meng te ka luo shu sou suo	600
+过程奖励引导	guo cheng jiang li yin dao	600
+回溯搜索	hui su sou suo	600
+分解提示	fen jie ti shi	600
+从少到多提示	cong shao dao duo ti shi	600
+后退一步提示	hou tui yi bu ti shi	600
+苏格拉底式提问	su ge la di shi ti wen	600
+知识生成提示	zhi shi sheng cheng ti shi	600
+方向性刺激提示	fang xiang xing ci ji ti shi	600
+情感提示	qing gan ti shi	600
+上下文窗口	shang xia wen chuang kou	600
+上下文长度	shang xia wen chang du	600
+超长上下文	chao chang shang xia wen	600
+百万词元上下文	bai wan ci yuan shang xia wen	600
+无限上下文	wu xian shang xia wen	600
+上下文压缩	shang xia wen ya suo	600
+提示词压缩	ti shi ci ya suo	600
+上下文裁剪	shang xia wen cai jian	600
+大海捞针测试	da hai lao zhen ce shi	600
+中间迷失现象	zhong jian mi shi xian xiang	600
+首尾效应	shou wei xiao ying	600
+有效上下文长度	you xiao shang xia wen chang du	600
+多轮对话	duo lun dui hua	600
+单轮对话	dan lun dui hua	600
+对话历史	dui hua li shi	600
+会话状态	hui hua zhuang tai	600
+上下文管理	shang xia wen guan li	600
+滑动窗口记忆	hua dong chuang kou ji yi	600
+摘要记忆	zhai yao ji yi	600
+知识图谱记忆	zhi shi tu pu ji yi	600
+指令遵循	zhi ling zun xun	600
+复杂指令遵循	fu za zhi ling zun xun	600
+多约束指令	duo yue shu zhi ling	600
+意图识别	yi tu shi bie	600
+槽位填充	cao wei tian chong	600
+指代消解	zhi dai xiao jie	600
+上下文感知	shang xia wen gan zhi	600
+检索增强生成	jian suo zeng qiang sheng cheng	600
+模块化检索增强	mo kuai hua jian suo zeng qiang	600
+高级检索增强	gao ji jian suo zeng qiang	600
+朴素检索增强	pu su jian suo zeng qiang	600
+图检索增强生成	tu jian suo zeng qiang sheng cheng	600
+智能体检索增强	zhi neng ti jian suo zeng qiang	600
+自省式检索增强	zi xing shi jian suo zeng qiang	600
+纠错式检索增强	jiu cuo shi jian suo zeng qiang	600
+自适应检索增强	zi shi ying jian suo zeng qiang	600
+多模态检索增强	duo mo tai jian suo zeng qiang	600
+本地知识库	ben di zhi shi ku	600
+企业知识库	qi ye zhi shi ku	600
+私域知识库	si yu zhi shi ku	600
+向量数据库	xiang liang shu ju ku	600
+向量检索引擎	xiang liang jian suo yin qing	600
+向量索引	xiang liang suo yin	600
+倒排索引	dao pai suo yin	600
+分层可导航小世界图	fen ceng ke dao hang xiao shi jie tu	600
+乘积量化	cheng ji liang hua	600
+近似最近邻搜索	jin si zui jin lin sou suo	600
+最近邻检索	zui jin lin jian suo	600
+最大边际相关性	zui da bian ji xiang guan xing	600
+稠密检索	chou mi jian suo	600
+稀疏检索	xi shu jian suo	600
+关键词检索	guan jian ci jian suo	600
+语义检索	yu yi jian suo	600
+向量检索	xiang liang jian suo	600
+混合检索	hun he jian suo	600
+多路召回	duo lu zhao hui	600
+倒数排序融合	dao shu pai xu rong he	600
+重排序	chong pai xu	600
+重排序模型	chong pai xu mo xing	600
+交叉编码器	jiao cha bian ma qi	600
+双编码器	shuang bian ma qi	600
+嵌入模型	qian ru mo xing	600
+文本嵌入模型	wen ben qian ru mo xing	600
+多语言嵌入模型	duo yu yan qian ru mo xing	600
+文档解析	wen dang jie xi	600
+版面分析	ban mian fen xi	600
+光学字符识别	guang xue zi fu shi bie	600
+表格识别	biao ge shi bie	600
+公式识别	gong shi shi bie	600
+文档切分	wen dang qie fen	600
+文本分块	wen ben fen kuai	600
+语义分块	yu yi fen kuai	600
+递归字符切分	di gui zi fu qie fen	600
+固定长度分块	gu ding chang du fen kuai	600
+滑动窗口分块	hua dong chuang kou fen kuai	600
+块大小	kuai da xiao	600
+块重叠	kuai chong die	600
+父子文档检索	fu zi wen dang jian suo	600
+小块检索大块生成	xiao kuai jian suo da kuai sheng cheng	600
+上下文增强分块	shang xia wen zeng qiang fen kuai	600
+句子窗口检索	ju zi chuang kou jian suo	600
+自动合并检索	zi dong he bing jian suo	600
+查询改写	cha xun gai xie	600
+查询扩展	cha xun kuo zhan	600
+查询分解	cha xun fen jie	600
+子查询生成	zi cha xun sheng cheng	600
+多查询检索	duo cha xun jian suo	600
+假设性文档嵌入	jia she xing wen dang qian ru	600
+退步提示检索	tui bu ti shi jian suo	600
+元数据过滤	yuan shu ju guo lv	600
+混合过滤检索	hun he guo lv jian suo	600
+知识图谱	zhi shi tu pu	600
+实体抽取	shi ti chou qu	600
+关系抽取	guan xi chou qu	600
+事件抽取	shi jian chou qu	600
+知识三元组	zhi shi san yuan zu	600
+图数据库	tu shu ju ku	600
+社区发现算法	she qu fa xian suan fa	600
+多跳问答	duo tiao wen da	600
+多跳推理	duo tiao tui li	600
+引用溯源	yin yong su yuan	600
+事实核查	shi shi he cha	600
+知识挂载	zhi shi gua zai	600
+外挂知识库	wai gua zhi shi ku	600
+知识更新	zhi shi geng xin	600
+知识编辑	zhi shi bian ji	600
+召回率	zhao hui lv	600
+平均倒数排名	ping jun dao shu pai ming	600
+归一化折损累计增益	gui yi hua zhe sun lei ji zeng yi	600
+上下文相关性	shang xia wen xiang guan xing	600
+答案忠实度	da an zhong shi du	600
+答案相关性	da an xiang guan xing	600
+智能体	zhi neng ti	600
+人工智能体	ren gong zhi neng ti	600
+大模型智能体	da mo xing zhi neng ti	600
+自主智能体	zi zhu zhi neng ti	600
+单智能体	dan zhi neng ti	600
+多智能体	duo zhi neng ti	600
+多智能体系统	duo zhi neng ti xi tong	600
+多智能体协同	duo zhi neng ti xie tong	600
+多智能体辩论	duo zhi neng ti bian lun	600
+智能体编排	zhi neng ti bian pai	600
+智能体工作流	zhi neng ti gong zuo liu	600
+工作流编排	gong zuo liu bian pai	600
+工作流引擎	gong zuo liu yin qing	600
+推理与行动	tui li yu xing dong	600
+规划与执行	gui hua yu zhi xing	600
+反思机制	fan si ji zhi	600
+任务规划	ren wu gui hua	600
+任务拆解	ren wu chai jie	600
+子任务分解	zi ren wu fen jie	600
+行动空间	xing dong kong jian	600
+观察结果	guan cha jie guo	600
+环境交互	huan jing jiao hu	600
+环境反馈	huan jing fan kui	600
+工具调用	gong ju diao yong	600
+并行工具调用	bing xing gong ju diao yong	600
+多步工具调用	duo bu gong ju diao yong	600
+工具学习	gong ju xue xi	600
+工具使用	gong ju shi yong	600
+外部工具	wai bu gong ju	600
+插件机制	cha jian ji zhi	600
+代码解释器	dai ma jie shi qi	600
+沙箱环境	sha xiang huan jing	600
+安全沙箱	an quan sha xiang	600
+代码执行沙箱	dai ma zhi xing sha xiang	600
+联网搜索	lian wang sou suo	600
+网络爬虫	wang luo pa chong	600
+搜索增强	sou suo zeng qiang	600
+深度研究	shen du yan jiu	600
+计算机使用	ji suan ji shi yong	600
+浏览器操作	liu lan qi cao zuo	600
+手机操作智能体	shou ji cao zuo zhi neng ti	600
+图形界面智能体	tu xing jie mian zhi neng ti	600
+屏幕理解	ping mu li jie	600
+视觉定位	shi jue ding wei	600
+元素点击	yuan su dian ji	600
+自动化办公	zi dong hua ban gong	600
+机器人流程自动化	ji qi ren liu cheng zi dong hua	600
+短期记忆	duan qi ji yi	600
+长期记忆	chang qi ji yi	600
+工作记忆	gong zuo ji yi	600
+情景记忆	qing jing ji yi	600
+语义记忆	yu yi ji yi	600
+程序性记忆	cheng xu xing ji yi	600
+记忆模块	ji yi mo kuai	600
+记忆检索	ji yi jian suo	600
+记忆更新	ji yi geng xin	600
+记忆遗忘	ji yi yi wang	600
+智能体通信协议	zhi neng ti tong xin xie yi	600
+模型上下文协议	mo xing shang xia wen xie yi	600
+智能体间协议	zhi neng ti jian xie yi	600
+人机协同	ren ji xie tong	600
+人在回路	ren zai hui lu	600
+人工介入	ren gong jie ru	600
+人工审核	ren gong shen he	600
+智能编程助手	zhi neng bian cheng zhu shou	600
+代码生成	dai ma sheng cheng	600
+代码补全	dai ma bu quan	600
+行间代码补全	hang jian dai ma bu quan	600
+整库代码理解	zheng ku dai ma li jie	600
+代码重构	dai ma chong gou	600
+代码审查	dai ma shen cha	600
+缺陷修复	que xian xiu fu	600
+自动修复代码	zi dong xiu fu dai ma	600
+单元测试生成	dan yuan ce shi sheng cheng	600
+自然语言转代码	zi ran yu yan zhuan dai ma	600
+自然语言转查询	zi ran yu yan zhuan cha xun	600
+文本转数据库查询	wen ben zhuan shu ju ku cha xun	600
+氛围编程	fen wei bian cheng	600
+对话式编程	dui hua shi bian cheng	600
+智能体化编程	zhi neng ti hua bian cheng	600
+软件工程智能体	ruan jian gong cheng zhi neng ti	600
+自主编程智能体	zi zhu bian cheng zhi neng ti	600
+数字员工	shu zi yuan gong	600
+虚拟助手	xu ni zhu shou	600
+个人智能助理	ge ren zhi neng zhu li	600
+智能客服	zhi neng ke fu	600
+对话机器人	dui hua ji qi ren	600
+多模态	duo mo tai	600
+多模态大模型	duo mo tai da mo xing	600
+视觉语言模型	shi jue yu yan mo xing	600
+大视觉语言模型	da shi jue yu yan mo xing	600
+音频语言模型	yin pin yu yan mo xing	600
+全模态模型	quan mo tai mo xing	600
+跨模态理解	kua mo tai li jie	600
+跨模态对齐	kua mo tai dui qi	600
+跨模态检索	kua mo tai jian suo	600
+图文对齐	tu wen dui qi	600
+对比语言图像预训练	dui bi yu yan tu xiang yu xun lian	600
+视觉编码器	shi jue bian ma qi	600
+视觉变换器	shi jue bian huan qi	600
+图像分块	tu xiang fen kuai	600
+动态分辨率	dong tai fen bian lv	600
+原生分辨率	yuan sheng fen bian lv	600
+图文交错数据	tu wen jiao cuo shu ju	600
+视觉问答	shi jue wen da	600
+图像描述生成	tu xiang miao shu sheng cheng	600
+密集图像描述	mi ji tu xiang miao shu	600
+文档视觉问答	wen dang shi jue wen da	600
+细粒度视觉理解	xi li du shi jue li jie	600
+视觉推理	shi jue tui li	600
+端到端语音大模型	duan dao duan yu yin da mo xing	600
+实时语音对话	shi shi yu yin dui hua	600
+自动语音识别	zi dong yu yin shi bie	600
+文本转语音	wen ben zhuan yu yin	600
+声音克隆	sheng yin ke long	600
+零样本声音克隆	ling yang ben sheng yin ke long	600
+音色转换	yin se zhuan huan	600
+情感语音合成	qing gan yu yin he cheng	600
+流式语音合成	liu shi yu yin he cheng	600
+说话人分离	shuo hua ren fen li	600
+声纹识别	sheng wen shi bie	600
+音乐生成	yin yue sheng cheng	600
+文生音乐	wen sheng yin yue	600
+音效生成	yin xiao sheng cheng	600
+扩散模型	kuo san mo xing	600
+去噪扩散概率模型	qu zao kuo san gai lv mo xing	600
+去噪扩散隐式模型	qu zao kuo san yin shi mo xing	600
+潜在扩散模型	qian zai kuo san mo xing	600
+隐空间扩散模型	yin kong jian kuo san mo xing	600
+扩散变换器	kuo san bian huan qi	600
+流匹配	liu pi pei	600
+矫正流	jiao zheng liu	600
+一致性模型	yi zhi xing mo xing	600
+前向扩散过程	qian xiang kuo san guo cheng	600
+反向去噪过程	fan xiang qu zao guo cheng	600
+噪声预测网络	zao sheng yu ce wang luo	600
+噪声调度器	zao sheng diao du qi	600
+采样步数	cai yang bu shu	600
+无分类器引导	wu fen lei qi yin dao	600
+分类器引导	fen lei qi yin dao	600
+引导强度	yin dao qiang du	600
+重绘幅度	chong hui fu du	600
+随机种子	sui ji zhong zi	600
+文生图	wen sheng tu	600
+图生图	tu sheng tu	600
+局部重绘	ju bu chong hui	600
+图像修复	tu xiang xiu fu	600
+图像外扩	tu xiang wai kuo	600
+画布扩充	hua bu kuo chong	600
+超分辨率重建	chao fen bian lv chong jian	600
+图像放大	tu xiang fang da	600
+高清修复	gao qing xiu fu	600
+风格迁移	feng ge qian yi	600
+条件控制生成	tiao jian kong zhi sheng cheng	600
+控制网络	kong zhi wang luo	600
+姿态控制	zi tai kong zhi	600
+边缘检测控制	bian yuan jian ce kong zhi	600
+深度图控制	shen du tu kong zhi	600
+线稿上色	xian gao shang se	600
+图像提示适配器	tu xiang ti shi shi pei qi	600
+主体一致性	zhu ti yi zhi xing	600
+角色一致性	jue se yi zhi xing	600
+定制化微调	ding zhi hua wei tiao	600
+文本反演	wen ben fan yan	600
+超网络	chao wang luo	600
+美学评分	mei xue ping fen	600
+文生视频	wen sheng shi pin	600
+图生视频	tu sheng shi pin	600
+视频生成大模型	shi pin sheng cheng da mo xing	600
+时空注意力	shi kong zhu yi li	600
+三维变分自编码器	san wei bian fen zi bian ma qi	600
+帧间一致性	zhen jian yi zhi xing	600
+时间一致性	shi jian yi zhi xing	600
+物理规律模拟	wu li gui lv mo ni	600
+运镜控制	yun jing kong zhi	600
+首尾帧控制	shou wei zhen kong zhi	600
+运动笔刷	yun dong bi shua	600
+视频插帧	shi pin cha zhen	600
+视频超分	shi pin chao fen	600
+视频重绘	shi pin chong hui	600
+数字人	shu zi ren	600
+虚拟数字人	xu ni shu zi ren	600
+口型同步	kou xing tong bu	600
+唇形驱动	chun xing qu dong	600
+表情驱动	biao qing qu dong	600
+动作捕捉	dong zuo bu zhuo	600
+神经辐射场	shen jing fu she chang	600
+三维高斯泼溅	san wei gao si po jian	600
+文生三维	wen sheng san wei	600
+图生三维	tu sheng san wei	600
+三维网格生成	san wei wang ge sheng cheng	600
+视觉语言动作模型	shi jue yu yan dong zuo mo xing	600
+预训练语料	yu xun lian yu liao	600
+高质量语料	gao zhi liang yu liao	600
+多语言语料	duo yu yan yu liao	600
+平行语料	ping xing yu liao	600
+代码语料	dai ma yu liao	600
+网页抓取数据	wang ye zhua qu shu ju	600
+合成数据	he cheng shu ju	600
+数据合成	shu ju he cheng	600
+自我指令生成	zi wo zhi ling sheng cheng	600
+演化指令生成	yan hua zhi ling sheng cheng	600
+指令数据合成	zhi ling shu ju he cheng	600
+数据清洗	shu ju qing xi	600
+数据去重	shu ju qu zhong	600
+精确去重	jing que qu chong	600
+模糊去重	mo hu qu chong	600
+最小哈希去重	zui xiao ha xi qu chong	600
+语义去重	yu yi qu chong	600
+质量过滤	zhi liang guo lv	600
+启发式过滤	qi fa shi guo lv	600
+困惑度过滤	kun huo du guo lv	600
+敏感信息脱敏	min gan xin xi tuo min	600
+个人隐私脱敏	ge ren yin si tuo min	600
+数据配比	shu ju pei bi	600
+领域数据混合	ling yu shu ju hun he	600
+课程数据调度	ke cheng shu ju diao du	600
+数据增强	shu ju zeng qiang	600
+数据标注	shu ju biao zhu	600
+众包标注	zhong bao biao zhu	600
+专家标注	zhuan jia biao zhu	600
+自动化标注	zi dong hua biao zhu	600
+数据污染	shu ju wu ran	600
+测试集泄漏	ce shi ji xie lou	600
+基准测试去重	ji zhun ce shi qu chong	600
+模型幻觉	mo xing huan jue	600
+事实性幻觉	shi shi xing huan jue	600
+忠实性幻觉	zhong shi xing huan jue	600
+幻觉检测	huan jue jian ce	600
+幻觉缓解	huan jue huan jie	600
+幻觉率	huan jue lv	600
+事实性评估	shi shi xing ping gu	600
+真实性检验	zhen shi xing jian yan	600
+大模型安全	da mo xing an quan	600
+内容安全	nei rong an quan	600
+安全护栏	an quan hu lan	600
+输入护栏	shu ru hu lan	600
+输出护栏	shu chu hu lan	600
+敏感词过滤	min gan ci guo lv	600
+毒性检测	du xing jian ce	600
+有害内容拦截	you hai nei rong lan jie	600
+偏见与公平性	pian jian yu gong ping xing	600
+算法偏见	suan fa pian jian	600
+刻板印象	ke ban yin xiang	600
+提示词注入	ti shi ci zhu ru	600
+直接提示词注入	zhi jie ti shi ci zhu ru	600
+间接提示词注入	jian jie ti shi ci zhu ru	600
+越狱攻击	yue yu gong ji	600
+提示词越狱	ti shi ci yue yu	600
+提示词泄露	ti shi ci xie lou	600
+系统提示词提取	xi tong ti shi ci ti qu	600
+指令劫持	zhi ling jie chi	600
+对抗样本	dui kang yang ben	600
+对抗攻击	dui kang gong ji	600
+后门攻击	hou men gong ji	600
+数据投毒	shu ju tou du	600
+模型投毒	mo xing tou du	600
+成员推理攻击	cheng yuan tui li gong ji	600
+模型窃取	mo xing qie qu	600
+模型反演攻击	mo xing fan yan gong ji	600
+差分隐私	cha fen yin si	600
+机器遗忘	ji qi yi wang	600
+红队测试	hong dui ce shi	600
+自动化红队测试	zi dong hua hong dui ce shi	600
+安全红线	an quan hong xian	600
+拒答率	ju da lv	600
+过度拒答	guo du ju da	600
+防御性拒答	fang yu xing ju da	600
+数字水印	shu zi shui yin	600
+生成内容水印	sheng cheng nei rong shui yin	600
+隐式水印	yin shi shui yin	600
+显式水印	xian shi shui yin	600
+人工智能生成检测	ren gong zhi neng sheng cheng jian ce	600
+深度伪造	shen du wei zao	600
+换脸检测	huan lian jian ce	600
+可解释性	ke jie shi xing	600
+机械可解释性	ji xie ke jie shi xing	600
+稀疏自编码器	xi shu zi bian ma qi	600
+单义性神经元	dan yi xing shen jing yuan	600
+多义性神经元	duo yi xing shen jing yuan	600
+特征超叠加	te zheng chao die jia	600
+探测分类器	tan ce fen lei qi	600
+激活引导	ji huo yin dao	600
+干预向量	gan yu xiang liang	600
+基准测试	ji zhun ce shi	600
+评测基准	ping ce ji zhun	600
+大模型竞技场	da mo xing jing ji chang	600
+盲测对战	mang ce dui zhan	600
+等级分系统	deng ji fen xi tong	600
+胜率评估	sheng lv ping gu	600
+大模型裁判	da mo xing cai pan	600
+位置偏见	wei zhi pian jian	600
+长度偏见	chang du pian jian	600
+自我偏好偏见	zi wo pian hao pian jian	600
+客观题评测	ke guan ti ping ce	600
+主观题评测	zhu guan ti ping ce	600
+代码执行通过率	dai ma zhi xing tong guo lv	600
+综合能力评测	zong he neng li ping ce	600
+逻辑推理评测	luo ji tui li ping ce	600
+数学推理评测	shu xue tui li ping ce	600
+多语言能力评测	duo yu yan neng li ping ce	600
+通义千问	tong yi qian wen	600
+千问	qian wen	600
+通义万相	tong yi wan xiang	600
+通义听悟	tong yi ting wu	600
+通义灵码	tong yi ling ma	600
+通义星尘	tong yi xing chen	600
+通义晓蜜	tong yi xiao mi	600
+魔搭社区	mo da she qu	600
+阿里云百炼	a li yun bai lian	600
+深度求索	shen du qiu suo	600
+幻方量化	huan fang liang hua	600
+月之暗面	yue zhi an mian	600
+智谱清言	zhi pu qing yan	600
+智谱华章	zhi pu hua zhang	600
+智谱	zhi pu	600
+字节跳动	zi jie tiao dong	600
+豆包大模型	dou bao da mo xing	600
+豆包爱学	dou bao ai xue	600
+即梦	ji meng	600
+火山引擎	huo shan yin qing	600
+火山方舟	huo shan fang zhou	600
+百度文心	bai du wen xin	600
+文心一言	wen xin yi yan	600
+文心大模型	wen xin da mo xing	600
+文心一格	wen xin yi ge	600
+文心快码	wen xin kuai ma	600
+千帆大模型平台	qian fan da mo xing ping tai	600
+飞桨	fei jiang	600
+腾讯混元	teng xun hun yuan	600
+混元大模型	hun yuan da mo xing	600
+腾讯元宝	teng xun yuan bao	600
+腾讯元器	teng xun yuan qi	600
+华为盘古	hua wei pan gu	600
+盘古大模型	pan gu da mo xing	600
+昇腾	sheng teng	600
+昇思	sheng si	600
+讯飞星火	xun fei xing huo	600
+星火大模型	xing huo da mo xing	600
+科大讯飞	ke da xun fei	600
+百川智能	bai chuan zhi neng	600
+百川大模型	bai chuan da mo xing	600
+百小应	bai xiao ying	600
+零一万物	ling yi wan wu	600
+万知	wan zhi	600
+稀宇科技	xi yu ke ji	600
+阶跃星辰	jie yue xing chen	600
+跃问	yue wen	600
+冒泡鸭	mao pao ya	600
+面壁智能	mian bi zhi neng	600
+小钢炮	xiao gang pao	600
+昆仑万维	kun lun wan wei	600
+天工大模型	tian gong da mo xing	600
+天工音乐	tian gong yin yue	600
+商汤科技	shang tang ke ji	600
+日日新大模型	ri ri xin da mo xing	600
+秒画	miao hua	600
+上海人工智能实验室	shang hai ren gong zhi neng shi yan shi	600
+书生浦语	shu sheng pu yu	600
+书生万象	shu sheng wan xiang	600
+智源研究院	zhi yuan yan jiu yuan	600
+悟道大模型	wu dao da mo xing	600
+飞智模型	fei zhi mo xing	600
+快手可灵	kuai shou ke ling	600
+可灵	ke ling	600
+可图	ke tu	600
+快意大模型	kuai yi da mo xing	600
+生数科技	sheng shu ke ji	600
+爱诗科技	ai shi ke ji	600
+智象未来	zhi xiang wei lai	600
+印象笔记	yin xiang bi ji	600
+秘塔搜索	mi ta sou suo	600
+秘塔写作猫	mi ta xie zuo mao	600
+天工搜索	tian gong sou suo	600
+纳米搜索	na mi sou suo	600
+智脑大模型	zhi nao da mo xing	600
+紫东太初	zi dong tai chu	600
+源大模型	yuan da mo xing	600
+浪潮信息	lang chao xin xi	600
+孟子大模型	meng zi da mo xing	600
+澜舟科技	lan zhou ke ji	600
+山海大模型	shan hai da mo xing	600
+云知声	yun zhi sheng	600
+从容大模型	cong rong da mo xing	600
+云从科技	yun cong ke ji	600
+序列猴子	xu lie hou zi	600
+出门问问	chu men wen wen	600
+魔音工坊	mo yin gong fang	600
+奇妙元	qi miao yuan	600
+深言科技	shen yan ke ji	600
+智源开源	zhi yuan kai yuan	600
+硅基流动	gui ji liu dong	600
+无问芯穹	wu wen xin qiong	600
+潞晨科技	lu chen ke ji	600
+趋境科技	qu jing ke ji	600
+清程极智	qing cheng ji zhi	600
+开放传神	kai fang chuan shen	600
+美团大模型	mei tuan da mo xing	600
+蚂蚁百灵	ma yi bai ling	600
+百灵大模型	bai ling da mo xing	600
+京东言犀	jing dong yan xi	600
+言犀大模型	yan xi da mo xing	600
+网易有道	wang yi you dao	600
+子曰大模型	zi yue da mo xing	600
+九天大模型	jiu tian da mo xing	600
+星辰大模型	xing chen da mo xing	600
+元景大模型	yuan jing da mo xing	600
+银河通用	yin he tong yong	600
+智元机器人	zhi yuan ji qi ren	600
+宇树科技	yu shu ke ji	600
+傅利叶智能	fu li ye zhi neng	600
+大模型六小虎	da mo xing liu xiao hu	600
+大模型四小龙	da mo xing si xiao long	600
+开放人工智能研究中心	kai fang ren gong zhi neng yan jiu zhong xin	600
+谷歌深层思维	gu ge shen ceng si wei	600
+脸书人工智能研究院	lian shu ren gong zhi neng yan jiu yuan	600
+微软研究院	wei ruan yan jiu yuan	600
+超威半导体	chao wei ban dao ti	600
+苹果智能	ping guo zhi neng	600
+羊驼模型	yang tuo mo xing	600
+抱抱脸	bao bao lian	600
+马斯克	ma si ke	600
+黄仁勋	huang ren xun	600
+杨立昆	yang li kun	600
+辛顿	xin dun	600
+本吉奥	ben ji ao	600
+李飞飞	li fei fei	600
+卡帕西	ka pa xi	600
+苏茨克维	su ci ke wei	600
+阿莫迪	a mo di	600
+哈萨比斯	ha sa bi si	600
+梁文锋	liang wen feng	600
+杨植麟	yang zhi lin	600
+王小川	wang xiao chuan	600
+唐杰	tang jie	600
+闫俊杰	yan jun jie	600
+姜大昕	jiang da xin	600

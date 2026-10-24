@@ -52,7 +52,10 @@ object CellDictionaryManager {
             // The packager can leave a built-in dictionary out of an APK; skip it instead of failing deployment.
             val stream = try { context.assets.open(builtin.asset) } catch (_: java.io.FileNotFoundException) { return@forEach }
             val text = stream.bufferedReader().use { it.readText() }
-            store.installBuiltin(builtin, text)
+            val english = try {
+                context.assets.open(builtin.englishAsset).bufferedReader().use { it.readLines() }.filter { it.isNotBlank() }
+            } catch (_: java.io.FileNotFoundException) { emptyList() }
+            store.installBuiltin(builtin, text, english)
         }
     }
 
