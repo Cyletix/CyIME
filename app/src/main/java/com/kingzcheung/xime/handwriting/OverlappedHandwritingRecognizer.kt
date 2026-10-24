@@ -25,6 +25,12 @@ class OverlappedHandwritingRecognizer(
      * 日语、英文手写打开；中文习惯叠写在同一处，不打开（左右结构的字不会被拆开）。
      */
     private val sideBySide: Boolean = false,
+    /**
+     * 英文字母：一个字母的笔画在左右方向总是连着或重叠（i、j 的点在竖上方），
+     * 所以左右之间出现明显空隙的一段一定是两个字母，重罚，不让 c、o 这样挨着写的两个字母合成 O。
+     * 假名不能这样做（い、ハ 的两笔本身就左右分开）。
+     */
+    private val lettersApart: Boolean = false,
 ) {
     /**
      * 单个切分段（一个字）。
@@ -81,7 +87,7 @@ class OverlappedHandwritingRecognizer(
         }
         val n = bounded.size
         if (n == 0) return Result(emptyList(), 0f, 0f)
-        val layout = if (sideBySide) SideBySide(bounded) else null
+        val layout = if (sideBySide || lettersApart) SideBySide(bounded) else null
 
         val neg = Float.NEGATIVE_INFINITY
         // best[k][i]：前 i 笔切成 k 段的最大识别分总和（含时间间隔偏置）
@@ -101,7 +107,8 @@ class OverlappedHandwritingRecognizer(
                     val gapBias = if (j > 0 && j < gaps.size) gapBias(gaps[j]) else 0f
                     // 位置偏置：并排书写时，这一段整体在前面笔迹右边并留出空隙，倾向在此换字
                     val spaceBias = if (j > 0 && layout?.isBoundary(j, i) == true) GAP_SPLIT_BONUS else 0f
-                    val score = prev + candidates[0].score + gapBias + spaceBias
+                    val spanPenalty = if (lettersApart && layout?.spansGap(j, i) == true) LETTER_SPAN_PENALTY else 0f
+                    val score = prev + candidates[0].score + gapBias + spaceBias - spanPenalty
                     if (best[k][i] == neg || score > best[k][i]) {
                         best[k][i] = score
                         back[k][i] = j
@@ -138,7 +145,8 @@ class OverlappedHandwritingRecognizer(
         //   快写者字间间隔虽小但相对突出，仍能正确检出）。
         // 无显著停顿时按单字处理（合并段识别），输入框始终只显示一个字；
         // 连笔写多字词时合并段分数必然极低（跨字笔迹不成字），仍尊重 DP 切分。
-        if (bestK >= 2 && !hasPauseBoundary(gaps) && layout?.hasBoundary() != true) {
+        if (bestK >= 2 && !hasPauseBoundary(gaps) && layout?.hasBoundary() != true &&
+            !(lettersApart && layout?.spansGap(0, n) == true)) {
             val merged = segmentCandidates(0, n, bounded, predictFn)
             val mergedScore = merged.firstOrNull()?.score ?: 0f
             var end = n
@@ -261,6 +269,20 @@ class OverlappedHandwritingRecognizer(
             for (s in strokes.indices) a[s + 1] = maxOf(a[s], maxX[s])
         }
 
+        private val letterGap = gapNeeded / SIDE_GAP_RATIO * LETTER_GAP_RATIO
+
+        /** 第 j 到 i-1 笔在左右方向上有没有断开（按横向范围排序后，相邻两块之间空隙够大）。 */
+        fun spansGap(j: Int, i: Int): Boolean {
+            if (i - j < 2) return false
+            val order = (j until i).sortedBy { minX[it] }
+            var right = maxX[order[0]]
+            for (s in order.drop(1)) {
+                if (minX[s] - right >= letterGap) return true
+                right = maxOf(right, maxX[s])
+            }
+            return false
+        }
+
         fun isBoundary(j: Int, i: Int): Boolean {
             var left = Float.MAX_VALUE
             for (s in j until i) left = minOf(left, minX[s])
@@ -274,6 +296,12 @@ class OverlappedHandwritingRecognizer(
     companion object {
         /** 并排书写时，字与字之间的空隙至少为整行高度的这个比例才算换字。 */
         const val SIDE_GAP_RATIO = 0.25f
+
+        /** 英文字母之间：空隙到整行高度的这个比例就算两个字母。 */
+        const val LETTER_GAP_RATIO = 0.08f
+
+        /** 一段英文笔迹左右断开时的罚分：大到几乎不会被选，但仍保证总有切法（字母数超过上限时）。 */
+        const val LETTER_SPAN_PENALTY = 1f
 
         /**
          * 活动笔画最多同时叠写的字数。
