@@ -68,4 +68,12 @@ class SideBySideSegmentationTest {
             .recognize(strokes, noPauses.take(2)) { seg, _ -> listOf(HandwritingCandidate(if (seg.size == 2) "i" else "l", .8f)) }
         assertEquals(listOf("i"), result.segments.map { it.candidates.first().char })
     }
+    @Test fun kanaWhoseTwoStrokesStandApartStaysOneCharacter() {
+        // い：两笔左右分开（空隙 0.36 行高），每一笔单看也像个假名（し、へ），但都太窄，整体才是一个字
+        val strokes = listOf(listOf(0f to 0f, 5f to 100f), listOf(40f to 10f, 50f to 40f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, sideBySide = true).recognize(strokes, noPauses.take(2)) { seg, _ ->
+            listOf(if (seg.size == 2) HandwritingCandidate("い", .9f) else HandwritingCandidate(if (seg[0].first().first < 20f) "し" else "へ", .95f))
+        }
+        assertEquals(listOf("い"), result.segments.map { it.candidates.first().char })
+    }
 }

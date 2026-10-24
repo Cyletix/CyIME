@@ -108,7 +108,9 @@ class OverlappedHandwritingRecognizer(
                     // 位置偏置：并排书写时，这一段整体在前面笔迹右边并留出空隙，倾向在此换字
                     val spaceBias = if (j > 0 && layout?.isBoundary(j, i) == true) GAP_SPLIT_BONUS else 0f
                     val spanPenalty = if (lettersApart && layout?.spansGap(j, i) == true) LETTER_SPAN_PENALTY else 0f
-                    val score = prev + candidates[0].score + gapBias + spaceBias - spanPenalty
+                    // 假名、汉字大致方正：比行高窄很多的一段多半是半个字（い 的一笔被认成 し）
+                    val narrowPenalty = if (!lettersApart) layout?.narrowPenalty(j, i) ?: 0f else 0f
+                    val score = prev + candidates[0].score + gapBias + spaceBias - spanPenalty - narrowPenalty
                     if (best[k][i] == neg || score > best[k][i]) {
                         best[k][i] = score
                         back[k][i] = j
@@ -269,7 +271,17 @@ class OverlappedHandwritingRecognizer(
             for (s in strokes.indices) a[s + 1] = maxOf(a[s], maxX[s])
         }
 
-        private val letterGap = gapNeeded / SIDE_GAP_RATIO * LETTER_GAP_RATIO
+        private val lineHeight = gapNeeded / SIDE_GAP_RATIO
+        private val letterGap = lineHeight * LETTER_GAP_RATIO
+
+        /** 这一段的宽度不到行高的 [NARROW_RATIO] 时，越窄罚得越多（最多 [NARROW_PENALTY]）。 */
+        fun narrowPenalty(j: Int, i: Int): Float {
+            var left = Float.MAX_VALUE
+            var right = -Float.MAX_VALUE
+            for (s in j until i) { left = minOf(left, minX[s]); right = maxOf(right, maxX[s]) }
+            val ratio = (right - left) / lineHeight
+            return if (ratio >= NARROW_RATIO) 0f else NARROW_PENALTY * (1f - ratio.coerceAtLeast(0f) / NARROW_RATIO)
+        }
 
         /** 第 j 到 i-1 笔在左右方向上有没有断开（按横向范围排序后，相邻两块之间空隙够大）。 */
         fun spansGap(j: Int, i: Int): Boolean {
@@ -296,6 +308,12 @@ class OverlappedHandwritingRecognizer(
     companion object {
         /** 并排书写时，字与字之间的空隙至少为整行高度的这个比例才算换字。 */
         const val SIDE_GAP_RATIO = 0.25f
+
+        /** 假名、汉字：一段的宽度不到行高的这个比例就算偏窄（小写的っゃ约 0.4，几乎不罚）。 */
+        const val NARROW_RATIO = 0.4f
+
+        /** 偏窄的最大罚分（宽度趋近 0 时）。 */
+        const val NARROW_PENALTY = 0.3f
 
         /** 英文字母之间：空隙到整行高度的这个比例就算两个字母。 */
         const val LETTER_GAP_RATIO = 0.08f
