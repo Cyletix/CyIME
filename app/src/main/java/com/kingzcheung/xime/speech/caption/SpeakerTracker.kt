@@ -69,39 +69,6 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     @Synchronized fun setStrictness(level: Int) { threshold = thresholdFor(level) }
 
-    /**
-     * Call captions: a phone call has two sides, the holder (heard through the air) and the other
-     * person (through the loudspeaker, codec-squeezed and changing all the time). Unlimited new voices
-     * split one caller into 20+ "people" in a 10-minute call (user, 2026-10-24). In a call there are
-     * at most two automatic voices, one once the holder's own voice is known; a voice that would be a
-     * new person goes to whoever it sounds most like. Remembered people and the TV still count apart.
-     */
-    private var callMode = false
-    @Synchronized fun setCallMode(on: Boolean) { callMode = on }
-    private fun callLimit() = if (speakers.containsKey(SELF)) 1 else 2
-    private fun automaticVoices() = speakers.values.filter { it.id < SELF && !it.named && !it.ignored }
-    private fun roomForNew() = !callMode || automaticVoices().size < callLimit()
-
-    /**
-     * Call captions over the limit (the holder was just marked, or voices were found before):
-     * the voice with the least speech joins whoever it sounds most like, until the limit holds.
-     */
-    @Synchronized fun foldExtra(): List<Label> {
-        if (!callMode) return emptyList()
-        val changed = ArrayList<Label>()
-        while (true) {
-            val auto = automaticVoices()
-            if (auto.size <= callLimit()) return changed
-            val owned = HashMap<Int, Long>()
-            for ((id, span) in segmentSpan) segmentSpeaker[id]?.let { owned[it] = (owned[it] ?: 0) + span[1] - span[0] }
-            val smallest = auto.minByOrNull { owned[it.id] ?: 0 } ?: return changed
-            val into = speakers.values.filter { it !== smallest }
-                .maxByOrNull { similarity(smallest.centroid ?: FloatArray(0), it.centroid) } ?: return changed
-            changed += moveAll(smallest, into)
-            for (p in probes) if (p.speaker == smallest.id) p.speaker = into.id
-        }
-    }
-
     /** One window of speech ending at [endMs]; returns labels of sentences this window settles or changes. */
     @Synchronized fun addWindow(startMs: Long, endMs: Long, rawPrint: FloatArray): List<Label> {
         nowMs = endMs
@@ -121,7 +88,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
                 unmatched = null
             } else {
                 val previous = unmatched
-                if (score < CLEARLY_DIFFERENT && roomForNew()) {
+                if (score < CLEARLY_DIFFERENT) {
                     // Nothing like anyone heard so far (through the air: other voices ≈ 0.15–0.23,
                     // the same voice ≥ 0.6): a new person at once, so a short first reply is not lost.
                     val speaker = newSpeaker(print)
@@ -130,7 +97,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
                     windows.addLast(window)
                     while (windows.size > MAX_WINDOWS) windows.removeFirst()
                     return revote(startMs, endMs) + mergeSimilar() + resolve(endMs)
-                } else if (previous != null && similarity(print, previous.print) >= threshold && roomForNew()) {
+                } else if (previous != null && similarity(print, previous.print) >= threshold) {
                     // Two unmatched windows in a row that sound alike: a new person.
                     val speaker = newSpeaker(previous.print)
                     speaker.add(print)
@@ -150,7 +117,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
         }
         windows.addLast(window)
         while (windows.size > MAX_WINDOWS) windows.removeFirst()
-        val changed = mergeSimilar() + foldExtra()
+        val changed = mergeSimilar()
         return changed + resolve(endMs)
     }
 
@@ -179,7 +146,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
         // alike each other are a new person (1.5 s of that voice). PC replay 2026-10-21, 20 tight
         // two-person dialogues: missed turn changes 49% → 25% clean, 68% → 52% with room echo;
         // 60 single-voice sessions (up to 50 s, with echo) still never split.
-        if (best.second < PROBE_NEW && roomForNew()) {
+        if (best.second < PROBE_NEW) {
             val last = probes.takeLast(PROBE_RUN)
             if (last.size == PROBE_RUN && last.all { p -> (speakers.values.maxOfOrNull { similarity(p.print, it.centroid) } ?: 0f) < PROBE_NEW } &&
                 (0 until PROBE_RUN).all { i -> (i + 1 until PROBE_RUN).all { j -> similarity(last[i].print, last[j].print) >= threshold } }) {
@@ -195,10 +162,10 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     /** Who speaks around [ms]: the sure probe centred nearest, else the covering window. */
     private fun speakerAt(ms: Long): Int? {
-        val probe = probes.filter { it.speaker > 0 && it.startMs <= ms && ms <= it.endMs }
+        val probe = probes.filter { it.speaker > 0 && it.speaker in speakers && it.startMs <= ms && ms <= it.endMs }
             .minByOrNull { kotlin.math.abs((it.startMs + it.endMs) / 2 - ms) }
         if (probe != null) return probe.speaker
-        return windows.filter { it.startMs <= ms && ms <= it.endMs }.minByOrNull { kotlin.math.abs((it.startMs + it.endMs) / 2 - ms) }?.speaker
+        return windows.filter { it.speaker in speakers && it.startMs <= ms && ms <= it.endMs }.minByOrNull { kotlin.math.abs((it.startMs + it.endMs) / 2 - ms) }?.speaker
     }
 
     /** Votes over [startMs, endMs] sampled every 250 ms with [speakerAt]. */
@@ -297,6 +264,10 @@ internal class SpeakerTracker(strictness: Int = 1) {
         into.ignored = if (into.id == SELF) true else into.ignored && from.ignored
         speakers.remove(from.id)
         for (w in windows) if (w.speaker == from.id) w.speaker = into.id
+        // Probes too: they pick each sentence's voice and its split points. A probe still naming the
+        // merged-away voice labelled later sentences with a person who no longer existed, a lane that
+        // never went away; in a long call these piled up (user: 20+ people in a 10-minute call).
+        for (p in probes) if (p.speaker == from.id) p.speaker = into.id
         val moved = ArrayList<Label>()
         for (entry in segmentSpeaker.entries) if (entry.value == from.id) { entry.setValue(into.id); moved += Label(entry.key, into.id) }
         return moved
@@ -384,8 +355,10 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     /**
      * An automatic person who after [FRAGMENT_AGE_MS] still owns under [FRAGMENT_MS] of speech is a
-     * fragment (a sentence tail, a cough, one noisy probe): each of their sentences goes to whoever
-     * spoke nearest in time, and the person disappears.
+     * fragment (a sentence tail, a cough, one noisy probe, one sentence through a changing phone
+     * line): their sentences go to the voice they sound most like, and the person disappears.
+     * PC replay 2026-10-24, six simulated 10-minute speakerphone calls: people found 2,3,3,3,3,3 →
+     * 2,2,2,3,3,3 (the third is coughs and key clicks); groups of three and four kept their accuracy.
      */
     @Synchronized fun absorbFragments(): List<Label> {
         val owned = HashMap<Int, Long>()
@@ -394,14 +367,15 @@ internal class SpeakerTracker(strictness: Int = 1) {
         val fragments = speakers.values.filter { sp -> sp.id < SELF && !sp.named && !sp.ignored &&
             nowMs - sp.bornMs >= FRAGMENT_AGE_MS && (owned[sp.id] ?: 0) < FRAGMENT_MS }.map { it.id }.toSet()
         if (fragments.isEmpty()) return emptyList()
+        val keep = speakers.values.filter { it.id !in fragments }
+        if (keep.isEmpty()) return emptyList()
+        val into = fragments.associateWith { f -> keep.maxBy { similarity(speakers[f]?.centroid ?: FloatArray(0), it.centroid) }.id }
         val changed = ArrayList<Label>()
         val ordered = segmentSpan.entries.sortedBy { it.value[0] }
         for ((k, entry) in ordered.withIndex()) {
             val who = segmentSpeaker[entry.key] ?: continue
             if (who !in fragments) continue
-            val near = (k - 1 downTo 0).asSequence().map { segmentSpeaker[ordered[it].key] }.firstOrNull { it != null && it !in fragments }
-                ?: (k + 1 until ordered.size).asSequence().map { segmentSpeaker[ordered[it].key] }.firstOrNull { it != null && it !in fragments }
-                ?: continue
+            val near = into.getValue(who)
             segmentSpeaker[entry.key] = near
             changed += Label(entry.key, near)
         }
@@ -419,14 +393,15 @@ internal class SpeakerTracker(strictness: Int = 1) {
         const val PROBE_SLACK = .05f
         const val PROBE_NEW = .32f
         const val PROBE_RUN = 2
-        const val FRAGMENT_MS = 1000L
+        const val FRAGMENT_MS = 3000L
         const val FRAGMENT_AGE_MS = 20_000L
         const val PROBE_MARGIN = .08f
         const val WINDOW_MS = 2000L
         const val HOP_MS = 1000L
         const val MAX_PRINTS = 30
         const val MAX_WINDOWS = 600
-        const val MAX_SEGMENTS = 1000
+        // Merges relabel only remembered sentences; an older one keeps a vanished person's lane.
+        const val MAX_SEGMENTS = 5000
         /** Kept at an absolute 0.35 for ignored voices (TV) when the standard threshold rose to 0.45 (2026-10-21). */
         const val IGNORED_SLACK = .10f
         /** Below this a window is someone new straight away (no second window needed). */

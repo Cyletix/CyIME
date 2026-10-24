@@ -69,7 +69,7 @@ class SegmentUi(val id: Long, val wallMs: Long) {
  * State and actions of the caption page. AIDL callbacks arrive on binder threads and are moved
  * to the main thread before touching Compose state; blocking service calls run on [io].
  */
-class CaptionController(context: Context, /** The call caption bar: two voices at most, see SpeakerTracker.setCallMode. */ private val callMode: Boolean = false) : CaptionInferenceClient.Listener {
+class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     /** Held: the user tapped the keyboard mic; captions gave it the microphone and resume after dictation. */
     enum class Status { Idle, Starting, Listening, Paused, Held, Error }
 
@@ -187,7 +187,6 @@ class CaptionController(context: Context, /** The call caption bar: two voices a
                 }
                 val speakerPath = speakerModelFile()?.absolutePath.orEmpty()
                 check(client.bind()) { "无法连接语音服务" }
-                client.setCallMode(callMode)
                 check(client.start(mode, speakerPath, sessionListener(epoch), chosen.id)) {
                     if (client.isHeld()) HELD_FOR_DICTATION else "语音模型启动失败" }
                 // Closed or paused while the model loaded: the page already stopped the recorder, so

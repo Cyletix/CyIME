@@ -35,6 +35,4 @@ interface ICaptionService {
     void forgetSpeaker(int knownId);
     /** start 返回 false 是因为键盘语音在用：字幕在等，键盘语音说完会收到 onHold(false) */
     boolean isHeld(IBinder session);
-    /** 通话字幕：一通电话只有拿手机的人和对方，自动分出的声音最多两个（认出“我”以后一个） */
-    void setCallMode(boolean call);
 }
