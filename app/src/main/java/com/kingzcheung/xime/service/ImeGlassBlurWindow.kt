@@ -28,11 +28,16 @@ import java.util.function.Consumer
  *
  * Android and optional One UI window blur operate on the live background. No app screenshot,
  * frozen bitmap, hidden-API exemption or global setting is used.
+ *
+ * A popup over the keyboard (language menu) passes TYPE_APPLICATION_PANEL instead: that child sits
+ * above the keyboard, so the keys beneath the popup are blurred too. Add it before the popup window;
+ * panels of the same type stack in the order they are added.
  */
 @MainThread
 internal class ImeGlassBlurWindow(
     private val context: Context,
     private val role: String = "keyboard",
+    private val windowType: Int = WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA,
     private val parentDecor: () -> View?,
 ) {
     private var enabled = false
@@ -234,7 +239,7 @@ internal class ImeGlassBlurWindow(
         window.isStatusBarContrastEnforced = false
         window.isNavigationBarContrastEnforced = false
         window.attributes = window.attributes.apply {
-            type = WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA
+            type = windowType
             this.token = token
             gravity = Gravity.TOP or Gravity.LEFT
             flags = (flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
