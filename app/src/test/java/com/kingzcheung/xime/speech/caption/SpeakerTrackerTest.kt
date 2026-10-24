@@ -15,6 +15,38 @@ class SpeakerTrackerTest {
     private fun speak(t: SpeakerTracker, from: Long, seconds: Int, angle: Double, jitter: Double = 0.0): List<SpeakerTracker.Label> =
         (1..seconds).flatMap { k -> t.addWindow(from + (k - 2) * 1000L, from + k * 1000L, print(angle + if (k % 2 == 0) jitter else -jitter)) }
 
+    @Test fun `a call never splits into more than two voices, however much the caller's sound changes`() {
+        val t = SpeakerTracker().apply { setCallMode(true) }
+        // Holder at angle 0, the caller through the loudspeaker wandering over many "voices".
+        speak(t, 0, 4, 0.0)
+        var at = 4000L
+        for (k in 0 until 20) { speak(t, at, 3, 2.0 + k * .35); at += 3000 }
+        assertTrue("got ${t.speakerIds.size}", t.speakerIds.size <= 2)
+    }
+
+    @Test fun `once the holder is marked, a call keeps one other voice and folds the extra one`() {
+        val t = SpeakerTracker()
+        speak(t, 0, 4, 0.0)            // holder
+        speak(t, 4000, 4, 2.0)         // caller
+        speak(t, 8000, 4, 4.0)         // a third "voice" found before call mode (or a split of the caller)
+        t.addSegment(1, 0, 3800); t.addSegment(2, 4200, 7800); t.addSegment(3, 8200, 11800)
+        t.setCallMode(true)
+        val holder = t.speakerIds.first()
+        t.markSelf(holder)
+        t.foldExtra()
+        assertEquals(1, t.speakerIds.count { it < SpeakerTracker.SELF })
+        // New holder windows go to the holder, not to a fresh person showing "my" voice.
+        speak(t, 12000, 4, 0.3)
+        assertEquals(1, t.speakerIds.count { it < SpeakerTracker.SELF })
+        assertTrue(SpeakerTracker.SELF in t.speakerIds)
+    }
+
+    @Test fun `in-person captions still find a third person`() {
+        val t = SpeakerTracker()
+        speak(t, 0, 4, 0.0); speak(t, 4000, 4, 2.0); speak(t, 8000, 4, 4.0)
+        assertEquals(3, t.speakerIds.size)
+    }
+
     @Test fun `a sentence takes the voice that covers most of its span`() {
         val t = SpeakerTracker()
         speak(t, 0, 4, 0.0)

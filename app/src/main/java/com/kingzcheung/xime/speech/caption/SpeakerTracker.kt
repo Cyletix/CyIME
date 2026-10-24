@@ -69,6 +69,39 @@ internal class SpeakerTracker(strictness: Int = 1) {
 
     @Synchronized fun setStrictness(level: Int) { threshold = thresholdFor(level) }
 
+    /**
+     * Call captions: a phone call has two sides, the holder (heard through the air) and the other
+     * person (through the loudspeaker, codec-squeezed and changing all the time). Unlimited new voices
+     * split one caller into 20+ "people" in a 10-minute call (user, 2026-10-24). In a call there are
+     * at most two automatic voices, one once the holder's own voice is known; a voice that would be a
+     * new person goes to whoever it sounds most like. Remembered people and the TV still count apart.
+     */
+    private var callMode = false
+    @Synchronized fun setCallMode(on: Boolean) { callMode = on }
+    private fun callLimit() = if (speakers.containsKey(SELF)) 1 else 2
+    private fun automaticVoices() = speakers.values.filter { it.id < SELF && !it.named && !it.ignored }
+    private fun roomForNew() = !callMode || automaticVoices().size < callLimit()
+
+    /**
+     * Call captions over the limit (the holder was just marked, or voices were found before):
+     * the voice with the least speech joins whoever it sounds most like, until the limit holds.
+     */
+    @Synchronized fun foldExtra(): List<Label> {
+        if (!callMode) return emptyList()
+        val changed = ArrayList<Label>()
+        while (true) {
+            val auto = automaticVoices()
+            if (auto.size <= callLimit()) return changed
+            val owned = HashMap<Int, Long>()
+            for ((id, span) in segmentSpan) segmentSpeaker[id]?.let { owned[it] = (owned[it] ?: 0) + span[1] - span[0] }
+            val smallest = auto.minByOrNull { owned[it.id] ?: 0 } ?: return changed
+            val into = speakers.values.filter { it !== smallest }
+                .maxByOrNull { similarity(smallest.centroid ?: FloatArray(0), it.centroid) } ?: return changed
+            changed += moveAll(smallest, into)
+            for (p in probes) if (p.speaker == smallest.id) p.speaker = into.id
+        }
+    }
+
     /** One window of speech ending at [endMs]; returns labels of sentences this window settles or changes. */
     @Synchronized fun addWindow(startMs: Long, endMs: Long, rawPrint: FloatArray): List<Label> {
         nowMs = endMs
@@ -88,7 +121,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
                 unmatched = null
             } else {
                 val previous = unmatched
-                if (score < CLEARLY_DIFFERENT) {
+                if (score < CLEARLY_DIFFERENT && roomForNew()) {
                     // Nothing like anyone heard so far (through the air: other voices ≈ 0.15–0.23,
                     // the same voice ≥ 0.6): a new person at once, so a short first reply is not lost.
                     val speaker = newSpeaker(print)
@@ -97,7 +130,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
                     windows.addLast(window)
                     while (windows.size > MAX_WINDOWS) windows.removeFirst()
                     return revote(startMs, endMs) + mergeSimilar() + resolve(endMs)
-                } else if (previous != null && similarity(print, previous.print) >= threshold) {
+                } else if (previous != null && similarity(print, previous.print) >= threshold && roomForNew()) {
                     // Two unmatched windows in a row that sound alike: a new person.
                     val speaker = newSpeaker(previous.print)
                     speaker.add(print)
@@ -117,7 +150,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
         }
         windows.addLast(window)
         while (windows.size > MAX_WINDOWS) windows.removeFirst()
-        val changed = mergeSimilar()
+        val changed = mergeSimilar() + foldExtra()
         return changed + resolve(endMs)
     }
 
@@ -146,7 +179,7 @@ internal class SpeakerTracker(strictness: Int = 1) {
         // alike each other are a new person (1.5 s of that voice). PC replay 2026-10-21, 20 tight
         // two-person dialogues: missed turn changes 49% → 25% clean, 68% → 52% with room echo;
         // 60 single-voice sessions (up to 50 s, with echo) still never split.
-        if (best.second < PROBE_NEW) {
+        if (best.second < PROBE_NEW && roomForNew()) {
             val last = probes.takeLast(PROBE_RUN)
             if (last.size == PROBE_RUN && last.all { p -> (speakers.values.maxOfOrNull { similarity(p.print, it.centroid) } ?: 0f) < PROBE_NEW } &&
                 (0 until PROBE_RUN).all { i -> (i + 1 until PROBE_RUN).all { j -> similarity(last[i].print, last[j].print) >= threshold } }) {
@@ -260,7 +293,8 @@ internal class SpeakerTracker(strictness: Int = 1) {
     private fun moveAll(from: Speaker, into: Speaker): List<Label> {
         for (p in from.prints) into.add(p)
         into.named = into.named || from.named
-        into.ignored = into.ignored && from.ignored
+        // The holder's voice stays left out of call captions whatever joins it.
+        into.ignored = if (into.id == SELF) true else into.ignored && from.ignored
         speakers.remove(from.id)
         for (w in windows) if (w.speaker == from.id) w.speaker = into.id
         val moved = ArrayList<Label>()

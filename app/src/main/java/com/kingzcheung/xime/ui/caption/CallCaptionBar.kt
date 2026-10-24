@@ -10,17 +10,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -47,6 +49,8 @@ private const val CALL_LINES = 3
 @Composable
 internal fun CallCaptionBar(controller: CaptionController, route: CallRoute, onDrag: (Float) -> Unit, onClose: () -> Unit) {
     var choosing by remember { mutableStateOf<SpeakerUi?>(null) }
+    // Answered "不是" once: tapping that voice again does not ask again.
+    val notSelf = remember { mutableStateListOf<Int>() }
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = .66f))
         .pointerInput(Unit) { detectVerticalDragGestures { change, dy -> change.consume(); onDrag(dy) } }
         .padding(start = 16.dp, end = 44.dp, top = 10.dp, bottom = 10.dp)) {
@@ -61,13 +65,13 @@ internal fun CallCaptionBar(controller: CaptionController, route: CallRoute, onD
                 }
             }
             if (hint != null) Text(hint, color = Color.White, fontSize = 20.sp, lineHeight = 26.sp)
-            else CallLines(controller, onSpeakerTap = { choosing = it })
+            else CallLines(controller, onSpeakerTap = { if (it.id !in notSelf) choosing = it })
             choosing?.let { speaker ->
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("“${speaker.name}”是拿手机的人吗？", color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                    Text("这个颜色的话是你自己说的吗？", color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
                     BarButton("是我，不显示") { controller.markSelf(speaker.id); choosing = null }
-                    BarButton("不是") { choosing = null }
+                    BarButton("不是") { notSelf += speaker.id; choosing = null }
                 }
             }
         }
@@ -96,18 +100,28 @@ private fun CallLines(controller: CaptionController, onSpeakerTap: (SpeakerUi) -
         items(lines.size, key = { lines[it].id }) { index ->
             val line = lines[index]
             val speaker = controller.speakers.firstOrNull { it.id == line.speakerId }
-            Row(Modifier.fillMaxWidth().animateItem(fadeInSpec = tween(320),
-                placementSpec = tween(360, easing = FastOutSlowInEasing)), verticalAlignment = Alignment.Top) {
-                if (speaker != null) {
-                    Text(speaker.name + "：", color = speakerColor(speaker.colorIndex), fontSize = CALL_FONT.sp,
-                        lineHeight = lineHeight.sp, fontWeight = FontWeight.Medium,
-                        modifier = Modifier.clickable { onSpeakerTap(speaker) })
-                    Spacer(Modifier.width(2.dp))
-                }
-                ProgressiveText(listOf(line), fontSize = CALL_FONT.sp, lineHeight = lineHeight.sp, color = Color.White,
-                    suffix = if (!line.confirmed) "…" else "")
-            }
+            CallLine(line, speaker?.let { speakerColor(it.colorIndex) }, lineHeight,
+                Modifier.animateItem(fadeInSpec = tween(320), placementSpec = tween(360, easing = FastOutSlowInEasing)),
+                onMarkTap = { speaker?.let(onSpeakerTap) })
         }
+    }
+}
+
+/**
+ * One caption line. Who spoke is a colour mark, not a "第 x 个人：" label that took half a portrait
+ * line (user, 2026-10-24). The mark is the only tap target, so a tap on the words asks nothing.
+ */
+@Composable
+internal fun CallLine(line: SegmentUi, mark: Color?, lineHeight: Float, modifier: Modifier = Modifier, onMarkTap: () -> Unit = {}) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        if (mark != null) {
+            Box(Modifier.size(28.dp, lineHeight.dp).clickable(onClick = onMarkTap), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(12.dp).clip(CircleShape).background(mark))
+            }
+            Spacer(Modifier.width(4.dp))
+        }
+        ProgressiveText(listOf(line), fontSize = CALL_FONT.sp, lineHeight = lineHeight.sp, color = Color.White,
+            suffix = if (!line.confirmed) "…" else "")
     }
 }
 
