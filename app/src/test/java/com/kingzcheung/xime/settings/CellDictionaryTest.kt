@@ -97,6 +97,32 @@ class CellDictionaryTest {
         assertTrue(File(rime, "pinyin_simp.custom.yaml").readText().startsWith("# user notes only\n"))
     }
 
+    @Test fun `english words get a table per keyboard beside the bundled english`() {
+        val store = store()
+        val entry = store.install("你好 ni hao\nAme\nN0tail\n".toByteArray())
+        assertEquals(2, entry.english)
+        val rime = temp.newFolder()
+        val schemas = listOf(SchemaMeta("t9_pinyin", "九键"), SchemaMeta("pinyin_14jian", "14键"), SchemaMeta("rime_ice", "拼音"))
+        schemas.forEach { File(rime, "${it.schemaId}.schema.yaml").writeText("translator:\n  dictionary: rime_ice\n") }
+        CellDictionaryRime.prepare(rime, store, schemas, setOf(entry.id))
+        for ((schema, kind) in listOf("t9_pinyin" to CellDictionaryEnglish.Kind.T9,
+                "pinyin_14jian" to CellDictionaryEnglish.Kind.MERGED, "rime_ice" to CellDictionaryEnglish.Kind.ALPHABETIC)) {
+            val custom = File(rime, "$schema.custom.yaml").readText()
+            assertTrue(custom.contains("${kind.translator}@cyime_cells_en"))
+            assertTrue(custom.contains("\"schema/dependencies/+\": [\"${kind.dictionary}\"]"))
+            assertTrue(File(rime, "${kind.dictionary}.schema.yaml").readText().contains("dictionary: ${kind.dictionary}"))
+        }
+        assertTrue(File(rime, "user_cyime_cells_en9.dict.yaml").readText().contains("Ame\t263\t"))
+        assertTrue(File(rime, "user_cyime_cells_en9.dict.yaml").readText().contains("N0tail\t608245\t"))
+        val k14 = File(rime, "user_cyime_cells_en14.dict.yaml").readText()
+        assertTrue(k14.contains("Ame\tAmE\t") && !k14.contains("N0tail"))  // 14 keys have no digits
+        assertTrue(File(rime, "user_cyime_cells_en26.dict.yaml").readText().contains("Ame\tame\t"))
+        CellDictionaryRime.prepare(rime, store, schemas, emptySet())
+        assertFalse(File(rime, "rime_ice.custom.yaml").readText().contains("cyime_cells_en"))
+        store.remove(entry.id)
+        assertTrue(store.englishWords(entry.id).isEmpty())
+    }
+
     @Test fun `unsupported later schema does not leave earlier schema partially edited`() {
         val rime = temp.newFolder()
         val store = store()

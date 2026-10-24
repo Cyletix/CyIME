@@ -635,7 +635,8 @@ object SchemaManager {
 
         for (file in schemaFiles) {
             val meta = parseSchemaYaml(file)
-            if (meta != null) {
+            // Compilation-only tables of imported English words are not input modes.
+            if (meta != null && !CellDictionaryEnglish.isDependency(meta.schemaId)) {
                 schemas.add(meta)
             }
         }

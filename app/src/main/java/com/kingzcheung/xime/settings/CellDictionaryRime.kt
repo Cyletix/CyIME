@@ -20,7 +20,7 @@ object CellDictionaryRime {
         CellDictionaryStore.digest(dictionary.toByteArray()).take(16)
 
     /** Add/remove only our marked append patch, retaining every existing pack and other setting. */
-    internal fun patch(original: String, pack: String?): String {
+    internal fun patch(original: String, pack: String?, english: CellDictionaryEnglish.Kind? = null): String {
         val beginCount = original.lineSequence().count { it.trim() == START }
         val endCount = original.lineSequence().count { it.trim() == END }
         require(beginCount == endCount && beginCount <= 1) { "词库配置标记损坏，请检查方案自定义文件" }
@@ -39,6 +39,9 @@ object CellDictionaryRime {
         require(map?.node("translator/packs/+") == null && map?.node("translator/packs/@next") == null) {
             "方案已自定义追加词库，暂不能自动合并；原配置已保留"
         }
+        require(english == null || listOf("schema/dependencies/+", "engine/translators/+", "engine/translators/@before last",
+            CellDictionaryEnglish.NAMESPACE)
+            .none { map?.node(it) != null }) { "方案已自定义追加翻译器，暂不能自动合并英文词；原配置已保留" }
         // Reject flow maps/aliases instead of rewriting third-party YAML and losing its semantics.
         val line = Regex("(?m)^patch:[ \\t]*(?:#[^\\r\\n]*)?(?:\\r?\\n|$)").find(source)
         require(line != null || patchNode == null) { "暂不支持此方案的 patch 写法；原配置已保留" }
@@ -48,7 +51,8 @@ object CellDictionaryRime {
             Regex("(?m)^([ ]+)\\S").find(following)?.groupValues?.get(1) ?: "  "
         } else "  "
         // user_* also satisfies the legacy T9 pack validator; the file already exists before deployment.
-        val block = "$indentation$START$newline${indentation}\"translator/packs/+\": [\"$pack\"]$newline$indentation$END$newline"
+        val lines = listOf("\"translator/packs/+\": [\"$pack\"]") + english?.let(CellDictionaryEnglish::patchLines).orEmpty()
+        val block = "$indentation$START$newline" + lines.joinToString("") { "$indentation$it$newline" } + "$indentation$END$newline"
         val output = if (line == null) {
             val withoutEnd = source.trimEnd().removeSuffix("...").trimEnd()
             "$withoutEnd${newline}patch:$newline$block"
@@ -84,6 +88,7 @@ object CellDictionaryRime {
         }
         val writes = linkedMapOf<File, String>()
         val bindings = mutableListOf<Binding>()
+        val englishWords = ids.sorted().flatMap { store.englishWords(it) }.distinct()
         for (schema in schemas) {
             val customFile = File(rimeDir, "${schema.schemaId}.custom.yaml")
             val original = customFile.takeIf { it.isFile }?.readText().orEmpty()
@@ -95,7 +100,13 @@ object CellDictionaryRime {
             val source = File(rimeDir, "${schema.schemaId}.schema.yaml").readText()
             val pack = packName(dictionary(source, original))
             bindings += Binding(schema.schemaId, pack)
-            writes[customFile] = patch(original, pack)
+            val english = CellDictionaryEnglish.kind(schema.toSchemaInfo().profile.layout.kind)
+                ?.takeIf { kind -> englishWords.any { CellDictionaryEnglish.code(kind, it) != null } }
+            writes[customFile] = patch(original, pack, english)
+            if (english != null) {
+                writes[File(rimeDir, "${english.dictionary}.dict.yaml")] = CellDictionaryEnglish.dictionary(english, englishWords)
+                writes[File(rimeDir, "${english.dictionary}.schema.yaml")] = CellDictionaryEnglish.schema(english)
+            }
             writes[File(rimeDir, "$pack.dict.yaml")] = buildString {
                 append("---\nname: $pack\nversion: \"1\"\nsort: by_weight\nuse_preset_vocabulary: false\nimport_tables:\n")
                 ids.sorted().forEach { append("  - cyime_cells/cell_$it\n") }

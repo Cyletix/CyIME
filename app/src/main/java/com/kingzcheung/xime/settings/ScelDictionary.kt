@@ -9,7 +9,8 @@ import java.nio.charset.CodingErrorAction
 object ScelDictionary {
     const val MAX_BYTES = 16 * 1024 * 1024
     const val MAX_ENTRIES = 250_000
-    data class Parsed(val name: String, val entries: List<DictEntry>, val skipped: Int)
+    /** [english]: Latin words of a mixed list (Ame, Team Spirit), offered by the English candidates, not the Chinese pack. */
+    data class Parsed(val name: String, val entries: List<DictEntry>, val skipped: Int, val english: List<String> = emptyList())
 
     fun readBounded(input: InputStream): ByteArray {
         val output = ByteArrayOutputStream()

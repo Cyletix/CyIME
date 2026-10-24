@@ -10,6 +10,8 @@ import java.nio.charset.CodingErrorAction
  * separated by tabs, spaces or commas; pinyin may be written with spaces, apostrophes or run
  * together (nihao). A count column is ignored: every word gets the same weight as SCEL imports.
  * Lines without pinyin are skipped and counted. UTF-8, UTF-16 (with BOM) and GB18030 are read.
+ * A line without Chinese characters is an English word (`Ame`, `Team Spirit`, `Ame<TAB>ame<TAB>100`): its text
+ * before the first tab, kept as written, goes to the English candidates of every keyboard.
  */
 object TxtCellDictionary {
     private val word = Regex("[㐀-䶿一-鿿]{2,32}")
@@ -21,17 +23,30 @@ object TxtCellDictionary {
         // A Rime .dict.yaml: only the entries after its header.
         if (text.contains("\n...\n")) text = text.substringAfter("\n...\n")
         val entries = LinkedHashMap<Pair<String, String>, DictEntry>()
+        val english = LinkedHashSet<String>()
         var skipped = 0
         for (raw in text.lineSequence()) {
             val line = raw.trim()
             if (line.isEmpty() || line.startsWith("#")) continue
+            val latin = englishWord(line)
+            if (latin != null) { english += latin; continue }
             val entry = parseLine(line)
             if (entry == null) { skipped++; continue }
             entries.putIfAbsent(entry.word to entry.code, entry)
-            require(entries.size <= ScelDictionary.MAX_ENTRIES) { "词库超过 25 万条词语" }
+            require(entries.size + english.size <= ScelDictionary.MAX_ENTRIES) { "词库超过 25 万条词语" }
         }
-        require(entries.isNotEmpty()) { "没有读到带拼音的词条（每行“词 拼音”或“拼音 词”）" }
-        return ScelDictionary.Parsed("", entries.values.toList(), skipped)
+        require(entries.isNotEmpty() || english.isNotEmpty()) { "没有读到带拼音的词条（每行“词 拼音”或“拼音 词”）" }
+        return ScelDictionary.Parsed("", entries.values.toList(), skipped, english.toList())
+    }
+
+    private val latin = Regex("[A-Za-z0-9][A-Za-z0-9 '._&+-]{0,62}")
+
+    /** The English word of a line without Chinese characters, or null. A bare number or one letter is no word. */
+    internal fun englishWord(line: String): String? {
+        if (line.any { it.code > 0x7f }) return null
+        val text = line.substringBefore('\t').trim().replace(Regex(" +"), " ")
+        if (!latin.matches(text) || text.none(Char::isLetter)) return null
+        return text.takeIf { CellDictionaryEnglish.letters(it).length >= 2 }
     }
 
     internal fun parseLine(line: String): DictEntry? {

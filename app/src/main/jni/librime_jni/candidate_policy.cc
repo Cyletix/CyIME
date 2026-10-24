@@ -11,6 +11,7 @@
 #include <rime/engine.h>
 #include <rime/filter.h>
 #include <rime/gear/translator_commons.h>
+#include <rime/language.h>
 #include <rime/registry.h>
 #include <rime/translation.h>
 
@@ -127,6 +128,16 @@ class PolicyTranslation : public Translation {
         }
         std::rotate(insertion, exact, exact + 1);
       }
+    }
+    // Imported English words (CellDictionaryEnglish) come right after the first Chinese
+    // candidate on nine keys, where short digit codes collide with common Chinese: they
+    // never take the first place from it.
+    if (!input.empty() && input.find_first_not_of("0123456789' ") == std::string::npos) {
+      const auto chinese = std::find_if(head_.begin(), head_.end(), [](const auto& c) {
+        const auto p = As<Phrase>(Candidate::GetGenuineCandidate(c));
+        return !p || !p->language() || p->language()->name().rfind("user_cyime_cells_en", 0) != 0;
+      });
+      if (chinese != head_.begin() && chinese != head_.end()) std::rotate(head_.begin(), chinese, chinese + 1);
     }
     Advance();
   }
