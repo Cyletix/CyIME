@@ -1,0 +1,139 @@
+# CyIME demo note, typed key by key (see demo_typer.py).
+# A plain token is typed and committed with space; `x~` types without committing; `<key>` presses
+# a key (`<key:left>` flicks, `<key:hold>` long-presses); `@name` taps interface elements at a
+# human pace; `layout=` switches the coordinate table; `wait:ms|sentence|paragraph`; `glide:`,
+# `ink:`, `voice:` as in the script. Every segment starts and ends on Chinese 26-key with no
+# composition. `text` is what the segment should leave in the note (checked by `check`).
+note: /storage/emulated/0/Documents/CyIME 演示/CyIME 演示.md
+
+pace: {interval: 40, hold: 15, commit: 120, sentence: 400, paragraph: 1200, ui: 500}
+
+voices:
+  zh:
+    voice: Microsoft Huihui Desktop
+    text: 语音识别全在本地运行，不需要联网。边说边出字，停顿以后会整句校正，再自动加上标点。
+  ja:
+    voice: Microsoft Haruka Desktop
+    text: 音声入力は日本語にも対応しています。
+
+segments:
+- name: 标题
+  layout: cn26
+  text: "# CyIME：我想做世界上最好用的开源输入法\n\n"
+  do:
+  - <hash> <space> @lang layout=en26 CyIME~ @lang layout=cn26
+  - <colon> woxiang zuo shijie shang zui haoyong de kaiyuan shurufa <enter> <enter> wait:paragraph
+
+- name: 说明
+  layout: cn26
+  text: "> 这篇笔记里的每个字，都是在键盘上一个键一个键打出来的，由脚本模拟手指点按，没有直接粘贴。\n\n"
+  do:
+  - <gt> <space> zhepian biji li de meige zi <comma> dou shi zai jianpan shang yige jian yige jian dachulai de <comma>
+  - you jiaoben moni shouzhi dian'an <comma> meiyou zhijie zhantie <period> <enter> <enter>
+
+- name: 26 键全拼
+  layout: cn26
+  text: "## 26 键全拼\n\n这是我基于 Rime 引擎做的 Android 输入法。我想做出世界上最好用的开源输入法：最好的词库、最好的算法、最好的性能优化、最全面的多模态辅助输入、最好看的主题、音效、震动，最合理的排布，最全面的输入法，以及仅离线就能使用所有完整的服务。\n\n"
+  do:
+  - <hash> <hash> <space> <2> <6> <space> jian quanpin <enter> <enter>
+  - zhe shi wo jiyu <space> @lang layout=en26 Rime~ @lang layout=cn26 <space> yinqing zuo de <space> android <space> shurufa <period>
+  - woxiang zuochu shijie shang zui haoyong de kaiyuan shurufa <colon> wait:sentence
+  - zuihao de ciku <dun> zuihao de suanfa <dun> zuihao de xingneng youhua <dun> zui quanmian de duomotai fuzhu shuru <dun>
+  - zui haokan de zhuti <dun> yinxiao <dun> zhendong <comma> zui heli de paibu <comma> zui quanmian de shurufa <comma>
+  - yiji jin lixian jiu neng shiyong suoyou wanzheng de fuwu <period> <enter> <enter>
+
+- name: 简拼
+  layout: cn26
+  text: "## 简拼\n\n只输入声母也能出词：输入法、开源、离线、词库。\n\n"
+  do:
+  - <hash> <hash> <space> jianpin <enter> <enter>
+  - zhi shuru shengmu ye neng chuci <colon> srf <dun> ky <dun> lx <dun> ck <period> <enter> <enter>
+
+- name: 中英混打
+  layout: cn26
+  text: "## 中英混打\n\n不用切换键盘，中文里直接打英文：今天用 Python 写了个 App，代码放在 GitHub 上。\n手指按偏到相邻的键也没关系，一样能打出对的词。\n\n"
+  do:
+  - <hash> <hash> <space> zhongying hunda <enter> <enter>
+  - buyong qiehuan jianpan <comma> zhongwen li zhijie dayingwen <colon>
+  - jintian yong <space> python <space> xiele ge <space> app <comma> daima fang zai <space> github <space> shang <period> <enter>
+  # xianhlin: g pressed as its neighbour h on purpose (neighbour-key correction).
+  - shouzhi anpian dao xianhlin de jian ye meiguanxi <comma> yiyang neng dachu dui de ci <period> <enter> <enter>
+
+- name: 九键
+  layout: cn26
+  text: "## 九键\n\n九键自带词组模型，长句也能逐键选词：今天晚上我们一起去吃火锅吧。\n\n"
+  do:
+  - <hash> <hash> <space> jiujian <enter> <enter> @method @t9 layout=t9
+  - jiujian zidai cizu moxing <comma> changju ye neng zhujian xuanci <colon> wait:sentence
+  - jintianwanshangwomenyiqiquchihuoguoba <period> <enter> <enter> @method @cn26
+
+- name: 14 键
+  layout: cn26
+  text: "## 14 键\n\n14 键每个键两个字母，左右滑动选字母，键更大，更不容易按错。\n\n"
+  do:
+  - <hash> <hash> <space> <1> <4> <space> jian <enter> <enter> @method @fourteen layout=fourteen
+  - <1> <4> <space> jian meige jian liangge zimu <comma> zuoyou huadong xuan zimu <comma>
+  - jiangengda <comma> geng bu rongyi ancuo <period> <enter> <enter> @method @cn26
+
+- name: 小鹤双拼
+  layout: cn26
+  text: "## 小鹤双拼\n\n双拼也能用，和全拼、九键共用同一套雾凇词库。\n\n"
+  do:
+  - <hash> <hash> <space> xiaohe shuangpin <enter> <enter> @method @flypy layout=flypy
+  # Xiaohe codes: shuang=ul pin=pb ye neng=ng yong=ys quan=qr jiu=jq jian=jm gong=gs tong=ts tao=tc song=ss
+  - ulpb yengys <comma> he qrpb <dun> jqjm gsys tsyitc wuss ciku <period> <enter> <enter> @method @cn26
+
+- name: English
+  layout: cn26
+  text: "## English\n\nSwitch to English and keep typing. Whole-word suggestions finish words for you, and glide typing draws a word in one stroke: hello world.\n\n"
+  do:
+  - <hash> <hash> <space> @lang layout=en26 English~ <enter> <enter>
+  - Switch to English and keep typing~ <period> <space> Whole-word sugg~ @cand1 finish words for you~ <comma> <space>
+  - and glide typing draws a word in one stroke~ <colon> <space> glide:hello glide:world <period> <enter> <enter>
+  - "@lang layout=cn26"
+
+- name: 日本語
+  layout: cn26
+  text: "## 日本語\n\nローマ字入力でも、かな九キーでも日本語が打てます。\nありがとうございます。\n\n"
+  do:
+  - <hash> <hash> <space> <lang:hold> @ja layout=ja26 nihongo <enter> <enter>
+  - ro-majinyuuryokudemo <comma> kanakyuuki-demo nihongogautemasu <period> <enter>
+  - "@method @kana9 layout=kana9 ありがとうございます~ <enter> 。~ <enter> <enter>"
+  - <lang:hold> @zh layout=cn26
+
+- name: 符号和表情
+  layout: cn26
+  text: "## 符号和表情\n\n常用符号和表情也在键盘里：→ ✓ 😄\n\n"
+  do:
+  - <hash> <hash> <space> fuhao he biaoqing <enter> <enter>
+  - changyong fuhao he biaoqing ye zai jianpan li <colon>
+  - "@symbols @sym_arrow <space> @sym_check <space> @symbols_back @emoji @emoji_smile @emoji_back <enter> <enter>"
+
+- name: 语音
+  layout: cn26
+  text: "## 语音\n\n（这一段是对着平板说出来的）\n语音识别全在本地运行，不需要联网。边说边出字，停顿以后会整句校正，再自动加上标点。\n音声入力は日本語にも対応しています。\n\n"
+  do:
+  - <hash> <hash> <space> yuyin <enter> <enter>
+  - <lparen> zheyiduan shi duizhe pingban shuo chulai de <rparen> <enter>
+  - voice:zh <enter>
+  - <lang:hold> @ja voice:ja <enter> <enter> <lang:hold> @zh
+
+- name: 手写
+  layout: cn26
+  text: "## 手写\n\n手写支持中文、日语、英文和数学公式：永 あ Hi\n$e^{i\\pi}+1=0$\n$\\int_0^1 x^2\\,dx=\\frac{1}{3}$\n\n"
+  do:
+  - <hash> <hash> <space> shouxie <enter> <enter>
+  - shouxie zhichi zhongwen <dun> riyu <dun> yingwen he shuxue gongshi <colon> @handwriting layout=hw
+  - ink:yong wait:900 @cand1 <space> <lang:hold> @ja ink:a wait:900 @cand1 <space>
+  - <lang:hold> @en ink:hi wait:900 @cand1 <enter> @formula
+  - ink:euler wait:1200 @cand1 <enter> ink:integral wait:1200 @cand1 <enter> <enter> @formula
+  - <lang:hold> @zh @hw_back layout=cn26
+
+- name: 最后
+  layout: cn26
+  text: "## 最后\n\n打字、语音和手写识别都在这台平板上完成。CyIME 开源在 GitHub：Cyletix/CyIME"
+  do:
+  - <hash> <hash> <space> zuihou <enter> <enter>
+  - dazi <dun> yuyin he shouxie shibie dou zai zhetai pingban shang wancheng <period>
+  - "@lang layout=en26 CyIME~ <space> @lang layout=cn26 kaiyuan zai <space> github <colon>"
+  - "@lang layout=en26 Cyletix/CyIME~ @lang layout=cn26 wait:paragraph @hide_keyboard @reading_view"
