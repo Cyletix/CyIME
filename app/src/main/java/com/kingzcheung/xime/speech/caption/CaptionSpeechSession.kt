@@ -237,6 +237,7 @@ internal class CaptionSpeechSession(
             publish(tracker.merge(from, into))
         }
         publish(tracker.absorbFragments())
+        publish(tracker.foldExtra())
     }
 
     // Speaker-thread load, logged every 30 s as numbers only (no text, no audio): checks on the device
