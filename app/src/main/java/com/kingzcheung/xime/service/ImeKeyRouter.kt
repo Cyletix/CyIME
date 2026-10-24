@@ -748,11 +748,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // only a subsequent, idle Enter may invoke the editor action.
                     if (engineInput.isNotEmpty() || candState.isComposing ||
                         (!state.isAsciiMode && candState.pendingEnglishText.isNotEmpty())) {
-                        // T9 模式提交完整预编辑（含 partial commit 累积），非 T9 模式用 RIME input。
+                        // T9 和 14 键提交屏上的解码拼音（T9 含 partial commit 累积），其他用 RIME input。
                         val isT9 = isT9Schema(state.currentSchemaId)
-                        val input = rawCompositionCommitText(
-                            if (state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14)
-                                engineInput.lowercase() else engineInput, candState.preeditText, isT9)
+                        val input = rawCompositionCommitText(engineInput, candState.preeditText, isT9,
+                            state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14)
                         if (input.isNotEmpty()) {
                             val accepted = withEditor { service.submitText(input).accepted }
                             if (!accepted) return@command
@@ -1391,7 +1390,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             service.t9PartialSegments.map { it.text }, composition?.preedit.orEmpty(),
             composition?.input.orEmpty(), emptyList(), emptyList()).displayText
         else composition?.preedit.orEmpty()
-        val raw = if (hasComposition) rawCompositionCommitText(composition?.input.orEmpty(), preedit, t9) else ""
+        val raw = if (hasComposition) rawCompositionCommitText(composition?.input.orEmpty(), preedit, t9,
+            service.uiState.value.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) else ""
         val text = raw + suffix
         if (text.isNotEmpty() && !withEditor { service.commitTextAndPredict(text, false, allowPrediction = false).accepted }) return false
         if (text.isNotEmpty()) withEditor {

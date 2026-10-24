@@ -35,8 +35,14 @@ class CompositionCommitPrefixTest {
             prefix(true, "23744", "你好 ce shi", t9 = true, partial = "你好"))
     }
 
-    @Test fun fourteenKeyLowercasesMergedInputLikeEnter() {
-        assertEquals("nihao", prefix(true, "NIHAO", "ni hao", merged14 = true))
+    @Test fun fourteenKeyCommitsTheReadingShownNotTheMergedKeyCodes() {
+        // 14 键 bn ui gh as op 的引擎编码是 BUGAO，屏上显示 ni'hao；符号和回车都要上屏 nihao，不能是 bugao。
+        assertEquals("nihao，", prefix(true, "BUGAO", "ni'hao", merged14 = true, first = "你好") + "，")
+        assertEquals("nihao", rawCompositionCommitText("BUGAO", "ni'hao", t9 = false, merged14 = true))
+        // 还没有显示读音时退回小写编码。
+        assertEquals("bugao", rawCompositionCommitText("BUGAO", "", t9 = false, merged14 = true))
+        // 26 键仍用原始键入串（大写字母保留）。
+        assertEquals("zuogeDNA", rawCompositionCommitText("zuogeDNA", "zuo ge DNA", t9 = false))
     }
 
     @Test fun voiceAndHandwritingStillCommitTheFirstCandidate() {
