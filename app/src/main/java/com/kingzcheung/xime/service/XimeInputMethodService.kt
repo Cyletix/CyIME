@@ -188,6 +188,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     companion object {
         /** 键盘与语音悬浮条互换、悬浮条进出时内容下沉/上浮的距离。 */
         private const val CONTENT_SHIFT_DP = 24f
+        /** App 收起键盘后等这么久再弹出悬浮条：翻看时 App 可能连续收起几次。 */
+        private const val VOICE_PILL_RESHOW_DELAY_MS = 400L
+        private const val VOICE_PILL_SHOW_TIMEOUT_MS = 1500L
         internal const val TAG = "XimeInputMethodService"
         private const val DARK_MODE_LIGHT = 0
         private const val DARK_MODE_DARK = 1
@@ -576,6 +579,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             voiceRecognizedText = "",
             voiceAmplitude = 0f
         )
+        voiceStopRequested = false
+        voiceFieldHadText = false
+        // 悬浮条是因为 App 收起键盘才出现的：听写结束就一起收起，回到 App 原来没有键盘的样子。
+        if (voicePillAuto) {
+            voicePillAuto = false
+            if (uiState.value.voiceCollapsed) {
+                uiState.value = uiState.value.copy(voiceCollapsed = false)
+                requestHideSelf(0)
+            }
+        }
     }
     
     private var sharedPrefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
@@ -2593,7 +2606,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (keyCode == KeyEvent.KEYCODE_BACK &&
             (keyboardViewModel.page.value is KeyboardPage.Overlay || keyboardCallbacks?.onDismissPreeditEditor != null ||
                 uiState.value.showKeyboardResize || uiState.value.handwritingExpanded || uiState.value.clipboardSearchVisible ||
-                (hasHardwareKeyboard && hardwareKeyboardDisplay.screenKeyboardRequested) || canCollapseToVoicePill())) {
+                (hasHardwareKeyboard && hardwareKeyboardDisplay.screenKeyboardRequested))) {
             event?.startTracking()
             return true
         }
@@ -2757,10 +2770,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             if (event?.isCanceled != true) collapseScreenKeyboardToHardwareToolbar()
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK && canCollapseToVoicePill()) {
-            if (event?.isCanceled != true) collapseToVoicePill(VoiceSessionEnd.BACK_KEY)
-            return true
-        }
+        // 返回键就是退出键盘：听写同时结束，不收成悬浮条（用户 10-24）。
+        if (keyCode == KeyEvent.KEYCODE_BACK && event?.isCanceled != true && uiState.value.isVoiceMode &&
+            !voiceKeepsListeningAfter(VoiceSessionEnd.BACK_KEY)) stopVoiceBeforeLeaving()
         return super.onKeyUp(keyCode, event)
     }
 
@@ -2988,6 +3000,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         schemaController.observeEditorSelection(newSelStart, newSelEnd)
+        if (uiState.value.isVoiceMode && uiState.value.voiceSticky && !voiceStopRequested) {
+            // 听写中输入框从有字变成空：多半是点了发送，听写结束。
+            val ic = currentInputConnection
+            val text = runCatching {
+                val before = ic?.getTextBeforeCursor(1, 0)
+                val after = ic?.getTextAfterCursor(1, 0)
+                if (before == null || after == null) null else before.toString() + after.toString()
+            }.getOrNull()
+            if (voiceFieldCleared(voiceFieldHadText, text)) stopVoiceBeforeLeaving()
+            else if (!text.isNullOrEmpty()) voiceFieldHadText = true
+        }
         val current = candidateState.value
         if (!current.isComposing && current.inputText.isEmpty() &&
             (predictionManager.hasPendingPrediction || current.associationCandidates.isNotEmpty())) {
@@ -3028,7 +3051,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
         // 悬浮条状态下再点输入框：App 会再次请求弹出键盘，换回完整键盘；语音照常听写，与展开按钮相同。
-        if (voicePillExpandsOnShowRequest(uiState.value.voiceCollapsed, configChange)) expandFromVoicePill()
+        if (voicePillExpandsOnShowRequest(uiState.value.voiceCollapsed, voicePillSelfShow, configChange)) expandFromVoicePill()
+        voicePillSelfShow = false
         return true
     }
 
@@ -3241,6 +3265,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onFinishInput() {
+        // 焦点离开输入框：不再弹出悬浮条，听写随输入会话一起结束（clearInputState）。
+        mainHandler.removeCallbacks(showVoicePillAfterHide)
+        mainHandler.removeCallbacks(stopVoiceIfStillHidden)
+        voiceKeptAlive = false
+        voicePillSelfShow = false
         debugLog("onFinishInput page=${keyboardViewModel.page.value::class.simpleName}")
         englishEditorReadCapability.clear()
         inputStallWatchdog?.stop()
@@ -3285,7 +3314,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         closeClipboardSearch(openBoard = false)
         super.onFinishInputView(finishingInput)
         runtimeObserver?.stop()
-        voiceRecognitionHandler.endInputSession()
+        // App 收起键盘但输入框焦点还在（往上翻看内容等）：听写继续，随后换成悬浮条。
+        voiceKeptAlive = !finishingInput && voiceKeepsAliveOnHide()
+        if (!voiceKeptAlive) voiceRecognitionHandler.endInputSession()
         // 手写模型轻量，按"用键盘时加载、键盘收起即卸载"管理：输入会话结束
         // （收起键盘/焦点离开）即释放，:inference 侧同步卸载模型；未初始化时
         // release() 幂等空操作。下次落笔由 predict 自愈或布局重建重载。
@@ -3294,8 +3325,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onWindowHidden() {
         super.onWindowHidden()
-        // 输入框失焦、发送后 App 收起键盘、锁屏等：本次听写到此结束，麦克风立即释放，不收成悬浮条。
-        voiceRecognitionHandler.endInputSession()
+        val keepVoice = voiceKeptAlive
+        voiceKeptAlive = false
+        mainHandler.removeCallbacks(showVoicePillAfterHide)
+        mainHandler.removeCallbacks(stopVoiceIfStillHidden)
+        if (keepVoice) {
+            // 不清输入会话：听写会话以它为准，清了就会被当成换了输入框而丢弃。
+            mainHandler.postDelayed(showVoicePillAfterHide, VOICE_PILL_RESHOW_DELAY_MS)
+        } else {
+            // 返回键、焦点离开、锁屏等：本次听写到此结束，麦克风立即释放。
+            voiceRecognitionHandler.endInputSession()
+        }
         glassWindowVisible = false
         glassBlurWindows.values.forEach { it.setVisible(false) }
         com.kingzcheung.xime.ocr.DocumentOcrActivity.finishHiddenHost()
@@ -3304,7 +3344,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         runtimeObserver?.stop()
         clipboardSyncBridge?.setKeyboardVisible(false)
         cancelKeyboardResize()
-        clearInputState()
+        if (!keepVoice) clearInputState()
         recentClipboardItemsState.value = emptyList()
         mainHandler.removeCallbacks(releaseIdlePredictionModel)
         mainHandler.postDelayed(releaseIdlePredictionModel, PREDICTION_MODEL_IDLE_RELEASE_MS)
@@ -3564,12 +3604,52 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         requestHideSelf(0)
     }
     
+    // 键盘被 App 收起但焦点还在时继续听写（用户 10-24 选的方案）。
+    private var voiceKeptAlive = false
+    /** 悬浮条是 App 收起键盘后自己弹出的：听写结束时一起收起。 */
+    private var voicePillAuto = false
+    /** 自己请求弹出悬浮条：这次显示请求不能当成用户点输入框而展开键盘。 */
+    private var voicePillSelfShow = false
+    /** 用户已经要求结束（返回键、输入框被清空）：随后的收起不能再续上听写。 */
+    private var voiceStopRequested = false
+    private var voiceFieldHadText = false
+
+    private fun voiceKeepsAliveOnHide(): Boolean = uiState.value.let {
+        it.isVoiceMode && it.voiceSticky && !it.isCompact && !voiceStopRequested && currentInputConnection != null &&
+            (getSystemService(POWER_SERVICE) as android.os.PowerManager).isInteractive &&
+            voiceKeepsListeningAfter(VoiceSessionEnd.APP_HIDES_KEYBOARD)
+    }
+
+    private fun stopVoiceBeforeLeaving() {
+        voiceStopRequested = true
+        mainHandler.removeCallbacks(showVoicePillAfterHide)
+        endVoiceSession()
+    }
+
+    private val showVoicePillAfterHide = Runnable {
+        if (isInputViewShown || currentInputConnection == null || !uiState.value.isVoiceMode || voiceStopRequested) return@Runnable
+        voicePillAuto = true
+        voicePillSelfShow = true
+        uiState.value = uiState.value.copy(voiceCollapsed = true, handwritingExpanded = false)
+        applyWindowBackground()
+        requestShowSelf(0)
+        // 系统不让弹出时，麦克风不能在没有任何界面的情况下一直开着。
+        mainHandler.postDelayed(stopVoiceIfStillHidden, VOICE_PILL_SHOW_TIMEOUT_MS)
+    }
+
+    private val stopVoiceIfStillHidden = Runnable {
+        if (!isInputViewShown && uiState.value.isVoiceMode) {
+            voiceRecognitionHandler.endInputSession()
+            restoreAfterVoiceFinish()
+        }
+    }
+
     private fun canCollapseToVoicePill(): Boolean = uiState.value.let {
         it.isVoiceMode && it.voiceSticky && !it.voiceCollapsed && !it.isCompact
     }
 
     private fun collapseToVoicePill(end: VoiceSessionEnd): Boolean {
-        if (!voiceCollapsesInsteadOfEnding(end) || !canCollapseToVoicePill()) return false
+        if (!voiceKeepsListeningAfter(end) || !canCollapseToVoicePill()) return false
         keyboardViewModel.closeOverlay()
         closeToolPanel()
         closeClipboardSearch(openBoard = false)
@@ -3583,6 +3663,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     private fun expandFromVoicePill() {
         if (!uiState.value.voiceCollapsed) return
+        voicePillAuto = false
         swapKeyboardContent {
             clearHardwareSurfaceBounds()
             uiState.value = uiState.value.copy(voiceCollapsed = false)
