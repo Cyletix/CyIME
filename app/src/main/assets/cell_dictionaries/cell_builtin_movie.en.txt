@@ -1,0 +1,326 @@
+Marvel
+DC
+Pixar
+Disney
+Netflix
+IMAX
+Dolby
+Dolby Atmos
+Dolby Vision
+Oscar
+Oscars
+Cannes
+Berlinale
+BAFTA
+Golden Globe
+Sundance
+TIFF
+Warner Bros
+Universal
+Paramount
+Sony Pictures
+Columbia Pictures
+20th Century Studios
+Metro-Goldwyn-Mayer
+MGM
+Lionsgate
+DreamWorks
+Illumination
+A24
+Neon
+Focus Features
+Searchlight Pictures
+Miramax
+New Line Cinema
+Legendary
+Lucasfilm
+Marvel Studios
+DC Studios
+Studio Ghibli
+Toho
+Toei
+Shochiku
+CJ ENM
+Showbox
+HBO
+Max
+Apple TV+
+Prime Video
+Hulu
+Disney+
+Peacock
+Paramount+
+Criterion
+The Criterion Collection
+IMDb
+Rotten Tomatoes
+Metacritic
+Letterboxd
+Box Office Mojo
+ILM
+Weta FX
+Christopher Nolan
+Nolan
+Quentin Tarantino
+Tarantino
+Steven Spielberg
+Spielberg
+James Cameron
+Cameron
+Martin Scorsese
+Scorsese
+David Fincher
+Fincher
+Stanley Kubrick
+Kubrick
+Alfred Hitchcock
+Hitchcock
+Francis Ford Coppola
+Coppola
+Ridley Scott
+Denis Villeneuve
+Villeneuve
+Peter Jackson
+Tim Burton
+George Lucas
+Robert Zemeckis
+Clint Eastwood
+Woody Allen
+Wes Anderson
+Damien Chazelle
+Guillermo del Toro
+Alfonso Cuaron
+Alejandro Gonzalez Inarritu
+Richard Linklater
+Coen Brothers
+George Miller
+James Wan
+Zack Snyder
+Michael Bay
+David Lynch
+Darren Aronofsky
+Sofia Coppola
+Greta Gerwig
+Yorgos Lanthimos
+Luc Besson
+Jean-Luc Godard
+Francois Truffaut
+Eric Rohmer
+Agnes Varda
+Robert Bresson
+Krzysztof Kieslowski
+Federico Fellini
+Michelangelo Antonioni
+Giuseppe Tornatore
+Bernardo Bertolucci
+Ingmar Bergman
+Andrei Tarkovsky
+Michael Haneke
+Wim Wenders
+Pedro Almodovar
+Guy Ritchie
+Danny Boyle
+Akira Kurosawa
+Yasujiro Ozu
+Takeshi Kitano
+Hirokazu Koreeda
+Shunji Iwai
+Hayao Miyazaki
+Makoto Shinkai
+Satoshi Kon
+Hideaki Anno
+Ryusuke Hamaguchi
+Bong Joon-ho
+Park Chan-wook
+Lee Chang-dong
+Hong Sang-soo
+Wong Kar-wai
+Ang Lee
+Zhang Yimou
+Chen Kaige
+Jia Zhangke
+John Woo
+Tsui Hark
+Stephen Chow
+Jackie Chan
+Jet Li
+Donnie Yen
+Bruce Lee
+Tony Leung
+Andy Lau
+Chow Yun-fat
+Leslie Cheung
+Maggie Cheung
+Gong Li
+Zhang Ziyi
+Michelle Yeoh
+Leonardo DiCaprio
+DiCaprio
+Tom Hanks
+Tom Cruise
+Brad Pitt
+Morgan Freeman
+Robert De Niro
+Al Pacino
+Marlon Brando
+Johnny Depp
+Will Smith
+Nicolas Cage
+Matt Damon
+Christian Bale
+Robert Downey Jr
+Hugh Jackman
+Keanu Reeves
+Jim Carrey
+Anthony Hopkins
+Denzel Washington
+Gary Oldman
+Colin Firth
+Benedict Cumberbatch
+Tom Hardy
+Cillian Murphy
+Ryan Gosling
+Eddie Redmayne
+Timothee Chalamet
+Tom Holland
+Tom Hiddleston
+Chris Hemsworth
+Chris Evans
+Michael Fassbender
+James McAvoy
+Dwayne Johnson
+Vin Diesel
+Jason Statham
+Arnold Schwarzenegger
+Sylvester Stallone
+Bruce Willis
+Liam Neeson
+Harrison Ford
+Charlie Chaplin
+Audrey Hepburn
+Vivien Leigh
+Marilyn Monroe
+Meryl Streep
+Cate Blanchett
+Kate Winslet
+Nicole Kidman
+Julia Roberts
+Angelina Jolie
+Natalie Portman
+Anne Hathaway
+Scarlett Johansson
+Emma Stone
+Emma Watson
+Jennifer Lawrence
+Charlize Theron
+Margot Robbie
+Sophie Marceau
+Isabelle Huppert
+Juliette Binoche
+Monica Bellucci
+Song Kang-ho
+Choi Min-sik
+Ha Jung-woo
+Lee Jung-jae
+Gong Yoo
+Son Ye-jin
+Takeshi Kaneshiro
+Takuya Kimura
+Aamir Khan
+The Shawshank Redemption
+The Godfather
+Pulp Fiction
+The Dark Knight
+Schindler's List
+Forrest Gump
+Inception
+Interstellar
+The Matrix
+Fight Club
+Goodfellas
+Se7en
+The Silence of the Lambs
+Saving Private Ryan
+Spirited Away
+Parasite
+Oppenheimer
+Barbie
+Dune
+Avatar
+Titanic
+The Avengers
+Avengers Endgame
+Avengers Infinity War
+Iron Man
+Captain America
+Spider-Man
+Batman
+Joker
+Superman
+Wonder Woman
+Harry Potter
+The Lord of the Rings
+The Hobbit
+Star Wars
+Star Trek
+Jurassic Park
+Mission Impossible
+Fast and Furious
+Transformers
+James Bond
+Toy Story
+Coco
+Zootopia
+Frozen
+Inside Out
+WALL-E
+Up
+La La Land
+Whiplash
+Green Book
+Everything Everywhere All at Once
+Poor Things
+Anatomy of a Fall
+Roma
+Birdman
+The Revenant
+Mad Max Fury Road
+Blade Runner
+Blade Runner 2049
+2001 A Space Odyssey
+A Clockwork Orange
+The Shining
+Alien
+Terminator
+Gladiator
+Braveheart
+Casablanca
+Gone with the Wind
+Roman Holiday
+Cinema Paradiso
+Life Is Beautiful
+Leon
+Amelie
+Before Sunrise
+Before Sunset
+Before Midnight
+Brokeback Mountain
+Life of Pi
+Crouching Tiger Hidden Dragon
+In the Mood for Love
+Chungking Express
+Farewell My Concubine
+The Wandering Earth
+Ne Zha
+CGI
+VFX
+OST
+BGM
+NG
+Cameo
+Cult
+Noir
+IMAX 3D
+3D
+4K
+HDR

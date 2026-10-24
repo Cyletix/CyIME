@@ -58,7 +58,7 @@ class CellDictionaryStore(val directory: File) {
     }
 
     fun dictionaryFile(id: String): File {
-        require(id.matches(Regex("(sogou_[0-9]+|local_[a-f0-9]{24}|builtin_[a-z]+)"))) { "无效词库标识" }
+        require(id.matches(Regex("(sogou_[0-9]+|local_[a-f0-9]{24}|builtin_[a-z0-9]+)"))) { "无效词库标识" }
         return File(directory, "cell_$id.dict.yaml")
     }
 
@@ -93,20 +93,26 @@ class CellDictionaryStore(val directory: File) {
         entry
     }
 
-    /** Refresh a bundled dictionary from the APK; enable it once on first sight (default on). */
-    fun installBuiltin(builtin: BuiltinCellDictionary, text: String) = synchronized(lock) {
+    /**
+     * Refresh a bundled dictionary from the APK, with its English words (CellDictionaryEnglish) if it has any;
+     * a default-on one is enabled once on first sight.
+     */
+    fun installBuiltin(builtin: BuiltinCellDictionary, text: String, english: List<String> = emptyList()) = synchronized(lock) {
         val old = read()
-        val hash = digest(text.toByteArray())
+        val hash = digest((text + english.joinToString("\n")).toByteArray())
         val count = text.substringAfter("\n...\n").lineSequence().count { it.contains('\t') }
         val entry = InstalledCellDictionary(builtin.id, builtin.name, builtin.category, count,
-            sourceUrl = builtin.sourceUrl, sha256 = hash)
+            sourceUrl = builtin.sourceUrl, sha256 = hash, english = english.size)
         writeAtomic(dictionaryFile(builtin.id), text)
+        if (english.isEmpty()) englishFile(builtin.id).delete()
+        else writeAtomic(englishFile(builtin.id), english.joinToString("\n", postfix = "\n"))
         val first = builtin.id !in old.seeded
+        val enable = first && builtin.defaultOn
         if (old.installed.firstOrNull { it.id == builtin.id } == entry && !first) return@synchronized
         save(old.copy(
             installed = old.installed.filterNot { it.id == builtin.id } + entry,
-            selected = if (first) old.selected + builtin.id else old.selected,
-            applied = if (first) old.applied + builtin.id else old.applied,
+            selected = if (enable) old.selected + builtin.id else old.selected,
+            applied = if (enable) old.applied + builtin.id else old.applied,
             seeded = old.seeded + builtin.id,
         ))
     }

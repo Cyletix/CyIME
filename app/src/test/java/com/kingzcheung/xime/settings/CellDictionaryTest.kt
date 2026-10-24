@@ -189,6 +189,15 @@ class CellDictionaryTest {
         assertEquals(v2, store.dictionaryFile(builtin.id).readText())
     }
 
+    @Test fun `other built-in dictionaries start off and carry their english words`() {
+        val store = store()
+        val builtin = BuiltinCellDictionary("builtin_dota2", "Dota2", "电子游戏")
+        store.installBuiltin(builtin, "---\nname: cell_builtin_dota2\n...\n敌法师\tdi fa shi\t100\n", listOf("Ame", "BKB"))
+        assertTrue(store.read().selected.isEmpty())
+        assertEquals(2, store.read().installed.single().english)
+        assertEquals(listOf("Ame", "BKB"), store.englishWords(builtin.id))
+    }
+
     @Test fun `bundled arknights dictionary is a valid pinyin table with the core community terms`() {
         val text = File("src/main/assets/cell_dictionaries/cell_builtin_arknights.dict.yaml").readText()
         assertTrue(text.contains("\nname: cell_builtin_arknights\n"))

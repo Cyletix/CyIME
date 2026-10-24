@@ -1,0 +1,1788 @@
+# CyIME 文史词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_wenshi
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+夏朝	xia chao	600
+殷商	yin shang	600
+周朝	zhou chao	600
+东周	dong zhou	600
+新朝	xin chao	600
+曹魏	cao wei	600
+蜀汉	shu han	600
+晋朝	jin chao	600
+两晋	liang jin	600
+十六国	shi liu guo	600
+刘宋	liu song	600
+南齐	nan qi	600
+萧梁	xiao liang	600
+南陈	nan chen	600
+隋朝	sui chao	600
+武周	wu zhou	600
+中唐	zhong tang	600
+后梁	hou liang	600
+后晋	hou jin	600
+后汉	hou han	600
+后周	hou zhou	600
+前蜀	qian shu	600
+后蜀	hou shu	600
+北汉	bei han	600
+两宋	liang song	600
+辽朝	liao chao	600
+金朝	jin chao	600
+蒙元	meng yuan	600
+南明	nan ming	600
+建元	jian yuan	600
+元光	yuan guang	600
+元朔	yuan shuo	600
+元狩	yuan shou	600
+元鼎	yuan ding	600
+元封	yuan feng	600
+太初	tai chu	600
+征和	zheng he	600
+始元	shi yuan	600
+元凤	yuan feng	600
+本始	ben shi	600
+地节	di jie	600
+元康	yuan kang	600
+神爵	shen jue	600
+初元	chu yuan	600
+永光	yong guang	600
+建昭	jian zhao	600
+建始	jian shi	600
+河平	he ping	600
+鸿嘉	hong jia	600
+元延	yuan yan	600
+绥和	sui he	600
+元始	yuan shi	600
+居摄	ju she	600
+始建国	shi jian guo	600
+更始	geng shi	600
+建初	jian chu	600
+永元	yong yuan	600
+元兴	yuan xing	600
+永初	yong chu	600
+延光	yan guang	600
+永建	yong jian	600
+阳嘉	yang jia	600
+汉安	han an	600
+本初	ben chu	600
+建和	jian he	600
+永兴	yong xing	600
+延熹	yan xi	600
+建宁	jian ning	600
+熹平	xi ping	600
+光和	guang he	600
+中平	zhong ping	600
+初平	chu ping	600
+延康	yan kang	600
+黄初	huang chu	600
+景初	jing chu	600
+正始	zheng shi	600
+嘉平	jia ping	600
+景元	jing yuan	600
+咸熙	xian xi	600
+章武	zhang wu	600
+建兴	jian xing	600
+延熙	yan xi	600
+景耀	jing yao	600
+炎兴	yan xing	600
+黄武	huang wu	600
+赤乌	chi wu	600
+泰始	tai shi	600
+太康	tai kang	600
+永熙	yong xi	600
+永嘉	yong jia	600
+永昌	yong chang	600
+太宁	tai ning	600
+咸和	xian he	600
+咸康	xian kang	600
+升平	sheng ping	600
+隆和	long he	600
+咸安	xian an	600
+宁康	ning kang	600
+太元	tai yuan	600
+隆安	long an	600
+义熙	yi xi	600
+元熙	yuan xi	600
+元嘉	yuan jia	600
+孝建	xiao jian	600
+永明	yong ming	600
+天监	tian jian	600
+太建	tai jian	600
+祯明	zhen ming	600
+道武	dao wu	600
+孝昌	xiao chang	600
+武定	wu ding	600
+大统	da tong	600
+天保	tian bao	600
+开皇	kai huang	600
+仁寿	ren shou	600
+武德	wu de	600
+贞观	zhen guan	600
+永徽	yong hui	600
+显庆	xian qing	600
+龙朔	long shuo	600
+麟德	lin de	600
+乾封	qian feng	600
+总章	zong zhang	600
+上元	shang yuan	600
+仪凤	yi feng	600
+调露	diao lu	600
+永隆	yong long	600
+开耀	kai yao	600
+永淳	yong chun	600
+弘道	hong dao	600
+嗣圣	si sheng	600
+光宅	guang zhai	600
+垂拱	chui gong	600
+天授	tian shou	600
+延载	yan zai	600
+证圣	zheng sheng	600
+万岁通天	wan sui tong tian	600
+圣历	sheng li	600
+久视	jiu shi	600
+景龙	jing long	600
+景云	jing yun	600
+延和	yan he	600
+开元	kai yuan	600
+至德	zhi de	600
+乾元	qian yuan	600
+宝应	bao ying	600
+广德	guang de	600
+永泰	yong tai	600
+大历	da li	600
+建中	jian zhong	600
+兴元	xing yuan	600
+贞元	zhen yuan	600
+永贞	yong zhen	600
+元和	yuan he	600
+长庆	chang qing	600
+宝历	bao li	600
+大和	da he	600
+会昌	hui chang	600
+大中	da zhong	600
+咸通	xian tong	600
+乾符	qian fu	600
+广明	guang ming	600
+光启	guang qi	600
+龙纪	long ji	600
+景福	jing fu	600
+乾宁	qian ning	600
+光化	guang hua	600
+天复	tian fu	600
+天祐	tian you	600
+开平	kai ping	600
+乾化	qian hua	600
+同光	tong guang	600
+天成	tian cheng	600
+长兴	chang xing	600
+天福	tian fu	600
+广顺	guang shun	600
+显德	xian de	600
+建隆	jian long	600
+乾德	qian de	600
+开宝	kai bao	600
+太平兴国	tai ping xing guo	600
+雍熙	yong xi	600
+端拱	duan gong	600
+淳化	chun hua	600
+至道	zhi dao	600
+咸平	xian ping	600
+景德	jing de	600
+大中祥符	da zhong xiang fu	600
+天禧	tian xi	600
+乾兴	qian xing	600
+天圣	tian sheng	600
+明道	ming dao	600
+景祐	jing you	600
+宝元	bao yuan	600
+康定	kang ding	600
+庆历	qing li	600
+皇祐	huang you	600
+至和	zhi he	600
+嘉祐	jia you	600
+熙宁	xi ning	600
+元丰	yuan feng	600
+元祐	yuan you	600
+绍圣	shao sheng	600
+元符	yuan fu	600
+建中靖国	jian zhong jing guo	600
+崇宁	chong ning	600
+政和	zheng he	600
+重和	chong he	600
+宣和	xuan he	600
+靖康	jing kang	600
+建炎	jian yan	600
+隆兴	long xing	600
+乾道	qian dao	600
+淳熙	chun xi	600
+绍熙	shao xi	600
+庆元	qing yuan	600
+开禧	kai xi	600
+嘉定	jia ding	600
+宝庆	bao qing	600
+绍定	shao ding	600
+端平	duan ping	600
+嘉熙	jia xi	600
+淳祐	chun you	600
+宝祐	bao you	600
+开庆	kai qing	600
+景定	jing ding	600
+咸淳	xian chun	600
+德祐	de you	600
+景炎	jing yan	600
+祥兴	xiang xing	600
+至元	zhi yuan	600
+元贞	yuan zhen	600
+皇庆	huang qing	600
+延祐	yan you	600
+至治	zhi zhi	600
+泰定	tai ding	600
+天历	tian li	600
+至顺	zhi shun	600
+元统	yuan tong	600
+至正	zhi zheng	600
+洪武	hong wu	600
+洪熙	hong xi	600
+宣德	xuan de	600
+景泰	jing tai	600
+天顺	tian shun	600
+成化	cheng hua	600
+弘治	hong zhi	600
+隆庆	long qing	600
+泰昌	tai chang	600
+崇祯	chong zhen	600
+弘光	hong guang	600
+隆武	long wu	600
+永历	yong li	600
+天聪	tian cong	600
+崇德	chong de	600
+宣统	xuan tong	600
+唐尧	tang yao	600
+虞舜	yu shun	600
+夏启	xia qi	600
+夏桀	xia jie	600
+商汤	shang tang	600
+伊尹	yi yin	600
+盘庚	pan geng	600
+武丁	wu ding	600
+妇好	fu hao	600
+箕子	ji zi	600
+比干	bi gan	600
+商纣王	shang zhou wang	600
+周文王	zhou wen wang	600
+周武王	zhou wu wang	600
+周公旦	zhou gong dan	600
+姜子牙	jiang zi ya	600
+召公奭	shao gong shi	600
+周成王	zhou cheng wang	600
+周康王	zhou kang wang	600
+周穆王	zhou mu wang	600
+周厉王	zhou li wang	600
+周宣王	zhou xuan wang	600
+周幽王	zhou you wang	600
+周平王	zhou ping wang	600
+齐桓公	qi huan gong	600
+鲍叔牙	bao shu ya	600
+晏婴	yan ying	600
+宋襄公	song xiang gong	600
+晋文公	jin wen gong	600
+介子推	jie zi tui	600
+秦穆公	qin mu gong	600
+百里奚	bai li xi	600
+蹇叔	jian shu	600
+楚庄王	chu zhuang wang	600
+孙叔敖	sun shu ao	600
+吴王阖闾	wu wang he lv	600
+吴王夫差	wu wang fu chai	600
+伍子胥	wu zi xu	600
+孙武	sun wu	600
+越王勾践	yue wang gou jian	600
+范蠡	fan li	600
+文种	wen zhong	600
+郑庄公	zheng zhuang gong	600
+子产	zi chan	600
+颜回	yan hui	600
+子贡	zi gong	600
+曾参	zeng shen	600
+子游	zi you	600
+李耳	li er	600
+墨翟	mo di	600
+孟轲	meng ke	600
+荀况	xun kuang	600
+韩非	han fei	600
+公孙龙	gong sun long	600
+惠施	hui shi	600
+邹衍	zou yan	600
+杨朱	yang zhu	600
+扁鹊	bian que	600
+公输盘	gong shu pan	600
+魏文侯	wei wen hou	600
+李悝	li kui	600
+西门豹	xi men bao	600
+吴起	wu qi	600
+楚悼王	chu dao wang	600
+秦孝公	qin xiao gong	600
+商鞅	shang yang	600
+卫鞅	wei yang	600
+庞涓	pang juan	600
+田忌	tian ji	600
+齐威王	qi wei wang	600
+齐宣王	qi xuan wang	600
+孟尝君	meng chang jun	600
+田文	tian wen	600
+平原君	ping yuan jun	600
+赵胜	zhao sheng	600
+信陵君	xin ling jun	600
+魏无忌	wei wu ji	600
+春申君	chun shen jun	600
+黄歇	huang xie	600
+苏秦	su qin	600
+张仪	zhang yi	600
+范雎	fan ju	600
+蔡泽	cai ze	600
+乐毅	yue yi	600
+田单	tian dan	600
+赵武灵王	zhao wu ling wang	600
+蔺相如	lin xiang ru	600
+赵奢	zhao she	600
+赵括	zhao kuo	600
+李牧	li mu	600
+白起	bai qi	600
+王翦	wang jian	600
+王贲	wang ben	600
+蒙骜	meng ao	600
+蒙武	meng wu	600
+蒙恬	meng tian	600
+李斯	li si	600
+高渐离	gao jian li	600
+燕丹	yan dan	600
+扶苏	fu su	600
+胡亥	hu hai	600
+赵高	zhao gao	600
+吴广	wu guang	600
+项梁	xiang liang	600
+范增	fan zeng	600
+英布	ying bu	600
+彭越	peng yue	600
+汉高祖	han gao zu	600
+吕雉	lv zhi	600
+吕后	lv hou	600
+萧何	xiao he	600
+周勃	zhou bo	600
+曹参	cao can	600
+樊哙	fan kuai	600
+夏侯婴	xia hou ying	600
+灌婴	guan ying	600
+郦食其	li yi ji	600
+叔孙通	shu sun tong	600
+陆贾	lu jia	600
+娄敬	lou jing	600
+汉惠帝	han hui di	600
+汉文帝	han wen di	600
+汉景帝	han jing di	600
+窦太后	dou tai hou	600
+贾谊	jia yi	600
+晁错	chao cuo	600
+周亚夫	zhou ya fu	600
+袁盎	yuan ang	600
+刘彻	liu che	600
+卫子夫	wei zi fu	600
+李广	li guang	600
+公孙弘	gong sun hong	600
+董仲舒	dong zhong shu	600
+主父偃	zhu fu yan	600
+桑弘羊	sang hong yang	600
+张骞	zhang qian	600
+苏武	su wu	600
+东方朔	dong fang shuo	600
+司马相如	si ma xiang ru	600
+卓文君	zhuo wen jun	600
+霍光	huo guang	600
+汉昭帝	han zhao di	600
+汉宣帝	han xuan di	600
+刘询	liu xun	600
+赵充国	zhao chong guo	600
+丙吉	bing ji	600
+魏相	wei xiang	600
+汉元帝	han yuan di	600
+陈汤	chen tang	600
+甘延寿	gan yan shou	600
+刘向	liu xiang	600
+刘歆	liu xin	600
+杨雄	yang xiong	600
+扬雄	yang xiong	600
+王莽	wang mang	600
+刘秀	liu xiu	600
+汉光武帝	han guang wu di	600
+阴丽华	yin li hua	600
+邓禹	deng yu	600
+寇恂	kou xun	600
+冯异	feng yi	600
+岑彭	cen peng	600
+贾复	jia fu	600
+吴汉	wu han	600
+耿弇	geng yan	600
+马援	ma yuan	600
+严光	yan guang	600
+汉明帝	han ming di	600
+汉章帝	han zhang di	600
+班彪	ban biao	600
+班固	ban gu	600
+班超	ban chao	600
+班昭	ban zhao	600
+甘英	gan ying	600
+王充	wang chong	600
+张衡	zhang heng	600
+蔡伦	cai lun	600
+许慎	xu shen	600
+郑玄	zheng xuan	600
+马融	ma rong	600
+张仲景	zhang zhong jing	600
+蔡邕	cai yong	600
+李膺	li ying	600
+陈蕃	chen fan	600
+范滂	fan pang	600
+皇甫嵩	huang fu song	600
+卢植	lu zhi	600
+张角	zhang jiao	600
+何进	he jin	600
+王允	wang yun	600
+袁术	yuan shu	600
+公孙瓒	gong sun zan	600
+刘表	liu biao	600
+刘璋	liu zhang	600
+韩遂	han sui	600
+曹植	cao zhi	600
+曹叡	cao rui	600
+荀彧	xun yu	600
+荀攸	xun you	600
+贾诩	jia xu	600
+程昱	cheng yu	600
+刘晔	liu ye	600
+司马师	si ma shi	600
+司马炎	si ma yan	600
+张辽	zhang liao	600
+徐晃	xu huang	600
+张郃	zhang he	600
+乐进	yue jin	600
+夏侯渊	xia hou yuan	600
+曹仁	cao ren	600
+曹洪	cao hong	600
+许褚	xu chu	600
+邓艾	deng ai	600
+钟会	zhong hui	600
+羊祜	yang hu	600
+杜预	du yu	600
+刘禅	liu shan	600
+法正	fa zheng	600
+徐庶	xu shu	600
+蒋琬	jiang wan	600
+费祎	fei yi	600
+董允	dong yun	600
+马良	ma liang	600
+马谡	ma su	600
+孙策	sun ce	600
+鲁肃	lu su	600
+吕蒙	lv meng	600
+陆逊	lu xun	600
+陆抗	lu kang	600
+张昭	zhang zhao	600
+顾雍	gu yong	600
+诸葛瑾	zhu ge jin	600
+太史慈	tai shi ci	600
+程普	cheng pu	600
+韩当	han dang	600
+周泰	zhou tai	600
+凌统	ling tong	600
+丁奉	ding feng	600
+嵇康	ji kang	600
+阮籍	ruan ji	600
+山涛	shan tao	600
+向秀	xiang xiu	600
+刘伶	liu ling	600
+王戎	wang rong	600
+阮咸	ruan xian	600
+潘岳	pan yue	600
+陆机	lu ji	600
+左思	zuo si	600
+祖逖	zu ti	600
+刘琨	liu kun	600
+王导	wang dao	600
+王敦	wang dun	600
+温峤	wen qiao	600
+陶侃	tao kan	600
+庾亮	yu liang	600
+桓温	huan wen	600
+谢安	xie an	600
+谢玄	xie xuan	600
+谢道韫	xie dao yun	600
+王献之	wang xian zhi	600
+顾恺之	gu kai zhi	600
+谢灵运	xie ling yun	600
+颜延之	yan yan zhi	600
+鲍照	bao zhao	600
+谢朓	xie tiao	600
+沈约	shen yue	600
+范晔	fan ye	600
+刘勰	liu xie	600
+钟嵘	zhong rong	600
+萧统	xiao tong	600
+萧衍	xiao yan	600
+梁武帝	liang wu di	600
+陈霸先	chen ba xian	600
+陈叔宝	chen shu bao	600
+刘渊	liu yuan	600
+石勒	shi le	600
+石虎	shi hu	600
+慕容皝	mu rong huang	600
+慕容垂	mu rong chui	600
+苻坚	fu jian	600
+王猛	wang meng	600
+姚苌	yao chang	600
+拓跋珪	tuo ba gui	600
+拓跋焘	tuo ba tao	600
+冯太后	feng tai hou	600
+孝文帝	xiao wen di	600
+元宏	yuan hong	600
+尔朱荣	er zhu rong	600
+高欢	gao huan	600
+高洋	gao yang	600
+高长恭	gao chang gong	600
+宇文泰	yu wen tai	600
+宇文邕	yu wen yong	600
+韦孝宽	wei xiao kuan	600
+独孤信	du gu xin	600
+郦道元	li dao yuan	600
+贾思勰	jia si xie	600
+祖冲之	zu chong zhi	600
+范缜	fan zhen	600
+杨坚	yang jian	600
+隋文帝	sui wen di	600
+独孤伽罗	du gu jia luo	600
+杨广	yang guang	600
+隋炀帝	sui yang di	600
+高颎	gao jiong	600
+杨素	yang su	600
+韩擒虎	han qin hu	600
+贺若弼	he ruo bi	600
+长孙晟	zhang sun sheng	600
+宇文化及	yu wen hua ji	600
+李密	li mi	600
+王世充	wang shi chong	600
+窦建德	dou jian de	600
+李渊	li yuan	600
+唐高祖	tang gao zu	600
+长孙皇后	zhang sun huang hou	600
+李建成	li jian cheng	600
+李元吉	li yuan ji	600
+房玄龄	fang xuan ling	600
+杜如晦	du ru hui	600
+魏征	wei zheng	600
+长孙无忌	zhang sun wu ji	600
+褚遂良	chu sui liang	600
+秦琼	qin qiong	600
+尉迟恭	yu chi gong	600
+侯君集	hou jun ji	600
+苏定方	su ding fang	600
+薛仁贵	xue ren gui	600
+松赞干布	song zan gan bu	600
+文成公主	wen cheng gong zhu	600
+李治	li zhi	600
+唐高宗	tang gao zong	600
+娄师德	lou shi de	600
+张柬之	zhang jian zhi	600
+上官婉儿	shang guan wan er	600
+太平公主	tai ping gong zhu	600
+李隆基	li long ji	600
+唐玄宗	tang xuan zong	600
+姚崇	yao chong	600
+宋璟	song jing	600
+张九龄	zhang jiu ling	600
+张说	zhang shuo	600
+李林甫	li lin fu	600
+杨国忠	yang guo zhong	600
+高力士	gao li shi	600
+安禄山	an lu shan	600
+史思明	shi si ming	600
+郭子仪	guo zi yi	600
+李光弼	li guang bi	600
+颜真卿	yan zhen qing	600
+颜杲卿	yan gao qing	600
+张巡	zhang xun	600
+许远	xu yuan	600
+鉴真	jian zhen	600
+张旭	zhang xu	600
+吴道子	wu dao zi	600
+阎立本	yan li ben	600
+陆羽	lu yu	600
+刘知几	liu zhi ji	600
+杜佑	du you	600
+裴度	pei du	600
+牛僧孺	niu seng ru	600
+李德裕	li de yu	600
+黄巢	huang chao	600
+朱温	zhu wen	600
+李克用	li ke yong	600
+李存勖	li cun xu	600
+石敬瑭	shi jing tang	600
+刘知远	liu zhi yuan	600
+郭威	guo wei	600
+柴荣	chai rong	600
+周世宗	zhou shi zong	600
+李煜	li yu	600
+钱镠	qian liu	600
+赵匡胤	zhao kuang yin	600
+宋太祖	song tai zu	600
+赵光义	zhao guang yi	600
+宋太宗	song tai zong	600
+赵普	zhao pu	600
+潘美	pan mei	600
+曹彬	cao bin	600
+杨业	yang ye	600
+杨延昭	yang yan zhao	600
+寇准	kou zhun	600
+范仲淹	fan zhong yan	600
+包拯	bao zheng	600
+狄青	di qing	600
+吕惠卿	lv hui qing	600
+沈括	shen kuo	600
+毕昇	bi sheng	600
+苏洵	su xun	600
+苏辙	su zhe	600
+黄庭坚	huang ting jian	600
+米芾	mi fu	600
+蔡襄	cai xiang	600
+宋徽宗	song hui zong	600
+赵佶	zhao ji	600
+蔡京	cai jing	600
+童贯	tong guan	600
+方腊	fang la	600
+李纲	li gang	600
+宗泽	zong ze	600
+宋高宗	song gao zong	600
+赵构	zhao gou	600
+韩世忠	han shi zhong	600
+梁红玉	liang hong yu	600
+张俊	zhang jun	600
+刘光世	liu guang shi	600
+吴玠	wu jie	600
+吴璘	wu lin	600
+虞允文	yu yun wen	600
+秦桧	qin hui	600
+陆九渊	lu jiu yuan	600
+程颢	cheng hao	600
+程颐	cheng yi	600
+张载	zhang zai	600
+周敦颐	zhou dun yi	600
+邵雍	shao yong	600
+陈亮	chen liang	600
+叶适	ye shi	600
+宋慈	song ci	600
+贾似道	jia si dao	600
+文天祥	wen tian xiang	600
+陆秀夫	lu xiu fu	600
+张世杰	zhang shi jie	600
+耶律阿保机	ye lv a bao ji	600
+耶律德光	ye lv de guang	600
+萧绰	xiao chuo	600
+萧太后	xiao tai hou	600
+李元昊	li yuan hao	600
+完颜阿骨打	wan yan a gu da	600
+完颜宗翰	wan yan zong han	600
+完颜宗弼	wan yan zong bi	600
+金兀术	jin wu zhu	600
+窝阔台	wo kuo tai	600
+元世祖	yuan shi zu	600
+耶律楚材	ye lv chu cai	600
+伯颜	bo yan	600
+郭守敬	guo shou jing	600
+黄道婆	huang dao po	600
+明太祖	ming tai zu	600
+马皇后	ma huang hou	600
+徐达	xu da	600
+常遇春	chang yu chun	600
+刘基	liu ji	600
+刘伯温	liu bo wen	600
+李善长	li shan chang	600
+沐英	mu ying	600
+蓝玉	lan yu	600
+胡惟庸	hu wei yong	600
+朱允炆	zhu yun wen	600
+建文帝	jian wen di	600
+方孝孺	fang xiao ru	600
+朱棣	zhu di	600
+明成祖	ming cheng zu	600
+姚广孝	yao guang xiao	600
+解缙	xie jin	600
+杨士奇	yang shi qi	600
+杨荣	yang rong	600
+杨溥	yang pu	600
+郑和	zheng he	600
+王振	wang zhen	600
+刘瑾	liu jin	600
+王守仁	wang shou ren	600
+王阳明	wang yang ming	600
+唐寅	tang yin	600
+文徵明	wen zhi ming	600
+祝允明	zhu yun ming	600
+徐祯卿	xu zhen qing	600
+杨廷和	yang ting he	600
+杨慎	yang shen	600
+严嵩	yan song	600
+徐阶	xu jie	600
+高拱	gao gong	600
+张居正	zhang ju zheng	600
+海瑞	hai rui	600
+戚继光	qi ji guang	600
+俞大猷	yu da you	600
+李时珍	li shi zhen	600
+徐光启	xu guang qi	600
+宋应星	song ying xing	600
+徐霞客	xu xia ke	600
+李贽	li zhi	600
+魏忠贤	wei zhong xian	600
+杨涟	yang lian	600
+左光斗	zuo guang dou	600
+袁崇焕	yuan chong huan	600
+孙承宗	sun cheng zong	600
+卢象升	lu xiang sheng	600
+孙传庭	sun chuan ting	600
+洪承畴	hong cheng chou	600
+张献忠	zhang xian zhong	600
+史可法	shi ke fa	600
+黄宗羲	huang zong xi	600
+顾炎武	gu yan wu	600
+王夫之	wang fu zhi	600
+皇太极	huang tai ji	600
+多尔衮	duo er gun	600
+孝庄太后	xiao zhuang tai hou	600
+康熙帝	kang xi di	600
+玄烨	xuan ye	600
+纳兰性德	na lan xing de	600
+施琅	shi lang	600
+索额图	suo e tu	600
+雍正帝	yong zheng di	600
+胤禛	yin zhen	600
+隆科多	long ke duo	600
+张廷玉	zhang ting yu	600
+鄂尔泰	e er tai	600
+李卫	li wei	600
+乾隆帝	qian long di	600
+弘历	hong li	600
+傅恒	fu heng	600
+阿桂	a gui	600
+刘统勋	liu tong xun	600
+刘墉	liu yong	600
+纪昀	ji yun	600
+纪晓岚	ji xiao lan	600
+和珅	he shen	600
+戴震	dai zhen	600
+钱大昕	qian da xin	600
+章学诚	zhang xue cheng	600
+袁枚	yuan mei	600
+郑燮	zheng xie	600
+吴敬梓	wu jing zi	600
+魏源	wei yuan	600
+龚自珍	gong zi zhen	600
+关天培	guan tian pei	600
+陈化成	chen hua cheng	600
+洪秀全	hong xiu quan	600
+杨秀清	yang xiu qing	600
+石达开	shi da kai	600
+陈玉成	chen yu cheng	600
+李秀成	li xiu cheng	600
+曾国藩	zeng guo fan	600
+左宗棠	zuo zong tang	600
+张之洞	zhang zhi dong	600
+胡林翼	hu lin yi	600
+彭玉麟	peng yu lin	600
+沈葆桢	shen bao zhen	600
+刘铭传	liu ming chuan	600
+冯子材	feng zi cai	600
+邓世昌	deng shi chang	600
+丁汝昌	ding ru chang	600
+恭亲王	gong qin wang	600
+翁同龢	weng tong he	600
+谭嗣同	tan si tong	600
+严复	yan fu	600
+章太炎	zhang tai yan	600
+蔡元培	cai yuan pei	600
+黄兴	huang xing	600
+宋教仁	song jiao ren	600
+秋瑾	qiu jin	600
+张謇	zhang jian	600
+詹天佑	zhan tian you	600
+王国维	wang guo wei	600
+陈寅恪	chen yin que	600
+钱穆	qian mu	600
+胡适	hu shi	600
+曹禺	cao yu	600
+禅让制	shan rang zhi	600
+少康中兴	shao kang zhong xing	600
+成汤灭夏	cheng tang mie xia	600
+盘庚迁殷	pan geng qian yin	600
+武丁盛世	wu ding sheng shi	600
+武王伐纣	wu wang fa zhou	600
+牧野之战	mu ye zhi zhan	600
+周公东征	zhou gong dong zheng	600
+成康之治	cheng kang zhi zhi	600
+国人暴动	guo ren bao dong	600
+共和行政	gong he xing zheng	600
+宣王中兴	xuan wang zhong xing	600
+烽火戏诸侯	feng huo xi zhu hou	600
+平王东迁	ping wang dong qian	600
+春秋五霸	chun qiu wu ba	600
+战国七雄	zhan guo qi xiong	600
+尊王攘夷	zun wang rang yi	600
+葵丘会盟	kui qiu hui meng	600
+城濮之战	cheng pu zhi zhan	600
+践土之盟	jian tu zhi meng	600
+崤之战	xiao zhi zhan	600
+邲之战	bi zhi zhan	600
+鄢陵之战	yan ling zhi zhan	600
+弭兵之会	mi bing zhi hui	600
+柏举之战	bai ju zhi zhan	600
+三家分晋	san jia fen jin	600
+田氏代齐	tian shi dai qi	600
+李悝变法	li kui bian fa	600
+吴起变法	wu qi bian fa	600
+商鞅变法	shang yang bian fa	600
+桂陵之战	gui ling zhi zhan	600
+马陵之战	ma ling zhi zhan	600
+徐州相王	xu zhou xiang wang	600
+合纵连横	he zong lian heng	600
+胡服骑射	hu fu qi she	600
+五国伐齐	wu guo fa qi	600
+伊阙之战	yi que zhi zhan	600
+渑池之会	mian chi zhi hui	600
+阏与之战	yu yu zhi zhan	600
+长平之战	chang ping zhi zhan	600
+窃符救赵	qie fu jiu zhao	600
+邯郸之战	han dan zhi zhan	600
+荆轲刺秦	jing ke ci qin	600
+秦灭六国	qin mie liu guo	600
+书同文	shu tong wen	600
+车同轨	che tong gui	600
+沙丘之变	sha qiu zhi bian	600
+大泽乡起义	da ze xiang qi yi	600
+巨鹿之战	ju lu zhi zhan	600
+楚汉之争	chu han zhi zheng	600
+彭城之战	peng cheng zhi zhan	600
+井陉之战	jing xing zhi zhan	600
+潍水之战	wei shui zhi zhan	600
+垓下之战	gai xia zhi zhan	600
+白登之围	bai deng zhi wei	600
+吕后称制	lv hou cheng zhi	600
+诛吕安刘	zhu lv an liu	600
+文景之治	wen jing zhi zhi	600
+七国之乱	qi guo zhi luan	600
+汉武盛世	han wu sheng shi	600
+罢黜百家	ba chu bai jia	600
+独尊儒术	du zun ru shu	600
+推恩令	tui en ling	600
+盐铁官营	yan tie guan ying	600
+盐铁会议	yan tie hui yi	600
+张骞通西域	zhang qian tong xi yu	600
+漠北之战	mo bei zhi zhan	600
+巫蛊之祸	wu gu zhi huo	600
+轮台罪己诏	lun tai zui ji zhao	600
+昭宣中兴	zhao xuan zhong xing	600
+昭君出塞	zhao jun chu sai	600
+王莽改制	wang mang gai zhi	600
+绿林起义	lu lin qi yi	600
+赤眉起义	chi mei qi yi	600
+昆阳之战	kun yang zhi zhan	600
+光武中兴	guang wu zhong xing	600
+明章之治	ming zhang zhi zhi	600
+永元之隆	yong yuan zhi long	600
+班超通西域	ban chao tong xi yu	600
+党锢之祸	dang gu zhi huo	600
+黄巾起义	huang jin qi yi	600
+十常侍之乱	shi chang shi zhi luan	600
+董卓之乱	dong zhuo zhi luan	600
+官渡之战	guan du zhi zhan	600
+隆中对	long zhong dui	600
+潼关之战	tong guan zhi zhan	600
+汉中之战	han zhong zhi zhan	600
+白衣渡江	bai yi du jiang	600
+夷陵之战	yi ling zhi zhan	600
+七擒孟获	qi qin meng huo	600
+高平陵之变	gao ping ling zhi bian	600
+三分归晋	san fen gui jin	600
+太康之治	tai kang zhi zhi	600
+八王之乱	ba wang zhi luan	600
+永嘉之乱	yong jia zhi luan	600
+衣冠南渡	yi guan nan du	600
+王与马共天下	wang yu ma gong tian xia	600
+祖逖北伐	zu ti bei fa	600
+桓温北伐	huan wen bei fa	600
+淝水之战	fei shui zhi zhan	600
+刘裕北伐	liu yu bei fa	600
+元嘉之治	yuan jia zhi zhi	600
+永明之治	yong ming zhi zhi	600
+孝文帝改革	xiao wen di gai ge	600
+六镇起义	liu zhen qi yi	600
+河阴之变	he yin zhi bian	600
+侯景之乱	hou jing zhi luan	600
+北周武帝灭佛	bei zhou wu di mie fo	600
+开皇之治	kai huang zhi zhi	600
+三征高句丽	san zheng gao gou li	600
+瓦岗起义	wa gang qi yi	600
+晋阳起兵	jin yang qi bing	600
+虎牢之战	hu lao zhi zhan	600
+玄武门之变	xuan wu men zhi bian	600
+渭水之盟	wei shui zhi meng	600
+贞观之治	zhen guan zhi zhi	600
+永徽之治	yong hui zhi zhi	600
+文成公主入藏	wen cheng gong zhu ru zang	600
+玄奘西行	xuan zang xi xing	600
+鉴真东渡	jian zhen dong du	600
+白江口之战	bai jiang kou zhi zhan	600
+神龙政变	shen long zheng bian	600
+先天政变	xian tian zheng bian	600
+开元盛世	kai yuan sheng shi	600
+怛逻斯之战	da luo si zhi zhan	600
+安史之乱	an shi zhi luan	600
+马嵬驿兵变	ma wei yi bing bian	600
+奉天之难	feng tian zhi nan	600
+永贞革新	yong zhen ge xin	600
+元和中兴	yuan he zhong xing	600
+甘露之变	gan lu zhi bian	600
+牛李党争	niu li dang zheng	600
+会昌灭佛	hui chang mie fo	600
+大中之治	da zhong zhi zhi	600
+黄巢起义	huang chao qi yi	600
+白马之祸	bai ma zhi huo	600
+陈桥兵变	chen qiao bing bian	600
+杯酒释兵权	bei jiu shi bing quan	600
+金匮之盟	jin gui zhi meng	600
+高梁河之战	gao liang he zhi zhan	600
+雍熙北伐	yong xi bei fa	600
+澶渊之盟	chan yuan zhi meng	600
+咸平之治	xian ping zhi zhi	600
+仁宗盛治	ren zong sheng zhi	600
+庆历新政	qing li xin zheng	600
+王安石变法	wang an shi bian fa	600
+熙宁变法	xi ning bian fa	600
+元祐更化	yuan you geng hua	600
+新旧党争	xin jiu dang zheng	600
+乌台诗案	wu tai shi an	600
+花石纲	hua shi gang	600
+海上之盟	hai shang zhi meng	600
+靖康之变	jing kang zhi bian	600
+建炎南渡	jian yan nan du	600
+苗刘兵变	miao liu bing bian	600
+黄天荡之战	huang tian dang zhi zhan	600
+富平之战	fu ping zhi zhan	600
+和尚原之战	he shang yuan zhi zhan	600
+岳飞北伐	yue fei bei fa	600
+郾城之战	yan cheng zhi zhan	600
+绍兴和议	shao xing he yi	600
+采石之战	cai shi zhi zhan	600
+隆兴北伐	long xing bei fa	600
+隆兴和议	long xing he yi	600
+乾淳之治	qian chun zhi zhi	600
+开禧北伐	kai xi bei fa	600
+嘉定和议	jia ding he yi	600
+端平入洛	duan ping ru luo	600
+钓鱼城之战	diao yu cheng zhi zhan	600
+襄樊之战	xiang fan zhi zhan	600
+红巾军起义	hong jin jun qi yi	600
+鄱阳湖之战	po yang hu zhi zhan	600
+洪武之治	hong wu zhi zhi	600
+胡惟庸案	hu wei yong an	600
+蓝玉案	lan yu an	600
+靖难之役	jing nan zhi yi	600
+永乐盛世	yong le sheng shi	600
+郑和下西洋	zheng he xia xi yang	600
+仁宣之治	ren xuan zhi zhi	600
+土木堡之变	tu mu bao zhi bian	600
+北京保卫战	bei jing bao wei zhan	600
+夺门之变	duo men zhi bian	600
+大礼议	da li yi	600
+庚戌之变	geng xu zhi bian	600
+嘉靖倭乱	jia jing wo luan	600
+隆庆开关	long qing kai guan	600
+俺答封贡	an da feng gong	600
+万历新政	wan li xin zheng	600
+万历三大征	wan li san da zheng	600
+东林党争	dong lin dang zheng	600
+红丸案	hong wan an	600
+梃击案	ting ji an	600
+移宫案	yi gong an	600
+萨尔浒之战	sa er hu zhi zhan	600
+宁远之战	ning yuan zhi zhan	600
+松锦之战	song jin zhi zhan	600
+甲申之变	jia shen zhi bian	600
+扬州十日	yang zhou shi ri	600
+嘉定三屠	jia ding san tu	600
+郑成功收复台湾	zheng cheng gong shou fu tai wan	600
+三藩之乱	san fan zhi luan	600
+雅克萨之战	ya ke sa zhi zhan	600
+尼布楚条约	ni bu chu tiao yue	600
+九子夺嫡	jiu zi duo di	600
+康乾盛世	kang qian sheng shi	600
+摊丁入亩	tan ding ru mu	600
+改土归流	gai tu gui liu	600
+白莲教起义	bai lian jiao qi yi	600
+虎门销烟	hu men xiao yan	600
+三元里抗英	san yuan li kang ying	600
+金田起义	jin tian qi yi	600
+天京事变	tian jing shi bian	600
+洋务运动	yang wu yun dong	600
+同治中兴	tong zhi zhong xing	600
+中法战争	zhong fa zhan zheng	600
+镇南关大捷	zhen nan guan da jie	600
+甲午战争	jia wu zhan zheng	600
+黄海海战	huang hai hai zhan	600
+马关条约	ma guan tiao yue	600
+公车上书	gong che shang shu	600
+百日维新	bai ri wei xin	600
+戊戌政变	wu xu zheng bian	600
+清末新政	qing mo xin zheng	600
+保路运动	bao lu yun dong	600
+武昌起义	wu chang qi yi	600
+二次革命	er ci ge ming	600
+护国运动	hu guo yun dong	600
+护法运动	hu fa yun dong	600
+新文化运动	xin wen hua yun dong	600
+前四史	qian si shi	600
+周礼	zhou li	600
+礼记	li ji	600
+三礼	san li	600
+春秋左传	chun qiu zuo zhuan	600
+公羊传	gong yang zhuan	600
+谷梁传	gu liang zhuan	600
+春秋三传	chun qiu san zhuan	600
+孝经	xiao jing	600
+竹书纪年	zhu shu ji nian	600
+穆天子传	mu tian zi chuan	600
+南华经	nan hua jing	600
+商君书	shang jun shu	600
+晏子春秋	yan zi chun qiu	600
+孙膑兵法	sun bin bing fa	600
+吴子	wu zi	600
+六韬	liu tao	600
+三略	san lve	600
+司马法	si ma fa	600
+尉缭子	wei liao zi	600
+武经七书	wu jing qi shu	600
+离骚	li sao	600
+九章	jiu zhang	600
+淮南子	huai nan zi	600
+春秋繁露	chun qiu fan lu	600
+盐铁论	yan tie lun	600
+说苑	shuo yuan	600
+新序	xin xu	600
+法言	fa yan	600
+太玄经	tai xuan jing	600
+论衡	lun heng	600
+潜夫论	qian fu lun	600
+风俗通义	feng su tong yi	600
+白虎通义	bai hu tong yi	600
+太史公书	tai shi gong shu	600
+后汉书	hou han shu	600
+晋书	jin shu	600
+宋书	song shu	600
+南齐书	nan qi shu	600
+梁书	liang shu	600
+陈书	chen shu	600
+魏书	wei shu	600
+北齐书	bei qi shu	600
+周书	zhou shu	600
+隋书	sui shu	600
+南史	nan shi	600
+北史	bei shi	600
+旧唐书	jiu tang shu	600
+新唐书	xin tang shu	600
+旧五代史	jiu wu dai shi	600
+新五代史	xin wu dai shi	600
+辽史	liao shi	600
+金史	jin shi	600
+元史	yuan shi	600
+清史稿	qing shi gao	600
+通鉴纪事本末	tong jian ji shi ben mo	600
+续资治通鉴	xu zi zhi tong jian	600
+贞观政要	zhen guan zheng yao	600
+史通	shi tong	600
+文史通义	wen shi tong yi	600
+通典	tong dian	600
+通志	tong zhi	600
+文献通考	wen xian tong kao	600
+九通	jiu tong	600
+唐六典	tang liu dian	600
+唐律疏议	tang lv shu yi	600
+大明律	da ming lv	600
+大清律例	da qing lv li	600
+释名	shi ming	600
+玉篇	yu pian	600
+切韵	qie yun	600
+广韵	guang yun	600
+集韵	ji yun	600
+中原音韵	zhong yuan yin yun	600
+昭明文选	zhao ming wen xuan	600
+文心雕龙	wen xin diao long	600
+诗品	shi pin	600
+玉台新咏	yu tai xin yong	600
+搜神记	sou shen ji	600
+博物志	bo wu zhi	600
+拾遗记	shi yi ji	600
+洛阳伽蓝记	luo yang qie lan ji	600
+水经注	shui jing zhu	600
+华阳国志	hua yang guo zhi	600
+颜氏家训	yan shi jia xun	600
+大唐西域记	da tang xi yu ji	600
+蛮书	man shu	600
+元和郡县图志	yuan he jun xian tu zhi	600
+太平广记	tai ping guang ji	600
+太平御览	tai ping yu lan	600
+册府元龟	ce fu yuan gui	600
+文苑英华	wen yuan ying hua	600
+乐府诗集	yue fu shi ji	600
+全唐诗	quan tang shi	600
+全宋词	quan song ci	600
+古文观止	gu wen guan zhi	600
+沧浪诗话	cang lang shi hua	600
+人间词话	ren jian ci hua	600
+西厢记	xi xiang ji	600
+汉宫秋	han gong qiu	600
+赵氏孤儿	zhao shi gu er	600
+琵琶记	pi pa ji	600
+紫钗记	zi chai ji	600
+南柯记	nan ke ji	600
+邯郸记	han dan ji	600
+临川四梦	lin chuan si meng	600
+长生殿	chang sheng dian	600
+儒林外史	ru lin wai shi	600
+封神演义	feng shen yan yi	600
+东周列国志	dong zhou lie guo zhi	600
+喻世明言	yu shi ming yan	600
+警世通言	jing shi tong yan	600
+醒世恒言	xing shi heng yan	600
+三言二拍	san yan er pai	600
+初刻拍案惊奇	chu ke pai an jing qi	600
+二刻拍案惊奇	er ke pai an jing qi	600
+今古奇观	jin gu qi guan	600
+老残游记	lao can you ji	600
+官场现形记	guan chang xian xing ji	600
+二十年目睹之怪现状	er shi nian mu du zhi guai xian zhuang	600
+孽海花	nie hai hua	600
+黄帝内经	huang di nei jing	600
+神农本草经	shen nong ben cao jing	600
+伤寒杂病论	shang han za bing lun	600
+金匮要略	jin gui yao lve	600
+千金要方	qian jin yao fang	600
+周髀算经	zhou bi suan jing	600
+九章算术	jiu zhang suan shu	600
+茶经	cha jing	600
+营造法式	ying zao fa shi	600
+洗冤集录	xi yuan ji lu	600
+农政全书	nong zheng quan shu	600
+徐霞客游记	xu xia ke you ji	600
+古今图书集成	gu jin tu shu ji cheng	600
+海国图志	hai guo tu zhi	600
+宋玉	song yu	600
+景差	jing cha	600
+枚乘	mei sheng	600
+班婕妤	ban jie yu	600
+秦嘉	qin jia	600
+孔融	kong rong	600
+陈琳	chen lin	600
+王粲	wang can	600
+徐干	xu gan	600
+阮瑀	ruan yu	600
+刘桢	liu zhen	600
+建安七子	jian an qi zi	600
+三曹	san cao	600
+太康文学	tai kang wen xue	600
+永明体	yong ming ti	600
+宫体诗	gong ti shi	600
+建安风骨	jian an feng gu	600
+正始之音	zheng shi zhi yin	600
+初唐四杰	chu tang si jie	600
+王勃	wang bo	600
+杨炯	yang jiong	600
+卢照邻	lu zhao lin	600
+骆宾王	luo bin wang	600
+陈子昂	chen zi ang	600
+沈佺期	shen quan qi	600
+宋之问	song zhi wen	600
+贺知章	he zhi zhang	600
+张若虚	zhang ruo xu	600
+王之涣	wang zhi huan	600
+孟浩然	meng hao ran	600
+王维	wang wei	600
+王昌龄	wang chang ling	600
+高适	gao shi	600
+岑参	cen can	600
+王翰	wang han	600
+崔颢	cui hao	600
+李颀	li qi	600
+常建	chang jian	600
+储光羲	chu guang xi	600
+诗佛	shi fo	600
+诗鬼	shi gui	600
+诗魔	shi mo	600
+诗豪	shi hao	600
+山水田园诗派	shan shui tian yuan shi pai	600
+边塞诗派	bian sai shi pai	600
+大历十才子	da li shi cai zi	600
+刘长卿	liu chang qing	600
+韦应物	wei ying wu	600
+卢纶	lu lun	600
+李益	li yi	600
+张继	zhang ji	600
+韩翃	han hong	600
+司空曙	si kong shu	600
+孟郊	meng jiao	600
+贾岛	jia dao	600
+韩愈	han yu	600
+柳宗元	liu zong yuan	600
+元稹	yuan zhen	600
+李贺	li he	600
+张籍	zhang ji	600
+王建	wang jian	600
+新乐府运动	xin yue fu yun dong	600
+古文运动	gu wen yun dong	600
+韩孟诗派	han meng shi pai	600
+元白诗派	yuan bai shi pai	600
+郊寒岛瘦	jiao han dao shou	600
+元和体	yuan he ti	600
+杜牧	du mu	600
+小李杜	xiao li du	600
+温庭筠	wen ting yun	600
+韦庄	wei zhuang	600
+皮日休	pi ri xiu	600
+陆龟蒙	lu gui meng	600
+罗隐	luo yin	600
+司空图	si kong tu	600
+鱼玄机	yu xuan ji	600
+薛涛	xue tao	600
+花间派	hua jian pai	600
+冯延巳	feng yan si	600
+李璟	li jing	600
+西昆体	xi kun ti	600
+杨亿	yang yi	600
+刘筠	liu yun	600
+柳永	liu yong	600
+晏殊	yan shu	600
+晏几道	yan ji dao	600
+张先	zhang xian	600
+梅尧臣	mei yao chen	600
+苏舜钦	su shun qin	600
+曾巩	zeng gong	600
+秦观	qin guan	600
+贺铸	he zhu	600
+周邦彦	zhou bang yan	600
+朱淑真	zhu shu zhen	600
+江西诗派	jiang xi shi pai	600
+陈师道	chen shi dao	600
+陈与义	chen yu yi	600
+杨万里	yang wan li	600
+范成大	fan cheng da	600
+尤袤	you mao	600
+中兴四大诗人	zhong xing si da shi ren	600
+诚斋体	cheng zhai ti	600
+永嘉四灵	yong jia si ling	600
+江湖诗派	jiang hu shi pai	600
+张孝祥	zhang xiao xiang	600
+张元干	zhang yuan gan	600
+刘克庄	liu ke zhuang	600
+姜夔	jiang kui	600
+史达祖	shi da zu	600
+吴文英	wu wen ying	600
+王沂孙	wang yi sun	600
+张炎	zhang yan	600
+蒋捷	jiang jie	600
+关汉卿	guan han qing	600
+王实甫	wang shi fu	600
+白朴	bai pu	600
+马致远	ma zhi yuan	600
+郑光祖	zheng guang zu	600
+乔吉	qiao ji	600
+张可久	zhang ke jiu	600
+贯云石	guan yun shi	600
+睢景臣	sui jing chen	600
+元曲四大家	yuan qu si da jia	600
+施耐庵	shi nai an	600
+罗贯中	luo guan zhong	600
+高启	gao qi	600
+宋濂	song lian	600
+台阁体	tai ge ti	600
+茶陵派	cha ling pai	600
+李东阳	li dong yang	600
+前七子	qian qi zi	600
+后七子	hou qi zi	600
+李梦阳	li meng yang	600
+何景明	he jing ming	600
+李攀龙	li pan long	600
+王世贞	wang shi zhen	600
+唐宋派	tang song pai	600
+王慎中	wang shen zhong	600
+唐顺之	tang shun zhi	600
+茅坤	mao kun	600
+归有光	gui you guang	600
+吴中四才子	wu zhong si cai zi	600
+公安派	gong an pai	600
+袁宗道	yuan zong dao	600
+袁宏道	yuan hong dao	600
+袁中道	yuan zhong dao	600
+公安三袁	gong an san yuan	600
+竟陵派	jing ling pai	600
+钟惺	zhong xing	600
+谭元春	tan yuan chun	600
+汤显祖	tang xian zu	600
+沈璟	shen jing	600
+冯梦龙	feng meng long	600
+凌濛初	ling meng chu	600
+吴承恩	wu cheng en	600
+张岱	zhang dai	600
+夏完淳	xia wan chun	600
+陈子龙	chen zi long	600
+钱谦益	qian qian yi	600
+吴伟业	wu wei ye	600
+王士祯	wang shi zhen	600
+神韵说	shen yun shuo	600
+朱彝尊	zhu yi zun	600
+陈维崧	chen wei song	600
+阳羡词派	yang xian ci pai	600
+浙西词派	zhe xi ci pai	600
+常州词派	chang zhou ci pai	600
+张惠言	zhang hui yan	600
+洪昇	hong sheng	600
+孔尚任	kong shang ren	600
+南洪北孔	nan hong bei kong	600
+方苞	fang bao	600
+刘大櫆	liu da kui	600
+姚鼐	yao nai	600
+桐城派	tong cheng pai	600
+阳湖派	yang hu pai	600
+沈德潜	shen de qian	600
+格调说	ge diao shuo	600
+性灵说	xing ling shuo	600
+翁方纲	weng fang gang	600
+肌理说	ji li shuo	600
+黄景仁	huang jing ren	600
+同光体	tong guang ti	600
+陈三立	chen san li	600
+郑孝胥	zheng xiao xu	600
+黄遵宪	huang zun xian	600
+柳亚子	liu ya zi	600
+南社	nan she	600
+新月派	xin yue pai	600
+创造社	chuang zao she	600
+文学研究会	wen xue yan jiu hui	600
+左翼作家联盟	zuo yi zuo jia lian meng	600
+京派	jing pai	600
+山药蛋派	shan yao dan pai	600
+荷花淀派	he hua dian pai	600
+朦胧诗派	meng long shi pai	600
+分封制	fen feng zhi	600
+宗法制	zong fa zhi	600
+井田制	jing tian zhi	600
+礼乐制度	li yue zhi du	600
+郡县制	jun xian zhi	600
+三公九卿	san gong jiu qing	600
+三省六部	san sheng liu bu	600
+察举制	cha ju zhi	600
+征辟制	zheng bi zhi	600
+九品中正制	jiu pin zhong zheng zhi	600
+科举制	ke ju zhi	600
+八股取士	ba gu qu shi	600
+均田制	jun tian zhi	600
+租庸调制	zu yong diao zhi	600
+两税法	liang shui fa	600
+一条鞭法	yi tiao bian fa	600
+府兵制	fu bing zhi	600
+募兵制	mu bing zhi	600
+猛安谋克	meng an mou ke	600
+八旗制度	ba qi zhi du	600
+绿营兵	lu ying bing	600
+保甲法	bao jia fa	600
+将相法	jiang xiang fa	600
+青苗法	qing miao fa	600
+募役法	mu yi fa	600
+方田均税法	fang tian jun shui fa	600
+市易法	shi yi fa	600
+均输法	jun shu fa	600
+行省制	xing sheng zhi	600
+土司制度	tu si zhi du	600
+卫所制	wei suo zhi	600
+军机处	jun ji chu	600
+南书房	nan shu fang	600
+巡抚	xun fu	600
+布政使	bu zheng shi	600
+按察使	an cha shi	600
+学政	xue zheng	600
+道台	dao tai	600
+同知	tong zhi	600
+通判	tong pan	600
+知州	zhi zhou	600
+县丞	xian cheng	600
+主簿	zhu bu	600
+典史	dian shi	600
+驿丞	yi cheng	600
+教谕	jiao yu	600
+相国	xiang guo	600
+御史大夫	yu shi da fu	600
+大司空	da si kong	600
+太傅	tai fu	600
+少师	shao shi	600
+少傅	shao fu	600
+太子太师	tai zi tai shi	600
+太子太傅	tai zi tai fu	600
+太子太保	tai zi tai bao	600
+奉常	feng chang	600
+郎中令	lang zhong ling	600
+光禄勋	guang lu xun	600
+卫尉	wei wei	600
+太仆	tai pu	600
+廷尉	ting wei	600
+大理寺卿	da li si qing	600
+典客	dian ke	600
+大鸿胪	da hong lu	600
+宗正	zong zheng	600
+治粟内史	zhi su nei shi	600
+大司农	da si nong	600
+少府	shao fu	600
+执金吾	zhi jin wu	600
+将作大匠	jiang zuo da jiang	600
+大长秋	da chang qiu	600
+尚书省	shang shu sheng	600
+中书省	zhong shu sheng	600
+门下省	men xia sheng	600
+尚书令	shang shu ling	600
+尚书仆射	shang shu pu ye	600
+中书令	zhong shu ling	600
+侍中	shi zhong	600
+给事中	ji shi zhong	600
+中书舍人	zhong shu she ren	600
+同中书门下平章事	tong zhong shu men xia ping zhang shi	600
+参知政事	can zhi zheng shi	600
+枢密院	shu mi yuan	600
+枢密使	shu mi shi	600
+三司使	san si shi	600
+计相	ji xiang	600
+吏部	li bu	600
+户部	hu bu	600
+礼部	li bu	600
+兵部	bing bu	600
+刑部	xing bu	600
+员外郎	yuan wai lang	600
+御史台	yu shi tai	600
+都察院	du cha yuan	600
+御史中丞	yu shi zhong cheng	600
+左都御史	zuo du yu shi	600
+右都御史	you du yu shi	600
+监察御史	jian cha yu shi	600
+侍御史	shi yu shi	600
+殿中侍御史	dian zhong shi yu shi	600
+六科给事中	liu ke ji shi zhong	600
+谏议大夫	jian yi da fu	600
+司礼监	si li jian	600
+太常寺	tai chang si	600
+光禄寺	guang lu si	600
+太仆寺	tai pu si	600
+鸿胪寺	hong lu si	600
+祭酒	ji jiu	600
+司业	si ye	600
+钦天监	qin tian jian	600
+翰林学士	han lin xue shi	600
+修撰	xiu zhuan	600
+庶吉士	shu ji shi	600
+刺史	ci shi	600
+州牧	zhou mu	600
+观察使	guan cha shi	600
+防御使	fang yu shi	600
+团练使	tuan lian shi	600
+转运使	zhuan yun shi	600
+提点刑狱公事	ti dian xing yu gong shi	600
+安抚使	an fu shi	600
+经略使	jing lve shi	600
+宣慰使	xuan wei shi	600
+宣抚使	xuan fu shi	600
+戊己校尉	wu ji xiao wei	600
+西域都护	xi yu du hu	600
+安西都护府	an xi du hu fu	600
+北庭都护府	bei ting du hu fu	600
+安东都护府	an dong du hu fu	600
+安南都护府	an nan du hu fu	600
+安北都护府	an bei du hu fu	600
+单于都护府	chan yu du hu fu	600
+市舶司	shi bo si	600
+理藩院	li fan yuan	600
+宗人府	zong ren fu	600
+通政司	tong zheng si	600
+詹事府	zhan shi fu	600
+顺天府尹	shun tian fu yin	600
+左冯翊	zuo feng yi	600
+右扶风	you fu feng	600
+司隶校尉	si li xiao wei	600
+都司	du si	600
+会元	hui yuan	600
+贡士	gong shi	600
+解元	jie yuan	600
+案首	an shou	600
+生员	sheng yuan	600
+童生	tong sheng	600
+院试	yuan shi	600
+乡试	xiang shi	600
+恩科	en ke	600
+连中三元	lian zhong san yuan	600
+黎民	li min	600
+黔首	qian shou	600
+缙绅	jin shen	600
+膏粱	gao liang	600
+庶族	shu zu	600
+士族	shi zu	600
+门阀	men fa	600
+孤家	gu jia	600
+鄙人	bi ren	600
+不佞	bu ning	600
+顿首	dun shou	600
+稽首	qi shou	600
+再拜	zai bai	600
+拜手	bai shou	600
+及笄	ji ji	600
+总角	zong jiao	600
+垂髫	chui tiao	600
+鲐背	tai bei	600
+期颐	qi yi	600
+加冠	jia guan	600
+致仕	zhi shi	600
+乞骸骨	qi hai gu	600
+丁忧	ding you	600
+夺情	duo qing	600
+左迁	zuo qian	600
+谪守	zhe shou	600
+贬谪	bian zhe	600
+迁客	qian ke	600
+骚人	sao ren	600
+擢升	zhuo sheng	600
+超擢	chao zhuo	600
+拜相	bai xiang	600
+加官进爵	jia guan jin jue	600
+悬梁刺股	xuan liang ci gu	600
+囊萤映雪	nang ying ying xue	600
+韦编三绝	wei bian san jue	600
+牛角挂书	niu jiao gua shu	600
+闻鸡起舞	wen ji qi wu	600
+中流击楫	zhong liu ji ji	600
+投笔从戎	tou bi cong rong	600
+燕然勒功	yan ran le gong	600
+封狼居胥	feng lang ju xu	600
+负荆请罪	fu jing qing zui	600
+刎颈之交	wen jing zhi jiao	600
+管鲍之交	guan bao zhi jiao	600
+莫逆之交	mo ni zhi jiao	600
+金兰之交	jin lan zhi jiao	600
+市道之交	shi dao zhi jiao	600
+割席断交	ge xi duan jiao	600
+图穷匕见	tu qiong bi xian	600
+兔死狗烹	tu si gou peng	600
+鸟尽弓藏	niao jin gong cang	600
+揭竿而起	jie gan er qi	600
+鸿鹄之志	hong hu zhi zhi	600
+决胜千里	jue sheng qian li	600
+下自成蹊	xia zi cheng xi	600
+穷且益坚	qiong qie yi jian	600
+草木皆兵	cao mu jie bing	600
+投鞭断流	tou bian duan liu	600
+枕戈待旦	zhen ge dai dan	600
+洛阳纸贵	luo yang zhi gui	600
+东床快婿	dong chuang kuai xu	600
+咏絮之才	yong xu zhi cai	600
+吴下阿蒙	wu xia a meng	600
+手不释卷	shou bu shi juan	600
+死而后已	si er hou yi	600
+七步成诗	qi bu cheng shi	600
+梦笔生花	meng bi sheng hua	600
+景行行止	jing hang xing zhi	600
+温故知新	wen gu zhi xin	600
+杀身成仁	sha shen cheng ren	600
+浩然之气	hao ran zhi qi	600
+民贵君轻	min gui jun qing	600
+生于忧患	sheng yu you huan	600
+死于安乐	si yu an le	600
+小国寡民	xiao guo gua min	600
+齐物论	qi wu lun	600
+庖丁解牛	pao ding jie niu	600
+虚室生白	xu shi sheng bai	600
+郑人买履	zheng ren mai lv	600
+老马识途	lao ma shi tu	600
+唇亡齿寒	chun wang chi han	600
+问鼎中原	wen ding zhong yuan	600
+秦晋之好	qin jin zhi hao	600
+外强中干	wai qiang zhong gan	600
+大义灭亲	da yi mie qin	600
+前事不忘	qian shi bu wang	600
+抱薪救火	bao xin jiu huo	600
+高山景行	gao shan jing hang	600
+古印度	gu yin du	600
+美索不达米亚	mei suo bu da mi ya	600
+苏美尔	su mei er	600
+阿卡德	a ka de	600
+亚述帝国	ya shu di guo	600
+波斯帝国	bo si di guo	600
+赫梯帝国	he ti di guo	600
+腓尼基	fei ni ji	600
+特洛伊战争	te luo yi zhan zheng	600
+希波战争	xi bo zhan zheng	600
+马拉松战役	ma la song zhan yi	600
+温泉关战役	wen quan guan zhan yi	600
+萨拉米斯海战	sa la mi si hai zhan	600
+伯罗奔尼撒战争	bo luo ben ni sa zhan zheng	600
+亚历山大东征	ya li shan da dong zheng	600
+布匿战争	bu ni zhan zheng	600
+坎尼战役	kan ni zhan yi	600
+斯巴达克起义	si ba da ke qi yi	600
+罗马共和国	luo ma gong he guo	600
+西罗马帝国	xi luo ma di guo	600
+拜占庭帝国	bai zhan ting di guo	600
+查士丁尼法典	cha shi ding ni fa dian	600
+汉谟拉比法典	han mo la bi fa dian	600
+十二铜表法	shi er tong biao fa	600
+大宪章	da xian zhang	600
+权利法案	quan li fa an	600
+人权宣言	ren quan xuan yan	600
+拿破仑法典	na po lun fa dian	600
+解放黑人奴隶宣言	jie fang hei ren nu li xuan yan	600
+共产党宣言	gong chan dang xuan yan	600
+法兰克王国	fa lan ke wang guo	600
+查理曼帝国	cha li man di guo	600
+神圣罗马帝国	shen sheng luo ma di guo	600
+阿拉伯帝国	a la bo di guo	600
+奥斯曼帝国	ao si man di guo	600
+莫卧儿帝国	mo wo er di guo	600
+笈多王朝	ji duo wang chao	600
+孔雀王朝	kong que wang chao	600
+贵霜帝国	gui shuang di guo	600
+玛雅文明	ma ya wen ming	600
+阿兹特克	a zi te ke	600
+印加帝国	yin jia di guo	600
+十字军东征	shi zi jun dong zheng	600
+百年战争	bai nian zhan zheng	600
+玫瑰战争	mei gui zhan zheng	600
+三十年战争	san shi nian zhan zheng	600
+威斯特伐利亚和约	wei si te fa li ya he yue	600
+大化改新	da hua gai xin	600
+镰仓幕府	lian cang mu fu	600
+室町幕府	shi ding mu fu	600
+江户幕府	jiang hu mu fu	600
+德川幕府	de chuan mu fu	600
+应仁之乱	ying ren zhi luan	600
+本能寺之变	ben neng si zhi bian	600
+关原合战	guan yuan he zhan	600
+黑船事件	hei chuan shi jian	600
+倒幕运动	dao mu yun dong	600
+宗教改革	zong jiao gai ge	600
+地理大发现	di li da fa xian	600
+新航路开辟	xin hang lu kai pi	600
+三角贸易	san jiao mao yi	600
+启蒙运动	qi meng yun dong	600
+蒸汽时代	zheng qi shi dai	600
+电气时代	dian qi shi dai	600
+英国资产阶级革命	ying guo zi chan jie ji ge ming	600
+光荣革命	guang rong ge ming	600
+美国独立战争	mei guo du li zhan zheng	600
+莱克星顿枪声	lai ke xing dun qiang sheng	600
+萨拉托加战役	sa la tuo jia zhan yi	600
+约克镇战役	yue ke zhen zhan yi	600
+法国大革命	fa guo da ge ming	600
+攻占巴士底狱	gong zhan ba shi di yu	600
+热月政变	re yue zheng bian	600
+雾月政变	wu yue zheng bian	600
+法兰西第一帝国	fa lan xi di yi di guo	600
+滑铁卢战役	hua tie lu zhan yi	600
+维也纳会议	wei ye na hui yi	600
+神圣同盟	shen sheng tong meng	600
+宪章运动	xian zhang yun dong	600
+巴黎公社	ba li gong she	600
+美国南北战争	mei guo nan bei zhan zheng	600
+葛底斯堡战役	ge di si bao zhan yi	600
+俄国农奴制改革	e guo nong nu zhi gai ge	600
+克里米亚战争	ke li mi ya zhan zheng	600
+普法战争	pu fa zhan zheng	600
+色当战役	se dang zhan yi	600
+日俄战争	ri e zhan zheng	600
+对马海战	dui ma hai zhan	600
+萨拉热窝事件	sa la re wo shi jian	600
+马恩河战役	ma en he zhan yi	600
+凡尔登战役	fan er deng zhan yi	600
+索姆河战役	suo mu he zhan yi	600
+日德兰海战	ri de lan hai zhan	600
+十月革命	shi yue ge ming	600
+巴黎和会	ba li he hui	600
+凡尔赛条约	fan er sai tiao yue	600
+华盛顿会议	hua sheng dun hui yi	600
+九国公约	jiu guo gong yue	600
+国际联盟	guo ji lian meng	600
+经济大萧条	jing ji da xiao tiao	600
+罗斯福新政	luo si fu xin zheng	600
+慕尼黑阴谋	mu ni hei yin mou	600
+敦刻尔克大撤退	dun ke er ke da che tui	600
+不列颠空战	bu lie dian kong zhan	600
+莫斯科保卫战	mo si ke bao wei zhan	600
+珍珠港事件	zhen zhu gang shi jian	600
+中途岛海战	zhong tu dao hai zhan	600
+斯大林格勒战役	si da lin ge le zhan yi	600
+阿拉曼战役	a la man zhan yi	600
+库尔斯克会战	ku er si ke hui zhan	600
+雅尔塔会议	ya er ta hui yi	600
+波茨坦公告	bo ci tan gong gao	600
+杜鲁门主义	du lu men zhu yi	600
+马歇尔计划	ma xie er ji hua	600
+华约	hua yue	600
+古巴导弹危机	gu ba dao dan wei ji	600
+万隆会议	wan long hui yi	600
+不结盟运动	bu jie meng yun dong	600
+汉谟拉比	han mo la bi	600
+居鲁士	ju lu shi	600
+大流士	da liu shi	600
+阿育王	a yu wang	600
+伯里克利	bo li ke li	600
+荷马	he ma	600
+希罗多德	xi luo duo de	600
+修昔底德	xiu xi di de	600
+欧几里得	ou ji li de	600
+毕达哥拉斯	bi da ge la si	600
+亚历山大大帝	ya li shan da da di	600
+西塞罗	xi sai luo	600
+恺撒	kai sa	600
+奥古斯都	ao gu si du	600
+马可奥勒留	ma ke ao le liu	600
+君士坦丁大帝	jun shi tan ding da di	600
+查士丁尼	cha shi ding ni	600
+查理大帝	cha li da di	600
+萨拉丁	sa la ding	600
+圣女贞德	sheng nv zhen de	600
+织田信长	zhi tian xin chang	600
+丰臣秀吉	feng chen xiu ji	600
+彼特拉克	bi te la ke	600
+薄伽丘	bo jia qiu	600
+塞万提斯	sai wan ti si	600
+马丁路德	ma ding lu de	600
+哥白尼	ge bai ni	600
+开普勒	kai pu le	600
+达伽马	da jia ma	600
+伊丽莎白一世	yi li sha bai yi shi	600
+维多利亚女王	wei duo li ya nv wang	600
+孟德斯鸠	meng de si jiu	600
+狄德罗	di de luo	600
+康德	kang de	600
+恩格斯	en ge si	600
+罗伯斯庇尔	luo bo si bi er	600
+陀思妥耶夫斯基	tuo si tuo ye fu si ji	600
+席勒	xi le	600
+巴赫	ba he	600
+叶卡捷琳娜二世	ye ka jie lin na er shi	600
+俾斯麦	bi si mai	600
+加里波第	jia li bo di	600
+泰戈尔	tai ge er	600
+玻利瓦尔	bo li wa er	600
+圣马丁	sheng ma ding	600

@@ -1,0 +1,2242 @@
+# CyIME 数学词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_math
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+阿贝尔	a bei er	600
+阿达马	a da ma	600
+阿蒂亚	a di ya	600
+埃尔米特	ai er mi te	600
+埃拉托斯特尼	ai la tuo si te ni	600
+奥斯特罗格拉茨基	ao si te luo ge la ci ji	600
+巴拿赫	ba na he	600
+贝塞尔	bei sai er	600
+贝叶斯	bei ye si	600
+本迪克松	ben di ke song	600
+毕达哥拉斯	bi da ge la si	600
+伯努利	bo nu li	600
+泊松	bo song	600
+博雷尔	bo lei er	600
+布劳威尔	bu lao wei er	600
+策梅洛	ce mei luo	600
+陈省身	chen xing shen	600
+陈景润	chen jing run	600
+达朗贝尔	da lang bei er	600
+达布	da bu	600
+戴德金	dai de jin	600
+德摩根	de mo gen	600
+德拉姆	de la mu	600
+狄利克雷	di li ke lei	600
+狄拉克	di la ke	600
+蒂茨	di ci	600
+丢番图	diu fan tu	600
+杜布	du bu	600
+厄尔朵斯	e er duo si	600
+法图	fa tu	600
+费马	fei ma	600
+费耶	fei ye	600
+费希尔	fei xi er	600
+斐波那契	fei bo na qi	600
+冯诺依曼	feng nuo yi man	600
+弗雷德霍姆	fu lei de huo mu	600
+弗罗贝尼乌斯	fu luo bei ni wu si	600
+弗雷歇	fu lei xie	600
+傅里叶	fu li ye	600
+伽罗瓦	jia luo wa	600
+高斯	gao si	600
+哥德尔	ge de er	600
+哥德巴赫	ge de ba he	600
+格罗滕迪克	ge luo teng di ke	600
+格拉斯曼	ge la si man	600
+哈代	ha dai	600
+哈密顿	ha mi dun	600
+汉克尔	han ke er	600
+豪斯多夫	hao si duo fu	600
+海涅	hai nie	600
+海森堡	hai sen bao	600
+赫尔德	he er de	600
+霍奇	huo qi	600
+霍普夫	huo pu fu	600
+吉布斯	ji bu si	600
+基灵	ji ling	600
+嘉当	jia dang	600
+伽辽金	jia liao jin	600
+卡拉西奥多里	ka la xi ao duo li	600
+卡瓦列里	ka wa lie li	600
+康托尔	kang tuo er	600
+柯西	ke xi	600
+柯尔莫哥洛夫	ke er mo ge luo fu	600
+克莱因	ke lai yin	600
+克莱姆	ke lai mu	600
+克罗内克	ke luo nei ke	600
+克里斯托费尔	ke li si tuo fei er	600
+库拉托夫斯基	ku la tuo fu si ji	600
+库恩	ku en	600
+拉格朗日	la ge lang ri	600
+拉普拉斯	la pu la si	600
+拉东	la dong	600
+拉马努金	la ma nu jin	600
+莱布尼茨	lai bu ni ci	600
+兰道	lan dao	600
+勒贝格	le bei ge	600
+勒让德	le rang de	600
+黎曼	li man	600
+黎斯	li si	600
+李雅普诺夫	li ya pu nuo fu	600
+李群	li qun	600
+林德勒夫	lin de le fu	600
+刘维尔	liu wei er	600
+罗尔	luo er	600
+洛必达	luo bi da	600
+洛朗	luo lang	600
+马尔可夫	ma er ke fu	600
+麦克劳林	mai ke lao lin	600
+麦克斯韦	mai ke si wei	600
+闵可夫斯基	min ke fu si ji	600
+莫比乌斯	mo bi wu si	600
+莫尔斯	mo er si	600
+纳什	na shi	600
+欧几里得	ou ji li de	600
+帕塞瓦尔	pa sai wa er	600
+庞加莱	pang jia lai	600
+佩亚诺	pei ya nuo	600
+佩龙	pei long	600
+皮尔逊	pi er xun	600
+普朗歇尔	pu lang xie er	600
+切比雪夫	qie bi xue fu	600
+丘成桐	qiu cheng tong	600
+塞瓦	sai wa	600
+沙尔	sha er	600
+施瓦茨	shi wa ci	600
+斯托克斯	si tuo ke si	600
+斯蒂尔杰斯	si di er jie si	600
+索伯列夫	suo bo lie fu	600
+塔斯基	ta si ji	600
+托里拆利	tuo li chai li	600
+外尔	wai er	600
+外尔斯特拉斯	wai er si te la si	600
+韦达	wei da	600
+维诺格拉多夫	wei nuo ge la duo fu	600
+沃利斯	wo li si	600
+乌雷松	wu lei song	600
+希尔伯特	xi er bo te	600
+西尔维斯特	xi er wei si te	600
+西罗	xi luo	600
+夏普利	xia pu li	600
+香农	xiang nong	600
+辛钦	xin qin	600
+熊庆来	xiong qing lai	600
+雅可比	ya ke bi	600
+杨振宁	yang zhen ning	600
+伊东清	yi dong qing	600
+尤拉	you la	600
+约当	yue dang	600
+祖冲之	zu chong zhi	600
+佐恩	zuo en	600
+苏步青	su bu qing	600
+吴文俊	wu wen jun	600
+冯康	feng kang	600
+周炜良	zhou wei liang	600
+实数完备性	shi shu wan bei xing	600
+确界原理	que jie yuan li	600
+上确界	shang que jie	600
+下确界	xia que jie	600
+单调有界定理	dan diao you jie ding li	600
+闭区间套定理	bi qu jian tao ding li	600
+有限覆盖定理	you xian fu gai ding li	600
+聚点定理	ju dian ding li	600
+柯西收敛准则	ke xi shou lian zhun ze	600
+数列极限	shu lie ji xian	600
+函数极限	han shu ji xian	600
+上极限	shang ji xian	600
+下极限	xia ji xian	600
+无穷大量	wu qiong da liang	600
+高阶无穷小	gao jie wu qiong xiao	600
+等价无穷小	deng jia wu qiong xiao	600
+同阶无穷小	tong jie wu qiong xiao	600
+夹逼定理	jia bi ding li	600
+迫敛性	po lian xing	600
+归结原则	gui jie yuan ze	600
+海涅定理	hai nie ding li	600
+连续函数	lian xu han shu	600
+一致连续	yi zhi lian xu	600
+左连续	zuo lian xu	600
+右连续	you lian xu	600
+间断点	jian duan dian	600
+可去间断点	ke qu jian duan dian	600
+跳跃间断点	tiao yue jian duan dian	600
+振荡间断点	zhen dang jian duan dian	600
+介值定理	jie zhi ding li	600
+零点定理	ling dian ding li	600
+最值定理	zui zhi ding li	600
+康托尔定理	kang tuo er ding li	600
+左导数	zuo dao shu	600
+右导数	you dao shu	600
+高阶导数	gao jie dao shu	600
+高阶微分	gao jie wei fen	600
+复合函数求导	fu he han shu qiu dao	600
+隐函数求导	yin han shu qiu dao	600
+参数方程求导	can shu fang cheng qiu dao	600
+对数求导法	dui shu qiu dao fa	600
+莱布尼茨公式	lai bu ni ci gong shi	600
+费马引理	fei ma yin li	600
+罗尔定理	luo er ding li	600
+拉格朗日中值定理	la ge lang ri zhong zhi ding li	600
+柯西中值定理	ke xi zhong zhi ding li	600
+微分中值定理	wei fen zhong zhi ding li	600
+洛必达法则	luo bi da fa ze	600
+泰勒公式	tai le gong shi	600
+泰勒展开	tai le zhan kai	600
+泰勒级数	tai le ji shu	600
+麦克劳林公式	mai ke lao lin gong shi	600
+麦克劳林级数	mai ke lao lin ji shu	600
+佩亚诺余项	pei ya nuo yu xiang	600
+拉格朗日余项	la ge lang ri yu xiang	600
+积分余项	ji fen yu xiang	600
+单调性	dan diao xing	600
+极值点	ji zhi dian	600
+极大值	ji da zhi	600
+极小值	ji xiao zhi	600
+凹凸性	ao tu xing	600
+凸函数	tu han shu	600
+凹函数	ao han shu	600
+渐近线	jian jin xian	600
+水平渐近线	shui ping jian jin xian	600
+铅直渐近线	qian zhi jian jin xian	600
+斜渐近线	xie jian jin xian	600
+曲率半径	qu lv ban jing	600
+曲率圆	qu lv yuan	600
+曲率中心	qu lv zhong xin	600
+原函数	yuan han shu	600
+换元积分法	huan yuan ji fen fa	600
+分部积分法	fen bu ji fen fa	600
+有理函数积分	you li han shu ji fen	600
+黎曼积分	li man ji fen	600
+达布大和	da bu da he	600
+达布小和	da bu xiao he	600
+可积性	ke ji xing	600
+牛顿莱布尼茨公式	niu dun lai bu ni ci gong shi	600
+微积分基本定理	wei ji fen ji ben ding li	600
+积分第一中值定理	ji fen di yi zhong zhi ding li	600
+积分第二中值定理	ji fen di er zhong zhi ding li	600
+变上限积分	bian shang xian ji fen	600
+反常积分	fan chang ji fen	600
+广义积分	guang yi ji fen	600
+无穷限反常积分	wu qiong xian fan chang ji fen	600
+瑕积分	xia ji fen	600
+瑕点	xia dian	600
+绝对收敛	jue dui shou lian	600
+条件收敛	tiao jian shou lian	600
+阿贝尔判别法	a bei er pan bie fa	600
+狄利克雷判别法	di li ke lei pan bie fa	600
+数项级数	shu xiang ji shu	600
+正项级数	zheng xiang ji shu	600
+交错级数	jiao cuo ji shu	600
+比值判别法	bi zhi pan bie fa	600
+根值判别法	gen zhi pan bie fa	600
+达朗贝尔判别法	da lang bei er pan bie fa	600
+柯西判别法	ke xi pan bie fa	600
+积分判别法	ji fen pan bie fa	600
+拉贝判别法	la bei pan bie fa	600
+莱布尼茨判别法	lai bu ni ci pan bie fa	600
+函数项级数	han shu xiang ji shu	600
+一致收敛	yi zhi shou lian	600
+逐点收敛	zhu dian shou lian	600
+优级数判别法	you ji shu pan bie fa	600
+收敛半径	shou lian ban jing	600
+收敛区间	shou lian qu jian	600
+收敛域	shou lian yu	600
+阿贝尔定理	a bei er ding li	600
+傅里叶级数	fu li ye ji shu	600
+三角级数	san jiao ji shu	600
+正交函数系	zheng jiao han shu xi	600
+贝塞尔不等式	bei sai er bu deng shi	600
+帕塞瓦尔等式	pa sai wa er deng shi	600
+黎曼引理	li man yin li	600
+偏导数	pian dao shu	600
+全微分	quan wei fen	600
+方向导数	fang xiang dao shu	600
+散度	san du	600
+旋度	xuan du	600
+高阶偏导数	gao jie pian dao shu	600
+混合偏导数	hun he pian dao shu	600
+海森矩阵	hai sen ju zhen	600
+雅可比矩阵	ya ke bi ju zhen	600
+雅可比行列式	ya ke bi hang lie shi	600
+隐函数存在定理	yin han shu cun zai ding li	600
+反函数定理	fan han shu ding li	600
+逆映射定理	ni ying she ding li	600
+拉格朗日乘子	la ge lang ri cheng zi	600
+拉格朗日乘数法	la ge lang ri cheng shu fa	600
+条件极值	tiao jian ji zhi	600
+无条件极值	wu tiao jian ji zhi	600
+含参变量积分	han can bian liang ji fen	600
+欧拉积分	ou la ji fen	600
+伽马函数	jia ma han shu	600
+贝塔函数	bei ta han shu	600
+三重积分	san chong ji fen	600
+重积分	chong ji fen	600
+累次积分	lei ci ji fen	600
+柱面坐标	zhu mian zuo biao	600
+球面坐标	qiu mian zuo biao	600
+极坐标变换	ji zuo biao bian huan	600
+曲线积分	qu xian ji fen	600
+曲面积分	qu mian ji fen	600
+第一型曲线积分	di yi xing qu xian ji fen	600
+第二型曲线积分	di er xing qu xian ji fen	600
+第一型曲面积分	di yi xing qu mian ji fen	600
+第二型曲面积分	di er xing qu mian ji fen	600
+格林公式	ge lin gong shi	600
+高斯公式	gao si gong shi	600
+斯托克斯公式	si tuo ke si gong shi	600
+路径无关	lu jing wu guan	600
+保守向量场	bao shou xiang liang chang	600
+势函数	shi han shu	600
+实变函数	shi bian han shu	600
+测度论	ce du lun	600
+集合代数	ji he dai shu	600
+西格玛代数	xi ge ma dai shu	600
+波莱尔代数	bo lai er dai shu	600
+波莱尔集	bo lai er ji	600
+开集	kai ji	600
+闭集	bi ji	600
+紧集	jin ji	600
+完备集	wan bei ji	600
+疏集	shu ji	600
+稠密集	chou mi ji	600
+康托尔集	kang tuo er ji	600
+康托尔三分集	kang tuo er san fen ji	600
+可数集	ke shu ji	600
+不可数集	bu ke shu ji	600
+连续统假设	lian xu tong jia she	600
+阿列夫零	a lie fu ling	600
+外测度	wai ce du	600
+内测度	nei ce du	600
+勒贝格测度	le bei ge ce du	600
+可测集	ke ce ji	600
+零测集	ling ce ji	600
+零测度	ling ce du	600
+几乎处处	ji hu chu chu	600
+卡拉西奥多里条件	ka la xi ao duo li tiao jian	600
+可测函数	ke ce han shu	600
+简单函数	jian dan han shu	600
+阶梯函数	jie ti han shu	600
+特征函数	te zheng han shu	600
+示性函数	shi xing han shu	600
+叶戈罗夫定理	ye ge luo fu ding li	600
+鲁津定理	lu jin ding li	600
+黎斯定理	li si ding li	600
+依测度收敛	yi ce du shou lian	600
+几乎处处收敛	ji hu chu chu shou lian	600
+几乎一致收敛	ji hu yi zhi shou lian	600
+勒贝格积分	le bei ge ji fen	600
+勒贝格控制收敛定理	le bei ge kong zhi shou lian ding li	600
+控制收敛定理	kong zhi shou lian ding li	600
+单调收敛定理	dan diao shou lian ding li	600
+列维定理	lie wei ding li	600
+法图引理	fa tu yin li	600
+富比尼定理	fu bi ni ding li	600
+托内利定理	tuo nei li ding li	600
+乘积测度	cheng ji ce du	600
+有界变差函数	you jie bian cha han shu	600
+全变差	quan bian cha	600
+绝对连续函数	jue dui lian xu han shu	600
+奇异函数	qi yi han shu	600
+康托尔函数	kang tuo er han shu	600
+勒贝格分解定理	le bei ge fen jie ding li	600
+拉东尼科迪姆定理	la dong ni ke di mu ding li	600
+符号测度	fu hao ce du	600
+汉恩分解	han en fen jie	600
+约当分解	yue dang fen jie	600
+哈尔测度	ha er ce du	600
+豪斯多夫测度	hao si duo fu ce du	600
+豪斯多夫维数	hao si duo fu wei shu	600
+分形维数	fen xing wei shu	600
+覆盖引理	fu gai yin li	600
+维塔利覆盖引理	wei ta li fu gai yin li	600
+极大函数	ji da han shu	600
+哈代李特尔伍德极大函数	ha dai li te er wu de ji da han shu	600
+勒贝格微分定理	le bei ge wei fen ding li	600
+勒贝格点	le bei ge dian	600
+复分析	fu fen xi	600
+复平面	fu ping mian	600
+复数域	fu shu yu	600
+实部	shi bu	600
+虚部	xu bu	600
+共轭复数	gong e fu shu	600
+复数模	fu shu mo	600
+辐角	fu jiao	600
+辐角主值	fu jiao zhu zhi	600
+欧拉公式	ou la gong shi	600
+棣莫弗公式	di mo fu gong shi	600
+扩充复平面	kuo chong fu ping mian	600
+黎曼球面	li man qiu mian	600
+无穷远点	wu qiong yuan dian	600
+单连通域	dan lian tong yu	600
+多连通域	duo lian tong yu	600
+约当曲线	yue dang qu xian	600
+全纯函数	quan chun han shu	600
+解析函数	jie xi han shu	600
+亚纯函数	ya chun han shu	600
+整函数	zheng han shu	600
+调和函数	diao he han shu	600
+共轭调和函数	gong e diao he han shu	600
+柯西黎曼方程	ke xi li man fang cheng	600
+柯西积分定理	ke xi ji fen ding li	600
+柯西积分公式	ke xi ji fen gong shi	600
+高阶导数公式	gao jie dao shu gong shi	600
+莫雷拉定理	mo lei la ding li	600
+刘维尔定理	liu wei er ding li	600
+最大模原理	zui da mo yuan li	600
+最小模原理	zui xiao mo yuan li	600
+施瓦茨引理	shi wa ci yin li	600
+洛朗级数	luo lang ji shu	600
+洛朗展开	luo lang zhan kai	600
+孤立奇点	gu li qi dian	600
+可去奇点	ke qu qi dian	600
+本性奇点	ben xing qi dian	600
+分支点	fen zhi dian	600
+支割线	zhi ge xian	600
+黎曼曲面	li man qu mian	600
+单值化定理	dan zhi hua ding li	600
+皮卡大定理	pi ka da ding li	600
+皮卡小定理	pi ka xiao ding li	600
+留数	liu shu	600
+留数定理	liu shu ding li	600
+无穷远点留数	wu qiong yuan dian liu shu	600
+对数留数	dui shu liu shu	600
+辐角原理	fu jiao yuan li	600
+儒歇定理	ru xie ding li	600
+保角映射	bao jiao ying she	600
+共形映射	gong xing ying she	600
+分式线性变换	fen shi xian xing bian huan	600
+莫比乌斯变换	mo bi wu si bian huan	600
+黎曼映射定理	li man ying she ding li	600
+克里斯托费尔变换	ke li si tuo fei er bian huan	600
+解析延拓	jie xi yan tuo	600
+幂级数延拓	mi ji shu yan tuo	600
+对称原理	dui chen yuan li	600
+椭圆函数	tuo yuan han shu	600
+外尔斯特拉斯椭圆函数	wai er si te la si tuo yuan han shu	600
+雅可比椭圆函数	ya ke bi tuo yuan han shu	600
+模形式	mo xing shi	600
+自守形式	zi shou xing shi	600
+拉普拉斯变换	la pu la si bian huan	600
+傅里叶变换	fu li ye bian huan	600
+梅林变换	mei lin bian huan	600
+泛函分析	fan han fen xi	600
+算子理论	suan zi li lun	600
+度量空间	du liang kong jian	600
+距离空间	ju li kong jian	600
+完备度量空间	wan bei du liang kong jian	600
+完备化	wan bei hua	600
+压缩映射原理	ya suo ying she yuan li	600
+巴拿赫不动点定理	ba na he bu dong dian ding li	600
+列紧集	lie jin ji	600
+全有界集	quan you jie ji	600
+阿尔泽拉阿斯科利定理	a er ze la a si ke li ding li	600
+线性赋范空间	xian xing fu fan kong jian	600
+赋范线性空间	fu fan xian xing kong jian	600
+巴拿赫空间	ba na he kong jian	600
+范数	fan shu	600
+半范数	ban fan shu	600
+等价范数	deng jia fan shu	600
+内积空间	nei ji kong jian	600
+酉空间	you kong jian	600
+希尔伯特空间	xi er bo te kong jian	600
+柯西施瓦茨不等式	ke xi shi wa ci bu deng shi	600
+闵可夫斯基不等式	min ke fu si ji bu deng shi	600
+赫尔德不等式	he er de bu deng shi	600
+平行四边形法则	ping xing si bian xing fa ze	600
+正交补	zheng jiao bu	600
+正交投影	zheng jiao tou ying	600
+投影定理	tou ying ding li	600
+标准正交基	biao zhun zheng jiao ji	600
+格拉姆施密特正交化	ge la mu shi mi te zheng jiao hua	600
+可分空间	ke fen kong jian	600
+有界线性算子	you jie xian xing suan zi	600
+连续线性泛函	lian xu xian xing fan han	600
+算子范数	suan zi fan shu	600
+对偶空间	dui ou kong jian	600
+共轭空间	gong e kong jian	600
+自反空间	zi fan kong jian	600
+黎斯表示定理	li si biao shi ding li	600
+哈恩巴拿赫定理	ha en ba na he ding li	600
+延拓定理	yan tuo ding li	600
+一致有界原理	yi zhi you jie yuan li	600
+共鸣定理	gong ming ding li	600
+开映射定理	kai ying she ding li	600
+逆算子定理	ni suan zi ding li	600
+闭图像定理	bi tu xiang ding li	600
+伴随算子	ban sui suan zi	600
+共轭算子	gong e suan zi	600
+自伴算子	zi ban suan zi	600
+厄米算子	e mi suan zi	600
+酉算子	you suan zi	600
+正规算子	zheng gui suan zi	600
+投影算子	tou ying suan zi	600
+紧算子	jin suan zi	600
+全连续算子	quan lian xu suan zi	600
+弗雷德霍姆算子	fu lei de huo mu suan zi	600
+弗雷德霍姆二择一	fu lei de huo mu er ze yi	600
+谱理论	pu li lun	600
+谱半径	pu ban jing	600
+预解集	yu jie ji	600
+预解算子	yu jie suan zi	600
+点谱	dian pu	600
+连续谱	lian xu pu	600
+剩余谱	sheng yu pu	600
+谱分解定理	pu fen jie ding li	600
+弱收敛	ruo shou lian	600
+弱星收敛	ruo xing shou lian	600
+强收敛	qiang shou lian	600
+弱拓扑	ruo tuo pu	600
+弱星拓扑	ruo xing tuo pu	600
+巴拿赫阿拉奥卢定理	ba na he a la ao lu ding li	600
+索伯列夫空间	suo bo lie fu kong jian	600
+索伯列夫嵌入定理	suo bo lie fu qian ru ding li	600
+广义导数	guang yi dao shu	600
+弱导数	ruo dao shu	600
+广义函数	guang yi han shu	600
+分布理论	fen bu li lun	600
+检验函数	jian yan han shu	600
+狄拉克函数	di la ke han shu	600
+巴拿赫代数	ba na he dai shu	600
+冯诺依曼代数	feng nuo yi man dai shu	600
+算子半群	suan zi ban qun	600
+强连续半群	qiang lian xu ban qun	600
+无穷小生成元	wu qiong xiao sheng cheng yuan	600
+凸集分离定理	tu ji fen li ding li	600
+克莱因米尔曼定理	ke lai yin mi er man ding li	600
+不动点定理	bu dong dian ding li	600
+绍德尔不动点定理	shao de er bu dong dian ding li	600
+矩阵论	ju zhen lun	600
+行列式	hang lie shi	600
+范德蒙行列式	fan de meng hang lie shi	600
+余子式	yu zi shi	600
+代数余子式	dai shu yu zi shi	600
+拉普拉斯展开	la pu la si zhan kai	600
+克莱姆法则	ke lai mu fa ze	600
+单位矩阵	dan wei ju zhen	600
+零矩阵	ling ju zhen	600
+对角矩阵	dui jiao ju zhen	600
+上三角矩阵	shang san jiao ju zhen	600
+下三角矩阵	xia san jiao ju zhen	600
+对称矩阵	dui chen ju zhen	600
+反对称矩阵	fan dui chen ju zhen	600
+正交矩阵	zheng jiao ju zhen	600
+埃尔米特矩阵	ai er mi te ju zhen	600
+反埃尔米特矩阵	fan ai er mi te ju zhen	600
+酉矩阵	you ju zhen	600
+正规矩阵	zheng gui ju zhen	600
+幂等矩阵	mi deng ju zhen	600
+幂零矩阵	mi ling ju zhen	600
+对合矩阵	dui he ju zhen	600
+分块矩阵	fen kuai ju zhen	600
+伴随矩阵	ban sui ju zhen	600
+逆矩阵	ni ju zhen	600
+可逆矩阵	ke ni ju zhen	600
+非奇异矩阵	fei qi yi ju zhen	600
+奇异矩阵	qi yi ju zhen	600
+转置矩阵	zhuan zhi ju zhen	600
+共轭转置	gong e zhuan zhi	600
+初等变换	chu deng bian huan	600
+初等矩阵	chu deng ju zhen	600
+阶梯形矩阵	jie ti xing ju zhen	600
+行最简形	hang zui jian xing	600
+矩阵的秩	ju zhen de zhi	600
+行秩	hang zhi	600
+列秩	lie zhi	600
+满秩矩阵	man zhi ju zhen	600
+满秩分解	man zhi fen jie	600
+西尔维斯特不等式	xi er wei si te bu deng shi	600
+弗罗贝尼乌斯不等式	fu luo bei ni wu si bu deng shi	600
+线性方程组	xian xing fang cheng zu	600
+齐次线性方程组	qi ci xian xing fang cheng zu	600
+非齐次线性方程组	fei qi ci xian xing fang cheng zu	600
+高斯消元法	gao si xiao yuan fa	600
+增广矩阵	zeng guang ju zhen	600
+系数矩阵	xi shu ju zhen	600
+基础解系	ji chu jie xi	600
+解空间	jie kong jian	600
+通解	tong jie	600
+特解	te jie	600
+向量空间	xiang liang kong jian	600
+线性空间	xian xing kong jian	600
+线性子空间	xian xing zi kong jian	600
+生成子空间	sheng cheng zi kong jian	600
+和空间	he kong jian	600
+直和	zhi he	600
+维数公式	wei shu gong shi	600
+线性组合	xian xing zu he	600
+线性表出	xian xing biao chu	600
+线性相关	xian xing xiang guan	600
+线性无关	xian xing wu guan	600
+极大线性无关组	ji da xian xing wu guan zu	600
+向量组的秩	xiang liang zu de zhi	600
+基底	ji di	600
+维数	wei shu	600
+坐标变换	zuo biao bian huan	600
+过渡矩阵	guo du ju zhen	600
+线性映射	xian xing ying she	600
+线性变换	xian xing bian huan	600
+核空间	he kong jian	600
+零空间	ling kong jian	600
+值域	zhi yu	600
+列空间	lie kong jian	600
+行空间	hang kong jian	600
+秩零化度定理	zhi ling hua du ding li	600
+不变子空间	bu bian zi kong jian	600
+特征值	te zheng zhi	600
+特征向量	te zheng xiang liang	600
+特征多项式	te zheng duo xiang shi	600
+特征方程	te zheng fang cheng	600
+特征子空间	te zheng zi kong jian	600
+代数重数	dai shu chong shu	600
+几何重数	ji he chong shu	600
+矩阵的迹	ju zhen de ji	600
+相似矩阵	xiang si ju zhen	600
+相似变换	xiang si bian huan	600
+相似对角化	xiang si dui jiao hua	600
+可对角化	ke dui jiao hua	600
+凯莱哈密顿定理	kai lai ha mi dun ding li	600
+零化多项式	ling hua duo xiang shi	600
+最小多项式	zui xiao duo xiang shi	600
+不变因子	bu bian yin zi	600
+初等因子	chu deng yin zi	600
+行列式因子	hang lie shi yin zi	600
+史密斯标准形	shi mi si biao zhun xing	600
+有理标准形	you li biao zhun xing	600
+约当标准形	yue dang biao zhun xing	600
+约当块	yue dang kuai	600
+广义特征向量	guang yi te zheng xiang liang	600
+二次型	er ci xing	600
+标准形	biao zhun xing	600
+规范形	gui fan xing	600
+合同矩阵	he tong ju zhen	600
+合同变换	he tong bian huan	600
+配方法	pei fang fa	600
+惯性定理	guan xing ding li	600
+正惯性指数	zheng guan xing zhi shu	600
+负惯性指数	fu guan xing zhi shu	600
+符号差	fu hao cha	600
+正定二次型	zheng ding er ci xing	600
+正定矩阵	zheng ding ju zhen	600
+半正定矩阵	ban zheng ding ju zhen	600
+负定矩阵	fu ding ju zhen	600
+不定二次型	bu ding er ci xing	600
+顺序主子式	shun xu zhu zi shi	600
+主子式	zhu zi shi	600
+霍尔维茨定理	huo er wei ci ding li	600
+欧氏空间	ou shi kong jian	600
+内积	nei ji	600
+度量矩阵	du liang ju zhen	600
+格拉姆矩阵	ge la mu ju zhen	600
+格拉姆行列式	ge la mu hang lie shi	600
+正交向量组	zheng jiao xiang liang zu	600
+标准正交组	biao zhun zheng jiao zu	600
+施密特正交化	shi mi te zheng jiao hua	600
+正交变换	zheng jiao bian huan	600
+对称变换	dui chen bian huan	600
+镜面反射	jing mian fan she	600
+豪斯霍尔德变换	hao si huo er de bian huan	600
+吉文斯旋转	ji wen si xuan zhuan	600
+舒尔分解	shu er fen jie	600
+舒尔引理	shu er yin li	600
+舒尔补	shu er bu	600
+奇异值	qi yi zhi	600
+奇异值分解	qi yi zhi fen jie	600
+正交三角分解	zheng jiao san jiao fen jie	600
+乔列斯基分解	qiao lie si ji fen jie	600
+三角分解	san jiao fen jie	600
+极分解	ji fen jie	600
+谱分解	pu fen jie	600
+广义逆矩阵	guang yi ni ju zhen	600
+穆尔彭罗斯广义逆	mu er peng luo si guang yi ni	600
+伪逆	wei ni	600
+克罗内克积	ke luo nei ke ji	600
+阿达马积	a da ma ji	600
+张量积	zhang liang ji	600
+外积	wai ji	600
+矩阵范数	ju zhen fan shu	600
+谱范数	pu fan shu	600
+弗罗贝尼乌斯范数	fu luo bei ni wu si fan shu	600
+条件数	tiao jian shu	600
+矩阵函数	ju zhen han shu	600
+矩阵指数	ju zhen zhi shu	600
+盖尔圆定理	gai er yuan ding li	600
+佩龙弗罗贝尼乌斯定理	pei long fu luo bei ni wu si ding li	600
+非负矩阵	fei fu ju zhen	600
+随机矩阵	sui ji ju zhen	600
+托普利茨矩阵	tuo pu li ci ju zhen	600
+汉克尔矩阵	han ke er ju zhen	600
+循环矩阵	xun huan ju zhen	600
+希尔伯特矩阵	xi er bo te ju zhen	600
+抽象代数	chou xiang dai shu	600
+近世代数	jin shi dai shu	600
+群环域	qun huan yu	600
+代数结构	dai shu jie gou	600
+二元运算	er yuan yun suan	600
+结合律	jie he lv	600
+交换律	jiao huan lv	600
+分配律	fen pei lv	600
+单位元	dan wei yuan	600
+幺元	yao yuan	600
+逆元	ni yuan	600
+负元	fu yuan	600
+幂等元	mi deng yuan	600
+群论	qun lun	600
+半群	ban qun	600
+幺半群	yao ban qun	600
+独异点	du yi dian	600
+群公理	qun gong li	600
+阿贝尔群	a bei er qun	600
+交换群	jiao huan qun	600
+非交换群	fei jiao huan qun	600
+有限群	you xian qun	600
+无限群	wu xian qun	600
+群的阶	qun de jie	600
+元素的阶	yuan su de jie	600
+真子群	zhen zi qun	600
+平凡子群	ping fan zi qun	600
+生成子群	sheng cheng zi qun	600
+循环群	xun huan qun	600
+生成元	sheng cheng yuan	600
+变换群	bian huan qun	600
+置换群	zhi huan qun	600
+对称群	dui chen qun	600
+交错群	jiao cuo qun	600
+奇置换	qi zhi huan	600
+偶置换	ou zhi huan	600
+二面体群	er mian ti qun	600
+四元数群	si yuan shu qun	600
+克莱因四元群	ke lai yin si yuan qun	600
+一般线性群	yi ban xian xing qun	600
+特殊线性群	te shu xian xing qun	600
+正交群	zheng jiao qun	600
+特殊正交群	te shu zheng jiao qun	600
+酉群	you qun	600
+特殊酉群	te shu you qun	600
+辛群	xin qun	600
+陪集	pei ji	600
+左陪集	zuo pei ji	600
+右陪集	you pei ji	600
+拉格朗日定理	la ge lang ri ding li	600
+正规子群	zheng gui zi qun	600
+不变子群	bu bian zi qun	600
+商群	shang qun	600
+单群	dan qun	600
+群同态	qun tong tai	600
+群同构	qun tong gou	600
+自同构	zi tong gou	600
+内自同构	nei zi tong gou	600
+外自同构	wai zi tong gou	600
+同态核	tong tai he	600
+同态基本定理	tong tai ji ben ding li	600
+第一同构定理	di yi tong gou ding li	600
+第二同构定理	di er tong gou ding li	600
+第三同构定理	di san tong gou ding li	600
+对应定理	dui ying ding li	600
+凯莱定理	kai lai ding li	600
+群作用	qun zuo yong	600
+稳定化子	wen ding hua zi	600
+轨道稳定化子定理	gui dao wen ding hua zi ding li	600
+伯恩赛德引理	bo en sai de yin li	600
+共轭类	gong e lei	600
+中心化子	zhong xin hua zi	600
+正规化子	zheng gui hua zi	600
+群的中心	qun de zhong xin	600
+类方程	lei fang cheng	600
+柯西定理	ke xi ding li	600
+西罗定理	xi luo ding li	600
+西罗子群	xi luo zi qun	600
+换位子	huan wei zi	600
+换位子群	huan wei zi qun	600
+导群	dao qun	600
+可解群	ke jie qun	600
+幂零群	mi ling qun	600
+合成群列	he cheng qun lie	600
+约当赫尔德定理	yue dang he er de ding li	600
+自由群	zi you qun	600
+群表示论	qun biao shi lun	600
+不可约表示	bu ke yue biao shi	600
+特征标	te zheng biao	600
+特征标表	te zheng biao biao	600
+环论	huan lun	600
+结合环	jie he huan	600
+交换环	jiao huan huan	600
+含幺环	han yao huan	600
+零因子	ling yin zi	600
+整环	zheng huan	600
+无零因子环	wu ling yin zi huan	600
+除环	chu huan	600
+四元数体	si yuan shu ti	600
+交换域	jiao huan yu	600
+子环	zi huan	600
+左理想	zuo li xiang	600
+右理想	you li xiang	600
+双边理想	shuang bian li xiang	600
+主理想	zhu li xiang	600
+主理想整环	zhu li xiang zheng huan	600
+极大理想	ji da li xiang	600
+素理想	su li xiang	600
+准素理想	zhun su li xiang	600
+根理想	gen li xiang	600
+雅各布森根	ya ge bu sen gen	600
+幂零根	mi ling gen	600
+商环	shang huan	600
+剩余类环	sheng yu lei huan	600
+环同态	huan tong tai	600
+环同构	huan tong gou	600
+中国剩余定理	zhong guo sheng yu ding li	600
+分式域	fen shi yu	600
+商域	shang yu	600
+局部化	ju bu hua	600
+局部环	ju bu huan	600
+诺特环	nuo te huan	600
+阿廷环	a ting huan	600
+希尔伯特基定理	xi er bo te ji ding li	600
+唯一分解整环	wei yi fen jie zheng huan	600
+高斯整环	gao si zheng huan	600
+欧几里得整环	ou ji li de zheng huan	600
+不可约元	bu ke yue yuan	600
+素元	su yuan	600
+相伴元	xiang ban yuan	600
+多项式环	duo xiang shi huan	600
+本原多项式	ben yuan duo xiang shi	600
+高斯引理	gao si yin li	600
+艾森斯坦判别法	ai sen si tan pan bie fa	600
+对称多项式	dui chen duo xiang shi	600
+初等对称多项式	chu deng dui chen duo xiang shi	600
+牛顿公式	niu dun gong shi	600
+模论	mo lun	600
+左模	zuo mo	600
+右模	you mo	600
+子模	zi mo	600
+商模	shang mo	600
+自由模	zi you mo	600
+有限生成模	you xian sheng cheng mo	600
+投射模	tou she mo	600
+内射模	nei she mo	600
+平坦模	ping tan mo	600
+正合列	zheng he lie	600
+短正合列	duan zheng he lie	600
+分裂正合列	fen lie zheng he lie	600
+蛇引理	she yin li	600
+五引理	wu yin li	600
+域论	yu lun	600
+素域	su yu	600
+扩域	kuo yu	600
+域扩张	yu kuo zhang	600
+有限扩张	you xian kuo zhang	600
+代数扩张	dai shu kuo zhang	600
+超越扩张	chao yue kuo zhang	600
+单扩张	dan kuo zhang	600
+代数元	dai shu yuan	600
+超越元	chao yue yuan	600
+极小多项式	ji xiao duo xiang shi	600
+分裂域	fen lie yu	600
+代数闭包	dai shu bi bao	600
+代数闭域	dai shu bi yu	600
+正规扩张	zheng gui kuo zhang	600
+可分扩张	ke fen kuo zhang	600
+不可分扩张	bu ke fen kuo zhang	600
+完美域	wan mei yu	600
+本原元定理	ben yuan yuan ding li	600
+伽罗瓦扩张	jia luo wa kuo zhang	600
+伽罗瓦群	jia luo wa qun	600
+伽罗瓦理论	jia luo wa li lun	600
+伽罗瓦基本定理	jia luo wa ji ben ding li	600
+中间域	zhong jian yu	600
+不动域	bu dong yu	600
+分圆域	fen yuan yu	600
+分圆多项式	fen yuan duo xiang shi	600
+单位根	dan wei gen	600
+本原单位根	ben yuan dan wei gen	600
+根式扩张	gen shi kuo zhang	600
+根式可解	gen shi ke jie	600
+阿贝尔鲁菲尼定理	a bei er lu fei ni ding li	600
+尺规作图	chi gui zuo tu	600
+三等分角	san deng fen jiao	600
+倍立方	bei li fang	600
+化圆为方	hua yuan wei fang	600
+有限域	you xian yu	600
+伽罗瓦域	jia luo wa yu	600
+弗罗贝尼乌斯自同构	fu luo bei ni wu si zi tong gou	600
+范畴论	fan chou lun	600
+态射	tai she	600
+函子	han zi	600
+共变函子	gong bian han zi	600
+反变函子	fan bian han zi	600
+自然变换	zi ran bian huan	600
+伴随函子	ban sui han zi	600
+米田引理	mi tian yin li	600
+极限与余极限	ji xian yu yu ji xian	600
+纤维积	xian wei ji	600
+推出与拉回	tui chu yu la hui	600
+阿贝尔范畴	a bei er fan chou	600
+导出范畴	dao chu fan chou	600
+同调代数	tong diao dai shu	600
+链复形	lian fu xing	600
+上链复形	shang lian fu xing	600
+同调群	tong diao qun	600
+上同调群	shang tong diao qun	600
+导出函子	dao chu han zi	600
+数论	shu lun	600
+初等数论	chu deng shu lun	600
+解析数论	jie xi shu lun	600
+代数数论	dai shu shu lun	600
+带余除法	dai yu chu fa	600
+最大公因数	zui da gong yin shu	600
+最小公倍数	zui xiao gong bei shu	600
+互素	hu su	600
+两两互素	liang liang hu su	600
+辗转相除法	zhan zhuan xiang chu fa	600
+欧几里得算法	ou ji li de suan fa	600
+扩展欧几里得算法	kuo zhan ou ji li de suan fa	600
+裴蜀定理	pei shu ding li	600
+贝祖等式	bei zu deng shi	600
+算术基本定理	suan shu ji ben ding li	600
+素因数分解	su yin shu fen jie	600
+埃拉托斯特尼筛法	ai la tuo si te ni shai fa	600
+素数定理	su shu ding li	600
+梅森素数	mei sen su shu	600
+费马数	fei ma shu	600
+孪生素数	luan sheng su shu	600
+哥德巴赫猜想	ge de ba he cai xiang	600
+孪生素数猜想	luan sheng su shu cai xiang	600
+黎曼猜想	li man cai xiang	600
+黎曼泽塔函数	li man ze ta han shu	600
+狄利克雷级数	di li ke lei ji shu	600
+狄利克雷特征	di li ke lei te zheng	600
+算术函数	suan shu han shu	600
+数论函数	shu lun han shu	600
+积性函数	ji xing han shu	600
+完全积性函数	wan quan ji xing han shu	600
+欧拉函数	ou la han shu	600
+莫比乌斯函数	mo bi wu si han shu	600
+莫比乌斯反演	mo bi wu si fan yan	600
+除数函数	chu shu han shu	600
+狄利克雷卷积	di li ke lei juan ji	600
+冯曼戈尔特函数	feng man ge er te han shu	600
+高斯取整函数	gao si qu zheng han shu	600
+同余	tong yu	600
+同余式	tong yu shi	600
+同余方程	tong yu fang cheng	600
+完全剩余系	wan quan sheng yu xi	600
+简化剩余系	jian hua sheng yu xi	600
+既约剩余系	ji yue sheng yu xi	600
+费马小定理	fei ma xiao ding li	600
+欧拉定理	ou la ding li	600
+威尔逊定理	wei er xun ding li	600
+孙子定理	sun zi ding li	600
+原根	yuan gen	600
+离散对数	li san dui shu	600
+二次剩余	er ci sheng yu	600
+二次非剩余	er ci fei sheng yu	600
+勒让德符号	le rang de fu hao	600
+雅可比符号	ya ke bi fu hao	600
+二次互反律	er ci hu fan lv	600
+高斯和	gao si he	600
+丢番图方程	diu fan tu fang cheng	600
+不定方程	bu ding fang cheng	600
+勾股数	gou gu shu	600
+费马大定理	fei ma da ding li	600
+佩尔方程	pei er fang cheng	600
+连分数	lian fen shu	600
+渐近分数	jian jin fen shu	600
+丢番图逼近	diu fan tu bi jin	600
+代数数	dai shu shu	600
+超越数	chao yue shu	600
+代数整数	dai shu zheng shu	600
+数域	shu yu	600
+二次域	er ci yu	600
+整数环	zheng shu huan	600
+理想类群	li xiang lei qun	600
+类数	lei shu	600
+狄利克雷单位定理	di li ke lei dan wei ding li	600
+局部域	ju bu yu	600
+椭圆曲线	tuo yuan qu xian	600
+莫德尔定理	mo de er ding li	600
+谷山志村猜想	gu shan zhi cun cai xiang	600
+朗兰兹纲领	lang lan zi gang ling	600
+组合数学	zu he shu xue	600
+计数组合学	ji shu zu he xue	600
+极值组合学	ji zhi zu he xue	600
+加法原理	jia fa yuan li	600
+乘法原理	cheng fa yuan li	600
+全排列	quan pai lie	600
+圆排列	yuan pai lie	600
+多重集排列	duo chong ji pai lie	600
+多重集组合	duo chong ji zu he	600
+二项式定理	er xiang shi ding li	600
+二项式系数	er xiang shi xi shu	600
+多项式定理	duo xiang shi ding li	600
+帕斯卡恒等式	pa si ka heng deng shi	600
+杨辉三角	yang hui san jiao	600
+范德蒙恒等式	fan de meng heng deng shi	600
+容斥原理	rong chi yuan li	600
+错位排列	cuo wei pai lie	600
+错排数	cuo pai shu	600
+抽屉原理	chou ti yuan li	600
+鸽巢原理	ge chao yuan li	600
+拉姆齐定理	la mu qi ding li	600
+拉姆齐数	la mu qi shu	600
+母函数	mu han shu	600
+生成函数	sheng cheng han shu	600
+普通生成函数	pu tong sheng cheng han shu	600
+指数生成函数	zhi shu sheng cheng han shu	600
+递推关系	di tui guan xi	600
+常系数线性递推	chang xi shu xian xing di tui	600
+斐波那契数列	fei bo na qi shu lie	600
+卢卡斯数列	lu ka si shu lie	600
+卡特兰数	ka te lan shu	600
+第一类斯特林数	di yi lei si te lin shu	600
+第二类斯特林数	di er lei si te lin shu	600
+贝尔数	bei er shu	600
+伯努利数	bo nu li shu	600
+整数分拆	zheng shu fen chai	600
+分拆数	fen chai shu	600
+杨表	yang biao	600
+波利亚计数定理	bo li ya ji shu ding li	600
+偏序集	pian xu ji	600
+哈斯图	ha si tu	600
+链与反链	lian yu fan lian	600
+斯佩纳定理	si pei na ding li	600
+迪尔沃斯定理	di er wo si ding li	600
+霍尔婚配定理	huo er hun pei ding li	600
+相异代表系	xiang yi dai biao xi	600
+拉丁方	la ding fang	600
+正交拉丁方	zheng jiao la ding fang	600
+区组设计	qu zu she ji	600
+拟阵	ni zhen	600
+简单图	jian dan tu	600
+多重图	duo chong tu	600
+有向图	you xiang tu	600
+无向图	wu xiang tu	600
+完全图	wan quan tu	600
+二分图	er fen tu	600
+二部图	er bu tu	600
+正则图	zheng ze tu	600
+库拉托夫斯基定理	ku la tuo fu si ji ding li	600
+欧拉图	ou la tu	600
+欧拉回路	ou la hui lu	600
+欧拉路径	ou la lu jing	600
+哈密顿图	ha mi dun tu	600
+哈密顿回路	ha mi dun hui lu	600
+树与森林	shu yu sen lin	600
+生成树	sheng cheng shu	600
+最小生成树	zui xiao sheng cheng shu	600
+凯莱公式	kai lai gong shi	600
+普吕弗序列	pu lv fu xu lie	600
+连通图	lian tong tu	600
+连通分量	lian tong fen liang	600
+强连通分量	qiang lian tong fen liang	600
+割边	ge bian	600
+点连通度	dian lian tong du	600
+边连通度	bian lian tong du	600
+门格尔定理	men ge er ding li	600
+最大流最小割定理	zui da liu zui xiao ge ding li	600
+最大匹配	zui da pi pei	600
+完美匹配	wan mei pi pei	600
+增广路	zeng guang lu	600
+贝尔热定理	bei er re ding li	600
+科尼格定理	ke ni ge ding li	600
+独立集	du li ji	600
+最大独立集	zui da du li ji	600
+顶点覆盖	ding dian fu gai	600
+极大团	ji da tuan	600
+最大团	zui da tuan	600
+图兰定理	tu lan ding li	600
+图着色	tu zhuo se	600
+色数	se shu	600
+色多项式	se duo xiang shi	600
+四色定理	si se ding li	600
+五色定理	wu se ding li	600
+布鲁克斯定理	bu lu ke si ding li	600
+维津定理	wei jin ding li	600
+邻接矩阵	lin jie ju zhen	600
+关联矩阵	guan lian ju zhen	600
+拉普拉斯矩阵	la pu la si ju zhen	600
+矩阵树定理	ju zhen shu ding li	600
+谱图论	pu tu lun	600
+随机图	sui ji tu	600
+超图	chao tu	600
+几何学	ji he xue	600
+欧氏几何	ou shi ji he	600
+非欧几何	fei ou ji he	600
+双曲几何	shuang qu ji he	600
+罗巴切夫斯基几何	luo ba qie fu si ji ji he	600
+黎曼几何	li man ji he	600
+球面几何	qiu mian ji he	600
+解析几何	jie xi ji he	600
+仿射几何	fang she ji he	600
+射影几何	she ying ji he	600
+微分几何	wei fen ji he	600
+代数几何	dai shu ji he	600
+辛几何	xin ji he	600
+复几何	fu ji he	600
+计算几何	ji suan ji he	600
+凸几何	tu ji he	600
+双曲线	shuang qu xian	600
+离心率	li xin lv	600
+准线	zhun xian	600
+二次曲面	er ci qu mian	600
+椭球面	tuo qiu mian	600
+单叶双曲面	dan ye shuang qu mian	600
+双叶双曲面	shuang ye shuang qu mian	600
+椭圆抛物面	tuo yuan pao wu mian	600
+双曲抛物面	shuang qu pao wu mian	600
+马鞍面	ma an mian	600
+柱面	zhu mian	600
+锥面	zhui mian	600
+旋转曲面	xuan zhuan qu mian	600
+直纹面	zhi wen mian	600
+仿射变换	fang she bian huan	600
+射影平面	she ying ping mian	600
+射影变换	she ying bian huan	600
+齐次坐标	qi ci zuo biao	600
+交比	jiao bi	600
+对偶原理	dui ou yuan li	600
+德萨格定理	de sa ge ding li	600
+帕普斯定理	pa pu si ding li	600
+帕斯卡定理	pa si ka ding li	600
+布里昂松定理	bu li ang song ding li	600
+梅涅劳斯定理	mei nie lao si ding li	600
+塞瓦定理	sai wa ding li	600
+托勒密定理	tuo le mi ding li	600
+正弦定理	zheng xian ding li	600
+余弦定理	yu xian ding li	600
+正则曲线	zheng ze qu xian	600
+弧长参数	hu chang can shu	600
+自然参数	zi ran can shu	600
+弗雷内标架	fu lei nei biao jia	600
+切向量	qie xiang liang	600
+主法向量	zhu fa xiang liang	600
+副法向量	fu fa xiang liang	600
+挠率	nao lv	600
+伏雷内公式	fu lei nei gong shi	600
+密切平面	mi qie ping mian	600
+法平面	fa ping mian	600
+从切平面	cong qie ping mian	600
+渐伸线	jian shen xian	600
+渐屈线	jian qu xian	600
+包络线	bao luo xian	600
+第一基本形式	di yi ji ben xing shi	600
+第二基本形式	di er ji ben xing shi	600
+第三基本形式	di san ji ben xing shi	600
+温加滕变换	wen jia teng bian huan	600
+形状算子	xing zhuang suan zi	600
+法曲率	fa qu lv	600
+主曲率	zhu qu lv	600
+主方向	zhu fang xiang	600
+高斯曲率	gao si qu lv	600
+平均曲率	ping jun qu lv	600
+全脐点曲面	quan qi dian qu mian	600
+极小曲面	ji xiao qu mian	600
+常曲率曲面	chang qu lv qu mian	600
+可展曲面	ke zhan qu mian	600
+高斯绝妙定理	gao si jue miao ding li	600
+高斯博内定理	gao si bo nei ding li	600
+测地线	ce di xian	600
+测地曲率	ce di qu lv	600
+平行移动	ping xing yi dong	600
+微分流形	wei fen liu xing	600
+光滑流形	guang hua liu xing	600
+局部坐标卡	ju bu zuo biao ka	600
+坐标图册	zuo biao tu ce	600
+单位分解	dan wei fen jie	600
+切空间	qie kong jian	600
+余切空间	yu qie kong jian	600
+切丛	qie cong	600
+余切丛	yu qie cong	600
+向量丛	xiang liang cong	600
+纤维丛	xian wei cong	600
+主丛	zhu cong	600
+临界值	lin jie zhi	600
+萨德定理	sa de ding li	600
+惠特尼嵌入定理	hui te ni qian ru ding li	600
+向量场	xiang liang chang	600
+李括号	li kuo hao	600
+李导数	li dao shu	600
+单参数变换群	dan can shu bian huan qun	600
+弗罗贝尼乌斯定理	fu luo bei ni wu si ding li	600
+张量场	zhang liang chang	600
+微分形式	wei fen xing shi	600
+外积代数	wai ji dai shu	600
+楔积	xie ji	600
+外微分	wai wei fen	600
+闭形式	bi xing shi	600
+恰当形式	qia dang xing shi	600
+庞加莱引理	pang jia lai yin li	600
+德拉姆上同调	de la mu shang tong diao	600
+黎曼度量	li man du liang	600
+黎曼流形	li man liu xing	600
+伪黎曼流形	wei li man liu xing	600
+洛伦兹流形	luo lun zi liu xing	600
+仿射联络	fang she lian luo	600
+列维奇维塔联络	lie wei qi wei ta lian luo	600
+协变导数	xie bian dao shu	600
+克里斯托费尔符号	ke li si tuo fei er fu hao	600
+曲率张量	qu lv zhang liang	600
+黎曼曲率张量	li man qu lv zhang liang	600
+里奇曲率	li qi qu lv	600
+标量曲率	biao liang qu lv	600
+比安基恒等式	bi an ji heng deng shi	600
+截面曲率	jie mian qu lv	600
+指数映射	zhi shu ying she	600
+霍普夫里诺定理	huo pu fu li nuo ding li	600
+雅可比场	ya ke bi chang	600
+共轭点	gong e dian	600
+嘉当结构方程	jia dang jie gou fang cheng	600
+活动标架法	huo dong biao jia fa	600
+陈类	chen lei	600
+陈韦伊理论	chen wei yi li lun	600
+示性类	shi xing lei	600
+庞特里亚金类	pang te li ya jin lei	600
+欧拉类	ou la lei	600
+阿蒂亚辛格指标定理	a di ya xin ge zhi biao ding li	600
+霍奇理论	huo qi li lun	600
+霍奇星算子	huo qi xing suan zi	600
+调和形式	diao he xing shi	600
+凯勒流形	kai le liu xing	600
+卡拉比丘流形	ka la bi qiu liu xing	600
+里奇流	li qi liu	600
+李代数	li dai shu	600
+半单李代数	ban dan li dai shu	600
+外尔群	wai er qun	600
+泛包络代数	fan bao luo dai shu	600
+代数簇	dai shu cu	600
+仿射簇	fang she cu	600
+射影簇	she ying cu	600
+扎里斯基拓扑	za li si ji tuo pu	600
+希尔伯特零点定理	xi er bo te ling dian ding li	600
+概形	gai xing	600
+层论	ceng lun	600
+层上同调	ceng shang tong diao	600
+黎曼罗赫定理	li man luo he ding li	600
+拓扑学	tuo pu xue	600
+点集拓扑	dian ji tuo pu	600
+一般拓扑学	yi ban tuo pu xue	600
+代数拓扑	dai shu tuo pu	600
+微分拓扑	wei fen tuo pu	600
+几何拓扑	ji he tuo pu	600
+低维拓扑	di wei tuo pu	600
+纽结理论	niu jie li lun	600
+拓扑空间	tuo pu kong jian	600
+开集公理	kai ji gong li	600
+邻域	lin yu	600
+邻域系	lin yu xi	600
+拓扑基	tuo pu ji	600
+子基	zi ji	600
+闭包	bi bao	600
+导集	dao ji	600
+孤立点	gu li dian	600
+平凡拓扑	ping fan tuo pu	600
+离散拓扑	li san tuo pu	600
+余有限拓扑	yu you xian tuo pu	600
+诱导拓扑	you dao tuo pu	600
+子空间拓扑	zi kong jian tuo pu	600
+乘积拓扑	cheng ji tuo pu	600
+商拓扑	shang tuo pu	600
+粘合空间	zhan he kong jian	600
+连续映射	lian xu ying she	600
+同胚	tong pei	600
+同胚映射	tong pei ying she	600
+拓扑不变性	tuo pu bu bian xing	600
+拓扑不变量	tuo pu bu bian liang	600
+第一可数空间	di yi ke shu kong jian	600
+第二可数空间	di er ke shu kong jian	600
+林德勒夫空间	lin de le fu kong jian	600
+分离公理	fen li gong li	600
+豪斯多夫空间	hao si duo fu kong jian	600
+正则空间	zheng ze kong jian	600
+正规空间	zheng gui kong jian	600
+完全正规空间	wan quan zheng gui kong jian	600
+吉洪诺夫空间	ji hong nuo fu kong jian	600
+乌雷松引理	wu lei song yin li	600
+蒂茨扩张定理	di ci kuo zhang ding li	600
+乌雷松度量化定理	wu lei song du liang hua ding li	600
+紧致性	jin zhi xing	600
+紧致空间	jin zhi kong jian	600
+列紧空间	lie jin kong jian	600
+序列紧致	xu lie jin zhi	600
+可数紧致	ke shu jin zhi	600
+局部紧致	ju bu jin zhi	600
+吉洪诺夫定理	ji hong nuo fu ding li	600
+亚历山大子基定理	ya li shan da zi ji ding li	600
+单点紧化	dan dian jin hua	600
+斯通切赫紧化	si tong qie he jin hua	600
+仿紧空间	fang jin kong jian	600
+连通性	lian tong xing	600
+连通空间	lian tong kong jian	600
+道路连通	dao lu lian tong	600
+局部连通	ju bu lian tong	600
+不连通空间	bu lian tong kong jian	600
+完全不连通	wan quan bu lian tong	600
+贝尔纲定理	bei er gang ding li	600
+第一纲集	di yi gang ji	600
+第二纲集	di er gang ji	600
+同伦	tong lun	600
+同伦等价	tong lun deng jia	600
+形变收缩	xing bian shou suo	600
+可缩空间	ke suo kong jian	600
+基本群	ji ben qun	600
+庞加莱群	pang jia lai qun	600
+塞弗特范坎彭定理	sai fu te fan kan peng ding li	600
+覆叠空间	fu die kong jian	600
+覆叠映射	fu die ying she	600
+万有覆叠空间	wan you fu die kong jian	600
+道路提升定理	dao lu ti sheng ding li	600
+同伦提升定理	tong lun ti sheng ding li	600
+高阶同伦群	gao jie tong lun qun	600
+单纯复形	dan chun fu xing	600
+胞腔复形	bao qiang fu xing	600
+单纯同调	dan chun tong diao	600
+奇异同调	qi yi tong diao	600
+胞腔同调	bao qiang tong diao	600
+迈耶维托里斯序列	mai ye wei tuo li si xu lie	600
+切除定理	qie chu ding li	600
+贝蒂数	bei di shu	600
+欧拉示性数	ou la shi xing shu	600
+不动点性质	bu dong dian xing zhi	600
+布劳威尔不动点定理	bu lao wei er bu dong dian ding li	600
+莱夫谢茨不动点定理	lai fu xie ci bu dong dian ding li	600
+庞加莱对偶定理	pang jia lai dui ou ding li	600
+杯积	bei ji	600
+上同调环	shang tong diao huan	600
+万有系数定理	wan you xi shu ding li	600
+屈内特公式	qu nei te gong shi	600
+莫尔斯理论	mo er si li lun	600
+莫尔斯引理	mo er si yin li	600
+莫尔斯不等式	mo er si bu deng shi	600
+配边理论	pei bian li lun	600
+横截性	heng jie xing	600
+环面	huan mian	600
+克莱因瓶	ke lai yin ping	600
+莫比乌斯带	mo bi wu si dai	600
+亏格	kui ge	600
+闭曲面分类定理	bi qu mian fen lei ding li	600
+庞加莱猜想	pang jia lai cai xiang	600
+琼斯多项式	qiong si duo xiang shi	600
+偏微分方程	pian wei fen fang cheng	600
+随机微分方程	sui ji wei fen fang cheng	600
+时滞微分方程	shi zhi wei fen fang cheng	600
+积分方程	ji fen fang cheng	600
+初值问题	chu zhi wen ti	600
+柯西问题	ke xi wen ti	600
+边值问题	bian zhi wen ti	600
+定解问题	ding jie wen ti	600
+适定性	shi ding xing	600
+阿达马适定性	a da ma shi ding xing	600
+变量分离方程	bian liang fen li fang cheng	600
+齐次方程	qi ci fang cheng	600
+一阶线性方程	yi jie xian xing fang cheng	600
+常数变易法	chang shu bian yi fa	600
+伯努利方程	bo nu li fang cheng	600
+黎卡提方程	li ka ti fang cheng	600
+全微分方程	quan wei fen fang cheng	600
+恰当方程	qia dang fang cheng	600
+积分因子	ji fen yin zi	600
+克莱罗方程	ke lai luo fang cheng	600
+拉格朗日方程	la ge lang ri fang cheng	600
+奇解	qi jie	600
+皮卡存在唯一性定理	pi ka cun zai wei yi xing ding li	600
+佩亚诺存在定理	pei ya nuo cun zai ding li	600
+皮卡逐次逼近法	pi ka zhu ci bi jin fa	600
+格朗沃尔不等式	ge lang wo er bu deng shi	600
+解的延拓	jie de yan tuo	600
+最大存在区间	zui da cun zai qu jian	600
+对初值的连续依赖性	dui chu zhi de lian xu yi lai xing	600
+高阶线性微分方程	gao jie xian xing wei fen fang cheng	600
+线性微分方程组	xian xing wei fen fang cheng zu	600
+叠加原理	die jia yuan li	600
+朗斯基行列式	lang si ji hang lie shi	600
+刘维尔公式	liu wei er gong shi	600
+基解矩阵	ji jie ju zhen	600
+标准基解矩阵	biao zhun ji jie ju zhen	600
+常系数线性方程	chang xi shu xian xing fang cheng	600
+待定系数法	dai ding xi shu fa	600
+算子法	suan zi fa	600
+欧拉方程	ou la fang cheng	600
+幂级数解法	mi ji shu jie fa	600
+常点	chang dian	600
+正则奇点	zheng ze qi dian	600
+弗罗贝尼乌斯法	fu luo bei ni wu si fa	600
+勒让德方程	le rang de fang cheng	600
+勒让德多项式	le rang de duo xiang shi	600
+贝塞尔方程	bei sai er fang cheng	600
+贝塞尔函数	bei sai er han shu	600
+切比雪夫多项式	qie bi xue fu duo xiang shi	600
+埃尔米特多项式	ai er mi te duo xiang shi	600
+拉盖尔多项式	la gai er duo xiang shi	600
+超几何方程	chao ji he fang cheng	600
+超几何函数	chao ji he han shu	600
+施图姆刘维尔问题	shi tu mu liu wei er wen ti	600
+施图姆比较定理	shi tu mu bi jiao ding li	600
+自治系统	zi zhi xi tong	600
+非自治系统	fei zi zhi xi tong	600
+相空间	xiang kong jian	600
+相平面	xiang ping mian	600
+轨线	gui xian	600
+相图	xiang tu	600
+不动点	bu dong dian	600
+鞍点	an dian	600
+极限环	ji xian huan	600
+周期解	zhou qi jie	600
+庞加莱本迪克松定理	pang jia lai ben di ke song ding li	600
+李雅普诺夫稳定性	li ya pu nuo fu wen ding xing	600
+渐近稳定	jian jin wen ding	600
+全局稳定	quan ju wen ding	600
+李雅普诺夫函数	li ya pu nuo fu han shu	600
+李雅普诺夫直接法	li ya pu nuo fu zhi jie fa	600
+劳斯霍尔维茨判据	lao si huo er wei ci pan ju	600
+稳定流形	wen ding liu xing	600
+不稳定流形	bu wen ding liu xing	600
+中心流形	zhong xin liu xing	600
+哈特曼格罗布曼定理	ha te man ge luo bu man ding li	600
+弗洛凯理论	fu luo kai li lun	600
+庞加莱映射	pang jia lai ying she	600
+分岔理论	fen cha li lun	600
+鞍结分岔	an jie fen cha	600
+跨临界分岔	kua lin jie fen cha	600
+叉式分岔	cha shi fen cha	600
+霍普夫分岔	huo pu fu fen cha	600
+倍周期分岔	bei zhou qi fen cha	600
+奇怪吸引子	qi guai xi yin zi	600
+洛伦兹吸引子	luo lun zi xi yin zi	600
+李雅普诺夫指数	li ya pu nuo fu zhi shu	600
+斯梅尔马蹄	si mei er ma ti	600
+遍历理论	bian li li lun	600
+保测变换	bao ce bian huan	600
+庞加莱复现定理	pang jia lai fu xian ding li	600
+伯克霍夫遍历定理	bo ke huo fu bian li ding li	600
+冯诺依曼遍历定理	feng nuo yi man bian li ding li	600
+拓扑熵	tuo pu shang	600
+测度熵	ce du shang	600
+哈密顿系统	ha mi dun xi tong	600
+辛流形	xin liu xing	600
+泊松括号	bo song kuo hao	600
+可积系统	ke ji xi tong	600
+数学物理方程	shu xue wu li fang cheng	600
+一阶偏微分方程	yi jie pian wei fen fang cheng	600
+特征线法	te zheng xian fa	600
+二阶线性偏微分方程	er jie xian xing pian wei fen fang cheng	600
+双曲型方程	shuang qu xing fang cheng	600
+抛物型方程	pao wu xing fang cheng	600
+椭圆型方程	tuo yuan xing fang cheng	600
+波动方程	bo dong fang cheng	600
+弦振动方程	xian zhen dong fang cheng	600
+达朗贝尔公式	da lang bei er gong shi	600
+基尔霍夫公式	ji er huo fu gong shi	600
+泊松公式	bo song gong shi	600
+降维法	jiang wei fa	600
+齐次化原理	qi ci hua yuan li	600
+杜哈梅原理	du ha mei yuan li	600
+能量积分	neng liang ji fen	600
+热传导方程	re chuan dao fang cheng	600
+扩散方程	kuo san fang cheng	600
+拉普拉斯方程	la pu la si fang cheng	600
+泊松方程	bo song fang cheng	600
+调和方程	diao he fang cheng	600
+分离变量法	fen li bian liang fa	600
+傅里叶方法	fu li ye fang fa	600
+第一边值问题	di yi bian zhi wen ti	600
+狄利克雷问题	di li ke lei wen ti	600
+第二边值问题	di er bian zhi wen ti	600
+诺伊曼问题	nuo yi man wen ti	600
+第三边值问题	di san bian zhi wen ti	600
+罗宾问题	luo bin wen ti	600
+混合边值问题	hun he bian zhi wen ti	600
+基本解	ji ben jie	600
+格林函数	ge lin han shu	600
+静像法	jing xiang fa	600
+平均值性质	ping jun zhi xing zhi	600
+极值原理	ji zhi yuan li	600
+强极值原理	qiang ji zhi yuan li	600
+弱极值原理	ruo ji zhi yuan li	600
+霍普夫引理	huo pu fu yin li	600
+哈纳克不等式	ha na ke bu deng shi	600
+佩龙方法	pei long fang fa	600
+变分法	bian fen fa	600
+欧拉拉格朗日方程	ou la la ge lang ri fang cheng	600
+最速降线	zui su jiang xian	600
+等周问题	deng zhou wen ti	600
+等周不等式	deng zhou bu deng shi	600
+狄利克雷原理	di li ke lei yuan li	600
+弱解	ruo jie	600
+古典解	gu dian jie	600
+粘性解	zhan xing jie	600
+拉克斯米尔格拉姆定理	la ke si mi er ge la mu ding li	600
+庞加莱不等式	pang jia lai bu deng shi	600
+先验估计	xian yan gu ji	600
+绍德尔估计	shao de er gu ji	600
+卡尔德龙齐格蒙德理论	ka er de long qi ge meng de li lun	600
+守恒律	shou heng lv	600
+激波	ji bo	600
+稀疏波	xi shu bo	600
+朗金雨果尼奥条件	lang jin yu guo ni ao tiao jian	600
+熵条件	shang tiao jian	600
+布尔格斯方程	bu er ge si fang cheng	600
+科特韦格德弗里斯方程	ke te wei ge de fu li si fang cheng	600
+孤立子	gu li zi	600
+孤立波	gu li bo	600
+薛定谔方程	xue ding e fang cheng	600
+克莱因戈登方程	ke lai yin ge deng fang cheng	600
+麦克斯韦方程组	mai ke si wei fang cheng zu	600
+纳维斯托克斯方程	na wei si tuo ke si fang cheng	600
+欧拉流体方程	ou la liu ti fang cheng	600
+蒙日安培方程	meng ri an pei fang cheng	600
+极小曲面方程	ji xiao qu mian fang cheng	600
+反应扩散方程	fan ying kuo san fang cheng	600
+亥姆霍兹方程	hai mu huo zi fang cheng	600
+双调和方程	shuang diao he fang cheng	600
+积分微分方程	ji fen wei fen fang cheng	600
+弗雷德霍姆积分方程	fu lei de huo mu ji fen fang cheng	600
+沃尔泰拉积分方程	wo er tai la ji fen fang cheng	600
+随机试验	sui ji shi yan	600
+样本空间	yang ben kong jian	600
+样本点	yang ben dian	600
+基本事件	ji ben shi jian	600
+不可能事件	bu ke neng shi jian	600
+互斥事件	hu chi shi jian	600
+对立事件	dui li shi jian	600
+独立事件	du li shi jian	600
+相互独立	xiang hu du li	600
+古典概型	gu dian gai xing	600
+几何概型	ji he gai xing	600
+概率公理化	gai lv gong li hua	600
+柯尔莫哥洛夫公理	ke er mo ge luo fu gong li	600
+概率空间	gai lv kong jian	600
+概率测度	gai lv ce du	600
+事件域	shi jian yu	600
+条件概率	tiao jian gai lv	600
+乘法公式	cheng fa gong shi	600
+全概率公式	quan gai lv gong shi	600
+贝叶斯公式	bei ye si gong shi	600
+贝叶斯定理	bei ye si ding li	600
+先验概率	xian yan gai lv	600
+后验概率	hou yan gai lv	600
+伯努利试验	bo nu li shi yan	600
+独立重复试验	du li chong fu shi yan	600
+随机变量	sui ji bian liang	600
+离散型随机变量	li san xing sui ji bian liang	600
+连续型随机变量	lian xu xing sui ji bian liang	600
+分布函数	fen bu han shu	600
+累积分布函数	lei ji fen bu han shu	600
+概率密度函数	gai lv mi du han shu	600
+概率质量函数	gai lv zhi liang han shu	600
+分布律	fen bu lv	600
+退化分布	tui hua fen bu	600
+两点分布	liang dian fen bu	600
+伯努利分布	bo nu li fen bu	600
+二项分布	er xiang fen bu	600
+泊松分布	po song fen bu	600
+几何分布	ji he fen bu	600
+超几何分布	chao ji he fen bu	600
+负二项分布	fu er xiang fen bu	600
+帕斯卡分布	pa si ka fen bu	600
+多项分布	duo xiang fen bu	600
+均匀分布	jun yun fen bu	600
+指数分布	zhi shu fen bu	600
+无记忆性	wu ji yi xing	600
+正态分布	zheng tai fen bu	600
+高斯分布	gao si fen bu	600
+标准正态分布	biao zhun zheng tai fen bu	600
+对数正态分布	dui shu zheng tai fen bu	600
+伽马分布	jia ma fen bu	600
+爱尔朗分布	ai er lang fen bu	600
+贝塔分布	bei ta fen bu	600
+柯西分布	ke xi fen bu	600
+拉普拉斯分布	la pu la si fen bu	600
+威布尔分布	wei bu er fen bu	600
+瑞利分布	rui li fen bu	600
+帕累托分布	pa lei tuo fen bu	600
+幂律分布	mi lv fen bu	600
+卡方分布	ka fang fen bu	600
+学生分布	xue sheng fen bu	600
+威沙特分布	wei sha te fen bu	600
+狄利克雷分布	di li ke lei fen bu	600
+多维随机变量	duo wei sui ji bian liang	600
+随机向量	sui ji xiang liang	600
+联合分布	lian he fen bu	600
+联合分布函数	lian he fen bu han shu	600
+联合密度函数	lian he mi du han shu	600
+边缘分布	bian yuan fen bu	600
+边际分布	bian ji fen bu	600
+条件分布	tiao jian fen bu	600
+条件密度函数	tiao jian mi du han shu	600
+独立同分布	du li tong fen bu	600
+数学期望	shu xue qi wang	600
+条件期望	tiao jian qi wang	600
+全期望公式	quan qi wang gong shi	600
+方差	fang cha	600
+标准差	biao zhun cha	600
+均方差	jun fang cha	600
+变异系数	bian yi xi shu	600
+协方差	xie fang cha	600
+协方差矩阵	xie fang cha ju zhen	600
+相关系数	xiang guan xi shu	600
+皮尔逊相关系数	pi er xun xiang guan xi shu	600
+斯皮尔曼相关系数	si pi er man xiang guan xi shu	600
+肯德尔相关系数	ken de er xiang guan xi shu	600
+原点矩	yuan dian ju	600
+中心矩	zhong xin ju	600
+混合矩	hun he ju	600
+偏度	pian du	600
+峰度	feng du	600
+分位数	fen wei shu	600
+中位数	zhong wei shu	600
+众数	zhong shu	600
+矩母函数	ju mu han shu	600
+累积量	lei ji liang	600
+詹森不等式	zhan sen bu deng shi	600
+马尔可夫不等式	ma er ke fu bu deng shi	600
+切比雪夫不等式	qie bi xue fu bu deng shi	600
+霍夫丁不等式	huo fu ding bu deng shi	600
+伯恩斯坦不等式	bo en si tan bu deng shi	600
+集中不等式	ji zhong bu deng shi	600
+依概率收敛	yi gai lv shou lian	600
+几乎必然收敛	ji hu bi ran shou lian	600
+依分布收敛	yi fen bu shou lian	600
+均方收敛	jun fang shou lian	600
+博雷尔坎泰利引理	bo lei er kan tai li yin li	600
+零一律	ling yi lv	600
+柯尔莫哥洛夫零一律	ke er mo ge luo fu ling yi lv	600
+大数定律	da shu ding lv	600
+弱大数定律	ruo da shu ding lv	600
+强大数定律	qiang da shu ding lv	600
+伯努利大数定律	bo nu li da shu ding lv	600
+切比雪夫大数定律	qie bi xue fu da shu ding lv	600
+辛钦大数定律	xin qin da shu ding lv	600
+柯尔莫哥洛夫大数定律	ke er mo ge luo fu da shu ding lv	600
+中心极限定理	zhong xin ji xian ding li	600
+棣莫弗拉普拉斯定理	di mo fu la pu la si ding li	600
+林德伯格列维定理	lin de bo ge lie wei ding li	600
+李雅普诺夫定理	li ya pu nuo fu ding li	600
+重对数律	chong dui shu lv	600
+大偏差理论	da pian cha li lun	600
+随机过程	sui ji guo cheng	600
+有限维分布族	you xian wei fen bu zu	600
+轨道性质	gui dao xing zhi	600
+独立增量过程	du li zeng liang guo cheng	600
+平稳增量过程	ping wen zeng liang guo cheng	600
+莱维过程	lai wei guo cheng	600
+泊松过程	bo song guo cheng	600
+复合泊松过程	fu he bo song guo cheng	600
+非齐次泊松过程	fei qi ci bo song guo cheng	600
+更新过程	geng xin guo cheng	600
+马尔可夫过程	ma er ke fu guo cheng	600
+马尔可夫链	ma er ke fu lian	600
+马尔可夫性	ma er ke fu xing	600
+无后效性	wu hou xiao xing	600
+转移概率	zhuan yi gai lv	600
+转移概率矩阵	zhuan yi gai lv ju zhen	600
+查普曼柯尔莫哥洛夫方程	cha pu man ke er mo ge luo fu fang cheng	600
+常返态	chang fan tai	600
+暂留态	zan liu tai	600
+吸收态	xi shou tai	600
+遍历态	bian li tai	600
+平稳分布	ping wen fen bu	600
+极限分布	ji xian fen bu	600
+细致平衡条件	xi zhi ping heng tiao jian	600
+隐马尔可夫模型	yin ma er ke fu mo xing	600
+生灭过程	sheng mie guo cheng	600
+分支过程	fen zhi guo cheng	600
+高尔顿沃森过程	gao er dun wo sen guo cheng	600
+排队论	pai dui lun	600
+随机游走	sui ji you zou	600
+赌徒破产问题	du tu po chan wen ti	600
+鞅论	yang lun	600
+下鞅	xia yang	600
+上鞅	shang yang	600
+停时	ting shi	600
+杜布可选停时定理	du bu ke xuan ting shi ding li	600
+鞅收敛定理	yang shou lian ding li	600
+鞅不等式	yang bu deng shi	600
+布朗运动	bu lang yun dong	600
+维纳过程	wei na guo cheng	600
+几何布朗运动	ji he bu lang yun dong	600
+布朗桥	bu lang qiao	600
+奥恩斯坦乌伦贝克过程	ao en si tan wu lun bei ke guo cheng	600
+高斯过程	gao si guo cheng	600
+平稳过程	ping wen guo cheng	600
+严平稳过程	yan ping wen guo cheng	600
+宽平稳过程	kuan ping wen guo cheng	600
+自相关函数	zi xiang guan han shu	600
+功率谱密度	gong lv pu mi du	600
+维纳辛钦定理	wei na xin qin ding li	600
+遍历性	bian li xing	600
+随机分析	sui ji fen xi	600
+随机积分	sui ji ji fen	600
+伊东积分	yi dong ji fen	600
+伊东引理	yi dong yin li	600
+伊东公式	yi dong gong shi	600
+斯特拉托诺维奇积分	si te la tuo nuo wei qi ji fen	600
+吉尔萨诺夫定理	ji er sa nuo fu ding li	600
+费曼卡茨公式	fei man ka ci gong shi	600
+倒向随机微分方程	dao xiang sui ji wei fen fang cheng	600
+简单随机样本	jian dan sui ji yang ben	600
+样本容量	yang ben rong liang	600
+统计量	tong ji liang	600
+样本均值	yang ben jun zhi	600
+样本方差	yang ben fang cha	600
+样本标准差	yang ben biao zhun cha	600
+样本矩	yang ben ju	600
+次序统计量	ci xu tong ji liang	600
+顺序统计量	shun xu tong ji liang	600
+经验分布函数	jing yan fen bu han shu	600
+格利文科坎泰利定理	ge li wen ke kan tai li ding li	600
+抽样分布	chou yang fen bu	600
+费希尔引理	fei xi er yin li	600
+充分统计量	chong fen tong ji liang	600
+完备统计量	wan bei tong ji liang	600
+极小充分统计量	ji xiao chong fen tong ji liang	600
+因子分解定理	yin zi fen jie ding li	600
+点估计	dian gu ji	600
+矩估计	ju gu ji	600
+极大似然估计	ji da si ran gu ji	600
+最大似然估计	zui da si ran gu ji	600
+似然函数	si ran han shu	600
+对数似然函数	dui shu si ran han shu	600
+得分函数	de fen han shu	600
+费希尔信息量	fei xi er xin xi liang	600
+费希尔信息矩阵	fei xi er xin xi ju zhen	600
+无偏估计	wu pian gu ji	600
+渐近无偏	jian jin wu pian	600
+均方误差	jun fang wu cha	600
+一致最小方差无偏估计	yi zhi zui xiao fang cha wu pian gu ji	600
+克拉美罗不等式	ke la mei luo bu deng shi	600
+克拉美罗下界	ke la mei luo xia jie	600
+拉奥布莱克韦尔定理	la ao bu lai ke wei er ding li	600
+莱曼谢费定理	lai man xie fei ding li	600
+相合性	xiang he xing	600
+强相合	qiang xiang he	600
+渐近正态性	jian jin zheng tai xing	600
+区间估计	qu jian gu ji	600
+置信区间	zhi xin qu jian	600
+置信度	zhi xin du	600
+置信水平	zhi xin shui ping	600
+置信上限	zhi xin shang xian	600
+置信下限	zhi xin xia xian	600
+枢轴量	shu zhou liang	600
+假设检验	jia she jian yan	600
+原假设	yuan jia she	600
+零假设	ling jia she	600
+备择假设	bei ze jia she	600
+对立假设	dui li jia she	600
+检验统计量	jian yan tong ji liang	600
+拒绝域	ju jue yu	600
+接受域	jie shou yu	600
+第一类错误	di yi lei cuo wu	600
+弃真错误	qi zhen cuo wu	600
+第二类错误	di er lei cuo wu	600
+取伪错误	qu wei cuo wu	600
+显著性水平	xian zhu xing shui ping	600
+功效函数	gong xiao han shu	600
+奈曼皮尔逊引理	nai man pi er xun yin li	600
+一致最优检验	yi zhi zui you jian yan	600
+似然比检验	si ran bi jian yan	600
+广义似然比检验	guang yi si ran bi jian yan	600
+沃尔德检验	wo er de jian yan	600
+拉格朗日乘子检验	la ge lang ri cheng zi jian yan	600
+得分检验	de fen jian yan	600
+正态性检验	zheng tai xing jian yan	600
+拟合优度检验	ni he you du jian yan	600
+卡方检验	ka fang jian yan	600
+独立性检验	du li xing jian yan	600
+列联表	lie lian biao	600
+秩和检验	zhi he jian yan	600
+符号检验	fu hao jian yan	600
+威尔科克森检验	wei er ke ke sen jian yan	600
+曼惠特尼检验	man hui te ni jian yan	600
+斯米尔诺夫检验	si mi er nuo fu jian yan	600
+非参数统计	fei can shu tong ji	600
+核密度估计	he mi du gu ji	600
+经验似然	jing yan si ran	600
+自助法	zi zhu fa	600
+重抽样	chong chou yang	600
+刀切法	dao qie fa	600
+交叉验证	jiao cha yan zheng	600
+方差分析	fang cha fen xi	600
+单因素方差分析	dan yin su fang cha fen xi	600
+双因素方差分析	shuang yin su fang cha fen xi	600
+线性回归	xian xing hui gui	600
+一元线性回归	yi yuan xian xing hui gui	600
+多元线性回归	duo yuan xian xing hui gui	600
+非线性回归	fei xian xing hui gui	600
+逻辑回归	luo ji hui gui	600
+广义线性模型	guang yi xian xing mo xing	600
+普通最小二乘	pu tong zui xiao er cheng	600
+加权最小二乘	jia quan zui xiao er cheng	600
+广义最小二乘	guang yi zui xiao er cheng	600
+高斯马尔可夫定理	gao si ma er ke fu ding li	600
+最佳线性无偏估计	zui jia xian xing wu pian gu ji	600
+残差平方和	can cha ping fang he	600
+回归平方和	hui gui ping fang he	600
+总平方和	zong ping fang he	600
+决定系数	jue ding xi shu	600
+多重共线性	duo chong gong xian xing	600
+异方差性	yi fang cha xing	600
+自相关性	zi xiang guan xing	600
+岭回归	ling hui gui	600
+套索回归	tao suo hui gui	600
+弹性网络	tan xing wang luo	600
+多元统计分析	duo yuan tong ji fen xi	600
+主成分分析	zhu cheng fen fen xi	600
+因子分析	yin zi fen xi	600
+判别分析	pan bie fen xi	600
+聚类分析	ju lei fen xi	600
+典型相关分析	dian xing xiang guan fen xi	600
+对应分析	dui ying fen xi	600
+多维标度法	duo wei biao du fa	600
+时间序列分析	shi jian xu lie fen xi	600
+白噪声	bai zao sheng	600
+自回归模型	zi hui gui mo xing	600
+移动平均模型	yi dong ping jun mo xing	600
+自回归移动平均模型	zi hui gui yi dong ping jun mo xing	600
+差分自回归移动平均	cha fen zi hui gui yi dong ping jun	600
+条件异方差模型	tiao jian yi fang cha mo xing	600
+卡尔曼滤波	ka er man lv bo	600
+维纳滤波	wei na lv bo	600
+粒子滤波	li zi lv bo	600
+贝叶斯统计	bei ye si tong ji	600
+共轭先验	gong e xian yan	600
+无信息先验	wu xin xi xian yan	600
+杰弗里斯先验	jie fu li si xian yan	600
+最大后验估计	zui da hou yan gu ji	600
+可信区间	ke xin qu jian	600
+马尔可夫链蒙特卡罗	ma er ke fu lian meng te ka luo	600
+吉布斯采样	ji bu si cai yang	600
+梅特罗波利斯黑斯廷斯算法	mei te luo bo li si hei si ting si suan fa	600
+变分推断	bian fen tui duan	600
+期望最大化算法	qi wang zui da hua suan fa	600
+赤池信息准则	chi chi xin xi zhun ze	600
+贝叶斯信息准则	bei ye si xin xi zhun ze	600
+生存分析	sheng cun fen xi	600
+风险函数	feng xian han shu	600
+比例风险模型	bi li feng xian mo xing	600
+实验设计	shi yan she ji	600
+正交设计	zheng jiao she ji	600
+随机化区组设计	sui ji hua qu zu she ji	600
+最优化	zui you hua	600
+数学规划	shu xue gui hua	600
+目标函数	mu biao han shu	600
+决策变量	jue ce bian liang	600
+等式约束	deng shi yue shu	600
+不等式约束	bu deng shi yue shu	600
+可行域	ke xing yu	600
+可行解	ke xing jie	600
+基本可行解	ji ben ke xing jie	600
+最优解	zui you jie	600
+最优值	zui you zhi	600
+全局最优解	quan ju zui you jie	600
+局部最优解	ju bu zui you jie	600
+线性规划	xian xing gui hua	600
+非线性规划	fei xian xing gui hua	600
+凸优化	tu you hua	600
+整数规划	zheng shu gui hua	600
+混合整数规划	hun he zheng shu gui hua	600
+二次规划	er ci gui hua	600
+二阶锥规划	er jie zhui gui hua	600
+半定规划	ban ding gui hua	600
+锥规划	zhui gui hua	600
+几何规划	ji he gui hua	600
+分式规划	fen shi gui hua	600
+随机规划	sui ji gui hua	600
+鲁棒优化	lu bang you hua	600
+多目标优化	duo mu biao you hua	600
+帕累托最优	pa lei tuo zui you	600
+帕累托前沿	pa lei tuo qian yan	600
+组合优化	zu he you hua	600
+网络流	wang luo liu	600
+最大流问题	zui da liu wen ti	600
+最小费用流	zui xiao fei yong liu	600
+最短路问题	zui duan lu wen ti	600
+旅行商问题	lv xing shang wen ti	600
+背包问题	bei bao wen ti	600
+指派问题	zhi pai wen ti	600
+运输问题	yun shu wen ti	600
+选址问题	xuan zhi wen ti	600
+调度问题	diao du wen ti	600
+单纯形法	dan chun xing fa	600
+对偶单纯形法	dui ou dan chun xing fa	600
+修正单纯形法	xiu zheng dan chun xing fa	600
+大姆法	da mu fa	600
+两阶段法	liang jie duan fa	600
+检验数	jian yan shu	600
+基变量	ji bian liang	600
+非基变量	fei ji bian liang	600
+旋转运算	xuan zhuan yun suan	600
+退化现象	tui hua xian xiang	600
+勃兰特规则	bo lan te gui ze	600
+对偶问题	dui ou wen ti	600
+原问题	yuan wen ti	600
+拉格朗日对偶	la ge lang ri dui ou	600
+拉格朗日函数	la ge lang ri han shu	600
+对偶间隙	dui ou jian xi	600
+弱对偶定理	ruo dui ou ding li	600
+强对偶定理	qiang dui ou ding li	600
+互补松弛条件	hu bu song chi tiao jian	600
+影子价格	ying zi jia ge	600
+灵敏度分析	ling min du fen xi	600
+卡鲁什库恩塔克条件	ka lu shi ku en ta ke tiao jian	600
+库恩塔克条件	ku en ta ke tiao jian	600
+弗里茨约翰条件	fu li ci yue han tiao jian	600
+约束规范	yue shu gui fan	600
+斯莱特条件	si lai te tiao jian	600
+线性无关约束规范	xian xing wu guan yue shu gui fan	600
+凸集	tu ji	600
+凸锥	tu zhui	600
+凸包	tu bao	600
+极方向	ji fang xiang	600
+超平面分离定理	chao ping mian fen li ding li	600
+支撑超平面	zhi cheng chao ping mian	600
+次梯度	ci ti du	600
+次微分	ci wei fen	600
+共轭函数	gong e han shu	600
+芬切尔共轭	fen qie er gong e	600
+勒让德芬切尔变换	le rang de fen qie er bian huan	600
+无约束优化	wu yue shu you hua	600
+线搜索	xian sou suo	600
+精确线搜索	jing que xian sou suo	600
+非精确线搜索	fei jing que xian sou suo	600
+阿米霍准则	a mi huo zhun ze	600
+沃尔夫条件	wo er fu tiao jian	600
+黄金分割法	huang jin fen ge fa	600
+斐波那契搜索	fei bo na qi sou suo	600
+最速下降法	zui su xia jiang fa	600
+梯度下降法	ti du xia jiang fa	600
+随机梯度下降	sui ji ti du xia jiang	600
+次梯度法	ci ti du fa	600
+近端梯度法	jin duan ti du fa	600
+加速梯度法	jia su ti du fa	600
+牛顿法	niu dun fa	600
+阻尼牛顿法	zu ni niu dun fa	600
+拟牛顿法	ni niu dun fa	600
+秩一校正	zhi yi jiao zheng	600
+对称秩一算法	dui chen zhi yi suan fa	600
+高斯牛顿法	gao si niu dun fa	600
+列文伯格马夸尔特法	lie wen bo ge ma kua er te fa	600
+共轭梯度法	gong e ti du fa	600
+非线性共轭梯度法	fei xian xing gong e ti du fa	600
+信赖域方法	xin lai yu fang fa	600
+坐标下降法	zuo biao xia jiang fa	600
+块坐标下降法	kuai zuo biao xia jiang fa	600
+内点法	nei dian fa	600
+障碍函数法	zhang ai han shu fa	600
+罚函数法	fa han shu fa	600
+外罚函数法	wai fa han shu fa	600
+增广拉格朗日法	zeng guang la ge lang ri fa	600
+乘子法	cheng zi fa	600
+交替方向乘子法	jiao ti fang xiang cheng zi fa	600
+序列二次规划	xu lie er ci gui hua	600
+可行方向法	ke xing fang xiang fa	600
+投影梯度法	tou ying ti du fa	600
+弗兰克沃尔夫算法	fu lan ke wo er fu suan fa	600
+条件梯度法	tiao jian ti du fa	600
+椭球法	tuo qiu fa	600
+分支定界法	fen zhi ding jie fa	600
+割平面法	ge ping mian fa	600
+分支切割法	fen zhi qie ge fa	600
+列生成法	lie sheng cheng fa	600
+本德尔斯分解	ben de er si fen jie	600
+丹齐格沃尔夫分解	dan qi ge wo er fu fen jie	600
+贝尔曼方程	bei er man fang cheng	600
+最优性原理	zui you xing yuan li	600
+庞特里亚金极大值原理	pang te li ya jin ji da zhi yuan li	600
+最优控制	zui you kong zhi	600
+博弈论	bo yi lun	600
+对策论	dui ce lun	600
+零和博弈	ling he bo yi	600
+非合作博弈	fei he zuo bo yi	600
+合作博弈	he zuo bo yi	600
+纳什均衡	na shi jun heng	600
+混合策略	hun he ce lve	600
+纯策略	chun ce lve	600
+占优策略	zhan you ce lve	600
+极小化极大定理	ji xiao hua ji da ding li	600
+鞍点定理	an dian ding li	600
+囚徒困境	qiu tu kun jing	600
+夏普利值	xia pu li zhi	600
+数值计算	shu zhi ji suan	600
+计算数学	ji suan shu xue	600
+科学计算	ke xue ji suan	600
+误差分析	wu cha fen xi	600
+绝对误差	jue dui wu cha	600
+相对误差	xiang dui wu cha	600
+有效数字	you xiao shu zi	600
+舍入误差	she ru wu cha	600
+截断误差	jie duan wu cha	600
+机器精度	ji qi jing du	600
+病态问题	bing tai wen ti	600
+良态问题	liang tai wen ti	600
+数值稳定性	shu zhi wen ding xing	600
+向后误差分析	xiang hou wu cha fen xi	600
+向前误差分析	xiang qian wu cha fen xi	600
+插值法	cha zhi fa	600
+多项式插值	duo xiang shi cha zhi	600
+拉格朗日插值	la ge lang ri cha zhi	600
+牛顿插值	niu dun cha zhi	600
+均差	jun cha	600
+差商	cha shang	600
+向前差分	xiang qian cha fen	600
+向后差分	xiang hou cha fen	600
+中心差分	zhong xin cha fen	600
+埃尔米特插值	ai er mi te cha zhi	600
+分段插值	fen duan cha zhi	600
+样条插值	yang tiao cha zhi	600
+三次样条	san ci yang tiao	600
+样条函数	yang tiao han shu	600
+龙格现象	long ge xian xiang	600
+切比雪夫节点	qie bi xue fu jie dian	600
+三角插值	san jiao cha zhi	600
+有理插值	you li cha zhi	600
+帕德逼近	pa de bi jin	600
+函数逼近	han shu bi jin	600
+最佳一致逼近	zui jia yi zhi bi jin	600
+切比雪夫逼近	qie bi xue fu bi jin	600
+雷米兹算法	lei mi zi suan fa	600
+最佳平方逼近	zui jia ping fang bi jin	600
+最小二乘拟合	zui xiao er cheng ni he	600
+正交多项式	zheng jiao duo xiang shi	600
+伯恩斯坦多项式	bo en si tan duo xiang shi	600
+外尔斯特拉斯逼近定理	wai er si te la si bi jin ding li	600
+数值积分	shu zhi ji fen	600
+机械求积	ji xie qiu ji	600
+求积公式	qiu ji gong shi	600
+代数精度	dai shu jing du	600
+牛顿科特斯公式	niu dun ke te si gong shi	600
+梯形公式	ti xing gong shi	600
+辛普森公式	xin pu sen gong shi	600
+复化求积公式	fu hua qiu ji gong shi	600
+复化梯形公式	fu hua ti xing gong shi	600
+复化辛普森公式	fu hua xin pu sen gong shi	600
+理查森外推	li cha sen wai tui	600
+龙贝格积分	long bei ge ji fen	600
+高斯求积公式	gao si qiu ji gong shi	600
+高斯勒让德求积	gao si le rang de qiu ji	600
+高斯切比雪夫求积	gao si qie bi xue fu qiu ji	600
+高斯埃尔米特求积	gao si ai er mi te qiu ji	600
+高斯拉盖尔求积	gao si la gai er qiu ji	600
+自适应积分	zi shi ying ji fen	600
+蒙特卡罗积分	meng te ka luo ji fen	600
+拟蒙特卡罗方法	ni meng te ka luo fang fa	600
+数值微分	shu zhi wei fen	600
+数值线性代数	shu zhi xian xing dai shu	600
+矩阵计算	ju zhen ji suan	600
+直接法	zhi jie fa	600
+列主元消元法	lie zhu yuan xiao yuan fa	600
+全主元消元法	quan zhu yuan xiao yuan fa	600
+追赶法	zhui gan fa	600
+托马斯算法	tuo ma si suan fa	600
+平方根法	ping fang gen fa	600
+改进平方根法	gai jin ping fang gen fa	600
+迭代法	die dai fa	600
+雅可比迭代	ya ke bi die dai	600
+高斯赛德尔迭代	gao si sai de er die dai	600
+逐次超松弛迭代	zhu ci chao song chi die dai	600
+松弛因子	song chi yin zi	600
+严格对角占优	yan ge dui jiao zhan you	600
+不可约对角占优	bu ke yue dui jiao zhan you	600
+克雷洛夫子空间	ke lei luo fu zi kong jian	600
+预条件共轭梯度法	yu tiao jian gong e ti du fa	600
+广义极小残差法	guang yi ji xiao can cha fa	600
+双共轭梯度法	shuang gong e ti du fa	600
+阿诺尔迪过程	a nuo er di guo cheng	600
+兰乔斯算法	lan qiao si suan fa	600
+幂法	mi fa	600
+反幂法	fan mi fa	600
+原点位移	yuan dian wei yi	600
+瑞利商	rui li shang	600
+瑞利商迭代	rui li shang die dai	600
+雅可比方法	ya ke bi fang fa	600
+不动点迭代	bu dong dian die dai	600
+埃特金加速	ai te jin jia su	600
+斯特芬森方法	si te fen sen fang fa	600
+割线法	ge xian fa	600
+弦截法	xian jie fa	600
+穆勒法	mu le fa	600
+布罗伊登方法	bu luo yi deng fang fa	600
+同伦延拓法	tong lun yan tuo fa	600
+快速傅里叶变换	kuai su fu li ye bian huan	600
+离散傅里叶变换	li san fu li ye bian huan	600
+离散余弦变换	li san yu xian bian huan	600
+小波变换	xiao bo bian huan	600
+欧拉法	ou la fa	600
+向前欧拉法	xiang qian ou la fa	600
+向后欧拉法	xiang hou ou la fa	600
+隐式欧拉法	yin shi ou la fa	600
+改进欧拉法	gai jin ou la fa	600
+梯形法	ti xing fa	600
+中点法	zhong dian fa	600
+龙格库塔法	long ge ku ta fa	600
+四阶龙格库塔法	si jie long ge ku ta fa	600
+线性多步法	xian xing duo bu fa	600
+亚当斯外插法	ya dang si wai cha fa	600
+亚当斯内插法	ya dang si nei cha fa	600
+预测校正法	yu ce jiao zheng fa	600
+局部截断误差	ju bu jie duan wu cha	600
+整体截断误差	zheng ti jie duan wu cha	600
+收敛性	shou lian xing	600
+达尔奎斯特等价定理	da er kui si te deng jia ding li	600
+绝对稳定域	jue dui wen ding yu	600
+刚性方程	gang xing fang cheng	600
+吉尔方法	ji er fang fa	600
+向后差分公式	xiang hou cha fen gong shi	600
+辛几何算法	xin ji he suan fa	600
+保结构算法	bao jie gou suan fa	600
+打靶法	da ba fa	600
+有限差分法	you xian cha fen fa	600
+网格剖分	wang ge pou fen	600
+五点差分格式	wu dian cha fen ge shi	600
+显式格式	xian shi ge shi	600
+隐式格式	yin shi ge shi	600
+克兰克尼科尔森格式	ke lan ke ni ke er sen ge shi	600
+交替方向隐式格式	jiao ti fang xiang yin shi ge shi	600
+迎风格式	ying feng ge shi	600
+拉克斯温德罗夫格式	la ke si wen de luo fu ge shi	600
+拉克斯等价定理	la ke si deng jia ding li	600
+冯诺依曼稳定性分析	feng nuo yi man wen ding xing fen xi	600
+库朗条件	ku lang tiao jian	600
+有限元法	you xian yuan fa	600
+变分形式	bian fen xing shi	600
+弱形式	ruo xing shi	600
+里茨法	li ci fa	600
+伽辽金法	jia liao jin fa	600
+彼得罗夫伽辽金法	bi de luo fu jia liao jin fa	600
+基函数	ji han shu	600
+形函数	xing han shu	600
+刚度矩阵	gang du ju zhen	600
+质量矩阵	zhi liang ju zhen	600
+载荷向量	zai he xiang liang	600
+等参元	deng can yuan	600
+间断有限元法	jian duan you xian yuan fa	600
+混合有限元法	hun he you xian yuan fa	600
+自适应有限元	zi shi ying you xian yuan	600
+后验误差估计	hou yan wu cha gu ji	600
+有限体积法	you xian ti ji fa	600
+数值通量	shu zhi tong liang	600
+边界元法	bian jie yuan fa	600
+谱方法	pu fang fa	600
+伪谱法	wei pu fa	600
+无网格法	wu wang ge fa	600
+多重网格法	duo chong wang ge fa	600
+代数多重网格	dai shu duo chong wang ge	600
+区域分解法	qu yu fen jie fa	600
+施瓦茨交替法	shi wa ci jiao ti fa	600
+集合论	ji he lun	600
+公理集合论	gong li ji he lun	600
+朴素集合论	pu su ji he lun	600
+罗素悖论	luo su bei lun	600
+康托尔悖论	kang tuo er bei lun	600
+说谎者悖论	shuo huang zhe bei lun	600
+策梅洛弗兰克尔集合论	ce mei luo fu lan ke er ji he lun	600
+外延公理	wai yan gong li	600
+空集公理	kong ji gong li	600
+配对公理	pei dui gong li	600
+并集公理	bing ji gong li	600
+幂集公理	mi ji gong li	600
+无穷公理	wu qiong gong li	600
+替换公理	ti huan gong li	600
+正则公理	zheng ze gong li	600
+基础公理	ji chu gong li	600
+选择公理	xuan ze gong li	600
+良序定理	liang xu ding li	600
+佐恩引理	zuo en yin li	600
+豪斯多夫极大原理	hao si duo fu ji da yuan li	600
+巴拿赫塔斯基悖论	ba na he ta si ji bei lun	600
+分球怪论	fen qiu guai lun	600
+笛卡尔积	di ka er ji	600
+幂集	mi ji	600
+对称差	dui chen cha	600
+德摩根定律	de mo gen ding lv	600
+二元关系	er yuan guan xi	600
+等价关系	deng jia guan xi	600
+自反性	zi fan xing	600
+对称性	dui chen xing	600
+传递性	chuan di xing	600
+反对称性	fan dui chen xing	600
+等价类	deng jia lei	600
+商集	shang ji	600
+全序集	quan xu ji	600
+良序集	liang xu ji	600
+超限归纳法	chao xian gui na fa	600
+超限递归	chao xian di gui	600
+序数	xu shu	600
+极限序数	ji xian xu shu	600
+后继序数	hou ji xu shu	600
+基数算术	ji shu suan shu	600
+康托尔伯恩斯坦定理	kang tuo er bo en si tan ding li	600
+施罗德伯恩斯坦定理	shi luo de bo en si tan ding li	600
+连续统基数	lian xu tong ji shu	600
+广义连续统假设	guang yi lian xu tong jia she	600
+大基数	da ji shu	600
+不可达基数	bu ke da ji shu	600
+可测基数	ke ce ji shu	600
+命题逻辑	ming ti luo ji	600
+一阶逻辑	yi jie luo ji	600
+谓词逻辑	wei ci luo ji	600
+高阶逻辑	gao jie luo ji	600
+模态逻辑	mo tai luo ji	600
+直觉主义逻辑	zhi jue zhu yi luo ji	600
+逻辑联结词	luo ji lian jie ci	600
+合取	he qu	600
+析取	xi qu	600
+蕴涵	yun han	600
+重言式	chong yan shi	600
+永真式	yong zhen shi	600
+矛盾式	mao dun shi	600
+可满足性	ke man zu xing	600
+析取范式	xi qu fan shi	600
+合取范式	he qu fan shi	600
+前束范式	qian shu fan shi	600
+斯科伦范式	si ke lun fan shi	600
+全称量词	quan cheng liang ci	600
+存在量词	cun zai liang ci	600
+自由变元	zi you bian yuan	600
+约束变元	yue shu bian yuan	600
+形式系统	xing shi xi tong	600
+公理系统	gong li xi tong	600
+推理规则	tui li gui ze	600
+分离规则	fen li gui ze	600
+可靠性定理	ke kao xing ding li	600
+完备性定理	wan bei xing ding li	600
+哥德尔完备性定理	ge de er wan bei xing ding li	600
+哥德尔不完备性定理	ge de er bu wan bei xing ding li	600
+第一不完备性定理	di yi bu wan bei xing ding li	600
+第二不完备性定理	di er bu wan bei xing ding li	600
+紧致性定理	jin zhi xing ding li	600
+勒文海姆斯科伦定理	le wen hai mu si ke lun ding li	600
+塔斯基不可定义性定理	ta si ji bu ke ding yi xing ding li	600
+佩亚诺算术	pei ya nuo suan shu	600
+模型论	mo xing lun	600
+初等等价	chu deng deng jia	600
+超滤子	chao lv zi	600
+超积	chao ji	600
+非标准分析	fei biao zhun fen xi	600
+证明论	zheng ming lun	600
+相继式演算	xiang ji shi yan suan	600
+自然演绎	zi ran yan yi	600
+切消定理	qie xiao ding li	600
+递归论	di gui lun	600
+可计算性理论	ke ji suan xing li lun	600
+原始递归函数	yuan shi di gui han shu	600
+一般递归函数	yi ban di gui han shu	600
+部分递归函数	bu fen di gui han shu	600
+图灵机	tu ling ji	600
+丘奇图灵论题	qiu qi tu ling lun ti	600
+停机问题	ting ji wen ti	600
+递归集	di gui ji	600
+可判定集	ke pan ding ji	600
+递归可枚举集	di gui ke mei ju ji	600
+莱斯定理	lai si ding li	600
+图灵归约	tu ling gui yue	600
+图灵度	tu ling du	600
+格论	ge lun	600
+布尔代数	bu er dai shu	600
+海廷代数	hai ting dai shu	600
+斯通表示定理	si tong biao shi ding li	600

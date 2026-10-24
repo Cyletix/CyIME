@@ -1,0 +1,1607 @@
+# CyIME Dota2词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_dota2
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+敌法师	di fa shi	600
+敌法	di fa	600
+马吉纳	ma ji na	600
+高阶圣堂	gao jie sheng tang	600
+分身斧敌法	fen shen fu di fa	600
+斧王	fu wang	600
+蒙哥卡恩	meng ge ka en	600
+人头狗	ren tou gou	600
+祸乱之源	huo luan zhi yuan	600
+痛苦之源	tong ku zhi yuan	600
+阿特洛波斯	a te luo bo si	600
+血魔	xue mo	600
+嗜血狂魔	shi xue kuang mo	600
+史崔格尔	shi cui ge er	600
+放血魔	fang xue mo	600
+水晶室女	shui jing shi nv	600
+冰女	bing nv	600
+莉莱	li lai	600
+卓尔游侠	zhuo er you xia	600
+黑暗游侠	hei an you xia	600
+崔希丝	cui xi si	600
+撼地者	han di zhe	600
+撼地神牛	han di shen niu	600
+神牛	shen niu	600
+雷格石蹄	lei ge shi ti	600
+尤涅若	you nie ruo	600
+米拉娜	mi la na	600
+月之女祭司	yue zhi nv ji si	600
+变体精灵	bian ti jing ling	600
+奈文摩尔	nai wen mo er	600
+幻影长矛手	huan ying chang mao shou	600
+阿兹瑞斯	a zi rui si	600
+仙女龙	xian nv long	600
+精灵龙	jing ling long	600
+帕吉	pa ji	600
+肉钩屠夫	rou gou tu fu	600
+闪电幽魂	shan dian you hun	600
+电魂	dian hun	600
+沙王	sha wang	600
+克里瑟历斯	ke li se li si	600
+风暴之灵	feng bao zhi ling	600
+考林	kao lin	600
+斯温	si wen	600
+流浪剑客	liu lang jian ke	600
+真男人	zhen nan ren	600
+山岭巨人	shan ling ju ren	600
+复仇之魂	fu chou zhi hun	600
+仙德尔莎	xian de er sha	600
+风行者	feng xing zhe	600
+莱瑞蕾	lai rui lei	600
+天界之王	tian jie zhi wang	600
+众神之王	zhong shen zhi wang	600
+昆卡	kun ka	600
+戴泽	dai ze	600
+莉娜	li na	600
+秀逗魔导士	xiu dou mo dao shi	600
+火女	huo nv	600
+莱恩	lai en	600
+恶魔巫师	e mo wu shi	600
+暗影萨满	an ying sa man	600
+小歪	xiao wai	600
+罗斯塔	luo si ta	600
+斯拉达	si la da	600
+鱼人守卫	yu ren shou wei	600
+大鱼人	da yu ren	600
+潮汐猎人	chao xi lie ren	600
+利维坦	li wei tan	600
+扎瓦克	zha wa ke	600
+艾斯瑞安	ai si rui an	600
+科尔苏加德	ke er su jia de	600
+力丸	li wan	600
+隐形刺客	yin xing ci ke	600
+隐刺	yin ci	600
+瑞奇	rui qi	600
+修补匠	xiu bu jiang	600
+鲍什	bao shi	600
+矮人火枪手	ai ren huo qiang shou	600
+传说哥	chuan shuo ge	600
+卡德尔	ka de er	600
+瘟疫法师	wen yi fa shi	600
+死灵法师	si ling fa shi	600
+死灵法	si ling fa	600
+罗坦德吉利	luo tan de ji li	600
+雷克萨	lei ke sa	600
+卡洛克	ka luo ke	600
+痛苦女王	tong ku nv wang	600
+阿卡莎	a ka sha	600
+剧毒术士	ju du shu shi	600
+刺蛇	ci she	600
+里瑟尔	li se er	600
+虚空假面	xu kong jia mian	600
+虚空	xu kong	600
+鸡巴脸	ji ba lian	600
+达克特	da ke te	600
+冥魂大帝	ming hun da di	600
+骷髅王	ku lou wang	600
+奥斯塔里昂	ao si ta li ang	600
+死亡先知	si wang xian zhi	600
+克萝贝露丝	ke luo bei lu si	600
+幻影刺客	huan ying ci ke	600
+幻刺	huan ci	600
+茉崔蒂	mo cui di	600
+帕格纳	pa ge na	600
+湮灭法师	yan mie fa shi	600
+骨法	gu fa	600
+圣堂刺客	sheng tang ci ke	600
+拉娜娅	la na ya	600
+冥界亚龙	ming jie ya long	600
+毒龙	du long	600
+蝮蛇	fu she	600
+宁录	ning lu	600
+月之骑士	yue zhi qi shi	600
+月骑	yue qi	600
+龙骑士	long qi shi	600
+达维安	da wei an	600
+神灵武士	shen ling wu shi	600
+哈斯卡	ha si ka	600
+单车武士	dan che wu shi	600
+发条技师	fa tiao ji shi	600
+发条地精	fa tiao di jing	600
+瑞托崔普	rui tuo cui pu	600
+拉席克	la xi ke	600
+受折磨的灵魂	shou zhe mo de ling hun	600
+老鹿	lao lu	600
+法里奥	fa li ao	600
+特傅珑	te fu long	600
+噬魂鬼	shi hun gui	600
+奈克斯	nai ke si	600
+黑暗贤者	hei an xian zhe	600
+黑贤	hei xian	600
+奔腾哥	ben teng ge	600
+依什卡菲尔	yi shi ka fei er	600
+克林克兹	ke lin ke zi	600
+骷髅射手	ku lou she shou	600
+小骷髅	xiao ku lou	600
+骨弓	gu gong	600
+全能骑士	quan neng qi shi	600
+普里斯特	pu li si te	600
+魅惑魔女	mei huo mo nv	600
+爱由莎	ai you sha	600
+暗夜魔王	an ye mo wang	600
+巴拉那	ba la na	600
+育母蜘蛛	yu mu zhi zhu	600
+布蕾克艾拉齐娜	bu lei ke ai la qi na	600
+赏金猎人	shang jin lie ren	600
+刚铎	gang duo	600
+编织者	bian zhi zhe	600
+斯吉茨格尔	si ji ci ge er	600
+杰奇洛	jie qi luo	600
+双头龙	shuang tou long	600
+奇美拉	qi mei la	600
+蝙蝠骑士	bian fu qi shi	600
+老陈	lao chen	600
+幽鬼	you gui	600
+墨丘利	mo qiu li	600
+远古冰魄	yuan gu bing po	600
+冰魂	bing hun	600
+卡尔德	ka er de	600
+末日使者	mo ri shi zhe	600
+路西法	lu xi fa	600
+司夜刺客	si ye ci ke	600
+地穴刺客	di xue ci ke	600
+阿努巴拉克	a nu ba la ke	600
+拍拍熊	pai pai xiong	600
+熊战士	xiong zhan shi	600
+乌尔萨	wu er sa	600
+裂魂人	lie hun ren	600
+白牛	bai niu	600
+巴拉森	ba la sen	600
+矮人直升机	ai ren zhi sheng ji	600
+奥瑞尔	ao rui er	600
+拉泽尔	la ze er	600
+祈求者	qi qiu zhe	600
+召唤师	zhao huan shi	600
+祈求者卡尔	qi qiu zhe ka er	600
+沉默术士	chen mo shu shi	600
+诺崇	nuo chong	600
+殁境神蚀者	mo jing shen shi zhe	600
+殁境毁灭者	mo jing hui mie zhe	600
+贝恩霍勒	bei en huo le	600
+熊猫酒仙	xiong mao jiu xian	600
+莽吉	mang ji	600
+暗影恶魔	an ying e mo	600
+毒狗	du gou	600
+艾瑞达	ai rui da	600
+德鲁伊	de lu yi	600
+熊德	xiong de	600
+利爪德鲁伊	li zhua de lu yi	600
+瑟拉留斯	se la liu si	600
+混沌骑士	hun dun qi shi	600
+米波	mi bo	600
+地卜师	di bu shi	600
+狗头人	gou tou ren	600
+树精卫士	shu jing wei shi	600
+鲁夫特伦	lu fu te lun	600
+食人魔魔法师	shi ren mo mo fa shi	600
+蓝胖	lan pang	600
+阿格隆碎石者	a ge long sui shi zhe	600
+不朽尸王	bu xiu shi wang	600
+尸王	shi wang	600
+迪尔奇	di er qi	600
+拉比克	la bi ke	600
+大魔导师	da mo dao shi	600
+干扰者	gan rao zhe	600
+风暴之主	feng bao zhi zhu	600
+娜迦海妖	na jia hai yao	600
+小娜迦	xiao na jia	600
+司里希丝	si li xi si	600
+光之守卫	guang zhi shou wei	600
+光法	guang fa	600
+伊扎洛	yi zha luo	600
+艾欧	ai ou	600
+精灵守卫	jing ling shou wei	600
+维萨吉	wei sa ji	600
+死灵飞龙	si ling fei long	600
+死灵龙	si ling long	600
+斯拉克	si la ke	600
+鱼人夜行者	yu ren ye xing zhe	600
+小鱼人	xiao yu ren	600
+蛇发女妖	she fa nv yao	600
+大娜迦	da na jia	600
+一姐	yi jie	600
+巨魔战将	ju mo zhan jiang	600
+杰拉卡	jie la ka	600
+半人马战行者	ban ren ma zhan xing zhe	600
+半人马酋长	ban ren ma qiu zhang	600
+布拉德瓦登	bu la de wa deng	600
+马格纳斯	ma ge na si	600
+半人猛犸	ban ren meng ma	600
+伐木机	fa mu ji	600
+地精撕裂者	di jing si lie zhe	600
+瑞兹拉克	rui zi la ke	600
+钢背兽	gang bei shou	600
+刚背兽	gang bei shou	600
+钢背	gang bei	600
+瑞格沃	rui ge wo	600
+巨牙海民	ju ya hai min	600
+海民	hai min	600
+尤弥尔	you mi er	600
+天怒法师	tian nu fa shi	600
+天怒	tian nu	600
+扎贡纳斯	zha gong na si	600
+亚巴顿	ya ba dun	600
+死灵骑士	si ling qi shi	600
+阿尔萨斯	a er sa si	600
+上古巨神	shang gu ju shen	600
+牛头人酋长	niu tou ren qiu zhang	600
+军团指挥官	jun tuan zhi hui guan	600
+特蕾丝汀	te lei si ting	600
+炸弹人	zha dan ren	600
+地精工程师	di jing gong cheng shi	600
+灰烬之灵	hui jin zhi ling	600
+火猫	huo mao	600
+大地之灵	da di zhi ling	600
+土猫	tu mao	600
+考林土猫	kao lin tu mao	600
+孽主	nie zhu	600
+深渊领主	shen yuan ling zhu	600
+阿兹加洛	a zi jia luo	600
+恐怖利刃	kong bu li ren	600
+魂守	hun shou	600
+灵魂守卫	ling hun shou wei	600
+伊卡洛斯	yi ka luo si	600
+神谕者	shen yu zhe	600
+奈里夫	nai li fu	600
+寒冬飞龙	han dong fei long	600
+冰龙	bing long	600
+奥罗拉	ao luo la	600
+天穹守望者	tian qiong shou wang zhe	600
+电狗	dian gou	600
+弧光守望者	hu guang shou wang zhe	600
+泽特	ze te	600
+邪影芳灵	xie ying fang ling	600
+米瑞斯嘉	mi rui si jia	600
+石鳞剑士	shi lin jian shi	600
+穿山甲	chuan shan jia	600
+唐泰尔	tang tai er	600
+天涯墨客	tian ya mo ke	600
+玛尔斯	ma er si	600
+紫猫	zi mao	600
+虚无之灵	xu wu zhi ling	600
+电炎绝手	dian yan jue shou	600
+贝翠丝	bei cui si	600
+森海飞霞	sen hai fei xia	600
+破晓辰星	po xiao chen xing	600
+瓦尔基里	wa er ji li	600
+玛西	ma xi	600
+原始野兽	yuan shi ye shou	600
+琼英碧灵	qiong ying bi ling	600
+奶绿	nai lv	600
+百戏大王	bai xi da wang	600
+马戏团长	ma xi tuan zhang	600
+影武者	ying wu zhe	600
+朗戈	lang ge	600
+吟游青蛙	yin you qing wa	600
+法力损毁	fa li sun hui	600
+法术反制	fa shu fan zhi	600
+法力虚空	fa li xu kong	600
+法力过载	fa li guo zai	600
+狂战士之吼	kuang zhan shi zhi hou	600
+战斗饥渴	zhan dou ji ke	600
+反击螺旋	fan ji luo xuan	600
+淘汰之刃	tao tai zhi ren	600
+涂油之刃	tu you zhi ren	600
+一人之军	yi ren zhi jun	600
+噬脑	shi nao	600
+梦游者	meng you zhe	600
+梦魇漫步	meng yan man bu	600
+脓液之触	nong ye zhi chu	600
+血怒	xue nu	600
+血祭	xue ji	600
+焦渴	jiao ke	600
+血雾	xue wu	600
+陈年老血	chen nian lao xue	600
+冰霜新星	bing shuang xin xing	600
+冰封禁制	bing feng jin zhi	600
+奥术光环	ao shu guang huan	600
+极寒领域	ji han ling yu	600
+冰晶克隆	bing jing ke long	600
+蓝量增幅	lan liang zeng fu	600
+霜冻之箭	shuang dong zhi jian	600
+数箭齐发	shu jian qi fa	600
+射手天赋	she shou tian fu	600
+精准光环	jing zhun guang huan	600
+强化图腾	qiang hua tu teng	600
+回音击	hui yin ji	600
+崎岖体魄	qi qu ti po	600
+剑刃风暴	jian ren feng bao	600
+治疗守卫	zhi liao shou wei	600
+剑舞	jian wu	600
+无敌斩	wu di zhan	600
+迅风斩	xun feng zhan	600
+决斗家	jue dou jia	600
+剑心犹在	jian xin you zai	600
+群星风暴	qun xing feng bao	600
+月神之箭	yue shen zhi jian	600
+猛跃	meng yue	600
+月之暗面	yue zhi an mian	600
+赛莉蒙妮的眷顾	sai li meng ni de juan gu	600
+波浪形态	bo lang xing tai	600
+变体攻击	bian ti gong ji	600
+属性转换	shu xing zhuan huan	600
+潮生	chao sheng	600
+毁灭阴影	hui mie yin ying	600
+压炮	ya pao	600
+影压	ying ya	600
+死灵精通	si ling jing tong	600
+魔王降临	mo wang jiang lin	600
+魂之挽歌	hun zhi wan ge	600
+死神盛宴	si shen sheng yan	600
+灵魂之灵	ling hun zhi ling	600
+灵魂冲刺	ling hun chong ci	600
+幻影冲锋	huan ying chong feng	600
+神行百变	shen xing bai bian	600
+虚幻之锋	xu huan zhi feng	600
+幻影之矛	huan ying zhi mao	600
+幻象之舞	huan xiang zhi wu	600
+幻象法球	huan xiang fa qiu	600
+新月之痕	xin yue zhi hen	600
+相位转移	xiang wei zhuan yi	600
+梦境缠绕	meng jing chan rao	600
+顽皮克敌	wan pi ke di	600
+肉钩	rou gou	600
+腐肉堆积	fu rou dui ji	600
+出钩	chu gou	600
+等离子场	deng li zi chang	600
+静电连接	jing dian lian jie	600
+风暴涌动	feng bao yong dong	600
+风暴之眼	feng bao zhi yan	600
+不稳定电流	bu wen ding dian liu	600
+掘地穿刺	jue di chuan ci	600
+尾刺	wei ci	600
+腐尸毒	fu shi du	600
+电子涡流	dian zi wo liu	600
+球状闪电	qiu zhuang shan dian	600
+风暴之锤	feng bao zhi chui	600
+巨力挥舞	ju li hui wu	600
+战吼	zhan hou	600
+神之力量	shen zhi li liang	600
+征服者的蔑视	zheng fu zhe de mie shi	600
+抓树	zhua shu	600
+岩石壁垒	yan shi bi lei	600
+树木连掷	shu mu lian zhi	600
+山崩投掷	shan beng tou zhi	600
+魔法箭	mo fa jian	600
+恐怖波动	kong bu bo dong	600
+复仇光环	fu chou guang huan	600
+移形换位	yi xing huan wei	600
+束缚击	shu fu ji	600
+强力击	qiang li ji	600
+风行步	feng xing bu	600
+集中火力	ji zhong huo li	600
+狂风之力	kuang feng zhi li	600
+轻风易行	qing feng yi xing	600
+弧形闪电	hu xing shan dian	600
+天界跳跃	tian jie tiao yue	600
+雷神之怒	lei shen zhi nu	600
+静电场	jing dian chang	600
+雷云	lei yun	600
+神圣狂暴	shen sheng kuang bao	600
+潮汐使者	chao xi shi zhe	600
+剧毒之触	ju du zhi chu	600
+薄葬	bo zang	600
+暗影波	an ying bo	600
+邪能	xie neng	600
+离魂	li hun	600
+龙破斩	long po zhan	600
+光击阵	guang ji zhen	600
+炽魂	chi hun	600
+神灭斩	shen mie zhan	600
+腾焰斗篷	teng yan dou peng	600
+裂地尖刺	lie di jian ci	600
+法力汲取	fa li ji qu	600
+死亡一指	si wang yi zhi	600
+地狱归来	di yu gui lai	600
+苍穹震击	cang qiong zhen ji	600
+群蛇守卫	qun she shou wei	600
+禽戏	qin xi	600
+鱼人碎击	yu ren sui ji	600
+守卫冲刺	shou wei chong ci	600
+深海重击	shen hai zhong ji	600
+腐蚀雾霭	fu shi wu ai	600
+海洋之速	hai yang zhi su	600
+海妖外壳	hai yao wai ke	600
+锚击	mao ji	600
+海妖之触	hai yao zhi chu	600
+死神之锚	si shen zhi mao	600
+鲸脂	jing zhi	600
+麻痹药剂	ma bi yao ji	600
+巫毒疗法	wu du liao fa	600
+死亡守卫	si wang shou wei	600
+巫毒变身	wu du bian shen	600
+格里斯格里斯	ge li si ge li si	600
+寒霜爆发	han shuang bao fa	600
+冰霜魔盾	bing shuang mo dun	600
+邪恶凝视	xie e ning shi	600
+连环霜冻	lian huan shuang dong	600
+食魂	shi hun	600
+闪烁突袭	shan shuo tu xi	600
+绝杀秘技	jue sha mi ji	600
+刀光谍影	dao guang die ying	600
+睡眠飞镖	shui mian fei biao	600
+恶魔召唤	e mo zhao huan	600
+午夜凋零	wu ye diao ling	600
+引力井	yin li jing	600
+分裂图像	fen lie tu xiang	600
+进击的机械	jin ji de ji xie	600
+防御矩阵	fang yu ju zhen	600
+再装填	zai zhuang tian	600
+折跃耀光	zhe yue yao guang	600
+热导飞弹	re dao fei dan	600
+尤里卡	you li ka	600
+榴霰弹	liu xian dan	600
+震荡手雷	zhen dang shou lei	600
+死亡脉冲	si wang mai chong	600
+护尸罩	hu shi zhao	600
+竭心光环	jie xin guang huan	600
+死神镰刀	si shen lian dao	600
+死神追寻者	si shen zhui xun zhe	600
+施虐之心	shi nve zhi xin	600
+致命连接	zhi ming lian jie	600
+暗言术	an yan shu	600
+混乱之祭	hun luan zhi ji	600
+邪术召唤	xie shu zhao huan	600
+野性之斧	ye xing zhi fu	600
+野性呼唤	ye xing hu huan	600
+战鹰	zhan ying	600
+野性之心	ye xing zhi xin	600
+原始咆哮	yuan shi pao xiao	600
+野性战鼓	ye xing zhan gu	600
+暗影突袭	an ying tu xi	600
+痛苦尖叫	tong ku jian jiao	600
+超声冲击波	chao sheng chong ji bo	600
+受虐狂	shou nve kuang	600
+瘴气	zhang qi	600
+毒刺	du ci	600
+瘟疫守卫	wen yi shou wei	600
+恶性瘟疫	e xing wen yi	600
+剧毒新星	ju du xin xing	600
+败血休克	bai xue xiu ke	600
+时间漫游	shi jian man you	600
+时间膨胀	shi jian peng zhang	600
+时间锁定	shi jian suo ding	600
+时间结界	shi jian jie jie	600
+扭曲力场	niu qu li chang	600
+逆转时间漫游	ni zhuan shi jian man you	600
+时间区域	shi jian qu yu	600
+冥火爆击	ming huo bao ji	600
+吸血灵魂	xi xue ling hun	600
+本命一击	ben ming yi ji	600
+绝冥再生	jue ming zai sheng	600
+不死大帝	bu si da di	600
+食尸虫群	shi shi chong qun	600
+吸魂巫术	xi hun wu shu	600
+驱使恶灵	qu shi e ling	600
+魔女狡黠	mo nv jiao xia	600
+窒息之刃	zhi xi zhi ren	600
+幻影突袭	huan ying tu xi	600
+魅影无形	mei ying wu xing	600
+恩赐解脱	en ci jie tuo	600
+刀阵旋风	dao zhen xuan feng	600
+幽冥爆轰	you ming bao hong	600
+幽冥守卫	you ming shou wei	600
+生命汲取	sheng ming ji qu	600
+忘却学者	wang que xue zhe	600
+折光	zhe guang	600
+灵能之刃	ling neng zhi ren	600
+灵能陷阱	ling neng xian jing	600
+灵能投射	ling neng tou she	600
+毒性攻击	du xing gong ji	600
+幽冥剧毒	you ming ju du	600
+腐蚀皮肤	fu shi pi fu	600
+蝮蛇突袭	fu she tu xi	600
+俯冲轰炸	fu chong hong zha	600
+月刃	yue ren	600
+月之祝福	yue zhi zhu fu	600
+月蚀	yue shi	600
+环月	huan yue	600
+火焰气息	huo yan qi xi	600
+神龙摆尾	shen long bai wei	600
+龙族血统	long zu xue tong	600
+真龙形态	zhen long xing tai	600
+绿龙	lv long	600
+冰龙形态	bing long xing tai	600
+心炎	xin yan	600
+沸血之矛	fei xue zhi mao	600
+狂战士之血	kuang zhan shi zhi xue	600
+血魔法	xue mo fa	600
+弹幕冲击	dan mu chong ji	600
+能量齿轮	neng liang chi lun	600
+照明火箭	zhao ming huo jian	600
+发射钩爪	fa she gou zhua	600
+装甲力量	zhuang jia li liang	600
+喷气背包	pen qi bei bao	600
+超速运转	chao su yun zhuan	600
+撕裂大地	si lie da di	600
+恶魔敕令	e mo chi ling	600
+闪电风暴	shan dian feng bao	600
+脉冲新星	mai chong xin xing	600
+大肆污染	da si wu ran	600
+自然的呼唤	zi ran de hu huan	600
+自然之怒	zi ran zhi nu	600
+森林之魂	sen lin zhi hun	600
+树海诅咒	shu hai zu zhou	600
+撕裂伤口	si lie shang kou	600
+食尸鬼狂怒	shi shi gui kuang nu	600
+离子外壳	li zi wai ke	600
+复制之墙	fu zhi zhi qiang	600
+普通一拳	pu tong yi quan	600
+心智聪颖	xin zhi cong ying	600
+灼热之箭	zhuo re zhi jian	600
+死亡契约	si wang qi yue	600
+骷髅步	ku lou bu	600
+燃烧之军	ran shao zhi jun	600
+焦油炸弹	jiao you zha dan	600
+天国恩赐	tian guo en ci	600
+退化光环	tui hua guang huan	600
+纯洁之锤	chun jie zhi chui	600
+全能之锤	quan neng zhi chui	600
+自然之助	zi ran zhi zhu	600
+森林伙伴	sen lin huo ban	600
+虚空暗夜	xu kong an ye	600
+伤残恐惧	shang can kong ju	600
+暗夜猎影	an ye lie ying	600
+黑暗飞升	hei an fei sheng	600
+夜之化身	ye zhi hua shen	600
+孵化蜘蛛	fu hua zhi zhu	600
+麻痹之咬	ma bi zhi yao	600
+极度饥渴	ji du ji ke	600
+蛛网猎手	zhu wang lie shou	600
+丝制重器	si zhi zhong qi	600
+投掷飞镖	tou zhi fei biao	600
+暗影步	an ying bu	600
+追踪术	zhui zong shu	600
+妙手空空	miao shou kong kong	600
+缩地	suo di	600
+命运织网	ming yun zhi wang	600
+冰火交加	bing huo jiao jia	600
+冰封路径	bing feng lu jing	600
+液态火	ye tai huo	600
+烈焰焚身	lie yan fen shen	600
+液态冰	ye tai bing	600
+粘性燃油	zhan xing ran you	600
+烈焰破击	lie yan po ji	600
+火焰飞行	huo yan fei xing	600
+燃烧枷锁	ran shao jia suo	600
+闷烧树脂	men shao shu zhi	600
+神圣劝化	shen sheng quan hua	600
+神恩眷顾	shen en juan gu	600
+召唤信徒	zhao huan xin tu	600
+幽鬼之刃	you gui zhi ren	600
+鬼影重重	gui ying chong chong	600
+暗影步幽鬼	an ying bu you gui	600
+幻影突袭幽鬼	huan ying tu xi you gui	600
+极寒之触	ji han zhi chu	600
+冰霜漩涡	bing shuang xuan wo	600
+寒霜之足	han shuang zhi zu	600
+冰晶爆轰	bing jing bao hong	600
+死亡雾霜	si wang wu shuang	600
+阎刃	yan ren	600
+末日降临	mo ri jiang lin	600
+等级分红	deng ji fen hong	600
+法力燃烧	fa li ran shao	600
+尖刺外壳	jian ci wai ke	600
+钻地小强	zuan di xiao qiang	600
+意识感知	yi shi gan zhi	600
+震撼大地	zhen han da di	600
+超强力量	chao qiang li liang	600
+怒意狂击	nu yi kuang ji	600
+槌毛	chui mao	600
+暗影冲刺	an ying chong ci	600
+巨力重击	ju li zhong ji	600
+幽冥一击	you ming yi ji	600
+平面空洞	ping mian kong dong	600
+火箭弹幕	huo jian dan mu	600
+追踪导弹	zhui zong dao dan	600
+高射火炮	gao she huo pao	600
+召唤飞弹	zhao huan fei dan	600
+拆装工	chai zhuang gong	600
+酸性喷雾	suan xing pen wu	600
+不稳定化合物	bu wen ding hua he wu	600
+贪魔的贪婪	tan mo de tan lan	600
+化学狂暴	hua xue kuang bao	600
+狂暴药水	kuang bao yao shui	600
+种子资金	zhong zi zi jin	600
+元素祈唤	yuan su qi huan	600
+冰元素	bing yuan su	600
+雷元素	lei yuan su	600
+火元素	huo yuan su	600
+极速冷却	ji su leng que	600
+幽灵漫步	you ling man bu	600
+强袭飓风	qiang xi ju feng	600
+电磁脉冲	dian ci mai chong	600
+灵动迅捷	ling dong xun jie	600
+混沌陨石	hun dun yun shi	600
+阳炎冲击	yang yan chong ji	600
+熔炉精灵	rong lu jing ling	600
+寒冰之墙	han bing zhi qiang	600
+冰墙	bing qiang	600
+超震声波	chao zhen sheng bo	600
+天火洗礼	tian huo xi li	600
+博学之人	bo xue zhi ren	600
+奥术诅咒	ao shu zu zhou	600
+智慧之刃	zhi hui zhi ren	600
+全领域静默	quan ling yu jing mo	600
+大招静默	da zhao jing mo	600
+窃取智力	qie qu zhi li	600
+奥术天球	ao shu tian qiu	600
+星体禁锢	xing ti jin gu	600
+精气光环	jing qi guang huan	600
+神智之蚀	shen zhi zhi shi	600
+殁境之威	mo jing zhi wei	600
+召唤狼	zhao huan lang	600
+野性驱使	ye xing qu shi	600
+狼咬	lang yao	600
+掠食本能	lve shi ben neng	600
+雷霆一击	lei ting yi ji	600
+余烬佳酿	yu jin jia niang	600
+元素分离	yuan su fen li	600
+原始拆分	yuan shi chai fen	600
+醉仙拳	zui xian quan	600
+酒桶滚滚	jiu tong gun gun	600
+大地战士	da di zhan shi	600
+狂风战士	kuang feng zhan shi	600
+烈火战士	lie huo zhan shi	600
+虚无战士	xu wu zhan shi	600
+崩裂禁锢	beng lie jin gu	600
+暗影毒	an ying du	600
+释放暗影毒	shi fang an ying du	600
+邪恶净化	xie e jing hua	600
+恶魔清洗	e mo qing xi	600
+菜单传人	cai dan chuan ren	600
+召唤熊灵	zhao huan xiong ling	600
+灵魂链接	ling hun lian jie	600
+野蛮咆哮	ye man pao xiao	600
+真熊形态	zhen xiong xing tai	600
+缠绕之爪	chan rao zhi zhua	600
+礼物使者	li wu shi zhe	600
+混乱之箭	hun luan zhi jian	600
+实相裂隙	shi xiang lie xi	600
+混沌一击	hun dun yi ji	600
+混沌之军	hun dun zhi jun	600
+幻象洗牌	huan xiang xi pai	600
+地之束缚	di zhi shu fu	600
+分则能成	fen ze neng cheng	600
+超大米波	chao da mi bo	600
+打包跑路	da bao pao lu	600
+自然蔽护	zi ran bi hu	600
+寄生种子	ji sheng zhong zi	600
+活体护甲	huo ti hu jia	600
+疯狂生长	feng kuang sheng zhang	600
+森林之眼	sen lin zhi yan	600
+自然卷握	zi ran juan wo	600
+树人漫步	shu ren man bu	600
+火焰爆轰	huo yan bao hong	600
+嗜血术	shi xue shu	600
+多重施法	duo chong shi fa	600
+烈火护盾	lie huo hu dun	600
+未精炼火焰爆轰	wei jing lian huo yan bao hong	600
+愚钝天赐	yu dun tian ci	600
+噬魂	shi hun	600
+血肉傀儡	xue rou kui lei	600
+永生不朽	yong sheng bu xiu	600
+隔空取物	ge kong qu wu	600
+弱化能流	ruo hua neng liu	600
+奥术至尊	ao shu zhi zun	600
+技能窃取	ji neng qie qu	600
+力量增幅	li liang zeng fu	600
+雷霆之击	lei ting zhi ji	600
+瞥视	pie shi	600
+动能立场	dong neng li chang	600
+动能栅栏	dong neng zha lan	600
+静态风暴	jing tai feng bao	600
+电磁排斥	dian ci pai chi	600
+海妖之歌	hai yao zhi ge	600
+卷浪	juan lang	600
+冲击光波	chong ji guang bo	600
+盲目之光	mang mu zhi guang	600
+查克拉魔法	cha ke la mo fa	600
+灵魂形态	ling hun xing tai	600
+威尔普斯	wei er pu si	600
+魔法充盈	mo fa chong ying	600
+降临重定位	jiang lin chong ding wei	600
+黄泉颤抖	huang quan chan dou	600
+灵魂超度	ling hun chao du	600
+守墓人的斗篷	shou mu ren de dou peng	600
+召唤佣兽	zhao huan yong shou	600
+石像形态	shi xiang xing tai	600
+潜伏者	qian fu zhe	600
+黑暗契约	hei an qi yue	600
+能量转移	neng liang zhuan yi	600
+暗影之舞	an ying zhi wu	600
+深海狂鲨	shen hai kuang sha	600
+分裂箭	fen lie jian	600
+秘术异蛇	mi shu yi she	600
+魔法护盾	mo fa hu dun	600
+石化凝视	shi hua ning shi	600
+冷血动物	leng xue dong wu	600
+戈尔贡之握	ge er gong zhi wo	600
+狂战士之怒	kuang zhan shi zhi nu	600
+旋风飞斧	xuan feng fei fu	600
+热血战魂	re xue zhan hun	600
+战斗专注	zhan dou zhuan zhu	600
+马蹄践踏	ma ti jian ta	600
+奔袭冲撞	ben xi chong zhuang	600
+粗壮体格	cu zhuang ti ge	600
+裂地波	lie di bo	600
+授予力量	shou yu li liang	600
+獠牙冲刺	liao ya chong ci	600
+两极反转	liang ji fan zhuan	600
+长角抛物	chang jiao pao wu	600
+坚实核心	jian shi he xin	600
+死亡旋风	si wang xuan feng	600
+伐木锯链	fa mu ju lian	600
+活性护甲	huo xing hu jia	600
+锯齿飞轮	ju chi fei lun	600
+投掷飞轮	tou zhi fei lun	600
+喷火器	pen huo qi	600
+极限暴露	ji xian bao lu	600
+粘稠鼻涕	nian chou bi ti	600
+刺针扫射	ci zhen sao she	600
+钢毛后背	gang mao hou bei	600
+战意	zhan yi	600
+毛团	mao tuan	600
+鼻涕泡	bi ti pao	600
+寒冰碎片	han bing sui pian	600
+冰封魔印	bing feng mo yin	600
+摔角行家	shuai jiao hang jia	600
+海象神拳	hai xiang shen quan	600
+海象飞踢	hai xiang fei ti	600
+严寒体质	yan han ti zhi	600
+奥术鹰隼	ao shu ying sun	600
+震荡光弹	zhen dang guang dan	600
+上古封印	shang gu feng yin	600
+神秘之耀	shen mi zhi yao	600
+毁灭与重生	hui mie yu chong sheng	600
+迷雾缠绕	mi wu chan rao	600
+死亡缠绕	si wang chan rao	600
+无光之盾	wu guang zhi dun	600
+魔霭诅咒	mo ai zu zhou	600
+艾弗良斯的献祭	ai fu liang si de xian ji	600
+回音重踏	hui yin zhong ta	600
+星体游魂	xing ti you hun	600
+自然秩序	zi ran zhi xu	600
+裂地沟壑	lie di gou he	600
+步履沉重	bu lv chen zhong	600
+压倒性优势	ya dao xing you shi	600
+勇气之霎	yong qi zhi sha	600
+粘性炸弹	zhan xing zha dan	600
+电击地雷	dian ji di lei	600
+爆破起飞	bao po qi fei	600
+感应地雷	gan ying di lei	600
+雷区标识	lei qu biao shi	600
+炎阳索	yan yang suo	600
+无影拳	wu ying quan	600
+烈火罩	lie huo zhao	600
+残焰	can yan	600
+激活残焰	ji huo can yan	600
+巨石冲击	ju shi chong ji	600
+巨石翻滚	ju shi fan gun	600
+地磁之握	di ci zhi wo	600
+残岩	can yan	600
+石化魔咒	shi hua mo zhou	600
+火焰风暴	huo yan feng bao	600
+怨念深渊	yuan nian shen yuan	600
+衰退光环	shuai tui guang huan	600
+恶魔扉页	e mo fei ye	600
+地狱入侵	di yu ru qin	600
+惑幻	huo huan	600
+魔化	mo hua	600
+恶魔狂热	e mo kuang re	600
+恐惧浪潮	kong ju lang chao	600
+凤凰冲击	feng huang chong ji	600
+烈火精灵	lie huo jing ling	600
+烈日炙烤	lie ri zhi kao	600
+盲目烈日	mang mu lie ri	600
+气运之末	qi yun zhi mo	600
+命运敕令	ming yun chi ling	600
+涤罪之火	di zui zhi huo	600
+虚妄之诺	xu wang zhi nuo	600
+严寒烧灼	yan han shao zhuo	600
+碎裂冲击	sui lie chong ji	600
+极寒之拥	ji han zhi yong	600
+寒冬诅咒	han dong zu zhou	600
+艾尔德林的博学	ai er de lin de bo xue	600
+闪光幽魂	shan guang you hun	600
+风暴双雄	feng bao shuang xiong	600
+神符灌注	shen fu guan zhu	600
+棒击大地	bang ji da di	600
+丛林之舞	cong lin zhi wu	600
+乾坤跃	qian kun yue	600
+如意棒法	ru yi bang fa	600
+猴子猴孙	hou zi hou sun	600
+护身法宝	hu shen fa bao	600
+荆棘迷宫	jing ji mi gong	600
+暗影之境	an ying zhi jing	600
+诅咒王冠	zu zhou wang guan	600
+仙灵粉尘	xian ling fen chen	600
+甲盾冲击	jia dun chong ji	600
+幸运一击	xing yun yi ji	600
+地雷滚滚	di lei gun gun	600
+勇猛天成	yong meng tian cheng	600
+命运之笔	ming yun zhi bi	600
+幻影之拥	huan ying zhi yong	600
+墨涌	mo yong	600
+缚魂	fu hun	600
+暗绘	an hui	600
+战神迅矛	zhan shen xun mao	600
+神之谴戒	shen zhi qian jie	600
+护身甲盾	hu shen jia dun	600
+热血竞技场	re xue jing ji chang	600
+不败之勇	bu bai zhi yong	600
+残阴	can yin	600
+共鸣脉冲	gong ming mai chong	600
+太虚之径	tai xu zhi jing	600
+内在力量	nei zai li liang	600
+电光石火	dian guang shi huo	600
+霹雳铁手	pi li tie shou	600
+蜥蜴绝吻	xi yi jue wen	600
+一口吞下	yi kou tun xia	600
+正中靶心	zheng zhong ba xin	600
+爆栗出击	bao li chu ji	600
+野地奇袭	ye di qi xi	600
+密林奔走	mi lin ben zou	600
+诱敌奇术	you di qi shu	600
+猎人回旋镖	lie ren hui xuan biao	600
+星破天惊	xing po tian jing	600
+上界重锤	shang jie zhong chui	600
+天光现世	tian guang xian shi	600
+破晓时分	po xiao shi fen	600
+过肩摔	guo jian shuai	600
+回音击跃	hui yin ji yue	600
+健体术	jian ti shu	600
+怒拳破	nu quan po	600
+贴身护卫	tie shen hu wei	600
+特殊快递	te shu kuai di	600
+巨石投掷	ju shi tou zhi	600
+亡者之枪	wang zhe zhi qiang	600
+唤魂	huan hun	600
+神枪在手	shen qiang zai shou	600
+掘墓人	jue mu ren	600
+帕特的赠礼	pa te de zeng li	600
+驯兽皮鞭	xun shou pi bian	600
+逃生魔术	tao sheng mo shu	600
+飞刀杂技	fei dao za ji	600
+奇观轮盘	qi guan lun pan	600
+强光聚光灯	qiang guang ju guang deng	600
+放气垫	fang qi dian	600
+怪力药水	guai li yao shui	600
+通灵馅饼	tong ling xian bing	600
+尖叫玩偶	jian jiao wan ou	600
+流派变换	liu pai bian huan	600
+回音斩	hui yin zhan	600
+钩爪铁链	gou zhua tie lian	600
+御刀术	yu dao shu	600
+猛禽之舞	meng qin zhi wu	600
+翔影之袭	xiang ying zhi xi	600
+天隼冲击	tian sun chong ji	600
+利爪飞掷	li zhua fei zhi	600
+渡鸦之纱	du ya zhi sha	600
+纠缠之舌	jiu chan zhi she	600
+演艺精神	yan yi jing shen	600
+双栖狂想曲	shuang qi kuang xiang qu	600
+巨胃欢歌	ju wei huan ge	600
+两栖战歌	liang qi zhan ge	600
+牛蛙重踏	niu wa zhong ta	600
+岛屿万灵药	dao yu wan ling yao	600
+安可	an ke	600
+闪烁匕首	shan shuo bi shou	600
+跳刀	tiao dao	600
+力量跳刀	li liang tiao dao	600
+盛势闪光	sheng shi shan guang	600
+敏捷跳刀	min jie tiao dao	600
+迅疾闪光	xun ji shan guang	600
+智力跳刀	zhi li tiao dao	600
+秘奥闪光	mi ao shan guang	600
+大跳刀	da tiao dao	600
+攻击之爪	gong ji zhi zhua	600
+阔剑	kuo jian	600
+链甲	lian jia	600
+秘银锤	mi yin chui	600
+铁意头盔	tie yi tou kui	600
+振奋宝石	zhen fen bao shi	600
+恶魔刀锋	e mo dao feng	600
+圣者遗物	sheng zhe yi wu	600
+掠夺者之斧	lve duo zhe zhi fu	600
+神秘法杖	shen mi fa zhang	600
+鹰歌弓	ying ge gong	600
+极限法球	ji xian fa qiu	600
+活力之球	huo li zhi qiu	600
+精气之球	jing qi zhi qiu	600
+能量之球	neng liang zhi qiu	600
+治疗指环	zhi liao zhi huan	600
+虚无宝石	xu wu bao shi	600
+魔力法杖	mo li fa zhang	600
+欢欣之刃	huan xin zhi ren	600
+食人魔之斧	shi ren mo zhi fu	600
+贵族头巾	gui zu tou jin	600
+力量腰带	li liang yao dai	600
+精灵布带	jing ling bu dai	600
+法师长袍	fa shi chang pao	600
+力量手套	li liang shou tao	600
+敏捷便鞋	min jie bian xie	600
+智力斗篷	zhi li dou peng	600
+铁树枝干	tie shu zhi gan	600
+大魔棒	da mo bang	600
+小魔棒	xiao mo bang	600
+怨灵系带	yuan ling ji dai	600
+系带	xi dai	600
+空灵挂件	kong ling gua jian	600
+灵魂之戒	ling hun zhi jie	600
+魂戒	hun jie	600
+相位鞋	xiang wei xie	600
+动力鞋	dong li xie	600
+远行鞋	yuan xing xie	600
+大飞鞋	da fei xie	600
+速度之靴	su du zhi xue	600
+静谧之靴	jing mi zhi xue	600
+奥术鞋	ao shu xie	600
+秘法鞋	mi fa xie	600
+卫士胫甲	wei shi jing jia	600
+大鞋	da xie	600
+点金手	dian jin shou	600
+迈达斯之手	mai da si zhi shou	600
+疯脸	feng lian	600
+疯狂面具	feng kuang mian ju	600
+吸血面具	xi xue mian ju	600
+支配头盔	zhi pei tou kui	600
+统御头盔	tong yu tou kui	600
+大支配	da zhi pei	600
+月之银	yue zhi yin	600
+银月之晶	yin yue zhi jing	600
+暗影护符	an ying hu fu	600
+隐刀	yin dao	600
+影刃	ying ren	600
+白银之锋	bai yin zhi feng	600
+大隐刀	da yin dao	600
+骷髅棒	ku lou bang	600
+碎颅锤	sui lu chui	600
+晕锤	yun chui	600
+深渊之刃	shen yuan zhi ren	600
+大晕锤	da yun chui	600
+水晶剑	shui jing jian	600
+小暴击	xiao bao ji	600
+代达罗斯之殇	dai da luo si zhi shang	600
+大暴击	da bao ji	600
+狂战斧	kuang zhan fu	600
+陨星锤	yun xing chui	600
+精进陨星锤	jing jin yun xing chui	600
+猴子棒	hou zi bang	600
+回音战刃	hui yin zhan ren	600
+连击刀	lian ji dao	600
+神圣鱼叉	shen sheng yu cha	600
+小电锤	xiao dian chui	600
+雷神之锤	lei shen zhi chui	600
+大电锤	da dian chui	600
+血棘	xue ji	600
+大紫苑	da zi yuan	600
+紫苑	zi yuan	600
+邪恶镰刀	xie e lian dao	600
+阿托斯之棍	a tuo si zhi gun	600
+阿托斯	a tuo si	600
+缚灵索	fu ling suo	600
+大阿托斯	da a tuo si	600
+风杖	feng zhang	600
+尤尔的神圣法杖	you er de shen sheng fa zhang	600
+风之杖	feng zhi zhang	600
+大吹风	da chui feng	600
+原力法杖	yuan li fa zhang	600
+推推棒	tui tui bang	600
+飓风长戟	ju feng chang ji	600
+大推推	da tui tui	600
+达贡之神力	da gong zhi shen li	600
+红杖	hong zhang	600
+大根	da gen	600
+阿哈利姆神杖	a ha li mu shen zhang	600
+蓝杖	lan zhang	600
+神杖	shen zhang	600
+阿哈利姆魔晶	a ha li mu mo jing	600
+魔晶	mo jing	600
+刷新球	shua xin qiu	600
+玲珑心	ling long xin	600
+纷争面纱	fen zheng mian sha	600
+巫师之刃	wu shi zhi ren	600
+英灵胸针	ying ling xiong zhen	600
+圣洁吊坠	sheng jie diao zhui	600
+微光披风	wei guang pi feng	600
+洞察烟斗	dong cha yan dou	600
+挑战头巾	tiao zhan tou jin	600
+梅肯斯姆	mei ken si mu	600
+梅肯	mei ken	600
+弗拉迪米尔的祭品	fu la di mi er de ji pin	600
+韧鼓	ren gu	600
+宽容之靴	kuan rong zhi xue	600
+大战鼓	da zhan gu	600
+影之灵龛	ying zhi ling kan	600
+魂之灵瓮	hun zhi ling weng	600
+大骨灰	da gu hui	600
+炎阳纹章	yan yang wen zhang	600
+大勋章	da xun zhang	600
+勇气勋章	yong qi xun zhang	600
+小勋章	xiao xun zhang	600
+幽灵权杖	you ling quan zhang	600
+绿杖	lv zhang	600
+虚灵之刃	xu ling zhi ren	600
+虚灵刀	xu ling dao	600
+黑皇杖	hei huang zhang	600
+林肯法球	lin ken fa qiu	600
+清莲宝珠	qing lian bao zhu	600
+刃甲	ren jia	600
+赤红甲	chi hong jia	600
+先锋盾	xian feng dun	600
+永世法衣	yong shi fa yi	600
+法衣	fa yi	600
+血精石	xue jing shi	600
+血精	xue jing	600
+希瓦的守护	xi wa de shou hu	600
+冰甲	bing jia	600
+强袭胸甲	qiang xi xiong jia	600
+恐鳌之心	kong ao zhi xin	600
+龙心	long xin	600
+撒旦之邪力	sa dan zhi xie li	600
+斯嘉蒂之眼	si jia di zhi yan	600
+冰眼	bing yan	600
+散华	san hua	600
+慧光	hui guang	600
+对剑	dui jian	600
+散夜对剑	san ye dui jian	600
+散慧对剑	san hui dui jian	600
+慧夜对剑	hui ye dui jian	600
+天堂之戟	tian tang zhi ji	600
+幻影斧	huan ying fu	600
+分身斧	fen shen fu	600
+净魂之刃	jing hun zhi ren	600
+散失之刃	san shi zhi ren	600
+血色华尔兹	xue se hua er zi	600
+散魂剑	san hun jian	600
+大散失	da san shi	600
+法师克星	fa shi ke xing	600
+圣斧	sheng fu	600
+莫尔迪基安的臂章	mo er di ji an de bi zhang	600
+否决坠饰	fou jue zhui shi	600
+魔龙枪	mo long qiang	600
+黯灭	an mie	600
+暗灭	an mie	600
+双生暗灭	shuang sheng an mie	600
+腐蚀之球	fu shi zhi qiu	600
+毒球	du qiu	600
+淬毒之珠	cui du zhi zhu	600
+迅雷之闪	xun lei zhi shan	600
+猎鹰战刃	lie ying zhan ren	600
+腐蚀之刃	fu shi zhi ren	600
+寒铁钢爪	han tie gang zhua	600
+打野爪	da ye zhua	600
+天鹰之戒	tian ying zhi jie	600
+天鹰戒	tian ying jie	600
+穷鬼盾	qiong gui dun	600
+死灵书	si ling shu	600
+达贡	da gong	600
+侦查守卫	zhen cha shou wei	600
+假眼	jia yan	600
+岗哨守卫	gang shao shou wei	600
+真眼	zhen yan	600
+显影之尘	xian ying zhi chen	600
+真视宝石	zhen shi bao shi	600
+诡计之雾	gui ji zhi wu	600
+开雾	kai wu	600
+回城卷轴	hui cheng juan zhou	600
+魔瓶	mo ping	600
+治疗药膏	zhi liao yao gao	600
+大药	da yao	600
+树之祭祀	shu zhi ji si	600
+吃树	chi shu	600
+净化药水	jing hua yao shui	600
+小蓝	xiao lan	600
+仙灵之火	xian ling zhi huo	600
+魔法芒果	mo fa mang guo	600
+血腥榴弹	xue xing liu dan	600
+凝魂之露	ning hun zhi lu	600
+魂泪	hun lei	600
+风灵之纹	feng ling zhi wen	600
+枯萎之石	ku wei zhi shi	600
+回复戒指	hui fu jie zhi	600
+贤者面罩	xian zhe mian zhao	600
+抗魔斗篷	kang mo dou peng	600
+压制之刃	ya zhi zhi ren	600
+补刀斧	bu dao fu	600
+绒毛帽	rong mao mao	600
+毛毛帽	mao mao mao	600
+淬毒之箭	cui du zhi jian	600
+吸血鬼獠牙	xi xue gui liao ya	600
+不朽之守护	bu xiu zhi shou hu	600
+不朽盾	bu xiu dun	600
+刷新球碎片	shua xin qiu sui pian	600
+阿哈利姆神杖的祝福	a ha li mu shen zhang de zhu fu	600
+肉山战旗	rou shan zhan qi	600
+知识之书	zhi shi zhi shu	600
+奥术指环	ao shu zhi huan	600
+铁意之戒	tie yi zhi jie	600
+蜂王浆	feng wang jiang	600
+秘术手镯	mi shu shou zhuo	600
+散失护身符	san shi hu shen fu	600
+猎人短刀	lie ren duan dao	600
+法术棱镜	fa shu leng jing	600
+天崩	tian beng	600
+寂灭	ji mie	600
+海盗帽	hai dao mao	600
+巨人之戒	ju ren zhi jie	600
+木偶大师	mu ou da shi	600
+魔童之爪	mo tong zhi zhua	600
+安全泡泡	an quan pao pao	600
+幽冥背心	you ming bei xin	600
+折翼之羽	zhe yi zhi yu	600
+狗头人酒杯	gou tou ren jiu bei	600
+奥术宝石	ao shu bao shi	600
+行家阵列	hang jia zhen lie	600
+双生吊坠	shuang sheng diao zhui	600
+回响之盾	hui xiang zhi dun	600
+先锋之盾	xian feng zhi dun	600
+加长枪管	jia chang qiang guan	600
+复仇之爪	fu chou zhi zhua	600
+蜘蛛腿	zhi zhu tui	600
+亲王短刀	qin wang duan dao	600
+牛头人号角	niu tou ren hao jiao	600
+圣堂之戒	sheng tang zhi jie	600
+迈达斯王冠	mai da si wang guan	600
+风暴宝器	feng bao bao qi	600
+原力靴	yuan li xue	600
+天翼之靴	tian yi zhi xue	600
+冥灵书	ming ling shu	600
+海神三叉戟	hai shen san cha ji	600
+奥术师铠甲	ao shu shi kai jia	600
+浩劫巨锤	hao jie ju chui	600
+幻术师披风	huan shu shi pi feng	600
+忍者用具	ren zhe yong ju	600
+机敏之靴	ji min zhi xue	600
+闪烁戒指	shan shuo jie zhi	600
+星辰重锤	xing chen zhong chui	600
+魔力箭袋	mo li jian dai	600
+骑士剑	qi shi jian	600
+心灵炽焰	xin ling chi yan	600
+智灭	zhi mie	600
+毁灵法球	hui ling fa qiu	600
+弹射法杖	tan she fa zhang	600
+森森木枝	sen sen mu zhi	600
+铁树之木	tie shu zhi mu	600
+杂技玩具	za ji wan ju	600
+波莉沃格护符	bo li wo ge hu fu	600
+撕裂之鞭	si lie zhi bian	600
+玄奥指环	xuan ao zhi huan	600
+碎魂之戒	sui hun zhi jie	600
+炎爪	yan zhua	600
+笨重战斧	ben zhong zhan fu	600
+贫困之盾	pin kun zhi dun	600
+法力药水	fa li yao shui	600
+不眠之眼	bu mian zhi yan	600
+不死头盔	bu si tou kui	600
+天残之靴	tian can zhi xue	600
+天鹰战旗	tian ying zhan qi	600
+先祖药水	xian zu yao shui	600
+咒术手套	zhou shu shou tao	600
+不对称法杖	bu dui chen fa zhang	600
+神圣法衣	shen sheng fa yi	600
+全能之眼	quan neng zhi yan	600
+巨神之刃	ju shen zhi ren	600
+米诺陶斯角	mi nuo tao si jiao	600
+巫师之帽	wu shi zhi mao	600
+学徒之礼	xue tu zhi li	600
+铁木之树	tie mu zhi shu	600
+生锈铁锤	sheng xiu tie chui	600
+铁甲背心	tie jia bei xin	600
+掘墓人铁锹	jue mu ren tie qiao	600
+信任之铲	xin ren zhi chan	600
+猪杆	zhu gan	600
+仙灵饰品	xian ling shi pin	600
+种子袋	zhong zi dai	600
+火花之勇	huo hua zhi yong	600
+赤色天篷	chi se tian peng	600
+暗影斗篷	an ying dou peng	600
+低语斗篷	di yu dou peng	600
+全知之眼	quan zhi zhi yan	600
+精准之眼	jing zhun zhi yan	600
+狂热的信徒	kuang re de xin tu	600
+食尸鬼面罩	shi shi gui mian zhao	600
+加重的骰子	jia zhong de tou zi	600
+狗头人护符	gou tou ren hu fu	600
+奥术水晶	ao shu shui jing	600
+猎人战靴	lie ren zhan xue	600
+行者之靴	xing zhe zhi xue	600
+灵匣	ling xia	600
+达贡之冠	da gong zhi guan	600
+消散法球	xiao san fa qiu	600
+血肉之环	xue rou zhi huan	600
+魔力头冠	mo li tou guan	600
+极速护腕	ji su hu wan	600
+专家阵列	zhuan jia zhen lie	600
+双生之花	shuang sheng zhi hua	600
+反抗头巾	fan kang tou jin	600
+法术增幅器	fa shu zeng fu qi	600
+狂怒之石	kuang nu zhi shi	600
+碎裂背心	sui lie bei xin	600
+巫毒面具	wu du mian ju	600
+毁灭灵球	hui mie ling qiu	600
+角斗士头盔	jue dou shi tou kui	600
+统御之冠	tong yu zhi guan	600
+巨神重锤	ju shen zhong chui	600
+魔导法杖	mo dao fa zhang	600
+神圣之剑	shen sheng zhi jian	600
+死灵法杖	si ling fa zhang	600
+狂乱之石	kuang luan zhi shi	600
+天辉	tian hui	600
+夜魇	ye yan	600
+一号位	yi hao wei	600
+二号位	er hao wei	600
+三号位	san hao wei	600
+五号位	wu hao wei	600
+大核	da he	600
+劣单	lie dan	600
+优势路	you shi lu	600
+劣势路	lie shi lu	600
+边路	bian lu	600
+纯辅助	chun fu zhu	600
+工具人	gong ju ren	600
+软控	ruan kong	600
+沉默术	chen mo shu	600
+真实视域	zhen shi shi yu	600
+真视	zhen shi	600
+高坡视野	gao po shi ye	600
+高地视野	gao di shi ye	600
+绕树林	rao shu lin	600
+卡视野	ka shi ye	600
+技能免疫	ji neng mian yi	600
+魔法免疫	mo fa mian yi	600
+魔免	mo mian	600
+减益免疫	jian yi mian yi	600
+状态抗性	zhuang tai kang xing	600
+魔法抗性	mo fa kang xing	600
+物理护甲	wu li hu jia	600
+分裂攻击	fen lie gong ji	600
+溅射	jian she	600
+攻击前摇	gong ji qian yao	600
+攻击后摇	gong ji hou yao	600
+施法前摇	shi fa qian yao	600
+施法后摇	shi fa hou yao	600
+取消后摇	qu xiao hou yao	600
+走砍	zou kan	600
+转身速率	zhuan shen su lv	600
+主属性	zhu shu xing	600
+力量英雄	li liang ying xiong	600
+敏捷英雄	min jie ying xiong	600
+智力英雄	zhi li ying xiong	600
+全才英雄	quan cai ying xiong	600
+先天技能	xian tian ji neng	600
+命石	ming shi	600
+天赋树	tian fu shu	600
+黄点	huang dian	600
+全属性	quan shu xing	600
+物理伤害	wu li shang hai	600
+魔法伤害	mo fa shang hai	600
+纯粹伤害	chun cui shang hai	600
+生命移除	sheng ming yi chu	600
+生命恢复	sheng ming hui fu	600
+魔法恢复	mo fa hui fu	600
+技能增强	ji neng zeng qiang	600
+冷却缩减	leng que suo jian	600
+施法距离	shi fa ju li	600
+昼夜交替	zhou ye jiao ti	600
+白天视野	bai tian shi ye	600
+夜间视野	ye jian shi ye	600
+正补	zheng bu	600
+反补	fan bu	600
+漏刀	lou dao	600
+塔刀	ta dao	600
+控线	kong xian	600
+断兵	duan bing	600
+断兵线	duan bing xian	600
+勾兵	gou bing	600
+卡兵	ka bing	600
+拉野	la ye	600
+屯野	tun ye	600
+拉双野	la shuang ye	600
+封野	feng ye	600
+反封野	fan feng ye	600
+中野	zhong ye	600
+远古野	yuan gu ye	600
+打远古	da yuan gu	600
+清远古	qing yuan gu	600
+刷钱	shua qian	600
+刚三	gang san	600
+劣势路刚三	lie shi lu gang san	600
+混线	hun xian	600
+蹭经验	ceng jing yan	600
+吃经验	chi jing yan	600
+控符	kong fu	600
+抢符	qiang fu	600
+灌瓶	guan ping	600
+赏金神符	shang jin shen fu	600
+赏金符	shang jin fu	600
+圣水神符	sheng shui shen fu	600
+水符	shui fu	600
+智慧神符	zhi hui shen fu	600
+经验符	jing yan fu	600
+双倍神符	shuang bei shen fu	600
+双倍伤害	shuang bei shang hai	600
+极速神符	ji su shen fu	600
+极速符	ji su fu	600
+幻象神符	huan xiang shen fu	600
+幻象符	huan xiang fu	600
+隐身神符	yin shen shen fu	600
+隐身符	yin shen fu	600
+恢复神符	hui fu shen fu	600
+恢复符	hui fu fu	600
+奥术神符	ao shu shen fu	600
+奥术符	ao shu fu	600
+护盾神符	hu dun shen fu	600
+护盾符	hu dun fu	600
+反眼	fan yan	600
+排眼	pai yan	600
+做视野	zuo shi ye	600
+高台眼	gao tai yan	600
+线眼	xian yan	600
+防守眼	fang shou yan	600
+进攻眼	jin gong yan	600
+肉山眼	rou shan yan	600
+买活	mai huo	600
+骗买活	pian mai huo	600
+买活死	mai huo si	600
+读秒	du miao	600
+冲泉	chong quan	600
+守高	shou gao	600
+破高地	po gao di	600
+一路高地	yi lu gao di	600
+两路高地	liang lu gao di	600
+三路高地	san lu gao di	600
+超级兵	chao ji bing	600
+近战兵营	jin zhan bing ying	600
+远程兵营	yuan cheng bing ying	600
+外塔	wai ta	600
+二塔	er ta	600
+高地塔	gao di ta	600
+门牙塔	men ya ta	600
+四塔	si ta	600
+符文加固	fu wen jia gu	600
+防御符文	fang yu fu wen	600
+疗伤莲花	liao shang lian hua	600
+大莲花	da lian hua	600
+双生门	shuang sheng men	600
+痛苦魔方	tong ku mo fang	600
+偷肉山	tou rou shan	600
+打肉山	da rou shan	600
+肉山巢穴	rou shan chao xue	600
+肉山盾	rou shan dun	600
+带盾	dai dun	600
+带盾上高	dai dun shang gao	600
+运装备	yun zhuang bei	600
+神秘商店	shen mi shang dian	600
+野外商店	ye wai shang dian	600
+游走抓人	you zou zhua ren	600
+蹲人	dun ren	600
+反蹲	fan dun	600
+推进阵容	tui jin zhen rong	600
+四保一	si bao yi	600
+全球流	quan qiu liu	600
+召唤流	zhao huan liu	600
+冲脸	chong lian	600
+四人团灭	si ren tuan mie	600
+五人团灭	wu ren tuan mie	600
+买活反打	mai huo fan da	600
+惊天翻盘	jing tian fan pan	600
+膀胱局	pang guang ju	600
+基地丝血	ji di si xue	600
+偷家	tou jia	600
+换家	huan jia	600
+背靠世界树	bei kao shi jie shu	600
+第一滴血	di yi di xue	600
+一血	yi xue	600
+疯狂杀戮	feng kuang sha lu	600
+大杀特杀	da sha te sha	600
+主宰比赛	zhu zai bi sai	600
+杀人如麻	sha ren ru ma	600
+无人能挡	wu ren neng dang	600
+变态杀戮	bian tai sha lu	600
+妖怪般的杀戮	yao guai ban de sha lu	600
+如同神一般	ru tong shen yi ban	600
+圣剑翻盘	sheng jian fan pan	600
+弱驱散	ruo qu san	600
+强驱散	qiang qu san	600
+打断施法	da duan shi fa	600
+眩晕打断	xuan yun da duan	600
+无视魔免	wu shi mo mian	600
+无视技能免疫	wu shi ji neng mian yi	600
+召唤物	zhao huan wu	600
+远古黑龙	yuan gu hei long	600
+远古雷肤兽	yuan gu lei fu shou	600
+远古岩石傀儡	yuan gu yan shi kui lei	600
+人马征服者	ren ma zheng fu zhe	600
+地狱熊怪	di yu xiong guai	600
+枭兽	xiao shou	600
+萨特苦难使者	sa te ku nan shi zhe	600
+萨特窃神者	sa te qie shen zhe	600
+巨魔召唤师	ju mo zhao huan shi	600
+鹰身女妖	ying shen nv yao	600
+狗头人前景官	gou tou ren qian jing guan	600
+泥土傀儡	ni tu kui lei	600
+天梯分	tian ti fen	600
+冠绝一世	guan jue yi shi	600
+万古流芳	wan gu liu fang	600
+国际邀请赛	guo ji yao qing sai	600
+不朽盾冠军	bu xiu dun guan jun	600
+勇士令状	yong shi ling zhuang	600
+不朽饰品	bu xiu shi pin	600
+刀塔霸业	dao ta ba ye	600
+游廊	you lang	600
+队长模式	dui zhang mo shi	600
+全英雄选择	quan ying xiong xuan ze	600
+加速模式	jia su mo shi	600
+技能征召	ji neng zheng zhao	600
+中路单挑	zhong lu dan tiao	600
+老干爹	lao gan die	600
+大巴黎	da ba li	600
+茶队	cha dui	600
+星辰战队	xing chen zhan dui	600
+液体战队	ye ti zhan dui	600
+秘密战队	mi mi zhan dui	600
+石头人战队	shi tou ren zhan dui	600
+苔原	tai yuan	600
+绿鹰	lv ying	600
+猎鹰战队	lie ying zhan dui	600
+潮汐猎人战队	chao xi lie ren zhan dui	600
+战神七	zhan shen qi	600
+同福战队	tong fu zhan dui	600
+护国神翼	hu guo shen yi	600
+翼队	yi dui	600
+零二战队	ling er zhan dui	600
+银河战舰	yin he zhan jian	600
+幻影战队	huan ying zhan dui	600
+邪恶天才	xie e tian cai	600
+帝国战队	di guo zhan dui	600
+红星老师	hong xing lao shi	600
+黑黄战队	hei huang zhan dui	600
+联盟战队	lian meng zhan dui	600
+橘子战队	ju zi zhan dui	600
+春秋霸主	chun qiu ba zhu	600
+绿翼	lv yi	600
+新兵战队	xin bing zhan dui	600
+幻梦	huan meng	600
+云九	yun jiu	600
+秘密大魔王	mi mi da mo wang	600
+老男孩	lao nan hai	600
+王淳煜	wang chun yu	600
+萧瑟仙贝	xiao se xian bei	600
+徐林森	xu lin sen	600
+森哥	sen ge	600
+烟花神	yan hua shen	600
+路垚	lu yao	600
+超哥	chao ge	600
+杨沈仪	yang shen yi	600
+皮鞋杨	pi xie yang	600
+查理斯	cha li si	600
+猪皇	zhu huang	600
+姜岸	jiang an	600
+张宁	zhang ning	600
+下面八	xia mian ba	600
+八师傅	ba shi fu	600
+王兆辉	wang zhao hui	600
+陈尧	chen yao	600
+周神	zhou shen	600
+鲷哥	diao ge	600
+骆非池	luo fei chi	600
+姜岑	jiang cen	600
+枫哥	feng ge	600
+邹倚天	zou yi tian	600
+大酒神	da jiu shen	600
+伍声	wu sheng	600
+创世神	chuang shi shen	600
+徐志雷	xu zhi lei	600
+燃烧军团	ran shao jun tuan	600
+敌法冠名者	di fa guan ming zhe	600
+燃烧哥	ran shao ge	600
+张盼	zhang pan	600
+老队长	lao dui zhang	600
+刘嘉俊	liu jia jun	600
+陈智豪	chen zhi hao	600
+豪娘	hao niang	600
+上头豪	shang tou hao	600
+黄福全	huang fu quan	600
+黄翔	huang xiang	600
+绝活哥	jue huo ge	600
+谢彬	xie bin	600
+奶哥哥	nai ge ge	600
+陈彦川	chen yan chuan	600
+宝哥	bao ge	600
+曾焦阳	zeng jiao yang	600
+焦阳	jiao yang	600
+王蛟	wang jiao	600
+李岑	li cen	600
+护国神翼一号位	hu guo shen yi yi hao wei	600
+褚泽宇	chu ze yu	600
+张睿达	zhang rui da	600
+鞭神	bian shen	600
+李鹏	li peng	600
+二冰	er bing	600
+张纵	zhang zong	600
+护国神翼五号位	hu guo shen yi wu hao wei	600
+拒绝者	ju jue zhe	600
+张成俊	zhang cheng jun	600
+老十一	lao shi yi	600
+曾宏达	zeng hong da	600
+胡良智	hu liang zhi	600
+张顺权	zhang shun quan	600
+王质诚	wang zhi cheng	600
+白学家	bai xue jia	600
+赵子星	zhao zi xing	600
+欣欣	xin xin	600
+熊家晗	xiong jia han	600
+林灏	lin hao	600
+庄进祥	zhuang jin xiang	600
+郭轩昂	guo xuan ang	600
+卢路	lu lu	600
+路神	lu shen	600
+楼桢	lou zhen	600
+超凡楼	chao fan lou	600
+杜鹏	du peng	600
+刘宇皓	liu yu hao	600
+余亚军	yu ya jun	600
+皮丝	pi si	600
+卜严骏	bu yan jun	600
+高振雄	gao zhen xiong	600
+鸡哥	ji ge	600
+陈冠宏	chen guan hong	600
+老陈主播	lao chen zhu bo	600
+张羽	zhang yu	600
+沐沐	mu mu	600
+小鸽子	xiao ge zi	600
+完美大师姐	wan mei da shi jie	600
+奇迹哥	qi ji ge	600
+松鼠哥	song shu ge	600
+崩溃哥	beng kui ge	600
+苏跳跳	su tiao tiao	600
+光头哥	guang tou ge	600
+鸭王	ya wang	600
+天才少年	tian cai shao nian	600
+世界第一中单	shi jie di yi zhong dan	600
+三冰	san bing	600
+蔡国师	cai guo shi	600
+国土无双	guo tu wu shuang	600
+呆神	dai shen	600
+毛毛鸭	mao mao ya	600
+霸气哥	ba qi ge	600
+芬队	fen dui	600
+队魂	dui hun	600
+跳刀跳刀	tiao dao tiao dao	600
+二号位跳刀	er hao wei tiao dao	600
+孟获	meng huo	600
+大老师	da lao shi	600
+王冠选手	wang guan xuan shou	600
+石头人中单	shi tou ren zhong dan	600
+雪碧一号位	xue bi yi hao wei	600
+崩溃大魔王	beng kui da mo wang	600
