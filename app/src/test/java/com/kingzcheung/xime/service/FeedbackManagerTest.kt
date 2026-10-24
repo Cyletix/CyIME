@@ -105,6 +105,12 @@ class FeedbackManagerTest {
         org.junit.Assert.assertFalse(FeedbackManager.mutedByDnd(false, none, systemSoundsAllowed = false))
     }
 
+    @Test fun `plain motors get pulses long enough to be felt`() {
+        org.junit.Assert.assertEquals(45L, FeedbackManager.plainMotorDurationMs(longPress = false, light = false))
+        org.junit.Assert.assertEquals(30L, FeedbackManager.plainMotorDurationMs(longPress = false, light = true))
+        org.junit.Assert.assertEquals(70L, FeedbackManager.plainMotorDurationMs(longPress = true, light = false))
+    }
+
     @Test fun `only repeated delete sounds cut off the previous one`() {
         org.junit.Assert.assertTrue(FeedbackManager.chokesPrevious("delete"))
         listOf("standard", "space", "enter", "voice_start").forEach {

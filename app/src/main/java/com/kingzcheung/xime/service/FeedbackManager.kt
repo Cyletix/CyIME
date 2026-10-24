@@ -71,6 +71,13 @@ class FeedbackManager(private val context: Context) {
         fun resolveKeySoundStyle(stored: String?, hardware: Boolean): String =
             if (hardware || stored == "mahjong") "mahjong" else "default"
 
+        /** 不支持点击触感的普通马达上，按键震动时长：短于约 30 ms 时转子马达基本震不起来。 */
+        fun plainMotorDurationMs(longPress: Boolean, light: Boolean): Long = when {
+            longPress -> 70L
+            light -> 30L
+            else -> 45L
+        }
+
         /** 删除音连发时只保留最新一层；其他按键音照常可以重叠。 */
         fun chokesPrevious(keyType: String): Boolean = keyType == "delete"
 
@@ -301,6 +308,13 @@ class FeedbackManager(private val context: Context) {
         val defaultScale = if (light) 0.8f else 1f
         if (vibratePrimitive(primitive, amplitude, defaultScale)) return
         if (duration == 0L && amplitude == 0 && vibratePredefined(if (light) VibrationEffect.EFFECT_TICK else VibrationEffect.EFFECT_CLICK)) return
+        // 普通转子马达（如 Tab S8）：系统 KEYBOARD_TAP 只给 20 ms，马达还没转起来就停了，几乎感觉不到；
+        // 改用与三星系统界面相同量级的短震（按键 45 ms、光标/抬起 30 ms、长按 70 ms）。
+        if (duration == 0L && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && vibrator.hasVibrator()) {
+            val amp = if (hasAmplitudeControl && amplitude != 0) amplitude else VibrationEffect.DEFAULT_AMPLITUDE
+            vibrateTouch(VibrationEffect.createOneShot(plainMotorDurationMs(longPress, light), amp))
+            return
+        }
         if (duration != 0L) {
             if (hasAmplitudeControl && amplitude != 0) {
                 vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
@@ -371,7 +385,7 @@ class FeedbackManager(private val context: Context) {
         val custom = hapticMode == HapticMode.Enabled
         val pressAmp = if (custom) pressAmplitude else 0
         if (vibratePrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, pressAmp)) return
-        val duration = if (custom && pressDuration != 0L) pressDuration else 20L
+        val duration = if (custom && pressDuration != 0L) pressDuration else plainMotorDurationMs(longPress = false, light = false)
         val amplitude = if (hasAmplitudeControl && pressAmp != 0) pressAmp else VibrationEffect.DEFAULT_AMPLITUDE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
