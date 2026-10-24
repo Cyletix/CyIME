@@ -134,7 +134,7 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
     private fun startCaptions() {
         if (dismissedThisCall || overlay != null) return
         if (!PermissionHelper.hasRecordAudioPermission(this)) { FileLogger.w(TAG, "no microphone permission"); return }
-        controller = controller ?: CaptionController(this, callMode = true)
+        controller = controller ?: CaptionController(this)
         showOverlay()
         followRoute()
     }

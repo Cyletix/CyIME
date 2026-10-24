@@ -15,30 +15,34 @@ class SpeakerTrackerTest {
     private fun speak(t: SpeakerTracker, from: Long, seconds: Int, angle: Double, jitter: Double = 0.0): List<SpeakerTracker.Label> =
         (1..seconds).flatMap { k -> t.addWindow(from + (k - 2) * 1000L, from + k * 1000L, print(angle + if (k % 2 == 0) jitter else -jitter)) }
 
-    @Test fun `a call never splits into more than two voices, however much the caller's sound changes`() {
-        val t = SpeakerTracker().apply { setCallMode(true) }
-        // Holder at angle 0, the caller through the loudspeaker wandering over many "voices".
-        speak(t, 0, 4, 0.0)
-        var at = 4000L
-        for (k in 0 until 20) { speak(t, at, 3, 2.0 + k * .35); at += 3000 }
-        assertTrue("got ${t.speakerIds.size}", t.speakerIds.size <= 2)
+    @Test fun `a merged-away voice never labels later sentences`() {
+        val t = SpeakerTracker()
+        speak(t, 0, 4, 0.0)                   // A
+        speak(t, 4000, 6, 2.0)                // B, windows ending 5000..10000
+        val a = t.speakerIds.first(); val b = t.speakerIds.last()
+        // Short probes over 8-10 s are sure it is B; then the two turn out to be one person.
+        for (end in 8750L..10000L step 250) t.addProbe(end - 750, end, print(2.0))
+        t.merge(b, a)
+        val labels = t.addSegment(1, 8200, 9800) + t.settle()
+        assertTrue(labels.isNotEmpty())
+        assertTrue("labels name only living voices: $labels", labels.all { it.speakerId in t.speakerIds && it.runs.all { r -> r.first in t.speakerIds } })
     }
 
-    @Test fun `once the holder is marked, a call keeps one other voice and folds the extra one`() {
+    @Test fun `a splinter of one sentence joins the voice it sounds most like, not the one nearest in time`() {
         val t = SpeakerTracker()
-        speak(t, 0, 4, 0.0)            // holder
-        speak(t, 4000, 4, 2.0)         // caller
-        speak(t, 8000, 4, 4.0)         // a third "voice" found before call mode (or a split of the caller)
-        t.addSegment(1, 0, 3800); t.addSegment(2, 4200, 7800); t.addSegment(3, 8200, 11800)
-        t.setCallMode(true)
-        val holder = t.speakerIds.first()
-        t.markSelf(holder)
-        t.foldExtra()
-        assertEquals(1, t.speakerIds.count { it < SpeakerTracker.SELF })
-        // New holder windows go to the holder, not to a fresh person showing "my" voice.
-        speak(t, 12000, 4, 0.3)
-        assertEquals(1, t.speakerIds.count { it < SpeakerTracker.SELF })
-        assertTrue(SpeakerTracker.SELF in t.speakerIds)
+        speak(t, 0, 10, 0.0)                                  // A
+        t.addWindow(10_000, 12_000, print(1.6))               // a voice like nobody: a new person at once
+        t.addWindow(11_000, 13_000, print(1.6))
+        t.addSegment(1, 10_500, 12_500)
+        speak(t, 13_000, 7, 0.0)                              // A again, right after it
+        speak(t, 20_000, 20, 3.0)                             // B, closer to the splinter than A is
+        t.addSegment(2, 1000, 9000); t.addSegment(3, 21_000, 39_000)
+        t.settle()
+        val splinter = t.speakerIds.first { it != t.speakerIds.first() && it != t.speakerIds.last() }
+        val b = t.speakerIds.last()
+        val moved = t.absorbFragments()
+        assertTrue(splinter !in t.speakerIds)
+        assertEquals(b, moved.first { it.segmentId == 1L }.speakerId)
     }
 
     @Test fun `in-person captions still find a third person`() {

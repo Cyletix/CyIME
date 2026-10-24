@@ -338,7 +338,6 @@ class AsrInferenceService : Service() {
         override fun setSpeakerIgnored(speakerId: Int, ignored: Boolean) = speakerTracker.setIgnored(speakerId, ignored)
         override fun setSpeakerNamed(speakerId: Int, named: Boolean) = speakerTracker.setNamed(speakerId, named)
         override fun setStrictness(level: Int) = speakerTracker.setStrictness(level)
-        override fun setCallMode(call: Boolean) = speakerTracker.setCallMode(call)
         override fun resetSpeakers() { speakerTracker.reset(); readSelfPrint()?.let(speakerTracker::seedSelf); seedKnownVoices() }
         override fun rememberSpeaker(speakerId: Int, name: String): Int {
             val context = this@AsrInferenceService
