@@ -2,11 +2,11 @@
 
 Input is project_messages.py output plus two hand-made files kept with the data (never in the repo):
 
-  edits.tsv     idx<TAB>from<TAB>to<TAB>kind<TAB>sure   one fix of a misheard / mistyped span
-                idx<TAB>DROP                            pasted or generated message, not typed
-                idx<TAB>KEEP<TAB>substring              keep only the typed part of a mixed message
-                (idx = line number in messages.jsonl, 0-based; kind = asr / ime / slip)
-  reported.tsv  idx<TAB>keys<TAB>expect<TAB>layout<TAB>note   cases the user reported (tuned on)
+  edits.tsv     id<TAB>from<TAB>to<TAB>kind<TAB>sure    one fix of a misheard / mistyped span
+                id<TAB>DROP                             pasted or generated message, not typed
+                id<TAB>KEEP<TAB>substring               keep only the typed part of a mixed message
+                (id = project message id; kind = asr / ime / slip)
+  reported.tsv  id<TAB>keys<TAB>expect<TAB>layout<TAB>note    cases the user reported (tuned on)
 
 Fenced code blocks and quoted ">" lines are always removed. Corrected text is split the same way as
 personal_holdout.py and written in the same public-set format (lexicon_regression.py --public-set,
@@ -47,11 +47,11 @@ def read_rules(path):
         if not line.strip() or line.startswith("#"):
             continue
         fields = line.split("\t")
-        idx = int(fields[0])
+        msg_id = fields[0]
         if fields[1] in ("DROP", "KEEP"):
-            overrides[idx] = (fields[1], fields[2] if len(fields) > 2 else "")
+            overrides[msg_id] = (fields[1], fields[2] if len(fields) > 2 else "")
         else:
-            edits.setdefault(idx, []).append(
+            edits.setdefault(msg_id, []).append(
                 {"from": fields[1], "to": fields[2], "kind": fields[3], "sure": fields[4] == "1"})
     return overrides, edits
 
@@ -62,14 +62,14 @@ def guess_mode(text):
     return "voice" if gaps >= 2 and gaps >= 3 * max(punct, 1) else "typed"
 
 
-def apply_edits(text, edits, missing, idx):
+def apply_edits(text, edits, missing, msg_id):
     applied = []
     for edit in edits:
         if edit["from"] in text:
             text = text.replace(edit["from"], edit["to"])
             applied.append(edit)
         else:
-            missing.append(idx)
+            missing.append(msg_id)
     return text, applied
 
 
@@ -181,33 +181,34 @@ def main():
     overrides, edits = read_rules(args.edits)
 
     cleaned, missing, skipped = [], [], Counter()
-    for idx, msg in enumerate(messages):
-        action, keep = overrides.get(idx, (None, None))
+    for msg in messages:
+        msg_id = msg["id"]
+        action, keep = overrides.get(msg_id, (None, None))
         if action == "DROP":
             skipped["pasted"] += 1
             continue
         text = msg["text"]
         if action == "KEEP":
             if keep not in text:
-                missing.append(idx)
+                missing.append(msg_id)
                 continue
             text = keep
         text = QUOTE.sub("", FENCE.sub(" ", text)).strip()
         if not HAN.search(text):
             skipped["no han"] += 1
             continue
-        corrected, applied = apply_edits(text, edits.get(idx, []), missing, idx)
-        cleaned.append({"idx": idx, "id": msg["id"], "sent_at": msg["sent_at"], "thread": msg.get("thread"),
+        corrected, applied = apply_edits(text, edits.get(msg_id, []), missing, msg_id)
+        cleaned.append({"id": msg["id"], "sent_at": msg["sent_at"], "thread": msg.get("thread"),
                         "after_cutoff": (msg["sent_at"] or "") > args.after, "mode": guess_mode(text),
                         "original": text, "corrected": corrected, "edits": applied})
 
     reported = []
     for line in args.reported.read_text(encoding="utf-8").splitlines():
         if line.strip() and not line.startswith("#"):
-            idx, keys, expect, layout, note = line.split("\t")
+            msg_id, keys, expect, layout, note = line.split("\t")
             reported.append({"group": "reported", "context": "", "text": expect, "keys": keys,
                              "pinyin": syllables(expect) or [], "layout": layout, "note": note,
-                             "msg": messages[int(idx)]["id"], "count": 1, "id": f"r{len(reported) + 1:03d}"})
+                             "msg": msg_id, "count": 1, "id": f"r{len(reported) + 1:03d}"})
     exclude = args.exclude
     banned = excluded_texts(exclude) if exclude is not None else excluded_texts(
         [str(Path(__file__).resolve().parent / "fixtures/lexicon_regression.tsv"),
@@ -215,7 +216,7 @@ def main():
     banned |= {r["text"] for r in reported}
 
     stats = {"after": args.after, "messages": len(messages), "kept_messages": len(cleaned),
-             "skipped_messages": dict(skipped), "edits_missing_for_idx": sorted(set(missing)),
+             "skipped_messages": dict(skipped), "edits_missing_for": sorted(set(missing)),
              "edits_applied": sum(len(r["edits"]) for r in cleaned),
              "edits_by_kind": dict(Counter(e["kind"] for r in cleaned for e in r["edits"])),
              "mode": dict(Counter(r["mode"] for r in cleaned)), "reported": len(reported)}

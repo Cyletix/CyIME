@@ -6,8 +6,8 @@ messages as ``<cited id="cmsg_..." author="user" at=... where=...>``. Both carry
 message id, so the same message seen by several sessions is kept once. Escaped tags (quoted by a
 session) are not matched. Nothing here prints message text; the output belongs outside the repository.
 
-  project_messages.py --output D:/CyIME-Data/private/project-messages/messages.jsonl
-                      [--home ~] [--project chan_...] [--author-id user_...] [--name cyletix] [--merge FILE ...]
+  project_messages.py --project chan_... --output D:/CyIME-Data/private/project-messages/messages.jsonl
+                      [--home ~] [--author-id user_...] [--name cyletix] [--merge FILE ...]
 
 --merge reads extra JSONL rows of the same shape (id, sent_at, text, ...), e.g. messages fetched
 through the project API for threads that never ran on this computer; local rows win only when they
@@ -135,9 +135,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--home", default=str(Path.home()))
-    parser.add_argument("--author-id", default="user_01Gpe5JvbC4DrPykswQhZEZ8")
-    parser.add_argument("--name", default="cyletix")
-    parser.add_argument("--project", default="chan_01KXwySizrwRcFMgD6xQAN34")
+    parser.add_argument("--author-id", default="", help="keep only this account (default: every human)")
+    parser.add_argument("--name", default="", help="keep only cited messages under this display name")
+    parser.add_argument("--project", required=True, help="the project channel id, chan_...")
     parser.add_argument("--merge", nargs="*", default=[], type=Path)
     args = parser.parse_args()
     found = collect(args.home, args.author_id, args.name, args.project)
