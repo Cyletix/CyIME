@@ -57,6 +57,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/** 并排书写（日语、英文）一次最多切出的字数：一个单词、一小句。 */
+private const val SIDE_BY_SIDE_MAX_CHARS = 12
+
 /** 手写板左上角的当前语言提示。 */
 internal fun handwritingLanguageHint(language: InputLanguage, useTemplates: Boolean, preparing: Boolean, missingKana: Boolean): String = when {
     preparing -> "${language.displayName}手写 · 正在准备（只在第一次较慢）…"
@@ -212,8 +215,10 @@ fun HandwritingKeyboardLayout(
                     val points = strokes.map { stroke -> stroke.map { it.x to it.y } }
                     val gaps = HandwritingStrokeFx.windowGaps(strokes).map { it * OverlappedHandwritingRecognizer.GAP_SPLIT_MS / pauseMs }
                     // 字母最多 4 笔；日语有漢字，沿用中文的上限
-                    val recognizer = if (script == HandwritingTemplates.Script.LATIN) OverlappedHandwritingRecognizer(maxStrokesPerSegment = 4)
-                        else OverlappedHandwritingRecognizer()
+                    // 日语、英文习惯从左往右并排写：位置空隙也当换字信号
+                    val recognizer = if (script == HandwritingTemplates.Script.LATIN)
+                        OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, maxStrokesPerSegment = 4, sideBySide = true)
+                        else OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, sideBySide = true)
                     val segments = recognizer.recognize(points, gaps, predictFn = { seg, k ->
                         // 模板分数 (cos+1)/2 换回余弦，乱切的段明显更低，切分才分得开
                         HandwritingTemplates.recognize(context, script, seg, k, remember = false)
@@ -227,7 +232,11 @@ fun HandwritingKeyboardLayout(
                 val gaps = HandwritingStrokeFx.windowGaps(strokes).map { it * OverlappedHandwritingRecognizer.GAP_SPLIT_MS / pauseMs }
                 recognitionMutex.withLock {
                     withContext(Dispatchers.Default) {
-                        OverlappedHandwritingRecognizer().recognize(
+                        // 英文（内置模型里的字母）也按并排书写切分；中文保持叠写习惯
+                        (if (recognitionLanguage == InputLanguage.CHINESE) OverlappedHandwritingRecognizer()
+                            else OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, sideBySide = true,
+                                maxStrokesPerSegment = if (recognitionLanguage == InputLanguage.ENGLISH) 4
+                                    else OverlappedHandwritingRecognizer.DEFAULT_MAX_STROKES_PER_SEGMENT)).recognize(
                             strokes.map { stroke -> stroke.map { it.x to it.y } }, gaps,
                             predictFn = { points, topK -> HandwritingEngine.predict(points, topK, recognitionLanguage) },
                         ).segments
