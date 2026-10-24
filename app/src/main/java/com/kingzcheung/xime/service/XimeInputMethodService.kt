@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.keyboard.KeyboardResizeOverlay
 import com.kingzcheung.xime.ui.keyboard.ProtectedKeyboardSize
 import com.kingzcheung.xime.ui.keyboard.KeyboardDockTarget
+import com.kingzcheung.xime.ui.keyboard.rectInHost
 import com.kingzcheung.xime.ui.keyboard.KeyboardAspectLimits
 import com.kingzcheung.xime.ui.keyboard.letterKeyboardDefaults
 import com.kingzcheung.xime.ui.keyboard.keyboardPhysicalMetrics
@@ -2077,6 +2078,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                      onPositionDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
                                      onPositionDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
                                      onSnapFeedback = { feedbackManager.hapticFeedback(hapticView) },
+                                     modeSwitchTarget = { toFloating, hostW, hostH ->
+                                         val d = resources.displayMetrics.density
+                                         if (toFloating) resolveFloatingSwitchRect(hostW, hostH, floatingMinY)
+                                         else resolveKeyboardDockTarget((hostW / d).roundToInt().coerceAtLeast(1), uiState.value)
+                                             .rectInHost(hostW, hostH, d)
+                                     },
                                      onOpacityChange = { opacity ->
                                          uiState.value = uiState.value.copy(keyboardOpacity = opacity)
                                      },
@@ -2396,6 +2403,26 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             page !is KeyboardPage.Overlay) 170 else 0
         return KeyboardDockTarget(normal.width, contentHeight + toolExtra, normal.offsetX,
             fixed.keyboardBottomPaddingDp, bottom)
+    }
+
+    /** 调节界面里从固定拖成悬浮时，悬浮卡片会落到的矩形（宿主 px）；与 restoreKeyboardDisplayMode(true) 同一套尺寸和位置。 */
+    private fun resolveFloatingSwitchRect(hostWidthPx: Float, hostHeightPx: Float, navBarDp: Int): com.kingzcheung.xime.ui.keyboard.ResizeRect {
+        val config = resources.configuration
+        val landscape = config.screenWidthDp > config.screenHeightDp
+        val density = resources.displayMetrics.density
+        val hostHeight = ((resources.displayMetrics.heightPixels / density).roundToInt() -
+            tryGetStatusBarHeightDp(this, window.window)).coerceAtLeast(1)
+        val minBottom = maxOf(navBarDp, tryGetVisibleNavBarHeightDp(this, window.window),
+            kotlin.math.ceil(bottomInsetPxState.value / density).toInt())
+        val size = resolveKeyboardSize((hostWidthPx / density).roundToInt().coerceAtLeast(1), hostHeight, minBottom,
+            uiState.value.copy(showKeyboardResize = false,
+                floatingWidthDp = SettingsPreferences.getFloatingWidthDp(this, landscape),
+                fixedWidthDp = SettingsPreferences.getFixedWidthDp(this, landscape)),
+            floating = true)
+        return com.kingzcheung.xime.ui.keyboard.floatingCardRect(hostWidthPx, hostHeightPx, size.width * density,
+            (size.height + FLOATING_DRAG_BAR_HEIGHT_DP) * density,
+            SettingsPreferences.getFloatingOffsetX(this, landscape) * density,
+            SettingsPreferences.getFloatingOffsetY(this, landscape) * density, minBottom * density)
     }
 
     /** 读取目标模式的尺寸；恢复固定时透明度归零，保留各模式的位置。 */

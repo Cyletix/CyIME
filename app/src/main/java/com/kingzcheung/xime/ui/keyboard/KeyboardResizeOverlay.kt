@@ -51,6 +51,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -129,6 +130,11 @@ internal fun KeyboardResizeOverlay(
     defaultSize: ProtectedKeyboardSize? = null,
     /** 吸附到特定位置时的振动；为空时用系统触感。 */
     onSnapFeedback: (() -> Unit)? = null,
+    /**
+     * 拖动切换模式时另一种模式下键盘会落到的矩形（宿主 px，参数为目标是否悬浮、宿主宽高）；
+     * 和点「悬浮」按钮切过去的结果相同。为空时不支持拖动切换。
+     */
+    modeSwitchTarget: ((toFloating: Boolean, hostWidthPx: Float, hostHeightPx: Float) -> ResizeRect?)? = null,
 ) {
     val density = LocalDensity.current
     val hostView = LocalView.current
@@ -214,6 +220,33 @@ internal fun KeyboardResizeOverlay(
         val functionTextColor = palette?.functionText ?: MaterialTheme.colorScheme.onSurfaceVariant
         val panelShape = remember(floatingMode, roundedBottom) {
             keyboardPanelShape(floatingMode, roundedBottom)
+        }
+        val currentOnFloatingModeChange by rememberUpdatedState(onFloatingModeChange)
+        fun switchFloating(enabled: Boolean) {
+            floatingMode = enabled
+            if (!enabled) {
+                opacity = 1f // 透明度 0%，即完全不透明。
+                currentOnPreviewOpacity(opacity)
+            }
+            currentOnFloatingModeChange?.invoke(enabled)
+        }
+        // 拖动切换模式：固定上拖过阻力距离、悬浮贴底停够时长，渐变框变到目标位置，满了松手即切换。
+        val currentModeSwitchTarget by rememberUpdatedState(modeSwitchTarget)
+        var morphTarget by remember(floatingMode) { mutableStateOf<ResizeRect?>(null) }
+        var morphProgress by remember(floatingMode) { mutableFloatStateOf(0f) }
+        var dockArmed by remember(floatingMode) { mutableStateOf(false) }
+        var dockEpoch by remember(floatingMode) { mutableIntStateOf(0) }
+        LaunchedEffect(dockArmed, dockEpoch, floatingMode) {
+            if (!floatingMode) return@LaunchedEffect
+            morphProgress = 0f
+            if (dockArmed) androidx.compose.animation.core.animate(0f, 1f,
+                animationSpec = androidx.compose.animation.core.tween(FLOATING_DOCK_DURATION_MILLIS.toInt(),
+                    easing = androidx.compose.animation.core.LinearEasing)) { value, _ -> morphProgress = value }
+        }
+        fun endMorph() {
+            morphTarget = null
+            morphProgress = 0f
+            dockArmed = false
         }
 
         // This full-size pointer layer catches uncovered hits below the controls.
@@ -543,6 +576,16 @@ internal fun KeyboardResizeOverlay(
                 },
         )
 
+        morphTarget?.takeIf { morphProgress > 0f && (!floatingMode || dockArmed) }?.let { target ->
+            val p = morphProgress
+            fun between(start: Float, end: Float) = start + (end - start) * p
+            KeyboardModeMorphOutline(Modifier.zIndex(2f),
+                ResizeRect(between(frame.left, target.left), between(frame.top, target.top),
+                    between(frame.right, target.right), between(frame.bottom, target.bottom)),
+                p, if (floatingMode) keyboardPanelShape(false, roundedBottom) else FloatingKeyboardCardShape,
+                p >= 1f, "keyboard-resize-mode-switch-preview")
+        }
+
         // 控件直接占用键盘框内的可用区域；没有第二层小卡片/底板/描边。
         // 顶部工具栏、左右拖边及底部永久移动条均留出命中空间。
         val defaultControls = resizeControlsRect(frame, density.density, floatingMode,
@@ -783,14 +826,7 @@ internal fun KeyboardResizeOverlay(
                                 modifier = Modifier.size(20.dp),
                             )
                         },
-                    ) {
-                        floatingMode = !floatingMode
-                        if (!floatingMode) {
-                            opacity = 1f // 透明度 0%，即完全不透明。
-                            currentOnPreviewOpacity(opacity)
-                        }
-                        onFloatingModeChange?.invoke(floatingMode)
-                    }
+                    ) { switchFloating(!floatingMode) }
 
                     EqualActionButton(
                         modifier = Modifier.weight(1f).testTag("keyboard-resize-split-button"),
@@ -841,6 +877,17 @@ internal fun KeyboardResizeOverlay(
                 val moved = base.translated(dxPx, if (floatingMode) dyPx else 0f).coerceInside(moveBounds)
                 dragRect = moved
                 currentOnPreviewRectChange(moved)
+                if (floatingMode) {
+                    // 和普通悬浮一样：贴住底边停够时长，渐变框变成固定键盘的位置。
+                    val onBottom = moveBounds.bottom - moved.bottom <= 12f * density.density
+                    if (onBottom && morphTarget == null) morphTarget = currentModeSwitchTarget?.invoke(false,
+                        currentViewRect.width, currentViewRect.height)
+                    val armed = onBottom && morphTarget != null
+                    if (armed != dockArmed) {
+                        dockArmed = armed
+                        dockEpoch++
+                    }
+                }
                 // 预览矩形是调节事务的唯一位置源；确认时统一保存，避免同时改宿主偏移。
             }
         }
@@ -893,11 +940,15 @@ internal fun KeyboardResizeOverlay(
         val floatingMoveGesture = Modifier.pointerInput(floatingMode) {
             detectDragGestures(
                 onDragEnd = {
+                    val dock = dockArmed && morphProgress >= 1f
+                    endMorph()
                     dragRect = null
                     currentPreviewState.onDragEnd()
                     currentOnPositionDragEnd?.invoke()
+                    if (dock) switchFloating(false)
                 },
                 onDragCancel = {
+                    endMorph()
                     dragRect = null
                     currentPreviewState.onDragEnd()
                     currentOnPositionDragEnd?.invoke()
@@ -921,15 +972,22 @@ internal fun KeyboardResizeOverlay(
                 .pointerInput(floatingMode, maxWidth, maxHeight) {
                     var movement: FixedKeyboardMoveGesture? = null
                     var moveSnapped = false
+                    var pulledUp = 0f
                     detectDragGestures(onDragStart = {
                         val base = currentPreviewRect ?: currentViewRect
                         movement = FixedKeyboardMoveGesture(base,
                             currentPreviewState.bounds ?: currentViewRect, 12.dp.toPx())
+                        pulledUp = 0f
+                        morphTarget = currentModeSwitchTarget?.invoke(true, currentViewRect.width, currentViewRect.height)
                     }, onDragEnd = {
+                        val float = morphTarget != null && morphProgress >= 1f
+                        endMorph()
                         movement = null
                         dragRect = null
                         currentPreviewState.onDragEnd()
+                        if (float) switchFloating(true)
                     }, onDragCancel = {
+                        endMorph()
                         movement = null
                         dragRect = null
                         currentPreviewState.onDragEnd()
@@ -941,6 +999,13 @@ internal fun KeyboardResizeOverlay(
                             moveSnapped = gesture.snapped
                             dragRect = moved
                             currentOnPreviewRectChange(moved)
+                        }
+                        if (morphTarget != null) {
+                            // 上拖有阻力：先过一段死区，再拉满一段距离，渐变框才变成悬浮位置。
+                            pulledUp = (pulledUp - amount.y).coerceAtLeast(0f)
+                            val before = morphProgress
+                            morphProgress = fixedToFloatingPullProgress(pulledUp / 1.dp.toPx())
+                            if (morphProgress >= 1f && before < 1f) currentSnapFeedback()
                         }
                     }
                 }, contentAlignment = Alignment.Center) {
