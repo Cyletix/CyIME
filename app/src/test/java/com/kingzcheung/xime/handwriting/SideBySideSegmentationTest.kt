@@ -49,4 +49,23 @@ class SideBySideSegmentationTest {
         }
         assertEquals(1, result.segments.size)
     }
+    @Test fun twoLettersWrittenCloseAreNotMergedIntoOneLetter() {
+        // c 和 o 只隔 0.15 行高：不到假名的换字空隙，但字母内部不会左右断开，仍切成两个字母
+        val strokes = listOf(column(0, 35f), column(1, 35f))
+        val merged: (List<List<Pair<Float, Float>>>, Int) -> List<HandwritingCandidate> = { seg, _ ->
+            listOf(if (seg.size == 2) HandwritingCandidate("O", .97f)
+                else HandwritingCandidate("co"[(seg[0].first().first / 35f).toInt()].toString(), .8f))
+        }
+        val letters = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, noPauses.take(2), merged)
+        assertEquals(listOf("c", "o"), letters.segments.map { it.candidates.first().char })
+    }
+
+    @Test fun dotAboveTheStemStaysOneLetter() {
+        // i：竖和上面的点左右重叠，不算断开
+        val strokes = listOf(listOf(10f to 40f, 10f to 100f), listOf(10f to 10f, 11f to 12f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, noPauses.take(2)) { seg, _ -> listOf(HandwritingCandidate(if (seg.size == 2) "i" else "l", .8f)) }
+        assertEquals(listOf("i"), result.segments.map { it.candidates.first().char })
+    }
 }

@@ -217,7 +217,7 @@ fun HandwritingKeyboardLayout(
                     // 字母最多 4 笔；日语有漢字，沿用中文的上限
                     // 日语、英文习惯从左往右并排写：位置空隙也当换字信号
                     val recognizer = if (script == HandwritingTemplates.Script.LATIN)
-                        OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, maxStrokesPerSegment = 4, sideBySide = true)
+                        OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
                         else OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, sideBySide = true)
                     val segments = recognizer.recognize(points, gaps, predictFn = { seg, k ->
                         // 模板分数 (cos+1)/2 换回余弦，乱切的段明显更低，切分才分得开
@@ -236,7 +236,8 @@ fun HandwritingKeyboardLayout(
                         (if (recognitionLanguage == InputLanguage.CHINESE) OverlappedHandwritingRecognizer()
                             else OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, sideBySide = true,
                                 maxStrokesPerSegment = if (recognitionLanguage == InputLanguage.ENGLISH) 4
-                                    else OverlappedHandwritingRecognizer.DEFAULT_MAX_STROKES_PER_SEGMENT)).recognize(
+                                    else OverlappedHandwritingRecognizer.DEFAULT_MAX_STROKES_PER_SEGMENT,
+                                lettersApart = recognitionLanguage == InputLanguage.ENGLISH)).recognize(
                             strokes.map { stroke -> stroke.map { it.x to it.y } }, gaps,
                             predictFn = { points, topK -> HandwritingEngine.predict(points, topK, recognitionLanguage) },
                         ).segments
