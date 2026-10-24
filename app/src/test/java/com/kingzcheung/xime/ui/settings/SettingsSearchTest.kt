@@ -54,7 +54,7 @@ class SettingsSearchTest {
         assertTrue("玻璃效果" in titles("毛玻璃"))
         assertTrue("剪贴板卡片最多显示" in titles("剪切板"))
         assertTrue("性能与省电" in titles("卡顿"))
-        assertTrue("自定义短语" in titles("快捷短语"))
+        assertTrue("我的短语" in titles("快捷短语"))
         assertTrue("Ctrl + 空格" in titles("ctrl"))
         assertTrue("Ctrl + 空格" in titles("ＣＴＲＬ"))
     }

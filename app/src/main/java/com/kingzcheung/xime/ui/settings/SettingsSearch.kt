@@ -115,7 +115,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("主题与外观", look, SettingsRoutes.Theme, "主题 皮肤 颜色 配色 深色 浅色 夜间 玻璃 背景 外观 视觉样式 定制"),
         page("候选词", look, candidatePage, "候选 候选栏 字号 候选注释 每页候选数"),
         page("按键效果", look, SettingsRoutes.KeyEffect, "按键音 声音 音效 振动 震动 反馈 发光 动画 炫光"),
-        page("词库", smart, SettingsRoutes.Dictionary, "分类词库 个人词库 用户词 自定义短语 方案词库 词典 词库管理 导入词库"),
+        page("词库", smart, SettingsRoutes.Dictionary, "我的短语 导入的词库 分类词库 删掉的候选 查词 个人词库 用户词 自定义短语 方案词库 词典 词库管理 导入词库"),
         page("智能联想", smart, SettingsRoutes.SmartPrediction, "联想 预测 个人学习 模型增强 下一个词"),
         page("语音转文本", smart, SettingsRoutes.SpeechToText, "语音 识别 麦克风 说话 听写 在线 本地 语音输入 开关 字幕"),
         page("手写", smart, SettingsRoutes.Handwriting, "手写 写字 笔迹 公式 手写模型"),
@@ -200,10 +200,10 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("按键动效", effect, SettingsRoutes.KeyEffect, "动效 动画 缩放 回弹 键帽"),
         SettingsSearchEntry("键内炫光", effect, SettingsRoutes.KeyEffect, "炫光 发光 光效 渐变 彩虹"),
         // 智能 › 词库
-        page("分类词库", dictionary, SettingsRoutes.CellDictionaries, "细胞词库 搜狗 scel txt json 导入词库 下载词库 本地导入"),
-        SettingsSearchEntry("自定义短语", dictionary, SettingsRoutes.Dictionary, "短语 快捷短语 常用语 编码", anchor = null),
-        SettingsSearchEntry("方案词库", dictionary, SettingsRoutes.Dictionary, "方案 词库 词条", anchor = null),
-        SettingsSearchEntry("屏蔽的候选", dictionary, SettingsRoutes.Dictionary, "屏蔽 恢复 候选 九键 删词 忘记", anchor = null),
+        page("导入的词库", dictionary, SettingsRoutes.CellDictionaries, "分类词库 细胞词库 搜狗 scel txt json 导入词库 下载词库 本地导入 删除词库"),
+        SettingsSearchEntry("我的短语", dictionary, SettingsRoutes.Dictionary, "自定义短语 短语 快捷短语 常用语 编码", anchor = null),
+        SettingsSearchEntry("查词", dictionary, SettingsRoutes.Dictionary, "方案词库 词库 词条 编码 查找", anchor = null),
+        SettingsSearchEntry("删掉的候选", dictionary, SettingsRoutes.Dictionary, "屏蔽的候选 屏蔽 恢复 候选 九键 删词 忘记", anchor = null),
         // 智能 › 智能联想
         SettingsSearchEntry("启用智能联想", prediction, SettingsRoutes.SmartPrediction, "联想 开关 预测 基础联想"),
         SettingsSearchEntry("空格上屏联想候选", prediction, SettingsRoutes.SmartPrediction, "空格 联想 上屏", section = "功能开关"),
