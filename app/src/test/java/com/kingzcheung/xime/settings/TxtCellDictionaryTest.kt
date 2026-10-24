@@ -35,4 +35,14 @@ class TxtCellDictionaryTest {
         val gbk = "你好 ni hao\n".toByteArray(charset("GB18030"))
         assertEquals("你好", TxtCellDictionary.parse(gbk).entries.single().word)
     }
+
+    @Test
+    fun `english lines of a mixed list are kept as written`() {
+        val text = "敌法师 di fa shi\nAme\nTeam Spirit\tteamspirit\t100\n33\nx\n"
+        val parsed = TxtCellDictionary.parse(text.toByteArray(Charsets.UTF_8))
+        assertEquals(listOf("敌法师"), parsed.entries.map { it.word })
+        assertEquals(listOf("Ame", "Team Spirit"), parsed.english)
+        assertEquals(2, parsed.skipped)  // a bare number and one letter are no words
+        assertEquals(listOf("Ame"), TxtCellDictionary.parse("Ame\n".toByteArray()).english)
+    }
 }

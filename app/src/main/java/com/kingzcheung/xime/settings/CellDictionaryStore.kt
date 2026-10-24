@@ -13,6 +13,8 @@ data class InstalledCellDictionary(
     val id: String, val name: String, val category: String,
     val count: Int, val skipped: Int = 0, val sourceUrl: String = "",
     val sha256: String,
+    /** English words of a mixed list, offered by the English candidates (CellDictionaryEnglish). */
+    val english: Int = 0,
 )
 
 @Serializable
@@ -60,6 +62,11 @@ class CellDictionaryStore(val directory: File) {
         return File(directory, "cell_$id.dict.yaml")
     }
 
+    private fun englishFile(id: String): File = File(directory, dictionaryFile(id).name.removeSuffix(".dict.yaml") + ".en.txt")
+
+    fun englishWords(id: String): List<String> = englishFile(id).takeIf { it.isFile }?.readLines()
+        ?.filter { it.isNotBlank() }.orEmpty()
+
     fun install(bytes: ByteArray, offer: CellDictionaryOffer? = null): InstalledCellDictionary = synchronized(lock) {
         val hash = digest(bytes)
         val id = offer?.id ?: "local_${hash.take(24)}"
@@ -77,8 +84,11 @@ class CellDictionaryStore(val directory: File) {
             else -> TxtCellDictionary.parse(bytes)  // 词 拼音 / 拼音 词 / Rime .dict.yaml
         }
         val entry = InstalledCellDictionary(id, offer?.name ?: parsed.name.ifBlank { "本地词库" },
-            offer?.category ?: "本地导入", parsed.entries.size, parsed.skipped, offer?.sourceUrl.orEmpty(), hash)
+            offer?.category ?: "本地导入", parsed.entries.size, parsed.skipped, offer?.sourceUrl.orEmpty(), hash,
+            parsed.english.size)
         writeAtomic(dictionaryFile(id), ScelDictionary.toRime("cell_$id", parsed.entries))
+        if (parsed.english.isEmpty()) englishFile(id).delete()
+        else writeAtomic(englishFile(id), parsed.english.joinToString("\n", postfix = "\n"))
         save(old.copy(installed = old.installed.filterNot { it.id == id } + entry))
         entry
     }
@@ -105,6 +115,16 @@ class CellDictionaryStore(val directory: File) {
         val old = read()
         require(old.installed.any { it.id == id } && (!enabled || dictionaryFile(id).isFile)) { "请先下载词库" }
         save(old.copy(selected = if (enabled) old.selected + id else old.selected - id))
+    }
+
+    /** Removes a downloaded or imported dictionary that is not in use; built-ins stay. */
+    fun remove(id: String) = synchronized(lock) {
+        val old = read()
+        require(!id.startsWith("builtin_")) { "内置词库不能删除，可以关闭" }
+        require(id !in old.applied) { "请先关闭这个词库并应用更改，再删除" }
+        dictionaryFile(id).delete()
+        englishFile(id).delete()
+        save(old.copy(installed = old.installed.filterNot { it.id == id }, selected = old.selected - id))
     }
 
     fun markApplied(ids: Set<String>) = synchronized(lock) {
