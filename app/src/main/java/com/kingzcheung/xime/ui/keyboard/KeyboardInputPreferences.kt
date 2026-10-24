@@ -18,6 +18,10 @@ internal fun normalizeHandwritingPause(value: Float): Float =
 internal fun normalizeCursorHoldSeconds(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.2f).coerceIn(0.1f, 1f) * 10).roundToInt() / 10f
 
+/** 移光标时从中间滑到边缘走几行：0.5–3 行，每档 0.25 行，默认 1 行。 */
+internal fun normalizeCursorSwipeLines(value: Float): Float =
+    ((value.takeIf { it.isFinite() } ?: 1f).coerceIn(0.5f, 3f) * 4).roundToInt() / 4f
+
 /** 长按语言键打开语言列表的等待时间：0.05–1 秒，每档 0.05 秒，默认 0.15 秒。 */
 internal fun normalizeLanguageMenuHoldSeconds(value: Float): Float =
     ((value.takeIf { it.isFinite() } ?: 0.15f).coerceIn(0.05f, 1f) * 20).roundToInt() / 20f
@@ -91,6 +95,8 @@ data class KeyboardInputPreferences(
     val symbolKeyHoldSeconds: Float = 1f,
     /** 手写公式上屏时两边的标记，默认 $…$。 */
     val formulaDelimiter: FormulaDelimiter = FormulaDelimiter.DOLLAR,
+    /** 移光标时从中间滑到屏幕边缘走几行，按输入框一行能放几个字换算每字距离。 */
+    val cursorSwipeLines: Float = 1f,
 ) {
     val effectiveSpaceHold: SpaceHoldAction get() = if (cursorGesture == CursorGestureMode.SPACE) SpaceHoldAction.CURSOR
         else spaceHold.takeUnless { it == SpaceHoldAction.CURSOR } ?: SpaceHoldAction.REPEAT
@@ -102,7 +108,7 @@ data class KeyboardInputPreferences(
         internal val watchedKeys: Set<String> by lazy {
             setOf(KeyEffectPreferences.GLOW, KeyEffectPreferences.ANIMATION, SettingsPreferences.KEY_SHOW_PRESS_BUBBLE,
                 SettingsPreferences.KEY_SPLIT_KEYBOARD, SettingsPreferences.KEY_SPLIT_GAP_PORTRAIT, SettingsPreferences.KEY_SPLIT_GAP_LANDSCAPE,
-                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
+                "space_hold_action", "cursor_gesture_mode", "cursor_hold_seconds", "neighbor_correction", "symbol_input_mode", "cursor_step_dp", "cursor_swipe_lines", "cursor_step_haptic", "cursor_step_sound", "key_text_scale", "fixed_symbols",
                 "fourteen_letter_swipe", "fourteen_letter_swipe_dp", "reverse_symbol_swipe", "kana_direction_hints", "flick_direction_disc", "flick_direction_disc_v2",
                 "glide_typing", "glide_typing_v2", "letter_long_press_menu", "t9_flick_letters", "language_key_hold_seconds", "language_key_hold_seconds_v2", "symbol_key_hold_seconds",
                 "qwerty_stagger_mode", "qwerty_stagger_custom", "qwerty_comma_key", "qwerty_period_key", "qwerty_period_key_v2",
@@ -144,6 +150,7 @@ data class KeyboardInputPreferences(
                 cursorGesture = CursorGestureMode.entries.firstOrNull { it.name == prefs.getString("cursor_gesture_mode", null) }
                     ?: if (hold == SpaceHoldAction.CURSOR) CursorGestureMode.SPACE else CursorGestureMode.NONE,
                 cursorStepDp = prefs.getFloat("cursor_step_dp", 10f).takeIf { it.isFinite() }?.coerceIn(6f, 24f) ?: 10f,
+                cursorSwipeLines = normalizeCursorSwipeLines(prefs.getFloat("cursor_swipe_lines", 1f)),
                 cursorHoldSeconds = normalizeCursorHoldSeconds(prefs.getFloat("cursor_hold_seconds", 0.2f)),
                 cursorStepHaptic = prefs.getBoolean("cursor_step_haptic", true),
                 cursorStepSound = prefs.getBoolean("cursor_step_sound", false),
@@ -194,6 +201,7 @@ data class KeyboardInputPreferences(
             .putBoolean("glide_typing", glideTyping)
             .putBoolean("t9_flick_letters", t9FlickLetters)
             .putFloat("cursor_step_dp", cursorStepDp.coerceIn(6f, 24f))
+            .putFloat("cursor_swipe_lines", normalizeCursorSwipeLines(cursorSwipeLines))
             .putBoolean("cursor_step_haptic", cursorStepHaptic)
             .putBoolean("cursor_step_sound", cursorStepSound)
             .putFloat("key_text_scale", keyTextScale.coerceIn(0.8f, 1.6f))

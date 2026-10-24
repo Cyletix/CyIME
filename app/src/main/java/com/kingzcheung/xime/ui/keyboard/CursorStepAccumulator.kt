@@ -8,7 +8,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 
 /** 累积细微位移；改变方向后从转向点重新计算，避免抵消上一方向的余量。 */
-internal class CursorStepAccumulator(private val stepPx: Float) {
+internal class CursorStepAccumulator(stepPx: Float) {
+    /** 输入框排版在拖动开始后才到，步长可在拖动中更新。 */
+    var stepPx: Float = stepPx
+        set(value) {
+            require(value.isFinite() && value > 0f)
+            field = value
+        }
+
     init {
         require(stepPx.isFinite() && stepPx > 0f)
     }
@@ -32,6 +39,33 @@ internal class CursorStepAccumulator(private val stepPx: Float) {
  */
 internal fun cursorUnitPx(physical: KeyboardPhysicalMetrics?, pixelsPerDp: Float): Float =
     physical?.let { it.xDpi * CURSOR_UNIT_MM / 25.4f } ?: pixelsPerDp
+
+/**
+ * 输入框一行能放几个字：输入法服务在移光标开始时向输入框要排版（CursorAnchorInfo）后填入，0 表示还没到或输入框不提供。
+ */
+internal object CursorLineMetrics {
+    @Volatile var requester: (() -> Unit)? = null
+    @Volatile var charsPerLine = 0f
+        private set
+
+    fun request() {
+        charsPerLine = 0f
+        requester?.invoke()
+    }
+
+    fun update(chars: Float?) {
+        charsPerLine = chars?.takeIf { it.isFinite() && it >= 2f } ?: 0f
+    }
+}
+
+/**
+ * 从中间滑到边缘（半个窗口宽）走 [lines] 行：每字距离 = 半宽 ÷（一行字数 × 行数），字号、屏幕和横竖屏都自动对上。
+ * 读不到一行字数时用 [fallbackStepPx]（设置里的每字距离）；结果限制在约 0.6–7.6 毫米，太小会抖、太大一步跨太远。
+ */
+internal fun lineCursorStepPx(halfWidthPx: Float, lines: Float, charsPerLine: Float, fallbackStepPx: Float, unitPx: Float): Float {
+    if (charsPerLine < 2f || !(halfWidthPx > 0f) || !(lines > 0f)) return fallbackStepPx
+    return (halfWidthPx / (charsPerLine * lines)).coerceIn(3f * unitPx, 40f * unitPx)
+}
 
 internal fun cursorDistanceMillimeters(distance: Float): Float = distance * CURSOR_UNIT_MM
 

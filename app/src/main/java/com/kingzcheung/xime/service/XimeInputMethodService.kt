@@ -781,6 +781,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onCreate() {
         super.onCreate()
         com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter = handwritingGlassRegionReporter
+        com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.requester = cursorLineRequester
         // 记录与打字速度有关的本机状态（用户词库体积、可选模型、内存余量），只记数量不记内容。
         serviceScope.launch(Dispatchers.IO) {
             delay(5_000)
@@ -2604,6 +2605,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private var hardwareCursorImmediateOnly = false
+    private var cursorLinePending = false
+    // 移光标开始时要一次输入框排版；实体键盘模式已常驻监听，等下一次更新即可。输入法内部输入框不向宿主要。
+    private val cursorLineRequester: () -> Unit = {
+        val connection = currentInputConnection
+        if (connection != null && !uiState.value.inputTarget.isInternal) {
+            cursorLinePending = true
+            if (!hasHardwareKeyboard && !requestLineLayout(connection)) cursorLinePending = false
+        }
+    }
     private fun switchHardwareLanguage(mode: com.kingzcheung.xime.settings.LanguageSwitchMode? = null) {
         keyboardViewModel.resetShift()
         keyRouter.handleKeyPress("ime_switch", uiState.value.isAsciiMode, languageSwitchMode = mode)
@@ -3048,6 +3058,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onUpdateCursorAnchorInfo(info: CursorAnchorInfo) {
+        if (cursorLinePending) {
+            cursorLinePending = false
+            val ic = currentInputConnection
+            val sample = runCatching {
+                "${ic?.getTextBeforeCursor(40, 0) ?: ""}${ic?.getTextAfterCursor(40, 0) ?: ""}"
+            }.getOrDefault("")
+            com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.update(runCatching { cursorAnchorCharsPerLine(info, sample) }.getOrNull())
+        }
         if (!hasHardwareKeyboard) return
         try {
             val anchor = resolveHardwareCursorAnchor(info)
@@ -3583,6 +3601,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onDestroy() {
         if (com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter === handwritingGlassRegionReporter)
             com.kingzcheung.xime.ui.keyboard.HandwritingGlassRegion.reporter = null
+        if (com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.requester === cursorLineRequester)
+            com.kingzcheung.xime.ui.keyboard.CursorLineMetrics.requester = null
         glassBlurWindows.values.forEach { it.dispose() }
         glassBlurWindows.clear()
         glassSurfaceBounds.clear()

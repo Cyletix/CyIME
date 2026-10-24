@@ -60,4 +60,29 @@ class CursorStepAccumulatorTest {
     fun `unknown physical density keeps the logical dp step`() {
         assertEquals(1.875f, cursorUnitPx(null, 1.875f))
     }
+
+    @Test
+    fun `swiping from the middle to the edge walks one line on phone and tablet`() {
+        // Phone: 1080 px wide, 24 characters per line. Tablet portrait: 1752 px wide, 58 per line.
+        val phone = lineCursorStepPx(540f, 1f, 24f, fallbackStepPx = 28f, unitPx = 2.8125f)
+        assertEquals(24, (540f / phone).toInt())
+        val tablet = lineCursorStepPx(876f, 1f, 58f, fallbackStepPx = 18.75f, unitPx = 1.665f)
+        assertEquals(58, (876f / tablet).toInt())
+        assertEquals(29, (876f / lineCursorStepPx(876f, 0.5f, 58f, 18.75f, 1.665f)).toInt())
+    }
+
+    @Test
+    fun `without the editor layout the distance setting is used, and steps stay usable`() {
+        assertEquals(18.75f, lineCursorStepPx(876f, 1f, 0f, 18.75f, 1.665f))
+        assertEquals(3f * 1.665f, lineCursorStepPx(876f, 1f, 2000f, 18.75f, 1.665f))
+        assertEquals(40f * 1.665f, lineCursorStepPx(876f, 1f, 3f, 18.75f, 1.665f))
+    }
+
+    @Test
+    fun `swipe line setting snaps to quarter lines within range`() {
+        assertEquals(1f, normalizeCursorSwipeLines(Float.NaN))
+        assertEquals(0.5f, normalizeCursorSwipeLines(0.1f))
+        assertEquals(3f, normalizeCursorSwipeLines(9f))
+        assertEquals(1.25f, normalizeCursorSwipeLines(1.3f))
+    }
 }

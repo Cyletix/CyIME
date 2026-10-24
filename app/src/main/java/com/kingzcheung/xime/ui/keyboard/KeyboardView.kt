@@ -70,6 +70,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -1256,16 +1257,17 @@ fun KeyboardView(
                         val currentOnCursorMove = rememberUpdatedState(callbacks.onCursorMove)
                         val suppressCursorMove = remember { mutableStateOf(false) }
                         val cursorUnitPx = rememberCursorUnitPx()
+                        val cursorRootView = LocalView.current.rootView
                         val cursorMod = if (callbacks.onCursorMove != null && inputPreferences.cursorGesture == CursorGestureMode.KEYBOARD) {
-                            Modifier.pointerInput(inputPreferences.cursorStepDp, cursorUnitPx) {
-                                val stepThresholdPx = inputPreferences.cursorStepDp * cursorUnitPx
+                            Modifier.pointerInput(inputPreferences.cursorStepDp, inputPreferences.cursorSwipeLines, cursorUnitPx) {
+                                val fallbackStepPx = inputPreferences.cursorStepDp * cursorUnitPx
                                 val activationThresholdPx = 60.dp.toPx()
                                 awaitEachGesture {
                                     suppressCursorMove.value = false
                                     val down = awaitFirstDown(requireUnconsumed = false)
                                     var isCursorGesture = false
-                                    var lastSteps = 0
-                                    var activationAnchorX = down.position.x
+                                    val cursorSteps = CursorStepAccumulator(fallbackStepPx)
+                                    var lastX = down.position.x
 
                                     do {
                                         val event = awaitPointerEvent()
@@ -1285,18 +1287,17 @@ fun KeyboardView(
 
                                             if (!isCursorGesture && abs(dx) > activationThresholdPx) {
                                                 isCursorGesture = true
-                                                activationAnchorX = change.position.x
+                                                lastX = change.position.x
+                                                CursorLineMetrics.request()
                                             }
 
                                             if (isCursorGesture) {
                                                 event.changes.forEach { it.consume() }
-                                                val dxFromAnchor = change.position.x - activationAnchorX
-                                                val steps = (dxFromAnchor / stepThresholdPx).toInt()
-                                                if (steps != lastSteps) {
-                                                    val delta = steps - lastSteps
-                                                    currentOnCursorMove.value?.invoke(delta)
-                                                    lastSteps = steps
-                                                }
+                                                cursorSteps.stepPx = lineCursorStepPx(cursorRootView.width / 2f,
+                                                    inputPreferences.cursorSwipeLines, CursorLineMetrics.charsPerLine, fallbackStepPx, cursorUnitPx)
+                                                val steps = cursorSteps.move(change.position.x - lastX)
+                                                lastX = change.position.x
+                                                if (steps != 0) currentOnCursorMove.value?.invoke(steps)
                                             }
                                         }
                                     } while (true)
