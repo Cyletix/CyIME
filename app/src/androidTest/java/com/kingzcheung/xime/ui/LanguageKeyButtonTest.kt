@@ -41,6 +41,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -397,13 +399,27 @@ class LanguageKeyButtonTest {
     }
 
     @Test
-    fun releasingOnTheOriginalKeyDismissesWithoutSwitching() {
+    fun releasingOnTheOriginalKeyKeepsTheMenuForATapSelection() {
         setKey()
         holdKey()
         rule.onNodeWithTag("language-key").performTouchInput { up() }
         rule.runOnIdle { assertTrue(events.isEmpty()) }
-        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag("language-schema:second").assertIsDisplayed()
+        rule.onNodeWithTag("language-schema:second").performClick()
+        rule.runOnIdle { assertEquals(listOf("schema:second"), events) }
         rule.onNodeWithTag("language-schema:second").assertDoesNotExist()
+    }
+
+    @Test
+    fun tappingOutsideTheStickyMenuClosesItWithoutTyping() {
+        setKey()
+        holdKey()
+        rule.onNodeWithTag("language-key").performTouchInput { up() }
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag("language-menu-dismiss").performTouchInput { click(Offset(2f, 2f)) }
+        rule.onNodeWithTag("language-schema:second").assertDoesNotExist()
+        rule.runOnIdle { assertTrue(events.isEmpty()) }
     }
 
     @Test fun englishIsAlwaysListedAndSlideSelectable() {
