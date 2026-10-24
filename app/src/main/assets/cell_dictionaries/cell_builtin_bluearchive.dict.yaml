@@ -1,0 +1,394 @@
+# CyIME 蔚蓝档案词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_bluearchive
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+小鸟游星野	xiao niao you xing ye	600
+十六夜野宫	shi liu ye ye gong	600
+砂狼白子	sha lang bai zi	600
+黑见芹香	hei jian qin xiang	600
+奥空绫音	ao kong ling yin	600
+早濑优香	zao lai you xiang	600
+天童爱丽丝	tian tong ai li si	600
+才羽桃井	cai yu tao jing	600
+才羽绿	cai yu lv	600
+花冈柚子	hua gang you zi	600
+猫冢响	mao zhong xiang	600
+角楯卡琳	jiao dun ka lin	600
+室笠朱音	shi li zhu yin	600
+一之濑明日奈	yi zhi lai ming ri nai	600
+音濑小玉	yin lai xiao yu	600
+明星日鞠	ming xing ri ju	600
+乙花堇	yi hua jin	600
+生盐诺亚	sheng yan nuo ya	600
+黑崎小雪	hei qi xiao xue	600
+白石歌原	bai shi ge yuan	600
+小涂真纪	xiao tu zhen ji	600
+空崎日奈	kong qi ri nai	600
+鬼方佳代子	gui fang jia dai zi	600
+银镜伊织	yin jing yi zhi	600
+狮子堂泉	shi zi tang quan	600
+火宫千夏	huo gong qian xia	600
+天雨亚子	tian yu ya zi	600
+赤司淳子	chi si chun zi	600
+鬼怒川霞	gui nu chuan xia	600
+陆八魔阿露	lu ba mo a lu	600
+浅黄睦月	qian huang mu yue	600
+伊草遥香	yi cao yao xiang	600
+鳄渊亚伽里	e yuan ya ga li	600
+爱清风香	ai qing feng xiang	600
+牛牧朱莉	niu mu zhu li	600
+黑馆晴奈	hei guan qing nai	600
+圣园未花	sheng yuan wei hua	600
+桐藤渚	tong teng zhu	600
+百合园圣娅	bai he yuan sheng ya	600
+阿慈谷日富美	a ci gu ri fu mei	600
+白洲梓	bai zhou zi	600
+下江小春	xia jiang xiao chun	600
+浦和花子	pu he hua zi	600
+剑先鹤城	jian xian he cheng	600
+羽川莲见	yu chuan lian jian	600
+静山真白	jing shan zhen bai	600
+守月铃美	shou yue ling mei	600
+杏山和纱	xing shan he sha	600
+栗村爱莉	li cun ai li	600
+伊原木好美	yi yuan mu hao mei	600
+柚鸟夏	you niao xia	600
+伊落玛丽	yi luo ma li	600
+若叶日向	ruo ye ri xiang	600
+苍森美弥	cang sen mei mi	600
+古关忧	gu guan you	600
+圆堂志美子	yuan tang zhi mei zi	600
+宇泽玲纱	yu ze ling sha	600
+高坂芹娜	gao ban qin na	600
+狐坂若藻	hu ban ruo zao	600
+葛叶	ge ye	600
+春原千世	chun yuan qian shi	600
+久田泉奈	jiu tian quan nai	600
+大野月咏	da ye yue yong	600
+河和静子	he he jing zi	600
+里滨海香	li bin hai xiang	600
+佐城椿	zuo cheng chun	600
+桐生枫	tong sheng feng	600
+龙华妃咲	long hua fei xiao	600
+春原瞬	chun yuan shun	600
+春原心奈	chun yuan xin nai	600
+药子沙耶	yao zi sha ye	600
+月雪宫子	yue xue gong zi	600
+空井咲	kong jing xiao	600
+霞泽美游	xia ze mei you	600
+风仓萌	feng cang meng	600
+仲正和香	zhong zheng he xiang	600
+锭前纱织	ding qian sha zhi	600
+秤亚津子	cheng ya jin zi	600
+槌永日和	chui yong ri he	600
+戒野美咲	jie ye mei xiao	600
+连邦切里诺	lian bang qie li nuo	600
+天见巴	tian jian ba	600
+池仓玛莉娜	chi cang ma li na	600
+尾刃康娜	wei ren kang na	600
+合欢垣桐乃	he huan yuan tong nai	600
+合欢垣吹雪	he huan yuan chui xue	600
+七神琳	qi shen lin	600
+由良木桃香	you liang mu tao xiang	600
+阿罗娜	a luo na	600
+普拉娜	pu la na	600
+野宫	ye gong	600
+白子	bai zi	600
+芹香	qin xiang	600
+绫音	ling yin	600
+优香	you xiang	600
+桃井	tao jing	600
+小绿	xiao lv	600
+卡琳	ka lin	600
+朱音	zhu yin	600
+明日奈	ming ri nai	600
+日鞠	ri ju	600
+歌原	ge yuan	600
+真纪	zhen ji	600
+日奈	ri nai	600
+佳代子	jia dai zi	600
+伊织	yi zhi	600
+千夏	qian xia	600
+亚子	ya zi	600
+淳子	chun zi	600
+阿露	a lu	600
+睦月	mu yue	600
+遥香	yao xiang	600
+亚伽里	ya ga li	600
+风香	feng xiang	600
+晴奈	qing nai	600
+未花	wei hua	600
+圣娅	sheng ya	600
+日富美	ri fu mei	600
+小梓	xiao zi	600
+小春	xiao chun	600
+鹤城	he cheng	600
+莲见	lian jian	600
+铃美	ling mei	600
+和纱	he sha	600
+爱莉	ai li	600
+小夏	xiao xia	600
+日向	ri xiang	600
+美弥	mei mi	600
+志美子	zhi mei zi	600
+玲纱	ling sha	600
+芹娜	qin na	600
+若藻	ruo zao	600
+千世	qian shi	600
+泉奈	quan nai	600
+月咏	yue yong	600
+静子	jing zi	600
+海香	hai xiang	600
+妃咲	fei xiao	600
+心奈	xin nai	600
+沙耶	sha ye	600
+宫子	gong zi	600
+美游	mei you	600
+和香	he xiang	600
+纱织	sha zhi	600
+亚津子	ya jin zi	600
+日和	ri he	600
+美咲	mei xiao	600
+切里诺	qie li nuo	600
+玛莉娜	ma li na	600
+康娜	kang na	600
+桐乃	tong nai	600
+桃香	tao xiang	600
+阿拜多斯高中	a bai duo si gao zhong	600
+阿拜多斯	a bai duo si	600
+千年科学学园	qian nian ke xue xue yuan	600
+格黑娜学园	ge hei na xue yuan	600
+格黑娜	ge hei na	600
+圣三一综合学园	sheng san yi zong he xue yuan	600
+圣三一	sheng san yi	600
+百鬼夜行联合学院	bai gui ye xing lian he xue yuan	600
+百鬼夜行	bai gui ye xing	600
+山海经高级中学	shan hai jing gao ji zhong xue	600
+红冬联邦学园	hong dong lian bang xue yuan	600
+红冬	hong dong	600
+瓦尔基里警察学校	wa er ji li jing cha xue xiao	600
+瓦尔基里	wa er ji li	600
+阿里乌斯分校	a li wu si fen xiao	600
+阿里乌斯	a li wu si	600
+奥德赛海洋学校	ao de sai hai yang xue xiao	600
+狂猎艺术学园	kuang lie yi shu xue yuan	600
+狂猎	kuang lie	600
+高地铁道学园	gao di tie dao xue yuan	600
+克洛诺斯新闻学院	ke luo nuo si xin wen xue yuan	600
+克洛诺斯	ke luo nuo si	600
+联邦学生会	lian bang xue sheng hui	600
+夏莱	xia lai	600
+补课部	bu ke bu	600
+便利屋	bian li wu	600
+风纪委员会	feng ji wei yuan hui	600
+正义实现委员会	zheng yi shi xian wei yuan hui	600
+修女会	xiu nv hui	600
+救护骑士团	jiu hu qi shi tuan	600
+图书委员会	tu shu wei yuan hui	600
+游戏开发部	you xi kai fa bu	600
+女仆部	nv pu bu	600
+温泉开发部	wen quan kai fa bu	600
+美食研究会	mei shi yan jiu hui	600
+给食部	ji shi bu	600
+对策委员会	dui ce wei yuan hui	600
+甜点部	tian dian bu	600
+忍术研究部	ren shu yan jiu bu	600
+阴阳部	yin yang bu	600
+修行部	xiu xing bu	600
+玄龙门	xuan long men	600
+梅花园	mei hua yuan	600
+炼丹术研究会	lian dan shu yan jiu hui	600
+玄武商会	xuan wu shang hui	600
+兔子小队	tu zi xiao dui	600
+狐狸小队	hu li xiao dui	600
+阿里乌斯小队	a li wu si xiao dui	600
+红冬事务局	hong dong shi wu ju	600
+知识解放战线	zhi shi jie fang zhan xian	600
+中央学生会	zhong yang xue sheng hui	600
+联邦搜查部	lian bang sou cha bu	600
+阿拜多斯学生会	a bai duo si xue sheng hui	600
+千年学生会	qian nian xue sheng hui	600
+格黑娜学生会	ge hei na xue sheng hui	600
+圣三一学生会	sheng san yi xue sheng hui	600
+百鬼夜行学生会	bai gui ye xing xue sheng hui	600
+山海经学生会	shan hai jing xue sheng hui	600
+风纪委员	feng ji wei yuan	600
+基沃托斯	ji wo tuo si	600
+夏莱办公室	xia lai ban gong shi	600
+联邦学生会总部	lian bang xue sheng hui zong bu	600
+阿拜多斯自治区	a bai duo si zi zhi qu	600
+阿拜多斯校舍	a bai duo si xiao she	600
+千年塔	qian nian ta	600
+千年校舍	qian nian xiao she	600
+圣三一大教堂	sheng san yi da jiao tang	600
+圣三一校舍	sheng san yi xiao she	600
+格黑娜校舍	ge hei na xiao she	600
+百鬼夜行商店街	bai gui ye xing shang dian jie	600
+温泉街	wen quan jie	600
+温泉旅馆	wen quan lv guan	600
+学生会室	xue sheng hui shi	600
+演习场	yan xi chang	600
+战场遗迹	zhan chang yi ji	600
+总力战	zong li zhan	600
+制约解除决战	zhi yue jie chu jue zhan	600
+战术对抗赛	zhan shu dui kang sai	600
+合同火力演习	he tong huo li yan xi	600
+特别依赖	te bie yi lai	600
+悬赏通缉	xuan shang tong ji	600
+学园交流会	xue yuan jiao liu hui	600
+常驻招募	chang zhu zhao mu	600
+限定招募	xian ding zhao mu	600
+复刻招募	fu ke zhao mu	600
+免费招募	mian fei zhao mu	600
+十连招募	shi lian zhao mu	600
+单次招募	dan ci zhao mu	600
+招募点数	zhao mu dian shu	600
+限定池	xian ding chi	600
+常驻池	chang zhu chi	600
+羁绊剧情	ji ban ju qing	600
+羁绊等级	ji ban deng ji	600
+学生等级	xue sheng deng ji	600
+老师等级	lao shi deng ji	600
+技能等级	ji neng deng ji	600
+装备等级	zhuang bei deng ji	600
+专武	zhuan wu	600
+专属武器	zhuan shu wu qi	600
+爱用品	ai yong pin	600
+信用点	xin yong dian	600
+清辉石	qing hui shi	600
+神名文字	shen ming wen zi	600
+战术教育光盘	zhan shu jiao yu guang pan	600
+技术笔记	ji shu bi ji	600
+初级技术笔记	chu ji ji shu bi ji	600
+中级技术笔记	zhong ji ji shu bi ji	600
+高级技术笔记	gao ji ji shu bi ji	600
+最高级技术笔记	zui gao ji ji shu bi ji	600
+强化石	qiang hua shi	600
+装备图纸	zhuang bei tu zhi	600
+制造石	zhi zao shi	600
+启动石	qi dong shi	600
+攻击类型	gong ji lei xing	600
+装甲类型	zhuang jia lei xing	600
+轻装甲	qing zhuang jia	600
+重装甲	zhong zhuang jia	600
+特殊装甲	te shu zhuang jia	600
+弹力装甲	tan li zhuang jia	600
+市街	shi jie	600
+普通攻击	pu tong gong ji	600
+普通技能	pu tong ji neng	600
+被动技能	bei dong ji neng	600
+技能书	ji neng shu	600
+自动战斗	zi dong zhan dou	600
+手动战斗	shou dong zhan dou	600
+速通	su tong	600
+凹分	ao fen	600
+卡轴	ka zhou	600
+暴击率	bao ji lv	600
+暴击伤害	bao ji shang hai	600
+闪避率	shan bi lv	600
+治疗量	zhi liao liang	600
+减益	jian yi	600
+防守队	fang shou dui	600
+进攻队	jin gong dui	600
+配队	pei dui	600
+周常	zhou chang	600
+活动奖励	huo dong jiang li	600
+满星	man xing	600
+技能费用	ji neng fei yong	600
+普通关卡	pu tong guan qia	600
+困难关卡	kun nan guan qia	600
+活动关卡	huo dong guan qia	600
+挑战关卡	tiao zhan guan qia	600
+最终关	zui zhong guan	600
+波次	bo ci	600
+掉落率	diao luo lv	600
+保底机制	bao di ji zhi	600
+日常任务	ri chang ren wu	600
+每周任务	mei zhou ren wu	600
+新手任务	xin shou ren wu	600
+成就任务	cheng jiu ren wu	600
+登录奖励	deng lu jiang li	600
+活动剧情	huo dong ju qing	600
+特别活动	te bie huo dong	600
+复刻活动	fu ke huo dong	600
+联动活动	lian dong huo dong	600
+限时活动	xian shi huo dong	600
+主线剧情	zhu xian ju qing	600
+主线关卡	zhu xian guan qia	600
+总力战币	zong li zhan bi	600
+大决战币	da jue zhan bi	600
+战术奖章	zhan shu jiang zhang	600
+精通证书	jing tong zheng shu	600
+咖啡厅等级	ka fei ting deng ji	600
+状态异常	zhuang tai yi chang	600
+持续伤害	chi xu shang hai	600
+持续治疗	chi xu zhi liao	600
+护盾值	hu dun zhi	600
+增益效果	zeng yi xiao guo	600
+减益效果	jian yi xiao guo	600
+对轴	dui zhou	600
+技能冷却	ji neng leng que	600
+首领战	shou ling zhan	600
+挑战模式	tiao zhan mo shi	600
+练习模式	lian xi mo shi	600
+剧情模式	ju qing mo shi	600
+推荐战力	tui jian zhan li	600
+队伍战力	dui wu zhan li	600
+通关奖励	tong guan jiang li	600
+首次通关	shou ci tong guan	600
+三星通关	san xing tong guan	600
+满星通关	man xing tong guan	600
+装备强化	zhuang bei qiang hua	600
+技能强化	ji neng qiang hua	600
+学生招募	xue sheng zhao mu	600
+老师经验	lao shi jing yan	600
+学生经验	xue sheng jing yan	600
+氪佬	ke lao	600
+肝帝	gan di	600
+凹总力	ao zong li	600
+抄作业	chao zuo ye	600
+强度党	qiang du dang	600
+厨力党	chu li dang	600
+大额头	da e tou	600
+团宠	tuan chong	600
+欧皇	ou huang	600
+吃井	chi jing	600
+仓管	cang guan	600
+人权卡	ren quan ka	600
+幻神	huan shen	600
+退环境	tui huan jing	600
+下位替代	xia wei ti dai	600
+上位替代	shang wei ti dai	600
+满练	man lian	600
+初始号	chu shi hao	600
+自建号	zi jian hao	600
+引继	yin ji	600
+月卡	yue ka	600
+非气	fei qi	600
+抽卡	chou ka	600
+单抽	dan chou	600
+免费十连	mian fei shi lian	600
+歪卡	wai ka	600
+剧情党	ju qing dang	600
+收集党	shou ji dang	600
+休闲党	xiu xian dang	600
+白嫖党	bai piao dang	600
+月卡党	yue ka dang	600
+氪金党	ke jin dang	600
+云玩家	yun wan jia	600
+退坑	tui keng	600
+回坑	hui keng	600
+二创	er chuang	600
+表情包	biao qing bao	600
+名场面	ming chang mian	600
+日服	ri fu	600
+国际服	guo ji fu	600
+渠道服	qu dao fu	600
+测试服	ce shi fu	600
+体验服	ti yan fu	600
+刷初始	shua chu shi	600
+清体力	qing ti li	600

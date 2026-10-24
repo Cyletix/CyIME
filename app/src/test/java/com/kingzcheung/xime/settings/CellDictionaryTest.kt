@@ -198,6 +198,18 @@ class CellDictionaryTest {
         assertEquals(listOf("Ame", "BKB"), store.englishWords(builtin.id))
     }
 
+    @Test fun `every bundled dictionary is a valid pinyin table with one syllable per character`() {
+        for (builtin in CellDictionaryCatalog.builtins) {
+            val text = File("src/main/assets/${builtin.asset}").readText()
+            assertTrue(builtin.id, text.contains("\nname: cell_${builtin.id}\n"))
+            val rows = text.substringAfter("\n...\n").lines().filter { it.isNotBlank() }.map { it.split('\t') }
+            assertTrue(builtin.id, rows.size >= 200)
+            rows.forEach { (word, code) -> assertEquals("${builtin.id} $word", word.length, code.split(' ').size) }
+            val english = File("src/main/assets/${builtin.englishAsset}")
+            if (english.isFile) assertTrue(english.readLines().all { it.isNotBlank() && it.all { c -> c.code < 128 } })
+        }
+    }
+
     @Test fun `bundled arknights dictionary is a valid pinyin table with the core community terms`() {
         val text = File("src/main/assets/cell_dictionaries/cell_builtin_arknights.dict.yaml").readText()
         assertTrue(text.contains("\nname: cell_builtin_arknights\n"))

@@ -1,0 +1,446 @@
+# CyIME 崩坏3词库。由 tools/dictionaries/topics/build_topic_dict.py 生成，请勿手改。
+# 词表由 CyletixCode 整理，读音按 rime-ice 校对。
+---
+name: cell_builtin_honkai3
+version: "1"
+sort: by_weight
+use_preset_vocabulary: false
+...
+圣女祈祷	sheng nv qi dao	600
+领域装白练	ling yu zhuang bai lian	600
+女武神游侠	nv wu shen you xia	600
+白骑士月光	bai qi shi yue guang	600
+天穹游侠	tian qiong you xia	600
+脉冲装绯红	mai chong zhuang fei hong	600
+影舞冲击	ying wu chong ji	600
+雷电女王的鬼铠	lei dian nv wang de gui kai	600
+鬼铠	gui kai	600
+女武神强袭	nv wu shen qiang xi	600
+驱动装山吹	qu dong zhuang shan chui	600
+山吹	shan chui	600
+女武神战车	nv wu shen zhan che	600
+次元边界突破	ci yuan bian jie tu po	600
+次生银翼	ci sheng yin yi	600
+战场疾风	zhan chang ji feng	600
+融核装深红	rong he zhuang shen hong	600
+血色玫瑰	xue se mei gui	600
+女武神凯旋	nv wu shen kai xuan	600
+极地战刃	ji di zhan ren	600
+女武神誓约	nv wu shen shi yue	600
+处刑装紫苑	chu xing zhuang zi yuan	600
+紫苑	zi yuan	600
+神恩颂歌	shen en song ge	600
+暮光骑士月煌	mu guang qi shi yue huang	600
+月煌	yue huang	600
+月下初拥	yue xia chu yong	600
+朔夜观星	shuo ye guan xing	600
+女武神迅羽	nv wu shen xun yu	600
+迅羽	xun yu	600
+雾都迅羽	wu du xun yu	600
+影骑士月轮	ying qi shi yue lun	600
+月轮	yue lun	600
+炽翎	chi ling	600
+云墨丹心	yun mo dan xin	600
+白夜执事	bai ye zhi shi	600
+御神装勿忘	yu shen zhuang wu wang	600
+逆神巫女	ni shen wu nv	600
+真炎幸魂	zhen yan xing hun	600
+夜隐重霞	ye yin chong xia	600
+第六夜想曲	di liu ye xiang qu	600
+圣仪装今样	sheng yi zhuang jin yang	600
+今样	jin yang	600
+失落迷迭	shi luo mi die	600
+黯蔷薇	an qiang wei	600
+缭乱星棘	liao luan xing ji	600
+幻海梦蝶	huan hai meng die	600
+魇夜星渊	yan ye xing yuan	600
+樱桃炸弹	ying tao zha dan	600
+狂热蓝调	kuang re lan diao	600
+蓝莓特攻	lan mei te gong	600
+女武神荣光	nv wu shen rong guang	600
+辉骑士月魄	hui qi shi yue po	600
+月魄	yue po	600
+不灭星锚	bu mie xing mao	600
+天元骑英	tian yuan qi ying	600
+粉色妖精小姐	fen se yao jing xiao jie	600
+无限噬界之蛇	wu xian shi jie zhi she	600
+戒律深罪之槛	jie lv shen zui zhi kan	600
+黄金璀耀之歌	huang jin cui yao zhi ge	600
+螺旋愚戏之匣	luo xuan yu xi zhi xia	600
+繁星绘世之卷	fan xing hui shi zhi juan	600
+空梦掠影	kong meng lve ying	600
+午夜苦艾	wu ye ku ai	600
+鏖灭浮生渡尘	ao mie fu sheng du chen	600
+女武神热砂	nv wu shen re sha	600
+热砂	re sha	600
+糖露星霜	tang lu xing shuang	600
+玉骑士月痕	yu qi shi yue hen	600
+女武神装甲	nv wu shen zhuang jia	600
+樱火轮舞	ying huo lun wu	600
+原罪猎人	yuan zui lie ren	600
+猎袭装影铁	lie xi zhuang ying tie	600
+苍骑士月魂	cang qi shi yue hun	600
+真红骑士月蚀	zhen hong qi shi yue shi	600
+断罪影舞	duan zui ying wu	600
+破晓强袭	po xiao qiang xi	600
+迷城骇兔	mi cheng hai tu	600
+彗星驱动	hui xing qu dong	600
+异度黑核侵蚀	yi du hei he qin shi	600
+银狼的黎明	yin lang de li ming	600
+雪地狙击	xue di ju ji	600
+月下誓约予爱以心	yue xia shi yue yu ai yi xin	600
+时帆旅人	shi fan lv ren	600
+织羽梦旌	zhi yu meng jing	600
+深空定锚	shen kong ding mao	600
+孑遗千星	jie yi qian xing	600
+诡戏千役	gui xi qian yi	600
+奇迹魔法少女	qi ji mo fa shao nv	600
+律者	lv zhe	600
+理之律者	li zhi lv zhe	600
+空之律者	kong zhi lv zhe	600
+雷之律者	lei zhi lv zhe	600
+风之律者	feng zhi lv zhe	600
+冰之律者	bing zhi lv zhe	600
+炎之律者	yan zhi lv zhe	600
+死之律者	si zhi lv zhe	600
+星之律者	xing zhi lv zhe	600
+识之律者	shi zhi lv zhe	600
+支配之律者	zhi pei zhi lv zhe	600
+约束之律者	yue shu zhi lv zhe	600
+侵蚀之律者	qin shi zhi lv zhe	600
+终焉之律者	zhong yan zhi lv zhe	600
+始源之律者	shi yuan zhi lv zhe	600
+真理之律者	zhen li zhi lv zhe	600
+死生之律者	si sheng zhi lv zhe	600
+人之律者	ren zhi lv zhe	600
+薪炎之律者	xin yan zhi lv zhe	600
+伪神	wei shen	600
+伪神奥托	wei shen ao tuo	600
+律者核心	lv zhe he xin	600
+崩坏能	beng huai neng	600
+崩坏兽	beng huai shou	600
+崩坏爆发	beng huai bao fa	600
+大崩坏	da beng huai	600
+崩坏降临	beng huai jiang lin	600
+神之键	shen zhi jian	600
+拟似律者	ni si lv zhe	600
+崩坏能浓度	beng huai neng nong du	600
+逆熵	ni shang	600
+世界蛇	shi jie she	600
+逐火之蛾	zhu huo zhi e	600
+圣芙蕾雅学园	sheng fu lei ya xue yuan	600
+女武神部队	nv wu shen bu dui	600
+天命主教	tian ming zhu jiao	600
+逆熵盟主	ni shang meng zhu	600
+学园长	xue yuan zhang	600
+女武神宿舍	nv wu shen su she	600
+休伯利安	xiu bo li an	600
+休伯利安号	xiu bo li an hao	600
+月光王座	yue guang wang zuo	600
+极东支部	ji dong zhi bu	600
+天命总部	tian ming zong bu	600
+逆熵总部	ni shang zong bu	600
+世界蛇总部	shi jie she zong bu	600
+灰蛇	hui she	600
+渡鸦	du ya	600
+夜枭	ye xiao	600
+十三英桀	shi san ying jie	600
+英桀	ying jie	600
+前文明	qian wen ming	600
+现文明	xian wen ming	600
+火种计划	huo zhong ji hua	600
+圣痕计划	sheng hen ji hua	600
+融合战士	rong he zhan shi	600
+适格者	shi ge zhe	600
+实验体	shi yan ti	600
+琪亚娜	qi ya na	600
+雷电芽衣	lei dian ya yi	600
+芽衣	ya yi	600
+布洛妮娅	bu luo ni ya	600
+姬子	ji zi	600
+无量塔姬子	wu liang ta ji zi	600
+德丽莎	de li sha	600
+符华	fu hua	600
+八重樱	ba chong ying	600
+卡莲	ka lian	600
+丽塔	li ta	600
+希儿	xi er	600
+萝莎莉娅	luo sha li ya	600
+莉莉娅	li li ya	600
+幽兰黛尔	you lan dai er	600
+比安卡	bi an ka	600
+西琳	xi lin	600
+爱莉希雅	ai li xi ya	600
+爱莉	ai li	600
+梅比乌斯	mei bi wu si	600
+阿波尼亚	a bo ni ya	600
+维尔薇	wei er wei	600
+格蕾修	ge lei xiu	600
+帕朵菲莉丝	pa duo fei li si	600
+千劫	qian jie	600
+克莱因	ke lai yin	600
+可可利亚	ke ke li ya	600
+奥托	ao tuo	600
+绯玉丸	fei yu wan	600
+塞西莉亚	sai xi li ya	600
+齐格飞	qi ge fei	600
+时雨绮罗	shi yu qi luo	600
+李素裳	li su shang	600
+苏莎娜	su sha na	600
+卡萝尔	ka luo er	600
+缇米朵	ti mi duo	600
+温蒂	wen di	600
+陈天武	chen tian wu	600
+约阿希姆	yue a xi mu	600
+程立雪	cheng li xue	600
+丹朱	dan zhu	600
+苍玄	cang xuan	600
+赤鸢仙人	chi yuan xian ren	600
+小识	xiao shi	600
+草履虫	cao lv chong	600
+呆鹅	dai e	600
+煮饭婆	zhu fan po	600
+上仙	shang xian	600
+绿托	lv tuo	600
+特日日	te ri ri	600
+姬子阿姨	ji zi a yi	600
+黑希	hei xi	600
+白希	bai xi	600
+杏玛尔	xing ma er	600
+卡斯兰娜	ka si lan na	600
+阿波卡利斯	a bo ka li si	600
+沙尼亚特	sha ni ya te	600
+扎伊切克	zha yi qie ke	600
+芙乐艾	fu le ai	600
+洛丝薇瑟	luo si wei se	600
+希奥拉	xi ao la	600
+琪亚娜卡斯兰娜	qi ya na ka si lan na	600
+布洛妮娅扎伊切克	bu luo ni ya zha yi qie ke	600
+德丽莎阿波卡利斯	de li sha a bo ka li si	600
+奥托阿波卡利斯	ao tuo a bo ka li si	600
+卡莲卡斯兰娜	ka lian ka si lan na	600
+塞西莉亚沙尼亚特	sai xi li ya sha ni ya te	600
+齐格飞卡斯兰娜	qi ge fei ka si lan na	600
+娜塔莎希奥拉	na ta sha xi ao la	600
+丽塔洛丝薇瑟	li ta luo si wei se	600
+希儿芙乐艾	xi er fu le ai	600
+奥托主教	ao tuo zhu jiao	600
+德丽莎学园长	de li sha xue yuan zhang	600
+符华上仙	fu hua shang xian	600
+爱衣	ai yi	600
+米丝忒琳	mi si te lin	600
+希娜狄雅	xi na di ya	600
+科拉莉	ke la li	600
+赫丽娅	he li ya	600
+瑟莉姆	se li mu	600
+松雀	song que	600
+薇塔	wei ta	600
+莎芙莱	sha fu lai	600
+花火	hua huo	600
+长空市	chang kong shi	600
+沧海市	cang hai shi	600
+天穹市	tian qiong shi	600
+圣芙蕾雅	sheng fu lei ya	600
+极东	ji dong	600
+太虚山	tai xu shan	600
+八重村	ba chong cun	600
+柯洛斯滕	ke luo si teng	600
+量子之海	liang zi zhi hai	600
+虚数空间	xu shu kong jian	600
+虚数之树	xu shu zhi shu	600
+世界泡	shi jie pao	600
+平行世界	ping xing shi jie	600
+圣方丹	sheng fang dan	600
+长空	chang kong	600
+圣痕	sheng hen	600
+芥川龙之介	jie chuan long zhi jie	600
+阿提拉	a ti la	600
+姬轩辕戏水	ji xuan yuan xi shui	600
+巴托里伊丽莎白	ba tuo li yi li sha bai	600
+普朗克	pu lang ke	600
+门捷列夫	men jie lie fu	600
+卡拉瓦乔	ka la wa qiao	600
+亚丝拉琪	ya si la qi	600
+克列欧博克拉	ke lie ou bo ke la	600
+长光	chang guang	600
+阿伏伽德罗	a fu jia de luo	600
+马可波罗	ma ke bo luo	600
+里纳尔多	li na er duo	600
+卡莲颂歌	ka lian song ge	600
+西琳升华	xi lin sheng hua	600
+符华戍边	fu hua shu bian	600
+赤鸢	chi yuan	600
+空无之钥	kong wu zhi yue	600
+幽色咏叹调	you se yong tan diao	600
+索尔之锤	suo er zhi chui	600
+原型妖精之弓	yuan xing yao jing zhi gong	600
+异型赫尔之弓	yi xing he er zhi gong	600
+雷刀鬼角	lei dao gui jiao	600
+磁暴斩	ci bao zhan	600
+重磁暴斩	zhong ci bao zhan	600
+灵刀樱吹雪	ling dao ying chui xue	600
+御灵刀寒狱冰天	yu ling dao han yu bing tian	600
+仿灵刀冰昙天	fang ling dao bing tan tian	600
+天火圣裁	tian huo sheng cai	600
+黑渊白花	hei yuan bai hua	600
+犹大的誓约	you da de shi yue	600
+虚空万藏	xu kong wan cang	600
+伊甸之星	yi dian zhi xing	600
+太虚之握	tai xu zhi wo	600
+轩辕剑	xuan yuan jian	600
+量子毁灭者	liang zi hui mie zhe	600
+鲜血之舞	xian xue zhi wu	600
+赫朗格尼尔	he lang ge ni er	600
+巴鲁蒙格	ba lu meng ge	600
+天穹撕裂者	tian qiong si lie zhe	600
+极夜之赫卡忒	ji ye zhi he ka te	600
+埃琉德尼尔	ai liu de ni er	600
+破晓者塔尔瓦	po xiao zhe ta er wa	600
+虚无之刃	xu wu zhi ren	600
+黑轩辕剑	hei xuan yuan jian	600
+阿芙洛狄忒	a fu luo di te	600
+圣遗物	sheng yi wu	600
+环刃	huan ren	600
+骑枪	qi qiang	600
+梭镖	suo biao	600
+阳电子手炮	yang dian zi shou pao	600
+幽夜狂想曲	you ye kuang xiang qu	600
+地藏御魂	di zang yu hun	600
+天殛之钥	tian ji zhi yue	600
+雷切	lei qie	600
+开天剑	kai tian jian	600
+妖精剑希尔文	yao jing jian xi er wen	600
+彼岸之扉	bi an zhi fei	600
+群青风暴	qun qing feng bao	600
+朗基努斯之枪	lang ji nu si zhi qiang	600
+永寂之赫勒尔	yong ji zhi he le er	600
+记忆战场	ji yi zhan chang	600
+往世乐土	wang shi le tu	600
+精准补给	jing zhun bu ji	600
+扩充补给	kuo chong bu ji	600
+家园补给	jia yuan bu ji	600
+人偶补给	ren ou bu ji	600
+装备补给	zhuang bei bu ji	600
+标准补给	biao zhun bu ji	600
+新手补给	xin shou bu ji	600
+单抽	dan chou	600
+抽卡	chou ka	600
+月卡	yue ka	600
+兑换码	dui huan ma	600
+头像框	tou xiang kuang	600
+女武神	nv wu shen	600
+圣痕共鸣	sheng hen gong ming	600
+武装共鸣	wu zhuang gong ming	600
+崩坏结晶	beng huai jie jing	600
+相转移镜面	xiang zhuan yi jing mian	600
+超导金属氢	chao dao jin shu qing	600
+星石	xing shi	600
+燃素	ran su	600
+武装人偶	wu zhuang ren ou	600
+词缀	ci zhui	600
+补给卡	bu ji ka	600
+舰团	jian tuan	600
+超弦空间	chao xian kong jian	600
+量子奇点	liang zi qi dian	600
+迪拉克之海	di la ke zhi hai	600
+无尽深渊	wu jin shen yuan	600
+寂灭	ji mie	600
+视觉小说	shi jue xiao shuo	600
+开放世界	kai fang shi jie	600
+樱色轮回	ying se lun hui	600
+后崩坏书	hou beng huai shu	600
+挑战模式	tiao zhan mo shi	600
+无尽模式	wu jin mo shi	600
+生存模式	sheng cun mo shi	600
+限时挑战	xian shi tiao zhan	600
+排名奖励	pai ming jiang li	600
+波次	bo ci	600
+精英怪	jing ying guai	600
+死士	si shi	600
+泰坦机甲	tai tan ji jia	600
+生物属性	sheng wu shu xing	600
+异能属性	yi neng shu xing	600
+机械属性	ji xie shu xing	600
+量子属性	liang zi shu xing	600
+虚数属性	xu shu shu xing	600
+克制关系	ke zhi guan xi	600
+感电	gan dian	600
+易伤	yi shang	600
+增伤	zeng shang	600
+暴伤	bao shang	600
+极限闪避	ji xian shan bi	600
+时空断裂	shi kong duan lie	600
+聚怪	ju guai	600
+配队	pei dui	600
+队长技	dui zhang ji	600
+武器技	wu qi ji	600
+被动技能	bei dong ji neng	600
+主动技能	zhu dong ji neng	600
+专武	zhuan wu	600
+六星	liu xing	600
+稀有度	xi you du	600
+毕业套	bi ye tao	600
+角色碎片	jue se sui pian	600
+灵魂觉醒	ling hun jue xing	600
+增幅核心	zeng fu he xin	600
+专属圣痕	zhuan shu sheng hen	600
+专属武器	zhuan shu wu qi	600
+超限武器	chao xian wu qi	600
+毕业武器	bi ye wu qi	600
+圣痕词缀	sheng hen ci zhui	600
+洗词缀	xi ci zhui	600
+锁词缀	suo ci zhui	600
+攻速词缀	gong su ci zhui	600
+双暴	shuang bao	600
+三攻	san gong	600
+凹分	ao fen	600
+凹深渊	ao shen yuan	600
+抄作业	chao zuo ye	600
+满星	man xing	600
+初始号	chu shi hao	600
+自抽号	zi chou hao	600
+防沉迷	fang chen mi	600
+作战凭证	zuo zhan ping zheng	600
+精英凭证	jing ying ping zheng	600
+进阶凭证	jin jie ping zheng	600
+免费凭证	mian fei ping zheng	600
+自动战斗	zi dong zhan dou	600
+快速作战	kuai su zuo zhan	600
+周常	zhou chang	600
+团队挑战	tuan dui tiao zhan	600
+追忆之皿	zhui yi zhi min	600
+通用刻印	tong yong ke yin	600
+专属刻印	zhuan shu ke yin	600
+空梦	kong meng	600
+鏖灭	ao mie	600
+天慧	tian hui	600
+旭光	xu guang	600
+崩坏三	beng huai san	600
+崩崩崩	beng beng beng	600
+崩三	beng san	600
+米哈游	mi ha you	600
+米忽悠	mi hu you	600
+大伟哥	da wei ge	600
+刘伟	liu wei	600
+蔡浩宇	cai hao yu	600
+罗宇皓	luo yu hao	600
+欧皇	ou huang	600
+晒卡	shai ka	600
+歪卡	wai ka	600
+抽歪	chou wai	600
+吃井	chi jing	600
+垫刀	dian dao	600
+非气	fei qi	600
+月卡党	yue ka dang	600
+氪佬	ke lao	600
+肝帝	gan di	600
+米卫兵	mi wei bing	600
+米黑	mi hei	600
+真爱党	zhen ai dang	600
+强度党	qiang du dang	600
+剧情党	ju qing dang	600
+老婆党	lao po dang	600
+考据党	kao ju dang	600
+二创	er chuang	600
+纸片人	zhi pian ren	600
+空中劈叉	kong zhong pi cha	600
