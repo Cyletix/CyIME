@@ -23,3 +23,16 @@ internal fun ShiftSlideLine(targets: ShiftSlideTargets, rootOrigin: () -> Offset
         }
     }
 }
+
+/** 九键 0 键拖到候选时键盘里那段拖线；候选栏那段由候选栏自己画（[CandidateDropTargets.dragLine]）。 */
+@Composable
+internal fun CandidateDragLine(targets: CandidateDropTargets, rootOrigin: () -> Offset, color: Color, modifier: Modifier) {
+    Canvas(modifier.testTag("candidate-drag-line")) {
+        targets.dragLine?.let { (from, to) ->
+            val origin = rootOrigin()
+            clipRect {
+                drawLine(color, from - origin, to - origin, strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+            }
+        }
+    }
+}
