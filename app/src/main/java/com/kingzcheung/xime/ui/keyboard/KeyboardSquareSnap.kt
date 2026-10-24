@@ -11,7 +11,8 @@ internal data class KeyboardSquareSnap(val columns: Float, val split: Boolean, v
     fun capDifference(rect: ResizeRect, density: Float, extra: Float,
         floating: Boolean, spacing: Pair<Float?, Float?>): Float {
         val width = rect.width / density
-        val bodyHeight = (rect.height - extra) / density - 44f
+        val panelHeight = (rect.height - extra) / density
+        val bodyHeight = panelHeight - candidateBarHeightDp(candidateBarScale(width, panelHeight))
         val fraction = if (split) SplitKeyboardGeometry.keyWidthFraction(width, gapFraction,
             SplitKeyboardGeometry.gutterDp(floating)) else 1f
         val policy = (if (keypad) KeyVisualPolicy.T9 else KeyVisualPolicy.Qwerty)

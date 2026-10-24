@@ -74,6 +74,7 @@ import com.kingzcheung.xime.rime.RimeCandidate
 import com.kingzcheung.xime.service.ExpandedCandidatePager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * 候选展开页条目：候选文本 + 拼音注释 + 跨页全局索引。
@@ -203,7 +204,8 @@ private fun CandidatePageContent(
     onHapticFeedback: (() -> Unit)? = null,
 ) {
     val configuration = LocalConfiguration.current
-    val candidateTextSize = rememberCandidateTextSize()
+    // 展开页候选字号与候选栏一起随键盘放大。
+    val candidateTextSize = (rememberCandidateTextSize() * LocalCandidateBarScale.current).roundToInt()
     val isLandscape =
         configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val leftRailWidth = if (isLandscape) 48.dp else 40.dp

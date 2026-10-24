@@ -70,6 +70,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -412,7 +413,20 @@ fun KeyboardView(
         previewRectState = if (resizeActive) resizePreviewRect else null,
         onCardPositioned = onCardPositioned,
     ) {
-        Box(modifier = Modifier.fillMaxSize().then(contentModifier)) {
+        // 候选栏随键盘半速放大：按卡片实际尺寸算，调节尺寸时跟着预览走；剪贴板上拉和搜索时卡片临时变高，不跟。
+        val barScaleFrozen = LocalClipboardPanelExpansion.current != null || state.clipboardSearchVisible
+        val candidateBarScaleState = remember {
+            mutableFloatStateOf(candidateBarScale(
+                (if (state.isFloatingMode) cardWidthDp else state.keyboardWidthDp.takeIf { it > 0 }
+                    ?: state.fixedWidthDp.takeIf { it > 0 } ?: screenW).toFloat(),
+                state.keyboardHeightDp.toFloat()))
+        }
+        Box(modifier = Modifier.fillMaxSize().then(contentModifier).onSizeChanged { size ->
+            if (!barScaleFrozen && size.width > 0 && size.height > 0) {
+                candidateBarScaleState.floatValue = candidateBarScale(size.width / resizeControlDensity.density,
+                    size.height / resizeControlDensity.density - renderedBottomPaddingDp)
+            }
+        }) {
         // 长按候选删除自造词：确认覆盖层状态（键盘视图内渲染，不弹独立
         // 窗口——焦点型弹窗会抢焦点导致 IME 被系统收起）
         // 长按删除待确认项：词文本 + 确认后执行（候选栏/展开页共用同一确认覆盖层）
@@ -857,6 +871,7 @@ fun KeyboardView(
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalLearnedCandidates provides candidateState.value.learnedCandidates,
                 LocalCorrectedCandidates provides candidateState.value.correctedCandidates) {
+            ScaledCandidateBar(candidateBarScaleState.floatValue) {
             CandidateBar(
                 modifier = Modifier.clipboardPanelExpandGesture().drawWithContent {
                     drawContent()
@@ -1021,6 +1036,7 @@ fun KeyboardView(
                     openPreeditEditor()
                 }) else null,
             )
+            }
             }
             }
             // Opening a tool must not insert a row and shrink the underlying handwriting canvas.
@@ -1583,7 +1599,8 @@ fun KeyboardView(
                     .then(if (overlayVisible) Modifier.clearAndSetSemantics {} else Modifier),
                 revealState = candidateReveal,
             ) {
-                CompositionLocalProvider(LocalKeyCornerRadius provides kbKey.cornerRadius.dp) {
+                CompositionLocalProvider(LocalKeyCornerRadius provides kbKey.cornerRadius.dp,
+                    LocalCandidateBarScale provides candidateBarScaleState.floatValue) {
                     renderExpandedCandidates()
                 }
             }
@@ -1740,7 +1757,8 @@ fun KeyboardView(
         // A route change replaces only the panel content, never restarts the reveal host.
             KeyboardPanelReveal(
                 visible = page is KeyboardPage.Overlay,
-                modifier = Modifier.fillMaxSize().padding(top = 44.dp).testTag("keyboard-overlay"),
+                modifier = Modifier.fillMaxSize().padding(top = candidateBarHeightDp(candidateBarScaleState.floatValue).dp)
+                    .testTag("keyboard-overlay"),
                 visibility = overlayVisibility,
                 revealState = overlayReveal,
             ) {
