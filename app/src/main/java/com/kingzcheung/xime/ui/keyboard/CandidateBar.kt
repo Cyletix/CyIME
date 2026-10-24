@@ -1019,7 +1019,8 @@ private fun CandidateExpansionButton(
 @Composable
 private fun PreeditPreview(text: String, visuals: CandidateBarVisuals, onEdit: (() -> Unit)?) {
     val density = LocalDensity.current
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    // 放大后的候选栏里 dp 变大了，按屏宽限宽要换回同样的像素宽度。
+    val screenWidth = (LocalConfiguration.current.screenWidthDp / LocalCandidateBarScale.current).dp
     val margin = with(density) { 4.dp.roundToPx() }
     val gap = with(density) { 2.dp.roundToPx() }
     // 气泡贴着键盘左边（用户 10-20 要求恢复）：不跟光标，所有应用位置一样。

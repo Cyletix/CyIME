@@ -37,7 +37,9 @@ internal fun letterKeyboardDefaults(
  * become square. A measured physical pitch bounds calibrated QWERTY defaults; unknown
  * displays keep the original 88dp cap and 45% default-height budget. A calibrated target
  * may raise that budget continuously to at most 50% (retaining the old 228dp floor),
- * within the existing resize bounds. Manual sizes never enter here. Includes the 44dp toolbar and 8dp bottom. */
+ * within the existing resize bounds. Manual sizes never enter here. Includes the 44dp toolbar and 8dp bottom.
+ * Default sizes stay as chosen: on large panels the scaled candidate bar ([candidateBarScale]) takes its
+ * extra height from the rows, about 2dp per row, rather than widening or narrowing the default. */
 internal fun defaultLetterKeyboardSize(
     availableWidthDp: Int, preferredWidthDp: Int, defaults: LetterKeyboardDefaults,
 ): ProtectedKeyboardSize {
