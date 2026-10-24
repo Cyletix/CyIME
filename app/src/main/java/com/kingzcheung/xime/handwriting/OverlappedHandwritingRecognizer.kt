@@ -20,6 +20,11 @@ class OverlappedHandwritingRecognizer(
     private val maxSegments: Int = DEFAULT_MAX_SEGMENTS,
     /** 单个字允许的最大笔画数（超出视为不可识别为单字）。 */
     private val maxStrokesPerSegment: Int = DEFAULT_MAX_STROKES_PER_SEGMENT,
+    /**
+     * 并排书写：新的一段整体落在前面所有笔迹右边、中间留出明显空隙时，当作换字（和停顿同等的切分信号）。
+     * 日语、英文手写打开；中文习惯叠写在同一处，不打开（左右结构的字不会被拆开）。
+     */
+    private val sideBySide: Boolean = false,
 ) {
     /**
      * 单个切分段（一个字）。
@@ -76,6 +81,7 @@ class OverlappedHandwritingRecognizer(
         }
         val n = bounded.size
         if (n == 0) return Result(emptyList(), 0f, 0f)
+        val layout = if (sideBySide) SideBySide(bounded) else null
 
         val neg = Float.NEGATIVE_INFINITY
         // best[k][i]：前 i 笔切成 k 段的最大识别分总和（含时间间隔偏置）
@@ -93,7 +99,9 @@ class OverlappedHandwritingRecognizer(
                     if (candidates.isEmpty()) continue
                     // 时间偏置：j>0 时新段起笔与上一段收笔的间隔影响切分倾向
                     val gapBias = if (j > 0 && j < gaps.size) gapBias(gaps[j]) else 0f
-                    val score = prev + candidates[0].score + gapBias
+                    // 位置偏置：并排书写时，这一段整体在前面笔迹右边并留出空隙，倾向在此换字
+                    val spaceBias = if (j > 0 && layout?.isBoundary(j, i) == true) GAP_SPLIT_BONUS else 0f
+                    val score = prev + candidates[0].score + gapBias + spaceBias
                     if (best[k][i] == neg || score > best[k][i]) {
                         best[k][i] = score
                         back[k][i] = j
@@ -120,7 +128,8 @@ class OverlappedHandwritingRecognizer(
         // 最小诊断日志（2026-09-25 手写“第1/3字”排查）：把切分决策的输入与结论一次打出来
         android.util.Log.i(
             "HandwritingChain",
-            "recognize strokes=$n gaps=$gaps bestK=$bestK norm=$bestNorm pauseBoundary=${hasPauseBoundary(gaps)}"
+            "recognize strokes=$n gaps=$gaps bestK=$bestK norm=$bestNorm pauseBoundary=${hasPauseBoundary(gaps)}" +
+                " sideBySide=${layout?.hasBoundary()}"
         )
 
         // "一个字"先验：DP 选出多段时，必须存在"显著换字停顿"才信任切分。
@@ -129,7 +138,7 @@ class OverlappedHandwritingRecognizer(
         //   快写者字间间隔虽小但相对突出，仍能正确检出）。
         // 无显著停顿时按单字处理（合并段识别），输入框始终只显示一个字；
         // 连笔写多字词时合并段分数必然极低（跨字笔迹不成字），仍尊重 DP 切分。
-        if (bestK >= 2 && !hasPauseBoundary(gaps)) {
+        if (bestK >= 2 && !hasPauseBoundary(gaps) && layout?.hasBoundary() != true) {
             val merged = segmentCandidates(0, n, bounded, predictFn)
             val mergedScore = merged.firstOrNull()?.score ?: 0f
             var end = n
@@ -236,7 +245,36 @@ class OverlappedHandwritingRecognizer(
         return inner.any { it >= threshold }
     }
 
+    /**
+     * 并排书写的位置判断：第 j 笔起的一段（到第 i 笔前）最左边，比前面所有笔迹最右边还靠右，
+     * 且空隙不小于整行高度的 [SIDE_GAP_RATIO]，就算换字。字内部件之间的空隙通常更小，不会触发。
+     */
+    private class SideBySide(strokes: List<List<Pair<Float, Float>>>) {
+        private val minX = FloatArray(strokes.size) { s -> strokes[s].minOfOrNull { it.first } ?: Float.MAX_VALUE }
+        private val maxX = FloatArray(strokes.size) { s -> strokes[s].maxOfOrNull { it.first } ?: -Float.MAX_VALUE }
+        private val gapNeeded: Float = strokes.flatten().let { pts ->
+            if (pts.isEmpty()) Float.MAX_VALUE
+            else (pts.maxOf { it.second } - pts.minOf { it.second }).coerceAtLeast(1f) * SIDE_GAP_RATIO
+        }
+        private val prefixMaxX = FloatArray(strokes.size + 1).also { a ->
+            a[0] = -Float.MAX_VALUE
+            for (s in strokes.indices) a[s + 1] = maxOf(a[s], maxX[s])
+        }
+
+        fun isBoundary(j: Int, i: Int): Boolean {
+            var left = Float.MAX_VALUE
+            for (s in j until i) left = minOf(left, minX[s])
+            return left - prefixMaxX[j] >= gapNeeded
+        }
+
+        /** 整段笔迹里有没有一处是并排换字（从那一笔起到最后都在前面笔迹右边）。 */
+        fun hasBoundary(): Boolean = (1 until minX.size).any { isBoundary(it, minX.size) }
+    }
+
     companion object {
+        /** 并排书写时，字与字之间的空隙至少为整行高度的这个比例才算换字。 */
+        const val SIDE_GAP_RATIO = 0.25f
+
         /**
          * 活动笔画最多同时叠写的字数。
          * 5 段上限保证单字书写中途的临时多段切分（如"在"写到 3 笔时的
