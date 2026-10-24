@@ -67,7 +67,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 九键「下一项」0 键：短左滑、较长左滑（没过键盘半宽）仍是键内左箭头；拖出键盘一半高到候选上才是拖动选词，
+ * 九键「下一项」0 键：短左滑、较长左滑（没过键盘半宽）仍是键内左箭头，右滑是键内右箭头（下一项）；拖出键盘一半高到候选上才是拖动选词，
  * 画出从键到手指的拖线、候选高亮，松手选中这个候选。只在设了 CYIME_RENDER_OUT 时出图。
  */
 @RunWith(AndroidJUnit4::class)
@@ -88,6 +88,7 @@ class T9ZeroKeyDragRenderTest {
         var glass by mutableStateOf(false)
         var selected: Int? = null
         var previous = 0
+        var next = 0
         rule.setContent {
             val palette = resolveKeyboardPalette(theme, dark)
             val config = FrostedGlassConfig.defaults(dark, enabled = glass)
@@ -140,7 +141,7 @@ class T9ZeroKeyDragRenderTest {
                                         iconSizeDp = T9NextCandidateIconDp,
                                         onClick = {}, backgroundColor = palette.key, textColor = palette.text,
                                         modifier = Modifier.weight(1f).testTag("zero").dragToCandidate(true, { area }),
-                                        onSwipeLeft = { previous++ })
+                                        onSwipeLeft = { previous++ }, onSwipeRight = { next++ })
                                     NineKeyButton(digit = "", letters = "发送", onClick = {},
                                         backgroundColor = palette.function, textColor = palette.functionText,
                                         modifier = Modifier.weight(1f))
@@ -182,6 +183,18 @@ class T9ZeroKeyDragRenderTest {
                 rule.waitForIdle()
                 assertEquals("左滑松手是上一项", before + 1, previous)
             }
+            // 右滑：键内右箭头，松手是「下一项」（用户 10-25：左滑上一项，右滑也要有下一项）。
+            rule.onNodeWithTag("zero", true).performTouchInput {
+                down(center)
+                for (step in 1..10) moveTo(center + Offset(60.dp.toPx() * step / 10f, 0f))
+            }
+            rule.waitForIdle()
+            assertNull("右滑不算拖动", drops.dragLine)
+            frames += shot()
+            val beforeNext = next
+            rule.onNodeWithTag("zero", true).performTouchInput { up() }
+            rule.waitForIdle()
+            assertEquals("右滑松手是下一项", beforeNext + 1, next)
             // 拖到第二个候选上：拖线、候选高亮，键内不再有左滑预览；松手选中它，不触发上一项。
             val target = rule.onNodeWithTag("bar-candidate:1", true).fetchSemanticsNode().boundsInRoot.center
             val zero = rule.onNodeWithTag("zero", true).fetchSemanticsNode().boundsInRoot
@@ -203,12 +216,12 @@ class T9ZeroKeyDragRenderTest {
         }
         val labelWidth = 300
         val cell = rows.first().second.first()
-        val sheet = Bitmap.createBitmap(labelWidth + (cell.width + 16) * 3, 60 + (cell.height + 16) * rows.size,
+        val sheet = Bitmap.createBitmap(labelWidth + (cell.width + 16) * 4, 60 + (cell.height + 16) * rows.size,
             Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(sheet)
         canvas.drawColor(0xFF808080.toInt())
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 30f }
-        listOf("左滑 60dp", "左滑 150dp（不到半宽）", "拖到第二个候选上").forEachIndexed { index, title ->
+        listOf("左滑 60dp", "左滑 150dp（不到半宽）", "右滑 60dp", "拖到第二个候选上").forEachIndexed { index, title ->
             canvas.drawText(title, labelWidth + index * (cell.width + 16f) + 12f, 40f, paint)
         }
         rows.forEachIndexed { row, (label, frames) ->

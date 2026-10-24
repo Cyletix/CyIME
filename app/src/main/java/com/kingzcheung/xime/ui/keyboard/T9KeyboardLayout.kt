@@ -757,6 +757,10 @@ private fun T9KeyboardContent(
                     callbacks.onDismissPreeditEditor?.invoke()
                     callbacks.onPreviousCandidate(candidateState.value)
                 }) else null,
+                onSwipeRight = if (nextCandidate) ({
+                    callbacks.onDismissPreeditEditor?.invoke()
+                    callbacks.onNextCandidate(candidateState.value)
+                }) else null,
                 onPress = { onKeyPressDown?.invoke("0") },
                 onSwipeStateChange = onSwipeStateChange, swipes = swipesFor("0"),
                 shadowEnabled = shadowEnabled, shadowElevation = shadowElevation,
@@ -947,6 +951,7 @@ internal fun NineKeyButton(
     icon: androidx.compose.ui.graphics.painter.Painter? = null,
     iconSizeDp: Float = KeyboardKeyMetrics.FunctionIconSize.value,
     onSwipeLeft: (() -> Unit)? = null,
+    onSwipeRight: (() -> Unit)? = null,
     /** 九键拂动模式下与 2~9 一致：长按弹出本键数字，松手输入。 */
     flickDigitLongPress: Boolean = false,
 ) {
@@ -965,6 +970,11 @@ internal fun NineKeyButton(
         // 有箭头图标时左滑预览也是箭头（左箭头 = 上一项），不出汉字（用户 10-25）。
         swipeLeftIcon = if (onSwipeLeft != null && icon != null)
             rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowLeft) else null,
+        // 左滑上一项、右滑下一项成对（用户 10-25）。
+        onSwipeRight = onSwipeRight,
+        swipeRightText = if (onSwipeRight != null) "下一项" else null,
+        swipeRightIcon = if (onSwipeRight != null && icon != null)
+            rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardArrowRight) else null,
         onClick = onClick,
         backgroundColor = backgroundColor,
         textColor = textColor,
