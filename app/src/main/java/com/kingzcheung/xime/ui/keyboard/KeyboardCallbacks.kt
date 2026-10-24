@@ -119,6 +119,8 @@ data class KeyboardCallbacks(
     val onFloatingModeChange: ((Boolean) -> Unit)? = null,
     val onFloatingKeyboardDrag: ((dx: Float, dy: Float) -> Unit)? = null,
     val onFloatingKeyboardDragEnd: (() -> Unit)? = null,
+    /** 松开旋转手柄：新的悬浮旋转角（度）。位置随后经 onFloatingKeyboardDrag 一起交回。 */
+    val onFloatingKeyboardRotate: ((degrees: Float) -> Unit)? = null,
     val onT9ReplaceFullPinyin: ((String) -> Unit)? = null,
     /**
      * 回退最近一次 T9 半提交：清除累积的半提交文本（及输入框中已上屏的文字）。

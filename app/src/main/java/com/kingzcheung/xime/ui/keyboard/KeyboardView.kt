@@ -407,6 +407,8 @@ fun KeyboardView(
         onDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
+        rotationDegrees = state.floatingRotation,
+        onRotate = { callbacks.onFloatingKeyboardRotate?.invoke(it) },
         previewRectState = if (resizeActive) resizePreviewRect else null,
         onCardPositioned = onCardPositioned,
     ) {

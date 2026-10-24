@@ -642,8 +642,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         val halfMargin = maxOf(0, (screenW - displaySize.width) / 2)
         val cardH = displaySize.height + (if (isFloatingMode) FLOATING_DRAG_BAR_HEIGHT_DP else 0)
         val maxY = maxOf(minY, effectiveH - cardH)
-        val clampedX = loadedX.coerceIn(-halfMargin, halfMargin)
-        val clampedY = loadedY.coerceIn(minY, maxY)
+        // 转着的卡片按旋转后的规则限位（顶部条在屏内即可）；当前屏放不下这个角度就先摆正显示，不改保存值。
+        val savedRotation = SettingsPreferences.getFloatingRotation(this, isLandscape)
+        val rotatedBounds = com.kingzcheung.xime.ui.keyboard.floatingRotatedOffsetBounds(screenW.toFloat(),
+            effectiveH.toFloat(), displaySize.width.toFloat(), cardH.toFloat(), savedRotation, minY.toFloat())
+            .takeIf { isFloatingMode && com.kingzcheung.xime.ui.keyboard.isFloatingRotated(savedRotation) && it.feasible }
+        val clampedX = rotatedBounds?.clampX(loadedX.toFloat())?.roundToInt() ?: loadedX.coerceIn(-halfMargin, halfMargin)
+        val clampedY = rotatedBounds?.clampY(loadedY.toFloat())?.roundToInt() ?: loadedY.coerceIn(minY, maxY)
         // 越界只在当前视口中夹紧，不让一次配置/主题刷新改写另一个方向的保存位置。
         uiState.value = uiState.value.copy(
             darkMode = SettingsPreferences.getEffectiveDarkMode(this),
@@ -657,6 +662,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             isFloatingMode = isFloatingMode,
             floatingOffsetX = clampedX,
             floatingOffsetY = clampedY,
+            floatingRotation = if (rotatedBounds != null) savedRotation else 0f,
             floatingWidthDp = savedWidth,
             fixedWidthDp = fixedWidth,
             fixedOffsetX = fixedOffset,
@@ -2013,6 +2019,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     // Floating cards remain draggable even when an old size is being protected.
                                     floatingOffsetX = state.floatingOffsetX,
                                     floatingOffsetY = state.floatingOffsetY,
+                                    floatingRotation = if (state.isFloatingMode && !handwritingExpanded) state.floatingRotation else 0f,
                                     floatingMinOffsetY = floatingMinY,
                                     floatingScreenHeightDp = effectiveScreenH,
                                     resizePreviewWidthDp = state.resizePreviewWidthDp,
@@ -2193,7 +2200,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                 // 语义与按键按下反馈完全一致（模式/时长/振幅走同一配置）
                                 onHapticFeedback = { feedbackManager.hapticFeedback(hapticView) },
                                 onCardPositioned = { left: Int, top: Int, right: Int, bottom: Int ->
-                                    keyboardGlassCard = android.graphics.Rect(left, top, right, bottom)
+                                    // 毛玻璃窗口只能是直角矩形，盖不住转过的卡片；转着时不放玻璃。
+                                    keyboardGlassCard = if (state.isFloatingMode && com.kingzcheung.xime.ui.keyboard
+                                            .isFloatingRotated(state.floatingRotation)) null
+                                        else android.graphics.Rect(left, top, right, bottom)
                                     updateKeyboardGlass()
                                     val cardHeightPx = bottom - top
                                     if (!handwritingExpanded && !state.isFloatingMode && !state.showKeyboardResize && cardHeightPx > 0) {
@@ -2429,6 +2439,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             fixedOffsetX = fixedRestore?.first?.fixedOffsetX ?: SettingsPreferences.getFixedOffsetX(this, landscape),
             floatingOffsetX = savedX,
             floatingOffsetY = savedY,
+            floatingRotation = SettingsPreferences.getFloatingRotation(this, landscape),
         )
         if (enabled) closeToolPanel()
         refreshKeyboardGeometry()
@@ -3742,7 +3753,23 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 卡片已测量到就直接用它；只有还没测到时才去算一次兜底尺寸（resolveKeyboardSize 不便宜）。
                 val measuredCard = floatingCardBounds
                 if (measuredCard != null) {
-                    touchableRegion.set(measuredCard)
+                    // 卡片和顶上的旋转手柄按当前角度转过去；只有它们真正盖住的地方吃触摸。
+                    val clip = android.graphics.Region(0, 0, decor.width.coerceAtLeast(1), decor.height.coerceAtLeast(1))
+                    touchableRegion.setEmpty()
+                    com.kingzcheung.xime.ui.keyboard.floatingRotatedTouchQuads(
+                        com.kingzcheung.xime.ui.keyboard.ResizeRect(measuredCard.left.toFloat(), measuredCard.top.toFloat(),
+                            measuredCard.right.toFloat(), measuredCard.bottom.toFloat()),
+                        state.floatingRotation, density,
+                    ).forEach { quad ->
+                        val path = android.graphics.Path().apply {
+                            moveTo(quad[0], quad[1])
+                            for (i in 1 until 4) lineTo(quad[i * 2], quad[i * 2 + 1])
+                            close()
+                        }
+                        val piece = android.graphics.Region()
+                        piece.setPath(path, clip)
+                        touchableRegion.op(piece, android.graphics.Region.Op.UNION)
+                    }
                 } else {
                     val minimumBottom = maxOf(
                         tryGetVisibleNavBarHeightDp(this@XimeInputMethodService, window.window) * density,
@@ -3763,7 +3790,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         hostLocation[1] + fallback.bottom.roundToInt(),
                     )
                 }
-                floatingCardBounds?.let { card -> splitKeyboardGap.hole(card.bottom.toFloat()) }?.let {
+                floatingCardBounds?.takeUnless { com.kingzcheung.xime.ui.keyboard.isFloatingRotated(state.floatingRotation) }
+                    ?.let { card -> splitKeyboardGap.hole(card.bottom.toFloat()) }?.let {
                     touchableRegion.op(it.left.roundToInt(), it.top.roundToInt(),
                         it.right.roundToInt(), it.bottom.roundToInt(), android.graphics.Region.Op.DIFFERENCE)
                 }

@@ -62,6 +62,8 @@ data class InputUIState(
     val isFloatingMode: Boolean = false,
     val floatingOffsetX: Int = 0,
     val floatingOffsetY: Int = 0,
+    /** 悬浮卡片绕中心的旋转角（度，顺时针为正，-90..90），横竖屏分别保存。 */
+    val floatingRotation: Float = 0f,
     /** Current editor's cursor in screen pixels; null until it reports a usable anchor. */
     val hardwareOptions: com.kingzcheung.xime.settings.HardwareKeyboardOptions = com.kingzcheung.xime.settings.HardwareKeyboardOptions(),
     val editorBounds: HardwareCursorAnchor? = null,
