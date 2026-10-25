@@ -125,7 +125,7 @@ class CustomKeyboardLayoutTest {
         assertTrue(CustomKeyboardLayouts.find(QwjrtkLayout.ID)!!.valid())
         val cyletix = CustomKeyboardLayouts.find(Cyletix10Layout.ID)!!
         assertTrue(cyletix.valid())
-        assertEquals(listOf("qwbrtydfpu", "aseoghjin", "zxckvlm"), cyletix.rows.map { it.joinToString("") })
+        assertEquals(listOf("qwdrf;jkyp", "asetghliou", "zxcvbnm"), cyletix.rows.map { it.joinToString("") })
         assertTrue(CustomKeyboardLayouts.load(context).isEmpty())
         assertTrue(CustomKeyboardLayouts.load(context).isEmpty())
     }

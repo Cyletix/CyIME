@@ -37,3 +37,9 @@
 - 来源：Cyletix-Keyboard `research/nosymbol-20261023`，用户自己的聊天按键流，在“同指连击、手指停在原处移动、回主行移动”三项相对 QWERTY 的比值里压最差一项，最多改 12 个字母、小指负荷不超过原 Cyletix10。比原研究版和用户手机修法在三项和小指上都更好，手机双拇指模型与 QWERTY 打平。数字都是模型结果，不是实打速度。
 - 用户在手机上保存过的 Cyletix10 改版（`custom-keyboard-layouts.json` 里同 ID 的条目）仍优先于内置排列，不被覆盖。
 - 验证：`testDebugUnitTest` 2085 项 0 失败；`LayoutGeometryGateTest` 的 Cyletix10 用例改为点首行末键 u（原先点首行的 `;`）。`compileDebugAndroidTestKotlin` 本轮失败在 `PluginSettingsNavigationTest`（另一线程的插件设置改动，与本改动无关），该用例未运行。截图：中英日 × 4 主题 × 玻璃开关 × 手机/平板 48 张，`.codex-artifacts/cyletix10-nosymbol-20261023/`，逐张看过。未打包、未安装、未真机验收。
+
+## Cyletix10 改回用户自己的排列（2026-10-25）
+
+- 10-23 的替换（5b17e9e7）把搜索得出的 `qwbrtydfpu / aseoghjin / zxckvlm` 放进了 Cyletix10 这个名字下；11 个字母和用户的设计不同。用户在平板 1.14.119 上认不出这是自己的布局。原因在我：替换前只给了排列的文字和评分，没有给他看键盘图、没有说明会有 11 个字母换位。
+- 现在撤回该提交，Cyletix10 回到用户的设计 `qwdrf;jkyp / asetghliou / zxcvbnm`（Cyletix-Keyboard README 里的基因 `qazwsxdecrtvfgb;hnjlmki,yo.pu/`）。`Cyletix10Layout.kt` 写明：不是用户看过并确认的排列，不能用这个名字替换。
+- 不动符号的研究结果保留在 Cyletix-Keyboard `research/nosymbol-20261023`，不进 CyIME。
