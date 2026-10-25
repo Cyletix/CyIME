@@ -111,4 +111,22 @@ class KeyboardShiftStateTest {
         shift.reset(); shift.endHold(); assertEquals(ShiftMode.OFF, shift.mode.value)
     }
 
+    /** 引擎部署完等重置键盘的时刻手指还按着 Shift：后面的字母仍大写，松手回小写（含之前的锁定）。 */
+    @Test fun `keyboard reset while shift is held keeps it held until release`() {
+        for (before in listOf(ShiftMode.OFF, ShiftMode.SINGLE, ShiftMode.CAPS)) {
+            val shift = KeyboardShiftState()
+            if (before == ShiftMode.SINGLE) shift.singleTap()
+            if (before == ShiftMode.CAPS) shift.doubleTap()
+            shift.beginHold()
+            shift.onCharacterTyped()
+            shift.reset()
+            assertEquals(ShiftMode.HELD, shift.mode.value)
+            assertEquals("M", shift.mode.value.applyToKey("m"))
+            shift.setShifted(false)
+            assertEquals(ShiftMode.HELD, shift.mode.value)
+            assertTrue(shift.endHold())
+            assertEquals("重置清掉了 $before", ShiftMode.OFF, shift.mode.value)
+        }
+    }
+
 }
