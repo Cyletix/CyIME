@@ -3,8 +3,9 @@
   "privateGloss": "D:/CyIME-Data/private-gloss/cyime_gloss-private.tsv",
   "cylm": {
     "cylm_lexicon.cylx": "D:/CyIME-Data/cylm/export/lexicon.bin",
-    "cylm_model.lm": "D:/CyIME-Data/cylm/models/cy1-p4e-7.lm",
-    "cylm_rerank.onnx": "D:/CyIME-Data/cylm/nn/rs/rerank.int8.onnx",
+    "cylm_model.lm": "D:/CyIME-Data/cylm/models/cy1-p3e-8.lm",
+    "cylm_model2.lm": "D:/CyIME-Data/cylm/models/cyc2-p3e-8.lm",
+    "cylm_rerank.onnx": "D:/CyIME-Data/cylm/nn/r6/rerank.kv.int8.onnx",
     "cylm_vocab.txt": "D:/CyIME-Data/cylm/nn/vocab.txt"
   },
   "resourceTag": "models",
