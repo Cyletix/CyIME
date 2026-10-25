@@ -208,6 +208,9 @@ class Runner:
         if ink["rotation"] % 2 != self.layouts["rotation"] % 2:
             raise SystemExit(f"ink {name} was recorded at rotation {ink['rotation']}")
         strokes = ink["strokes"]
+        # Monkey rebases event times from the start of its script; deep into a long script the
+        # first moves of a stroke land before their own down and get dropped, so ink gets its own run.
+        self.flush()
         for index, stroke in enumerate(strokes):
             gap = strokes[index + 1][0][2] - stroke[-1][2] if index + 1 < len(strokes) else 0
             t0, kept = stroke[0][2], [stroke[0]]
@@ -216,6 +219,7 @@ class Runner:
                     kept.append(point)
             kept += stroke[-1:] if len(stroke) > 1 else []
             self.pointer.stroke([(x, y, t - t0, p) for x, y, t, p in kept], max(30, gap))
+        self.flush()
 
     def flush(self):
         if not self.pointer.events:
@@ -304,6 +308,7 @@ class Runner:
         if self.layout_name == "cn26" and "zh" in self.keys:
             self.token("<lang:hold>")
             self.token("@zh")
+            self.token("wait:600")  # the first word after the menu otherwise loses its space
         for line in segment["do"]:
             for token in line.split():
                 self.token(token)
@@ -455,11 +460,15 @@ class InputDevices:
 def read_strokes(serial, devices, idle, on_stroke=None):
     """Read getevent until `idle` seconds pass with no contact after the first stroke."""
     # getevent takes at most one device; watch them all and keep the touch and pen nodes.
-    proc = subprocess.Popen(["adb", "-s", serial, "shell", "getevent", "-lt"],
+    # -tt gives getevent a terminal, so it writes each event at once instead of in 4 KB blocks.
+    proc = subprocess.Popen(["adb", "-s", serial, "shell", "-tt", "getevent", "-lt"],
                             stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     lines = []
     reader = threading.Thread(target=lambda: [lines.append(line) for line in proc.stdout], daemon=True)
     reader.start()
+    while not lines and proc.poll() is None:  # getevent lists the devices first; then it is listening
+        time.sleep(0.05)
+    print("ready", flush=True)
     strokes, current, used_pen = [], None, False
     state = {node: {"x": 0, "y": 0, "p": 1.0, "down": False} for node in devices.nodes}
     last_up = None
@@ -493,7 +502,7 @@ def read_strokes(serial, devices, idle, on_stroke=None):
             elif (pen and code == "BTN_TOUCH") or (not pen and code == "ABS_MT_TRACKING_ID"):
                 s["down"] = value == "DOWN" if pen else value != "ffffffff"
                 if not s["down"] and current is not None and current[0] == node:
-                    strokes.append(current[1])
+                    strokes.append((pen, current[1]))
                     if on_stroke:
                         on_stroke(current[1])
                     current, last_up = None, time.time()
@@ -509,7 +518,10 @@ def read_strokes(serial, devices, idle, on_stroke=None):
                     current[1].append([round(x, 1), round(y, 1), int(float(stamp) * 1000), round(s["p"], 3)])
     finally:
         proc.kill()
-    return [stroke for stroke in strokes if stroke]
+    # A palm or finger that touched before the pen arrived is not part of the writing.
+    if any(is_pen for is_pen, _ in strokes):
+        strokes = [(is_pen, stroke) for is_pen, stroke in strokes if is_pen]
+    return [stroke for _, stroke in strokes if stroke]
 
 
 def cmd_devices(args):
@@ -532,6 +544,8 @@ def cmd_record_ink(args):
     out_dir = os.path.join(args.data, "ink")
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, args.name + ".json")
+    if os.path.exists(path):  # keep earlier takes (a failed take is still useful for reproducing)
+        os.replace(path, os.path.join(out_dir, f"{args.name}-{int(os.path.getmtime(path))}.json"))
     with open(path, "w", encoding="utf-8") as out:
         json.dump({"rotation": devices.rotation, "strokes": strokes}, out)
     print(f"{path}: {len(strokes)} strokes")

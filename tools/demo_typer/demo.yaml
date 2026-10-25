@@ -108,11 +108,19 @@ segments:
   # xinagguan: two letters swapped on purpose; the first candidate is still 相关 (typo correction).
   - shousu taikuai bazimu shunxu dacuo ye meiguanxi <comma> zhaoyang nengchu xinagguan deci <period> <enter> <enter>
 
+- name: Shift 选英文
+  layout: cn26
+  text: "打中文的时候按住 Shift 点一下候选，直接上屏英文：input method\n\n"
+  do:
+  # Two fingers: the segment stops with shurufa composing; the user holds Shift and taps the
+  # first candidate by hand (input method), then the next segment starts with two new lines.
+  - da zhongwen de shihou anzhu <space> en:Shift <space> dian yixia houxuan <comma> zhijie shangping yingwen <colon> shurufa~
+
 - name: 九键
   layout: cn26
   text: "## 九键\n\n九键自带词组模型，长句一口气打完也能出整句话；长按下一项拖到候选上，还能直接上屏英文。下面用九键打：\n\n> 今天晚上我们一起去吃火锅吧。\n> input method\n\n"
   do:
-  - <hash> <hash> <space> jiujian <enter> <enter>
+  - <enter> <enter> <hash> <hash> <space> jiujian <enter> <enter>
   - jiujian zidai cizu moxing <comma> changju yikouqi dawan yeneng chu zhengjuhua <semicolon>
   - changan xiayixiang tuodao houxuan shang <comma> hai neng zhijie shangping yingwen <period> xiamian yong jiujian da <colon> <enter> <enter>
   - "<gt> <space> @method swipe:lay_row:1400:0:0 @lay_t9 layout=t9"
@@ -221,18 +229,12 @@ segments:
 
 - name: 手写
   layout: cn26
-  text: "## 手写\n\n手写支持中文、日语、英文，还能写 LaTeX 数学公式，写完直接插进 Obsidian。用三星 S Pen 的朋友，压感是能检测到的，按住笔侧键就是橡皮。日语和英文可以连着写：\n\n> 永 ありがとう Hello\n\n公式直接插进 Obsidian：\n\n$e^{i\\pi}+1=0$\n$\\int_0^1 x^2\\,dx=\\frac{1}{3}$\n\n"
+  text: "## 手写\n\n手写支持中文、日语、英文，还能写 LaTeX 数学公式，写完直接插入 Obsidian。用三星 S Pen 的朋友，能识别下笔的轻重，按住 S Pen 的侧键就是橡皮。日语和英文可以连起来写：\n\n永 　ありがとう Hello\n\n公式直接插入 Obsidian：\n\n $V_{n}(r)=\\frac{\\pi^{n/2}}{\\Gamma(\\frac{n}{2}+1)}r^{n}$\n\n"
   do:
   - <hash> <hash> <space> shouxie <enter> <enter>
-  - shouxiezhichizhongwen <dun> riyu <dun> yingwen <comma> hainengxie <space> en:LaTeX <space> shuxuegongshi <comma> xiewanzhijiecharu <space> en:Obsidian <period>
-  - yongsanxing <space> en:S_Pen <space> depengyou <comma> yaganshinengjiancedaode <comma> anzhubicejianjiushi xiangpi <period> riyuheyingwenkeyilianzhe xie <colon> <enter> <enter>
-  - "<gt> <space> @handwriting layout=hw"
-  - ink:yong wait:900 @cand1 <space> <lang:hold> @ja ink:arigatou wait:900 @cand1 <space>
-  - <lang:hold> @en ink:hello wait:900 @cand1 <enter> <enter> @hw_back layout=en26 @lang layout=cn26
-  - gongshizhijiecharu <space> en:Obsidian <colon> <enter> <enter>
-  - <lang:hold> @en @handwriting layout=hw @formula
-  - ink:euler wait:1200 @cand1 <enter> ink:integral wait:1200 @cand1 <enter> <enter> @formula
-  - "@hw_back layout=en26 <lang:hold> @zh layout=cn26"
+  - shouxie zhichi zhongwen <dun> riyu <dun> yingwen <comma> hainengxie <space> en:LaTeX <space> shuxuegongshi <comma> xiewan zhijie charu <space> en:Obsidian <period>
+  - yongsanxing <space> en:S_Pen <space> depengyou <comma> nengshibie xiabi de qingzhong <comma> anzhu <space> en:S_Pen <space> de cejian jiushi xiangpi <period> riyu he yingwen keyi lianqilaixie <colon> <enter> <enter>
+  # The user writes 永, ありがとう, Hello and his formula by hand on camera after this line.
 
 - name: 拍照识别
   layout: cn26
@@ -244,13 +246,12 @@ segments:
 
 - name: 平板适配
   layout: cn26
-  text: "## 平板适配\n\n键盘可以拖起来变成悬浮窗，按住顶边能转一个角度，拖回底部又变回固定；大屏上候选栏也跟着键盘一起放大。\n\n"
+  text: "## 平板适配\n\n键盘可以拖起来变成悬浮窗，按住顶部的手柄能转一个角度，拖回底部又变回固定；大屏上候选栏也跟着键盘一起放大。\n\n"
   do:
-  - <hash> <hash> <space> pingbanshipei <enter> <enter>
-  - jianpankeyituoqilai bianchengxuanfuchuang <comma> anzhudingbiannengzhuan yigejiaodu <comma>
+  - <hash> <hash> <space> pingban shipei <enter> <enter>
+  - jianpankeyituoqilai bianchengxuanfuchuang <comma> anzhu dingbu de shoubing neng zhuan yige jiaodu <comma>
   - tuohuidibuyoubianhui guding <semicolon> dapingshanghouxuanlanye genzhejianpanyiqifangda <period> <enter> <enter>
-  # The user's own float / rotate / dock gestures, recorded once with record-ink and replayed as is.
-  - ink:tablet
+  # The user drags the keyboard to float, rotates it and docks it by hand on camera after this line.
 
 - name: 手感和外观
   layout: cn26
