@@ -248,7 +248,8 @@ val prepareChineseDictionaries by tasks.registering {
             // CyLM (CyIME-Windows tools/cylm) puts its best sentence first when its files are in the Rime user
             // directory. Only the 装到我的设备 package carries them; without them the open fails once and Rime's
             // sentence stays (cyime_rime/t9_cylm_sentence.cc). Same files and settings as t9_pinyin.schema.yaml.
-            "\ncylm:\n  lexicon: cylm_lexicon.bin\n  model: cylm_model.lm\n  reranker: cylm_rerank.onnx\n  vocab: cylm_vocab.txt\n" +
+            // The lexicon is not named *.bin: Rime's deploy (CleanupTrash) moves every *.bin in the user directory to trash/.
+            "\ncylm:\n  lexicon: cylm_lexicon.cylx\n  model: cylm_model.lm\n  reranker: cylm_rerank.onnx\n  vocab: cylm_vocab.txt\n" +
             "  params: \"mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=16;per_span=12;per_span_abbrev=24;per_span1=40;" +
             "nbest=8;t9_beam=10;t9_per_span=8;rr_gamma=0.6;rr_short=0.4\"\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))

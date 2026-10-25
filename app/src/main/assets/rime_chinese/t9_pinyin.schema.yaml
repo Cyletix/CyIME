@@ -7,7 +7,7 @@
 # CyLM（CyIME-Windows tools/cylm）：rime 用户目录里有这些文件时，用它的最优整句替换整句位。
 # 只有“装到我的设备”包带这些文件；没有时打开失败一次，保持 Rime 原整句。与 26 键 rime_ice 同一套文件和参数。
 cylm:
-  lexicon: cylm_lexicon.bin
+  lexicon: cylm_lexicon.cylx
   model: cylm_model.lm
   reranker: cylm_rerank.onnx
   vocab: cylm_vocab.txt
