@@ -20,6 +20,8 @@ import java.io.File
  *
  * 假名另有内置默认模板（assets/handwriting/kana_default_*，KanjiVG 笔画加变体，
  * 由 tools/handwriting_training/kana_kanjivg.py 生成）：没录过样本也能直接写；自己的模板略加分，永远优先。
+ * 英文字母同样有内置模板（assets/handwriting/latin_default_strokes.json，MathWriting 里不同人写的字母，
+ * 由 tools/handwriting_training/build_latin_defaults.py 生成），特征第一次打开英文手写时用公式模型现算并缓存。
  */
 object HandwritingTemplates {
     private const val TAG = "HandwritingTemplates"
@@ -109,6 +111,8 @@ object HandwritingTemplates {
         BuiltinSet("handwriting/japanese_kanji_strokes.json", "handwriting/japanese_kanji_och.bin", "handwriting/japanese_kanji_och.json"),
     )
     private const val DEFAULT_CACHE = "kana_default_och_v2.json"
+    private const val LATIN_DEFAULT_STROKES = "handwriting/latin_default_strokes.json"
+    private const val LATIN_DEFAULT_CACHE = "latin_default_v1.json"
     /** 自己写的模板比内置模板多算的相似度，同样像时排在前面。 */
     private const val PERSONAL_BONUS = 0.03f
 
@@ -231,7 +235,8 @@ object HandwritingTemplates {
     private val defaultLock = Any()
 
     private fun prepareDefaults(context: Context, script: Script) {
-        if (script != Script.KANA || synchronized(this) { defaults.containsKey(script) }) return
+        if (synchronized(this) { defaults.containsKey(script) }) return
+        if (script == Script.LATIN) return prepareLatinDefaults(context)
         if (!script.available(context)) return
         val personal = HandwritingEngine.personalModelFile(context).takeIf { it.isFile }
         val model = personal ?: File(com.kingzcheung.xime.model.ModelStorage.getModelDir(context, "ochwpro"), "ochwpro.onnx")
@@ -278,6 +283,49 @@ object HandwritingTemplates {
             out
         }.onFailure { Log.w(TAG, "builtin kana templates failed", it) }.getOrNull() ?: return
         synchronized(this) { defaults[script] = list }
+    }
+
+    /**
+     * 准备内置字母模板：公式模型不在安装包里，没法预算特征，第一次打开英文手写时在设备上现算一次（约 500 份）并缓存；
+     * 换了公式模型（文件变了）时重算。在后台线程调用。
+     */
+    private fun prepareLatinDefaults(context: Context) {
+        if (!Script.LATIN.available(context)) return
+        val encoder = File(FormulaRecognizer.dir(context), "formula_encoder.onnx")
+        val stamp = "${encoder.path}:${encoder.length()}:${encoder.lastModified()}"
+        val cacheFile = File(dir(context), LATIN_DEFAULT_CACHE)
+        val cached = runCatching {
+            val o = JSONObject(cacheFile.readText())
+            if (o.getString("model") != stamp) null else {
+                val arr = o.getJSONArray("t")
+                (0 until arr.length()).map { i -> arr.getJSONObject(i).let { e -> Entry(e.getString("l"), featureFromJson(e), "builtin") } }
+            }
+        }.getOrNull()
+        val list = cached ?: runCatching {
+            val chars = JSONObject(context.assets.open(LATIN_DEFAULT_STROKES).bufferedReader(Charsets.UTF_8).use { it.readText() })
+                .getJSONObject("chars")
+            val out = mutableListOf<Entry>()
+            for (label in chars.keys()) {
+                val variants = chars.getJSONArray(label)
+                for (i in 0 until variants.length()) {
+                    val strokes = variants.getJSONArray(i).let { st ->
+                        (0 until st.length()).map { j ->
+                            val pts = st.getJSONArray(j)
+                            (0 until pts.length()).map { k -> pts.getJSONArray(k).let { p -> p.getDouble(0).toFloat() to p.getDouble(1).toFloat() } }
+                        }
+                    }
+                    feature(context, Script.LATIN, strokes)?.let { out += Entry(label, it, "builtin") }
+                }
+            }
+            if (out.isEmpty()) return
+            val arr = JSONArray()
+            for (e in out) arr.put(e.feat.toJson(JSONObject().put("l", e.label)))
+            val tmp = File(cacheFile.path + ".tmp")
+            tmp.writeText(JSONObject().put("model", stamp).put("t", arr).toString())
+            if (!tmp.renameTo(cacheFile)) { tmp.copyTo(cacheFile, overwrite = true); tmp.delete() }
+            out
+        }.onFailure { Log.w(TAG, "builtin latin templates failed", it) }.getOrNull() ?: return
+        synchronized(this) { defaults[Script.LATIN] = list }
     }
 
     /**
