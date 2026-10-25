@@ -25,6 +25,11 @@ CylmModel* cylm_open2(const char* lexicon, const char* model, const char* model2
  * homophone D, or reported it); a P ranked below its D moves to just above D. Call before cylm_session. Returns the
  * number of D entries, or -1. */
 int cylm_prefer(CylmModel* model, const char* path);
+/* Characters missing from the second (chat) model's corpus, one per line: words containing them are scored by the
+ * main model alone. Call before cylm_session. Returns the number of characters, or -1. */
+int cylm_holes(CylmModel* model, const char* path);
+/* A separate reranker for nine-key input (the full tier uses a larger one there). Call before cylm_session. */
+int cylm_reranker_t9(CylmModel* model, const char* reranker, const char* vocab);
 CylmSession* cylm_session(CylmModel* model);
 /* keys: pinyin letters (full, initials or mixed, "'" separates) or nine-key digits; mode 0 = pinyin, 1 = nine-key;
  * context: text before the caret (UTF-8, may be NULL). Candidates are written to out as UTF-8 strings each ended

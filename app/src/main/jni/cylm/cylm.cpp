@@ -16,6 +16,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <queue>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -374,16 +375,31 @@ struct Lexicon {
   }
 };
 
-struct Token { char kind; char16_t full; char letter; std::string prefix; };  // kind f / a / s(eparator)
+// kind f / a / s(eparator); typo: a full syllable whose first letter is the previous key, typed once for two
+// ("chengong" for cheng'gong: an n or ng+g syllable boundary with the shared letter typed once)
+// vowel (parameter vowel, off by default): 1 a vowel letter typed as the initial of a vowel syllable (a for ai / an /
+// ang / ao, e for ei / en / eng / er, o for ou), 2 e typed for 嗯 (syllable n or ng)
+// keys: keys an initial-only token covers (2 for a pinyin zh / ch / sh initial; counted by abbrev_keys)
+struct Token { char kind; char16_t full; char letter; std::string prefix; int typo = 0; int vowel = 0; int keys = 1; };  // typo: 1 doubled letter, 2 neighbour key
 
 struct Params {
-  double mu_word = 0.0, eos_word = -1.0, adapt_word = -1.0, rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
-  int t9_beam = 0, t9_per_span = 0, rr_threads = 4, incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
+  double vowel_pen = -1.0, typo_first = 0.0, neighbor_pen = -2.0, adapt_add = 0.0, typo = 0.0, mu_word = 0.0, eos_word = -1.0, adapt_word = -1.0, rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
+  int abbrev_keys = 0, vowel = 0, neighbor = 0, prune = 1, rr_cache = 2048, t9_beam = 0, t9_per_span = 0, rr_threads = 4, incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
   bool Set(const std::string& k, const std::string& v) {
     if (k == "mu_word") mu_word = std::stod(v); else if (k == "eos_word") eos_word = std::stod(v); else if (k == "adapt_word") adapt_word = std::stod(v);
     else if (k == "t9_beam") t9_beam = std::stoi(v); else if (k == "t9_per_span") t9_per_span = std::stoi(v);
     else if (k == "rr_gamma") rr_gamma = std::stod(v); else if (k == "rr_short") rr_short = std::stod(v);
     else if (k == "rr_threads") rr_threads = std::stoi(v);
+    else if (k == "rr_cache") rr_cache = std::stoi(v);
+    else if (k == "prune") prune = std::stoi(v);
+    else if (k == "typo") typo = std::stod(v);
+    else if (k == "neighbor") neighbor = std::stoi(v);
+    else if (k == "neighbor_pen") neighbor_pen = std::stod(v);  // kept in a neighbour-key reading's own score
+    else if (k == "vowel") vowel = std::stoi(v);  // a / e / o as initials of vowel syllables (and e for 嗯); 2: not in full pinyin of any length
+    else if (k == "vowel_pen") vowel_pen = std::stod(v);  // per such initial, on top of abbrev
+    else if (k == "abbrev_keys") abbrev_keys = std::stoi(v);  // 1: abbrev per key (zh / ch / sh initials count 2)
+    else if (k == "typo_first") typo_first = std::stod(v);  // margin (nats) for a typo reading to go first; 0 = never
+    else if (k == "adapt_add") adapt_add = std::stod(v);
     else if (k == "incremental") incremental = std::stoi(v); else if (k == "abbrev_full") abbrev_full = std::stod(v); else if (k == "eos2") eos2 = std::stod(v); else if (k == "interleave") interleave = std::stoi(v);
     else if (k == "mix") mix = std::stod(v); else if (k == "mu") mu = std::stod(v); else if (k == "abbrev") abbrev = std::stod(v);
     else if (k == "word_pen") word_pen = std::stod(v); else if (k == "eos") eos = std::stod(v);
@@ -402,6 +418,38 @@ struct Params {
 // each next token [batch, T-1]; a candidate's score is the sum over its characters (and </s>), given <s> + context.
 #ifdef CYLM_ORT
 #include "onnxruntime_c_api.h"
+// The reranker's per-session cache (incremental graphs, nn/export_kv.py): a trie of the token prefixes scored so far.
+// Node 0 is <s>; each node keeps log P(its token | its path) and, once it has been a run input, its keys and values.
+struct KvCache {
+  struct Node { int32_t parent; int64_t tok; int32_t depth; float logp; std::vector<float> k, v;
+                std::unordered_map<int64_t, int32_t> kids; };
+  std::vector<Node> nodes;
+  size_t limit = 2048;  // nodes; beyond it only the current candidates' paths are kept
+  int32_t Child(int32_t at, int64_t tok, bool& made) {
+    auto it = nodes[at].kids.find(tok);
+    made = it == nodes[at].kids.end();
+    if (!made) return it->second;
+    int32_t id = int32_t(nodes.size());
+    nodes.push_back(Node{at, tok, nodes[at].depth + 1, 0.f, {}, {}, {}});
+    nodes[at].kids.emplace(tok, id);
+    return id;
+  }
+  // Keep only the nodes on `paths` (renumbered) once the trie has grown past the limit.
+  void Compact(std::vector<std::vector<int32_t>>& paths) {
+    if (nodes.size() <= limit) return;
+    std::vector<int32_t> map(nodes.size(), -1); std::vector<Node> kept;
+    for (auto& path : paths) for (int32_t n : path) if (map[n] < 0) { map[n] = int32_t(kept.size()); kept.push_back(std::move(nodes[n])); }
+    for (auto& n : kept) {
+      n.parent = n.parent >= 0 ? map[n.parent] : -1;
+      std::unordered_map<int64_t, int32_t> kids;
+      for (auto& [t, c] : n.kids) if (map[c] >= 0) kids.emplace(t, map[c]);
+      n.kids = std::move(kids);
+    }
+    nodes = std::move(kept);
+    for (auto& path : paths) for (auto& n : path) n = map[n];
+  }
+};
+
 struct Reranker {
   const OrtApi* api = nullptr; OrtEnv* env = nullptr; OrtSession* sess = nullptr; OrtMemoryInfo* mem = nullptr;
   std::unordered_map<uint32_t, int64_t> vocab;
@@ -422,7 +470,115 @@ struct Reranker {
 #endif
     api->ReleaseSessionOptions(so);
     if (st) { std::fprintf(stderr, "reranker: %s\n", api->GetErrorMessage(st)); api->ReleaseStatus(st); return false; }
+    size_t inputs = 0; api->SessionGetInputCount(sess, &inputs);
+    if (inputs == 6) {  // incremental graph: past_k is [layers, heads, P, d/heads]
+      OrtTypeInfo* ti = nullptr; const OrtTensorTypeAndShapeInfo* tsi = nullptr; int64_t dims[4] = {0, 0, 0, 0};
+      if (api->SessionGetInputTypeInfo(sess, 3, &ti) || api->CastTypeInfoToTensorInfo(ti, &tsi) || api->GetDimensions(tsi, dims, 4)) return false;
+      api->ReleaseTypeInfo(ti);
+      kv = true; layers = dims[0]; heads = dims[1]; dh = dims[3];
+    }
     return !api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &mem);
+  }
+  bool kv = false; int64_t layers = 0, heads = 0, dh = 0;
+  OrtValue* Tensor(void* data, size_t bytes, const int64_t* shape, size_t rank, ONNXTensorElementDataType type) const {
+    OrtValue* v = nullptr;
+    if (api->CreateTensorWithDataAsOrtValue(mem, data, bytes, shape, rank, type, &v)) return nullptr;
+    return v;
+  }
+  // Incremental scoring: only tokens not yet in the cache run, all candidates in one call; the sums equal Score's.
+  std::vector<double> ScoreKV(KvCache& cache, const std::string& context, const std::vector<std::string>& cands, bool eos) const {
+    std::vector<double> out(cands.size(), 0.0);
+    if (!sess || cands.empty()) return out;
+    auto ctx = Utf8Decode(context); size_t e = ctx.size(), b = e;
+    while (b > 0 && IsHan(ctx[b - 1])) --b;
+    if (e - b > 24) b = e - 24;
+    std::vector<int64_t> head{1}; for (size_t i = b; i < e; ++i) head.push_back(Id(ctx[i]));
+    if (cache.nodes.empty()) cache.nodes.push_back(KvCache::Node{-1, 1, 0, 0.f, {}, {}, {}});
+    std::vector<std::vector<int32_t>> paths;
+    std::vector<int32_t> pending;  // nodes whose log-probability is unknown, parents before children
+    for (auto& c : cands) {
+      auto s = head; for (uint32_t cp : Utf8Decode(c)) s.push_back(Id(cp));
+      if (eos) s.push_back(2);
+      if (s.size() > 129) s.resize(129);
+      std::vector<int32_t> path{0};
+      for (size_t t = 1; t < s.size(); ++t) {
+        bool made = false;
+        int32_t n = cache.Child(path.back(), s[t], made);
+        if (made) pending.push_back(n);
+        path.push_back(n);
+      }
+      paths.push_back(std::move(path));
+    }
+    if (!pending.empty()) {
+      const size_t T = pending.size(), slot = size_t(layers * heads * dh);
+      // Run token r: input = the parent of pending[r], target = pending[r]. A node without keys and values takes
+      // them from its first run token (`rep`); nodes that have them are past slots (slot 0 is a masked dummy).
+      std::unordered_map<int32_t, int32_t> rep, past_of;
+      std::vector<int32_t> past{-1};
+      for (size_t r = 0; r < T; ++r) {
+        int32_t q = cache.nodes[pending[r]].parent;
+        if (cache.nodes[q].k.empty() && !rep.count(q)) rep[q] = int32_t(r);
+      }
+      std::vector<int64_t> ids(T), pos(T), tgt(T);
+      for (size_t r = 0; r < T; ++r) {
+        const auto& n = cache.nodes[pending[r]]; const auto& q = cache.nodes[n.parent];
+        ids[r] = q.tok; pos[r] = q.depth; tgt[r] = n.tok;
+        for (int32_t a = q.parent; a >= 0; a = cache.nodes[a].parent)
+          if (!cache.nodes[a].k.empty() && !past_of.count(a)) { past_of[a] = int32_t(past.size()); past.push_back(a); }
+      }
+      const size_t P = past.size(), W = P + T;
+      std::vector<float> mask(T * W, -INFINITY);
+      for (size_t r = 0; r < T; ++r) {
+        float* row = &mask[r * W];
+        int32_t q = cache.nodes[pending[r]].parent;
+        row[P + r] = 0.f;  // itself (its input is q)
+        for (int32_t a = cache.nodes[q].parent; a >= 0; a = cache.nodes[a].parent)
+          row[!cache.nodes[a].k.empty() ? size_t(past_of[a]) : P + size_t(rep[a])] = 0.f;
+      }
+      std::vector<float> pk(slot * P, 0.f), pv(slot * P, 0.f);
+      for (size_t si = 1; si < P; ++si) {
+        const auto& n = cache.nodes[past[si]];
+        for (int64_t lh = 0; lh < layers * heads; ++lh) {
+          std::memcpy(&pk[(lh * P + si) * dh], &n.k[lh * dh], dh * sizeof(float));
+          std::memcpy(&pv[(lh * P + si) * dh], &n.v[lh * dh], dh * sizeof(float));
+        }
+      }
+      int64_t s1[1] = {int64_t(T)}, sp[4] = {layers, heads, int64_t(P), dh}, sm[2] = {int64_t(T), int64_t(W)};
+      OrtValue* in[6] = {Tensor(ids.data(), T * 8, s1, 1, ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64),
+                         Tensor(pos.data(), T * 8, s1, 1, ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64),
+                         Tensor(tgt.data(), T * 8, s1, 1, ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64),
+                         Tensor(pk.data(), pk.size() * 4, sp, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT),
+                         Tensor(pv.data(), pv.size() * 4, sp, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT),
+                         Tensor(mask.data(), mask.size() * 4, sm, 2, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT)};
+      OrtValue* res[3] = {nullptr, nullptr, nullptr};
+      const char* inames[] = {"ids", "pos", "tgt", "past_k", "past_v", "mask"}; const char* onames[] = {"logp", "new_k", "new_v"};
+      bool ok = true; for (auto* v : in) ok = ok && v;
+      OrtStatus* st = ok ? api->Run(sess, nullptr, inames, in, 6, onames, 3, res) : nullptr;
+      if (ok && !st) {
+        float *lp = nullptr, *nk = nullptr, *nv = nullptr;
+        api->GetTensorMutableData(res[0], reinterpret_cast<void**>(&lp));
+        api->GetTensorMutableData(res[1], reinterpret_cast<void**>(&nk));
+        api->GetTensorMutableData(res[2], reinterpret_cast<void**>(&nv));
+        for (size_t r = 0; r < T; ++r) cache.nodes[pending[r]].logp = lp[r];
+        for (auto& [q, r] : rep) {
+          auto& n = cache.nodes[q]; n.k.resize(slot); n.v.resize(slot);
+          for (int64_t lh = 0; lh < layers * heads; ++lh) {
+            std::memcpy(&n.k[lh * dh], &nk[(lh * int64_t(T) + r) * dh], dh * sizeof(float));
+            std::memcpy(&n.v[lh * dh], &nv[(lh * int64_t(T) + r) * dh], dh * sizeof(float));
+          }
+        }
+      } else if (st) { std::fprintf(stderr, "reranker: %s\n", api->GetErrorMessage(st)); api->ReleaseStatus(st); }
+      for (auto* v : res) if (v) api->ReleaseValue(v);
+      for (auto* v : in) if (v) api->ReleaseValue(v);
+      if (!ok || st) { cache.nodes.clear(); return out; }  // failed: forget this call's nodes, score nothing
+    }
+    for (size_t r = 0; r < cands.size(); ++r) {
+      double sum = 0;
+      for (int32_t n : paths[r]) if (cache.nodes[n].depth >= int32_t(head.size())) sum += cache.nodes[n].logp;
+      out[r] = sum;
+    }
+    cache.Compact(paths);
+    return out;
   }
   int64_t Id(uint32_t c) const { auto it = vocab.find(c); return it == vocab.end() ? 3 : it->second; }  // 3 = <unk>
   std::vector<double> Score(const std::string& context, const std::vector<std::string>& cands, bool eos) const {
@@ -460,7 +616,10 @@ struct Reranker {
   }
 };
 #else
+struct KvCache { size_t limit = 2048; };
 struct Reranker {
+  bool kv = false;
+  std::vector<double> ScoreKV(KvCache&, const std::string&, const std::vector<std::string>& c, bool) const { return std::vector<double>(c.size(), 0.0); }
   bool Load(const char*, const char*, int) { return false; }
   std::vector<double> Score(const std::string&, const std::vector<std::string>& c, bool) const { return std::vector<double>(c.size(), 0.0); }
 };
@@ -469,23 +628,32 @@ struct Reranker {
 static const char* kT9[] = {"", "", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"};
 static char T9Of(char c) { for (int d = 2; d <= 9; ++d) if (std::strchr(kT9[d], c)) return char('0' + d); return '?'; }
 static const std::string kInitials = "bpmfdtnlgkhjqxrzcsyw";
+static const char kQwerty[] = "qwertyuiop asdfghjkl zxcvbnm";  // rows separated by a space: no neighbour across rows
 
 struct State {
-  int32_t a, b, wa, wb, a2 = -1, b2 = -1;
-  bool operator==(const State& o) const { return a == o.a && b == o.b && wa == o.wa && wb == o.wb && a2 == o.a2 && b2 == o.b2; }
+  int32_t a, b, wa, wb, a2 = -1, b2 = -1, ty = 0;  // ty: typo syllables on the path
+  bool operator==(const State& o) const { return a == o.a && b == o.b && wa == o.wa && wb == o.wb && a2 == o.a2 && b2 == o.b2 && ty == o.ty; }
 };
 struct StateHash { size_t operator()(const State& s) const {
   uint64_t x = uint64_t(uint32_t(s.a)) * 0x9E3779B97F4A7C15ULL ^ uint64_t(uint32_t(s.b)) * 0xC2B2AE3D27D4EB4FULL ^
                uint64_t(uint32_t(s.wa)) * 0x165667B19E3779F9ULL ^ uint64_t(uint32_t(s.wb)) ^
-               uint64_t(uint32_t(s.a2)) * 0x27D4EB2F165667C5ULL ^ uint64_t(uint32_t(s.b2)) * 0x94D049BB133111EBULL; return size_t(x ^ (x >> 29)); } };
+               uint64_t(uint32_t(s.a2)) * 0x27D4EB2F165667C5ULL ^ uint64_t(uint32_t(s.b2)) * 0x94D049BB133111EBULL ^ uint64_t(uint32_t(s.ty)) * 0xD6E8FEB86659FD93ULL; return size_t(x ^ (x >> 29)); } };
 
-struct Edge { int j; std::string word; int abbrevs; u16 key; };
+struct Edge { int j; std::string word; int abbrevs; u16 key; int typos = 0; int nears = 0; int vowels = 0; };
 
 struct Decoder {
-  Lexicon& lex; C3& base; Adapt& adapt; Params p; C3* base2 = nullptr; const Reranker* rr = nullptr;
+  Lexicon& lex; C3& base; Adapt& adapt; Params p; C3* base2 = nullptr; const Reranker* rr = nullptr; const Reranker* rr_t9 = nullptr;  // optional nine-key reranker
   // The user's own preferences: "P above D" pairs (their typing uses P and not its homophone D, or they reported it).
   // After ranking, a preferred P listed below its D moves to just above D; nothing else moves.
   const std::unordered_map<std::string, std::vector<std::string>>* prefer = nullptr;  // D -> the P that beat it
+  // Characters the chat corpus never contains (LCCC was filtered by a word list when published): for words with
+  // them the chat model's estimate is an artefact, so the mixture uses the main model alone for those words.
+  const std::unordered_set<uint32_t>* holes = nullptr;
+  bool HasHole(const std::string& w) const {
+    if (!holes) return false;
+    for (uint32_t c : Utf8Decode(w)) if (holes->count(c)) return true;
+    return false;
+  }
   std::unordered_map<std::string, char16_t> spell; size_t max_syl = 0;
   std::unordered_map<std::string, std::vector<char16_t>> by_t9; std::unordered_map<std::string, std::vector<std::string>> t9_prefix;
   std::unordered_map<std::string, double> prior_cache, lnw_cache;
@@ -525,12 +693,46 @@ struct Decoder {
           }
         }
       }
+      if (!t9 && p.typo != 0 && i > 0 && (text[i - 1] == 'n' || (text[i - 1] == 'g' && i > 1 && text[i - 2] == 'n'))) {
+        for (size_t j = i + 1; j <= std::min(n, i + max_syl - 1); ++j) {
+          auto it = spell.find(text[i - 1] + text.substr(i, j - i));
+          if (it != spell.end()) out[i].push_back({int(j), Token{'f', it->second, 0, "", 1}});
+        }
+      }
+      if (!t9 && p.typo != 0 && p.neighbor) {
+        // One key of a syllable (not its first) hit a QWERTY neighbour: "hai" typed for "hao". Typo readings, so
+        // the same rules hold: places 2-5 only when far more common than what was typed, first only past typo_first.
+        for (size_t j = i + 2; j <= std::min(n, i + max_syl); ++j) {
+          std::string sub = text.substr(i, j - i);
+          if (sub.find('\'') != std::string::npos) break;
+          if (sub.find_first_of("aeiouv") == std::string::npos) continue;  // initials typed as abbreviations: no typo
+          for (size_t k = 1; k < sub.size(); ++k) {
+            const char* row = std::strchr(kQwerty, sub[k]);
+            if (!row) continue;
+            for (int d : {-1, 1}) {
+              const char c = row[d];
+              if (d < 0 && row == kQwerty) continue;
+              if (c == ' ' || c == '\0') continue;
+              std::string alt = sub; alt[k] = c;
+              auto it = spell.find(alt);
+              if (it != spell.end()) out[i].push_back({int(j), Token{'f', it->second, 0, "", 2}});
+            }
+          }
+        }
+      }
       if (!t9) {
         char ch = text[i];
         if (kInitials.find(ch) != std::string::npos) {
           std::string two = text.substr(i, 2);
-          if (two == "zh" || two == "ch" || two == "sh") out[i].push_back({int(i + 2), Token{'a', 0, ch, two}});
+          if (two == "zh" || two == "ch" || two == "sh") out[i].push_back({int(i + 2), Token{'a', 0, ch, two, 0, 0, 2}});
           out[i].push_back({int(i + 1), Token{'a', 0, ch, ""}});
+        }
+        if (vowel_on_ && (ch == 'a' || ch == 'e' || ch == 'o')) {
+          // A vowel letter as the initial of a vowel syllable (wa for 晚安, qad for 亲爱的), and e for 嗯 (n / ng).
+          // These words are their own class (vowels in the span key: own budget, vowel_pen each); the bare
+          // syllables a / e / o keep their full-syllable tokens, so nothing that was readable before changes.
+          out[i].push_back({int(i + 1), Token{'a', 0, ch, "", 0, 1}});
+          if (ch == 'e') out[i].push_back({int(i + 1), Token{'a', 0, 'n', "", 0, 2}});
         }
       }
     }
@@ -554,7 +756,9 @@ struct Decoder {
       if (t.kind == 'f') { if (key[i] != t.full) return false; }
       else {
         const std::string& s = lex.Syl(key[i]);
+        if (t.vowel == 2) { if (s != "n" && s != "ng") return false; continue; }  // e typed for 嗯
         if (s[0] != t.letter) return false;
+        if (t.vowel == 1 && s.size() == 1) return false;  // the bare a / e / o: already its full-syllable token
         if (!t.prefix.empty() && s.compare(0, t.prefix.size(), t.prefix) != 0) return false;
       }
     }
@@ -562,13 +766,16 @@ struct Decoder {
   }
   using Bucket = std::unordered_map<std::string, std::tuple<int, double, u16>>;  // word -> (initial-only syllables, prior, reading)
   void Collect(Bucket& bucket, const std::vector<Token>& path, const std::string& ini) {
-    int ab = 0; for (auto& t : path) ab += t.kind == 'a';
+    // initial-only syllables; abbrev_keys 1 counts keys instead, so z + sh (这是) costs as much as z + s + h (早上好):
+    // every reading of an all-initials input then pays the same abbreviation total, and in a span's word list the
+    // two compete by prior (with 0, both the cost and the list order favour the zh / ch / sh reading every time)
+    int ab = 0; for (auto& t : path) ab += t.kind == 'a' ? (p.abbrev_keys ? t.keys : 1) : 0;
     std::string ck;
     if (!ab) { ck = "F"; for (auto& t : path) { ck += char(t.full >> 8); ck += char(t.full & 0xff); } }
     else {
       if (path.size() > size_t(kMaxAbbrev)) return;
       ck = "A";
-      for (auto& t : path) { if (t.kind == 'f') { ck += 'f'; ck += char(t.full >> 8); ck += char(t.full & 0xff); } else { ck += 'a'; ck += t.letter; ck += t.prefix; ck += '/'; } }
+      for (auto& t : path) { if (t.kind == 'f') { ck += 'f'; ck += char(t.full >> 8); ck += char(t.full & 0xff); } else { ck += 'a'; ck += t.letter; ck += t.prefix; if (t.vowel) ck += char('0' + t.vowel); ck += '/'; } }
     }
     auto it = hit_cache.find(ck);
     if (it == hit_cache.end()) {
@@ -604,14 +811,14 @@ struct Decoder {
   std::vector<std::vector<Edge>> Lattice(const std::string& text, bool t9, int min_end = -1) {
     auto toks = Tokens(text, t9);
     size_t n = text.size();
-    std::map<std::pair<int, int>, Bucket> spans;
+    std::map<std::tuple<int, int, int, int>, Bucket> spans;  // (start, end, typo syllables, vowel initials)
     // A word covers at most kMaxWord syllables of at most 6 keys (plus separators), so spans that end after
     // min_end start no earlier than this.
-    const size_t first = min_end < 0 ? 0 : size_t(std::max(0, min_end + 1 - 64));
+    const size_t first = min_end < 0 ? 0 : size_t(std::max(0, min_end + 1 - int(kMaxWord * max_syl)));
     for (size_t i = first; i < n; ++i) {
-      for (auto& [j, t] : toks[i]) if (t.kind == 's' && j > min_end) spans[{int(i), j}][""] = {0, 0.0, u16()};
-      struct Item { int pos; std::vector<Token> path; std::string ini; };
-      std::vector<Item> stack{{int(i), {}, ""}};
+      for (auto& [j, t] : toks[i]) if (t.kind == 's' && j > min_end) spans[{int(i), j, 0, 0}][""] = {0, 0.0, u16()};
+      struct Item { int pos; std::vector<Token> path; std::string ini; int typos; int vowels; };
+      std::vector<Item> stack{{int(i), {}, "", 0, 0}};
       while (!stack.empty()) {
         Item cur = std::move(stack.back()); stack.pop_back();
         if (cur.pos >= int(n)) continue;
@@ -620,25 +827,36 @@ struct Decoder {
           char f = t.kind == 'f' ? lex.first[t.full - 1] : t.letter;
           std::string ini2 = cur.ini + f;
           if (!lex.HasPrefix(ini2)) continue;
+          if (cur.typos && t.typo) continue;  // at most one typo syllable per word
+          const int typos = cur.typos ? cur.typos : t.typo;  // its kind (1 doubled letter, 2 neighbour key)
+          const int vowels = cur.vowels + (t.vowel ? 1 : 0);
           std::vector<Token> path2 = cur.path; path2.push_back(t);
-          if (j > min_end) Collect(spans[{int(i), j}], path2, ini2);
-          if (path2.size() < size_t(kMaxWord)) stack.push_back({j, std::move(path2), ini2});
+          if (j > min_end) Collect(spans[{int(i), j, typos, vowels}], path2, ini2);
+          // extend only paths that can still end after min_end (kMaxWord syllables of at most max_syl keys)
+          if (path2.size() < size_t(kMaxWord) && j + int((kMaxWord - path2.size()) * max_syl) > min_end)
+            stack.push_back({j, std::move(path2), ini2, typos, vowels});
         }
       }
     }
     std::vector<std::vector<Edge>> out(n);
     for (auto& [ij, words] : spans) {
       std::vector<std::pair<std::string, std::tuple<int, double, u16>>> items(words.begin(), words.end());
+      // Fewest initial-only syllables first, so with abbrev_keys 0 every two-syllable reading of "zsh" (z + sh: 这是)
+      // comes before every three-syllable one (z + s + h: 早上好); abbrev_keys 1 makes them equal (prior decides).
       std::sort(items.begin(), items.end(), [](auto& x, auto& y) {
         if (std::get<0>(x.second) != std::get<0>(y.second)) return std::get<0>(x.second) < std::get<0>(y.second);
         if (std::get<1>(x.second) != std::get<1>(y.second)) return std::get<1>(x.second) > std::get<1>(y.second);
         return x.first < y.first; });
-      int kf = 0, ka = 0; bool single = ij.second - ij.first <= 2;
+      const auto [si, sj, typos, vowels] = ij;
+      int kf = 0, ka = 0; bool single = sj - si <= 2;
       int la = single ? p.per_span1 : p.per_span_abbrev;
+      int lf = t9 && p.t9_per_span > 0 ? p.t9_per_span : p.per_span;
+      if (typos) { lf = std::max(1, lf / 4); la = std::max(1, la / 8); }  // a typo reading: only its likeliest words
+      if (vowels) la = std::max(1, la / 4);  // vowel initials: their own, smaller budget (never crowd the others out)
       for (auto& [w, v] : items) {
-        if (std::get<0>(v) == 0) { if (kf++ >= (t9 && p.t9_per_span > 0 ? p.t9_per_span : p.per_span)) continue; }
+        if (std::get<0>(v) == 0) { if (kf++ >= lf) continue; }
         else { if (ka++ >= la) continue; }
-        out[ij.first].push_back({ij.second, w, std::get<0>(v), std::get<2>(v)});
+        out[si].push_back({sj, w, std::get<0>(v), std::get<2>(v), typos ? 1 : 0, typos == 2 ? 1 : 0, vowels});
       }
     }
     return out;
@@ -652,16 +870,21 @@ struct Decoder {
   std::pair<double, State> EdgeScore(const State& st, const std::string& w) {
     int32_t a = st.a, b = st.b, a2 = st.a2, b2 = st.b2;
     double lp = Chain(base, a, b, w);
-    if (base2 && p.mix > 0) lp = Mix(lp, Chain(*base2, a2, b2, w), p.mix);
+    if (base2 && p.mix > 0) { double lp2 = Chain(*base2, a2, b2, w); if (!HasHole(w)) lp = Mix(lp, lp2, p.mix); }
     int32_t wid = adapt.loaded ? adapt.Lookup(w) : -1;
-    if (p.adapt_lambda > 0 && adapt.loaded) lp = std::log((1 - p.adapt_lambda) * std::exp(lp) + p.adapt_lambda * adapt.P(st.wa, st.wb, wid));
-    State out{a, b, st.wb, wid, a2, b2};
+    // The user's own text: a mixture (adapt_lambda) scales every other word down by 1 - lambda per word, which also
+    // favours fewer, longer words; adapt_add only adds the user's probability, so it can raise a word and never
+    // lowers the others or changes the per-word cost.
+    if (p.adapt_add > 0 && adapt.loaded) lp = std::log(std::exp(lp) + p.adapt_add * adapt.P(st.wa, st.wb, wid));
+    else if (p.adapt_lambda > 0 && adapt.loaded) lp = std::log((1 - p.adapt_lambda) * std::exp(lp) + p.adapt_lambda * adapt.P(st.wa, st.wb, wid));
+    State out{a, b, st.wb, wid, a2, b2, st.ty};
     return {lp, out};
   }
   double Eos(const State& st) {
     double lp = base.Logp3(st.a, st.b, int32_t(base.h.eos));
     if (base2 && p.mix > 0) lp = Mix(lp, base2->Logp3(st.a2, st.b2, int32_t(base2->h.eos)), p.mix);
-    if (p.adapt_lambda > 0 && adapt.loaded) lp = std::log((1 - p.adapt_lambda) * std::exp(lp) + p.adapt_lambda * adapt.P(st.wa, st.wb, EOSW));
+    if (p.adapt_add > 0 && adapt.loaded) lp = std::log(std::exp(lp) + p.adapt_add * adapt.P(st.wa, st.wb, EOSW));
+    else if (p.adapt_lambda > 0 && adapt.loaded) lp = std::log((1 - p.adapt_lambda) * std::exp(lp) + p.adapt_lambda * adapt.P(st.wa, st.wb, EOSW));
     return lp;
   }
   State Start(const std::string& context) {
@@ -686,6 +909,7 @@ struct Decoder {
   struct Trace { int32_t prev; int16_t i, j; uint8_t len; char16_t key[kMaxWord]; };
   struct Hyp { double score; State st; std::string out; int ab = 0; int32_t tr = -1; };
   std::vector<Trace> arena_;
+  KvCache kv_cache_, kv_cache_t9_;
   std::pair<std::string, std::string> Reading(int32_t tr) const {
     std::vector<const Trace*> words; for (int32_t t = tr; t >= 0; t = arena_[t].prev) words.push_back(&arena_[t]);
     std::string py, seg;
@@ -703,55 +927,97 @@ struct Decoder {
   // Incremental state: the previous input's edges and beams. A new key changes only the spans that end after
   // the common prefix, so beams up to it are reused as they are (the IME decodes once per keystroke).
   std::string inc_text_, inc_context_; bool inc_t9_ = false; std::vector<std::vector<Edge>> inc_edges_; std::vector<Beam> inc_beams_;
+  bool vowel_on_ = false, inc_vowel_on_ = false;  // vowel initials for this input (set by Decode, read by Tokens)
+  // Each position's beam, sorted and cut to the beam width: unchanged positions are not sorted again.
+  std::vector<std::vector<Hyp>> inc_sorted_; std::vector<char> inc_sorted_ok_;
   std::vector<std::pair<std::string, double>> Decode(const std::string& text, bool t9, const std::string& context) {
     size_t n = text.size();
     // When the whole input spells complete syllables (all but possibly the last), initial-only readings inside it
     // are what the user did not type: they cost abbrev_full instead of abbrev (applied to finished paths below).
     double abbrev = p.abbrev;
-    if (p.abbrev_full != 0 && n >= 6) {
+    // Vowel initials (vowel): off for an input of 6+ keys that spells complete syllables, where they would be
+    // initials the user did not type and would only add paths at every vowel of the sentence. vowel=2 turns them off
+    // for such an input of any length, so a full-pinyin prefix (xia, typing 下) never reads as xi + a (西安).
+    vowel_on_ = p.vowel != 0 && !t9;
+    if ((p.abbrev_full != 0 || vowel_on_) && (n >= 6 || (vowel_on_ && p.vowel == 2))) {
+      const bool vowel_wanted = vowel_on_;
+      vowel_on_ = false;  // this check reads the plain tokens
       auto toks = Tokens(text, t9);
       std::vector<char> ok(n + 1, 0); ok[0] = 1;
       for (size_t i = 0; i < n; ++i) {
         if (!ok[i]) continue;
-        for (auto& [j, t] : toks[i]) if (t.kind == 'f' || t.kind == 's' || (t.kind == 'a' && size_t(j) == n && i > 0)) ok[j] = 1;
+        for (auto& [j, t] : toks[i]) if ((t.kind == 'f' && !t.typo) || t.kind == 's' || (t.kind == 'a' && size_t(j) == n && i > 0)) ok[j] = 1;
       }
-      if (ok[n]) abbrev = p.abbrev_full;
+      if (ok[n] && p.abbrev_full != 0 && n >= 6) abbrev = p.abbrev_full;
+      vowel_on_ = vowel_wanted && !ok[n];
     }
     // Reuse boundary: edges and beams up to `keep` are unchanged. Nine-key inputs allow a partial syllable only at
     // the end, so the old last position is recomputed for them.
     size_t keep = 0;
-    if (p.incremental && t9 == inc_t9_ && context == inc_context_ && !inc_beams_.empty()) {
+    if (p.incremental && t9 == inc_t9_ && context == inc_context_ && vowel_on_ == inc_vowel_on_ && !inc_beams_.empty()) {
       while (keep < n && keep < inc_text_.size() && text[keep] == inc_text_[keep]) ++keep;
       if (t9 && keep > 0 && (keep == inc_text_.size() || keep == n)) --keep;
       if (!t9 && keep == inc_text_.size() && keep > 0 && keep < n) {}  // pinyin: abbreviations are valid anywhere
     }
-    std::vector<std::vector<Edge>> edges(n);
+    std::vector<std::vector<Edge>> edges(n), fresh;
     std::vector<Beam> beams(n + 1);
+    std::vector<std::vector<Hyp>> sorted(n + 1); std::vector<char> sorted_ok(n + 1, 0);
     if (keep == 0) arena_.clear();
     if (keep > 0) {
       for (size_t i = 0; i < std::min(n, inc_edges_.size()); ++i)
         for (auto& e : inc_edges_[i]) if (size_t(e.j) <= keep) edges[i].push_back(std::move(e));
       for (size_t i = 0; i <= keep; ++i) beams[i] = std::move(inc_beams_[i]);
-      auto fresh = Lattice(text, t9, int(keep));
+      for (size_t i = 0; i <= keep && i < inc_sorted_.size(); ++i)
+        if (inc_sorted_ok_[i]) { sorted[i] = std::move(inc_sorted_[i]); sorted_ok[i] = 1; }
+      fresh = Lattice(text, t9, int(keep));
       for (size_t i = 0; i < n; ++i) for (auto& e : fresh[i]) edges[i].push_back(e);
     } else {
-      edges = Lattice(text, t9);
+      fresh = Lattice(text, t9);
+      edges = fresh;
       State init = Start(context);
       beams[0][{init, ""}] = Hyp{0.0, init, "", 0, -1};
     }
+    // Exact pruning: a word's log-probability is at most 0, so hy.score + mu*ln(weight) + abbrev penalties bounds
+    // what an edge can reach. Each new position keeps a lower bound of its cut-off: the beam-th best score among
+    // its distinct entries (at the end, the nbest-th best final score among distinct outputs); an edge whose bound
+    // is below it could not have survived the beam (or the returned list), so it is not scored. Results are the same.
+    const size_t beam_w = t9 && p.t9_beam > 0 ? size_t(p.t9_beam) : size_t(p.beam);
+    const bool prune = p.prune && !adapt.loaded, prune_n = prune && p.eos2 < 0 && p.mu_word == 0 && abbrev <= p.abbrev && p.eos >= 0 && p.eos_word < 0;
+    // Typo readings (p.typo != 0) are a separate class with their own, smaller budget, so they never change what
+    // the strict readings keep.
+    const size_t typo_w = std::max<size_t>(1, beam_w / 4), typo_n = std::max<size_t>(4, size_t(p.nbest) / 4);
+    std::vector<std::priority_queue<double, std::vector<double>, std::greater<double>>> cut(n + 1), cut_t(n + 1);
+    std::unordered_set<std::string> seen_n, seen_t;
+    auto cap_of = [&](size_t j, bool ty) { return j == n ? (ty ? typo_n : size_t(p.nbest)) : (ty ? typo_w : beam_w); };
+    auto push_cut = [&](size_t j, bool ty, double v) {
+      auto& h = ty ? cut_t[j] : cut[j]; const size_t cap = cap_of(j, ty);
+      if (h.size() < cap) h.push(v); else if (v > h.top()) { h.pop(); h.push(v); }
+    };
+    auto bound = [&](size_t j, bool ty) { auto& h = ty ? cut_t[j] : cut[j]; return h.size() >= cap_of(j, ty) ? h.top() : -INFINITY; };
+    // Only the fresh edges (ending after `keep`) are new; the reused ones are already in the reused beams.
     for (size_t i = 0; i < n; ++i) {
-      if (beams[i].empty()) continue;
-      std::vector<Hyp> items; items.reserve(beams[i].size());
-      for (auto& kv : beams[i]) items.push_back(kv.second);
-      std::sort(items.begin(), items.end(), [](const Hyp& x, const Hyp& y) { return x.score != y.score ? x.score > y.score : x.out < y.out; });
-      const size_t beam = t9 && p.t9_beam > 0 ? size_t(p.t9_beam) : size_t(p.beam);
-      if (items.size() > beam) items.resize(beam);
-      for (auto& hy : items) {
-        for (auto& e : edges[i]) {
-          if (size_t(e.j) <= keep) continue;  // already in the reused beams
+      if (beams[i].empty() || fresh[i].empty()) continue;
+      if (!sorted_ok[i]) {
+        auto& items = sorted[i]; items.clear(); items.reserve(beams[i].size());
+        for (auto& kv : beams[i]) items.push_back(kv.second);
+        std::sort(items.begin(), items.end(), [](const Hyp& x, const Hyp& y) { return x.score != y.score ? x.score > y.score : x.out < y.out; });
+        if (p.typo == 0) { if (items.size() > beam_w) items.resize(beam_w); }
+        else {
+          std::vector<Hyp> kept; size_t ns = 0, nt = 0;
+          for (auto& h : items) {
+            if (h.st.ty == 0 ? ns++ < beam_w : nt++ < typo_w) kept.push_back(std::move(h));
+          }
+          items = std::move(kept);
+        }
+        sorted_ok[i] = 1;
+      }
+      for (auto& hy : sorted[i]) {
+        for (auto& e : fresh[i]) {
           double s2; State st2;
+          const size_t ej = size_t(e.j);
           if (e.word.empty()) { s2 = hy.score; st2 = hy.st; }
           else {
+            if (prune && (ej < n || prune_n) && hy.score + p.mu * Lnw(e.word) + p.abbrev * e.abbrevs + p.typo * e.typos + p.vowel_pen * e.vowels + p.word_pen < bound(ej, hy.st.ty + e.typos > 0)) continue;
             auto sc = EdgeScore(hy.st, e.word);
             if (i == 0 && size_t(e.j) == n && p.adapt_word >= 0 && adapt.loaded) {
               // the whole input as one word: add the user's own frequency of it, weighted by adapt_word
@@ -765,11 +1031,20 @@ struct Decoder {
               double pa = wid >= 0 ? adapt.P(hy.st.wa, hy.st.wb, wid) : 0.0;
               sc.first = std::log(std::exp(lp_base) + lam * pa);
             }
-            s2 = hy.score + sc.first + p.mu * Lnw(e.word) + p.abbrev * e.abbrevs + p.word_pen; st2 = sc.second;
+            s2 = hy.score + sc.first + p.mu * Lnw(e.word) + p.abbrev * e.abbrevs + p.typo * e.typos + p.neighbor_pen * e.nears + p.vowel_pen * e.vowels + p.word_pen; st2 = sc.second;
+            st2.ty += e.typos;
           }
           std::string out2 = hy.out + e.word;
           auto key = std::make_pair(st2, out2);
           auto old = beams[e.j].find(key);
+          if (prune && old == beams[e.j].end()) {
+            const bool ty = st2.ty > 0;
+            if (ej < n) push_cut(ej, ty, s2);
+            else if (prune_n && (ty ? seen_t : seen_n).insert(out2).second) {
+              // eos_word < 0 here, so every output takes p.eos (as in ranked below)
+              push_cut(n, ty, s2 + p.eos * Eos(st2) + (abbrev - p.abbrev) * (hy.ab + e.abbrevs));
+            }
+          }
           if (old == beams[e.j].end() || s2 > old->second.score) {
             Hyp h{s2, st2, out2, hy.ab + e.abbrevs, hy.tr};
             if (!e.word.empty()) {
@@ -782,27 +1057,30 @@ struct Decoder {
         }
       }
     }
-    std::unordered_map<std::string, int32_t> best_tr;
-    auto ranked = [&](double eos_w) {
+    std::unordered_map<std::string, int32_t> best_tr, best_tr_t;
+    std::unordered_map<std::string, double> typo_raw;  // typo-only outputs: score without the typo penalty
+    auto ranked = [&](double eos_w, int cls) {  // cls 0: strict paths, 1: typo paths
       std::unordered_map<std::string, double> best;
       for (auto& kv : beams[n]) {
+        if ((kv.second.st.ty > 0) != (cls == 1)) continue;
         const bool one_word = kv.second.tr >= 0 && arena_[kv.second.tr].prev < 0;
         const double ew = one_word && p.eos_word >= 0 && eos_w == p.eos ? p.eos_word : eos_w;
         double s = kv.second.score + ew * Eos(kv.second.st) + (abbrev - p.abbrev) * kv.second.ab;
         if (one_word && p.mu_word != 0) s += p.mu_word * Lnw(kv.second.out);  // a typed word: how common the word is
+        if (cls == 1) s -= p.typo * kv.second.st.ty;  // ranked by the reading's own score; listed later only if far more common
         auto it = best.find(kv.second.out);
-        if (it == best.end() || s > it->second) { best[kv.second.out] = s; best_tr[kv.second.out] = kv.second.tr; }
+        if (it == best.end() || s > it->second) { best[kv.second.out] = s; (cls == 0 ? best_tr : best_tr_t)[kv.second.out] = kv.second.tr; }
       }
       std::vector<std::pair<std::string, double>> out(best.begin(), best.end());
       std::sort(out.begin(), out.end(), [](auto& x, auto& y) { return x.second != y.second ? x.second > y.second : x.first < y.first; });
       return out;
     };
     last_meta_.clear();
-    auto out = ranked(p.eos);
+    auto out = ranked(p.eos, 0);
     if (p.eos2 >= 0) {
       // Two readings of a short input: a whole message (with the end-of-message probability) and a word that the
       // message continues after (eos2). The list alternates them: `interleave` whole-message candidates, then one word.
-      auto alt = ranked(p.eos2);
+      auto alt = ranked(p.eos2, 0);
       std::vector<std::pair<std::string, double>> merged; std::unordered_set<std::string> seen;
       size_t ia = 0, ib = 0;
       while (merged.size() < size_t(p.nbest) && (ia < out.size() || ib < alt.size())) {
@@ -814,10 +1092,27 @@ struct Decoder {
       out = merged;
     }
     if (out.size() > size_t(p.nbest)) out.resize(p.nbest);
+    const size_t n_strict = out.size();
+    if (p.typo != 0 && p.eos2 < 0) {
+      // Typo readings (a doubled letter typed once): kept apart; after reranking they may only take places 2-5, and
+      // only when far more common than the strict reading; first place only past typo_first (docs/CYLM_TYPO.md).
+      std::unordered_set<std::string> strict; for (auto& [w, sc] : out) strict.insert(w);
+      for (auto& kv : beams[n]) if (kv.second.st.ty == 0) strict.insert(kv.second.out);
+      auto ty = ranked(p.eos, 1); size_t added = 0;
+      for (auto& [w, sc] : ty) {
+        if (added >= typo_n) break;
+        if (strict.count(w)) continue;
+        typo_raw[w] = sc; best_tr[w] = best_tr_t[w]; out.push_back({w, sc}); ++added;
+      }
+    }
+    std::unordered_map<std::string, double> decoder_score; for (auto& [w, sc] : out) decoder_score[w] = sc;
     for (auto& [w, sc] : out) last_meta_[w] = Reading(best_tr[w]);  // readings only for the returned candidates
-    if (rr && !out.empty()) {  // rerank: decoder score + gamma * character-model log-probability (same step, no pause)
+    const Reranker* use_rr = t9 && rr_t9 ? rr_t9 : rr;
+    if (use_rr && !out.empty()) {  // rerank: decoder score + gamma * character-model log-probability (same step, no pause)
       std::vector<std::string> cands; for (auto& [w, sc] : out) cands.push_back(w);
-      auto nn = rr->Score(context, cands, true);
+      auto& cache = use_rr == rr ? kv_cache_ : kv_cache_t9_;
+      cache.limit = size_t(p.rr_cache);
+      auto nn = use_rr->kv ? use_rr->ScoreKV(cache, context, cands, true) : use_rr->Score(context, cands, true);
       double g = Utf8Decode(out[0].first).size() <= 3 ? p.rr_short : p.rr_gamma;
       for (size_t k = 0; k < out.size(); ++k) out[k].second += g * nn[k];
       std::stable_sort(out.begin(), out.end(), [](auto& x, auto& y) { return x.second > y.second; });
@@ -831,7 +1126,37 @@ struct Decoder {
             if (out[m].first == pw) { auto moved = out[m]; out.erase(out.begin() + m); out.insert(out.begin() + k, moved); ++k; break; }
       }
     }
-    if (p.incremental) { inc_text_ = text; inc_context_ = context; inc_t9_ = t9; inc_edges_ = std::move(edges); inc_beams_ = std::move(beams); }
+    if (!typo_raw.empty()) {
+      // First place: the best strict reading of what was typed, whatever the reranker or the preferences said. A typo
+      // reading is listed only when its decoder score beats the best strict reading's by ln 20 (20 times as common),
+      // and only within places 2-5. With no strict reading at all, the typo readings stand alone.
+      // typo_first > 0 (user, 2026-10-25): the typo reading with the best decoder score goes first instead when it
+      // beats the best strict reading's by more than typo_first nats; the strict candidate that was first is then
+      // second, and the rest follow the rule above.
+      double top_strict = -INFINITY;
+      for (auto& [w, sc] : out) if (!typo_raw.count(w)) top_strict = std::max(top_strict, decoder_score[w]);
+      if (n_strict > 0) {
+        std::string lead; double lead_sc = -INFINITY;  // the best typo reading by its own decoder score
+        if (p.typo_first > 0)
+          for (auto& [w, sc] : out) if (typo_raw.count(w) && decoder_score[w] > lead_sc) { lead = w; lead_sc = decoder_score[w]; }
+        const bool lead_first = p.typo_first > 0 && lead_sc > top_strict + p.typo_first;
+        std::vector<std::pair<std::string, double>> placed; bool first = false;
+        if (lead_first) for (auto& c : out) if (c.first == lead) { placed.push_back(c); break; }
+        for (auto& c : out) if (!typo_raw.count(c.first)) { placed.push_back(c); first = true; break; }
+        const std::string head = first ? placed.back().first : std::string();  // the first strict candidate (second after a lead)
+        for (auto& c : out) {
+          if (first && c.first == head) continue;
+          if (lead_first && c.first == lead) continue;
+          if (typo_raw.count(c.first)) {
+            if (placed.size() >= 5 || decoder_score[c.first] < top_strict + std::log(20.0)) continue;
+          }
+          placed.push_back(c);
+        }
+        out = std::move(placed);
+      }
+    }
+    if (p.incremental) { inc_text_ = text; inc_context_ = context; inc_t9_ = t9; inc_vowel_on_ = vowel_on_; inc_edges_ = std::move(edges); inc_beams_ = std::move(beams);
+                         inc_sorted_ = std::move(sorted); inc_sorted_ok_ = std::move(sorted_ok); }
     return out;
   }
   std::vector<std::pair<std::string, double>> Choice(const std::string& context, const std::vector<std::string>& cands) {
@@ -857,7 +1182,8 @@ static bool LoadPrefer(const char* path, std::unordered_map<std::string, std::ve
 // ------------------------------------------------------------------ C API (cylm.h): library for Windows Core / Android JNI
 #include "cylm.h"
 struct CylmModel { Lexicon lex; C3 base; C3 base2; bool has2 = false; Adapt adapt; Params p; Reranker rr; bool has_rr = false;
-                   std::unordered_map<std::string, std::vector<std::string>> prefer; };
+                   Reranker rr_t9; bool has_rr_t9 = false;
+                   std::unordered_map<std::string, std::vector<std::string>> prefer; std::unordered_set<uint32_t> holes; };
 struct CylmSession { std::unique_ptr<Decoder> d; };
 extern "C" {
 CylmModel* cylm_open(const char* lexicon, const char* model, const char* model2, const char* params) {
@@ -887,7 +1213,9 @@ CylmSession* cylm_session(CylmModel* m) {
   s->d = std::make_unique<Decoder>(m->lex, m->base, m->adapt, m->p);
   if (m->has2) s->d->base2 = &m->base2;
   if (m->has_rr) s->d->rr = &m->rr;
+  if (m->has_rr_t9) s->d->rr_t9 = &m->rr_t9;
   if (!m->prefer.empty()) s->d->prefer = &m->prefer;
+  if (!m->holes.empty()) s->d->holes = &m->holes;
   return s;
 }
 int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
@@ -900,10 +1228,22 @@ int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context,
   }
   return n;
 }
+int cylm_reranker_t9(CylmModel* m, const char* reranker, const char* vocab) {
+  if (!m || !reranker || !vocab || !m->rr_t9.Load(reranker, vocab, m->p.rr_threads)) return -1;
+  m->has_rr_t9 = true;
+  return 0;
+}
 int cylm_prefer(CylmModel* m, const char* path) {
   if (!m || !path) return -1;
   m->prefer.clear();
   return LoadPrefer(path, m->prefer) ? int(m->prefer.size()) : -1;
+}
+int cylm_holes(CylmModel* m, const char* path) {
+  if (!m || !path) return -1;
+  std::ifstream in(path, std::ios::binary); if (!in) return -1;
+  std::string line; m->holes.clear();
+  while (std::getline(in, line)) { auto cps = Utf8Decode(line); if (!cps.empty() && cps[0] > 0x7f) m->holes.insert(cps[0]); }
+  return int(m->holes.size());
 }
 int cylm_decode2(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
   if (!s || !keys || !out || cap <= 0) return -1;
@@ -925,7 +1265,7 @@ void cylm_close(CylmModel* m) { delete m; }
 #ifndef CYLM_LIBRARY
 int main(int argc, char** argv) {
   if (argc < 3) { std::fprintf(stderr, "usage: cylm LEXICON.tsv MODEL.lm [--adapt COUNTS.tsv] [--set k=v]... < items > out\n"); return 2; }
-  Params p; std::string adapt_path, model2, reranker, vocab, prefer_path;
+  Params p; std::string adapt_path, model2, reranker, vocab, prefer_path, holes_path, reranker_t9;
   for (int i = 3; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--adapt" && i + 1 < argc) adapt_path = argv[++i];
@@ -933,6 +1273,8 @@ int main(int argc, char** argv) {
     else if (a == "--reranker" && i + 1 < argc) reranker = argv[++i];
     else if (a == "--vocab" && i + 1 < argc) vocab = argv[++i];
     else if (a == "--prefer" && i + 1 < argc) prefer_path = argv[++i];
+    else if (a == "--holes" && i + 1 < argc) holes_path = argv[++i];
+    else if (a == "--reranker_t9" && i + 1 < argc) reranker_t9 = argv[++i];
     else if (a == "--set" && i + 1 < argc) {
       std::string kv = argv[++i]; auto eq = kv.find('=');
       if (eq == std::string::npos || !p.Set(kv.substr(0, eq), kv.substr(eq + 1))) { std::fprintf(stderr, "bad --set %s\n", kv.c_str()); return 2; }
@@ -959,8 +1301,16 @@ int main(int argc, char** argv) {
     for (auto& one : Split(prefer_path, ',')) if (!LoadPrefer(one.c_str(), prefer)) { std::fprintf(stderr, "cannot read %s\n", one.c_str()); return 1; }
     d.prefer = &prefer;
   }
+  std::unordered_set<uint32_t> holes;
+  if (!holes_path.empty()) {
+    std::ifstream in(holes_path, std::ios::binary); std::string line;
+    while (std::getline(in, line)) { auto cps = Utf8Decode(line); if (!cps.empty() && cps[0] > 0x7f) holes.insert(cps[0]); }
+    d.holes = &holes;
+  }
   Reranker rr;
   if (!reranker.empty()) { if (!rr.Load(reranker.c_str(), vocab.c_str(), p.rr_threads)) { std::fprintf(stderr, "cannot load reranker\n"); return 1; } d.rr = &rr; }
+  Reranker rr9;
+  if (!reranker_t9.empty()) { if (!rr9.Load(reranker_t9.c_str(), vocab.c_str(), p.rr_threads)) { std::fprintf(stderr, "cannot load nine-key reranker\n"); return 1; } d.rr_t9 = &rr9; }
   std::fprintf(stderr, "loaded in %.1fs: %zu words\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), lex.WordCount());
   std::ios::sync_with_stdio(false);
   std::string line;
