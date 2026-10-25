@@ -706,6 +706,9 @@ struct Decoder {
           std::string sub = text.substr(i, j - i);
           if (sub.find('\'') != std::string::npos) break;
           if (sub.find_first_of("aeiouv") == std::string::npos) continue;  // initials typed as abbreviations: no typo
+          // neighbor=2: only where the keys spell no syllable (zuu, xon): far fewer typo paths (speed), and a typed
+          // valid syllable is taken as meant
+          if (p.neighbor == 2 && spell.count(sub)) continue;
           for (size_t k = 1; k < sub.size(); ++k) {
             const char* row = std::strchr(kQwerty, sub[k]);
             if (!row) continue;
