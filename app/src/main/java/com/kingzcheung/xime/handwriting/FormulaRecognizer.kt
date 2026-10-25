@@ -1,19 +1,9 @@
 package com.kingzcheung.xime.handwriting
 
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
 import android.content.Context
-import android.util.Log
-import com.kingzcheung.xime.util.FileLogger
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
-import java.nio.FloatBuffer
-import java.nio.LongBuffer
 import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.max
 
@@ -27,7 +17,6 @@ import kotlin.math.max
  * 所在笔画先后 0~1，有时间信息=1)。解码用小束宽的束搜索，给出几个候选。
  */
 object FormulaRecognizer {
-    private const val TAG = "FormulaRecognizer"
     /** 点数超上限时每次把留点间距放宽到这个倍数，最多放宽到训练时的 [MAX_STEP_SCALE] 倍。 */
     private const val STEP_GROWTH = 1.15f
     private const val MAX_STEP_SCALE = 4f
@@ -37,197 +26,33 @@ object FormulaRecognizer {
     data class Meta(val segLen: Int, val segFeat: Int, val maxPoints: Int, val maxTokens: Int,
                     val minStep: Float, val wideRatio: Float, val bos: Int, val eos: Int)
 
-    private var env: OrtEnvironment? = null
-    private var encoder: OrtSession? = null
-    private var decoder: OrtSession? = null
-    private var vocab: List<String> = emptyList()
-    private var meta: Meta? = null
-
     /** 模型下载页里的公式手写模型 id（BuiltinModelCatalog），下载到 filesDir/models/<id>/。 */
     const val MODEL_ID = "handwriting-formula"
-    private val FILES = listOf("formula_encoder.onnx", "formula_decoder.onnx", "formula_vocab.json", "formula_meta.json")
 
-    private fun complete(d: File) = FILES.all { File(d, it).isFile }
+    private val model = InkSeq2SeqModel(MODEL_ID, DIR, "formula")
 
     /** 优先用模型下载页下载的版本；没有时用 adb 推到外部私有目录 `handwriting_models/formula/` 的个人模型包。 */
-    fun dir(context: Context): File = com.kingzcheung.xime.model.ModelStorage.getModelDir(context, MODEL_ID).takeIf(::complete)
-        ?: File(context.getExternalFilesDir(null) ?: context.filesDir, DIR)
+    fun dir(context: Context): File = model.dir(context)
 
     /** 公式模型包是否已放到设备上。 */
-    fun isAvailable(context: Context): Boolean = complete(dir(context))
+    fun isAvailable(context: Context): Boolean = model.isAvailable(context)
 
-    @Synchronized
-    fun ensureLoaded(context: Context): Boolean {
-        if (encoder != null && decoder != null) return true
-        if (!isAvailable(context)) return false
-        return try {
-            val d = dir(context)
-            val m = JSONObject(File(d, "formula_meta.json").readText())
-            meta = Meta(m.getInt("seg_len"), m.getInt("seg_feat"), m.getInt("max_points"), m.getInt("max_tokens"),
-                m.getDouble("min_step").toFloat(), m.getDouble("wide_ratio").toFloat(), m.getInt("bos"), m.getInt("eos"))
-            val v = JSONArray(File(d, "formula_vocab.json").readText())
-            vocab = List(v.length()) { v.getString(it) }
-            val e = OrtEnvironment.getEnvironment()
-            val options = OrtSession.SessionOptions().apply { setIntraOpNumThreads(2) }
-            encoder = e.createSession(File(d, "formula_encoder.onnx").path, options)
-            decoder = e.createSession(File(d, "formula_decoder.onnx").path, options)
-            env = e
-            true
-        } catch (t: Throwable) {
-            Log.e(TAG, "load formula model failed", t)
-            FileLogger.e(TAG, "load formula model failed", t)
-            release()
-            false
-        }
-    }
+    fun ensureLoaded(context: Context): Boolean = model.ensureLoaded(context)
 
-    @Synchronized
-    fun release() {
-        runCatching { encoder?.close() }
-        runCatching { decoder?.close() }
-        encoder = null
-        decoder = null
-    }
+    fun release() = model.release()
 
     /** 识别整段公式，返回 (LaTeX, 置信度 0~1) 按置信度降序；模型不可用或没有笔迹时为空。 */
-    @Synchronized
-    fun recognize(context: Context, strokes: List<List<Pair<Float, Float>>>): List<Pair<String, Float>> {
-        if (!ensureLoaded(context)) return emptyList()
-        val m = meta ?: return emptyList()
-        val feats = featurize(strokes, m) ?: return emptyList()
-        val segs = segments(feats, m)
-        if (segs.isEmpty()) return emptyList()
-        val e = env ?: return emptyList()
-        val s = segs.size.toLong()
-        val p = FloatArray(segs.size * m.segLen * 6)
-        val pm = BooleanArray(segs.size * m.segLen)
-        val c = FloatArray(segs.size * m.segFeat)
-        segs.forEachIndexed { i, seg ->
-            seg.points.forEachIndexed { j, row ->
-                System.arraycopy(row, 0, p, (i * m.segLen + j) * 6, 6)
-                pm[i * m.segLen + j] = true
-            }
-            System.arraycopy(seg.feat, 0, c, i * m.segFeat, m.segFeat)
-        }
-        val sm = BooleanArray(segs.size) { true }
-        return try {
-            OnnxTensor.createTensor(e, FloatBuffer.wrap(p), longArrayOf(1, s, m.segLen.toLong(), 6)).use { tp ->
-                boolTensor(e, pm, longArrayOf(1, s, m.segLen.toLong())).use { tpm ->
-                    OnnxTensor.createTensor(e, FloatBuffer.wrap(c), longArrayOf(1, s, m.segFeat.toLong())).use { tc ->
-                        boolTensor(e, sm, longArrayOf(1, s)).use { tsm ->
-                            encoder!!.run(mapOf("P" to tp, "PM" to tpm, "C" to tc, "SM" to tsm)).use { encOut ->
-                                val mem = encOut[0] as OnnxTensor
-                                beamSearch(e, mem, tsm, m)
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (t: Throwable) {
-            Log.e(TAG, "formula recognize failed", t)
-            FileLogger.e(TAG, "formula recognize failed", t)
-            emptyList()
-        }
-    }
+    fun recognize(context: Context, strokes: List<List<Pair<Float, Float>>>): List<Pair<String, Float>> =
+        model.recognize(context, strokes, BEAM)
 
     /**
      * 只跑编码器，把一个字（或一段笔迹）变成 256 维单位向量：各段输出取平均再归一化。
      * 边用边学的模板比对用它（见 [HandwritingTemplates]）；离线测过假名 1-shot 首选约 78%。
      */
-    @Synchronized
-    fun embed(context: Context, strokes: List<List<Pair<Float, Float>>>): FloatArray? {
-        if (!ensureLoaded(context)) return null
-        val m = meta ?: return null
-        val e = env ?: return null
-        // 字母模板比对：点很稀的笔画（快速一划、只有几个采样点）先沿笔迹补点，否则特征几乎为空，什么都认成 c
-        val feats = featurize(densify(strokes, m), m) ?: return null
-        val segs = segments(feats, m)
-        if (segs.isEmpty()) return null
-        val s = segs.size.toLong()
-        val p = FloatArray(segs.size * m.segLen * 6)
-        val pm = BooleanArray(segs.size * m.segLen)
-        val c = FloatArray(segs.size * m.segFeat)
-        segs.forEachIndexed { i, seg ->
-            seg.points.forEachIndexed { j, row ->
-                System.arraycopy(row, 0, p, (i * m.segLen + j) * 6, 6)
-                pm[i * m.segLen + j] = true
-            }
-            System.arraycopy(seg.feat, 0, c, i * m.segFeat, m.segFeat)
-        }
-        return try {
-            OnnxTensor.createTensor(e, FloatBuffer.wrap(p), longArrayOf(1, s, m.segLen.toLong(), 6)).use { tp ->
-                boolTensor(e, pm, longArrayOf(1, s, m.segLen.toLong())).use { tpm ->
-                    OnnxTensor.createTensor(e, FloatBuffer.wrap(c), longArrayOf(1, s, m.segFeat.toLong())).use { tc ->
-                        boolTensor(e, BooleanArray(segs.size) { true }, longArrayOf(1, s)).use { tsm ->
-                            encoder!!.run(mapOf("P" to tp, "PM" to tpm, "C" to tc, "SM" to tsm)).use { out ->
-                                @Suppress("UNCHECKED_CAST")
-                                val mem = (out[0].value as Array<Array<FloatArray>>)[0]
-                                val v = FloatArray(mem[0].size)
-                                for (row in mem) for (k in v.indices) v[k] += row[k]
-                                val norm = kotlin.math.sqrt(v.fold(0f) { acc, x -> acc + x * x }).coerceAtLeast(1e-6f)
-                                FloatArray(v.size) { v[it] / norm }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (t: Throwable) {
-            Log.e(TAG, "formula embed failed", t)
-            null
-        }
-    }
-
-    private fun boolTensor(e: OrtEnvironment, data: BooleanArray, shape: LongArray): OnnxTensor {
-        // Java ORT 的布尔张量从多维 boolean 数组创建；这里形状最多 3 维且首维为 1
-        return when (shape.size) {
-            2 -> OnnxTensor.createTensor(e, arrayOf(data))
-            3 -> {
-                val rows = shape[1].toInt()
-                val cols = shape[2].toInt()
-                OnnxTensor.createTensor(e, arrayOf(Array(rows) { r -> data.copyOfRange(r * cols, (r + 1) * cols) }))
-            }
-            else -> error("unsupported bool shape")
-        }
-    }
-
-    private fun beamSearch(e: OrtEnvironment, mem: OnnxTensor, sm: OnnxTensor, m: Meta): List<Pair<String, Float>> {
-        data class Hyp(val tokens: List<Int>, val logp: Double, val done: Boolean)
-        var beams = listOf(Hyp(listOf(m.bos), 0.0, false))
-        repeat(m.maxTokens) {
-            if (beams.all { it.done }) return@repeat
-            val next = mutableListOf<Hyp>()
-            for (h in beams) {
-                if (h.done) { next += h; continue }
-                val y = LongArray(h.tokens.size) { h.tokens[it].toLong() }
-                val logits = OnnxTensor.createTensor(e, LongBuffer.wrap(y), longArrayOf(1, y.size.toLong())).use { ty ->
-                    decoder!!.run(mapOf("mem" to mem, "SM" to sm, "y" to ty)).use { out ->
-                        @Suppress("UNCHECKED_CAST")
-                        (out[0].value as Array<FloatArray>)[0]
-                    }
-                }
-                val lse = logSumExp(logits)
-                logits.indices.sortedByDescending { logits[it] }.take(BEAM).forEach { t ->
-                    next += Hyp(h.tokens + t, h.logp + (logits[t] - lse), t == m.eos)
-                }
-            }
-            // 按平均对数概率排序，避免短候选天然占优
-            beams = next.sortedByDescending { it.logp / it.tokens.size }.take(BEAM)
-        }
-        return beams.map { h ->
-            val ids = h.tokens.drop(1).filter { it != m.eos }
-            detokenize(ids) to exp(h.logp / max(h.tokens.size - 1, 1)).toFloat()
-        }.filter { it.first.isNotBlank() }.distinctBy { it.first }
-    }
-
-    private fun logSumExp(v: FloatArray): Double {
-        val mx = v.maxOrNull() ?: 0f
-        var s = 0.0
-        for (x in v) s += exp((x - mx).toDouble())
-        return mx + kotlin.math.ln(s)
-    }
+    fun embed(context: Context, strokes: List<List<Pair<Float, Float>>>): FloatArray? = model.embed(context, strokes)
 
     /** 记号拼回 LaTeX：命令后面紧跟字母时补一个空格（\alpha x），其它直接相连。 */
-    internal fun detokenize(ids: List<Int>, table: List<String> = vocab): String {
+    internal fun detokenize(ids: List<Int>, table: List<String>): String {
         val sb = StringBuilder()
         var prevCommand = false
         for (id in ids) {

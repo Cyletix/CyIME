@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kingzcheung.xime.handwriting.EnglishWordRecognizer
 import com.kingzcheung.xime.handwriting.FormulaRecognizer
 import com.kingzcheung.xime.handwriting.HandwritingCandidate
 import com.kingzcheung.xime.handwriting.HandwritingEngine
@@ -224,6 +225,17 @@ fun HandwritingKeyboardLayout(
                         HandwritingTemplates.recognize(context, script, seg, k, remember = false)
                             .map { (text, score) -> HandwritingCandidate(text, (2f * score - 1f).coerceAtLeast(0.0001f)) }
                     }).segments
+                    // 英文整词模型在时：整段笔迹一次认成单词放在前面，逐个字母切出来的结果拼成一个词排在后面（数字只有它能出）
+                    val words = if (script == HandwritingTemplates.Script.LATIN && EnglishWordRecognizer.isAvailable(context))
+                        EnglishWordRecognizer.recognize(context, points) else emptyList()
+                    if (words.isNotEmpty()) {
+                        val spelled = segments.joinToString("") { it.candidates.firstOrNull()?.char.orEmpty() }
+                        val candidates = (words.map { (word, score) -> HandwritingCandidate(word, score) } +
+                            listOfNotNull(spelled.takeIf { it.isNotEmpty() }?.let { HandwritingCandidate(it, 0f) }))
+                            .distinctBy { it.char }
+                        HandwritingTemplates.rememberForLearning(context, script, null)
+                        return@withContext listOf(OverlappedHandwritingRecognizer.Segment(0, strokes.size, candidates))
+                    }
                     HandwritingTemplates.rememberForLearning(context, script, points.takeIf { segments.size == 1 })
                     segments
                 }
