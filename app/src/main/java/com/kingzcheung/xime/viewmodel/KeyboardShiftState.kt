@@ -58,8 +58,13 @@ internal class KeyboardShiftState {
         else if (_mode.value == ShiftMode.SINGLE) reset()
     }
 
+    /**
+     * 清掉单次大写和大写锁定。手指还按着 Shift 时保持按住（引擎部署完、换输入框、切中英都会重置键盘，
+     * 不能替用户松开 Shift，用户 10-25：CyLM 的 M 变小写），松手后回到小写。
+     */
     fun reset() {
         beforeHold = ShiftMode.OFF
+        if (_mode.value == ShiftMode.HELD) return
         usedWhileHeld = false
         _mode.value = ShiftMode.OFF
     }
