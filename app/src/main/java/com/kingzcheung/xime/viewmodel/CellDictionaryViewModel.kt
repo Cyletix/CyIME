@@ -50,7 +50,7 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
     fun download(offer: CellDictionaryOffer) = work("正在下载 ${offer.name}…") {
         val installed = store.install(CellDictionaryManager.download(offer), offer)
         store.select(installed.id, true)
-        "已下载 ${installed.count} 条，点击「应用词库更改」生效"
+        "已下载，点「应用更改」后生效"
     }
 
     fun import(uri: Uri) = work("正在导入词库…") {
@@ -58,8 +58,7 @@ class CellDictionaryViewModel(application: Application) : AndroidViewModel(appli
             .use(ScelDictionary::readBounded)
         val entry = store.install(bytes)
         store.select(entry.id, true)
-        "已导入「${entry.name}」${entry.count} 条" + (if (entry.english > 0) "、英文 ${entry.english} 个" else "") + "（最坏情况下最慢的按键约慢 " +
-            "${com.kingzcheung.xime.settings.CellDictionaryCost.slowdownPercent(entry.count)}%），点击「应用词库更改」生效"
+        "已导入「${entry.name}」，点「应用更改」后生效"
     }
 
     fun select(id: String, selected: Boolean) = work("保存选择…") {
