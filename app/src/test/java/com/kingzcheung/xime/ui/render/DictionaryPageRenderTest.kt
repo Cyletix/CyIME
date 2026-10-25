@@ -49,11 +49,13 @@ class DictionaryPageRenderTest {
         val cells = CellDictionaryUiState(
             dictionaries = CellDictionaryState(
                 installed = listOf(
-                    InstalledCellDictionary("builtin_arknights", "明日方舟", "内置", 4200, sha256 = "a"),
-                    InstalledCellDictionary("local_aaaaaaaaaaaaaaaaaaaaaaaa", "我的行业词库", "本地导入", 120_000, 35, sha256 = "b"),
-                    InstalledCellDictionary("local_bbbbbbbbbbbbbbbbbbbbbbbb", "旧词表", "本地导入", 800, sha256 = "c"),
+                    InstalledCellDictionary("builtin_arknights", "明日方舟", "电子游戏", 5645, sha256 = "a"),
+                    InstalledCellDictionary("builtin_dota2", "Dota2", "电子游戏", 1599, english = 634, sha256 = "b"),
+                    InstalledCellDictionary("builtin_genshin", "原神", "电子游戏", 507, english = 123, sha256 = "c"),
+                    InstalledCellDictionary("builtin_programming", "编程常用", "编程与 AI", 1530, english = 478, sha256 = "d"),
+                    InstalledCellDictionary("local_aaaaaaaaaaaaaaaaaaaaaaaa", "我的行业词库", "本地导入", 120_000, 35, sha256 = "e"),
                 ),
-                selected = setOf("builtin_arknights", "local_aaaaaaaaaaaaaaaaaaaaaaaa"),
+                selected = setOf("builtin_arknights", "builtin_dota2", "local_aaaaaaaaaaaaaaaaaaaaaaaa"),
                 applied = setOf("builtin_arknights"),
             ),
             busy = false,
@@ -83,6 +85,8 @@ class DictionaryPageRenderTest {
             shot("phrases-$theme")
             rule.onAllNodesWithText("查词")[0].performClick()
             shot("lookup-$theme")
+            rule.onAllNodesWithText("删掉的候选")[0].performClick()
+            shot("removed-$theme")
         }
     }
 }
