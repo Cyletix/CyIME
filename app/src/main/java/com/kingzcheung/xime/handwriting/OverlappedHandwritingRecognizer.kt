@@ -26,9 +26,9 @@ class OverlappedHandwritingRecognizer(
      */
     private val sideBySide: Boolean = false,
     /**
-     * 英文字母：一个字母的笔画在左右方向总是连着或重叠（i、j 的点在竖上方），
-     * 所以左右之间出现明显空隙的一段一定是两个字母，重罚，不让 c、o 这样挨着写的两个字母合成 O。
-     * 假名不能这样做（い、ハ 的两笔本身就左右分开）。
+     * 英文字母：一个字母的笔画在左右方向大多连着或重叠（i、j 的点在竖上方），左右断开得越宽越可能是两个字母，
+     * 按空隙大小罚分，不让 c、o 这样挨着写的两个字母合成 O；但 H 的横常常不碰两竖，小空隙不罚。
+     * 另外按字母高矮区分 o/O、c/C 这类只差大小的字母。假名不能这样做（い、ハ 的两笔本身就左右分开）。
      */
     private val lettersApart: Boolean = false,
 ) {
@@ -107,7 +107,7 @@ class OverlappedHandwritingRecognizer(
                     val gapBias = if (j > 0 && j < gaps.size) gapBias(gaps[j]) else 0f
                     // 位置偏置：并排书写时，这一段整体在前面笔迹右边并留出空隙，倾向在此换字
                     val spaceBias = if (j > 0 && layout?.isBoundary(j, i) == true) GAP_SPLIT_BONUS else 0f
-                    val spanPenalty = if (lettersApart && layout?.spansGap(j, i) == true) LETTER_SPAN_PENALTY else 0f
+                    val spanPenalty = if (lettersApart) layout?.spanPenalty(j, i) ?: 0f else 0f
                     // 假名、汉字大致方正：比行高窄很多的一段多半是半个字（い 的一笔被认成 し）
                     val narrowPenalty = if (!lettersApart) layout?.narrowPenalty(j, i) ?: 0f else 0f
                     // 从左往右写时，下一个字不会退回去压在前面的字上（に 的右半被认成 ト、し）；停顿后叠写不算
@@ -181,6 +181,21 @@ class OverlappedHandwritingRecognizer(
             val j = back[k][i]
             segments.add(0, Segment(j, i - j, segmentCandidates(j, i, bounded, predictFn)))
             i = j
+        }
+        if (lettersApart && layout != null && segments.size >= 2) {
+            // 同一行里比最高的字母矮很多的是小写，和矮字母并排、自己一样高的是大写（o/O、c/C、s/S…只差大小）
+            val heights = segments.map { layout.height(it.startStroke, it.startStroke + it.strokeCount) }
+            val tallest = heights.max().coerceAtLeast(1f)
+            val hasSmall = heights.any { it / tallest < SMALL_LETTER_RATIO }
+            for (s in segments.indices) {
+                val ratio = heights[s] / tallest
+                val want = when {
+                    ratio < SMALL_LETTER_RATIO -> false
+                    hasSmall && ratio >= TALL_LETTER_RATIO -> true
+                    else -> null
+                } ?: continue
+                segments[s] = segments[s].copy(candidates = byCase(segments[s].candidates, upper = want))
+            }
         }
         val total = best[bestK][n]
         android.util.Log.i(
@@ -265,6 +280,8 @@ class OverlappedHandwritingRecognizer(
     private class SideBySide(strokes: List<List<Pair<Float, Float>>>) {
         private val minX = FloatArray(strokes.size) { s -> strokes[s].minOfOrNull { it.first } ?: Float.MAX_VALUE }
         private val maxX = FloatArray(strokes.size) { s -> strokes[s].maxOfOrNull { it.first } ?: -Float.MAX_VALUE }
+        private val minY = FloatArray(strokes.size) { s -> strokes[s].minOfOrNull { it.second } ?: Float.MAX_VALUE }
+        private val maxY = FloatArray(strokes.size) { s -> strokes[s].maxOfOrNull { it.second } ?: -Float.MAX_VALUE }
         private val gapNeeded: Float = strokes.flatten().let { pts ->
             if (pts.isEmpty()) Float.MAX_VALUE
             else (pts.maxOf { it.second } - pts.minOf { it.second }).coerceAtLeast(1f) * SIDE_GAP_RATIO
@@ -298,15 +315,23 @@ class OverlappedHandwritingRecognizer(
         }
 
         /** 第 j 到 i-1 笔在左右方向上有没有断开（按横向范围排序后，相邻两块之间空隙够大）。 */
-        fun spansGap(j: Int, i: Int): Boolean {
-            if (i - j < 2) return false
+        fun spanPenalty(j: Int, i: Int): Float {
+            if (i - j < 2) return 0f
             val order = (j until i).sortedBy { minX[it] }
             var right = maxX[order[0]]
+            var gap = 0f
             for (s in order.drop(1)) {
-                if (minX[s] - right >= letterGap) return true
+                gap = maxOf(gap, minX[s] - right)
                 right = maxOf(right, maxX[s])
             }
-            return false
+            return LETTER_SPAN_PENALTY * ((gap - letterGap) / (lineHeight * LETTER_GAP_FULL_RATIO)).coerceIn(0f, 1f)
+        }
+
+        fun height(j: Int, i: Int): Float {
+            var top = Float.MAX_VALUE
+            var bottom = -Float.MAX_VALUE
+            for (s in j until i) { top = minOf(top, minY[s]); bottom = maxOf(bottom, maxY[s]) }
+            return bottom - top
         }
 
         fun isBoundary(j: Int, i: Int): Boolean {
@@ -341,11 +366,34 @@ class OverlappedHandwritingRecognizer(
         /** 压回前面笔迹的最大罚分。 */
         const val OVERLAP_PENALTY = 0.3f
 
-        /** 英文字母之间：空隙到整行高度的这个比例就算两个字母。 */
-        const val LETTER_GAP_RATIO = 0.08f
+        /** 英文一段笔迹左右断开的空隙超过行高的这个比例才开始罚（H 的横离两竖约 0.15）。 */
+        const val LETTER_GAP_RATIO = 0.2f
 
-        /** 一段英文笔迹左右断开时的罚分：大到几乎不会被选，但仍保证总有切法（字母数超过上限时）。 */
-        const val LETTER_SPAN_PENALTY = 1f
+        /** 空隙再宽出行高的这个比例时罚满。 */
+        const val LETTER_GAP_FULL_RATIO = 0.3f
+
+        /** 一段英文笔迹左右断开时的最大罚分。 */
+        const val LETTER_SPAN_PENALTY = 0.5f
+
+        /** 字母高度不到同一行最高字母的这个比例算小写。 */
+        const val SMALL_LETTER_RATIO = 0.7f
+
+        /** 有小写字母时，高度达到最高字母这个比例的算大写。 */
+        const val TALL_LETTER_RATIO = 0.85f
+
+        /** 大小写只差大小的字母（数字 0 写得矮时当 o）。 */
+        private const val SIZE_ONLY_CASE = "cosuvwxz"
+
+        /** 首选是只差大小的字母时，按要的大小写换成另一种写法（分数沿用首选的），原来那个往后放。 */
+        internal fun byCase(candidates: List<HandwritingCandidate>, upper: Boolean): List<HandwritingCandidate> {
+            val top = candidates.firstOrNull() ?: return candidates
+            val c = top.char.singleOrNull() ?: return candidates
+            val lower = if (c == '0' && !upper) 'o' else c.lowercaseChar()
+            if (lower !in SIZE_ONLY_CASE) return candidates
+            val target = (if (upper) lower.uppercaseChar() else lower).toString()
+            if (target == top.char) return candidates
+            return listOf(HandwritingCandidate(target, top.score)) + candidates.filter { it.char != target }
+        }
 
         /**
          * 活动笔画最多同时叠写的字数。
