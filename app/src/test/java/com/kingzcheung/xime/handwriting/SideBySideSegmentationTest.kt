@@ -49,16 +49,43 @@ class SideBySideSegmentationTest {
         }
         assertEquals(1, result.segments.size)
     }
-    @Test fun twoLettersWrittenCloseAreNotMergedIntoOneLetter() {
-        // c 和 o 只隔 0.15 行高：不到假名的换字空隙，但字母内部不会左右断开，仍切成两个字母
-        val strokes = listOf(column(0, 35f), column(1, 35f))
+    @Test fun twoLettersWithAClearGapAreNotMergedIntoOneLetter() {
+        // c 和 o 隔 0.4 行高：字母内部很少断开这么宽，即使合起来像 O 也切成两个字母
+        val strokes = listOf(column(0, 60f), column(1, 60f))
         val merged: (List<List<Pair<Float, Float>>>, Int) -> List<HandwritingCandidate> = { seg, _ ->
             listOf(if (seg.size == 2) HandwritingCandidate("O", .97f)
-                else HandwritingCandidate("co"[(seg[0].first().first / 35f).toInt()].toString(), .8f))
+                else HandwritingCandidate("co"[(seg[0].first().first / 60f).toInt()].toString(), .8f))
         }
         val letters = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
             .recognize(strokes, noPauses.take(2), merged)
         assertEquals(listOf("c", "o"), letters.segments.map { it.candidates.first().char })
+    }
+
+    @Test fun hWhoseCrossbarDoesNotTouchTheStemsStaysOneLetter() {
+        // 演示时写的 H：横离两竖各约 0.1、0.17 行高，不罚，认成 H 的分数够高就是一个字母
+        val strokes = listOf(listOf(0f to 0f, 3f to 100f), listOf(11f to 55f, 40f to 58f), listOf(57f to 0f, 60f to 100f))
+        val names = mapOf(listOf(0, 1, 2) to ("H" to .85f), listOf(0, 1) to ("t" to .7f), listOf(2) to ("l" to .9f),
+            listOf(0) to ("l" to .9f), listOf(1, 2) to ("+" to .5f), listOf(1) to ("-" to .6f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, noPauses.take(3)) { seg, _ ->
+                val (name, score) = names.getValue(seg.map { strokes.indexOf(it) })
+                listOf(HandwritingCandidate(name, score))
+            }
+        assertEquals(listOf("H"), result.segments.map { it.candidates.first().char })
+    }
+
+    @Test fun lettersThatDifferOnlyInSizeFollowTheirHeightInTheLine() {
+        // 「Ho」：o 只有 H 的三分之一高，认成 O 也改成 o；矮字母旁边一样高的 c 改成 C
+        assertEquals("o", OverlappedHandwritingRecognizer.byCase(listOf(HandwritingCandidate("O", .9f), HandwritingCandidate("0", .8f)), upper = false).first().char)
+        assertEquals("o", OverlappedHandwritingRecognizer.byCase(listOf(HandwritingCandidate("0", .9f)), upper = false).first().char)
+        assertEquals("C", OverlappedHandwritingRecognizer.byCase(listOf(HandwritingCandidate("c", .9f)), upper = true).first().char)
+        assertEquals("e", OverlappedHandwritingRecognizer.byCase(listOf(HandwritingCandidate("e", .9f)), upper = true).first().char)
+        val strokes = listOf(listOf(0f to 0f, 0f to 100f), listOf(40f to 60f, 70f to 60f, 70f to 100f, 40f to 100f, 40f to 60f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, noPauses.take(2)) { seg, _ ->
+                listOf(HandwritingCandidate(if (seg.size == 2) "?" else if (seg[0].size == 2) "l" else "O", if (seg.size == 2) .1f else .9f))
+            }
+        assertEquals(listOf("l", "o"), result.segments.map { it.candidates.first().char })
     }
 
     @Test fun dotAboveTheStemStaysOneLetter() {
