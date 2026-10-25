@@ -38,7 +38,10 @@ CONFIG_PATH = HERE / "config.json"
 T9_TARGET = "app/src/main/assets/rime_chinese/t9_ngram.lm"
 # Private gloss add-on (entries chosen from the user's own messages): bundled only into 装到我的设备, never committed, never public.
 GLOSS_TARGET = "app/src/main/assets/gloss/cyime_gloss-private.tsv"
+# CyLM files (config cylm: target name under rime_chinese -> source path): only 装到我的设备 until the user approves more.
+CYLM_DIR = "app/src/main/assets/rime_chinese"
 PUBLIC_FORBIDDEN_ASSETS = ("assets/gloss/cyime_gloss-private.tsv",)
+PUBLIC_FORBIDDEN_PREFIXES = ("assets/rime_chinese/cylm_",)
 PUBLIC_FORBIDDEN_REFERENCES = ("cyime_gloss-v9",)
 # The bundled-model (full) edition is the elder package; docs/development/elder-pack-spec.md is its checklist.
 ELDER_MODELS = {"ochwpro", "paraformer-zh-en-int8", "predictive-text-base", "predictive-text-small",
@@ -298,7 +301,8 @@ class BuildOptions(SimpleNamespace):
                     latest=False, prerelease=False, keep_draft=False, notes="", yes=False, dry_run=False, check=False,
                     audience="",  # "elder" / "friend": a bundled-model package checked against its spec
                     dev_tools=False,  # developer-only features (handwriting training); only 装到我的设备
-                    private_gloss=False)  # bundle the private gloss add-on (config privateGloss); only 装到我的设备
+                    private_gloss=False,  # bundle the private gloss add-on (config privateGloss); only 装到我的设备
+                    cylm=False)  # bundle the CyLM files (config cylm); only 装到我的设备
 
     def __init__(self, **values):
         merged = dict(self.DEFAULTS)
@@ -420,9 +424,62 @@ class GlossStaging:
         return False
 
 
+class CylmStaging:
+    """Put the CyLM files under rime_chinese for 装到我的设备 only, and remove them afterwards (same rules as the T9 model)."""
+
+    def __init__(self, root: Path, files: dict[str, Path], work: Path):
+        self.root, self.files, self.work = root, files, work
+        self.marker = work / "staged-cylm.json"
+        self.created: list[Path] = []
+        self.sha256 = {name: ad.digest(src) for name, src in files.items()}
+
+    def cleanup_stale(self):
+        if not self.marker.is_file():
+            return
+        for name, record in ad.read_json(self.marker).items():
+            target = self.root / CYLM_DIR / name
+            if target.is_file() and target.stat().st_size == record.get("size") and ad.digest(target) == record.get("sha256"):
+                target.unlink()
+                say(f"[STAGE] 已移除上次中断时留下的临时 CyLM 文件 {name}。")
+        self.marker.unlink()
+
+    def __enter__(self):
+        self.cleanup_stale()
+        stray = sorted(p.name for p in (self.root / CYLM_DIR).glob("cylm_*") if p.name not in self.files)
+        if stray or (not self.files and any((self.root / CYLM_DIR).glob("cylm_*"))):
+            raise DeliveryError(f"{CYLM_DIR} 里有不是打包器放的 CyLM 文件：{'、'.join(stray)}，请先确认谁在用并移走。")
+        if not self.files:
+            return self
+        self.work.mkdir(parents=True, exist_ok=True)
+        ad.write_json(self.marker, {name: {"sha256": self.sha256[name], "size": src.stat().st_size}
+                                    for name, src in self.files.items()})
+        for name, src in self.files.items():
+            target = self.root / CYLM_DIR / name
+            if target.exists():
+                if ad.digest(target) != self.sha256[name]:
+                    raise DeliveryError(f"{CYLM_DIR}/{name} 已有另一份文件（不是打包器放的），没有覆盖。")
+                continue
+            try:
+                os.link(src, target)  # same volume: no extra disk space
+            except OSError:
+                shutil.copyfile(src, target)
+            self.created.append(target)
+        say("[STAGE] CyLM 文件已临时放入 " + CYLM_DIR + "：" + "、".join(self.files))
+        return self
+
+    def __exit__(self, *exc):
+        if self.files:
+            for target in self.created:
+                with contextlib.suppress(FileNotFoundError):
+                    target.unlink()
+            self.marker.unlink(missing_ok=True)
+            say("[STAGE] 临时 CyLM 文件已移除，源码目录恢复原样。")
+        return False
+
+
 def public_violations(names: list[str], texts: dict[str, bytes]) -> list[str]:
-    """What must never be in a package that leaves the user's own devices: the private gloss, or any reference to the retired v9 gloss."""
-    problems = [f"包内含私人文件 {n}" for n in names if n in PUBLIC_FORBIDDEN_ASSETS]
+    """What must never be in a package that leaves the user's own devices: the private gloss, the CyLM files, or any reference to the retired v9 gloss."""
+    problems = [f"包内含私人文件 {n}" for n in names if n in PUBLIC_FORBIDDEN_ASSETS or n.startswith(PUBLIC_FORBIDDEN_PREFIXES)]
     for n in names:
         if any(k in n for k in PUBLIC_FORBIDDEN_REFERENCES):
             problems.append(f"包内含已淘汰文件 {n}")
@@ -466,6 +523,15 @@ class Packager(ad.Delivery):
             if not self.gloss.is_file():
                 raise DeliveryError(f"找不到私人释义包：{self.gloss}（config.json 的 privateGloss）")
         self.gloss_staging = GlossStaging(self.root, self.gloss, self.work)
+        self.cylm: dict[str, Path] = {}
+        if opts.cylm:
+            if opts.audience or opts.publish:
+                raise DeliveryError("CyLM 模型文件只能进“装到我的设备”，老人包、朋友包和公开版都不带。")
+            self.cylm = {name: Path(src) for name, src in (self.config.get("cylm") or {}).items()}
+            missing = [str(src) for src in self.cylm.values() if not src.is_file()]
+            if not self.cylm or missing:
+                raise DeliveryError("找不到 CyLM 文件（config.json 的 cylm）：" + ("、".join(missing) or "没有配置"))
+        self.cylm_staging = CylmStaging(self.root, self.cylm, self.work)
         if opts.publish and self.kind != "release":
             raise DeliveryError("调试版不能发布到 GitHub Release。")
 
@@ -478,7 +544,8 @@ class Packager(ad.Delivery):
                 **({"offlineIds": list(self.p.offline_ids)} if self.p.offline_ids else {}),
                 **({"audience": self.p.audience} if self.p.audience else {}),
                 **({"devTools": True} if self.p.dev_tools else {}),
-                **({"privateGloss": self.gloss_staging.sha256} if self.gloss else {})}
+                **({"privateGloss": self.gloss_staging.sha256} if self.gloss else {}),
+                **({"cylm": self.cylm_staging.sha256} if self.cylm else {})}
 
     def variant_id(self) -> str:
         return hashlib.sha256(json.dumps(self.variant(), sort_keys=True).encode()).hexdigest()[:12]
@@ -629,7 +696,7 @@ class Packager(ad.Delivery):
             texts = {n: apk.read(n) for n in names
                      if n.startswith("assets/") and n.rsplit(".", 1)[-1] in ("json", "yaml", "yml", "txt", "tsv", "md", "list")
                      and not n.startswith("assets/gloss/")}
-        if not self.gloss:
+        if not self.gloss and not self.cylm:
             problems = public_violations(names, texts)
             if problems:
                 raise DeliveryError("安装包带了不能离开本机的内容：" + "；".join(problems))
@@ -739,6 +806,9 @@ class Packager(ad.Delivery):
         if self.gloss:
             lines.append(f"私人释义包：{self.gloss.name}（{human(self.gloss.stat().st_size)}，SHA256 {self.gloss_staging.sha256[:16]}…）"
                          f"临时放入 {GLOSS_TARGET}，结束后移除")
+        if self.cylm:
+            lines.append("CyLM：" + "、".join(f"{src.name} → {name}（{human(src.stat().st_size)}）" for name, src in self.cylm.items())
+                         + f" 临时放入 {CYLM_DIR}，结束后移除")
         dicts = list_dicts(self.root)
         kept = [d["name"] for d in dicts if d["id"] not in p.exclude_dicts]
         dropped = [d["name"] for d in dicts if d["id"] in p.exclude_dicts]
@@ -769,7 +839,7 @@ class Packager(ad.Delivery):
             return
         self.check_delivered_version()
         self.dependencies()
-        with self.staging, self.gloss_staging:
+        with self.staging, self.gloss_staging, self.cylm_staging:
             if self.p.publish:
                 self.check_remote_tag()
                 existing = self.release_info()
@@ -942,6 +1012,8 @@ def build_options_from_args(a, config) -> BuildOptions:
         values["install"] = False
     if getattr(a, "push_banks", None) is False:
         values["push_banks"] = False
+    if getattr(a, "cylm", None) is False:
+        values["cylm"] = False
     if a.offline_models is False:
         values["offline_models"] = False
     if a.not_latest:
@@ -1016,6 +1088,10 @@ def main(argv=None) -> int:
     pb.add_argument("--private-gloss", dest="private_gloss", action="store_true", default=None,
                     help="内置私人释义补充包（config.json 的 privateGloss；只用于“装到我的设备”）")
     pb.add_argument("--no-private-gloss", dest="private_gloss", action="store_false")
+    cy = b.add_mutually_exclusive_group()
+    cy.add_argument("--cylm", dest="cylm", action="store_true", default=None,
+                    help="内置 CyLM 选词模型文件（config.json 的 cylm；只用于“装到我的设备”）")
+    cy.add_argument("--no-cylm", dest="cylm", action="store_false")
     pb.add_argument("--push-banks", dest="push_banks", action="store_true", default=None,
                     help="安装后把手写训练题库推到设备（“装到我的设备”默认开）")
     pb.add_argument("--no-push-banks", dest="push_banks", action="store_false")
