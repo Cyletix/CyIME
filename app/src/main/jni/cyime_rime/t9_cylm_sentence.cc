@@ -1,6 +1,8 @@
 #include "t9_cylm_sentence.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -12,7 +14,27 @@
 
 #include "t9_script_options.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 namespace rime {
+
+namespace {
+// Proof on a device that CyLM runs (adb logcat -s CyLM): the first decodes and then every 50th log how many
+// decodes ran, how many put a different sentence first and the last decode time. Never the keys or the text.
+void TraceCylm(bool replaced, double ms) {
+  static std::atomic<long> calls{0}, replacements{0};
+  const long n = ++calls;
+  const long r = replaced ? ++replacements : replacements.load();
+#ifdef __ANDROID__
+  if (n <= 3 || n % 50 == 0)
+    __android_log_print(ANDROID_LOG_INFO, "CyLM", "decode calls=%ld replaced=%ld last_ms=%.2f", n, r, ms);
+#else
+  (void)n; (void)r; (void)ms;
+#endif
+}
+}  // namespace
 
 void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, const string& left_context,
                          Dictionary* dict, const Language* translator_language, size_t start,
@@ -34,13 +56,15 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
   if (!session) return;
   const string context = !left_context.empty() && left_context[0] == '\x1e' ? left_context.substr(1) : string();
   vector<char> out(16384);
+  const auto started = std::chrono::steady_clock::now();
   const int n = cylm_decode2(session, in.c_str(), digits ? 1 : 0, context.c_str(), out.data(), static_cast<int>(out.size()));
-  if (n <= 0 || !out[0]) return;
+  const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+  if (n <= 0 || !out[0]) return TraceCylm(false, ms);
   const string record(out.data());  // text \x1f pinyin \x1f spans
   const auto unit = record.find('\x1f');
   const string text = record.substr(0, unit);
   const auto& rime = sentences->front();
-  if (text.empty() || text == rime->text()) return;
+  if (text.empty() || text == rime->text()) return TraceCylm(false, ms);
   DictEntry entry;
   entry.text = text;
   entry.weight = rime->weight();
@@ -67,6 +91,7 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
   sentence->set_syllabifier(syllabifier);
   sentence->set_quality(rime->quality());
   sentences->front() = sentence;
+  TraceCylm(true, ms);
 }
 
 }  // namespace rime

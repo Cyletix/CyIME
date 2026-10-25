@@ -17,6 +17,10 @@
 #include <t9_ngram_model.h>
 #include <t9_sentence_scorer.h>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 namespace rime {
 
 T9ScriptOptions::T9ScriptOptions() = default;
@@ -185,6 +189,12 @@ std::shared_ptr<CylmModel> T9ScriptOptions::T9CylmOpen(const string& lexicon, co
       [](CylmModel* m) { if (m) cylm_close(m); });
   if (!handle.get()) handle.reset();
   else if (!prefer.empty()) cylm_prefer(handle.get(), prefer.c_str());
+#ifdef __ANDROID__
+  // Once per file set and process (adb logcat -s CyLM): whether the schema's CyLM files opened.
+  __android_log_print(handle ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, "CyLM", "%s lexicon=%s model=%s reranker=%s",
+                      handle ? "opened" : "failed to open", lexicon.c_str(), model.c_str(),
+                      reranker.empty() ? "none" : reranker.c_str());
+#endif
   return opened[key] = handle;
 }
 
