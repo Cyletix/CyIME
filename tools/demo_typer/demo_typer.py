@@ -114,10 +114,11 @@ class Runner:
     def __init__(self, args, plan, layouts):
         self.args, self.plan, self.layouts = args, plan, layouts
         self.pace = {"interval": 40, "hold": 15, "commit": 120, "sentence": 400, "paragraph": 1200,
-                     "ui": 500, "flick": 60, "hold_long": 700, "glide_step": 70, **plan.get("pace", {})}
+                     "ui": 500, "flick": 60, "pre_commit": 150, "after_enter": 350, "hold_long": 700, "glide_step": 70, **plan.get("pace", {})}
         if args.interval:
             self.pace["interval"] = args.interval
         self.layout_name = None
+        self.played = []  # (seconds since time.monotonic() origin, clip) for the recording's audio track
         self.pointer = Pointer()
         self.taps = 0
 
@@ -197,7 +198,7 @@ class Runner:
     def ink(self, name):
         with open(os.path.join(self.args.data, "ink", name + ".json"), encoding="utf-8") as source:
             ink = json.load(source)
-        if ink["rotation"] != self.layouts["rotation"]:
+        if ink["rotation"] % 2 != self.layouts["rotation"] % 2:
             raise SystemExit(f"ink {name} was recorded at rotation {ink['rotation']}")
         strokes = ink["strokes"]
         for index, stroke in enumerate(strokes):
@@ -236,6 +237,7 @@ class Runner:
         if self.args.dry:
             print(f"  play {clip}")
         else:
+            self.played.append((time.monotonic(), clip))
             subprocess.run(["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", clip], check=True)
         time.sleep(voice.get("tail", 1800) / 1000)
         self.pointer.tap(mic[0], mic[1], self.pace["hold"], self.pace["paragraph"])
@@ -250,7 +252,8 @@ class Runner:
             self.press_spec(self.key(token[1:]), after=self.pace["ui"])
         elif token.startswith("<") and token.endswith(">"):
             name, _, gesture = token[1:-1].partition(":")
-            self.press_spec(self.key(name), gesture or None)
+            # A new line makes the editor restart input; give it a moment before the next word.
+            self.press_spec(self.key(name), gesture or None, after=self.pace["after_enter"] if name == "enter" else None)
         elif token.startswith("drag:"):  # drag:a>b - press a, slide onto b, release there
             start, end = (self.key(name) for name in token[5:].split(">"))
             self.slide(start, end, 150)
@@ -258,6 +261,9 @@ class Runner:
             name, dx, dy, hold = token[6:].split(":")
             start = self.key(name)
             self.slide(start, (start[0] + int(dx), start[1] + int(dy)), int(hold))
+        elif token.startswith("tap:"):  # tap:x:y - a one-off screen point, such as a later candidate
+            x, y = token[4:].split(":")
+            self.press_spec([int(x), int(y)], after=self.pace["commit"])
         elif token.startswith("glide:"):
             self.glide(token[6:])
         elif token.startswith("ink:"):
@@ -268,6 +274,8 @@ class Runner:
             self.letters(token[:-1])
         else:  # a word: its keys, then space takes the first candidate
             self.letters(token)
+            # A space that lands before the engine has answered the last key is dropped; let it catch up.
+            self.pointer.wait(self.pace["pre_commit"])
             self.press_spec(self.key("space"), after=self.pace["commit"])
 
     def segment(self, segment):
@@ -299,22 +307,62 @@ def cmd_run(args):
     plan = load(args)
     with open(args.layouts, encoding="utf-8") as source:
         layouts = json.load(source)
-    if not args.dry and rotation(args.serial) != layouts["rotation"]:
-        raise SystemExit("screen rotation differs from the calibrated layouts")
+    # Display coordinates only depend on portrait vs landscape, not on which way up the tablet is.
+    if not args.dry and rotation(args.serial) % 2 != layouts["rotation"] % 2:
+        raise SystemExit("screen orientation differs from the calibrated layouts")
     runner = Runner(args, plan, layouts)
     for segment in pick(plan, args.segment):
-        runner.segment(segment)
+        if args.record and not args.dry:
+            record(args, plan, runner, segment)
+        else:
+            runner.segment(segment)
     print(f"keys={runner.taps}")
 
 
+def record(args, plan, runner, segment):
+    """One screenrecord file per segment; voice clips played meanwhile become its audio track."""
+    os.makedirs(args.record, exist_ok=True)
+    index = plan["segments"].index(segment) + 1
+    name = f"{index:02d}-{segment['name'].replace(' ', '')}"
+    remote = f"/sdcard/cyime-demo-{index:02d}.mp4"
+    proc = subprocess.Popen(["adb", "-s", args.serial, "shell", "screenrecord", "--bit-rate", "24000000",
+                             "--time-limit", "180", remote])
+    time.sleep(1.5)  # screenrecord needs a moment before the first frame
+    start = time.monotonic()
+    runner.played = []
+    runner.segment(segment)
+    time.sleep(1.0)
+    adb(args.serial, "shell", "pkill", "-INT", "screenrecord", check=False)
+    proc.wait()
+    time.sleep(1.0)
+    video = os.path.join(args.record, name + ".mp4")
+    silent = video if not runner.played else os.path.join(args.record, name + "-silent.mp4")
+    adb(args.serial, "pull", remote, silent)
+    adb(args.serial, "shell", "rm", "-f", remote)
+    if runner.played:
+        inputs, filters = ["-i", silent], []
+        for n, (at, clip) in enumerate(runner.played, 1):
+            inputs += ["-i", clip]
+            delay = max(0, int((at - start + 1.5) * 1000))  # + the lead-in before `start`
+            filters.append(f"[{n}:a]adelay={delay}|{delay}[a{n}]")
+        mix = "".join(f"[a{n}]" for n in range(1, len(runner.played) + 1))
+        filters.append(f"{mix}amix=inputs={len(runner.played)}:normalize=0[aout]")
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *inputs, "-filter_complex", ";".join(filters),
+                        "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", video], check=True)
+    print(f"  {video}")
+
+
+FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
+
+
 def note_text(args, plan):
-    return adb(args.serial, "shell", "cat", f"'{plan['note']}'")
+    return adb(args.serial, "shell", "cat", f"'{plan['note']}'").replace("\r\n", "\n")
 
 
 def cmd_check(args):
     plan = load(args)
     expected = "".join(s["text"] for s in pick(plan, args.segment))
-    actual = note_text(args, plan).replace("\r\n", "\n")
+    actual = FRONTMATTER.sub("", note_text(args, plan))
     if actual.strip() == expected.strip():
         print("same")
         return
@@ -324,7 +372,10 @@ def cmd_check(args):
 
 def cmd_clear(args):
     plan = load(args)
-    adb(args.serial, "shell", f"truncate -s 0 '{plan['note']}'")
+    # Keep the note's properties block (the vault's template); empty only the body.
+    head = FRONTMATTER.match(note_text(args, plan))
+    body = head.group(0).replace("\n", "\\n") if head else ""
+    adb(args.serial, "shell", f"printf '{body}' > '{plan['note']}'")
 
 
 def cmd_tts(args):
@@ -380,7 +431,8 @@ class InputDevices:
 
 def read_strokes(serial, devices, idle, on_stroke=None):
     """Read getevent until `idle` seconds pass with no contact after the first stroke."""
-    proc = subprocess.Popen(["adb", "-s", serial, "shell", "getevent", "-lt", *devices.nodes],
+    # getevent takes at most one device; watch them all and keep the touch and pen nodes.
+    proc = subprocess.Popen(["adb", "-s", serial, "shell", "getevent", "-lt"],
                             stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     lines = []
     reader = threading.Thread(target=lambda: [lines.append(line) for line in proc.stdout], daemon=True)
@@ -390,7 +442,7 @@ def read_strokes(serial, devices, idle, on_stroke=None):
     last_up = None
     # getevent omits the node when it watches a single device.
     pattern = re.compile(r"\[\s*([\d.]+)\]\s+(?:(/dev/\S+?):\s+)?(\w+)\s+(\w+)\s+(\w+)")
-    only = next(iter(devices.nodes)) if len(devices.nodes) == 1 else None
+    only = None
     try:
         while True:
             if not lines:
@@ -452,7 +504,7 @@ def cmd_taps(args):
 
 def cmd_record_ink(args):
     devices = InputDevices(args.serial)
-    print(f"write {args.name} now; saved {args.idle} s after the last stroke")
+    print(f"write {args.name} now; saved {args.idle} s after the last stroke", flush=True)
     strokes = read_strokes(args.serial, devices, args.idle, lambda s: print(f"  stroke {len(s)} points", flush=True))
     out_dir = os.path.join(args.data, "ink")
     os.makedirs(out_dir, exist_ok=True)
@@ -473,6 +525,7 @@ def main():
     run.add_argument("--segment", action="append")
     run.add_argument("--dry", action="store_true", help="build the monkey scripts without touching the device")
     run.add_argument("--interval", type=int, help="ms from one key down to the next")
+    run.add_argument("--record", metavar="DIR", help="screen-record each segment into its own file here")
     check = sub.add_parser("check")
     check.add_argument("--segment", action="append")
     sub.add_parser("clear")
