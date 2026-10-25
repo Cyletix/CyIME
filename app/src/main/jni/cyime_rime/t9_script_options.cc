@@ -181,19 +181,35 @@ std::shared_ptr<CylmModel> T9ScriptOptions::T9CylmOpen(const string& lexicon, co
                      '\n' + prefer;
   auto found = opened.find(key);
   if (found != opened.end()) return found->second;
-  std::shared_ptr<CylmModel> handle(
-      reranker.empty()
-          ? cylm_open(lexicon.c_str(), model.c_str(), model2.empty() ? nullptr : model2.c_str(), params.c_str())
-          : cylm_open2(lexicon.c_str(), model.c_str(), model2.empty() ? nullptr : model2.c_str(), reranker.c_str(),
-                       vocab.c_str(), params.c_str()),
-      [](CylmModel* m) { if (m) cylm_close(m); });
+  const char* second = model2.empty() ? nullptr : model2.c_str();
+  CylmModel* raw = reranker.empty()
+                       ? cylm_open(lexicon.c_str(), model.c_str(), second, params.c_str())
+                       : cylm_open2(lexicon.c_str(), model.c_str(), second, reranker.c_str(), vocab.c_str(), params.c_str());
+  // Without the reranker CyLM still decodes (only its rescoring is lost), so a reranker that fails to load
+  // does not take the whole model down.
+  const bool without_reranker = !raw && !reranker.empty() &&
+                                (raw = cylm_open(lexicon.c_str(), model.c_str(), second, params.c_str())) != nullptr;
+  std::shared_ptr<CylmModel> handle(raw, [](CylmModel* m) { if (m) cylm_close(m); });
   if (!handle.get()) handle.reset();
   else if (!prefer.empty()) cylm_prefer(handle.get(), prefer.c_str());
 #ifdef __ANDROID__
-  // Once per file set and process (adb logcat -s CyLM): whether the schema's CyLM files opened.
-  __android_log_print(handle ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, "CyLM", "%s lexicon=%s model=%s reranker=%s",
-                      handle ? "opened" : "failed to open", lexicon.c_str(), model.c_str(),
-                      reranker.empty() ? "none" : reranker.c_str());
+  // Once per file set and process (adb logcat -s CyLM): whether the schema's CyLM files opened, and if not,
+  // which file is missing and whether the settings alone are the problem.
+  auto size = [](const string& path) -> long long {
+    std::ifstream in(path, std::ios::binary | std::ios::ate);
+    return in ? static_cast<long long>(in.tellg()) : -1;
+  };
+  __android_log_print(handle ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, "CyLM",
+                      "%s lexicon=%s(%lld) model=%s(%lld) reranker=%s(%lld) vocab=%lld",
+                      !handle ? "failed to open" : without_reranker ? "opened without reranker (reranker failed)" : "opened",
+                      lexicon.c_str(), size(lexicon), model.c_str(), size(model),
+                      reranker.empty() ? "none" : reranker.c_str(), reranker.empty() ? 0LL : size(reranker),
+                      vocab.empty() ? 0LL : size(vocab));
+  if (!handle) {
+    CylmModel* bare = cylm_open(lexicon.c_str(), model.c_str(), second, "");
+    __android_log_print(ANDROID_LOG_WARN, "CyLM", "same files with default settings: %s", bare ? "open" : "fail");
+    if (bare) cylm_close(bare);
+  }
 #endif
   return opened[key] = handle;
 }
