@@ -1125,3 +1125,21 @@ k14-tail-jius	14	JUUA	就是	5	k14-tail	2026-10-23	同上，“就啊”仍排�
 k14-tail-zhendea	14	ZGEBDEA	真的啊	1	k14-tail	2026-10-23	打全时完整音节“啊”的读法仍排第一
 k14-tail-zhishanga	14	ZGUAGABGA	智商啊	1	k14-tail	2026-10-23	声母读法拼出的整词（猪上树）不抢第一
 k14-jqc	14	JQC	讲清楚	5	k14-initials	2026-10-24	C 键（c/v）跟在 J/Q 后要能当声母，不能被读成 ju/qu 的 v
+demo-shijiyanshi	26	shijiyanshi	实机演示	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-jiaquanfen	26	jiaquanfen	加权分	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-jiaquandefen	26	jiaquandefen	加权得分	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-pingbanshice	26	pingbanshice	平板实测	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-kuashouzhi	26	kuashouzhi	跨手指	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-chuzisudu	26	chuzisudu	出字速度	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-jianquanpin	26	jianquanpin	键全拼	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-zhishurushengmu	26	zhishurushengmu	只输入声母	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-shengmu	26	shengmu	声母	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-dashouzimu	26	dashouzimu	打首字母	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-xiaoxuanfutiao	26	xiaoxuanfutiao	小悬浮条	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-shengwenmoxing	26	shengwenmoxing	声纹模型	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-anjianyinxiaoshiwo	26	anjianyinxiaoshiwo	按键音效是我	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-ziweizhou	26	ziweizhou	紫薇轴	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-meigejian	26	meigejian	每个键	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-bicejian	26	bicejian	笔侧键	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-zhenjiyanshi	26	zhenjiyanshi	真机演示	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
+demo-meugejuab	14	mEUGEJUAB	每个键	1	demo-misses	2026-10-26	演示打字：输入法用词权重低（cyime_domain_terms）
