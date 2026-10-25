@@ -280,7 +280,7 @@ class LayoutGeometryGateTest {
         assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
 
-    @Test fun cyletix10MobileRowsFitExtremeSizesAndKeepEdgeKeysClickable() {
+    @Test fun cyletix10MobileRowsFitExtremeSizesAndKeepPunctuationClickable() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         KeysConfigHelper.loadConfig(app)
         val vm = KeyboardViewModel(app)
@@ -318,12 +318,12 @@ class LayoutGeometryGateTest {
                             rect.bottom <= keyboard.bottom + 1f)
                     rect
                 }
-                assertTrue("$v 原始字母顺序", bounds.zipWithNext().all { (a, b) -> a.right <= b.left + 1f })
+                assertTrue("$v 原始字母和分号顺序", bounds.zipWithNext().all { (a, b) -> a.right <= b.left + 1f })
             }
             // The 800dp synthetic keyboard extends beyond the emulator window; touch only
             // the 280dp cases, while checking all keys against their own viewport above.
             if (v.width == 280) {
-                rule.onNodeWithTag("qwerty-key:u", useUnmergedTree = true)
+                rule.onNodeWithTag("qwerty-key:;", useUnmergedTree = true)
                     .assertIsDisplayed().performClick()
             }
         }
