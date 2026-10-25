@@ -51,18 +51,10 @@ object CellDictionaryCatalog {
         CellDictionaryOffer(11508, "风景名胜精选", "城市信息大全", 1279, 53140),
         CellDictionaryOffer(73918, "王者荣耀", "电子游戏", 740, 33810),
         CellDictionaryOffer(53593, "英雄联盟", "电子游戏", 1173, 45970),
-        // Added 2026-10-24 (counts and sizes from each detail page; downloads checked).
-        CellDictionaryOffer(180520, "原神（按版本更新）", "电子游戏", 22029, 812586),
-        CellDictionaryOffer(171143, "崩坏：星穹铁道", "电子游戏", 1525, 66354),
-        CellDictionaryOffer(170111, "鸣潮", "电子游戏", 546, 28266),
-        CellDictionaryOffer(169333, "绝区零", "电子游戏", 432, 24202),
-        CellDictionaryOffer(177728, "明日方舟：终末地", "电子游戏", 312, 20564),
-        // One dictionary per game, so only the games someone plays are switched on.
-        CellDictionaryOffer(87470, "崩坏3", "电子游戏", 1743, 70024),
-        CellDictionaryOffer(177101, "蔚蓝档案", "电子游戏", 314, 19422),
+        // One dictionary per game, so only the games someone plays are switched on (counts and sizes from each
+        // detail page, downloads checked, 2026-10-24). Topics the built-ins cover are not offered twice.
         CellDictionaryOffer(78390, "碧蓝航线", "电子游戏", 3375, 128008),
         CellDictionaryOffer(83081, "少女前线", "电子游戏", 433, 23892),
-        CellDictionaryOffer(66902, "阴阳师", "电子游戏", 235, 17156),
         CellDictionaryOffer(169094, "恋与深空", "电子游戏", 385, 22206),
         CellDictionaryOffer(171456, "无限暖暖", "电子游戏", 961, 44810),
         CellDictionaryOffer(158615, "光·遇", "电子游戏", 378, 21480),
@@ -74,12 +66,6 @@ object CellDictionaryCatalog {
         CellDictionaryOffer(72606, "炉石传说", "电子游戏", 2032, 80850),
         CellDictionaryOffer(171005, "魔兽世界", "电子游戏", 48687, 1796992),
         CellDictionaryOffer(61481, "我的世界（Minecraft）", "电子游戏", 1576, 64688),
-        CellDictionaryOffer(15202, "数学词汇大全", "自然科学", 15992, 557880),
-        CellDictionaryOffer(15130, "中国历史词汇大全", "人文科学", 20526, 586860),
-        CellDictionaryOffer(97640, "人工智能常用词", CellDictionaryCatalog.AI_CATEGORY, 737, 35898),
-        CellDictionaryOffer(176192, "AI 编程（Vibe coding）", CellDictionaryCatalog.AI_CATEGORY, 747, 33120),
-        CellDictionaryOffer(20652, "热门电影大全", "娱乐", 67101, 2240626),
-        CellDictionaryOffer(22537, "动漫名称大全", "娱乐", 65654, 575134),
         CellDictionaryOffer(15203, "物理词汇大全", "自然科学", 13107, 455528),
         CellDictionaryOffer(15205, "化学化工词汇大全", "自然科学", 13264, 479284),
         CellDictionaryOffer(15097, "成语俗语", "人文科学", 46785, 1645056),
