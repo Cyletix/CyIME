@@ -244,7 +244,13 @@ val prepareChineseDictionaries by tasks.registering {
             "  spelling_penalty: 0\n  word_penalty: 8.0\n  correction_penalty: -9.2\n  whole_input_phrases: 16\n" +
             "  prefer_user_entries: true\n  ngram_model: t9_ngram\n" +
             "  ngram_sentence_start: false\n  ngram_eos_weight: 0\n  ngram_user_weight: 0.3\n" +
-            "  ngram_dictionary_prior: 0.02\n  ngram_merge_segmentations: false\n"
+            "  ngram_dictionary_prior: 0.02\n  ngram_merge_segmentations: false\n" +
+            // CyLM (CyIME-Windows tools/cylm) puts its best sentence first when its files are in the Rime user
+            // directory. Only the 装到我的设备 package carries them; without them the open fails once and Rime's
+            // sentence stays (cyime_rime/t9_cylm_sentence.cc). Same files and settings as t9_pinyin.schema.yaml.
+            "\ncylm:\n  lexicon: cylm_lexicon.bin\n  model: cylm_model.lm\n  reranker: cylm_rerank.onnx\n  vocab: cylm_vocab.txt\n" +
+            "  params: \"mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=16;per_span=12;per_span_abbrev=24;per_span1=40;" +
+            "nbest=8;t9_beam=10;t9_per_span=8;rr_gamma=0.6;rr_short=0.4\"\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
         // The 14-key schema (assets/rime_chinese) repeats these sentence rules; keep them the same list.
         check(file("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText()

@@ -4,6 +4,14 @@
 # 参考雾凇拼音方案：数字序列直接由 RIME speller algebra 展开，
 # 引擎原生处理数字→拼音转换和多音节歧义消解。
 # 左侧候选区由 T9PinyinMap librime-t9 计算展示。
+# CyLM（CyIME-Windows tools/cylm）：rime 用户目录里有这些文件时，用它的最优整句替换整句位。
+# 只有“装到我的设备”包带这些文件；没有时打开失败一次，保持 Rime 原整句。与 26 键 rime_ice 同一套文件和参数。
+cylm:
+  lexicon: cylm_lexicon.bin
+  model: cylm_model.lm
+  reranker: cylm_rerank.onnx
+  vocab: cylm_vocab.txt
+  params: "mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=16;per_span=12;per_span_abbrev=24;per_span1=40;nbest=8;t9_beam=10;t9_per_span=8;rr_gamma=0.6;rr_short=0.4"
 t9:
   joint_decoder: true
   source_budget: 128
