@@ -401,3 +401,4 @@ LiveCodeBench
 AIME
 GPQA
 ARC-AGI
+Latent Space
