@@ -1,0 +1,70 @@
+# IME, keyboard and typing-demo vocabulary: chat counts underrate it (上屏 43, 出词 11, 声纹 29).
+# Each word gets at least this weight: an existing rime-ice entry is raised to it, a missing one is added.
+# Kept to words of the IME's own subject; tasks-chinese.gradle.kts applies it. text<TAB>code<TAB>weight
+每个键	mei ge jian	5000
+一个键	yi ge jian	5000
+这个键	zhe ge jian	5000
+那个键	na ge jian	5000
+键全拼	jian quan pin	5000
+九键全拼	jiu jian quan pin	5000
+全拼键盘	quan pin jian pan	5000
+笔侧键	bi ce jian	5000
+侧键	ce jian	5000
+声纹模型	sheng wen mo xing	5000
+声纹识别	sheng wen shi bie	5000
+真机演示	zhen ji yan shi	5000
+实机演示	shi ji yan shi	5000
+加权分	jia quan fen	5000
+加权得分	jia quan de fen	5000
+测试集	ce shi ji	5000
+悬浮条	xuan fu tiao	5000
+小悬浮条	xiao xuan fu tiao	5000
+出字	chu zi	5000
+出字速度	chu zi su du	5000
+出词	chu ci	5000
+逐键	zhu jian	5000
+逐键选词	zhu jian xuan ci	5000
+词组模型	ci zu mo xing	5000
+换候选	huan hou xuan	5000
+选候选	xuan hou xuan	5000
+字幕模式	zi mu mo shi	5000
+实时字幕	shi shi zi mu	5000
+跨手指	kua shou zhi	5000
+紫薇轴	zi wei zhou	5000
+上屏	shang ping	5000
+直接上屏	zhi jie shang ping	5000
+中英混打	zhong ying hun da	5000
+小鹤双拼	xiao he shuang pin	5000
+声母	sheng mu	5000
+整句	zheng ju	5000
+整句输入	zheng ju shu ru	5000
+打首字母	da shou zi mu	5000
+首字母	shou zi mu	5000
+长按	chang an	5000
+下一项	xia yi xiang	5000
+九键	jiu jian	5000
+十四键	shi si jian	5000
+二十六键	er shi liu jian	5000
+双拼	shuang pin	5000
+全拼	quan pin	5000
+五笔	wu bi	5000
+输入法	shu ru fa	5000
+候选	hou xuan	5000
+候选栏	hou xuan lan	5000
+候选词	hou xuan ci	5000
+键位	jian wei	5000
+布局切换	bu ju qie huan	5000
+按键音效	an jian yin xiao	5000
+压感	ya gan	5000
+平板实测	ping ban shi ce	5000
+实测	shi ce	5000
+脚本模拟	jiao ben mo ni	5000
+演示视频	yan shi shi pin	5000
+联想词	lian xiang ci	5000
+邻键纠错	lin jian jiu cuo	5000
+简拼	jian pin	5000
+词库	ci ku	5000
+词频	ci pin	5000
+选词	xuan ci	5000
+无痕模式	wu hen mo shi	5000
+悬浮键盘	xuan fu jian pan	5000

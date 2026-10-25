@@ -42,6 +42,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(charWeights)
     val tencentWeights = file("data/rime_ice_tencent_weights.tsv.gz")
     inputs.file(tencentWeights)
+    val domainTerms = file("data/cyime_domain_terms.tsv")
+    inputs.file(domainTerms)
     val acronymFilter = file("data/cyime_acronym_filter.lua")
     inputs.file(acronymFilter)
     val englishMemory = file("data/cyime_en_memory.lua")
@@ -110,6 +112,28 @@ val prepareChineseDictionaries by tasks.registering {
         // tencent.dict.yaml (about a million phrases) also gives every entry the placeholder 100, so 被嫌弃 and 被掀起
         // tied and the sentence took either. Same corpus estimate as ext, spread less (ext_weights.py tencent).
         reweight("tencent", tencentWeights)
+        // IME vocabulary (app/data/cyime_domain_terms.tsv) gets at least its listed weight: the chat counts above
+        // rate the IME's own words near zero (上屏 43, 出词 11), so 只输入声母 came out 只输入圣母 and 每个键
+        // 每个见. Raise the existing rime-ice entries here; missing ones are added to cyime_terms below.
+        val domainFloors = domainTerms.readLines().filter { it.isNotBlank() && !it.startsWith("#") }
+            .map { it.split('\t') }.associate { (it[0] + "\t" + it[1]) to it[2].toInt() }
+        val domainTexts = domainFloors.keys.associateBy { it.substringBefore('\t') }
+        val domainPresent = mutableSetOf<String>()
+        for (name in listOf("base", "ext", "tencent")) {
+            val dict = File(root, "cn_dicts/$name.dict.yaml")
+            var body = false
+            dict.writeText(dict.readLines().joinToString("\n", postfix = "\n") { line ->
+                if (line.trim() == "...") body = true
+                val fields = line.split('\t')
+                // tencent has no code column (text, weight).
+                val key = if (fields.size == 3) fields[0] + "\t" + fields[1] else domainTexts[fields[0]]
+                val floor = if (body && fields.size in 2..3) key?.let(domainFloors::get) else null
+                if (floor != null) domainPresent += key!!
+                val weight = fields.last().toIntOrNull()
+                if (floor == null || weight == null || weight >= floor) line
+                else fields.dropLast(1).joinToString("\t") + "\t" + floor
+            })
+        }
         // The upstream corrector clears ordinary spelling annotations after the
         // translator has generated them. Let the host retain that real spelling
         // for responsive candidate UI without disabling pronunciation corrections.
@@ -287,7 +311,9 @@ val prepareChineseDictionaries by tasks.registering {
                 "收起键\tshou qi jian\t5000", "全选键\tquan xuan jian\t5000", "撤销键\tche xiao jian\t5000",
                 "拼音键\tpin yin jian\t5000", "手写键\tshou xie jian\t5000", "地球键\tdi qiu jian\t5000",
                 "搜索键\tsou suo jian\t5000", "十四键\tshi si jian\t5000", "悬浮键盘\txuan fu jian pan\t5000",
-                "单手键盘\tdan shou jian pan\t5000", "键盘高度\tjian pan gao du\t5000").joinToString("\n", postfix = "\n"))
+                "单手键盘\tdan shou jian pan\t5000", "键盘高度\tjian pan gao du\t5000").joinToString("\n", postfix = "\n") +
+            // Only words rime-ice lacks: a second copy of an existing entry is just more to look up.
+            (domainFloors.keys - domainPresent).joinToString("\n", postfix = "\n") { it + "\t" + domainFloors.getValue(it) })
         // rime-ice reads the adverbial 地 in 慢慢地/默默地 only as de; many people type it as di (manmandi), which
         // matched nothing and gave 慢慢滴. Offer every such entry under di too, at the same weight: a larger
         // (whole 的/地/得 family) weight was tried and pushed 有效地 over 有效的 for the initials yxd.
