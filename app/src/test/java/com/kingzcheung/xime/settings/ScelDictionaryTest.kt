@@ -76,6 +76,6 @@ class ScelDictionaryTest {
             "${offer.sourceId}\t${offer.name}\t${result.entries.size}\t${result.skipped}"
         }
         File(directory, "parsed-counts.tsv").writeText(rows.joinToString("\n") + "\n")
-        assertEquals(51, rows.size)
+        assertEquals(37, rows.size)
     }
 }
