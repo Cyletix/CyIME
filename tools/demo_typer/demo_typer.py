@@ -93,6 +93,13 @@ class Pointer:
         self.release(x, y)
         self.wait(after)
 
+    def hold_and_tap(self, held, target, after):
+        """Second finger taps `target` while the first holds `held`: monkey's two-pointer PinchZoom
+        with both points standing still (down, pointer down, pointer up, up)."""
+        (hx, hy), (tx, ty) = held, target
+        self.events.append(f"PinchZoom({hx},{hy},{hx},{hy},{tx},{ty},{tx},{ty},1)")
+        self.wait(after)
+
     def stroke(self, points, after):
         """points: [(x, y, ms, pressure)], ms from stroke start."""
         x, y, t0, p = points[0]
@@ -243,7 +250,14 @@ class Runner:
         self.pointer.tap(mic[0], mic[1], self.pace["hold"], self.pace["paragraph"])
 
     def token(self, token):
-        if token.startswith("layout="):
+        if token.startswith("en:"):  # en:Word_or_two - a burst of English: language key, letters ("_" = space), back
+            back = self.layout_name
+            self.press_spec(self.key("lang"), after=self.pace["ui"])
+            self.layout_name = "en26"
+            self.letters(token[3:].replace("_", " "))
+            self.press_spec(self.key("lang"), after=self.pace["ui"])
+            self.layout_name = back
+        elif token.startswith("layout="):
             self.layout_name = token[7:]
         elif token.startswith("wait:"):
             value = token[5:]
@@ -261,6 +275,10 @@ class Runner:
             name, dx, dy, hold = token[6:].split(":")
             start = self.key(name)
             self.slide(start, (start[0] + int(dx), start[1] + int(dy)), int(hold))
+        elif token.startswith("shiftpick:"):  # shiftpick:x:y - hold Shift and tap the candidate at (x, y)
+            x, y = token[10:].split(":")
+            self.pointer.hold_and_tap(self.key("shift")[:2], (int(x), int(y)), self.pace["commit"])
+            self.taps += 2
         elif token.startswith("tap:"):  # tap:x:y - a one-off screen point, such as a later candidate
             x, y = token[4:].split(":")
             self.press_spec([int(x), int(y)], after=self.pace["commit"])
@@ -275,12 +293,17 @@ class Runner:
         else:  # a word: its keys, then space takes the first candidate
             self.letters(token)
             # A space that lands before the engine has answered the last key is dropped; let it catch up.
-            self.pointer.wait(self.pace["pre_commit"])
+            self.pointer.wait(self.pace["pre_commit"] + 8 * len(token))  # long phrases decode longer
             self.press_spec(self.key("space"), after=self.pace["commit"])
 
     def segment(self, segment):
         print(f"[{segment['name']}]")
         self.layout_name = segment["layout"]
+        # The language key toggles, so a segment that starts on the wrong language inverts every
+        # English burst; pick Chinese from the language menu first.
+        if self.layout_name == "cn26" and "zh" in self.keys:
+            self.token("<lang:hold>")
+            self.token("@zh")
         for line in segment["do"]:
             for token in line.split():
                 self.token(token)
