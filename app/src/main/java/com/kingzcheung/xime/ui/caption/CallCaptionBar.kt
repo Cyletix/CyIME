@@ -47,12 +47,16 @@ private const val CALL_LINES = 3
  * words fade in one by one and older lines glide up; nothing jumps.
  */
 @Composable
-internal fun CallCaptionBar(controller: CaptionController, route: CallRoute, onDrag: (Float) -> Unit, onClose: () -> Unit) {
+internal fun CallCaptionBar(controller: CaptionController, route: CallRoute, onDrag: (Float) -> Unit, onClose: () -> Unit,
+    /** The caption page's captions floating over other apps (「后台浮窗」), not a call. */
+    floating: Boolean = false, onOpen: (() -> Unit)? = null) {
     var choosing by remember { mutableStateOf<SpeakerUi?>(null) }
     // Answered "不是" once: tapping that voice again does not ask again.
     val notSelf = remember { mutableStateListOf<Int>() }
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = .66f))
         .pointerInput(Unit) { detectVerticalDragGestures { change, dy -> change.consume(); onDrag(dy) } }
+        // Floating: a tap on the words goes back to the full caption page.
+        .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
         .padding(start = 16.dp, end = 44.dp, top = 10.dp, bottom = 10.dp)) {
         Column {
             val hint = when (route) {
@@ -60,12 +64,13 @@ internal fun CallCaptionBar(controller: CaptionController, route: CallRoute, onD
                 CallRoute.Headset -> "戴着耳机时手机听不到对方，请改用免提"
                 CallRoute.Speaker -> when {
                     controller.status == CaptionController.Status.Error || controller.status == CaptionController.Status.Held -> controller.message
+                    floating && controller.status == CaptionController.Status.Paused -> "字幕已暂停，点这里回到字幕页"
                     controller.micTaken -> "麦克风被别的应用占着（比如带声音的录屏），这会儿听不到对方"
                     else -> null
                 }
             }
             if (hint != null) Text(hint, color = Color.White, fontSize = 20.sp, lineHeight = 26.sp)
-            else CallLines(controller, onSpeakerTap = { if (it.id !in notSelf) choosing = it })
+            else CallLines(controller, floating, onSpeakerTap = { if (it.id !in notSelf) choosing = it })
             choosing?.let { speaker ->
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -81,7 +86,7 @@ internal fun CallCaptionBar(controller: CaptionController, route: CallRoute, onD
 }
 
 @Composable
-private fun CallLines(controller: CaptionController, onSpeakerTap: (SpeakerUi) -> Unit) {
+private fun CallLines(controller: CaptionController, floating: Boolean, onSpeakerTap: (SpeakerUi) -> Unit) {
     RevealTicker(controller)
     val lines = controller.segments.filter { line ->
         line.text.isNotEmpty() && line.speakerId != CaptionController.SELF_SPEAKER &&
@@ -90,7 +95,8 @@ private fun CallLines(controller: CaptionController, onSpeakerTap: (SpeakerUi) -
     val list = rememberLazyListState()
     val lineHeight = (CALL_FONT * 1.3f)
     if (lines.isEmpty()) {
-        Text("通话字幕已开启，对方说的话会显示在这里", color = Color.White.copy(alpha = .8f), fontSize = 20.sp)
+        Text(if (floating) "字幕在后台继续，说的话会显示在这里" else "通话字幕已开启，对方说的话会显示在这里",
+            color = Color.White.copy(alpha = .8f), fontSize = 20.sp)
         return
     }
     val newest = lines.last()

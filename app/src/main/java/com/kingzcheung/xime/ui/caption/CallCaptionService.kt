@@ -49,6 +49,11 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
     private var lastLevelLog = 0L
     private var lastStartAt = 0L
     private var route by mutableStateOf(CallRoute.Earpiece)
+    // The caption page's captions floating after it was left (see [CaptionFloat]).
+    private var floatController: CaptionController? = null
+    private var floatOverlay: View? = null
+    /** A call paused the floating captions; they go on after hang-up. */
+    private var floatResumeAfterCall = false
 
     // A ComposeView outside an activity needs its own lifecycle and saved-state owners.
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -81,6 +86,7 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
         // Mode callbacks are not delivered by every OEM; a slow poll keeps entry automatic everywhere.
         main.post(poll)
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        CaptionFloat.service = this
         FileLogger.i(TAG, "connected sdk=${Build.VERSION.SDK_INT}")
     }
 
@@ -89,7 +95,59 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
         if (call == inCall) return
         inCall = call
         FileLogger.i(TAG, "call=$call mode=$mode")
-        if (call) { dismissedThisCall = false; startCaptions() } else stopCaptions()
+        if (call) {
+            // One bar at a time: the call bar takes the microphone and the screen; the floating page
+            // captions pause and hide until hang-up.
+            floatController?.let { f ->
+                val active = f.status == CaptionController.Status.Listening || f.status == CaptionController.Status.Starting ||
+                    f.status == CaptionController.Status.Held
+                floatResumeAfterCall = floatResumeAfterCall || active
+                if (active) { f.resumeOnForeground = true; f.pause() }
+                removeFloatOverlay()
+            }
+            dismissedThisCall = false; startCaptions()
+        } else {
+            stopCaptions()
+            floatController?.let { f ->
+                addFloatOverlay(f)
+                if (floatResumeAfterCall) { f.resumeOnForeground = false; f.start() }
+                floatResumeAfterCall = false
+            }
+        }
+    }
+
+    /** The caption page left with 「后台浮窗」 on: its captions go on in a bar here. */
+    fun showFloat(c: CaptionController) {
+        main.post {
+            floatController = c
+            if (inCall) {
+                floatResumeAfterCall = true
+                c.resumeOnForeground = true; c.pause()
+            } else addFloatOverlay(c)
+        }
+    }
+
+    fun hideFloat() {
+        main.post {
+            removeFloatOverlay()
+            floatController = null
+            floatResumeAfterCall = false
+        }
+    }
+
+    private fun addFloatOverlay(c: CaptionController) {
+        if (floatOverlay != null) return
+        val added = addBar(c, floating = true, onClose = {
+            removeFloatOverlay(); floatController = null; floatResumeAfterCall = false
+            CaptionFloat.closed()
+        }) ?: return
+        floatOverlay = added.first
+    }
+
+    private fun removeFloatOverlay() {
+        val view = floatOverlay ?: return
+        runCatching { (getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(view) }
+        floatOverlay = null
     }
 
     /**
@@ -147,6 +205,13 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
 
     private fun showOverlay() {
         val c = controller ?: return
+        val added = addBar(c, floating = false, onClose = { dismissedThisCall = true; stopCaptions() }) ?: return
+        overlay = added.first
+        params = added.second
+    }
+
+    /** The subtitle bar at the bottom of the screen, for call captions or the floating caption page. */
+    private fun addBar(c: CaptionController, floating: Boolean, onClose: () -> Unit): Pair<View, WindowManager.LayoutParams>? {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics).toInt()
         val layout = WindowManager.LayoutParams(
@@ -155,27 +220,27 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.BOTTOM
-            y = dp(120f) // above the call buttons
+            y = dp(if (floating) 80f else 120f) // above the call buttons / the navigation bar
             horizontalMargin = 0.03f
         }
-        val view = ComposeView(this).apply {
+        lateinit var view: ComposeView
+        view = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@CallCaptionService)
             setViewTreeSavedStateRegistryOwner(this@CallCaptionService)
             setContent {
-                CallCaptionBar(c, route,
+                CallCaptionBar(c, if (floating) CallRoute.Speaker else route,
                     // Drag up or down to move it off the call buttons.
                     onDrag = { dy ->
-                        params?.let { p ->
-                            p.y = (p.y - dy).toInt().coerceAtLeast(0)
-                            this@CallCaptionService.overlay?.let { runCatching { wm.updateViewLayout(it, p) } }
-                        }
+                        layout.y = (layout.y - dy).toInt().coerceAtLeast(0)
+                        runCatching { wm.updateViewLayout(view, layout) }
                     },
-                    onClose = { dismissedThisCall = true; stopCaptions() })
+                    onClose = onClose,
+                    floating = floating,
+                    onOpen = if (floating) ({ CaptionActivity.open(this@CallCaptionService) }) else null)
             }
         }
-        runCatching { wm.addView(view, layout) }.onFailure { FileLogger.e(TAG, "overlay failed", it); return }
-        overlay = view
-        params = layout
+        runCatching { wm.addView(view, layout) }.onFailure { FileLogger.e(TAG, "overlay failed", it); return null }
+        return view to layout
     }
 
     private fun removeOverlay() {
@@ -201,6 +266,10 @@ class CallCaptionService : AccessibilityService(), LifecycleOwner, SavedStateReg
         main.removeCallbacksAndMessages(null)
         if (Build.VERSION.SDK_INT >= 31) (modeListener as? AudioManager.OnModeChangedListener)?.let { audio.removeOnModeChangedListener(it) }
         stopCaptions()
+        // Switched off while floating: the captions stop with the bar.
+        if (CaptionFloat.service === this) CaptionFloat.service = null
+        removeFloatOverlay(); floatController = null
+        CaptionFloat.closed()
         super.onDestroy()
     }
 

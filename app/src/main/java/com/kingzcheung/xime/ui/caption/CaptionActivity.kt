@@ -28,6 +28,8 @@ class CaptionActivity : ComponentActivity() {
 
     private lateinit var controller: CaptionController
     private var permissionAsked = false
+    /** 退出 was pressed: captions stop instead of floating on. */
+    private var exitRequested = false
     private val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         if (allowed) controller.start()
         else Toast.makeText(this, "没有麦克风权限就听不到，请在手机设置里允许", Toast.LENGTH_LONG).show()
@@ -62,12 +64,15 @@ class CaptionActivity : ComponentActivity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         applyGlass()
-        controller = CaptionController(this)
-        setContent { CaptionScreen(controller, onExit = { finish() }) }
+        // Captions floating from an earlier page carry on here instead of starting over.
+        controller = CaptionFloat.giveBack() ?: CaptionController(this)
+        CaptionFloat.pageAlive = true
+        setContent { CaptionScreen(controller, onExit = { exitRequested = true; finish() }) }
     }
 
     override fun onStart() {
         super.onStart()
+        CaptionFloat.giveBack()
         controller.refreshCallCaption()
         if (PermissionHelper.hasRecordAudioPermission(this)) {
             if (controller.status == CaptionController.Status.Idle || controller.resumeOnForeground) {
@@ -81,9 +86,12 @@ class CaptionActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        // Background: release the microphone (no foreground service in this version); resume on return.
-        if (controller.status == CaptionController.Status.Listening || controller.status == CaptionController.Status.Starting ||
-            controller.status == CaptionController.Status.Held) {
+        val active = controller.status == CaptionController.Status.Listening || controller.status == CaptionController.Status.Starting ||
+            controller.status == CaptionController.Status.Held
+        // 「后台浮窗」 on: the captions go on in a bar over other apps (needs the call caption service).
+        if (active && !exitRequested && CaptionFloat.takeOver(this, controller)) { super.onStop(); return }
+        // Background: release the microphone; resume on return.
+        if (active) {
             controller.resumeOnForeground = true
             controller.pause()
         }
@@ -91,7 +99,9 @@ class CaptionActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        controller.release()
+        CaptionFloat.pageAlive = false
+        // Still floating (the page was swiped away): the bar owns the captions now.
+        if (CaptionFloat.controller !== controller) controller.release()
         super.onDestroy()
     }
 }
