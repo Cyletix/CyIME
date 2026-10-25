@@ -262,6 +262,36 @@ fun SpeechToTextSettingsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                var captionFloat by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionFloat.isOn(context)) }
+                val callCaptionOn = remember(captionFloat) { com.kingzcheung.xime.ui.caption.CallCaptionService.isEnabled(context) }
+                Column(Modifier.settingsSearchAnchor("后台浮窗").fillMaxWidth().padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "后台浮窗",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = captionFloat,
+                            onCheckedChange = {
+                                captionFloat = it
+                                com.kingzcheung.xime.ui.caption.CaptionFloat.setOn(context, it)
+                                // The bar lives in the call caption service; without it there is nothing to float in.
+                                if (it && !com.kingzcheung.xime.ui.caption.CallCaptionService.isEnabled(context)) runCatching {
+                                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                                }
+                            },
+                        )
+                    }
+                    Text(
+                        text = "离开字幕页（回桌面或切到别的应用）后，字幕继续在屏幕底部显示，点一下回到字幕页；按“退出”才停止。打电话时只显示通话字幕，挂断后接着显示。" +
+                            if (callCaptionOn) "" else "需要先在系统无障碍里打开“通话字幕”。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             if (!useLocal) {

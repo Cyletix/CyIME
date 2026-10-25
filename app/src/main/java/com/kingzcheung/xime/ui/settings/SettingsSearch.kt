@@ -217,6 +217,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("保存语音调优录音", speech, SettingsRoutes.SpeechToText, "录音 保存 调优 回放 分析", section = "本地识别"),
         SettingsSearchEntry("字幕", speech, SettingsRoutes.SpeechToText, "字幕 听障 老人 对话 实时字幕"),
         SettingsSearchEntry("桌面显示“字幕”图标", speech, SettingsRoutes.SpeechToText, "字幕 桌面图标 快捷方式"),
+        SettingsSearchEntry("后台浮窗", speech, SettingsRoutes.SpeechToText, "字幕 浮窗 后台 悬浮 其他应用"),
         SettingsSearchEntry("在线服务", speech, SettingsRoutes.SpeechToText, "在线 语音插件 api 密钥 联网"),
         // 智能 › 手写
         SettingsSearchEntry("已安装的手写模型", handwriting, SettingsRoutes.Handwriting, "手写模型 公式 个人手写 下载 切换 删除"),
