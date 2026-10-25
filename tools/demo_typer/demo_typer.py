@@ -312,6 +312,8 @@ class Runner:
         for line in segment["do"]:
             for token in line.split():
                 self.token(token)
+            # One monkey run per line: stopping the PC side (or `stop`) ends the typing within a line.
+            self.flush()
         self.pointer.wait(self.pace["paragraph"])
         self.flush()
 
@@ -396,6 +398,12 @@ def cmd_check(args):
         return
     sys.stdout.writelines(difflib.unified_diff(expected.splitlines(True), actual.splitlines(True), "expected", "note"))
     sys.exit(1)
+
+
+def cmd_stop(args):
+    """Kill the monkey run on the device; it keeps typing its pushed events even without USB."""
+    adb(args.serial, "shell", "pid=$(pidof com.android.commands.monkey); [ -n \"$pid\" ] && kill $pid; true",
+        check=False)
 
 
 def cmd_clear(args):
@@ -566,6 +574,7 @@ def main():
     check = sub.add_parser("check")
     check.add_argument("--segment", action="append")
     sub.add_parser("clear")
+    sub.add_parser("stop")
     sub.add_parser("tts")
     sub.add_parser("devices")
     shot = sub.add_parser("screenshot")
@@ -576,7 +585,7 @@ def main():
     ink.add_argument("name")
     ink.add_argument("--idle", type=float, default=3)
     args = parser.parse_args()
-    {"run": cmd_run, "check": cmd_check, "clear": cmd_clear, "tts": cmd_tts, "devices": cmd_devices,
+    {"run": cmd_run, "check": cmd_check, "clear": cmd_clear, "stop": cmd_stop, "tts": cmd_tts, "devices": cmd_devices,
      "screenshot": cmd_screenshot, "taps": cmd_taps, "record-ink": cmd_record_ink}[args.command](args)
 
 
