@@ -28,6 +28,9 @@ import kotlin.math.max
  */
 object FormulaRecognizer {
     private const val TAG = "FormulaRecognizer"
+    /** 点数超上限时每次把留点间距放宽到这个倍数，最多放宽到训练时的 [MAX_STEP_SCALE] 倍。 */
+    private const val STEP_GROWTH = 1.15f
+    private const val MAX_STEP_SCALE = 4f
     private const val DIR = "handwriting_models/formula"
     private const val BEAM = 3
 
@@ -267,6 +270,17 @@ object FormulaRecognizer {
     }
 
     internal fun featurize(strokes: List<List<Pair<Float, Float>>>, m: Meta): List<List<FloatArray>>? {
+        // 大公式按训练时的点距会超过模型的点数上限，以前直接不识别（停在上一次的结果上）：
+        // 逐步放宽点距（最多 4 倍）直到放得下。演示的 74 笔矩阵公式放宽到约 1.3 倍后能整段认出。
+        var step = m.minStep
+        while (step <= m.minStep * MAX_STEP_SCALE) {
+            featurize(strokes, m, step)?.let { return it }
+            step *= STEP_GROWTH
+        }
+        return null
+    }
+
+    private fun featurize(strokes: List<List<Pair<Float, Float>>>, m: Meta, minStep: Float): List<List<FloatArray>>? {
         val all = strokes.flatten()
         if (all.size < 2) return null
         val minX = all.minOf { it.first }
@@ -287,7 +301,7 @@ object FormulaRecognizer {
                 val k = mutableListOf<Int>()
                 for (i in st.indices) {
                     if (i > 0) cum += (abs(sx[i] - sx[i - 1]) + abs(sy[i] - sy[i - 1])).toDouble()
-                    val bucket = floor(cum / m.minStep)
+                    val bucket = floor(cum / minStep)
                     if (bucket > lastBucket) { k += i; lastBucket = bucket }
                 }
                 if (k.last() != st.size - 1) k += st.size - 1
