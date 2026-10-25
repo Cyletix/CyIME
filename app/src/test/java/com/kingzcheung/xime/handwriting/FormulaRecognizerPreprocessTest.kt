@@ -2,6 +2,7 @@ package com.kingzcheung.xime.handwriting
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.cos
 import kotlin.math.sin
@@ -72,5 +73,15 @@ class FormulaRecognizerPreprocessTest {
         // 正常书写的点本来就密（这里每 2 像素一个点）：一点不变
         val written = listOf((0..165).map { 650f to 120f + it * 2 } + (1..100).map { 650f + it * 2 to 450f })
         assertEquals(written, FormulaRecognizer.densify(written, meta))
+    }
+    @Test fun longFormulaOverThePointLimitIsSampledMoreCoarselyInsteadOfDropped() {
+        // 一行很长的公式：按训练时的点距约 1800 个点，超过 1024；放宽点距后仍能送进模型，左右顺序不变
+        val strokes = (0 until 60).map { c ->
+            (0..100).map { k -> c * 30f to k.toFloat() }
+        }
+        val rows = FormulaRecognizer.featurize(strokes, meta)
+        assertTrue(rows != null && rows.sumOf { it.size } <= meta.maxPoints)
+        assertEquals(60, rows!!.size)
+        assertTrue(rows.first().first()[0] < rows.last().first()[0])
     }
 }
