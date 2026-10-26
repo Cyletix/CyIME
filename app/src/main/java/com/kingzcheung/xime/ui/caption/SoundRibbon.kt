@@ -25,12 +25,22 @@ import kotlin.math.sin
 private const val LINES = 19
 private const val POINTS = 96
 private const val CYCLES = 1.65f
-private const val AMPLITUDE = 76f / 280f
+private const val AMPLITUDE = .36f
 private const val ATTACK = 32f
-private const val RELEASE = 22f
+// Falls back over about half a second, so a word stays visible instead of flicking once and vanishing.
+private const val RELEASE = 7f
 private const val QUIET = .001f
 /** Room hum below this stays flat, so a quiet room costs no redraws. */
 private const val FLOOR = .06f
+/**
+ * Loudness stays absolute (the spectrum's fixed dB window), so quiet, normal and loud speech look
+ * different; a curve lifts the middle so normal speech uses most of the height. A linear scale on a
+ * 24 dp strip left normal speech a sliver that flicked once and vanished (user 2026-10-27).
+ */
+private const val LOUD = .75f
+private const val CURVE = .6f
+internal fun ribbonLevel(band: Float): Float =
+    if (band < FLOOR) 0f else ((band - FLOOR) / (LOUD - FLOOR)).coerceIn(0f, 1f).let { Math.pow(it.toDouble(), CURVE.toDouble()).toFloat() }
 
 /**
  * Sound made visible for a reader who cannot hear it: a ribbon of fine lines that opens where
@@ -55,7 +65,7 @@ internal fun SoundRibbon(bands: FloatArray, active: Boolean, color: Color, modif
                 last = now
                 val goal = target
                 for (i in shown.indices) {
-                    val want = (goal?.getOrNull(i) ?: 0f).let { if (it < FLOOR) 0f else it }
+                    val want = ribbonLevel(goal?.getOrNull(i) ?: 0f)
                     val speed = if (want > shown[i]) ATTACK else RELEASE
                     shown[i] += (want - shown[i]) * (1f - exp(-dt * speed))
                     if (want == 0f && shown[i] < QUIET) shown[i] = 0f
