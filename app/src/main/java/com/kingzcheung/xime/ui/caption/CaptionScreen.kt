@@ -168,7 +168,10 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
             controller.downloadState) { controller.downloadSpeakerModel() }
     }
     val transcript: @Composable (Modifier) -> Unit = { modifier ->
-        Box(modifier.fadeTopEdge()) {
+        NewSegmentPull(modifier.fadeTopEdge(), onNewSegment = {
+            controller.newSegment()
+            android.widget.Toast.makeText(context, "已开始新的一段，刚才的字幕已保存", android.widget.Toast.LENGTH_SHORT).show()
+        }) {
             // Landscape: one track per speaker on a time axis. Portrait: a chat log of messages.
             RevealTicker(controller)
             if (portrait) CaptionChat(controller, fontSp, onSpeakerTap = { menuSpeaker = it }, onMessageLongPress = { reassignTurn = it })
@@ -258,6 +261,7 @@ private fun SaveDialog(controller: CaptionController, onDismiss: () -> Unit) {
         }
     }
 }
+
 
 @Composable
 internal fun BigButton(text: String, modifier: Modifier = Modifier, outlined: Boolean = false,

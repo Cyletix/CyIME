@@ -416,7 +416,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     // ---- this session's transcript file ----
     // One file per session (opening the page until 退出), rewritten in place as lines arrive, so
     // tapping 保存 again never adds another file (user 2026-10-27: every tap made a new one).
-    private val sessionName = "字幕_" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date()) + ".txt"
+    private fun newSessionName() = "字幕_" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date()) + ".txt"
+    private var sessionName = newSessionName()
     /** Lines that scrolled out of [segments] (kept to [MAX_LINES]), already written out. */
     private val archived = StringBuilder()
     private var savedUri: android.net.Uri? = null
@@ -469,6 +470,19 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
             .recoverCatching { savedUri = null; write() }
             .onFailure { FileLogger.e(TAG, "save transcript failed", it) }.getOrNull()
             ?.also { savedWhere = it }
+    }
+
+    /**
+     * 「开始新一段」 (a long pull on the captions): what was said so far is saved and cleared, and a new
+     * file starts; listening goes on and the people stay known. The sentence still being spoken stays.
+     */
+    fun newSegment() {
+        if (CaptionAutoSave.isOn(app)) saveTranscript()
+        for (line in segments.filter { it.confirmed }) { segments.remove(line); transcript.remove(line.id) }
+        archived.setLength(0)
+        savedUri = null
+        savedWhere = null
+        sessionName = newSessionName()
     }
 
     /** Puts the whole session on the clipboard; false when there is nothing yet. */
