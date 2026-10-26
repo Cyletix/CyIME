@@ -392,10 +392,11 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
     const double len = double(a.size());
     const double margin = scores[0] - scores[rime_rank];
     const double gap12 = scores.size() > 1 ? scores[0] - scores[1] : 0.0;
-    const double z = 0.73 * margin - 0.497 * std::min(rime_rank, 8) / 8.0 + 1.224 * std::min(gap12, 10.0) / 10.0 -
-                     0.313 * len / 10.0 + 0.339 * diff / std::max(1.0, len) + 0.501 * (same_len ? 1 : 0) -
-                     0.137 * (diff == 1 ? 1 : 0) - 0.305 * margin / std::max(1.0, diff) - 1.098;
-    if (z <= 3.1) return Stats().Add(false, false, ready, wait_ms, ms);
+    // Coefficients refit for the 500k lexicon (CyIME-Windows 1b141e6).
+    const double z = 0.725 * margin - 0.654 * std::min(rime_rank, 8) / 8.0 + 0.866 * std::min(gap12, 10.0) / 10.0 +
+                     0.067 * len / 10.0 + 0.475 * diff / std::max(1.0, len) + 0.52 * (same_len ? 1 : 0) -
+                     0.086 * (diff == 1 ? 1 : 0) - 0.377 * margin / std::max(1.0, diff) - 1.309;
+    if (z <= 3.2) return Stats().Add(false, false, ready, wait_ms, ms);
   }
   // CyLM knows nothing of what the user picked before: a Rime sentence built from a learned word (这篇 picked once,
   // then zhepianbiji) stays, or CyLM's 这片笔记 replaced it and learning never reached whole sentences.
