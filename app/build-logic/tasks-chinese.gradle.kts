@@ -276,9 +276,12 @@ val prepareChineseDictionaries by tasks.registering {
             // Phone-fast tier "D" (cy1-p1e-7, no reranker, beam 8) with the trimmed 45 MB lexicon. On the tablet the
             // light tier with its reranker missed the 12 ms budget on 97% of keys, the half-size full model on all
             // of them, and D/E with the 114 MB lexicon added ~5 ms per key and ~280 MB over CyLM off (2026-10-26).
-            "\ncylm:\n  lexicon: cylm_lexicon.cylx\n  model: cylm_model.lm\n" +
+            // cylm_adapt.tsv is the user's own trigram layer (only in 装到我的设备 packages); nbest 16 and the typo
+            // readings let the replacement rule in t9_cylm_sentence.cc compare Rime's sentence with CyLM's.
+            "\ncylm:\n  lexicon: cylm_lexicon.cylx\n  model: cylm_model.lm\n  adapt: cylm_adapt.tsv\n" +
             "  params: \"mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=8;per_span=8;per_span_abbrev=16;per_span1=24;" +
-            "nbest=4;t9_beam=6;t9_per_span=6;skip_inner=1;hit_cap=5000;word_cap=50000;id_cap=50000;dec_cap=25000\"\n" +
+            "nbest=4;t9_beam=6;t9_per_span=6;skip_inner=1;hit_cap=5000;word_cap=50000;id_cap=50000;dec_cap=25000;" +
+            "nbest=16;typo=-3;typo_first=8.4;adapt_add=1.0\"\n" +
             // With CyLM started while Rime builds its sentence most keys find it done; a key waits at most 6 ms.
             "  budget_ms: 6\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))

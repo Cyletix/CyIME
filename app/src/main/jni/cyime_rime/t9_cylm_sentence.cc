@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -129,7 +130,10 @@ class CylmWorker {
       lock.lock();
       running_ = nullptr;
       done_session_ = session; done_in_ = in; done_context_ = context; done_ms_ = ms;
-      done_record_ = n > 0 && out[0] ? string(out.data()) : string();
+      // All n-best records ("text\x1f pinyin\x1f spans\x1f score", each ended by '\0'), best first.
+      size_t used = 0;
+      for (int i = 0; i < n; ++i) used += std::char_traits<char>::length(out.data() + used) + 1;
+      done_record_ = n > 0 && out[0] ? string(out.data(), used) : string();
       finished_ = id;
       done_.notify_all();
     }
@@ -203,11 +207,27 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
                                                       std::chrono::milliseconds(budget_ms.load()), &wait_ms, &ms,
                                                       &late, &ready);
   if (record.empty()) return Stats().Add(false, late, ready, wait_ms, ms);
-  // record: text \x1f pinyin \x1f spans
-  const auto unit = record.find('\x1f');
-  const string text = record.substr(0, unit);
+  // records: text \x1f pinyin \x1f spans \x1f score, '\0' after each, best first.
+  const string best_record(record.c_str());
+  const auto unit = best_record.find('\x1f');
+  const string text = best_record.substr(0, unit);
   const auto& rime = sentences->front();
   if (text.empty() || text == rime->text()) return Stats().Add(false, false, ready, wait_ms, ms);
+  // CyLM replaces Rime's sentence only when it is clearly surer: Rime's text is among its n-best and the best
+  // scores more than 1.0 above it. A sentence CyLM cannot read (a typo correction, a word only the user has)
+  // stays (自训模型攻坚 f259d30, 2026-10-27).
+  auto score_of = [](const string& one) {
+    const auto at = one.rfind('\x1f');
+    return at == string::npos ? 0.0 : std::atof(one.c_str() + at + 1);
+  };
+  bool rime_known = false;
+  double rime_score = 0;
+  for (size_t at = 0; at < record.size();) {
+    const string one(record.c_str() + at);
+    at += one.size() + 1;
+    if (one.compare(0, one.find('\x1f'), rime->text()) == 0) { rime_known = true; rime_score = score_of(one); break; }
+  }
+  if (!rime_known || score_of(best_record) - rime_score <= 1.0) return Stats().Add(false, false, ready, wait_ms, ms);
   // CyLM knows nothing of what the user picked before: a Rime sentence built from a learned word (这篇 picked once,
   // then zhepianbiji) stays, or CyLM's 这片笔记 replaced it and learning never reached whole sentences.
   for (const auto& part : rime->components())
@@ -217,8 +237,8 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
   entry.weight = rime->weight();
   const Language* language = nullptr;
   if (unit != string::npos && dict) {
-    const auto end = record.find('\x1f', unit + 1);
-    std::istringstream pinyin(record.substr(unit + 1, end == string::npos ? string::npos : end - unit - 1));
+    const auto end = best_record.find('\x1f', unit + 1);
+    std::istringstream pinyin(best_record.substr(unit + 1, end == string::npos ? string::npos : end - unit - 1));
     const auto& ids = T9ScriptOptions::T9SyllableIds(dict);
     string syllable;
     Code code;

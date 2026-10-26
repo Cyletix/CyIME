@@ -9,7 +9,8 @@
 cylm:
   lexicon: cylm_lexicon.cylx
   model: cylm_model.lm
-  params: "mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=8;per_span=8;per_span_abbrev=16;per_span1=24;nbest=4;t9_beam=6;t9_per_span=6;skip_inner=1;hit_cap=5000;word_cap=50000;id_cap=50000;dec_cap=25000"
+  adapt: cylm_adapt.tsv
+  params: "mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=8;per_span=8;per_span_abbrev=16;per_span1=24;nbest=4;t9_beam=6;t9_per_span=6;skip_inner=1;hit_cap=5000;word_cap=50000;id_cap=50000;dec_cap=25000;nbest=16;typo=-3;typo_first=8.4;adapt_add=1.0"
   budget_ms: 6
 t9:
   joint_decoder: true

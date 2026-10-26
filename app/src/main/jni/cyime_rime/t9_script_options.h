@@ -73,7 +73,7 @@ struct T9ScriptOptions {
   // One CyLM model per set of files for the process (memory-mapped); a failed open is remembered too.
   static std::shared_ptr<CylmModel> T9CylmOpen(const string& lexicon, const string& model, const string& model2,
                                                const string& reranker, const string& vocab, const string& params,
-                                               const string& prefer);
+                                               const string& prefer, const string& adapt);
 };
 
 }  // namespace rime
