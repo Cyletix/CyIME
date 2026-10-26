@@ -81,6 +81,7 @@ import com.kingzcheung.xime.R
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
 import com.kingzcheung.xime.service.usesT9CandidateNavigation
+import com.kingzcheung.xime.service.highlightedT9Syllable
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.util.PermissionHelper
 import com.kingzcheung.xime.util.SubcharHelper
@@ -434,6 +435,7 @@ private fun T9KeyboardContent(
                     .background(frostedKeyColor(keyBackgroundColor, keyTextColor, frostedGlass))
             ) {
                 val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
+                val highlightedSyllable = candidateState.value.highlightedT9Syllable(uiState.inputProfile)
                 val currentFirstOptions = controller.firstOptions
                 // 空闲态符号列表来自 xime.yaml keyboard.t9.side_symbols（可自定义，>4 滚动）
                 val configVersion by KeysConfigHelper.configVersion.collectAsState()
@@ -460,9 +462,11 @@ private fun T9KeyboardContent(
                 ) {
                     itemsIndexed(displayItems) { index, item ->
                         val option = currentFirstOptions.getOrNull(index).takeIf { showCandidates }
-                        val isSelected = option != null &&
-                            controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
-                            controller.selectedOption == option && controller.isSelectedOptionInCurrentCandidates()
+                        // 「下一项」换了高亮时，左栏标出高亮候选的第一个音节（用户 10-27：和候选栏、编码一致）。
+                        val explicitSelection = controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
+                            controller.isSelectedOptionInCurrentCandidates()
+                        val isSelected = option != null && if (explicitSelection) controller.selectedOption == option
+                            else option.pinyin == highlightedSyllable
                         T9CandidateItem(
                             text = item,
                             preserveWidth = !showCandidates && customSymbols != null,

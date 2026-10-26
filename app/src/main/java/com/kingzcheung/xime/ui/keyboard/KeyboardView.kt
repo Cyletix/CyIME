@@ -90,6 +90,7 @@ import com.kingzcheung.xime.keyboard.resolveToolbarButtonItem
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
 import com.kingzcheung.xime.service.highlightedCandidateIndex
+import com.kingzcheung.xime.service.shownPreedit
 import com.kingzcheung.xime.service.focusedT9AssociationIndex
 import com.kingzcheung.xime.service.usesT9CandidateNavigation
 import com.kingzcheung.xime.service.ExpandedCandidatePager
@@ -856,7 +857,7 @@ fun KeyboardView(
                         candidates = shownTexts,
                         candidateComments = shownComments,
                         inputText = cs.inputText,
-                        preeditText = cs.preeditText,
+                        preeditText = cs.shownPreedit(state.inputProfile),
                         isComposing = cs.isComposing,
                         associationCandidates = if (cs.pendingEnglishText.isNotEmpty() && cs.englishReplaceSupported) {
                             listOf(cs.pendingEnglishText) + cs.associationCandidates

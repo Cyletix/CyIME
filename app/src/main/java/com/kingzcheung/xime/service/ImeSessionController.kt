@@ -173,6 +173,15 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         }
     }
 
+    /** 九键「下一项」换了高亮：输入框模式里的编码跟着换成高亮候选的拼音。 */
+    internal fun refreshInputBoxComposition() {
+        if (SettingsPreferences.getInputTextLocation(service) != SettingsPreferences.INPUT_TEXT_INPUT_BOX ||
+            service.uiState.value.toolPanelInputFocused) return
+        val state = service.candidateState.value
+        val text = state.shownPreedit(service.uiState.value.inputProfile)
+        if (state.isComposing && text.isNotEmpty()) showInputBoxComposition(service.currentInputConnection, text)
+    }
+
     /** 在输入框模式向编辑器写入编码文本。 */
     private fun showInputBoxComposition(ic: android.view.inputmethod.InputConnection?, displayText: String) {
         // Android may detach the editor while a queued candidate snapshot is being delivered.
