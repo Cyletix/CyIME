@@ -262,6 +262,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     fun resume() = start()
 
     fun exit() {
+        if (CaptionAutoSave.isOn(app)) saveTranscript()
         ++sessionEpoch
         recorder.stop()
         stopDiagnostics()
@@ -307,7 +308,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
             if (confirmed) {
                 FileLogger.i(TAG, "seg=$id final len=${text.length} event=$event durMs=${endMs - startMs}")
                 // Nothing to read: a short empty segment disappears, a long one shows the marker.
-                if (ui.text.isEmpty()) { segments.remove(ui); transcript.remove(id) }
+                if (ui.text.isEmpty()) { segments.remove(ui); transcript.remove(id) } else scheduleSave()
             }
             trimHistory()
         }
@@ -372,7 +373,10 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     fun isRemembered(speakerId: Int) = KnownVoices.isKnown(speakerId)
 
     private fun trimHistory() {
-        while (segments.size > MAX_LINES) { val old = segments.removeAt(0); transcript.remove(old.id) }
+        while (segments.size > MAX_LINES) {
+            val old = segments.removeAt(0); transcript.remove(old.id)
+            lineOf(old)?.let { archived.append(it).append('\n') }
+        }
     }
 
     // ---- user actions ----
@@ -409,36 +413,71 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         io.execute { client.forgetSpeaker(speakerId) }
     }
 
-    /**
-     * Saves this session's captions as text in Downloads: one line per sentence, "说话人  时间  内容".
-     * Returns where it went, or null when there is nothing to save or the write failed.
-     */
+    // ---- this session's transcript file ----
+    // One file per session (opening the page until 退出), rewritten in place as lines arrive, so
+    // tapping 保存 again never adds another file (user 2026-10-27: every tap made a new one).
+    private val sessionName = "字幕_" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date()) + ".txt"
+    /** Lines that scrolled out of [segments] (kept to [MAX_LINES]), already written out. */
+    private val archived = StringBuilder()
+    private var savedUri: android.net.Uri? = null
+    /** Where the file is, once written ("下载/CyIME字幕/…"). */
+    var savedWhere by mutableStateOf<String?>(null); private set
+    private val autoSave = Runnable { writeTranscript() }
+
+    private fun lineOf(line: SegmentUi): String? {
+        if (line.text.isEmpty() || speakers.any { it.id == line.speakerId && it.ignored }) return null
+        return transcriptLine(speakers.firstOrNull { it.id == line.speakerId }?.name, line.wallMs, line.text)
+    }
+
+    /** The whole session as text: speaker, time and words per line, oldest first. */
+    fun transcriptText(): String = archived.toString() + segments.mapNotNull { lineOf(it)?.plus("\n") }.joinToString("")
+
+    private fun scheduleSave() {
+        if (!CaptionAutoSave.isOn(app)) return
+        main.removeCallbacks(autoSave)
+        main.postDelayed(autoSave, AUTO_SAVE_DELAY_MS)
+    }
+
+    /** Writes the file now (creating it the first time); returns where it is, or null when there is nothing yet. */
     fun saveTranscript(): String? {
-        val clock = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-        val lines = segments.filter { line -> line.text.isNotEmpty() && speakers.none { it.id == line.speakerId && it.ignored } }
-            .map { line ->
-                val who = speakers.firstOrNull { it.id == line.speakerId }?.name ?: "说话的人"
-                "$who  ${clock.format(java.util.Date(line.wallMs))}  ${line.text}"
-            }
-        if (lines.isEmpty()) return null
-        val name = "字幕_" + java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.getDefault()).format(java.util.Date()) + ".txt"
-        val bytes = lines.joinToString("\n", postfix = "\n").toByteArray()
-        return runCatching {
-            if (android.os.Build.VERSION.SDK_INT >= 29) {
-                val values = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+        main.removeCallbacks(autoSave)
+        return writeTranscript()
+    }
+
+    private fun writeTranscript(): String? {
+        val text = transcriptText()
+        if (text.isEmpty()) return null
+        val bytes = text.toByteArray()
+        fun write(): String = if (android.os.Build.VERSION.SDK_INT >= 29) {
+            val uri = savedUri ?: checkNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, sessionName)
                     put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
-                }
-                val uri = checkNotNull(app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values))
-                checkNotNull(app.contentResolver.openOutputStream(uri)).use { it.write(bytes) }
-                "下载/$name"
-            } else {
-                // Android 9 has no Downloads collection without storage permission: keep it in the app's own folder.
-                val dir = checkNotNull(app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS))
-                java.io.File(dir, name).writeBytes(bytes)
-                java.io.File(dir, name).absolutePath
-            }
-        }.onFailure { FileLogger.e(TAG, "save transcript failed", it) }.getOrNull()
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/" + SAVE_FOLDER)
+                })).also { savedUri = it }
+            // "wt": replace the contents, the same file every time.
+            checkNotNull(app.contentResolver.openOutputStream(uri, "wt")).use { it.write(bytes) }
+            "下载/$SAVE_FOLDER/$sessionName"
+        } else {
+            // Android 9 has no Downloads collection without storage permission: keep it in the app's own folder.
+            val dir = java.io.File(checkNotNull(app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)), SAVE_FOLDER).apply { mkdirs() }
+            java.io.File(dir, sessionName).writeBytes(bytes)
+            java.io.File(dir, sessionName).absolutePath
+        }
+        return runCatching { write() }
+            // Deleted by the user meanwhile: start the file again under the same name.
+            .recoverCatching { savedUri = null; write() }
+            .onFailure { FileLogger.e(TAG, "save transcript failed", it) }.getOrNull()
+            ?.also { savedWhere = it }
+    }
+
+    /** Puts the whole session on the clipboard; false when there is nothing yet. */
+    fun copyAll(): Boolean {
+        val text = transcriptText()
+        if (text.isEmpty()) return false
+        val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("字幕", text))
+        return true
     }
 
     /** "That voice is this person": the picked speaker keeps its name, the other row disappears. */
@@ -633,6 +672,8 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         /** Above every id a session uses, including pieces split at a change of voice (SPLIT_BASE = 2^40). */
         const val SESSION_STRIDE = 1_000_000_000_000_000L
         const val MAX_LINES = 400
+        private const val AUTO_SAVE_DELAY_MS = 3_000L
+        const val SAVE_FOLDER = "CyIME字幕"
         val FONT_SP = intArrayOf(24, 32, 44)
         val FONT_LABEL = arrayOf("大", "特大", "巨大")
         /** Okabe-Ito colour-blind safe palette: orange, sky blue, bluish green, blue, vermillion, reddish purple, yellow, grey. */

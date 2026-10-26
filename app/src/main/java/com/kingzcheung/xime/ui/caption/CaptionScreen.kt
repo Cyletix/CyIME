@@ -145,12 +145,9 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
             androidx.compose.foundation.layout.WindowInsetsSides.Bottom))
         .padding(horizontal = CaptionStyle.Edge, vertical = 8.dp)
     val context = androidx.compose.ui.platform.LocalContext.current
-    // 保存本次字幕：说话人、时间、内容，存到手机的“下载”里。
-    val save: () -> Unit = {
-        val where = controller.saveTranscript()
-        android.widget.Toast.makeText(context, if (where != null) "字幕已保存到 $where" else "还没有字幕可以保存",
-            android.widget.Toast.LENGTH_LONG).show()
-    }
+    // 保存本次字幕：同一次字幕始终是同一个文件（再点只是更新它），另可复制全部或分享。
+    var saving by remember { mutableStateOf(false) }
+    val save: () -> Unit = { saving = true }
     val banners: @Composable () -> Unit = {
         // 换成没下载过的语言时：在这里看下载进度，下完自动开始听。
         val languageDownload = controller.languageDownload(controller.language)
@@ -229,6 +226,37 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
     // 横屏要自己写字：要弹出键盘，才打开整页回话。
     if (writing) ReplyDialog(controller, fontSp, onDismiss = { writing = false })
     flipped?.let { text -> FlippedCard(text) { flipped = null } }
+    if (saving) SaveDialog(controller, onDismiss = { saving = false })
+}
+
+/** 保存：写好这次的文件并告诉在哪；复制全部、分享给别的应用。 */
+@Composable
+private fun SaveDialog(controller: CaptionController, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val where = remember { controller.saveTranscript() }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("这次的字幕", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(if (where == null) "还没有字幕。" else "已保存在“$where”。这次字幕一直写在这一个文件里，边听边更新，再点保存不会多出文件。",
+                    fontSize = 18.sp, lineHeight = 26.sp)
+                if (where != null) {
+                    CaptionButton("复制全部", Modifier.fillMaxWidth()) {
+                        if (controller.copyAll()) android.widget.Toast.makeText(context, "已复制全部字幕", android.widget.Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    }
+                    CaptionButton("分享", Modifier.fillMaxWidth()) {
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                            .putExtra(android.content.Intent.EXTRA_TEXT, controller.transcriptText())
+                        runCatching { context.startActivity(android.content.Intent.createChooser(send, "分享字幕")
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        onDismiss()
+                    }
+                }
+                BigButton("好", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
+            }
+        }
+    }
 }
 
 @Composable

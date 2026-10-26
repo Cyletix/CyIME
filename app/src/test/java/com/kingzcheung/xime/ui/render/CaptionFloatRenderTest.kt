@@ -63,6 +63,6 @@ class CaptionFloatRenderTest {
         rule.runOnUiThread { root.draw(android.graphics.Canvas(bitmap)) }
         File(out!!).mkdirs()
         File(out, "caption-float.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        controller.release()
+
     }
 }
