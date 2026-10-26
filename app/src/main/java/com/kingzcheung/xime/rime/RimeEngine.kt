@@ -1064,6 +1064,7 @@ class RimeEngine {
     private external fun nativeT9Memorize(text: String, pinyin: String): Boolean
     private external fun nativeSetIncognito(on: Boolean)
     private external fun nativeT9Forget(text: String, pinyin: String): Boolean
+    private external fun nativeUnlearn(rows: String): Int
     private external fun nativeT9SelectPinyinDirect(pinyin: String, digitLength: Int): Boolean
     private external fun nativeT9FixLetter(letter: String): Boolean
     private external fun nativeT9GetLeftPanelState(): String?
@@ -1238,6 +1239,14 @@ class RimeEngine {
      * 返回 0 失败（含候选已过期）、1 已忘掉、2 没有学习记录（排序不变）。
      */
     @androidx.annotation.WorkerThread
+    /** Developer tool: takes back learned commits (rows "text<TAB>commits") from the current schema's user dictionary. */
+    @androidx.annotation.WorkerThread
+    fun unlearn(rows: String): Int = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked -1
+        candidateRevision.incrementAndGet()
+        nativeUnlearn(rows)
+    }
+
     internal fun forgetCandidateAtRevision(index: Int, revision: Long, global: Boolean = false): Int = locked {
         if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked 0
         candidateRevision.incrementAndGet()
