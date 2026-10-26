@@ -9,10 +9,9 @@
 cylm:
   lexicon: cylm_lexicon.cylx
   model: cylm_model.lm
-  model2: cylm_model2.lm
   reranker: cylm_rerank.onnx
   vocab: cylm_vocab.txt
-  params: "mix=0.8;mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;nbest=32;per_span_abbrev=96;per_span1=160;beam=48;t9_beam=32;rr_gamma=0.8;rr_short=0.2;typo=-3;neighbor=1;typo_first=8.4"
+  params: "mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=16;per_span=12;per_span_abbrev=24;per_span1=40;nbest=8;t9_beam=10;t9_per_span=8;rr_gamma=0.6;rr_short=0.4;rr_threads=2"
 t9:
   joint_decoder: true
   source_budget: 128
