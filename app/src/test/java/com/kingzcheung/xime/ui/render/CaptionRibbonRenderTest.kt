@@ -36,7 +36,7 @@ class CaptionRibbonRenderTest {
         assumeTrue(!out.isNullOrEmpty())
         // Spectrum band values (0..1 over the -66..-30 dB window) for three voices.
         val shape = floatArrayOf(.55f, .9f, 1f, .8f, .6f, .45f, .3f, .2f)
-        val levels = listOf("轻声" to .28f, "正常说话" to .5f, "大声" to .78f)
+        val levels = listOf("轻声" to .25f, "正常说话" to .46f, "大声" to .72f)
         rule.mainClock.autoAdvance = false
         rule.setContent {
             Column(Modifier.background(Color(0xFF1B1D22)).padding(8.dp)) {

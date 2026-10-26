@@ -37,8 +37,11 @@ private const val FLOOR = .06f
  * different; a curve lifts the middle so normal speech uses most of the height. A linear scale on a
  * 24 dp strip left normal speech a sliver that flicked once and vanished (user 2026-10-27).
  */
-private const val LOUD = .75f
-private const val CURVE = .6f
+// Tablet recordings (2026-10-18): speech frames' loudest band sits at .46-.72 of the window, so .55 is loud.
+private const val LOUD = .55f
+private const val CURVE = .5f
+/** Every band rises with the loudest one, so the whole ribbon swells with the voice, not one bump. */
+private const val CARRY = .7f
 internal fun ribbonLevel(band: Float): Float =
     if (band < FLOOR) 0f else ((band - FLOOR) / (LOUD - FLOOR)).coerceIn(0f, 1f).let { Math.pow(it.toDouble(), CURVE.toDouble()).toFloat() }
 
@@ -64,8 +67,9 @@ internal fun SoundRibbon(bands: FloatArray, active: Boolean, color: Color, modif
                 val dt = if (last == 0L) 1f / 60 else ((now - last) / 1e9f).coerceIn(0f, .1f)
                 last = now
                 val goal = target
+                val loudest = goal?.maxOrNull() ?: 0f
                 for (i in shown.indices) {
-                    val want = ribbonLevel(goal?.getOrNull(i) ?: 0f)
+                    val want = ribbonLevel(maxOf(goal?.getOrNull(i) ?: 0f, loudest * CARRY))
                     val speed = if (want > shown[i]) ATTACK else RELEASE
                     shown[i] += (want - shown[i]) * (1f - exp(-dt * speed))
                     if (want == 0f && shown[i] < QUIET) shown[i] = 0f
