@@ -323,7 +323,7 @@ internal fun StatusRow(language: String?, dotColor: Color, text: String, onPickL
         Spacer(Modifier.width(8.dp))
         Text(text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 280.dp))
         Spacer(Modifier.width(12.dp))
-        Box(Modifier.weight(1f)) { ribbon(24.dp) }
+        Box(Modifier.weight(1f)) { ribbon(40.dp) }
     }
 }
 
