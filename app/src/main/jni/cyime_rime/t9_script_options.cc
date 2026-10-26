@@ -60,6 +60,15 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       // A translation is created for every key: start CyLM on it now, so it decodes while Rime makes its own
       // sentence instead of after it.
       if (t9_cylm_ && context) T9CylmPrefetch(t9_cylm_.get(), context->input(), t9_left_context_);
+      // Every commit of this input context teaches CyLM; connected once per context (marked by a property).
+      if (t9_cylm_ && context && context->get_property("cyime_cylm_learn").empty()) {
+        context->set_property("cyime_cylm_learn", "1");
+        auto learner = t9_cylm_;
+        // Incognito (the _cyime_incognito option, as Memory::OnCommit) teaches it nothing.
+        context->commit_notifier().connect([learner](Context* ctx) {
+          if (!ctx->get_option("_cyime_incognito")) T9CylmLearn(learner.get(), ctx->GetCommitText());
+        });
+      }
     }
   }
   if (t9_sentence_rescore_ && !t9_joint_) {
@@ -203,8 +212,13 @@ std::shared_ptr<CylmModel> T9ScriptOptions::T9CylmOpen(const string& lexicon, co
   else {
     if (!prefer.empty()) cylm_prefer(handle.get(), prefer.c_str());
     // Before any session: sessions read the layer when they are created. A missing file (public packages) is
-    // simply no layer.
-    if (!adapt.empty()) cylm_adapt(handle.get(), adapt.c_str());
+    // simply no layer. What the user taught it on this device is saved beside it (cylm_learned.tsv, the same
+    // layer plus the learned counts) and read instead when present.
+    if (!adapt.empty()) {
+      const string learned = adapt.substr(0, adapt.find_last_of('/') + 1) + "cylm_learned.tsv";
+      if (cylm_adapt(handle.get(), learned.c_str()) < 0) cylm_adapt(handle.get(), adapt.c_str());
+      T9CylmLearnInto(handle.get(), learned);
+    }
     T9CylmWarm(handle.get());
   }
 #ifdef __ANDROID__

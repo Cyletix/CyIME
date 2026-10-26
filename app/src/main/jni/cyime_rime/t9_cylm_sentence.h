@@ -27,6 +27,10 @@ void T9CylmSetBudget(int ms);
 bool T9CylmEnabled();
 // Loads a newly opened model's pages on the CyLM thread, off the key path.
 void T9CylmWarm(CylmModel* model);
+// What the user commits teaches CyLM (cylm_learn on the CyLM thread); the layer is saved to the LearnInto file
+// every 20 texts and read back from it when the model opens.
+void T9CylmLearn(CylmModel* model, const string& text);
+void T9CylmLearnInto(CylmModel* model, const string& file);
 // Starts CyLM on this key's input while Rime builds its own sentence (called when the translation is created).
 void T9CylmPrefetch(CylmModel* model, const string& input, const string& left_context);
 
