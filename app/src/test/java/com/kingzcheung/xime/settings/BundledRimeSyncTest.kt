@@ -67,6 +67,27 @@ class BundledRimeSyncTest {
         assertEquals("updated schema", File(target, "core.dict.yaml").readText())
     }
 
+    @Test fun cylmFileDroppedByNewPackageIsRemovedButOtherDroppedFilesStay() {
+        val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
+        val previous = manifest("schema") + manifest("big", "cylm_model2.lm") + manifest("grammar", "a.gram")
+        BundledRimeSync.install(target, backups, previous) {
+            when (it.substringAfterLast('/')) { "cylm_model2.lm" -> "big"; "a.gram" -> "grammar"; else -> "schema" }.byteInputStream()
+        }
+        assertTrue(BundledRimeSync.install(target, backups, manifest("new schema")) { "new schema".byteInputStream() })
+        assertFalse(File(target, "cylm_model2.lm").exists())
+        assertEquals("grammar", File(target, "a.gram").readText())
+    }
+
+    @Test fun userReplacedCylmFileIsKept() {
+        val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
+        BundledRimeSync.install(target, backups, manifest("schema") + manifest("big", "cylm_model2.lm")) {
+            (if (it.endsWith("cylm_model2.lm")) "big" else "schema").byteInputStream()
+        }
+        File(target, "cylm_model2.lm").writeText("mine")
+        BundledRimeSync.install(target, backups, manifest("new schema")) { "new schema".byteInputStream() }
+        assertEquals("mine", File(target, "cylm_model2.lm").readText())
+    }
+
     @Test fun unmodifiedPreviousBundleIsReplacedWithoutBackup() {
         val target = folder.newFolder("rime"); val backups = folder.newFolder("backup")
         BundledRimeSync.install(target, backups, manifest("one")) { "one".byteInputStream() }
