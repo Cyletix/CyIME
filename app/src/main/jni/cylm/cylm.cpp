@@ -8,6 +8,7 @@
 // items.tsv  : id \t mode (pinyin|t9|choice) \t keys \t context [\t candidate|candidate... for choice]
 // out.tsv    : id \t ms \t cand1|cand2|...
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -90,10 +91,11 @@ static const uint8_t* MapFile(const char* path) {
 // Cache caps. Inside an input method the caches live as long as the keyboard process, so the library keeps them to
 // a few tens of MB (CyIME Android 2026-10-26: uncapped, the session hit cache grew to ~900 MB of native heap after
 // a day of typing and the device swapped on every key).
+// kWordCacheMax: the per-word prior and weight caches (Decoder::prior_cache, lnw_cache), which had no cap at all.
 #ifdef CYLM_LIBRARY
-constexpr size_t kIdCacheMax = 200000, kDecCacheMax = 100000, kHitCacheMax = 20000;
+constexpr size_t kIdCacheMax = 200000, kDecCacheMax = 100000, kHitCacheMax = 20000, kWordCacheMax = 200000;
 #else
-constexpr size_t kIdCacheMax = 4000000, kDecCacheMax = 2000000, kHitCacheMax = 3000000;
+constexpr size_t kIdCacheMax = 4000000, kDecCacheMax = 2000000, kHitCacheMax = 3000000, kWordCacheMax = 4000000;
 #endif
 
 // ------------------------------------------------------------------ c3 model
@@ -110,6 +112,7 @@ struct C3 {
   const uint8_t* m = nullptr; Header3 h{};
   static constexpr double kScale = 1024.0;
   int32_t none = -1;
+  size_t id_cap = kIdCacheMax, dec_cap = kDecCacheMax;  // cache caps (params id_cap, dec_cap in the library)
   std::unordered_map<std::string, int32_t> id_cache;
   std::unordered_map<std::string, std::vector<int32_t>> dec_cache;
   bool Open(const char* path) {
@@ -145,7 +148,7 @@ struct C3 {
       if ((slot >> 24) == (hh >> 24)) { r = int32_t(slot & 0xFFFFFF) - 1; break; }
       i = (i + 1) & mask;
     }
-    if (id_cache.size() > kIdCacheMax) id_cache.clear();
+    if (id_cache.size() > id_cap) id_cache.clear();
     id_cache[text] = r;
     return r;
   }
@@ -202,7 +205,7 @@ struct C3 {
       for (size_t j = n; j > 0; j = from[j]) parts.push_back(wid[j]);
       std::reverse(parts.begin(), parts.end());
     }
-    if (dec_cache.size() > kDecCacheMax) dec_cache.clear();
+    if (dec_cache.size() > dec_cap) dec_cache.clear();
     return dec_cache[text] = parts;
   }
 };
@@ -393,8 +396,15 @@ struct Token { char kind; char16_t full; char letter; std::string prefix; int ty
 
 struct Params {
   double vowel_pen = -1.0, typo_first = 0.0, neighbor_pen = -2.0, adapt_add = 0.0, typo = 0.0, mu_word = 0.0, eos_word = -1.0, adapt_word = -1.0, rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
-  int abbrev_keys = 0, vowel = 0, neighbor = 0, prune = 1, rr_cache = 2048, t9_beam = 0, t9_per_span = 0, rr_threads = 4, incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
+  int skip_inner = 0, abbrev_keys = 0, vowel = 0, neighbor = 0, prune = 1, rr_cache = 2048, t9_beam = 0, t9_per_span = 0, rr_threads = 4, incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
+  // cache caps: hit_cap (span word lists), word_cap (word priors and weights), id_cap / dec_cap (model word ids and
+  // splits, per model); the library defaults keep a session to a few tens of MB
+  size_t hit_cap = kHitCacheMax, word_cap = kWordCacheMax, id_cap = kIdCacheMax, dec_cap = kDecCacheMax;
   bool Set(const std::string& k, const std::string& v) {
+    if (k == "hit_cap") { hit_cap = std::stoull(v); return true; }
+    if (k == "word_cap") { word_cap = std::stoull(v); return true; }
+    if (k == "id_cap") { id_cap = std::stoull(v); return true; }
+    if (k == "dec_cap") { dec_cap = std::stoull(v); return true; }
     if (k == "mu_word") mu_word = std::stod(v); else if (k == "eos_word") eos_word = std::stod(v); else if (k == "adapt_word") adapt_word = std::stod(v);
     else if (k == "t9_beam") t9_beam = std::stoi(v); else if (k == "t9_per_span") t9_per_span = std::stoi(v);
     else if (k == "rr_gamma") rr_gamma = std::stod(v); else if (k == "rr_short") rr_short = std::stod(v);
@@ -408,6 +418,7 @@ struct Params {
     else if (k == "vowel_pen") vowel_pen = std::stod(v);  // per such initial, on top of abbrev
     else if (k == "abbrev_keys") abbrev_keys = std::stoi(v);  // 1: abbrev per key (zh / ch / sh initials count 2)
     else if (k == "typo_first") typo_first = std::stod(v);  // margin (nats) for a typo reading to go first; 0 = never
+    else if (k == "skip_inner") skip_inner = std::stoi(v);  // 1: no initial-only readings before the syllable being typed in spelled input
     else if (k == "adapt_add") adapt_add = std::stod(v);
     else if (k == "incremental") incremental = std::stoi(v); else if (k == "abbrev_full") abbrev_full = std::stod(v); else if (k == "eos2") eos2 = std::stod(v); else if (k == "interleave") interleave = std::stoi(v);
     else if (k == "mix") mix = std::stod(v); else if (k == "mu") mu = std::stod(v); else if (k == "abbrev") abbrev = std::stod(v);
@@ -667,11 +678,24 @@ struct Decoder {
   std::unordered_map<std::string, std::vector<char16_t>> by_t9; std::unordered_map<std::string, std::vector<std::string>> t9_prefix;
   std::unordered_map<std::string, double> prior_cache, lnw_cache;
   std::unordered_map<std::string, std::vector<std::tuple<double, std::string, u16>>> hit_cache;
+  // Called between decodes: every cache a long-lived session fills is dropped once past its cap.
+  void TrimCaches() {
+    if (hit_cache.size() > p.hit_cap) hit_cache.clear();
+    if (prior_cache.size() > p.word_cap) prior_cache.clear();
+    if (lnw_cache.size() > p.word_cap) lnw_cache.clear();
+  }
   int32_t BOSW, EOSW;
+  // cylm_cancel (another thread) bumps cancel_gen_; a decode that started before stops at its next check, returns
+  // nothing and keeps the session's incremental state of the common prefix (cylm.h).
+  std::atomic<uint32_t> cancel_gen_{0}; uint32_t run_gen_ = 0; bool last_cancelled_ = false;
+  bool Cancelled() const { return cancel_gen_.load(std::memory_order_relaxed) != run_gen_; }
+  // skip_inner: initial-only tokens are not generated before skip_before_ (see SpelledFrom); 0 = everywhere as before
+  std::unordered_set<std::string> spell_prefix; int skip_before_ = 0, inc_skip_before_ = 0;
   Decoder(Lexicon& l, C3& b, Adapt& a, Params pp) : lex(l), base(b), adapt(a), p(pp) {
     for (auto& s : lex.syls) {
       if (s == "m" || s == "n" || s == "ng" || s == "hm" || s == "hng") continue;
       spell[s] = lex.code[s]; max_syl = std::max(max_syl, s.size());
+      for (size_t i = 1; i <= s.size(); ++i) spell_prefix.insert(s.substr(0, i));
       std::string d; for (char c : s) d += T9Of(c);
       by_t9[d].push_back(lex.code[s]);
       for (size_t i = 1; i <= d.size(); ++i) {
@@ -680,6 +704,20 @@ struct Decoder {
       }
     }
     BOSW = adapt.Lookup("<s>"); EOSW = adapt.Lookup("</s>");
+  }
+  // The start of the syllable being typed when the keys before it spell complete syllables (separators allowed) and
+  // the rest is the beginning of a syllable, possibly empty ("nihaozho" -> 5); 0 when not (an initial-only key in
+  // between, "nihaozg"). With skip_inner, initial-only tokens before it are left out: in spelled input they are
+  // readings the user did not type (abbrev_full already marks them down), and each one opens abbreviation spans.
+  int SpelledFrom(const std::string& text) const {
+    const size_t n = text.size(); std::vector<char> ok(n + 1, 0); ok[0] = 1;
+    for (size_t i = 0; i < n; ++i) {
+      if (!ok[i]) continue;
+      if (text[i] == '\'') { ok[i + 1] = 1; continue; }
+      for (size_t j = i + 1; j <= std::min(n, i + max_syl); ++j) if (spell.count(text.substr(i, j - i))) ok[j] = 1;
+    }
+    for (size_t b = n + 1; b-- > 0;) if (ok[b] && (b == n || spell_prefix.count(text.substr(b)))) return int(b);
+    return 0;
   }
   std::vector<std::vector<std::pair<int, Token>>> Tokens(const std::string& text, bool t9) {
     size_t n = text.size(); std::vector<std::vector<std::pair<int, Token>>> out(n);
@@ -732,7 +770,7 @@ struct Decoder {
           }
         }
       }
-      if (!t9) {
+      if (!t9 && int(i) >= skip_before_) {
         char ch = text[i];
         if (kInitials.find(ch) != std::string::npos) {
           std::string two = text.substr(i, 2);
@@ -828,6 +866,7 @@ struct Decoder {
     // min_end start no earlier than this.
     const size_t first = min_end < 0 ? 0 : size_t(std::max(0, min_end + 1 - int(kMaxWord * max_syl)));
     for (size_t i = first; i < n; ++i) {
+      if (Cancelled()) break;  // Decode returns nothing; the partial spans are dropped
       for (auto& [j, t] : toks[i]) if (t.kind == 's' && j > min_end) spans[{int(i), j, 0, 0}][""] = {0, 0.0, u16()};
       struct Item { int pos; std::vector<Token> path; std::string ini; int typos; int vowels; };
       std::vector<Item> stack{{int(i), {}, "", 0, 0}};
@@ -944,6 +983,8 @@ struct Decoder {
   std::vector<std::vector<Hyp>> inc_sorted_; std::vector<char> inc_sorted_ok_;
   std::vector<std::pair<std::string, double>> Decode(const std::string& text, bool t9, const std::string& context) {
     size_t n = text.size();
+    run_gen_ = cancel_gen_.load(std::memory_order_relaxed); last_cancelled_ = false;
+    skip_before_ = 0;  // the abbrev_full check below reads every token
     // When the whole input spells complete syllables (all but possibly the last), initial-only readings inside it
     // are what the user did not type: they cost abbrev_full instead of abbrev (applied to finished paths below).
     double abbrev = p.abbrev;
@@ -963,6 +1004,8 @@ struct Decoder {
       if (ok[n] && p.abbrev_full != 0 && n >= 6) abbrev = p.abbrev_full;
       vowel_on_ = vowel_wanted && !ok[n];
     }
+    // (6+ keys, as abbrev_full: in a short input an initial-only reading is as likely as the spelled one, sa = 是啊)
+    if (p.skip_inner && !t9 && n >= 6) skip_before_ = SpelledFrom(text);
     // Reuse boundary: edges and beams up to `keep` are unchanged. Nine-key inputs allow a partial syllable only at
     // the end, so the old last position is recomputed for them.
     size_t keep = 0;
@@ -970,6 +1013,9 @@ struct Decoder {
       while (keep < n && keep < inc_text_.size() && text[keep] == inc_text_[keep]) ++keep;
       if (t9 && keep > 0 && (keep == inc_text_.size() || keep == n)) --keep;
       if (!t9 && keep == inc_text_.size() && keep > 0 && keep < n) {}  // pinyin: abbreviations are valid anywhere
+      // skip_inner: tokens differ only between the old and the new skip_before_, so edges ending at or before the
+      // smaller one are the same either way
+      if (skip_before_ != inc_skip_before_) keep = std::min(keep, size_t(std::min(skip_before_, inc_skip_before_)));
     }
     std::vector<std::vector<Edge>> edges(n), fresh;
     std::vector<Beam> beams(n + 1);
@@ -1008,6 +1054,7 @@ struct Decoder {
     auto bound = [&](size_t j, bool ty) { auto& h = ty ? cut_t[j] : cut[j]; return h.size() >= cap_of(j, ty) ? h.top() : -INFINITY; };
     // Only the fresh edges (ending after `keep`) are new; the reused ones are already in the reused beams.
     for (size_t i = 0; i < n; ++i) {
+      if (Cancelled()) break;
       if (beams[i].empty() || fresh[i].empty()) continue;
       if (!sorted_ok[i]) {
         auto& items = sorted[i]; items.clear(); items.reserve(beams[i].size());
@@ -1068,6 +1115,20 @@ struct Decoder {
           }
         }
       }
+    }
+    if (Cancelled()) {
+      // A newer request is waiting (cylm_cancel): return nothing, and keep as the state of the common prefix what this
+      // call reused unchanged (edges ending at or before `keep`, beams up to `keep`; fresh edges end after it and only
+      // beams after it were touched), so the next decode still continues from there instead of from scratch.
+      last_cancelled_ = true;
+      if (p.incremental) {
+        edges.resize(keep);
+        for (auto& v : edges) v.erase(std::remove_if(v.begin(), v.end(), [&](const Edge& e) { return size_t(e.j) > keep; }), v.end());
+        beams.resize(keep + 1); sorted.resize(keep + 1); sorted_ok.resize(keep + 1);
+        inc_text_ = text.substr(0, keep); inc_context_ = context; inc_t9_ = t9; inc_vowel_on_ = vowel_on_; inc_skip_before_ = skip_before_;
+        inc_edges_ = std::move(edges); inc_beams_ = std::move(beams); inc_sorted_ = std::move(sorted); inc_sorted_ok_ = std::move(sorted_ok);
+      }
+      return {};
     }
     std::unordered_map<std::string, int32_t> best_tr, best_tr_t;
     std::unordered_map<std::string, double> typo_raw;  // typo-only outputs: score without the typo penalty
@@ -1167,7 +1228,7 @@ struct Decoder {
         out = std::move(placed);
       }
     }
-    if (p.incremental) { inc_text_ = text; inc_context_ = context; inc_t9_ = t9; inc_vowel_on_ = vowel_on_; inc_edges_ = std::move(edges); inc_beams_ = std::move(beams);
+    if (p.incremental) { inc_text_ = text; inc_context_ = context; inc_t9_ = t9; inc_vowel_on_ = vowel_on_; inc_skip_before_ = skip_before_; inc_edges_ = std::move(edges); inc_beams_ = std::move(beams);
                          inc_sorted_ = std::move(sorted); inc_sorted_ok_ = std::move(sorted_ok); }
     return out;
   }
@@ -1213,6 +1274,7 @@ CylmModel* cylm_open2(const char* lexicon, const char* model, const char* model2
     if (eq != std::string::npos && !m->p.Set(kv.substr(0, eq), kv.substr(eq + 1))) return nullptr;
   }
   m->p.incremental = 1;
+  m->base.id_cap = m->base2.id_cap = m->p.id_cap; m->base.dec_cap = m->base2.dec_cap = m->p.dec_cap;
   if (reranker && *reranker) {
     if (!vocab || !m->rr.Load(reranker, vocab, m->p.rr_threads)) return nullptr;
     m->has_rr = true;
@@ -1232,8 +1294,9 @@ CylmSession* cylm_session(CylmModel* m) {
 }
 int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
   if (!s || !keys || !out || cap <= 0) return -1;
-  if (s->d->hit_cache.size() > kHitCacheMax) s->d->hit_cache.clear();
+  s->d->TrimCaches();
   auto ranked = s->d->Decode(keys, mode == 1, context ? context : "");
+  if (s->d->last_cancelled_) return -2;
   int n = 0, used = 0;
   for (auto& [w, sc] : ranked) {
     if (used + int(w.size()) + 1 > cap) break;
@@ -1260,8 +1323,9 @@ int cylm_holes(CylmModel* m, const char* path) {
 }
 int cylm_decode2(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
   if (!s || !keys || !out || cap <= 0) return -1;
-  if (s->d->hit_cache.size() > kHitCacheMax) s->d->hit_cache.clear();
+  s->d->TrimCaches();
   auto ranked = s->d->Decode(keys, mode == 1, context ? context : "");
+  if (s->d->last_cancelled_) return -2;
   int n = 0, used = 0;
   for (auto& [w, sc] : ranked) {
     auto it = s->d->last_meta_.find(w);
@@ -1272,6 +1336,7 @@ int cylm_decode2(CylmSession* s, const char* keys, int mode, const char* context
   }
   return n;
 }
+void cylm_cancel(CylmSession* s) { if (s) s->d->cancel_gen_.fetch_add(1, std::memory_order_relaxed); }
 void cylm_close_session(CylmSession* s) { delete s; }
 void cylm_close(CylmModel* m) { delete m; }
 }
@@ -1349,7 +1414,7 @@ int main(int argc, char** argv) {
     }
     std::cout << out << '\n';
     std::cout.flush();
-    if (d.hit_cache.size() > kHitCacheMax) d.hit_cache.clear();
+    d.TrimCaches();
   }
   return 0;
 }
