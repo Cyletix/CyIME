@@ -97,4 +97,44 @@ class T9CandidateNavigationTest {
         val focused = state.advanceT9Candidate(profile)
         assertEquals(CandidateAction.plugin("第二个真实文本"), focused.candidateActions[focused.spaceCandidateIndex(profile)])
     }
+
+    // 用户 10-27 截图：736 显示 pen、左栏 pen 在前、首选 盆，「下一项」高亮到 人 后编码和左栏却没跟着变。
+    private val pen = CandidateState(candidates = listOf("盆", "人", "认", "SEO"),
+        candidateComments = listOf("pen", "ren", "ren", ""), inputText = "pen", preeditText = "pen",
+        isComposing = true, engineRevision = 3)
+
+    @Test fun shownPreeditAndColumnFollowTheHighlightedCandidateThatSpaceCommits() {
+        assertEquals("pen", pen.shownPreedit(profile))
+        assertNull(pen.highlightedT9Syllable(profile))
+        val ren = pen.advanceT9Candidate(profile)
+        assertEquals("人", ren.candidates[ren.spaceCandidateIndex(profile)])
+        assertEquals("ren", ren.shownPreedit(profile))
+        assertEquals("ren", ren.highlightedT9Syllable(profile))
+        // 英文候选没有注释，用它本身的字母。
+        val seo = ren.advanceT9Candidate(profile).advanceT9Candidate(profile)
+        assertEquals("seo", seo.shownPreedit(profile))
+        // 回到首选，又是引擎的编码；回车按屏上编码上屏。
+        assertEquals("pen", seo.advanceT9Candidate(profile).shownPreedit(profile))
+        assertEquals("ren", rawCompositionCommitText("736", ren.shownPreedit(profile), t9 = true))
+        // 编码一变，高亮回首选，显示回到引擎编码。
+        assertEquals("pen", ren.copy(engineRevision = 4).shownPreedit(profile))
+    }
+
+    @Test fun replacingOnlyThePartTheHighlightedCandidateUses() {
+        // 同键不同音：替换它用掉的字母，后面没用掉的编码和已选的汉字不动。
+        assertEquals("mi'hao", t9PreeditWithReading("ni'hao", "mi"))
+        assertEquals("mi gao", t9PreeditWithReading("ni hao", "mi gao"))
+        assertEquals("你好ce'shi", t9PreeditWithReading("你好ce'shi", "ce shi"))
+        assertEquals("你好de'shi", t9PreeditWithReading("你好ce'shi", "de"))
+        // 简拼：按键对不上，按音节数替换。
+        assertEquals("ni'hao", t9PreeditWithReading("n'h", "ni hao"))
+        assertNull(t9PreeditWithReading("n", "ni hao"))
+        assertNull(t9PreeditWithReading("你好", "ni"))
+    }
+
+    @Test fun otherLayoutsKeepTheEnginePreedit() {
+        val full = InputProfile(InputLanguage.CHINESE, InputScheme.PINYIN, InputLayout.QWERTY, EngineProfile.Rime("rime_ice"))
+        assertEquals("pen", pen.copy(candidateFocus = CandidateFocus.at(1, pen)).shownPreedit(full))
+        assertNull(pen.copy(candidateFocus = CandidateFocus.at(1, pen)).highlightedT9Syllable(full))
+    }
 }

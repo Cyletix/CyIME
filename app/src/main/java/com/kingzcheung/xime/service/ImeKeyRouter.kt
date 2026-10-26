@@ -749,7 +749,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         (!state.isAsciiMode && candState.pendingEnglishText.isNotEmpty())) {
                         // T9 和 14 键提交屏上的解码拼音（T9 含 partial commit 累积），其他用 RIME input。
                         val isT9 = isT9Schema(state.currentSchemaId)
-                        val input = rawCompositionCommitText(engineInput, candState.preeditText, isT9,
+                        val input = rawCompositionCommitText(engineInput, candState.shownPreedit(state.inputProfile), isT9,
                             state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14)
                         if (input.isNotEmpty()) {
                             val accepted = withEditor { service.submitText(input).accepted }
@@ -1921,6 +1921,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val profile = service.uiState.value.inputProfile
         service.candidateState.value = if (forward) current.advanceT9Candidate(profile)
             else current.retreatT9Candidate(profile)
+        service.sessionController.refreshInputBoxComposition()
     }
 
     internal fun selectCandidate(index: Int) {
