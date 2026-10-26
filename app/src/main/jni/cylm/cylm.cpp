@@ -84,7 +84,10 @@ static const uint8_t* MapFile(const char* path) {
   struct stat st; if (fstat(fd, &st) != 0) { ::close(fd); return nullptr; }
   void* addr = mmap(nullptr, size_t(st.st_size), PROT_READ, MAP_SHARED, fd, 0);
   ::close(fd);
-  return addr == MAP_FAILED ? nullptr : static_cast<const uint8_t*>(addr);
+  if (addr == MAP_FAILED) return nullptr;
+  // Lookups jump around the file: no read-ahead, so only the pages actually read take memory (CyIME Android).
+  madvise(addr, size_t(st.st_size), MADV_RANDOM);
+  return static_cast<const uint8_t*>(addr);
 #endif
 }
 
@@ -128,6 +131,7 @@ struct C3 {
     void* addr = mmap(nullptr, size_t(st.st_size), PROT_READ, MAP_SHARED, fd, 0);
     ::close(fd);
     if (addr == MAP_FAILED) return false;
+    madvise(addr, size_t(st.st_size), MADV_RANDOM);  // random lookups: no read-ahead (see MapFile)
     m = static_cast<const uint8_t*>(addr);
 #endif
     std::memcpy(&h, m, sizeof h);

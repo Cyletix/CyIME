@@ -43,7 +43,7 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
     // Optional cylm/prefer: "P<TAB>D" rows, P moves above its homophone D after ranking (cylm_prefer).
     string lexicon, model, model2, reranker, vocab, params, prefer;
     if (config->GetString("cylm/lexicon", &lexicon) && config->GetString("cylm/model", &model) &&
-        !lexicon.empty() && !model.empty()) {
+        !lexicon.empty() && !model.empty() && T9CylmEnabled()) {
       config->GetString("cylm/model2", &model2);
       config->GetString("cylm/reranker", &reranker);
       config->GetString("cylm/vocab", &vocab);
