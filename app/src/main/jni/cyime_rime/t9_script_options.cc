@@ -41,7 +41,8 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
     // cylm/model2 and cylm/params). Nothing names them by default, so nothing is loaded.
     // Optional cylm/reranker + cylm/vocab: the ONNX reranker runs inside the same keystroke.
     // Optional cylm/prefer: "P<TAB>D" rows, P moves above its homophone D after ranking (cylm_prefer).
-    string lexicon, model, model2, reranker, vocab, params, prefer;
+    // Optional cylm/adapt: the user's own trigram counts (cylm_adapt), only in packages for his own devices.
+    string lexicon, model, model2, reranker, vocab, params, prefer, adapt;
     if (config->GetString("cylm/lexicon", &lexicon) && config->GetString("cylm/model", &model) &&
         !lexicon.empty() && !model.empty() && T9CylmEnabled()) {
       config->GetString("cylm/model2", &model2);
@@ -49,11 +50,13 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       config->GetString("cylm/vocab", &vocab);
       config->GetString("cylm/params", &params);
       config->GetString("cylm/prefer", &prefer);
+      config->GetString("cylm/adapt", &adapt);
       int budget = 0;
       if (config->GetInt("cylm/budget_ms", &budget) && budget > 0) T9CylmSetBudget(budget);
       auto resolve = [](const string& name) { return name.empty() ? string() : T9ResolveOnce("cylm", "", name); };
       t9_cylm_ = T9CylmOpen(resolve(lexicon), resolve(model), resolve(model2),
-                            vocab.empty() ? string() : resolve(reranker), resolve(vocab), params, resolve(prefer));
+                            vocab.empty() ? string() : resolve(reranker), resolve(vocab), params, resolve(prefer),
+                            resolve(adapt));
       // A translation is created for every key: start CyLM on it now, so it decodes while Rime makes its own
       // sentence instead of after it.
       if (t9_cylm_ && context) T9CylmPrefetch(t9_cylm_.get(), context->input(), t9_left_context_);
@@ -179,12 +182,12 @@ const std::unordered_map<string, SyllableId>& T9ScriptOptions::T9SyllableIds(Dic
 std::shared_ptr<CylmModel> T9ScriptOptions::T9CylmOpen(const string& lexicon, const string& model,
                                                        const string& model2, const string& reranker,
                                                        const string& vocab, const string& params,
-                                                       const string& prefer) {
+                                                       const string& prefer, const string& adapt) {
   static std::mutex mutex;
   static std::map<string, std::shared_ptr<CylmModel>> opened;
   std::lock_guard<std::mutex> lock(mutex);
   const string key = lexicon + '\n' + model + '\n' + model2 + '\n' + reranker + '\n' + vocab + '\n' + params +
-                     '\n' + prefer;
+                     '\n' + prefer + '\n' + adapt;
   auto found = opened.find(key);
   if (found != opened.end()) return found->second;
   const char* second = model2.empty() ? nullptr : model2.c_str();
@@ -199,6 +202,9 @@ std::shared_ptr<CylmModel> T9ScriptOptions::T9CylmOpen(const string& lexicon, co
   if (!handle.get()) handle.reset();
   else {
     if (!prefer.empty()) cylm_prefer(handle.get(), prefer.c_str());
+    // Before any session: sessions read the layer when they are created. A missing file (public packages) is
+    // simply no layer.
+    if (!adapt.empty()) cylm_adapt(handle.get(), adapt.c_str());
     T9CylmWarm(handle.get());
   }
 #ifdef __ANDROID__
