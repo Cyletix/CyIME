@@ -208,6 +208,10 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
   const string text = record.substr(0, unit);
   const auto& rime = sentences->front();
   if (text.empty() || text == rime->text()) return Stats().Add(false, false, ready, wait_ms, ms);
+  // CyLM knows nothing of what the user picked before: a Rime sentence built from a learned word (这篇 picked once,
+  // then zhepianbiji) stays, or CyLM's 这片笔记 replaced it and learning never reached whole sentences.
+  for (const auto& part : rime->components())
+    if (part.commit_count > 0) return Stats().Add(false, false, ready, wait_ms, ms);
   DictEntry entry;
   entry.text = text;
   entry.weight = rime->weight();
