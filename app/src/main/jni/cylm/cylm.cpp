@@ -215,12 +215,50 @@ struct C3 {
 };
 
 // ------------------------------------------------------------------ adaptive model
+// A count table kept small for a long-lived process: sorted (key, value) pairs plus a hash map of what was added
+// since (learning); Freeze merges the additions into the sorted part. A hash map costs ~50 bytes an entry, the sorted
+// pairs 8-12 (CyIME Android 2026-10-27: the user's 77k-trigram layer was 21 MB of heap).
+template <class K, class V, class H = std::hash<K>> struct Packed {
+  std::vector<std::pair<K, V>> base; std::unordered_map<K, V, H> add;
+  V Get(K k) const {
+    V v = 0;
+    if (!add.empty()) { auto it = add.find(k); if (it != add.end()) v = it->second; }
+    auto b = std::lower_bound(base.begin(), base.end(), k, [](const std::pair<K, V>& e, K x) { return e.first < x; });
+    if (b != base.end() && b->first == k) v += b->second;
+    return v;
+  }
+  V& Delta(K k) { return add[k]; }
+  size_t Size() const { size_t n = base.size(); for (auto& kv : add) if (!InBase(kv.first)) ++n; return n; }
+  bool InBase(K k) const {
+    auto b = std::lower_bound(base.begin(), base.end(), k, [](const std::pair<K, V>& e, K x) { return e.first < x; });
+    return b != base.end() && b->first == k;
+  }
+  void Freeze() {
+    if (add.empty()) return;
+    std::vector<std::pair<K, V>> extra(add.begin(), add.end());
+    std::sort(extra.begin(), extra.end());
+    std::vector<std::pair<K, V>> out; out.reserve(base.size() + extra.size());
+    size_t i = 0, j = 0;
+    while (i < base.size() || j < extra.size()) {
+      if (j == extra.size() || (i < base.size() && base[i].first < extra[j].first)) out.push_back(base[i++]);
+      else if (i == base.size() || extra[j].first < base[i].first) out.push_back(extra[j++]);
+      else { out.push_back({base[i].first, V(base[i].second + extra[j].second)}); ++i; ++j; }
+    }
+    base.swap(out); base.shrink_to_fit(); add = std::unordered_map<K, V, H>();
+  }
+  template <class F> void Each(F f) const {  // every key with its total
+    for (auto& [k, v] : base) { auto it = add.find(k); f(k, it == add.end() ? v : V(v + it->second)); }
+    for (auto& [k, v] : add) if (!InBase(k)) f(k, v);
+  }
+  void Clear() { base.clear(); base.shrink_to_fit(); add = std::unordered_map<K, V, H>(); }
+};
+
 struct Adapt {
   static constexpr double D = 0.75;
   std::unordered_map<std::string, int32_t> ids; std::vector<std::string> names;
   struct H2 { size_t operator()(uint64_t x) const { return std::hash<uint64_t>()(x * 0x9E3779B97F4A7C15ULL); } };
-  std::unordered_map<uint64_t, double, H2> c3, h3; std::unordered_map<uint64_t, int, H2> t3, cont2;
-  std::unordered_map<int32_t, double> h2; std::unordered_map<int32_t, int> t2, cont1;
+  Packed<uint64_t, float, H2> c3, h3; Packed<uint64_t, int32_t, H2> t3, cont2;
+  Packed<int32_t, float> h2; Packed<int32_t, int32_t> t2, cont1;
   double n1 = 1, vocab = 1; bool loaded = false;
   uint64_t version = 0;  // bumped by Add: sessions then drop their reused scores (Decoder::Sync)
   int32_t Intern(const std::string& s) {
@@ -230,32 +268,29 @@ struct Adapt {
   int32_t Lookup(const std::string& s) const { auto it = ids.find(s); return it == ids.end() ? -1 : it->second; }
   static uint64_t K2(int32_t a, int32_t b) { return (uint64_t(uint32_t(a)) << 32) | uint32_t(b); }
   static uint64_t K3(int32_t a, int32_t b, int32_t w) { return (uint64_t(uint32_t(a)) << 42) ^ (uint64_t(uint32_t(b)) << 21) ^ uint32_t(w); }
+  void Freeze() { c3.Freeze(); h3.Freeze(); t3.Freeze(); cont2.Freeze(); h2.Freeze(); t2.Freeze(); cont1.Freeze(); }
   bool Load(const char* path) {
     std::ifstream in(path); if (!in) return false;
     std::string line;
-    std::unordered_map<uint64_t, double, H2> trig; std::vector<std::tuple<int32_t, int32_t, int32_t, double>> rows;
     while (std::getline(in, line)) {
       auto f = Split(line, '\t'); if (f.size() < 4) continue;
-      rows.emplace_back(Intern(f[0]), Intern(f[1]), Intern(f[2]), std::stod(f[3]));
+      if (!loaded) { n1 = 0; vocab = 1; loaded = true; }
+      AddTrigram(Intern(f[0]), Intern(f[1]), Intern(f[2]), std::stod(f[3]));
+      if (c3.add.size() >= 65536) Freeze();  // keep the hash part small while reading too
     }
-    for (auto& [a, b, w, c] : rows) {
-      c3[K3(a, b, w)] += c; h3[K2(a, b)] += c; t3[K2(a, b)] += 1; cont2[K2(b, w)] += 1;
-    }
-    for (auto& [k, c] : cont2) { int32_t b = int32_t(k >> 32), w = int32_t(k & 0xffffffff); h2[b] += c; t2[b] += 1; cont1[w] += 1; }
-    n1 = 0; for (auto& [w, c] : cont1) n1 += c; if (n1 == 0) n1 = 1;
-    vocab = double(cont1.size()) + 1; loaded = true;
-    return true;
+    Freeze();
+    if (n1 == 0) n1 = 1;
+    return loaded;
   }
-  // One more occurrence of a trigram, keeping the lower orders exactly as Load derives them from the trigram types.
+  // One more occurrence of a trigram, keeping the lower orders as the trigram types imply (Kneser-Ney counts).
   void AddTrigram(int32_t a, int32_t b, int32_t w, double c) {
-    double& x = c3[K3(a, b, w)];
-    const bool fresh = x == 0;
-    x += c; h3[K2(a, b)] += c;
+    const uint64_t k3 = K3(a, b, w), k2 = K2(a, b), kb = K2(b, w);
+    const bool fresh = c3.Get(k3) == 0;
+    c3.Delta(k3) += float(c); h3.Delta(k2) += float(c);
     if (!fresh) return;
-    t3[K2(a, b)] += 1;
-    int& cb = cont2[K2(b, w)];
-    if (cb == 0) { t2[b] += 1; if (cont1[w]++ == 0) vocab += 1; n1 += 1; }
-    cb += 1; h2[b] += 1;
+    t3.Delta(k2) += 1;
+    if (cont2.Get(kb) == 0) { t2.Delta(b) += 1; if (cont1.Get(w) == 0) vocab += 1; cont1.Delta(w) += 1; n1 += 1; }
+    cont2.Delta(kb) += 1; h2.Delta(b) += 1;
   }
   // Learning (cylm_learn): a committed sentence's words, with <s> <s> before and </s> after, count c each. Past
   // `cap` trigram types every count is halved and those under 0.5 dropped (old, rare entries go first).
@@ -264,35 +299,35 @@ struct Adapt {
     int32_t a = Intern("<s>"), b = a;
     for (auto& w : words) { const int32_t x = Intern(w); AddTrigram(a, b, x, c); a = b; b = x; }
     AddTrigram(a, b, Intern("</s>"), c);
-    if (cap && c3.size() > cap) Decay();
+    if (c3.add.size() > 4096 + c3.base.size() / 8) Freeze();
+    if (cap && c3.Size() > cap) Decay();
     ++version;
   }
   void Decay() {
-    std::unordered_map<uint64_t, double, H2> old; old.swap(c3);
-    h3.clear(); t3.clear(); cont2.clear(); h2.clear(); t2.clear(); cont1.clear(); n1 = 0; vocab = 1;
-    for (auto& [k, c] : old) {
-      if (c / 2 < 0.5) continue;
-      AddTrigram(int32_t(k >> 42), int32_t((k >> 21) & 0x1FFFFF), int32_t(k & 0x1FFFFF), c / 2);
-    }
+    std::vector<std::pair<uint64_t, float>> old;
+    c3.Each([&](uint64_t k, float c) { if (c / 2 >= 0.5f) old.push_back({k, c / 2}); });
+    c3.Clear(); h3.Clear(); t3.Clear(); cont2.Clear(); h2.Clear(); t2.Clear(); cont1.Clear(); n1 = 0; vocab = 1;
+    for (auto& [k, c] : old) AddTrigram(int32_t(k >> 42), int32_t((k >> 21) & 0x1FFFFF), int32_t(k & 0x1FFFFF), c);
+    Freeze();
     if (n1 == 0) n1 = 1;
   }
+  size_t Trigrams() const { return c3.Size(); }
   bool Save(const char* path) const {  // the counts file Load reads (cylm_adapt)
     std::ofstream out(path, std::ios::binary); if (!out) return false;
-    for (auto& [k, c] : c3) {
+    c3.Each([&](uint64_t k, float c) {
       const int32_t a = int32_t(k >> 42), b = int32_t((k >> 21) & 0x1FFFFF), w = int32_t(k & 0x1FFFFF);
       out << names[a] << '\t' << names[b] << '\t' << names[w] << '\t' << c << '\n';
-    }
+    });
     return bool(out);
   }
   double P(int32_t a, int32_t b, int32_t w) const {
-    auto get = [](const auto& m, auto k) -> double { auto it = m.find(k); return it == m.end() ? 0.0 : double(it->second); };
-    double p1 = ((w >= 0 ? get(cont1, w) : 0.0) + 0.5) / (n1 + 0.5 * vocab);
+    double p1 = ((w >= 0 ? double(cont1.Get(w)) : 0.0) + 0.5) / (n1 + 0.5 * vocab);
     double p2 = p1;
-    if (b >= 0) { double hh = get(h2, b); if (hh > 0) p2 = (std::max(get(cont2, K2(b, w)) - D, 0.0) + D * get(t2, b) * p1) / hh; }
+    if (b >= 0) { double hh = h2.Get(b); if (hh > 0) p2 = (std::max(double(cont2.Get(K2(b, w))) - D, 0.0) + D * t2.Get(b) * p1) / hh; }
     if (a < 0 || b < 0) return p2;
-    double hh3 = get(h3, K2(a, b));
+    double hh3 = h3.Get(K2(a, b));
     if (hh3 <= 0) return p2;
-    return (std::max(get(c3, K3(a, b, w)) - D, 0.0) + D * get(t3, K2(a, b)) * p2) / hh3;
+    return (std::max(double(c3.Get(K3(a, b, w))) - D, 0.0) + D * t3.Get(K2(a, b)) * p2) / hh3;
   }
 };
 
@@ -1447,7 +1482,7 @@ int cylm_add_word(CylmModel* m, const char* word, const char* pinyin, long long 
 int cylm_has_word(CylmModel* m, const char* word) { return m && word && m->lex.WeightOf(word) >= 0 ? 1 : 0; }
 int cylm_adapt_save(CylmModel* m, const char* path) {
   if (!m || !path) return -1;
-  return m->adapt.Save(path) ? int(m->adapt.c3.size()) : -1;
+  return m->adapt.Save(path) ? int(m->adapt.Trigrams()) : -1;
 }
 int cylm_adapt(CylmModel* m, const char* path) {
   if (!m || !path) return -1;
