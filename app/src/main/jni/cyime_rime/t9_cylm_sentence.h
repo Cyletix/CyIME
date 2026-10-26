@@ -23,6 +23,8 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& inpu
 
 // How long a key waits for CyLM (schema cylm/budget_ms); a slower result is not shown for that key.
 void T9CylmSetBudget(int ms);
+// False after `adb shell setprop debug.cyime.cylm 0` (developer switch); CyLM is then not even opened.
+bool T9CylmEnabled();
 // Loads a newly opened model's pages on the CyLM thread, off the key path.
 void T9CylmWarm(CylmModel* model);
 // Starts CyLM on this key's input while Rime builds its own sentence (called when the translation is created).

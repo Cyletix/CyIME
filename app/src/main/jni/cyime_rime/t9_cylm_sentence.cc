@@ -18,6 +18,7 @@
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <malloc.h>
 #include <sys/system_properties.h>
 #endif
 
@@ -45,8 +46,9 @@ struct CylmStats {
     if (calls <= 3 || calls % 50 == 0)
       __android_log_print(ANDROID_LOG_INFO, "CyLM",
                           "decode calls=%ld replaced=%ld late=%ld ready_at_ask=%ld wait_ms p50=%.2f p95=%.2f "
-                          "decode_ms p50=%.2f p95=%.2f", calls, replaced, late, ready, Quantile(waits, 0.5),
-                          Quantile(waits, 0.95), Quantile(decodes, 0.5), Quantile(decodes, 0.95));
+                          "decode_ms p50=%.2f p95=%.2f heap_mb=%.1f", calls, replaced, late, ready,
+                          Quantile(waits, 0.5), Quantile(waits, 0.95), Quantile(decodes, 0.5),
+                          Quantile(decodes, 0.95), mallinfo().uordblks / 1048576.0);
 #endif
     if (calls % 50 == 0) { waits.clear(); decodes.clear(); }
   }
@@ -168,11 +170,16 @@ string CylmContext(const string& left_context) {
 
 void T9CylmSetBudget(int ms) { budget_ms = std::max(1, std::min(200, ms)); }
 
+bool T9CylmEnabled() { return !CylmSwitchedOff(); }
+
 void T9CylmWarm(CylmModel* model) {
-  // The first decode maps hundreds of MB of model pages (about 0.6 s on the tablet); do it on the worker while
-  // the keyboard opens, so the first key does not pay for it.
-  if (CylmSession* session = model ? SessionFor(model) : nullptr)
-    CylmWorker::Instance().Prefetch(session, "nihao", false, string());
+  // The first decodes read model pages from storage (about 0.6 s, then slower keys for the first sentences on the
+  // tablet); read the common ones on the worker while the keyboard opens: one everyday sentence in full pinyin
+  // and the same in nine-key digits (the worker runs the first and then the newest pending request).
+  if (CylmSession* session = model ? SessionFor(model) : nullptr) {
+    CylmWorker::Instance().Prefetch(session, "womenjintianqunalichifanzhegeshishenmeyisi", false, string());
+    CylmWorker::Instance().Prefetch(session, "966365468426786254244326", true, string());
+  }
 }
 
 void T9CylmPrefetch(CylmModel* model, const string& input, const string& left_context) {
