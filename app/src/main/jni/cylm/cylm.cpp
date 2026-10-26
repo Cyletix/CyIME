@@ -1318,6 +1318,11 @@ int cylm_prefer(CylmModel* m, const char* path) {
   m->prefer.clear();
   return LoadPrefer(path, m->prefer) ? int(m->prefer.size()) : -1;
 }
+int cylm_adapt(CylmModel* m, const char* path) {
+  if (!m || !path) return -1;
+  m->adapt = Adapt();
+  return m->adapt.Load(path) ? int(m->adapt.names.size()) : -1;
+}
 int cylm_holes(CylmModel* m, const char* path) {
   if (!m || !path) return -1;
   std::ifstream in(path, std::ios::binary); if (!in) return -1;
@@ -1333,8 +1338,9 @@ int cylm_decode2(CylmSession* s, const char* keys, int mode, const char* context
   int n = 0, used = 0;
   for (auto& [w, sc] : ranked) {
     auto it = s->d->last_meta_.find(w);
+    char score[32]; std::snprintf(score, sizeof score, "%.3f", sc);  // the ranking score (higher is better)
     std::string rec = w + '\x1f' + (it == s->d->last_meta_.end() ? "" : it->second.first) + '\x1f' +
-                      (it == s->d->last_meta_.end() ? "" : it->second.second);
+                      (it == s->d->last_meta_.end() ? "" : it->second.second) + '\x1f' + score;
     if (used + int(rec.size()) + 1 > cap) break;
     std::memcpy(out + used, rec.data(), rec.size()); used += int(rec.size()); out[used++] = '\0'; ++n;
   }
