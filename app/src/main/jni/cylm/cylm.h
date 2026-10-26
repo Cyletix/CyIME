@@ -32,6 +32,15 @@ int cylm_holes(CylmModel* model, const char* path);
  * by the adapt_add or adapt_lambda parameter. Private data: only for the user's own devices. Call before
  * cylm_session. Returns the number of words, or -1. */
 int cylm_adapt(CylmModel* model, const char* path);
+/* Learning, on the device. cylm_learn: add a committed text to the user's layer (count per occurrence; 0 = 1), in
+ * effect from the next decode; the layer keeps at most adapt_cap trigram types (params, default 100000), older counts
+ * decay past that. Returns the number of words learned. cylm_add_word: a word the user chose ("我的词"), typed by
+ * its pinyin ("zi mu"), on top of the compiled lexicon; weight 0 = as common as a frequent word. Returns 0 or -1.
+ * cylm_adapt_save: write the layer back (the file cylm_adapt reads); returns the number of trigrams or -1.
+ * None of these may overlap a decode on any session of the model: call them from the decoding thread. */
+int cylm_learn(CylmModel* model, const char* text, double count);
+int cylm_add_word(CylmModel* model, const char* word, const char* pinyin, long long weight);
+int cylm_adapt_save(CylmModel* model, const char* path);
 /* A separate reranker for nine-key input (the full tier uses a larger one there). Call before cylm_session. */
 int cylm_reranker_t9(CylmModel* model, const char* reranker, const char* vocab);
 CylmSession* cylm_session(CylmModel* model);
