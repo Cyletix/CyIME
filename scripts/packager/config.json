@@ -15,7 +15,7 @@
       "offline_models": false,
       "t9_model": "@best_private",
       "private_gloss": true,
-      "cylm": true,
+      "cylm": false,
       "exclude_dicts": [],
       "install": true,
       "push_banks": true
