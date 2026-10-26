@@ -273,11 +273,12 @@ val prepareChineseDictionaries by tasks.registering {
             // directory. Only the 装到我的设备 package carries them; without them the open fails once and Rime's
             // sentence stays (cyime_rime/t9_cylm_sentence.cc). Same files and settings as t9_pinyin.schema.yaml.
             // The lexicon is not named *.bin: Rime's deploy (CleanupTrash) moves every *.bin in the user directory to trash/.
-            // Phone-fast tier "D" (cy1-p1e-7, no reranker, narrow beams): the light tier with its reranker missed the
-            // 12 ms budget on 97% of tablet keys and the half-size full model on all of them (2026-10-26).
+            // Phone-fast tier "E" (cy1-p1e-7, no reranker, narrowest beams). On the tablet the light tier with its
+            // reranker missed the 12 ms budget on 97% of keys, the half-size full model on all of them, and tier D
+            // (beam 8) still added ~5 ms per key over CyLM off (2026-10-26).
             "\ncylm:\n  lexicon: cylm_lexicon.cylx\n  model: cylm_model.lm\n" +
-            "  params: \"mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=8;per_span=8;per_span_abbrev=16;per_span1=24;" +
-            "nbest=4;t9_beam=6;t9_per_span=6\"\n"
+            "  params: \"mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=4;per_span=6;per_span_abbrev=10;per_span1=16;" +
+            "nbest=3;t9_beam=4;t9_per_span=4\"\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
         // The 14-key schema (assets/rime_chinese) repeats these sentence rules; keep them the same list.
         check(file("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText()
