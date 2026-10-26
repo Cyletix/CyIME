@@ -162,6 +162,8 @@ internal fun CaptionChat(controller: CaptionController, fontSp: Int, onSpeakerTa
         }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val bubbleMax = maxWidth * .86f
+            // Long-press any words to select and copy them, like other apps' text (user 2026-10-27).
+            androidx.compose.foundation.text.selection.SelectionContainer {
             LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (hidden > 0) item(key = "hidden") {
@@ -177,6 +179,7 @@ internal fun CaptionChat(controller: CaptionController, fontSp: Int, onSpeakerTa
                         Message(turn, mine, fontSp, Modifier.widthIn(max = bubbleMax), onSpeakerTap, onMessageLongPress)
                     }
                 }
+            }
             }
         }
         AnimatedVisibility(visible = !following && !atBottom, enter = fadeIn(), exit = fadeOut(),
@@ -208,7 +211,8 @@ private fun Message(turn: Turn, mine: Boolean, fontSp: Int, modifier: Modifier, 
         Row(Modifier.height(IntrinsicSize.Min).clip(RoundedCornerShape(CaptionStyle.Corner))
             .background(if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh.translucent(.86f))
             .visualMaterial(VisualStyles.current, CaptionStyle.Corner, level = MaterialLevel.RAISED)
-            .combinedClickable(onClick = {}, onLongClick = { if (speaker != null) onLongPress(turn) })) {
+            // Long-press now selects text; a tap on the bubble asks who really said it.
+            .combinedClickable(onClick = { if (speaker != null) onLongPress(turn) })) {
             if (!mine) Box(Modifier.width(6.dp).fillMaxHeight().background(accent))
             ProgressiveText(turn.segments, fontSize = fontSp.sp, lineHeight = (fontSp * 1.3f).sp,
                 color = if (mine) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,

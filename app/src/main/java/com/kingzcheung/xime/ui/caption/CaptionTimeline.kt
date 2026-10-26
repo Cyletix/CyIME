@@ -262,7 +262,9 @@ internal fun CaptionTimeline(controller: CaptionController, fontSp: Int, onSpeak
                         Text("正在说", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Box(Modifier.weight(1f).horizontalScroll(horizontal)) {
+                // Long-press the words to select and copy them; a tap on a block asks who really said it.
+                androidx.compose.foundation.text.selection.SelectionContainer(Modifier.weight(1f)) {
+                Box(Modifier.horizontalScroll(horizontal)) {
                     Column(Modifier.width(maxOf(end, boxWidth - LABEL_WIDTH)), verticalArrangement = Arrangement.spacedBy(TRACK_SPACING)) {
                         speakers.forEachIndexed { index, speaker ->
                             Box(Modifier.fillMaxWidth().height(trackHeight)) {
@@ -277,6 +279,7 @@ internal fun CaptionTimeline(controller: CaptionController, fontSp: Int, onSpeak
                             }
                         }
                     }
+                }
                 }
             }
         }
@@ -313,7 +316,7 @@ private fun TimelineBlock(turn: Turn, left: Dp, width: Dp, height: Dp, accent: C
     val time = remember(turn.key) { clock.format(Date(turn.segments.first().wallMs)) }
     Row(Modifier.offset(x = left).width(width).height(height)
         .clip(RoundedCornerShape(CaptionStyle.Corner)).background(MaterialTheme.colorScheme.surfaceContainerHigh.translucent(.86f))
-        .combinedClickable(onClick = {}, onLongClick = { onLongPress?.invoke(turn) })) {
+        .combinedClickable(onClick = { onLongPress?.invoke(turn) })) {
         Box(Modifier.width(6.dp).fillMaxHeight().background(accent))
         Box(Modifier.fillMaxSize().padding(start = 10.dp, end = 12.dp), contentAlignment = Alignment.CenterStart) {
             ProgressiveText(turn.segments, fontSize = fontSp.sp, lineHeight = (fontSp * 1.3f).sp, color = MaterialTheme.colorScheme.onSurface,
