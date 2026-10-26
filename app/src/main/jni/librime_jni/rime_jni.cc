@@ -656,6 +656,38 @@ public:
     // 词库里本来就有的词回到原来的位置，自造词消失；以后再选它会重新学起来。
     // 拼出来的整句没有自己的记录，改为忘掉句里学过的词。所有方案一致，不再屏蔽文字。
     // 返回 0 失败、1 已忘掉、2 没有学习记录（排序不变）。
+    // Developer tool: takes back what automated typing taught the user dictionary of the current schema
+    // (rows "text<TAB>commits"); returns the number of commits taken back, or -1.
+    int unlearn(const std::string& rows) {
+        if (!rime || !session_id_) return -1;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->schema()) return -1;
+        auto* dictionaries = rime::Dictionary::Require("dictionary");
+        auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
+        if (!dictionaries || !userDictionaries) return -1;
+        const rime::Ticket ticket(session->schema(), "translator");
+        rime::the<rime::Dictionary> dictionary(dictionaries->Create(ticket));
+        rime::the<rime::UserDictionary> userDictionary(userDictionaries->Create(ticket));
+        if (!dictionary || !userDictionary || !dictionary->Load() || !userDictionary->Load() ||
+            userDictionary->readonly()) return -1;
+        int taken = 0;
+        size_t start = 0;
+        while (start < rows.size()) {
+            size_t end = rows.find('\n', start);
+            if (end == std::string::npos) end = rows.size();
+            const std::string line = rows.substr(start, end - start);
+            start = end + 1;
+            const auto tab = line.find('\t');
+            if (tab == std::string::npos) continue;
+            const int n = std::atoi(line.c_str() + tab + 1);
+            const int got = userDictionary->Unlearn(line.substr(0, tab), n);
+            LOGE("unlearn %s: %d of %d", line.substr(0, tab).c_str(), got, n);
+            taken += got;
+        }
+        if (auto* context = session->context()) context->RefreshNonConfirmedComposition();
+        return taken;
+    }
+
     int forgetCandidate(int index, bool global) {
         if (!rime || !session_id_ || index < 0) return 0;
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
@@ -2697,6 +2729,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9Memorize(
     jstring pinyin
 ) {
     return T9DictUpdate(env, text, pinyin, true);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeUnlearn(JNIEnv* env, jobject, jstring rows) {
+    const char* text = env->GetStringUTFChars(rows, nullptr);
+    const std::string copy(text ? text : "");
+    if (text) env->ReleaseStringUTFChars(rows, text);
+    return Rime::Instance().unlearn(copy);
 }
 
 JNIEXPORT jboolean JNICALL

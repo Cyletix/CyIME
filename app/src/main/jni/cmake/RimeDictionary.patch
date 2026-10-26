@@ -1051,7 +1051,7 @@ index 56d4eef1..6d057fe2 100644
  
    uint32_t dict_file_checksum() const;
 diff --git a/src/rime/dict/user_dictionary.cc b/src/rime/dict/user_dictionary.cc
-index 953c59cf..77fc8770 100644
+index 953c59cf..62bfe730 100644
 --- a/src/rime/dict/user_dictionary.cc
 +++ b/src/rime/dict/user_dictionary.cc
 @@ -10,6 +10,7 @@
@@ -1188,10 +1188,47 @@ index 953c59cf..77fc8770 100644
    TickCount present_tick = tick_ + 1;
    size_t len = input.length();
    size_t start = result->cache_size();
-@@ -430,13 +469,56 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry, int commits) {
+@@ -430,13 +469,93 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry, int commits) {
    return UpdateEntry(entry, commits, "");
  }
  
++int UserDictionary::Unlearn(const string& text, int commits) {
++  if (commits <= 0 || text.empty())
++    return 0;
++  auto accessor = db_->Query("");
++  if (!accessor)
++    return 0;
++  vector<std::pair<string, UserDbValue>> found;
++  string key, value;
++  while (accessor->GetNextRecord(&key, &value)) {
++    const auto tab = key.find('\t');
++    if (tab == string::npos || key.compare(tab + 1, string::npos, text) != 0)
++      continue;
++    UserDbValue v(value);
++    if (v.commits > 0)
++      found.emplace_back(key, v);
++  }
++  std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.second.tick > b.second.tick; });
++  int taken = 0;
++  for (auto& [k, v] : found) {
++    if (taken >= commits)
++      break;
++    const int n = (std::min)(commits - taken, v.commits);
++    taken += n;
++    v.commits -= n;
++    if (v.commits <= 0) {
++      v.commits = -1;
++      v.dee = 0.0;
++    } else {
++      v.dee = (std::max)(0.0, v.dee - n);
++    }
++    db_->Update(k, v.Pack());
++  }
++  if (taken)
++    T9InvalidateUserDictionary();
++  return taken;
++}
++
 +bool UserDictionary::PreferEntry(const DictEntry& entry) {
 +  // CyIME (2026-10-27): one pick is enough. A learned rival of the same reading (字母 committed many times, often by
 +  // taking the first candidate) kept its larger decayed count and stayed first after the user picked 字幕 once.
@@ -1245,7 +1282,7 @@ index 953c59cf..77fc8770 100644
    string value;
    UserDbValue v;
    if (db_->Fetch(key, &value)) {
-@@ -461,10 +543,21 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry,
+@@ -461,10 +580,21 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry,
      v.dee = algo::formula_d(0.0, (double)tick_, v.dee, (double)v.tick);
    }
    v.tick = tick_;
@@ -1268,7 +1305,7 @@ index 953c59cf..77fc8770 100644
    tick_ += increment;
    try {
      return db_->MetaUpdate("/tick", std::to_string(tick_));
-@@ -506,6 +599,7 @@ bool UserDictionary::RevertRecentTransaction() {
+@@ -506,6 +636,7 @@ bool UserDictionary::RevertRecentTransaction() {
      return false;
    if (time(NULL) - transaction_time_ > 3 /*seconds*/)
      return false;
@@ -1277,20 +1314,24 @@ index 953c59cf..77fc8770 100644
  }
  
 diff --git a/src/rime/dict/user_dictionary.h b/src/rime/dict/user_dictionary.h
-index 7886e494..c58a31e3 100644
+index 7886e494..89315f81 100644
 --- a/src/rime/dict/user_dictionary.h
 +++ b/src/rime/dict/user_dictionary.h
-@@ -71,6 +71,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -71,6 +71,13 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
    bool UpdateEntry(const DictEntry& entry,
                     int commits,
                     const string& new_entry_prefix);
 +  // CyIME: the entry just picked by hand (not the first candidate) outranks every other learned entry of the same
 +  // reading from now on; call after its UpdateEntry.
 +  bool PreferEntry(const DictEntry& entry);
++  // CyIME: takes back `commits` learned commits of `text` (any code), newest entries first, as if those commits had
++  // not happened; an entry left with none is marked deleted (back to the dictionary's own rank). Returns the number
++  // of commits taken back.
++  int Unlearn(const string& text, int commits);
    bool UpdateTickCount(TickCount increment);
  
    bool NewTransaction();
-@@ -95,6 +98,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -95,6 +102,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
                   size_t current_pos,
                   const string& current_prefix,
                   DfsState* state);
@@ -1300,7 +1341,7 @@ index 7886e494..c58a31e3 100644
  
   private:
    string name_;
-@@ -105,6 +111,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -105,6 +115,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
    hash_map<SyllableId, string> rev_syllabary_;
    TickCount tick_ = 0;
    time_t transaction_time_ = 0;
