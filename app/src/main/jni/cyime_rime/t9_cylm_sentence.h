@@ -25,6 +25,8 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& inpu
 void T9CylmSetBudget(int ms);
 // Loads a newly opened model's pages on the CyLM thread, off the key path.
 void T9CylmWarm(CylmModel* model);
+// Starts CyLM on this key's input while Rime builds its own sentence (called when the translation is created).
+void T9CylmPrefetch(CylmModel* model, const string& input, const string& left_context);
 
 }  // namespace rime
 

@@ -54,6 +54,9 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       auto resolve = [](const string& name) { return name.empty() ? string() : T9ResolveOnce("cylm", "", name); };
       t9_cylm_ = T9CylmOpen(resolve(lexicon), resolve(model), resolve(model2),
                             vocab.empty() ? string() : resolve(reranker), resolve(vocab), params, resolve(prefer));
+      // A translation is created for every key: start CyLM on it now, so it decodes while Rime makes its own
+      // sentence instead of after it.
+      if (t9_cylm_ && context) T9CylmPrefetch(t9_cylm_.get(), context->input(), t9_left_context_);
     }
   }
   if (t9_sentence_rescore_ && !t9_joint_) {
