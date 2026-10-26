@@ -1444,6 +1444,7 @@ int cylm_add_word(CylmModel* m, const char* word, const char* pinyin, long long 
   const int64_t wt = weight > 0 ? int64_t(weight) : std::max<int64_t>(1, int64_t(m->lex.total / 20000));
   return m->lex.AddWord(word, syl, wt) ? 0 : -1;
 }
+int cylm_has_word(CylmModel* m, const char* word) { return m && word && m->lex.WeightOf(word) >= 0 ? 1 : 0; }
 int cylm_adapt_save(CylmModel* m, const char* path) {
   if (!m || !path) return -1;
   return m->adapt.Save(path) ? int(m->adapt.c3.size()) : -1;

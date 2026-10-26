@@ -41,6 +41,9 @@ int cylm_adapt(CylmModel* model, const char* path);
 int cylm_learn(CylmModel* model, const char* text, double count);
 int cylm_add_word(CylmModel* model, const char* word, const char* pinyin, long long weight);
 int cylm_adapt_save(CylmModel* model, const char* path);
+/* 1 when the word is in CyLM's lexicon (the user's words included), else 0. The hook keeps Rime's sentence when one
+ * of its words (2+ characters) is not: CyLM would only spell that word out of single characters. */
+int cylm_has_word(CylmModel* model, const char* word);
 /* A separate reranker for nine-key input (the full tier uses a larger one there). Call before cylm_session. */
 int cylm_reranker_t9(CylmModel* model, const char* reranker, const char* vocab);
 CylmSession* cylm_session(CylmModel* model);
