@@ -40,3 +40,6 @@ internal object CaptionNameAlert {
 /** Whether [text] calls one of [names] (split on spaces, commas, 、; each at least one character). */
 internal fun callsName(text: String, names: String): Boolean =
     names.split(' ', ',', '，', '、', ';', '；').map { it.trim() }.filter { it.isNotEmpty() }.any { text.contains(it, ignoreCase = true) }
+
+/** One earlier caption file in 下载/CyIME字幕. */
+internal data class SavedCaption(val name: String, val modifiedMs: Long, val sizeBytes: Long, val uri: android.net.Uri?, val file: java.io.File?)
