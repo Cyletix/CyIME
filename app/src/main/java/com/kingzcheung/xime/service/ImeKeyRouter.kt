@@ -89,7 +89,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         if (!usesDirectFieldInput) return@withEditor false
         val literal = service.editorInputPolicy.field.typedLiteral(text)
         if (literal.isEmpty()) return@withEditor true
-        service.cancelVerificationCodeInput()
         service.predictionManager.invalidatePendingPredictions()
         service.candidateState.value = CandidateState()
         if (service.editorInputPolicy.field.kind in keyEventFieldKinds) {

@@ -931,7 +931,6 @@ fun KeyboardView(
                         callbacks.onDismissClipboardPreview?.invoke()
                         viewModel.showOverlay(OverlayRoute.Clipboard(0))
                     },
-                    onVerificationCodeSelect = callbacks.onVerificationCodeSelect,
                     onClipboardImageSelect = callbacks.onClipboardImageSelect,
                     onExpandClipboardImages = callbacks.onExpandClipboardImages,
                     onCandidateSelect = select@{ index ->

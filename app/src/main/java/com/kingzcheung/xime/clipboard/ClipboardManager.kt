@@ -52,6 +52,8 @@ class ClipboardManager private constructor(private val context: Context) {
         private const val KEY_CLIPBOARD_ITEMS = "clipboard_items"
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
         private const val INTERNAL_IMAGE_CLIP_LABEL = "cyime_image"
+        /** 短信验证码只用一次：自动复制 10 分钟后从候选栏和系统剪贴板删掉。 */
+        internal const val SMS_CODE_LIFETIME_MS = 10 * 60_000L
 
         @Volatile
         private var instance: ClipboardManager? = null
@@ -117,12 +119,14 @@ class ClipboardManager private constructor(private val context: Context) {
                     if (clipData.description.label == VerificationCodeSmsReceiver.CLIP_LABEL && VerificationCodeExtractor.isCode(text)) {
                         // Automatic SMS codes stay in memory and never enter history or sync.
                         val timestamp = clipData.description.timestamp
-                        if (lastSmsClipTimestamp != timestamp) {
+                        val remaining = timestamp + SMS_CODE_LIFETIME_MS - System.currentTimeMillis()
+                        if (remaining <= 0) {
+                            // 键盘进程中途被回收时定时器没跑，下次读到就补删。
+                            expireSmsCode(timestamp)
+                        } else if (lastSmsClipTimestamp != timestamp) {
                             lastSmsClipTimestamp = timestamp
                             _verificationCode.value = ClipboardItem(text = text, timestamp = timestamp)
-                            Handler(Looper.getMainLooper()).postDelayed({
-                                if (_verificationCode.value?.timestamp == timestamp) _verificationCode.value = null
-                            }, (timestamp + 5 * 60_000L - System.currentTimeMillis()).coerceAtLeast(0))
+                            Handler(Looper.getMainLooper()).postDelayed({ expireSmsCode(timestamp) }, remaining)
                         }
                         return
                     }
@@ -141,6 +145,17 @@ class ClipboardManager private constructor(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error reading clipboard", e)
         }
+    }
+
+    /** Drops an expired SMS code; clears the system clipboard only while it still holds that same code. */
+    private fun expireSmsCode(timestamp: Long) {
+        if (_verificationCode.value?.timestamp == timestamp) _verificationCode.value = null
+        runCatching {
+            val description = androidClipboardManager.primaryClipDescription
+            if (description?.label == VerificationCodeSmsReceiver.CLIP_LABEL && description.timestamp == timestamp) {
+                androidClipboardManager.clearPrimaryClip()
+            }
+        }.onFailure { Log.w(TAG, "Could not clear expired SMS code", it) }
     }
 
     private val database = ClipboardDatabase.getInstance(context)
@@ -536,7 +551,7 @@ class ClipboardManager private constructor(private val context: Context) {
         val now = System.currentTimeMillis()
         val cutoff = now - seconds * 1000L
         // 候选栏只展示未消费的最近剪贴板项（用户点选上屏后标记 consumed 不再显示）
-        val sms = _verificationCode.value?.takeIf { it.timestamp >= now - 5 * 60_000L }
+        val sms = _verificationCode.value?.takeIf { it.timestamp >= now - SMS_CODE_LIFETIME_MS }
         return listOfNotNull(sms) + _clipboardItems.value.filter { it.timestamp >= cutoff && !it.consumed && it.text != sms?.text }
     }
 
