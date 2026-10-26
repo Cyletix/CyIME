@@ -28,6 +28,10 @@ int cylm_prefer(CylmModel* model, const char* path);
 /* Characters missing from the second (chat) model's corpus, one per line: words containing them are scored by the
  * main model alone. Call before cylm_session. Returns the number of characters, or -1. */
 int cylm_holes(CylmModel* model, const char* path);
+/* The user's own word layer: trigram counts "a\tb\tw\tcount" (tools/cylm, the private adapt.counts.tsv), mixed in
+ * by the adapt_add or adapt_lambda parameter. Private data: only for the user's own devices. Call before
+ * cylm_session. Returns the number of words, or -1. */
+int cylm_adapt(CylmModel* model, const char* path);
 /* A separate reranker for nine-key input (the full tier uses a larger one there). Call before cylm_session. */
 int cylm_reranker_t9(CylmModel* model, const char* reranker, const char* vocab);
 CylmSession* cylm_session(CylmModel* model);
@@ -35,7 +39,8 @@ CylmSession* cylm_session(CylmModel* model);
  * context: text before the caret (UTF-8, may be NULL). Candidates are written to out as UTF-8 strings each ended
  * by '\0', best first. Returns the number of candidates, or -1 on bad arguments. */
 int cylm_decode(CylmSession* session, const char* keys, int mode, const char* context, char* out, int cap);
-/* As cylm_decode, but each record is "text\x1fpinyin\x1fspans\0": pinyin = the candidate's syllables separated by
+/* As cylm_decode, but each record is "text\x1fpinyin\x1fspans\x1fscore\0" (score: the ranking score, higher is
+ * better; the differences between candidates are log-probability ratios): pinyin = the candidate's syllables separated by
  * spaces ("bei xian qi le"; for initials typed as abbreviations, the full syllable of the chosen reading), spans = the
  * key range [start-end) of each word in the input, comma separated ("0-3,3-7,7-9,9-11"), which maps nine-key digits
  * and pinyin letters alike back to the keys the user pressed. Use the pinyin as the Rime code when committing. */
