@@ -1,4 +1,5 @@
 #include "t9_script_options.h"
+#include "t9_cylm_sentence.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -48,6 +49,8 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       config->GetString("cylm/vocab", &vocab);
       config->GetString("cylm/params", &params);
       config->GetString("cylm/prefer", &prefer);
+      int budget = 0;
+      if (config->GetInt("cylm/budget_ms", &budget) && budget > 0) T9CylmSetBudget(budget);
       auto resolve = [](const string& name) { return name.empty() ? string() : T9ResolveOnce("cylm", "", name); };
       t9_cylm_ = T9CylmOpen(resolve(lexicon), resolve(model), resolve(model2),
                             vocab.empty() ? string() : resolve(reranker), resolve(vocab), params, resolve(prefer));
@@ -191,7 +194,10 @@ std::shared_ptr<CylmModel> T9ScriptOptions::T9CylmOpen(const string& lexicon, co
                                 (raw = cylm_open(lexicon.c_str(), model.c_str(), second, params.c_str())) != nullptr;
   std::shared_ptr<CylmModel> handle(raw, [](CylmModel* m) { if (m) cylm_close(m); });
   if (!handle.get()) handle.reset();
-  else if (!prefer.empty()) cylm_prefer(handle.get(), prefer.c_str());
+  else {
+    if (!prefer.empty()) cylm_prefer(handle.get(), prefer.c_str());
+    T9CylmWarm(handle.get());
+  }
 #ifdef __ANDROID__
   // Once per file set and process (adb logcat -s CyLM): whether the schema's CyLM files opened, and if not,
   // which file is missing and whether the settings alone are the problem.
