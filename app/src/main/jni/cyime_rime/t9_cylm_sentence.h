@@ -21,6 +21,11 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& inpu
                          Dictionary* dict, const Language* language, size_t start,
                          const an<PhraseSyllabifier>& syllabifier, deque<an<Sentence>>* sentences);
 
+// How long a key waits for CyLM (schema cylm/budget_ms); a slower result is not shown for that key.
+void T9CylmSetBudget(int ms);
+// Loads a newly opened model's pages on the CyLM thread, off the key path.
+void T9CylmWarm(CylmModel* model);
+
 }  // namespace rime
 
 #endif  // CYIME_T9_CYLM_SENTENCE_H_
