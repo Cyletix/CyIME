@@ -278,7 +278,9 @@ val prepareChineseDictionaries by tasks.registering {
             // of them, and D/E with the 114 MB lexicon added ~5 ms per key and ~280 MB over CyLM off (2026-10-26).
             "\ncylm:\n  lexicon: cylm_lexicon.cylx\n  model: cylm_model.lm\n" +
             "  params: \"mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=8;per_span=8;per_span_abbrev=16;per_span1=24;" +
-            "nbest=4;t9_beam=6;t9_per_span=6\"\n"
+            "nbest=4;t9_beam=6;t9_per_span=6;skip_inner=1;hit_cap=5000;word_cap=50000;id_cap=50000;dec_cap=25000\"\n" +
+            // With CyLM started while Rime builds its sentence most keys find it done; a key waits at most 6 ms.
+            "  budget_ms: 6\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
         // The 14-key schema (assets/rime_chinese) repeats these sentence rules; keep them the same list.
         check(file("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText()

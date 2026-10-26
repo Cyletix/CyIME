@@ -102,6 +102,9 @@ class CylmWorker {
   // The request id for (session, input, context): the newest one when it matches, else a new one. Under mutex_.
   uint64_t Want(CylmSession* session, const string& in, bool digits, const string& context) {
     if (wanted_ > 0 && session_ == session && in_ == in && context_ == context) return wanted_;
+    // A decode still running for an older key is stopped (it keeps the incremental state of the common prefix),
+    // so the newest key does not queue behind it.
+    if (started_ > finished_ && running_) cylm_cancel(running_);
     session_ = session; in_ = in; digits_ = digits; context_ = context;
     wake_.notify_one();
     return ++wanted_;
@@ -115,12 +118,14 @@ class CylmWorker {
       CylmSession* session = session_;
       const string in = in_, context = context_;
       const bool digits = digits_;
+      running_ = session;
       lock.unlock();
       const auto t0 = std::chrono::steady_clock::now();
       const int n = cylm_decode2(session, in.c_str(), digits ? 1 : 0, context.c_str(), out.data(),
                                  static_cast<int>(out.size()));
       const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
       lock.lock();
+      running_ = nullptr;
       done_session_ = session; done_in_ = in; done_context_ = context; done_ms_ = ms;
       done_record_ = n > 0 && out[0] ? string(out.data()) : string();
       finished_ = id;
@@ -131,6 +136,7 @@ class CylmWorker {
   std::condition_variable wake_, done_;
   uint64_t wanted_ = 0, started_ = 0, finished_ = 0;
   CylmSession* session_ = nullptr;
+  CylmSession* running_ = nullptr;  // the session the worker is decoding now, for cylm_cancel
   string in_, context_;
   bool digits_ = false;
   CylmSession* done_session_ = nullptr;
