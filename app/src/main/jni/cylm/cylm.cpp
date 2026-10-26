@@ -87,6 +87,15 @@ static const uint8_t* MapFile(const char* path) {
 #endif
 }
 
+// Cache caps. Inside an input method the caches live as long as the keyboard process, so the library keeps them to
+// a few tens of MB (CyIME Android 2026-10-26: uncapped, the session hit cache grew to ~900 MB of native heap after
+// a day of typing and the device swapped on every key).
+#ifdef CYLM_LIBRARY
+constexpr size_t kIdCacheMax = 200000, kDecCacheMax = 100000, kHitCacheMax = 20000;
+#else
+constexpr size_t kIdCacheMax = 4000000, kDecCacheMax = 2000000, kHitCacheMax = 3000000;
+#endif
+
 // ------------------------------------------------------------------ c3 model
 #pragma pack(push, 1)
 struct Header3 {
@@ -136,7 +145,7 @@ struct C3 {
       if ((slot >> 24) == (hh >> 24)) { r = int32_t(slot & 0xFFFFFF) - 1; break; }
       i = (i + 1) & mask;
     }
-    if (id_cache.size() > 4000000) id_cache.clear();
+    if (id_cache.size() > kIdCacheMax) id_cache.clear();
     id_cache[text] = r;
     return r;
   }
@@ -193,7 +202,7 @@ struct C3 {
       for (size_t j = n; j > 0; j = from[j]) parts.push_back(wid[j]);
       std::reverse(parts.begin(), parts.end());
     }
-    if (dec_cache.size() > 2000000) dec_cache.clear();
+    if (dec_cache.size() > kDecCacheMax) dec_cache.clear();
     return dec_cache[text] = parts;
   }
 };
@@ -1223,6 +1232,7 @@ CylmSession* cylm_session(CylmModel* m) {
 }
 int cylm_decode(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
   if (!s || !keys || !out || cap <= 0) return -1;
+  if (s->d->hit_cache.size() > kHitCacheMax) s->d->hit_cache.clear();
   auto ranked = s->d->Decode(keys, mode == 1, context ? context : "");
   int n = 0, used = 0;
   for (auto& [w, sc] : ranked) {
@@ -1250,6 +1260,7 @@ int cylm_holes(CylmModel* m, const char* path) {
 }
 int cylm_decode2(CylmSession* s, const char* keys, int mode, const char* context, char* out, int cap) {
   if (!s || !keys || !out || cap <= 0) return -1;
+  if (s->d->hit_cache.size() > kHitCacheMax) s->d->hit_cache.clear();
   auto ranked = s->d->Decode(keys, mode == 1, context ? context : "");
   int n = 0, used = 0;
   for (auto& [w, sc] : ranked) {
@@ -1338,7 +1349,7 @@ int main(int argc, char** argv) {
     }
     std::cout << out << '\n';
     std::cout.flush();
-    if (d.hit_cache.size() > 3000000) d.hit_cache.clear();
+    if (d.hit_cache.size() > kHitCacheMax) d.hit_cache.clear();
   }
   return 0;
 }
