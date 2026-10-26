@@ -1234,11 +1234,6 @@ class RimeEngine {
         if (global) nativeDeleteCandidateByGlobalIndex(index) else nativeDeleteCandidateOnCurrentPage(index)
     }
 
-    /**
-     * 长按删除 = 忘掉这条候选的学习记录：词库里本来有的词回到原位，自造词消失，整句忘掉句里学过的词。
-     * 返回 0 失败（含候选已过期）、1 已忘掉、2 没有学习记录（排序不变）。
-     */
-    @androidx.annotation.WorkerThread
     /** Developer tool: takes back learned commits (rows "text<TAB>commits") from the current schema's user dictionary. */
     @androidx.annotation.WorkerThread
     fun unlearn(rows: String): Int = locked {
@@ -1247,6 +1242,11 @@ class RimeEngine {
         nativeUnlearn(rows)
     }
 
+    /**
+     * 长按删除 = 忘掉这条候选的学习记录：词库里本来有的词回到原位，自造词消失，整句忘掉句里学过的词。
+     * 返回 0 失败（含候选已过期）、1 已忘掉、2 没有学习记录（排序不变）。
+     */
+    @androidx.annotation.WorkerThread
     internal fun forgetCandidateAtRevision(index: Int, revision: Long, global: Boolean = false): Int = locked {
         if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked 0
         candidateRevision.incrementAndGet()
