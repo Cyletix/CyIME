@@ -49,3 +49,24 @@
 ### 测试
 
 `./gradlew :app:testDebugUnitTest --tests …`（`--no-daemon --max-workers=2`，编译含整个 main 源码）：`CompositionCommitPrefixTest`（新增）6/6、`AssociationSelectionTest` 4/4、`InputTextPolicyTest` 10/10、`HardwareLanguageSwitchRoutingTest` 5/5 通过。空格选首选、回车原样两条反例只在纯函数层体现（`asTyped=false` 仍是首选、九键文字与回车同源），路由层没有单测覆盖。未打包，真机未验收。
+
+## C. 1.14.138 平板验收（2026-10-27 06:50–07:10）
+
+平板 `R52T800SKWZ`，1.14.138（含 `d5309168` 14 键读音上屏、`338de6ac` 九键高亮一致）。CyIME 设置页测试框，输入框文字用 uiautomator 从 CyIME 自己的试打框读出。截图在 `D:\CyIME-Data\key-audit-20261024\after-138\`。
+
+| 用例 | 期望 | 实际 | 结果 | 证据 |
+|---|---|---|---|---|
+| 九键 736，「下一项」到 森 | 编码 sen、左栏标 sen | 编码 sen，左栏标 sen，高亮 森 | 通过 | t1b、t3a |
+| 同上按空格 | 森 | 森 | 通过 | t1c |
+| 同上按回车 | sen | sen | 通过 | t3b |
+| 同上开 !@# 点 ? | sen？ | sen？ | 通过 | t3c、t3d |
+| 森 上按「上一项」回首选 | 编码 ren、左栏不标、空格 人 | ren，不标，人 | 通过 | t4a、t4b |
+| 九键 64426 逐个「下一项」 | 编码跟高亮候选 | 你好/拟好 ni'hao，你敢 ni'gan，你搞 ni'gao，米糕 mi'gao（左栏标 mi），蜜柑 mi'gan，密告 mi'gao | 通过 | p0–p6 |
+| 14 键 nihao＋， | nihao， | nihao， | 通过 | k2 |
+| 14 键 nihao 回车 | nihao | nihao | 通过 | k3 |
+| 14 键 nihao 空格 | 你好 | 你好 | 通过 | k4 |
+| 14 键 zuoge＋Shift D | zuogeD | zuogeD | 通过 | k5 |
+| 26 键 why＋， | why， | why， | 通过 | a1 |
+| 26 键 nihao＋中/英 | nihao，切到英文 | nihao，空格键显示英文 | 通过 | a2 |
+
+测试时上屏过 森，平板的「选一次就记住」把 九键 736 的 森 排到了第二（第一次按 4 下「下一项」落在 忍 上，编码 ren、回车 ren，与高亮一致）。26 键 Shift 大写：10-27 在 1.14.137 上单击 Shift、双击锁定、按住 Shift 拖到字母都出“做个DNA”，双指按住 Shift 点字母无法用 adb 模拟；按住 Shift 时键盘重置把 Shift 松掉的问题已由 `f5e0da3b`（1.14.119 起）修复。
