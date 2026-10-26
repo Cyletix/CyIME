@@ -65,6 +65,15 @@ internal object BundledRimeSync {
                 changed = true
             } finally { pending.delete() }
         }
+        // CyLM files (cylm_*) change with the tier a package carries: one the new package no longer has is removed
+        // when unmodified, so switching to a smaller tier does not leave hundreds of MB behind. Other files a
+        // package dropped stay, as before (a lightweight edition keeps the enhancement models already installed).
+        val carried = entries.map { it[3] }.toSet()
+        for ((relative, installed) in previous) {
+            if (!relative.startsWith("cylm_") || relative in carried) continue
+            val file = destination(relative)
+            if (file.isFile && !userModified(file, installed)) file.delete()
+        }
         target.mkdirs()
         val pendingManifest = File(target, ".cyime-bundled-manifest.tmp")
         pendingManifest.writeText(manifest)
