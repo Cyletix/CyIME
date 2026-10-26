@@ -262,6 +262,29 @@ fun SpeechToTextSettingsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                var captionAutoSave by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionAutoSave.isOn(context)) }
+                Column(Modifier.settingsSearchAnchor("自动保存字幕").fillMaxWidth().padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "自动保存字幕",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = captionAutoSave,
+                            onCheckedChange = {
+                                captionAutoSave = it
+                                com.kingzcheung.xime.ui.caption.CaptionAutoSave.setOn(context, it)
+                            },
+                        )
+                    }
+                    Text(
+                        text = "从打开字幕到按“退出”算一次，每次存成一个文件，边听边更新，在“下载/CyIME字幕”里。关闭后只在点“保存”时存。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 var captionFloat by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionFloat.isOn(context)) }
                 val callCaptionOn = remember(captionFloat) { com.kingzcheung.xime.ui.caption.CallCaptionService.isEnabled(context) }
                 Column(Modifier.settingsSearchAnchor("后台浮窗").fillMaxWidth().padding(16.dp)) {
