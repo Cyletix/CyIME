@@ -50,9 +50,9 @@ struct CylmStats {
     if (calls <= 3 || calls % 50 == 0)
       __android_log_print(ANDROID_LOG_INFO, "CyLM",
                           "decode calls=%ld replaced=%ld late=%ld ready_at_ask=%ld wait_ms p50=%.2f p95=%.2f "
-                          "decode_ms p50=%.2f p95=%.2f heap_mb=%.1f", calls, replaced, late, ready,
+                          "decode_ms p50=%.2f p95=%.2f heap_mb=%.1f learned=%ld", calls, replaced, late, ready,
                           Quantile(waits, 0.5), Quantile(waits, 0.95), Quantile(decodes, 0.5),
-                          Quantile(decodes, 0.95), mallinfo().uordblks / 1048576.0);
+                          Quantile(decodes, 0.95), mallinfo().uordblks / 1048576.0, learned_texts.load());
 #endif
     if (calls % 50 == 0) { waits.clear(); decodes.clear(); }
   }
@@ -60,6 +60,7 @@ struct CylmStats {
 CylmStats& Stats() { static auto* stats = new CylmStats(); return *stats; }
 
 std::atomic<int> budget_ms{12};
+std::atomic<long> learned_texts{0};  // committed texts CyLM learned (cylm_learn), for the log
 
 // Developer switch for A/B on one install: `adb shell setprop debug.cyime.cylm 0` turns CyLM off from the next
 // key, `setprop debug.cyime.cylm 1` turns it back on.
@@ -153,6 +154,7 @@ class CylmWorker {
         lock.unlock();
         for (const auto& [model, text] : texts) {
           if (cylm_learn(model, text.c_str(), 1.0) <= 0) continue;
+          ++learned_texts;
           const auto file = files.find(model);
           if (++learned_ % 20 == 0 && file != files.end()) cylm_adapt_save(model, file->second.c_str());
         }
