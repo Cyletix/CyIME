@@ -422,13 +422,16 @@ class RimeEngine {
 
     private fun displayPreedit(input: String, preedit: String, spelling: String): String {
         val schema = nativeGetCurrentSchema().orEmpty()
-        val groups = if (com.kingzcheung.xime.settings.InputProfiles.describe(schema).layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) merged14Groups else
+        val profile = com.kingzcheung.xime.settings.InputProfiles.describe(schema)
+        val groups = if (profile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) merged14Groups else
             com.kingzcheung.xime.settings.CustomKeyboardLayouts.find(schema)?.mergedGroups.orEmpty()
         if (groups.none { it.length > 1 } || nativeIsAsciiMode()) return preedit
         val snapshot = nativePinyinEditSnapshot()
         val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0
         val prefix = snapshot.getOrNull(3).orEmpty()
-        return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), spelling, groups)
+        // 14 键双拼的首选读音是全拼，换成小鹤双拼的键才能和合并编码一一对上。
+        val reading = if (profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN) flypyReading(spelling) else spelling
+        return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), reading, groups)
     }
 
     private fun withDisplayPreedit(result: RimeProcessResult): RimeProcessResult = result.copy(
