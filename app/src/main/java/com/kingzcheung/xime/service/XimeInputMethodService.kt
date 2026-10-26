@@ -2622,7 +2622,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         event?.let { hardwareCapsLockState.value = it.isCapsLockOn }
         if (hasHardwareKeyboard) event?.let { feedbackManager.playHardwareKeySound(it) }
-        cancelVerificationCodeInput()
         if (uiState.value.showQuickSendForm && keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) {
             keyRouter.handleKeyPress("enter", event?.isShiftPressed == true)
             return true
@@ -3998,46 +3997,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         )
     }
 
-    private var verificationCodeJob: Job? = null
-
-    internal fun cancelVerificationCodeInput() { verificationCodeJob?.cancel() }
-
-    internal fun fillVerificationCode(code: String, sequential: Boolean) {
-        if (!com.kingzcheung.xime.clipboard.VerificationCodeExtractor.isCode(code) ||
-            candidateState.value.isComposing || keyRouter.hasPendingCandidateCommit ||
-            uiState.value.inputTarget.isInternal) return
-        cancelVerificationCodeInput()
-        predictionManager.invalidatePendingPredictions()
-        verificationCodeJob = serviceScope.launch {
-            val commit: (String) -> Boolean = {
-                commitTextSilently(it, isPaste = true, isSensitive = true) == TextCommitResult.ACCEPTED_HOST
-            }
-            // Numeric editors use digit commits even on the main code button, so
-            // single-field and auto-advancing split-field forms share a safe path.
-            val digitMode = sequential || currentInputEditorInfo?.inputType?.and(android.text.InputType.TYPE_MASK_CLASS) == android.text.InputType.TYPE_CLASS_NUMBER
-            val accepted = if (digitMode) VerificationCodeInput.fill(code, target = {
-                val info = currentInputEditorInfo
-                if (info == null || currentInputConnection == null || !isInputViewShown ||
-                    uiState.value.inputTarget.isInternal ||
-                    candidateState.value.isComposing || keyRouter.hasPendingCandidateCommit) null
-                else VerificationCodeInput.Target(info.packageName, info.fieldId, info.inputType, uiState.value.inputSessionId)
-            }, commit = commit, content = {
-                runCatching { currentInputConnection?.let { connection ->
-                    val before = connection.getTextBeforeCursor(16, 0)
-                    val after = connection.getTextAfterCursor(16, 0)
-                    if (before == null || after == null) null else "$before|$after"
-                } }.getOrNull()
-            }) else commit(code)
-            if (accepted) {
-                recentClipboardItemsState.value.filter { it.text == code ||
-                    com.kingzcheung.xime.clipboard.VerificationCodeExtractor.extract(it.text) == code
-                }.forEach { clipboardManager.markConsumed(it.text) }
-                candidateState.value = CandidateState()
-            } else android.widget.Toast.makeText(this@XimeInputMethodService,
-                "填入已停止，请检查输入框；未自动跳格时请手动逐格输入", android.widget.Toast.LENGTH_LONG).show()
-        }
-    }
-
     internal fun submitText(text: String): TextCommitResult {
         InputCommandOwner.requireOwner().requireCurrent(inputReadiness, uiState.value.inputSessionId)
         return commitTextAndPredict(text, false)
@@ -4103,7 +4062,6 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      */
     internal fun commitTextSilently(text: String, isPaste: Boolean = false, isSensitive: Boolean = false): TextCommitResult {
         check(Looper.myLooper() == Looper.getMainLooper()) { "Editor commits belong to Main" }
-        if (!isSensitive) cancelVerificationCodeInput()
         if (InputCommandOwner.current.get() == null) {
             check(com.kingzcheung.xime.rime.RimeCommandContext.validity.get() == null) {
                 "Queued editor delivery lost its command owner"

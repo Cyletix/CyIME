@@ -101,7 +101,6 @@ internal fun rememberImeKeyboardCallbacks(
                 } else service.schemaController.handleJapaneseKanaAction(action)
             },
             onKeyPressDown = { key ->
-                service.cancelVerificationCodeInput()
                 service.predictionManager.invalidatePendingPredictions()
                 service.feedbackManager.performKeyPressDownEffect(key, view)
             },
@@ -190,7 +189,6 @@ internal fun rememberImeKeyboardCallbacks(
                     service.startActivity(android.content.Intent.createChooser(send, "分享图片").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
                 }.onFailure { android.widget.Toast.makeText(service, "没有可接收图片的应用", android.widget.Toast.LENGTH_SHORT).show() }
             },
-            onVerificationCodeSelect = { code, sequential -> service.fillVerificationCode(code, sequential) },
             onClipboardPullRemote = { service.clipboardSyncBridge?.pullOnce() },
             onCommitText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text) },
             onCommitExactText = { text -> if (service.inputReadiness.ticket() != null) service.textCommit.commitLiteralText(text, preserveWidth = true) },
