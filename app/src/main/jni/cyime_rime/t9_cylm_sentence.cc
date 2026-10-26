@@ -284,8 +284,19 @@ void T9CylmSyncWords(CylmModel* model, const string& dir) {
     if (!model || dir.empty() || (checked.time_since_epoch().count() && now - checked < std::chrono::seconds(3))) return;
     checked = now;
   }
-  CylmWorker::Instance().Run([model, dir] {
+#ifdef __ANDROID__
+  // `setprop debug.cyime.cylm_cells 0` leaves out the cell dictionaries (user_cyime_cells_*), to measure their share.
+  char cells_value[PROP_VALUE_MAX] = {0};
+  const bool skip_cells = __system_property_get("debug.cyime.cylm_cells", cells_value) > 0 && cells_value[0] == '0';
+#else
+  const bool skip_cells = false;
+#endif
+  CylmWorker::Instance().Run([model, dir, skip_cells] {
     namespace fs = std::filesystem;
+#ifdef __ANDROID__
+    const double heap_before = mallinfo().uordblks / 1048576.0;
+    int words = 0;
+#endif
     static std::map<string, fs::file_time_type> seen;  // the CyLM thread only
     std::error_code ec;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
@@ -293,6 +304,7 @@ void T9CylmSyncWords(CylmModel* model, const string& dir) {
       const bool pack = name.rfind("user_", 0) == 0 && name.size() > 10 && name.compare(name.size() - 10, 10, ".dict.yaml") == 0;
       const bool phrases = name.rfind("custom_phrase", 0) == 0 && name.size() > 4 && name.compare(name.size() - 4, 4, ".txt") == 0;
       if (!pack && !phrases) continue;
+      if (skip_cells && name.rfind("user_cyime_cells_", 0) == 0) continue;
       const auto time = it->last_write_time(ec);
       if (ec || seen[name] == time) continue;
       seen[name] = time;
@@ -309,9 +321,18 @@ void T9CylmSyncWords(CylmModel* model, const string& dir) {
         if (tab == string::npos) continue;
         const auto tab2 = line.find('\t', tab + 1);
         const string reading = line.substr(tab + 1, tab2 == string::npos ? string::npos : tab2 - tab - 1);
+#ifdef __ANDROID__
+        words += cylm_add_word(model, line.substr(0, tab).c_str(), reading.c_str(), 0) == 0;
+#else
         cylm_add_word(model, line.substr(0, tab).c_str(), reading.c_str(), 0);
+#endif
       }
     }
+#ifdef __ANDROID__
+    if (words)
+      __android_log_print(ANDROID_LOG_INFO, "CyLM", "user words %d%s: heap %.1f -> %.1f MB", words,
+                          skip_cells ? " (cells skipped)" : "", heap_before, mallinfo().uordblks / 1048576.0);
+#endif
   });
 }
 

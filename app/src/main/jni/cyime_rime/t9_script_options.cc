@@ -20,6 +20,8 @@
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <malloc.h>
+#include <sys/system_properties.h>
 #endif
 
 namespace rime {
@@ -218,11 +220,24 @@ std::shared_ptr<CylmModel> T9ScriptOptions::T9CylmOpen(const string& lexicon, co
     // Before any session: sessions read the layer when they are created. A missing file (public packages) is
     // simply no layer. What the user taught it on this device is saved beside it (cylm_learned.tsv, the same
     // layer plus the learned counts) and read instead when present.
-    if (!adapt.empty()) {
+#ifdef __ANDROID__
+    // Memory diagnosis (adb logcat -s CyLM): heap before and after the user layer; `setprop debug.cyime.cylm_adapt 0`
+    // opens without it, to measure its share.
+    char no_adapt[PROP_VALUE_MAX] = {0};
+    const bool skip_adapt = __system_property_get("debug.cyime.cylm_adapt", no_adapt) > 0 && no_adapt[0] == '0';
+    const double heap_before = mallinfo().uordblks / 1048576.0;
+#else
+    const bool skip_adapt = false;
+#endif
+    if (!adapt.empty() && !skip_adapt) {
       const string learned = adapt.substr(0, adapt.find_last_of('/') + 1) + "cylm_learned.tsv";
       if (cylm_adapt(handle.get(), learned.c_str()) < 0) cylm_adapt(handle.get(), adapt.c_str());
       T9CylmLearnInto(handle.get(), learned);
     }
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "CyLM", "user layer %s: heap %.1f -> %.1f MB", skip_adapt ? "skipped" : "loaded",
+                        heap_before, mallinfo().uordblks / 1048576.0);
+#endif
     T9CylmWarm(handle.get());
   }
 #ifdef __ANDROID__
