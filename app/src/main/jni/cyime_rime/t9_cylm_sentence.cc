@@ -62,6 +62,18 @@ struct CylmStats {
 CylmStats& Stats() { static auto* stats = new CylmStats(); return *stats; }
 
 std::atomic<int> budget_ms{12};
+std::atomic<bool> guard_unknown{false};  // schema cylm/guard_unknown_words
+
+// Keep Rime's sentence when one of its words (2+ characters) is unknown to CyLM: CyLM would only spell that word out
+// of single characters (自训模型攻坚 47badd7). `setprop debug.cyime.cylm_guard 1|0` overrides the schema for tests.
+bool GuardUnknownWords() {
+#ifdef __ANDROID__
+  char value[PROP_VALUE_MAX] = {0};
+  if (__system_property_get("debug.cyime.cylm_guard", value) > 0 && (value[0] == '0' || value[0] == '1'))
+    return value[0] == '1';
+#endif
+  return guard_unknown.load();
+}
 
 // Developer switch for A/B on one install: `adb shell setprop debug.cyime.cylm 0` turns CyLM off from the next
 // key, `setprop debug.cyime.cylm 1` turns it back on.
@@ -236,6 +248,8 @@ string CylmContext(const string& left_context) {
 
 void T9CylmSetBudget(int ms) { budget_ms = std::max(1, std::min(200, ms)); }
 
+void T9CylmSetGuardUnknownWords(bool on) { guard_unknown = on; }
+
 bool T9CylmEnabled() { return !CylmSwitchedOff(); }
 
 void T9CylmWarm(CylmModel* model) {
@@ -346,6 +360,10 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
   // then zhepianbiji) stays, or CyLM's 这片笔记 replaced it and learning never reached whole sentences.
   for (const auto& part : rime->components())
     if (part.commit_count > 0) return Stats().Add(false, false, ready, wait_ms, ms);
+  if (GuardUnknownWords())
+    for (const auto& part : rime->components())
+      if (utf8::unchecked::distance(part.text.begin(), part.text.end()) >= 2 && !cylm_has_word(model, part.text.c_str()))
+        return Stats().Add(false, false, ready, wait_ms, ms);
   DictEntry entry;
   entry.text = text;
   entry.weight = rime->weight();

@@ -53,6 +53,9 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       config->GetString("cylm/adapt", &adapt);
       int budget = 0;
       if (config->GetInt("cylm/budget_ms", &budget) && budget > 0) T9CylmSetBudget(budget);
+      bool guard = false;
+      config->GetBool("cylm/guard_unknown_words", &guard);
+      T9CylmSetGuardUnknownWords(guard);
       auto resolve = [](const string& name) { return name.empty() ? string() : T9ResolveOnce("cylm", "", name); };
       t9_cylm_ = T9CylmOpen(resolve(lexicon), resolve(model), resolve(model2),
                             vocab.empty() ? string() : resolve(reranker), resolve(vocab), params, resolve(prefer),

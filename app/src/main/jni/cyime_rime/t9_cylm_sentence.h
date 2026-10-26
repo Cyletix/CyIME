@@ -23,6 +23,8 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& inpu
 
 // How long a key waits for CyLM (schema cylm/budget_ms); a slower result is not shown for that key.
 void T9CylmSetBudget(int ms);
+// Keep Rime's sentence when one of its words is unknown to CyLM (schema cylm/guard_unknown_words).
+void T9CylmSetGuardUnknownWords(bool on);
 // False after `adb shell setprop debug.cyime.cylm 0` (developer switch); CyLM is then not even opened.
 bool T9CylmEnabled();
 // Loads a newly opened model's pages on the CyLM thread, off the key path.
