@@ -40,6 +40,10 @@ int cylm_decode(CylmSession* session, const char* keys, int mode, const char* co
  * key range [start-end) of each word in the input, comma separated ("0-3,3-7,7-9,9-11"), which maps nine-key digits
  * and pinyin letters alike back to the keys the user pressed. Use the pinyin as the Rime code when committing. */
 int cylm_decode2(CylmSession* session, const char* keys, int mode, const char* context, char* out, int cap);
+/* Stops a cylm_decode / cylm_decode2 running on this session in another thread (the only call that may overlap one):
+ * it returns -2 with no candidates at its next check, and the session keeps its state of the input's common prefix
+ * with the previous one, so the next decode is still incremental. Decodes started after the call are not affected. */
+void cylm_cancel(CylmSession* session);
 void cylm_close_session(CylmSession* session);
 void cylm_close(CylmModel* model);
 
