@@ -31,6 +31,8 @@ void T9CylmWarm(CylmModel* model);
 // every 20 texts and read back from it when the model opens.
 void T9CylmLearn(CylmModel* model, const string& text);
 void T9CylmLearnInto(CylmModel* model, const string& file);
+// The user's own words in the Rime user directory `dir` go to CyLM (cylm_add_word); rechecked when files change.
+void T9CylmSyncWords(CylmModel* model, const string& dir);
 // Starts CyLM on this key's input while Rime builds its own sentence (called when the translation is created).
 void T9CylmPrefetch(CylmModel* model, const string& input, const string& left_context);
 

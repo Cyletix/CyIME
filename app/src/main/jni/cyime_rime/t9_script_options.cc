@@ -60,6 +60,7 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       // A translation is created for every key: start CyLM on it now, so it decodes while Rime makes its own
       // sentence instead of after it.
       if (t9_cylm_ && context) T9CylmPrefetch(t9_cylm_.get(), context->input(), t9_left_context_);
+      if (t9_cylm_) T9CylmSyncWords(t9_cylm_.get(), Service::instance().deployer().user_data_dir.string());
       // Every commit of this input context teaches CyLM; connected once per context (marked by a property).
       if (t9_cylm_ && context && context->get_property("cyime_cylm_learn").empty()) {
         context->set_property("cyime_cylm_learn", "1");

@@ -5,6 +5,9 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -87,6 +90,12 @@ class CylmWorker {
     learn_.emplace_back(model, text);
     wake_.notify_one();
   }
+  // Any other model change (cylm_add_word), run on the worker between decodes like learning.
+  void Run(std::function<void()> task) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    tasks_.push_back(std::move(task));
+    wake_.notify_one();
+  }
   void LearnInto(CylmModel* model, const string& file) {
     std::lock_guard<std::mutex> lock(mutex_);
     learn_file_[model] = file;
@@ -127,7 +136,15 @@ class CylmWorker {
     vector<char> out(16384);
     std::unique_lock<std::mutex> lock(mutex_);
     for (;;) {
-      wake_.wait(lock, [&] { return wanted_ > started_ || !learn_.empty(); });
+      wake_.wait(lock, [&] { return wanted_ > started_ || !learn_.empty() || !tasks_.empty(); });
+      if (!tasks_.empty()) {
+        vector<std::function<void()>> tasks;
+        tasks.swap(tasks_);
+        lock.unlock();
+        for (auto& task : tasks) task();
+        lock.lock();
+        continue;
+      }
       if (!learn_.empty()) {
         // Learning never overlaps a decode (cylm.h): it runs here, on the decoding thread, before the next key.
         vector<std::pair<CylmModel*, string>> texts;
@@ -169,6 +186,7 @@ class CylmWorker {
   CylmSession* session_ = nullptr;
   CylmSession* running_ = nullptr;  // the session the worker is decoding now, for cylm_cancel
   vector<std::pair<CylmModel*, string>> learn_;
+  vector<std::function<void()>> tasks_;
   std::map<CylmModel*, string> learn_file_;
   long learned_ = 0;  // texts learned, on the worker only
   string in_, context_;
@@ -221,6 +239,50 @@ void T9CylmLearn(CylmModel* model, const string& text) {
 }
 
 void T9CylmLearnInto(CylmModel* model, const string& file) { CylmWorker::Instance().LearnInto(model, file); }
+
+void T9CylmSyncWords(CylmModel* model, const string& dir) {
+  // The user's own words (个人词库 user_*.dict.yaml, 我的短语 custom_phrase*.txt in the Rime user directory) are
+  // given to CyLM (cylm_add_word) when it opens and again when one of those files changes. The key's translation
+  // only checks the clock (at most every 3 s); the directory is read on the CyLM thread, so a phrase added in
+  // settings counts from the next sentence without touching the key path.
+  static std::mutex mutex;
+  static std::chrono::steady_clock::time_point checked;
+  {
+    std::lock_guard<std::mutex> lock(mutex);
+    const auto now = std::chrono::steady_clock::now();
+    if (!model || dir.empty() || (checked.time_since_epoch().count() && now - checked < std::chrono::seconds(3))) return;
+    checked = now;
+  }
+  CylmWorker::Instance().Run([model, dir] {
+    namespace fs = std::filesystem;
+    static std::map<string, fs::file_time_type> seen;  // the CyLM thread only
+    std::error_code ec;
+    for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+      const string name = it->path().filename().string();
+      const bool pack = name.rfind("user_", 0) == 0 && name.size() > 10 && name.compare(name.size() - 10, 10, ".dict.yaml") == 0;
+      const bool phrases = name.rfind("custom_phrase", 0) == 0 && name.size() > 4 && name.compare(name.size() - 4, 4, ".txt") == 0;
+      if (!pack && !phrases) continue;
+      const auto time = it->last_write_time(ec);
+      if (ec || seen[name] == time) continue;
+      seen[name] = time;
+      // Rows "word<TAB>reading[<TAB>weight]"; a dictionary pack's rows start after its "..." line. A phrase whose
+      // code is not pinyin (an abbreviation) is refused by cylm_add_word and stays Rime's alone.
+      std::ifstream in(it->path());
+      string line;
+      bool rows = !pack;
+      while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (!rows) { rows = line == "..."; continue; }
+        if (line.empty() || line[0] == '#') continue;
+        const auto tab = line.find('\t');
+        if (tab == string::npos) continue;
+        const auto tab2 = line.find('\t', tab + 1);
+        const string reading = line.substr(tab + 1, tab2 == string::npos ? string::npos : tab2 - tab - 1);
+        cylm_add_word(model, line.substr(0, tab).c_str(), reading.c_str(), 0);
+      }
+    }
+  });
+}
 
 void T9CylmPrefetch(CylmModel* model, const string& input, const string& left_context) {
   bool digits = false;
