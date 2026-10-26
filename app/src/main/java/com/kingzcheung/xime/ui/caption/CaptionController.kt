@@ -308,7 +308,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
             if (confirmed) {
                 FileLogger.i(TAG, "seg=$id final len=${text.length} event=$event durMs=${endMs - startMs}")
                 // Nothing to read: a short empty segment disappears, a long one shows the marker.
-                if (ui.text.isEmpty()) { segments.remove(ui); transcript.remove(id) } else scheduleSave()
+                if (ui.text.isEmpty()) { segments.remove(ui); transcript.remove(id) } else { scheduleSave(); alertIfNamed(ui) }
             }
             trimHistory()
         }
@@ -483,6 +483,22 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         savedUri = null
         savedWhere = null
         sessionName = newSessionName()
+    }
+
+    /** Buzzes when a finished line from someone else calls the holder by name (「有人叫我名字时振动」). */
+    private fun alertIfNamed(line: SegmentUi) {
+        if (!CaptionNameAlert.isOn(app)) return
+        if (line.speakerId == SELF_SPEAKER || line.speakerId == REPLY_SPEAKER) return
+        if (!callsName(line.text, CaptionNameAlert.names(app))) return
+        FileLogger.i(TAG, "name heard seg=${line.id}")
+        val vibrator = if (android.os.Build.VERSION.SDK_INT >= 31)
+            (app.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator
+            else @Suppress("DEPRECATION") app.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 26)
+                vibrator.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400, 200, 400), -1))
+            else @Suppress("DEPRECATION") vibrator.vibrate(longArrayOf(0, 400, 200, 400, 200, 400), -1)
+        }
     }
 
     /** Puts the whole session on the clipboard; false when there is nothing yet. */

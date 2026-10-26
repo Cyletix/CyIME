@@ -285,6 +285,40 @@ fun SpeechToTextSettingsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                var nameAlert by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionNameAlert.isOn(context)) }
+                var alertNames by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionNameAlert.names(context)) }
+                Column(Modifier.settingsSearchAnchor("有人叫我名字时振动").fillMaxWidth().padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "有人叫我名字时振动",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = nameAlert,
+                            onCheckedChange = {
+                                nameAlert = it
+                                com.kingzcheung.xime.ui.caption.CaptionNameAlert.setOn(context, it)
+                            },
+                        )
+                    }
+                    Text(
+                        text = "字幕里别人说的话出现下面的名字时，手机振动三下。几个叫法用空格隔开，比如“老王 王叔 爷爷”。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (nameAlert) androidx.compose.material3.OutlinedTextField(
+                        value = alertNames,
+                        onValueChange = {
+                            alertNames = it
+                            com.kingzcheung.xime.ui.caption.CaptionNameAlert.setNames(context, it)
+                        },
+                        label = { Text("我的名字") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
                 var captionFloat by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionFloat.isOn(context)) }
                 val callCaptionOn = remember(captionFloat) { com.kingzcheung.xime.ui.caption.CallCaptionService.isEnabled(context) }
                 Column(Modifier.settingsSearchAnchor("后台浮窗").fillMaxWidth().padding(16.dp)) {
