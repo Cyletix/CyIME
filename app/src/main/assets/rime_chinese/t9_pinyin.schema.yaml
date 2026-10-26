@@ -9,7 +9,7 @@
 cylm:
   lexicon: cylm_lexicon.cylx
   model: cylm_model.lm
-  params: "mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=8;per_span=8;per_span_abbrev=16;per_span1=24;nbest=4;t9_beam=6;t9_per_span=6"
+  params: "mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=4;per_span=6;per_span_abbrev=10;per_span1=16;nbest=3;t9_beam=4;t9_per_span=4"
 t9:
   joint_decoder: true
   source_budget: 128
