@@ -32,6 +32,8 @@ namespace {
 // Per-key diagnosis on a device (adb logcat -s CyLM): the first keys, then a summary every 50 keys of how many got
 // CyLM's sentence first, how many it missed the budget for, how many found it already decoded, and the median /
 // p95 of how long the key waited for CyLM and how long CyLM decoded. Never the keys or the text.
+std::atomic<long> learned_texts{0};  // committed texts CyLM learned (cylm_learn), for the log
+
 struct CylmStats {
   std::mutex mutex;
   long calls = 0, replaced = 0, late = 0, ready = 0;
@@ -60,7 +62,6 @@ struct CylmStats {
 CylmStats& Stats() { static auto* stats = new CylmStats(); return *stats; }
 
 std::atomic<int> budget_ms{12};
-std::atomic<long> learned_texts{0};  // committed texts CyLM learned (cylm_learn), for the log
 
 // Developer switch for A/B on one install: `adb shell setprop debug.cyime.cylm 0` turns CyLM off from the next
 // key, `setprop debug.cyime.cylm 1` turns it back on.
