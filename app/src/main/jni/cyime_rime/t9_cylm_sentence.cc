@@ -80,6 +80,17 @@ class CylmWorker {
     static auto* worker = new CylmWorker();  // lives for the process, like the sessions
     return *worker;
   }
+  // A committed text for the model's user layer (cylm_learn), applied on the worker between decodes; every 20th
+  // learned text the layer is written to `file` (set by LearnInto), so a restart keeps it.
+  void Learn(CylmModel* model, const string& text) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    learn_.emplace_back(model, text);
+    wake_.notify_one();
+  }
+  void LearnInto(CylmModel* model, const string& file) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    learn_file_[model] = file;
+  }
   // Starts decoding (session, input, context) unless that is already the newest request.
   void Prefetch(CylmSession* session, const string& in, bool digits, const string& context) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -116,7 +127,21 @@ class CylmWorker {
     vector<char> out(16384);
     std::unique_lock<std::mutex> lock(mutex_);
     for (;;) {
-      wake_.wait(lock, [&] { return wanted_ > started_; });
+      wake_.wait(lock, [&] { return wanted_ > started_ || !learn_.empty(); });
+      if (!learn_.empty()) {
+        // Learning never overlaps a decode (cylm.h): it runs here, on the decoding thread, before the next key.
+        vector<std::pair<CylmModel*, string>> texts;
+        texts.swap(learn_);
+        const auto files = learn_file_;
+        lock.unlock();
+        for (const auto& [model, text] : texts) {
+          if (cylm_learn(model, text.c_str(), 1.0) <= 0) continue;
+          const auto file = files.find(model);
+          if (++learned_ % 20 == 0 && file != files.end()) cylm_adapt_save(model, file->second.c_str());
+        }
+        lock.lock();
+        continue;
+      }
       const uint64_t id = started_ = wanted_;
       CylmSession* session = session_;
       const string in = in_, context = context_;
@@ -143,6 +168,9 @@ class CylmWorker {
   uint64_t wanted_ = 0, started_ = 0, finished_ = 0;
   CylmSession* session_ = nullptr;
   CylmSession* running_ = nullptr;  // the session the worker is decoding now, for cylm_cancel
+  vector<std::pair<CylmModel*, string>> learn_;
+  std::map<CylmModel*, string> learn_file_;
+  long learned_ = 0;  // texts learned, on the worker only
   string in_, context_;
   bool digits_ = false;
   CylmSession* done_session_ = nullptr;
@@ -185,6 +213,14 @@ void T9CylmWarm(CylmModel* model) {
     CylmWorker::Instance().Prefetch(session, "966365468426786254244326", true, string());
   }
 }
+
+void T9CylmLearn(CylmModel* model, const string& text) {
+  // Only text with Han characters teaches the model (letters committed raw or punctuation do not).
+  if (model && !CylmSwitchedOff() && std::any_of(text.begin(), text.end(), [](char c) { return c & 0x80; }))
+    CylmWorker::Instance().Learn(model, text);
+}
+
+void T9CylmLearnInto(CylmModel* model, const string& file) { CylmWorker::Instance().LearnInto(model, file); }
 
 void T9CylmPrefetch(CylmModel* model, const string& input, const string& left_context) {
   bool digits = false;
