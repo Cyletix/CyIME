@@ -64,6 +64,19 @@ std::atomic<long> learned_texts{0};  // committed texts CyLM learned (cylm_learn
 
 // Developer switch for A/B on one install: `adb shell setprop debug.cyime.cylm 0` turns CyLM off from the next
 // key, `setprop debug.cyime.cylm 1` turns it back on.
+// Developer override of the budget for measuring quality apart from timing: `setprop debug.cyime.cylm_budget 2000`
+// (ms); unset or 0 keeps the schema's cylm/budget_ms.
+int CylmBudgetMs() {
+#ifdef __ANDROID__
+  char value[PROP_VALUE_MAX] = {0};
+  if (__system_property_get("debug.cyime.cylm_budget", value) > 0) {
+    const int ms = std::atoi(value);
+    if (ms > 0) return std::min(ms, 5000);
+  }
+#endif
+  return budget_ms.load();
+}
+
 bool CylmSwitchedOff() {
 #ifdef __ANDROID__
   char value[PROP_VALUE_MAX] = {0};
@@ -304,7 +317,7 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
   double wait_ms = 0, ms = 0;
   bool late = false, ready = false;
   const string record = CylmWorker::Instance().Decode(session, in, digits, CylmContext(left_context),
-                                                      std::chrono::milliseconds(budget_ms.load()), &wait_ms, &ms,
+                                                      std::chrono::milliseconds(CylmBudgetMs()), &wait_ms, &ms,
                                                       &late, &ready);
   if (record.empty()) return Stats().Add(false, late, ready, wait_ms, ms);
   // records: text \x1f pinyin \x1f spans \x1f score, '\0' after each, best first.
