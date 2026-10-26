@@ -222,6 +222,7 @@ struct Adapt {
   std::unordered_map<uint64_t, double, H2> c3, h3; std::unordered_map<uint64_t, int, H2> t3, cont2;
   std::unordered_map<int32_t, double> h2; std::unordered_map<int32_t, int> t2, cont1;
   double n1 = 1, vocab = 1; bool loaded = false;
+  uint64_t version = 0;  // bumped by Add: sessions then drop their reused scores (Decoder::Sync)
   int32_t Intern(const std::string& s) {
     auto it = ids.find(s); if (it != ids.end()) return it->second;
     int32_t id = int32_t(names.size()); names.push_back(s); ids[s] = id; return id;
@@ -245,6 +246,44 @@ struct Adapt {
     vocab = double(cont1.size()) + 1; loaded = true;
     return true;
   }
+  // One more occurrence of a trigram, keeping the lower orders exactly as Load derives them from the trigram types.
+  void AddTrigram(int32_t a, int32_t b, int32_t w, double c) {
+    double& x = c3[K3(a, b, w)];
+    const bool fresh = x == 0;
+    x += c; h3[K2(a, b)] += c;
+    if (!fresh) return;
+    t3[K2(a, b)] += 1;
+    int& cb = cont2[K2(b, w)];
+    if (cb == 0) { t2[b] += 1; if (cont1[w]++ == 0) vocab += 1; n1 += 1; }
+    cb += 1; h2[b] += 1;
+  }
+  // Learning (cylm_learn): a committed sentence's words, with <s> <s> before and </s> after, count c each. Past
+  // `cap` trigram types every count is halved and those under 0.5 dropped (old, rare entries go first).
+  void Add(const std::vector<std::string>& words, double c, size_t cap) {
+    if (!loaded) { n1 = 0; vocab = 1; loaded = true; }
+    int32_t a = Intern("<s>"), b = a;
+    for (auto& w : words) { const int32_t x = Intern(w); AddTrigram(a, b, x, c); a = b; b = x; }
+    AddTrigram(a, b, Intern("</s>"), c);
+    if (cap && c3.size() > cap) Decay();
+    ++version;
+  }
+  void Decay() {
+    std::unordered_map<uint64_t, double, H2> old; old.swap(c3);
+    h3.clear(); t3.clear(); cont2.clear(); h2.clear(); t2.clear(); cont1.clear(); n1 = 0; vocab = 1;
+    for (auto& [k, c] : old) {
+      if (c / 2 < 0.5) continue;
+      AddTrigram(int32_t(k >> 42), int32_t((k >> 21) & 0x1FFFFF), int32_t(k & 0x1FFFFF), c / 2);
+    }
+    if (n1 == 0) n1 = 1;
+  }
+  bool Save(const char* path) const {  // the counts file Load reads (cylm_adapt)
+    std::ofstream out(path, std::ios::binary); if (!out) return false;
+    for (auto& [k, c] : c3) {
+      const int32_t a = int32_t(k >> 42), b = int32_t((k >> 21) & 0x1FFFFF), w = int32_t(k & 0x1FFFFF);
+      out << names[a] << '\t' << names[b] << '\t' << names[w] << '\t' << c << '\n';
+    }
+    return bool(out);
+  }
   double P(int32_t a, int32_t b, int32_t w) const {
     auto get = [](const auto& m, auto k) -> double { auto it = m.find(k); return it == m.end() ? 0.0 : double(it->second); };
     double p1 = ((w >= 0 ? get(cont1, w) : 0.0) + 0.5) / (n1 + 0.5 * vocab);
@@ -265,6 +304,24 @@ struct Lexicon {
   std::unordered_map<std::string, std::vector<u16>> by_init;
   std::unordered_set<std::string> init_prefix;
   double total = 1;
+  // With a compiled lexicon the maps above hold only the user's own words (cylm_add_word), read on top of it.
+  size_t overlay = 0; uint64_t version = 0;
+  bool AddWord(const std::string& w, const std::vector<std::string>& syl, int64_t wt) {
+    u16 key;
+    for (auto& x : syl) { auto it = code.find(x); if (it == code.end()) return false; key += it->second; }
+    if (key.empty() || key.size() > size_t(kMaxWord)) return false;
+    auto& v = by_key[key];
+    bool seen = false;
+    for (auto& e : v) if (e.second == w) { e.first = std::max(e.first, wt); seen = true; }
+    if (!seen) v.emplace_back(wt, w);
+    std::sort(v.begin(), v.end(), [](auto& x, auto& y) { return x.first > y.first; });
+    auto& cur = weight[w]; cur = std::max(cur, wt);
+    std::string ini; for (char16_t c : key) ini += first[c - 1];
+    if (key.size() <= size_t(kMaxAbbrev)) { auto& ks = by_init[ini]; if (std::find(ks.begin(), ks.end(), key) == ks.end()) ks.push_back(key); }
+    for (size_t i = 1; i <= ini.size(); ++i) init_prefix.insert(ini.substr(0, i));
+    ++overlay; ++version;
+    return true;
+  }
   bool Load(const char* path) {
     std::ifstream in(path); if (!in) return false;
     std::string line; std::vector<std::tuple<std::string, std::vector<std::string>, int64_t>> rows;
@@ -322,7 +379,9 @@ struct Lexicon {
   int64_t WeightOf(const std::string& w) const {
     if (!bin) { auto it = weight.find(w); return it == weight.end() ? -1 : it->second; }
     auto k = Find(H.nw, [&](uint32_t i) { return Word(i); }, std::string_view(w));
-    return k < 0 ? -1 : int64_t(At<uint32_t>(H.wwt)[k]);
+    int64_t r = k < 0 ? -1 : int64_t(At<uint32_t>(H.wwt)[k]);
+    if (overlay) { auto it = weight.find(w); if (it != weight.end()) r = std::max(r, it->second); }
+    return r;
   }
   std::vector<std::pair<int64_t, std::string>> KeyWords(const u16& key) const {
     if (!bin) { auto it = by_key.find(key); return it == by_key.end() ? std::vector<std::pair<int64_t, std::string>>{} : it->second; }
@@ -331,6 +390,11 @@ struct Lexicon {
     if (k < 0) return out;
     auto eo = At<uint32_t>(H.eoff); auto e = At<Ent>(H.ent);
     for (uint32_t j = eo[k]; j < eo[k + 1]; ++j) out.emplace_back(int64_t(e[j].wt), std::string(Word(e[j].word)));
+    return out;
+  }
+  std::vector<std::pair<int64_t, std::string>> KeyWordsAll(const u16& key) const {  // compiled lexicon + the user's words
+    auto out = KeyWords(key);
+    if (bin && overlay) { auto it = by_key.find(key); if (it != by_key.end()) out.insert(out.end(), it->second.begin(), it->second.end()); }
     return out;
   }
   std::vector<u16> InitKeys(const std::string& ini) const {
@@ -342,9 +406,17 @@ struct Lexicon {
     for (uint32_t j = lo[k]; j < lo[k + 1]; ++j) out.emplace_back(Key(l[j]));
     return out;
   }
+  std::vector<u16> InitKeysAll(const std::string& ini) const {
+    auto out = InitKeys(ini);
+    if (bin && overlay) {
+      auto it = by_init.find(ini);
+      if (it != by_init.end()) for (auto& k : it->second) if (std::find(out.begin(), out.end(), k) == out.end()) out.push_back(k);
+    }
+    return out;
+  }
   bool HasPrefix(const std::string& p) const {
     if (!bin) return init_prefix.count(p) > 0;
-    return Find(H.np, [&](uint32_t i) { return Pre(i); }, std::string_view(p)) >= 0;
+    return Find(H.np, [&](uint32_t i) { return Pre(i); }, std::string_view(p)) >= 0 || (overlay && init_prefix.count(p) > 0);
   }
   bool Compile(const char* out_path) const {
     std::vector<std::string> words; for (auto& [w, wt] : weight) words.push_back(w);
@@ -404,8 +476,10 @@ struct Params {
   // cache caps: hit_cap (span word lists), word_cap (word priors and weights), id_cap / dec_cap (model word ids and
   // splits, per model); the library defaults keep a session to a few tens of MB
   size_t hit_cap = kHitCacheMax, word_cap = kWordCacheMax, id_cap = kIdCacheMax, dec_cap = kDecCacheMax;
+  size_t adapt_cap = 100000;  // trigram types the user's layer keeps while learning (cylm_learn); then old counts decay
   bool Set(const std::string& k, const std::string& v) {
     if (k == "hit_cap") { hit_cap = std::stoull(v); return true; }
+    if (k == "adapt_cap") { adapt_cap = std::stoull(v); return true; }
     if (k == "word_cap") { word_cap = std::stoull(v); return true; }
     if (k == "id_cap") { id_cap = std::stoull(v); return true; }
     if (k == "dec_cap") { dec_cap = std::stoull(v); return true; }
@@ -689,6 +763,12 @@ struct Decoder {
     if (lnw_cache.size() > p.word_cap) lnw_cache.clear();
   }
   int32_t BOSW, EOSW;
+  // Learning changed the user's layer or words since the last decode: reused scores and word lists are stale.
+  uint64_t seen_lex_ = 0, seen_adapt_ = 0;
+  void Sync() {
+    if (lex.version != seen_lex_) { seen_lex_ = lex.version; hit_cache.clear(); prior_cache.clear(); lnw_cache.clear(); inc_beams_.clear(); }
+    if (adapt.version != seen_adapt_) { seen_adapt_ = adapt.version; inc_beams_.clear(); BOSW = adapt.Lookup("<s>"); EOSW = adapt.Lookup("</s>"); }
+  }
   // cylm_cancel (another thread) bumps cancel_gen_; a decode that started before stops at its next check, returns
   // nothing and keeps the session's incremental state of the common prefix (cylm.h).
   std::atomic<uint32_t> cancel_gen_{0}; uint32_t run_gen_ = 0; bool last_cancelled_ = false;
@@ -708,6 +788,7 @@ struct Decoder {
       }
     }
     BOSW = adapt.Lookup("<s>"); EOSW = adapt.Lookup("</s>");
+    seen_lex_ = lex.version; seen_adapt_ = adapt.version;
   }
   // The start of the syllable being typed when the keys before it spell complete syllables (separators allowed) and
   // the rest is the beginning of a syllable, possibly empty ("nihaozho" -> 5); 0 when not (an initial-only key in
@@ -837,18 +918,18 @@ struct Decoder {
       auto order = [](auto& x, auto& y) { return std::get<0>(x) != std::get<0>(y) ? std::get<0>(x) > std::get<0>(y) : std::get<1>(x) > std::get<1>(y); };
       if (!ab) {
         u16 key; for (auto& t : path) key += t.full;
-        for (auto& [wt, w] : lex.KeyWords(key)) hits.emplace_back(Prior(w), w, key);
+        for (auto& [wt, w] : lex.KeyWordsAll(key)) hits.emplace_back(Prior(w), w, key);
         std::sort(hits.begin(), hits.end(), order);
         if (hits.size() > size_t(p.per_span)) hits.resize(p.per_span);
       } else {
         size_t limit = path.size() == 1 ? p.per_span1 : p.per_span_abbrev;
         std::unordered_map<std::string, u16> words;
-        auto init_keys = lex.InitKeys(ini);
+        auto init_keys = lex.InitKeysAll(ini);
         {
           size_t k = 0;
           for (auto& key : init_keys) {
             if (k++ >= size_t(p.scan)) break;
-            if (Matches(key, path)) for (auto& [wt, w] : lex.KeyWords(key)) words.emplace(w, key);
+            if (Matches(key, path)) for (auto& [wt, w] : lex.KeyWordsAll(key)) words.emplace(w, key);
           }
         }
         for (auto& [w, key] : words) hits.emplace_back(Prior(w), w, key);
@@ -987,6 +1068,7 @@ struct Decoder {
   std::vector<std::vector<Hyp>> inc_sorted_; std::vector<char> inc_sorted_ok_;
   std::vector<std::pair<std::string, double>> Decode(const std::string& text, bool t9, const std::string& context) {
     size_t n = text.size();
+    Sync();
     run_gen_ = cancel_gen_.load(std::memory_order_relaxed); last_cancelled_ = false;
     skip_before_ = 0;  // the abbrev_full check below reads every token
     // When the whole input spells complete syllables (all but possibly the last), initial-only readings inside it
@@ -1262,6 +1344,36 @@ struct CylmModel { Lexicon lex; C3 base; C3 base2; bool has2 = false; Adapt adap
                    Reranker rr_t9; bool has_rr_t9 = false;
                    std::unordered_map<std::string, std::vector<std::string>> prefer; std::unordered_set<uint32_t> holes; };
 struct CylmSession { std::unique_ptr<Decoder> d; };
+// Words of a committed text for learning: Han runs split into lexicon words (the user's words included) by the
+// model's unigram, -2 per word as in the Python decoder's segment(); other characters end a run.
+static std::vector<std::vector<std::string>> LearnRuns(CylmModel* m, const std::string& text) {
+  std::vector<std::vector<std::string>> runs; std::vector<uint32_t> run;
+  auto flush = [&]() {
+    const size_t n = run.size();
+    if (n) {
+      std::vector<double> best(n + 1, -1e18); std::vector<size_t> from(n + 1, 0); best[0] = 0;
+      for (size_t i = 0; i < n; ++i) {
+        if (best[i] <= -1e17) continue;
+        for (size_t j = i + 1; j <= std::min(n, i + size_t(kMaxWord)); ++j) {
+          const std::string w = Utf8Encode(run, i, j);
+          const int64_t wt = m->lex.WeightOf(w);
+          if (j > i + 1 && wt < 0) continue;
+          const int32_t id = m->base.Id(w);
+          const double sc = best[i] + (id >= 0 ? m->base.Ml(id) : std::log((std::max<int64_t>(wt, 0) + 1) / m->lex.total)) - 2.0;
+          if (sc > best[j]) { best[j] = sc; from[j] = i; }
+        }
+      }
+      std::vector<std::string> words;
+      for (size_t j = n; j > 0; j = from[j]) words.push_back(Utf8Encode(run, from[j], j));
+      std::reverse(words.begin(), words.end());
+      runs.push_back(std::move(words));
+    }
+    run.clear();
+  };
+  for (uint32_t c : Utf8Decode(text)) { if (IsHan(c)) run.push_back(c); else flush(); }
+  flush();
+  return runs;
+}
 extern "C" {
 CylmModel* cylm_open(const char* lexicon, const char* model, const char* model2, const char* params) {
   return cylm_open2(lexicon, model, model2, nullptr, nullptr, params);
@@ -1317,6 +1429,24 @@ int cylm_prefer(CylmModel* m, const char* path) {
   if (!m || !path) return -1;
   m->prefer.clear();
   return LoadPrefer(path, m->prefer) ? int(m->prefer.size()) : -1;
+}
+int cylm_learn(CylmModel* m, const char* text, double count) {
+  if (!m || !text) return -1;
+  int words = 0;
+  for (auto& run : LearnRuns(m, text)) { m->adapt.Add(run, count > 0 ? count : 1.0, m->p.adapt_cap); words += int(run.size()); }
+  return words;
+}
+int cylm_add_word(CylmModel* m, const char* word, const char* pinyin, long long weight) {
+  if (!m || !word || !pinyin) return -1;
+  std::vector<std::string> syl; for (auto& x : Split(pinyin, ' ')) if (!x.empty()) syl.push_back(x);
+  if (Utf8Decode(word).size() != syl.size()) return -1;
+  // default weight: about as common as a frequent word of the lexicon (1/20000 of its total)
+  const int64_t wt = weight > 0 ? int64_t(weight) : std::max<int64_t>(1, int64_t(m->lex.total / 20000));
+  return m->lex.AddWord(word, syl, wt) ? 0 : -1;
+}
+int cylm_adapt_save(CylmModel* m, const char* path) {
+  if (!m || !path) return -1;
+  return m->adapt.Save(path) ? int(m->adapt.c3.size()) : -1;
 }
 int cylm_adapt(CylmModel* m, const char* path) {
   if (!m || !path) return -1;
