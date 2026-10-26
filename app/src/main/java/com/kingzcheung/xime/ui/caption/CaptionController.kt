@@ -485,6 +485,33 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         sessionName = newSessionName()
     }
 
+    /** Earlier caption files in 下载/CyIME字幕, newest first. */
+    internal fun savedCaptions(): List<SavedCaption> = runCatching {
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            val out = ArrayList<SavedCaption>()
+            val columns = arrayOf(android.provider.MediaStore.Downloads._ID, android.provider.MediaStore.Downloads.DISPLAY_NAME,
+                android.provider.MediaStore.Downloads.DATE_MODIFIED, android.provider.MediaStore.Downloads.SIZE)
+            app.contentResolver.query(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, columns,
+                "${android.provider.MediaStore.Downloads.RELATIVE_PATH} = ?",
+                arrayOf(android.os.Environment.DIRECTORY_DOWNLOADS + "/" + SAVE_FOLDER + "/"),
+                "${android.provider.MediaStore.Downloads.DATE_MODIFIED} DESC")?.use { c ->
+                while (c.moveToNext()) {
+                    val uri = android.content.ContentUris.withAppendedId(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0))
+                    out += SavedCaption(c.getString(1), c.getLong(2) * 1000, c.getLong(3), uri, null)
+                }
+            }
+            out
+        } else {
+            val dir = java.io.File(checkNotNull(app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)), SAVE_FOLDER)
+            (dir.listFiles() ?: emptyArray()).sortedByDescending { it.lastModified() }
+                .map { SavedCaption(it.name, it.lastModified(), it.length(), null, it) }
+        }
+    }.onFailure { FileLogger.e(TAG, "list saved captions failed", it) }.getOrDefault(emptyList())
+
+    internal fun readSaved(saved: SavedCaption): String = runCatching {
+        saved.file?.readText() ?: checkNotNull(app.contentResolver.openInputStream(checkNotNull(saved.uri))).use { it.readBytes().decodeToString() }
+    }.getOrDefault("")
+
     /** Buzzes when a finished line from someone else calls the holder by name (「有人叫我名字时振动」). */
     private fun alertIfNamed(line: SegmentUi) {
         if (!CaptionNameAlert.isOn(app)) return

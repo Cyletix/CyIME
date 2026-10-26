@@ -237,6 +237,7 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
 private fun SaveDialog(controller: CaptionController, onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val where = remember { controller.saveTranscript() }
+    var history by remember { mutableStateOf(false) }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -256,12 +257,68 @@ private fun SaveDialog(controller: CaptionController, onDismiss: () -> Unit) {
                         onDismiss()
                     }
                 }
+                CaptionButton("以前的字幕", Modifier.fillMaxWidth()) { history = true }
                 BigButton("好", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
             }
         }
     }
+    if (history) HistoryDialog(controller, onDismiss = { history = false })
 }
 
+/** 以前的字幕：一个简单的列表，新的在上；点开看全文，可以选字、复制全部、分享。 */
+@Composable
+private fun HistoryDialog(controller: CaptionController, onDismiss: () -> Unit) {
+    val files = remember { controller.savedCaptions() }
+    var open by remember { mutableStateOf<SavedCaption?>(null) }
+    val clock = remember { SimpleDateFormat("M月d日 HH:mm", Locale.getDefault()) }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("以前的字幕", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                if (files.isEmpty()) Text("还没有保存过的字幕。", fontSize = 18.sp)
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(files.size) { i ->
+                        val f = files[i]
+                        CaptionButton("${clock.format(Date(f.modifiedMs))}　${(f.sizeBytes + 1023) / 1024} KB", Modifier.fillMaxWidth()) { open = f }
+                    }
+                }
+                BigButton("返回", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
+            }
+        }
+    }
+    open?.let { f -> SavedCaptionDialog(controller, f, onDismiss = { open = null }) }
+}
+
+@Composable
+private fun SavedCaptionDialog(controller: CaptionController, saved: SavedCaption, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val text = remember(saved) { controller.readSaved(saved) }
+    Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth(.94f).fillMaxHeight(.9f), shape = RoundedCornerShape(28.dp), color = captionDialogColor(),
+            contentColor = MaterialTheme.colorScheme.onSurface) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(saved.name.removeSuffix(".txt"), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                androidx.compose.foundation.text.selection.SelectionContainer(Modifier.weight(1f).fillMaxWidth()) {
+                    Text(text, fontSize = 19.sp, lineHeight = 28.sp, modifier = Modifier.verticalScroll(rememberScrollState()))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CaptionButton("复制全部", Modifier.weight(1f)) {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("字幕", text))
+                        android.widget.Toast.makeText(context, "已复制全部字幕", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    CaptionButton("分享", Modifier.weight(1f)) {
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                            .putExtra(android.content.Intent.EXTRA_TEXT, text)
+                        runCatching { context.startActivity(android.content.Intent.createChooser(send, "分享字幕")
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }
+                    CaptionButton("返回", Modifier.weight(1f), onClick = onDismiss)
+                }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun BigButton(text: String, modifier: Modifier = Modifier, outlined: Boolean = false,
