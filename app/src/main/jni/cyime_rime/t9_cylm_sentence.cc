@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstdlib>
 #include <filesystem>
@@ -341,21 +342,40 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
   const string text = best_record.substr(0, unit);
   const auto& rime = sentences->front();
   if (text.empty() || text == rime->text()) return Stats().Add(false, false, ready, wait_ms, ms);
-  // CyLM replaces Rime's sentence only when it is clearly surer: Rime's text is among its n-best and the best
-  // scores more than 1.0 above it. A sentence CyLM cannot read (a typo correction, a word only the user has)
-  // stays (自训模型攻坚 f259d30, 2026-10-27).
+  // CyLM replaces Rime's sentence only when a learned rule says it is right (CyIME-Windows 65e22c9,
+  // tools/cylm/replace_model.py, fit on tune sets, threshold at precision 0.9 per column; the earlier "margin > 1"
+  // rule broke far more correct sentences). Rime's text must be in CyLM's n-best; features are what the hook sees.
   auto score_of = [](const string& one) {
     const auto at = one.rfind('\x1f');
     return at == string::npos ? 0.0 : std::atof(one.c_str() + at + 1);
   };
-  bool rime_known = false;
-  double rime_score = 0;
+  vector<double> scores;
+  int rime_rank = -1;
   for (size_t at = 0; at < record.size();) {
     const string one(record.c_str() + at);
     at += one.size() + 1;
-    if (one.compare(0, one.find('\x1f'), rime->text()) == 0) { rime_known = true; rime_score = score_of(one); break; }
+    if (rime_rank < 0 && one.compare(0, one.find('\x1f'), rime->text()) == 0) rime_rank = static_cast<int>(scores.size());
+    scores.push_back(score_of(one));
   }
-  if (!rime_known || score_of(best_record) - rime_score <= 1.0) return Stats().Add(false, false, ready, wait_ms, ms);
+  if (rime_rank < 0) return Stats().Add(false, false, ready, wait_ms, ms);
+  {
+    auto chars = [](const string& t) {
+      vector<uint32_t> out;
+      for (auto it = t.begin(); it != t.end();) out.push_back(utf8::unchecked::next(it));
+      return out;
+    };
+    const auto a = chars(rime->text()), b = chars(text);
+    const bool same_len = a.size() == b.size();
+    double diff = same_len ? 0 : std::fabs(double(a.size()) - double(b.size()));
+    for (size_t i = 0; i < std::min(a.size(), b.size()); ++i) diff += a[i] != b[i];
+    const double len = double(a.size());
+    const double margin = scores[0] - scores[rime_rank];
+    const double gap12 = scores.size() > 1 ? scores[0] - scores[1] : 0.0;
+    const double z = 0.73 * margin - 0.497 * std::min(rime_rank, 8) / 8.0 + 1.224 * std::min(gap12, 10.0) / 10.0 -
+                     0.313 * len / 10.0 + 0.339 * diff / std::max(1.0, len) + 0.501 * (same_len ? 1 : 0) -
+                     0.137 * (diff == 1 ? 1 : 0) - 0.305 * margin / std::max(1.0, diff) - 1.098;
+    if (z <= 3.1) return Stats().Add(false, false, ready, wait_ms, ms);
+  }
   // CyLM knows nothing of what the user picked before: a Rime sentence built from a learned word (这篇 picked once,
   // then zhepianbiji) stays, or CyLM's 这片笔记 replaced it and learning never reached whole sentences.
   for (const auto& part : rime->components())
