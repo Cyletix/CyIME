@@ -154,7 +154,6 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         if (com.kingzcheung.xime.clipboard.clipboardPasteMode(text, service.clipboardManager.quickSendItems.value) ==
             com.kingzcheung.xime.clipboard.ClipboardPasteMode.PRIVATE) {
             // 固定内容多是账号、密码等个人信息：照常上屏，但不发给插件提交事件，也不进联想上下文。
-            service.cancelVerificationCodeInput()
             service.dismissPredictionsForPaste()
             service.commitTextSilently(text, isPaste = true, isSensitive = true)
             return
