@@ -196,10 +196,12 @@ fun KeyboardLayout(
         SplitKeyboardGeometry.splitStraddlingPairs(keyRows[2], letterSideKeyWeight),
     ) + keyRows.drop(3) else keyRows
     val shiftSlideTargets = remember(uiState.currentSchemaId, isAsciiMode) { ShiftSlideTargets() }
+    val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     // 14 键按住 Shift 拖动时，双字母键拆回单字母键，键帽显示手指实际停的那个字母；松开 Shift 恢复（用户 10-21）。
     // 按住符号键当 Ctrl 时同样拆开，每个字母各显示自己的快捷键（用户 10-24）。
+    // Shift 亮着（单次、锁定、按住）时也拆开：大写只能是一个确定的字母，点哪个出哪个，bn 不再只出 B（10-27）。
     // 按字母数定宽，拆开后每个字母的位置和宽度不变。
-    val renderRows = if (fourteenKey && (shiftSlideTargets.dragging || shiftSlideTargets.ctrl)) pairedRows.mapIndexed { index, row ->
+    val renderRows = if (fourteenKey && (shiftSlideTargets.dragging || shiftSlideTargets.ctrl || shiftMode.isShifted)) pairedRows.mapIndexed { index, row ->
         if (index > 2) row else row.flatMap { key ->
             if (key.length == 2 && key.all { it.lowercaseChar() in 'a'..'z' }) listOf(key.take(1), key.drop(1)) else listOf(key)
         }
@@ -212,7 +214,6 @@ fun KeyboardLayout(
     val splitAt1 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow1,
         splitRow1InsetDp.value / splitCellDp.coerceAtLeast(1f), splitWeighted) else -1
     val splitAt2 = if (splitKeyboard) SplitKeyboardGeometry.leftCount(splitRow2, letterSideKeyWeight, splitWeighted) else -1
-    val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
     val isShifted = shiftMode.isShifted
 
     val context = LocalContext.current
