@@ -2,7 +2,7 @@
   "modelsDir": "D:/CyIME-Data/models",
   "privateGloss": "D:/CyIME-Data/private-gloss/cyime_gloss-private.tsv",
   "cylm": {
-    "cylm_lexicon.cylx": "D:/CyIME-Data/cylm/export/lexicon.bin",
+    "cylm_lexicon.cylx": "D:/CyIME-Data/cylm/export/lexicon-1000000m.bin",
     "cylm_model.lm": "D:/CyIME-Data/cylm/models/cy1-p1e-7.lm"
   },
   "resourceTag": "models",
