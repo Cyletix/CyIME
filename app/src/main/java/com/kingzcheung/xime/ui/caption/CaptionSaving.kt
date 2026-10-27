@@ -13,6 +13,13 @@ internal object CaptionAutoSave {
     fun setOn(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY, on).apply()
     }
+
+    private const val KEY_KEEP = "keep_three_days"
+    const val KEEP_MS = 3L * 24 * 60 * 60 * 1000
+    fun keepsThreeDays(context: Context): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_KEEP, true)
+    fun setKeepsThreeDays(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_KEEP, on).apply()
+    }
 }
 
 /** One transcript line: speaker, clock time, words (the format of the saved file and of 复制全部). */

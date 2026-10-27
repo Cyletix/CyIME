@@ -425,6 +425,23 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     var savedWhere by mutableStateOf<String?>(null); private set
     private val autoSave = Runnable { writeTranscript() }
 
+    // Like Google Live Transcribe, saved captions are kept for 3 days and then removed (setting
+    // 「字幕只保留 3 天」, on by default). Only this app's own files in 下载/CyIME字幕 are touched.
+    init { if (CaptionAutoSave.keepsThreeDays(app)) io.execute { pruneOldCaptions() } }
+
+    private fun pruneOldCaptions() {
+        val cutoff = System.currentTimeMillis() - CaptionAutoSave.KEEP_MS
+        var removed = 0
+        for (old in savedCaptions().filter { it.modifiedMs < cutoff }) {
+            val gone = runCatching {
+                old.file?.delete() ?: (app.contentResolver.delete(checkNotNull(old.uri), null, null) > 0)
+            }.getOrDefault(false)
+            if (gone) removed++
+        }
+        if (removed > 0) FileLogger.i(TAG, "removed $removed caption files older than 3 days")
+    }
+
+
     private fun lineOf(line: SegmentUi): String? {
         if (line.text.isEmpty() || speakers.any { it.id == line.speakerId && it.ignored }) return null
         return transcriptLine(speakers.firstOrNull { it.id == line.speakerId }?.name, line.wallMs, line.text)

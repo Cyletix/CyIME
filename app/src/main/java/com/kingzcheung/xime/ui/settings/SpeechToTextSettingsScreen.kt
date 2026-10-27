@@ -285,6 +285,29 @@ fun SpeechToTextSettingsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                var keepThreeDays by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionAutoSave.keepsThreeDays(context)) }
+                Column(Modifier.settingsSearchAnchor("字幕只保留 3 天").fillMaxWidth().padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "字幕只保留 3 天",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = keepThreeDays,
+                            onCheckedChange = {
+                                keepThreeDays = it
+                                com.kingzcheung.xime.ui.caption.CaptionAutoSave.setKeepsThreeDays(context, it)
+                            },
+                        )
+                    }
+                    Text(
+                        text = "和 Google 实时转写一样，“下载/CyIME字幕”里超过 3 天的字幕记录在下次打开字幕时自动删掉。关闭后一直保留。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 var nameAlert by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionNameAlert.isOn(context)) }
                 var alertNames by remember { mutableStateOf(com.kingzcheung.xime.ui.caption.CaptionNameAlert.names(context)) }
                 Column(Modifier.settingsSearchAnchor("有人叫我名字时振动").fillMaxWidth().padding(16.dp)) {
