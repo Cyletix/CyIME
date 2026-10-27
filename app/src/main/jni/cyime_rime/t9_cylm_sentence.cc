@@ -11,6 +11,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <thread>
 #include <utility>
@@ -63,6 +64,18 @@ struct CylmStats {
 CylmStats& Stats() { static auto* stats = new CylmStats(); return *stats; }
 
 std::atomic<int> budget_ms{12};
+
+// Everything that touches a model's state (decode, learning, user words, the replace gate) runs under this lock, so
+// the hook can score with the gate (cylm_gate_score must not overlap a decode) without its own thread.
+std::timed_mutex& ModelMutex() { static auto* m = new std::timed_mutex(); return *m; }
+
+// Models whose replace gate loaded (T9CylmGate); the hook then uses the gate's rule.
+std::mutex gate_mutex;
+std::set<const CylmModel*>& GateModels() { static auto* s = new std::set<const CylmModel*>(); return *s; }
+bool HasGate(const CylmModel* model) {
+  std::lock_guard<std::mutex> lock(gate_mutex);
+  return GateModels().count(model) > 0;
+}
 std::atomic<bool> guard_unknown{false};  // schema cylm/guard_unknown_words
 
 // Keep Rime's sentence when one of its words (2+ characters) is unknown to CyLM: CyLM would only spell that word out
@@ -169,7 +182,10 @@ class CylmWorker {
         vector<std::function<void()>> tasks;
         tasks.swap(tasks_);
         lock.unlock();
-        for (auto& task : tasks) task();
+        for (auto& task : tasks) {
+          std::lock_guard<std::timed_mutex> model_lock(ModelMutex());
+          task();
+        }
         lock.lock();
         continue;
       }
@@ -180,6 +196,7 @@ class CylmWorker {
         const auto files = learn_file_;
         lock.unlock();
         for (const auto& [model, text] : texts) {
+          std::lock_guard<std::timed_mutex> model_lock(ModelMutex());
           if (cylm_learn(model, text.c_str(), 1.0) <= 0) continue;
           ++learned_texts;
           const auto file = files.find(model);
@@ -195,8 +212,11 @@ class CylmWorker {
       running_ = session;
       lock.unlock();
       const auto t0 = std::chrono::steady_clock::now();
-      const int n = cylm_decode2(session, in.c_str(), digits ? 1 : 0, context.c_str(), out.data(),
-                                 static_cast<int>(out.size()));
+      int n;
+      {
+        std::lock_guard<std::timed_mutex> model_lock(ModelMutex());
+        n = cylm_decode2(session, in.c_str(), digits ? 1 : 0, context.c_str(), out.data(), static_cast<int>(out.size()));
+      }
       const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
       lock.lock();
       running_ = nullptr;
@@ -250,6 +270,30 @@ string CylmContext(const string& left_context) {
 void T9CylmSetBudget(int ms) { budget_ms = std::max(1, std::min(200, ms)); }
 
 void T9CylmSetGuardUnknownWords(bool on) { guard_unknown = on; }
+
+bool T9CylmGate(CylmModel* model, const string& gate, const string& vocab) {
+  if (!model || gate.empty() || vocab.empty()) return false;
+#ifdef __ANDROID__
+  // `setprop debug.cyime.cylm_gate 0` opens without the gate (to measure its memory and effect).
+  char value[PROP_VALUE_MAX] = {0};
+  if (__system_property_get("debug.cyime.cylm_gate", value) > 0 && value[0] == '0') return false;
+  const double heap_before = mallinfo().uordblks / 1048576.0;
+#endif
+  bool loaded;
+  {
+    std::lock_guard<std::timed_mutex> model_lock(ModelMutex());
+    loaded = cylm_gate_load(model, gate.c_str(), vocab.c_str()) >= 0;
+  }
+#ifdef __ANDROID__
+  __android_log_print(ANDROID_LOG_INFO, "CyLM", "replace gate %s: heap %.1f -> %.1f MB", loaded ? "loaded" : "failed",
+                      heap_before, mallinfo().uordblks / 1048576.0);
+#endif
+  if (loaded) {
+    std::lock_guard<std::mutex> lock(gate_mutex);
+    GateModels().insert(model);
+  }
+  return loaded;
+}
 
 bool T9CylmEnabled() { return !CylmSwitchedOff(); }
 
@@ -392,10 +436,24 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& in, 
     const double len = double(a.size());
     const double margin = scores[0] - scores[rime_rank];
     const double gap12 = scores.size() > 1 ? scores[0] - scores[1] : 0.0;
-    // Coefficients refit for the 500k lexicon (CyIME-Windows 1b141e6).
-    const double z = 0.725 * margin - 0.654 * std::min(rime_rank, 8) / 8.0 + 0.866 * std::min(gap12, 10.0) / 10.0 +
-                     0.067 * len / 10.0 + 0.475 * diff / std::max(1.0, len) + 0.52 * (same_len ? 1 : 0) -
-                     0.086 * (diff == 1 ? 1 : 0) - 0.377 * margin / std::max(1.0, diff) - 1.309;
+    double z;
+    if (HasGate(model)) {
+      // With the gate's character model (CyIME-Windows 102ad9a): its log-probability difference between CyLM's best
+      // and Rime's sentence joins the features. Scoring must not overlap a decode; if the CyLM thread is busy for
+      // longer than a few ms the key keeps Rime's sentence.
+      std::unique_lock<std::timed_mutex> model_lock(ModelMutex(), std::chrono::milliseconds(4));
+      if (!model_lock.owns_lock()) return Stats().Add(false, true, ready, wait_ms, ms);
+      const double delta = cylm_gate_score(model, text.c_str()) - cylm_gate_score(model, rime->text().c_str());
+      z = 0.664 * margin - 0.912 * std::min(rime_rank, 8) / 8.0 + 0.868 * std::min(gap12, 10.0) / 10.0 +
+          0.083 * len / 10.0 + 0.484 * diff / std::max(1.0, len) + 0.673 * (same_len ? 1 : 0) -
+          0.166 * (diff == 1 ? 1 : 0) - 0.372 * margin / std::max(1.0, diff) + 1.057 * delta / 10.0 +
+          0.774 * delta / std::max(1.0, diff) / 5.0 - 1.229;
+    } else {
+      // Coefficients refit for the 500k lexicon (CyIME-Windows 1b141e6).
+      z = 0.725 * margin - 0.654 * std::min(rime_rank, 8) / 8.0 + 0.866 * std::min(gap12, 10.0) / 10.0 +
+          0.067 * len / 10.0 + 0.475 * diff / std::max(1.0, len) + 0.52 * (same_len ? 1 : 0) -
+          0.086 * (diff == 1 ? 1 : 0) - 0.377 * margin / std::max(1.0, diff) - 1.309;
+    }
     if (z <= 3.2) return Stats().Add(false, false, ready, wait_ms, ms);
   }
   // CyLM knows nothing of what the user picked before: a Rime sentence built from a learned word (这篇 picked once,
