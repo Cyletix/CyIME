@@ -1065,6 +1065,7 @@ class RimeEngine {
     private external fun nativeSetIncognito(on: Boolean)
     private external fun nativeT9Forget(text: String, pinyin: String): Boolean
     private external fun nativeUnlearn(rows: String): Int
+    private external fun nativeExportUserDict(file: String): Boolean
     private external fun nativeT9SelectPinyinDirect(pinyin: String, digitLength: Int): Boolean
     private external fun nativeT9FixLetter(letter: String): Boolean
     private external fun nativeT9GetLeftPanelState(): String?
@@ -1232,6 +1233,13 @@ class RimeEngine {
         if (!isCandidateRevisionCurrent(revision) || !isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked false
         candidateRevision.incrementAndGet()
         if (global) nativeDeleteCandidateByGlobalIndex(index) else nativeDeleteCandidateOnCurrentPage(index)
+    }
+
+    /** Developer tool: the current schema's user dictionary as a Rime text snapshot (.userdb.txt). */
+    @androidx.annotation.WorkerThread
+    fun exportUserDict(file: String): Boolean = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked false
+        nativeExportUserDict(file)
     }
 
     /** Developer tool: takes back learned commits (rows "text<TAB>commits") from the current schema's user dictionary. */
