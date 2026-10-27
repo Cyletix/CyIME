@@ -239,7 +239,7 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
         val partial = if (t9) service.t9PartialSegments.joinToString("") { it.text } else ""
         val action = candidates.candidateActions.firstOrNull()
         val prefix = compositionCommitPrefix(asTyped, input, candidates.shownPreedit(state.inputProfile), t9,
-            state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14, partial,
+            usesMergedLetterKeys(state.inputProfile.layout), partial,
             englishDelivered = candidates.pendingEnglishText.isNotEmpty(),
             japanesePreview = service.japaneseInputController.conversionPreview()) {
             if (action?.isPluginCandidate == true && !t9) action.commitText

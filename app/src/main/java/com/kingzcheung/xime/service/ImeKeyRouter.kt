@@ -368,10 +368,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     if (hasComposing) {
                         // 组合态：先把拼音提交进面板输入框，再触发生成。剪贴板搜索提交拼音首字母，
                         // 与边打边筛同一口径（"di'zhi" → dz）。
+                        // 编码以屏上显示的为准（九键高亮换了就是高亮候选的拼音；九键、双字母键不交原始键码）。
+                        val profile = service.uiState.value.inputProfile
+                        val shown = candState.shownPreedit(profile)
                         val input = if (service.uiState.value.clipboardSearchVisible)
-                            com.kingzcheung.xime.clipboard.ClipboardSearch.composingInitials(candState.preeditText,
+                            com.kingzcheung.xime.clipboard.ClipboardSearch.composingInitials(shown,
                                 com.kingzcheung.xime.clipboard.AndroidPinyinInitials::initialOf)
-                        else candState.inputText
+                        else rawCompositionCommitText(candState.inputText, shown,
+                            isT9Schema(service.uiState.value.currentSchemaId), usesMergedLetterKeys(profile.layout))
                         service.mainHandler.post {
                             if (!service.inputReadiness.accepts(admission)) return@post
                             ToolPanelEditTextHolder.editText?.let { et ->
@@ -750,7 +754,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // T9 和 14 键提交屏上的解码拼音（T9 含 partial commit 累积），其他用 RIME input。
                         val isT9 = isT9Schema(state.currentSchemaId)
                         val input = rawCompositionCommitText(engineInput, candState.shownPreedit(state.inputProfile), isT9,
-                            state.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14)
+                            usesMergedLetterKeys(state.inputProfile.layout))
                         if (input.isNotEmpty()) {
                             val accepted = withEditor { service.submitText(input).accepted }
                             if (!accepted) return@command
@@ -1390,7 +1394,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             composition?.input.orEmpty(), emptyList(), emptyList()).displayText
         else composition?.preedit.orEmpty()
         val raw = if (hasComposition) rawCompositionCommitText(composition?.input.orEmpty(), preedit, t9,
-            service.uiState.value.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14) else ""
+            usesMergedLetterKeys(service.uiState.value.inputProfile.layout)) else ""
         val text = raw + suffix
         if (text.isNotEmpty() && !withEditor { service.commitTextAndPredict(text, false, allowPrediction = false).accepted }) return false
         if (text.isNotEmpty()) withEditor {
