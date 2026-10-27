@@ -1066,6 +1066,7 @@ class RimeEngine {
     private external fun nativeT9Forget(text: String, pinyin: String): Boolean
     private external fun nativeUnlearn(rows: String): Int
     private external fun nativeExportUserDict(file: String): Boolean
+    private external fun nativeRestoreUserDict(file: String): Int
     private external fun nativeT9SelectPinyinDirect(pinyin: String, digitLength: Int): Boolean
     private external fun nativeT9FixLetter(letter: String): Boolean
     private external fun nativeT9GetLeftPanelState(): String?
@@ -1240,6 +1241,13 @@ class RimeEngine {
     fun exportUserDict(file: String): Boolean = locked {
         if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked false
         nativeExportUserDict(file)
+    }
+
+    /** Developer tool: puts the user dictionary back to an [exportUserDict] snapshot; entries changed, -1 on failure. */
+    @androidx.annotation.WorkerThread
+    fun restoreUserDict(file: String): Int = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked -1
+        nativeRestoreUserDict(file)
     }
 
     /** Developer tool: takes back learned commits (rows "text<TAB>commits") from the current schema's user dictionary. */

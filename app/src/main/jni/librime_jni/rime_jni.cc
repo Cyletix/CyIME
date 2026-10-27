@@ -702,6 +702,19 @@ public:
         return userDictionary->Export(rime::path(file));
     }
 
+    // Developer tool: puts the current schema's user dictionary back to the snapshot at `file` (made by exportUserDict).
+    int restoreUserDict(const std::string& file) {
+        if (!rime || !session_id_) return -1;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->schema()) return -1;
+        auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
+        if (!userDictionaries) return -1;
+        const rime::Ticket ticket(session->schema(), "translator");
+        rime::the<rime::UserDictionary> userDictionary(userDictionaries->Create(ticket));
+        if (!userDictionary || !userDictionary->Load()) return -1;
+        return userDictionary->RestoreExact(rime::path(file));
+    }
+
     int forgetCandidate(int index, bool global) {
         if (!rime || !session_id_ || index < 0) return 0;
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
@@ -2751,6 +2764,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeExportUserDict(JNIEnv* env, jobj
     const std::string copy(text ? text : "");
     if (text) env->ReleaseStringUTFChars(file, text);
     return Rime::Instance().exportUserDict(copy) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeRestoreUserDict(JNIEnv* env, jobject, jstring file) {
+    const char* text = env->GetStringUTFChars(file, nullptr);
+    const std::string copy(text ? text : "");
+    if (text) env->ReleaseStringUTFChars(file, text);
+    return Rime::Instance().restoreUserDict(copy);
 }
 
 JNIEXPORT jint JNICALL
