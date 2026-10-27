@@ -72,15 +72,17 @@ internal class CaptionSpeechSession(
         }
         override fun reset() = detector.reset()
     }
+    // Sentence cutting measured on continuous FLEURS speech through this segmenter + SenseVoice
+    // (2026-10-27, D:/CyIME-Data/tmp/caption-asr): the energy-floor pause cut quiet speech away and
+    // 5 s / 0.4 s pieces broke sentences — English 14.0% word errors (7.5% on whole sentences),
+    // Chinese 8.4%. Up to 12 s, 0.6 s pauses, Silero only: English 8.4%, Chinese 7.3%. Turn changes
+    // inside a longer sentence are still split by the speaker probes (emitFinal).
     private val segmenter: SpeechSegmenter by lazy { SpeechSegmenter(wrapped,
-        // Speakers change at pauses; a segment that runs through a pause mixes two voices into one print.
-        maxSegmentMs = minOf(engine.maxSegmentMs, 5000),
+        maxSegmentMs = CAPTION_MAX_SEGMENT_MS,
         onAudio = { id, samples -> onAudio(id, samples) },
         onEnd = { id, samples, boundary -> endRegion(id, samples, boundary) },
-        minimumPauseMs = maxOf(minimumPauseMs, if (engine.isStreaming) 0 else 300),
-        // Through a room (TV, reverb) Silero alone hears speech across short turn-taking pauses
-        // (device log: 8 s segments spanning two speakers); the adaptive energy floor splits them.
-        useEnergyPause = true, resetDetectorOnPause = engine.resetDetectorOnPause) }
+        minimumPauseMs = maxOf(minimumPauseMs, CAPTION_MIN_PAUSE_MS),
+        useEnergyPause = false, resetDetectorOnPause = engine.resetDetectorOnPause) }
 
     private fun onAudio(id: Long, samples: FloatArray) {
         if (id != activeId) {
@@ -483,6 +485,8 @@ internal object CaptionSpeakers { const val SINGLE = 0 }
 
 /** Ids of sentence pieces split off at a change of voice; far above anything the segmenter numbers. */
 internal const val SPLIT_BASE = 1L shl 40
+private const val CAPTION_MAX_SEGMENT_MS = 12_000
+private const val CAPTION_MIN_PAUSE_MS = 600
 private const val PROBE_MS = 750L
 private const val REGROUP_EVERY_MS = 15_000L
 private const val REGROUP_SIMILARITY = .5f
