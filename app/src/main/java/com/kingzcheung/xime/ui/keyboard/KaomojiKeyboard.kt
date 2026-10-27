@@ -36,7 +36,6 @@ internal fun KaomojiKeyboard(onSelect: (String) -> Unit, modifier: Modifier = Mo
     var category by remember { mutableIntStateOf(0) }
     var recent by remember { mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_KAOMOJI)) }
     val faces = if (category == -1) recent else KaomojiData.categories[category].faces
-    val colors = MaterialTheme.colorScheme
     Column(modifier.fillMaxSize()) {
         ExpressionPanelBar(textColor, { onSelect("delete") }, leadingTabs) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),
@@ -51,9 +50,8 @@ internal fun KaomojiKeyboard(onSelect: (String) -> Unit, modifier: Modifier = Mo
                 }
             }
         }
-        if (faces.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text("まだ履歴がありません", color = colors.onSurfaceVariant, fontSize = 14.sp)
-        } else BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        if (faces.isEmpty()) PanelEmptyHint("暂无颜文字记录", textColor, Modifier.weight(1f).fillMaxWidth())
+        else BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             // Long faces span several cells instead of wrapping onto a second line.
             val density = LocalDensity.current
             val measurer = rememberTextMeasurer()

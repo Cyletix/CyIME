@@ -162,9 +162,7 @@ private fun EmojiContent(
                         }
                     }
                 } else if (category.emojis.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("暂无表情记录", color = textColor.copy(alpha = .5f), fontSize = 14.sp)
-                    }
+                    PanelEmptyHint("暂无表情记录", textColor, Modifier.fillMaxSize())
                 } else {
                     val rows = remember(category.emojis, grid.columns) { category.emojis.chunked(grid.columns) }
                     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {

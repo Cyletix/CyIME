@@ -147,16 +147,7 @@ fun SymbolKeyboardLayout(
 
                 if (category.symbols.isEmpty()) {
                     // 最近使用为空时的占位提示
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "暂无最近使用",
-                            color = textColor.copy(alpha = 0.5f),
-                            fontSize = 14.sp
-                        )
-                    }
+                    PanelEmptyHint("暂无最近使用", textColor, Modifier.fillMaxSize())
                 } else {
                     // 大分类有数百个符号：只组合可见行，打开或切换分类时不一次创建全部按键。
                     val rows = remember(category.symbols, columns) { category.symbols.chunked(columns) }
