@@ -520,6 +520,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
      * 运行在 keyProcessingDispatcher 线程。
      */
     internal suspend fun commitFirstCandidateAndClearT9() {
+        // 「下一项」换了高亮：先走空格那条路上屏高亮的候选，剩下的编码再按首选上屏（用户 10-27：处处跟高亮一致）。
+        val snapshot = service.candidateState.value
+        snapshot.modeChangeCandidateIndex(service.uiState.value.inputProfile)?.let {
+            service.keyRouter.selectCandidateAsync(it, snapshot = snapshot)
+        }
         service.textCommit.commitCompositionAndLiteral()
     }
 

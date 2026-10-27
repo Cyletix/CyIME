@@ -1,5 +1,12 @@
 package com.kingzcheung.xime.service
 
+import com.kingzcheung.xime.settings.InputLayout
+import com.kingzcheung.xime.settings.LayoutKind
+
+/** Layouts with double-letter keys: 14/17/18 键 and custom layouts that put two letters on a key. Their engine
+ * input is the key code (bn → b), so Enter and symbols commit the reading shown on screen, never the codes. */
+internal fun usesMergedLetterKeys(layout: InputLayout): Boolean = layout.kind == LayoutKind.MERGED
+
 /** Raw alphabetic encoding is not the formatted preedit. T9 has numeric engine input and 14-key has
  * merged-key codes (bn → b), so both use the decoded reading shown on screen, keeping partial Chinese
  * selections but removing display separators; never the merged codes ("bugao" for ni'hao). */

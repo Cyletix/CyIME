@@ -59,6 +59,10 @@ private fun CandidateState.moveT9Candidate(profile: InputProfile, direction: Int
 internal fun CandidateState.spaceCandidateIndex(profile: InputProfile): Int =
     if (usesT9CandidateNavigation(profile)) highlightedCandidateIndex else 0
 
+/** 开语音、手写前要先上屏的高亮候选：只有「下一项」把高亮移开首选时才有，和空格上屏同一个；否则 null（照旧按首选）。 */
+internal fun CandidateState.modeChangeCandidateIndex(profile: InputProfile): Int? =
+    if (isComposing) spaceCandidateIndex(profile).takeIf { it > 0 } else null
+
 /** 高亮候选自己的读音：九键候选注释就是拼音；没有注释的英文候选用它本身。 */
 internal fun CandidateState.highlightedT9Reading(): String? {
     if (!isComposing) return null

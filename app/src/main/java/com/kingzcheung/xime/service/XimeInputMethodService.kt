@@ -1803,7 +1803,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                             HardwareKeyboardCandidateBar(
                                 frostedGlass = glass,
                                 inputText = if (hardwareEnglish) "" else cand.inputText,
-                                preeditText = if (hardwareEnglish) "" else cand.preeditText,
+                                preeditText = if (hardwareEnglish) "" else cand.shownPreedit(state.inputProfile),
                                 candidates = hardwareCandidates.standaloneWords,
                                 hasNextPage = hardwareCandidates.hasNextPage,
                                 hasPrevPage = hardwareCandidates.hasPreviousPage,
