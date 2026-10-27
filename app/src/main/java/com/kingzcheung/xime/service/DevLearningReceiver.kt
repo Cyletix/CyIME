@@ -105,7 +105,7 @@ class DevLearningReceiver : BroadcastReceiver() {
         val problems = mutableListOf<String>()
         val saved = BackupManager.parsePrefs(File(dir, SETTINGS_FILE).readBytes())
         val live = BackupManager.parsePrefs(BackupManager.prefsToJson(settings(app)).toByteArray())
-        val settingDiffs = (saved.keys + live.keys).toSortedSet().filter { saved[it] != live[it] }
+        val settingDiffs = (saved.keys + live.keys).toSortedSet().filter { it !in DEPLOY_STATE && saved[it] != live[it] }
         if (settingDiffs.isNotEmpty()) problems += "settings=" + settingDiffs.joinToString(",")
         SNAPSHOT_FILES.forEach { name ->
             val a = File(dir, "files/$name").takeIf { it.isFile }?.let { comparable(name, it) }
@@ -170,6 +170,8 @@ class DevLearningReceiver : BroadcastReceiver() {
         const val SETTINGS_PREFS = "kime_settings"
         const val SETTINGS_FILE = "kime_settings.json"
         const val USERDB = "user_dict.userdb.txt"
+        /** Settings an app update rewrites on its own while redeploying Rime; not the run's doing. */
+        val DEPLOY_STATE = setOf("deployment_done", "deployment_hash", "rime_assets_version", "builtin_schemas_merged")
         /** Files under filesDir an automated run may change: custom layouts, Rime saved options, CyLM learned layer. */
         val SNAPSHOT_FILES = listOf("custom-keyboard-layouts.json", "rime/user.yaml", "rime/cylm_learned.tsv")
     }
