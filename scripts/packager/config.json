@@ -4,9 +4,7 @@
   "cylm": {
     "cylm_lexicon.cylx": "D:/CyIME-Data/cylm/export/lexicon-500000mt.bin",
     "cylm_model.lm": "D:/CyIME-Data/cylm/models/cy1-p1e-7.lm",
-    "cylm_adapt.tsv": "D:/CyIME-Data/cylm/private/adapt-pre1013.counts.tsv",
-    "cylm_gate.onnx": "D:/CyIME-Data/cylm/nn/rs/rerank.int8.onnx",
-    "cylm_gate_vocab.txt": "D:/CyIME-Data/cylm/nn/vocab.txt"
+    "cylm_adapt.tsv": "D:/CyIME-Data/cylm/private/adapt-pre1013.counts.tsv"
   },
   "resourceTag": "models",
   "presets": {
