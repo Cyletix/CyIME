@@ -25,7 +25,7 @@ import kotlin.concurrent.thread
  * - `op=restore`：打完后把上面这些原样放回（用户词库按快照逐条复原，期间新学的词删掉），再核对一遍。
  *   之后脚本要重启输入法进程，让内存里的设置和 CyLM 学习层重新读取，再发 `op=verify`。
  * - `op=verify`：只核对现状和快照是否完全一样，结果第一个词是 OK 或 DIFFERENT，后面列出哪里不一样。
- * 每个 op 的结果写进广播结果（am broadcast 会打印 data=...）和 logcat 标签 DevLearning。
+ * 输入法正在部署时回 busy，稍后重试。每个 op 的结果写进广播结果（am broadcast 会打印 data=...）和 logcat 标签 DevLearning。
  * 用法：adb shell am broadcast -n com.cyletix.cyime/com.kingzcheung.xime.service.DevLearningReceiver -a com.cyletix.cyime.DEV_LEARNING --es op unlearn
  * 只有 adb（持有 DUMP 权限）能发，普通应用发不进来。
  */
@@ -130,11 +130,18 @@ class DevLearningReceiver : BroadcastReceiver() {
         resultData = message
     }
 
-    /** Engine work off the main thread; the broadcast result carries its message. */
+    /**
+     * Engine work off the main thread; the broadcast result carries its message.
+     * A deploy holds the engine for minutes; waiting on it ran past the broadcast's time limit, and Android
+     * killed the process in the middle of the deploy. So the engine is taken here with a short wait,
+     * and a busy engine answers "busy" for the script to retry later.
+     */
     private fun background(work: () -> String) {
         val pending = goAsync()
         thread(name = "dev-learning") {
-            val message = runCatching(work).getOrElse { "failed: ${it.message}" }
+            val lock = RimeEngine.rimeLock
+            val message = if (!lock.tryLock(20, java.util.concurrent.TimeUnit.SECONDS)) "busy: engine is deploying, try again"
+            else try { runCatching(work).getOrElse { "failed: ${it.message}" } } finally { lock.unlock() }
             Log.i(TAG, message)
             pending.resultData = message
             pending.finish()

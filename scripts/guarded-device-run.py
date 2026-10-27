@@ -31,11 +31,15 @@ def adb(serial, *args, check=True):
 
 
 def dev_op(serial, op, *extra):
-    out = adb(serial, "shell", "am", "broadcast", "-n", RECEIVER, "-a", ACTION, "--es", "op", op, *extra)
-    match = re.search(r'data="(.*)"', out, re.S)
-    if not match:
-        raise SystemExit(f"{op}: no answer from CyIME (dev tools missing?): {out}")
-    return match.group(1)
+    for _ in range(20):  # "busy" while the IME deploys (after an install that takes minutes)
+        out = adb(serial, "shell", "am", "broadcast", "-n", RECEIVER, "-a", ACTION, "--es", "op", op, *extra)
+        match = re.search(r'data="(.*)"', out, re.S)
+        if not match:
+            raise SystemExit(f"{op}: no answer from CyIME (dev tools missing?): {out}")
+        if not match.group(1).startswith("busy"):
+            return match.group(1)
+        time.sleep(10)
+    raise SystemExit(f"{op}: CyIME stayed busy")
 
 
 def main():
