@@ -762,7 +762,7 @@ fun KeyboardView(
                 val clipboardContext = androidx.compose.ui.platform.LocalContext.current
                 val clipboard = remember(clipboardContext) {
                     com.kingzcheung.xime.clipboard.ClipboardManager.getInstance(clipboardContext) }
-                ClipboardSearchResults(clipboard, candidateState, isT9Schema(state.currentSchemaId),
+                ClipboardSearchResults(clipboard, candidateState, isT9Schema(state.currentSchemaId), state.inputProfile,
                     state.clipboardItems, callbacks, viewModel::removeClipboardItems,
                     Modifier.fillMaxWidth().height(state.clipboardSearchResultsHeight.dp),
                     showControls = !state.clipboardSearchInline)
@@ -1632,7 +1632,7 @@ fun KeyboardView(
             val isLandscapeBottom = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         }
 
-        if (cursorControlActive) CursorControlOverlay(Modifier.matchParentSize())
+        if (cursorControlActive) CursorControlOverlay(keyboardBgColor, keyTextColor, Modifier.matchParentSize())
 
         state.rejectedCommitText?.let { rejected ->
             Box(Modifier.matchParentSize().then(Modifier.zIndex(20f))) {
@@ -1707,58 +1707,9 @@ fun KeyboardView(
         // 避免焦点型弹窗导致 IME 被系统收起）；确认后按来源分发——
         // 候选栏走当前页索引，展开页走全局索引。
         deletePending?.let { pending ->
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { deletePending = null },
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.widthIn(max = 300.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
-                        Text(
-                            text = "忘掉学习",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = pending.message ?: "忘掉「${pending.word}」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = {
-                                onHapticFeedback?.invoke()
-                                deletePending = null
-                            }) {
-                                Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Spacer(Modifier.width(4.dp))
-                            TextButton(onClick = {
-                                onHapticFeedback?.invoke()
-                                deletePending = null
-                                pending.onConfirm()
-                            }) {
-                                Text("忘掉", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
-            }
+            ForgetLearningConfirm(pending.word, pending.message, Modifier.matchParentSize(),
+                onCancel = { onHapticFeedback?.invoke(); deletePending = null },
+                onConfirm = { onHapticFeedback?.invoke(); deletePending = null; pending.onConfirm() })
         }
 
         // A route change replaces only the panel content, never restarts the reveal host.
@@ -2061,6 +2012,57 @@ private fun KeyboardResizeControlsHost(
     }
 }
 
+/** 忘掉学习记录的确认卡。和剪贴板删除确认同一套卡片颜色：按键色卡片、主题字色，不用 Material 底（深色 iOS 上曾是白卡）。 */
+@Composable
+internal fun ForgetLearningConfirm(word: String, message: String?, modifier: Modifier,
+    onCancel: () -> Unit, onConfirm: () -> Unit) {
+    val cardColors = keyboardCardColors()
+    Box(
+        modifier = modifier
+            .background(cardColors.scrim)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onCancel
+            )
+            .testTag("forget-learning-confirm"),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.widthIn(max = 300.dp),
+            colors = CardDefaults.cardColors(containerColor = cardColors.card)
+        ) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                Text(
+                    text = "忘掉学习",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = cardColors.text
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = message ?: "忘掉「$word」的学习记录？词库里本来有的词会回到原来的位置，自己打出来的新词会消失。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = cardColors.text.copy(alpha = .7f)
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onCancel) {
+                        Text("取消", color = cardColors.text.copy(alpha = .7f))
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(onClick = onConfirm) {
+                        Text("忘掉", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** 长按删除待确认项：词文本 + 用户确认后执行的删除动作（候选栏/展开页共用）。 */
 private data class DeletePendingWord(
     val word: String,
@@ -2079,6 +2081,7 @@ private fun ClipboardSearchResults(
     clipboard: com.kingzcheung.xime.clipboard.ClipboardManager,
     candidateState: State<CandidateState>,
     t9: Boolean,
+    profile: com.kingzcheung.xime.settings.InputProfile,
     items: List<com.kingzcheung.xime.clipboard.ClipboardItem>,
     callbacks: KeyboardCallbacks,
     onRemoveText: (List<Long>) -> Unit,
@@ -2086,7 +2089,7 @@ private fun ClipboardSearchResults(
     showControls: Boolean = true,
 ) {
     val field by clipboard.boardQuery.collectAsStateWithLifecycle()
-    val composing = candidateState.value.let { if (it.isComposing) it.preeditText else "" }
+    val composing = candidateState.value.let { if (it.isComposing) it.shownPreedit(profile) else "" }
     val query = remember(field, composing, t9) { com.kingzcheung.xime.clipboard.ClipboardLiveQuery(field, composing, t9) }
     // The space is there from the first frame; the results rise into it with the panel motion.
     // Only the layer moves, so nothing is measured or recomposed while it runs.

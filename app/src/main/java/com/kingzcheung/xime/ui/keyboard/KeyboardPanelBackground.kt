@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,4 +24,23 @@ internal fun Modifier.keyboardPanelBackground(
     val layered = themeBackground?.type == "gradient" || themeBackground?.type == "image"
     return if (glass.enabled || layered) keyboardBackground(themeBackground, fallback.luminance() < 0.5f, fallback, glass)
     else background(fallback)
+}
+
+/** Card, text and dim colors for an opaque card over the keyboard (confirmations, record actions). */
+internal data class KeyboardCardColors(val card: Color, val text: Color, val scrim: Color)
+
+/**
+ * Keyboard palette, not the Material surface: the card looks like the keys of every theme (a white
+ * Material surface showed on dark iOS). It covers other content, so it stays opaque even on glass.
+ */
+@Composable
+internal fun keyboardCardColors(): KeyboardCardColors {
+    val colors = MaterialTheme.colorScheme
+    val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    return KeyboardCardColors(
+        card = palette?.key?.copy(alpha = 1f) ?: if (glass.enabled) colors.surface.copy(alpha = 1f) else colors.surfaceContainerHigh,
+        text = palette?.text ?: colors.onSurface,
+        scrim = colors.scrim.copy(alpha = .32f),
+    )
 }

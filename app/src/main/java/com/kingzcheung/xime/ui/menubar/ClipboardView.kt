@@ -195,20 +195,16 @@ internal fun LongPressMenuOverlay(
     /** Corner of the bright area left around [anchor]; the pressed card's own corner. */
     highlightCorner: androidx.compose.ui.unit.Dp = 8.dp,
 ) {
-    val colors = MaterialTheme.colorScheme
-    // Keyboard palette, not the Material surface: the card looks like the keys of every theme
-    // (a white Material surface showed on dark iOS). It covers other records, so it stays opaque
-    // even on glass, like CompactActionMenu; a translucent keycap fill let their text show through.
-    val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current
-    val glass = LocalKeyboardInputPreferences.current.frostedGlass
-    val cardText = palette?.text ?: colors.onSurface
-    val cardColor = palette?.key?.copy(alpha = 1f)
-        ?: if (glass.enabled) colors.surface.copy(alpha = 1f) else colors.surfaceContainerHigh
+    // It covers other records, so it stays opaque even on glass, like CompactActionMenu; a translucent
+    // keycap fill let their text show through. Same card colors as every other keyboard confirmation.
+    val cardColors = com.kingzcheung.xime.ui.keyboard.keyboardCardColors()
+    val cardText = cardColors.text
+    val cardColor = cardColors.card
     // 输入法窗口没有返回键分发器；无条件调用 BackHandler 会直接崩溃。
     if (androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current != null)
         androidx.activity.compose.BackHandler(onBack = onDismiss)
     val density = LocalDensity.current
-    val scrim = colors.scrim.copy(alpha = .32f)
+    val scrim = cardColors.scrim
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Dim everything except the pressed record, which stays visible beside its actions.
         androidx.compose.foundation.Canvas(Modifier.matchParentSize().testTag("$tag-dismiss")

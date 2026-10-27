@@ -56,3 +56,11 @@ internal fun ExpressionTab(label: String, chosen: Boolean, textColor: Color, acc
         Text(label, color = textColor, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 1)
     }
 }
+
+/** 表情、颜文字、符号面板“最近”为空时同一句式、同一颜色（主题字色的一半）。 */
+@Composable
+internal fun PanelEmptyHint(text: String, textColor: Color, modifier: Modifier = Modifier) {
+    Box(modifier.testTag("panel-empty-hint"), contentAlignment = Alignment.Center) {
+        Text(text, color = textColor.copy(alpha = .5f), fontSize = 14.sp)
+    }
+}
