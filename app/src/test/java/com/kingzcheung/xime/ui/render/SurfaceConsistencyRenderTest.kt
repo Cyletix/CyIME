@@ -107,6 +107,8 @@ class SurfaceConsistencyRenderTest {
         }
         for (t in listOf("soft_blue", "pure_black", "transparent_glass")) for (d in listOf(false, true)) for (g in listOf(false, true)) {
             KeysConfigHelper.setActiveKeyboardSchema("rime_ice")
+            // 面板底色按设置里的主题取渐变/图片（KeyboardPanelBackground），不设的话 iOS 渐变出图成纯黑。
+            com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(app).edit().putString("keyboard_theme", t).commit()
             rule.runOnIdle { vm.resetKeyboard(false, "rime_ice"); theme = t; dark = d; glass = g }
             rule.waitForIdle()
             shot("$t-${if (d) "dark" else "light"}-${if (g) "glass" else "solid"}")
