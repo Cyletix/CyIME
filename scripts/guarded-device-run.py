@@ -2,8 +2,8 @@
 
 Before: snapshot CyIME's settings (无痕, 全角, scheme, layout and every other kime_settings key), custom layouts,
 Rime saved options, CyLM learned layer and the user dictionary; then turn 无痕 on.
-After (also when the command fails or is interrupted): put all of it back, restart the IME process so nothing
-in memory writes the old state back, reselect the IME, and check everything matches the snapshot.
+After (also when the command fails or is interrupted): put all of it back, restart the IME process (only when a
+file kept in memory had to be put back, and after the keyboard is hidden), reselect the IME, and check everything matches the snapshot.
 Refuses to start unless CyIME is the default keyboard, and after the restart sets it again until it sticks.
 Any difference (including the default keyboard) fails loudly (exit code 3) and lists what differs.
 
@@ -58,6 +58,16 @@ def select_ime(serial):
     return False
 
 
+def wait_keyboard_hidden(serial, seconds=60):
+    """Before restarting the IME, give a person typing on the device a chance to finish."""
+    for _ in range(seconds // 3):
+        shown = adb(serial, "shell", "dumpsys", "input_method", check=False)
+        if "mInputShown=true" not in shown:
+            return
+        time.sleep(3)
+    print("keyboard still shown; restarting the IME anyway", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--serial", required=True)
@@ -83,9 +93,14 @@ def main():
     finally:
         restored = dev_op(args.serial, "restore")
         print(restored)
-        # Settings and the CyLM layer live in memory too; a fresh process reads the restored files.
-        adb(args.serial, "shell", "am", "force-stop", PACKAGE)
-        ime_back = select_ime(args.serial)
+        # Files the CyLM layer and Rime options come from also live in memory; when one had to be put back,
+        # a fresh process reads it. Builds that say restart=no need none: a restart while the user is
+        # typing on the device kills the keyboard under their fingers.
+        ime_back = True
+        if "restart=no" not in restored:
+            wait_keyboard_hidden(args.serial)
+            adb(args.serial, "shell", "am", "force-stop", PACKAGE)
+            ime_back = select_ime(args.serial)
         verified = dev_op(args.serial, "verify")
         for _ in range(15):  # the restarted IME needs a moment before its engine can export
             if "export failed" not in verified and "failed:" not in verified:

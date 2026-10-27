@@ -77,14 +77,21 @@ class DevLearningReceiver : BroadcastReceiver() {
                 val dir = snapshotDir(app)
                 check(File(dir, SETTINGS_FILE).isFile && File(dir, USERDB).isFile) { "no snapshot in ${dir.path}" }
                 BackupManager.restorePrefsJson(settings(app), File(dir, SETTINGS_FILE).readBytes(), replace = true)
-                SNAPSHOT_FILES.forEach { name ->
+                // Only files the run really changed are put back. Those are also held in memory (CyLM layer,
+                // Rime options), so only then does the script have to restart the IME; a restart while the
+                // user types looks like a crash to them.
+                val putBack = SNAPSHOT_FILES.filter { name ->
                     val saved = File(dir, "files/$name")
                     val live = File(app.filesDir, name)
-                    if (saved.isFile) saved.copyTo(live, true) else live.delete()
+                    val a = saved.takeIf { it.isFile }?.let { comparable(name, it) }
+                    val b = live.takeIf { it.isFile }?.let { comparable(name, it) }
+                    if (a != b) { if (saved.isFile) saved.copyTo(live, true) else live.delete() }
+                    a != b
                 }
                 val changed = RimeEngine.getInstance().restoreUserDict(File(dir, USERDB).path)
                 check(changed >= 0) { "user dictionary restore failed" }
-                "restore: userdb entries put back=$changed; " + verify(app, dir)
+                "restore: userdb entries put back=$changed files put back=${putBack.joinToString(",")} " +
+                    "restart=${if (putBack.isEmpty()) "no" else "yes"}; " + verify(app, dir)
             }
             "verify" -> background { verify(app, snapshotDir(app)) }
             else -> report("unknown op")
