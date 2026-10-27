@@ -4,7 +4,8 @@ Before: snapshot CyIME's settings (无痕, 全角, scheme, layout and every othe
 Rime saved options, CyLM learned layer and the user dictionary; then turn 无痕 on.
 After (also when the command fails or is interrupted): put all of it back, restart the IME process so nothing
 in memory writes the old state back, reselect the IME, and check everything matches the snapshot.
-Any difference fails loudly (exit code 3) and lists what differs.
+Refuses to start unless CyIME is the default keyboard, and after the restart sets it again until it sticks.
+Any difference (including the default keyboard) fails loudly (exit code 3) and lists what differs.
 
 Needs a "装到我的设备" build (dev tools on). Usage:
   python -I scripts/guarded-device-run.py --serial R52T800SKWZ -- python tools/demo_typer/demo_typer.py ...
@@ -19,6 +20,7 @@ import time
 PACKAGE = "com.cyletix.cyime"
 RECEIVER = PACKAGE + "/com.kingzcheung.xime.service.DevLearningReceiver"
 ACTION = PACKAGE + ".DEV_LEARNING"
+IME = PACKAGE + "/com.kingzcheung.xime.service.XimeInputMethodService"
 
 
 def adb(serial, *args, check=True):
@@ -42,6 +44,20 @@ def dev_op(serial, op, *extra):
     raise SystemExit(f"{op}: CyIME stayed busy")
 
 
+def current_ime(serial):
+    return adb(serial, "shell", "settings", "get", "secure", "default_input_method")
+
+
+def select_ime(serial):
+    """After force-stop Samsung may fall back to its own keyboard; set CyIME again until it sticks."""
+    for _ in range(10):
+        adb(serial, "shell", "ime", "set", IME, check=False)
+        time.sleep(2)
+        if current_ime(serial) == IME:
+            return True
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--serial", required=True)
@@ -51,7 +67,10 @@ def main():
     if not command:
         parser.error("give the command to run after --")
 
-    ime = adb(args.serial, "shell", "settings", "get", "secure", "default_input_method")
+    ime = current_ime(args.serial)
+    if ime != IME:
+        # Typing would go into another keyboard (it once did: probe words typed with Samsung's keyboard).
+        raise SystemExit(f"default keyboard is {ime}, not CyIME; nothing was run")
     answer = dev_op(args.serial, "snapshot")
     print(answer)
     if not answer.startswith("snapshot:"):
@@ -66,14 +85,15 @@ def main():
         print(restored)
         # Settings and the CyLM layer live in memory too; a fresh process reads the restored files.
         adb(args.serial, "shell", "am", "force-stop", PACKAGE)
-        if ime.startswith(PACKAGE):
-            adb(args.serial, "shell", "ime", "set", ime)
+        ime_back = select_ime(args.serial)
         verified = dev_op(args.serial, "verify")
         for _ in range(15):  # the restarted IME needs a moment before its engine can export
             if "export failed" not in verified and "failed:" not in verified:
                 break
             time.sleep(2)
             verified = dev_op(args.serial, "verify")
+        if not ime_back:
+            verified += f"; default keyboard is {current_ime(args.serial)}, not CyIME"
         print("verify after restart:", verified)
         if verified != "OK" or not restored.endswith("OK"):
             print("!!! DEVICE NOT RESTORED: " + verified, file=sys.stderr)
