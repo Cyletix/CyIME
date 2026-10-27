@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.rime.RimeEngine
+import com.kingzcheung.xime.settings.BackupManager
 import com.kingzcheung.xime.settings.SettingsPreferences
 import java.io.File
 import kotlin.concurrent.thread
@@ -19,6 +20,11 @@ import kotlin.concurrent.thread
  *   之后要重启输入法进程，免得内存里的那层再写回去。
  * - `op=export`：把当前方案的用户词库（Rime 文本快照 .userdb.txt）和 CyLM 学习层复制到
  *   Android/data/<包名>/files/cyime-dev/<时间>/，供电脑 adb pull 分析。
+ * - `op=snapshot`：自动打字前存一份快照（kime_settings 全部设置：无痕、全角、方案、布局等；自定义布局；
+ *   rime/user.yaml；CyLM 学习层；当前方案用户词库），放在 Android/data/<包名>/files/cyime-dev/snapshot/。
+ * - `op=restore`：打完后把上面这些原样放回（用户词库按快照逐条复原，期间新学的词删掉），再核对一遍。
+ *   之后脚本要重启输入法进程，让内存里的设置和 CyLM 学习层重新读取，再发 `op=verify`。
+ * - `op=verify`：只核对现状和快照是否完全一样，结果第一个词是 OK 或 DIFFERENT，后面列出哪里不一样。
  * 每个 op 的结果写进广播结果（am broadcast 会打印 data=...）和 logcat 标签 DevLearning。
  * 用法：adb shell am broadcast -n com.cyletix.cyime/com.kingzcheung.xime.service.DevLearningReceiver -a com.cyletix.cyime.DEV_LEARNING --es op unlearn
  * 只有 adb（持有 DUMP 权限）能发，普通应用发不进来。
@@ -55,8 +61,68 @@ class DevLearningReceiver : BroadcastReceiver() {
                     "export: ${dir.path} userdb=$dict cylm_learned=$cylm"
                 }
             }
+            "snapshot" -> background {
+                val dir = snapshotDir(app)
+                dir.deleteRecursively()
+                File(dir, "files").mkdirs()
+                File(dir, SETTINGS_FILE).writeText(BackupManager.prefsToJson(settings(app)))
+                SNAPSHOT_FILES.forEach { name ->
+                    File(app.filesDir, name).takeIf { it.isFile }?.copyTo(File(dir, "files/$name"), true)
+                }
+                check(RimeEngine.getInstance().exportUserDict(File(dir, USERDB).path)) { "user dictionary export failed" }
+                "snapshot: ${dir.path} settings=${settings(app).all.size} " +
+                    "files=${SNAPSHOT_FILES.count { File(dir, "files/$it").isFile }} userdb=${dataLines(File(dir, USERDB)).size}"
+            }
+            "restore" -> background {
+                val dir = snapshotDir(app)
+                check(File(dir, SETTINGS_FILE).isFile && File(dir, USERDB).isFile) { "no snapshot in ${dir.path}" }
+                BackupManager.restorePrefsJson(settings(app), File(dir, SETTINGS_FILE).readBytes(), replace = true)
+                SNAPSHOT_FILES.forEach { name ->
+                    val saved = File(dir, "files/$name")
+                    val live = File(app.filesDir, name)
+                    if (saved.isFile) saved.copyTo(live, true) else live.delete()
+                }
+                val changed = RimeEngine.getInstance().restoreUserDict(File(dir, USERDB).path)
+                check(changed >= 0) { "user dictionary restore failed" }
+                "restore: userdb entries put back=$changed; " + verify(app, dir)
+            }
+            "verify" -> background { verify(app, snapshotDir(app)) }
             else -> report("unknown op")
         }
+    }
+
+    private fun snapshotDir(app: Context) = File(app.getExternalFilesDir(null), "cyime-dev/snapshot")
+
+    private fun settings(app: Context) = app.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+
+    /** Entry lines of a Rime .userdb.txt snapshot (header comments are left out). */
+    private fun dataLines(file: File): Set<String> =
+        file.readLines().filter { it.isNotEmpty() && !it.startsWith("#") }.toSet()
+
+    /** "OK", or "DIFFERENT" followed by every setting key, file and dictionary entry that doesn't match the snapshot. */
+    private fun verify(app: Context, dir: File): String {
+        check(File(dir, SETTINGS_FILE).isFile && File(dir, USERDB).isFile) { "no snapshot in ${dir.path}" }
+        val problems = mutableListOf<String>()
+        val saved = BackupManager.parsePrefs(File(dir, SETTINGS_FILE).readBytes())
+        val live = BackupManager.parsePrefs(BackupManager.prefsToJson(settings(app)).toByteArray())
+        val settingDiffs = (saved.keys + live.keys).toSortedSet().filter { saved[it] != live[it] }
+        if (settingDiffs.isNotEmpty()) problems += "settings=" + settingDiffs.joinToString(",")
+        SNAPSHOT_FILES.forEach { name ->
+            val a = File(dir, "files/$name").takeIf { it.isFile }?.readBytes()
+            val b = File(app.filesDir, name).takeIf { it.isFile }?.readBytes()
+            if (!(a == null && b == null) && !(a != null && b != null && a.contentEquals(b))) problems += "file=$name"
+        }
+        val now = File(dir, "verify.userdb.txt")
+        if (!RimeEngine.getInstance().exportUserDict(now.path)) problems += "userdb=export failed"
+        else {
+            val want = dataLines(File(dir, USERDB))
+            val have = dataLines(now)
+            val extra = have - want
+            val missing = want - have
+            if (extra.isNotEmpty() || missing.isNotEmpty())
+                problems += "userdb=+${extra.size}/-${missing.size} " + (extra.take(5) + missing.take(5)).joinToString(" | ")
+        }
+        return if (problems.isEmpty()) "OK" else "DIFFERENT " + problems.joinToString("; ")
     }
 
     private fun report(message: String) {
@@ -78,5 +144,10 @@ class DevLearningReceiver : BroadcastReceiver() {
     private companion object {
         const val ACTION = "com.cyletix.cyime.DEV_LEARNING"
         const val TAG = "DevLearning"
+        const val SETTINGS_PREFS = "kime_settings"
+        const val SETTINGS_FILE = "kime_settings.json"
+        const val USERDB = "user_dict.userdb.txt"
+        /** Files under filesDir an automated run may change: custom layouts, Rime saved options, CyLM learned layer. */
+        val SNAPSHOT_FILES = listOf("custom-keyboard-layouts.json", "rime/user.yaml", "rime/cylm_learned.tsv")
     }
 }
