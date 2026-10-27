@@ -44,6 +44,11 @@ int cylm_adapt_save(CylmModel* model, const char* path);
 /* 1 when the word is in CyLM's lexicon (the user's words included), else 0. The hook keeps Rime's sentence when one
  * of its words (2+ characters) is not: CyLM would only spell that word out of single characters. */
 int cylm_has_word(CylmModel* model, const char* word);
+/* The replace gate's character model (a small reranker, e.g. rs int8; needs a -DCYLM_ORT build): load it once, then
+ * cylm_gate_score gives ln P(text </s>) for one sentence (Rime's and CyLM's best, before deciding to replace). It is not
+ * used by the decode itself. Returns -1 / 0.0 without it. Call from the decoding thread. */
+int cylm_gate_load(CylmModel* model, const char* model_path, const char* vocab);
+double cylm_gate_score(CylmModel* model, const char* text);
 /* A separate reranker for nine-key input (the full tier uses a larger one there). Call before cylm_session. */
 int cylm_reranker_t9(CylmModel* model, const char* reranker, const char* vocab);
 CylmSession* cylm_session(CylmModel* model);
