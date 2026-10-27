@@ -238,11 +238,13 @@ private fun SaveDialog(controller: CaptionController, onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val where = remember { controller.saveTranscript() }
     var history by remember { mutableStateOf(false) }
+    var searching by remember { mutableStateOf(false) }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(28.dp), color = captionDialogColor(), contentColor = MaterialTheme.colorScheme.onSurface) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("这次的字幕", fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                Text(if (where == null) "还没有字幕。" else "已保存在“$where”。这次字幕一直写在这一个文件里，边听边更新，再点保存不会多出文件。",
+                Text("字幕记录", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(if (where == null) "这次还没有字幕。" else "这次的字幕已保存在“$where”，边听边更新，一次只有这一个文件。" +
+                    if (CaptionAutoSave.keepsThreeDays(context)) "字幕记录保留 3 天。" else "",
                     fontSize = 18.sp, lineHeight = 26.sp)
                 if (where != null) {
                     CaptionButton("复制全部", Modifier.fillMaxWidth()) {
@@ -257,12 +259,73 @@ private fun SaveDialog(controller: CaptionController, onDismiss: () -> Unit) {
                         onDismiss()
                     }
                 }
+                CaptionButton("搜索字幕", Modifier.fillMaxWidth()) { searching = true }
                 CaptionButton("以前的字幕", Modifier.fillMaxWidth()) { history = true }
                 BigButton("好", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
             }
         }
     }
     if (history) HistoryDialog(controller, onDismiss = { history = false })
+    if (searching) SearchDialog(controller, onDismiss = { searching = false })
+}
+
+/** 搜索字幕：这次和以前保存的字幕里含这个词的句子，新的在上；点一句打开那份记录。 */
+@Composable
+private fun SearchDialog(controller: CaptionController, onDismiss: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    var hits by remember { mutableStateOf<List<Pair<SavedCaption?, String>>>(emptyList()) }
+    var open by remember { mutableStateOf<SavedCaption?>(null) }
+    val clock = remember { SimpleDateFormat("M月d日", Locale.getDefault()) }
+    LaunchedEffect(query) {
+        kotlinx.coroutines.delay(250)
+        hits = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { controller.search(query) }
+    }
+    Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth(.94f).fillMaxHeight(.9f), shape = RoundedCornerShape(28.dp), color = captionDialogColor(),
+            contentColor = MaterialTheme.colorScheme.onSurface) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("搜索字幕", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                androidx.compose.material3.OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
+                    placeholder = { Text("要找的词", fontSize = 19.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 20.sp),
+                    modifier = Modifier.fillMaxWidth())
+                if (query.isNotBlank() && hits.isEmpty()) Text("没有找到。", fontSize = 18.sp)
+                LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(hits.size) { i ->
+                        val (saved, line) = hits[i]
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .combinedClickableNoRipple { if (saved != null) open = saved }.padding(12.dp)) {
+                            Text(if (saved == null) "这次" else clock.format(Date(saved.modifiedMs)), fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(highlight(line, query), fontSize = 19.sp, lineHeight = 26.sp)
+                        }
+                    }
+                }
+                BigButton("返回", Modifier.fillMaxWidth(), outlined = true, onClick = onDismiss)
+            }
+        }
+    }
+    open?.let { f -> SavedCaptionDialog(controller, f, onDismiss = { open = null }) }
+}
+
+/** The search word in bold accent inside a found line. */
+@Composable
+private fun highlight(line: String, query: String): androidx.compose.ui.text.AnnotatedString {
+    val accent = MaterialTheme.colorScheme.primary
+    return androidx.compose.ui.text.buildAnnotatedString {
+        val q = query.trim()
+        var at = 0
+        while (q.isNotEmpty()) {
+            val i = line.indexOf(q, at, ignoreCase = true)
+            if (i < 0) break
+            append(line.substring(at, i))
+            pushStyle(androidx.compose.ui.text.SpanStyle(color = accent, fontWeight = FontWeight.Bold))
+            append(line.substring(i, i + q.length))
+            pop()
+            at = i + q.length
+        }
+        append(line.substring(at))
+    }
 }
 
 /** 以前的字幕：一个简单的列表，新的在上；点开看全文，可以选字、复制全部、分享。 */
@@ -344,7 +407,7 @@ private fun TopControls(controller: CaptionController, onSave: () -> Unit, onExi
                 CaptionController.Status.Paused -> button("继续", Icons.Rounded.PlayArrow, CaptionEmphasis.Primary) { controller.resume() }
                 else -> button("暂停", Icons.Rounded.Pause) { controller.pause() }
             }
-            button("保存", Icons.Rounded.Save, onClick = onSave)
+            button("记录", Icons.Rounded.Save, onClick = onSave)
             button("退出", Icons.Rounded.Close, onClick = onExit)
         }
     }
@@ -366,7 +429,7 @@ private fun SlimRail(controller: CaptionController, onSave: () -> Unit, onExit: 
         CaptionButton("快捷回复", each, icon = Icons.Rounded.Forum, emphasis = CaptionEmphasis.Primary,
             height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onReply)
         CaptionButton("再说一遍", each, icon = Icons.Rounded.Replay, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onRepeat)
-        CaptionButton("保存", each, icon = Icons.Rounded.Save, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onSave)
+        CaptionButton("记录", each, icon = Icons.Rounded.Save, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onSave)
         CaptionButton("退出", each, icon = Icons.Rounded.Close, height = RAIL_BUTTON, fontSize = 15.sp, stacked = true, onClick = onExit)
     }
 }
