@@ -27,13 +27,16 @@ class KeyboardSurfaceConsistencyTest {
     )
 
     @Test fun everyPanelPaintsItsBackgroundWithTheThemeAndGlass() {
-        val missing = panels.filterNot { source(it).contains("keyboardPanelBackground(") }
+        val missing = panels.filterNot { source(it).contains("keyboardPanelBackground(") || source(it).contains("keyboardOverlayBackground(") }
         assertEquals("这些面板没有用 keyboardPanelBackground，换主题或开毛玻璃时会和键盘不一致", emptyList<String>(), missing)
         val fixed = Regex("""\.background\(\s*Color\.(Black|White|Gray|DarkGray|LightGray)\b""")
         val scrims = panels.flatMap { path ->
             source(path).lines().mapIndexedNotNull { i, line -> if (fixed.containsMatchIn(line)) "$path:${i + 1}" else null }
         }
         assertEquals("面板底色写死了黑/白/灰，不跟主题", emptyList<String>(), scrims)
+        // 盖在按键上面的覆盖层：玻璃下面板底是透的，必须用 keyboardOverlayBackground，否则按键和字叠在一起。
+        for (overlay in listOf("ui/keyboard/CursorControlOverlay.kt", "ui/keyboard/RejectedCommitOverlay.kt"))
+            assertTrue("$overlay 没用 keyboardOverlayBackground", source(overlay).contains("keyboardOverlayBackground("))
     }
 
     @Test fun cardsAndDimsOverTheKeyboardShareTheKeyboardCardColors() {

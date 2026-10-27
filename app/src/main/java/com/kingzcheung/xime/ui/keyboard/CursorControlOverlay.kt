@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.sp
 /** 纯展示层：不消费触摸，长按中的空格继续接收移动和松手。底色和字色跟主题、毛玻璃走，与其它键盘内覆盖层一致。 */
 @Composable
 fun CursorControlOverlay(background: Color, foreground: Color, modifier: Modifier = Modifier) {
-    Box(modifier.keyboardPanelBackground(background).testTag("cursor-control-overlay"),
+    Box(modifier.keyboardOverlayBackground(background).testTag("cursor-control-overlay"),
         contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Default.Swipe, contentDescription = null, tint = foreground, modifier = Modifier.size(36.dp))

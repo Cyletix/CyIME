@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 /** An in-keyboard overlay keeps the host editor focused (no dialog window). */
 @Composable
 internal fun RejectedCommitOverlay(text: String, background: Color, foreground: Color, retry: () -> Unit, cancel: () -> Unit) {
-    Box(Modifier.fillMaxSize().keyboardPanelBackground(background).clickable {}.testTag("rejected-commit"), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().keyboardOverlayBackground(background).clickable {}.testTag("rejected-commit"), contentAlignment = Alignment.Center) {
         Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("输入框未接受文字，内容已保留", color = foreground)
             Text(text, Modifier.padding(vertical = 8.dp), color = foreground)

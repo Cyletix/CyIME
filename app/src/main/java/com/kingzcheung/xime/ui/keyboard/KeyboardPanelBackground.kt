@@ -26,6 +26,18 @@ internal fun Modifier.keyboardPanelBackground(
     else background(fallback)
 }
 
+/**
+ * Overlays drawn on top of the keys (cursor control, rejected commit). A panel hides the keys under it, but an
+ * overlay cannot, and a glass panel background is see-through: the keys showed through the overlay's text.
+ * On glass add an almost opaque wash of the theme background; without glass the panel background is opaque.
+ */
+@Composable
+internal fun Modifier.keyboardOverlayBackground(background: Color): Modifier {
+    val glass = LocalKeyboardInputPreferences.current.frostedGlass
+    return keyboardPanelBackground(background, glass)
+        .then(if (glass.enabled) Modifier.background(background.copy(alpha = .9f)) else Modifier)
+}
+
 /** Card, text and dim colors for an opaque card over the keyboard (confirmations, record actions). */
 internal data class KeyboardCardColors(val card: Color, val text: Color, val scrim: Color)
 
