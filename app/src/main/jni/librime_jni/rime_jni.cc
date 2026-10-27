@@ -688,6 +688,20 @@ public:
         return taken;
     }
 
+    // Developer tool: the current schema's user dictionary as a text snapshot at `file`.
+    bool exportUserDict(const std::string& file) {
+        if (!rime || !session_id_) return false;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->schema()) return false;
+        auto* dictionaries = rime::Dictionary::Require("dictionary");
+        auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
+        if (!dictionaries || !userDictionaries) return false;
+        const rime::Ticket ticket(session->schema(), "translator");
+        rime::the<rime::UserDictionary> userDictionary(userDictionaries->Create(ticket));
+        if (!userDictionary || !userDictionary->Load()) return false;
+        return userDictionary->Export(rime::path(file));
+    }
+
     int forgetCandidate(int index, bool global) {
         if (!rime || !session_id_ || index < 0) return 0;
         auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
@@ -2729,6 +2743,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeT9Memorize(
     jstring pinyin
 ) {
     return T9DictUpdate(env, text, pinyin, true);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeExportUserDict(JNIEnv* env, jobject, jstring file) {
+    const char* text = env->GetStringUTFChars(file, nullptr);
+    const std::string copy(text ? text : "");
+    if (text) env->ReleaseStringUTFChars(file, text);
+    return Rime::Instance().exportUserDict(copy) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jint JNICALL

@@ -1314,10 +1314,10 @@ index 953c59cf..62bfe730 100644
  }
  
 diff --git a/src/rime/dict/user_dictionary.h b/src/rime/dict/user_dictionary.h
-index 7886e494..89315f81 100644
+index 7886e494..d073b70e 100644
 --- a/src/rime/dict/user_dictionary.h
 +++ b/src/rime/dict/user_dictionary.h
-@@ -71,6 +71,13 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -71,6 +71,15 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
    bool UpdateEntry(const DictEntry& entry,
                     int commits,
                     const string& new_entry_prefix);
@@ -1328,10 +1328,12 @@ index 7886e494..89315f81 100644
 +  // not happened; an entry left with none is marked deleted (back to the dictionary's own rank). Returns the number
 +  // of commits taken back.
 +  int Unlearn(const string& text, int commits);
++  // CyIME: writes the whole user dictionary as a text snapshot (Rime's own .userdb.txt format).
++  bool Export(const path& file) { return db_ && db_->Backup(file); }
    bool UpdateTickCount(TickCount increment);
  
    bool NewTransaction();
-@@ -95,6 +102,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -95,6 +104,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
                   size_t current_pos,
                   const string& current_prefix,
                   DfsState* state);
@@ -1341,7 +1343,7 @@ index 7886e494..89315f81 100644
  
   private:
    string name_;
-@@ -105,6 +115,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -105,6 +117,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
    hash_map<SyllableId, string> rev_syllabary_;
    TickCount tick_ = 0;
    time_t transaction_time_ = 0;
