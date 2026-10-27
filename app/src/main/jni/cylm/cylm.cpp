@@ -586,7 +586,7 @@ struct KvCache {
 struct Reranker {
   const OrtApi* api = nullptr; OrtEnv* env = nullptr; OrtSession* sess = nullptr; OrtMemoryInfo* mem = nullptr;
   std::unordered_map<uint32_t, int64_t> vocab;
-  bool Load(const char* model, const char* vocab_path, int threads) {
+  bool Load(const char* model, const char* vocab_path, int threads, bool lean = false) {
     api = OrtGetApiBase()->GetApi(17);
     if (!api) return false;
     std::ifstream in(vocab_path, std::ios::binary); std::string line; int64_t id = 0;
@@ -595,6 +595,7 @@ struct Reranker {
     OrtSessionOptions* so = nullptr;
     if (api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "cylm", &env) || api->CreateSessionOptions(&so)) return false;
     api->SetIntraOpNumThreads(so, threads); api->SetSessionGraphOptimizationLevel(so, ORT_ENABLE_ALL);
+    if (lean) { api->DisableCpuMemArena(so); api->DisableMemPattern(so); api->SetInterOpNumThreads(so, 1); }  // the gate: small, rare calls
 #ifdef _WIN32
     std::wstring w(model, model + std::strlen(model));
     OrtStatus* st = api->CreateSession(env, w.c_str(), so, &sess);
@@ -753,7 +754,7 @@ struct KvCache { size_t limit = 2048; };
 struct Reranker {
   bool kv = false;
   std::vector<double> ScoreKV(KvCache&, const std::string&, const std::vector<std::string>& c, bool) const { return std::vector<double>(c.size(), 0.0); }
-  bool Load(const char*, const char*, int) { return false; }
+  bool Load(const char*, const char*, int, bool = false) { return false; }
   std::vector<double> Score(const std::string&, const std::vector<std::string>& c, bool) const { return std::vector<double>(c.size(), 0.0); }
 };
 #endif
@@ -1376,6 +1377,7 @@ static bool LoadPrefer(const char* path, std::unordered_map<std::string, std::ve
 // ------------------------------------------------------------------ C API (cylm.h): library for Windows Core / Android JNI
 #include "cylm.h"
 struct CylmModel { Lexicon lex; C3 base; C3 base2; bool has2 = false; Adapt adapt; Params p; Reranker rr; bool has_rr = false;
+                   Reranker gate; bool has_gate = false;  // a small character model the hook asks about two sentences (cylm_gate_score)
                    Reranker rr_t9; bool has_rr_t9 = false;
                    std::unordered_map<std::string, std::vector<std::string>> prefer; std::unordered_set<uint32_t> holes; };
 struct CylmSession { std::unique_ptr<Decoder> d; };
@@ -1478,6 +1480,16 @@ int cylm_add_word(CylmModel* m, const char* word, const char* pinyin, long long 
   // default weight: about as common as a frequent word of the lexicon (1/20000 of its total)
   const int64_t wt = weight > 0 ? int64_t(weight) : std::max<int64_t>(1, int64_t(m->lex.total / 20000));
   return m->lex.AddWord(word, syl, wt) ? 0 : -1;
+}
+int cylm_gate_load(CylmModel* m, const char* model, const char* vocab) {
+  if (!m || !model || !vocab || !m->gate.Load(model, vocab, 1, true)) return -1;
+  m->has_gate = true;
+  return 0;
+}
+double cylm_gate_score(CylmModel* m, const char* text) {
+  if (!m || !text || !m->has_gate) return 0.0;
+  auto v = m->gate.Score("", {std::string(text)}, true);
+  return v.empty() ? 0.0 : v[0];
 }
 int cylm_has_word(CylmModel* m, const char* word) { return m && word && m->lex.WeightOf(word) >= 0 ? 1 : 0; }
 int cylm_adapt_save(CylmModel* m, const char* path) {
