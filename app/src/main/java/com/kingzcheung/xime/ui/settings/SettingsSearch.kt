@@ -219,6 +219,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("桌面显示“字幕”图标", speech, SettingsRoutes.SpeechToText, "字幕 桌面图标 快捷方式"),
         SettingsSearchEntry("后台浮窗", speech, SettingsRoutes.SpeechToText, "字幕 浮窗 后台 悬浮 其他应用"),
         SettingsSearchEntry("自动保存字幕", speech, SettingsRoutes.SpeechToText, "字幕 保存 文件 记录 下载"),
+        SettingsSearchEntry("字幕只保留 3 天", speech, SettingsRoutes.SpeechToText, "字幕 记录 删除 三天 保留"),
         SettingsSearchEntry("有人叫我名字时振动", speech, SettingsRoutes.SpeechToText, "字幕 名字 振动 提醒 叫我"),
         SettingsSearchEntry("在线服务", speech, SettingsRoutes.SpeechToText, "在线 语音插件 api 密钥 联网"),
         // 智能 › 手写

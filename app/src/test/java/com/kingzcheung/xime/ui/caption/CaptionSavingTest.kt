@@ -19,4 +19,8 @@ class CaptionSavingTest {
         val line = transcriptLine(null, 0L, "你好")
         assertTrue(line.startsWith("说话的人  ") && line.endsWith("  你好"))
     }
+
+    @Test fun `records are kept three days`() {
+        org.junit.Assert.assertEquals(259_200_000L, CaptionAutoSave.KEEP_MS)
+    }
 }
