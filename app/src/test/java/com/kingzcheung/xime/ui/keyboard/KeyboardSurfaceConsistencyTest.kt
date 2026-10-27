@@ -34,9 +34,11 @@ class KeyboardSurfaceConsistencyTest {
             source(path).lines().mapIndexedNotNull { i, line -> if (fixed.containsMatchIn(line)) "$path:${i + 1}" else null }
         }
         assertEquals("面板底色写死了黑/白/灰，不跟主题", emptyList<String>(), scrims)
-        // 盖在按键上面的覆盖层：玻璃下面板底是透的，必须用 keyboardOverlayBackground，否则按键和字叠在一起。
-        for (overlay in listOf("ui/keyboard/CursorControlOverlay.kt", "ui/keyboard/RejectedCommitOverlay.kt"))
-            assertTrue("$overlay 没用 keyboardOverlayBackground", source(overlay).contains("keyboardOverlayBackground("))
+        // 玻璃下面板底是透的：盖在按键上的覆盖层要么用 keyboardOverlayBackground 挡住，要么把下面的按键藏起来，
+        // 否则按键和字叠在一起。光标调整走后一种（保留玻璃观感，空格仍收拖动）。
+        assertTrue(source("ui/keyboard/RejectedCommitOverlay.kt").contains("keyboardOverlayBackground("))
+        assertTrue("光标调整时键盘内容没藏起来",
+            source("ui/keyboard/KeyboardView.kt").contains(".hiddenDuringCursorControl(cursorControlActive)"))
     }
 
     @Test fun cardsAndDimsOverTheKeyboardShareTheKeyboardCardColors() {
