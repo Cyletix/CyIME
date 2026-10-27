@@ -25,6 +25,8 @@ void T9ApplyCylmSentence(CylmModel* model, const void* owner, const string& inpu
 void T9CylmSetBudget(int ms);
 // Keep Rime's sentence when one of its words is unknown to CyLM (schema cylm/guard_unknown_words).
 void T9CylmSetGuardUnknownWords(bool on);
+// Loads the replace gate's character model (schema cylm/gate + cylm/gate_vocab); the hook then uses its rule.
+bool T9CylmGate(CylmModel* model, const string& gate, const string& vocab);
 // False after `adb shell setprop debug.cyime.cylm 0` (developer switch); CyLM is then not even opened.
 bool T9CylmEnabled();
 // Loads a newly opened model's pages on the CyLM thread, off the key path.

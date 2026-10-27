@@ -279,6 +279,8 @@ val prepareChineseDictionaries by tasks.registering {
             // cylm_adapt.tsv is the user's own trigram layer (only in 装到我的设备 packages); nbest 16 and the typo
             // readings let the replacement rule in t9_cylm_sentence.cc compare Rime's sentence with CyLM's.
             "\ncylm:\n  lexicon: cylm_lexicon.cylx\n  model: cylm_model.lm\n  adapt: cylm_adapt.tsv\n" +
+            // Replace gate's character model (CyIME-Windows 102ad9a), scored by the hook before replacing.
+            "  gate: cylm_gate.onnx\n  gate_vocab: cylm_gate_vocab.txt\n" +
             "  params: \"mu=0.04;eos=0.6;abbrev_full=-4;incremental=1;beam=8;per_span=8;per_span_abbrev=16;per_span1=24;" +
             "nbest=4;t9_beam=6;t9_per_span=6;skip_inner=1;hit_cap=5000;word_cap=50000;id_cap=50000;dec_cap=25000;" +
             "nbest=16;typo=-3;typo_first=8.4;adapt_add=1.0\"\n" +

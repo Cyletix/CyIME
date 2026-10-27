@@ -44,7 +44,7 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
     // Optional cylm/reranker + cylm/vocab: the ONNX reranker runs inside the same keystroke.
     // Optional cylm/prefer: "P<TAB>D" rows, P moves above its homophone D after ranking (cylm_prefer).
     // Optional cylm/adapt: the user's own trigram counts (cylm_adapt), only in packages for his own devices.
-    string lexicon, model, model2, reranker, vocab, params, prefer, adapt;
+    string lexicon, model, model2, reranker, vocab, params, prefer, adapt, gate, gate_vocab;
     if (config->GetString("cylm/lexicon", &lexicon) && config->GetString("cylm/model", &model) &&
         !lexicon.empty() && !model.empty() && T9CylmEnabled()) {
       config->GetString("cylm/model2", &model2);
@@ -53,6 +53,8 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
       config->GetString("cylm/params", &params);
       config->GetString("cylm/prefer", &prefer);
       config->GetString("cylm/adapt", &adapt);
+      config->GetString("cylm/gate", &gate);
+      config->GetString("cylm/gate_vocab", &gate_vocab);
       int budget = 0;
       if (config->GetInt("cylm/budget_ms", &budget) && budget > 0) T9CylmSetBudget(budget);
       bool guard = false;
@@ -64,6 +66,10 @@ void T9ScriptOptions::LoadT9Options(Config* config, Context* context) {
                             resolve(adapt));
       // A translation is created for every key: start CyLM on it now, so it decodes while Rime makes its own
       // sentence instead of after it.
+      // The replace gate loads once per model (T9CylmGate keeps the set); only when the schema names it.
+      static std::once_flag gate_once;
+      if (t9_cylm_ && !gate.empty())
+        std::call_once(gate_once, [&] { T9CylmGate(t9_cylm_.get(), resolve(gate), resolve(gate_vocab)); });
       if (t9_cylm_ && context) T9CylmPrefetch(t9_cylm_.get(), context->input(), t9_left_context_);
       if (t9_cylm_) T9CylmSyncWords(t9_cylm_.get(), Service::instance().deployer().user_data_dir.string());
       // Every commit of this input context teaches CyLM; connected once per context (marked by a property).
