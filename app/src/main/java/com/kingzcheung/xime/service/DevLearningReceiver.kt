@@ -28,6 +28,8 @@ class DevLearningReceiver : BroadcastReceiver() {
             "incognito" -> {
                 val on = intent.getBooleanExtra("on", true)
                 SettingsPreferences.setIncognito(app, on)
+                // `am broadcast` prints this, so a script can check the switch really changed.
+                resultData = "incognito=${SettingsPreferences.isIncognito(app)}"
                 FileLogger.i(TAG, "incognito=$on")
             }
             "unlearn" -> {
