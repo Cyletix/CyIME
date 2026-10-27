@@ -441,6 +441,24 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
         if (removed > 0) FileLogger.i(TAG, "removed $removed caption files older than 3 days")
     }
 
+    /**
+     * Lines containing [query] in this session and in the saved captions, newest file first; each hit
+     * names its file (null = this session). The current session's own file is not searched twice.
+     */
+    internal fun search(query: String, limit: Int = 200): List<Pair<SavedCaption?, String>> {
+        val q = query.trim()
+        if (q.isEmpty()) return emptyList()
+        val hits = ArrayList<Pair<SavedCaption?, String>>()
+        for (line in transcriptText().lineSequence()) if (line.contains(q, ignoreCase = true)) hits += null to line
+        for (saved in savedCaptions()) {
+            if (saved.name == sessionName) continue
+            for (line in readSaved(saved).lineSequence()) {
+                if (line.contains(q, ignoreCase = true)) hits += saved to line
+                if (hits.size >= limit) return hits
+            }
+        }
+        return hits
+    }
 
     private fun lineOf(line: SegmentUi): String? {
         if (line.text.isEmpty() || speakers.any { it.id == line.speakerId && it.ignored }) return null
