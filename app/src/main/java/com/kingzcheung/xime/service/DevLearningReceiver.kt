@@ -108,9 +108,9 @@ class DevLearningReceiver : BroadcastReceiver() {
         val settingDiffs = (saved.keys + live.keys).toSortedSet().filter { saved[it] != live[it] }
         if (settingDiffs.isNotEmpty()) problems += "settings=" + settingDiffs.joinToString(",")
         SNAPSHOT_FILES.forEach { name ->
-            val a = File(dir, "files/$name").takeIf { it.isFile }?.readBytes()
-            val b = File(app.filesDir, name).takeIf { it.isFile }?.readBytes()
-            if (!(a == null && b == null) && !(a != null && b != null && a.contentEquals(b))) problems += "file=$name"
+            val a = File(dir, "files/$name").takeIf { it.isFile }?.let { comparable(name, it) }
+            val b = File(app.filesDir, name).takeIf { it.isFile }?.let { comparable(name, it) }
+            if (a != b) problems += "file=$name"
         }
         val now = File(dir, "verify.userdb.txt")
         if (!RimeEngine.getInstance().exportUserDict(now.path)) problems += "userdb=export failed"
@@ -123,6 +123,22 @@ class DevLearningReceiver : BroadcastReceiver() {
                 problems += "userdb=+${extra.size}/-${missing.size} " + (extra.take(5) + missing.take(5)).joinToString(" | ")
         }
         return if (problems.isEmpty()) "OK" else "DIFFERENT " + problems.joinToString("; ")
+    }
+
+    /**
+     * File content as compared by [verify]. Rime rewrites the timestamps in user.yaml (last_build_time,
+     * schema_access_time) whenever the IME restarts or a schema is opened, so those lines don't count;
+     * the saved options and the selected schema do.
+     */
+    private fun comparable(name: String, file: File): String {
+        if (!name.endsWith("user.yaml")) return file.readBytes().joinToString(",")
+        var inAccessTimes = false
+        return file.readLines().filter { line ->
+            val trimmed = line.trim()
+            if (inAccessTimes && line.startsWith("    ")) return@filter false
+            inAccessTimes = trimmed == "schema_access_time:"
+            !trimmed.startsWith("last_build_time:")
+        }.joinToString("\n")
     }
 
     private fun report(message: String) {
