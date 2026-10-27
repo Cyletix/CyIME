@@ -8,15 +8,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** 纯展示层：不消费触摸，长按中的空格继续接收移动和松手。底色和字色跟主题、毛玻璃走，与其它键盘内覆盖层一致。 */
+/** 纯展示层：不消费触摸，长按中的空格继续接收移动和松手。底色和字色跟主题、毛玻璃走，与其它键盘面板一致。 */
 @Composable
 fun CursorControlOverlay(background: Color, foreground: Color, modifier: Modifier = Modifier) {
-    Box(modifier.keyboardOverlayBackground(background).testTag("cursor-control-overlay"),
+    Box(modifier.keyboardPanelBackground(background).testTag("cursor-control-overlay"),
         contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Default.Swipe, contentDescription = null, tint = foreground, modifier = Modifier.size(36.dp))
@@ -24,3 +25,9 @@ fun CursorControlOverlay(background: Color, foreground: Color, modifier: Modifie
         }
     }
 }
+
+/**
+ * 光标调整时下面的按键和候选只是不画，仍在原处接收长按空格的拖动和松手。
+ * 毛玻璃下遮罩是透的，按键要是还画着就会和「光标调整」叠在一起。
+ */
+internal fun Modifier.hiddenDuringCursorControl(active: Boolean): Modifier = if (active) alpha(0f) else this

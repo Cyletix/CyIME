@@ -30,6 +30,7 @@ import com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences
 import com.kingzcheung.xime.ui.keyboard.KeyboardLayout
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardExplicitWidth
 import com.kingzcheung.xime.ui.keyboard.LocalKeyboardInputPreferences
+import com.kingzcheung.xime.ui.keyboard.hiddenDuringCursorControl
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.XimeTheme
 import com.kingzcheung.xime.ui.theme.keyboardBackground
@@ -79,7 +80,7 @@ class SurfaceConsistencyRenderTest {
                         Box(Modifier.requiredSize(480.dp, 300.dp).then(keyboardBg)) {
                             KeyboardLayout({}, vm, KeyboardCallbacks(onKeyPress = { _, _ -> }, onCandidateSelect = {}),
                                 KeyboardUiState(currentSchemaId = "rime_ice", themeId = theme, isDarkTheme = dark),
-                                false, Modifier.requiredSize(480.dp, 300.dp))
+                                false, Modifier.requiredSize(480.dp, 300.dp).hiddenDuringCursorControl(true))
                             CursorControlOverlay(palette.background, palette.text, Modifier.requiredSize(480.dp, 300.dp))
                         }
                         Box(Modifier.requiredSize(380.dp, 300.dp).then(keyboardBg)) {

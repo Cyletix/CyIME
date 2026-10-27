@@ -642,6 +642,7 @@ fun KeyboardView(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .hiddenDuringCursorControl(cursorControlActive)
         ) {
             var handwritingCandidates by remember(state.inputSessionId, state.inputProfile.language) { mutableStateOf<List<String>>(emptyList()) }
             var handwritingComments by remember(state.inputSessionId, state.inputProfile.language) { mutableStateOf<List<String>>(emptyList()) }
