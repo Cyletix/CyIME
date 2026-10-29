@@ -44,6 +44,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(tencentWeights)
     val domainTerms = file("data/cyime_domain_terms.tsv")
     inputs.file(domainTerms)
+    val userFixes = file("data/cyime_user_fixes.tsv")
+    inputs.file(userFixes)
     val acronymFilter = file("data/cyime_acronym_filter.lua")
     inputs.file(acronymFilter)
     val englishMemory = file("data/cyime_en_memory.lua")
@@ -117,7 +119,8 @@ val prepareChineseDictionaries by tasks.registering {
         // IME vocabulary (app/data/cyime_domain_terms.tsv) gets at least its listed weight: the chat counts above
         // rate the IME's own words near zero (上屏 43, 出词 11), so 只输入声母 came out 只输入圣母 and 每个键
         // 每个见. Raise the existing rime-ice entries here; missing ones are added to cyime_terms below.
-        val domainFloors = domainTerms.readLines().filter { it.isNotBlank() && !it.startsWith("#") }
+        // The user's must-pass words (app/data/cyime_user_fixes.tsv) use the same floor, one code each.
+        val domainFloors = (domainTerms.readLines() + userFixes.readLines()).filter { it.isNotBlank() && !it.startsWith("#") }
             .map { it.split('\t') }.associate { (it[0] + "\t" + it[1]) to it[2].toInt() }
         val domainTexts = domainFloors.keys.associateBy { it.substringBefore('\t') }
         val domainPresent = mutableSetOf<String>()
