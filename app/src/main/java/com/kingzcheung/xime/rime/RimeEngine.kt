@@ -1065,6 +1065,7 @@ class RimeEngine {
     private external fun nativeSetIncognito(on: Boolean)
     private external fun nativeT9Forget(text: String, pinyin: String): Boolean
     private external fun nativeUnlearn(rows: String): Int
+    private external fun nativeLearn(rows: String): Int
     private external fun nativeExportUserDict(file: String): Boolean
     private external fun nativeRestoreUserDict(file: String): Int
     private external fun nativeT9SelectPinyinDirect(pinyin: String, digitLength: Int): Boolean
@@ -1256,6 +1257,14 @@ class RimeEngine {
         if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked -1
         candidateRevision.incrementAndGet()
         nativeUnlearn(rows)
+    }
+
+    /** Developer tool: teaches words the user wrote elsewhere (rows "text<TAB>pin yin<TAB>commits") to the current schema's user dictionary. */
+    @androidx.annotation.WorkerThread
+    fun learn(rows: String): Int = locked {
+        if (!isInitialized || !nativeHasSession() || nativeIsMaintaining()) return@locked -1
+        candidateRevision.incrementAndGet()
+        nativeLearn(rows)
     }
 
     /**

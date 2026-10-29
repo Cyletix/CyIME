@@ -688,6 +688,39 @@ public:
         return taken;
     }
 
+    // Developer tool: teaches the current schema's user dictionary words the user wrote elsewhere (his own
+    // messages), as if each was picked that many times. Rows "text<TAB>pin yin<TAB>commits"; returns the
+    // number of words taught, or -1.
+    int learn(const std::string& rows) {
+        if (!rime || !session_id_) return -1;
+        auto session = rime::Service::instance().GetSession(static_cast<rime::SessionId>(session_id_));
+        if (!session || !session->schema()) return -1;
+        auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
+        if (!userDictionaries) return -1;
+        const rime::Ticket ticket(session->schema(), "translator");
+        rime::the<rime::UserDictionary> userDictionary(userDictionaries->Create(ticket));
+        if (!userDictionary || !userDictionary->Load() || userDictionary->readonly()) return -1;
+        int taught = 0;
+        size_t start = 0;
+        while (start < rows.size()) {
+            size_t end = rows.find('\n', start);
+            if (end == std::string::npos) end = rows.size();
+            const std::string line = rows.substr(start, end - start);
+            start = end + 1;
+            const auto tab = line.find('\t');
+            const auto tab2 = tab == std::string::npos ? std::string::npos : line.find('\t', tab + 1);
+            if (tab2 == std::string::npos) continue;
+            const int n = std::atoi(line.c_str() + tab2 + 1);
+            if (n <= 0) continue;
+            rime::DictEntry entry;
+            entry.text = line.substr(0, tab);
+            entry.custom_code = line.substr(tab + 1, tab2 - tab - 1) + " ";  // the user db's own key form
+            if (userDictionary->UpdateEntry(entry, n)) ++taught;
+        }
+        if (auto* context = session->context()) context->RefreshNonConfirmedComposition();
+        return taught;
+    }
+
     // Developer tool: the current schema's user dictionary as a text snapshot at `file`.
     bool exportUserDict(const std::string& file) {
         if (!rime || !session_id_) return false;
@@ -2780,6 +2813,14 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeUnlearn(JNIEnv* env, jobject, js
     const std::string copy(text ? text : "");
     if (text) env->ReleaseStringUTFChars(rows, text);
     return Rime::Instance().unlearn(copy);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeLearn(JNIEnv* env, jobject, jstring rows) {
+    const char* text = env->GetStringUTFChars(rows, nullptr);
+    const std::string copy(text ? text : "");
+    if (text) env->ReleaseStringUTFChars(rows, text);
+    return Rime::Instance().learn(copy);
 }
 
 JNIEXPORT jboolean JNICALL

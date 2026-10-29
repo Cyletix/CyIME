@@ -16,6 +16,8 @@ import kotlin.concurrent.thread
  * - `op=incognito --ez on true|false`：开关无痕，测试前打开、测试后恢复，Rime 和 CyLM 都不学。
  * - `op=unlearn`：读 Android/data/<包名>/files/unlearn.tsv（每行“词<TAB>次数”），从当前方案的用户词库里
  *   减去这么多次学习，减完的词回到词库原来的位置；用户自己别的学习不动。
+ * - `op=learn`：读 Android/data/<包名>/files/learn.tsv（每行“词<TAB>拼 音<TAB>次数”），把用户自己在别处写过的词
+ *   按选过这么多次学进当前方案的用户词库（他自己的聊天记录，只进他的设备）。
  * - `op=reset_cylm`：删掉 CyLM 在本机学到的那层（rime/cylm_learned.tsv），下次打开回到安装包带的用户层。
  *   之后要重启输入法进程，免得内存里的那层再写回去。
  * - `op=export`：把当前方案的用户词库（Rime 文本快照 .userdb.txt）和 CyLM 学习层复制到
@@ -45,6 +47,12 @@ class DevLearningReceiver : BroadcastReceiver() {
                 if (!file.isFile) { report("unlearn: ${file.path} missing"); return }
                 val rows = file.readText()
                 background { "unlearn: ${RimeEngine.getInstance().unlearn(rows)} commits taken back" }
+            }
+            "learn" -> {
+                val file = File(app.getExternalFilesDir(null), "learn.tsv")
+                if (!file.isFile) { report("learn: ${file.path} missing"); return }
+                val rows = file.readText()
+                background { "learn: ${RimeEngine.getInstance().learn(rows)} words taught" }
             }
             "reset_cylm" -> {
                 val layer = File(File(app.filesDir, "rime"), "cylm_learned.tsv")
