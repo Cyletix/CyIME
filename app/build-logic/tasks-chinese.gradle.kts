@@ -105,6 +105,8 @@ val prepareChineseDictionaries by tasks.registering {
         reweight("ext", extWeights)
         // base.dict.yaml weights are counts from written text (核心 over 好像 for hx); blend them (70% written, 30% chat)
         // with LCCC chat counts (tools/ime_lab/chat_word_counts.py + chat_base_weights.py, beta 0.3).
+        // Where the blend flipped a code's first word and wiki + subtitles + LCCC agree with rime-ice (美国 over 没过:
+        // LCCC drops 美国), that one entry goes back on top (tools/ime_lab/general_corpus_fix.py, 567 entries).
         reweight("base", baseWeights)
         // Single characters (8105.dict.yaml) also had written-text weights: 把 3.8M over 吧 2.4M although chat uses
         // 吧 seven times as often, so 下个月吧 came out as 下个月把. Same blend as base (chat_base_weights.py --dict 8105).
