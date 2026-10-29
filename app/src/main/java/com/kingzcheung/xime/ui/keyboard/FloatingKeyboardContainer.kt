@@ -110,6 +110,19 @@ internal fun FloatingKeyboardContainer(
     val previewRect = previewRectState?.value
     val hideDragBar = previewRect != null && LocalKeyboardResizeOpacityEditing.current?.value == true
 
+    // 位置提示角标：切成悬浮、退出调节界面后亮一下（只有悬浮卡片画）；调节界面里有自己的边框，不亮。
+    val highlight = rememberKeyboardPositionHighlight()
+    val highlightColor = (dragPalette?.accent ?: MaterialTheme.colorScheme.primary).copy(alpha = 1f)
+    val highlightGlass = LocalKeyboardInputPreferences.current.frostedGlass.enabled
+    val resizing = previewRectState != null
+    var seenFloating by remember { mutableStateOf(isFloatingMode) }
+    var seenResizing by remember { mutableStateOf(resizing) }
+    LaunchedEffect(isFloatingMode, resizing) {
+        if (!resizing && (seenFloating != isFloatingMode || seenResizing)) highlight.trigger()
+        seenFloating = isFloatingMode
+        seenResizing = resizing
+    }
+
     // 调节模式下固定键盘也放进稳定的全屏宿主里，previewRect 直接决定它的真实区域。
     // 这样控制面板可以放在键盘外面，边框也不会因为宿主高度变化而漂移。
     if (!isFloatingMode) {
@@ -253,6 +266,20 @@ internal fun FloatingKeyboardContainer(
                 IntOffset((cardRect.left + shift.x).roundToInt(), (cardRect.top + shift.y).roundToInt())
             }
             .size(with(density) { cardRect.width.toDp() }, with(density) { cardRect.height.toDp() })
+        // 位置提示角标：卡片外扩一圈，跟卡片一起移动、旋转；调节界面里有自己的边框，不画。
+        if (previewRect == null) Box(
+            Modifier.align(Alignment.TopStart)
+                .absoluteOffset {
+                    val shift = liveShiftPx()
+                    val gap = PositionHighlightGap.toPx()
+                    IntOffset((cardRect.left + shift.x - gap).roundToInt(), (cardRect.top + shift.y - gap).roundToInt())
+                }
+                .size(with(density) { cardRect.width.toDp() } + PositionHighlightGap * 2,
+                    with(density) { cardRect.height.toDp() } + PositionHighlightGap * 2)
+                .graphicsLayer { rotationZ = restingRotation }
+                .keyboardPositionCorners(highlight, highlightColor, highlightGlass)
+                .testTag("floating-position-corners"),
+        )
         Box(
             modifier = cardPlacement
                 // 按未旋转的矩形上报；触摸区由后台按角度转过去。
@@ -342,7 +369,8 @@ internal fun FloatingKeyboardContainer(
                     isDragging = false
                     dockReady = false
                     onDragEnd()
-                    if (restore) onDock()
+                    // 变回固定时由模式切换亮框；留在悬浮就在松手处亮一下。
+                    if (restore) onDock() else highlight.trigger()
                 },
                 onDragCancel = {
                     dockGesture.cancel()
