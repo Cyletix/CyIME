@@ -137,11 +137,27 @@ object TransparentGlassTheme {
         }
         (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
     }
+    // 不透明的深色渐变底上，字母键要亮出来、功能键压暗（与 iOS 深色键盘相同的层次）。
+    private val keyDark = Color(0xFF55555A)
+    private val functionDark = Color(0xFF3A3A3C)
+
+    /**
+     * 玻璃下沿用 10-09 改色前的近黑键（#1C1C1C / #353535）：提亮后字母键是一层淡灰、功能键更亮，
+     * 后面的页面透得出来。用上面的灰键会被提成近白的一层，像实心灰块（2026-10-30 用户反馈）。
+     */
+    internal fun glassKeyBase(color: Color): Color = when (color) {
+        keyDark -> Color(0xFF1C1C1C)
+        functionDark -> Color(0xFF353535)
+        else -> color
+    }
+
+    /** 早期玻璃的功能键与字母键同样不透明，靠更亮的键色分开，不再减半。 */
+    internal fun isGlassFunctionKey(color: Color): Boolean = color == functionDark
+
     fun create() = PureBlackTheme.create().copy(
         id = ID, name = "iOS 渐变",
-        // 深色渐变底上，字母键要亮出来、功能键压暗（与 iOS 深色键盘相同的层次）。
-        keyBgDark = Color(0xFF55555A),
-        specialKeyDark = Color(0xFF3A3A3C), enterKeyDark = Color(0xFF3A3A3C),
+        keyBgDark = keyDark,
+        specialKeyDark = functionDark, enterKeyDark = functionDark,
         keyboardBackground = com.kingzcheung.xime.settings.BackgroundConfig(
             type = "gradient", angle = 135, colors = fixedBackground(false), colorsDark = fixedBackground(true)),
     )

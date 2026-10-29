@@ -154,4 +154,17 @@ class FrostedKeyColorsTest {
         assertEquals(0.22f,
             frostedKeyColor(darkKey, Color.White, enabled.copy(keyOpacity = Float.NaN)).alpha, tolerance)
     }
+
+    @Test fun iosGradientGlassUsesTheEarlyNearBlackKeys() {
+        // 玻璃下 iOS 渐变深色键按早期近黑键提亮：字母键 #1C1C1C → #8C8C8C，功能键更亮（2026-10-30 用户反馈）。
+        val glass = FrostedGlassConfig.defaults(isDark = true, enabled = true)
+        val letter = frostedKeyColor(Color(0xFF55555A), Color.White, glass)
+        val function = frostedKeyColor(Color(0xFF3A3A3C), Color.White, glass)
+        assertEquals(0x8C / 255f, letter.red, tolerance)
+        assertEquals(0.2f, letter.alpha, tolerance)
+        assertTrue(function.red > letter.red + 0.3f)
+        // 不开玻璃或按键不透明时仍用灰键，保留与渐变底的对比。
+        assertEquals(Color(0xFF55555A), frostedKeyColor(Color(0xFF55555A), Color.White, glass.copy(enabled = false)))
+        assertEquals(Color(0xFF55555A), frostedKeyColor(Color(0xFF55555A), Color.White, glass.copy(keyOpacity = 1f)))
+    }
 }
