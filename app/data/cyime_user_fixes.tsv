@@ -1,0 +1,7 @@
+# Words the user put on the must-pass list where the dictionary order is wrong for him (2026-10-30).
+# Same rule as cyime_domain_terms.tsv: an existing entry is raised to at least this weight, a missing one is added.
+# Each row moves only its own code. text<TAB>code<TAB>weight
+慢慢地	man man de	125647
+好好地	hao hao de	88235
+他也会来的	ta ye hui lai de	20000
+帮我拿个快递	bang wo na ge kuai di	20000
