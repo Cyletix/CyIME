@@ -219,6 +219,10 @@ class InferenceService : Service() {
             HandwritingNativeEngine.release()
             return false
         }
+        // 常用度表缺失或损坏只是不调整候选顺序，不影响识别
+        runCatching {
+            assets.open("handwriting/hanzi_frequency.tsv").bufferedReader(Charsets.UTF_8).useLines(HandwritingInference::loadFrequency)
+        }.onFailure { Log.w(TAG, "hanzi frequency table unreadable", it) }
         return true
     }
 }

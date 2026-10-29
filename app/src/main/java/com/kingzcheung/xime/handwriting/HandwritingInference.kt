@@ -223,6 +223,21 @@ object HandwritingInference {
 
         // The upstream demo prioritizes Han candidates too. Never refill with symbols here:
         // those would participate in DP as high-confidence fragments of an unfinished character.
-        return HandwritingCandidatePolicy.select(results, topK)
+        val han = HandwritingCandidatePolicy.select(results, results.size)
+        return HandwritingCandidatePolicy.preferCommon(han, frequency).take(topK)
+    }
+
+    /** 汉字常用度（assets/handwriting/hanzi_frequency.tsv），候选排序用；没加载时不调整。 */
+    @Volatile
+    private var frequency: Map<String, Int> = emptyMap()
+
+    fun loadFrequency(lines: Sequence<String>) {
+        val map = HashMap<String, Int>(16384)
+        for (line in lines) {
+            val tab = line.indexOf('\t')
+            if (tab <= 0) continue
+            line.substring(tab + 1).trim().toIntOrNull()?.let { map[line.substring(0, tab)] = it }
+        }
+        frequency = map
     }
 }
