@@ -147,6 +147,35 @@ class PositionHighlightRenderTest {
         assertEquals(false, floating)
     }
 
+    private fun pullDockedHandle(pullDp: Float): Boolean {
+        var undocked = false
+        rule.setContent {
+            MaterialTheme {
+                Box(Modifier.requiredSize(hostW.dp, contentH.dp).testTag("host")) {
+                    FloatingKeyboardContainer(isFloatingMode = false, scaleFactor = 1f, contentHeightDp = contentH,
+                        offsetX = 0, offsetY = 0, onDrag = { _, _ -> }, onDragEnd = {}, onUndock = { undocked = true }) {
+                        FakeKeys()
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        val density = rule.activity.resources.displayMetrics.density
+        val start = Offset(hostW / 2f * density, 6f * density)
+        rule.onNodeWithTag("host").performTouchInput {
+            down(start)
+            val steps = 20
+            for (step in 1..steps) moveTo(start + Offset(0f, -pullDp * step / steps * density))
+            up()
+        }
+        rule.waitForIdle()
+        return undocked
+    }
+
+    @Test fun pullingTheDockedHandleUpMakesItFloating() = assertTrue(pullDockedHandle(160f))
+
+    @Test fun shortPullOnTheDockedHandleStaysDocked() = assertEquals(false, pullDockedHandle(60f))
+
     private var floatingMode by mutableStateOf(false)
 
     @Composable
@@ -161,7 +190,7 @@ class PositionHighlightRenderTest {
                     else Modifier.background(if (dark) Color(0xFF202124) else Color(0xFFE8EAED)))) {
                     Box(Modifier.fillMaxSize()) {
                         FloatingKeyboardContainer(isFloatingMode = floatingMode, scaleFactor = 0.7f, contentHeightDp = contentH,
-                            offsetX = 0, offsetY = 60, onDrag = { _, _ -> }, onDragEnd = {}) {
+                            offsetX = 0, offsetY = 60, onDrag = { _, _ -> }, onDragEnd = {}, onUndock = {}) {
                             Box(Modifier.fillMaxSize().keyboardBackground(KeyboardThemes.getRenderingScheme(id).keyboardBackground,
                                 dark, palette.background, glassConfig)) { FakeKeys(palette.key, palette.text) }
                         }
@@ -180,11 +209,11 @@ class PositionHighlightRenderTest {
         val shots = mutableListOf<Pair<String, Bitmap>>()
         var variant by mutableStateOf(Triple(themes[0].first, themes[0].second, false))
         rule.setContent { val (vid, vdark, vglass) = variant; androidx.compose.runtime.key(variant) { Variant(vid, vdark, vglass) } }
-        for ((id, dark) in themes) for (glass in listOf(false, true)) for (afterMs in listOf(700L, 1600L)) {
+        for ((id, dark) in themes) for (glass in listOf(false, true)) for (afterMs in listOf(0L, 700L, 1600L)) {
             rule.runOnIdle { floatingMode = false; variant = Triple(id, dark, glass) }
             rule.waitForIdle()
             rule.mainClock.autoAdvance = false
-            rule.runOnIdle { floatingMode = true }
+            if (afterMs > 0) rule.runOnIdle { floatingMode = true }
             // 先走一帧让切换生效、动画开始计时，再按动画时间截图。
             rule.mainClock.advanceTimeByFrame()
             rule.mainClock.advanceTimeBy(afterMs)
@@ -192,12 +221,12 @@ class PositionHighlightRenderTest {
             val full = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             rule.runOnUiThread { root.draw(android.graphics.Canvas(full)) }
             rule.mainClock.autoAdvance = true
-            shots += "$id ${if (dark) "深" else "浅"} ${if (glass) "玻璃" else "不透明"} 切悬浮后 ${afterMs}ms" to
+            shots += "$id ${if (dark) "深" else "浅"} ${if (glass) "玻璃" else "不透明"} ${if (afterMs == 0L) "固定（顶边把手）" else "切悬浮后 ${afterMs}ms"}" to
                 Bitmap.createBitmap(full, 0, 0, minOf(full.width, hostW), minOf(full.height, hostH))
         }
         val cellW = hostW + 12
         val cellH = hostH + 40
-        val cols = 4
+        val cols = 3
         val rows = (shots.size + cols - 1) / cols
         val sheet = Bitmap.createBitmap(cellW * cols + 12, cellH * rows + 12, Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(sheet)
