@@ -37,7 +37,7 @@
 **剪贴板与同步**
 
 - 剪贴板历史、固定、折叠、快捷发送；刚截的图会在候选栏提示「粘贴」。
-- 与 Windows 上的 [CyIME Windows](https://github.com/Cyletix/CyIME-Windows) 扫码或局域网配对后，两边剪贴板双向同步。
+- 与 Windows 版 CyIME（开发中，暂未公开）扫码或局域网配对后，两边剪贴板双向同步。
 - 本地备份与恢复；WebDAV 等同步通过插件接入。
 
 **扩展**
