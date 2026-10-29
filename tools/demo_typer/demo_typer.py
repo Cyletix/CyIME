@@ -33,6 +33,9 @@ import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REMOTE = "/data/local/tmp/cyime-demo.txt"
+# Plays the monkey-format scripts through InputManager (inject/Inject.java, built by inject/build.sh):
+# `monkey -f` freezes and thaws the rotation on every run, which flips a tablet lying upside down.
+INJECT_DEX = "/data/local/tmp/cyime-inject.dex"
 T9 = {c: d for d, letters in {"2": "abc", "3": "def", "4": "ghi", "5": "jkl", "6": "mno",
                               "7": "pqrs", "8": "tuv", "9": "wxyz"}.items() for c in letters}
 # Kana nine-key: tap, left, up, right, down (app/.../JapaneseKanaInput.kt); the modifier key
@@ -121,7 +124,7 @@ class Runner:
     def __init__(self, args, plan, layouts):
         self.args, self.plan, self.layouts = args, plan, layouts
         self.pace = {"interval": 40, "hold": 15, "commit": 120, "sentence": 400, "paragraph": 1200,
-                     "ui": 500, "flick": 60, "pre_commit": 150, "after_enter": 350, "hold_long": 700, "glide_step": 70, **plan.get("pace", {})}
+                     "ui": 500, "flick": 60, "pre_commit": 150, "after_enter": 350, "hold_long": 700, "glide_step": 70, "per_letter": 8, **plan.get("pace", {})}
         if args.interval:
             self.pace["interval"] = args.interval
         self.layout_name = None
@@ -233,7 +236,15 @@ class Runner:
                 with open(path, "w", encoding="utf-8", newline="\n") as out:
                     out.write(script)
                 adb(self.args.serial, "push", "-q", path, REMOTE)
-            adb(self.args.serial, "shell", f"monkey -f {REMOTE} 1 >/dev/null; rm -f {REMOTE}")
+            # Touches only land in the note while Obsidian has the keyboard up; with it hidden they hit
+            # the app itself and can open and type into another note.
+            guard = ("dumpsys window | grep mCurrentFocus | grep -q md.obsidian && "
+                     "settings get secure default_input_method | grep -q com.cyletix.cyime && "
+                     "dumpsys input_method | grep -q mInputShown=true || { echo NOGUARD; exit 0; }; "
+                     if any(e.startswith("DispatchPointer") for e in self.pointer.events) else "")
+            out = adb(self.args.serial, "shell", f"{guard}CLASSPATH={INJECT_DEX} app_process / Inject {REMOTE} >/dev/null; rm -f {REMOTE}")
+            if "NOGUARD" in out:
+                raise SystemExit("stopped: Obsidian is not in front with the CyIME keyboard up")
         self.pointer = Pointer()
 
     def voice(self, name):
@@ -297,7 +308,7 @@ class Runner:
         else:  # a word: its keys, then space takes the first candidate
             self.letters(token)
             # A space that lands before the engine has answered the last key is dropped; let it catch up.
-            self.pointer.wait(self.pace["pre_commit"] + 8 * len(token))  # long phrases decode longer
+            self.pointer.wait(self.pace["pre_commit"] + self.pace["per_letter"] * len(token))  # long phrases decode longer
             self.press_spec(self.key("space"), after=self.pace["commit"])
 
     def segment(self, segment):
@@ -309,13 +320,35 @@ class Runner:
             self.token("<lang:hold>")
             self.token("@zh")
             self.token("wait:600")  # the first word after the menu otherwise loses its space
+        before = self.note_size()
+        # A segment may slow the global pace (English word completion needs longer before space).
+        saved, self.pace = self.pace, {**self.pace, **segment.get("pace", {})}
+        try:
+            self.lines(segment)
+        finally:
+            self.pace = saved
+        self.pointer.wait(self.pace["paragraph"])
+        self.flush()
+        # Obsidian saves a moment after the last key.
+        for _ in range(4):
+            if self.args.dry or self.note_size() > before:
+                break
+            time.sleep(1)
+        else:
+            raise SystemExit(f"stopped: {self.plan['note']} did not grow; the typing went somewhere else")
+
+    def lines(self, segment):
         for line in segment["do"]:
             for token in line.split():
                 self.token(token)
-            # One monkey run per line: stopping the PC side (or `stop`) ends the typing within a line.
+            # One player run per line: stopping the PC side (or `stop`) ends the typing within a line.
             self.flush()
-        self.pointer.wait(self.pace["paragraph"])
-        self.flush()
+
+    def note_size(self):
+        if self.args.dry:
+            return 0
+        out = adb(self.args.serial, "shell", f"stat -c %s '{self.plan['note']}'", check=False).strip()
+        return int(out) if out.isdigit() else -1
 
 
 def load(args):
@@ -340,13 +373,37 @@ def cmd_run(args):
     # Display coordinates only depend on portrait vs landscape, not on which way up the tablet is.
     if not args.dry and rotation(args.serial) % 2 != layouts["rotation"] % 2:
         raise SystemExit("screen orientation differs from the calibrated layouts")
+    if not args.dry:
+        dex = os.path.join(args.data, "cyime-inject.dex")
+        if not os.path.exists(dex):
+            raise SystemExit(f"missing {dex}; run inject/build.sh first")
+        adb(args.serial, "push", "-q", dex, INJECT_DEX)
     runner = Runner(args, plan, layouts)
-    for segment in pick(plan, args.segment):
-        if args.record and not args.dry:
-            record(args, plan, runner, segment)
-        else:
-            runner.segment(segment)
+    # The demo text and any wrong picks must not be learned: incognito for the whole run, then
+    # back off (CyIME's dev receiver; Rime and CyLM both stop learning).
+    # scripts/guarded-device-run.py already holds incognito (and restores every setting) around the run.
+    guarded = os.environ.get("CYIME_GUARDED") == "1"
+    if not args.dry and not guarded:
+        incognito(args, True)
+    try:
+        for segment in pick(plan, args.segment):
+            if args.record and not args.dry:
+                record(args, plan, runner, segment)
+            else:
+                runner.segment(segment)
+    finally:
+        if not args.dry and not guarded:
+            incognito(args, False)
     print(f"keys={runner.taps}")
+
+
+def incognito(args, on):
+    # From 1.14.144 the receiver answers with the state it set.
+    state = "true" if on else "false"
+    out = adb(args.serial, "shell", "am broadcast -n com.cyletix.cyime/com.kingzcheung.xime.service.DevLearningReceiver "
+              f"-a com.cyletix.cyime.DEV_LEARNING --es op incognito --ez on {state}")
+    if f'data="incognito={state}"' not in out:
+        raise SystemExit(f"could not switch incognito {'on' if on else 'off'}: {out.strip()}")
 
 
 def record(args, plan, runner, segment):
@@ -401,8 +458,9 @@ def cmd_check(args):
 
 
 def cmd_stop(args):
-    """Kill the monkey run on the device; it keeps typing its pushed events even without USB."""
-    adb(args.serial, "shell", "pid=$(pidof com.android.commands.monkey); [ -n \"$pid\" ] && kill $pid; true",
+    """Kill the event player on the device; it keeps typing its pushed events even without USB."""
+    adb(args.serial, "shell", "for p in $(ps -A -o PID=,ARGS= | grep '[I]nject /data/local/tmp' | awk '{print $1}'); "
+        "do kill $p; done; pid=$(pidof com.android.commands.monkey); [ -n \"$pid\" ] && kill $pid; true",
         check=False)
 
 
