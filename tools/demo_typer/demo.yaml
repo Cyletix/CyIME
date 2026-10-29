@@ -1,5 +1,6 @@
 # CyIME demo note, typed key by key (see demo_typer.py). Text follows the user's script
-# (Notebook @Inbox/2026-10-25 233438 整理稿.md).
+# (Notebook @Inbox/2026-10-26 CyIME 演示文稿 v2.md); each segment's `text` is sliced from it by tools
+# that regenerate this file, so edit the manuscript and the do-lines together.
 # A plain token is typed and committed with space; `x~` types without committing; `<key>` presses
 # a key (`<key:left>` flicks, `<key:hold>` long-presses); `@name` taps interface elements at a
 # human pace; `layout=` switches the coordinate table; `wait:ms|sentence|paragraph`; `glide:`,
@@ -7,10 +8,12 @@
 # `swipe:key:dx:dy:hold` holds a key, then slides by (dx, dy); `tap:x:y` taps a screen point
 # (a later candidate whose place was read off a screenshot); `en:Word_two` types a burst of
 # English through the language key ("_" is a space). Every segment starts and ends on Chinese
-# 26-key with no composition. `text` is what the segment should leave in the note (checked by `check`).
-note: /sdcard/Notebook/@Inbox/CyIME演示.md
+# 26-key with no composition. Special features (calculator, Shift and next-item drags) commit by
+# picking the candidate, never by typing the answer. Hand-operated parts (handwriting, photo
+# recognition, floating keyboard) are recorded separately; their segments only type the narration.
+note: /sdcard/Documents/test/CyIME：做世界做好的输入法.md
 
-pace: {interval: 40, hold: 15, pre_commit: 300, commit: 120, sentence: 400, paragraph: 1200, ui: 500}
+pace: {interval: 40, hold: 15, pre_commit: 160, per_letter: 0, commit: 60, sentence: 0, paragraph: 300, ui: 400, after_enter: 150}
 
 voices:
   zh:
@@ -27,290 +30,326 @@ voices:
 segments:
 - name: 开场
   layout: cn26
-  text: "# CyIME：做世界上最好用的开源输入法\n\n今天给大家介绍我做的安卓输入法 CyIME，地表最强输入法。\n\n当今输入法群魔乱舞下的集大成者。我看过很多输入法，有些确实有各自的特色，不过大部分都是纯垃圾，缺陷很大。虽然我们都是站在巨人肩膀上做事，但这些无异于在巨人肩膀上拉屎的 vibe 产物，我实在是吃不下，于是想到为何不自己做一个键盘呢。花了一个月时间做了个键盘，用的是 Rime 引擎，目前只支持 Android。我也做了一个 Windows 版本，不过还需要时间打磨。\n\n我想做出世界上最好用的开源输入法：最好的词库、最好的算法、最好的性能优化、最全面的多模态辅助输入、最好看的主题、音效、震动，最合理的排布，最全面的输入法，以及仅靠离线就能使用所有完整的服务。\n我可以说目前几乎在所有领域都击败了所有对手，或者至少持平，是综合体验最强的输入法。\n\n"
+  text: "# CyIME：做世界上最好用的开源输入法\n\n今天给大家介绍我做的安卓输入法 CyIME。我认为它是目前最强的开源安卓输入法，几乎可以闭着眼睛换。\n\n当今输入法群魔乱舞，CyIME 是集大成者。我看过很多输入法，有些确实有各自的特色，不过大部分都是纯垃圾，缺陷很大。虽然我们都是站在巨人肩膀上做事，但这些无异于在巨人肩膀上拉屎的 vibe 产物，我实在是吃不下，于是想到为何不自己做一个键盘呢？\n\n我想做出世界上最好用的开源输入法：最好的词库、最好的算法、最好的性能优化、最全面的多模态辅助输入、最好看的主题、音效、震动，最合理的排布，最全面的输入法，以及仅离线就能使用所有完整的服务。\n\n于是花了一个月时间做了个键盘，基于 Xime（Rime 引擎），目前只支持 Android。我也做了一个 Windows 版本，不过还需要时间打磨。\n\n谦虚地说，CyIME 目前几乎在所有领域都处于领先水平，或者至少不落后，是综合体验最强的输入法。\n不谦虚地说，老子就是最强的，不服来比划两下！！！\n\n"
   do:
-  # Start from Chinese whatever the keyboard was left on.
-  - <hash> <space> en:CyIME <colon> zuoshijieshangzuihaoyong dekaiyuanshurufa <enter> <enter>
-  - jintiangeidajiajieshaowo zuodeanzhuoshurufa <space> en:CyIME <comma> dibiaozuiqiangshurufa <period> <enter> <enter>
-  - dangjinshurufa qunmoluanwuxiade jidachengzhe <period> wokanguohenduoshurufa <comma> youxiequeshiyougezide tese <comma>
-  - buguodabufendoushi chunlaji <comma> quexianhenda <period>
-  - suiranwomendoushizhanzai jurenjianbangshangzuoshi <comma> danzhexiewuyiyuzaijuren jianbangshang lashide <space> vibe <space> chanwu <comma>
-  - woshizaishichibuxia <comma> yushixiangdaoweihebuziji zuoyigejianpanne <period>
-  - hualeyigeyueshijianzuole gejianpan <comma> yongdeshi <space> en:Rime <space> yinqing <comma> muqianzhizhichi <space> android <period>
-  - woyezuoleyige <space> windows <space> banben <comma> buguohaixuyaoshijiandamo <period> <enter> <enter>
-  - woxiangzuochushijieshang zuihaoyongdekaiyuan shurufa <colon> wait:sentence
-  - zuihaodeciku <dun> zuihaodesuanfa <dun> zuihaodexingnengyouhua <dun> zuiquanmiandeduomotai fuzhushuru <dun>
-  - zuihaokandezhuti <dun> yinxiao <dun> zhendong <comma> zuihelidepaibu <comma> zuiquanmiandeshurufa <comma>
-  - yiji jinkao lixianjiuneng shiyongsuoyouwanzhengde fuwu <period> <enter>
-  - wokeyishuomuqianjihuzai suoyoulingyudoujibaile suoyouduishou <comma> huozhezhishaochiping <comma> shizonghetiyanzuiqiangde shurufa <period> <enter> <enter>
+  - "<hash> <space> en:CyIME <colon> zuoshijieshang zuihaoyongde kaiyuanshurufa <enter> <enter>"
+  - "jintiangeidajiajieshaowo zuodeanzhuoshurufa <space> en:CyIME <period> worenwei ta~ wait:300 tap:385:2000 shimuqian zuiqiangdekaiyuan anzhuoshurufa <comma> jihukeyi bizheyanjing huan <period> <enter> <enter>"
+  - "dangjinshurufa qunmoluanwu <comma> en:CyIME <space> shijidachengzhe <period> wokanguohenduoshurufa <comma> youxiequeshiyougezide tese <comma>"
+  - "buguodabufendoushi chunlaji <comma> quexianhenda <period>"
+  - "suiranwomendoushizhanzai jurenjianbangshangzuoshi <comma> danzhexiewuyiyuzaijuren jianbangshang lashide <space> vibe <space> chanwu <comma>"
+  - "woshizaishichibuxia <comma> yushixiangdaoweihebuziji zuoyigejianpanne <question> <enter> <enter>"
+  - "woxiangzuochushijieshang zuihaoyongdekaiyuan shurufa <colon> wait:sentence"
+  - "zuihaodeciku <dun> zuihaodesuanfa <dun> zuihaodexingnengyouhua <dun> zuiquanmiandeduomotai fuzhushuru <dun>"
+  - "zuihaokandezhuti <dun> yinxiao <dun> zhendong <comma> zuihelidepaibu <comma> zuiquanmiandeshurufa <comma>"
+  - "yiji jin~ wait:300 tap:432:2000 lixianjiuneng shiyongsuoyouwanzhengde fuwu <period> <enter> <enter>"
+  - "yushi hualeyigeyueshijianzuole gejianpan <comma> ji~ wait:300 tap:1545:2000 yu~ wait:300 tap:418:2000 <space> en:Xime <lparen> en:Rime <space> yinqing <rparen> <comma> muqianzhizhichi <space> android <period>"
+  - "woyezuoleyige <space> windows <space> banben <comma> buguohaixuyaoshijiandamo <period> <enter> <enter>"
+  - "qianxudishuo <comma> en:CyIME <space> muqianjihuzai suoyoulingyudou chuyulingxianshuiping <comma> huozhezhishao buluohou <comma> shizonghetiyanzuiqiangde shurufa <period> <enter>"
+  - "buqianxudishuo <comma> laozijiushizuiqiangde <comma> bufulaibi hua~ wait:300 tap:912:2000 liangxia <exclaim> <exclaim> <exclaim> <enter> <enter>"
 
 - name: 备注
   layout: cn26
-  text: "> [!info] 备注\n> 这篇笔记里的每个字，都是在键盘上一个键一个键打出来的，用脚本模拟手指按键，没有直接粘贴。我认为现场演示就是展示一个输入法性能、准确性、易用性最直观的方式，目前没有人能做到，如有不服可以自己跑一段试试。\n\n---\n\n接下来介绍具体功能。\n\n"
+  text: "> [!info] 备注\n> 这篇笔记里的每个字，都是在键盘上一个键一个键打出来的，由脚本模拟手指点按，没有直接粘贴。我认为实机演示是展示一个输入法性能、准确性、易用性最直观的方式，目前很少有人这样做，如有不服可以自己跑一段试试。\n\n---\n\n接下来介绍具体功能特色。\n\n"
   do:
-  - en:>_[!info]_ beizhu <enter>
-  - zhepian bijilide meigezi <comma> doushizaijianpanshang yige jian yige jian dachulai de <comma>
-  - yongjiaoben monishouzhi anjian <comma> meiyouzhijiezhantie <period>
-  - worenwei xianchangyanshi jiushi zhanshi yige shurufa xingneng <dun> zhunquexing <dun> yiyongxingzuizhiguande fangshi <comma>
-  - muqianmeiyourenneng zuodao <comma> ruyoubufukeyizijipao yiduanshishi <period> <enter> <enter>
-  - en:--- <enter> <enter> jiexialaijieshaojuti gongneng <period> <enter> <enter>
+  - "en:>_[!info]_ beizhu <enter>"
+  - "zhepian bijilide meigezi <comma> doushizaijianpanshang yige jian yige jian dachulai de <comma>"
+  - "youjiaobenmoni shouzhi dianan <comma> meiyouzhijiezhantie <period>"
+  - "worenwei shi~ wait:300 tap:805:2000 ji~ wait:300 tap:548:2000 yanshi shi~ wait:300 tap:155:2000 zhanshi yige shurufa xingneng <dun> zhunquexing <dun> yiyongxingzuizhiguande fangshi <comma>"
+  - "muqian henshaoyouren zheyangzuo <comma> ruyoubufu keyizijipao yiduanshishi <period> <enter> <enter>"
+  - "en:--- <enter> <enter> jiexialaijieshaojuti gongnengtese <period> <enter> <enter>"
 
 - name: 词库
   layout: cn26
-  text: "## 词库\n\n先说最核心的词库。CyIME 用的是我自己训练的 N-gram 模型和长句算法 CyLM，在我自己的测试集上几乎持平了排名第一的搜狗。\n\n同一批 1987 个题目（2026-10-23），搜狗（平板测试）对 CyLM 完整版：\n- 26 键全拼（长句，693 个题目）：89.6 对 90.6，持平\n- 26 键简拼（2-4 字，754 个题目）：54.8 对 **63.0**，**+8.3**\n- 九键（长句，540 个题目）：75.5 对 **81.6**，**+6.2**\n\nCyLM 的数字是电脑上跑的同一套引擎和模型，搜狗是平板测试。\n\n"
+  text: "## 词库\n\n先说最核心的词库。CyIME 用的是我自己训练的 N-gram 模型和长句算法 CyLM，在我自己的测试集上几乎持平了排名第一的搜狗。\n\n同一批 1987 个题目（2026-10-23），搜狗（平板测试）对 CyLM 完整版：\n- 26 键全拼（长句，693 个题目）：89.6 对 90.6，持平\n- 26 键简拼（2-4 字，754 个题目）：54.8 对 **63.0**，**+8.2**\n- 九键（长句，540 个题目）：75.5 对 **81.6**，**+6.1**\n\nCyLM 的数字是电脑上跑的同一套引擎和模型，搜狗是平板测试。\n\n"
   do:
-  - <hash> <hash> <space> ciku <enter> <enter>
-  - xianshuozuihexindeciku <period> en:CyIME <space> yongdeshiwozijixunliande <space> en:N-gram <space> moxinghechangjusuanfa <space> en:CyLM <comma>
-  - zai wo ziji de ceshiji shang jihuchipinglepaimingdiyi desougou <period> <enter> <enter>
-  - tongyipi <space> <1> <9> <8> <7> <space> getimu <lparen> en:2026-10-23 <rparen> <comma> sougou <lparen> pingban ceshi <rparen> dui <space> en:CyLM <space> wanzhengban <colon> <enter>
-  - en:-_ <2> <6> <space> jian quanpin <lparen> changju <comma> <6> <9> <3> <space> getimu <rparen> <colon> en:89.6 <space> dui <space> en:90.6 <comma> chiping <enter>
-  - <2> <6> <space> jian jianpin <lparen> en:2-4 <space> zi <comma> <7> <5> <4> <space> getimu <rparen> <colon> en:54.8 <space> dui <space> en:**63.0** <comma> en:**+8.3** <enter>
-  - jiujian <lparen> changju <comma> <5> <4> <0> <space> getimu <rparen> <colon> en:75.5 <space> dui <space> en:**81.6** <comma> en:**+6.2** <enter> <enter> <enter>
-
-  - en:CyLM <space> deshuzishi diannaoshang paodetongyitaoyinqinghe moxing <comma> sougoushi pingban ceshi <period> <enter> <enter>
+  - "<hash> <hash> <space> ciku <enter> <enter>"
+  - "xianshuozuihexindeciku <period> en:CyIME <space> yongdeshiwozijixunliande <space> en:N-gram <space> moxinghechangjusuanfa <space> en:CyLM <comma>"
+  - "zai wo ziji de ceshiji shang jihuchipinglepaimingdiyi desougou <period> <enter> <enter>"
+  - "tongyipi <space> <1> <9> <8> <7> <space> getimu <lparen> en:2026-10-23 <rparen> <comma> sougou <lparen> pingbanceshi <rparen> dui <space> en:CyLM <space> wanzhengban <colon> <enter>"
+  - "en:-_ <2> <6> <space> jian quanpin <lparen> changju <comma> <6> <9> <3> <space> getimu <rparen> <colon> en:89.6 <space> dui <space> en:90.6 <comma> chiping <enter>"
+  - "<2> <6> <space> jian jianpin <lparen> en:2-4 <space> zi <comma> <7> <5> <4> <space> getimu <rparen> <colon> en:54.8 <space> dui <space> en:**63.0** <comma> en:**+8.2** <enter>"
+  - "jiujian <lparen> changju <comma> <5> <4> <0> <space> getimu <rparen> <colon> en:75.5 <space> dui <space> en:**81.6** <comma> en:**+6.1** <enter> <enter> <enter>"
+  - "en:CyLM <space> deshuzishi diannaoshang paodetongyitaoyinqinghe moxing <comma> sougoushi pingban ceshi <period> <enter> <enter>"
 
 - name: 布局
   layout: cn26
-  text: "## 布局\n\n布局切换相当便捷，只需点击左上角，就能切换配置好的布局和方案。\n26 键可以自定义符号、自定义布局，符号有好几种输入方式，空格旁边直接就是逗号句号。九键有拼音九键和笔画九键，用的是词组模型，长句子一口气打完，首选很稳。还有 14 键、小鹤双拼、五笔输入（98 版本），甚至日语假名。不管你习惯哪一种，这里都有。\n这里还内置了我自己设计的键盘布局 Cyletix-10。这个布局的好处很直接：手指移动的距离更短，变化比较小，跨手指的移动也很少，打起来更省力，不过仅限 8 根手指打字。我还用进化算法设计了更多不同的布局候选，后续有机会加入。\n\n"
+  text: "## 布局\n\n布局切换相当便捷，只需点击左上角，就能切换配置好的布局和方案：\n- 26 键可以自定义符号、自定义布局，符号有好几种输入方式，空格旁边直接就是逗号句号。\n- 九键有拼音九键和笔画九键（笔画要自己装），用的是词组模型，长句子一口气打完，首选很稳。\n- 还有 14 键、小鹤双拼、五笔 98，甚至日语假名，不管你用哪一种，这里都有。\n- 这里还内置了我自己设计的键盘布局 Cyletix-10。它的好处很直接：手指移动的距离更短，变化比较小，跨手指的移动也很少，打起来更省力，不过仅限十个手指打字。\n- 我还用进化算法设计了更多不同的布局候选，后续有机会加入。\n\n"
   do:
-  - <hash> <hash> <space> buju <enter> <enter>
-  - buju qiehuan xiangdang bianjie <comma> zhixu dianji zuoshangjiao <comma> jiu neng qiehuan peizhi hao de buju he fangan <period> <enter>
-  - <2> <6> <space> jian keyi zidingyi fuhao <dun> zidingyi buju <comma> fuhao you haojizhong shurufangshi <comma> kongge pangbian zhijie jiushi douhaojuhao <period>
-  - jiujian you pinyin jiujian he bihua jiujian <comma> yongdeshi cizu moxing <comma> chang juzi yikouqi dawan <comma> shouxuan henwen <period>
-  - haiyou <space> <1> <4> <space> jian <dun> xiaoheshuangpin <dun> wubishuru <lparen> <9> <8> <space> banben <rparen> <comma> shenzhi riyu jiaming <period> buguan ni xiguan nayizhong <comma> zheli dou you <period> <enter>
-  - zheli hai neizhi le wo ziji sheji de jianpan buju <space> en:Cyletix-10 <period> zhege buju de haochu hen zhijie <colon>
-  - shouzhi yidong de juli gengduan <comma> bianhua bijiao xiao <comma> kuashouzhi de yidong ye henshao <comma> daqilai gengshengli <comma> buguo jinxian <space> <8> <space> genshouzhi dazi <period>
-  - wo hai yong jinhua suanfa sheji le gengduo butong de buju houxuan <comma> houxu you jihui jiaru <period> <enter> <enter>
+  - "<hash> <hash> <space> buju <enter> <enter>"
+  - "bujuqiehuan xiangdangbianjie <comma> zhixudianji zuoshangjiao <comma> jiunengqiehuan peizhihaodebuju hefangan <colon> <enter>"
+  - "en:-_ <2> <6> <space> jian keyi zidingyi fuhao <dun> zidingyi buju <comma> fuhao you haojizhong shurufangshi <comma> kongge pangbian zhijie jiushi douhaojuhao <period> <enter>"
+  - "jiujianyoupinyin jiujianhebihua jiujian <lparen> bihuayaoziji zhuang <rparen> <comma> yongdeshicizu moxing <comma> changjuziyikouqi dawan <comma> shouxuanhenwen <period> <enter>"
+  - "haiyou <space> <1> <4> <space> jian <dun> xiaoheshuangpin <dun> wubi <space> <9> <8> <comma> shenzhi riyu jiaming <comma> buguan ni yong nayizhong <comma> zheli dou you <period> <enter>"
+  - "zheli hai neizhi le wo ziji sheji de jianpan buju <space> en:Cyletix-10 <period> ta de haochu hen zhijie <colon>"
+  - "shouzhi yidong de juli gengduan <comma> bianhua bijiao xiao <comma> kuashouzhi de yidong ye henshao <comma> daqilai gengshengli <comma> buguo jinxian shigeshouzhi dazi <period> <enter>"
+  - "wohaiyongjinhua suanfashejile gengduobutongde bujuhouxuan <comma> houxuyoujihui jiaru <period> <enter> <enter> <enter>"
 
 - name: 26 键全拼
   layout: cn26
-  text: "## 26 键全拼\n\n在保证全拼、简拼的正确率、上屏速度和打字性能的前提下，支持了非常多样的输入方式。\n\n"
+  text: "## 26 键全拼\n\n在保证全拼、简拼的正确率、出字速度和打字性能的前提下，支持了非常多样的输入方式。\n\n我还根据自己之前的 Obsidian 英语词库项目，集成了最近流行的打中文出英文单词的功能：候选旁边直接标着英文释义，打「输入法」就能看到 input method。\n\n"
   do:
-  - <hash> <hash> <space> <2> <6> <space> jian quanpin <enter> <enter>
-  - zai baozheng quanpin <dun> jianpin de zhengquelv <dun> shangpingsudu he dazi xingneng de qianti xia <comma> zhichi le feichang duoyang de shuru fangshi <period> <enter> <enter>
+  - "<hash> <hash> <space> <2> <6> <space> jian quanpin <enter> <enter>"
+  - "zaibaozheng quanpin <dun> jianpinde zhengquelv <dun> chuzisuduhedazi xingnengdeqianti xia <comma> zhichilefeichang duoyangdeshuru fangshi <period> <enter> <enter>"
+  - "wo hai genju ziji zhiqian de <space> en:Obsidian <space> yingyuciku xiangmu <comma> jicheng le zuijin liuxing de da zhongwen chu yingwen danci de gongneng <colon>"
+  - "houxuanpangbian zhijiebiaozhe yingwenshiyi <comma> da <lcorner> shurufa <rcorner> jiunengkandao <space> en:input_method <period> <enter> <enter>"
 
 - name: 简拼
   layout: cn26
-  text: "## 简拼\n\n只输入首字母也能打出词语：\n\n> 输入法、开源软件、离线、词库。\n\n"
+  text: "## 简拼\n\n只输入声母也能出词：\n\n> 输入法、开源软件、离线、词库。\n\n"
   do:
-  - <hash> <hash> <space> jianpin <enter> <enter>
-  - zhishurushouzimu yeneng dachu ciyu <colon> <enter> <enter>
-  - <gt> <space> srf <dun> kyrj <dun> lx <dun> ck <period> <enter> <enter>
+  - "<hash> <hash> <space> jianpin <enter> <enter>"
+  - "zhishuru shengmu yeneng chuci <colon> <enter> <enter>"
+  - "<gt> <space> srf <dun> kyrj <dun> lx <dun> ck <period> <enter> <enter>"
 
 - name: 中英混打
   layout: cn26
-  text: "## 中英混打\n\n不用切换键盘，中文里直接打英文：\n\n> 今天用 Python 写了个 demo，代码放在 GitHub 上。\n\n手速太快把字母顺序打错也没关系，照样能出相关的词。\n\n"
+  text: "## 中英混打\n\n不用切换键盘，中文里直接打英文：\n\n> 今天用 Python 写了个 demo，代码放在 GitHub 上。\n\n手速太快把字母顺序打错也没关系，照样能出相关的词。\n\n另外，我还设计了 26 键的 Shift 拖动：从 Shift 键拖到字母上就是大写字母，拖到候选上就直接上屏这个候选的英文：\n\n> input method\n\n"
   do:
-  - <hash> <hash> <space> zhongyinghunda <enter> <enter>
-  - buyong qiehuan jianpan <comma> zhongwen li zhijiedayingwen <colon> <enter> <enter>
-  # demo~ then comma: the typed letters go up as they are (1.14.109), not the first candidate.
-  - <gt> <space> jintian yong <space> python <space> xiele ge <space> demo~ <comma> daima fangzai <space> github <space> shang <period> <enter> <enter>
-  # xinagguan: two letters swapped on purpose; the first candidate is still 相关 (typo correction).
-  - shousu taikuai bazimu shunxu dacuo ye meiguanxi <comma> zhaoyang nengchu xinagguan deci <period> <enter> <enter>
-
-- name: Shift 选英文
-  layout: cn26
-  text: "打中文的时候按住 Shift 点一下候选，直接上屏英文：input method\n\n"
-  do:
-  # Two fingers: the segment stops with shurufa composing; the user holds Shift and taps the
-  # first candidate by hand (input method), then the next segment starts with two new lines.
-  - da zhongwen de shihou anzhu <space> en:Shift <space> dian yixia houxuan <comma> zhijie shangping yingwen <colon> shurufa~
+  - "<hash> <hash> <space> zhongyinghunda <enter> <enter>"
+  - "buyongqiehuan jianpan <comma> zhongwenli zhijiedayingwen <colon> <enter> <enter>"
+  - "<gt> <space> jintianyong <space> python <space> xielege <space> demo~ <comma> daimafangzai <space> github <space> shang <period> <enter> <enter>"
+  - "shousutaikuai bazimushunxu dacuoyemeiguanxi <comma> zhaoyangnengchu xinagguandeci <period> <enter> <enter>"
+  - "lingwai <comma> wo hai sheji le <space> <2> <6> <space> jian de <space> en:Shift <space> tuodong <colon>"
+  - "cong <space> en:Shift <space> jian tuodaozimushang jiushi daxiezimu <comma> tuodao houxuan shang jiu zhijie shangping zhege houxuan de yingwen <colon> <enter> <enter>"
+  - "<gt> <space> shurufa~ wait:300 drag:shift>cand1 <enter> <enter>"
 
 - name: 九键
   layout: cn26
-  text: "## 九键\n\n九键自带词组模型，长句一口气打完也能出整句话；长按下一项拖到候选上，还能直接上屏英文。下面用九键打：\n\n> 今天晚上我们一起去吃火锅吧。\n> input method\n\n"
+  text: "## 九键\n\n九键自带词组模型，长句一口气打完也能出整句话。有候选的时候，0 键会变成「下一项」，左滑是「上一项」；长按下一项拖到候选上，同样直接上屏英文。下面用九键打：\n\n> 今天晚上我们一起去吃火锅吧。\n> input method\n\n"
   do:
-  - <enter> <enter> <hash> <hash> <space> jiujian <enter> <enter>
-  - jiujian zidai cizu moxing <comma> changju yikouqi dawan yeneng chu zhengjuhua <semicolon>
-  - changan xiayixiang tuodao houxuan shang <comma> hai neng zhijie shangping yingwen <period> xiamian yong jiujian da <colon> <enter> <enter>
+  - "<hash> <hash> <space> jiujian <enter> <enter>"
+  - "jiujianzidaicizu moxing <comma> changjuyikouqi dawanyenengchu zhengjuhua <period>"
+  - "you houxuan de shihou <comma> <0> <space> jian hui biancheng <lcorner> xiayixiang <rcorner> <comma> zuohua shi <lcorner> shangyixiang <rcorner> <semicolon>"
+  - "changan xiayixiang tuodao houxuan shang <comma> tongyang zhijie shangping yingwen <period> xiamian yong jiujian da <colon> <enter> <enter>"
   - "<gt> <space> @method swipe:lay_row:1400:0:0 @lay_t9 layout=t9"
-  # A long nine-key phrase needs a moment before space takes it; shurufa dragged from 下一项 goes up in English.
-  - jintianwanshangwomenyiqiquchihuoguoba~ wait:800 <space> <period> <enter>
-  - shurufa~ wait:300 drag:next>cand1 <enter> <enter> @method swipe:lay_row:1400:0:0 @lay_cn26 layout=cn26
+  - "jintianwanshang~ wait:600 <space> womenyiqiquchihuoguoba~ wait:800 <space> <period> <enter>"
+  - "shurufa~ wait:300 drag:next>cand1 <enter> <enter> @method swipe:lay_row:1400:0:0 @lay_cn26 layout=cn26"
 
 - name: 14 键
   layout: cn26
   text: "## 14 键\n\n现在切换到 14 键：\n\n> 14 键每个键两个字母，左右滑动选字母，按键更大，更不容易按错。\n\n"
   do:
-  - <hash> <hash> <space> <1> <4> <space> jian <enter> <enter>
-  - xianzai qiehuan dao <space> <1> <4> <space> jian <colon> <enter> <enter>
+  - "<hash> <hash> <space> <1> <4> <space> jian <enter> <enter>"
+  - "xianzaiqiehuan dao <space> <1> <4> <space> jian <colon> <enter> <enter>"
   - "<gt> <space> @method swipe:lay_row:1400:0:0 @lay_fourteen layout=fourteen"
-  - <1> <4> <space> jian meige jian liangge zimu <comma> zuoyou huadong xuan zimu <comma>
-  - anjian gengda <comma> geng bu rongyi ancuo <period> <enter> <enter> @method swipe:lay_row:1400:0:0 @lay_cn26 layout=cn26
+  - "<1> <4> <space> jian meige jian lianggezimu <comma> zuoyou huadong xuanzimu <comma>"
+  - "anjiangengda <comma> gengburongyi ancuo <period> <enter> <enter> @method swipe:lay_row:1400:0:0 @lay_cn26 layout=cn26"
 
 - name: 小鹤双拼
   layout: cn26
   text: "## 小鹤双拼\n\n> 双拼也能用，和全拼、九键用同一套雾凇词库。\n\n"
   do:
-  - <hash> <hash> <space> xiaoheshuangpin <enter> <enter>
+  - "<hash> <hash> <space> xiaoheshuangpin <enter> <enter>"
   - "<gt> <space> @method @sch_flypy layout=flypy"
-  # Xiaohe codes: shuang=ul pin=pb ye neng=ng yong=ys quan=qr jiu=jq jian=jm tong=ts tao=tc song=ss
-  - ulpbyengys <comma> heqrpb <dun> jqjmystsyitcwussciku <period> <enter> <enter> @method @sch_pinyin layout=cn26
+  - "ulpbyengys <comma> heqrpb <dun> jqjmystsyitcwussciku <period> <enter> <enter> @method @sch_pinyin layout=cn26"
+
+- name: 自定义分类词库
+  layout: cn26
+  text: "## 自定义分类词库\n\n打开分类词库，长的专业词用简拼就能出：原生多模态模型。\n游戏和专业词也能直接打：\n\n> Dota2：Yatoro、Ame、敌法师、剑圣、水人、恩赐解脱\n> 明日方舟：凯尔希、莱万汀、阿米娅、矢量突破\n> 计算机：Transformer、ResNet、具身智能\n\n每个词库都标着开启后打字会慢多少。\n\n"
+  do:
+  - "<hash> <hash> <space> zidingyifenleiciku <enter> <enter>"
+  - "dakaifenleiciku <comma> changdezhuanyeci yongjianpin jiunengchu <colon> ysdmtmx <period> <enter>"
+  - "youxihezhuanyeci yenengzhijieda <colon> <enter> <enter>"
+  - "<gt> <space> en:Dota2 <colon> yatoro <dun> ame <dun> difashi <dun> jiansheng <dun> shuiren <dun> encijietuo <enter>"
+  - "mingrifangzhou <colon> kaierxi <dun> laiwanting <dun> amiya <dun> shiliangtupo <enter>"
+  - "jisuanji <colon> transformer <dun> resnet <dun> jushenzhineng <enter> <enter>"
+  - "meigecikudoubiaozhekaiqi houdazi huiman duoshao <period> <enter> <enter>"
 
 - name: 更多布局
   layout: cn26
   text: "## 更多布局\n\n> 这一句就是用 Cyletix-10 布局打的。\n\n"
   do:
-  - <hash> <hash> <space> gengduo buju <enter> <enter>
-  # Needs the restored Cyletix10 (qwdrf;jkyp / asetghliou / zxcvbnm) and its coordinates; not calibrated yet.
+  - "<hash> <hash> <space> gengduobuju <enter> <enter>"
   - "<gt> <space> @method swipe:lay_row_r:-1400:0:0 @lay_c10 layout=c10"
-  - zhe yiju jiushi yong <space> en:Cyletix-10 <space> buju da de <period> <enter> <enter>
+  - "zhe yiju jiushi yong <space> en:Cyletix-10 <space> buju da de <period> <enter> <enter>"
   - "@method swipe:lay_row:1400:0:0 @lay_cn26 layout=cn26"
-
-- name: 分类词库
-  layout: cn26
-  text: "## 自定义分类词库\n\n打开分类词库，长的专业词用简拼就能出：原生多模态模型。\n游戏和专业词也能直接打：\n\n> Dota2：Yatoro、Ame、敌法师、剑圣、水人、恩赐解脱\n> 明日方舟：凯尔希、莱万汀、阿米娅、矢量突破\n> 计算机：Transformer、ResNet、具身智能\n\n每个词库都标着开启后打字会慢多少。\n\n"
-  do:
-  - <hash> <hash> <space> zidingyifenleiciku <enter> <enter>
-  - dakaifenleiciku <comma> chang de zhuanyeci yong jianpin jiuneng chu <colon> ysdmtmx <period> <enter>
-  - youxi he zhuanyeci ye neng zhijie da <colon> <enter> <enter>
-  - <gt> <space> en:Dota2 <colon> yatoro <dun> ame <dun> difashi <dun> jiansheng <dun> shuiren <dun> encijietuo <enter>
-  - mingrifangzhou <colon> kaierxi <dun> laiwanting <dun> amiya <dun> shiliangtupo <enter>
-  - jisuanji <colon> transformer <dun> resnet <dun> jushenzhineng <enter> <enter>
-  - meigecikudoubiaozhekaiqi houdazihuimanduoshao <period> <enter> <enter>
 
 - name: English
   layout: cn26
+  pace: {"pre_commit": 300, "commit": 150}
   text: "## English\n\n> Switch to English and keep typing. Whole-word suggestions finish words for you, and glide typing draws a word in one stroke.\n\n"
   do:
-  - <hash> <hash> <space> @lang layout=en26 English~ <enter> <enter>
+  - "<hash> <hash> <space> @lang layout=en26 English~ <enter> <enter>"
   - ">"
-  # The suggestion row starts with the typed letters; "suggestions" is the third entry.
-  - Switch to English and keep typing~ <period> <space> Whole-word sugg~ wait:300 tap:548:2003 <space> finish words for you~ <comma> <space>
-  - and glide typing draws a word in one stroke~ <period> <enter> <enter>
+  - "Switch to English andkeep typing~ <period> <space> Whole-word sugg~ wait:300 tap:548:2003 <space> finishwordsfor you~ <comma> <space>"
+  - "and glide typing draws a word in one stroke~ <period> <enter> <enter>"
   - "@lang layout=cn26"
 
 - name: 日本語
   layout: cn26
   text: "## 日本語\n\n> 日本語も普通に打てます。\n> ありがとうございます。\n\n"
   do:
-  - <hash> <hash> <space> <lang:hold> @ja layout=ja26 nihongo <enter> <enter>
-  - en:>_ nihongomo futsuuni utemasu <period> <enter>
-  # Kana nine-key: flicks for the other vowels; while composing the 、 key turns into 小゛゜.
+  - "<hash> <hash> <space> <lang:hold> @ja layout=ja26 nihongo <enter> <enter>"
+  - "en:>_ nihongomo futsuuni utemasu <period> <enter>"
   - "@method swipe:lay_row:1400:0:0 @lay_kana layout=kana9 ありがとうございます~ <enter> 。~ <enter> <enter>"
   - "@method swipe:lay_row:1400:0:0 @lay_cn26 layout=ja26 <lang:hold> @zh layout=cn26"
 
-- name: 符号和表情
+- name: 符号
   layout: cn26
-  text: "## 符号和表情\n\n常用符号和表情也在键盘里：\n\n> 《》【】～😀😂\n\n"
+  text: "## 符号\n\n常用符号是我精心设计的一套上下角标滑动输入逻辑，符号位置都精心安排过：既保留了电脑上数字键的习惯，又尽可能让同类符号挨在一起，还考虑了只开上角标时的布局。上角标是全角符号，下角标是英文半角，打符号不用切换面板，效率高很多：\n\n> (1+2)*3=9, 50%, #CyIME, @Cyletix, ~/notes/a_b.md\n> 价格：¥99（含税）！\n\n数字键盘还能直接算加减乘除：\n\n> 12+30*2=72\n\n"
   do:
-  - <hash> <hash> <space> fuhaohebiaoqing <enter> <enter>
-  - changyongfuhaohebiaoqing yezaijianpanli <colon> <enter> <enter>
+  - "<hash> <hash> <space> fuhao <enter> <enter>"
+  - "changyongfuhao shiwo jingxinshejide yitaoshangxia jiaobiaohuadong shuruluoji <comma> fuhaoweizhidou jingxinanpaiguo <colon>"
+  - "ji baoliu le diannao shang shuzijian de xiguan <comma> you jinkeneng rang tonglei fuhao aizai yiqi <comma> hai kaolv le zhi kai shangjiaobiao shi de buju <period>"
+  - "shangjiaobiao shi quanjiaofuhao <comma> xiajiaobiao shi yingwen banjiao <comma> da fuhaobuyongqiehuan mianban <comma> xiaolv gao henduo <colon> <enter> <enter>"
+  - "<gt> <space> @lang layout=en26 (1+2)*3=9, 50%, #CyIME, <@> Cyletix, ~/notes/a_b.md~ <enter>"
+  - "@lang layout=cn26 jiage <colon> <yen> <9> <9> <lparen> hanshui <rparen> <exclaim> <enter> <enter>"
+  - "shuzijianpanhai nengzhijiesuan jiajianchengchu <colon> <enter> <enter>"
+  - "<gt> <space> <123> layout=num wait:400 12+30*2~ wait:1200 tap:892:2001 <enter> <enter> <abc> layout=cn26 wait:400"
+
+- name: 表情
+  layout: cn26
+  text: "## 表情\n\n表情和颜文字也可以输入：\n\n> 《》【】～😀😂\n\n"
+  do:
+  - "<hash> <hash> <space> biaoqing <enter> <enter>"
+  - "biaoqinghe yanwenziyekeyi shuru <colon> <enter> <enter>"
   - "<gt> <space> @sym @sym_lb @sym_rb @sym_lsq @sym_rsq @sym_tilde @sym_back @emoji @emoji1 @emoji2 @emoji_back <enter> <enter>"
 
 - name: 编辑和快捷键
   layout: cn26
-  text: "## 编辑和快捷键\n\nCyIME 有一组编辑按钮，常见的文本编辑操作全在里面。即使不打开编辑罗盘，长按空格左右滑动，光标就跟着走，灵敏度是我精心调校过的。\n\n先点一下大写键，然后长按空格拖动就能选中文字，按住符号键拖到字母上就是 Ctrl 快捷键，比如：\n\n> 把这两个字**加粗**。\n\n---\n\n"
+  text: "## 编辑和快捷键\n\nCyIME 有一组编辑按钮，常见的文本编辑操作全在里面。即使不打开编辑罗盘，长按空格左右滑动，光标就跟着走，灵敏度是我精心调教过的。\n\n点亮大写键再长按空格拖动就能选中文字。我还给符号键做了功能集成：按住符号键，字母键会换成快捷键，拖到字母上就是 Ctrl 快捷键，让 26 键也能像电脑一样 Ctrl+C、Ctrl+V，比如：\n\n> 把这两个字**加粗**。\n\n"
   do:
-  - <hash> <hash> <space> bianjihekuaijiejian <enter> <enter>
-  - en:CyIME <space> youyizubianjianniu <comma> changjiandewenbenbianji caozuoquanzailimian <period>
-  - jishibudakaibianjiluopan <comma> changan kongge zuoyou huadong <comma> guangbiaojiugenzhezou <comma> lingmindu shiwo jingxin tiaojiaoguode <period> <enter> <enter>
-  - xian dian yixia daxie jian <comma> ranhou changan kongge tuodong jiuneng xuanzhong wenzi <comma>
-  - anzhu fuhaojian tuodao zimu shang jiushi <space> en:Ctrl <space> kuaijiejian <comma> biru <colon> <enter> <enter>
-  - <gt> <space> bazheliangge zi~ wait:150 tap:288:2003 jiacu
-  # One-shot Shift + long-press space dragged left selects the last two characters (1.14.108);
-  # !@# dragged onto B sends Ctrl+B (1.14.107), which Obsidian turns into **bold**; then back to the end.
-  - <shift> swipe:space:-26:0:600 drag:sym>b swipe:space:45:0:600 <period> <enter> <enter>
-  - en:--- <enter> <enter>
+  - "<hash> <hash> <space> bianjihekuaijiejian <enter> <enter>"
+  - "en:CyIME <space> youyizubianjianniu <comma> changjiandewenbenbianji caozuoquanzailimian <period>"
+  - "jishibudakaibianjiluopan <comma> changankongge zuoyouhuadong <comma> guangbiaojiugenzhezou <comma> lingmindushiwo jingxintiaojiao guode <period> <enter> <enter>"
+  - "dianliang daxiejian zai changan kongge tuodong jiuneng xuanzhong wenzi <period> wo hai gei fuhaojian zuole gongneng jicheng <colon>"
+  - "anzhufuhaojian <comma> zimujianhui huancheng kuaijiejian <comma> tuodaozimushang jiushi <space> en:Ctrl <space> kuaijiejian <comma>"
+  - "rang <space> <2> <6> <space> jian yenengxiang diannao yiyang <space> en:Ctrl+C <dun> en:Ctrl+V <comma> biru <colon> <enter> <enter>"
+  - "<gt> <space> bazheliangge zi~ wait:150 tap:288:2003 jiacu"
+  - "<shift> swipe:space:-26:0:600 drag:sym>b swipe:space:45:0:600 <period> <enter> <enter>"
+
+- name: 更多细节
+  layout: cn26
+  text: "## 更多细节\n\n- 上屏以后会接着联想下一个词。\n- 无痕模式不学新词、不记剪贴板，进密码框自动开启。\n- 长按候选可以忘掉学到的词，词库里本来有的词回到原来的位置。\n- 候选栏可以左右滑，看后面更多的候选。\n- 新到的短信验证码会直接出现在候选栏。\n\n---\n\n"
+  do:
+  - "<hash> <hash> <space> gengduoxijie <enter> <enter>"
+  - "en:-_ shangpingyihou huijiezhe lianxiang xiayigeci <period> <enter>"
+  - "wuhen moshi buxue xinci <dun> buji jiantieban <comma> jinmimakuang zidong kaiqi <period> <enter>"
+  - "changanhouxuan keyiwangdiao xuedaodeci <comma> cikulibenlaiyou decihuidao yuanlaideweizhi <period> <enter>"
+  - "houxuanlan keyi zuoyou hua <comma> kan houmian gengduo de houxuan <period> <enter>"
+  - "xindaodeduanxin yanzhengmahui zhijiechuxianzai houxuanlan <period> <enter> <enter> <enter>"
+  - "en:--- <enter> <enter>"
 
 - name: 语音
   layout: cn26
-  text: "## 输入方式\n\n不仅仅是打字。\n\n## 语音\n\n语音输入用的是离线模型，CPU 占用超低。两个模型配合：一个边听边打字，你一停下来，另一个把整句话重新矫正一次，顺便把标点加上。键盘还能收成一个小悬浮窗，不会挡住内容。\n\n（下面这段是对着平板说出来的）\n语音输入用的是离线模型 资源占用很低 两个模型二次校正 全程在本地运行\n\n日语也能说：\n\n> 音声入力は日本語にも対応しています\n\n"
+  text: "## 输入方式\n\n不只是打字。\n\n## 语音\n\n语音输入用的是离线模型，CPU 占用超低。两个模型配合：一个边听边出字，你一停顿，另一个把整句话再矫正一次，顺便把标点加上。键盘还能收成一条小悬浮条，不挡住你看内容。\n\n（下面这段是电脑播放的语音，平板现场识别）\n语音输入用的是离线模型，资源占用很低，两个模型二次校正，全程在本地运行。\n\n日语也能说：\n\n> 音声入力は日本語にも対応しています。\n\n"
   do:
-  - <hash> <hash> <space> shurufangshi <enter> <enter> bujinjinshi dazi <period> <enter> <enter>
-  - <hash> <hash> <space> yuyin <enter> <enter>
-  - yuyinshuruyongdeshi lixianmoxing <comma> en:CPU <space> zhanyongchaodi <period> lianggemoxingpeihe <colon>
-  - yige biantingbiandazi <comma> ni yi tingxialai <comma> lingyige bazhengjuhua chongxin jiaozhengyici <comma> shunbianbabiaodian jiashang <period>
-  - jianpanhainengshoucheng yige xiao xuanfuchuang <comma> buhui dangzhu neirong <period> <enter> <enter>
-  - <lparen> xiamianzheduanshiduizhe pingbanshuochulaide <rparen> <enter>
-  - voice:zh <enter> <enter> wait:2500
-  - riyu ye neng shuo <colon> <enter> <enter>
-  - <gt> <space> <lang:hold> @ja voice:ja <enter> <enter> <lang:hold> @zh
+  - "<hash> <hash> <space> shurufangshi <enter> <enter> buzhishidazi <period> <enter> <enter>"
+  - "<hash> <hash> <space> yuyin <enter> <enter>"
+  - "yuyinshuruyongdeshi lixianmoxing <comma> en:CPU <space> zhanyongchaodi <period> lianggemoxingpeihe <colon>"
+  - "yige bianting bianchuzi <comma> ni yi tingdun <comma> lingyige bazhengjuhua zai jiaozheng yici <comma> shunbianbabiaodian jiashang <period>"
+  - "jianpanhainengshoucheng yitiaoxiao xuanfutiao <comma> budangzhunikan neirong <period> <enter> <enter>"
+  - "<lparen> xiamianzheduan shidiannaobofang deyuyin <comma> pingbanxianchang shibie <rparen> <enter>"
+  - "voice:zh <enter> <enter> wait:2500"
+  - "riyuyenengshuo <colon> <enter> <enter>"
+  - "<gt> <space> <lang:hold> @ja voice:ja <enter> <enter> <lang:hold> @zh"
 
 - name: 手写
   layout: cn26
-  text: "## 手写\n\n手写支持中文、日语、英文，还能写 LaTeX 数学公式，写完直接插入 Obsidian。用三星 S Pen 的朋友，能识别下笔的轻重，按住 S Pen 的侧键就是橡皮。日语和英文可以连起来写：\n\n永 　ありがとう Hello\n\n公式直接插入 Obsidian：\n\n $V_{n}(r)=\\frac{\\pi^{n/2}}{\\Gamma(\\frac{n}{2}+1)}r^{n}$\n\n"
+  text: "## 手写\n\n手写支持中文、日语、英文，还能写 LaTeX 数学公式，写完直接插进 Obsidian。用三星 S Pen 的朋友，压感是能检测到的，按住笔侧键就是橡皮。日语和英文可以连着写。\n\n（这一段现场手写）\n\n"
   do:
-  - <hash> <hash> <space> shouxie <enter> <enter>
-  - shouxie zhichi zhongwen <dun> riyu <dun> yingwen <comma> hainengxie <space> en:LaTeX <space> shuxuegongshi <comma> xiewan zhijie charu <space> en:Obsidian <period>
-  - yongsanxing <space> en:S_Pen <space> depengyou <comma> nengshibie xiabi de qingzhong <comma> anzhu <space> en:S_Pen <space> de cejian jiushi xiangpi <period> riyu he yingwen keyi lianqilaixie <colon> <enter> <enter>
-  # The user writes 永, ありがとう, Hello and his formula by hand on camera after this line.
+  - "<hash> <hash> <space> shouxie <enter> <enter>"
+  - "shouxie zhichi zhongwen <dun> riyu <dun> yingwen <comma> hainengxie <space> en:LaTeX <space> shuxuegongshi <comma> xiewan zhijie chajin <space> en:Obsidian <period>"
+  - "yong sanxing <space> en:S_Pen <space> de pengyou <comma> yagan shi neng jiance dao de <comma> anzhubicejian jiushi xiangpi <period> riyu he yingwen keyi lianzhe xie <period> <enter> <enter>"
+  - "<lparen> zheyiduan xianchangshouxie <rparen> <enter> <enter>"
 
 - name: 拍照识别
   layout: cn26
-  text: "## 拍照识别\n\n还有拍照识别，对着文字拍一下，文本直接进剪贴板。用的是百度飞桨的 PaddleOCR 模型，同样完全离线，特别感谢百度飞桨和 RapidOCR 项目。\n\n"
+  text: "## 拍照识别\n\n还有拍照识别，对着文字一拍，文本直接进剪贴板。用的是百度飞桨的 PaddleOCR 模型，同样完全离线，在此感谢百度飞桨和 RapidOCR 项目。\n\n"
   do:
-  - <hash> <hash> <space> paizhaoshibie <enter> <enter>
-  - haiyoupaizhaoshibie <comma> duizhe wenzi pai yixia <comma> wenbenzhijiejin jiantieban <period>
-  - yongdeshibaidufeijiangde <space> en:PaddleOCR <space> moxing <comma> tongyangwanquanlixian <comma> tebie ganxie baidufeijiang he <space> en:RapidOCR <space> xiangmu <period> <enter> <enter>
+  - "<hash> <hash> <space> paizhaoshibie <enter> <enter>"
+  - "haiyoupaizhaoshibie <comma> duizhe wenzi yi pai <comma> wenbenzhijiejin jiantieban <period>"
+  - "yongdeshibaidufeijiangde <space> en:PaddleOCR <space> moxing <comma> tongyangwanquanlixian <comma> zaici ganxie baidufeijiang he <space> en:RapidOCR <space> xiangmu <period> <enter> <enter>"
 
 - name: 平板适配
   layout: cn26
-  text: "## 平板适配\n\n键盘可以拖起来变成悬浮窗，按住顶部的手柄能转一个角度，拖回底部又变回固定；大屏上候选栏也跟着键盘一起放大。\n\n"
+  text: "## 平板适配\n\n对 26 键默认布局做了尺寸适配：\n- 与实体键盘完全一致的字母排列\n- 手指自然放好时的间距\n- 键盘支持悬浮窗，按住顶部按钮能旋转角度，拖回底部又换回固定\n\n"
   do:
-  - <hash> <hash> <space> pingban shipei <enter> <enter>
-  - jianpankeyituoqilai bianchengxuanfuchuang <comma> anzhu dingbu de shoubing neng zhuan yige jiaodu <comma>
-  - tuohuidibuyoubianhui guding <semicolon> dapingshanghouxuanlanye genzhejianpanyiqifangda <period> <enter> <enter>
-  # The user drags the keyboard to float, rotates it and docks it by hand on camera after this line.
+  - "<hash> <hash> <space> pingbanshipei <enter> <enter>"
+  - "dui <space> <2> <6> <space> jian moren buju zuole chicun shipei <colon> <enter>"
+  - "en:-_ yushitijianpan wanquanyizhide zimupailie <enter>"
+  - "shouzhi ziran fanghao shi de jianju <enter>"
+  - "jianpan zhichi xuanfuchuang <comma> anzhu dingbu anniu neng xuanzhuan jiaodu <comma> tuohui dibu you huanhui guding <enter> <enter> <enter>"
 
 - name: 手感和外观
   layout: cn26
-  text: "## 手感和外观\n\n线性马达振动、按键光效、清脆音效，玻璃主题一键切换。\n\n"
+  text: "## 手感和外观\n\n外观美化方面，做了：\n- 线性马达震动\n- 三星键盘那样的按键光效\n- 我自己录制的 Rain75 紫薇轴音效，做了降噪、去回音和响度归一化\n- iOS 主题和玻璃效果一键切换\n\n"
   do:
-  - <hash> <hash> <space> shougan he waiguan <enter> <enter>
-  - xianxingmadazhendong <dun> anjianguangxiao <dun> qingcuiyinxiao <comma> bolizhutiyijianqiehuan <period>
-  # The menu stays open while glass is toggled off and back on.
-  - "@menu @glass wait:2000 @glass wait:800 @panel_back <enter> <enter>"
+  - "<hash> <hash> <space> shouganhewaiguan <enter> <enter>"
+  - "waiguanmeihua fangmian <comma> zuole <colon> <enter>"
+  - "en:-_ xianxingmada zhendong <enter>"
+  - "sanxingjianpan nayangdeanjian guangxiao <enter>"
+  - "wo ziji luzhi de <space> en:Rain75 <space> ziweizhou yinxiao <comma> zuole jiangzao <dun> quhuiyin he xiangduguiyihua <enter>"
+  - "en:iOS <space> zhutiheboli xiaoguo yijianqiehuan <enter> <enter> <enter>"
+  - "@menu @glass wait:2000 @glass wait:800 @panel_back"
 
 - name: 物理键盘
   layout: cn26
-  text: "## 物理键盘\n\n接上实体键盘，这就是最好的物理键盘支持。候选变成一条小浮窗，跟着光标走；打拼音的时候按 Tab 切换候选，方向键、Esc、大写提示都和你在电脑上的习惯一样。按键音效是我用自己的 Rain75 键盘一个一个录的，所有按键的音量都调成一样大。\n\n"
+  text: "## 物理键盘\n\n接上实体键盘，全网最好的物理键盘支持。候选变成一条小浮窗，跟着光标走；打拼音的时候按 Tab 换候选，方向键、Esc、大写提示都和你在电脑上的习惯一样；Ctrl+空格切换语言，单独按下 Shift 中英互切。按键音效默认使用 Rain75。\n\n"
   do:
-  - <hash> <hash> <space> wulijianpan <enter> <enter>
-  - jieshangshitijianpan <comma> zhejiushizuihaodewuli jianpanzhichi <period> houxuanbianchengyitiao xiao fuchuang <comma> genzheguangbiaozou <semicolon>
-  - dapinyindeshihouan <space> en:Tab <space> qiehuan houxuan <comma> fangxiangjian <dun> en:Esc <dun> daxietishidouhenizai diannaoshangdexiguan yiyang <period>
-  - anjian yinxiao shiwo yong zijide <space> en:Rain75 <space> jianpan yigeyige lude <comma> suoyou anjian de yinliang dou tiaocheng yiyangda <period> <enter> <enter>
+  - "<hash> <hash> <space> wulijianpan <enter> <enter>"
+  - "jieshangshitijianpan <comma> quanwangzuihaode wulijianpan zhichi <period> houxuanbianchengyitiao xiaofuchuang <comma> genzheguangbiaozou <semicolon>"
+  - "dapinyindeshihouan <space> en:Tab <space> huanhouxuan <comma> fangxiangjian <dun> en:Esc <dun> daxietishidouhenizai diannaoshangdexiguan yiyang <semicolon>"
+  - "en:Ctrl+ konggeqiehuan yuyan <comma> danduanxia <space> en:Shift <space> zhongyinghuqie <period> anjianyinxiao morenshiyong <space> en:Rain75 <period> <enter> <enter>"
+
+- name: 剪贴板
+  layout: cn26
+  text: "## 剪贴板\n\n剪贴板会记下复制过的文字和图片，按链接、电话、邮箱等分类，可以固定常用内容，也能把一条记录拆成一个个词挑着上屏；刚截的图会在候选栏提示一键粘贴。和电脑上的 CyIME Windows 配对以后，两边剪贴板自动同步，只在自己的局域网里直传。\n\n"
+  do:
+  - "<hash> <hash> <space> jiantieban <enter> <enter>"
+  - "jiantieban hui jixia fuzhiguo de wenzi he tupian <comma> an lianjie <dun> dianhua <dun> youxiang deng fenlei <comma> keyi guding changyong neirong <comma>"
+  - "yeneng ba yitiao jilu chaicheng yigegeci tiaozhe shangping <semicolon> gangjiedetu hui zai houxuanlan tishi yijianzhantie <period>"
+  - "he diannao shang de <space> en:CyIME_Windows <space> peidui yihou <comma> liangbian jiantieban zidong tongbu <comma> zhi zai ziji de juyuwang li zhichuan <period> <enter> <enter>"
 
 - name: 设置
   layout: cn26
-  text: "## 设置\n\n功能这么多，找不到怎么办？没关系，我加了强大的设置搜索功能，设置条目和菜单都可以搜到，想改哪一项，直接在设置里搜。\n\n"
+  text: "## 设置\n\n功能这么多，找不到怎么办？没关系，我加了强大的设置搜索功能，设置条目和菜单都可以搜到，想改哪一项，直接在设置里搜。第一次安装还会按手机配置自动选高配、中配或低配。\n\n"
   do:
-  - <hash> <hash> <space> shezhi <enter> <enter>
-  - gongnengzhemeduo <comma> zhaobudaozenmeban <question> meiguanxi <comma> wojialeqiangdadeshezhi sousuogongneng <comma>
-  - shezhitiaomuhecaidandou keyisoudao <comma> xianggainayixiang <comma> zhijiezaishezhilisou <period> <enter> <enter>
+  - "<hash> <hash> <space> shezhi <enter> <enter>"
+  - "gongnengzhemeduo <comma> zhaobudaozenmeban <question> meiguanxi <comma> wojialeqiangdadeshezhi sousuogongneng <comma>"
+  - "shezhitiaomuhecaidandou keyisoudao <comma> xianggainayixiang <comma> zhijiezaishezhilisou <period>"
+  - "diyici anzhuang hai hui an shouji peizhi zidong xuan gaopei <dun> zhongpei huo dipei <period> <enter> <enter>"
 
 - name: 字幕
   layout: cn26
-  text: "## 字幕模式\n\n最后，想到长辈年纪增长、听力受损后，整个人交流少了，人也沉默寡言了。我想他的世界什么都听不清，助听器也有各种问题，一定非常孤独和备受折磨。为此，我加入了阿里的 SenseVoice 模型（特别感谢阿里达摩院），配合声纹识别模型，可以分出是谁在说话。打开字幕模式，周围人说的话实时显示成文字，自动分出说话人，可以给每个说话人自定义备注。如果打开了无障碍服务，打电话也能自动开启字幕模式。老人不方便说话、想回复的时候，点一下快捷回复，屏幕就转过来给对面的人看。桌面上还能放一个单独的字幕模式的图标，进入更方便。\n\n每个人说的话各占一栏，声音记住一次，下次自动认出来。聊完可以把记录存成文本，谁、什么时候、说了什么，都在里面。快捷回复里还有【紧急：打 120】，真有急事，老人点一下就能让身边的人看到。\n\n"
+  text: "## 字幕\n\n还有，想到长辈年纪增长、听力受损后，整个人交流少了，人也沉默寡言了。我想他的世界什么都听不清，助听器也有各种问题，一定非常孤独和备受折磨。为此，我加入了阿里的 SenseVoice 模型（在此感谢阿里达摩院），配合声纹模型，可以分出是谁在说话。打开字幕模式，周围人说的话实时变成字幕，自动分出说话人，可以给每个说话人自定义备注。如果打开了无障碍服务，打电话也能自动开启字幕。老人不方便说话、想回复的时候，点一下快捷回复，屏幕就翻转过来给对面的人看。桌面上还能放一个单独的字幕图标，进入更方便。\n\n每个人说的话各占一栏，声音记住一次就一直认得。聊完可以把记录存成文本，谁、什么时候、说了什么，都在里面。快捷回复里还有「紧急：打 120」，真有急事，老人点一下就能让身边的人看到。\n\n"
   do:
-  - <hash> <hash> <space> zimumoshi <enter> <enter>
-  - zuihou <comma> xiangdaozhangbeinianji zengzhang <dun> tinglishousunhou <comma> zhenggerenjiaoliushaole <comma> renyechenmoguayanle <period>
-  - woxiangtadeshijieshenme doutingbuqing <comma> zhutingqiyeyougezhong wenti <comma> yidingfeichangguduhe beishouzhemo <period>
-  - weici <comma> wojiarulealide <space> en:SenseVoice <space> moxing <lparen> tebie ganxie alidamoyuan <rparen> <comma> peihe shengwenshibie moxing <comma> keyifenchushisheizai shuohua <period>
-  - dakaizimumoshi <comma> zhouweirenshuodehua shishixianshi cheng wenzi <comma> zidongfenchushuohuaren <comma> keyigeimeigeshuohuaren zidingyibeizhu <period>
-  - ruguodakailewuzhangai fuwu <comma> dadianhuayenengzidong kaiqi zimumoshi <period>
-  - laorenbufangbianshuohua <dun> xiang huifu de shihou <comma> dianyixiakuaijiehuifu <comma> pingmujiu zhuan guolai gei duimianderenkan <period>
-  - zhuomianshanghainengfang yigedandude zimumoshi de tubiao <comma> jinrugengfangbian <period> <enter> <enter>
-  - meigerenshuodehuagezhan yilan <comma> shengyinjizhuyici <comma> xiaci zidong renchulai <period> liaowankeyibajilu cunchengwenben <comma>
-  - shei <dun> shenmeshihou <dun> shuoleshenme <comma> douzailimian <period> kuaijiehuifu lihaiyou <lcorner> jinji <colon> da <space> <1> <2> <0> <rcorner> <comma>
-  - zhenyoujishi <comma> laorendianyixiajiuneng rangshenbianderenkandao <period> <enter> <enter>
+  - "<hash> <hash> <space> zimu <enter> <enter>"
+  - "haiyou <comma> xiangdaozhangbeinianji zengzhang <dun> tinglishousunhou <comma> zhenggerenjiaoliushaole <comma> renyechenmoguayanle <period>"
+  - "woxiangtadeshijieshenme doutingbuqing <comma> zhutingqiyeyougezhong wenti <comma> yidingfeichangguduhe beishouzhemo <period>"
+  - "weici <comma> wojiarulealide <space> en:SenseVoice <space> moxing <lparen> zaici ganxie alidamoyuan <rparen> <comma> peihe shengwenmoxing <comma> keyi fenchushishui zaishuohua <period>"
+  - "dakaizimumoshi <comma> zhouweirenshuodehua shishi biancheng zimu <comma> zidongfenchushuohuaren <comma> keyigeimeigeshuohuaren zidingyibeizhu <period>"
+  - "ruguodakailewuzhangai fuwu <comma> dadianhuayenengzidong kaiqizimu <period>"
+  - "laorenbufangbianshuohua <dun> xiang huifu de shihou <comma> dianyixiakuaijiehuifu <comma> pingmujiu fanzhuanguolai gei duimianderenkan <period>"
+  - "zhuomianshanghainengfang yigedandudezimu tubiao <comma> jinrugengfangbian <period> <enter> <enter>"
+  - "meigerenshuodehuagezhan yilan <comma> shengyinjizhu yicijiuyizhi rende <period> liaowankeyibajilu cunchengwenben <comma>"
+  - "shei <dun> shenmeshihou <dun> shuoleshenme <comma> douzailimian <period> kuaijiehuifu lihaiyou <lcorner> jinji <colon> da <space> <1> <2> <0> <rcorner> <comma>"
+  - "zhenyoujishi <comma> laorendianyixiajiuneng rangshenbianderenkandao <period> <enter> <enter>"
+
+- name: 扩展
+  layout: cn26
+  text: "## 扩展\n\n方案、手写和语音模型、插件都能在应用里下载，也能用电脑浏览器把文件拖进网页装到手机上；设置、主题、布局和词库可以一键备份恢复。\n\n"
+  do:
+  - "<hash> <hash> <space> kuozhan <enter> <enter>"
+  - "fangan <dun> shouxieheyuyin moxing <dun> chajiandouneng zaiyingyongli xiazai <comma>"
+  - "ye neng yong diannao liulanqi ba wenjian tuojin wangye zhuang dao shouji shang <semicolon> shezhi <dun> zhuti <dun> buju he ciku keyi yijianbeifenhuifu <period> <enter> <enter>"
 
 - name: 发布
   layout: cn26
-  text: "## 发布\n\nCyIME 有两个版本。轻量版安装包小，模型用到的时候再从网上下载；完整版把语音、手写、公式这些模型全部装好，装上不联网就能用。用过旧版的，直接覆盖安装就行。\n\n"
+  text: "## 发布\n\nCyIME 有两个版本。轻量版安装包小，模型用到的时候再从网上下载；完整版把语音、手写、公式这些模型全部装好，装上不联网就能用。用过旧版的，直接覆盖安装就行。Windows 版还在打磨，Linux 版还在规划中，精力有限，随时咕咕~\n\n"
   do:
-  - <hash> <hash> <space> fabu <enter> <enter>
-  - en:CyIME <space> youlianggebanben <period> qingliangbananzhuangbao xiao <comma> moxingyongdaodeshihou zaicong wangshang xiazai <semicolon>
-  - wanzhengbanbayuyin <dun> shouxie <dun> gongshizhexiemoxing quanbuzhuanghao <comma> zhuangshang bulianwang jiunengyong <period>
-  - yongguojiubande <comma> zhijiefugaianzhuang jiuxing <period> <enter> <enter>
+  - "<hash> <hash> <space> fabu <enter> <enter>"
+  - "en:CyIME <space> youlianggebanben <period> qingliangbananzhuangbao xiao <comma> moxingyongdaodeshihou zaicong wangshang xiazai <semicolon>"
+  - "wanzhengbanbayuyin <dun> shouxie <dun> gongshizhexiemoxing quanbuzhuanghao <comma> zhuangshang bulianwang jiunengyong <period>"
+  - "yongguojiubande <comma> zhijiefugaianzhuang jiuxing <period> en:Windows <space> ban haizai damo <comma> en:Linux <space> ban haizai guihuazhong <comma> jingliyouxian <comma> suishi gugu <tilde> <enter> <enter>"
 
 - name: 最后
   layout: cn26
-  text: "## 最后\n\n打字、语音和手写识别都是在这台平板上现场完成的。拍照识别、字幕模式、剪贴板管理和 Windows 电脑同步剪贴板这次只是做了介绍，没有现场演示。CyIME 开源在 GitHub：Cyletix/CyIME\n\n**这就是当前最强输入法，如有不服可以来辩论。**"
+  text: "## 最后\n\n打字、语音和手写识别都是在这台平板上现场完成的。CyIME 开源在 GitHub：Cyletix/CyIME，遵循 GPLv3 协议，请尊重前人的劳动成果，fork 的项目同样以 GPLv3 开源。\n\n**这就是当前最强输入法！**"
   do:
-  - <hash> <hash> <space> zuihou <enter> <enter>
-  - dazi <dun> yuyinheshouxieshibie doushizaizhetaipingban shangxianchangwanchengde <period>
-  - paizhaoshibie <dun> zimumoshi <dun> jiantiebanguanlihe <space> windows <space> diannao tongbu jiantieban zheci zhishi zuole jieshao <comma> meiyouxianchangyanshi <period>
-  - en:CyIME <space> kaiyuanzai <space> github <colon> en:Cyletix/CyIME <enter> <enter>
-  - en:** zhejiushidangqian zuiqiangshurufa <comma> ruyoubufukeyi laibianlun <period> en:**
-  - wait:paragraph @hide_keyboard @reading_view
+  - "<hash> <hash> <space> zuihou <enter> <enter>"
+  - "dazi <dun> yuyinheshouxieshibie doushizaizhetaipingban shangxianchangwanchengde <period>"
+  - "en:CyIME <space> kaiyuanzai <space> github <colon> en:Cyletix/CyIME <comma> zunxun <space> en:GPLv3 <space> xieyi <comma> qingzunzhong qianren de laodong chengguo <comma>"
+  - "en:fork <space> dexiangmu tongyangyi <space> en:GPLv3 <space> kaiyuan <period> <enter> <enter>"
+  - "en:** zhejiushidangqian zuiqiangshurufa <exclaim> en:**"
+  - "wait:paragraph @hide_keyboard @reading_view"
