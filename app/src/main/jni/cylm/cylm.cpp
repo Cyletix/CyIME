@@ -506,7 +506,7 @@ struct Lexicon {
 struct Token { char kind; char16_t full; char letter; std::string prefix; int typo = 0; int vowel = 0; int keys = 1; };  // typo: 1 doubled letter, 2 neighbour key
 
 struct Params {
-  double vowel_pen = -1.0, typo_first = 0.0, neighbor_pen = -2.0, adapt_add = 0.0, typo = 0.0, mu_word = 0.0, eos_word = -1.0, adapt_word = -1.0, rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
+  double vowel_pen = -1.0, typo_first = 0.0, neighbor_pen = -2.0, adapt_add = 0.0, typo = 0.0, mu_word = 0.0, eos_word = -1.0, adapt_word = -1.0, rr_gamma = 0.8, rr_short = 0.1, abbrev_full = 0.0, abbrev_syl = -8.0, eos2 = -1.0, mix = 0.0, mu = 0.02, abbrev = -0.7, word_pen = 0.0, eos = 1.0, adapt_lambda = 0.0, select_lm = 1.0;
   int skip_inner = 0, abbrev_keys = 0, vowel = 0, neighbor = 0, prune = 1, rr_cache = 2048, t9_beam = 0, t9_per_span = 0, rr_threads = 4, incremental = 0, interleave = 1, per_span = 24, per_span_abbrev = 48, per_span1 = 80, scan = 4000, beam = 32, nbest = 10;
   // cache caps: hit_cap (span word lists), word_cap (word priors and weights), id_cap / dec_cap (model word ids and
   // splits, per model); the library defaults keep a session to a few tens of MB
@@ -533,7 +533,7 @@ struct Params {
     else if (k == "typo_first") typo_first = std::stod(v);  // margin (nats) for a typo reading to go first; 0 = never
     else if (k == "skip_inner") skip_inner = std::stoi(v);  // 1: no initial-only readings before the syllable being typed in spelled input
     else if (k == "adapt_add") adapt_add = std::stod(v);
-    else if (k == "incremental") incremental = std::stoi(v); else if (k == "abbrev_full") abbrev_full = std::stod(v); else if (k == "eos2") eos2 = std::stod(v); else if (k == "interleave") interleave = std::stoi(v);
+    else if (k == "incremental") incremental = std::stoi(v); else if (k == "abbrev_full") abbrev_full = std::stod(v); else if (k == "abbrev_syl") abbrev_syl = std::stod(v); else if (k == "eos2") eos2 = std::stod(v); else if (k == "interleave") interleave = std::stoi(v);
     else if (k == "mix") mix = std::stod(v); else if (k == "mu") mu = std::stod(v); else if (k == "abbrev") abbrev = std::stod(v);
     else if (k == "word_pen") word_pen = std::stod(v); else if (k == "eos") eos = std::stod(v);
     else if (k == "adapt_lambda") adapt_lambda = std::stod(v); else if (k == "select_lm") select_lm = std::stod(v);
@@ -1125,6 +1125,15 @@ struct Decoder {
       }
       if (ok[n] && p.abbrev_full != 0 && n >= 6) abbrev = p.abbrev_full;
       vowel_on_ = vowel_wanted && !ok[n];
+    }
+    // One complete syllable (da, dan, sa) is a syllable the user spelled, however short: its initial-only readings
+    // (d + a 对啊, d + an 答案, da + n 打你) cost abbrev_syl each, so they never come before the syllable's own words.
+    if (p.abbrev_syl != 0 && !t9 && n < 6 && abbrev == p.abbrev) {
+      const bool vowel_saved = vowel_on_;
+      vowel_on_ = false;
+      const auto toks = Tokens(text, t9);
+      for (auto& [j, t] : toks[0]) if (t.kind == 'f' && !t.typo && size_t(j) == n) abbrev = p.abbrev_syl;
+      vowel_on_ = vowel_saved;
     }
     // (6+ keys, as abbrev_full: in a short input an initial-only reading is as likely as the spelled one, sa = 是啊)
     if (p.skip_inner && !t9 && n >= 6) skip_before_ = SpelledFrom(text);
