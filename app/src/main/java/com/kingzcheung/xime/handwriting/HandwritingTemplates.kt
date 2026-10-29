@@ -405,7 +405,8 @@ object HandwritingTemplates {
             lastScript = script
         }
         val kanji = if (script == Script.KANA) JapaneseKanji.tableFor(context) else null
-        return rank(query, list.map { it.label to it.feat }, builtin.map { it.label to it.feat }, topK, raw, kanji)
+        val ranked = rank(query, list.map { it.label to it.feat }, builtin.map { it.label to it.feat }, topK, raw, kanji)
+        return if (script == Script.KANA) KanaMarks.fix(ranked, strokes) else ranked
     }
 
     /**
