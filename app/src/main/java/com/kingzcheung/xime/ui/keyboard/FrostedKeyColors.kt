@@ -28,7 +28,9 @@ internal fun frostedKeyColor(
     // become #060606 over black. Compensate the tint (not alpha), preserving
     // the theme's channel ratios and its original color at full opacity.
     // For light surfaces the same rule preserves their distance from white.
-    val raisedTint = glassKeyTint(background, foreground, opacity)
+    val base = if (opacity < 1f) com.kingzcheung.xime.ui.theme.TransparentGlassTheme.glassKeyBase(background) else background
+    // 早期近黑键按 1/不透明度提亮（#1C1C1C → #8C8C8C），不走黑白主题的 3 倍。
+    val raisedTint = glassKeyTint(base, foreground, opacity, nearBlackLift = base == background)
     val feedback = when {
         pressed -> 0.08f
         highlighted -> 0.04f
@@ -36,7 +38,7 @@ internal fun frostedKeyColor(
     }
     val feedbackTarget = if (maxOf(kotlin.math.abs(raisedTint.red - foreground.red),
         kotlin.math.abs(raisedTint.green - foreground.green), kotlin.math.abs(raisedTint.blue - foreground.blue)) < 0.05f)
-        background else foreground
+        base else foreground
     val tint = lerp(raisedTint, feedbackTarget, feedback)
     // Frosted material owns its opacity independently of an imported theme's alpha.
     // Disabled controls and transparent hit regions can explicitly scale the material.
@@ -49,7 +51,7 @@ internal const val NEAR_BLACK_KEY_PEAK = .18f
 /** 近黑键帽在玻璃下的提亮倍数（可调参数；渲染测试会临时改它出对比图）。 */
 internal var glassNearBlackLift = 3f
 
-private fun glassKeyTint(background: Color, foreground: Color, opacity: Float): Color {
+private fun glassKeyTint(background: Color, foreground: Color, opacity: Float, nearBlackLift: Boolean = true): Color {
     if (opacity <= 0f || opacity >= 1f) return background
     val darkSurface = foreground.luminance() > background.luminance()
     val r = if (darkSurface) background.red else 1f - background.red
@@ -59,7 +61,7 @@ private fun glassKeyTint(background: Color, foreground: Color, opacity: Float): 
     if (peak <= 0f) return background
     // 近黑键帽（黑白主题深色）在玻璃下只提亮 GLASS_NEAR_BLACK_LIFT 倍：
     // 按 1/不透明度（默认 5 倍）会发灰，不提亮（1 倍）又和背景混在一起（2026-10-22 用户反馈）。
-    val lift = if (darkSurface && peak < NEAR_BLACK_KEY_PEAK) glassNearBlackLift else 1f / opacity
+    val lift = if (nearBlackLift && darkSurface && peak < NEAR_BLACK_KEY_PEAK) glassNearBlackLift else 1f / opacity
     val scale = minOf(lift, 1f / opacity, 1f / peak)
     fun channel(value: Float) = if (darkSurface) value * scale else 1f - value * scale
     return Color(channel(r), channel(g), channel(b), background.alpha)
@@ -74,6 +76,7 @@ internal const val GLASS_FUNCTION_KEY_SCALE = 0.5f
 @androidx.compose.runtime.Composable
 internal fun glassFunctionKeyScale(background: Color): Float {
     val palette = com.kingzcheung.xime.ui.theme.LocalKeyboardPalette.current ?: return 1f
+    if (com.kingzcheung.xime.ui.theme.TransparentGlassTheme.isGlassFunctionKey(background)) return 1f
     fun Color.sameRgb(other: Color) = kotlin.math.abs(red - other.red) < 0.004f &&
         kotlin.math.abs(green - other.green) < 0.004f && kotlin.math.abs(blue - other.blue) < 0.004f
     return if (background.sameRgb(palette.function) && !palette.key.sameRgb(palette.function))
