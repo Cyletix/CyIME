@@ -473,6 +473,7 @@ internal fun KeyboardResizeOverlay(
                             }
                         }
                         var splitDrag = 0f
+                        var pulledUp = 0f
                         // Snap band grows with the keyboard: 6dp on phones, up to 16dp on tablets.
                         val snapBandDp = (gestureRect.width / density.density * 0.012f).coerceIn(6f, 16f)
 
@@ -574,28 +575,42 @@ internal fun KeyboardResizeOverlay(
                                         snapFeedback(if (fixedMove.snapped) "center" else null)
                                         dragRect = workingRect
                                         currentOnPreviewRectChange(workingRect)
+                                        // 拖键盘内部空白往上拉，和顶上「拖动移动」胶囊一样过阻力后变悬浮。
+                                        if (morphTarget != null) {
+                                            pulledUp = (pulledUp - amount.y).coerceAtLeast(0f)
+                                            val before = morphProgress
+                                            morphProgress = fixedToFloatingPullProgress(pulledUp / 1.dp.toPx())
+                                            if (morphProgress >= 1f && before < 1f) currentSnapFeedback()
+                                        }
                                     }
                                 }
                             }
                         }
 
                         if (isFloatingRotated(rotationState?.floatValue ?: 0f)) gesturePivot = Offset(gestureRect.centerX, gestureRect.centerY)
+                        if (!gestureFloating && dragEdge == ResizeHandle.NONE && splitEdge == 0) {
+                            morphTarget = currentModeSwitchTarget?.invoke(true, gestureViewRect.width, gestureViewRect.height)
+                        }
+                        var released = false
                         try {
                             val start = awaitTouchSlopOrCancellation(down.id) { change, over ->
                                 change.consume()
                                 applyDelta(over)
                             }
                             if (start != null) {
-                                drag(start.id) { change ->
+                                released = drag(start.id) { change ->
                                     applyDelta(change.positionChange())
                                     change.consume()
                                 }
                             }
                         } finally {
+                            val float = released && morphTarget != null && morphProgress >= 1f
+                            if (!floatingMode) endMorph()
                             dragRect = null
                             gesturePivot = null
                             dragEdge = ResizeHandle.NONE
                             if (didDrag) currentPreviewState.onDragEnd()
+                            if (float) switchFloating(true)
                         }
                     }
                 },
