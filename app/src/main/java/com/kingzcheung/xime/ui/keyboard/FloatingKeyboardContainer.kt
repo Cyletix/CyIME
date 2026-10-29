@@ -97,6 +97,8 @@ internal fun FloatingKeyboardContainer(
     rotationDegrees: Float = 0f,
     /** 调节界面里正在调的旋转角；非空时代替 [rotationDegrees]，只在图层里读，转动时不重组键盘。 */
     previewRotationState: State<Float>? = null,
+    /** 非空时固定键盘顶边正中显示小把手，按住往上拉过阻力松手即变悬浮（平板）。 */
+    onUndock: (() -> Unit)? = null,
     keyboardContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -140,6 +142,8 @@ internal fun FloatingKeyboardContainer(
                             (pos.x + coords.size.width).roundToInt(), (pos.y + coords.size.height).roundToInt())
                     }) {
                     LanguageMenuPanel { keyboardContent() }
+                    if (onUndock != null) UndockHandle(Modifier.align(Alignment.TopCenter), dragIndicatorColor,
+                        highlightColor, onUndock)
                 }
             }
         } else {
@@ -414,6 +418,61 @@ internal fun KeyboardModeMorphOutline(
             .testTag(tag).semantics { stateDescription = if (ready) "ready" else "expanding" },
     )
 }
+
+/**
+ * 固定键盘顶边正中的小把手：和悬浮键盘底部拖动条同样的 40×4dp 圆头条，只占顶边一小块。
+ * 按住往上拉，先过 [FIXED_TO_FLOATING_DEAD_ZONE_DP] 的阻力，再拉满一段（把手随进度变长、变成强调色），满了振动一下，松手变悬浮；
+ * 不满松手保持固定。
+ */
+@Composable
+private fun UndockHandle(
+    modifier: Modifier,
+    indicatorColor: Color,
+    readyColor: Color,
+    onUndock: () -> Unit,
+) {
+    val currentOnUndock by rememberUpdatedState(onUndock)
+    val view = androidx.compose.ui.platform.LocalView.current
+    var progress by remember { mutableFloatStateOf(0f) }
+    Box(
+        modifier = modifier
+            .size(UNDOCK_HANDLE_WIDTH_DP.dp, UNDOCK_HANDLE_HEIGHT_DP.dp)
+            .testTag("fixed-undock-handle")
+            .semantics { stateDescription = if (progress >= 1f) "ready" else "docked" }
+            .pointerInput(Unit) {
+                var pulled = 0f
+                detectDragGestures(
+                    onDragStart = { pulled = 0f; progress = 0f },
+                    onDragEnd = {
+                        val ready = progress >= 1f
+                        progress = 0f
+                        if (ready) currentOnUndock()
+                    },
+                    onDragCancel = { progress = 0f },
+                ) { change, amount ->
+                    change.consume()
+                    pulled = (pulled - amount.y).coerceAtLeast(0f)
+                    val before = progress
+                    progress = fixedToFloatingPullProgress(pulled / 1.dp.toPx())
+                    if (progress >= 1f && before < 1f) view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                }
+            },
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .width((40f + 24f * progress).dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(50))
+                .background(lerp(indicatorColor, readyColor, progress))
+                .testTag("fixed-undock-indicator")
+        )
+    }
+}
+
+internal const val UNDOCK_HANDLE_WIDTH_DP = 96
+internal const val UNDOCK_HANDLE_HEIGHT_DP = 14
 
 @Composable
 private fun DragBar(

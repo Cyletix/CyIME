@@ -417,6 +417,11 @@ fun KeyboardView(
         onDrag = { dx, dy -> callbacks.onFloatingKeyboardDrag?.invoke(dx, dy) },
         onDragEnd = { callbacks.onFloatingKeyboardDragEnd?.invoke() },
         onDock = { callbacks.onFloatingModeChange?.invoke(false) },
+        // 平板固定键盘顶边的把手：往上拉变悬浮，和工具栏「悬浮」同一个切换。
+        onUndock = callbacks.onFloatingModeChange?.takeIf {
+            !state.isFloatingMode && !resizeActive && !state.isHandwritingMode &&
+                LocalConfiguration.current.smallestScreenWidthDp >= 600
+        }?.let { change -> { change(true) } },
         rotationDegrees = state.floatingRotation,
         previewRotationState = if (resizeActive && state.isFloatingMode) resizeRotation else null,
         previewRectState = if (resizeActive) resizePreviewRect else null,
