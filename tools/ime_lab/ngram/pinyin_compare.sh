@@ -5,7 +5,7 @@ set -u
 REPO=/mnt/d/GitHub/CyIME
 RUN=$1   # a completed host run directory (engine library + deployed user data)
 OUT=$REPO/.codex-artifacts/t9-ngram-20261010/pinyin
-W=$HOME/cyime-pinyin
+W=$HOME/cyime-work/pinyin
 JAR=/mnt/c/Users/Administrator/.gradle/caches/modules-2/files-2.1/org.json/json/20240303/ebb88e8fb5122b7506d5cf1d69f1ccdb790d22a/json-20240303.jar
 JAVAC=$HOME/.cache/cyime-t9-host/dependencies/javac
 LIB=$(python3 -c "import json;print(json.load(open('$RUN/engine-build.json'))['library_dir'])" 2>/dev/null || true)
@@ -30,3 +30,4 @@ for variant in plain gram; do
   echo "$variant exit=$?" >> "$OUT/done.log"
 done
 echo PINYIN-DONE >> "$OUT/done.log"
+rm -rf "$W"

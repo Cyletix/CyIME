@@ -3,7 +3,7 @@
 set -u
 REPO=/mnt/d/GitHub/CyIME
 OUT=$REPO/.codex-artifacts/t9-ngram-20261010/v3
-M=/home/priestess/cyime-ngram
+M=${M:-$HOME/cyime-work/ngram}  # build workspace; inputs archived in D:/CyIME-Data/corpus, models in D:/CyIME-Data/models
 SETS="tune=.codex-artifacts/t9-ngram-20261010/gen/tune/fixture.json dev=.codex-artifacts/t9-ngram-20261010/dev/fixture.json"
 until grep -q TUNE-V3-DONE "$OUT/runs.log" 2>/dev/null; do sleep 30; done
 cd "$REPO"

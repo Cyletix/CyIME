@@ -7,7 +7,7 @@ set -u
 REPO=/mnt/d/GitHub/CyIME
 SCHEMA=$REPO/app/src/main/assets/rime_chinese/t9_pinyin.schema.yaml
 OUT=${OUT:-$REPO/.codex-artifacts/t9-ngram-20261010/next}
-M=/home/priestess/cyime-ngram
+M=${M:-$HOME/cyime-work/ngram}  # build workspace; inputs archived in D:/CyIME-Data/corpus, models in D:/CyIME-Data/models
 TARGET=$REPO/app/build/generated/t9-ngram/rime_chinese/t9_ngram.lm
 JAR=/mnt/c/Users/Administrator/.gradle/caches/modules-2/files-2.1/org.json/json/20240303/ebb88e8fb5122b7506d5cf1d69f1ccdb790d22a/json-20240303.jar
 A=.codex-artifacts/t9-ngram-20261010
@@ -34,7 +34,7 @@ for model in w12 w21; do run "$model" "$M/model-v5-$model.lm"; done
 # Left context (committed text before the composition), engine and deployed data of the reference run.
 RUN=$OUT/base-tune
 LIB=$(python3 -c "import json;import os;print(os.path.dirname(json.load(open('$RUN/engine-build.json'))['library']))")
-W=$HOME/cyime-chunk; rm -rf "$W"; mkdir -p "$W/classes" "$W/user"
+W=$HOME/cyime-work/chunk; rm -rf "$W"; mkdir -p "$W/classes" "$W/user"
 "$HOME/.cache/cyime-t9-host/dependencies/javac" -encoding UTF-8 -cp "$RUN/runner/classes:$JAR" -d "$W/classes" tools/ime_lab/ngram/ChunkReplay.java
 rsync -a --exclude build --exclude '*.userdb' "$RUN/native-run/user/" "$W/user/"
 for cases in tune-dev test; do
@@ -44,3 +44,4 @@ for cases in tune-dev test; do
 done
 grep -n "ngram_\|dictionary_beam" "$SCHEMA" | tee -a "$OUT/runs.log"
 echo NEXT-DONE | tee -a "$OUT/runs.log"
+rm -rf "$W"
