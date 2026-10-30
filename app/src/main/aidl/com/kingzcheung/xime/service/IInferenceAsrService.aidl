@@ -27,4 +27,6 @@ interface IInferenceAsrService {
      * 空闲 engineIdleSeconds 秒后释放全部模型。0 表示永不释放这一级。
      */
     oneway void setIdleLadder(int refinerIdleSeconds, int engineIdleSeconds);
+    /** 整句定稿：SenseVoice 在真停顿或结束时校正一整句，不再每 6 秒切一次。 */
+    oneway void setWholeSentenceFinal(boolean enabled);
 }

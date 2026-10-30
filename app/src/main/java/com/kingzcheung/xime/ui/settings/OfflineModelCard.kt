@@ -23,6 +23,7 @@ import com.kingzcheung.xime.speech.SpeechModelCatalog
 import com.kingzcheung.xime.speech.SpeechModelSelection
 import com.kingzcheung.xime.speech.SpeechLanguages
 import com.kingzcheung.xime.settings.InputLanguage
+import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -95,6 +96,25 @@ internal fun OfflineModelCard() {
                         }
                         Switch(checked = enabled, enabled = available, onCheckedChange = null)
                     }
+                }
+                // 整句定稿只改变 SenseVoice 校正的切法，所以只在有语言开着校正时可用。
+                val anyCorrection = listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
+                    .any { SpeechModelSelection.hasCorrection(selected.getValue(it)) }
+                var wholeSentence by remember { mutableStateOf(SettingsPreferences.isSttWholeSentence(context)) }
+                HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Row(Modifier.fillMaxWidth().settingsSearchAnchor("整句定稿").testTag("speech-whole-sentence")
+                    .toggleable(value = wholeSentence, enabled = anyCorrection, role = Role.Switch,
+                        onValueChange = { wholeSentence = it; SettingsPreferences.setSttWholeSentence(context, it) })
+                    .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("整句定稿", style = MaterialTheme.typography.bodyLarge)
+                        Text(if (anyCorrection) "说完一整句（停顿约 1 秒或点结束）再统一校正一次，更准，说完要多等一会儿；关闭时每 6 秒校正一次。"
+                            else "先开启上面的 SenseVoice 二次校正。",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = wholeSentence, enabled = anyCorrection, onCheckedChange = null)
                 }
                 if (!senseReady) {
                     ModelDownloadAction(SpeechModelCatalog.SENSEVOICE, downloads) { download(SpeechModelCatalog.SENSEVOICE) }

@@ -113,14 +113,17 @@ class OfflineAsrBackend(private val context: Context) : AsrBackend {
             val modelManager = AsrModelManager(context)
             val selection = modelManager.selectionForLanguage(language)
             activeMode = selection.mode
+            val wholeSentence = SettingsPreferences.isSttWholeSentence(context)
             finishTimeoutMs = if (SpeechModelCatalog.isJapaneseZipformer(selection.mode))
-                JapaneseZipformerDecoding.backendTimeoutMs else 8000L
+                JapaneseZipformerDecoding.backendTimeoutMs
+                else if (wholeSentence) WHOLE_SENTENCE_DECODE_TIMEOUT_MS + 3000L else 8000L
             // 每次会话开始都重新 startAsr：服务端会重置语音会话并重设回调，
             // 否则 preload 预热时 stop() 清空的 callback 会导致 partial 结果丢失
             runBlocking {
                 if (!client.ensureBound()) return@runBlocking false
                 client.setKeepModelAlive(SettingsPreferences.isSttKeepEngineAlive(context))
                 client.setSaveTuningAudio(SettingsPreferences.isSttDebugRecord(context))
+                client.setWholeSentenceFinal(wholeSentence)
                 client.startAsr(selection.mode, asrCallback, language)
             }
         } catch (e: InterruptedException) {

@@ -36,6 +36,7 @@ class AsrInferenceService : Service() {
     private var refinerIdleMs = 60_000L
     private var engineIdleMs = 60_000L
     @Volatile private var saveTuningAudio = false
+    @Volatile private var wholeSentenceFinal = false
     // Opt-in only; keyed by the client's session binder, like pushed PCM.
     private val recorders = ConcurrentHashMap<IBinder, SpeechTuningRecorder>()
     private val generation = AtomicLong()
@@ -161,7 +162,9 @@ class AsrInferenceService : Service() {
                         "mode" to selection.mode, "language" to (language?.id ?: ""),
                         "device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
                         "app_version" to com.kingzcheung.xime.BuildConfig.VERSION_NAME,
+                        "whole_sentence" to wholeSentenceFinal,
                     )).also { recorders[callback.asBinder()] = it } else null
+                val wholeSentence = wholeSentenceFinal
                 val selectedAt = SystemClock.elapsedRealtime()
                 val ready = sessions.start(selection.key,
                     createEngine = {
@@ -179,7 +182,8 @@ class AsrInferenceService : Service() {
                             recorder?.error(message)
                             if (generation.get() == token) try { callback.onError(message) } catch (_: Exception) { }
                         },
-                        onRegion = { id, samples, boundary -> recorder?.region(id, samples, boundary) }) },
+                        onRegion = { id, samples, boundary -> recorder?.region(id, samples, boundary) },
+                        wholeSentence = wholeSentence) },
                     owner = callback.asBinder(), isActive = { generation.get() == token })
                 val readyAt = SystemClock.elapsedRealtime()
                 val modelState = if (constructed) "loaded" else if (ready) "resident" else "superseded"
@@ -234,6 +238,9 @@ class AsrInferenceService : Service() {
         }
         override fun setSaveTuningAudio(enabled: Boolean) {
             saveTuningAudio = enabled
+        }
+        override fun setWholeSentenceFinal(enabled: Boolean) {
+            wholeSentenceFinal = enabled
         }
         override fun setKeepModelAlive(keep: Boolean) = synchronized(lock) {
             keepAlive = keep

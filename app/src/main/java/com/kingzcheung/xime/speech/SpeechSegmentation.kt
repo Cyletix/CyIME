@@ -39,6 +39,15 @@ internal interface SpeechDetector {
 
 internal enum class SpeechBoundary { PAUSE, LIMIT, STOP }
 
+/**
+ * 整句定稿：SenseVoice 只在真停顿（≥1 s）或结束时校正一整句，不再每 6 s 切。一口气说得很长时在
+ * 28 s 后的第一个短停顿切，最迟 30 s 硬切（SenseVoice 单次输入上限）。2026-10-30 回放：同一
+ * SenseVoice 不切段，公开口语 290 段 CER 7.5→5.6 %，噪声 0 dB 34.1→24.8 %。
+ */
+internal const val WHOLE_SENTENCE_MAX_SEGMENT_MS = 28000
+/** 一整句（最长 30 s）在手机上的定稿时间余量；6 s 分段时用引擎自己的 5 s。 */
+internal const val WHOLE_SENTENCE_DECODE_TIMEOUT_MS = 15000L
+
 /** 32 ms acoustic frames, 1024 ms pre-roll, adaptive pauses. Every sample is decoded at most once. */
 internal class SpeechSegmenter(
     private val detector: SpeechDetector,

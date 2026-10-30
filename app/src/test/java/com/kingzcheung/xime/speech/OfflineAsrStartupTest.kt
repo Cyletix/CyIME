@@ -71,6 +71,8 @@ class OfflineAsrStartupTest {
         val preferences = mock<SharedPreferences>()
         whenever(context.getSharedPreferences(any(), any())).thenReturn(preferences)
         whenever(preferences.getBoolean(any(), any())).thenReturn(true)
+        // 整句定稿 keeps its own default (off) here; this test covers the normal finish limit.
+        whenever(preferences.getBoolean(eq(com.kingzcheung.xime.settings.SettingsPreferences.KEY_STT_WHOLE_SENTENCE), any())).thenReturn(false)
 
         mockConstruction(AsrInferenceClient::class.java) { client, _ ->
             runBlocking {

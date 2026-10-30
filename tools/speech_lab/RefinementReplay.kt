@@ -52,7 +52,9 @@ fun main(args: Array<String>) {
             }
             lateinit var segmenter: SpeechSegmenter
             val single = mode.startsWith("single")
-            segmenter = SpeechSegmenter(detector, if (single) 12000 else 6000,
+            // "refinement-whole": the 整句定稿 setting (production cap, 1 s streaming pause).
+            val whole = mode == "refinement-whole"
+            segmenter = SpeechSegmenter(detector, if (single) 12000 else if (whole) WHOLE_SENTENCE_MAX_SEGMENT_MS else 6000,
                 { id, audio ->
                     if (id != lastId) { lastId = id; count = 0 }
                     count += audio.size
@@ -63,7 +65,7 @@ fun main(args: Array<String>) {
                     val parts = exchange("END\t$boundary\t${encode(audio)}").split('|')
                     first.update(id, decode(parts[0]), boundary)
                     second.update(id, cleanSenseVoiceText(decode(parts[1])), boundary)
-                }, minimumPauseMs = if (mode == "single") 0 else if (mode.contains("-pause")) mode.substringAfter("-pause").toInt() else 600,
+                }, minimumPauseMs = if (mode == "single") 0 else if (whole) 1000 else if (mode.contains("-pause")) mode.substringAfter("-pause").toInt() else 600,
                 useEnergyPause = false, resetDetectorOnPause = true)
             for (offset in pcm.indices step 1600) segmenter.accept(pcm.copyOfRange(offset, minOf(offset + 1600, pcm.size)))
             segmenter.finishInput()
