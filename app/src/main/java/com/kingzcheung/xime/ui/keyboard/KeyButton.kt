@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
@@ -307,6 +309,8 @@ fun SwipeableKeyButton(
     symbolInputText: String? = null,
     onSwipe: ((String) -> Unit)? = null,
     onSwipeDown: ((String) -> Unit)? = null,
+    /** 14 键双字母键右半边字母的角标；上面几个 swipe 参数是左半边字母的。按下的位置决定用哪一半。 */
+    rightHalf: KeyHalfSymbols? = null,
     onSwipeLeft: (() -> Unit)? = null,
     swipeLeftText: String? = null,
     /** 左滑预览用的图标（有主图标的键用，如 0 键「上一项」左箭头）；null 时显示 [swipeLeftText]。 */
@@ -370,6 +374,40 @@ fun SwipeableKeyButton(
     // 按住符号键当 Ctrl 时，另一根手指点字母发 Ctrl+字母，不打字（用户 10-24）。
     val ctrlTargets = LocalShiftSlideTargets.current
     val tapOrCtrl: () -> Unit = { if (ctrlTargets?.ctrlTap(letterGroup ?: text) != true) onClick() }
+    fun symbolActions(up: String?, down: String?, upLabel: String?, downLabel: String?,
+        onUp: ((String) -> Unit)?, onDown: ((String) -> Unit)?, symbolInput: String?) = KeyGestureActions(
+        text = text,
+        onTap = tapOrCtrl,
+        onPress = { isPressed = true; onPress?.invoke() },
+        onRelease = { isPressed = false; onRelease?.invoke() },
+        onPreview = { flickPreview = it.keyFlick; onSwipeStateChange?.invoke(it, buttonBounds) },
+        inlineVerticalPreview = true,
+        upText = up,
+        downText = down,
+        upPreviewText = upLabel?.takeIf { it.isNotEmpty() } ?: up,
+        downPreviewText = downLabel?.takeIf { it.isNotEmpty() } ?: down,
+        onUp = onUp,
+        onDown = onDown,
+        longPressItems = longPressItems.orEmpty(),
+        onLeft = letters?.let { { onLetterSelection?.invoke(it.first); Unit } } ?: onSwipeLeft,
+        leftText = letters?.first ?: swipeLeftText,
+        onRight = letters?.let { { onLetterSelection?.invoke(it.second); Unit } } ?: onSwipeRight,
+        rightText = letters?.second ?: swipeRightText,
+        horizontalThresholdDp = if (letters != null) normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp) else 50f,
+        reserveHorizontalSwipe = letters != null,
+        // With the four-way disc shown, 14-key pairs re-aim freely like kana and nine-key flicks;
+        // the in-key mode keeps the 26-key axis lock.
+        freeDirection = letters != null && inputPreferences.flickDirectionDisc,
+        // 横滑动作（如九键 0 键左滑「上一项」）和上下滑一样在键内渐变，不再弹旧的滑动浮窗（用户 10-24）。
+        inlineHorizontalPreview = true,
+        longPressDrawableIds = longPressDrawableIds.orEmpty(),
+        keyWidth = buttonBounds.width,
+        onLongPressSelect = onLongPressSelect,
+        longPressTimeoutMillis = longPressTimeoutMillis,
+        onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
+    ).withSymbolInput(symbolInputMode, symbolInput).let {
+        if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
+    }
     val gestureActions = if (flick != null) KeyGestureActions(
         // 拂动：方向固定对应字母，不随角标方向反转；数字等改为长按。
         text = text,
@@ -394,40 +432,16 @@ fun SwipeableKeyButton(
         onLongPressSelect = { onFlickLongPress?.invoke() },
         longPressTimeoutMillis = 300L,
         onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
-    ) else KeyGestureActions(
-        text = text,
-        onTap = tapOrCtrl,
-        onPress = { isPressed = true; onPress?.invoke() },
-        onRelease = { isPressed = false; onRelease?.invoke() },
-        onPreview = { flickPreview = it.keyFlick; onSwipeStateChange?.invoke(it, buttonBounds) },
-        inlineVerticalPreview = true,
-        upText = swipeText,
-        downText = swipeDownText,
-        upPreviewText = swipeUpKeyLabel?.takeIf { it.isNotEmpty() } ?: swipeText,
-        downPreviewText = swipeDownKeyLabel?.takeIf { it.isNotEmpty() } ?: swipeDownText,
-        onUp = onSwipe,
-        onDown = onSwipeDown,
-        longPressItems = longPressItems.orEmpty(),
-        onLeft = letters?.let { { onLetterSelection?.invoke(it.first); Unit } } ?: onSwipeLeft,
-        leftText = letters?.first ?: swipeLeftText,
-        onRight = letters?.let { { onLetterSelection?.invoke(it.second); Unit } } ?: onSwipeRight,
-        rightText = letters?.second ?: swipeRightText,
-        horizontalThresholdDp = if (letters != null) normalizeLetterSwipeDistance(inputPreferences.fourteenLetterSwipeDp) else 50f,
-        reserveHorizontalSwipe = letters != null,
-        // With the four-way disc shown, 14-key pairs re-aim freely like kana and nine-key flicks;
-        // the in-key mode keeps the 26-key axis lock.
-        freeDirection = letters != null && inputPreferences.flickDirectionDisc,
-        // 横滑动作（如九键 0 键左滑「上一项」）和上下滑一样在键内渐变，不再弹旧的滑动浮窗（用户 10-24）。
-        inlineHorizontalPreview = true,
-        longPressDrawableIds = longPressDrawableIds.orEmpty(),
-        keyWidth = buttonBounds.width,
-        onLongPressSelect = onLongPressSelect,
-        longPressTimeoutMillis = longPressTimeoutMillis,
-        onLongPressFeedback = { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) },
-    ).withSymbolInput(symbolInputMode, symbolInputText).let {
-        if (followSymbolSwipeDirection) it.withSymbolSwipeDirection(inputPreferences.reverseSymbolSwipe) else it
+    ) else symbolActions(swipeText, swipeDownText, swipeUpKeyLabel, swipeDownKeyLabel, onSwipe, onSwipeDown, symbolInputText)
+    val rightActions = rightHalf?.takeIf { flick == null }?.let {
+        symbolActions(it.swipeText, it.swipeDownText, it.swipeUpKeyLabel, it.swipeDownKeyLabel, it.onSwipe, it.onSwipeDown, it.symbolInputText)
     }
     val currentActions by rememberUpdatedState(gestureActions)
+    val currentRightActions by rememberUpdatedState(rightActions)
+    val currentEdgePadding by rememberUpdatedState(edgeContentPadding)
+    // 双字母键按在哪一半，就是哪个字母的角标（方向盘也跟着这一半）。
+    var rightHalfPressed by remember { mutableStateOf(false) }
+    val pressedActions = rightActions?.takeIf { rightHalfPressed } ?: gestureActions
 
     // Keys whose flick directions are fixed letters (nine-key flick mode, fourteen-key pairs)
     // show the kana direction disc while held. Labels come from the live gesture mapping.
@@ -435,7 +449,7 @@ fun SwipeableKeyButton(
     // 不再一个出方向盘、一个键面渐变（用户 10-21）。
     val fourteenSingle = LocalFourteenKeyLayout.current && inputPreferences.fourteenLetterSwipe &&
         text.length == 1 && text[0].lowercaseChar() in 'a'..'z'
-    val discLabels = if (flick == null && letters == null && !fourteenSingle) null else gestureActions.let { actions ->
+    val discLabels = if (flick == null && letters == null && !fourteenSingle) null else pressedActions.let { actions ->
         buildMap {
             put(KanaFlickDirection.TAP, text)
             actions.leftText?.let { put(KanaFlickDirection.LEFT, it) }
@@ -507,7 +521,16 @@ fun SwipeableKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .fillMaxWidth()
-            .pointerInput(Unit) { detectExclusiveKeyGestures { currentActions } }
+            .pointerInput(Unit) {
+                detectExclusiveKeyGestures { at ->
+                    // 只算键帽本身（不含行边留白）的中线。
+                    val start = currentEdgePadding.calculateLeftPadding(LayoutDirection.Ltr).toPx()
+                    val end = size.width - currentEdgePadding.calculateRightPadding(LayoutDirection.Ltr).toPx()
+                    val right = currentRightActions?.takeIf { at.x >= (start + end) / 2f }
+                    rightHalfPressed = right != null
+                    right ?: currentActions
+                }
+            }
             .padding(edgeContentPadding)
             .onGloballyPositioned { coordinates ->
                 buttonBounds = coordinates.boundsInRoot()
@@ -642,9 +665,10 @@ fun SwipeableKeyButton(
 
                 // 上滑提示与角标文字相同（如九键/笔画上滑输入键面数字）时不再重复渲染提示，
                 // 角标已表达该信息；swipeText 状态保持非空，上滑触发与气泡不受影响。
-                if (hintsVisible && flickPreview?.fromTop != true && !(swipeUpKeyLabel ?: swipeText).isNullOrEmpty() && (swipeUpKeyLabel ?: swipeText) != badgeText) {
-                    val keyLabel = (swipeUpKeyLabel ?: swipeText)!!
-                    val displayText = if (keyLabel.length <= 4) keyLabel else keyLabel.take(4)
+                // 14 键双字母键：左右两半各画自己字母的上下角标，位置和 26 键上这个字母的键一样。
+                val cornerHints: @Composable BoxScope.(String?, String?) -> Unit = { upHint, downHint ->
+                if (hintsVisible && flickPreview?.fromTop != true && !upHint.isNullOrEmpty() && upHint != badgeText) {
+                    val displayText = if (upHint.length <= 4) upHint else upHint.take(4)
                     Text(
                         text = punctuationKeyLabel(displayText),
                         color = keyHintColor(resolvedText, frostedGlass, 0.6f),
@@ -658,8 +682,8 @@ fun SwipeableKeyButton(
                     )
                 }
 
-                if (hintsVisible && flickPreview?.fromTop != false && !swipeDownKeyLabel.isNullOrEmpty()) {
-                    val displayText = if (swipeDownKeyLabel.length <= 4) swipeDownKeyLabel else swipeDownKeyLabel.take(4)
+                if (hintsVisible && flickPreview?.fromTop != false && !downHint.isNullOrEmpty()) {
+                    val displayText = if (downHint.length <= 4) downHint else downHint.take(4)
                     Text(
                         text = punctuationKeyLabel(displayText),
                         color = keyHintColor(resolvedText, frostedGlass, 0.5f),
@@ -671,6 +695,14 @@ fun SwipeableKeyButton(
                         modifier = Modifier.align(Alignment.BottomStart).padding(start = 5.dp, bottom = 2.dp),
                         fontFamily = keyLabelFontFamily
                     )
+                }
+                }
+                if (rightHalf == null) this.cornerHints(swipeUpKeyLabel ?: swipeText, swipeDownKeyLabel)
+                else Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxHeight()) { this.cornerHints(swipeUpKeyLabel ?: swipeText, swipeDownKeyLabel) }
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        this.cornerHints(rightHalf.swipeUpKeyLabel ?: rightHalf.swipeText, rightHalf.swipeDownKeyLabel)
+                    }
                 }
 
                 if (badgeText != null && !(flickPreview?.fromTop == true && flickPreview?.text == badgeText)) {

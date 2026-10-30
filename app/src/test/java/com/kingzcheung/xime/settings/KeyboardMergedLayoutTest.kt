@@ -322,8 +322,9 @@ class KeyboardMergedLayoutTest {
     // ── 手势配置完整性 ──
 
     @Test
-    fun `三个布局每个字母键都有 swipe_up`() {
-        for (section in listOf("qwerty_14", "qwerty_17", "qwerty_18")) {
+    fun `17和18键每个字母键都有 swipe_up`() {
+        // 14 键不在这里配符号：每个字母沿用 26 键同一字母的上下角标（FourteenKeySymbolsTest）。
+        for (section in listOf("qwerty_17", "qwerty_18")) {
             val yaml = ximeYamlText()
             val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(yaml, section)
                 ?: error("xime.yaml 缺少 $section rows")

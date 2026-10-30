@@ -263,21 +263,21 @@ keyboard:
         - [[a, s], [d, f], [g, h], [j, k], [l]]
         - [[z, x], [c, v], [b, n], [m]]
     keys:
-      # swipe_up 数字按行序排布：上排 1-5、中排 6-0
-      qw: { tap: { label: "qw", value: "q" }, swipe_up: "1", long_press: { display: "bubble", values: ["q", "w", "Q", "W"] } }
-      er: { tap: { label: "er", value: "e" }, swipe_up: "2", long_press: { display: "bubble", values: ["e", "r", "E", "R"] } }
-      ty: { tap: { label: "ty", value: "t" }, swipe_up: "3", long_press: { display: "bubble", values: ["t", "y", "T", "Y"] } }
-      ui: { tap: { label: "ui", value: "u" }, swipe_up: "4", long_press: { display: "bubble", values: ["u", "i", "U", "I"] } }
-      op: { tap: { label: "op", value: "o" }, swipe_up: "5", long_press: { display: "bubble", values: ["o", "p", "O", "P"] } }
-      as: { tap: { label: "as", value: "a" }, swipe_up: "6", long_press: { display: "bubble", values: ["a", "s", "A", "S"] } }
-      df: { tap: { label: "df", value: "d" }, swipe_up: "7", long_press: { display: "bubble", values: ["d", "f", "D", "F"] } }
-      gh: { tap: { label: "gh", value: "g" }, swipe_up: "8", long_press: { display: "bubble", values: ["g", "h", "G", "H"] } }
-      jk: { tap: { label: "jk", value: "j" }, swipe_up: "9", long_press: { display: "bubble", values: ["j", "k", "J", "K"] } }
-      l:  { tap: { label: "l", value: "l" }, swipe_up: "0", long_press: { display: "bubble", values: ["l", "L"] } }
-      zx: { tap: { label: "zx", value: "z" }, swipe_up: "*", long_press: { display: "bubble", values: ["z", "x", "Z", "X"] } }
-      cv: { tap: { label: "cv", value: "c" }, swipe_up: "、", long_press: { display: "bubble", values: ["c", "v", "C", "V"] } }
-      bn: { tap: { label: "bn", value: "b" }, swipe_up: "!", long_press: { display: "bubble", values: ["b", "n", "B", "N"] } }
-      m:  { tap: { label: "m", value: "m" }, swipe_up: "#", long_press: { display: "bubble", values: ["m", "M"] } }
+      # 上下角标和 26 键同一字母一样（KeysConfigHelper.getKeyGesture 按字母查 26 键的符号，符号编辑同样生效），这里不再单独配置。
+      qw: { tap: { label: "qw", value: "q" }, long_press: { display: "bubble", values: ["q", "w", "Q", "W"] } }
+      er: { tap: { label: "er", value: "e" }, long_press: { display: "bubble", values: ["e", "r", "E", "R"] } }
+      ty: { tap: { label: "ty", value: "t" }, long_press: { display: "bubble", values: ["t", "y", "T", "Y"] } }
+      ui: { tap: { label: "ui", value: "u" }, long_press: { display: "bubble", values: ["u", "i", "U", "I"] } }
+      op: { tap: { label: "op", value: "o" }, long_press: { display: "bubble", values: ["o", "p", "O", "P"] } }
+      as: { tap: { label: "as", value: "a" }, long_press: { display: "bubble", values: ["a", "s", "A", "S"] } }
+      df: { tap: { label: "df", value: "d" }, long_press: { display: "bubble", values: ["d", "f", "D", "F"] } }
+      gh: { tap: { label: "gh", value: "g" }, long_press: { display: "bubble", values: ["g", "h", "G", "H"] } }
+      jk: { tap: { label: "jk", value: "j" }, long_press: { display: "bubble", values: ["j", "k", "J", "K"] } }
+      l:  { tap: { label: "l", value: "l" }, long_press: { display: "bubble", values: ["l", "L"] } }
+      zx: { tap: { label: "zx", value: "z" }, long_press: { display: "bubble", values: ["z", "x", "Z", "X"] } }
+      cv: { tap: { label: "cv", value: "c" }, long_press: { display: "bubble", values: ["c", "v", "C", "V"] } }
+      bn: { tap: { label: "bn", value: "b" }, long_press: { display: "bubble", values: ["b", "n", "B", "N"] } }
+      m:  { tap: { label: "m", value: "m" }, long_press: { display: "bubble", values: ["m", "M"] } }
       "'": { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [ ",","."] }}
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 

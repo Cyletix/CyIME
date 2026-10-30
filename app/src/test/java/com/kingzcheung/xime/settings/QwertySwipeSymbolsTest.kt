@@ -43,6 +43,26 @@ class QwertySwipeSymbolsTest {
         assertEquals(original, KeysConfigHelper.getKeyGesture("a", false))
     }
 
+    @Test fun fourteenKeyLettersKeepTheirOwn26KeySymbols() {
+        // 14 键：双字母键左半边是第一个字母的角标，右半边按第二个字母单独查；落单的 l、m 和拆开的单字母同理。
+        for (schema in listOf("pinyin_14jian", "double_pinyin_flypy_14jian")) {
+            KeysConfigHelper.setActiveKeyboardSchema(schema)
+            assertEquals(InputLayout.MERGED14, InputProfiles.current(schema).layout)
+            for (key in listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")) {
+                for (letter in key.map(Char::toString)) {
+                    val gesture = KeysConfigHelper.getKeyGesture(if (letter == key.take(1)) key else letter, false)!!
+                    assertEquals("$schema $key $letter 上", QwertySwipeSymbols.up.getValue(letter), gesture.swipeUp!!.value)
+                    assertEquals("$schema $key $letter 下", QwertySwipeSymbols.down.getValue(letter), gesture.swipeDown!!.value)
+                }
+                // 点按与长按仍是 14 键自己的配置。
+                assertEquals(key, KeysConfigHelper.getKeyGesture(key, false)!!.tap!!.label)
+                assertNotNull(KeysConfigHelper.getKeyGesture(key, false)!!.longPress)
+            }
+            // 空格旁的逗号键不是字母，保持 14 键配置。
+            assertEquals("。", KeysConfigHelper.getKeyGesture("'", false)!!.swipeUp!!.label)
+        }
+    }
+
     @Test fun presetMatchesEveryRequestedKeyExactly() {
         val keys = "qwertyuiopasdfghjklzxcvbnm"
         assertEquals(26, QwertySwipeSymbols.up.size)
