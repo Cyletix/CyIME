@@ -97,6 +97,7 @@ object ThemeIconColors {
         "mint_green" -> "mint"
         "cream_beige" -> "cream"
         "olivcelso_desert" -> "desert"
+        CustomImageTheme.ID -> forTheme(CustomImageTheme.baseThemeId)
         else -> "lavender"
     }
 }

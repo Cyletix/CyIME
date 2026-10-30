@@ -144,7 +144,9 @@ object KeyboardThemes {
             .filterKeys { it !in existingIds }
             .map { (id, entry) -> buildSchemeFromConfig(context, id, entry) }
             .filterNotNull()
-        themesCache = overridden + newThemes
+        val loaded = overridden + newThemes
+        // 3) 用户选了自己的图片时，按沿用的主题配色生成「我的图片」
+        themesCache = loaded + listOfNotNull(CustomImageTheme.build(context, loaded))
         themesMapCache = themesCache.associateBy { it.id }
     }
 

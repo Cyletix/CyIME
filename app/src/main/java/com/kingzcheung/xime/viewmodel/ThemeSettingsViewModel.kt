@@ -19,7 +19,9 @@ internal val OFFERED_THEMES = setOf(
     com.kingzcheung.xime.ui.theme.PureBlackTheme.ID,
     "lavender_purple",
     com.kingzcheung.xime.ui.theme.SoftBlueTheme.ID,
-) + com.kingzcheung.xime.ui.theme.TonalThemes.create().map { it.id }
+) + com.kingzcheung.xime.ui.theme.TonalThemes.create().map { it.id } +
+    // 「我的图片」只在用户选过图片后才在主题列表里（[com.kingzcheung.xime.ui.theme.CustomImageTheme]）。
+    com.kingzcheung.xime.ui.theme.CustomImageTheme.ID
 
 data class ThemeUiState(
     val darkMode: Int = 1,
@@ -41,6 +43,11 @@ class ThemeSettingsViewModel(application: Application) : AndroidViewModel(applic
         _uiState.update { it.copy(darkMode = mode) }
     }
     
+    /** 主题列表变了（选了自己的图片）后重新取。 */
+    fun refreshThemes() {
+        _uiState.update { it.copy(colorThemes = KeyboardThemes.themes.filter { theme -> theme.id in OFFERED_THEMES }) }
+    }
+
     fun setColorTheme(themeId: String) {
         SettingsPreferences.setKeyboardTheme(context, themeId)
         _uiState.update { it.copy(colorTheme = themeId) }
