@@ -149,6 +149,7 @@ internal fun KeyboardResizeOverlay(
         hostView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
     })
     val roundedBottom = rememberRoundedKeyboardBottom()
+    val cornerGlass = LocalKeyboardInputPreferences.current.frostedGlass.enabled
     val opacityEditingState = LocalKeyboardResizeOpacityEditing.current ?: remember { mutableStateOf(false) }
     var editingOpacity by opacityEditingState
     val opacityInteraction = remember { MutableInteractionSource() }
@@ -389,6 +390,13 @@ internal fun KeyboardResizeOverlay(
                         corner(cardRight, cardTop, -1f, 1f, cornerRadius, emphasis(ResizeHandle.TOP_RIGHT))
                         corner(cardLeft, cardBottom, 1f, -1f, bottomRadius, emphasis(ResizeHandle.BOTTOM_LEFT))
                         corner(cardRight, cardBottom, -1f, -1f, bottomRadius, emphasis(ResizeHandle.BOTTOM_RIGHT))
+                    }
+                    // 悬浮键盘外四角的弧形角标：和平时点亮的悬浮键盘同一个样子，调节界面里一直亮着，
+                    // 拖边、拖角、移动时跟着卡片走。固定键盘贴着屏幕边，外面没有地方画，只留框内角标。
+                    if (floatingMode) {
+                        val gap = PositionHighlightGap.toPx()
+                        drawPositionCorners(Offset(cardLeft - gap, cardTop - gap),
+                            Size(cardSize.width + gap * 2f, cardSize.height + gap * 2f), accentColor, 1f, cornerGlass)
                     }
                 }
                 .pointerInput(editingOpacity, floatingMode, isLandscape, hostMaxWidth, hostMaxHeight, splitActive) {
