@@ -10,6 +10,8 @@ data class KeyboardCallbacks(
     val onLetterNeighbors: ((String, String) -> Unit)? = null,
     /** 英文滑行：首选整词上屏，其余作为可替换的英文候选。 */
     val onGlideWord: ((String, List<String>) -> Unit)? = null,
+    /** 中文滑行：识别出的一个词的编码（全拼或双拼），按点按同一路径接进当前编码。 */
+    val onGlideCode: ((String) -> Unit)? = null,
     val inputAdmissionTicket: () -> Long? = { 0L },
     val captureInputContext: () -> kotlin.coroutines.CoroutineContext = { kotlin.coroutines.EmptyCoroutineContext },
     /** 九键组句的上文：组合为空时光标前的已上屏文字；null 表示未知或正在组合。 */

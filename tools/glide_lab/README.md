@@ -1,5 +1,7 @@
 # 滑行输入实验
 
+2026-10-30：中文滑行已接入应用。中文词表 `app/src/main/assets/glide_pinyin.txt` 由 `python -B tools/glide_lab/build_pinyin_lexicon.py` 从 `app/data` 的雾凇词频生成（同音合并、取前 30000 个编码并补齐单音节），双拼在应用里按方案逐音节换码；回归见 `app/src/test/.../glide/GlideChineseLexiconTest.kt`。以下为 10-03 原型说明。
+
 2026-10-03：**仅电脑离线原型，未接入 Android，未验收。** 本目录不在应用 source set 内，不修改键盘、候选、Rime、配置或词库，不运行 Gradle，不打包、不安装、不联系设备，不自动联网或下载依赖。
 
 ## 本轮具备什么

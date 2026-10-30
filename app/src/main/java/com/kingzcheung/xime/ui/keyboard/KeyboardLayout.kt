@@ -294,7 +294,6 @@ fun KeyboardLayout(
             )
         )
     }
-    val effectiveSwipeDownHintsEnabled = swipeDownHintsEnabled
 
     // 监听设置变化
     DisposableEffect(context) {
@@ -319,10 +318,16 @@ fun KeyboardLayout(
 
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
-    // 英文滑行：只在英文 26 键（含分体）启用；整键盘滑动移动光标与其冲突时让位。
+    // 滑行：英文 26 键出整词；中文全拼、双拼 26 键（含分体、自定义字母排列）出一个词的编码交给 Rime。
+    // 整键盘滑动移动光标与其冲突时让位。
     val glidePrefs = LocalKeyboardInputPreferences.current
-    val glideEnabled = isAsciiMode && glidePrefs.glideTyping && callbacks.onGlideWord != null &&
-        glidePrefs.cursorGesture != CursorGestureMode.KEYBOARD && !(isVoiceMode && !isVoiceSticky)
+    val glideProfile = uiState.inputProfile
+    val chineseGlide = !isAsciiMode && com.kingzcheung.xime.glide.chineseGlideSupported(glideProfile, uiState.currentSchemaId)
+    val glideEnabled = (isAsciiMode && callbacks.onGlideWord != null || chineseGlide && callbacks.onGlideCode != null) &&
+        glidePrefs.glideTyping && glidePrefs.cursorGesture != CursorGestureMode.KEYBOARD && !(isVoiceMode && !isVoiceSticky)
+    // 开着滑行时这块键盘不画上下角标（用户 10-30）：与两个角标提示开关都关掉一样，只是不显示，滑动出符号照常。
+    val keySwipeUpHints = swipeUpHintsEnabled && !glideEnabled
+    val keySwipeDownHints = swipeDownHintsEnabled && !glideEnabled
     val glideTrail = remember { GlideTrail() }
     val glideScope = rememberCoroutineScope()
     val glideContext = LocalContext.current.applicationContext
@@ -332,21 +337,34 @@ fun KeyboardLayout(
         // 输入框归属在抬手时确定；识别完成前切换输入框则作废。
         val inputContext = runCatching { callbacks.captureInputContext() }.getOrNull() ?: return@trace
         val shift = viewModel.shiftMode.value
+        // 中文：双拼按当前方案换码，全拼为空。
+        val doublePinyin = if (chineseGlide && glideProfile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN)
+            com.kingzcheung.xime.settings.DoublePinyinSchemes.find(uiState.currentSchemaId) else null
+        val chinese = chineseGlide
         glideScope.launch {
-            val words = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                com.kingzcheung.xime.glide.GlideLexicon.decoder(glideContext,
-                    com.kingzcheung.xime.glide.GlideLexicon.keyboard(keys)).decode(xs, ys)
-            }.map { com.kingzcheung.xime.glide.glideCased(it.word, shift.isShifted,
-                shift == com.kingzcheung.xime.viewmodel.ShiftMode.CAPS) }
-            if (words.isEmpty()) return@launch
+            val candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val keyboard = com.kingzcheung.xime.glide.GlideLexicon.keyboard(keys)
+                if (chinese) com.kingzcheung.xime.glide.GlideLexicon.chineseDecoder(glideContext, keyboard, doublePinyin).decode(xs, ys)
+                else com.kingzcheung.xime.glide.GlideLexicon.decoder(glideContext, keyboard).decode(xs, ys)
+            }
+            if (candidates.isEmpty()) return@launch
             viewModel.onCharacterTyped()
+            if (chinese) {
+                kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideCode?.invoke(candidates.first().word) }
+                return@launch
+            }
+            val words = candidates.map { com.kingzcheung.xime.glide.glideCased(it.word, shift.isShifted,
+                shift == com.kingzcheung.xime.viewmodel.ShiftMode.CAPS) }
             kotlinx.coroutines.withContext(inputContext) { callbacks.onGlideWord?.invoke(words.first(), words.drop(1)) }
         }
     }
     // 提前读入词表，第一次滑行不必等待。
-    LaunchedEffect(glideEnabled) {
+    LaunchedEffect(glideEnabled, chineseGlide) {
         if (glideEnabled) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { com.kingzcheung.xime.glide.GlideLexicon.words(glideContext) }
+            runCatching {
+                if (chineseGlide) com.kingzcheung.xime.glide.GlideLexicon.pinyin(glideContext)
+                else com.kingzcheung.xime.glide.GlideLexicon.words(glideContext)
+            }
         }
     }
 
@@ -494,8 +512,8 @@ fun KeyboardLayout(
                                 },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = effectiveSwipeDownHintsEnabled,
-                                swipeUpHintsEnabled = swipeUpHintsEnabled,
+                                swipeDownHintsEnabled = keySwipeDownHints,
+                                swipeUpHintsEnabled = keySwipeUpHints,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
@@ -548,8 +566,8 @@ fun KeyboardLayout(
                                 },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = effectiveSwipeDownHintsEnabled,
-                                swipeUpHintsEnabled = swipeUpHintsEnabled,
+                                swipeDownHintsEnabled = keySwipeDownHints,
+                                swipeUpHintsEnabled = keySwipeUpHints,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
@@ -593,8 +611,8 @@ fun KeyboardLayout(
                                 onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = effectiveSwipeDownHintsEnabled,
-                                swipeUpHintsEnabled = swipeUpHintsEnabled,
+                                swipeDownHintsEnabled = keySwipeDownHints,
+                                swipeUpHintsEnabled = keySwipeUpHints,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
@@ -645,11 +663,11 @@ fun KeyboardLayout(
                                 segmentKeys.forEach { key ->
                                     val rawSwipeUpLabel = KeysConfigHelper.getSwipeUpLabel(key, isAsciiMode)
                                     val swipeUpText =
-                                        if (swipeUpHintsEnabled) rawSwipeUpLabel else null
+                                        if (keySwipeUpHints) rawSwipeUpLabel else null
                                     val swipeUpAction = KeysConfigHelper.getSwipeUpAction(key, isAsciiMode)
                                     val swipeUpDisplay = KeysConfigHelper.getSwipeUpDisplay(key, isAsciiMode)
                                     val swipeUpKeyLabel =
-                                        if (swipeUpDisplay != DisplayMode.BUBBLE && swipeUpHintsEnabled) swipeUpText else ""
+                                        if (swipeUpDisplay != DisplayMode.BUBBLE && keySwipeUpHints) swipeUpText else ""
                                     val swipeUpCommitValue = KeysConfigHelper.getSwipeUpCommitValue(key, isAsciiMode)
                                     val swipeDownRaw =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeDown
@@ -658,7 +676,7 @@ fun KeyboardLayout(
                                     val swipeDownAction = swipeDownRaw?.action
                                     val swipeDownValue = swipeDownRaw?.value
                                     val swipeDownDisplay = swipeDownRaw?.display ?: DisplayMode.BOTH
-                                    val swipeDownBubbleText = if (swipeDownDisplay != DisplayMode.KEY && swipeDownHintsEnabled) swipeDownLabel else null
+                                    val swipeDownBubbleText = if (swipeDownDisplay != DisplayMode.KEY && keySwipeDownHints) swipeDownLabel else null
                                     val longPressConfig =
                                         KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.longPress
                                     val longPressDisplay = (longPressConfig?.display ?: "key").takeIf {
@@ -723,7 +741,7 @@ fun KeyboardLayout(
                                         symbolInputText = symbolInputValue(swipeUpCommitValue, swipeUpAction),
                                         swipeDownText = swipeDownBubbleText,
                                         swipeUpKeyLabel = swipeUpKeyLabel,
-                                        swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && swipeDownHintsEnabled) swipeDownLabel else null,
+                                        swipeDownKeyLabel = if ((swipeDownDisplay == DisplayMode.KEY || swipeDownDisplay == DisplayMode.BOTH) && keySwipeDownHints) swipeDownLabel else null,
                                         onSwipe = if (swipeUpCommitValue != null && swipeUpAction != GestureAction.NONE) { {
                     if (swipeUpAction == null || swipeUpAction == GestureAction.COMMIT) {
                         (onCommitText ?: onKeyPress)(swipeUpCommitValue)
@@ -776,8 +794,8 @@ fun KeyboardLayout(
                                 onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
                                 onKeyPressDown = onKeyPressDown,
                                 onKeyRelease = onKeyRelease,
-                                swipeDownHintsEnabled = effectiveSwipeDownHintsEnabled,
-                                swipeUpHintsEnabled = swipeUpHintsEnabled,
+                                swipeDownHintsEnabled = keySwipeDownHints,
+                                swipeUpHintsEnabled = keySwipeUpHints,
                                 onCommitText = onCommitText,
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,

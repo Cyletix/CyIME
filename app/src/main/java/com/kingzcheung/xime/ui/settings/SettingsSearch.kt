@@ -142,7 +142,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("键盘尺寸与位置", layouts, SettingsRoutes.KeyboardResize, "尺寸 大小 高度 宽度 调整尺寸 键盘调节 悬浮 浮动 分体 透明度 底部留白 单手 位置 旋转"),
         page("工具栏与菜单排列", layouts, SettingsRoutes.ToolbarArrange, "工具栏 菜单 排列 顺序 入口 图标 按钮 自定义工具栏"),
         SettingsSearchEntry("邻键纠错", qwertyPath, qwerty, "纠错 打错 误触 全拼 按错 相邻"),
-        SettingsSearchEntry("滑行输入", qwertyPath, qwerty, "滑行 划词 滑动输入 手势输入 英文 整词 swype"),
+        SettingsSearchEntry("滑行输入", qwertyPath, qwerty, "滑行 划词 滑动输入 手势输入 英文 中文 拼音 双拼 整词 swype"),
         SettingsSearchEntry("三行字母错位", qwertyPath, qwerty, "错位 排布 实体键盘 对齐 手机排布 字母行 偏移"),
         SettingsSearchEntry("空格两侧的标点", qwertyPath, qwerty, "逗号键 句号键 空格 标点 全角 半角 宽度"),
         SettingsSearchEntry("空格左侧逗号键", qwertyPath, qwerty, "逗号 空格 加宽 标点"),
@@ -153,7 +153,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("拂动时显示方向圆盘", ninePath, nine, "圆盘 方向 箭头 拂动 提示 假名 日语"),
         SettingsSearchEntry("假名方向提示", ninePath, nine, "日语 日文 假名 灰色小字 方向"),
         // 输入 › 按键与手势
-        SettingsSearchEntry("手势预设", gestures, gesturePage, "预设 滑动 长按 英文滑行 一键 整套 手势 自定义"),
+        SettingsSearchEntry("手势预设", gestures, gesturePage, "预设 滑动 长按 滑行 英文滑行 中文滑行 一键 整套 手势 自定义"),
         SettingsSearchEntry("按键角标的符号和数字", gestures, gesturePage, "角标 滑动输入 长按输入 符号 数字 上滑 下滑 输入方式"),
         SettingsSearchEntry("长按弹出字母气泡", gestures, gesturePage, "长按 字母 大写 小写 音调 气泡 弹出 拼音声调 九键 字母键长按弹出大小写 字母菜单"),
         SettingsSearchEntry("反转上下滑方向", gestures, gesturePage, "反转 方向 上滑 下滑 上拉 下拉 删除键 清空 撤销"),

@@ -593,7 +593,7 @@ internal fun HandwritingSettings() {
     InputExperienceSettings(setOf(InputExperiencePart.HANDWRITING), "手写")
 }
 
-/** 「按键与手势」最上面的整套预设：滑动 / 长按 / 英文滑行；单独改过下面某项就显示为自定义（与性能页档位同一写法）。 */
+/** 「按键与手势」最上面的整套预设：滑动 / 长按 / 滑行输入；单独改过下面某项就显示为自定义（与性能页档位同一写法）。 */
 @Composable
 private fun GesturePresetSettings() {
     val context = LocalContext.current
