@@ -113,7 +113,6 @@ fun SettingsScreen(
                     }
                     onWizardBack()
                 },
-                onNavigateToMarket = { navController.navigate(SettingsRoutes.Market) },
                 onNavigateToRimeFileBrowser = { navController.navigate(SettingsRoutes.RimeFileBrowser) },
             )
         }
