@@ -75,3 +75,16 @@ internal fun resizeControlsRect(
         .coerceAtMost(if (floating) (frame.height - top).coerceAtLeast(0f) else frame.height / 4f)
     return ResizeRect(frame.left + side, frame.top + top, frame.right - side, frame.bottom - bottom)
 }
+
+/** 调节控件按 1 倍摆放时对应的控件区宽高：手机竖屏键盘的大小，这时滑条和按钮就是原来的尺寸。 */
+internal const val RESIZE_CONTROLS_REFERENCE_WIDTH_DP = 320f
+internal const val RESIZE_CONTROLS_REFERENCE_HEIGHT_DP = 200f
+
+/**
+ * 调节界面的透明度滑条和重置/悬浮/分体/确认按钮跟着键盘大小缩放的倍率：键盘缩小时一起缩小，
+ * 不再整片盖住按键；平板上的大键盘一起放大，不再缩在中间一小块。宽、高按小的那边算，免得一边挤出框；
+ * 再小时由按钮只留图标兜底。
+ */
+internal fun resizeControlScale(controlsWidthDp: Float, controlsHeightDp: Float): Float =
+    minOf(controlsWidthDp / RESIZE_CONTROLS_REFERENCE_WIDTH_DP, controlsHeightDp / RESIZE_CONTROLS_REFERENCE_HEIGHT_DP)
+        .coerceIn(0.7f, 1.5f)

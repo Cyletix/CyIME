@@ -635,11 +635,15 @@ internal fun KeyboardResizeOverlay(
             defaultControls.copy(left = splitInnerLeft + handleHitPx, right = splitInnerRight - handleHitPx) else defaultControls
         val controlsWidthDp = with(density) { controls.width.toDp() }
         val controlsHeightDp = with(density) { controls.height.toDp() }
-        // 滑条和操作共用宽度；宽屏不拉长按钮，窄屏仍避开两侧拖动热区。
-        val contentWidthDp = (minOf(controlsWidthDp, 560.dp) - 24.dp).coerceAtLeast(1.dp)
-        val buttonHeight = minOf(48f, (controlsHeightDp.value / 3f).coerceAtLeast(28f)).dp
-        val opacityHeight = maxOf(buttonHeight, 44.dp, (24f * density.fontScale).dp)
-        val showButtonLabels = contentWidthDp.value >= 288f * density.fontScale
+        // 滑条、按钮、图标和文字按同一个倍率跟着键盘大小缩放（手机竖屏键盘上是原来的尺寸）。
+        val controlScale = resizeControlScale(controlsWidthDp.value, controlsHeightDp.value)
+        // 滑条和操作共用宽度；宽屏不无限拉长按钮，窄屏仍避开两侧拖动热区。
+        val contentWidthDp = (minOf(controlsWidthDp, 560.dp * controlScale) - 24.dp * controlScale).coerceAtLeast(1.dp)
+        val buttonHeight = minOf(48f * controlScale, (controlsHeightDp.value / 3f).coerceAtLeast(28f)).dp
+        val opacityHeight = maxOf(buttonHeight, 44.dp * controlScale, (24f * density.fontScale * controlScale).dp)
+        val showButtonLabels = contentWidthDp.value >= 288f * density.fontScale * controlScale
+        val controlIconSize = 20.dp * controlScale
+        val controlGap = 8.dp * controlScale
         fun confirmResize() {
             val finalRect = currentPreviewRect ?: previewState.rect
             if (floatingMode && finalRect != null) {
@@ -679,9 +683,9 @@ internal fun KeyboardResizeOverlay(
                         .fillMaxWidth()
                         .height(opacityHeight)
                         .testTag("keyboard-resize-opacity-panel")
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp * controlScale))
                         .background(surfaceColor.copy(alpha = 0.92f))
-                        .border(1.dp, outlineVariantColor, RoundedCornerShape(10.dp)),
+                        .border(1.dp, outlineVariantColor, RoundedCornerShape(10.dp * controlScale)),
                     contentAlignment = Alignment.Center,
                 ) {
                     val sliderColors = SliderDefaults.colors(
@@ -703,7 +707,7 @@ internal fun KeyboardResizeOverlay(
                             thumb = {
                                 Box(
                                     Modifier
-                                        .size(18.dp)
+                                        .size(18.dp * controlScale)
                                         .clip(CircleShape)
                                         .background(accentColor)
                                         .testTag("keyboard-opacity-thumb"),
@@ -715,21 +719,21 @@ internal fun KeyboardResizeOverlay(
                                 Box(
                                     Modifier
                                         .fillMaxWidth()
-                                        .height(16.dp)
+                                        .height(16.dp * controlScale)
                                         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                                         .drawBehind {
                                             val radius = size.height / 2f
                                             drawRoundRect(functionColor, cornerRadius = CornerRadius(radius))
                                             val thumbX = fraction * size.width
                                             if (thumbX > 0f) drawRoundRect(accentColor, size = Size(thumbX, size.height), cornerRadius = CornerRadius(radius))
-                                            drawCircle(Color.Transparent, radius = 12.dp.toPx(), center = Offset(thumbX, radius), blendMode = BlendMode.Clear)
+                                            drawCircle(Color.Transparent, radius = 12.dp.toPx() * controlScale, center = Offset(thumbX, radius), blendMode = BlendMode.Clear)
                                         },
                                 )
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(opacityHeight)
-                                .padding(horizontal = 6.dp)
+                                .padding(horizontal = 6.dp * controlScale)
                                 .semantics { contentDescription = "键盘透明度" }
                                 .testTag("keyboard-opacity-slider"),
                         )
@@ -739,13 +743,13 @@ internal fun KeyboardResizeOverlay(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .width(IntrinsicSize.Max)
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(6.dp * controlScale))
                             .background(surfaceColor.copy(alpha = 0.92f))
-                            .padding(horizontal = 2.dp)
+                            .padding(horizontal = 2.dp * controlScale)
                             .testTag("keyboard-opacity-overlay-label"),
                         color = onSurfaceColor,
-                        fontSize = 16.sp,
-                        lineHeight = 22.sp,
+                        fontSize = 16.sp * controlScale,
+                        lineHeight = 22.sp * controlScale,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         textAlign = TextAlign.Center,
@@ -787,13 +791,13 @@ internal fun KeyboardResizeOverlay(
                             disabledContainerColor = functionColor,
                             disabledContentColor = content.copy(alpha = 0.35f),
                         ),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp * controlScale, vertical = 0.dp),
                     ) {
                         icon()
                         if (text != null && showButtonLabels) {
-                            Spacer(Modifier.width(3.dp))
+                            Spacer(Modifier.width(3.dp * controlScale))
                             // 文字只占剩余宽度：放不下时被裁掉，而不是把整组图标和文字挤出中心。
-                            Text(text, modifier = Modifier.weight(1f, fill = false), fontSize = 14.sp,
+                            Text(text, modifier = Modifier.weight(1f, fill = false), fontSize = 14.sp * controlScale,
                                 maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
                         }
                     }
@@ -802,7 +806,7 @@ internal fun KeyboardResizeOverlay(
                 if (editingOpacity) Row(
                     modifier = Modifier.fillMaxWidth().alpha(if (adjustingOpacity) 0f else 1f)
                         .testTag("keyboard-opacity-actions"),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(controlGap),
                 ) {
                     EqualActionButton(modifier = Modifier.weight(1f), description = "返回",
                         icon = { Text("返回") }, onClick = { editingOpacity = false })
@@ -812,13 +816,13 @@ internal fun KeyboardResizeOverlay(
                     modifier = Modifier.fillMaxWidth().alpha(if (adjustingOpacity) 0f else 1f)
                         .testTag("keyboard-resize-actions"),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(controlGap),
                 ) {
                     EqualActionButton(
                         modifier = Modifier.weight(1f),
                         text = "重置",
                         description = "重置",
-                        icon = { Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(controlIconSize)) },
                     ) {
                         opacity = 1f
                         currentOnPreviewOpacity(opacity)
@@ -865,7 +869,7 @@ internal fun KeyboardResizeOverlay(
                             Icon(
                                 Icons.Default.OpenInNew,
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(controlIconSize),
                             )
                         },
                     ) { switchFloating(!floatingMode) }
@@ -880,7 +884,7 @@ internal fun KeyboardResizeOverlay(
                             Icon(
                                 Icons.Default.HorizontalSplit,
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(controlIconSize),
                             )
                         },
                     ) {
@@ -902,7 +906,7 @@ internal fun KeyboardResizeOverlay(
                         text = "确认",
                         description = "确认",
                         emphasized = true,
-                        icon = { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(controlIconSize)) },
                         onClick = ::confirmResize,
                     )
                 }

@@ -450,4 +450,17 @@ class KeyboardResizeGeometryTest {
         assertEquals(1200, keyboardWidthBounds(1200).last)
         assertTrue(floatingResizeHeightBounds(800, true).last >= 520)
         assertEquals(244, floatingResizeHeightBounds(800, true).first)
-    }}
+    }
+
+    /** 用户 2026-10-30：调节界面的滑条和按钮要跟着键盘大小走，小键盘不再整片盖住按键，平板大键盘不再缩成一小块。 */
+    @Test fun controlsKeepTheirSizeOnAPhoneAndFollowSmallerOrBiggerKeyboards() {
+        assertEquals(1f, resizeControlScale(RESIZE_CONTROLS_REFERENCE_WIDTH_DP, RESIZE_CONTROLS_REFERENCE_HEIGHT_DP), 0.001f)
+        // 小悬浮键盘：控件一起缩小；平板大键盘：一起放大，但有上限。
+        assertTrue(resizeControlScale(220f, 160f) < 0.9f)
+        assertEquals(0.7f, resizeControlScale(100f, 60f), 0.001f)
+        assertTrue(resizeControlScale(900f, 300f) > 1.3f)
+        assertEquals(1.5f, resizeControlScale(1200f, 500f), 0.001f)
+        // 宽高按小的那边算：宽屏但很矮时不放大。
+        assertTrue(resizeControlScale(1200f, 180f) < 1f)
+    }
+}
