@@ -45,14 +45,23 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
             } else if (first != null) {
                 val dir = selection.firstDir!!
                 fun path(name: String) = requireFile(dir, name)
-                val model = if (first.modelType == "paraformer") OnlineModelConfig(
-                    paraformer = OnlineParaformerModelConfig(path(first.encoderFile), path(first.decoderFile)),
+                fun model(encoder: String) = if (first.modelType == "paraformer") OnlineModelConfig(
+                    paraformer = OnlineParaformerModelConfig(encoder, path(first.decoderFile)),
                     tokens = path("tokens.txt"), numThreads = 1,
                 ) else OnlineModelConfig(
-                    transducer = OnlineTransducerModelConfig(path(first.encoderFile), path(first.decoderFile), path(first.joinerFile)),
+                    transducer = OnlineTransducerModelConfig(encoder, path(first.decoderFile), path(first.joinerFile)),
                     tokens = path("tokens.txt"), numThreads = 1,
                 )
-                online = OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model, enableEndpoint = false))
+                val original = path(first.encoderFile)
+                // Zipformer: the pre-optimized copy (see OptimizedEncoder) loads in about 60 % of the time.
+                val optimized = if (first.modelType == "transducer") OptimizedEncoder.path(context, dir, first.encoderFile) else null
+                online = try {
+                    OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model(optimized?.absolutePath ?: original), enableEndpoint = false))
+                } catch (error: Exception) {
+                    if (optimized == null) throw error
+                    OptimizedEncoder.reject(context, dir.name)
+                    OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model(original), enableEndpoint = false))
+                }
             }
             // With X-ASR finalizing whole sentences, SenseVoice loads only if something still asks for it.
             // Beside a streaming model it loads in the background (prepareRefinement), so the first words
