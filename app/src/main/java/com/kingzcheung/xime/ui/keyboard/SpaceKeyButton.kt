@@ -55,6 +55,8 @@ fun SpaceKeyButton(
     val onMoveVertical by rememberUpdatedState(actions.onCursorMoveVertical)
     val onCursorMode by rememberUpdatedState(actions.onCursorModeChange)
     val onVoiceToggle by rememberUpdatedState(actions.onVoiceToggle)
+    val onVoiceHoldEnd by rememberUpdatedState(actions.onVoiceHoldEnd)
+    val voiceOn by rememberUpdatedState(isVoiceMode)
     val holdAction = settings.effectiveSpaceHold
     val cursorUnitPx = rememberCursorUnitPx()
     DisposableEffect(Unit) { onDispose { onCursorMode?.invoke(false) } }
@@ -87,6 +89,8 @@ fun SpaceKeyButton(
                     if (!guarded) currentPress?.invoke()
                     var held = false
                     var movedBeforeHold = false
+                    // 按住说话（用户 10-30：长按开了语音松手不停，和点麦克风是两回事）：这次长按开的语音，松手就结束并上屏。
+                    var startedVoice = false
                     var lastX = down.position.x
                     var lastY = down.position.y
                     val cursorSteps = CursorStepAccumulator(step)
@@ -105,7 +109,11 @@ fun SpaceKeyButton(
                                 onCursorMode?.invoke(true)
                             }
                             SpaceHoldAction.REPEAT -> while (true) { currentClick(); delay(70L) }
-                            SpaceHoldAction.VOICE_TOGGLE -> onVoiceToggle?.invoke()
+                            SpaceHoldAction.VOICE_TOGGLE -> {
+                                // 工具栏麦克风已经在听时，长按只把它结束，松手不再动。
+                                startedVoice = !voiceOn
+                                onVoiceToggle?.invoke()
+                            }
                         }
                     }
                     try {
@@ -150,6 +158,7 @@ fun SpaceKeyButton(
                             SpaceCursorShift.end()
                         }
                         timer.cancel()
+                        if (startedVoice) onVoiceHoldEnd?.invoke()
                         pressed = false
                         cursorActive = false
                         onCursorMode?.invoke(false)

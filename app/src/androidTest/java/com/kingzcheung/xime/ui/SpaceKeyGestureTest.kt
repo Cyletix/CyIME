@@ -28,6 +28,7 @@ class SpaceKeyGestureTest {
     @get:Rule val rule = createComposeRule()
     private var spaces = 0
     private var voices = 0
+    private var voiceEnds = 0
     private var density = 1f
     private val moves = mutableListOf<Int>()
     private val rows = mutableListOf<Int>()
@@ -42,7 +43,7 @@ class SpaceKeyGestureTest {
                 LocalKeyboardInputPreferences provides KeyboardInputPreferences(spaceHold = mode, cursorGesture = cursor,
                     cursorStepDp = 10f, cursorHoldSeconds = cursorHoldSeconds.value),
                 LocalKeyboardInputActions provides KeyboardInputActions(onCursorMove = { moves += it }, onCursorMoveVertical = { rows += it }, onCursorModeChange = { cursorActive = it },
-                    onVoiceToggle = { voices++ }, isVoiceMode = voiceSticky, voiceSticky = voiceSticky),
+                    onVoiceToggle = { voices++ }, onVoiceHoldEnd = { voiceEnds++ }, isVoiceMode = voiceSticky, voiceSticky = voiceSticky),
             ) {
                 Box(Modifier.size(240.dp, 64.dp)) {
                     SpaceKeyButton(onClick = { spaces++ }, backgroundColor = Color.White, textColor = Color.Black,
@@ -198,15 +199,43 @@ class SpaceKeyGestureTest {
         rule.runOnIdle { assertEquals(stopped, spaces) }
     }
 
-    @Test fun voiceHoldTogglesOnceWithoutSpaceOrCursor() {
+    @Test fun voiceHoldTalksWhileHeldAndEndsOnRelease() {
         setKey(SpaceHoldAction.VOICE_TOGGLE, cursor = CursorGestureMode.KEYBOARD)
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag("space").performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(128L)
         rule.runOnIdle { assertEquals(0, voices) }
         rule.mainClock.advanceTimeBy(500L)
+        // 按住期间一直在听，不提前结束。
+        rule.runOnIdle { assertEquals(1, voices); assertEquals(0, voiceEnds) }
+        rule.mainClock.advanceTimeBy(3000L)
+        rule.runOnIdle { assertEquals(0, voiceEnds) }
         rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(12f * density, 0f)); up() }
-        rule.runOnIdle { assertEquals(1, voices); assertEquals(0, spaces); assertTrue(moves.isEmpty()) }
+        rule.runOnIdle { assertEquals(1, voices); assertEquals(1, voiceEnds); assertEquals(0, spaces); assertTrue(moves.isEmpty()) }
+    }
+
+    @Test fun voiceHoldReleasedOffTheKeyStillEnds() {
+        setKey(SpaceHoldAction.VOICE_TOGGLE, cursor = CursorGestureMode.KEYBOARD)
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("space").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(400L)
+        rule.onNodeWithTag("space").performTouchInput { moveTo(Offset(center.x, -100f)); up() }
+        rule.runOnIdle { assertEquals(1, voices); assertEquals(1, voiceEnds); assertEquals(0, spaces) }
+    }
+
+    @Test fun shortTapWithVoiceHoldIsJustASpace() {
+        setKey(SpaceHoldAction.VOICE_TOGGLE, cursor = CursorGestureMode.KEYBOARD)
+        rule.onNodeWithTag("space").performTouchInput { down(center); up() }
+        rule.runOnIdle { assertEquals(1, spaces); assertEquals(0, voices); assertEquals(0, voiceEnds) }
+    }
+
+    @Test fun voiceHoldWhileToolbarVoiceIsOnOnlyStopsIt() {
+        setKey(SpaceHoldAction.VOICE_TOGGLE, voiceSticky = true, cursor = CursorGestureMode.KEYBOARD)
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("space").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(400L)
+        rule.onNodeWithTag("space").performTouchInput { up() }
+        rule.runOnIdle { assertEquals(1, voices); assertEquals(0, voiceEnds); assertEquals(0, spaces) }
     }
 
     @Test fun spaceCursorOverridesSavedVoiceActionWithoutStartingMicrophone() {
@@ -215,6 +244,6 @@ class SpaceKeyGestureTest {
         rule.onNodeWithTag("space").performTouchInput { down(center) }
         rule.mainClock.advanceTimeBy(400L)
         rule.onNodeWithTag("space").performTouchInput { moveTo(center + Offset(12f * density, 0f)); up() }
-        rule.runOnIdle { assertEquals(0, voices); assertEquals(0, spaces); assertEquals(listOf(1), moves) }
+        rule.runOnIdle { assertEquals(0, voices); assertEquals(0, voiceEnds); assertEquals(0, spaces); assertEquals(listOf(1), moves) }
     }
 }
