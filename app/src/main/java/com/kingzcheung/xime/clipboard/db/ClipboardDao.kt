@@ -7,6 +7,12 @@ import androidx.room3.Query
 import androidx.room3.Transaction
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Characters ignored at both ends when two clips are compared: copying "地址" and "地址\n" (or with a
+ * full-width / no-break space) is the same record (user 10-30: 剪贴板去重).
+ */
+internal const val CLIP_TRIM = "' ' || char(9) || char(10) || char(13) || char(12288) || char(160)"
+
 @Dao
 interface ClipboardDao {
 
@@ -54,6 +60,38 @@ interface ClipboardDao {
 
     @Query("SELECT * FROM clipboard_entries WHERE text = :text AND isQuickSend = 0 ORDER BY isPinned ASC, timestamp DESC, id DESC LIMIT 1")
     suspend fun findByText(text: String): ClipboardEntry?
+
+    /** The record holding this text, ends' whitespace ignored: a history copy first, else a fixed one. */
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND trim(text, " + CLIP_TRIM + ") = trim(:text, " + CLIP_TRIM + ") " +
+        "ORDER BY isPinned ASC, timestamp DESC, id DESC LIMIT 1")
+    suspend fun findSameText(text: String): ClipboardEntry?
+
+    @Query("SELECT * FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 1 AND code = :code AND " +
+        "trim(text, " + CLIP_TRIM + ") = trim(:text, " + CLIP_TRIM + ") ORDER BY timestamp DESC LIMIT 1")
+    suspend fun findPinnedSameText(text: String, code: String): ClipboardEntry?
+
+    /** Other history copies of this text; fixed records are never removed here. */
+    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND id != :keepId AND " +
+        "trim(text, " + CLIP_TRIM + ") = trim(:text, " + CLIP_TRIM + ")")
+    suspend fun deleteHistoryCopies(text: String, keepId: Long)
+
+    /**
+     * One record per text: drops history copies of a fixed text and, among history copies, all but
+     * the newest. Fixed records (and their codes) are kept as they are.
+     */
+    @Query("DELETE FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 AND (" +
+        "trim(text, " + CLIP_TRIM + ") IN (SELECT trim(text, " + CLIP_TRIM + ") FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 1) " +
+        "OR id NOT IN (SELECT id FROM (SELECT id, MAX(timestamp) FROM clipboard_entries WHERE isQuickSend = 0 AND isPinned = 0 " +
+        "GROUP BY trim(text, " + CLIP_TRIM + "))))")
+    suspend fun deleteDuplicateHistory(): Int
+
+    /** A copy differing only in surrounding whitespace replaces the history record's text. */
+    @Query("UPDATE clipboard_entries SET text = :text, searchKey = :searchKey, timestamp = :timestamp, consumed = 0 " +
+        "WHERE id = :id AND isQuickSend = 0")
+    suspend fun replaceCopiedText(id: Long, text: String, searchKey: String, timestamp: Long)
+
+    @Query("UPDATE clipboard_entries SET isPinned = 1, code = :code WHERE id = :id AND isQuickSend = 0")
+    suspend fun pinWithCode(id: Long, code: String)
 
     /** Atomic and idempotent; no deduplication may discard different codes on equal text. */
     @Query("UPDATE clipboard_entries SET isPinned = 1, isQuickSend = 0 WHERE isQuickSend = 1")
@@ -117,16 +155,36 @@ interface ClipboardDao {
         }
     }
 
-    /** A copy already in history moves to the top; a new one is added. True when it was added. */
+    /**
+     * A copy already in history (ends' whitespace ignored) moves to the top, taking the new copy's exact
+     * text; a fixed record keeps its text. A new one is added. One record per text remains. True when added.
+     */
     @Transaction
     suspend fun upsert(text: String, now: Long, searchKey: String = ""): Boolean {
-        val existing = findByText(text)
-        if (existing != null) {
-            refreshCopiedItem(existing.id, now)
-            return false
+        val existing = findSameText(text)
+        val keep = when {
+            existing == null -> insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey))
+            !existing.isPinned && existing.text != text -> existing.id.also { replaceCopiedText(it, text, searchKey, now) }
+            else -> existing.id.also { refreshCopiedItem(it, now) }
         }
-        insert(ClipboardEntry(text = text, timestamp = now, searchKey = searchKey))
-        return true
+        deleteHistoryCopies(text, keep)
+        return existing == null
+    }
+
+    /**
+     * Fixing text: the same fixed text and code only moves up; text already in history is fixed in
+     * place (no second copy); otherwise a new fixed record. Different codes on equal text stay apart.
+     */
+    @Transaction
+    suspend fun addPinned(text: String, code: String, now: Long, searchKey: String = ""): Long {
+        val id = findPinnedSameText(text, code)?.id?.also { refreshCopiedItem(it, now) }
+            ?: findSameText(text)?.takeIf { !it.isPinned }?.id?.also {
+                replaceCopiedText(it, text, searchKey, now)
+                pinWithCode(it, code)
+            }
+            ?: insertPinnedText(text, code, now, searchKey)
+        deleteHistoryCopies(text, id)
+        return id
     }
 
     /** Bytes of text and search keys stored (fixed and history), re-read whenever records change. */

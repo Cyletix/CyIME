@@ -51,6 +51,7 @@ class ClipboardManager private constructor(private val context: Context) {
         private const val PREFS_NAME = "clipboard_prefs"
         private const val KEY_CLIPBOARD_ITEMS = "clipboard_items"
         private const val KEY_QUICK_SEND_ITEMS = "quick_send_items"
+        private const val KEY_HISTORY_DEDUPED = "history_deduped_v1"
         private const val INTERNAL_IMAGE_CLIP_LABEL = "cyime_image"
         /** 短信验证码只用一次：自动复制 10 分钟后从候选栏和系统剪贴板删掉。 */
         internal const val SMS_CODE_LIFETIME_MS = 10 * 60_000L
@@ -278,6 +279,12 @@ class ClipboardManager private constructor(private val context: Context) {
             } finally {
                 clipboardPinsReady.complete(Unit)
             }
+            // Duplicates saved before copies were merged (user 10-30): removed once; new copies merge as they come.
+            if (!prefs.getBoolean(KEY_HISTORY_DEDUPED, false)) {
+                runCatching { dao.deleteDuplicateHistory() }
+                    .onSuccess { prefs.edit().putBoolean(KEY_HISTORY_DEDUPED, true).apply() }
+                    .onFailure { Log.e(TAG, "Could not remove duplicate clipboard records", it) }
+            }
             scope.launch { dao.observeUnpinnedCount().collect { _unpinnedCount.value = it } }
             scope.launch {
                 dao.observeStoredBytes().collect { stored ->
@@ -424,7 +431,7 @@ class ClipboardManager private constructor(private val context: Context) {
             if (!ClipboardCapacity.fitsRow(text)) return@launch
             val key = searchKey(text)
             // A copy already in history only moves up and needs no room; a full history saves nothing new.
-            if (dao.findByText(text) == null && !hasRoomFor(text, key)) return@launch
+            if (dao.findSameText(text) == null && !hasRoomFor(text, key)) return@launch
             dao.upsert(text, System.currentTimeMillis(), key)
             _clipboardChanged.emit(
                 ClipboardItem(
@@ -513,6 +520,8 @@ class ClipboardManager private constructor(private val context: Context) {
             }
             dao.updateClipboardItem(id, newText, newCode?.trim(), System.currentTimeMillis())
             dao.setSearchKey(id, key)
+            // Edited into text another history record already holds: keep only the edited one.
+            dao.deleteHistoryCopies(newText, id)
         }
         return true
     }
@@ -526,8 +535,9 @@ class ClipboardManager private constructor(private val context: Context) {
         scope.launch {
             clipboardPinsReady.await()
             val key = searchKey(text)
-            if (!hasRoomFor(text, key)) return@launch
-            dao.insertPinnedText(text, code.trim(), System.currentTimeMillis(), key)
+            // Text already saved is fixed in place and needs no room.
+            if (dao.findSameText(text) == null && !hasRoomFor(text, key)) return@launch
+            dao.addPinned(text, code.trim(), System.currentTimeMillis(), key)
         }
     }
 
