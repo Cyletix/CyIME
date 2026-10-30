@@ -58,7 +58,7 @@ class ClipboardSyncBridge(
         }
         override fun writeIfUnchanged(expected: SyncClipboardSnapshot, text: String): Boolean {
             if (read() != expected) return false
-            clipboardManager.copyToSystemClipboard(text)
+            clipboardManager.copyReceivedToSystemClipboard(text)
             return read().text == text
         }
     }

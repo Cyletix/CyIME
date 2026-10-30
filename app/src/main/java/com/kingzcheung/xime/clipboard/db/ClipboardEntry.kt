@@ -21,4 +21,6 @@ data class ClipboardEntry(
     @ColumnInfo(defaultValue = "0") val consumed: Boolean = false,
     /** Pinyin initials and lowercase letters of the first characters, for search; "" = not computed yet. */
     @ColumnInfo(defaultValue = "") val searchKey: String = "",
+    /** Received from a paired computer, phone or tablet rather than copied on this device. */
+    @ColumnInfo(defaultValue = "0") val fromDevice: Boolean = false,
 )
