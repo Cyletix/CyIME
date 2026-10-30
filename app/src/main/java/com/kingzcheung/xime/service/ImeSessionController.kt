@@ -186,6 +186,10 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     private fun showInputBoxComposition(ic: android.view.inputmethod.InputConnection?, displayText: String) {
         // Android may detach the editor while a queued candidate snapshot is being delivered.
         if (ic == null) return
+        // Typing into the keyboard's own field (clipboard search, tool panel, quick send): the pinyin
+        // belongs there, never in the app behind it. 26-key search wrote it into the app's field and it
+        // stayed after search closed (10-30 device check); all three callers pass through here.
+        if (service.uiState.value.inputTarget.isInternal) return
         // 第二参数为 1：光标相对编码起始偏移 1 个字符，使光标落在编码末尾，
         // 避免传 displayText.length 时被 AOSP 钳制到整段文本末尾（光标跑到最右边）。
         // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
