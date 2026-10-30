@@ -345,6 +345,35 @@ keyboard:
       "'": { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [ ",","."] }}
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
+  # 注音（大千式，对应方案 cyime_zhuyin，默认不启用）：键帽是注音符号，同电脑大千键盘的列，
+  # 第一行 11 键，下面三行 10 键缩进半键，删除键在第四行末尾（KeyboardLayout 按 LayoutKind.ZHUYIN 排）。
+  # 键帽送注音符号，ImeKeyRouter 换成大千键码（ZhuyinKeys）。第一声是空格。
+  # 大千的逗号句号键是 ㄝ ㄡ，底排逗号键直接上屏全角标点，不经 Rime。
+  zhuyin:
+    schemas: [cyime_zhuyin]
+    button_layout: standard
+    layout:
+      rows:
+        - [ㄅ, ㄉ, ˇ, ˋ, ㄓ, ˊ, ˙, ㄚ, ㄞ, ㄢ, ㄦ]
+        - [ㄆ, ㄊ, ㄍ, ㄐ, ㄔ, ㄗ, ㄧ, ㄛ, ㄟ, ㄣ]
+        - [ㄇ, ㄋ, ㄎ, ㄑ, ㄕ, ㄘ, ㄨ, ㄜ, ㄠ, ㄤ]
+        - [ㄈ, ㄌ, ㄏ, ㄒ, ㄖ, ㄙ, ㄩ, ㄝ, ㄡ, ㄥ]
+    keys:
+      # 上滑是电脑大千键盘同一键位上的数字
+      ㄅ: { swipe_up: "1" }
+      ㄉ: { swipe_up: "2" }
+      ˇ: { swipe_up: "3" }
+      ˋ: { swipe_up: "4" }
+      ㄓ: { swipe_up: "5" }
+      ˊ: { swipe_up: "6" }
+      ˙: { swipe_up: "7" }
+      ㄚ: { swipe_up: "8" }
+      ㄞ: { swipe_up: "9" }
+      ㄢ: { swipe_up: "0" }
+      ㄦ: { swipe_up: "-" }
+      "'": { tap: { label: "，", value: "，" }, swipe_up: { label: "。", value: "。" } , long_press: { display: "bubble", values: [ "，", "。"] }}
+      earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
+
   # 日语：26 键用成熟 jaroomaji 罗马音转换，九宫格将假名读音交给同一引擎。
   japanese_kana:
     schemas: [japanese_kana]

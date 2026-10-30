@@ -643,6 +643,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             var needsUIUpdate = false
             var pendingResult: com.kingzcheung.xime.rime.RimeProcessResult? = null
             var committedText: String? = null
+
+            if (!state.isAsciiMode && state.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.ZHUYIN &&
+                routeZhuyinKey(key, hardwareEvent)) return@command
             
             when (key) {
                 "clear_composition" -> {
@@ -1377,6 +1380,37 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val paged = if (direction < 0) service.rimeEngine.hasPrevPage() && service.rimeEngine.pageUp()
             else service.rimeEngine.hasNextPage() && service.rimeEngine.pageDown()
         if (paged) hardwareNavigation.enginePaged(shown, direction)
+    }
+
+    /**
+     * 注音（大千）：键帽上的注音符号换成方案里的大千键码交给 Rime（[ZhuyinKeys]），空格跟在音节后面是第一声。
+     * 声调只跟在音节后面：没打字时照原样上屏这个符号，刚打过声调再按声调不收（Rime 会把它当成上屏键）。
+     * 大千里数字和 , . - / ; 也是注音键，屏幕上别处送来的这些符号照符号上屏，不当拼写；实体键盘照大千键位打。
+     * 处理了返回 true；音节后已有声调的空格、回车、删除和数字键盘等走原来的路。
+     */
+    private suspend fun routeZhuyinKey(key: String, hardwareEvent: KeyEvent?): Boolean {
+        val input = service.rimeEngine.readQueuedComposition()?.input.orEmpty()
+        val code = when {
+            key == "space" -> if (ZhuyinKeys.takesTone(input)) ' ' else return false
+            hardwareEvent == null && key.length == 1 && key[0].code in 0x21..0x7E -> {
+                if (service.keyboardViewModel.keyboardState.value is KeyboardLayoutState.Number) return false
+                commitHardwareLiteral(service.textCommit.keyboardLiteral(key))
+                return true
+            }
+            else -> ZhuyinKeys.code(key) ?: return false
+        }
+        if (ZhuyinKeys.isTone(code) && !ZhuyinKeys.takesTone(input)) {
+            if (input.isEmpty()) withEditor { service.commitText(key) }
+            return true
+        }
+        val result = service.rimeEngine.processQueuedKeyAndGetResult(code.code, 0)
+        if (result.processed) {
+            if (result.committedText.isNotEmpty()) withEditor { service.commitText(result.committedText) }
+            sendTransformedResult(result)
+        } else if (input.isEmpty()) {
+            withEditor { service.commitText(key) }
+        }
+        return true
     }
 
     /** Finish unfinished raw input without choosing a word; clear only after acceptance. */

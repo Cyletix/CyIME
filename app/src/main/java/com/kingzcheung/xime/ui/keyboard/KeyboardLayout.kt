@@ -139,6 +139,8 @@ fun KeyboardLayout(
     // Shared physical frame and bottom-row spacing for 14/26 keys. The paired
     // alphabet keys still occupy their own five-column rows inside that frame.
     val fourteenKey = !isAsciiMode && uiState.inputProfile.layout == com.kingzcheung.xime.settings.InputLayout.MERGED14
+    // 注音（大千）：11 列，下面三行 10 键缩进半键，没有 Shift，删除键在第四行末尾。
+    val zhuyin = !isAsciiMode && uiState.inputProfile.layout.kind == com.kingzcheung.xime.settings.LayoutKind.ZHUYIN
     val metricContext = LocalContext.current
     val metricDisplay = LocalView.current.display
     val metricConfiguration = LocalConfiguration.current
@@ -415,6 +417,40 @@ fun KeyboardLayout(
                 // first row and below the last letter row (five equal rows share the height).
                 val honeycombOverhang = if (honeycomb) (keyboardHeight - 8.dp) / 32 else 0.dp
 
+                // 删除键：26 键在第三行末尾，注音在第四行末尾。
+                val deleteKey: @Composable (Modifier) -> Unit = { keyModifier ->
+                    SwipeableIconKeyButton(
+                        icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
+                        onClick = { onKeyPress("delete") },
+                        backgroundColor = specialKeyBackgroundColor,
+                        iconColor = specialKeyTextColor,
+                        modifier = keyModifier
+                            .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
+                        swipeText = "清空",
+                        onSwipe = { onKeyPress("clear_composition") },
+                        onLongClick = { onKeyPress("delete") },
+                        onPress = { onKeyPressDown?.invoke("delete") },
+                        onRelease = { onKeyRelease?.invoke("delete") },
+                        followSymbolSwipeDirection = true,
+                        upFeedback = KeyFlickFeedback.DELETE,
+                        swipeUpLabel = "上滑清空",
+                        downFeedback = KeyFlickFeedback.UNDO,
+                        swipeDownLabel = "下滑撤回",
+                        onSwipeUp = { onKeyPress("clear_all") },
+                        onSwipeDown = { onKeyPress("undo_clear") },
+                        onSwipeLeft = { suppressCursorMove.value = true; onKeyPress("clear_composition") },
+                        onSwipeStateChange = { state, bounds ->
+                            processSwipeState(
+                                state,
+                                bounds
+                            )
+                        },
+                        shadowEnabled = shadowEnabled,
+                        shadowElevation = shadowElevation,
+                        shadowShapeRadius = shadowShapeRadius,
+                    )
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -486,7 +522,7 @@ fun KeyboardLayout(
                     } else {
                         Box(modifier = Modifier.weight(1f)) {
                             val row1 = renderRows.getOrElse(1) { listOf("a", "s", "d", "f", "g", "h", "j", "k", "l") }
-                            val row1Inset = standardRowInset
+                            val row1Inset = if (zhuyin) (splitCellDp / 2f).dp else standardRowInset
                                 ?: if ((if (LocalCustomLayout.current != null) row1.sumOf { it.length } else row1.size) > 9) 0.dp else 16.dp
                             KeyboardRowWithConfig(
                                 keys = row1,
@@ -535,6 +571,33 @@ fun KeyboardLayout(
                                 endKeyWeight = if (standardRowInset != null) letterDeleteKeyWeight else 1.2f,
                                 letterWeight = letterBottomWeight,
                                 splitAt = splitAt2, splitGap = splitGapDp,
+                            )
+                        }
+                    } else if (zhuyin) {
+                        // 注音第三行同第二行：10 键缩进半键，没有 Shift 和删除键。
+                        Box(modifier = Modifier.weight(1f)) {
+                            KeyboardRowWithConfig(
+                                keys = renderRows.getOrNull(2).orEmpty(),
+                                onKeyPress = onKeyPress,
+                                config = KeyboardRowConfig(
+                                    keyBackgroundColor = keyBackgroundColor,
+                                    keyTextColor = keyTextColor,
+                                    keyboardBackgroundColor = keyboardBackgroundColor,
+                                    shadowEnabled = shadowEnabled,
+                                    shadowElevation = shadowElevation,
+                                    shadowShapeRadius = shadowShapeRadius,
+                                ),
+                                isShifted = false,
+                                isAsciiMode = isAsciiMode,
+                                edgeInset = (splitCellDp / 2f).dp,
+                                onSwipeStateChange = { state, bounds -> processSwipeState(state, bounds) },
+                                onKeyPressDown = onKeyPressDown,
+                                onKeyRelease = onKeyRelease,
+                                swipeDownHintsEnabled = effectiveSwipeDownHintsEnabled,
+                                swipeUpHintsEnabled = swipeUpHintsEnabled,
+                                onCommitText = onCommitText,
+                                onGestureAction = onGestureAction,
+                                configVersion = cfgVer,
                             )
                         }
                     } else {
@@ -684,49 +747,20 @@ fun KeyboardLayout(
                             }
 
                             CompositionLocalProvider(LocalHoneycombEdge provides if (honeycomb) HoneycombEdge.END else null) {
-                            SwipeableIconKeyButton(
-                                icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
-                                onClick = { onKeyPress("delete") },
-                                backgroundColor = specialKeyBackgroundColor,
-                                iconColor = specialKeyTextColor,
-                                modifier = Modifier
-                                    .weight(letterDeleteKeyWeight - fourteenMExtra)
-                                    .fillMaxHeight().testTag("qwerty-delete-key").semantics { contentDescription = "删除" },
-                                swipeText = "清空",
-                                onSwipe = { onKeyPress("clear_composition") },
-                                onLongClick = { onKeyPress("delete") },
-                                onPress = { onKeyPressDown?.invoke("delete") },
-                                onRelease = { onKeyRelease?.invoke("delete") },
-                                followSymbolSwipeDirection = true,
-                                upFeedback = KeyFlickFeedback.DELETE,
-                                swipeUpLabel = "上滑清空",
-                                downFeedback = KeyFlickFeedback.UNDO,
-                                swipeDownLabel = "下滑撤回",
-                                onSwipeUp = { onKeyPress("clear_all") },
-                                onSwipeDown = { onKeyPress("undo_clear") },
-                                onSwipeLeft = { suppressCursorMove.value = true; onKeyPress("clear_composition") },
-                                onSwipeStateChange = { state, bounds ->
-                                    processSwipeState(
-                                        state,
-                                        bounds
-                                    )
-                                },
-                                shadowEnabled = shadowEnabled,
-                                shadowElevation = shadowElevation,
-                                shadowShapeRadius = shadowShapeRadius,
-                            )
+                            deleteKey(Modifier.weight(letterDeleteKeyWeight - fourteenMExtra))
                             }
                         }
                     }
 
-                    // 蜂窝布局的第四行字母（zxcvbnm），与第二行同宽对齐。
+                    // 蜂窝布局的第四行字母（zxcvbnm），与第二行同宽对齐。注音的第四行 10 键，删除键占第 11 列。
                     renderRows.getOrNull(3)?.let { row3 ->
-                        Box(modifier = Modifier.weight(1f)) {
+                        Row(modifier = Modifier.weight(1f)) {
                             if (isVoiceMode && !isVoiceSticky) DummyKeyboardRow(
                                 keys = row3, weightedLetters = true,
                                 keyBackgroundColor = keyBackgroundColor.copy(alpha = 0.5f),
                                 keyboardBackgroundColor = keyboardBackgroundColor,
                             ) else KeyboardRowWithConfig(
+                                modifier = Modifier.weight(row3.size.toFloat()),
                                 keys = row3,
                                 onKeyPress = onKeyPress,
                                 config = KeyboardRowConfig(
@@ -748,12 +782,14 @@ fun KeyboardLayout(
                                 onGestureAction = onGestureAction,
                                 configVersion = cfgVer,
                             )
+                            if (zhuyin && !(isVoiceMode && !isVoiceSticky)) deleteKey(Modifier.weight(1f))
                         }
                         Spacer(Modifier.height(honeycombOverhang))
                     }
 
                     // 底排保留共用权重及逗号/地球等宽；宽屏实体字母错位不移动底排。
-                    val bottom = letterKeyboardBottomRow(keyRows, fourteenKey)
+                    // 注音的底排同 26 键的比例（首行 11 键不是旧式布局）。
+                    val bottom = letterKeyboardBottomRow(keyRows, fourteenKey || zhuyin)
                     // 空格左侧逗号、右侧句号；只开逗号时沿用原配置的逗号键。
                     val bottomPrefs = LocalKeyboardInputPreferences.current
                     val commaOnLeft = bottomPrefs.qwertyCommaKey

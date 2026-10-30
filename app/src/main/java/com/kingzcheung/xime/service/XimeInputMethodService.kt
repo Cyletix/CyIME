@@ -856,9 +856,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         predictionManager.getPrediction(contextText)
     }
 
-    /** 联想表只有简体：繁体输出时不给中文联想，免得简体词混进繁体文字。 */
-    private fun traditionalChineseOutput(): Boolean = SettingsPreferences.getPrefsPublic(this)
-        .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
+    /** 联想表只有简体：繁体输出时不给中文联想，免得简体词混进繁体文字。注音一律出正体，同样不给。 */
+    private fun traditionalChineseOutput(): Boolean =
+        uiState.value.inputProfile.scheme == com.kingzcheung.xime.settings.InputScheme.ZHUYIN ||
+            SettingsPreferences.getPrefsPublic(this)
+                .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.TRADITIONAL_OUTPUT_KEY, false)
     
     private var rimeInitializationJob: kotlinx.coroutines.Job? = null
 

@@ -1,0 +1,141 @@
+# Rime schema
+# 注音（大千式），台湾朋友提的需求，默认不启用（设置 → 已安装的方案里打开）。
+# 词库沿用雾凇，拼写运算把拼音音节改写成注音、再落到大千键位（同 rime-bopomofo 的 zhuyin.yaml）；
+# 雾凇没有声调，声调键只用来分隔音节，可以不打。候选一律经 cyime_s2tw 转成台湾正体，
+# 台湾特有词和台湾读音（垃圾 ㄌㄜˋㄙㄜˋ）在 cyime_tw 里，见 tools/zhuyin/build_cyime_tw.py。
+# 键盘见 xime.yaml 的 keyboard.zhuyin：键帽是注音符号，ImeKeyRouter 按 ZhuyinKeys 换成这里的大千键码。
+schema:
+  schema_id: cyime_zhuyin
+  name: 注音
+  version: "1.0"
+  description: |
+    注音符號輸入，大千式鍵盤排列，輸出臺灣正體。
+    空格鍵輸入第一聲；聲調可以省略。
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中文, 西文 ]
+  - name: full_shape
+    states: [ 半角, 全角 ]
+  - name: ascii_punct
+    reset: 0
+    states: [ 。，, ．， ]
+  # 注音只出繁体，不跟「繁体输出」设置走（那个开关管的是 traditionalization）。
+  - name: zh_tw
+    reset: 1
+    states: [ 简, 繁 ]
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - script_translator
+  # 先转正体再过候选规则：长按删掉的是屏上的正体字，按它来藏。声调表是正体字，排在转换之后。
+  filters:
+    - simplifier@zh_tw
+    - lua_filter@*cyime_zhuyin_tone
+    - cyime_candidate_policy
+    - uniquifier
+
+speller:
+  alphabet: "1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347"
+  initials: "1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/-"
+  finals: " 6347"
+  delimiter: "'"
+  use_space: true
+  algebra:
+    # 词库里带大写字母的读音（A 股的 A）在大千键盘上打不出，还会撞上下面的注音大写码。
+    - erase/^.*[A-Z].*$/
+    # 拼音 → 注音（rime-bopomofo zhuyin.yaml 的 pinyin_to_zhuyin，雾凇的 ü 写作 v）
+    - xform/iu/iou/
+    - xform/ui/uei/
+    - xform/ong/ung/
+    - xform/^yi?/i/
+    - xform/^wu?/u/
+    - xform/iu/v/
+    - xform/^([jqx])u/$1v/
+    - xform/([iuv])n/$1en/
+    - xform/^zhi?/Z/
+    - xform/^chi?/C/
+    - xform/^shi?/S/
+    - xform/^([zcsr])i/$1/
+    - xform/ai/A/
+    - xform/ei/I/
+    - xform/ao/O/
+    - xform/ou/U/
+    - xform/ang/K/
+    - xform/eng/G/
+    - xform/an/M/
+    - xform/en/N/
+    - xform/er/R/
+    - xform/eh/E/
+    - xform/([iv])e/$1E/
+    # 声调：词库不分声调，五个声调都认（1 = 空格的第一声，5 = 轻声）。
+    - derive/^([^0-9]+)$/${1}1/
+    - derive/^([^0-9]+)$/${1}2/
+    - derive/^([^0-9]+)$/${1}3/
+    - derive/^([^0-9]+)$/${1}4/
+    - derive/^([^0-9]+)$/${1}5/
+    # 只打声母（ㄋㄏ → 你好），也可以声母加声调。
+    - abbrev/^([bpmfdtnlgkhjqxZCSrzcs]).+$/$1/
+    - abbrev/^([bpmfdtnlgkhjqxZCSrzcs]).+([0-9])$/$1$2/
+    # 注音 → 大千键位
+    - 'xlit|bpmfdtnlgkhjqxZCSrzcsiuvaoeEAIOUMNKGR12345|1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347|'
+
+translator:
+  dictionary: rime_ice
+  prism: cyime_zhuyin
+  # cyime_tw 是台湾词和台湾读音；user_simp 是个人词库（同 14 键）。cyime_tw 要排在前面：
+  # 个人词库文件还没有时，librime 跳过它会丢掉音节表，排在后面的词表就编不进去（实测只剩 3 KB）。
+  packs:
+    - cyime_tw
+    - user_simp
+  # 整句规则同 26 键（tasks-chinese.gradle.kts 检查这一行与 app/data 的语气词、量词表一致）。
+  sentence_char_homophones: 4
+  sentence_position_penalty: -2.0
+  sentence_position_final_only: [吧, 呗, 呢, 吗, 啊, 嘛, 啦, 呀, 哦, 咯, 哟, 哇, 嘞, 喽, 个, 只, 条, 张, 件, 位, 块]
+  sentence_position_initial_only: [把, 被]
+  max_sentences: 4
+  sentence_cutoff_threshold: 100
+  preedit_format:
+    - "xlit|1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347'|ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦˉˊˇˋ˙ |"
+
+# 词组模型给 Rime 的四条整句重新打分，同 26 键、14 键。
+t9:
+  sentence_rescore: true
+  ngram_model: t9_ngram
+  ngram_sentence_start: false
+
+zh_tw:
+  option_name: zh_tw
+  opencc_config: cyime_s2tw.json
+  tips: none
+
+menu:
+  page_size: 5
+
+punctuator:
+  import_preset: default
+  __include: symbols:/punctuator
+
+# 不引默认的 key_binder：它把有候选时的数字键、空格当选词键，而大千的数字键是 ㄅㄉ…，空格是第一声。
+key_binder:
+  bindings: []
+
+recognizer:
+  import_preset: default

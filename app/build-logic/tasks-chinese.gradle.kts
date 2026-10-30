@@ -331,10 +331,10 @@ val prepareChineseDictionaries by tasks.registering {
             "  budget_ms: 6\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
         check(baseSchema.contains("    - lua_translator@*cyime_mixed_input\n")) { "Upstream rime_ice translator list changed" }
-        // The 14-key schema (assets/rime_chinese) repeats these sentence rules; keep them the same list.
-        check(file("src/main/assets/rime_chinese/pinyin_14jian.schema.yaml").readText()
+        // The 14-key and 注音 schemas (assets/rime_chinese) repeat these sentence rules; keep them the same list.
+        for (schema in listOf("pinyin_14jian", "cyime_zhuyin")) check(file("src/main/assets/rime_chinese/$schema.schema.yaml").readText()
             .contains("  sentence_position_final_only: [${particles.joinToString(", ")}]\n")) {
-            "pinyin_14jian.schema.yaml sentence_position_final_only differs from app/data particle lists"
+            "$schema.schema.yaml sentence_position_final_only differs from app/data particle lists"
         }
         File(root, "rime_ice.schema.yaml").writeText(baseSchema)
         val doublePinyin = File(root, "double_pinyin_flypy.schema.yaml")
