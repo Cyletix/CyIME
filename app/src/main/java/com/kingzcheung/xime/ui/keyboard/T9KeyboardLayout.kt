@@ -736,8 +736,8 @@ private fun T9KeyboardContent(
                 compactMode = compactMode,
             )
             val nextCandidate = candidateState.value.usesT9CandidateNavigation(uiState.inputProfile)
-            // 长按“下一项”代替 Shift：长按一次切到中英对调（松手保持），点候选上屏英文后或再长按一次恢复；
-            // 长按那次松手不切下一项。编码结束（上屏或清空）时也恢复。
+            // 长按“下一项”= 按住 Shift：按住期间候选中英对调，松手就恢复（用户 10-30：松手不恢复就再也变不回去）；
+            // 长按那次松手不切下一项。
             var glossHoldUsed by remember { mutableStateOf(false) }
             androidx.compose.runtime.LaunchedEffect(nextCandidate) {
                 if (!nextCandidate) com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld.value = false
@@ -760,14 +760,8 @@ private fun T9KeyboardContent(
                 backgroundColor = keyBackgroundColor, textColor = keyTextColor,
                 // 拖出超过键盘一半宽或高才算拖动选词（画出拖线），拖到候选上松手等于按住 Shift 选它（有英文上屏英文）；
                 // 没拖那么远仍是本键的左滑「上一项」等手势（用户 10-25）。
-                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(glossHoldEnabled, dragArea).glossHold(glossHoldEnabled,
-                    onDown = { glossHoldUsed = false }) { holding ->
-                    if (holding) {
-                        glossHoldUsed = true
-                        val swap = com.kingzcheung.xime.gloss.CandidateGlossary.t9NextHeld
-                        swap.value = !swap.value
-                    }
-                },
+                modifier = Modifier.weight(1f).testTag("t9-zero-key").dragToCandidate(glossHoldEnabled, dragArea).t9NextShiftHold(glossHoldEnabled,
+                    onDown = { glossHoldUsed = false }, onHeld = { glossHoldUsed = true }),
                 onSwipeLeft = if (nextCandidate) ({
                     callbacks.onDismissPreeditEditor?.invoke()
                     callbacks.onPreviousCandidate(candidateState.value)

@@ -136,7 +136,7 @@ object CandidateGlossary {
     /** 物理键盘的 Shift 正被按住；屏幕键盘看 ShiftMode.HELD。按住时候选中英对调。 */
     val physicalShiftHeld = mutableStateOf(false)
 
-    /** 九键长按“下一项”切到的中英对调（代替 Shift，松手保持）；上屏英文、再长按或编码结束时恢复。 */
+    /** 九键正按住“下一项”（代替按住 Shift）：按住期间中英对调，松手或上屏英文时恢复。 */
     val t9NextHeld = mutableStateOf(false)
 
     /** 任一种“按住 Shift”生效中：屏幕 Shift 键按住（[screenShiftHeld]）、物理 Shift、九键长按“下一项”，或从它拖到候选上。 */
