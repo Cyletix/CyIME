@@ -1,25 +1,43 @@
 package com.kingzcheung.xime.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.twotone.ClosedCaption
-import androidx.compose.material.icons.twotone.Delete
-import androidx.compose.material.icons.twotone.Dialpad
-import androidx.compose.material.icons.twotone.NetworkCell
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.kingzcheung.xime.ui.theme.CyMotion
 import com.kingzcheung.xime.model.DeviceModelTier
 import com.kingzcheung.xime.model.SetupAnswers
 import com.kingzcheung.xime.model.SetupFacts
@@ -37,6 +55,9 @@ import kotlinx.coroutines.withContext
  * 按设备推荐配置：首次设置完成后出现一次，之后从设置首页「配置选择」进入。
  * 先问三件用法（语音、九键、字幕），再按手机情况给出要留、要下载、可以删的模型，全部用白话说明；
  * 只有点了“按推荐设置”才改设置和删文件。
+ *
+ * 引导页原则（用户 10-30）：字要大，选项卡要大，选中的那个一目了然（底色、粗边框、打勾三样一起变），
+ * 过渡放慢到看得清（[CyMotion.GUIDE]），不靠小圆点或开关位置让人猜选了哪个。
  */
 @Composable
 fun SetupGuideScreen(firstRun: Boolean, onDone: () -> Unit) {
@@ -99,13 +120,13 @@ internal fun SetupGuideContent(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("按设备推荐配置") },
+                title = { Text("按设备推荐配置", style = GuideText.heading()) },
                 navigationIcon = {
                     if (!firstRun) IconButton(onClick = onDone) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
-                actions = { if (firstRun && result == null) TextButton(onClick = onSkip) { Text("以后再说") } },
+                actions = { if (firstRun && result == null) TextButton(onClick = onSkip) { Text("以后再说", style = GuideText.body()) } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
@@ -115,11 +136,11 @@ internal fun SetupGuideContent(
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Spacer(Modifier.height(4.dp))
             Text("看看这台手机的情况，再告诉 CyIME 你打算怎么用，它会推荐留哪些模型、删掉哪些用不到的，让应用少占空间。",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (facts == null || plan == null) {
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
             } else if (result != null) {
@@ -127,40 +148,63 @@ internal fun SetupGuideContent(
                 ResultSection(result, onDone)
                 Spacer(Modifier.height(24.dp))
             } else {
-            DeviceSection(facts)
-            AnswerSection(plan.answers, onAnswers)
-            KeepSection(plan.keep)
-            if (plan.remove.isNotEmpty()) RemoveSection(plan.remove, removeIds, onToggleRemove)
-            SummarySection(facts, plan, removeIds)
-            if (facts.metered && facts.online && plan.downloadBytes > 0) SettingsSection(title = "下载") {
-                SettingsToggleItem(icon = Icons.TwoTone.NetworkCell, title = "现在用流量下载",
-                    subtitle = "要下载 ${SetupGuidePlanner.mbText(plan.downloadBytes)}；不打开就等连上 Wi-Fi 自动下载",
-                    checked = allowMetered, onCheckedChange = onAllowMetered)
-            }
-            Button(onClick = onApply, enabled = !applying, modifier = Modifier.fillMaxWidth().testTag("setup-guide-apply")) {
-                if (applying) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                    Spacer(Modifier.width(8.dp))
-                    Text("正在整理…")
-                } else Text("按推荐设置")
-            }
-            Text("以后想换，随时可以在 设置 → 配置选择 → 按设备推荐配置 重新选；删掉的模型在用到时会提示下载。",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(24.dp))
+                DeviceSection(facts)
+                AnswerSection(plan.answers, onAnswers)
+                KeepSection(plan.keep)
+                if (plan.remove.isNotEmpty()) RemoveSection(plan.remove, removeIds, onToggleRemove)
+                SummarySection(facts, plan, removeIds)
+                if (facts.metered && facts.online && plan.downloadBytes > 0) GuideCard {
+                    GuideSwitchRow(title = "现在用流量下载",
+                        subtitle = "要下载 ${SetupGuidePlanner.mbText(plan.downloadBytes)}；不打开就等连上 Wi-Fi 自动下载",
+                        checked = allowMetered, tag = "setup-metered", onCheckedChange = onAllowMetered)
+                }
+                Button(onClick = onApply, enabled = !applying,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("setup-guide-apply")) {
+                    if (applying) {
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("正在整理…", style = GuideText.optionTitle())
+                    } else Text("按推荐设置", style = GuideText.optionTitle())
+                }
+                Text("以后想换，随时可以在 设置 → 配置选择 → 按设备推荐配置 重新选；删掉的模型在用到时会提示下载。",
+                    style = GuideText.note(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
 }
 
+/** 引导页字号：比普通设置页大一档。 */
+private object GuideText {
+    @Composable fun heading(): TextStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+    @Composable fun optionTitle(): TextStyle = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp, lineHeight = 26.sp,
+        fontWeight = FontWeight.SemiBold)
+    @Composable fun body(): TextStyle = MaterialTheme.typography.bodyLarge
+    @Composable fun note(): TextStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp)
+}
+
+@Composable
+private fun GuideHeading(text: String) {
+    Text(text, style = GuideText.heading(), color = MaterialTheme.colorScheme.onSurface)
+}
+
+@Composable
+private fun GuideCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.fillMaxWidth().animateContentSize(tween(CyMotion.GUIDE, easing = CyMotion.Standard)), content = content)
+    }
+}
+
 @Composable
 private fun DeviceSection(facts: SetupFacts) {
-    SettingsSection(title = "这台手机") {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    GuideHeading("这台手机")
+    GuideCard {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(when (facts.tier) {
                 DeviceModelTier.ENHANCED -> "性能较强"
                 DeviceModelTier.STANDARD -> "性能中等"
                 DeviceModelTier.LIGHT -> "入门配置，优先省内存"
-            }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }, style = GuideText.optionTitle())
             val hardware = buildList {
                 facts.memoryBytes?.let { add("内存 ${(it + SetupGuidePlanner.GIB / 2) / SetupGuidePlanner.GIB} GB") }
                 facts.cores?.let { add("$it 核") }
@@ -177,56 +221,102 @@ private fun DeviceSection(facts: SetupFacts) {
 
 @Composable
 private fun FactLine(text: String) {
-    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/**
+ * 一个大选项卡：至少 76dp 高，整张卡可点。选中时底色、2dp 主题色边框和右侧打勾一起慢慢变过去，
+ * 没选中的是浅底、细边框、空心圆；读屏按单选按钮报“已选中”。
+ */
+@Composable
+private fun GuideOption(selected: Boolean, title: String, subtitle: String, tag: String, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val container by animateColorAsState(if (selected) colors.primaryContainer else colors.surfaceContainerLow,
+        tween(CyMotion.GUIDE, easing = CyMotion.Standard), label = "guide-option-container")
+    val edge by animateColorAsState(if (selected) colors.primary else colors.outlineVariant,
+        tween(CyMotion.GUIDE, easing = CyMotion.Standard), label = "guide-option-edge")
+    val edgeWidth by animateDpAsState(if (selected) 2.dp else 1.dp, tween(CyMotion.GUIDE, easing = CyMotion.Standard),
+        label = "guide-option-edge-width")
+    val content by animateColorAsState(if (selected) colors.onPrimaryContainer else colors.onSurface,
+        tween(CyMotion.GUIDE, easing = CyMotion.Standard), label = "guide-option-content")
+    val shape = RoundedCornerShape(16.dp)
+    Surface(shape = shape, color = container, border = BorderStroke(edgeWidth, edge),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp).testTag(tag).clip(shape)
+            .selectable(selected, role = Role.RadioButton, onClick = onClick)) {
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = GuideText.optionTitle(), color = content)
+                Text(subtitle, style = GuideText.body(), color = content.copy(alpha = 0.8f))
+            }
+            Spacer(Modifier.width(16.dp))
+            CheckBadge(selected)
+        }
+    }
+}
+
+@Composable
+private fun CheckBadge(selected: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    val fill by animateColorAsState(if (selected) colors.primary else Color.Transparent,
+        tween(CyMotion.GUIDE, easing = CyMotion.Standard), label = "guide-check-fill")
+    val ring by animateColorAsState(if (selected) colors.primary else colors.outline,
+        tween(CyMotion.GUIDE, easing = CyMotion.Standard), label = "guide-check-ring")
+    Box(Modifier.size(32.dp).clip(CircleShape).background(fill).border(2.dp, ring, CircleShape),
+        contentAlignment = Alignment.Center) {
+        AnimatedVisibility(selected,
+            enter = scaleIn(tween(CyMotion.GUIDE, easing = CyMotion.Enter), initialScale = 0.4f) + fadeIn(tween(CyMotion.GUIDE)),
+            exit = scaleOut(tween(CyMotion.GUIDE, easing = CyMotion.Exit), targetScale = 0.4f) + fadeOut(tween(CyMotion.GUIDE))) {
+            Icon(Icons.Filled.Check, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+/** 一个问题：标题＋竖排的大选项卡（不并排，手机上每张卡都够宽）。 */
+@Composable
+private fun <T> GuideQuestion(title: String, options: List<Triple<T, String, String>>, selected: T, tagPrefix: String,
+    onSelect: (T) -> Unit) {
+    GuideHeading(title)
+    Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        options.forEach { (value, optionTitle, subtitle) ->
+            GuideOption(selected == value, optionTitle, subtitle, "$tagPrefix:$value") { onSelect(value) }
+        }
+    }
 }
 
 @Composable
 private fun AnswerSection(answers: SetupAnswers, onAnswers: (SetupAnswers) -> Unit) {
-    SettingsSection(title = "语音输入打算怎么用") {
-        Column(Modifier.fillMaxWidth().selectableGroup()) {
-            listOf(
-                Triple(VoiceUse.OFTEN, "经常用，想边说边看到字", "说话时字就跟着出来，停下后再自动改错、加标点"),
-                Triple(VoiceUse.SOMETIMES, "偶尔用，说完出字就行", "说完一句再出字，错字少、带标点，占的空间少一半"),
-                Triple(VoiceUse.NEVER, "不用语音", "关掉语音输入，不留语音模型（字幕要用的除外）"),
-            ).forEachIndexed { index, (use, title, subtitle) ->
-                if (index > 0) HorizontalDivider(Modifier.padding(start = 56.dp), thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Row(Modifier.fillMaxWidth().testTag("setup-voice:${use.name}")
-                    .selectable(answers.voice == use, role = Role.RadioButton) { onAnswers(answers.copy(voice = use)) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = answers.voice == use, onClick = null, modifier = Modifier.width(40.dp))
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-    SettingsSection(title = "其他用法") {
-        SettingsToggleItem(icon = Icons.TwoTone.Dialpad, title = "用九键打字",
-            subtitle = "九键按整句常用说法组词，长句更容易一次打对；需要九键整句组词模型",
-            checked = answers.t9, onCheckedChange = { onAnswers(answers.copy(t9 = it)) })
-        HorizontalDivider(Modifier.padding(start = 72.dp), thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        SettingsToggleItem(icon = Icons.TwoTone.ClosedCaption, title = "用字幕",
-            subtitle = "开会、和听力不好的人说话时，把别人说的话实时显示在屏幕上，并分清是谁说的",
-            checked = answers.caption, onCheckedChange = { onAnswers(answers.copy(caption = it)) })
-    }
+    GuideQuestion("语音输入打算怎么用？", listOf(
+        Triple(VoiceUse.OFTEN, "经常用，想边说边看到字", "说话时字就跟着出来，停下后再自动改错、加标点"),
+        Triple(VoiceUse.SOMETIMES, "偶尔用，说完出字就行", "说完一句再出字，错字少、带标点，占的空间少一半"),
+        Triple(VoiceUse.NEVER, "不用语音", "关掉语音输入，不留语音模型（字幕要用的除外）"),
+    ), answers.voice, "setup-voice") { onAnswers(answers.copy(voice = it)) }
+    GuideQuestion("用九键打字吗？", listOf(
+        Triple(true, "用九键", "九键按整句常用说法组词，长句更容易一次打对；需要九键整句组词模型"),
+        Triple(false, "不用九键", "只用 26 键、14 键或手写，不留九键模型"),
+    ), answers.t9, "setup-t9") { onAnswers(answers.copy(t9 = it)) }
+    GuideQuestion("用字幕吗？", listOf(
+        Triple(true, "用字幕", "开会、和听力不好的人说话时，把别人说的话实时显示在屏幕上，并分清是谁说的"),
+        Triple(false, "不用字幕", "不留分清说话人的模型"),
+    ), answers.caption, "setup-caption") { onAnswers(answers.copy(caption = it)) }
+}
+
+@Composable
+private fun GuideDivider() {
+    HorizontalDivider(Modifier.padding(horizontal = 20.dp), thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
 }
 
 @Composable
 private fun KeepSection(items: List<SetupItem>) {
-    SettingsSection(title = "推荐留下的") {
+    GuideHeading("推荐留下的")
+    GuideCard {
         items.forEachIndexed { index, item ->
-            if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Row(Modifier.fillMaxWidth().testTag("setup-keep:${item.id}").padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(item.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                    Text(item.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (item.modelName.isNotEmpty()) Text("设置里叫「${item.modelName}」", style = MaterialTheme.typography.labelSmall,
+            if (index > 0) GuideDivider()
+            Row(Modifier.fillMaxWidth().testTag("setup-keep:${item.id}").padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(item.title, style = GuideText.optionTitle())
+                    Text(item.reason, style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (item.modelName.isNotEmpty()) Text("设置里叫「${item.modelName}」", style = GuideText.note(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
                 }
                 Spacer(Modifier.width(12.dp))
@@ -235,29 +325,44 @@ private fun KeepSection(items: List<SetupItem>) {
                     SetupSource.ON_PHONE -> "已在手机上\n$size"
                     SetupSource.IN_PACKAGE -> "从安装包取出\n$size"
                     SetupSource.DOWNLOAD -> "要下载\n$size"
-                }, style = MaterialTheme.typography.labelMedium,
+                }, style = GuideText.note(),
                     color = if (item.source == SetupSource.DOWNLOAD) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                    textAlign = TextAlign.End)
             }
         }
     }
 }
 
+/** 标题＋说明＋开关的整行（设置页规则），字号放大到引导页这一档；说明和开关之间留 12dp。 */
+@Composable
+private fun GuideSwitchRow(title: String, subtitle: String, checked: Boolean, tag: String, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).testTag(tag)
+        .toggleable(checked, role = Role.Switch, onValueChange = onCheckedChange).padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = GuideText.optionTitle())
+            Text(subtitle, style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
 @Composable
 private fun RemoveSection(items: List<SetupItem>, removeIds: Set<String>, onToggle: (String, Boolean) -> Unit) {
-    SettingsSection(title = "可以删掉的") {
+    GuideHeading("可以删掉的")
+    GuideCard {
         items.forEachIndexed { index, item ->
-            if (index > 0) HorizontalDivider(Modifier.padding(start = 72.dp), thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            if (index > 0) GuideDivider()
             val saving = SetupGuidePlanner.mbText(item.bytes)
-            SettingsToggleItem(icon = Icons.TwoTone.Delete, title = item.title,
+            GuideSwitchRow(title = item.title,
                 subtitle = buildString {
                     append(item.reason)
                     append(if (item.source == SetupSource.ON_PHONE) "删掉省 $saving。" else "不从安装包解压，省 $saving。")
                     if (item.modelName.isNotEmpty()) append("设置里叫「${item.modelName}」。")
                 },
-                checked = item.id in removeIds, onCheckedChange = { onToggle(item.id, it) })
+                checked = item.id in removeIds, tag = "setup-remove:${item.id}", onCheckedChange = { onToggle(item.id, it) })
         }
     }
 }
@@ -268,21 +373,21 @@ private fun SummarySection(facts: SetupFacts, plan: SetupPlan, removeIds: Set<St
     val removed = plan.remove.filter { it.id in removeIds && it.source == SetupSource.ON_PHONE }.sumOf { it.bytes }
     val added = plan.keep.filter { it.source != SetupSource.ON_PHONE }.sumOf { it.bytes }
     val after = now - removed + added
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("这些模型现在占 ${SetupGuidePlanner.mbText(now)}，整理后 ${SetupGuidePlanner.mbText(after)}" +
             (if (now > after) "，少占 ${SetupGuidePlanner.mbText(now - after)}。" else "。"),
-            style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            style = GuideText.optionTitle())
         plan.notes.forEach {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(it, style = GuideText.body(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
 private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("✓ 已按推荐设置好", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
+    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("✓ 已按推荐设置好", style = GuideText.heading(), color = MaterialTheme.colorScheme.onPrimaryContainer)
             val lines = buildList {
                 if (result.removed > 0) add("删掉了 ${result.removed} 个用不到的模型，空出 ${SetupGuidePlanner.mbText(result.freedBytes)}。")
                 if (result.downloading > 0) add(if (result.waitingForWifi)
@@ -290,8 +395,8 @@ private fun ResultSection(result: SetupGuide.Result, onDone: () -> Unit) {
                     else "正在后台下载 ${SetupGuidePlanner.mbText(result.downloading)}，下好就能用。")
                 if (result.failed.isNotEmpty()) add("这些没删成：${result.failed.joinToString("、")}，可以在 扩展 → 已安装的模型 里再删。")
             }
-            lines.forEach { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.bodyMedium) }
+            lines.forEach { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer, style = GuideText.body()) }
         }
     }
-    Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("完成") }
+    Button(onClick = onDone, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("完成", style = GuideText.optionTitle()) }
 }

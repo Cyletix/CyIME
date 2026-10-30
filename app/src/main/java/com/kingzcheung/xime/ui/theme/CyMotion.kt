@@ -30,6 +30,8 @@ object CyMotion {
     const val LONG = 240
     /** 整块面板收起，比展开快约 25%（沿用原 180 ms）。 */
     const val LONG_EXIT = 180
+    /** 引导页选项选中：底色、边框、打勾慢慢变过去，让人看清选了哪个（用户 10-30「过渡动画要慢」）。 */
+    const val GUIDE = 360
 
     /** 位移和尺寸。 */
     val Standard = FastOutSlowInEasing
