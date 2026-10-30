@@ -25,21 +25,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.twotone.DriveFolderUpload
-import androidx.compose.material.icons.twotone.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import com.kingzcheung.xime.ui.common.CompactDropdownMenu
-import com.kingzcheung.xime.ui.common.CompactMenuRow
-import com.kingzcheung.xime.ui.common.CompactMenuDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -75,7 +68,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -98,7 +90,6 @@ import com.kingzcheung.xime.ui.menubar.dragOrderItem
 @Composable
 fun SchemaSettingsContent(
     onBack: () -> Unit,
-    onNavigateToMarket: () -> Unit = {},
     onNavigateToRimeFileBrowser: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -125,7 +116,6 @@ fun SchemaSettingsContent(
     LaunchedEffect(Unit) {
         viewModel.importCompleted.collect { localViewModel.loadLocalPackages() }
     }
-    var showMenu by remember { mutableStateOf(false) }
     var showImportWarning by remember { mutableStateOf(false) }
     var dontShowImportWarning by remember { mutableStateOf(false) }
     var pendingImportAction by remember { mutableStateOf<() -> Unit>({}) }
@@ -138,6 +128,7 @@ fun SchemaSettingsContent(
         }
     }
 
+    // 导入前说清楚认哪些文件、导入后去哪里；看过可勾「不再显示」，以后点「导入方案」直接选文件。
     if (showImportWarning) {
         AlertDialog(
             onDismissRequest = {
@@ -145,19 +136,27 @@ fun SchemaSettingsContent(
             },
             containerColor = MaterialTheme.colorScheme.surface,
             title = {
-                Text("导入方案须知", fontWeight = FontWeight.SemiBold)
+                Text("导入方案", fontWeight = FontWeight.SemiBold)
             },
             text = {
                 Column {
+                    Text("可以导入：", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "使用导入方案功能时，请先去了解 Rime 配置方案以及相关文档（github.com/rime/home/wiki），并确保你知道自己正在做什么。",
+                        "· Rime 方案压缩包（.zip、.tar.gz），比如从 GitHub 下载的方案仓库\n" +
+                            "· 单个方案或词库文件（.schema.yaml、.dict.yaml）",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "如果你不知道自己在做什么，请使用默认方案。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
+                        "导入后直接安装并打开其中的主方案，出现在「已启用的输入组合」里；点下方「应用方案更改」后就能在键盘上用。" +
+                            "和已有文件同名时会先问你，确认后备份再替换，卸载时恢复。",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "五笔等常用方案在「扩展 › 方案」可以直接获取。也可以在手机的文件管理里把文件「分享」给 CyIME 导入。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(
@@ -177,7 +176,7 @@ fun SchemaSettingsContent(
                         showImportWarning = false
                         pendingImportAction()
                     }
-                ) { Text("继续导入") }
+                ) { Text("选择文件") }
             },
             dismissButton = {
                 TextButton(onClick = { showImportWarning = false }) {
@@ -318,39 +317,8 @@ fun SchemaSettingsContent(
                     }
                 },
                 actions = {
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "更多")
-                        }
-                        CompactDropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                            offset = DpOffset(0.dp, 4.dp)
-                        ) {
-                            CompactMenuRow(
-                                label = "方案市场", icon = Icons.TwoTone.Storefront,
-                                onClick = {
-                                    showMenu = false
-                                    onNavigateToMarket()
-                                }
-                            )
-                            CompactMenuDivider()
-                            CompactMenuRow(
-                                label = "从文件选择", icon = Icons.TwoTone.DriveFolderUpload,
-                                onClick = {
-                                    showMenu = false
-                                    requireImportWarning { importLauncher.launch(arrayOf("*/*")) }
-                                }
-                            )
-                            CompactMenuDivider()
-                            CompactMenuRow(
-                                label = "文件管理器", icon = Icons.Default.FolderOpen,
-                                onClick = {
-                                    showMenu = false
-                                    onNavigateToRimeFileBrowser()
-                                }
-                            )
-                        }
+                    TextButton(onClick = { requireImportWarning { importLauncher.launch(arrayOf("*/*")) } }) {
+                        Text("导入方案", style = MaterialTheme.typography.labelMedium)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -475,6 +443,12 @@ fun SchemaSettingsContent(
                                 groupIndex = row,
                                 groupSize = disabledSchemas.size,
                             )
+                        }
+                        // 直接看、改 Rime 文件只用来排错，放在高级方案后面。
+                        item {
+                            TextButton(onClick = onNavigateToRimeFileBrowser) {
+                                Text("Rime 配置文件（高级）")
+                            }
                         }
                         item { Spacer(Modifier.height(8.dp)) }
                     }

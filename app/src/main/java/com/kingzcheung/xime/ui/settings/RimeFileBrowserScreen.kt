@@ -149,7 +149,7 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
                 TopAppBar(
                     title = {
                         Column {
-                            Text("文件管理器", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("Rime 配置文件", maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val rel = if (currentDir == rootDir) "" else
                                 currentDir.absolutePath.removePrefix(rootDir.absolutePath)
                             if (rel.isNotEmpty()) {
