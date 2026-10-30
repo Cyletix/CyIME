@@ -127,6 +127,7 @@ import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
+import com.kingzcheung.xime.ui.theme.keyboardBackgroundBelowCard
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.keyboard.isBottomDocked
 import com.kingzcheung.xime.ui.keyboard.HardwareCandidateRow
@@ -1972,6 +1973,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         // this strip draws only its own slice, never a separately fitted glass image.
                         // 键盘内容通过 offset 上移 activeBottomDp 留出导航栏空间。
                         // 浮动模式：卡片由 KeyboardView 内部 FloatingKeyboardContainer 自绘背景与定位，此处不做背景/偏移。
+                        // 固定卡片在窗口里的位置：导航条的渐变/图片接着卡片底边铺，不另起一段。
+                        val navigationStripCard = remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
                         if (!state.isFloatingMode && !roundedKeyboardBottom) {
                             Box(
                                 modifier = Modifier
@@ -1986,7 +1989,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             (position.y + coordinates.size.height).roundToInt()))
                                     }
                                     .graphicsLayer { alpha = keyboardLayerOpacity }
-                                    .keyboardBackground(rootTheme.keyboardBackground, isDark, keyboardBgColor)
+                                    .keyboardBackgroundBelowCard(rootTheme.keyboardBackground, isDark, keyboardBgColor,
+                                        card = { navigationStripCard.value })
                             )
                         }
                         Box(
@@ -2270,6 +2274,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                             .isFloatingRotated(state.floatingRotation)) null
                                         else android.graphics.Rect(left, top, right, bottom)
                                     updateKeyboardGlass()
+                                    if (!state.isFloatingMode) navigationStripCard.value = androidx.compose.ui.geometry.Rect(
+                                        left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
                                     val cardHeightPx = bottom - top
                                     if (!handwritingExpanded && !state.isFloatingMode && !state.showKeyboardResize && cardHeightPx > 0) {
                                         val bounds = android.graphics.Rect(left, top, right, bottom)
