@@ -16,6 +16,12 @@ class SettingsSearchTest {
         assertTrue("按键效果" in titles("振动"))
     }
 
+    @Test fun englishWordsFindTheGlossSetting() {
+        // 用户 10-30：想在中文键盘里选英文单词，搜“单词”“英文”找不到要选「释义」的那一项。
+        for (q in listOf("单词", "英文单词", "选英文", "下一项")) assertEquals(q, "候选注释内容", titles(q).first())
+        assertTrue("候选注释内容" in titles("英文"))
+    }
+
     @Test fun titleMatchesComeFirst() {
         assertEquals("拂动选字母", titles("拂动").first())
     }
