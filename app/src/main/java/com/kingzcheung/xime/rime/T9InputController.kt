@@ -510,6 +510,7 @@ class T9InputController(
         if (!accepts(admission, epoch)) return
         val remaining = rimeEngine.t9GetRemainingDigits()
         if (remaining.isNotEmpty()) rimeEngine.setInput(remaining)
+        rimeEngine.restoreT9CaretAfterChoice(remaining)
         refreshOnBackground(admission = admission, epoch = epoch)
     }
 

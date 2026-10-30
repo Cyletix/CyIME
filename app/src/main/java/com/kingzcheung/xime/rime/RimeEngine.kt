@@ -678,6 +678,16 @@ class RimeEngine {
         true
     }
 
+    /** Keys left before the code caret after a partial nine-key choice; -1 when it is at the end. */
+    @Volatile private var t9CaretKeysAfterChoice = -1
+
+    /** After the remaining keys of a partial choice are set, put back the caret the choice did not reach. */
+    internal fun restoreT9CaretAfterChoice(remaining: String) {
+        val keys = t9CaretKeysAfterChoice
+        t9CaretKeysAfterChoice = -1
+        if (keys > 0 && keys < codeKeysBefore(remaining, remaining.length)) placeT9CodeCaret(keys, remaining)
+    }
+
     /** Whole-code reading of the nine-key code whose caret [placeT9CodeCaret] moved. */
     @Volatile private var t9CaretReading: Pair<String, String>? = null
 
@@ -1246,7 +1256,14 @@ class RimeEngine {
         candidateRevision.incrementAndGet()
         // A partial choice becomes history for the remaining digits (ignored after a full commit).
         if (text != null) t9LeftContext?.let { t9LeftContext = it + text; nativeSetT9LeftContext(it + text) }
+        val before = nativeGetInput().orEmpty()
+        val caretKeys = nativePinyinEditSnapshot().getOrNull(1)?.toIntOrNull()
+            ?.takeIf { it < before.length }?.let { codeKeysBefore(before, it) }
         val full = nativeT9SelectCandidate(pinyin, text, length)
+        // A caret inside the code still bounds what is left of it, as in full pinyin.
+        val remaining = nativeT9GetRemainingDigits().orEmpty()
+        t9CaretKeysAfterChoice = if (full || caretKeys == null) -1
+            else caretKeys - (codeKeysBefore(before, before.length) - codeKeysBefore(remaining, remaining.length))
         nativeT9FlushRimeInput()
         full to withDisplayPreedit(nativeGetProcessResult(true))
     }
