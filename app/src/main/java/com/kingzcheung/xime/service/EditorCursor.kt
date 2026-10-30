@@ -259,6 +259,63 @@ internal class EditorCursor {
         }
         return moved
     }
+    /**
+     * 编辑面板的上下键按宿主排版的视觉行移动：多行输入框交给宿主处理方向键，
+     * 单行或不明类型的输入框仍只在文本内移动。文首按上、文末按下不发送，避免焦点跳出输入框。
+     */
+    fun moveLine(ic: InputConnection, direction: Int, selecting: Boolean = false, multiLine: Boolean = false): Boolean {
+        if (direction == 0) return false
+        if (!multiLine) return moveVertical(ic, direction, selecting)
+        val key = if (direction < 0) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN
+        return sendHostMove(ic, key, selecting, guardEdge = true)
+    }
+
+    /** 行首/行尾按视觉行，由宿主处理 Home/End；选择时保持锚点。 */
+    fun moveToLineBoundary(ic: InputConnection, toEnd: Boolean, selecting: Boolean = false): Boolean =
+        sendHostMove(ic, if (toEnd) KeyEvent.KEYCODE_MOVE_END else KeyEvent.KEYCODE_MOVE_HOME, selecting, guardEdge = false)
+
+    private fun sendHostMove(ic: InputConnection, key: Int, selecting: Boolean, guardEdge: Boolean): Boolean {
+        bind(ic)
+        if (!selecting) resetSelection()
+        val backwards = key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_MOVE_HOME
+        val extracted = snapshot(ic)
+        if (extracted != null) {
+            val start = extracted.startOffset + minOf(extracted.selectionStart, extracted.selectionEnd)
+            val end = extracted.startOffset + maxOf(extracted.selectionStart, extracted.selectionEnd)
+            if (!selecting && start != end && guardEdge) {
+                // 与左右键一致：有选区时先折叠到对应一端；宿主的上下键在全选时会把焦点移走。
+                return setSelection(ic, if (backwards) start else end, false)
+            }
+            if (selecting) syncSelection(extracted)
+            val position = if (selecting) active!! else if (backwards) start else end
+            if (guardEdge && atDocumentEdge(ic, position, start, end, backwards)) return false
+            // 宿主从它记录的活动端扩选；先恢复方向，规范化宿主会忽略，不影响结果。
+            if (selecting && active!! < anchor!!) runCatching { ic.setSelection(anchor!!, active!!) }
+        } else if (guardEdge) {
+            val adjacent = runCatching {
+                if (backwards) ic.getTextBeforeCursor(1, 0) else ic.getTextAfterCursor(1, 0)
+            }.getOrNull()
+            if (adjacent.isNullOrEmpty()) return false
+        }
+        return sendKeyPair(ic, key, selecting)
+    }
+
+    private fun atDocumentEdge(ic: InputConnection, position: Int, start: Int, end: Int, backwards: Boolean): Boolean {
+        if (backwards) return position <= 0
+        if (position != end) return false
+        return runCatching { ic.getTextAfterCursor(1, 0) }.getOrNull().isNullOrEmpty()
+    }
+
+    /** 选择时先按住 Shift：EditText 只看 Shift 键本身设置的状态，不看方向键事件的 meta。 */
+    private fun sendKeyPair(ic: InputConnection, key: Int, selecting: Boolean): Boolean {
+        val meta = if (selecting) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
+        if (selecting) ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 0, meta))
+        val downAccepted = ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, key, 0, meta))
+        val upAccepted = ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, key, 0, meta))
+        if (selecting) ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0, 0))
+        return downAccepted || upAccepted
+    }
+
     fun sendDirection(ic: InputConnection, key: Int, selecting: Boolean = false, additionalMeta: Int = 0): Boolean {
         bind(ic)
         if (!selecting) resetSelection()
