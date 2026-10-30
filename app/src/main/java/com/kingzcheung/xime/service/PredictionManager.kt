@@ -49,6 +49,24 @@ class PredictionManager(
     fun invalidatePendingPredictions(): Boolean = latest.invalidate()
 
     /**
+     * 上屏后联想要等一次 Main post 才发请求。这段空档也算“等联想”：期间按退格只取消联想、
+     * 不删正文（todo 139，实体键盘按得快时正好落在空档里）。返回值与 [requestRevision] 相同，
+     * post 里没有发出请求时用 [releasePrediction] 归还。不会出联想（关了智能联想、单次联想刚用过）
+     * 时不登记，退格照常删字。
+     */
+    fun reservePrediction(): Long =
+        if (!suppressNextPrediction && SettingsPreferences.isSmartPredictionEnabled(context)) latest.reserve()
+        else latest.revision
+
+    fun releasePrediction(token: Long) = latest.release(token)
+
+    /**
+     * 屏幕退格按下：在等的联想立即作废（按住时不让它冒出来），但松手那一下退格仍只算取消联想、
+     * 不删正文（todo 139：以前按下就清掉了“在等”，松手时退格当成空闲去删字）。
+     */
+    fun cancelForDeletePress(): Boolean = latest.invalidateAndHold()
+
+    /**
      * 单次联想抑制标志：联想候选上屏（点击/空格）前置位，使 commitText 触发的下一轮
      * 自动推理被跳过并清空联想候选（候选栏干净），等待用户下一次真实输入。
      * 连续联想模式不置位——commitText 的自动推理即为"一直上屏一直推理"。

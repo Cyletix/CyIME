@@ -24,12 +24,39 @@ internal class LatestPrediction(
     val isPending: Boolean get() = pendingGeneration.value != 0L
     val revision: Long get() = generation
     private var nextAllowed = 0L
+    // 上屏后到请求真正 submit 之间（中间隔一次 Main post）的登记；不显示在 pendingRequest 里。
+    private var reservation: Long? = null
+
+    // 按下退格时作废掉的请求：下一次 invalidate（松手那一下退格）仍报“在等”，中间有别的作废就失效。
+    private var heldCancel: Long? = null
 
     @Synchronized fun invalidate(): Boolean {
+        val held = heldCancel == generation
+        heldCancel = null
         generation++
+        val reserved = reservation != null
+        reservation = null
         val pending = pendingGeneration.getAndUpdate { 0L } != 0L
         job?.cancel(); job = null
+        return pending || reserved || held
+    }
+
+    /** Invalidates now; when something was pending, the next [invalidate] still reports it. */
+    @Synchronized fun invalidateAndHold(): Boolean {
+        val pending = invalidate()
+        if (pending) heldCancel = generation
         return pending
+    }
+
+    /** Marks a request that will be submitted after a post; [invalidate] reports it as pending. */
+    @Synchronized fun reserve(): Long {
+        reservation = generation
+        return generation
+    }
+
+    /** Drops a reservation that ended without a submit; a newer request is left alone. */
+    @Synchronized fun release(token: Long) {
+        if (reservation == token && generation == token) reservation = null
     }
 
     @Synchronized fun submit(text: String) {

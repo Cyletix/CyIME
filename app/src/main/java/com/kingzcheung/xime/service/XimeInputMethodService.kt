@@ -4041,13 +4041,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (isChineseMode) {
             val predictionAdmission = inputReadiness.ticket()
             val predictionEditor = uiState.value.inputSessionId
-            val predictionRevision = predictionManager.requestRevision
+            val predictionRevision = predictionManager.reservePrediction()
             mainHandler.post {
                 if (predictionAdmission != null && inputReadiness.accepts(predictionAdmission) &&
                     uiState.value.inputSessionId == predictionEditor && !uiState.value.isAsciiMode &&
                     predictionManager.requestRevision == predictionRevision) {
                     getPredictionFromPlugin(predictionManager.lastCommittedText)
                 }
+                predictionManager.releasePrediction(predictionRevision)
             }
         }
         return result

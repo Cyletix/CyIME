@@ -1475,10 +1475,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             return
         }
         if (service.japaneseInputController.deleteKana()) return
-        val candState = service.candidateState.value
         // 退格改变输入上下文：使在途的联想预测结果失效，防止过期结果迟到回填
         // associationCandidates，导致长按退格删除时候选栏在"联想词↔空"之间闪动。
+        // 先作废再读候选：联想恰好在两步之间送达时，要么算“在等”，要么已经看得到，不会落成删正文。
         val predictionWasPending = service.predictionManager.invalidatePendingPredictions()
+        val candState = service.candidateState.value
         val target = deletionTarget(
             engineComposing = service.rimeEngine.compositionActiveForDeletion(),
             uiComposing = candState.isComposing || candState.inputText.isNotEmpty() || candState.preeditText.isNotEmpty(),
