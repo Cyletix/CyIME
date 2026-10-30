@@ -73,6 +73,30 @@ data class CustomKeyboardLayout(
     fun split(key: String): CustomKeyboardLayout = copy(rows = rows.map { row -> row.flatMap {
         if (it == key) it.map(Char::toString) else listOf(it)
     } })
+    /**
+     * 这个单字母键在 26 键上占的那一格的字母（和 [gestures] 同一套位置），角标按这一格出；
+     * 蜂窝没有对应的 26 键位置，按字母自己。分号键挪进字母区时（Cyletix10），被挤到多出来那一格的字母
+     * 拿分号键占掉的那一格，26 个字母各占一格不落空，分号键自己不带角标。不在这个布局里的键、分号键返回 null。
+     */
+    fun positionLetter(key: String): String? {
+        if (honeycomb) return key.takeIf { it.length == 1 && rows.any { row -> key in row } }
+        val reference = referenceRows()
+        val slots = buildMap<String, Char> {
+            rows.forEachIndexed { rowIndex, row ->
+                var column = 0
+                row.forEach { cell ->
+                    reference.getOrNull(rowIndex)?.getOrNull(column)?.let { put(cell, it) }
+                    column += if (cell == EMPTY_SLOT) 1 else cell.length
+                }
+            }
+        }
+        fun letter(c: String) = c.length == 1 && c[0] in 'a'..'z'
+        val slot = slots[key]?.takeIf { letter(key) } ?: return null
+        if (slot in 'a'..'z') return slot.toString()
+        val stranded = slots.filter { (cell, at) -> letter(cell) && at !in 'a'..'z' }.keys.toList()
+        val freed = slots.filter { (cell, at) -> !letter(cell) && at in 'a'..'z' }.values.toList()
+        return freed.getOrNull(stranded.indexOf(key))?.toString()
+    }
     fun gestures(base: Map<String, KeyGestureConfig>): Map<String, KeyGestureConfig> {
         val result = base.toMutableMap()
         rows.forEachIndexed { rowIndex, row ->

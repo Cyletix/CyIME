@@ -322,21 +322,23 @@ class KeyboardMergedLayoutTest {
     // ── 手势配置完整性 ──
 
     @Test
-    fun `17和18键每个字母键都有 swipe_up`() {
-        // 14 键不在这里配符号：角标是 FourteenKeySymbols 里 14 键自己的一套（FourteenKeySymbolsTest）。
-        for (section in listOf("qwerty_17", "qwerty_18")) {
+    fun `合并键布局不在 yaml 里配角标，统一按 MergedKeySymbols 的读顺序排`() {
+        // 角标由 MergedKeySymbols 统一给出（CornerHintConsistencyTest 逐个布局核对），yaml 里写了就会顶替预设。
+        for (section in listOf("qwerty_14", "qwerty_17", "qwerty_18")) {
             val yaml = ximeYamlText()
             val rows = KeysConfigHelper.parseKeyboardLayoutYamlText(yaml, section)
                 ?: error("xime.yaml 缺少 $section rows")
             val gestures = KeysConfigHelper.parseKeyboardYamlSection(yaml, section)
                 ?: error("xime.yaml 缺少 $section keys")
             for (key in rows.flatten()) {
-                val swipeUp = gestures[key.lowercase()]?.swipeUp
-                assertTrue(
-                    "$section 的按键 $key 缺少 swipe_up 配置",
-                    swipeUp != null && (swipeUp.label.isNotEmpty() || swipeUp.value.isNotEmpty()),
-                )
+                assertTrue("$section 的按键 $key 不该在 yaml 里配 swipe_up",
+                    gestures[key.lowercase()]?.swipeUp == null && gestures[key.lowercase()]?.swipeDown == null)
             }
+            val keys = rows.flatten().map { it.lowercase() }
+            val up = MergedKeySymbols.up(keys)
+            assertEquals("$section 前 10 个键是 1-0", "1234567890", keys.take(10).joinToString("") { up.getValue(it) })
         }
+        assertEquals(FourteenKeySymbols.up, MergedKeySymbols.up(FourteenKeySymbols.keys))
+        assertEquals(FourteenKeySymbols.down, MergedKeySymbols.down(FourteenKeySymbols.keys))
     }
 }
