@@ -178,4 +178,127 @@ class DoublePinyinSchemeTest {
         assertFalse(table.any { it.startsWith("坏") })
         assertEquals(8, table.size)
     }
+
+    /** Rime 官方 rime-double-pinyin 的拼写运算（自然码 double_pinyin、智能ABC double_pinyin_abc、拼音加加 double_pinyin_pyjj）。 */
+    private val upstream = mapOf(
+        DoublePinyinScheme.ZIRANMA to """
+            erase/^xx$/
+            derive/^([jqxy])u$/$1v/
+            derive/^([aoe])([ioun])$/$1$1$2/
+            xform/^([aoe])(ng)?$/$1$1$2/
+            xform/iu$/Q/
+            xform/[iu]a$/W/
+            xform/[uv]an$/R/
+            xform/[uv]e$/T/
+            xform/ing$|uai$/Y/
+            xform/^sh/U/
+            xform/^ch/I/
+            xform/^zh/V/
+            xform/uo$/O/
+            xform/[uv]n$/P/
+            xform/i?ong$/S/
+            xform/[iu]ang$/D/
+            xform/(.)en$/$1F/
+            xform/(.)eng$/$1G/
+            xform/(.)ang$/$1H/
+            xform/ian$/M/
+            xform/(.)an$/$1J/
+            xform/iao$/C/
+            xform/(.)ao$/$1K/
+            xform/(.)ai$/$1L/
+            xform/(.)ei$/$1Z/
+            xform/ie$/X/
+            xform/ui$/V/
+            xform/(.)ou$/$1B/
+            xform/in$/N/
+            xlit/QWRTYUIOPSDFGHMJCKLZXVBN/qwrtyuiopsdfghmjcklzxvbn/
+        """,
+        DoublePinyinScheme.ZNABC to """
+            erase/^xx$/
+            derive/^([jqxy])u$/$1v/
+            xform/^zh/A/
+            xform/^ch/E/
+            xform/^sh/V/
+            xform/^([aoe].*)$/O$1/
+            xform/ei$/Q/
+            xform/ian$/W/
+            xform/er$|iu$/R/
+            xform/[iu]ang$/T/
+            xform/ing$/Y/
+            xform/uo$/O/
+            xform/uan$/P/
+            xform/i?ong$/S/
+            xform/[iu]a$/D/
+            xform/en$/F/
+            xform/eng$/G/
+            xform/ang$/H/
+            xform/an$/J/
+            xform/iao$/Z/
+            xform/ao$/K/
+            xform/in$|uai$/C/
+            xform/ai$/L/
+            xform/ie$/X/
+            xform/ou$/B/
+            xform/un$/N/
+            xform/[uv]e$|ui$/M/
+            xlit/QWERTYOPASDFGHJKLZXCVBNM/qwertyopasdfghjklzxcvbnm/
+        """,
+        DoublePinyinScheme.JIAJIA to """
+            erase/^xx$/
+            derive/^([jqxy])u$/$1v/
+            derive/^([aoe].*)$/o$1/
+            xform/^([ae])(.*)$/$1$1$2/
+            xform/iu$/N/
+            xform/[iu]a$/B/
+            xform/er$|ing$/Q/
+            xform/[uv]an$/C/
+            xform/[uv]e$|uai$/X/
+            xform/^sh/I/
+            xform/^ch/U/
+            xform/^zh/V/
+            xform/uo$/O/
+            xform/[uv]n$/Z/
+            xform/i?ong$/Y/
+            xform/[iu]ang$/H/
+            xform/(.)en$/$1R/
+            xform/(.)eng$/$1T/
+            xform/(.)ang$/$1G/
+            xform/ian$/J/
+            xform/(.)an$/$1F/
+            xform/iao$/K/
+            xform/(.)ao$/$1D/
+            xform/(.)ai$/$1S/
+            xform/(.)ei$/$1W/
+            xform/ie$/M/
+            xform/ui$/V/
+            xform/(.)ou$/$1P/
+            xform/in$/L/
+            xlit/QWRTYUIOPSDFGHMJCKLZXVBN/qwrtyuiopsdfghmjcklzxvbn/
+        """,
+    ).mapValues { (_, rules) -> rules.trimIndent().lines().filter { it.isNotBlank() } }
+
+    @Test fun builtinsTypeWhatTheOfficialRimeSchemesType() {
+        for ((scheme, rules) in upstream) {
+            assertEquals(scheme.name, emptyList<String>(), scheme.problems())
+            for (syllable in DoublePinyinScheme.SYLLABLES) {
+                val official = spellings(rules, syllable)
+                assertTrue("${scheme.name} $syllable ${scheme.code(syllable)} $official", scheme.code(syllable) in official)
+            }
+        }
+        val z = DoublePinyinScheme.ZIRANMA
+        assertEquals(listOf("vs", "ih", "ud", "sr", "jp", "ly", "xy", "lz", "lv", "lt"),
+            listOf("zhong", "chang", "shuang", "suan", "jun", "ling", "xing", "lei", "lv", "lve").map { z.code(it) })
+        assertEquals("ud'pn", z.preview())
+        assertEquals(listOf("oa", "ol", "or"), listOf("a", "ai", "er").map { DoublePinyinScheme.ZNABC.code(it) })
+        assertEquals(listOf("as", "eq", "op"), listOf("ai", "er", "ou").map { DoublePinyinScheme.JIAJIA.code(it) })
+    }
+
+    @Test fun builtinPreeditShowsPinyin() {
+        val rules = DoublePinyinScheme.ZIRANMA.preeditFormat()
+        assertEquals("zhong guo", apply(rules, "vsgo"))
+        assertEquals("shuang'pin", apply(rules, "ud'pn"))
+        assertEquals("ang eng er", apply(rules, "aheger"))
+        assertEquals("lve jue", apply(rules, "ltjt"))
+        assertEquals("zhong sh", apply(rules, "vsu"))
+    }
 }

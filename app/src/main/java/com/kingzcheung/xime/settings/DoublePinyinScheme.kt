@@ -260,7 +260,10 @@ data class DoublePinyinScheme(
         const val GENERATED_MARK = "# CyIME 双拼方案生成："
         const val SHOUDAO_ID = "double_pinyin_shoudao"
         const val CUSTOM_PREFIX = "custom_shuangpin_"
-        private val ID_PATTERN = Regex("$SHOUDAO_ID|${CUSTOM_PREFIX}[a-f0-9]{32}")
+        const val ZIRANMA_ID = "double_pinyin_ziranma"
+        const val ZNABC_ID = "double_pinyin_znabc"
+        const val JIAJIA_ID = "double_pinyin_jiajia"
+        private val ID_PATTERN = Regex("$SHOUDAO_ID|$ZIRANMA_ID|$ZNABC_ID|$JIAJIA_ID|${CUSTOM_PREFIX}[a-f0-9]{32}")
         val SPECIAL_INITIALS = listOf("zh", "ch", "sh")
         const val PLAIN_INITIALS = "bpmfdtnlgkhjqxrzcsyw"
         /** 按词库拼写列出的韵母；jue 的 ue 与 lüe 的 ve、ju 的 u 与 lü 的 v 分开设置。 */
@@ -322,7 +325,37 @@ data class DoublePinyinScheme(
             mapOf("a" to "aa", "o" to "oo", "e" to "ue", "ai" to "ai", "ei" to "ui", "ao" to "ao", "ou" to "ou",
                 "an" to "an", "en" to "en", "ang" to "ay", "eng" to "uf", "er" to "er"))
 
-        val BUILTINS = listOf(FLYPY, SHOUDAO)
+        /** 自然码：zh→V、ch→I、sh→U；零声母取首字母加韵母键（ang→AH、eng→EG），a、o、e 双写。 */
+        val ZIRANMA = DoublePinyinScheme(ZIRANMA_ID, "自然码", mapOf("zh" to 'v', "ch" to 'i', "sh" to 'u'),
+            mapOf("a" to 'a', "o" to 'o', "e" to 'e', "i" to 'i', "u" to 'u', "v" to 'v', "ai" to 'l', "ei" to 'z',
+                "ui" to 'v', "ao" to 'k', "ou" to 'b', "iu" to 'q', "ie" to 'x', "ue" to 't', "ve" to 't', "an" to 'j',
+                "en" to 'f', "in" to 'n', "un" to 'p', "ang" to 'h', "eng" to 'g', "ing" to 'y', "ong" to 's', "ia" to 'w',
+                "ua" to 'w', "uo" to 'o', "iao" to 'c', "ian" to 'm', "uan" to 'r', "iang" to 'd', "uang" to 'd',
+                "iong" to 's', "uai" to 'y'),
+            mapOf("a" to "aa", "o" to "oo", "e" to "ee", "ai" to "ai", "ei" to "ei", "ao" to "ao", "ou" to "ou",
+                "an" to "an", "en" to "en", "ang" to "ah", "eng" to "eg", "er" to "er"))
+
+        /** 智能ABC双拼：zh→A、ch→E、sh→V；零声母一律以 O 开头再加韵母键（ai→OL、er→OR）。 */
+        val ZNABC = DoublePinyinScheme(ZNABC_ID, "智能ABC双拼", mapOf("zh" to 'a', "ch" to 'e', "sh" to 'v'),
+            mapOf("a" to 'a', "o" to 'o', "e" to 'e', "i" to 'i', "u" to 'u', "v" to 'v', "ai" to 'l', "ei" to 'q',
+                "ui" to 'm', "ao" to 'k', "ou" to 'b', "iu" to 'r', "ie" to 'x', "ue" to 'm', "ve" to 'm', "an" to 'j',
+                "en" to 'f', "in" to 'c', "un" to 'n', "ang" to 'h', "eng" to 'g', "ing" to 'y', "ong" to 's', "ia" to 'd',
+                "ua" to 'd', "uo" to 'o', "iao" to 'z', "ian" to 'w', "uan" to 'p', "iang" to 't', "uang" to 't',
+                "iong" to 's', "uai" to 'c'),
+            mapOf("a" to "oa", "o" to "oo", "e" to "oe", "ai" to "ol", "ei" to "oq", "ao" to "ok", "ou" to "ob",
+                "an" to "oj", "en" to "of", "ang" to "oh", "eng" to "og", "er" to "or"))
+
+        /** 拼音加加：zh→V、ch→U、sh→I；零声母 a、e 开头的双写首字母再加韵母键（ai→AS、er→EQ），o、ou 打 OO、OP。 */
+        val JIAJIA = DoublePinyinScheme(JIAJIA_ID, "拼音加加", mapOf("zh" to 'v', "ch" to 'u', "sh" to 'i'),
+            mapOf("a" to 'a', "o" to 'o', "e" to 'e', "i" to 'i', "u" to 'u', "v" to 'v', "ai" to 's', "ei" to 'w',
+                "ui" to 'v', "ao" to 'd', "ou" to 'p', "iu" to 'n', "ie" to 'm', "ue" to 'x', "ve" to 'x', "an" to 'f',
+                "en" to 'r', "in" to 'l', "un" to 'z', "ang" to 'g', "eng" to 't', "ing" to 'q', "ong" to 'y', "ia" to 'b',
+                "ua" to 'b', "uo" to 'o', "iao" to 'k', "ian" to 'j', "uan" to 'c', "iang" to 'h', "uang" to 'h',
+                "iong" to 'y', "uai" to 'x'),
+            mapOf("a" to "aa", "o" to "oo", "e" to "ee", "ai" to "as", "ei" to "ew", "ao" to "ad", "ou" to "op",
+                "an" to "af", "en" to "er", "ang" to "ag", "eng" to "et", "er" to "eq"))
+
+        val BUILTINS = listOf(FLYPY, SHOUDAO, ZIRANMA, ZNABC, JIAJIA)
 
         /** 小鹤双拼编码 → 音节；lo 与 luo 同码时取 luo。 */
         private val FLYPY_DECODE: Map<String, String> = HashMap<String, String>().apply {
