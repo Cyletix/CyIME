@@ -57,9 +57,9 @@ internal fun KeyboardPanelSettingsContent(panel: KeyboardPanelLaunch.Panel, onBa
     val title = keyboardPanelTitle(panel)
     val description = when (panel) {
         KeyboardPanelLaunch.Panel.RESIZE -> "与键盘菜单里的「键盘调节」是同一个面板：拖动边框和四角改高度、宽度，" +
-            "切换悬浮与分体，调透明度和底部留白，改好后点面板上的「完成」。"
+            "切换悬浮与分体，调透明度和底部留白，改好后点面板上的「确认」。"
         KeyboardPanelLaunch.Panel.ARRANGE -> "与键盘菜单里的「排列」是同一个面板：把入口拖到工具栏、菜单或不使用，" +
-            "并调整先后顺序，改好后点「完成」。"
+            "并调整先后顺序，改好后点右上角的 ✓。"
     }
     val focus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
