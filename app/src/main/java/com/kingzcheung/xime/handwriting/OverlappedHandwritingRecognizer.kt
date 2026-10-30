@@ -31,6 +31,11 @@ class OverlappedHandwritingRecognizer(
      * 另外按字母高矮区分 o/O、c/C 这类只差大小的字母。假名不能这样做（い、ハ 的两笔本身就左右分开）。
      */
     private val lettersApart: Boolean = false,
+    /**
+     * 英文字母每切一段的成本（[lettersApart] 时用）：一段的分数高过它才值得单独成一个字母。
+     * 按打分的尺度定：字母模板的余弦约 0.85，汉字模型里字母的概率低得多，约 0.1。
+     */
+    private val letterCost: Float = TEMPLATE_LETTER_COST,
 ) {
     /**
      * 单个切分段（一个字）。
@@ -101,10 +106,11 @@ class OverlappedHandwritingRecognizer(
                 for (j in minJ until i) {
                     val prev = best[k - 1][j]
                     if (prev == neg) continue
-                    val candidates = segmentCandidates(j, i, bounded, predictFn)
+                    val candidates = letterDots(layout, j, i, segmentCandidates(j, i, bounded, predictFn))
                     if (candidates.isEmpty()) continue
                     // 时间偏置：j>0 时新段起笔与上一段收笔的间隔影响切分倾向
-                    val gapBias = if (j > 0 && j < gaps.size) gapBias(gaps[j]) else 0f
+                    // 英文字母之间和字母内部的笔间隔一样短，连笔压制只会把 ti 合成 t：字母只认停顿加分
+                    val gapBias = if (j > 0 && j < gaps.size) gapBias(gaps[j]).let { if (lettersApart) it.coerceAtLeast(0f) else it } else 0f
                     // 位置偏置：并排书写时，这一段整体在前面笔迹右边并留出空隙，倾向在此换字
                     val spaceBias = if (j > 0 && layout?.isBoundary(j, i) == true) GAP_SPLIT_BONUS else 0f
                     val spanPenalty = if (lettersApart) layout?.spanPenalty(j, i) ?: 0f else 0f
@@ -129,7 +135,8 @@ class OverlappedHandwritingRecognizer(
         for (k in 1..maxSegments) {
             val total = best[k][n]
             if (total == neg) continue
-            val norm = total / k - SEGMENT_PENALTY * (k - 1)
+            // 英文字母：比总分减去每个字母的成本。均分会让两个都认得好的字母（pp）合成一个勉强像的（P）
+            val norm = if (lettersApart) total - letterCost * k else total / k - SEGMENT_PENALTY * (k - 1)
             if (norm > bestNorm) {
                 bestNorm = norm
                 bestK = k
@@ -179,7 +186,7 @@ class OverlappedHandwritingRecognizer(
         var i = n
         for (k in bestK downTo 1) {
             val j = back[k][i]
-            segments.add(0, Segment(j, i - j, segmentCandidates(j, i, bounded, predictFn)))
+            segments.add(0, Segment(j, i - j, letterDots(layout, j, i, segmentCandidates(j, i, bounded, predictFn))))
             i = j
         }
         if (lettersApart && layout != null && segments.size >= 2) {
@@ -204,6 +211,21 @@ class OverlappedHandwritingRecognizer(
                 "heads=${segments.map { it.candidates.firstOrNull()?.char }}"
         )
         return Result(segments, total, total / bestK)
+    }
+
+    /**
+     * 英文字母上的点：点在一竖正上方的两笔是 i（模型把 j 排在 i 前面时是 j），模型常认成 1、l；
+     * 写在半行以上、单独成段的点不是一个字母（是 i、j 的点），压低分数让它和下面的竖合成一段。
+     */
+    private fun letterDots(layout: SideBySide?, j: Int, i: Int, candidates: List<HandwritingCandidate>): List<HandwritingCandidate> {
+        if (!lettersApart || layout == null || candidates.isEmpty()) return candidates
+        if (layout.dottedStem(j, i)) {
+            val letter = candidates.firstOrNull { it.char == "i" || it.char == "j" }?.char ?: "i"
+            val score = (candidates[0].score + DOTTED_STEM_BONUS).coerceAtMost(1f)
+            return listOf(HandwritingCandidate(letter, score)) + candidates.filter { it.char != letter }
+        }
+        if (i - j == 1 && layout.isRaisedDot(j)) return candidates.map { it.copy(score = it.score - RAISED_DOT_PENALTY) }
+        return candidates
     }
 
     /** 笔画缓冲被裁剪或清空时调用，使段缓存失效。 */
@@ -327,6 +349,29 @@ class OverlappedHandwritingRecognizer(
             return LETTER_SPAN_PENALTY * ((gap - letterGap) / (lineHeight * LETTER_GAP_FULL_RATIO)).coerceIn(0f, 1f)
         }
 
+        private val lineTop = minY.minOrNull() ?: 0f
+
+        /** 很小的一笔（i、j 上的点）。 */
+        fun isDot(s: Int): Boolean = maxOf(maxX[s] - minX[s], maxY[s] - minY[s]) < DOT_RATIO * lineHeight
+
+        /** 写在整行上半部分的点（i、j 的点；句号在下面，不算）。 */
+        fun isRaisedDot(s: Int): Boolean = isDot(s) && (minY[s] + maxY[s]) / 2 - lineTop < lineHeight / 2
+
+        /** 第 j、j+1 笔是一个点加一竖，点在竖的上方、左右对得上。 */
+        fun dottedStem(j: Int, i: Int): Boolean {
+            if (i - j != 2) return false
+            val (dot, stem) = when {
+                isDot(j) && !isDot(j + 1) -> j to j + 1
+                isDot(j + 1) && !isDot(j) -> j + 1 to j
+                else -> return false
+            }
+            val dotX = (minX[dot] + maxX[dot]) / 2
+            val dotY = (minY[dot] + maxY[dot]) / 2
+            val slack = DOT_SIDE_SLACK_RATIO * lineHeight
+            return maxX[stem] - minX[stem] < STEM_WIDTH_RATIO * lineHeight && dotY < minY[stem] + slack &&
+                dotX >= minX[stem] - slack && dotX <= maxX[stem] + slack
+        }
+
         fun height(j: Int, i: Int): Float {
             var top = Float.MAX_VALUE
             var bottom = -Float.MAX_VALUE
@@ -374,6 +419,27 @@ class OverlappedHandwritingRecognizer(
 
         /** 一段英文笔迹左右断开时的最大罚分。 */
         const val LETTER_SPAN_PENALTY = 0.5f
+
+        /** 字母模板打分（余弦）时每个字母的成本：电脑回放你写的 11 条英文词句，0.8～0.9 最好，单个字母也不被拆开。 */
+        const val TEMPLATE_LETTER_COST = 0.85f
+
+        /** 汉字模型里的字母（概率）每个字母的成本。 */
+        const val MODEL_LETTER_COST = 0.1f
+
+        /** 一笔的宽高都不到行高的这个比例算一个点。 */
+        const val DOT_RATIO = 0.15f
+
+        /** i、j 的竖最宽为行高的这个比例（j 带钩）。 */
+        const val STEM_WIDTH_RATIO = 0.35f
+
+        /** 点可以偏离竖的左右范围、低于竖顶端行高的这个比例。 */
+        const val DOT_SIDE_SLACK_RATIO = 0.25f
+
+        /** 点加一竖认成 i、j 时比模型首选多的分数。 */
+        const val DOTTED_STEM_BONUS = 0.1f
+
+        /** 单独成段的点（i、j 的点）的罚分。 */
+        const val RAISED_DOT_PENALTY = 0.5f
 
         /** 字母高度不到同一行最高字母的这个比例算小写。 */
         const val SMALL_LETTER_RATIO = 0.7f
