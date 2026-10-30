@@ -691,8 +691,8 @@ fun KeyboardView(
                 callbacks.onKeyPressDown?.invoke("standard")
                 handwritingPending.select(index)?.let {
                     callbacks.onCommitText?.invoke(it)
-                    // 假名 / 字母边用边学：选中的字记成这次笔迹的新模板
-                    com.kingzcheung.xime.handwriting.HandwritingTemplates.learnSelection(handwritingContext, it)
+                    // 假名 / 字母边用边学：选中的字记成这次笔迹的新模板（英文新词前补的空格不算）
+                    com.kingzcheung.xime.handwriting.HandwritingTemplates.learnSelection(handwritingContext, it.trim())
                     clearHandwriting()
                 }
             }
@@ -700,7 +700,7 @@ fun KeyboardView(
                 handwritingPending.confirmAll().takeIf { it.isNotEmpty() }?.let {
                     callbacks.onCommitText?.invoke(it)
                     // 空格确认的首选和点选一样学（只有整段是一个字时才学，无痕时不学）
-                    com.kingzcheung.xime.handwriting.HandwritingTemplates.learnSelection(handwritingContext, it)
+                    com.kingzcheung.xime.handwriting.HandwritingTemplates.learnSelection(handwritingContext, it.trim())
                 }
                 clearHandwriting()
             }
@@ -1493,8 +1493,12 @@ fun KeyboardView(
                                         clearHandwriting()
                                         callbacks.onKeyPress("ime_switch", false)
                                     }
-                                    // 有候选时空格只确认候选，不再多打一个空格；没有候选才打空格
-                                    "space" -> if (handwritingPending.size > 0) confirmHandwriting() else callbacks.onCommitText?.invoke(" ")
+                                    // 有候选时空格只确认候选，不再多打一个空格；没有候选才打空格。
+                                    // 英文的空格本来就是词与词的分隔：确认候选后照样打一个空格（否则整句英文一个空格都没有）
+                                    "space" -> if (handwritingPending.size > 0) {
+                                        confirmHandwriting()
+                                        if (state.inputProfile.language == com.kingzcheung.xime.settings.InputLanguage.ENGLISH) callbacks.onCommitText?.invoke(" ")
+                                    } else callbacks.onCommitText?.invoke(" ")
                                     "enter" -> { confirmHandwriting(); callbacks.onKeyPress("enter", false) }
                                     else -> { confirmHandwriting(); callbacks.onCommitText?.invoke(key) }
                                 }
