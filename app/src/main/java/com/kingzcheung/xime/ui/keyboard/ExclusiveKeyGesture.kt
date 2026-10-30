@@ -2,6 +2,7 @@ package com.kingzcheung.xime.ui.keyboard
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.unit.dp
@@ -52,14 +53,15 @@ internal data class KeyGestureActions(
     val freeDirection: Boolean = false,
 )
 
+/** [currentActions] gets where the finger went down: a paired 14-key key answers with the half it landed on. */
 internal suspend fun PointerInputScope.detectExclusiveKeyGestures(
-    currentActions: () -> KeyGestureActions,
+    currentActions: (Offset) -> KeyGestureActions,
 ) = coroutineScope {
     val gestureScope = this
     val horizontalCancelThreshold = 60.dp.toPx()
     awaitEachGesture {
         val down = awaitFirstDown()
-        val actions = currentActions()
+        val actions = currentActions(down.position)
         val swipeThreshold = actions.verticalThresholdDp.dp.toPx()
         val horizontalThreshold = actions.horizontalThresholdDp.dp.toPx()
         down.consume()

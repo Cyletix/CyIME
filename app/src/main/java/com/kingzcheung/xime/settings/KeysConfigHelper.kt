@@ -1692,6 +1692,13 @@ object KeysConfigHelper {
         val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
         val normalized = key.lowercase()
         val profile = InputProfiles.current(_activeSchemaId, isAsciiMode)
+        // 14 键的每个字母都用 26 键同一字母的上下角标（符号编辑、预设一起生效）：单字母键就是那个字母，
+        // 双字母键按左半边的字母查，右半边的字母由键盘按 [fourteenKeyLetters] 的第二个字母单独查。
+        if (profile.layout == InputLayout.MERGED14 && profile.language == InputLanguage.CHINESE) {
+            val letter = normalized.takeIf { it.length in 1..2 && it.all { c -> c in 'a'..'z' } }?.take(1)
+                ?: return config[normalized]
+            return QwertySwipeSymbols.apply(letter, config[normalized], symbolOverridesZh, symbolCustomZh[letter])
+        }
         if (profile.layout.kind != LayoutKind.ALPHABETIC ||
             profile.language !in setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)) return config[normalized]
         // Rearranged custom layouts bind digits to physical positions. Keep those

@@ -669,6 +669,8 @@ fun KeyboardLayout(
                     Unit
                 } } else null,
                                         onSwipeDown = onSwipeDown,
+                                        rightHalf = fourteenRightHalfSymbols(key, LocalFourteenKeyLayout.current, isAsciiMode,
+                                            swipeUpHintsEnabled, swipeDownHintsEnabled, onCommitText ?: onKeyPress, onGestureAction),
                                         onSwipeStateChange = onSwipeStateChange,
                                         onPress = onPress,
                                         onRelease = onRelease,
@@ -1364,6 +1366,8 @@ fun KeyboardRowWithConfig(
                     Unit
                 } } else null,
                 onSwipeDown = onSwipeDown,
+                rightHalf = fourteenRightHalfSymbols(key, LocalFourteenKeyLayout.current, isAsciiMode,
+                    swipeUpHintsEnabled, swipeDownHintsEnabled, onCommitText ?: onKeyPress, onGestureAction),
                 onSwipeStateChange = onSwipeStateChange,
                 onPress = onPress,
                 onRelease = onRelease,
