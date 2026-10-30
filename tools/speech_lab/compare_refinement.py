@@ -41,6 +41,8 @@ def main():
         first=so.OnlineRecognizer.from_paraformer(encoder=str(para/'encoder.int8.onnx'),decoder=str(para/'decoder.int8.onnx'),tokens=str(para/'tokens.txt'),num_threads=1,enable_endpoint_detection=False)
         second=so.OfflineRecognizer.from_sense_voice(model=str(sense/'model.int8.onnx'),tokens=str(sense/'tokens.txt'),language='zh',use_itn=True,num_threads=1)
         # 整句定稿 with the optional X-ASR model (CYIME_REPLAY_FINALIZER=<model dir>), as SherpaSpeechEngine loads it.
+        # X-ASR fails below 1440 samples; pad short input with silence to 4000 like SherpaSpeechEngine.
+        fit=(lambda a:np.pad(a,(0,max(0,4000-len(a))))) if os.environ.get('CYIME_REPLAY_FINALIZER') else (lambda a:a)
         if os.environ.get('CYIME_REPLAY_FINALIZER'):
             x=Path(os.environ['CYIME_REPLAY_FINALIZER'])
             second=so.OfflineRecognizer.from_transducer(encoder=str(x/'encoder-epoch-99-avg-1.int8.onnx'),decoder=str(x/'decoder-epoch-99-avg-1.onnx'),joiner=str(x/'joiner-epoch-99-avg-1.int8.onnx'),tokens=str(x/'tokens.txt'),num_threads=2)
@@ -80,7 +82,7 @@ def main():
                     detector.accept_waveform(unpack(parts[1]));reply=str(int(detector.is_speech_detected()))
                     while not detector.empty():detector.pop()
                 elif op=='REREAD':
-                    s=second.create_stream();s.accept_waveform(16000,unpack(parts[1]));second.decode_stream(s)
+                    s=second.create_stream();s.accept_waveform(16000,fit(unpack(parts[1])));second.decode_stream(s)
                     reply=pack('' if 'nospeech' in s.result.lang.lower() else s.result.text);del s
                 elif op=='RESET':detector.reset()
                 elif op=='AUDIO':
@@ -94,7 +96,7 @@ def main():
                     initial=first.get_result(stream);stream=None
                     audio=unpack(parts[2]);refined=''
                     if mode.startswith('refinement'):
-                        s=second.create_stream();s.accept_waveform(16000,audio);second.decode_stream(s)
+                        s=second.create_stream();s.accept_waveform(16000,fit(audio));second.decode_stream(s)
                         refined='' if 'nospeech' in s.result.lang.lower() else s.result.text
                         del s
                     regions.append(dict(boundary=parts[1],duration_s=len(audio)/16000,first=initial,second=refined))
