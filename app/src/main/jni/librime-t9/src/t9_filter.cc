@@ -263,6 +263,54 @@ std::string T9ConvertCandidatePreedit(const std::string& preedit,
     return T9ConvertPreedit(preedit, comment);
 }
 
+// ── 双拼九键 preedit ──
+// 双拼每个字固定两个键：编码段（数字或字母）按两键一字换成注释里的拼音，
+// 只按了一个键的字显示它的声母（zh/ch/sh 整体）。中文（已选部分）原样保留。
+
+std::string T9ConvertDoublePinyinPreedit(const std::string& preedit,
+                                         const std::string& comment) {
+    if (preedit.empty() || comment.empty() || comment[0] == '~') return preedit;
+    std::vector<std::string> syllables;
+    {
+        std::istringstream iss(comment);
+        std::string word;
+        while (iss >> word) {
+            std::string filtered = NormalizePinyinComment(word);
+            if (!filtered.empty()) syllables.push_back(filtered);
+        }
+    }
+    if (syllables.empty()) return preedit;
+
+    size_t si = 0;
+    std::string result;
+    for (const auto& part : SplitPreedit(preedit)) {
+        if (part.is_separator) {
+            result += ' ';
+            continue;
+        }
+        if (part.is_chinese) {
+            result += part.text;
+            continue;
+        }
+        for (size_t i = 0; i < part.text.size(); i += 2) {
+            if (si >= syllables.size()) {
+                result += part.text.substr(i);
+                break;
+            }
+            std::string py = syllables[si++];
+            for (auto& c : py) c = static_cast<char>(tolower(c));
+            if (i + 1 < part.text.size()) {
+                result += py;
+            } else {
+                const bool retroflex = py.size() > 2 && py[1] == 'h' &&
+                    (py[0] == 'z' || py[0] == 'c' || py[0] == 's');
+                result += py.substr(0, retroflex ? 2 : 1);
+            }
+        }
+    }
+    return result;
+}
+
 // ════════════════════════════════════════════════════════════════
 // T9Filter / T9Translation（RIME 依赖）
 // ════════════════════════════════════════════════════════════════
@@ -287,9 +335,12 @@ void T9Translation::ConvertCurrent() {
         }
     }
     if (!convert_preedit_) return;  // 透传：仅缓存，不改 preedit
-    std::string converted = T9ConvertCandidatePreedit(genuine->preedit(),
-                                                       genuine->comment(),
-                                                       genuine->text());
+    // 双拼九键的英文词（无拼音注释）与中文九键一样显示单词本身。
+    const std::string& comment = genuine->comment();
+    std::string converted = double_pinyin_ && !comment.empty() && comment[0] != '~'
+        ? T9ConvertDoublePinyinPreedit(genuine->preedit(), comment)
+        : T9ConvertCandidatePreedit(genuine->preedit(), genuine->comment(),
+                                    genuine->text());
     T9FLOG("ConvertCurrent: \"%s\" -> \"%s\"",
           genuine->preedit().c_str(), converted.c_str());
     if (converted != genuine->preedit()) {
@@ -302,11 +353,13 @@ T9Translation::T9Translation(an<Translation> translation,
                                char manual_delim,
                                bool convert_preedit,
                                std::shared_ptr<T9SuppressionStore> suppression,
-                               std::string schema)
+                               std::string schema,
+                               bool double_pinyin)
     : translation_(translation),
       auto_delim_(auto_delim),
       manual_delim_(manual_delim),
       convert_preedit_(convert_preedit),
+      double_pinyin_(double_pinyin),
       suppression_(std::move(suppression)),
       schema_(std::move(schema)) {
     // 定位到第一个候选（构造时 translation 已定位在第一个候选）。
@@ -359,6 +412,7 @@ T9Filter::T9Filter(const Ticket& ticket) : Filter(ticket) {
             bool display_original = false;
             config->GetBool("t9/isDisplayOriginalPreedit", &display_original);
             convert_preedit_ = !display_original;
+            config->GetBool("t9/double_pinyin", &double_pinyin_);
 
             std::string delimiter;
             if (config->GetString("speller/delimiter", &delimiter)
@@ -376,7 +430,8 @@ an<Translation> T9Filter::Apply(an<Translation> translation,
     if (!translation) return translation;
     // 去重由 filter 链末尾的 uniquifier 兜底，t9_filter 只做 preedit 转换。
     return New<T9Translation>(translation, auto_delimiter_, manual_delimiter_,
-                              convert_preedit_, suppression_, schema_);
+                              convert_preedit_, suppression_, schema_,
+                              double_pinyin_);
 }
 
 #endif  // T9_ALGO_ONLY_BUILD

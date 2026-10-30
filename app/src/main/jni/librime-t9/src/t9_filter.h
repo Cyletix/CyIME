@@ -33,6 +33,12 @@ std::string T9ConvertCandidatePreedit(const std::string& preedit,
                                       const std::string& comment,
                                       const std::string& candidate_text);
 
+// 双拼九键（t9/double_pinyin: true）的 preedit：每个字两个键，编码段按两键一字
+// 换成注释里的拼音，末尾只按一个键的字显示声母。
+// 例如 "87 46" + "zhong guo" → "zhong guo"，"87 4" + "zhong guo" → "zhong g"。
+std::string T9ConvertDoublePinyinPreedit(const std::string& preedit,
+                                         const std::string& comment);
+
 #ifndef T9_ALGO_ONLY_BUILD
 // 包装候选，覆盖 preedit() 返回转换后的拼音，
 // 不修改原始候选对象，避免跨 .so 边界的 dynamic_cast 失效问题。
@@ -70,7 +76,8 @@ public:
                    char manual_delim,
                    bool convert_preedit,
                    std::shared_ptr<T9SuppressionStore> suppression,
-                   std::string schema);
+                   std::string schema,
+                   bool double_pinyin);
     bool Next() override;
     an<Candidate> Peek() override { return cand_; }
 
@@ -86,6 +93,8 @@ private:
     char manual_delim_;
     // false（isDisplayOriginalPreedit: true）时透传 preedit，仅缓存 Phrase 码供调频。
     bool convert_preedit_ = false;
+    // 双拼九键：preedit 按两键一字换成拼音（T9ConvertDoublePinyinPreedit）。
+    bool double_pinyin_ = false;
     std::shared_ptr<T9SuppressionStore> suppression_;
     std::string schema_;
 };
@@ -97,6 +106,7 @@ public:
                            CandidateList* candidates) override;
 private:
     bool convert_preedit_ = false;
+    bool double_pinyin_ = false;
     std::shared_ptr<T9SuppressionStore> suppression_;
     std::string schema_;
     char auto_delimiter_ = ' ';

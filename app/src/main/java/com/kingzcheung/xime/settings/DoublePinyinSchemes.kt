@@ -15,14 +15,18 @@ object DoublePinyinSchemes {
     const val FILE = "custom-double-pinyin.json"
     private const val BASE = "double_pinyin_flypy"
 
-    fun isGenerated(id: String) = id == DoublePinyinScheme.SHOUDAO_ID || id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX)
-    fun isCustom(id: String) = id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX)
+    fun isGenerated(id: String) = isT9(id) || id == DoublePinyinScheme.SHOUDAO_ID || isCustom(id)
+    fun isCustom(id: String) = id.startsWith(DoublePinyinScheme.CUSTOM_PREFIX) && !id.endsWith(DoublePinyinScheme.T9_SUFFIX)
+    /** 双拼方案的九键版本（小鹤、首道和自定义方案各一个，默认不启用）。 */
+    fun isT9(id: String) = id.endsWith(DoublePinyinScheme.T9_SUFFIX) && id.removeSuffix(DoublePinyinScheme.T9_SUFFIX).let {
+        it == BASE || it == DoublePinyinScheme.SHOUDAO_ID || isCustom(it)
+    }
 
     @Volatile private var cached: List<DoublePinyinScheme> = emptyList()
 
     /** 方案卡片的示例编码用；自定义方案在读过一次键位表后可查到。 */
-    fun find(id: String): DoublePinyinScheme? = DoublePinyinScheme.BUILTINS.firstOrNull { it.id == id }
-        ?: cached.firstOrNull { it.id == id }
+    fun find(id: String): DoublePinyinScheme? = if (isT9(id)) find(id.removeSuffix(DoublePinyinScheme.T9_SUFFIX))
+        else DoublePinyinScheme.BUILTINS.firstOrNull { it.id == id } ?: cached.firstOrNull { it.id == id }
 
     @Synchronized fun load(context: Context): List<DoublePinyinScheme> {
         val file = File(context.filesDir, FILE)
@@ -59,35 +63,39 @@ object DoublePinyinSchemes {
         } finally { pending.delete() }
     }
 
-    /** 写出一个方案的 Rime 配置；内容没变时不写，避免触发重新部署。 */
+    private fun writeIfChanged(file: File, text: String) {
+        if (!file.isFile || file.readText() != text) writeAtomically(file, text)
+    }
+
+    /** 写出一个方案的 Rime 配置（含九键版本）；内容没变时不写，避免触发重新部署。小鹤双拼本身随应用内置，只写九键版本。 */
     private fun writeSchema(rimeDir: File, scheme: DoublePinyinScheme) {
         val base = File(rimeDir, "$BASE.schema.yaml")
         check(base.isFile) { "请先完成小鹤双拼部署" }
-        val schema = File(rimeDir, "${scheme.id}.schema.yaml")
-        val text = scheme.schema(base.readText())
-        if (!schema.isFile || schema.readText() != text) writeAtomically(schema, text)
-        val flypyTable = File(rimeDir, "en_dicts/cn_en_flypy.txt")
-        if (flypyTable.isFile) {
-            val table = File(rimeDir, "en_dicts/${DoublePinyinScheme.cnEnName(scheme.id)}.txt")
-            val content = scheme.cnEnTable(flypyTable.readText())
-            if (!table.isFile || table.readText() != content) writeAtomically(table, content)
+        if (scheme.id != BASE) {
+            writeIfChanged(File(rimeDir, "${scheme.id}.schema.yaml"), scheme.schema(base.readText()))
+            val flypyTable = File(rimeDir, "en_dicts/cn_en_flypy.txt")
+            if (flypyTable.isFile) {
+                val table = File(rimeDir, "en_dicts/${DoublePinyinScheme.cnEnName(scheme.id)}.txt")
+                writeIfChanged(table, scheme.cnEnTable(flypyTable.readText()))
+            }
         }
+        writeIfChanged(File(rimeDir, "${DoublePinyinScheme.t9Id(scheme.id)}.schema.yaml"), scheme.t9Schema())
     }
 
-    /** 初始化时调用：小鹤双拼方案随版本更新后，首道和自定义方案跟着更新。 */
+    /** 初始化时调用：小鹤双拼方案随版本更新后，首道、自定义方案和各九键版本跟着更新。 */
     @Synchronized fun install(context: Context, rimeDir: File) {
         if (!File(rimeDir, "$BASE.schema.yaml").isFile) return
-        for (scheme in listOf(DoublePinyinScheme.SHOUDAO) + runCatching { load(context) }.getOrDefault(emptyList())) {
+        for (scheme in DoublePinyinScheme.BUILTINS + runCatching { load(context) }.getOrDefault(emptyList())) {
             try { writeSchema(rimeDir, scheme) }
             catch (e: Exception) { Log.w(TAG, "Cannot generate ${scheme.id}", e) }
         }
     }
 
-    /** 在方案栏显示或隐藏一个双拼方案；首道双拼默认不启用，在双拼方案页自己打开。 */
+    /** 在方案栏显示或隐藏一个双拼方案；首道双拼和各九键版本默认不启用，在双拼方案页自己打开。 */
     fun setEnabled(context: Context, id: String, enabled: Boolean) {
         val current = SchemaManager.getEnabledSchemas(context)
         val updated = if (enabled) {
-            val after = current.indexOf(BASE)
+            val after = current.indexOf(if (isT9(id)) "t9_pinyin" else BASE)
             if (id in current) current else if (after < 0) current + id
             else current.take(after + 1) + id + current.drop(after + 1)
         } else current.filterNot { it == id }.ifEmpty { listOf("rime_ice") }
@@ -130,11 +138,13 @@ object DoublePinyinSchemes {
             val rimeDir = SchemaManager.getRimeDir(context)
             // 只删本方案的配置和混输词表；词库、用户词和学习记录都保留。
             File(rimeDir, "$id.schema.yaml").delete()
+            File(rimeDir, "${DoublePinyinScheme.t9Id(id)}.schema.yaml").delete()
             File(rimeDir, "en_dicts/${DoublePinyinScheme.cnEnName(id)}.txt").delete()
         }
+        val ids = setOf(id, DoublePinyinScheme.t9Id(id))
         val fallback = if (File(SchemaManager.getRimeDir(context), "$BASE.schema.yaml").isFile) BASE else "rime_ice"
-        if (SettingsPreferences.getCurrentSchema(context) == id) SettingsPreferences.setCurrentSchema(context, fallback)
-        SchemaManager.setEnabledSchemas(context, SchemaManager.getEnabledSchemas(context).filterNot { it == id }
+        if (SettingsPreferences.getCurrentSchema(context) in ids) SettingsPreferences.setCurrentSchema(context, fallback)
+        SchemaManager.setEnabledSchemas(context, SchemaManager.getEnabledSchemas(context).filterNot { it in ids }
             .ifEmpty { listOf(fallback) })
         notifyChanged(context)
     }

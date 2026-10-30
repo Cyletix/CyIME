@@ -96,24 +96,28 @@ fun DoublePinyinSettingsContent(onBack: () -> Unit) {
                                 scheme.collisions().size.let { if (it > 0) " · $it 组同码" else "" },
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             DoublePinyinKeyMap(scheme)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("在方案栏显示", style = MaterialTheme.typography.bodyLarge)
-                                    Text("打开后可在「语言与方案」里选它", style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            listOf(Triple(scheme.id, "在方案栏显示", "打开后可在「语言与方案」里选它"),
+                                Triple(DoublePinyinScheme.t9Id(scheme.id), "九键版本", "用九键打${scheme.name}：每个字按两个双拼键所在的数字键")
+                            ).forEach { (id, title, subtitle) ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(title, style = MaterialTheme.typography.bodyLarge)
+                                        Text(subtitle, style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Switch(id in enabled, enabled = !busy, modifier = Modifier.testTag("double-pinyin-enabled:$id"),
+                                        onCheckedChange = { on ->
+                                            busy = true
+                                            scope.launch {
+                                                runCatching { withContext(Dispatchers.IO) {
+                                                    DoublePinyinSchemes.setEnabled(context, id, on)
+                                                    SchemaManager.getEnabledSchemas(context).toSet()
+                                                } }.onSuccess { enabled = it; message = if (on) "已打开，正在应用" else "已从方案栏隐藏" }
+                                                    .onFailure { message = "设置失败：${it.message}" }
+                                                busy = false
+                                            }
+                                        })
                                 }
-                                Switch(scheme.id in enabled, enabled = !busy, modifier = Modifier.testTag("double-pinyin-enabled:${scheme.id}"),
-                                    onCheckedChange = { on ->
-                                        busy = true
-                                        scope.launch {
-                                            runCatching { withContext(Dispatchers.IO) {
-                                                DoublePinyinSchemes.setEnabled(context, scheme.id, on)
-                                                SchemaManager.getEnabledSchemas(context).toSet()
-                                            } }.onSuccess { enabled = it; message = if (on) "已打开，正在应用" else "已从方案栏隐藏" }
-                                                .onFailure { message = "设置失败：${it.message}" }
-                                            busy = false
-                                        }
-                                    })
                             }
                             Row {
                                 if (custom) TextButton(onClick = { edit(scheme) }, enabled = !busy) { Text("编辑") }

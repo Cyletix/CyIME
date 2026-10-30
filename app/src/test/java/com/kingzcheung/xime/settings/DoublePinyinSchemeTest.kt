@@ -136,6 +136,39 @@ class DoublePinyinSchemeTest {
             .lines().takeWhile { it.startsWith("    - ") }.last())
     }
 
+    /** 带 derive 的拼写运算：derive 保留原拼写并加上改写后的拼写。 */
+    private fun spellings(rules: List<String>, input: String): Set<String> = rules.fold(setOf(input)) { set, rule ->
+        val parts = rule.split('/')
+        if (parts[0] == "derive") set + set.map { Regex(parts[1]).replace(it, parts[2]) }
+        else set.map { apply(listOf(rule), it) }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    @Test fun t9VersionTypesEachSyllableOnTwoDigitKeys() {
+        val digits = mapOf("abc" to '2', "def" to '3', "ghi" to '4', "jkl" to '5', "mno" to '6', "pqrs" to '7', "tuv" to '8', "wxyz" to '9')
+        fun t9(code: String) = code.map { c -> digits.entries.first { c in it.key }.value }.joinToString("")
+        for (scheme in DoublePinyinScheme.BUILTINS + custom) {
+            val id = DoublePinyinScheme.t9Id(scheme.id)
+            val text = scheme.t9Schema()
+            assertTrue(text.startsWith(DoublePinyinScheme.GENERATED_MARK + id + "\n"))
+            assertTrue(text.contains("  schema_id: $id\n  language: zh\n  input_scheme: double_pinyin\n"))
+            assertTrue(text.contains("  prism: $id\n"))
+            assertTrue(text.contains("  left_panel_mode: none\n  double_pinyin: true\n  isDisplayOriginalPreedit: false\n"))
+            assertTrue(text.contains("    - t9_processor\n") && text.contains("    - t9_filter\n"))
+            assertFalse(text.contains("joint_decoder") || text.contains("cylm"))
+            val rules = text.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
+                .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }
+            assertEquals(scheme.algebra().size + 8, rules.size)
+            for (syllable in DoublePinyinScheme.SYLLABLES) {
+                val code = scheme.code(syllable)!!
+                val result = spellings(rules, syllable)
+                assertTrue("$syllable $result", code in result && t9(code) in result)
+                assertTrue("$syllable $result", result.all { it.length == 2 })
+            }
+        }
+        assertEquals("87", t9(DoublePinyinScheme.FLYPY.code("zhong")!!))
+        assertEquals("小鹤双拼九键", DoublePinyinScheme.FLYPY.t9Schema().substringAfter("  name: \"").substringBefore('"'))
+    }
+
     @Test fun mixedEnglishTableFollowsTheScheme() {
         val flypy = "# Rime table\n#@/db_name\tcn_en_flypy.txt\n# 此行之后不能写注释\nX光\tXgl\n4S店\tsiSdm\nJ.K.罗琳\tJKlolb\n上网\tuhwh\n坏\tz\n"
         val table = custom.cnEnTable(flypy).lines()
