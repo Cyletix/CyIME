@@ -9,7 +9,7 @@ class QuickActionLayoutTest {
         val toolbar = listOf("schema", "emoji", "ocr", "clipboard")
         val layout = QuickActionLayout.normalize(toolbar, QuickActionLayout.defaultMenu(toolbar))
         assertEquals(toolbar, layout.toolbar)
-        assertEquals(listOf("settings", "float", "caption", "sound", "floating", "glass", "incognito", "full_shape", "arrange"), layout.menu.filter { it !in ToolbarButton.LAYOUT_GESTURES.map { g -> g.id } })
+        assertEquals(listOf("settings", "float", "caption", "sound", "glass", "incognito", "full_shape", "arrange"), layout.menu.filter { it !in ToolbarButton.LAYOUT_GESTURES.map { g -> g.id } })
     }
 
     @Test fun eachEntryLivesInOnePlaceAndSettingsCannotBeRemoved() {

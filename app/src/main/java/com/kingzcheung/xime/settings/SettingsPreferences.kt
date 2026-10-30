@@ -654,6 +654,8 @@ object SettingsPreferences {
 
     /** 是否把本地语音识别收到的录音与识别过程保存到应用自己的 speech_tuning 目录，供电脑回放调优。 */
     fun isSttDebugRecord(context: Context): Boolean {
+        // 开发者工具：公开包即使以前打开过也不再录。
+        if (!com.kingzcheung.xime.BuildConfig.DEV_TOOLS && !com.kingzcheung.xime.BuildConfig.DEBUG) return false
         return getPrefs(context).getBoolean(KEY_STT_DEBUG_RECORD, false)
     }
 

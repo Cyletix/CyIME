@@ -51,6 +51,7 @@ class SpeechRecognitionManager(
     @Volatile private var backendConfiguration: String? = null
     private fun selectedBackendConfiguration(): String =
         if (SettingsPreferences.isSttUseLocal(context)) "local:${AsrSupport.generation}"
+        else if (OnlineSpeechApi.isConfigured(context)) "api"
         else "online:${SettingsPreferences.getSttOnlinePluginId(context)}"
     @Volatile private var recordingThread: RecordingThread? = null
     @Volatile private var released = false
@@ -105,7 +106,8 @@ class SpeechRecognitionManager(
             return
         }
         if (language == InputLanguage.UNSPECIFIED ||
-            language != InputLanguage.CHINESE && !SettingsPreferences.isSttUseLocal(context) && backendFactory == null) {
+            language != InputLanguage.CHINESE && !SettingsPreferences.isSttUseLocal(context) &&
+            !OnlineSpeechApi.isConfigured(context) && backendFactory == null) {
             cancelPreStart()
             errorCallback?.invoke(if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请先选择输入语言"
                 else "当前在线语音插件尚未声明${language.displayName}支持，请使用本地多语言模型", true)
@@ -388,7 +390,9 @@ class SpeechRecognitionManager(
         return if (useLocal) {
             AsrBackendFactory.create(context) ?: createOnlineAsrBackend()
         } else {
-            createOnlineAsrBackend()
+            // 关了本地：先用内置在线接口；没填密钥时退回旧的在线插件，再没有就用本地模型。
+            if (OnlineSpeechApi.isConfigured(context)) OnlineApiAsrBackend(context)
+            else createOnlineAsrBackend() ?: AsrBackendFactory.create(context)
         }
     }
 

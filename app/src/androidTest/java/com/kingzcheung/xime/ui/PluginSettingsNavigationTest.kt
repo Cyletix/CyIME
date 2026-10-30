@@ -42,9 +42,11 @@ class PluginSettingsNavigationTest {
         rule.onNodeWithText("从备份恢复").assertIsDisplayed()
         rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
-    @Test fun onlineSpeechHasNoPluginStoreEntry() {
-        rule.setContent { XimeTheme { OnlineAsrTab(emptyList(), {}) } }
-        rule.onNodeWithText("尚未安装在线语音插件；也可以返回上方选择本地模型。").assertIsDisplayed()
+    @Test fun onlineSpeechIsBuiltInApiWithoutPluginStore() {
+        rule.setContent { XimeTheme { OnlineSpeechApiSection() } }
+        rule.onNodeWithTag("speech-api-key").assertIsDisplayed()
+        rule.onNodeWithTag("speech-api-test").assertIsDisplayed()
+        rule.onNodeWithTag("speech-api-status").assertIsDisplayed()
         rule.onNodeWithText("安装插件").assertDoesNotExist()
     }
 

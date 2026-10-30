@@ -83,7 +83,8 @@ class VoiceRecognitionHandler(
     private val delayedPreStartRunnable = Runnable {
         val language = getState().voiceKeyboardLanguages.recognitionLanguage
         if (::speechRecognitionManager.isInitialized && language != InputLanguage.UNSPECIFIED &&
-            (language == InputLanguage.CHINESE || SettingsPreferences.isSttUseLocal(context))) {
+            (language == InputLanguage.CHINESE || SettingsPreferences.isSttUseLocal(context) ||
+                com.kingzcheung.xime.speech.OnlineSpeechApi.isConfigured(context))) {
             speechRecognitionManager.startPreStart()
         }
     }
@@ -168,6 +169,7 @@ class VoiceRecognitionHandler(
             val localName = AsrBackendFactory.getLocalName()
             if (localName != null) return localName
         }
+        if (com.kingzcheung.xime.speech.OnlineSpeechApi.isConfigured(context)) return "在线语音"
         val enabledPlugins = ExtensionManager.getEnabledAsrPlugins(context)
         if (enabledPlugins.isNotEmpty()) {
             val selectedId = SettingsPreferences.getSttOnlinePluginId(context)
@@ -299,7 +301,8 @@ class VoiceRecognitionHandler(
         onStateChanged(getState().copy(voiceRecognitionState = RecognitionState.PROCESSING))
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         mainHandler.postDelayed(finishTimeoutRunnable,
-            if (SettingsPreferences.isSttUseLocal(context)) speechRecognitionManager.finishTimeoutMs + 500 else FINISH_TIMEOUT_MS)
+            if (SettingsPreferences.isSttUseLocal(context) || com.kingzcheung.xime.speech.OnlineSpeechApi.isConfigured(context))
+                speechRecognitionManager.finishTimeoutMs + 500 else FINISH_TIMEOUT_MS)
         speechRecognitionManager.stopRecognition()
         if (toolbarSession) onRecordingStopped()
     }

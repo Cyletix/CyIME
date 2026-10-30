@@ -232,7 +232,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("自动保存字幕", speech, SettingsRoutes.SpeechToText, "字幕 保存 文件 记录 下载"),
         SettingsSearchEntry("字幕只保留 3 天", speech, SettingsRoutes.SpeechToText, "字幕 记录 删除 三天 保留"),
         SettingsSearchEntry("有人叫我名字时振动", speech, SettingsRoutes.SpeechToText, "字幕 名字 振动 提醒 叫我"),
-        SettingsSearchEntry("在线服务", speech, SettingsRoutes.SpeechToText, "在线 语音插件 api 密钥 联网"),
+        SettingsSearchEntry("在线语音接口", speech, SettingsRoutes.SpeechToText, "在线 api 密钥 接口 测试 联网 openai whisper", section = "在线语音接口"),
         // 智能 › 手写
         SettingsSearchEntry("已安装的手写模型", handwriting, SettingsRoutes.Handwriting, "手写模型 公式 个人手写 下载 切换 删除"),
         SettingsSearchEntry("手写停顿识别", handwriting, SettingsRoutes.Handwriting, "手写 停顿 识别 延迟 时长 秒"),
@@ -264,8 +264,10 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         page("日志查看器", about, SettingsRoutes.LogViewer, "日志 log 崩溃 错误"),
         page("存储空间", about, SettingsRoutes.StorageSpace, "存储 空间 占用 清理 缓存 容量"),
     ).filter {
-        // The developer-only handwriting training page is hidden in public, elder and friend packages.
-        it.target !in setOf(SettingsRoutes.HandwritingTraining, SettingsRoutes.HandwritingCapture) || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
+        // Developer-only tools (handwriting training, speech tuning recordings, raw Rime file manager)
+        // are hidden in public, elder and friend packages.
+        (it.target !in setOf(SettingsRoutes.HandwritingTraining, SettingsRoutes.HandwritingCapture, SettingsRoutes.RimeFileBrowser) &&
+            it.title != "保存语音调优录音") || com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG
     }
 }
 

@@ -66,7 +66,10 @@ private const val SIDE_BY_SIDE_MAX_CHARS = 12
 /** 手写板左上角的当前语言提示。 */
 internal fun handwritingLanguageHint(language: InputLanguage, useTemplates: Boolean, preparing: Boolean, missingKana: Boolean): String = when {
     preparing -> "${language.displayName}手写 · 正在准备（只在第一次较慢）…"
-    language == InputLanguage.JAPANESE && missingKana -> "日语手写 · 假名模板没读到，去 设置 → 手写训练模式 导入样本备份"
+    // 手写训练页只在自用测试包里有，公开包不指向它。
+    language == InputLanguage.JAPANESE && missingKana ->
+        if (com.kingzcheung.xime.BuildConfig.DEV_TOOLS || com.kingzcheung.xime.BuildConfig.DEBUG)
+            "日语手写 · 假名模板没读到，去 设置 → 手写训练模式 导入样本备份" else "日语手写 · 假名模板没读到"
     language == InputLanguage.JAPANESE -> "日语手写 · 假名＋漢字"
     language == InputLanguage.ENGLISH && useTemplates -> "英文手写 · 边写边学"
     else -> "${language.displayName}手写"
