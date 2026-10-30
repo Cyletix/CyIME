@@ -7,6 +7,7 @@ import androidx.compose.material.icons.twotone.SpaceBar
 import androidx.compose.material.icons.twotone.Gesture
 import androidx.compose.material.icons.twotone.Abc
 import androidx.compose.material.icons.twotone.Spellcheck
+import androidx.compose.material.icons.twotone.FontDownload
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -50,6 +51,12 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
                         "仅用于中文全拼 26 键；拼音里夹着英文词（nihaohello）时首选“你好hello”。本身像拼音的英文词（game、nice）认不出。",
                         checked = settings.mixedInput, onCheckedChange = {
                             settings = settings.copy(mixedInput = it); settings.save(context)
+                        })
+                    HorizontalDivider()
+                    SettingsToggleItem(Icons.TwoTone.FontDownload, "生僻字",
+                        "仅用于中文全拼 26 键；打一个完整拼音（chan）时，在常用字后面补上约 1.8 万个生僻字（瀺）。",
+                        checked = settings.rareCharacters, onCheckedChange = {
+                            settings = settings.copy(rareCharacters = it); settings.save(context)
                         })
                     HorizontalDivider()
                     // 「键盘滑动」移光标和滑行冲突：照常显示，被锁时置灰并写明被谁锁（见 InputGestureLocks）。
