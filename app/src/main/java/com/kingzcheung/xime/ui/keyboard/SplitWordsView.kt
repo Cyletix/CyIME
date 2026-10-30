@@ -186,53 +186,47 @@ fun SplitWordsView(
                         }?.key
                     }
 
+                    val scrollState = rememberScrollState()
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(scrollState)
                             .onGloballyPositioned { containerRootPos = it.positionInRoot() }
                             .pointerInput(splitParts) {
+                                // 点一下切换一个词；横着拖从按下的词连选到手指下的词。竖着拖是在滚动看内容，
+                                // 一个词也不选（用户 10-30：上下拖动松手后，手指处的词被选中）。
+                                // 内容放得下、滚不动时，竖着拖仍然连选。
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = false)
                                     val firstChip = findChipAt(down.position)
-                                    val dragStartIndex = firstChip
                                     val isRemoveMode = firstChip != null && firstChip in selectedIndices
-                                    var didDrag = false
-
-                                    // 处理首个词块
-                                    if (firstChip != null) {
-                                        if (isRemoveMode) {
-                                            selectedIndices.remove(firstChip)
-                                        } else {
-                                            addSelected(firstChip)
-                                        }
-
-                                    }
-
-                                    // 滑动过程只修改面板内的选择
-                                    do {
-                                        val event = awaitPointerEvent(PointerEventPass.Final)
-                                        val change = event.changes.firstOrNull() ?: break
-                                        if (change.pressed) {
-                                            change.consume()
-                                            val chipIndex = findChipAt(change.position)
-                                            if (chipIndex != null && dragStartIndex != null) {
-                                                didDrag = true
-                                                val from = minOf(dragStartIndex, chipIndex)
-                                                val to = maxOf(dragStartIndex, chipIndex)
-                                                for (i in from..to) {
-                                                    if (isRemoveMode) {
-                                                        selectedIndices.remove(i)
-                                                    } else if (i !in selectedIndices) {
-                                                        addSelected(i)
-                                                    }
-                                                }
-
+                                    var mode = SplitGesture.PENDING
+                                    while (true) {
+                                        // Main 先于外层滚动：连选时先消费，滚动就不会接手。
+                                        val event = awaitPointerEvent(PointerEventPass.Main)
+                                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                        if (!change.pressed) {
+                                            if (mode == SplitGesture.PENDING && firstChip != null && !change.isConsumed) {
+                                                if (isRemoveMode) selectedIndices.remove(firstChip) else addSelected(firstChip)
                                             }
-                                        } else {
                                             break
                                         }
-                                    } while (true)
+                                        if (mode == SplitGesture.PENDING) {
+                                            if (change.isConsumed) { mode = SplitGesture.SCROLL; continue }
+                                            val moved = change.position - down.position
+                                            if (moved.getDistance() <= viewConfiguration.touchSlop) continue
+                                            mode = splitGestureMode(firstChip != null, moved.x, moved.y, scrollState.maxValue > 0)
+                                        }
+                                        if (mode != SplitGesture.SELECT) continue
+                                        change.consume()
+                                        val chipIndex = findChipAt(change.position) ?: continue
+                                        val from = minOf(firstChip!!, chipIndex)
+                                        val to = maxOf(firstChip, chipIndex)
+                                        for (i in from..to) {
+                                            if (isRemoveMode) selectedIndices.remove(i)
+                                            else if (i !in selectedIndices) addSelected(i)
+                                        }
+                                    }
                                 }
                             }
                     ) {
@@ -269,6 +263,18 @@ fun SplitWordsView(
         Spacer(modifier = Modifier.height(bottomPaddingDp.dp))
     }
 }
+}
+
+internal enum class SplitGesture { PENDING, SELECT, SCROLL }
+
+/**
+ * What a drag past the touch slop does: sideways from a word selects a run of words; up or down
+ * scrolls the list and selects nothing, unless the list cannot scroll, where it still selects.
+ */
+internal fun splitGestureMode(onChip: Boolean, dx: Float, dy: Float, canScroll: Boolean): SplitGesture = when {
+    !onChip -> SplitGesture.SCROLL
+    canScroll && kotlin.math.abs(dy) >= kotlin.math.abs(dx) -> SplitGesture.SCROLL
+    else -> SplitGesture.SELECT
 }
 
 private val NO_BREAK_SPACE = Char(0x00A0)
