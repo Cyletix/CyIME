@@ -12,10 +12,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -86,6 +89,14 @@ internal fun Modifier.keyboardPositionCorners(
 ): Modifier = drawBehind {
     val alpha = highlight.alpha.value
     if (alpha <= 0f) return@drawBehind
+    drawPositionCorners(Offset.Zero, size, color, alpha, glass)
+}
+
+/**
+ * 外扩后的区域（[topLeft]、[size]，卡片四周各多 [PositionHighlightGap]）四角的弧形角标。
+ * 悬浮键盘亮角和调节界面里的悬浮键盘共用这一种画法，两处看起来一样。
+ */
+internal fun DrawScope.drawPositionCorners(topLeft: Offset, size: Size, color: Color, alpha: Float, glass: Boolean) {
     val gap = PositionHighlightGap.toPx()
     val radius = (FloatingKeyboardCardCorner.toPx() + gap).coerceAtMost(minOf(size.width, size.height) / 2f)
     val leg = 10.dp.toPx().coerceAtMost(minOf(size.width, size.height) / 4f)
@@ -104,10 +115,10 @@ internal fun Modifier.keyboardPositionCorners(
         val endY = cy + radius * kotlin.math.sin(Math.toRadians((startAngle + 90f * dirX * dirY).toDouble())).toFloat()
         path.lineTo(endX + dirX * leg, endY)
     }
-    val l = inset + radius
-    val t = inset + radius
-    val r = size.width - inset - radius
-    val b = size.height - inset - radius
+    val l = topLeft.x + inset + radius
+    val t = topLeft.y + inset + radius
+    val r = topLeft.x + size.width - inset - radius
+    val b = topLeft.y + size.height - inset - radius
     corner(l, t, 180f, 1f, 1f)
     corner(r, t, 0f, -1f, 1f)
     corner(r, b, 0f, -1f, -1f)
