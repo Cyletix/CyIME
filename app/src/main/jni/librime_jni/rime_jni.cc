@@ -652,8 +652,8 @@ public:
         return result;
     }
     
-    // 长按删除 = 忘掉这条候选的学习记录（Rime 原生语义）：用户词库里把它标记为删除，
-    // 词库里本来就有的词回到原来的位置，自造词消失；以后再选它会重新学起来。
+    // 长按删除 = 忘掉这条候选的学习记录：用户词库里删掉它的记录（次数和权重都不留），
+    // 词库里本来就有的词回到原来的位置，自造词消失；以后再选它从头学起。
     // 拼出来的整句没有自己的记录，改为忘掉句里学过的词。所有方案一致，不再屏蔽文字。
     // 返回 0 失败、1 已忘掉、2 没有学习记录（排序不变）。
     // Developer tool: takes back what automated typing taught the user dictionary of the current schema
@@ -765,31 +765,35 @@ public:
         auto phrase = rime::As<rime::Phrase>(genuine);
         if (!phrase) return 2;  // symbols, dates and other generated candidates learn nothing
         auto sentence = rime::As<rime::Sentence>(genuine);
-        if (sentence && sentence->components().size() > 1) {
-            std::vector<const rime::DictEntry*> learned;
+        std::vector<const rime::DictEntry*> learned;
+        if (sentence) {
             for (const auto& component : sentence->components())
                 if (component.commit_count > 0) learned.push_back(&component);
-            if (learned.empty()) return 2;
-            // The same user dictionary the translator learns into (shared through the component pool).
-            auto* dictionaries = rime::Dictionary::Require("dictionary");
-            auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
-            if (!dictionaries || !userDictionaries) return 0;
-            const rime::Ticket ticket(session->schema(), "translator");
-            rime::the<rime::Dictionary> dictionary(dictionaries->Create(ticket));
-            rime::the<rime::UserDictionary> userDictionary(userDictionaries->Create(ticket));
-            if (!dictionary || !userDictionary || !dictionary->Load() || !userDictionary->Load() ||
-                userDictionary->readonly()) return 0;
-            userDictionary->Attach(dictionary->primary_table(), dictionary->prism());
-            bool forgotten = false;
-            for (const auto* entry : learned) forgotten = userDictionary->UpdateEntry(*entry, -1) || forgotten;
-            context->RefreshNonConfirmedComposition();
-            return forgotten ? 1 : 0;
+        } else if (phrase->entry().commit_count > 0) {
+            learned.push_back(&phrase->entry());
         }
-        const bool learned = (sentence ? sentence->components().front().commit_count
-                                       : phrase->entry().commit_count) > 0;
-        // Rime's own deletion: the owning translator marks the entry deleted and refreshes the menu.
-        if (!context->DeleteCandidate(nativeIndex)) return 0;
-        return learned ? 1 : 2;
+        // Nothing learned: write nothing (a deletion mark would make the next pick count twice).
+        if (learned.empty()) return 2;
+        // The same user dictionary the translator learns into (shared through the component pool).
+        // Its records are erased, so picking the word again learns from the start.
+        auto* dictionaries = rime::Dictionary::Require("dictionary");
+        auto* userDictionaries = rime::UserDictionary::Require("user_dictionary");
+        const rime::Ticket ticket(session->schema(), "translator");
+        rime::the<rime::Dictionary> dictionary(dictionaries ? dictionaries->Create(ticket) : nullptr);
+        rime::the<rime::UserDictionary> userDictionary(userDictionaries ? userDictionaries->Create(ticket) : nullptr);
+        bool forgotten = false;
+        if (dictionary && userDictionary && dictionary->Load() && userDictionary->Load() &&
+            !userDictionary->readonly()) {
+            userDictionary->Attach(dictionary->primary_table(), dictionary->prism());
+            for (const auto* entry : learned) forgotten = userDictionary->Forget(*entry) || forgotten;
+        }
+        if (forgotten) {
+            context->RefreshNonConfirmedComposition();
+            return 1;
+        }
+        // Not in that dictionary (another translator's word): Rime's own deletion by the owning translator.
+        if (sentence && sentence->components().size() > 1) return 0;
+        return context->DeleteCandidate(nativeIndex) ? 1 : 0;
     }
 
     bool reloadSessionAfterMaintenance() {

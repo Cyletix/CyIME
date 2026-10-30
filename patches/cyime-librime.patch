@@ -1053,7 +1053,7 @@ index 56d4eef1..6d057fe2 100644
  
    uint32_t dict_file_checksum() const;
 diff --git a/src/rime/dict/user_dictionary.cc b/src/rime/dict/user_dictionary.cc
-index 953c59cf..ca384421 100644
+index 953c59cf..92182f80 100644
 --- a/src/rime/dict/user_dictionary.cc
 +++ b/src/rime/dict/user_dictionary.cc
 @@ -7,9 +7,11 @@
@@ -1194,7 +1194,7 @@ index 953c59cf..ca384421 100644
    TickCount present_tick = tick_ + 1;
    size_t len = input.length();
    size_t start = result->cache_size();
-@@ -430,13 +470,146 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry, int commits) {
+@@ -430,13 +470,160 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry, int commits) {
    return UpdateEntry(entry, commits, "");
  }
  
@@ -1233,6 +1233,20 @@ index 953c59cf..ca384421 100644
 +  if (taken)
 +    T9InvalidateUserDictionary();
 +  return taken;
++}
++
++bool UserDictionary::Forget(const DictEntry& entry) {
++  if (!db_)
++    return false;
++  string code_str(entry.custom_code);
++  if (code_str.empty() && !TranslateCodeToString(entry.code, &code_str))
++    return false;
++  const string key = code_str + '\t' + entry.text;
++  string value;
++  if (!db_->Fetch(key, &value) || UserDbValue(value).commits <= 0 || !db_->Erase(key))
++    return false;
++  T9InvalidateUserDictionary();
++  return true;
 +}
 +
 +int UserDictionary::RestoreExact(const path& file) {
@@ -1341,7 +1355,7 @@ index 953c59cf..ca384421 100644
    string value;
    UserDbValue v;
    if (db_->Fetch(key, &value)) {
-@@ -461,10 +634,21 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry,
+@@ -461,10 +648,21 @@ bool UserDictionary::UpdateEntry(const DictEntry& entry,
      v.dee = algo::formula_d(0.0, (double)tick_, v.dee, (double)v.tick);
    }
    v.tick = tick_;
@@ -1364,7 +1378,7 @@ index 953c59cf..ca384421 100644
    tick_ += increment;
    try {
      return db_->MetaUpdate("/tick", std::to_string(tick_));
-@@ -506,6 +690,7 @@ bool UserDictionary::RevertRecentTransaction() {
+@@ -506,6 +704,7 @@ bool UserDictionary::RevertRecentTransaction() {
      return false;
    if (time(NULL) - transaction_time_ > 3 /*seconds*/)
      return false;
@@ -1373,10 +1387,10 @@ index 953c59cf..ca384421 100644
  }
  
 diff --git a/src/rime/dict/user_dictionary.h b/src/rime/dict/user_dictionary.h
-index 7886e494..d55640a7 100644
+index 7886e494..3fe897ce 100644
 --- a/src/rime/dict/user_dictionary.h
 +++ b/src/rime/dict/user_dictionary.h
-@@ -71,6 +71,18 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -71,6 +71,21 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
    bool UpdateEntry(const DictEntry& entry,
                     int commits,
                     const string& new_entry_prefix);
@@ -1387,6 +1401,9 @@ index 7886e494..d55640a7 100644
 +  // not happened; an entry left with none is marked deleted (back to the dictionary's own rank). Returns the number
 +  // of commits taken back.
 +  int Unlearn(const string& text, int commits);
++  // CyIME: forgets this entry's learning outright (the record is erased), so picking it again learns from the start;
++  // Rime's own deletion keeps the count and weight, and a single pick brings all of it back. False without a record.
++  bool Forget(const DictEntry& entry);
 +  // CyIME: writes the whole user dictionary as a text snapshot (Rime's own .userdb.txt format).
 +  bool Export(const path& file) { return db_ && db_->Backup(file); }
 +  // CyIME: puts every entry back exactly as an Export snapshot has it (entries added since are erased);
@@ -1395,7 +1412,7 @@ index 7886e494..d55640a7 100644
    bool UpdateTickCount(TickCount increment);
  
    bool NewTransaction();
-@@ -95,6 +107,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -95,6 +110,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
                   size_t current_pos,
                   const string& current_prefix,
                   DfsState* state);
@@ -1405,7 +1422,7 @@ index 7886e494..d55640a7 100644
  
   private:
    string name_;
-@@ -105,6 +120,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
+@@ -105,6 +123,9 @@ class UserDictionary : public Class<UserDictionary, const Ticket&> {
    hash_map<SyllableId, string> rev_syllabary_;
    TickCount tick_ = 0;
    time_t transaction_time_ = 0;
