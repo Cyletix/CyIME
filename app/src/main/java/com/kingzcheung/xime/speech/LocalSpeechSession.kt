@@ -62,12 +62,15 @@ internal class LocalSpeechSession(
     private val onText: (String) -> Unit,
     private val onError: (String) -> Unit,
     private val onRegion: (Long, Int, SpeechBoundary) -> Unit = { _, _, _ -> },
-    /** 整句定稿开关；只影响「流式预览 + SenseVoice 校正」组合。 */
+    /** 整句定稿开关；影响「流式预览 + SenseVoice 校正」组合和只用 SenseVoice（没有预览）的识别。 */
     wholeSentence: Boolean = false,
     /** 结束时整段重识别的时间预算，超出就保留按停顿定稿的文字。 */
     private val wholeSessionBudgetMs: Long = WHOLE_SESSION_BUDGET_MS,
 ) : ResidentSession {
-    private val wholeSentenceActive = wholeSentence && engine.hasRefinement && engine.isStreaming
+    // SenseVoice alone (no streaming or rolling preview, e.g. the 完整版 without Paraformer) keeps punctuation and gets
+    // the same end-of-input re-read; its segments stay at the engine's 6 s so text still appears while speaking.
+    private val wholeSentenceActive = wholeSentence &&
+        (engine.hasRefinement && engine.isStreaming || !engine.isStreaming && !engine.hasRollingPreview)
     /** 整句定稿时保留模型标点（整句的句末不再是切点硬塞的句号）。 */
     private val transcript = SpeechTranscript(keepMarks = wholeSentenceActive)
     private val decodeTimeoutMs = if (wholeSentenceActive) maxOf(engine.decodeTimeoutMs, WHOLE_SENTENCE_DECODE_TIMEOUT_MS)
@@ -101,7 +104,7 @@ internal class LocalSpeechSession(
     private val wholeLock = Any()
     private val wholeSettled = java.util.concurrent.CountDownLatch(1)
     private val segmenter: SpeechSegmenter by lazy { SpeechSegmenter(engine.detector(),
-        maxSegmentMs = if (wholeSentenceActive) WHOLE_SENTENCE_MAX_SEGMENT_MS else engine.maxSegmentMs,
+        maxSegmentMs = if (wholeSentenceActive && engine.isStreaming) WHOLE_SENTENCE_MAX_SEGMENT_MS else engine.maxSegmentMs,
         onAudio = { id, samples ->
             if (id != activeId) { activeId = id; segmentSamples = 0; previewAudio.clear() }
             segmentSamples += samples.size
@@ -179,7 +182,8 @@ internal class LocalSpeechSession(
         if (engine.isStreaming) publish(id, preview, boundary, confirmed = !engine.hasRefinement)
         // 整句定稿: the end-of-input re-read covers the last sentence, so the stop region is not decoded twice
         // (saves up to one 30 s decode of waiting). If the re-read is cancelled or over budget, its preview stays.
-        if (wholeSentenceActive && boundary == SpeechBoundary.STOP && !sessionOverflow) return
+        // Without a streaming preview there is nothing to keep, so the stop region is still decoded.
+        if (wholeSentenceActive && engine.isStreaming && boundary == SpeechBoundary.STOP && !sessionOverflow) return
         if (engine.hasRefinement || !engine.isStreaming) {
             synchronized(outputLock) { pending.add(id) }
             val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(decodeTimeoutMs)

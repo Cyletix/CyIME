@@ -101,26 +101,31 @@ internal fun OfflineModelCard() {
                         Switch(checked = enabled, enabled = available, onCheckedChange = null)
                     }
                 }
-                // 整句定稿只改变 SenseVoice 校正的切法，所以只在有语言开着校正时可用。
+                // 整句定稿只改变 SenseVoice 定稿的切法：有语言开着校正，或中文直接用 SenseVoice 时可用。
                 val anyCorrection = listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH)
                     .any { SpeechModelSelection.hasCorrection(selected.getValue(it)) }
+                val senseVoiceChinese = selected.getValue(InputLanguage.CHINESE) == SpeechModelCatalog.SENSEVOICE
+                val wholeSentenceAvailable = anyCorrection || senseVoiceChinese
                 var wholeSentence by remember { mutableStateOf(SettingsPreferences.isSttWholeSentence(context)) }
                 HorizontalDivider(modifier = Modifier.padding(start = 16.dp),
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Row(Modifier.fillMaxWidth().settingsSearchAnchor("整句定稿").testTag("speech-whole-sentence")
-                    .toggleable(value = wholeSentence, enabled = anyCorrection, role = Role.Switch,
+                    .toggleable(value = wholeSentence, enabled = wholeSentenceAvailable, role = Role.Switch,
                         onValueChange = { wholeSentence = it; SettingsPreferences.setSttWholeSentence(context, it) })
                     .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("整句定稿", style = MaterialTheme.typography.bodyLarge)
-                        Text(if (anyCorrection) "说完一整句（停顿约 1 秒或点结束）再统一校正一次，保留标点，更准，说完要多等一会儿；关闭时每 6 秒校正一次。"
-                            else "先开启上面的 SenseVoice 二次校正。",
+                        Text(when {
+                            anyCorrection -> "说完一整句（停顿约 1 秒或点结束）再统一校正一次，保留标点，更准，说完要多等一会儿；关闭时每 6 秒校正一次。"
+                            senseVoiceChinese -> "中文用 SenseVoice 时保留标点，说完（点结束）把整段再识别一次，更准，说完要多等一会儿。"
+                            else -> "先开启上面的 SenseVoice 二次校正。"
+                        },
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (anyCorrection) Text(if (xasrReady) "中文整句定稿使用 X-ASR 模型。" else "中文整句定稿使用 SenseVoice；下载 X-ASR 模型（约 136 MB）后改用它，更准、更快。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Switch(checked = wholeSentence, enabled = anyCorrection, onCheckedChange = null)
+                    Switch(checked = wholeSentence, enabled = wholeSentenceAvailable, onCheckedChange = null)
                 }
                 if (anyCorrection && !xasrReady) {
                     ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }
