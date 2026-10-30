@@ -60,7 +60,12 @@ internal class LocalSpeechSession(
     private val onText: (String) -> Unit,
     private val onError: (String) -> Unit,
     private val onRegion: (Long, Int, SpeechBoundary) -> Unit = { _, _, _ -> },
+    /** 整句定稿开关；只影响「流式预览 + SenseVoice 校正」组合。 */
+    wholeSentence: Boolean = false,
 ) : ResidentSession {
+    private val wholeSentenceActive = wholeSentence && engine.hasRefinement && engine.isStreaming
+    private val decodeTimeoutMs = if (wholeSentenceActive) maxOf(engine.decodeTimeoutMs, WHOLE_SENTENCE_DECODE_TIMEOUT_MS)
+        else engine.decodeTimeoutMs
     private fun worker(name: String, capacity: Int) = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
         ArrayBlockingQueue(capacity), { task -> Thread(task, name).apply { isDaemon = true } })
     private val audio = worker("CyIME-Speech", 100) // 10 s of 100 ms PCM, bounded on low-end CPUs
@@ -82,7 +87,7 @@ internal class LocalSpeechSession(
     private val previewAudio = ArrayList<FloatArray>()
     private val previewBusy = AtomicBoolean(false)
     private val segmenter: SpeechSegmenter by lazy { SpeechSegmenter(engine.detector(),
-        maxSegmentMs = engine.maxSegmentMs,
+        maxSegmentMs = if (wholeSentenceActive) WHOLE_SENTENCE_MAX_SEGMENT_MS else engine.maxSegmentMs,
         onAudio = { id, samples ->
             if (id != activeId) { activeId = id; segmentSamples = 0; previewAudio.clear() }
             segmentSamples += samples.size
@@ -154,7 +159,7 @@ internal class LocalSpeechSession(
         if (engine.isStreaming) publish(id, preview, boundary, confirmed = !engine.hasRefinement)
         if (engine.hasRefinement || !engine.isStreaming) {
             synchronized(outputLock) { pending.add(id) }
-            val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(engine.decodeTimeoutMs)
+            val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(decodeTimeoutMs)
             try {
                 refinement.execute {
                     if (abandoned.get()) return@execute
@@ -191,7 +196,7 @@ internal class LocalSpeechSession(
         }
     }
 
-    override fun finish(): String = finish(engine.decodeTimeoutMs + 2000)
+    override fun finish(): String = finish(decodeTimeoutMs + 2000)
 
     /** Drains actual audio, then waits only for outstanding work; no artificial stop delay. */
     fun finish(timeoutMs: Long): String {

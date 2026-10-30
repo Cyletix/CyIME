@@ -65,6 +65,7 @@ object SettingsPreferences {
     const val KEY_STT_REFINER_IDLE_MINUTES = "stt_refiner_idle_minutes"
     const val KEY_STT_ENGINE_IDLE_MINUTES = "stt_engine_idle_minutes"
     const val KEY_STT_DEBUG_RECORD = "stt_debug_record"
+    const val KEY_STT_WHOLE_SENTENCE = "stt_whole_sentence"
     
     /** 默认主题 ID，可从 xime.yaml 的 style.color_scheme 初始化。 */
     @JvmStatic
@@ -636,6 +637,15 @@ object SettingsPreferences {
 
     fun setSttDebugRecord(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_STT_DEBUG_RECORD, enabled).apply()
+    }
+
+    /** 整句定稿：SenseVoice 在真停顿或结束时校正一整句，不再每 6 秒切一次。默认关，真机耗时测完再定。 */
+    fun isSttWholeSentence(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_STT_WHOLE_SENTENCE, false)
+    }
+
+    fun setSttWholeSentence(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_STT_WHOLE_SENTENCE, enabled).apply()
     }
 
     // ---- 插件网络授权（per plugin per host） ----

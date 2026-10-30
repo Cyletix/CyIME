@@ -196,4 +196,11 @@ class AsrInferenceClient(context: Context) {
             requireService().setSaveTuningAudio(enabled)
         } catch (_: Exception) {}
     }
+
+    /** 同步“整句定稿”设置；下一次录音开始时生效。 */
+    suspend fun setWholeSentenceFinal(enabled: Boolean) {
+        try {
+            requireService().setWholeSentenceFinal(enabled)
+        } catch (_: Exception) {}
+    }
 }

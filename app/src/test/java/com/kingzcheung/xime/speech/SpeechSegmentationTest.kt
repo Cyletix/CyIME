@@ -260,4 +260,62 @@ class SpeechSegmentationTest {
         s.acceptPcm(pcm(16000))
         assertEquals("", s.finish()); assertEquals(1, errors.size)
     }
+
+    private class RecordingEngine : FakeEngine(true) {
+        val refined = java.util.Collections.synchronizedList(mutableListOf<Int>())
+        override fun refine(samples: FloatArray): String { refined.add(samples.size); return "句" }
+    }
+
+    @Test fun `whole sentence corrects a 10 s phrase once while off keeps the 6 s cuts`() {
+        for (whole in listOf(false, true)) {
+            val engine = RecordingEngine()
+            val errors = mutableListOf<String>()
+            val s = LocalSpeechSession(engine, {}, { errors.add(it) }, wholeSentence = whole)
+            s.acceptPcm(pcm(160000)); s.acceptPcm(pcm(24000, 0)) // 10 s speech, then a 1.5 s pause
+            s.finish()
+            assertTrue(errors.isEmpty())
+            if (whole) {
+                assertEquals(1, engine.refined.size)
+                assertTrue(engine.refined.single() >= 160000)
+            } else {
+                assertTrue("off: ${engine.refined}", engine.refined.size >= 2)
+                assertTrue(engine.refined.all { it <= (6000 + 2000) * 16 })
+            }
+        }
+    }
+
+    @Test fun `whole sentence still cuts continuous speech within the 30 s SenseVoice limit`() {
+        val engine = RecordingEngine()
+        val s = LocalSpeechSession(engine, {}, {}, wholeSentence = true)
+        repeat(45) { s.acceptPcm(pcm(16000)) } // 45 s without any pause
+        s.finish()
+        assertTrue(engine.refined.toString(), engine.refined.size >= 2)
+        // The hard cut lands on the next 32 ms frame: at most 30 s + 512 samples.
+        assertTrue(engine.refined.toString(), engine.refined.all { it <= (WHOLE_SENTENCE_MAX_SEGMENT_MS + 2000) * 16 + 512 })
+        assertTrue(engine.refined.toString(), engine.refined.first() >= WHOLE_SENTENCE_MAX_SEGMENT_MS * 16)
+        assertEquals(45 * 16000, engine.refined.sum()) // every sample decoded exactly once
+    }
+
+    @Test fun `whole sentence has no effect without a second pass`() {
+        val counts = listOf(false, true).map { whole ->
+            val engine = FakeEngine(false)
+            LocalSpeechSession(engine, {}, {}, wholeSentence = whole).apply { repeat(20) { acceptPcm(pcm(16000)) }; finish() }
+            engine.finalizedSizes.size
+        }
+        assertEquals(counts[0], counts[1])
+    }
+
+    @Test fun `cancel in whole sentence mode leaves no late correction`() {
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        val output = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val engine = object : FakeEngine(true) {
+            override fun refine(samples: FloatArray): String { entered.countDown(); release.await(2, TimeUnit.SECONDS); return "迟到" }
+        }
+        val s = LocalSpeechSession(engine, { output.add(it) }, {}, wholeSentence = true)
+        s.acceptPcm(pcm(160000)); s.acceptPcm(pcm(24000, 0))
+        assertTrue(entered.await(2, TimeUnit.SECONDS)); s.cancel(); val count = output.size
+        release.countDown(); s.awaitIdle()
+        assertEquals(count, output.size); assertFalse(output.contains("迟到"))
+        assertTrue(s.isIdle)
+    }
 }
