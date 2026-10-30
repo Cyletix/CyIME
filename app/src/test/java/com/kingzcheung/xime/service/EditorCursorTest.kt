@@ -471,4 +471,73 @@ class EditorCursorTest {
         cursor.endSelection(ic)
         verify(ic).setSelection(0, 0)
     }
+
+    private fun keyEvents(action: () -> Unit): List<List<Int>> {
+        val events = mutableListOf<List<Int>>()
+        mockConstruction(KeyEvent::class.java) { _, construction ->
+            val args = construction.arguments()
+            events += listOf(args[2] as Int, args[3] as Int, args[5] as Int)
+        }.use { action() }
+        return events
+    }
+
+    @Test fun `multi line arrows let the host move by visual line but never leave the text`() {
+        val ic = editor(6, text = "one\nabcd\nlast")
+        val cursor = EditorCursor()
+        assertEquals(listOf(listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 0), listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP, 0)),
+            keyEvents { cursor.moveLine(ic, -1, multiLine = true) })
+        val first = editor(0, text = "one\nabcd")
+        val last = editor(8, text = "one\nabcd")
+        assertEquals(emptyList<List<Int>>(), keyEvents {
+            assertEquals(false, cursor.moveLine(first, -1, multiLine = true))
+            assertEquals(false, cursor.moveLine(last, 1, multiLine = true))
+            assertEquals(false, cursor.moveLine(first, -1, selecting = true, multiLine = true))
+        })
+        val missing = mock<InputConnection>()
+        whenever(missing.getTextBeforeCursor(1, 0)).thenReturn("")
+        assertEquals(false, cursor.moveLine(missing, -1, multiLine = true))
+        verify(missing, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `single line arrows keep the in-text movement`() {
+        val ic = editor(2)
+        EditorCursor().moveLine(ic, -1)
+        verify(ic).setSelection(0, 0)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `plain arrow with a selection collapses instead of sending a focus key`() {
+        val ic = editor(0, 4)
+        EditorCursor().moveLine(ic, 1, multiLine = true)
+        verify(ic).setSelection(4, 4)
+        verify(ic, never()).sendKeyEvent(any())
+    }
+
+    @Test fun `selecting by line holds shift and restores the active end first`() {
+        val ic = editor(6, text = "one\nabcd\nlast")
+        val cursor = EditorCursor()
+        cursor.beginSelection(ic)
+        cursor.move(ic, -1, true)
+        clearInvocations(ic)
+        val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        assertEquals(listOf(
+            listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, shift),
+            listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, shift),
+            listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP, shift),
+            listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0),
+        ), keyEvents { cursor.moveLine(ic, -1, selecting = true, multiLine = true) })
+        verify(ic).setSelection(6, 5)
+    }
+
+    @Test fun `line start and end use the host visual line keys`() {
+        val ic = editor(6, text = "one\nabcd\nlast")
+        val cursor = EditorCursor()
+        assertEquals(listOf(listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MOVE_HOME, 0), listOf(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MOVE_HOME, 0)),
+            keyEvents { cursor.moveToLineBoundary(ic, false) })
+        cursor.beginSelection(ic)
+        val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        assertEquals(listOf(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MOVE_END, shift),
+            keyEvents { cursor.moveToLineBoundary(ic, true, selecting = true) }[1])
+        verify(ic, never()).setSelection(any(), any())
+    }
 }
