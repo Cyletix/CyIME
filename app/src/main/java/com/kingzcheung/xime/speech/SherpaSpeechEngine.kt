@@ -139,6 +139,17 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
             return cleanSenseVoiceText(result.text, result.lang)
         } finally { s.release() }
     }
+    override fun refinePunctuated(samples: FloatArray): String {
+        if (japanese) return refine(samples)
+        val recognizer = refiner()
+        val s = recognizer.createStream()
+        try {
+            s.acceptWaveform(samples, 16000)
+            recognizer.decode(s)
+            val result = recognizer.getResult(s)
+            return cleanSenseVoiceText(result.text, result.lang, keepMarks = true)
+        } finally { s.release() }
+    }
     override fun refineRich(samples: FloatArray): RichTranscript {
         if (japanese) {
             val words = refine(samples)

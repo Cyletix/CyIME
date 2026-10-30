@@ -43,7 +43,7 @@ fun main(args: Array<String>) {
             exchange("CASE\t${file.name.removeSuffix(".raw.f32")}\t$mode")
             val level = SpeechDetectionLevel()
             val first = SpeechTranscript()
-            val second = SpeechTranscript()
+            val second = SpeechTranscript(keepMarks = mode == "refinement-whole")
             var lastId = -1L
             var count = 0
             val detector = object : SpeechDetector {
@@ -64,7 +64,7 @@ fun main(args: Array<String>) {
                 { id, audio, boundary ->
                     val parts = exchange("END\t$boundary\t${encode(audio)}").split('|')
                     first.update(id, decode(parts[0]), boundary)
-                    second.update(id, cleanSenseVoiceText(decode(parts[1])), boundary)
+                    second.update(id, cleanSenseVoiceText(decode(parts[1]), keepMarks = whole), boundary)
                 }, minimumPauseMs = if (mode == "single") 0 else if (whole) 1000 else if (mode.contains("-pause")) mode.substringAfter("-pause").toInt() else 600,
                 useEnergyPause = false, resetDetectorOnPause = true)
             for (offset in pcm.indices step 1600) segmenter.accept(pcm.copyOfRange(offset, minOf(offset + 1600, pcm.size)))

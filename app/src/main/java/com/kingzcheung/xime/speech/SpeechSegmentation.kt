@@ -138,11 +138,63 @@ private val richTags = Regex("<\\|[^|]*\\|>")
 private val speechPunctuation = Regex("[\\p{P}]")
 private val speechWhitespace = Regex("[\\p{Z}\\s]+")
 
+/** Sentence and clause marks kept by 整句定稿 (full-width after Chinese text). */
+private val keptMarks = mapOf(',' to '，', '，' to '，', '。' to '。', '.' to '。', '？' to '？', '?' to '？',
+    '！' to '！', '!' to '！', '、' to '、', '；' to '；', ';' to '；', '：' to '：', ':' to '：')
+
 /** Model-added sentence punctuation becomes spacing; numeric notation keeps its meaning.
  * Spoken punctuation names stay as words until the final UI boundary, so repeated local
  * cleanup (SenseVoice -> transcript -> UI) cannot erase an explicitly dictated symbol.
+ * [keepMarks] (整句定稿): clause/sentence marks stay — full-width after Chinese, ASCII after Latin —
+ * and a run of marks collapses to its strongest one, so repeated cleanup is idempotent.
  */
-internal fun cleanSpeechText(text: String): String {
+internal fun cleanSpeechText(text: String, keepMarks: Boolean = false): String {
+    if (keepMarks) return keepSpeechMarks(cleanSpeechText(markPlaceholders(text)))
+    return cleanSpeechTextOnly(text)
+}
+
+// Marks are swapped for private-use placeholders, the ordinary cleanup runs (numbers, tags,
+// spacing), then the placeholders become real marks again. Numeric '.', ',' and ':' are left
+// alone here so the ordinary cleanup still decides them.
+private val placeholder = keptMarks.values.distinct().withIndex().associate { (i, m) -> m to ('' + i) }
+private val fromPlaceholder = placeholder.entries.associate { (m, p) -> p to m }
+private fun markPlaceholders(text: String): String = buildString {
+    text.forEachIndexed { i, c ->
+        val mark = keptMarks[c]
+        val numeric = c in ".,:" && text.getOrNull(i - 1)?.isDigit() == true && text.getOrNull(i + 1)?.isDigit() == true
+        append(if (mark != null && !numeric) placeholder.getValue(mark) else c)
+    }
+}
+private val strength = "、，；：。！？"
+private fun keepSpeechMarks(text: String): String {
+    val out = StringBuilder()
+    var i = 0
+    while (i < text.length) {
+        val c = text[i]
+        val mark = fromPlaceholder[c]
+        if (mark == null) { out.append(c); i++; continue }
+        // Collapse a run of marks (and the spaces between them) into the strongest one.
+        var best: Char = mark; var j = i + 1
+        while (j < text.length && (fromPlaceholder[text[j]] != null || text[j] == ' ')) {
+            fromPlaceholder[text[j]]?.let { if (strength.indexOf(it) > strength.indexOf(best)) best = it }
+            j++
+        }
+        while (out.isNotEmpty() && out.last() == ' ') out.setLength(out.length - 1)
+        val left = out.lastOrNull()
+        // Digits are neutral: "版本 1.14。" stays Chinese, "version 2." stays ASCII.
+        val word = out.lastOrNull { !it.isDigit() && it != ' ' && it != '.' }
+        if (left != null) {
+            if (word != null && word.code < 128 && word.isLetter()) {
+                out.append(when (best) { '，', '、' -> ','; '。' -> '.'; '？' -> '?'; '！' -> '!'; '；' -> ';'; else -> ':' })
+                if (j < text.length) out.append(' ')
+            } else out.append(best)
+        }
+        i = j
+    }
+    return out.toString().trim()
+}
+
+private fun cleanSpeechTextOnly(text: String): String {
     val plain = richTags.replace(text, "")
     fun neighbor(from: Int, step: Int): Char? {
         var index = from
@@ -191,7 +243,7 @@ internal fun cleanSpeechText(text: String): String {
 
 // Remove SenseVoice's CJK token-spacing before punctuation normalization so acoustic
 // and punctuation boundaries survive. Latin word spacing is never removed.
-internal fun cleanSenseVoiceText(text: String, detectedLanguage: String = ""): String {
+internal fun cleanSenseVoiceText(text: String, detectedLanguage: String = "", keepMarks: Boolean = false): String {
     // sherpa-onnx separates the language/event prefix from text. A no-speech classification
     // must be handled before tag cleanup; it is not a word-confidence score or a blacklist.
     if (detectedLanguage.removePrefix("<|").removeSuffix("|>").equals("nospeech", ignoreCase = true) ||
@@ -213,16 +265,16 @@ internal fun cleanSenseVoiceText(text: String, detectedLanguage: String = ""): S
             i = next
         }
     }
-    return cleanSpeechText(joined)
+    return cleanSpeechText(joined, keepMarks)
 }
 
 /** Identified regions allow late second-pass results to replace exactly their preview. */
-internal class SpeechTranscript {
+internal class SpeechTranscript(private val keepMarks: Boolean = false) {
     private data class Region(var text: String = "", var boundary: SpeechBoundary = SpeechBoundary.STOP)
     private val regions = sortedMapOf<Long, Region>()
     fun update(id: Long, text: String, boundary: SpeechBoundary? = null): String {
         val region = regions.getOrPut(id) { Region() }
-        region.text = cleanSpeechText(text)
+        region.text = cleanSpeechText(text, keepMarks)
         if (boundary != null) region.boundary = boundary
         return text()
     }
@@ -230,6 +282,12 @@ internal class SpeechTranscript {
         var previous = SpeechBoundary.STOP
         for (region in regions.values) {
             if (region.text.isNotEmpty()) {
+                // A kept mark already separates the sentences: no space, and never two marks in a row.
+                if (keepMarks && isNotEmpty() && last() in "，。？！、；：") {
+                    append(region.text.trimStart('，', '。', '？', '！', '、', '；', '：'))
+                    previous = region.boundary
+                    continue
+                }
                 if (isNotEmpty() && (previous != SpeechBoundary.LIMIT ||
                     last().isLetterOrDigit() && last().code < 128 && region.text.first().code < 128)) append(' ')
                 append(region.text)
