@@ -30,9 +30,9 @@ class ClipboardPastePredictionTest {
                 }
             }
             whenever(service.isChineseMode).thenReturn(true)
-            whenever(service.commitTextSilently(any(), any(), any())).thenReturn(result)
+            whenever(service.commitTextSilently(any(), any(), any(), any())).thenReturn(result)
             doCallRealMethod().whenever(service).dismissPredictionsForPaste()
-            doCallRealMethod().whenever(service).commitTextAndPredict(any(), any(), any())
+            doCallRealMethod().whenever(service).commitTextAndPredict(any(), any(), any(), any())
             doCallRealMethod().whenever(service).commitPastedText(any())
         }
     }
@@ -41,7 +41,7 @@ class ClipboardPastePredictionTest {
         val f = Fixture(TextCommitResult.ACCEPTED_HOST)
         f.service.commitPastedText("刚复制的中文内容")
         verify(f.prediction).invalidatePendingPredictions()
-        verify(f.service).commitTextSilently("刚复制的中文内容", true, false)
+        verify(f.service).commitTextSilently("刚复制的中文内容", true, false, CommitCaret.NONE)
         verify(f.handler, never()).post(any())
         assertTrue(f.candidates.value.associationCandidates.isEmpty())
         assertEquals("", f.candidates.value.pendingEnglishText)
@@ -62,6 +62,6 @@ class ClipboardPastePredictionTest {
         f.service.commitPastedText("剪贴板")
         f.service.commitTextAndPredict("打字", false)
         verify(f.handler).post(any())
-        verify(f.service).commitTextSilently("打字", false, false)
+        verify(f.service).commitTextSilently("打字", false, false, CommitCaret.NONE)
     }
 }
