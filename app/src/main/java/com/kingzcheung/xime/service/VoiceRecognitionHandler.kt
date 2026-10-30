@@ -345,7 +345,7 @@ class VoiceRecognitionHandler(
             return
         }
 
-        val cleanText = normalizeVoiceText(text, normalizationLanguage ?: getState().inputProfile.language, keepVoiceMarks())
+        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it)) }
         if (toolbarSession) {
             // 部分引擎 stop 时重发上一句 final；没有新 partial 时只保留一次。
             if (cleanText.isNotEmpty() && !text.trimStart().startsWith("错误:") && !text.trimStart().startsWith("错误：") &&
@@ -416,13 +416,15 @@ class VoiceRecognitionHandler(
         toolbarText.update(ic, toolbarSentencePrefix.orEmpty() + text)
     }
 
-    /** 整句定稿 keeps the local model's punctuation; online engines and the 6 s mode keep the old spacing. */
-    private fun keepVoiceMarks() = SettingsPreferences.isSttUseLocal(context) && SettingsPreferences.isSttWholeSentence(context)
+    /** 整句定稿 (Chinese recognition only) keeps the local model's punctuation; online engines, other recognizers
+     *  (including the English side of a Chinese pair) and the 6 s mode keep the old spacing. */
+    private fun keepVoiceMarks(recognition: InputLanguage) = recognition == InputLanguage.CHINESE &&
+        SettingsPreferences.isSttUseLocal(context) && SettingsPreferences.isSttWholeSentence(context)
 
     private fun handlePartialResult(text: String) {
         if (!acceptsInputSession()) return
         if (sessionAbandoned || suppressDuplicateFinal) return
-        val cleanText = normalizeVoiceText(text, normalizationLanguage ?: getState().inputProfile.language, keepVoiceMarks())
+        val cleanText = (normalizationLanguage ?: getState().inputProfile.language).let { normalizeVoiceText(text, it, keepVoiceMarks(inputLanguage ?: it)) }
         if (cleanText == lastPartialText) return
         lastPartialText = cleanText
         Log.d(TAG, "Speech result (partial): $cleanText")

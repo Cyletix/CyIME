@@ -55,6 +55,7 @@ class VoiceRecognitionHandlerFinishTest {
     private var recordingStoppedCount = 0
     private var voiceCompleteCount = 0
     private var currentState = InputUIState(currentSchemaId = "rime_ice")
+    private var wholeSentence = false
 
     /** mock mainHandler 的 postDelayed 队列，可手动推进超时。 */
     private val posted = mutableListOf<Runnable>()
@@ -72,6 +73,9 @@ class VoiceRecognitionHandlerFinishTest {
         whenever(mockPrefs.getBoolean(any(), any<Boolean>())).thenAnswer { it.getArgument(1) }
         whenever(mockPrefs.getBoolean(eq(SettingsPreferences.KEY_STT_USE_LOCAL), any<Boolean>()))
             .thenReturn(true)
+        // 整句定稿默认开；这些用例断言的是关闭时（每 6 秒校正、标点变空格）的行为，开启时的用例单独设 wholeSentence = true。
+        whenever(mockPrefs.getBoolean(eq(SettingsPreferences.KEY_STT_WHOLE_SENTENCE), any<Boolean>()))
+            .thenAnswer { wholeSentence }
         whenever(mockManager.finishTimeoutMs).thenReturn(8000L)
         whenever(mockMainHandler.postDelayed(any<Runnable>(), anyLong())).thenAnswer {
             posted.add(it.getArgument(0))
@@ -460,6 +464,44 @@ class VoiceRecognitionHandlerFinishTest {
         onResult("How are you？")
         assertEquals("你好 world How are you", editor.toString())
         assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `whole sentence keeps the local model's Chinese punctuation`() {
+        wholeSentence = true
+        startToolbar()
+        onPartial("今天天气不错，我们去公园吧。")
+        assertEquals("今天天气不错，我们去公园吧。", editor.toString())
+        handler.finishRecognition()
+        onResult("今天天气不错，我们去公园吧。明天见。")
+        assertEquals("今天天气不错，我们去公园吧。明天见。", editor.toString())
+        assertEquals(1, voiceCompleteCount)
+    }
+
+    @Test fun `whole sentence leaves the English side of a Chinese pair with spaces`() {
+        wholeSentence = true
+        currentState = currentState.copy(isAsciiMode = true)
+        startToolbar()
+        onPartial("Hello, world!")
+        assertEquals("Hello world", editor.toString())
+        handler.finishRecognition()
+        onResult("Hello world.")
+        assertEquals("Hello world", editor.toString())
+    }
+
+    @Test fun `whole sentence leaves a standalone English profile with the old spacing`() {
+        wholeSentence = true
+        currentState = currentState.copy(currentSchemaId = "english", isAsciiMode = true)
+        startToolbar()
+        onPartial("How are you? Fine.")
+        assertEquals("How are you Fine", editor.toString())
+    }
+
+    @Test fun `whole sentence leaves Japanese with the old spacing`() {
+        wholeSentence = true
+        currentState = currentState.copy(currentSchemaId = "japanese")
+        startToolbar()
+        onPartial("今日は、東京です。")
+        assertEquals("今日は 東京です", editor.toString())
     }
 
     @Test fun `final revisions remove punctuation already present in partial without deleting words`() {
