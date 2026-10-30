@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
+import com.kingzcheung.xime.ui.theme.KeyShapes
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.getValue
@@ -493,10 +494,10 @@ private fun RowScope.PreviewKey(
     val glass = LocalKeyboardInputPreferences.current.frostedGlass
     val shadow = KeysConfigHelper.getKeyboardShadow()
     val density = LocalDensity.current
-    val shadowModifier = remember(shadow, density, color, glass.enabled) {
+    val shadowModifier = remember(shadow, KeyShapes.current, density, color, glass.enabled) {
         if (shadow.enabled && !glass.enabled) {
             val offsetPx = with(density) { shadow.elevation.dp.toPx() }
-            val cornerPx = with(density) { shadow.shapeRadius.dp.toPx() }
+            val cornerPx = with(density) { KeyShapes.current.radius(shadow.shapeRadius).dp.toPx() }
             Modifier.drawBehind {
                 drawRoundRect(
                     color = crispShadowColor(color),

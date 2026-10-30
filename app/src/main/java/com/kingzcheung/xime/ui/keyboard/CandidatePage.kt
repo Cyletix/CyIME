@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.KeyShapes
 import com.kingzcheung.xime.ui.theme.VisualStyles
 import com.kingzcheung.xime.ui.theme.visualMaterial
 
@@ -441,7 +442,7 @@ private fun CandidatePageContent(
                 ) {
                     val railKeyModifier = if (compactRail) Modifier.weight(1f) else Modifier.size(46.dp)
                     CompositionLocalProvider(
-                        LocalKeyCornerRadius provides if (matchKeyboard) LocalKeyCornerRadius.current else 14.dp,
+                        LocalKeyCornerRadius provides if (matchKeyboard) LocalKeyCornerRadius.current else KeyShapes.current.radius(14.dp),
                         LocalKeyVisualPadding provides if (matchKeyboard) LocalKeyVisualPadding.current else PaddingValues(0.dp),
                         LocalKeyboardKeyVisualMetrics provides if (matchKeyboard) LocalKeyboardKeyVisualMetrics.current else KeyVisualMetrics.Unspecified,
                         LocalKeyboardKeyContentScale provides if (matchKeyboard) LocalKeyboardKeyContentScale.current else 1f,
@@ -827,7 +828,7 @@ private fun RailKey(
                 interactionSource = interactionSource, onClick = onClick,
             )
             .padding(visualPadding)
-            .clip(RoundedCornerShape(cornerRadius))
+            .clip(RoundedCornerShape(KeyShapes.current.radius(cornerRadius)))
             .background(frostedKeyColor(
                 keyBg, textColor, LocalKeyboardInputPreferences.current.frostedGlass,
                 legacyStateColor = when {

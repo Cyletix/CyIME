@@ -510,6 +510,16 @@ object SettingsPreferences {
         com.kingzcheung.xime.ui.theme.IconAppearance.setKeyboardStyle(context, style)
     }
 
+    const val KEY_KEY_SHAPE = "cyime_key_shape"
+
+    fun getKeyShape(context: Context) = com.kingzcheung.xime.ui.theme.KeyShape.fromId(
+        getPrefs(context).getString(KEY_KEY_SHAPE, null))
+
+    fun setKeyShape(context: Context, shape: com.kingzcheung.xime.ui.theme.KeyShape) {
+        getPrefs(context).edit().putString(KEY_KEY_SHAPE, shape.id).apply()
+        com.kingzcheung.xime.ui.theme.KeyShapes.current = shape
+    }
+
     
     fun setKeyboardTheme(context: Context, themeId: String) {
         getPrefs(context).edit().putString(KEY_KEYBOARD_THEME, themeId).apply()

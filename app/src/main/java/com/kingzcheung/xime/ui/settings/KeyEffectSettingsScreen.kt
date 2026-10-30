@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
+import com.kingzcheung.xime.settings.KeysConfigHelper
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -386,7 +387,8 @@ internal fun KeyVisualEffectSettings(
             Text("点按下方按键预览", style = MaterialTheme.typography.labelMedium)
             val preview = rememberKeyboardInputPreferences().copy(
                 keyGlowEnabled = glowEnabled, keyAnimationEnabled = animationEnabled)
-            CompositionLocalProvider(LocalKeyboardInputPreferences provides preview) {
+            CompositionLocalProvider(LocalKeyboardInputPreferences provides preview,
+                LocalKeyCornerRadius provides KeysConfigHelper.getKeyboardKeyConfig().cornerRadius.dp) {
                 Row(Modifier.fillMaxWidth().height(56.dp)) {
                     listOf("A", "あ", "123").forEach { label ->
                         KeyButton(label, {}, MaterialTheme.colorScheme.secondaryContainer,

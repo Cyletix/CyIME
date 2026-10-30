@@ -229,6 +229,11 @@ private fun ThemeSettingsPage(
                     changeAppearance(context, onThemeChanged) { SettingsPreferences.setVisualStyle(context, style) }
                 }
             }
+            item {
+                KeyShapePicker(com.kingzcheung.xime.ui.theme.KeyShapes.current) { shape ->
+                    changeAppearance(context, onThemeChanged) { SettingsPreferences.setKeyShape(context, shape) }
+                }
+            }
             item { KeyboardAppearanceSettings() }
             item {
                 SettingsSection(title = "桌面图标") {

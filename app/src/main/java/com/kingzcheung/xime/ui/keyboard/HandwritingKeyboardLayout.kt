@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.KeyShapes
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.foundation.Canvas
@@ -133,7 +134,7 @@ fun HandwritingKeyboardLayout(
         return
     }
     val configVersion by KeysConfigHelper.configVersion.collectAsState()
-    val keyConfig = remember(configVersion) { KeysConfigHelper.getKeyboardKeyConfig() }
+    val keyConfig = remember(configVersion, KeyShapes.current) { KeysConfigHelper.getKeyboardKeyConfig() }
     val spacing = keyConfig.spacingFor("qwerty")
     // Measure gaps against the same four-row QWERTY reference. The handwriting
     // controls below still divide the actual body into five equal rows.
