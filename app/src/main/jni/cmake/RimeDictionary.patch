@@ -2427,6 +2427,38 @@ index 28e4f3bf..f66b9986 100644
  };
  
  }  // namespace rime
+diff --git a/src/rime/gear/shape.cc b/src/rime/gear/shape.cc
+index 09748afa..f5a659ca 100644
+--- a/src/rime/gear/shape.cc
++++ b/src/rime/gear/shape.cc
+@@ -13,8 +13,17 @@
+ 
+ namespace rime {
+ 
++// CyIME: full width covers punctuation only. The punctuator still picks its
++// full_shape table, but committed words, raw letters, digits and spaces stay ASCII
++// (GitHub is never committed as ＧｉｔＨｕｂ). Japanese turns cyime_full_shape_ascii
++// on for its full-width 英数.
++static bool WidensAscii(Context* ctx) {
++  return ctx->get_option("full_shape") &&
++         ctx->get_option("cyime_full_shape_ascii");
++}
++
+ void ShapeFormatter::Format(string* text) {
+-  if (!engine_->context()->get_option("full_shape")) {
++  if (!WidensAscii(engine_->context())) {
+     return;
+   }
+   if (std::all_of(text->cbegin(), text->cend(),
+@@ -37,7 +46,7 @@ void ShapeFormatter::Format(string* text) {
+ 
+ ProcessResult ShapeProcessor::ProcessKeyEvent(const KeyEvent& key_event) {
+   DLOG(INFO) << "shape_processor: " << key_event;
+-  if (!engine_->context()->get_option("full_shape")) {
++  if (!WidensAscii(engine_->context())) {
+     return kNoop;
+   }
+   if (key_event.ctrl() || key_event.alt() || key_event.super() ||
 diff --git a/src/rime/gear/table_translator.cc b/src/rime/gear/table_translator.cc
 index 67bc2292..e917a348 100644
 --- a/src/rime/gear/table_translator.cc
