@@ -263,6 +263,32 @@ internal fun KeyboardResizeOverlay(
             morphProgress = 0f
             dockArmed = false
         }
+        // 固定键盘上拉拉满就变悬浮，悬浮键盘接着跟这根手指走，松手停在那里（确认时再保存）。
+        // 上拉的手势在固定模式的控件里，一变悬浮就结束；外层的 undockFollowTracker 接着读手指。
+        val undockFollow = LocalKeyboardUndockFollow.current
+        fun followFromHere(id: androidx.compose.ui.input.pointer.PointerId, fingerInWindow: Offset): Boolean {
+            val follow = undockFollow ?: return false
+            endMorph()
+            follow.start(id, fingerInWindow)
+            switchFloating(true)
+            return true
+        }
+        if (undockFollow != null && floatingMode) {
+            LaunchedEffect(undockFollow) {
+                androidx.compose.runtime.snapshotFlow { undockFollow.finger }.collect { finger ->
+                    val rect = currentPreviewRect ?: return@collect
+                    if (finger == null) return@collect
+                    val moveBounds = currentPreviewState.bounds ?: currentViewRect
+                    currentOnPreviewRectChange(undockFollowRect(rect, finger - overlayOrigin,
+                        UNDOCK_FOLLOW_GRAB_DP * density.density, moveBounds))
+                }
+            }
+            androidx.compose.runtime.DisposableEffect(undockFollow) {
+                val finish = { currentPreviewState.onDragEnd() }
+                undockFollow.onFinish = finish
+                onDispose { if (undockFollow.onFinish === finish) undockFollow.onFinish = null }
+            }
+        }
 
         // This full-size pointer layer catches uncovered hits below the controls.
         // Do not consume down events on their common parent: that cancels Slider drags.
@@ -447,6 +473,9 @@ internal fun KeyboardResizeOverlay(
                         val fixedMove = FixedKeyboardMoveGesture(gestureRect, stableBounds, 12.dp.toPx())
                         var workingPadding = session.bottomPaddingDp.toFloat()
                         var didDrag = false
+                        // 上拉拉满已经变成悬浮、交给外层跟手：这一段手势剩下的移动不再改固定键盘。
+                        var followed = false
+                        var lastChange: androidx.compose.ui.input.pointer.PointerInputChange? = null
                         // 进入吸附位置振动一次；离开后再次进入才再振动。
                         var engagedSnap: String? = null
                         fun snapFeedback(target: String?) {
@@ -478,6 +507,7 @@ internal fun KeyboardResizeOverlay(
                         val snapBandDp = (gestureRect.width / density.density * 0.012f).coerceIn(6f, 16f)
 
                         fun applyDelta(amount: Offset) {
+                            if (followed) return
                             didDrag = true
                             if (splitEdge != 0) {
                                 splitDrag += amount.x
@@ -580,7 +610,11 @@ internal fun KeyboardResizeOverlay(
                                             pulledUp = (pulledUp - amount.y).coerceAtLeast(0f)
                                             val before = morphProgress
                                             morphProgress = fixedToFloatingPullProgress(pulledUp / 1.dp.toPx())
-                                            if (morphProgress >= 1f && before < 1f) currentSnapFeedback()
+                                            if (morphProgress >= 1f && before < 1f) {
+                                                currentSnapFeedback()
+                                                val change = lastChange
+                                                if (change != null) followed = followFromHere(change.id, change.position + overlayOrigin)
+                                            }
                                         }
                                     }
                                 }
@@ -595,10 +629,12 @@ internal fun KeyboardResizeOverlay(
                         try {
                             val start = awaitTouchSlopOrCancellation(down.id) { change, over ->
                                 change.consume()
+                                lastChange = change
                                 applyDelta(over)
                             }
                             if (start != null) {
                                 released = drag(start.id) { change ->
+                                    lastChange = change
                                     applyDelta(change.positionChange())
                                     change.consume()
                                 }
@@ -968,6 +1004,7 @@ internal fun KeyboardResizeOverlay(
                 }
             }
         }
+        var movePillCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
         // 顶边「拖动移动」胶囊：和按钮一样的功能键实心色、无描边（用户 2026-10-19 要求），四向箭头 + 文字。
         @Composable
         fun MovePill() {
@@ -1023,11 +1060,14 @@ internal fun KeyboardResizeOverlay(
             }.size(with(density) { (frame.width.toDp() - (RESIZE_CORNER_HIT_DP * 2).dp).coerceAtLeast(1.dp) }, 28.dp)
                 .zIndex(1f).testTag("keyboard-resize-fixed-move-bar")
                 .semantics { stateDescription = alignmentLabel }
+                .onGloballyPositioned { movePillCoords = it }
                 .pointerInput(floatingMode, hostMaxWidth, hostMaxHeight) {
                     var movement: FixedKeyboardMoveGesture? = null
                     var moveSnapped = false
                     var pulledUp = 0f
+                    var followed = false
                     detectDragGestures(onDragStart = {
+                        followed = false
                         val base = currentPreviewRect ?: currentViewRect
                         movement = FixedKeyboardMoveGesture(base,
                             currentPreviewState.bounds ?: currentViewRect, 12.dp.toPx())
@@ -1047,6 +1087,7 @@ internal fun KeyboardResizeOverlay(
                         currentPreviewState.onDragEnd()
                     }) { change, amount ->
                         change.consume()
+                        if (followed) return@detectDragGestures
                         movement?.let { gesture ->
                             val moved = gesture.move(amount.x)
                             if (gesture.snapped && !moveSnapped) currentSnapFeedback()
@@ -1059,7 +1100,11 @@ internal fun KeyboardResizeOverlay(
                             pulledUp = (pulledUp - amount.y).coerceAtLeast(0f)
                             val before = morphProgress
                             morphProgress = fixedToFloatingPullProgress(pulledUp / 1.dp.toPx())
-                            if (morphProgress >= 1f && before < 1f) currentSnapFeedback()
+                            if (morphProgress >= 1f && before < 1f) {
+                                currentSnapFeedback()
+                                val coords = movePillCoords?.takeIf { it.isAttached }
+                                if (coords != null) followed = followFromHere(change.id, coords.localToWindow(change.position))
+                            }
                         }
                     }
                 }, contentAlignment = Alignment.Center) {
