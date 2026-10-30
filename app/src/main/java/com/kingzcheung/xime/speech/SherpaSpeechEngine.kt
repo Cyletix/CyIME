@@ -10,6 +10,8 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     private var offline: OfflineRecognizer? = null
     /** Japanese captions: SenseVoice in Japanese, used only for its punctuation (see projectPunctuation). */
     private var punctuator: OfflineRecognizer? = null
+    /** 整句定稿的 X-ASR（只在 [AsrModelManager.Selection.finalizerDir] 存在时加载，代替 SenseVoice）。 */
+    private var finalizer: OfflineRecognizer? = null
     private var stream: OnlineStream? = null
     private var vad: Vad? = null
     private var japaneseVad: Vad? = null // Refinement worker only; capture owns the other VAD.
@@ -49,7 +51,8 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
                 )
                 online = OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model, enableEndpoint = false))
             }
-            if (selection.secondDir != null) {
+            // With X-ASR finalizing whole sentences, SenseVoice loads only if something still asks for it.
+            if (selection.secondDir != null && selection.finalizerDir == null) {
                 if (japanese) punctuator = createSenseVoice(selection.secondDir) else offline = createSenseVoice(selection.secondDir)
             }
             vad = Vad(context.assets, if (japanese) japaneseVadConfig() else VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(
@@ -141,7 +144,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     }
     override fun refinePunctuated(samples: FloatArray): String {
         if (japanese) return refine(samples)
-        val recognizer = refiner()
+        val recognizer = selection.finalizerDir?.let { dir -> finalizer ?: createXasr(dir).also { finalizer = it } } ?: refiner()
         val s = recognizer.createStream()
         try {
             s.acceptWaveform(samples, 16000)
@@ -202,18 +205,25 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     }
     override fun releaseRefinement(): Boolean {
         if (japanese || selection.first == null || selection.secondDir == null) return false
-        val recognizer = offline ?: return false
-        recognizer.release()
-        offline = null
+        if (offline == null && finalizer == null) return false
+        offline?.release(); offline = null
+        finalizer?.release(); finalizer = null
         return true
     }
+    // The X-ASR int8 export aborts in its encoder (Reshape) on inputs of 40.2 s or more (2026-10-30 scan,
+    // 25–48 s in 0.16 s steps; none below). Whole-sentence regions stop at 30 s and re-read blocks at 28 s.
+    private fun createXasr(dir: File) = OfflineRecognizer(config = OfflineRecognizerConfig(modelConfig = OfflineModelConfig(
+        transducer = OfflineTransducerModelConfig(requireFile(dir, "encoder-epoch-99-avg-1.int8.onnx"),
+            requireFile(dir, "decoder-epoch-99-avg-1.onnx"), requireFile(dir, "joiner-epoch-99-avg-1.int8.onnx")),
+        tokens = requireFile(dir, "tokens.txt"), numThreads = 2, provider = "cpu"),
+        decodingMethod = "greedy_search"))
     private fun createSenseVoice(dir: File) = OfflineRecognizer(config = OfflineRecognizerConfig(modelConfig = OfflineModelConfig(
         senseVoice = OfflineSenseVoiceModelConfig(
             model = requireFile(dir, "model.int8.onnx"), language = selection.recognitionLanguage, useInverseTextNormalization = true),
         // Runs only at a pause/stop, beside the one streaming thread; two threads shorten the final wait.
         tokens = requireFile(dir, "tokens.txt"), numThreads = 2,
     )))
-    override fun close() { reset(); online?.release(); online = null; offline?.release(); offline = null; punctuator?.release(); punctuator = null; vad?.release(); vad = null; japaneseVad?.release(); japaneseVad = null }
+    override fun close() { reset(); online?.release(); online = null; offline?.release(); offline = null; finalizer?.release(); finalizer = null; punctuator?.release(); punctuator = null; vad?.release(); vad = null; japaneseVad?.release(); japaneseVad = null }
     private fun japaneseVadConfig() = VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(
         model = "speech/silero_vad.onnx", threshold = .5f, minSilenceDuration = .2f,
         minSpeechDuration = .15f, windowSize = 512, maxSpeechDuration = 30f))

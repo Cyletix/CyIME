@@ -39,10 +39,14 @@ internal fun OfflineModelCard() {
     } }
     var editing by remember { mutableStateOf<InputLanguage?>(null) }
     var ready by remember { mutableStateOf(emptySet<String>()) }
+    var xasrReady by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { ModelManager.loadFromRemote(context) } }
     LaunchedEffect(models, downloads) {
         ready = withContext(Dispatchers.IO) {
             SpeechModelSelection.primaryIds.filter { runCatching { manager.selection(it).ready }.getOrDefault(false) }.toSet()
+        }
+        xasrReady = withContext(Dispatchers.IO) {
+            runCatching { manager.wholeSentenceFinalizer(manager.selection(SpeechModelCatalog.TWO_PASS)).finalizerDir != null }.getOrDefault(false)
         }
     }
     fun refresh(language: InputLanguage) { selected[language] = manager.getSelectedModelId(language) }
@@ -110,11 +114,16 @@ internal fun OfflineModelCard() {
                     verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("整句定稿", style = MaterialTheme.typography.bodyLarge)
-                        Text(if (anyCorrection) "说完一整句（停顿约 1 秒或点结束）再统一校正一次，更准，说完要多等一会儿；关闭时每 6 秒校正一次。"
+                        Text(if (anyCorrection) "说完一整句（停顿约 1 秒或点结束）再统一校正一次，保留标点，更准，说完要多等一会儿；关闭时每 6 秒校正一次。"
                             else "先开启上面的 SenseVoice 二次校正。",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (anyCorrection) Text(if (xasrReady) "中文整句定稿使用 X-ASR 模型。" else "中文整句定稿使用 SenseVoice；下载 X-ASR 模型（约 136 MB）后改用它，更准、更快。",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = wholeSentence, enabled = anyCorrection, onCheckedChange = null)
+                }
+                if (anyCorrection && !xasrReady) {
+                    ModelDownloadAction(SpeechModelCatalog.XASR, downloads) { download(SpeechModelCatalog.XASR) }
                 }
                 if (!senseReady) {
                     ModelDownloadAction(SpeechModelCatalog.SENSEVOICE, downloads) { download(SpeechModelCatalog.SENSEVOICE) }

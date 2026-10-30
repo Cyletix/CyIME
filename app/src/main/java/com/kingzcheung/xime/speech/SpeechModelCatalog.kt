@@ -12,6 +12,8 @@ object SpeechModelCatalog {
     const val PARAFORMER = "paraformer-zh-en-int8"
     const val SENSEVOICE = "sensevoice-multilingual-int8"
     const val TWO_PASS = "paraformer-sensevoice"
+    /** 整句定稿的可选模型：X-ASR 中英 Zipformer（离线、自带标点），下载后整句定稿用它代替 SenseVoice。 */
+    const val XASR = "xasr-zh-en-punct-int8"
     private const val reazonBase = "https://huggingface.co/reazon-research/reazonspeech-k2-v2/resolve/291488c8151be24d7da4bf7af26e533fad96e407"
     val models = listOf(
         ModelInfo(ZIPFORMER_JA_INT8, "Zipformer · 日语轻量", "约 153 MB，原版的 INT8 量化版；说话中预览、停顿后定稿，准确度与原版可能不同。", ModelCategory.ASR,
@@ -34,6 +36,16 @@ object SpeechModelCatalog {
                 ModelFile("encoder.int8.onnx", "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/8e40c43232a1c5c66c82111efc5820d3accca11b/encoder.int8.onnx", "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a", 165462184L),
                 ModelFile("tokens.txt", "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en/resolve/8e40c43232a1c5c66c82111efc5820d3accca11b/tokens.txt", "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6", 75756L)
             )))),
+        // 2026-10-30 回放：公开口语 CER 6.1 %（SenseVoice 整句 7.2 %），平板外放实测与豆包同为 5.6 %；只用于中文整句定稿。
+        ModelInfo(XASR, "X-ASR · 中英整句定稿", "可选。下载后「整句定稿」改用它：更准、更快，自带标点；只用于中文。", ModelCategory.ASR,
+            versions = listOf(ModelVersion(version = "2026-06-03", size = "136.4MB",
+                archiveUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03.tar.bz2", sha256 = "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224",
+                files = listOf(
+                    ModelFile("encoder-epoch-99-avg-1.int8.onnx", "", "", 0L),
+                    ModelFile("decoder-epoch-99-avg-1.onnx", "", "", 0L),
+                    ModelFile("joiner-epoch-99-avg-1.int8.onnx", "", "", 0L),
+                    ModelFile("tokens.txt", "", "", 0L),
+                )))),
         ModelInfo("sensevoice-multilingual-int8", "SenseVoice · 多语言", "支持中英日粤韩，停顿后出字；可独立识别，也可为流式模型二次校正。", ModelCategory.ASR,
             versions = listOf(ModelVersion(version = "2365baeacb50", size = "228.5 MB", files = listOf(
                 ModelFile("model.int8.onnx", "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx", "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51", 239233841L),

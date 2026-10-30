@@ -83,10 +83,12 @@ class AsrModelManager(private val context: Context) {
         val mode: String,
         val first: AsrModelInfo?, val firstDir: File?, val secondDir: File?,
         val recognitionLanguage: String = "auto",
+        /** 整句定稿用的 X-ASR 目录；为 null 时整句定稿用 SenseVoice。 */
+        val finalizerDir: File? = null,
     ) {
         val ready: Boolean get() = (first == null || firstDir != null && first.files.isNotEmpty() && first.files.all { File(firstDir, it).let { f -> f.isFile && f.length() > 0 } }) &&
             (secondDir == null || listOf("model.int8.onnx", "tokens.txt").all { File(secondDir, it).let { f -> f.isFile && f.length() > 0 } })
-        val key: String get() = listOfNotNull(firstDir, secondDir).joinToString(prefix = "$mode:$recognitionLanguage:") { dir ->
+        val key: String get() = listOfNotNull(firstDir, secondDir, finalizerDir).joinToString(prefix = "$mode:$recognitionLanguage:") { dir ->
             dir.absolutePath + ":" + dir.listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }
                 .joinToString { "${it.name}:${it.length()}:${it.lastModified()}" }
         }
@@ -118,6 +120,15 @@ class AsrModelManager(private val context: Context) {
         val info = getAsrModels().firstOrNull { it.id == mode } ?: error("不支持的语音模型：$mode")
         return if (info.modelType == "sensevoice") Selection(mode, null, null, dir(mode), languageId)
         else Selection(mode, info, dir(mode), null, languageId)
+    }
+
+    /** X-ASR for 整句定稿, when fully downloaded; Chinese sessions with a streaming preview + SenseVoice only. */
+    fun wholeSentenceFinalizer(selection: Selection): Selection {
+        if (selection.first == null || selection.secondDir == null || selection.recognitionLanguage != "zh") return selection
+        val info = getAsrModels().firstOrNull { it.id == SpeechModelCatalog.XASR } ?: return selection
+        val dir = ModelStorage.getModelDir(context, SpeechModelCatalog.XASR)
+        val complete = info.files.isNotEmpty() && info.files.all { File(dir, it).let { f -> f.isFile && f.length() > 0 } }
+        return if (complete) selection.copy(finalizerDir = dir) else selection
     }
 
     /** Called on the speech worker: model file checks/migration never enter the key path. */
