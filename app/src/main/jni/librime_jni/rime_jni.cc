@@ -527,10 +527,37 @@ public:
             }
             size_t chars = 0;
             if (entry) for (unsigned char c : entry->text) chars += (c & 0xC0) != 0x80;
-            marks[i] = entry && entry->commit_count > 0 && chars >= 2;
+            // Only the user's own words: a learned word the schema's dictionary already has is an
+            // ordinary word with a usage count, and marking those covered most common words (2026-10-30).
+            marks[i] = entry && entry->commit_count > 0 && chars >= 2 && !inSystemDictionary(entry->text);
         }
         return marks;
     }
+
+    // Whether the current schema's translator dictionary has this text (its reverse lookup table).
+    bool inSystemDictionary(const std::string& text) {
+        char schema_id[256] = {0};
+        if (!rime || !session_id_ || !rime->get_current_schema(session_id_, schema_id, sizeof(schema_id))) return false;
+        if (system_dict_schema_ != schema_id) {
+            system_dict_schema_ = schema_id;
+            system_dict_.reset();
+            RimeConfig config = {0};
+            if (rime->schema_open(schema_id, &config)) {
+                const char* dict = rime->config_get_cstring(&config, "translator/dictionary");
+                auto* rldc = dynamic_cast<rime::ReverseLookupDictionaryComponent*>(
+                    rime::ReverseLookupDictionary::Require("reverse_lookup_dictionary"));
+                if (dict && rldc) {
+                    system_dict_.reset(rldc->Create(dict));
+                    if (system_dict_ && !system_dict_->Load()) system_dict_.reset();
+                }
+                rime->config_close(&config);
+            }
+        }
+        std::string code;
+        return system_dict_ && system_dict_->ReverseLookup(text, &code);
+    }
+    std::string system_dict_schema_;
+    std::unique_ptr<rime::ReverseLookupDictionary> system_dict_;
 
     // A candidate reached through spelling correction: its syllables as "typed=correct" for the
     // corrected ones and "typed" for the rest, so the candidate bar can show how it was fixed.
