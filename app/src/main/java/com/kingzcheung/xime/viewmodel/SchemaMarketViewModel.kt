@@ -7,6 +7,7 @@ import com.kingzcheung.xime.BuildConfig
 import com.kingzcheung.xime.settings.MarketSchemeItem
 import com.kingzcheung.xime.settings.MarketVersionStore
 import com.kingzcheung.xime.settings.SchemaManager
+import com.kingzcheung.xime.settings.SchemaManifestManager
 import com.kingzcheung.xime.settings.XimeIndexSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,12 +76,13 @@ class SchemaMarketViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val result = XimeIndexSource.fetchSchemes(context, BuildConfig.VERSION_NAME)
-            // 「已下载」靠 market/{schemeId}/ 子目录存在性判断
+            // 「已安装」：market/{schemeId}/ 里有下载文件，并且装进了 rime（卸载后只剩下载文件的算没装，按钮回到「获取」）
             val downloadedIds = withContext(Dispatchers.IO) {
                 val marketDir = SchemaManager.getMarketDir(context)
+                val installed = SchemaManifestManager.getInstalledPackages(context).map { it.packageId }.toSet()
                 if (!marketDir.exists()) emptySet()
                 else marketDir.listFiles()?.mapNotNull { sub ->
-                    if (sub.isDirectory && sub.listFiles()?.any { it.isFile } == true) sub.name
+                    if (sub.isDirectory && sub.name in installed && sub.listFiles()?.any { it.isFile } == true) sub.name
                     else null
                 }?.toSet() ?: emptySet()
             }
@@ -176,9 +178,11 @@ class SchemaMarketViewModel(application: Application) : AndroidViewModel(applica
                     },
                 )
             }
-            val nowDownloaded = withContext(Dispatchers.IO) {
-                SchemaManager.isSchemeDownloaded(context, item.scheme.id)
-            }
+            // 获取 = 下载并安装（打开主方案），不再让人去「已下载/导入」再点一次安装。
+            val install = if (result.success) withContext(Dispatchers.IO) {
+                XimeIndexSource.installFromMarket(context, item.scheme)
+            } else null
+            val nowDownloaded = install?.success == true
             // 下载成功后记录本地版本号（用于更新检测）
             val actualVersion = if (nowDownloaded) {
                 (version ?: selectedVersion ?: item.scheme.resolvedVersion()?.version
@@ -209,9 +213,13 @@ class SchemaMarketViewModel(application: Application) : AndroidViewModel(applica
                 !result.success && result.sha256Status == false ->
                     "sha256 校验不通过，文件可能不完整，请重新下载"
                 !result.success -> result.failureReason ?: "下载失败"
-                result.sha256Status == true -> "已下载「${item.scheme.name}」（已校验）"
-                result.sha256Status == null -> "已下载「${item.scheme.name}」（未验证）"
-                else -> "已下载「${item.scheme.name}」"
+                install?.success != true ->
+                    "已下载「${item.scheme.name}」但没装上：${install?.failureReason ?: "未知原因"}。可到「已安装的方案」页重新安装"
+                else -> buildString {
+                    append("已安装「${item.scheme.name}」，到「已安装的方案」点「应用方案更改」生效")
+                    val deps = install?.unresolvedDeps.orEmpty()
+                    if (deps.isNotEmpty()) append("\n依赖未完整：${deps.joinToString("、")}")
+                }
             }
             showToast(toast)
         }

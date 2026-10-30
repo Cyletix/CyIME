@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kingzcheung.xime.settings.FileConflictInfo
+import com.kingzcheung.xime.settings.ImportManager
 import com.kingzcheung.xime.settings.SchemaManifestManager
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.SchemaManager.InstallFromDirResult
@@ -61,21 +62,23 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
             val installedPkgs = withContext(Dispatchers.IO) {
                 SchemaManifestManager.getInstalledPackages(context)
             }
-            val downloadedIds = withContext(Dispatchers.IO) {
+            // 已下载未安装的包没有清单，用里面的压缩包名当显示名，不显示 import_日期 这种目录名。
+            val downloaded = withContext(Dispatchers.IO) {
                 val marketDir = SchemaManager.getMarketDir(context)
-                if (!marketDir.exists()) emptySet()
+                if (!marketDir.exists()) emptyMap()
                 else marketDir.listFiles()?.mapNotNull { sub ->
-                    if (sub.isDirectory && sub.listFiles()?.any { it.isFile } == true) sub.name
-                    else null
-                }?.toSet() ?: emptySet()
+                    val archive = sub.listFiles()?.firstOrNull { it.isFile } ?: return@mapNotNull null
+                    sub.name to if (sub.name.startsWith("import_")) ImportManager.archiveTitle(archive.name) else sub.name
+                }?.toMap() ?: emptyMap()
             }
+            val downloadedIds = downloaded.keys
             val installedMap = installedPkgs.associateBy { it.packageId }
             val allIds = (downloadedIds + installedMap.keys).sorted()
             val packages = allIds.map { id ->
                 val info = installedMap[id]
                 LocalPackageItem(
                     packageId = id,
-                    displayName = if (id == "builtin") "CyIME 内置资源" else info?.displayName ?: id,
+                    displayName = if (id == "builtin") "CyIME 内置资源" else info?.displayName ?: downloaded[id] ?: id,
                     version = info?.version ?: "",
                     downloaded = id in downloadedIds,
                     installed = info != null,
@@ -88,6 +91,12 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun installPackage(item: LocalPackageItem) = install(item, replaceConflictingFiles = false)
+
+    /** 刚导入、因同名文件没装上的包：接着走一遍安装，冲突时弹「更新共用文件」确认。 */
+    fun installImported(packageId: String, displayName: String) = installPackage(
+        LocalPackageItem(packageId, displayName.ifBlank { packageId }, "", downloaded = true, installed = false))
+
+    private var conflictItem: LocalPackageItem? = null
 
     private fun install(item: LocalPackageItem, replaceConflictingFiles: Boolean) {
         if (_uiState.value.installingId != null) return
@@ -106,12 +115,15 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
             _uiState.update { it.copy(installingId = null, conflictingFiles = emptyList(), conflictingSchemeIds = emptyList()) }
             when {
                 result.success -> showToast(buildString {
-                    append("已安装「${item.displayName}」，点「部署」生效")
+                    append("已安装「${item.displayName}」，点「应用方案更改」生效")
                     if (result.parseFailures.isNotEmpty()) append("\n" + result.parseFailures.joinToString("\n"))
                 })
-                result.conflicts.isNotEmpty() -> _uiState.update {
-                    it.copy(conflictPackageId = item.packageId, conflictingFiles = result.conflicts,
-                        conflictingSchemeIds = result.conflicts.flatMap { conflict -> conflict.claimedBy }.distinct())
+                result.conflicts.isNotEmpty() -> {
+                    conflictItem = item
+                    _uiState.update {
+                        it.copy(conflictPackageId = item.packageId, conflictingFiles = result.conflicts,
+                            conflictingSchemeIds = result.conflicts.flatMap { conflict -> conflict.claimedBy }.distinct())
+                    }
                 }
                 else -> showToast(result.failureReason ?: "安装失败")
             }
@@ -120,8 +132,7 @@ class SchemaLocalViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun confirmInstallWithReplace() {
-        val packageId = _uiState.value.conflictPackageId ?: return
-        val item = _uiState.value.packages.firstOrNull { it.packageId == packageId } ?: return
+        val item = conflictItem?.takeIf { it.packageId == _uiState.value.conflictPackageId } ?: return
         install(item, replaceConflictingFiles = true)
     }
 

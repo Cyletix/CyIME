@@ -273,11 +273,10 @@ class MainActivity : ComponentActivity() {
             when (val result = ImportManager.import(this@MainActivity, uri)) {
                 is ImportManager.ImportResult.Content -> {
                     launch(Dispatchers.Main) {
-                        val msg = when {
-                            !result.success -> "导入失败"
-                            result.installedDirect -> "导入成功，已放入 rime 目录"
-                            else -> "方案导入成功，请到「输入方案」页面部署"
-                        }
+                        // 应用方案更改和同名文件确认都在「已安装的方案」页。
+                        val msg = if (result.pendingPackageId != null) "${result.message}：到「已安装的方案」页确认"
+                            else if (result.installedDirect) result.message.replace("点「应用方案更改」", "到「已安装的方案」点「应用方案更改」")
+                            else result.message
                         Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
                     }
                 }
