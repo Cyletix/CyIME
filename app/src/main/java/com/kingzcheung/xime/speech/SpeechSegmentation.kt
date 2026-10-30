@@ -308,6 +308,15 @@ internal class SpeechTranscript(private val keepMarks: Boolean = false) {
         var previous = SpeechBoundary.STOP
         for (region in regions.values) {
             if (region.text.isNotEmpty()) {
+                // The second pass ends every pause segment with a full stop, but most pauses fall inside a
+                // sentence (on the user's recordings the whole re-read keeps a stop at 108 of 397). Once more
+                // speech follows, the stop reads as a comma; ？！ stay, and the end-of-input re-read decides
+                // the real sentence ends when the session is stopped rather than cancelled.
+                if (keepMarks && isNotEmpty() && previous != SpeechBoundary.STOP && last() in "。.") {
+                    val ascii = last() == '.'
+                    setLength(length - 1)
+                    append(if (ascii) ',' else '，')
+                }
                 // A kept mark already separates the sentences: no space, and never two marks in a row.
                 if (keepMarks && isNotEmpty() && last() in "，。？！、；：") {
                     append(region.text.trimStart('，', '。', '？', '！', '、', '；', '：'))
