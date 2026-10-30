@@ -63,6 +63,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             key == "clear_all" -> withEditor {
                 // Never read or retain a password in the clear/undo buffer.
                 service.lastClearedText = ""
+                service.lastClearedDocument = null
                 service.currentInputConnection?.let { connection ->
                     if (connection.performContextMenuAction(android.R.id.selectAll)) connection.commitText("", 1)
                 }
@@ -640,6 +641,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 引擎繁忙时不把未知状态当成空闲，更不能清正文。
                     if (service.rimeEngine.compositionActiveForDeletion() == null) return@command
                     if (hasInputState(candState)) {
+                        service.lastClearedDocument = null
                         // 输入态：只清输入态（等价于 clear_composition），并记录 lastClearedText 供下滑撤回。
                         // 需在 clearInputStateForKeys() 之前记录（该函数会清空 preeditText/inputText）。
                         val pendingEnglish = candState.pendingEnglishText
@@ -662,21 +664,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                         clearInputStateForKeys()
                     } else {
-                        // 空闲态：清空输入框全部已上屏文本。
+                        // 空闲态：清空整个输入框（光标前、选区、光标后），记下来供下滑撤回原位恢复。
                         service.calculatorEngine.clear()
                         updateCalculatorCandidates()
-                        // 记录撤回内容：输入框模式 getTextBeforeCursor 已含 composing 区（与 inputText 同源，
-                        // 避免重复拼接）；候选栏模式输入框只有已上屏文本，需补候选栏编码 inputText。
-                        // 英文输入态已被 hasInputState() 拦截，此处 pendingEnglishText 恒为空，拼接仅作防御。
-                        val codeInInputBox = SettingsPreferences.getInputTextLocation(service) ==
-                            SettingsPreferences.INPUT_TEXT_INPUT_BOX
-                        val inputFieldText = withEditor {
-                            service.currentInputConnection?.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0)?.toString() ?: ""
-                        }
-                        service.lastClearedText = when {
-                            codeInInputBox -> inputFieldText + candState.pendingEnglishText
-                            else -> inputFieldText + candState.inputText + candState.pendingEnglishText
-                        }
                         // 清空 partial 累积，避免残留词被 buildT9DisplayState 拼进下一轮 preedit。
                         service.t9PartialSegments.clear()
                         endQueuedComposition()
@@ -691,13 +681,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             candidateActions = emptyList()
                         )
                         withEditor {
-                            service.currentInputConnection?.let {
+                            service.lastClearedText = ""
+                            service.lastClearedDocument = null
+                            service.currentInputConnection?.let { ic ->
                                 service.endComposingInputBox()
-                                // 删除输入框中所有文字
-                                val textLen = inputFieldText.length
-                                if (textLen > 0) {
-                                    it.deleteSurroundingText(textLen, 0)
-                                }
+                                val limit = XimeInputMethodService.SAFE_TEXT_LIMIT
+                                val document = ic.readDocumentForClear(limit) ?: return@let
+                                service.lastClearedDocument = ic.clearDocument(document, limit)
                             }
                         }
                     }
@@ -708,7 +698,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 判定与 clear_all 共用 hasInputState()。
                     if (!hasInputState(candState)) {
                         val text = service.lastClearedText
-                        if (text.isNotEmpty()) {
+                        val document = service.lastClearedDocument
+                        if (document != null) withEditor {
+                            // 整框清空的撤回：原位放回、光标回原处；清空后输入框被改过就不放（审计 F06）。
+                            val ic = service.currentInputConnection ?: return@withEditor
+                            if (ic.restoreDocument(document, XimeInputMethodService.SAFE_TEXT_LIMIT)) service.lastClearedDocument = null
+                        } else if (text.isNotEmpty()) {
                             service.lastClearedText = ""
                             withEditor {
                                 val ic = service.currentInputConnection

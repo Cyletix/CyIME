@@ -428,6 +428,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     private var pendingVoiceAction: (() -> Unit)? = null
     internal var composeViewRef: View? = null
     internal var lastClearedText: String = ""
+    /** 空闲态上滑清空掉的整框文字，供下滑撤回原位恢复；与 [lastClearedText]（清掉的编码）互斥。 */
+    @Volatile internal var lastClearedDocument: ClearedDocument? = null
     /** 累积的 partial commit 段列表（多段选词场景下逐段追加，文本+拼音同源，供调频/回滚） */
     internal val t9PartialSegments = mutableListOf<T9PartialSegment>()
     /** 键盘回调引用，用于在 RIME selectCandidate 前同步通知 T9 控制器 */
@@ -2899,6 +2901,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
         val editorPresentation = beginEditorField(attribute, restarting)
         lastClearedText = ""
+        lastClearedDocument = null
 
         // 旧组合区已在 onStartInput 开头脱离（重启输入时框架也会定格它），此处不再保留标记，
         // 避免 endComposingInputBox 对新连接执行 setComposingText("")（选中文字时等于删除选区）。
