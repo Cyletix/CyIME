@@ -625,6 +625,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             val geometry = letterNeighbors
             service.rimeEngine.setNeighborMap(
                 if (hardwareEvent == null && geometry.first == service.uiState.value.currentSchemaId) geometry.second else "")
+            // 中英混输（默认关）：Rime 选项随会话重建而清零，按键前补设；只在变了时写，免得每键触发选项通知。
+            if (key.length == 1 && key[0].isLetter()) {
+                val mixed = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
+                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY, false)
+                if (service.rimeEngine.getOption("cyime_mixed_input") != mixed) service.rimeEngine.setOption("cyime_mixed_input", mixed)
+            }
             if (service.japaneseInputController.handleKey(key)) return@command
             val state = service.uiState.value
             val candState = service.candidateState.value
