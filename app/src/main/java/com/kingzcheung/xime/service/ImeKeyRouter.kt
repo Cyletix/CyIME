@@ -1488,7 +1488,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             target == DeletionTarget.DOCUMENT) {
             withEditor {
                 if (owner != service.uiState.value.inputSessionId) return@withEditor
-                service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                service.sendDeleteKey()
             }
         } else when {
             // 1. 英文待处理文本：逐个删除字符，重新加载联想
@@ -1589,7 +1589,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 withEditor {
 
                     if (owner != service.uiState.value.inputSessionId) return@withEditor
-                    service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                    service.sendDeleteKey()
                 }
 
                 service.candidateState.value = service.candidateState.value.copy(
@@ -1773,14 +1773,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /** A rejected commit retains its original owner and text. Retry is an explicit user action. */
-    internal suspend fun commitPreparedText(text: String, t9: Boolean): TextCommitResult =
-        deliverCandidateCommit(PendingCandidateCommit(InputCommandOwner.requireOwner(), text, t9, learnSelection = false))
+    internal suspend fun commitPreparedText(text: String, t9: Boolean, caret: CommitCaret = CommitCaret.NONE): TextCommitResult =
+        deliverCandidateCommit(PendingCandidateCommit(InputCommandOwner.requireOwner(), text, t9, learnSelection = false,
+            caret = caret))
 
     private suspend fun deliverCandidateCommit(pending: PendingCandidateCommit): TextCommitResult =
         pending.deliver(
             submit = { text -> withEditor {
                 val previousText = service.predictionManager.lastCommittedText
-                val outcome = service.submitText(text)
+                val outcome = service.submitText(text, pending.caret)
                 if (outcome.accepted) {
                     if (pending.learnSelection && previousText.isNotEmpty() && service.isChineseMode &&
                         SettingsPreferences.isSmartPredictionEnabled(service) && AssociationManager.isInitialized()) {

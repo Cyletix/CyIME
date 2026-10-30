@@ -121,6 +121,14 @@ private fun LayoutDisplayPage(
                             .putExtra("edit_symbols", true)) },
                         showArrow = true)
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    var pairedSymbols by remember { mutableStateOf(SettingsPreferences.isPairedSymbolsEnabled(context)) }
+                    SettingsToggleItem(Icons.TwoTone.Keyboard, "输入成对符号",
+                        "点 “ （ 《 【 等开头的一半时连结尾一起输入，光标停在中间；接着点结尾会跳过已有的那个，" +
+                            "退格删掉空的一对。所有屏幕键盘、符号面板和侧栏都一样，实体键盘不变。",
+                        checked = pairedSymbols, onCheckedChange = {
+                            pairedSymbols = it; SettingsPreferences.setPairedSymbolsEnabled(context, it)
+                        })
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     val split = com.kingzcheung.xime.ui.keyboard.rememberKeyboardInputPreferences().splitKeyboardEnabled
                     SettingsToggleItem(Icons.TwoTone.Keyboard, "分体键盘",
                         "适用于 26 键和 14 键；14 键跨中线的双字母键分体时拆成两个单字母键。间距与尺寸在键盘调整面板中设置。",
