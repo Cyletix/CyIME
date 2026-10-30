@@ -11,3 +11,7 @@ CyIME 构建适配在 `app/build-logic/tasks-chinese.gradle.kts`：接入候选�
 ## 简繁转换表（opencc/）
 
 `s2t.json`、`s2tw.json`、`s2hk.json` 和其中引用的 `.ocd2` 表来自 OpenCC（Apache-2.0），即 librime 子模块 `deps/opencc` 的提交 `e9f3bb3`，由同一份源码编出，未修改。`cyime_s2tw.json` 在 `s2tw.json` 后加一步 `CyimeTWPhrases.ocd2`，把 s2tw 选的字形换成台湾日常写法（臺→台、計劃→計畫、瞭解→了解），表的原文是 `tools/opencc/cyime_tw_phrases.txt`，按小麦注音 McBopomofo（MIT）`Source/Data/phrase.occ` 的词频挑出，提交 `18e2060dd5d0b511753ad79a8fe0d112e944f1af`。生成方法见 `tools/opencc/build_cyime_opencc.py`。
+
+## 注音（cyime_zhuyin）
+
+`cyime_zhuyin.schema.yaml` 的拼写运算（拼音音节改写成注音、再落到大千键位）照 rime/rime-bopomofo（LGPL-3.0）`zhuyin.yaml` 与 `bopomofo.schema.yaml` 的写法，按雾凇词库的 ü 写法和 CyIME 的键码改写。`cyime_tw.dict.yaml`（台湾词与台湾读音）和 `lua/cyime_zhuyin_tones.lua`（每个字可读的声调）由 `tools/zhuyin/build_cyime_tw.py` 从小麦注音 McBopomofo（MIT）`Source/Data` 的 `BPMFMappings.txt`、`phrase.occ`、`BPMFBase.txt` 生成，提交 `18e2060dd5d0b511753ad79a8fe0d112e944f1af`。

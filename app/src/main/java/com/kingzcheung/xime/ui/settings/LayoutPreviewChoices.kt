@@ -90,7 +90,7 @@ internal fun LayoutPreviewChoices(
                         containerColor, contentColor, accentColor, "$itemTagPrefix${layout.id}", { onSelect(layout.id) },
                         unavailable = layout.id in unavailableIds) {
                                 if (rows.isEmpty()) Icon(Icons.Outlined.Keyboard, "${layout.displayName}布局", tint = contentColor)
-                                else MiniatureKeyboard(rows, layout.kind in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED),
+                                else MiniatureKeyboard(rows, layout.kind in setOf(LayoutKind.ALPHABETIC, LayoutKind.MERGED, LayoutKind.ZHUYIN),
                                     contentColor, Modifier.testTag("layout-preview:${layout.id}"), fillKeys = !containerColor.isNearBlack(),
                                     equalMergedKeys = layout.kind == LayoutKind.MERGED && CustomKeyboardLayouts.find(layout.id) == null,
                                     qwertyStagger = qwertyPreviewStagger)

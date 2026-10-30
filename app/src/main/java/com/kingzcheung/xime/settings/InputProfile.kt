@@ -20,13 +20,14 @@ enum class InputScheme(val id: String, val displayName: String) {
     PINYIN("pinyin", "拼音"), DOUBLE_PINYIN("double_pinyin", "双拼"),
     WUBI("wubi", "五笔"), WUBI_PINYIN("wubi_pinyin", "五笔拼音混输"), STROKE("stroke", "笔画"),
     ROMAJI("romaji", "罗马字"), KANA("kana", "假名"), DIRECT("direct", "直接输入"),
-    EXTERNAL("external", "自定义编码");
+    EXTERNAL("external", "自定义编码"), ZHUYIN("zhuyin", "注音");
 
     companion object { fun fromId(id: String): InputScheme? = entries.firstOrNull { it.id == id } }
 }
 
 enum class InputMode { KEYBOARD, HANDWRITING, VOICE }
-enum class LayoutKind { ALPHABETIC, T9, MERGED, KANA_KEYPAD, STROKE_KEYPAD, HANDWRITING, NUMBER }
+/** ZHUYIN：大千式注音键盘，键帽是注音符号（11 列 4 行），不是字母键。 */
+enum class LayoutKind { ALPHABETIC, T9, MERGED, KANA_KEYPAD, STROKE_KEYPAD, HANDWRITING, NUMBER, ZHUYIN }
 
 data class InputLayout(val id: String, val displayName: String, val kind: LayoutKind) {
     companion object {
@@ -37,6 +38,7 @@ data class InputLayout(val id: String, val displayName: String, val kind: Layout
         val STROKE = InputLayout("stroke", "笔画键盘", LayoutKind.STROKE_KEYPAD)
         val HANDWRITING = InputLayout("handwriting", "手写板", LayoutKind.HANDWRITING)
         val NUMBER = InputLayout("number", "数字键盘", LayoutKind.NUMBER)
+        val ZHUYIN = InputLayout("zhuyin", "大千", LayoutKind.ZHUYIN)
     }
 }
 
@@ -86,6 +88,7 @@ object InputProfiles {
         InputScheme.STROKE -> "一丨丿丶乛"
         InputScheme.WUBI, InputScheme.WUBI_PINYIN -> "字根编码"
         InputScheme.EXTERNAL -> "自定义编码"
+        InputScheme.ZHUYIN -> "ㄓㄨˋㄧㄣ"
     }
     private val descriptions = java.util.concurrent.ConcurrentHashMap<String, InputProfile>()
     @Volatile private var installed: Map<String, InputProfile> = emptyMap()
@@ -134,13 +137,14 @@ object InputProfiles {
             id == "stroke" -> InputScheme.STROKE
             id == "japanese" || id == "jaroomaji" -> InputScheme.ROMAJI
             id == "japanese_kana" -> InputScheme.KANA
+            id == "cyime_zhuyin" -> InputScheme.ZHUYIN
             else -> InputScheme.EXTERNAL
         }
         val inputLanguage = when {
             id == InputModes.ENGLISH -> InputLanguage.ENGLISH
             inputScheme in setOf(InputScheme.ROMAJI, InputScheme.KANA) -> InputLanguage.JAPANESE
             inputScheme in setOf(InputScheme.PINYIN, InputScheme.DOUBLE_PINYIN, InputScheme.WUBI,
-                InputScheme.WUBI_PINYIN, InputScheme.STROKE) || id == "handwriting" -> InputLanguage.CHINESE
+                InputScheme.WUBI_PINYIN, InputScheme.STROKE, InputScheme.ZHUYIN) || id == "handwriting" -> InputLanguage.CHINESE
             else -> InputLanguage.UNSPECIFIED
         }
         val layout = when {
@@ -152,6 +156,7 @@ object InputProfiles {
             id == "stroke" -> InputLayout.STROKE
             id == "handwriting" -> InputLayout.HANDWRITING
             id == "numbers" -> InputLayout.NUMBER
+            id == "cyime_zhuyin" -> InputLayout.ZHUYIN
             else -> InputLayout.QWERTY
         }
         return InputProfile(inputLanguage, inputScheme, layout,
@@ -175,6 +180,7 @@ object InputProfiles {
         "stroke" -> InputLayout.STROKE
         "handwriting" -> InputLayout.HANDWRITING
         "japanese_kana" -> InputLayout.KANA
+        "zhuyin" -> InputLayout.ZHUYIN
         else -> if (custom != null) customLayout(custom) else when (section) {
             null -> InputLayout.QWERTY
             "qwerty_14" -> InputLayout.MERGED14

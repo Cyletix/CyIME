@@ -763,7 +763,7 @@ object KeysConfigHelper {
     /** Read a thumbnail without changing the active keyboard or its gesture state. */
     fun previewKeyRows(layout: InputLayout, language: InputLanguage): List<List<String>> =
         CustomKeyboardLayouts.find(layout.id)?.typingRows() ?: when {
-            layout.kind == LayoutKind.MERGED -> _mergedRows[layout.id].orEmpty()
+            layout.kind == LayoutKind.MERGED || layout.kind == LayoutKind.ZHUYIN -> _mergedRows[layout.id].orEmpty()
             layout.kind == LayoutKind.ALPHABETIC -> if (language == InputLanguage.ENGLISH) _enRowsBase else _zhRowsBase
             else -> emptyList()
         }

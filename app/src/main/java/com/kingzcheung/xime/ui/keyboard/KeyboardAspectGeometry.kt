@@ -24,6 +24,8 @@ internal data class KeyboardAspectLimits(val min: Float, val max: Float) {
             LayoutKind.KANA_KEYPAD, LayoutKind.STROKE_KEYPAD,
             LayoutKind.NUMBER, LayoutKind.HANDWRITING -> Keypad
             // The split layout gives its centre gap to neither half.
+            // 注音 11 列 4 行，比例落在字母键盘的范围里；不分体。
+            LayoutKind.ZHUYIN -> Letters
             LayoutKind.ALPHABETIC, LayoutKind.MERGED -> if (split) (1f - splitGapFraction.coerceIn(0f, 0.9f)).let {
                 KeyboardAspectLimits(Letters.min / it, Letters.max / it) } else Letters
         }
