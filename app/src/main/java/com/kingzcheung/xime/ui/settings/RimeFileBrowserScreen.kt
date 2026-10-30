@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -194,8 +195,10 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
                     Text("空目录", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
+                val listState = rememberLazyListState()
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    state = listState,
+                    modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(innerPadding)
                 ) {
                     items(entries, key = { currentDir.absolutePath + "/" + it.name }) { entry ->
                         FileEntryRow(

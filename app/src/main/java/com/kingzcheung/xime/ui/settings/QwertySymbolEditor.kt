@@ -1,8 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -91,7 +89,7 @@ internal fun QwertySymbolEditor(onBack: () -> Unit, initialTarget: String? = nul
         })
     }) { padding ->
     Column(Modifier.fillMaxSize().padding(padding).imePadding()
-        .verticalScroll(rememberScrollState()).padding(16.dp)) {
+        .settingsVerticalScroll().padding(16.dp)) {
     // 一处编辑所有“某个位置的第二输入”：26 键角标与各固定栏，用标签页切换。
     val sideTargets = com.kingzcheung.xime.ui.keyboard.SideSymbolTarget.entries
     val sideIndex = sideTargets.indexOfFirst { it.key == sideTarget }

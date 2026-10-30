@@ -7,8 +7,6 @@ import android.provider.Settings
 import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -112,7 +110,7 @@ internal fun SetupWizardContent(
     onFinish: () -> Unit,
 ) {
     Scaffold(topBar = { TopAppBar(title = { Text("设置向导") }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+        Column(Modifier.fillMaxSize().padding(padding).settingsVerticalScroll()
             .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("按顺序完成下面三项，即可开始输入。", style = MaterialTheme.typography.bodyLarge)

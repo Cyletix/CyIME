@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -241,8 +242,10 @@ private fun SchemesMarketTab(
                 )
             }
 
+            val listState = rememberLazyListState()
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -490,8 +493,10 @@ private fun ModelsMarketTab(
                 },
             )
 
+            val listState = rememberLazyListState()
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -970,8 +975,10 @@ private fun SchemeDetailBody(
     val selectedVersion = uiState.selectedVersions[scheme.id] ?: scheme.currentVersion
     val selectedVersionObj = scheme.versions.firstOrNull { it.version == selectedVersion }
 
+    val listState = rememberLazyListState()
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        state = listState,
+        modifier = modifier.settingsGutterScroll(listState).fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1318,8 +1325,10 @@ private fun ModelDetailBody(
         ?: model.downloadableVersions.firstOrNull()?.version.orEmpty()
     val selectedVersionObj = model.downloadableVersions.firstOrNull { it.version == selectedVersion }
 
+    val listState = rememberLazyListState()
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        state = listState,
+        modifier = modifier.settingsGutterScroll(listState).fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1695,8 +1704,10 @@ fun PluginDetailContent(
                 ExtensionManager.getConfiguredNetworkHosts(context, plugin.id) +
                 SettingsPreferences.getPluginPendingHosts(context, plugin.id)).distinct()
         }
+        val listState = rememberLazyListState()
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            state = listState,
+            modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

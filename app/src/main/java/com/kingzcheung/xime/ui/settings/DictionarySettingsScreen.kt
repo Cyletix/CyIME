@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -146,7 +147,8 @@ private fun CustomPhraseTabContent(
     viewModel: CustomPhraseViewModel,
     uiState: CustomPhraseUiState,
 ) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
+    val listState = rememberLazyListState()
+    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
         item {
             DictionarySearchField(uiState.searchQuery, viewModel::setSearchQuery, "搜索短语或编码",
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp))

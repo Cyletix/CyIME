@@ -79,7 +79,8 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), state = rememberSettingsSearchListState(),
+        val listState = rememberSettingsSearchListState()
+        LazyColumn(modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding).padding(horizontal = 16.dp), state = listState,
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Text("本机：${describe(device)} · 本机配置推荐：${tierNames.getValue(detected)}",

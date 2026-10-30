@@ -3,6 +3,7 @@ package com.kingzcheung.xime.ui.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,7 +42,8 @@ internal fun T9SuppressionPanel() {
             error = "暂时读不到，请稍后再试"
         } finally { busy = false }
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+    val listState = rememberLazyListState()
+    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) } }
         if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp)) }
         if (!busy && words.isEmpty() && error == null) item { DictionaryEmptyLine("没有删掉的候选") }

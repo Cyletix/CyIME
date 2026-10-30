@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LinearProgressIndicator
@@ -49,7 +50,8 @@ internal fun DictionaryLookupPanel() {
             searching = false
         }
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+    val listState = rememberLazyListState()
+    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(value = word, onValueChange = { word = it }, placeholder = { Text("输入要查的词") },

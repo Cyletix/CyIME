@@ -130,9 +130,10 @@ fun SmartPredictionSettingsContent(
             )
         }
     ) { padding ->
+        val listState = rememberSettingsSearchListState()
         LazyColumn(
-            state = rememberSettingsSearchListState(),
-            modifier = Modifier
+            state = listState,
+            modifier = Modifier.settingsGutterScroll(listState)
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),

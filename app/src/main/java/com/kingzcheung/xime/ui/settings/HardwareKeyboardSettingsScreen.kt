@@ -1,8 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,7 +26,7 @@ fun HardwareKeyboardSettingsContent(onBack: () -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text("物理键盘") }, navigationIcon = {
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
     }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+        Column(Modifier.fillMaxSize().padding(padding).settingsVerticalScroll()
             .padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("语言切换", style = MaterialTheme.typography.titleMedium)
             HardwareOption("Ctrl + 空格", "按已启用语言的顺序循环切换，不输入空格", options.ctrlSpace) { save("ctrl_space", it) }

@@ -1,8 +1,6 @@
 package com.kingzcheung.xime.ui.settings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.Keyboard
@@ -33,7 +31,7 @@ internal fun LayoutInputSettingsContent(category: LayoutInputCategory, onBack: (
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         })
     }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+        Column(Modifier.fillMaxSize().padding(padding).settingsVerticalScroll().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             when (category) {
                 LayoutInputCategory.Qwerty -> SettingsSection(title = "26 键输入", content = {

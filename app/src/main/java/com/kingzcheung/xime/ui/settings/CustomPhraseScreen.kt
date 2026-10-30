@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -134,7 +135,8 @@ fun CustomPhraseContent(
                         Text("未找到匹配条目", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    val listState = rememberLazyListState()
+                    LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         itemsIndexed(items = uiState.filteredEntries,
                             key = { i, e -> "${e.word}_${e.code}_$i" }) { _, entry ->

@@ -5,6 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
@@ -101,7 +102,8 @@ fun CellDictionarySettingsPanel(
             }
         }
     }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(vertical = 8.dp)) {
+        val listState = rememberLazyListState()
+        LazyColumn(state = listState, modifier = Modifier.settingsGutterScroll(listState).fillMaxSize().padding(padding), contentPadding = PaddingValues(vertical = 8.dp)) {
             item {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("搜索词库") },
