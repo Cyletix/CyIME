@@ -66,7 +66,11 @@ fun ToolbarButtonIcon(
     }
 }
 
-/** 键盘上显示的名称：全角/半角开关按当前状态显示，其余按钮用原名称。 */
-internal fun ToolbarButtonItem.stateLabel(active: Boolean): String =
-    if (this is ToolbarButtonItem.Builtin && button == com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE)
-        (if (active) "全角" else "半角") else label
+/** 键盘上显示的名称：全角/半角、简繁开关按当前状态显示，其余按钮用原名称。 */
+internal fun ToolbarButtonItem.stateLabel(active: Boolean): String = when {
+    this is ToolbarButtonItem.Builtin && button == com.kingzcheung.xime.keyboard.ToolbarButton.FULL_SHAPE ->
+        if (active) "全角" else "半角"
+    this is ToolbarButtonItem.Builtin && button == com.kingzcheung.xime.keyboard.ToolbarButton.TRADITIONAL ->
+        if (active) "繁体" else "简体"
+    else -> label
+}
