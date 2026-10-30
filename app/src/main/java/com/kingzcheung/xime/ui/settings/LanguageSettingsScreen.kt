@@ -32,7 +32,7 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onBack: () -> Unit) {
+fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDoublePinyin: () -> Unit = {}, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var languages by remember { mutableStateOf(LanguagePreferences.enabled(context)) }
@@ -129,6 +129,8 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onBack: () -
                 SettingsSection(title = "方案资源") {
                     SettingsItem(Icons.TwoTone.KeyboardAlt, "已安装的方案",
                         "启停和排序语言、方案与布局的组合，导入方案文件", onClick = onOpenSchemaResources, showArrow = true)
+                    SettingsItem(Icons.TwoTone.KeyboardAlt, "双拼方案",
+                        "小鹤双拼的键位，新建和修改自己的双拼方案", onClick = onOpenDoublePinyin, showArrow = true)
                 }
             }
             item { if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) }

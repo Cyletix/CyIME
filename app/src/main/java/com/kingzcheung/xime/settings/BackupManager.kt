@@ -67,6 +67,7 @@ object BackupManager {
     /** filesDir 下允许经 `_xime_backup/files/` 往返的文件。 */
     internal fun isFilesEntry(relative: String, personal: Boolean): Boolean = when {
         relative == "custom-keyboard-layouts.json" -> true
+        relative == DoublePinyinSchemes.FILE -> true
         relative == "user_ngram_cache.json" -> personal
         relative.startsWith("learning-profiles/") && relative.endsWith(".json") &&
             relative.count { it == '/' } == 1 -> personal
@@ -194,6 +195,9 @@ object BackupManager {
         restoreArchive(context, bytes).onFailure { return Result.failure(it) }
         runCatching { CustomKeyboardLayouts.load(context) }
             .onFailure { Log.w(TAG, "reload custom layouts failed", it) }
+        // 自定义双拼只备份键位表，方案文件按它重新生成。
+        runCatching { DoublePinyinSchemes.install(context, SchemaManager.getRimeDir(context)) }
+            .onFailure { Log.w(TAG, "regenerate double pinyin schemes failed", it) }
         val deployed = runCatching { com.kingzcheung.xime.rime.RimeConfigHelper.redeploy(context) }.getOrDefault(false)
         return if (deployed) Result.success(Unit)
         else Result.failure(Exception("设置已恢复，但输入方案重新部署失败，请在方案设置中重新部署"))

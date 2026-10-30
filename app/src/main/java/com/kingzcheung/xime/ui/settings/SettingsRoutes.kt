@@ -4,6 +4,7 @@ object SettingsRoutes {
     const val HardwareKeyboard = "hardware_keyboard"
     const val Main = "main"
     const val Schema = "schema"
+    const val DoublePinyin = "double_pinyin"
     const val Market = "market"
     const val ModelLocal = "model_local"
     const val SchemaMarketDetail = "schema_market_detail/{schemeId}"
