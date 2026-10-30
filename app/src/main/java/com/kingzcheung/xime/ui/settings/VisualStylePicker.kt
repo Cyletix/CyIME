@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.ui.theme.MaterialLevel
 import com.kingzcheung.xime.ui.theme.VisualStyle
+import com.kingzcheung.xime.ui.theme.VisualStyles
+import com.kingzcheung.xime.ui.theme.KeyShape
+import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.theme.visualMaterial
 import com.kingzcheung.xime.ui.theme.visualEnvironment
 import com.kingzcheung.xime.ui.theme.LocalKeyboardPalette
@@ -28,6 +31,7 @@ import com.kingzcheung.xime.ui.theme.MaterialPalette
 @Composable
 internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) -> Unit) {
     val keyboard = LocalKeyboardPalette.current
+    val keyRadius = KeysConfigHelper.getKeyboardKeyConfig().cornerRadius.dp
     Column(Modifier.settingsSearchAnchor("视觉样式", bleed = 6.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("视觉样式", style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary)
@@ -56,9 +60,9 @@ internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) ->
                                 .padding(horizontal = 7.dp, vertical = 6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                             listOf("A", "S", "D").forEach { label ->
-                                Box(Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(8.dp))
+                                Box(Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(keyRadius))
                                     .background(key)
-                                    .visualMaterial(style, 8.dp), contentAlignment = Alignment.Center) {
+                                    .visualMaterial(style, keyRadius), contentAlignment = Alignment.Center) {
                                     Text(label, color = ink, fontSize = 16.sp)
                                 }
                             }
@@ -73,5 +77,52 @@ internal fun VisualStylePicker(selected: VisualStyle, onSelect: (VisualStyle) ->
         }
         if (selected != VisualStyle.ORIGINAL) Text("切换明暗或配色不会关闭当前材质效果。",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Key corners, previewed as real-size keys in the current material and colours. */
+@Composable
+internal fun KeyShapePicker(selected: KeyShape, onSelect: (KeyShape) -> Unit) {
+    val keyboard = LocalKeyboardPalette.current
+    val style = VisualStyles.current
+    // The theme's own radius; each card caps it the way the keyboard would.
+    val configured = KeysConfigHelper.configuredKeyCornerRadius()
+    Column(Modifier.settingsSearchAnchor("按键形状", bleed = 6.dp, bleedVertical = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("按键形状", style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary)
+        Text("所有布局和面板的按键一起改。方形接近 iOS 18 以前的键盘；蜂窝布局的六边形字母键不变。",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KeyShape.entries.forEach { shape ->
+                val palette = MaterialTheme.colorScheme
+                val surface = keyboard?.background ?: palette.surface
+                val accent = keyboard?.accent ?: palette.primary
+                val key = keyboard?.key ?: palette.surfaceContainerHigh
+                val ink = keyboard?.text ?: palette.onSurface
+                val radius = shape.radius(configured).dp
+                val cardShape = RoundedCornerShape(16.dp)
+                CompositionLocalProvider(LocalMaterialPalette provides MaterialPalette(surface, accent)) {
+                Column(Modifier.weight(1f).testTag("key-shape-${shape.id}")
+                    .semantics { this.selected = selected == shape }
+                    .clip(cardShape).background(surface).visualEnvironment(style)
+                    .border(if (selected == shape) 2.dp else 1.dp,
+                        accent.copy(alpha = if (selected == shape) 1f else .24f), cardShape)
+                    .clickable { onSelect(shape) }.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf("A", "S").forEach { label ->
+                            Box(Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(radius))
+                                .background(key)
+                                .visualMaterial(style, radius), contentAlignment = Alignment.Center) {
+                                Text(label, color = ink, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                    Text(shape.title + if (selected == shape) " · 已选" else "",
+                        color = ink, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                }
+                }
+            }
+        }
     }
 }

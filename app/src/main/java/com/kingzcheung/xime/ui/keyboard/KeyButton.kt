@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.KeyShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -179,10 +180,10 @@ fun KeyButton(
     ))
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, backgroundColor, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
+            val cornerPx = with(density) { KeyShapes.current.radius(shadowShapeRadius).toPx() }
             val color = crispShadowColor(backgroundColor)
             Modifier.drawBehind {
                 drawRoundRect(
@@ -497,10 +498,10 @@ fun SwipeableKeyButton(
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
     val hexagonal = LocalHoneycombKeys.current && (letterGroup ?: text).let { it.length == 1 && it[0].lowercaseChar() in 'a'..'z' }
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, resolvedBackground, frostedGlass.enabled, hexagonal) {
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, resolvedBackground, frostedGlass.enabled, hexagonal) {
         if (shadowEnabled && !frostedGlass.enabled && !hexagonal) {
             val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
+            val cornerPx = with(density) { KeyShapes.current.radius(shadowShapeRadius).toPx() }
             val color = crispShadowColor(resolvedBackground)
             Modifier.drawBehind {
                 drawRoundRect(
@@ -800,10 +801,10 @@ fun IconKeyButton(
     val density = LocalDensity.current
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, backgroundColor, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
+            val cornerPx = with(density) { KeyShapes.current.radius(shadowShapeRadius).toPx() }
             val color = crispShadowColor(backgroundColor)
             Modifier.drawBehind {
                 drawRoundRect(
@@ -931,10 +932,10 @@ fun SwipeableIconKeyButton(
     val density = LocalDensity.current
 
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, backgroundColor, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
+            val cornerPx = with(density) { KeyShapes.current.radius(shadowShapeRadius).toPx() }
             val color = crispShadowColor(backgroundColor)
             Modifier.drawBehind {
                 drawRoundRect(

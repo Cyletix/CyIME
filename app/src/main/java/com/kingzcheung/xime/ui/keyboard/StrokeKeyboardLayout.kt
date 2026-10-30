@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.KeyShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -318,10 +319,10 @@ private fun StrokeKeyboardContent(
     // 符号面板统一阴影（与九键左栏候选面板同款样式）
     val density = LocalDensity.current
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
-    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor, frostedGlass.enabled) {
+    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, keyBackgroundColor, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
+            val cornerPx = with(density) { KeyShapes.current.radius(shadowShapeRadius).toPx() }
             val color = crispShadowColor(keyBackgroundColor)
             Modifier.drawBehind {
                 drawRoundRect(
@@ -811,12 +812,12 @@ private fun ResetKey(
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnPress by rememberUpdatedState(onPress)
     val density = LocalDensity.current
-    val shape = RoundedCornerShape(shadowShapeRadius)
+    val shape = RoundedCornerShape(KeyShapes.current.radius(shadowShapeRadius))
     val frostedGlass = LocalKeyboardInputPreferences.current.frostedGlass
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor, frostedGlass.enabled) {
+    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, backgroundColor, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) {
             val offsetPx = with(density) { shadowElevation.toPx() }
-            val cornerPx = with(density) { shadowShapeRadius.toPx() }
+            val cornerPx = with(density) { KeyShapes.current.radius(shadowShapeRadius).toPx() }
             val color = crispShadowColor(backgroundColor)
             Modifier.drawBehind {
                 drawRoundRect(

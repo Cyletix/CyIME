@@ -130,6 +130,7 @@ object KeyboardThemes {
     /** 重新加载 xime.yaml/xime.custom.yaml 中的配色方案并更新缓存。 */
     fun reload(context: Context) {
         VisualStyles.current = com.kingzcheung.xime.settings.SettingsPreferences.getVisualStyle(context)
+        KeyShapes.current = com.kingzcheung.xime.settings.SettingsPreferences.getKeyShape(context)
         IconAppearance.reload(context)
         configOverrides = KeysConfigHelper.loadColorSchemes(context).filterKeys {
             it != "858AdvanceColor"

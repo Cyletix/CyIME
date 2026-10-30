@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.KeyShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -70,7 +71,7 @@ internal fun KaomojiKeyboard(onSelect: (String) -> Unit, modifier: Modifier = Mo
                 val needed = (widths[face] ?: 0) + padding
                 GridItemSpan(ceil((needed + gap) / (cell + gap)).toInt().coerceIn(1, maxLineSpan))
             }) { face ->
-                Box(Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(RoundedCornerShape(8.dp))
+                Box(Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(RoundedCornerShape(KeyShapes.current.radius(8.dp)))
                     .background(textColor.copy(alpha = .08f)).testTag("kaomoji:$face").clickable {
                         recent = RecentUsageStore.record(context, RecentUsageStore.KEY_RECENT_KAOMOJI, face)
                         onSelect(face)

@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.KeyShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.graphics.graphicsLayer
@@ -179,10 +180,10 @@ internal fun KanaFlickButton(
     val suppressCursorMove = LocalSuppressCursorMove.current
     val inputPreferences = LocalKeyboardInputPreferences.current
     val frostedGlass = inputPreferences.frostedGlass
-    val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, background, frostedGlass.enabled) {
+    val shadow = remember(shadowEnabled, shadowElevation, shadowShapeRadius, KeyShapes.current, density, background, frostedGlass.enabled) {
         if (shadowEnabled && !frostedGlass.enabled) Modifier.drawBehind {
             drawRoundRect(crispShadowColor(background), topLeft = Offset(0f, shadowElevation.toPx()),
-                size = size, cornerRadius = CornerRadius(shadowShapeRadius.toPx()))
+                size = size, cornerRadius = CornerRadius(KeyShapes.current.radius(shadowShapeRadius).toPx()))
         } else Modifier
     }
     val textScale = inputPreferences.keyTextScale

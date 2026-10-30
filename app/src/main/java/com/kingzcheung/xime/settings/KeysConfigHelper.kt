@@ -1653,8 +1653,14 @@ object KeysConfigHelper {
     /** 获取键盘阴影配置（从 xime.yaml keyboard.shadow 加载）。 */
     fun getKeyboardShadow(): KeyboardShadowConfig = keyboardShadowConfig
 
-    /** 获取键盘按键配置（从 xime.yaml keyboard.key 加载）。 */
-    fun getKeyboardKeyConfig(): KeyboardKeyConfig = keyboardKeyConfig
+    /** 获取键盘按键配置（从 xime.yaml keyboard.key 加载）；圆角按主题里选的按键形状收小。 */
+    fun getKeyboardKeyConfig(): KeyboardKeyConfig = keyboardKeyConfig.let { config ->
+        val radius = com.kingzcheung.xime.ui.theme.KeyShapes.current.radius(config.cornerRadius)
+        if (radius == config.cornerRadius) config else config.copy(cornerRadius = radius)
+    }
+
+    /** xime.yaml 配置的按键圆角，未按按键形状收小；设置页预览各形状用。 */
+    fun configuredKeyCornerRadius(): Int = keyboardKeyConfig.cornerRadius
 
     /** 获取九键左侧快捷符号栏配置（xime.custom.yaml → xime.yaml → 内置默认值）。 */
     fun getT9SideSymbols(): List<String> =
