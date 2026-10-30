@@ -60,7 +60,7 @@ object InputProfileSelection {
     fun sameScheme(a: SchemaInfo, b: SchemaInfo): Boolean = a.profile.scheme == b.profile.scheme &&
         (a.schemeLabel == b.schemeLabel || variantId(a) == variantId(b))
 
-    private fun variantId(entry: SchemaInfo): String = CyimeInputDefaults.companions[entry.schemaId]
+    private fun variantId(entry: SchemaInfo): String = CyimeInputDefaults.companionNeeds(entry.schemaId)
         ?.firstOrNull { InputProfiles.describe(it).scheme == entry.profile.scheme } ?: entry.schemaId
 
     /** 换到某布局后用的条目；[keepsScheme] 为假表示这个布局没有当前方案，只能换成它有的方案。 */

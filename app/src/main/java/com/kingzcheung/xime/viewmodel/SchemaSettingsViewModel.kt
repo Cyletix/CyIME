@@ -62,7 +62,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                 )
             }
             // 组合配置（如 14 键小鹤双拼）跟随方案与布局自动启用，不单列。
-            val sorted = allSchemas.filterNot { it.schemaId in com.kingzcheung.xime.settings.CyimeInputDefaults.companions }
+            val sorted = allSchemas.filterNot { com.kingzcheung.xime.settings.CyimeInputDefaults.isCompanion(it.schemaId) }
                 .sortedByDescending { it.schemaId in enabledSchemas }
             _uiState.update {
                 it.copy(

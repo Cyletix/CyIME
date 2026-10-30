@@ -677,7 +677,7 @@ object KeysConfigHelper {
 
     /** 合并键方案（pinyin_14jian 等）对应的 xime.yaml 键盘 section，非合并键方案返回 null。 */
     internal fun mergedSectionForSchema(schemaId: String): String? =
-        resolveMergedSection(schemaId, _schemaSectionBindings)
+        resolveMergedSection(schemaId, _schemaSectionBindings) ?: generatedSection(schemaId)
 
     /**
      * 绑定解析：仅认 schemas 声明（xime.yaml / xime.custom.yaml keyboard.<section>.schemas），
@@ -689,7 +689,14 @@ object KeysConfigHelper {
 
     /** 查询方案声明的键盘 section（任意类型，含代码布局），未声明返回 null。 */
     fun boundSectionForSchema(schemaId: String): String? = _schemaSectionBindings[schemaId]
-        ?: "t9".takeIf { DoublePinyinSchemes.isT9(schemaId) }
+        ?: "t9".takeIf { DoublePinyinSchemes.isT9(schemaId) } ?: generatedSection(schemaId)
+
+    /**
+     * 由键位表生成的双拼 14 键版本不写进 xime.yaml，用 14 键小鹤双拼的布局；用户在 xime.custom.yaml
+     * 给它声明了别的布局时以声明为准（上面先查绑定）。
+     */
+    private fun generatedSection(schemaId: String): String? =
+        _schemaSectionBindings[DoublePinyinScheme.k14Id("double_pinyin_flypy")]?.takeIf { DoublePinyinSchemes.isK14(schemaId) }
 
     /** 查询方案绑定的代码布局 section（t9 九键 / stroke 笔画），未绑定返回 null。 */
     fun codeLayoutForSchema(schemaId: String): String? =

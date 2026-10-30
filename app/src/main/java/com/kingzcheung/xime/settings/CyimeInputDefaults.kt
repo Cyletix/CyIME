@@ -8,13 +8,19 @@ object CyimeInputDefaults {
 
     /**
      * 方案 × 布局的组合配置：所需的方案和布局都启用时自动启用，不作为独立条目单独开关。
-     * 例如启用了小鹤双拼和 14 键，就同时提供 14 键小鹤双拼。
+     * 例如启用了小鹤双拼（或自然码、自定义双拼）和 14 键，就同时提供这个双拼方案的 14 键版本。
+     * 返回组合需要的方案（双拼方案在前）；不是组合配置时为 null。
      */
-    val companions = mapOf("double_pinyin_flypy_14jian" to setOf("double_pinyin_flypy", "pinyin_14jian"))
+    fun companionNeeds(id: String): List<String>? = if (DoublePinyinSchemes.isK14(id))
+        listOf(id.removeSuffix(DoublePinyinScheme.K14_SUFFIX), "pinyin_14jian") else null
+
+    fun isCompanion(id: String) = companionNeeds(id) != null
 
     fun withCompanions(ids: List<String>, available: Set<String>): List<String> {
-        val base = ids.filterNot { it in companions }
-        val implied = companions.filter { (id, needs) -> id in available && needs.all { it in base } }.keys
+        val base = ids.filterNot(::isCompanion)
+        // 按双拼方案在列表里的顺序排列，结果不随已安装文件的枚举顺序变化。
+        val implied = available.filter { id -> companionNeeds(id)?.all { it in base } == true }
+            .sortedWith(compareBy({ base.indexOf(companionNeeds(it)!!.first()) }, { it }))
         return base + implied
     }
 

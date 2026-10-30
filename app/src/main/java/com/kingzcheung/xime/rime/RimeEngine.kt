@@ -434,8 +434,8 @@ class RimeEngine {
         val snapshot = nativePinyinEditSnapshot()
         val confirmed = snapshot.getOrNull(2)?.toIntOrNull()?.coerceIn(0, input.length) ?: 0
         val prefix = snapshot.getOrNull(3).orEmpty()
-        // 14 键双拼的首选读音是全拼，换成小鹤双拼的键才能和合并编码一一对上。
-        val reading = if (profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN) flypyReading(spelling) else spelling
+        // 14 键双拼的首选读音是全拼，换成这个方案的双拼键才能和合并编码一一对上。
+        val reading = if (profile.scheme == com.kingzcheung.xime.settings.InputScheme.DOUBLE_PINYIN) doublePinyinReading(spelling, schema) else spelling
         return prefix + merged14Preedit(input.drop(confirmed), preedit.removePrefix(prefix), reading, groups)
     }
 
