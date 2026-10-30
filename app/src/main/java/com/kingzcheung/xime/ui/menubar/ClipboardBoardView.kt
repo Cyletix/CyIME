@@ -674,7 +674,11 @@ private fun ClipboardRecordCard(
             onLongClickLabel = if (selecting) "切换选择" else "更多操作")) {
         when (card) {
             is ClipboardCard.Text -> Text(card.item.text,
-                Modifier.align(Alignment.CenterStart).fillMaxWidth().heightIn(min = if (previewHeight == null) 48.dp else 0.dp)
+                // A one-line record is as tall as a pinned row and its line sits in the middle; the old
+                // 48dp floor left a strip under the text (user 10-30). Longer text grows the card.
+                Modifier.align(Alignment.CenterStart).fillMaxWidth()
+                    .heightIn(min = if (previewHeight == null) ClipboardPinnedRowHeight else 0.dp)
+                    .wrapContentHeight(Alignment.CenterVertically)
                     .padding(start = if (selecting) 28.dp else 8.dp,
                         end = if (pinned) 26.dp else 8.dp, top = if (oneLine) 0.dp else 8.dp, bottom = if (oneLine) 0.dp else 8.dp),
                 color = if (highlighted) colors.onSecondaryContainer else colors.onSurface,
