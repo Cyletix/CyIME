@@ -31,7 +31,6 @@ data class SchemaUiState(
     val enabledSchemas: List<String> = emptyList(),
     val currentSchema: String = "t9_pinyin",
     val isDeploying: Boolean = false,
-    val isDownloading: Boolean = false,
     val toastMessage: String? = null,
     val marketPackages: List<SchemaManifestManager.MarketPackageInfo> = emptyList(),
     val showUninstallDialog: Boolean = false,
@@ -188,19 +187,6 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
             refresh()
             loadMarketPackages()
             showToast(results.joinToString("\n") { (id, result) -> "$id：${result.message}" })
-        }
-    }
-
-    fun importFromUrl(url: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isDownloading = true) }
-            val success = withContext(Dispatchers.IO) {
-                SchemaManager.importFromUrl(getApplication(), url)
-            }
-            _uiState.update { it.copy(isDownloading = false) }
-            refresh()
-            _importCompleted.tryEmit(Unit)
-            showToast(if (success) "导入成功" else "下载或解压失败，请检查链接")
         }
     }
 
