@@ -2,6 +2,7 @@ package com.kingzcheung.xime.settings
 
 import android.content.Context
 import android.content.res.AssetManager
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -43,6 +44,9 @@ class KeysConfigLayoutReloadTest {
                 - [a, s, d, f, g, h, j, k, l, ";"]
                 - [z, x, c, v, b, n, m]
     """.trimIndent()
+
+    /** loadConfig 会留下“已加载、没有任何方案绑定”的全局状态，影响后面按方案判断布局的测试。 */
+    @After fun clearBindings() = KeysConfigHelper.clearSchemaBindingsForTest()
 
     @Test
     fun `重新部署时 xime custom 行布局生效`() {

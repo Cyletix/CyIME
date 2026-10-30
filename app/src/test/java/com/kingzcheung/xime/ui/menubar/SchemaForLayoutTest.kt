@@ -3,12 +3,15 @@ package com.kingzcheung.xime.ui.menubar
 import com.kingzcheung.xime.settings.InputLanguage
 import com.kingzcheung.xime.settings.InputModes
 import com.kingzcheung.xime.settings.InputProfileSelection
+import com.kingzcheung.xime.settings.InputProfiles
 import com.kingzcheung.xime.settings.InputLayout
+import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.SchemaInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /** 布局面板点一下布局就切换，不用再点方案；布局没有当前方案时照样切换，但要标出来并提示。 */
@@ -17,6 +20,12 @@ class SchemaForLayoutTest {
         .map { SchemaInfo(it, it, "", "", "") }
     private fun entry(id: String) = (entries + extra).first { it.schemaId == id }
     private val extra = listOf("double_pinyin_mspy", "wubi86").map { SchemaInfo(it, it, "", "", "") }
+
+    /** 布局按内置方案描述判断；前面的测试类加载过的布局绑定和方案元数据不能带进来。 */
+    @Before fun builtInLayouts() {
+        KeysConfigHelper.clearSchemaBindingsForTest()
+        InputProfiles.updateInstalled(emptyList())
+    }
 
     private fun switch(id: String, layoutId: String, list: List<SchemaInfo> = entries, all: List<SchemaInfo> = list) =
         InputProfileSelection.switchLayout(list, entry(id), layoutId, all)
