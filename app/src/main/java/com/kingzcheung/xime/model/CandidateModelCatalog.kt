@@ -26,7 +26,14 @@ object CandidateModelCatalog {
                     "7d346a1fa2b332bdd764d1b91bc8002526cb7d563fea091f6b861279be025c4e", 109685894L),
             )))),
         ModelInfo(GRAMMAR, "九键语法增强", "没装九键词组模型时增强九键组句排序；装了词组模型就不再起作用，会自动删除。来源：RIME-LMDG，CC-BY-4.0。", ModelCategory.CANDIDATE,
-            versions = listOf(ModelVersion(version = "lts-650124920", size = "380.0 MB", files = listOf(
+            versions = listOf(ModelVersion(version = "lts-e34500ab", size = "398.7 MB", files = listOf(
+                // 上游 2026-10-30 前又替换了 LTS 资产（仍是 Rime::Grammar/1.0 格式，418,078,764 字节），资产 650124920 那份已下不到。
+                // 先走上游固定文件名，上游再换文件时哈希对不上，就改用 CyIME Release 里转存的这一份。
+                ModelFile("wanxiang-lts-zh-hans.gram", "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram",
+                    "e34500ab44626dc039a0641792ecba98ab63307646eb3d29186be56608ffe094", 418078764L,
+                    mirrors = listOf("https://github.com/Cyletix/CyIME/releases/download/models/wanxiang-lts-zh-hans-e34500ab.gram")),
+            )),
+            ModelVersion(version = "lts-650124920", retired = true, size = "380.0 MB", files = listOf(
                 // 上游 2026-10-17 替换了 LTS 资产（同为 Rime::Grammar/1.0 格式），旧资产 602588267 已 404。
                 ModelFile("wanxiang-lts-zh-hans.gram", "https://api.github.com/repos/amzxyz/RIME-LMDG/releases/assets/650124920",
                     "1849e5e4acbdbfaf41fceeb86b739d5d0c85d574bd8a688562cba1e6beb78488", 398505004L),
