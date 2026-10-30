@@ -438,11 +438,21 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             "arrow_left", "arrow_right", "select_arrow_left", "select_arrow_right" -> editCursor {
                 editorCursor.move(it, if (action.endsWith("left")) -1 else 1, action.startsWith("select_"))
             }
+            "line_start", "line_end", "select_line_start", "select_line_end" -> editCursor {
+                editorCursor.moveToLineBoundary(it, toEnd = action.endsWith("end"), selecting = action.startsWith("select_"))
+            }
             "arrow_up", "arrow_down", "select_arrow_up", "select_arrow_down" -> editCursor {
-                editorCursor.sendDirection(it, if (action.endsWith("up")) KeyEvent.KEYCODE_DPAD_UP else KeyEvent.KEYCODE_DPAD_DOWN,
-                    action.startsWith("select_"))
+                editorCursor.moveLine(it, if (action.endsWith("up")) -1 else 1, action.startsWith("select_"), editorIsMultiLine())
             }
         }
+    }
+
+    /** 只有声明多行的文本框才交给宿主按视觉行移动；单行框里宿主的上下键可能移走焦点。 */
+    private fun editorIsMultiLine(): Boolean {
+        val target = service.uiState.value.inputTarget
+        val type = if (target.isInternal) target.editText()?.inputType else service.currentInputEditorInfo?.inputType
+        return type != null && type and android.text.InputType.TYPE_MASK_CLASS == android.text.InputType.TYPE_CLASS_TEXT &&
+            type and android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0
     }
 
     internal fun applyPageSizeSetting(schemaId: String) {
