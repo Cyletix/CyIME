@@ -92,6 +92,13 @@ def main():
         code = subprocess.call(command)
     finally:
         restored = dev_op(args.serial, "restore")
+        # Right after an install the new process is still deploying and the user dictionary is not open yet:
+        # that restore fails once and succeeds a little later (10-31, both devices).
+        for _ in range(6):
+            if restored.endswith("OK"):
+                break
+            time.sleep(20)
+            restored = dev_op(args.serial, "restore")
         print(restored)
         # Files the CyLM layer and Rime options come from also live in memory; when one had to be put back,
         # a fresh process reads it. Builds that say restart=no need none: a restart while the user is
