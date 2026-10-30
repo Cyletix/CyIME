@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -27,8 +28,9 @@ internal const val POSITION_HIGHLIGHT_FADE_OUT_MILLIS = 450
 internal val PositionHighlightGap = 8.dp
 
 /**
- * Gboard 式位置提示：切换成悬浮、拖完悬浮键盘、退出调节界面后，在悬浮卡片外四角亮出弧形角标，
- * 停一会儿再淡出，让人看清键盘现在落在哪里。只在绘制阶段读透明度，动画不重组键盘。
+ * Gboard 式位置提示：切换成悬浮、拖完悬浮键盘、点一下底部拖动条、退出调节界面后，在悬浮卡片外四角亮出弧形角标，
+ * 停一会儿再淡出，让人看清键盘现在落在哪里。亮着时角标就是调大小的把手：拖角改尺寸，点角打开调节界面。
+ * 只在绘制阶段读透明度，动画不重组键盘。
  */
 @Stable
 internal class KeyboardPositionHighlight {
@@ -36,19 +38,39 @@ internal class KeyboardPositionHighlight {
     var epoch by mutableIntStateOf(0)
         private set
 
+    /** 手指按在角标上（正在拖角调大小）时一直亮着；松手再 [trigger] 停一会儿淡出。 */
+    var held by mutableStateOf(false)
+
+    /**
+     * 角标是否在显示（从亮起到淡出完）：亮起时立刻置上，不等第一帧动画；把手的有无只看它，
+     * 不在组合里读逐帧变化的透明度。
+     */
+    var lit by mutableStateOf(false)
+        private set
+
     fun trigger() {
         epoch++
+        lit = true
+    }
+
+    internal fun faded() {
+        if (!held) lit = false
     }
 }
 
 @Composable
 internal fun rememberKeyboardPositionHighlight(): KeyboardPositionHighlight {
     val highlight = remember { KeyboardPositionHighlight() }
-    LaunchedEffect(highlight.epoch) {
+    LaunchedEffect(highlight.epoch, highlight.held) {
+        if (highlight.held) {
+            highlight.alpha.snapTo(1f)
+            return@LaunchedEffect
+        }
         if (highlight.epoch == 0) return@LaunchedEffect
         highlight.alpha.animateTo(1f, tween(POSITION_HIGHLIGHT_FADE_IN_MILLIS))
         delay(POSITION_HIGHLIGHT_HOLD_MILLIS)
         highlight.alpha.animateTo(0f, tween(POSITION_HIGHLIGHT_FADE_OUT_MILLIS))
+        highlight.faded()
     }
     return highlight
 }
