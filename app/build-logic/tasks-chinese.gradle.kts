@@ -121,7 +121,24 @@ val prepareChineseDictionaries by tasks.registering {
         // 每个见. Raise the existing rime-ice entries here; missing ones are added to cyime_terms below.
         // The user's must-pass words (app/data/cyime_user_fixes.tsv) use the same floor, one code each.
         val domainFloors = (domainTerms.readLines() + userFixes.readLines()).filter { it.isNotBlank() && !it.startsWith("#") }
-            .map { it.split('\t') }.associate { (it[0] + "\t" + it[1]) to it[2].toInt() }
+            .map { it.split('\t') }.associate { (it[0] + "\t" + it[1]) to it[2].toInt() }.toMutableMap()
+        // Sentence pattern verb + 完了/好了 + 吗/没 (user 2026-10-30: 测完了吗 came out 测验了吗 on nine-key): these
+        // phrases sat near 200, below 洗澡了吗 and 吃药了吗 on the same keys; each one present gets at least 1000
+        // (没 500). Generating the missing ones was tried and dropped: 上传完了吗 then read 上啊换完了吗.
+        val resultQuestion = Regex("(.{1,3})(完了|好了)(吗|没)")
+        for (name in listOf("base", "ext")) {
+            var body = false
+            for (line in File(root, "cn_dicts/$name.dict.yaml").readLines()) {
+                if (line.trim() == "...") { body = true; continue }
+                val fields = line.split('\t')
+                if (!body || fields.size != 3) continue
+                if (fields[2].toIntOrNull() == null) continue
+                val text = fields[0]
+                if (resultQuestion.matches(text)) {
+                    domainFloors.merge(text + "\t" + fields[1], if (text.endsWith("吗")) 1000 else 500, ::maxOf)
+                }
+            }
+        }
         val domainTexts = domainFloors.keys.associateBy { it.substringBefore('\t') }
         val domainPresent = mutableSetOf<String>()
         for (name in listOf("base", "ext", "tencent")) {
