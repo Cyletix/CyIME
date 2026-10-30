@@ -101,7 +101,7 @@ fun EditKeyboardLayout(
                 }
                 val cornerInset = metricsFor(availableDiameter).insetX ?: 2f
                 val cornerScale = KeyboardKeyMetrics.contentScale(
-                    cellWidth.value * .92f, availableDiameter.value / 3 * .92f).coerceAtMost(1.15f)
+                    cellWidth.value * .92f, availableDiameter.value / 3 * .92f)
                 val fontScale = LocalDensity.current.fontScale
                 val cornerHalfWidth = maxOf(12f, 10f * fontScale) * cornerScale
                 val cornerHalfHeight = (11f + 6f * fontScale) * cornerScale
@@ -191,7 +191,7 @@ fun EditKeyboardLayout(
                                     else {
                                         val circleX = (2.5f - columnIndex) * cellWidth.value
                                         val circleY = (1.5f - rowIndex) * cellHeight.value
-                                        val contentScale = glyphScale.coerceAtMost(1.15f)
+                                        val contentScale = glyphScale
                                         // 两侧键的内容居中在圆盘外露出的那一段里。
                                         val offset = if (rowIndex == 1) Offset((if (columnIndex == 1) -1f else 1f) *
                                             (cellWidth.value / 2 - inset.value - sideWidth / 2), 0f)
@@ -365,7 +365,8 @@ internal fun EditorActionKey(
             particleSize = glowSize,
             particleOffset = if (plain) androidx.compose.ui.unit.DpOffset(contentOffsetX, contentOffsetY) else androidx.compose.ui.unit.DpOffset.Zero), contentAlignment = Alignment.Center) {
         val scale = (LocalKeyboardKeyContentScale.current ?: 1f).let {
-            if (compact) minOf(it, 1.15f,
+            // 角键和外列键同倍率放大（平板上不再比外列小一号），只在格子矮时按高度收小。
+            if (compact) minOf(it,
                 ((maxHeight.value - 12f) / (20f + 14f * density.fontScale)).coerceAtLeast(.25f)) else it
         }
         val iconSize = (if (compact) 20.dp else 24.dp) * scale
