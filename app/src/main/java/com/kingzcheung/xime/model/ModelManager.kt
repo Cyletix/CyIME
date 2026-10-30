@@ -329,6 +329,7 @@ object ModelManager {
                 if (file.exists() && !file.delete()) success = false
             }
             if (success) {
+                if (model.category == ModelCategory.ASR) com.kingzcheung.xime.speech.OptimizedEncoder.forget(context, model.id)
                 MarketVersionStore.removeModelVersion(context, model.id)
                 DefaultModelInstaller.markHandled(context, model.id)
                 notifyInstalledModelsChanged()

@@ -38,6 +38,8 @@ class AsrInferenceService : Service() {
     private var engineIdleMs = 60_000L
     @Volatile private var saveTuningAudio = false
     @Volatile private var wholeSentenceFinal = false
+    /** 最近一次语音输入用的模型；结束后据此在后台准备 Zipformer 的快速加载副本。 */
+    @Volatile private var lastDictation: AsrModelManager.Selection? = null
     // Opt-in only; keyed by the client's session binder, like pushed PCM.
     private val recorders = ConcurrentHashMap<IBinder, SpeechTuningRecorder>()
     private val generation = AtomicLong()
@@ -198,6 +200,7 @@ class AsrInferenceService : Service() {
                     "selectionMs=${selectedAt - startedAt} modelMs=$modelLoadMs " +
                     "sessionWaitMs=${readyAt - selectedAt - modelLoadMs} totalMs=${readyAt - startedAt}")
                 if (!ready) { scheduleRelease(); recorders.remove(callback.asBinder())?.close("not_started", "") }
+                else lastDictation = selection
                 ready
             } catch (e: Exception) {
                 FileLogger.e("AsrInferenceService", "startAsr failed", e)
@@ -221,6 +224,7 @@ class AsrInferenceService : Service() {
             val text = sessions.finish(session) {
                 generation.compareAndSet(token, token + 1)
                 scheduleRelease()
+                lastDictation?.let { com.kingzcheung.xime.speech.OptimizedEncoder.prepareLater(this@AsrInferenceService, it) }
             } ?: ""
             recorders.remove(session)?.close("stop", text)
             resumeHeldCaption()
