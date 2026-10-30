@@ -1680,6 +1680,14 @@ fun KeyboardView(
 
         if (cursorControlActive) CursorControlOverlay(keyboardBgColor, keyTextColor, Modifier.matchParentSize())
 
+        state.voiceNotice?.let { notice ->
+            Box(Modifier.matchParentSize().then(Modifier.zIndex(21f)), contentAlignment = Alignment.TopCenter) {
+                Text(notice, color = keyTextColor, fontSize = 13.sp, maxLines = 2,
+                    modifier = Modifier.padding(8.dp).background(keyboardBgColor.copy(alpha = 0.95f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp).testTag("voice-notice"))
+            }
+        }
+
         state.rejectedCommitText?.let { rejected ->
             Box(Modifier.matchParentSize().then(Modifier.zIndex(20f))) {
                 RejectedCommitOverlay(rejected, keyboardBgColor, keyTextColor,

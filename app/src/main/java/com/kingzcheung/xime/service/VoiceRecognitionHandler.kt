@@ -51,6 +51,7 @@ class VoiceRecognitionHandler(
         FileLogger.i(TAG, "Initializing speech recognition system")
 
         speechRecognitionManager = managerFactory(context)
+        speechRecognitionManager.noticeCallback = { showVoiceNotice(it) }
 
         speechRecognitionManager.setCallbacks(
             onResult = { text ->
@@ -84,7 +85,7 @@ class VoiceRecognitionHandler(
         val language = getState().voiceKeyboardLanguages.recognitionLanguage
         if (::speechRecognitionManager.isInitialized && language != InputLanguage.UNSPECIFIED &&
             (language == InputLanguage.CHINESE || SettingsPreferences.isSttUseLocal(context) ||
-                com.kingzcheung.xime.speech.OnlineSpeechApi.isConfigured(context))) {
+                com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context))) {
             speechRecognitionManager.startPreStart()
         }
     }
@@ -169,7 +170,7 @@ class VoiceRecognitionHandler(
             val localName = AsrBackendFactory.getLocalName()
             if (localName != null) return localName
         }
-        if (com.kingzcheung.xime.speech.OnlineSpeechApi.isConfigured(context)) return "在线语音"
+        if (com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context)) return "在线语音"
         val enabledPlugins = ExtensionManager.getEnabledAsrPlugins(context)
         if (enabledPlugins.isNotEmpty()) {
             val selectedId = SettingsPreferences.getSttOnlinePluginId(context)
@@ -301,7 +302,7 @@ class VoiceRecognitionHandler(
         onStateChanged(getState().copy(voiceRecognitionState = RecognitionState.PROCESSING))
         mainHandler.removeCallbacks(finishTimeoutRunnable)
         mainHandler.postDelayed(finishTimeoutRunnable,
-            if (SettingsPreferences.isSttUseLocal(context) || com.kingzcheung.xime.speech.OnlineSpeechApi.isConfigured(context))
+            if (SettingsPreferences.isSttUseLocal(context) || com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context))
                 speechRecognitionManager.finishTimeoutMs + 500 else FINISH_TIMEOUT_MS)
         speechRecognitionManager.stopRecognition()
         if (toolbarSession) onRecordingStopped()
@@ -485,6 +486,16 @@ class VoiceRecognitionHandler(
             errorToast?.show()
         }
         onVoiceComplete()
+        if (userVisible && error.isNotBlank()) showVoiceNotice(error)
+    }
+
+    private val clearVoiceNotice = Runnable { onStateChanged(getState().copy(voiceNotice = null)) }
+
+    /** 键盘上的一行提示：有的手机（如 vivo）会拦下输入法的 Toast，语音出错不能悄无声息。 */
+    fun showVoiceNotice(message: String) {
+        mainHandler.removeCallbacks(clearVoiceNotice)
+        onStateChanged(getState().copy(voiceNotice = message))
+        mainHandler.postDelayed(clearVoiceNotice, 5000)
     }
 
     private fun handleAmplitudeUpdate(amplitude: Float) {

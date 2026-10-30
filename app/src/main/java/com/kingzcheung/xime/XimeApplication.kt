@@ -128,6 +128,7 @@ class XimeApplication : Application(), ImageLoaderFactory {
         SettingsPreferences.defaultKeyboardTheme = KeysConfigHelper.loadDefaultThemeId(this)
         SettingsPreferences.defaultDarkMode = KeysConfigHelper.loadDefaultDarkMode(this)
         SettingsPreferences.applyForkThemeDefaults(this)
+        SettingsPreferences.migrateSttUseLocalOnce(this)
 
         // 初始化模型运行时（内存管理 + 生命周期）
         ModelRuntime.attach(this)

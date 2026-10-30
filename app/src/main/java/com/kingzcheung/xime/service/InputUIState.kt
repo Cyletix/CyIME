@@ -41,6 +41,8 @@ data class InputUIState(
     val voiceSticky: Boolean = false,
     val voiceButtonState: VoiceButtonState = VoiceButtonState(),
     val voicePluginName: String = "",
+    /** 语音出错或改用本地时在键盘上显示的一行提示（有的手机会拦下 Toast）；几秒后自动清掉。 */
+    val voiceNotice: String? = null,
     val voiceRecognitionState: RecognitionState = RecognitionState.IDLE,
     val voiceRecognizedText: String = "",
     val voiceAmplitude: Float = 0f,

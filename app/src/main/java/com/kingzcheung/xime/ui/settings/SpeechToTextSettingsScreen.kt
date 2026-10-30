@@ -68,9 +68,6 @@ fun SpeechToTextSettingsContent(
 ) {
     val context = LocalContext.current
 
-    var useLocal by remember {
-        mutableStateOf(OfflineAsrSettings.isSupported() && SettingsPreferences.isSttUseLocal(context))
-    }
 
     var saveTuningAudio by remember {
         mutableStateOf(SettingsPreferences.isSttDebugRecord(context))
@@ -125,28 +122,8 @@ fun SpeechToTextSettingsContent(
             val scope = rememberCoroutineScope()
 
             if (OfflineAsrSettings.isSupported()) {
-                // 本地/在线引擎切换开关：关掉本地即用下方填写的在线语音接口
-                OfflineAsrSettings.EngineSelector(
-                    useLocal = useLocal,
-                    onUseLocalChange = {
-                        useLocal = it
-                        SettingsPreferences.setSttUseLocal(context, it)
-                        if (it) {
-                            // 打开本地识别：预热模型并常驻，避免语音时加载延迟丢开头音频
-                            scope.launch(Dispatchers.IO) {
-                                AsrBackendFactory.warmup(context)
-                            }
-                        } else {
-                            // 关闭本地识别：卸载常驻模型
-                            scope.launch(Dispatchers.IO) {
-                                AsrBackendFactory.releaseModel()
-                            }
-                        }
-                    }
-                )
-                if (!useLocal) OnlineSpeechApiSection()
-
-                if (useLocal) {
+                // 不再有「使用本地模型」开关：一律先用本地模型；在线接口测试通过后才可选「优先使用在线接口」。
+                run {
                     // 模型常驻与空闲释放统一在「性能与省电」设置，这里不再重复（两处会互相覆盖）。
                     SettingsSection(title = "本地识别") {
                         Text(
@@ -328,6 +305,7 @@ fun SpeechToTextSettingsContent(
                 }
             }
 
+            OnlineSpeechApiSection()
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
@@ -344,10 +322,15 @@ internal fun OnlineSpeechApiSection() {
     var model by remember { mutableStateOf(saved.model) }
     var status by remember { mutableStateOf(com.kingzcheung.xime.speech.OnlineSpeechApi.status(context)) }
     var testing by remember { mutableStateOf(false) }
+    var usable by remember { mutableStateOf(com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context)) }
+    var preferOnline by remember { mutableStateOf(!SettingsPreferences.isSttUseLocal(context)) }
     fun save() {
         com.kingzcheung.xime.speech.OnlineSpeechApi.save(context,
             com.kingzcheung.xime.speech.OnlineSpeechApi.Config(baseUrl, apiKey, model))
         status = com.kingzcheung.xime.speech.OnlineSpeechApi.status(context)
+        // 改了地址、密钥或模型就要重新测试；测试通过前一律用本地模型。
+        usable = false; preferOnline = false
+        SettingsPreferences.setSttUseLocal(context, true)
     }
     SettingsSection(title = "在线语音接口") {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -367,11 +350,19 @@ internal fun OnlineSpeechApiSection() {
                     save(); testing = true; status = "测试中…"
                     scope.launch {
                         status = withContext(Dispatchers.IO) { com.kingzcheung.xime.speech.OnlineSpeechApi.test(context) }
+                        usable = com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context)
                         testing = false
                     }
                 }, modifier = Modifier.testTag("speech-api-test")) { Text("测试") }
             }
-            Text("兼容 OpenAI 语音转写接口（/audio/transcriptions），如 OpenAI、Groq、硅基流动；说完一句整段上传识别。密钥只存在本机，不进备份。",
+            if (usable) SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "优先使用在线接口",
+                subtitle = "说话时先用在线接口识别；失败时这次自动改用本地模型，并在键盘上提示",
+                checked = preferOnline, onCheckedChange = {
+                    preferOnline = it
+                    SettingsPreferences.setSttUseLocal(context, !it)
+                })
+            Text("选填。兼容 OpenAI 语音转写接口（/audio/transcriptions），如 OpenAI、Groq、硅基流动；说完一句整段上传识别。" +
+                "不填或测试没通过时一律用本地模型。密钥只存在本机，不进备份。",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
