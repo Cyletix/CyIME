@@ -295,7 +295,10 @@ fun KeyboardView(
     val panelMaterial = Modifier.inheritKeyboardBackground(!state.handwritingExpanded)
     var cursorControlActive by remember { mutableStateOf(false) }
     val floatingBottomClearance = remember(state.isFloatingMode) { mutableFloatStateOf(0f) }
+    // 上拉变悬浮后接着跟手：换模式时这一层不变，由它接着读手指。
+    val undockFollow = remember { KeyboardUndockFollow() }
     CompositionLocalProvider(
+        LocalKeyboardUndockFollow provides undockFollow,
         LocalKeyboardResizeOpacityEditing provides opacityEditingState.takeIf { resizeActive },
         LocalSplitKeyboardGap provides splitKeyboardGap,
         LocalDpPerMillimeter provides rememberDpPerMillimeter(),
@@ -349,7 +352,7 @@ fun KeyboardView(
     ) {
     // 调节态的坐标宿主。Service 在“悬浮 + 调节”时把这一层扩成整个可用 IME 区域；
     // 因而这里的 (0,0) 就是卡片与调节框共同使用的唯一坐标原点。
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.undockFollowTracker(undockFollow).then(modifier).fillMaxSize()) {
         val hostWidthPx = with(resizeControlDensity) { maxWidth.toPx() }
         val hostHeightPx = with(resizeControlDensity) { maxHeight.toPx() }
         val dragBarPx = with(resizeControlDensity) { FLOATING_DRAG_BAR_HEIGHT_DP.dp.toPx() }

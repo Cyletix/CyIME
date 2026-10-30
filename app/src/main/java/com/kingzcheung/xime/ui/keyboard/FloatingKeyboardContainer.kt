@@ -252,10 +252,34 @@ internal fun FloatingKeyboardContainer(
         var dragStartX by remember(dockGesture) { mutableFloatStateOf(safeOffsetX) }
         var dragStartY by remember(dockGesture) { mutableFloatStateOf(safeOffsetY) }
         val dragging = isDragging
+        // 固定键盘上拉刚变成悬浮：卡片跟着那根手指走（只在摆放阶段读手指位置，不重组键盘）。
+        val undockFollow = LocalKeyboardUndockFollow.current?.takeIf { previewRect == null && rotatedRect == null }
+        val followBounds = floatingViewportBounds(maxWidth.value * density.density, maxHeight.value * density.density,
+            minOffsetY.coerceAtLeast(0) * density.density)
+        fun followShiftPx(): Offset {
+            val finger = undockFollow?.finger ?: return Offset.Zero
+            val target = undockFollowRect(normalRect, finger - hostOrigin,
+                UNDOCK_FOLLOW_GRAB_DP * density.density, followBounds)
+            return Offset(target.left - normalRect.left, target.top - normalRect.top)
+        }
         fun liveShiftPx(): Offset = if (dragging)
             Offset((dragX.roundToInt() - dragStartX.roundToInt()) * density.density,
                 -(dragY.roundToInt() - dragStartY.roundToInt()) * density.density)
-            else Offset.Zero
+            else followShiftPx()
+        if (undockFollow != null) {
+            // 松手：和拖底部拖动条一样，把整段位移一次交给后台限位、保存，再亮一下四角。
+            val finishFollow by rememberUpdatedState {
+                val shift = followShiftPx()
+                if (shift != Offset.Zero) onDrag(shift.x / density.density, -shift.y / density.density)
+                onDragEnd()
+                highlight.trigger()
+            }
+            DisposableEffect(undockFollow) {
+                val finish = { finishFollow() }
+                undockFollow.onFinish = finish
+                onDispose { if (undockFollow.onFinish === finish) undockFollow.onFinish = null }
+            }
+        }
         var dragEdge by remember(dockGesture) { mutableStateOf(positionedEdge) }
         var dockEpoch by remember(dockGesture) { mutableIntStateOf(0) }
         val edge = if (isDragging) dragEdge else positionedEdge
@@ -545,28 +569,44 @@ private fun UndockHandle(
 ) {
     val currentOnUndock by rememberUpdatedState(onUndock)
     val view = androidx.compose.ui.platform.LocalView.current
+    val follow = LocalKeyboardUndockFollow.current
     var progress by remember { mutableFloatStateOf(0f) }
+    var handleCoords by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     Box(
         modifier = modifier
             .size(UNDOCK_HANDLE_WIDTH_DP.dp, UNDOCK_HANDLE_HEIGHT_DP.dp)
             .testTag("fixed-undock-handle")
             .semantics { stateDescription = if (progress >= 1f) "ready" else "docked" }
-            .pointerInput(Unit) {
+            .onGloballyPositioned { handleCoords = it }
+            .pointerInput(follow) {
                 var pulled = 0f
+                var undocked = false
                 detectDragGestures(
-                    onDragStart = { pulled = 0f; progress = 0f },
+                    onDragStart = { pulled = 0f; progress = 0f; undocked = false },
                     onDragEnd = {
-                        val ready = progress >= 1f
+                        val ready = progress >= 1f && !undocked
                         progress = 0f
                         if (ready) currentOnUndock()
                     },
                     onDragCancel = { progress = 0f },
                 ) { change, amount ->
                     change.consume()
+                    if (undocked) return@detectDragGestures
                     pulled = (pulled - amount.y).coerceAtLeast(0f)
                     val before = progress
                     progress = fixedToFloatingPullProgress(pulled / 1.dp.toPx())
-                    if (progress >= 1f && before < 1f) view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                    if (progress >= 1f && before < 1f) {
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                        // 拉满就变悬浮，悬浮键盘接着跟这根手指走，松手停在那里；没有外层跟手时照旧松手才变。
+                        // 拿不到把手位置时手指位置由外层在同一个事件里补上。
+                        if (follow != null) {
+                            undocked = true
+                            progress = 0f
+                            follow.start(change.id,
+                                handleCoords?.takeIf { it.isAttached }?.localToWindow(change.position))
+                            currentOnUndock()
+                        }
+                    }
                 }
             },
         contentAlignment = Alignment.TopCenter,
