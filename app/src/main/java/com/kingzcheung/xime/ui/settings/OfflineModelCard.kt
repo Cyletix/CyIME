@@ -170,11 +170,11 @@ internal fun OfflineModelCard() {
 
 /** Factual file sizes and output timing; do not invent cross-device latency, RAM or accuracy scores. */
 internal fun speechModelFacts(id: String): String = when (id) {
-    SpeechModelCatalog.PARAFORMER -> "中英 · 流式 · 226 MB"
+    SpeechModelCatalog.PARAFORMER -> "中英 · 边说边出字 · 226 MB"
     SpeechModelCatalog.SENSEVOICE -> "中英日粤韩 · 停顿出字 · 228 MB"
-    SpeechModelCatalog.ZIPFORMER -> "中文 · 流式 · 133 MB"
-    SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "日语 · 分段预览 · 153 MB"
-    SpeechModelCatalog.ZIPFORMER_JA -> "日语 · 分段预览 · 586 MB"
+    SpeechModelCatalog.ZIPFORMER -> "中文 · 边说边出字 · 133 MB"
+    SpeechModelCatalog.ZIPFORMER_JA_INT8 -> "日语 · 说话中先出预览 · 153 MB"
+    SpeechModelCatalog.ZIPFORMER_JA -> "日语 · 说话中先出预览 · 586 MB"
     else -> ""
 }
 
