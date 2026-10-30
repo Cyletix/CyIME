@@ -23,6 +23,13 @@ internal sealed interface InputTarget {
     }
 }
 
+/**
+ * The tool-panel focus flag after its field gains or loses view focus. While clipboard search is
+ * open its field is the only place keys go, so a lost view focus (switching layout from the
+ * toolbar, 10-30) must not send typing to the app behind it; only closing search ends it.
+ */
+internal fun InputUIState.toolPanelFocusAfter(viewFocused: Boolean): Boolean = viewFocused || clipboardSearchVisible
+
 internal val InputUIState.inputTarget: InputTarget get() = when {
     quickSendFormFocused -> InputTarget.QuickSend(code = quickSendCodeFocused)
     toolPanelInputFocused -> if (clipboardSearchVisible) InputTarget.ClipboardSearch else InputTarget.ToolPanel

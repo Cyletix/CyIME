@@ -335,9 +335,8 @@ internal fun rememberImeKeyboardCallbacks(
                 service.keyboardCallbacks?.onClipboardImageSelect?.invoke(image)
             },
             onToolPanelFocusChange = { focused ->
-                service.uiState.value = service.uiState.value.copy(
-                    toolPanelInputFocused = focused,
-                )
+                val ui = service.uiState.value
+                service.uiState.value = ui.copy(toolPanelInputFocused = ui.toolPanelFocusAfter(focused))
             },
             onKeyboardModeChange = { chineseMode ->
                 if (service.isChineseMode != chineseMode) {

@@ -28,6 +28,17 @@ class InputTargetTest {
         assertTrue(InputTarget.ClipboardSearch.isInternal)
     }
 
+    /** 剪贴板搜索开着时搜索框丢了视图焦点（工具栏切换布局，10-30），按键仍进搜索框，不漏到后面的应用。 */
+    @Test fun clipboardSearchKeepsKeysWhenItsFieldLosesViewFocus() {
+        val searching = InputUIState(toolPanelInputFocused = true, clipboardSearchVisible = true)
+        assertTrue(searching.toolPanelFocusAfter(viewFocused = false))
+        assertEquals(InputTarget.ClipboardSearch,
+            searching.copy(toolPanelInputFocused = searching.toolPanelFocusAfter(false)).inputTarget)
+        // A plugin tool panel still lets go when its field loses focus.
+        assertFalse(InputUIState(toolPanelInputFocused = true).toolPanelFocusAfter(viewFocused = false))
+        assertTrue(InputUIState().toolPanelFocusAfter(viewFocused = true))
+    }
+
     /** Commit and cursor paths always preferred quick send when both flags were set. */
     @Test fun quickSendWinsOverTheToolPanelChannel() {
         assertEquals(InputTarget.QuickSend(code = false), InputUIState(
