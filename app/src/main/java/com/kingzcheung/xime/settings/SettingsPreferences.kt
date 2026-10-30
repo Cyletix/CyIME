@@ -606,8 +606,20 @@ object SettingsPreferences {
     }
 
     /** 语音转文本是否使用本地（离线）识别引擎。 */
+    /**
+     * 是否用本地模型识别。默认一律本地；只有在「在线语音接口」测试通过后选了「优先使用在线接口」，
+     * 或者旧版选过在线语音插件时才不是本地。存的值为 false 但在线不可用时仍算本地，语音不会打开就关。
+     */
     fun isSttUseLocal(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_STT_USE_LOCAL, getSttOnlinePluginId(context).isBlank())
+        val stored = getPrefs(context).getBoolean(KEY_STT_USE_LOCAL, getSttOnlinePluginId(context).isBlank())
+        return stored || !(com.kingzcheung.xime.speech.OnlineSpeechApi.isUsable(context) || getSttOnlinePluginId(context).isNotBlank())
+    }
+
+    /** 1.15.7 及以前的「使用本地模型」开关已删掉：关过它的老用户升级后改回本地（只做一次）。 */
+    fun migrateSttUseLocalOnce(context: Context) {
+        val prefs = getPrefs(context)
+        if (prefs.getBoolean("stt_use_local_reset_v1", false)) return
+        prefs.edit().putBoolean(KEY_STT_USE_LOCAL, true).putBoolean("stt_use_local_reset_v1", true).apply()
     }
 
     fun setSttUseLocal(context: Context, useLocal: Boolean) {

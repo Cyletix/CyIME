@@ -79,7 +79,8 @@ class OfflineEditionTest {
             assertFalse(SettingsPreferences.isSmartPredictionEnabled(fresh))
             assertFalse(SettingsPreferences.isSingleAssociationMode(fresh))
             assertFalse(SettingsPreferences.isSttEnabled(fresh))
-            assertFalse(SettingsPreferences.isSttUseLocal(fresh))
+            // 设备默认不改用户存的选择（是否真用在线还要看在线接口是否测试通过）。
+            assertFalse(prefs.getBoolean(SettingsPreferences.KEY_STT_USE_LOCAL, true))
             assertEquals(!glow, prefs.getBoolean("key_glow_enabled", glow))
             assertEquals(setOf(InputLanguage.CHINESE, InputLanguage.ENGLISH), LanguagePreferences.enabled(fresh))
             val choices = InputModes.languageChoices(listOf(SchemaInfo("rime_ice", "中文26键", "", "", "")), "rime_ice",

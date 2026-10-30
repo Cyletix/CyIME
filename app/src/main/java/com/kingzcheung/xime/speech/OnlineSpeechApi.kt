@@ -52,6 +52,9 @@ object OnlineSpeechApi {
 
     fun isConfigured(context: Context): Boolean = config(context).apiKey.isNotBlank()
 
+    /** 填好并且最近一次「测试」通过：只有这时才能选「优先使用在线接口」。 */
+    fun isUsable(context: Context): Boolean = isConfigured(context) && prefs(context).getString(KEY_STATUS, null).orEmpty().startsWith("可用")
+
     fun status(context: Context): String = prefs(context).getString(KEY_STATUS, null)
         ?: if (isConfigured(context)) "未测试" else "未填写密钥"
 
@@ -103,8 +106,15 @@ object OnlineSpeechApi {
     }
 }
 
-/** 录完一段再整段上传；说话中不出预览。 */
-class OnlineApiAsrBackend(private val context: Context) : AsrBackend {
+/**
+ * 录完一段再整段上传；说话中不出预览。上传失败时这段录音改用本地模型识别（[localFallback]），
+ * 并用 [onNotice] 在键盘上说明，不会无声无息地结束。
+ */
+class OnlineApiAsrBackend(
+    private val context: Context,
+    private val localFallback: () -> AsrBackend? = { null },
+    private val onNotice: (String) -> Unit = {},
+) : AsrBackend {
     override val name: String = "在线语音"
     override val finishTimeoutMs: Long = 30_000L
 
@@ -143,7 +153,29 @@ class OnlineApiAsrBackend(private val context: Context) : AsrBackend {
         onState?.invoke(RecognitionState.PROCESSING)
         OnlineSpeechApi.transcribe(context, pcm, language)
             .onSuccess { onResult?.invoke(it); onState?.invoke(RecognitionState.IDLE) }
-            .onFailure { onError?.invoke("在线语音：${it.message}"); onState?.invoke(RecognitionState.ERROR) }
+            .onFailure { error ->
+                if (recognizeLocally(pcm)) onNotice("在线接口不可用（${error.message}），这次已改用本地模型")
+                else { onError?.invoke("在线语音：${error.message}；本地模型也没能识别"); onState?.invoke(RecognitionState.ERROR) }
+            }
+    }
+
+    /** 把这段录音交给本地模型识别；本地也不可用时返回 false。 */
+    private fun recognizeLocally(pcm: ByteArray): Boolean {
+        val local = runCatching { localFallback() }.getOrNull() ?: return false
+        return try {
+            var text: String? = null
+            local.setCallbacks(onResult = { text = (text.orEmpty() + it) }, onPartialResult = null,
+                onStateChange = {}, onError = {})
+            if (!local.initialize(language) || !local.start(language)) return false
+            pcm.asList().chunked(3200).forEach { local.processAudioChunk(it.toByteArray()) }
+            local.stop()
+            onResult?.invoke(text.orEmpty()); onState?.invoke(RecognitionState.IDLE)
+            true
+        } catch (_: Exception) {
+            false
+        } finally {
+            runCatching { local.release() }
+        }
     }
 
     override fun cancel() {

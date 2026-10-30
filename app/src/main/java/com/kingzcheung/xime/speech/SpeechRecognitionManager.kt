@@ -51,7 +51,7 @@ class SpeechRecognitionManager(
     @Volatile private var backendConfiguration: String? = null
     private fun selectedBackendConfiguration(): String =
         if (SettingsPreferences.isSttUseLocal(context)) "local:${AsrSupport.generation}"
-        else if (OnlineSpeechApi.isConfigured(context)) "api"
+        else if (OnlineSpeechApi.isUsable(context)) "api"
         else "online:${SettingsPreferences.getSttOnlinePluginId(context)}"
     @Volatile private var recordingThread: RecordingThread? = null
     @Volatile private var released = false
@@ -90,6 +90,8 @@ class SpeechRecognitionManager(
     @Volatile
     private var currentState: RecognitionState = RecognitionState.IDLE
     private var errorCallback: ((String, Boolean) -> Unit)? = null
+    /** 不结束语音的提示（如在线接口失败、这次改用本地）。 */
+    @Volatile var noticeCallback: ((String) -> Unit)? = null
     private var amplitudeCallback: ((Float) -> Unit)? = null
     private var spectrumCallback: ((FloatArray) -> Unit)? = null
 
@@ -107,7 +109,7 @@ class SpeechRecognitionManager(
         }
         if (language == InputLanguage.UNSPECIFIED ||
             language != InputLanguage.CHINESE && !SettingsPreferences.isSttUseLocal(context) &&
-            !OnlineSpeechApi.isConfigured(context) && backendFactory == null) {
+            !OnlineSpeechApi.isUsable(context) && backendFactory == null) {
             cancelPreStart()
             errorCallback?.invoke(if (language == InputLanguage.UNSPECIFIED) "当前方案未标注语言，请先选择输入语言"
                 else "当前在线语音插件尚未声明${language.displayName}支持，请使用本地多语言模型", true)
@@ -140,7 +142,7 @@ class SpeechRecognitionManager(
                     if (!ok || synchronized(preloadLock) { backend } == null) {
                         mainHandler.post {
                             cancelPreStart()
-                            errorCallback?.invoke("无法初始化语音引擎，请检查本地模型或在线语音插件配置", true)
+                            errorCallback?.invoke("语音引擎没能启动：本地语音模型没下载或加载失败，请到 设置 → 语音转文本 检查模型", true)
                             setState(RecognitionState.ERROR)
                         }
                         return@Thread
@@ -386,13 +388,15 @@ class SpeechRecognitionManager(
     private fun createBackend(): AsrBackend? {
         backendFactory?.let { return it(context) }
         // 用户开启"本地识别"时才使用离线后端，否则走在线插件
+        // 默认一律本地模型；只有选了「优先使用在线接口」（测试通过才有这个选项）才先走在线，失败时这段改用本地。
         val useLocal = SettingsPreferences.isSttUseLocal(context)
         return if (useLocal) {
             AsrBackendFactory.create(context) ?: createOnlineAsrBackend()
+        } else if (OnlineSpeechApi.isUsable(context)) {
+            OnlineApiAsrBackend(context, localFallback = { AsrBackendFactory.create(context) },
+                onNotice = { message -> mainHandler.post { noticeCallback?.invoke(message) } })
         } else {
-            // 关了本地：先用内置在线接口；没填密钥时退回旧的在线插件，再没有就用本地模型。
-            if (OnlineSpeechApi.isConfigured(context)) OnlineApiAsrBackend(context)
-            else createOnlineAsrBackend() ?: AsrBackendFactory.create(context)
+            createOnlineAsrBackend() ?: AsrBackendFactory.create(context)
         }
     }
 
@@ -604,8 +608,10 @@ class SpeechRecognitionManager(
             var deliveryStarted = false
             try {
                 val audioRecord = microphone.acquire { createAudioRecord() }
-                    ?: if (stopRequested) return else error("无法启动录音")
-                if (stopRequested || !microphone.start()) return
+                    ?: if (stopRequested) return else error("麦克风打不开：请检查 CyIME 的录音权限，或关掉正在用麦克风的应用")
+                if (stopRequested) return
+                // 麦克风启动失败不能悄无声息地结束：报给用户（键盘上会显示）。
+                if (!microphone.start()) error("麦克风没能开始录音：可能被其他应用占用，或没有录音权限")
                 FileLogger.i(TAG, "Microphone ready session=$session elapsedMs=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestedAt)}")
                 deliveryThread = Thread(::deliverAudio, "AsrAudioDelivery").also { it.start() }
                 deliveryStarted = true

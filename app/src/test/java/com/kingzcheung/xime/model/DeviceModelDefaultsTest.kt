@@ -235,8 +235,9 @@ class DeviceModelDefaultsTest {
         SettingsPreferences.setSttOnlinePluginId(context, "online-provider")
         assertEquals(listOf("ochwpro"), DefaultModelInstaller.requestedModelIds(context))
         SettingsPreferences.setSttOnlinePluginId(context, "")
+        // 存的「不用本地」在在线接口没测试通过时不算数：语音仍用本地模型，照常下载。
         SettingsPreferences.setSttUseLocal(context, false)
-        assertEquals(listOf("ochwpro"), DefaultModelInstaller.requestedModelIds(context))
+        assertEquals(listOf("ochwpro", "sensevoice-multilingual-int8"), DefaultModelInstaller.requestedModelIds(context))
     }
 
     @Test fun completedOrDeletedModelsAreNotAutomaticallyRestored() {

@@ -11,15 +11,6 @@ object OfflineAsrSettings {
     /** 当前构建是否包含离线语音功能 */
     fun isSupported(): Boolean = true
 
-    /** 本地/在线引擎切换开关。 */
-    @Composable
-    fun EngineSelector(
-        useLocal: Boolean,
-        onUseLocalChange: (Boolean) -> Unit
-    ) {
-        OfflineAsrSettingsSupport.EngineSelector(useLocal, onUseLocalChange)
-    }
-
     /** 本地模型下载/管理卡片，仅在开启本地识别时渲染。 */
     @Composable
     fun ModelSection() {
