@@ -47,7 +47,7 @@ class SpaceKeyGestureTest {
                 Box(Modifier.size(240.dp, 64.dp)) {
                     SpaceKeyButton(onClick = { spaces++ }, backgroundColor = Color.White, textColor = Color.Black,
                         modifier = Modifier.testTag("space"), onVoiceModeChange = { voices++ })
-                    if (cursorActive) CursorControlOverlay(Modifier.matchParentSize())
+                    if (cursorActive) CursorControlOverlay(Color.Black, Color.White, Modifier.matchParentSize())
                 }
             }
         }
