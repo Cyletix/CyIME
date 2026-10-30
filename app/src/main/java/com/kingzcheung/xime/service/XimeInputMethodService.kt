@@ -2327,18 +2327,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun performEditorMenuAction(actionId: Int) {
         when (actionId) {
-            android.R.id.undo, android.R.id.redo -> {
-                // performContextMenuAction 对 undo 支持不一致，改用 Ctrl+Z 键盘快捷键
-                val now = SystemClock.uptimeMillis()
-                currentInputConnection?.sendKeyEvent(
-                    KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON or if (actionId == android.R.id.redo) KeyEvent.META_SHIFT_ON else 0)
-                )
-                currentInputConnection?.sendKeyEvent(
-                    KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON or if (actionId == android.R.id.redo) KeyEvent.META_SHIFT_ON else 0)
-                )
-            }
+            android.R.id.undo, android.R.id.redo ->
+                currentInputConnection?.let { sendUndoShortcut(it, redo = actionId == android.R.id.redo) }
             else -> currentInputConnection?.performContextMenuAction(actionId)
         }
+    }
+
+    /** performContextMenuAction 对 undo 支持不一致，改用 Ctrl+Z / Ctrl+Shift+Z 键盘快捷键。 */
+    internal fun sendUndoShortcut(connection: InputConnection, redo: Boolean) {
+        val now = SystemClock.uptimeMillis()
+        val meta = KeyEvent.META_CTRL_ON or if (redo) KeyEvent.META_SHIFT_ON else 0
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, meta))
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, meta))
     }
 
     /** Shared by Compose, first-frame insets, resize entry/reset and mode changes. */
