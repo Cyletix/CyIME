@@ -38,6 +38,12 @@ internal class CaptionSpeechSession(
     private val speaker = worker("CyIME-Speaker", 12) // windows and probes
     private val lifecycle = Any()
     private val abandoned = AtomicBoolean(false)
+    init {
+        // Same as dictation: captions start on the streaming model while SenseVoice loads on its own worker.
+        if (engine.hasRefinement && engine.isStreaming && !engine.refinementLoaded) refinement.execute {
+            if (!abandoned.get()) try { engine.prepareRefinement() } catch (_: Exception) { }
+        }
+    }
     private var accepting = true
 
     // Region bookkeeping on the audio worker only.

@@ -55,8 +55,11 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
                 online = OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model, enableEndpoint = false))
             }
             // With X-ASR finalizing whole sentences, SenseVoice loads only if something still asks for it.
+            // Beside a streaming model it loads in the background (prepareRefinement), so the first words
+            // do not wait for it: 2026-10-30, sherpa-onnx 1.13.8 on x86, SenseVoice int8 takes 1.2–2.2 s to load.
             if (selection.secondDir != null && selection.finalizerDir == null) {
-                if (japanese) punctuator = createSenseVoice(selection.secondDir) else offline = createSenseVoice(selection.secondDir)
+                if (japanese) punctuator = createSenseVoice(selection.secondDir)
+                else if (online == null) offline = createSenseVoice(selection.secondDir)
             }
             vad = Vad(context.assets, if (japanese) japaneseVadConfig() else VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(
                 model = "speech/silero_vad.onnx", threshold = .6f, minSilenceDuration = .064f,
@@ -206,6 +209,13 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
     private fun refiner(): OfflineRecognizer = offline ?: run {
         check(!japanese)
         createSenseVoice(checkNotNull(selection.secondDir)).also { offline = it }
+    }
+    override val refinementLoaded: Boolean get() = japanese || online == null ||
+        (if (selection.finalizerDir != null) finalizer != null else selection.secondDir == null || offline != null)
+    override fun prepareRefinement() {
+        if (refinementLoaded) return
+        val xasr = selection.finalizerDir
+        if (xasr != null) finalizer = createXasr(xasr) else refiner()
     }
     override fun releaseRefinement(): Boolean {
         if (japanese || selection.first == null || selection.secondDir == null) return false

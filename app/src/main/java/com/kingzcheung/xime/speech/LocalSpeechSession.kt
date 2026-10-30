@@ -37,6 +37,10 @@ internal interface LocalSpeechEngine : AutoCloseable {
      * 只能在没有会话使用引擎时调用；返回是否确实释放了。
      */
     fun releaseRefinement(): Boolean = false
+    /** 第二遍识别器（SenseVoice / X-ASR）已在内存；false 时会话开始后在定稿线程里预先加载。 */
+    val refinementLoaded: Boolean get() = true
+    /** 在定稿线程上加载第二遍识别器，不挡流式出字；第一次停顿时就不用再等加载。 */
+    fun prepareRefinement() {}
 }
 
 /** Text in a script Chinese speech never produces: kana, Hangul, Thai, Lao, Myanmar, Khmer, Indic, Arabic, Cyrillic, Hebrew. */
@@ -103,6 +107,12 @@ internal class LocalSpeechSession(
     // it (awaitIdle) before resetting or reusing the engine. Released by finish or cancel.
     private val wholeLock = Any()
     private val wholeSettled = java.util.concurrent.CountDownLatch(1)
+    init {
+        // 流式模型一就绪就开始出字；SenseVoice / X-ASR 在定稿线程上接着加载，赶在第一次停顿前。
+        if (engine.hasRefinement && engine.isStreaming && !engine.refinementLoaded) refinement.execute {
+            if (!abandoned.get()) try { engine.prepareRefinement() } catch (_: Exception) { } // 定稿时再加载并报错
+        }
+    }
     private val segmenter: SpeechSegmenter by lazy { SpeechSegmenter(engine.detector(),
         maxSegmentMs = if (wholeSentenceActive && engine.isStreaming) WHOLE_SENTENCE_MAX_SEGMENT_MS else engine.maxSegmentMs,
         onAudio = { id, samples ->
