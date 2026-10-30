@@ -26,7 +26,9 @@ import com.kingzcheung.xime.settings.LanguageSwitchPreferences
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.util.FileLogger
 import java.io.File
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -384,8 +386,17 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
 
+    /**
+     * 空格上下滑、实体键盘上下键之外的“上/下”：与编辑面板的上下键同一规则，多行框按宿主排版的视觉行，
+     * 单行框只在文本内移动（审计 F11：以前自动折行的长段落一下跳到段首/段尾）。
+     */
     internal fun moveEditorCursorVertical(steps: Int, selecting: Boolean = false) =
-        editCursor(preeditKey = "preedit_cursor:${if (steps < 0) "start" else "end"}") { editorCursor.moveVertical(it, steps, selecting) }
+        editCursor(preeditKey = "preedit_cursor:${if (steps < 0) "start" else "end"}") { connection ->
+            val multiLine = editorIsMultiLine()
+            repeat(abs(steps).coerceAtMost(1000)) {
+                if (!editorCursor.moveLine(connection, steps.sign, selecting, multiLine)) return@editCursor
+            }
+        }
 
     internal fun observeEditorSelection(start: Int, end: Int) {
         service.currentInputConnection?.let { editorCursor.observeSelection(it, start, end) }
