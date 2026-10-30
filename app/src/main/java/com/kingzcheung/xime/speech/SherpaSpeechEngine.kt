@@ -52,6 +52,7 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
                     transducer = OnlineTransducerModelConfig(encoder, path(first.decoderFile), path(first.joinerFile)),
                     tokens = path("tokens.txt"), numThreads = 1,
                 )
+                val loadingAt = System.nanoTime()
                 val original = path(first.encoderFile)
                 // Zipformer: the pre-optimized copy (see OptimizedEncoder) loads in about 60 % of the time.
                 val optimized = if (first.modelType == "transducer") OptimizedEncoder.path(context, dir, first.encoderFile) else null
@@ -62,6 +63,8 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
                     OptimizedEncoder.reject(context, dir.name)
                     OnlineRecognizer(config = OnlineRecognizerConfig(modelConfig = model(original), enableEndpoint = false))
                 }
+                android.util.Log.i("CyIME-AsrTiming", "streaming ${first.id} loaded in ${(System.nanoTime() - loadingAt) / 1_000_000} ms " +
+                    "optimized=${optimized != null && OptimizedEncoder.path(context, dir, first.encoderFile) != null}")
             }
             // With X-ASR finalizing whole sentences, SenseVoice loads only if something still asks for it.
             // Beside a streaming model it loads in the background (prepareRefinement), so the first words
@@ -223,8 +226,11 @@ internal class SherpaSpeechEngine(context: Context, val selection: AsrModelManag
         (if (selection.finalizerDir != null) finalizer != null else selection.secondDir == null || offline != null)
     override fun prepareRefinement() {
         if (refinementLoaded) return
+        val loadingAt = System.nanoTime()
         val xasr = selection.finalizerDir
         if (xasr != null) finalizer = createXasr(xasr) else refiner()
+        android.util.Log.i("CyIME-AsrTiming", "second pass ${if (xasr != null) "X-ASR" else "SenseVoice"} loaded in background in " +
+            "${(System.nanoTime() - loadingAt) / 1_000_000} ms")
     }
     override fun releaseRefinement(): Boolean {
         if (japanese || selection.first == null || selection.secondDir == null) return false

@@ -175,6 +175,7 @@ class AsrInferenceService : Service() {
                         "finalizer" to (selection.finalizerDir?.name ?: ""),
                     )).also { recorders[callback.asBinder()] = it } else null
                 val selectedAt = SystemClock.elapsedRealtime()
+                val firstText = java.util.concurrent.atomic.AtomicBoolean(false)
                 val ready = sessions.start(selection.key,
                     createEngine = {
                         constructed = true
@@ -184,6 +185,9 @@ class AsrInferenceService : Service() {
                     },
                     createSession = { engine -> LocalSpeechSession(engine,
                         onText = { text ->
+                            // Release builds too: `adb logcat -s CyIME-AsrTiming` measures the delay to the first words.
+                            if (text.isNotEmpty() && firstText.compareAndSet(false, true)) android.util.Log.i("CyIME-AsrTiming",
+                                "first text ${SystemClock.elapsedRealtime() - startedAt} ms after start mode=${selection.mode}")
                             recorder?.text(text)
                             if (generation.get() == token) try { callback.onPartialResult(text) } catch (_: Exception) { }
                         },
@@ -196,6 +200,8 @@ class AsrInferenceService : Service() {
                     owner = callback.asBinder(), isActive = { generation.get() == token })
                 val readyAt = SystemClock.elapsedRealtime()
                 val modelState = if (constructed) "loaded" else if (ready) "resident" else "superseded"
+                android.util.Log.i("CyIME-AsrTiming", "start ready=$ready model=$modelState modelMs=$modelLoadMs " +
+                    "totalMs=${readyAt - startedAt} mode=${selection.mode}")
                 FileLogger.i("AsrInferenceService", "start ready=$ready model=$modelState " +
                     "selectionMs=${selectedAt - startedAt} modelMs=$modelLoadMs " +
                     "sessionWaitMs=${readyAt - selectedAt - modelLoadMs} totalMs=${readyAt - startedAt}")
