@@ -209,6 +209,8 @@ fun SettingsToggleItem(
             )
             if (lockMessage != null) SettingsLockNote(lockMessage)
         }
+        // 说明写满一行时也不能贴着开关：和其他“标题＋说明＋开关”的行一样留 12dp。
+        Spacer(modifier = Modifier.width(12.dp))
         if (showArrow) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
