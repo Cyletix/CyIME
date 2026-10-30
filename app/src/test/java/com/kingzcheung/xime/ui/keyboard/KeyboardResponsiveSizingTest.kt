@@ -65,6 +65,22 @@ class KeyboardResponsiveSizingTest {
         assertTrue(offset + 9f * 1.3f / 2f <= 12f)
     }
 
+    /** 九键退格「清空」：默认高度的键（约 60dp）留字，最小高度的键（约 40dp）只留图标（用户截图 10-30）。 */
+    @Test fun iconHintDropsInsteadOfOverlappingTheIcon() {
+        fun fits(height: Float, fontScale: Float = 1f): Boolean {
+            val offset = KeyboardKeyMetrics.hintOffsetDp(height, 10f, fontScale, 1f)
+            return KeyboardKeyMetrics.hintClearsIcon(offset, 10f, fontScale, 20f)
+        }
+        assertTrue(fits(56f))
+        assertTrue(!fits(40f))
+        assertTrue(!fits(46f, fontScale = 1.3f))
+        // 留字时文字字形下沿一定在图标字形上沿之上。
+        for (h in 20..90) for (fs in listOf(0.85f, 1f, 1.15f, 1.3f, 1.5f)) {
+            val offset = KeyboardKeyMetrics.hintOffsetDp(h.toFloat(), 10f, fs, 1f)
+            if (KeyboardKeyMetrics.hintClearsIcon(offset, 10f, fs, 20f)) assertTrue(offset - 10f * fs / 2f > 7.5f)
+        }
+    }
+
     @Test fun equalWeightCellsUseTheSameFontDespitePhysicalPixelRounding() {
         assertEquals(KeyboardKeyMetrics.contentScale(67f, 58.42f),
             KeyboardKeyMetrics.contentScale(67.4f, 58.79f), tolerance)

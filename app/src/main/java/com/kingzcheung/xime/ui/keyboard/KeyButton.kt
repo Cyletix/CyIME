@@ -984,6 +984,7 @@ fun SwipeableIconKeyButton(
         val hintSize = 10f * adaptiveHintScale(contentScale)
         val renderedIconSize = keyIconSizeDp(maxWidth.value, maxHeight.value, iconSize.value).dp
         val hintOffset = KeyboardKeyMetrics.hintOffsetDp(maxHeight.value, hintSize, density.fontScale, contentScale).dp
+        val hintFits = KeyboardKeyMetrics.hintClearsIcon(hintOffset.value, hintSize, density.fontScale, renderedIconSize.value)
         Box(Modifier.fillMaxSize().graphicsLayer {
             alpha = 1f - (flickPreview?.progress ?: 0f)
         }, contentAlignment = Alignment.Center) {
@@ -995,8 +996,9 @@ fun SwipeableIconKeyButton(
         )
         
         // Like a character key's corner hint: the hint itself becomes the moving label.
-        // A half-hexagon edge key has no corner left for it; the swipe still works.
-        if (!swipeText.isNullOrEmpty() && flickPreview?.text != swipeText && honeycombEdge == null) {
+        // A half-hexagon edge key has no corner left for it, and a short key has no room above
+        // the icon; the swipe still works.
+        if (!swipeText.isNullOrEmpty() && flickPreview?.text != swipeText && honeycombEdge == null && hintFits) {
             Text(
                 text = punctuationKeyLabel(swipeText),
                 color = keyHintColor(iconColor, frostedGlass, 0.5f),

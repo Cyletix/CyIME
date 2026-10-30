@@ -856,7 +856,9 @@ private fun ResetKey(
             tint = textColor,
             modifier = Modifier.size(if (compactMode) 16.dp else 20.dp)
         )
-        if (!compactMode && maxHeight >= 48.dp) {
+        // 文字贴顶：中心在键中心上方「半高 - 上边距 - 半行高」，放不下时只留图标。
+        if (!compactMode && KeyboardKeyMetrics.hintClearsIcon(maxHeight.value / 2f - 2f - 11f * density.fontScale / 2f,
+                9f, density.fontScale, 20f)) {
 Text(
             text = "重输",
             color = keyHintColor(textColor, frostedGlass, 0.5f),
