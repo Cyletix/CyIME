@@ -87,13 +87,13 @@ class DeviceModelDefaultsTest {
             val profile = DeviceModelProfiles.choose(hardware)
             assertEquals(hardware.toString(), tier, profile.tier)
             assertEquals(if (tier == DeviceModelTier.LIGHT) DeviceModelProfiles.SMALL else DeviceModelProfiles.BASE, profile.predictionModel)
-            assertEquals(SpeechModelCatalog.PARAFORMER, profile.voiceModel)
+            assertEquals(SpeechModelCatalog.SENSEVOICE, profile.voiceModel)
         }
     }
 
-    @Test fun offlineEditionWithoutParaformerStartsOnSenseVoice() {
+    @Test fun onlyEditionsThatBundleParaformerStartOnIt() {
         val voice = { bundled: Set<String> -> DeviceModelProfiles.choose(device(), bundled).voiceModel }
-        assertEquals(SpeechModelCatalog.PARAFORMER, voice(emptySet()))
+        assertEquals(SpeechModelCatalog.SENSEVOICE, voice(emptySet()))
         assertEquals(SpeechModelCatalog.PARAFORMER, voice(setOf(SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE)))
         assertEquals(SpeechModelCatalog.SENSEVOICE, voice(setOf("ochwpro", SpeechModelCatalog.SENSEVOICE)))
     }
@@ -152,7 +152,7 @@ class DeviceModelDefaultsTest {
             assertEquals(hardware.maxCpuKHz, stores.values()["device_initial_max_cpu_khz"])
             assertFalse(stores.values().containsKey("prediction_selected_model"))
             assertFalse(stores.values("asr_model").containsKey("selected_model"))
-            val expected = setOf("ochwpro", profile.predictionModel, SpeechModelCatalog.PARAFORMER)
+            val expected = setOf("ochwpro", profile.predictionModel, SpeechModelCatalog.SENSEVOICE)
             assertEquals(expected, DefaultModelInstaller.requestedModelIds(context).toSet())
         }
     }
@@ -205,15 +205,18 @@ class DeviceModelDefaultsTest {
         assertFalse(SettingsPreferences.isSmartPredictionEnabled(stores.context))
     }
 
-    @Test fun standaloneDefaultDoesNotRequestSenseVoiceAndManualCorrectionStillWorks() {
+    @Test fun senseVoiceDefaultRequestsOnlySenseVoiceAndManualParaformerCorrectionStillWorks() {
         val stores = Stores()
         DeviceDefaults.initialize(stores.context) { device() }
-        assertFalse(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
-        AsrModelManager(stores.context).setRefinementEnabled(true)
-        assertEquals(SpeechModelCatalog.TWO_PASS, AsrModelManager(stores.context).getSelectedModelId())
-        AsrModelManager(stores.context).setRefinementEnabled(false)
-        assertFalse(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
-        assertTrue(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.PARAFORMER))
+        assertTrue(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.SENSEVOICE))
+        assertFalse(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.PARAFORMER))
+        val manager = AsrModelManager(stores.context)
+        manager.setFirstPassModel(SpeechModelCatalog.PARAFORMER)
+        assertEquals(SpeechModelCatalog.PARAFORMER, manager.getSelectedModelId())
+        manager.setRefinementEnabled(true)
+        assertEquals(SpeechModelCatalog.TWO_PASS, manager.getSelectedModelId())
+        // A manual choice is downloaded by the model centre, never by the first-run queue.
+        assertFalse(DefaultModelInstaller.isPendingDefault(stores.context, SpeechModelCatalog.PARAFORMER))
     }
 
     @Test fun disabledOrOnlineFeaturesDoNotAutoDownloadTheirModels() {
