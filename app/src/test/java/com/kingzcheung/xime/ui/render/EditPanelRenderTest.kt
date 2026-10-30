@@ -79,9 +79,10 @@ class EditPanelRenderTest {
                 body.width.toInt().coerceAtMost(full.width), body.height.toInt().coerceAtMost(full.height))
             File(out, "$name.png").outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        // 手机 360dp、平板 800dp；最小高度取尺寸调节的下限附近，默认取常用键盘高度。
+        // 手机竖屏 360dp、平板 800dp、手机横屏 780dp；最小高度取尺寸调节的下限附近，默认取常用键盘高度。
         val sizes = listOf(Triple("phone", 360, listOf("min" to 180, "default" to 250)),
-            Triple("tablet", 800, listOf("min" to 200, "default" to 320)))
+            Triple("tablet", 800, listOf("min" to 200, "default" to 320)),
+            Triple("phone_landscape", 780, listOf("min" to 160, "default" to 200)))
         val looks = listOf(Triple("soft_blue", false, false), Triple("pure_black", true, true),
             Triple("olivcelso_desert", false, false))
         for ((device, w, heights) in sizes) for ((label, h) in heights) for ((t, d, g) in looks) {
