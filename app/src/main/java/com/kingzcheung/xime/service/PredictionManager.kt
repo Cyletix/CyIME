@@ -95,7 +95,7 @@ class PredictionManager(
     
     fun deleteLastChar() {
         if (_lastCommittedText.isNotEmpty()) {
-            _lastCommittedText = _lastCommittedText.dropLast(1)
+            _lastCommittedText = _lastCommittedText.dropLastCharacter()
         }
     }
     
@@ -193,4 +193,16 @@ class PredictionManager(
             emptyList()
         }
     }
+}
+
+/**
+ * 退格删掉的是一个用户看到的字：代理对（😀、𠮷）、带组合符号的字母、ZWJ 拼成的 emoji 都整个删，
+ * 联想上下文不能留下半个代理项（审计 F10：以前 dropLast(1) 把 `a😀` 删成 `a\uD83D`）。
+ */
+internal fun String.dropLastCharacter(): String {
+    if (isEmpty()) return this
+    val boundaries = java.text.BreakIterator.getCharacterInstance()
+    boundaries.setText(this)
+    val start = boundaries.preceding(length)
+    return if (start == java.text.BreakIterator.DONE) "" else substring(0, start)
 }
