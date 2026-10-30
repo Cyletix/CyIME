@@ -29,6 +29,7 @@ object DefaultModelInstaller {
 
     private fun preferences(context: Context) = context.getSharedPreferences("default_models", Context.MODE_PRIVATE)
     private const val KEY_ALLOW_METERED = "allow_metered"
+    private const val KEY_GUIDE = "guide_ids"
     private val waiting = MutableStateFlow(0L)
 
     /** 首次默认模型因为当前是移动数据（按流量计费）而没有下载时的总字节数；0 表示没在等。 */
@@ -55,6 +56,21 @@ object DefaultModelInstaller {
 
     internal fun isHandled(context: Context, id: String): Boolean = preferences(context).getBoolean("handled_$id", false)
 
+    /** 设置向导选好、要从网上下载的模型。 */
+    private fun guideIds(context: Context): Set<String> = preferences(context).getStringSet(KEY_GUIDE, emptySet()).orEmpty()
+
+    /**
+     * 设置向导选好的模型和首次默认模型一样排队下载：移动数据下等 Wi-Fi（[allowMetered] 时照常下），
+     * 失败重试；下好后不再自动补回，之后在模型管理里删掉也算用户的选择。
+     */
+    fun requestGuided(context: Context, ids: Set<String>, allowMetered: Boolean) {
+        val editor = preferences(context).edit().putStringSet(KEY_GUIDE, guideIds(context) + ids)
+        ids.forEach { editor.remove("handled_$it") }
+        if (allowMetered) editor.putBoolean(KEY_ALLOW_METERED, true)
+        editor.commit()
+        start(context.applicationContext)
+    }
+
     /** Prepare only the initial recommendation while the user still requests it. Manual
      * alternatives remain under the model centre's control, not a new auto-download loop. */
     internal fun requestedModelIds(context: Context): List<String> = buildList {
@@ -71,13 +87,14 @@ object DefaultModelInstaller {
         val prediction = DeviceDefaults.predictionModel(context)
         if (SettingsPreferences.isSmartPredictionEnabled(context) &&
             SettingsPreferences.getPredictionSelectedModel(context) == prediction) add(prediction)
+        addAll(guideIds(context))
     }.distinct()
 
     internal fun isPendingDefault(context: Context, id: String): Boolean =
         !isHandled(context, id) && id in requestedModelIds(context)
 
     internal fun markHandled(context: Context, id: String) {
-        if (id in modelIds) preferences(context).edit()
+        if (id in modelIds || id in guideIds(context)) preferences(context).edit()
             .putBoolean("handled_$id", true).remove("pending_$id").commit()
     }
 

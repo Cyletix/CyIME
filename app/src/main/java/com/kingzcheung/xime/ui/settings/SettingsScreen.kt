@@ -234,6 +234,7 @@ fun SettingsScreen(
         composable(SettingsRoutes.SpeechToText) {
             SpeechToTextSettingsContent(
                 onBack = { navController.popBackStack() },
+                onNavigateToSetupGuide = { navController.navigate(SettingsRoutes.SetupGuide) },
                 onNavigateToPluginSettings = { pluginId ->
                     navController.navigate("${SettingsRoutes.PluginSettings}/$pluginId")
                 },
@@ -277,6 +278,9 @@ fun SettingsScreen(
                 onNavigateToHandwritingCapture = { navController.navigate(SettingsRoutes.HandwritingCapture) },
                 onNavigateToStorageSpace = { navController.navigate(SettingsRoutes.StorageSpace) }
             )
+        }
+        composable(SettingsRoutes.SetupGuide) {
+            SetupGuideScreen(firstRun = false, onDone = { navController.popBackStack() })
         }
         composable(SettingsRoutes.StorageSpace) {
             StorageSpaceScreen(

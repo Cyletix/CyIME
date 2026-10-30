@@ -22,6 +22,7 @@ object SettingsRoutes {
     const val SpeechToText = "speech_to_text"
     const val About = "about"
     const val StorageSpace = "storage_space"
+    const val SetupGuide = "setup_guide"
     const val Privacy = "privacy"
     const val Licenses = "licenses"
     const val LogViewer = "log_viewer"

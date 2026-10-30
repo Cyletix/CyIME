@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.GraphicEq
+import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,6 +78,7 @@ data class AsrProvider(
 fun SpeechToTextSettingsContent(
     onBack: () -> Unit,
     onNavigateToPluginSettings: (String) -> Unit = {},
+    onNavigateToSetupGuide: () -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -175,6 +177,13 @@ fun SpeechToTextSettingsContent(
                 SettingsToggleItem(icon = Icons.TwoTone.GraphicEq, title = "语音转文本",
                     subtitle = "长按空格或点工具栏麦克风说话，转成文字上屏",
                     checked = sttEnabled, onCheckedChange = { sttEnabled = it; SettingsPreferences.setSttEnabled(context, it) })
+            }
+
+            // 模型名（Paraformer、SenseVoice…）多数人看不懂：先给一个按手机和用法自动选好的入口。
+            SettingsSection(title = "不知道怎么选") {
+                SettingsItem(icon = Icons.TwoTone.Tune, title = "按设备推荐配置",
+                    subtitle = "回答几个问题，自动选好语音模型，删掉用不到的",
+                    onClick = onNavigateToSetupGuide, showArrow = true)
             }
 
             val scope = rememberCoroutineScope()

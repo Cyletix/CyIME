@@ -49,6 +49,7 @@ import androidx.compose.material.icons.twotone.Straighten
 import androidx.compose.material.icons.twotone.Sync
 import androidx.compose.material.icons.twotone.TableChart
 import androidx.compose.material.icons.twotone.ToggleOn
+import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.twotone.TypeSpecimen
 import androidx.compose.material.icons.twotone.Vibration
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -153,7 +154,7 @@ fun SettingsMainContent(
                     SettingsItem(
                         icon = Icons.TwoTone.CloudDownload,
                         title = "等连上 Wi-Fi 再下载模型",
-                        subtitle = "语音、联想、手写模型共约 ${formatModelMegabytes(waitingModelBytes)}；现在用的是移动数据，点这里用流量下载",
+                        subtitle = "语音、联想、手写等模型共约 ${formatModelMegabytes(waitingModelBytes)}；现在用的是移动数据，点这里用流量下载",
                         status = "等 Wi-Fi",
                         statusTone = SettingsStatusTone.WARNING,
                         onClick = { com.kingzcheung.xime.model.DefaultModelInstaller.allowMeteredDownload(context) }
@@ -196,6 +197,18 @@ fun SettingsMainContent(
                                 as InputMethodManager
                             imm.showInputMethodPicker()
                         }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.Tune,
+                        title = "按设备推荐配置",
+                        subtitle = "看手机性能和空间，推荐语音、九键、联想用哪些模型，删掉用不到的",
+                        onClick = { onNavigateToRoute(SettingsRoutes.SetupGuide) },
+                        showArrow = true
                     )
                     var testText by remember { mutableStateOf("") }
                     var isFocused by remember { mutableStateOf(false) }
