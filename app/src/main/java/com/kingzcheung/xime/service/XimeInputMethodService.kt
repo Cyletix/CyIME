@@ -2993,6 +2993,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         applyWindowBackground()
         requestHardwareCursorUpdates()
         openPendingOcrPanel()
+        openPendingKeyboardPanel()
         // 释义词典随设置与下载状态后台加载/释放；选拼音时不占内存。
         com.kingzcheung.xime.gloss.CandidateGlossary.prepare(this)
     }
@@ -3408,6 +3409,18 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (com.kingzcheung.xime.ocr.DocumentOcrActivity.takePending()) {
             showScreenKeyboardFromHardware(OverlayRoute.Ocr)
             keyboardViewModel.showOverlay(OverlayRoute.Ocr)
+        }
+    }
+
+    /** 设置页要求打开的键盘调节／排列面板：只在本应用的输入框里打开，与菜单入口走同一条路。 */
+    private fun openPendingKeyboardPanel() {
+        if (currentInputEditorInfo?.packageName != packageName) return
+        val panel = com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.take() ?: return
+        mainHandler.post {
+            when (panel) {
+                com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE -> keyboardCallbacks?.onKeyboardResize?.invoke()
+                com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.ARRANGE -> keyboardViewModel.showOverlay(OverlayRoute.ToolbarCustomize)
+            }
         }
     }
     

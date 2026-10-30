@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.twotone.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -275,6 +276,20 @@ fun SmartPredictionSettingsContent(
                         }
                     })
                 }
+            }
+
+            item {
+                // 与键盘菜单「无痕」是同一个开关，两边改动立即互相反映。
+                val toggles = com.kingzcheung.xime.ui.keyboard.rememberQuickToggleStates()
+                SettingsSection(title = "无痕", content = {
+                    SettingsToggleItem(
+                        icon = Icons.TwoTone.VisibilityOff,
+                        title = "无痕模式",
+                        subtitle = "打字不学新词和选词顺序，复制的内容不进剪贴板记录、不同步；密码框始终自动无痕",
+                        checked = toggles.incognito,
+                        onCheckedChange = { SettingsPreferences.setIncognito(context, it) }
+                    )
+                })
             }
 
             item {

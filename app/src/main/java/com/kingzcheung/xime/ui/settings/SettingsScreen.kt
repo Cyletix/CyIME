@@ -31,9 +31,9 @@ fun SettingsScreen(
     LaunchedEffect(initialRoute) {
         // 键盘提示「缺手写模型」发的是 model_management，冷启动时也要落到模型页（以前只在设置已打开时才认）。
         val route = if (initialRoute == "model_management") SettingsRoutes.ModelLocal else initialRoute
-        if (route in setOf(SettingsRoutes.Theme, SettingsRoutes.SmartPrediction,
-                SettingsRoutes.SpeechToText, SettingsRoutes.ModelLocal)) {
-            navController.navigate(requireNotNull(route)) { launchSingleTop = true }
+        // 起始页已处理的几个之外，图里有的页面都可直接进（键盘菜单长按跳到对应设置）；不认识的留在首页。
+        if (route != null && route !in setOf(SettingsRoutes.Main, "manage_dict", SettingsRoutes.Schema, SettingsRoutes.Plugins)) {
+            runCatching { navController.navigate(route) { launchSingleTop = true } }
         }
     }
 
@@ -50,13 +50,14 @@ fun SettingsScreen(
             "model_management" -> SettingsRoutes.ModelLocal
             else -> request.route
         }
-        if (destination in setOf(SettingsRoutes.Main, SettingsRoutes.Schema, SettingsRoutes.Plugins,
-                SettingsRoutes.Dictionary, SettingsRoutes.Theme, SettingsRoutes.SmartPrediction,
-                SettingsRoutes.SpeechToText, SettingsRoutes.ModelLocal) &&
-            navController.currentDestination?.route != destination) {
-            navController.navigate(destination) {
-                popUpTo(navController.graph.startDestinationId) { inclusive = false }
-                launchSingleTop = true
+        if (destination == SettingsRoutes.Main) {
+            navController.popBackStack(navController.graph.startDestinationId, inclusive = false)
+        } else if (navController.currentDestination?.route != destination) {
+            runCatching {
+                navController.navigate(destination) {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = false }
+                    launchSingleTop = true
+                }
             }
         }
     }
@@ -255,6 +256,12 @@ fun SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
             )
+        }
+        composable(SettingsRoutes.KeyboardResize) {
+            KeyboardPanelSettingsContent(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.RESIZE) { navController.popBackStack() }
+        }
+        composable(SettingsRoutes.ToolbarArrange) {
+            KeyboardPanelSettingsContent(com.kingzcheung.xime.keyboard.KeyboardPanelLaunch.Panel.ARRANGE) { navController.popBackStack() }
         }
         composable(SettingsRoutes.Backup) {
             BackupSettingsContent(onBack = { navController.popBackStack() })
