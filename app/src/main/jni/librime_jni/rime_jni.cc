@@ -682,7 +682,7 @@ public:
     // 长按删除 = 忘掉这条候选的学习记录：用户词库里删掉它的记录（次数和权重都不留），
     // 词库里本来就有的词回到原来的位置，自造词消失；以后再选它从头学起。
     // 拼出来的整句没有自己的记录，改为忘掉句里学过的词。所有方案一致，不再屏蔽文字。
-    // 返回 0 失败、1 已忘掉、2 没有学习记录（排序不变）。
+    // 返回 0 失败、1 已忘掉（词还在候选里）、2 没有学习记录（排序不变）、3 已忘掉且不再出现（自造词）。
     // Developer tool: takes back what automated typing taught the user dictionary of the current schema
     // (rows "text<TAB>commits"); returns the number of commits taken back, or -1.
     int unlearn(const std::string& rows) {
@@ -814,13 +814,27 @@ public:
             userDictionary->Attach(dictionary->primary_table(), dictionary->prism());
             for (const auto* entry : learned) forgotten = userDictionary->Forget(*entry) || forgotten;
         }
+        const std::string text = candidate->text();
         if (forgotten) {
             context->RefreshNonConfirmedComposition();
-            return 1;
+        } else {
+            // Not in that dictionary (another translator's word): Rime's own deletion by the owning translator.
+            if (sentence && sentence->components().size() > 1) return 0;
+            if (!context->DeleteCandidate(nativeIndex)) return 0;
         }
-        // Not in that dictionary (another translator's word): Rime's own deletion by the owning translator.
-        if (sentence && sentence->components().size() > 1) return 0;
-        return context->DeleteCandidate(nativeIndex) ? 1 : 0;
+        return stillOffered(context, text) ? 1 : 3;
+    }
+
+    // Whether `text` is still a candidate of the refreshed menu: a dictionary word stays, a self-made word is gone.
+    static bool stillOffered(rime::Context* context, const std::string& text) {
+        if (context->composition().empty() || !context->composition().back().menu) return false;
+        const auto& menu = context->composition().back().menu;
+        for (size_t i = 0; i < 300; ++i) {
+            const auto candidate = menu->GetCandidateAt(i);
+            if (!candidate) return false;
+            if (candidate->text() == text) return true;
+        }
+        return false;
     }
 
     bool reloadSessionAfterMaintenance() {
