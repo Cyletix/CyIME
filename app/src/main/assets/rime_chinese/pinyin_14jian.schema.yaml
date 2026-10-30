@@ -3,7 +3,7 @@
 schema:
   schema_id: pinyin_14jian
   name: 中文14键
-  version: "1.1"
+  version: "1.2"
   dependencies:
     - cyime_k14_english
   description: |
@@ -42,6 +42,10 @@ engine:
     - reverse_lookup_translator
     - t9_english_translator@k14_english
     - lua_translator@*uuid
+  # 与 26 键、九键同一套候选规则：长按删掉的候选不再出现、同字候选去重（cyime_candidate_policy），再去重一次。
+  filters:
+    - cyime_candidate_policy
+    - uniquifier
 
 speller:
   alphabet: zyxwvutsrqponmlkjihgfedcbaQETUOADGJZCB
