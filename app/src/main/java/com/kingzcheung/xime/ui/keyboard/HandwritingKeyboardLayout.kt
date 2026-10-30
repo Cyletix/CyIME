@@ -249,7 +249,8 @@ fun HandwritingKeyboardLayout(
                             else OverlappedHandwritingRecognizer(maxSegments = SIDE_BY_SIDE_MAX_CHARS, sideBySide = true,
                                 maxStrokesPerSegment = if (recognitionLanguage == InputLanguage.ENGLISH) 4
                                     else OverlappedHandwritingRecognizer.DEFAULT_MAX_STROKES_PER_SEGMENT,
-                                lettersApart = recognitionLanguage == InputLanguage.ENGLISH)).recognize(
+                                lettersApart = recognitionLanguage == InputLanguage.ENGLISH,
+                                letterCost = OverlappedHandwritingRecognizer.MODEL_LETTER_COST)).recognize(
                             strokes.map { stroke -> stroke.map { it.x to it.y } }, gaps,
                             predictFn = { points, topK -> HandwritingEngine.predict(points, topK, recognitionLanguage) },
                         ).segments

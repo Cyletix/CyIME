@@ -126,4 +126,44 @@ class SideBySideSegmentationTest {
             }
         assertEquals(listOf("h", "i"), result.segments.map { it.candidates.first().char })
     }
+
+    @Test fun dotAboveAStemIsReadAsIEvenWhenTheModelSaysOne() {
+        // 你写的 antique 里的 i：模型对「点 + 竖」给 1 0.78、i 0.64；点在竖正上方就是 i
+        val strokes = listOf(listOf(0f to 30f, 1f to 37f), listOf(-1f to 59f, 1f to 80f, 3f to 100f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, noPauses.take(2)) { seg, _ ->
+                if (seg.size == 2) listOf(HandwritingCandidate("1", .78f), HandwritingCandidate("i", .64f)) else listOf(HandwritingCandidate("1", .7f))
+            }
+        assertEquals(listOf("i"), result.segments.map { it.candidates.first().char })
+    }
+
+    @Test fun lettersWrittenQuicklyOneAfterAnotherAreStillSplit() {
+        // t 和 i 之间只隔 141 ms：中文的连笔压制不用在字母上，否则 ti 合成一个 t
+        val strokes = listOf(listOf(0f to 30f, 30f to 30f), listOf(10f to 0f, 15f to 100f), listOf(45f to 40f, 46f to 100f))
+        val names = mapOf(listOf(0, 1) to ("t" to .87f), listOf(2) to ("i" to .9f), listOf(0, 1, 2) to ("t" to .84f),
+            listOf(0) to ("-" to .3f), listOf(1) to ("l" to .5f), listOf(1, 2) to ("H" to .3f))
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, listOf(0L, 140L, 141L)) { seg, _ ->
+                val (name, score) = names.getValue(seg.map { strokes.indexOf(it) })
+                listOf(HandwritingCandidate(name, score))
+            }
+        assertEquals(listOf("t", "i"), result.segments.map { it.candidates.first().char })
+    }
+
+    @Test fun twoWellRecognizedLettersAreNotMergedIntoOneWorseLetter() {
+        // dapple 的 pp：两个 p 各 0.9，合起来也勉强像 P（0.89）；按均分比较会合成一个，按字母成本不会
+        val p1 = listOf(listOf(0f to 0f, 0f to 100f), listOf(0f to 0f, 20f to 20f, 0f to 40f))
+        val p2 = p1.map { st -> st.map { (x, y) -> x + 28f to y } }
+        val strokes = p1 + p2
+        val result = OverlappedHandwritingRecognizer(maxSegments = 12, maxStrokesPerSegment = 4, sideBySide = true, lettersApart = true)
+            .recognize(strokes, listOf(0L, 130L, 120L, 140L)) { seg, _ ->
+                val idx = seg.map { strokes.indexOf(it) }
+                listOf(when (idx) {
+                    listOf(0, 1), listOf(2, 3) -> HandwritingCandidate("p", .9f)
+                    listOf(0, 1, 2, 3) -> HandwritingCandidate("P", .89f)
+                    else -> HandwritingCandidate("1", .5f)
+                })
+            }
+        assertEquals(listOf("p", "p"), result.segments.map { it.candidates.first().char })
+    }
 }
