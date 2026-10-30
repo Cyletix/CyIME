@@ -47,6 +47,8 @@ class FeedbackManager(private val context: Context) {
 
     private var hasAmplitudeControl = false
 
+    private val samsungTuned = isSamsungTuned(Build.MANUFACTURER)
+
     private val feedbackScope = CoroutineScope(Dispatchers.Default)
 
     private var soundEnabled = true
@@ -77,6 +79,35 @@ class FeedbackManager(private val context: Context) {
             light -> 30L
             else -> 45L
         }
+
+        /**
+         * 能调振幅、却不报告点击原语和预设效果的马达（多是线性马达，如部分小米机型）：45 ms 长脉冲在线性马达上
+         * 会持续共振成「嗡」，只给十几毫秒，打出来是「哒」。
+         */
+        fun linearMotorDurationMs(longPress: Boolean, light: Boolean): Long = when {
+            longPress -> 30L
+            light -> 10L
+            else -> 15L
+        }
+
+        /** 拿不到点击触感时自己发的脉冲长度：三星沿用实测的转子马达时长，其他机型能调振幅时按线性马达给短脉冲。 */
+        fun fallbackPulseMs(samsungTuned: Boolean, hasAmplitudeControl: Boolean, longPress: Boolean, light: Boolean): Long =
+            if (samsungTuned || !hasAmplitudeControl) plainMotorDurationMs(longPress, light)
+            else linearMotorDurationMs(longPress, light)
+
+        /** 按键触感按三星实测调过（原语 click/tick、转子马达 45 ms）；其他厂商默认交给系统按键触感。 */
+        fun isSamsungTuned(manufacturer: String?): Boolean = manufacturer.equals("samsung", ignoreCase = true)
+
+        /**
+         * 非三星机型在没自定义时长、振幅时直接用系统按键触感（View.performHapticFeedback）：
+         * 小米澎湃OS、Pixel 等由系统映射到厂商调校的短促点击，和自带输入法、微信输入法同一条路。
+         * 「启用」模式下本机支持原语时仍按原语（设置页的振幅滑条要起作用），系统触感关着时也不走这条（系统会不震）。
+         */
+        fun prefersSystemHaptic(
+            samsungTuned: Boolean, custom: Boolean, duration: Long, amplitude: Int,
+            primitivesSupported: Boolean, systemHapticEnabled: Boolean
+        ): Boolean = !samsungTuned && duration == 0L && amplitude == 0 && systemHapticEnabled &&
+            (!custom || !primitivesSupported)
 
         /** 删除音连发时只保留最新一层；其他按键音照常可以重叠。 */
         fun chokesPrevious(keyType: String): Boolean = keyType == "delete"
@@ -270,22 +301,9 @@ class FeedbackManager(private val context: Context) {
     fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false, type: KeyFeedbackType = KeyFeedbackType.CHARACTER) {
         // 未开启松手反馈时，不必读取系统触觉设置。
         if (keyUp && !hapticOnKeyUp) return
-        when (hapticMode) {
-            HapticMode.Enabled -> {}
-            HapticMode.Disabled -> return
-            HapticMode.FollowingSystem -> {
-                val systemEnabled = try {
-                    Settings.System.getInt(
-                        context.contentResolver,
-                        Settings.System.HAPTIC_FEEDBACK_ENABLED,
-                        1
-                    ) == 1
-                } catch (_: Exception) {
-                    true
-                }
-                if (!systemEnabled) return
-            }
-        }
+        if (hapticMode == HapticMode.Disabled) return
+        val systemEnabled = systemHapticEnabled()
+        if (hapticMode == HapticMode.FollowingSystem && !systemEnabled) return
 
         // 自定义时长、振幅只在「启用」模式下显示，跟随系统时不使用残留值。
         val custom = hapticMode == HapticMode.Enabled
@@ -302,17 +320,22 @@ class FeedbackManager(private val context: Context) {
         }
 
         val light = keyUp || hfc == HapticFeedbackConstants.TEXT_HANDLE_MOVE
+        if (prefersSystemHaptic(samsungTuned, custom, duration, amplitude, primitivesSupported, systemEnabled)) {
+            view.performHapticFeedback(hfc, systemHapticFlags())
+            return
+        }
         // 线性马达优先：按下和长按是满强度 click，抬起/光标是稍轻的 tick；
-        // 时长由马达决定，振幅设置只调强弱。系统默认时不再交给 KEYBOARD_TAP（三星上偏重）。
+        // 时长由马达决定，振幅设置只调强弱。三星上系统默认时不再交给 KEYBOARD_TAP（偏重）。
         val primitive = if (light) VibrationEffect.Composition.PRIMITIVE_TICK else VibrationEffect.Composition.PRIMITIVE_CLICK
         val defaultScale = if (light) 0.8f else 1f
         if (vibratePrimitive(primitive, amplitude, defaultScale)) return
         if (duration == 0L && amplitude == 0 && vibratePredefined(if (light) VibrationEffect.EFFECT_TICK else VibrationEffect.EFFECT_CLICK)) return
         // 普通转子马达（如 Tab S8）：系统 KEYBOARD_TAP 只给 20 ms，马达还没转起来就停了，几乎感觉不到；
         // 改用与三星系统界面相同量级的短震（按键 45 ms、光标/抬起 30 ms、长按 70 ms）。
+        // 其他厂商能调振幅的马达（自定义了振幅，或系统触感关着时的「启用」）只给十几毫秒，避免线性马达嗡嗡响。
         if (duration == 0L && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && vibrator.hasVibrator()) {
             val amp = if (hasAmplitudeControl && amplitude != 0) amplitude else VibrationEffect.DEFAULT_AMPLITUDE
-            vibrateTouch(VibrationEffect.createOneShot(plainMotorDurationMs(longPress, light), amp))
+            vibrateTouch(VibrationEffect.createOneShot(fallbackPulseMs(samsungTuned, hasAmplitudeControl, longPress, light), amp))
             return
         }
         if (duration != 0L) {
@@ -325,13 +348,28 @@ class FeedbackManager(private val context: Context) {
                 vibrator.vibrate(duration)
             }
         } else {
-            var flags = HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-            if (hapticMode == HapticMode.Enabled) {
-                @Suppress("DEPRECATION")
-                flags = flags or HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-            }
-            view.performHapticFeedback(hfc, flags)
+            view.performHapticFeedback(hfc, systemHapticFlags())
         }
+    }
+
+    private fun systemHapticEnabled(): Boolean = try {
+        Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 1
+    } catch (_: Exception) {
+        true
+    }
+
+    private fun systemHapticFlags(): Int {
+        var flags = HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+        if (hapticMode == HapticMode.Enabled) {
+            @Suppress("DEPRECATION")
+            flags = flags or HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+        }
+        return flags
+    }
+
+    private val primitivesSupported: Boolean by lazy {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK)
     }
 
     /** 移动光标每走一字：按两个开关分别轻震、出声，仍受全局振动模式和按键音开关约束。 */
@@ -385,7 +423,10 @@ class FeedbackManager(private val context: Context) {
         val custom = hapticMode == HapticMode.Enabled
         val pressAmp = if (custom) pressAmplitude else 0
         if (vibratePrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, pressAmp)) return
-        val duration = if (custom && pressDuration != 0L) pressDuration else plainMotorDurationMs(longPress = false, light = false)
+        if (!samsungTuned && pressAmp == 0 && !(custom && pressDuration != 0L) &&
+            vibratePredefined(VibrationEffect.EFFECT_CLICK)) return
+        val duration = if (custom && pressDuration != 0L) pressDuration
+            else fallbackPulseMs(samsungTuned, hasAmplitudeControl, longPress = false, light = false)
         val amplitude = if (hasAmplitudeControl && pressAmp != 0) pressAmp else VibrationEffect.DEFAULT_AMPLITUDE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))

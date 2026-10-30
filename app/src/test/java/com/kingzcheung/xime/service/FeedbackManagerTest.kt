@@ -111,6 +111,41 @@ class FeedbackManagerTest {
         org.junit.Assert.assertEquals(70L, FeedbackManager.plainMotorDurationMs(longPress = true, light = false))
     }
 
+    @Test fun `linear motors without click effects get short pulses instead of a buzz`() {
+        org.junit.Assert.assertEquals(15L, FeedbackManager.fallbackPulseMs(samsungTuned = false, hasAmplitudeControl = true, longPress = false, light = false))
+        org.junit.Assert.assertEquals(10L, FeedbackManager.fallbackPulseMs(samsungTuned = false, hasAmplitudeControl = true, longPress = false, light = true))
+        org.junit.Assert.assertEquals(30L, FeedbackManager.fallbackPulseMs(samsungTuned = false, hasAmplitudeControl = true, longPress = true, light = false))
+        // 三星（Tab S8 转子马达）和不能调振幅的马达保持原来的长度。
+        org.junit.Assert.assertEquals(45L, FeedbackManager.fallbackPulseMs(samsungTuned = true, hasAmplitudeControl = true, longPress = false, light = false))
+        org.junit.Assert.assertEquals(45L, FeedbackManager.fallbackPulseMs(samsungTuned = false, hasAmplitudeControl = false, longPress = false, light = false))
+    }
+
+    @Test fun `only samsung keeps its own tuned haptics`() {
+        org.junit.Assert.assertTrue(FeedbackManager.isSamsungTuned("samsung"))
+        org.junit.Assert.assertTrue(FeedbackManager.isSamsungTuned("Samsung"))
+        org.junit.Assert.assertFalse(FeedbackManager.isSamsungTuned("Xiaomi"))
+        org.junit.Assert.assertFalse(FeedbackManager.isSamsungTuned("Google"))
+        org.junit.Assert.assertFalse(FeedbackManager.isSamsungTuned(null))
+    }
+
+    @Test fun `other vendors follow the system key haptic unless the user tuned it`() {
+        fun prefers(samsung: Boolean = false, custom: Boolean = false, duration: Long = 0L, amplitude: Int = 0,
+                    primitives: Boolean = false, systemOn: Boolean = true) =
+            FeedbackManager.prefersSystemHaptic(samsung, custom, duration, amplitude, primitives, systemOn)
+        // 跟随系统：小米这类机型交给系统按键触感，有没有原语都一样。
+        org.junit.Assert.assertTrue(prefers())
+        org.junit.Assert.assertTrue(prefers(primitives = true))
+        // 三星保持原来的原语 / 45 ms 路径。
+        org.junit.Assert.assertFalse(prefers(samsung = true))
+        // 「启用」且调了时长或振幅：按用户的设置自己震。
+        org.junit.Assert.assertFalse(prefers(custom = true, amplitude = 120))
+        org.junit.Assert.assertFalse(prefers(custom = true, duration = 20L))
+        // 「启用」未调参数：支持原语时仍用原语，不支持时用系统触感；系统触感关着时自己震。
+        org.junit.Assert.assertFalse(prefers(custom = true, primitives = true))
+        org.junit.Assert.assertTrue(prefers(custom = true))
+        org.junit.Assert.assertFalse(prefers(custom = true, systemOn = false))
+    }
+
     @Test fun `only repeated delete sounds cut off the previous one`() {
         org.junit.Assert.assertTrue(FeedbackManager.chokesPrevious("delete"))
         listOf("standard", "space", "enter", "voice_start").forEach {
