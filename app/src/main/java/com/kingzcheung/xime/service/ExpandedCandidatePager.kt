@@ -69,7 +69,13 @@ object ExpandedCandidatePager {
         fromIndex: Int = 0,
     ): List<Int> {
         val filtered = if (!singleCharOnly) all.indices.toList()
-        else all.indices.filter { all[it].text.length == 1 }
+        else all.indices.filter { all[it].text.isSingleCharacter() }
         return filtered.drop(fromIndex.coerceIn(0, filtered.size))
     }
 }
+
+/**
+ * “筛选单字”的单字：一个 Unicode 字符，补充平面汉字（𠮷 占两个 UTF-16 单元）也算。
+ * 候选栏、展开页、实体键盘候选窗共用，同一个候选在哪里都是同一个判断（审计 F09）。
+ */
+internal fun String.isSingleCharacter(): Boolean = isNotEmpty() && codePointCount(0, length) == 1

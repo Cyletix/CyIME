@@ -30,6 +30,15 @@ class ExpandedCandidatePagerTest {
         assertEquals(listOf(0, 2), ExpandedCandidatePager.filterIndices(all, singleCharOnly = true))
     }
 
+    // 审计 F09：补充平面汉字（两个 UTF-16 单元）也是单字，与候选栏同一判断。
+    @Test
+    fun `单字过滤保留补充平面汉字`() {
+        val all = listOf(candidate("\uD842\uDFB7"), candidate("吉"), candidate("\uD842\uDFB7野"), candidate(""))
+        assertEquals(listOf(0, 1), ExpandedCandidatePager.filterIndices(all, singleCharOnly = true))
+        assertTrue("\uD842\uDFB7".isSingleCharacter())
+        assertTrue(!"".isSingleCharacter() && !"你好".isSingleCharacter())
+    }
+
     @Test
     fun `fromIndex偏移跳过候选栏已显示的候选`() {
         val all = listOf(candidate("你"), candidate("你好"), candidate("世"), candidate("们好"))

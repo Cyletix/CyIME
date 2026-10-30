@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.service.isSingleCharacter
 import androidx.compose.ui.zIndex
 
 import androidx.compose.ui.draw.drawWithContent
@@ -842,7 +843,7 @@ fun KeyboardView(
             val railExpanded = if (expandedDataMode) {
                 if (singleCharFilter) {
                     cs.expandedCandidates.withIndex()
-                        .mapNotNull { (i, c) -> if (c.text.codePointCount(0, c.text.length) == 1) i to c else null }
+                        .mapNotNull { (i, c) -> if (c.text.isSingleCharacter()) i to c else null }
                 } else {
                     cs.expandedCandidates.withIndex().map { it.index to it.value }
                 }

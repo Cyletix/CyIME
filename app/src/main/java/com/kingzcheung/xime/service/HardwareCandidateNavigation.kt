@@ -24,7 +24,7 @@ internal data class HardwareCandidateSnapshot(
     /** Expanded UI indices refer to a filtered view; commits need the original global index. */
     val expandedGlobalIndices: List<Int>? = if (expanded && state.expandedCandidatesLoaded && !basePresentation.association) {
         state.expandedCandidates.indices.filter { index ->
-            !singleCharOnly || state.expandedCandidates[index].text.let { it.codePointCount(0, it.length) == 1 }
+            !singleCharOnly || state.expandedCandidates[index].text.isSingleCharacter()
         }
     } else null
     val words: List<String> = when {
