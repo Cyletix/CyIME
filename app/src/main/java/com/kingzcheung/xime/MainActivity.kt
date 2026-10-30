@@ -139,6 +139,7 @@ class MainActivity : ComponentActivity() {
             val context = this
             val setupCompleted = SettingsPreferences.isSetupCompleted(context)
             var showWizard by remember { mutableStateOf(!setupCompleted) }
+            var showGuide by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
             var wizardToSettings by remember { mutableStateOf(false) }
             var darkMode by remember { mutableIntStateOf(SettingsPreferences.getEffectiveDarkMode(context)) }
             var keyboardTheme by remember { mutableStateOf(SettingsPreferences.getKeyboardTheme(context)) }
@@ -190,7 +191,11 @@ class MainActivity : ComponentActivity() {
                             SetupWizardScreen(
                                 visible = !wizardToSettings,
                                 onNavigateToSchemaSettings = { wizardToSettings = true },
-                                onCompleted = { showWizard = false }
+                                onCompleted = {
+                                    showWizard = false
+                                    // 老人包按规格固定配置，不在首次设置后弹出推荐配置。
+                                    showGuide = !BuildConfig.ELDER && !com.kingzcheung.xime.model.SetupGuide.isShown(context)
+                                }
                             )
                             if (wizardToSettings) {
                                 SettingsScreen(
@@ -203,6 +208,8 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
+                    } else if (showGuide) {
+                        com.kingzcheung.xime.ui.settings.SetupGuideScreen(firstRun = true, onDone = { showGuide = false })
                     } else {
                         SettingsScreen(
                             initialRoute = openFragment,
