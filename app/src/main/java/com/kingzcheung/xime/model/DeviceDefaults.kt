@@ -36,6 +36,8 @@ object DeviceDefaults {
                 .putString(VOICE, profile.voiceModel)
                 .putBoolean(KeyEffectPreferences.GLOW, effects.glow)
                 .putBoolean(KeyEffectPreferences.ANIMATION, effects.animation)
+                .also { com.kingzcheung.xime.settings.PerformanceProfile.writeFirstRunAuto(it,
+                    com.kingzcheung.xime.runtime.adaptation.PerformanceTiers.classify(hardware)) }
                 .putLong("device_initial_memory_bytes", hardware.totalMemoryBytes ?: -1)
                 .putInt("device_initial_cores", hardware.processors ?: -1)
                 .putLong("device_initial_max_cpu_khz", hardware.maxCpuKHz ?: -1)

@@ -47,8 +47,8 @@ import kotlin.math.roundToInt
 
 private val tierNames = mapOf(PerformanceTier.HIGH to "高配", PerformanceTier.MEDIUM to "中配", PerformanceTier.LOW to "低配")
 private val tierHints = mapOf(
-    PerformanceTier.HIGH to "动效和炫光全开，语音 Paraformer 常驻，SenseVoice 空闲 30 分钟后释放",
-    PerformanceTier.MEDIUM to "保留按键动效，语音空闲 5 分钟先释放 SenseVoice，30 分钟后全部释放",
+    PerformanceTier.HIGH to "动效和炫光全开，语音模型常驻，二次校正模型空闲 30 分钟后释放",
+    PerformanceTier.MEDIUM to "保留按键动效，语音空闲 5 分钟先释放二次校正模型，30 分钟后全部释放",
     PerformanceTier.LOW to "关闭动效和炫光，语音用完 1 分钟就释放，内存最省",
 )
 private fun idleLabel(minutes: Int) = if (minutes == 0) "永不" else "$minutes 分钟"
@@ -109,7 +109,7 @@ fun PerformanceSettingsContent(onBack: () -> Unit) {
                     // 分档横条，与「输入体验」里长按时长等设置同一样式：标题写当前值，下面一行说明，再是分档滑块。
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         IdleLevelSlider("语音二次校正空闲后释放", settings.speechRefinerIdleMinutes,
-                            "SenseVoice 不用时卸掉，保留 Paraformer 边说边出字；再用时第一句定稿稍慢",
+                            "边说边出字＋二次校正时，先卸掉校正模型（SenseVoice 或 X-ASR），保留出字模型；再用时第一句定稿稍慢。只用一个模型（如只用 SenseVoice）时不起作用",
                             "speech-refiner-idle-slider") { custom(settings.copy(speechRefinerIdleMinutes = it)) }
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
                         IdleLevelSlider("语音模型空闲后全部释放", settings.speechEngineIdleMinutes,

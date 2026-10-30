@@ -222,7 +222,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         // 智能 › 语音转文本
         SettingsSearchEntry("本地识别", speech, SettingsRoutes.SpeechToText, "本地 离线 模型 识别方式 在线 无需网络"),
         SettingsSearchEntry("保存语音调优录音", speech, SettingsRoutes.SpeechToText, "录音 保存 调优 回放 分析", section = "本地识别"),
-        SettingsSearchEntry("整句定稿", speech, SettingsRoutes.SpeechToText, "整句 定稿 校正 断句 分段 准确 SenseVoice 说完", section = "二次校正"),
+        SettingsSearchEntry("整句定稿", speech, SettingsRoutes.SpeechToText, "整句 定稿 校正 断句 分段 准确 SenseVoice X-ASR 说完", section = "二次校正"),
         SettingsSearchEntry("字幕", speech, SettingsRoutes.SpeechToText, "字幕 听障 老人 对话 实时字幕"),
         SettingsSearchEntry("桌面显示“字幕”图标", speech, SettingsRoutes.SpeechToText, "字幕 桌面图标 快捷方式"),
         SettingsSearchEntry("后台浮窗", speech, SettingsRoutes.SpeechToText, "字幕 浮窗 后台 悬浮 其他应用"),
@@ -252,7 +252,7 @@ internal val SettingsSearchIndex: List<SettingsSearchEntry> = run {
         SettingsSearchEntry("从备份恢复", backup, SettingsRoutes.Backup, "恢复 导入 还原 备份文件", anchor = "操作"),
         // 系统 › 性能与省电
         SettingsSearchEntry("性能档位", performance, SettingsRoutes.Performance, "档位 自动 推荐 高配 中配 低配 自定义 省电", anchor = "档位"),
-        SettingsSearchEntry("语音二次校正空闲后释放", performance, SettingsRoutes.Performance, "SenseVoice 释放 空闲 内存 语音"),
+        SettingsSearchEntry("语音二次校正空闲后释放", performance, SettingsRoutes.Performance, "SenseVoice X-ASR 释放 空闲 内存 语音"),
         SettingsSearchEntry("语音模型空闲后全部释放", performance, SettingsRoutes.Performance, "Paraformer 释放 常驻 空闲 内存 语音 永不"),
         // 系统 › 关于 CyIME
         SettingsSearchEntry("使用文档", about, SettingsRoutes.About, "说明 帮助 文档 教程 用法"),
