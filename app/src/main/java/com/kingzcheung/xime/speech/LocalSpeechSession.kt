@@ -25,6 +25,8 @@ internal interface LocalSpeechEngine : AutoCloseable {
     fun accept(samples: FloatArray): String
     fun finishStream(): String
     fun refine(samples: FloatArray): String
+    /** 整句定稿：同 [refine]，但保留模型的句末、逗号、问号等标点。 */
+    fun refinePunctuated(samples: FloatArray): String = refine(samples)
     /** Captions keep punctuation and the event label; dictation keeps using [refine]. */
     fun refineRich(samples: FloatArray): RichTranscript = RichTranscript(refine(samples))
     /** Decoding is pinned to Chinese: a second pass that still comes back as kana is rejected. */
@@ -64,6 +66,8 @@ internal class LocalSpeechSession(
     wholeSentence: Boolean = false,
 ) : ResidentSession {
     private val wholeSentenceActive = wholeSentence && engine.hasRefinement && engine.isStreaming
+    /** 整句定稿时保留模型标点（整句的句末不再是切点硬塞的句号）。 */
+    private val transcript = SpeechTranscript(keepMarks = wholeSentenceActive)
     private val decodeTimeoutMs = if (wholeSentenceActive) maxOf(engine.decodeTimeoutMs, WHOLE_SENTENCE_DECODE_TIMEOUT_MS)
         else engine.decodeTimeoutMs
     private fun worker(name: String, capacity: Int) = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
@@ -72,7 +76,6 @@ internal class LocalSpeechSession(
     private val refinement = worker("CyIME-Refinement", 2)
     private val lifecycle = Any()
     private val outputLock = Any()
-    private val transcript = SpeechTranscript()
     private val pending = mutableSetOf<Long>()
     private val unconfirmed = mutableSetOf<Long>()
     private val ended = mutableMapOf<Long, SpeechBoundary>()
@@ -165,7 +168,7 @@ internal class LocalSpeechSession(
                     if (abandoned.get()) return@execute
                     try {
                         check(System.nanoTime() < deadline) { "离线识别积压" }
-                        val text = keepChinese(preview, engine.refine(samples), engine.lockedChinese)
+                        val text = keepChinese(preview, if (wholeSentenceActive) engine.refinePunctuated(samples) else engine.refine(samples), engine.lockedChinese)
                         check(System.nanoTime() < deadline) { "离线识别超时" }
                         synchronized(outputLock) { pending.remove(id); publish(id, text, boundary, confirmed = true) }
                     } catch (e: Exception) {
