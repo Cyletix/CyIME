@@ -18,6 +18,8 @@ APK 里 Paraformer 三个文件压缩后占 218.7 MB（含 zip 记录），按 1
 
 为什么留 SenseVoice、不留 Paraformer：「整句定稿」默认开，最终文字本来就是 SenseVoice 整句识别的结果（平板外放 83 段 8.1 % 对现方案 10.1 %，见项目文件 语音评估/整句识别对比-20261030.md）；Paraformer 单独用错字率 15–18 %（docs/development/speech-model-comparison-20261007.md），只留它会明显变差。只留 SenseVoice 失去的是说话中的预览文字，定稿准确度和标点不变。
 
-老人包、朋友包仍按各自要求带全六个模型，不受影响。
+轻量版新装（2026-10-30 起）也默认用 SenseVoice：第一次打开自动下载的是 SenseVoice（228 MB）而不是 Paraformer（226 MB），默认语音从 Paraformer 单独（不校正）变成 SenseVoice 整句定稿；以前装过的用户已保存的默认值不变。
+
+老人包、朋友包仍按各自要求带全六个模型，默认仍是 Paraformer＋SenseVoice，不受影响。
 
 未验收：只跑了电脑上的单元测试，没在手机上装过不带 Paraformer 的完整版。

@@ -17,7 +17,8 @@ object DeviceModelProfiles {
 
     /**
      * Initial heuristic, not a benchmark or an ongoing policy override. [bundled] lists the models inside an offline
-     * edition: one that ships SenseVoice without Paraformer starts on SenseVoice instead of downloading 226 MB first.
+     * edition. Voice starts on SenseVoice (Chinese 7.4 % CER vs Paraformer alone 15–18 %, 2026-10-07 FLEURS; wrong text
+     * is worse than a later one); only an edition that ships Paraformer (elder/friend packs, with SenseVoice) starts on it.
      */
     fun choose(device: DeviceCapabilities, bundled: Set<String> = emptySet()): DeviceModelProfile {
         val memory = device.totalMemoryBytes?.takeIf { it > 0 }
@@ -29,8 +30,7 @@ object DeviceModelProfiles {
             memory >= 6 * GIB && (frequency == null || frequency >= ENHANCED_CPU_KHZ) -> DeviceModelTier.ENHANCED
             else -> DeviceModelTier.STANDARD
         }
-        val voice = if (SpeechModelCatalog.SENSEVOICE in bundled && SpeechModelCatalog.PARAFORMER !in bundled)
-            SpeechModelCatalog.SENSEVOICE else SpeechModelCatalog.PARAFORMER
+        val voice = if (SpeechModelCatalog.PARAFORMER in bundled) SpeechModelCatalog.PARAFORMER else SpeechModelCatalog.SENSEVOICE
         return DeviceModelProfile(tier, if (tier == DeviceModelTier.LIGHT) SMALL else BASE, voice)
     }
 }

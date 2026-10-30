@@ -99,7 +99,7 @@ object DefaultModelInstaller {
                         if (complete && ModelManager.isModelDownloaded(app, model)) {
                             // 完成后不再自动补回，用户在模型中心删除模型也是有效选择。
                             markHandled(app, id)
-                            if (id == SpeechModelCatalog.PARAFORMER) {
+                            if (id == DeviceDefaults.voiceModel(app)) {
                                 val settings = SettingsPreferences.getPrefsPublic(app)
                                 // 只为尚未选择语音后端的新用户设置本地默认值。
                                 val editor = settings.edit()
