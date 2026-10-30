@@ -157,9 +157,14 @@ private fun CaptionPage(controller: CaptionController, onExit: () -> Unit) {
             controller.streamingDownload) { controller.downloadStreaming() }
         if (!controller.refinementReady) ModelBanner("没有 SenseVoice 校正：字幕没有标点、错字多", "下载 SenseVoice（228 MB）",
             controller.refinementDownload) { controller.downloadRefinement() }
-        if (!controller.callCaptionEnabled) {
+        // 通话字幕要开无障碍，有的银行应用见到无障碍开着就不让用：可以“不用了”关掉，以后不再出现。
+        if (!controller.callCaptionEnabled && !controller.callCaptionCardDismissed) {
             val context = androidx.compose.ui.platform.LocalContext.current
-            ModelBanner("打电话、微信视频时也想看字幕？开启后通话中会自动在屏幕底部显示", "去开启通话字幕", ModelDownloadState.Idle) {
+            ModelBanner("打电话、微信视频时也想看字幕？开启后通话中会自动在屏幕底部显示", "去开启通话字幕", ModelDownloadState.Idle,
+                onDismiss = {
+                    controller.dismissCallCaptionCard()
+                    android.widget.Toast.makeText(context, "以后要用，可以在系统设置 → 无障碍里打开“CyIME 通话字幕”", android.widget.Toast.LENGTH_LONG).show()
+                }) {
                 runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
@@ -506,7 +511,7 @@ private fun statusOf(controller: CaptionController) = when {
 }
 
 @Composable
-private fun ModelBanner(message: String, action: String, state: ModelDownloadState, onDownload: () -> Unit) {
+internal fun ModelBanner(message: String, action: String, state: ModelDownloadState, onDismiss: (() -> Unit)? = null, onDownload: () -> Unit) {
     // Same container as the settings pages (surfaceContainerLow, 12 dp, visual material).
     Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         BoxWithConstraints(Modifier.visualMaterial(VisualStyles.current, 12.dp, level = MaterialLevel.RAISED).padding(16.dp)) {
@@ -520,12 +525,20 @@ private fun ModelBanner(message: String, action: String, state: ModelDownloadSta
                     else -> {}
                 }
             }
+            // 可关闭的提示：主按钮旁边一个“不用了”，同高。
             if (narrow) Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 text()
-                if (state !is ModelDownloadState.Downloading) BigButton(action, Modifier.fillMaxWidth(), onClick = onDownload)
+                if (state !is ModelDownloadState.Downloading) {
+                    if (onDismiss == null) BigButton(action, Modifier.fillMaxWidth(), onClick = onDownload)
+                    else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        BigButton(action, Modifier.weight(1f), onClick = onDownload)
+                        BigButton("不用了", outlined = true, onClick = onDismiss)
+                    }
+                }
             } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) { text() }
                 if (state !is ModelDownloadState.Downloading) BigButton(action, onClick = onDownload)
+                if (onDismiss != null) BigButton("不用了", outlined = true, onClick = onDismiss)
             }
         }
     }

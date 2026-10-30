@@ -692,6 +692,15 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
     /** Whether the call-caption accessibility service is on; refreshed whenever the page comes back. */
     var callCaptionEnabled by mutableStateOf(true)
     fun refreshCallCaption() { callCaptionEnabled = CallCaptionService.isEnabled(app) }
+    /**
+     * The "去开启通话字幕" card was closed with "不用了": it stays closed. Call captions need an
+     * accessibility service, which some bank apps refuse to run beside; the page itself never needs it.
+     */
+    var callCaptionCardDismissed by mutableStateOf(prefs.getBoolean(KEY_CALL_CARD_DISMISSED, false)); private set
+    fun dismissCallCaptionCard() {
+        callCaptionCardDismissed = true
+        prefs.edit().putBoolean(KEY_CALL_CARD_DISMISSED, true).apply()
+    }
 
     /** SenseVoice is on disk (or the page has not checked yet). */
     var refinementReady by mutableStateOf(true); private set
@@ -754,6 +763,7 @@ class CaptionController(context: Context) : CaptionInferenceClient.Listener {
 
     companion object {
         private const val TAG = "Caption"
+        private const val KEY_CALL_CARD_DISMISSED = "call_caption_card_dismissed"
         /** Start refused because keyboard dictation is on; not an error. */
         private const val HELD_FOR_DICTATION = "held-for-dictation"
         const val REPLY_SPEAKER = -1
