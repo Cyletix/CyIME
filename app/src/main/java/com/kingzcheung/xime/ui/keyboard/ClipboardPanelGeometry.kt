@@ -3,8 +3,11 @@ package com.kingzcheung.xime.ui.keyboard
 import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.keyboard.OverlayRoute
 
+/** 能往上拉高的面板：剪贴板，以及「排列工具栏与菜单」（条目多，拉高好一次看全、拖得远）。 */
 internal fun clipboardPanelCanExpand(page: KeyboardPage, resizing: Boolean, compact: Boolean): Boolean =
-    !resizing && !compact && (page as? KeyboardPage.Overlay)?.route is OverlayRoute.Clipboard
+    !resizing && !compact && (page as? KeyboardPage.Overlay)?.route.let {
+        it is OverlayRoute.Clipboard || it is OverlayRoute.ToolbarCustomize
+    }
 
 internal data class ClipboardPanelBounds(val collapsed: Int, val expanded: Int) {
     fun clamp(height: Float): Float = height.coerceIn(collapsed.toFloat(), expanded.toFloat())

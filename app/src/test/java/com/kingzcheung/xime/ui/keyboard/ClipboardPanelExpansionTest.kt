@@ -17,13 +17,18 @@ class ClipboardPanelExpansionTest {
     private val main = KeyboardPage.Main(MainType.FULL)
     private fun overlay(route: OverlayRoute) = KeyboardPage.Overlay(route, emptyList(), main)
 
-    @Test fun onlyOpenClipboardTabsAcceptExpansion() {
+    @Test fun onlyClipboardTabsAndArrangeAcceptExpansion() {
         for (tab in 0..2) {
             val page = overlay(OverlayRoute.Clipboard(tab))
             assertTrue(clipboardPanelCanExpand(page, false, false))
             assertFalse(clipboardPanelCanExpand(page, true, false))
             assertFalse(clipboardPanelCanExpand(page, false, true))
         }
+        // 排列工具栏与菜单也能像剪贴板一样拉高；调节尺寸、实体键盘浮条时不能。
+        val arrange = overlay(OverlayRoute.ToolbarCustomize)
+        assertTrue(clipboardPanelCanExpand(arrange, false, false))
+        assertFalse(clipboardPanelCanExpand(arrange, true, false))
+        assertFalse(clipboardPanelCanExpand(arrange, false, true))
         for (page in listOf(main, KeyboardPage.Main(MainType.HANDWRITING),
             KeyboardPage.Panel(PanelType.NUMBER, MainType.FULL), overlay(OverlayRoute.Menu),
             overlay(OverlayRoute.Emoji), overlay(OverlayRoute.Edit), overlay(OverlayRoute.SplitWords("文字")))) {

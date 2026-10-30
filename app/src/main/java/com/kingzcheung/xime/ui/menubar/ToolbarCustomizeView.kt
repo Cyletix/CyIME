@@ -1,5 +1,7 @@
 package com.kingzcheung.xime.ui.menubar
 
+import com.kingzcheung.xime.ui.keyboard.clipboardPanelCollapseGesture
+import com.kingzcheung.xime.ui.keyboard.clipboardPanelExpandGesture
 import com.kingzcheung.xime.ui.keyboard.keyboardPanelBackground
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +43,7 @@ import com.kingzcheung.xime.ui.keyboard.ToolbarButtonIcon
 /**
  * 工具栏与菜单的统一排列：一个列表，长按拖动即可在“工具栏 / 菜单 / 不使用”之间移动和排序。
  * 分隔条不可拖动；“设置”被拖到“不使用”时自动回到菜单末尾，保证始终能进入设置。
+ * 面板能像剪贴板一样拉高（同一个 ClipboardPanelExpansion，见 clipboardPanelCanExpand）。
  */
 @Composable
 fun ToolbarCustomizeView(
@@ -72,14 +75,18 @@ fun ToolbarCustomizeView(
     val rowColor = lerp(keyBgColor, keyTextColor, .04f)
 
     Column(modifier.fillMaxWidth().keyboardPanelBackground(backgroundColor).padding(bottom = bottomPaddingDp.dp)) {
-        Row(Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        // 和剪贴板一样：按住标题栏往上拉把面板拉高，多露出几行；列表在最上面时往下拉收回。
+        Row(Modifier.fillMaxWidth().clipboardPanelExpandGesture().height(50.dp).padding(horizontal = 12.dp)
+            .testTag("quick-actions-header"), verticalAlignment = Alignment.CenterVertically) {
             Text("排列工具栏与菜单", color = keyTextColor, fontSize = 16.sp, modifier = Modifier.weight(1f))
             Box(Modifier.size(32.dp).clip(CircleShape).background(lerp(keyBgColor, accentColor, .25f))
                 .clickable(onClick = onDismiss).testTag("quick-actions-done"), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Check, contentDescription = "完成", tint = keyTextColor, modifier = Modifier.size(22.dp))
             }
         }
-        LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("quick-actions-list"), state = dragOrder.list,
+        LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("quick-actions-list")
+            .clipboardPanelCollapseGesture(dragOrder.dragging == null) { !dragOrder.list.canScrollBackward },
+            state = dragOrder.list,
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)) {
             item(key = "#toolbar") {
