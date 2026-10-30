@@ -47,6 +47,11 @@ class LetterLayoutsTest {
         // 拼音的布局在方案里，英文有自己的排列，都不受影响。
         assertNull(KeysConfigHelper.letterLayout("rime_ice", false))
         assertEquals(InputLayout.QWERTY.id, InputProfiles.current("rime_ice", asciiMode = true).layout.id)
+        // 五笔和导入的中文码表（音形等）用同一个选择；没标语言的导入方案不跟中文走。
+        assertEquals(ColemakLayout.ID, InputProfiles.current("wubi86").layout.id)
+        assertEquals(ColemakLayout.ID, InputProfiles.arranged(InputProfiles.describe("my_yinxing",
+            InputLanguage.CHINESE, InputScheme.EXTERNAL)).layout.id)
+        assertEquals(InputLayout.QWERTY.id, InputProfiles.arranged(InputProfiles.describe("my_yinxing")).layout.id)
         // 回到 26 键：不再用 Colemak。
         assertEquals(InputProfileSelection.LayoutSwitch(e(DoublePinyinScheme.ZIRANMA_ID), true),
             InputProfileSelection.switchLayout(all, e(DoublePinyinScheme.ZIRANMA_ID), InputLayout.QWERTY.id))
