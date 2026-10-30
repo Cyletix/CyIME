@@ -584,11 +584,11 @@ private fun GesturePresetSettings() {
     SettingsSection(title = "手势预设", content = {
         com.kingzcheung.xime.ui.keyboard.InputGesturePreset.presets.forEachIndexed { index, preset ->
             if (index > 0) RowDivider()
-            TierRow(preset.label, preset.summary, current == preset) { preset.applyTo(settings).save(context) }
+            TierRow(preset.label, preset.summary(settings.reverseSymbolSwipe), current == preset) { preset.applyTo(settings).save(context) }
         }
         if (current == com.kingzcheung.xime.ui.keyboard.InputGesturePreset.CUSTOM) {
             RowDivider()
-            TierRow(current.label, current.summary, true, enabled = false) {}
+            TierRow(current.label, current.summary(settings.reverseSymbolSwipe), true, enabled = false) {}
         }
     })
 }
