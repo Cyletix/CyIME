@@ -158,17 +158,17 @@ class AsrInferenceService : Service() {
                 val manager = AsrModelManager(this@AsrInferenceService)
                 val chosen = manager.selection(modelId, language)
                 check(chosen.ready) { "所选语音模型尚未完整下载" }
-                // 整句定稿：X-ASR 已下载时用它定稿（代替 SenseVoice），没下载照旧用 SenseVoice。
-                val selection = if (wholeSentenceFinal) manager.wholeSentenceFinalizer(chosen) else chosen
+                // 整句定稿只用于中文：X-ASR 已下载时用它定稿（代替 SenseVoice），没下载照旧用 SenseVoice。
+                val wholeSentence = wholeSentenceFinal && chosen.recognitionLanguage == "zh"
+                val selection = if (wholeSentence) manager.wholeSentenceFinalizer(chosen) else chosen
                 val recorder = if (saveTuningAudio) SpeechTuningRecorder(
                     java.io.File(getExternalFilesDir(null) ?: filesDir, "speech_tuning"), mapOf(
                         "mode" to selection.mode, "language" to (language?.id ?: ""),
                         "device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
                         "app_version" to com.kingzcheung.xime.BuildConfig.VERSION_NAME,
-                        "whole_sentence" to wholeSentenceFinal,
+                        "whole_sentence" to wholeSentence,
                         "finalizer" to (selection.finalizerDir?.name ?: ""),
                     )).also { recorders[callback.asBinder()] = it } else null
-                val wholeSentence = wholeSentenceFinal
                 val selectedAt = SystemClock.elapsedRealtime()
                 val ready = sessions.start(selection.key,
                     createEngine = {
