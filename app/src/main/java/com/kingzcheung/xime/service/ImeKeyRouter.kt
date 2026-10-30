@@ -2181,13 +2181,20 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         // Translate the same input again so the forgotten word leaves the menu.
         service.rimeEngine.setInput(service.rimeEngine.getInput())
         withEditor { service.updateUI() }
-        showForgetResult(text, 1)
+        showForgetResult(text, 3)
         return true
     }
 
-    /** 忘掉学习的结果提示：用户看不到词库内部状态，只有这句话说明发生了什么。 */
+    /**
+     * 忘掉学习的结果提示：用户看不到词库内部状态，只有这句话说明发生了什么。
+     * result 同 forgetCandidate：1 忘掉后仍是词库里的词、2 没有学习记录、3 忘掉后不再出现（自造词）。
+     */
     private fun showForgetResult(text: String, result: Int) {
-        val message = if (result == 1) "已忘掉「$text」的学习记录" else "「$text」没有学习记录，排序不变"
+        val message = when (result) {
+            1 -> "已忘掉「$text」的学习记录，回到词库原来的位置"
+            3 -> "已删除自造的「$text」，以后再用会重新记住"
+            else -> "「$text」没有学习记录，不会删掉，排序不变"
+        }
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             android.widget.Toast.makeText(service, message, android.widget.Toast.LENGTH_SHORT).show()
         }
