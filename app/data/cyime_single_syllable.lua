@@ -64,7 +64,8 @@ local function cyime_single_syllable(input, env)
     local function flush()
         local last_single, singles = 0, 0
         for i, cand in ipairs(buffer) do
-            if han_count(cand.text) == 1 then
+            -- Rare characters (cyime_rare_chars, after every dictionary character) do not count.
+            if han_count(cand.text) == 1 and cand.type ~= "rare" then
                 singles = singles + 1
                 last_single = i
                 if singles == KEEP then break end

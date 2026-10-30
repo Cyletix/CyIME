@@ -35,6 +35,7 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.property("candidateComments", 1)
     inputs.property("cyimeTerms", 1)
     inputs.property("taiwanTraditional", 1)
+    inputs.property("rareCharacters", 1)
     val extWeights = file("data/rime_ice_ext_weights.tsv.gz")
     inputs.file(extWeights)
     val baseWeights = file("data/rime_ice_base_weights.tsv.gz")
@@ -57,6 +58,8 @@ val prepareChineseDictionaries by tasks.registering {
     inputs.file(singleSyllable)
     val mixedInput = file("data/cyime_mixed_input.lua")
     inputs.file(mixedInput)
+    val rareChars = file("data/cyime_rare_chars.lua")
+    inputs.file(rareChars)
     val finalParticles = file("data/sentence_final_particles.txt")
     inputs.file(finalParticles)
     val measureWords = file("data/sentence_measure_words.txt")
@@ -189,6 +192,8 @@ val prepareChineseDictionaries by tasks.registering {
         singleSyllable.copyTo(File(root, "lua/cyime_single_syllable.lua"), overwrite = true)
         // 中英混输（nihaohello → 你好hello），Rime 选项 cyime_mixed_input 打开才出候选；设置默认关。
         mixedInput.copyTo(File(root, "lua/cyime_mixed_input.lua"), overwrite = true)
+        // 生僻字（瀺 chan…），Rime 选项 cyime_rare_chars 打开才出候选；设置默认关。表在下面生成。
+        rareChars.copyTo(File(root, "lua/cyime_rare_chars.lua"), overwrite = true)
         val corrector = File(root, "lua/corrector.lua")
         val source = corrector.readText()
         val commentGate = "if env.keep_comment then"
@@ -291,7 +296,8 @@ val prepareChineseDictionaries by tasks.registering {
             .lineSequence().filterNot { it.contains("- lua_filter@*long_word_filter") }
             .flatMap { if (it.contains("- lua_filter@*autocap_filter")) sequenceOf(it, "    - lua_filter@*cyime_acronym_filter",
                 "    - lua_filter@*cyime_single_syllable", "    - lua_filter@*cyime_en_memory")
-                else if (it == "    - script_translator") sequenceOf(it, "    - lua_translator@*cyime_mixed_input") else sequenceOf(it) }
+                else if (it == "    - script_translator") sequenceOf(it, "    - lua_translator@*cyime_mixed_input",
+                    "    - lua_translator@*cyime_rare_chars") else sequenceOf(it) }
             .joinToString("\n")
             .replace("  filters:\n", "  filters:\n    - cyime_candidate_policy\n") +
             "\ncyime:\n  candidate_policy: true\n" +
@@ -330,7 +336,9 @@ val prepareChineseDictionaries by tasks.registering {
             // With CyLM started while Rime builds its sentence most keys find it done; a key waits at most 6 ms.
             "  budget_ms: 6\n"
         check(baseSchema.contains("cyime_neighbor_correction: true"))
-        check(baseSchema.contains("    - lua_translator@*cyime_mixed_input\n")) { "Upstream rime_ice translator list changed" }
+        check(baseSchema.contains("    - lua_translator@*cyime_mixed_input\n    - lua_translator@*cyime_rare_chars\n")) {
+            "Upstream rime_ice translator list changed"
+        }
         // The 14-key and 注音 schemas (assets/rime_chinese) repeat these sentence rules; keep them the same list.
         for (schema in listOf("pinyin_14jian", "cyime_zhuyin")) check(file("src/main/assets/rime_chinese/$schema.schema.yaml").readText()
             .contains("  sentence_position_final_only: [${particles.joinToString(", ")}]\n")) {
@@ -384,6 +392,36 @@ val prepareChineseDictionaries by tasks.registering {
         File(root, "cyime_di.dict.yaml").writeText(
             "# Adverbial 地 typed as di (generated from rime_ice base/ext).\n---\nname: cyime_di\nversion: \"2026-10-19\"\nsort: by_weight\n...\n" +
             diVariants.joinToString("\n", postfix = "\n"))
+        // Rare characters (user 2026-10-30: 瀺 chan had no candidate). 8105.dict.yaml is only the 通用规范汉字表;
+        // upstream's large table 41448.dict.yaml (Unihan kMandarin + zdic readings) ships disabled. Importing all of
+        // it cost the nine-key replay +140% dictionary entries per key at the same first candidates, so the
+        // characters 8105 lacks go to cyime_rare.txt instead, read by lua/cyime_rare_chars.lua for full-pinyin 26 keys
+        // only while its switch is on (default off). Only the BMP (URO and Ext A, about 18,000): most Android fonts
+        // have no glyphs for Ext B and beyond, which would show as empty boxes. Only readings 8105 already has (drops
+        // 黁 nun). The large table itself is no longer bundled: the generated list is about half its size.
+        val common = HashSet<String>()
+        val commonCodes = HashSet<String>()
+        var commonBody = false
+        File(root, "cn_dicts/8105.dict.yaml").forEachLine { line ->
+            if (!commonBody) { commonBody = line.trimEnd() == "..."; return@forEachLine }
+            val fields = line.split('\t')
+            if (!line.startsWith("#") && fields.size >= 2) { common += fields[0]; commonCodes += fields[1] }
+        }
+        val largeTable = File(root, "cn_dicts/41448.dict.yaml")
+        var largeBody = false
+        val rare = largeTable.readLines().filter { line ->
+            if (!largeBody) { largeBody = line.trimEnd() == "..."; return@filter false }
+            val fields = line.split('\t')
+            val text = fields[0]
+            !line.startsWith("#") && fields.size == 2 && text.codePointCount(0, text.length) == 1 &&
+                text.codePointAt(0) < 0x10000 && Character.isIdeographic(text.codePointAt(0)) && text !in common &&
+                fields[1] in commonCodes
+        }
+        check(rare.any { it == "瀺\tchan" } && rare.size > 15000) { "Upstream 41448.dict.yaml changed" }
+        // Within a reading the large table goes by code point, Ext A (㙴) first; the URO ones (瀺) are the likelier.
+        File(root, "cyime_rare.txt").writeText(rare.sortedBy { if (it.codePointAt(0) < 0x4E00) 1 else 0 }
+            .joinToString("\n", postfix = "\n"))
+        largeTable.delete()
         val iceDict = File(root, "rime_ice.dict.yaml")
         val othersImport = "  - cn_dicts/others   # 一些杂项\n"
         check(iceDict.readText().split(othersImport).size == 2) { "Upstream rime_ice import list changed" }

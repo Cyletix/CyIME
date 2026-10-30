@@ -641,6 +641,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 val mixed = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
                     .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.MIXED_INPUT_KEY, false)
                 if (service.rimeEngine.getOption("cyime_mixed_input") != mixed) service.rimeEngine.setOption("cyime_mixed_input", mixed)
+                // 生僻字（默认关）：同上。
+                val rare = com.kingzcheung.xime.settings.SettingsPreferences.getPrefsPublic(service)
+                    .getBoolean(com.kingzcheung.xime.ui.keyboard.KeyboardInputPreferences.RARE_CHARACTERS_KEY, false)
+                if (service.rimeEngine.getOption("cyime_rare_chars") != rare) service.rimeEngine.setOption("cyime_rare_chars", rare)
             }
             // 繁体输出（默认关）：同上，按键前补设 traditionalization；九键数字键也走这里。
             if (key.length == 1 && key[0].isLetterOrDigit()) {
