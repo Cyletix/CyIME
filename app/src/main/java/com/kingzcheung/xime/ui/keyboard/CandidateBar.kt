@@ -398,12 +398,15 @@ fun CandidateBar(
         // 空闲工具栏：菜单、收起与中间各图标同为等宽一格，胶囊同尺寸（分体时扣除中缝）。
         val rowDensity = LocalDensity.current
         var toolbarRowWidth by remember { mutableStateOf(0.dp) }
-        val toolbarSlot = if (state is CandidateBarState.Idle && inlineSuggestions.isEmpty() && toolbarRowWidth > 0.dp) {
+        // 空闲时一格的宽度；联想态的收起按钮也用这一格，和空闲时落在同一位置。
+        val idleToolbarCell = if (inlineSuggestions.isEmpty() && toolbarRowWidth > 0.dp) {
             val gap = splitGapX?.let { (l, r) -> with(rowDensity) { (r - l).toDp() } } ?: 0.dp
-            val fixed = (if (callbacks.onHideKeyboard != null) 1 else 0) + (if (showLeftIcon) 1 else 0)
+            // 空闲时左侧菜单／返回总在，固定格＝它加收起按钮。
+            val fixed = (if (callbacks.onHideKeyboard != null) 1 else 0) + 1
             // 悬浮小窗里格子随宽度收窄（最窄 36dp），图标都留在面板内，不再横向溢出压住边框。
             maxOf((toolbarRowWidth - 8.dp - gap) / (toolbarActions.size + fixed).coerceAtLeast(1), 36.dp)
         } else null
+        val toolbarSlot = idleToolbarCell.takeIf { state is CandidateBarState.Idle }
         // 打字时两端「<」「^」用和空闲工具栏同样宽的格子：宽屏下同样变成胶囊（用户 10-20）。
         val edgeStyle = LocalEdgeButtonStyle.current
         val edgeSlot = if (edgeStyle == EdgeButtonStyle.CIRCLE || toolbarRowWidth <= 0.dp) null else {
@@ -605,13 +608,8 @@ fun CandidateBar(
 
                     if (callbacks.onHideKeyboard != null) {
                         Spacer(modifier = Modifier.width(4.dp))
-                        KeyboardToolbarButton(callbacks.onHideKeyboard, iconButtonContainer,
-                            modifier = Modifier.testTag("toolbar-hide"), slotWidth = toolbarSlot) {
-                            // 语音听写中：收起成底部悬浮条，语音继续。
-                            Icon(if (isVoiceSticky) Icons.Default.KeyboardDoubleArrowDown else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (isVoiceSticky) "收起成悬浮条" else "收起键盘",
-                                tint = protectedVisuals.textColor, modifier = Modifier.size(24.dp))
-                        }
+                        HideKeyboardButton(callbacks.onHideKeyboard, iconButtonContainer, isVoiceSticky,
+                            protectedVisuals.textColor, toolbarSlot)
                     }
                 }
                 candidatePageExpanded -> {
@@ -667,7 +665,29 @@ fun CandidateBar(
                     ToolbarActionButton(action, protectedVisuals, iconButtonTint, voiceAmplitude, voiceRecognitionState)
                 }
             }
+            // 上屏后的联想（连续联想会一直接着出）不是在打字，收起按钮照样留在最右那一格；
+            // 以前要先退格清掉联想才回到有收起按钮的工具栏（用户反馈 10-30）。展开候选时最右已是返回。
+            if (state is CandidateBarState.AssociationOnly && !candidatePageExpanded && callbacks.onHideKeyboard != null) {
+                HideKeyboardButton(callbacks.onHideKeyboard, iconButtonContainer, isVoiceSticky,
+                    protectedVisuals.textColor, idleToolbarCell)
+            }
         }
+    }
+}
+
+/** 工具栏最右的收起键盘按钮；语音听写中收起成底部悬浮条，语音继续。 */
+@Composable
+private fun HideKeyboardButton(
+    onHide: () -> Unit,
+    background: Color,
+    isVoiceSticky: Boolean,
+    tint: Color,
+    slotWidth: androidx.compose.ui.unit.Dp?,
+) {
+    KeyboardToolbarButton(onHide, background, modifier = Modifier.testTag("toolbar-hide"), slotWidth = slotWidth) {
+        Icon(if (isVoiceSticky) Icons.Default.KeyboardDoubleArrowDown else Icons.Default.KeyboardArrowDown,
+            contentDescription = if (isVoiceSticky) "收起成悬浮条" else "收起键盘",
+            tint = tint, modifier = Modifier.size(24.dp))
     }
 }
 
