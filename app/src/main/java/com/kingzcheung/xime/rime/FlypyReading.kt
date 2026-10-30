@@ -8,6 +8,18 @@ package com.kingzcheung.xime.rime
 internal fun flypyReading(reading: String): String =
     reading.trim().split(' ', '\'').filter { it.isNotEmpty() }.joinToString(" ") { flypySyllable(it) }
 
+/**
+ * 同上，按 [schemaId] 自己的双拼键位换（自然码、自定义双拼的 14 键版本）；小鹤双拼和查不到键位表时用小鹤。
+ * 键位表里没有的音节原样保留。
+ */
+internal fun doublePinyinReading(reading: String, schemaId: String): String {
+    val scheme = com.kingzcheung.xime.settings.DoublePinyinSchemes.find(schemaId)
+    if (scheme == null || scheme.id == com.kingzcheung.xime.settings.DoublePinyinScheme.FLYPY.id) return flypyReading(reading)
+    return reading.trim().split(' ', '\'').filter { it.isNotEmpty() }.joinToString(" ") { syllable ->
+        scheme.code(syllable.lowercase().replace('ü', 'v')) ?: syllable
+    }
+}
+
 private val FLYPY_RULES = listOf(
     "^([aoe])(ng)?$" to "$1$1$2", "iu$" to "Ⓠ", "(.)ei$" to "$1Ⓦ", "uan$" to "Ⓡ", "[uv]e$" to "Ⓣ", "un$" to "Ⓨ",
     "^sh" to "Ⓤ", "^ch" to "Ⓘ", "^zh" to "Ⓥ", "uo$" to "Ⓞ", "ie$" to "Ⓟ", "(.)i?ong$" to "$1Ⓢ", "ing$|uai$" to "Ⓚ",

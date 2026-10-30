@@ -301,4 +301,53 @@ class DoublePinyinSchemeTest {
         assertEquals("lve jue", apply(rules, "ltjt"))
         assertEquals("zhong sh", apply(rules, "vsu"))
     }
+
+    private val base14 = listOf("src/main/assets", "app/src/main/assets").map { java.io.File(it, "rime_chinese/double_pinyin_flypy_14jian.schema.yaml") }
+        .first { it.isFile }.readText()
+
+    @Test fun fourteenKeyVersionTypesEachKeyExactlyOrMerged() {
+        val groups = mapOf("qw" to 'Q', "er" to 'E', "ty" to 'T', "ui" to 'U', "op" to 'O', "as" to 'A', "df" to 'D',
+            "gh" to 'G', "jk" to 'J', "zx" to 'Z', "cv" to 'C', "bn" to 'B')
+        fun merged(c: Char) = groups.entries.firstOrNull { c in it.key }?.value ?: c
+        for (scheme in DoublePinyinScheme.BUILTINS.drop(1) + custom) {
+            val id = DoublePinyinScheme.k14Id(scheme.id)
+            val text = scheme.k14Schema(base14)
+            assertTrue(text.startsWith(DoublePinyinScheme.GENERATED_MARK + id + "\n"))
+            assertTrue(text.contains("  schema_id: $id\n"))
+            assertTrue(text.contains("  name: ${org.json.JSONObject.quote(scheme.name)}\n"))
+            assertTrue(text.contains("  language: zh\n  input_scheme: double_pinyin\n"))
+            assertTrue(text.contains("  prism: $id\n"))
+            assertFalse(text.contains("double_pinyin_flypy_14jian"))
+            // 词库、候选规则、符号和编码显示照 14 键小鹤双拼。
+            for (line in listOf("  dictionary: rime_ice\n", "    - cyime_candidate_policy\n", "  alphabet: zyxwvutsrqponmlkjihgfedcbaQETUOADGJZCB\n",
+                "    - xlit/QETUOADGJZCB/qetuoadgjzcb/\n", "  __include: symbols:/punctuator\n"))
+                assertTrue(line, text.contains(line))
+            val rules = text.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
+                .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }
+            assertEquals("erase/^[A-Z]$/", rules.first())
+            assertEquals(1 + scheme.algebra().size + 24, rules.size)
+            for (syllable in DoublePinyinScheme.SYLLABLES) {
+                val code = scheme.code(syllable)!!
+                val result = spellings(rules, syllable)
+                val expected = setOf(code, "${merged(code[0])}${code[1]}", "${code[0]}${merged(code[1])}", "${merged(code[0])}${merged(code[1])}")
+                assertEquals(syllable, expected, result)
+            }
+        }
+        // 自然码 zhong = VS：点 CV 键、AS 键，或侧滑出 V、S。
+        assertEquals("CA", DoublePinyinScheme.ZIRANMA.code("zhong")!!.map(::merged).joinToString(""))
+    }
+
+    @Test fun flypyFourteenKeyAssetMatchesTheGeneratedRules() {
+        // 随应用内置的 14 键小鹤双拼和由键位表生成的 14 键版本打出同样的编码（内置的另外多一组 ju→jv 的写法）。
+        val asset = base14.substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") || it.startsWith("    #") }
+            .filter { it.startsWith("    - ") }.map { it.removePrefix("    - ") }
+        val generated = DoublePinyinScheme.FLYPY.copy(id = DoublePinyinScheme.ZIRANMA_ID).k14Schema(base14)
+            .substringAfter("  algebra:\n").lines().takeWhile { it.startsWith("    - ") }
+            .map { it.removePrefix("    - \"").removeSuffix("\"").replace("\\\"", "\"").replace("\\\\", "\\") }
+        for (syllable in DoublePinyinScheme.SYLLABLES) {
+            val fromAsset = spellings(asset, syllable)
+            val fromTable = spellings(generated, syllable)
+            assertTrue("$syllable $fromTable $fromAsset", fromAsset.containsAll(fromTable))
+        }
+    }
 }

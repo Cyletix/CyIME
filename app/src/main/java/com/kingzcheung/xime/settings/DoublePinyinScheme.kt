@@ -2,7 +2,8 @@ package com.kingzcheung.xime.settings
 
 /**
  * 一套双拼键位：zh/ch/sh 各占一个键，每个韵母（按词库里的拼写，如 jue 的 ue、lüe 的 ve）占一个键，
- * 零声母音节各有两键编码。由它生成 Rime 拼写规则和编码显示规则；词库、符号和按键排列沿用小鹤双拼方案。
+ * 零声母音节各有两键编码。由它生成 Rime 拼写规则和编码显示规则；词库、符号和按键排列沿用小鹤双拼方案
+ * （26 键、九键、14 键各一个版本）。
  */
 data class DoublePinyinScheme(
     val id: String,
@@ -219,6 +220,31 @@ data class DoublePinyinScheme(
             |""".trimMargin()
     }
 
+    /**
+     * 14 键版本：以已部署的 14 键小鹤双拼方案为底，换上本方案的拼写规则。每个字两个键，每一位都可以是
+     * 精确字母（侧滑选的字母）或合并键（点按，大写代表字母），与 14 键小鹤双拼相同；词库和学习记录共用 rime_ice。
+     */
+    fun k14Schema(base: String): String {
+        require(valid())
+        val k14 = k14Id(id)
+        var text = base.replace("\r\n", "\n")
+        val header = Regex("(?ms)^schema:\\n.*?(?=^\\S)").find(text) ?: error("14 键小鹤双拼方案缺少 schema 段")
+        val schemaBlock = header.value
+            .replaceFirst(Regex("(?m)^  schema_id: .*$"), "  schema_id: $k14")
+            .replaceFirst(Regex("(?m)^  name: .*$"), Regex.escapeReplacement("  name: ${org.json.JSONObject.quote(name)}"))
+            .replaceFirst(Regex("(?m)^  description: \\|\\n(?:    .*\\n)*"),
+                "  description: |\n    CyIME 双拼方案（由键位表生成）的 14 键版本，词库和按键排列与 14 键小鹤双拼相同。\n")
+        check(schemaBlock.contains("  schema_id: $k14\n")) { "14 键小鹤双拼方案缺少 schema_id" }
+        text = text.replaceRange(header.range, schemaBlock)
+        // 每个字的两位各自可以换成合并键；词库里的单个大写字母音节与合并键的大写编码同形，14 键用不到，先删掉。
+        val merged = (0..1).flatMap { position -> K14_GROUPS.map { (letters, key) -> "derive/^(.{$position})[$letters](.*)$/\$1$key\$2/" } }
+        text = replaceList(text, "speller", "algebra", listOf("erase/^[A-Z]$/") + algebra() + merged)
+        val prism = Regex("(?m)^  prism: double_pinyin_flypy_14jian\\b.*$")
+        check(prism.containsMatchIn(text)) { "14 键小鹤双拼方案缺少 prism" }
+        text = text.replace(prism, "  prism: $k14")
+        return "$GENERATED_MARK$k14\n$text"
+    }
+
     /** 换掉 [section] 段里 [key] 列表的全部条目（含其间的注释行）。 */
     private fun replaceList(text: String, section: String, key: String, items: List<String>): String {
         val block = Regex("(?ms)^$section:\\n.*?(?=^[a-zA-Z_][a-zA-Z_0-9]*:|\\z)").find(text) ?: error("小鹤双拼方案缺少 $section 段")
@@ -280,6 +306,12 @@ data class DoublePinyinScheme(
         fun cnEnName(id: String) = "cn_en_$id"
         const val T9_SUFFIX = "_t9"
         fun t9Id(id: String) = id + T9_SUFFIX
+        /** 14 键版本，与 14 键小鹤双拼 double_pinyin_flypy_14jian 同样的后缀。 */
+        const val K14_SUFFIX = "_14jian"
+        fun k14Id(id: String) = id + K14_SUFFIX
+        /** 14 键的合并键（与 xime.yaml qwerty_14 和 14 键小鹤双拼的拼写运算相同）：点按送大写代表字母，l、m 单独一键。 */
+        private val K14_GROUPS = listOf("qw" to 'Q', "er" to 'E', "ty" to 'T', "ui" to 'U', "op" to 'O', "as" to 'A',
+            "df" to 'D', "gh" to 'G', "jk" to 'J', "zx" to 'Z', "cv" to 'C', "bn" to 'B')
         /** 九键的字母分组，与中文九键 t9_pinyin 的拼写运算相同。 */
         private val T9_DIGITS = listOf("abc" to 2, "def" to 3, "ghi" to 4, "jkl" to 5, "mno" to 6, "pqrs" to 7,
             "tuv" to 8, "wxyz" to 9)

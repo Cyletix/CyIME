@@ -149,7 +149,7 @@ object InputProfiles {
         }
         val layout = when {
             id == "t9_pinyin" || id == "t9" || DoublePinyinSchemes.isT9(id) -> InputLayout.T9
-            id == "pinyin_14jian" || id == "double_pinyin_flypy_14jian" -> InputLayout.MERGED14
+            id == "pinyin_14jian" || DoublePinyinSchemes.isK14(id) -> InputLayout.MERGED14
             id == "pinyin_17jian" -> InputLayout("qwerty_17", "17键", LayoutKind.MERGED)
             id == "pinyin_18jian" -> InputLayout("qwerty_18", "18键", LayoutKind.MERGED)
             id == "japanese_kana" -> InputLayout.KANA
