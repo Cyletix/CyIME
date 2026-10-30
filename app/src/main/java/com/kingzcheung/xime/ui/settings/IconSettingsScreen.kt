@@ -6,9 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -39,7 +37,7 @@ internal fun IconSettingsContent(onBack: () -> Unit, onChanged: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface))
     }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+        Column(Modifier.fillMaxSize().padding(padding).settingsVerticalScroll().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // 「跟随主题色」打开时底板和样式不起作用，那两组就不显示。
             if (!IconAppearance.followTheme) SettingsSection(title = "桌面图标底板") {

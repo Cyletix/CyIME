@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -126,8 +127,10 @@ fun StorageSpaceScreen(
         }
     ) { paddingValues ->
         val list = categories
+        val listState = rememberLazyListState()
         LazyColumn(
-            modifier = Modifier
+            state = listState,
+            modifier = Modifier.settingsGutterScroll(listState)
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),

@@ -96,9 +96,10 @@ private fun ThemeSettingsPage(
         var previewTheme by remember { mutableStateOf<KeyboardColorScheme?>(null) }
         var showGlassSettings by remember { mutableStateOf(false) }
 
+        val listState = rememberSettingsSearchListState()
         LazyColumn(
-            state = rememberSettingsSearchListState(),
-            modifier = Modifier
+            state = listState,
+            modifier = Modifier.settingsGutterScroll(listState)
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),

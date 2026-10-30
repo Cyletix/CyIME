@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import com.kingzcheung.xime.ui.settings.SettingsSection
+import com.kingzcheung.xime.ui.settings.settingsVerticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -142,7 +143,7 @@ internal fun CustomLayoutManager(themeId: String, dark: Boolean, createNew: Bool
             )
         }
     ) { paddingValues ->
-    Column(Modifier.fillMaxSize().padding(paddingValues).imePadding().verticalScroll(rememberScrollState())
+    Column(Modifier.fillMaxSize().padding(paddingValues).imePadding().settingsVerticalScroll()
         .padding(horizontal = 16.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (id == null) {
             OutlinedCard(Modifier.fillMaxWidth()) {

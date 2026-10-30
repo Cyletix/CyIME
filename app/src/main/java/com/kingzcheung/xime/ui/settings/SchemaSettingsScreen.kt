@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -544,7 +545,7 @@ fun SchemaSettingsContent(
                     val orderedEnabledIds = dragOrder.order
                     LazyColumn(
                         state = dragOrder.list,
-                        modifier = Modifier
+                        modifier = Modifier.settingsGutterScroll(dragOrder.list)
                             .weight(1f)
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -655,8 +656,10 @@ fun SchemaSettingsContent(
                             )
                         }
                     } else {
+                        val listState = rememberLazyListState()
                         LazyColumn(
-                            modifier = Modifier
+                            state = listState,
+                            modifier = Modifier.settingsGutterScroll(listState)
                                 .weight(1f)
                                 .padding(horizontal = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),

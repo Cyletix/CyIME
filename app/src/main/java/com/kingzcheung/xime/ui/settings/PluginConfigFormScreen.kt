@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -200,8 +201,10 @@ fun PluginConfigFormScreen(
                 )
             }
         ) { padding ->
+            val listState = rememberLazyListState()
             LazyColumn(
-                modifier = Modifier
+                state = listState,
+                modifier = Modifier.settingsGutterScroll(listState)
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp)

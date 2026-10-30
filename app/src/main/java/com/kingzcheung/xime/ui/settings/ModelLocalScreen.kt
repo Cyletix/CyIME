@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -123,8 +124,10 @@ fun ModelLocalContent(
     ) { padding ->
         val localModels = uiState.models.filter { it.isDownloaded }
         // 三段都用设置页统一的分组样式：标题 + 一个圆角面板，行样式一致，说明文字只放在所属分组里。
+        val listState = rememberLazyListState()
         LazyColumn(
-            modifier = Modifier
+            state = listState,
+            modifier = Modifier.settingsGutterScroll(listState)
                 .fillMaxSize()
                 .padding(padding)
                 .testTag("model-local-list"),

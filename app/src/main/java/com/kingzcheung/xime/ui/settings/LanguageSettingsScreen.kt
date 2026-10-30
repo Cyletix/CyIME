@@ -61,7 +61,7 @@ fun LanguageSettingsContent(onOpenSchemaResources: () -> Unit = {}, onOpenDouble
         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) }
     ) { padding ->
         SettingsSearchAutoScroll(dragOrder.list)
-        LazyColumn(Modifier.fillMaxSize().testTag("language-settings-list").padding(padding)
+        LazyColumn(modifier = Modifier.settingsGutterScroll(dragOrder.list).fillMaxSize().testTag("language-settings-list").padding(padding)
             .padding(horizontal = 16.dp, vertical = 8.dp),
             state = dragOrder.list, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Text("点开语言，分别设置输入方案和键盘布局；下次切换到该语言时使用。长按可调整语言顺序。",

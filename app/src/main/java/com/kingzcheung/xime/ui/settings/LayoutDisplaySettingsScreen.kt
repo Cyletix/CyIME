@@ -95,9 +95,10 @@ private fun LayoutDisplayPage(
             )
         }
     ) { paddingValues ->
+        val listState = rememberSettingsSearchListState()
         LazyColumn(
-            state = rememberSettingsSearchListState(),
-            modifier = Modifier
+            state = listState,
+            modifier = Modifier.settingsGutterScroll(listState)
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
