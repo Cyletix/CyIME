@@ -72,6 +72,17 @@ internal class PinyinEditDisplay(raw: String, preedit: String, isT9: Boolean = f
     fun displayOffset(raw: Int): Int = offsets.indexOfLast { it <= raw }.coerceAtLeast(0)
 }
 
+/** Nine-key code and its displayed reading match key for key; syllable delimiters are not keys. */
+internal fun codeKeysBefore(text: String, caret: Int): Int = text.take(caret.coerceAtLeast(0)).count { it != '\'' }
+
+/** Offset just after the first [keys] keys of [text]; 0 for none, the end when it has fewer. */
+internal fun offsetAfterCodeKeys(text: String, keys: Int): Int {
+    if (keys <= 0) return 0
+    var seen = 0
+    text.forEachIndexed { index, c -> if (c != '\'' && ++seen == keys) return index + 1 }
+    return text.length
+}
+
 /** Preserve confirmed Chinese text and real codes; make Latin syllable spaces visible. */
 internal fun pinyinPreviewText(preedit: String): String = preedit.trim()
     .replace(Regex("(?<=[a-zA-ZüÜ'])\\s+(?=[a-zA-ZüÜ'])"), "'")
