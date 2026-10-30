@@ -23,6 +23,13 @@ object SettingsPreferences {
         getPrefs(context).edit().putBoolean(KEY_PUNCTUATION_FULL_WIDTH, full).apply()
     }
 
+    /** 输入成对符号：点开头的引号、括号、书名号时连结尾一起上屏，光标停在中间；默认关（用户 10-30：不成对是有意的设计）。 */
+    const val KEY_PAIRED_SYMBOLS = "paired_symbols"
+    fun isPairedSymbolsEnabled(context: Context): Boolean = getPrefs(context).getBoolean(KEY_PAIRED_SYMBOLS, false)
+    fun setPairedSymbolsEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_PAIRED_SYMBOLS, enabled).apply()
+    }
+
     /**
      * 用户是否显式选择过标点宽度。
      *
