@@ -28,7 +28,8 @@ object DeviceDefaults {
         val editor = prefs.edit()
         if (fresh) {
             val hardware = probe()
-            val profile = DeviceModelProfiles.choose(hardware)
+            val profile = DeviceModelProfiles.choose(hardware,
+                if (com.kingzcheung.xime.BuildConfig.BUNDLED_MODELS) BundledModelInstaller.bundledIds(context) else emptySet())
             val effects = DeviceKeyEffectDefaults.choose(hardware)
             editor.putString(TIER, profile.tier.name)
                 .putString(PREDICTION, profile.predictionModel)

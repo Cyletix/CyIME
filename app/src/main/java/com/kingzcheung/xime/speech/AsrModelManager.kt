@@ -157,7 +157,7 @@ class AsrModelManager(private val context: Context) {
             return mode
         }
         val legacy = getSelectedModelId()
-        if (SpeechLanguages.supports(legacy, language)) return withDefaultCorrection(legacy)
+        if (SpeechLanguages.supports(legacy, language)) return withDefaultCorrection(legacy, language)
         return runCatching { SpeechLanguages.select(language, legacy) { selection(it, language).ready } }.getOrElse {
             when (language) {
                 InputLanguage.JAPANESE -> SpeechModelCatalog.ZIPFORMER_JA
@@ -170,10 +170,13 @@ class AsrModelManager(private val context: Context) {
     /**
      * Unchosen Chinese/English default: Paraformer alone misrecognizes about one character in
      * five (2026-10-07 FLEURS, 18% CER); once SenseVoice is downloaded, correct each pause with it.
-     * Any explicit per-language or legacy choice, including correction off, is kept.
+     * The 完整版 without Paraformer starts on SenseVoice alone; once Paraformer is downloaded it gets the
+     * same streaming preview + SenseVoice. Any explicit per-language or legacy choice, including correction off, is kept.
      */
-    private fun withDefaultCorrection(mode: String): String =
-        if (mode == SpeechModelCatalog.PARAFORMER && !preferences.contains("selected_model") &&
+    private fun withDefaultCorrection(mode: String, language: InputLanguage): String =
+        if ((mode == SpeechModelCatalog.PARAFORMER ||
+                mode == SpeechModelCatalog.SENSEVOICE && SpeechLanguages.supports(SpeechModelCatalog.TWO_PASS, language)) &&
+            !preferences.contains("selected_model") &&
             runCatching { selection(SpeechModelCatalog.TWO_PASS).ready }.getOrDefault(false)) SpeechModelCatalog.TWO_PASS
         else mode
 

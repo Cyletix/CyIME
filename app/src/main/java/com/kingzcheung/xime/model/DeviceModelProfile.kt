@@ -15,8 +15,11 @@ object DeviceModelProfiles {
     const val STANDARD_CPU_KHZ = 1_800_000L
     const val ENHANCED_CPU_KHZ = 2_200_000L
 
-    /** Initial heuristic, not a benchmark or an ongoing policy override. */
-    fun choose(device: DeviceCapabilities): DeviceModelProfile {
+    /**
+     * Initial heuristic, not a benchmark or an ongoing policy override. [bundled] lists the models inside an offline
+     * edition: one that ships SenseVoice without Paraformer starts on SenseVoice instead of downloading 226 MB first.
+     */
+    fun choose(device: DeviceCapabilities, bundled: Set<String> = emptySet()): DeviceModelProfile {
         val memory = device.totalMemoryBytes?.takeIf { it > 0 }
         val cores = device.processors?.takeIf { it > 0 }
         val frequency = device.maxCpuKHz?.takeIf { it > 0 }
@@ -26,7 +29,8 @@ object DeviceModelProfiles {
             memory >= 6 * GIB && (frequency == null || frequency >= ENHANCED_CPU_KHZ) -> DeviceModelTier.ENHANCED
             else -> DeviceModelTier.STANDARD
         }
-        return DeviceModelProfile(tier, if (tier == DeviceModelTier.LIGHT) SMALL else BASE,
-            SpeechModelCatalog.PARAFORMER)
+        val voice = if (SpeechModelCatalog.SENSEVOICE in bundled && SpeechModelCatalog.PARAFORMER !in bundled)
+            SpeechModelCatalog.SENSEVOICE else SpeechModelCatalog.PARAFORMER
+        return DeviceModelProfile(tier, if (tier == DeviceModelTier.LIGHT) SMALL else BASE, voice)
     }
 }

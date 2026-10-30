@@ -9,6 +9,12 @@ import org.json.JSONArray
 object BundledModelInstaller {
     val modelIds = setOf("ochwpro", DeviceModelProfiles.SMALL, DeviceModelProfiles.BASE,
         SpeechModelCatalog.PARAFORMER, SpeechModelCatalog.SENSEVOICE, BuiltinModelCatalog.SPEAKER_MODEL)
+    /** Model ids packed into this offline edition (empty when the manifest is missing). */
+    fun bundledIds(context: Context): Set<String> = runCatching {
+        val manifest = context.assets.open("bundled-models/manifest.json").bufferedReader().use { JSONArray(it.readText()) }
+        (0 until manifest.length()).map { manifest.getJSONObject(it).getString("id") }.toSet()
+    }.getOrDefault(emptySet())
+
     suspend fun install(context: Context) {
         DeviceDefaults.initialize(context)
         val prefs = context.getSharedPreferences("bundled_models", Context.MODE_PRIVATE)
