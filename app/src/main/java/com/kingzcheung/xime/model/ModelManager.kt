@@ -188,7 +188,35 @@ object ModelManager {
         onlyIfDefaultPending: Boolean = false): kotlinx.coroutines.Deferred<Unit> {
         val app = context.applicationContext
         val key = "${model.id}:${(version ?: model.resolvedVersion())?.version.orEmpty()}"
-        return downloads.start(key) { performDownload(app, model, onProgress, version, onlyIfDefaultPending) }
+        return downloads.start(key) {
+            if (!installFromPackage(app, model, onProgress, version, onlyIfDefaultPending))
+                performDownload(app, model, onProgress, version, onlyIfDefaultPending)
+        }
+    }
+
+    /**
+     * 完整版安装包里带着这个模型（设置向导或用户删掉了手机上的那份）：直接从安装包取回，不联网。
+     * 包里没有、或取回失败时返回 false，照常下载。
+     */
+    private suspend fun installFromPackage(context: Context, model: ModelInfo, onProgress: (ModelDownloadState) -> Unit,
+        version: ModelVersion?, onlyIfDefaultPending: Boolean): Boolean {
+        val target = version ?: model.resolvedVersion() ?: return false
+        val source = BundledModelInstaller.packagedSource(context, model, target) ?: return false
+        if (onlyIfDefaultPending && !DefaultModelInstaller.isPendingDefault(context, model.id)) {
+            onProgress(ModelDownloadState.Idle)
+            return true
+        }
+        return try {
+            onProgress(ModelDownloadState.Downloading(0f, 0, -1))
+            source()
+            _downloadStates.update { it + (model.id to ModelDownloadState.Complete) }
+            onProgress(ModelDownloadState.Complete)
+            true
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (error: Exception) {
+            FileLogger.w(TAG, "从安装包取回 ${model.id} 失败，改为下载：${error.message}")
+            false
+        }
     }
 
     suspend fun downloadModel(context: Context, model: ModelInfo,
