@@ -410,17 +410,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         }
                         sendTransformedResult(result)
                     } else {
-                        ToolPanelEditTextHolder.editText?.let { et ->
-                            val start = et.selectionStart.coerceAtLeast(0)
-                            val end = et.selectionEnd.coerceAtLeast(start)
-                            if (start == end && start > 0) {
-                                et.text?.delete(start - 1, start)
-                                try { et.setSelection(start - 1) } catch (_: Exception) {}
-                            } else if (end > start) {
-                                et.text?.delete(start, end)
-                                try { et.setSelection(start) } catch (_: Exception) {}
-                            }
-                        }
+                        deleteInToolPanelField()
                     }
                     return
                 }
@@ -1430,6 +1420,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         return true
     }
 
+    /** Backspace in the tool panel / clipboard search field: the selection, or the character before the caret. */
+    private fun deleteInToolPanelField() {
+        ToolPanelEditTextHolder.editText?.let { et ->
+            val start = et.selectionStart.coerceAtLeast(0)
+            val end = et.selectionEnd.coerceAtLeast(start)
+            if (start == end && start > 0) {
+                et.text?.delete(start - 1, start)
+                try { et.setSelection(start - 1) } catch (_: Exception) {}
+            } else if (end > start) {
+                et.text?.delete(start, end)
+                try { et.setSelection(start) } catch (_: Exception) {}
+            }
+        }
+    }
+
     /** Each tap keeps its FIFO position; a hold allows only one outstanding repeat. */
     internal fun handleDeleteKey() {
         // Keep this physical action at its original position, including D-D-A and D-A-D.
@@ -1449,6 +1454,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             withEditor {
                 if (owner != service.uiState.value.inputSessionId) return@withEditor
                 service.deleteInQuickSendForm()
+            }
+            return
+        }
+        // 工具面板/剪贴板搜索框：九键的退格不经 routeKeyPress，没有拼音时由九键控制器直接转到这里。
+        // 删框里的字，不能落到后面应用的输入框（用户 10-30：剪贴板搜索只能输入，不能删除）。
+        if (service.uiState.value.toolPanelInputFocused) {
+            withEditor {
+                if (owner != service.uiState.value.inputSessionId) return@withEditor
+                deleteInToolPanelField()
             }
             return
         }
