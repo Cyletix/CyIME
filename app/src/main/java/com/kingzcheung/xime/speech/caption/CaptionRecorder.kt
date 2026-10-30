@@ -22,6 +22,7 @@ internal class CaptionRecorder(
     private val onSpectrum: (List<FloatArray>) -> Unit = {},
 ) {
     private val spectrum = CaptionSpectrum()
+    private val room = RoomFloor()
     private val running = AtomicBoolean(false)
     private var record: AudioRecord? = null
     private var thread: Thread? = null
@@ -57,7 +58,7 @@ internal class CaptionRecorder(
                 val samples = read / 2
                 if (samples >= CaptionSpectrum.SIZE) {
                     val hop = (samples - CaptionSpectrum.SIZE) / 2
-                    onSpectrum(List(3) { spectrum.bands(chunk, it * hop) })
+                    onSpectrum(List(3) { room.above(spectrum.bands(chunk, it * hop)) })
                 }
                 try { onChunk(if (read == chunk.size) chunk.copyOf() else chunk.copyOf(read)) }
                 catch (e: Exception) { if (running.get()) onFailure(e.message ?: "字幕会话中断"); break }

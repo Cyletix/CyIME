@@ -73,3 +73,40 @@ internal class CaptionSpectrum {
         private const val RANGE_DB = 36f
     }
 }
+
+/**
+ * Takes the room out of [CaptionSpectrum]'s bands, so the ribbon lies flat in silence on any
+ * microphone. The fixed dB window was tuned on the tablet, whose quiet room sits at the bottom of it;
+ * a phone with a hotter microphone (SM-S9180, 2026-10-30) put its room hum well inside the window,
+ * and the ribbon stood as a big wave that never moved. Each band keeps a floor that drops quickly to
+ * quieter frames and creeps up slowly, so pauses between words reset it while speech stays above it.
+ * Bands come out as their height above that floor; a whole frame whose average barely clears its
+ * own floor counts as silence (single bands of hum flicker by several dB, the average does not).
+ */
+internal class RoomFloor(private val bands: Int = CaptionSpectrum.BANDS) {
+    private val floor = FloatArray(bands)
+    private var meanFloor = 0f
+    private var started = false
+
+    fun above(levels: FloatArray): FloatArray {
+        val mean = levels.average().toFloat()
+        if (!started) {
+            levels.copyInto(floor); meanFloor = mean; started = true
+        }
+        for (b in 0 until bands) floor[b] = follow(floor[b], levels[b])
+        meanFloor = follow(meanFloor, mean)
+        val open = ((mean - meanFloor - GATE_START) / (GATE_FULL - GATE_START)).coerceIn(0f, 1f)
+        return FloatArray(bands) { b -> (levels[b] - floor[b]).coerceAtLeast(0f) * open }
+    }
+
+    private fun follow(floor: Float, level: Float) = floor + (level - floor) * if (level < floor) FALL else RISE
+
+    companion object {
+        // Per ~33 ms frame: down in about a tenth of a second, up over several seconds.
+        private const val FALL = .25f
+        private const val RISE = .008f
+        // Average above its floor (window units, 36 dB each): below 2.9 dB is the room, 5.8 dB counts fully.
+        private const val GATE_START = .08f
+        private const val GATE_FULL = .16f
+    }
+}
