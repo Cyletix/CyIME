@@ -30,6 +30,35 @@ class DoublePinyinSchemeTest {
             assertEquals(syllable, flypySyllable(syllable), DoublePinyinScheme.FLYPY.code(syllable))
     }
 
+    @Test fun shoudaoFollowsItsKeyMap() {
+        val s = DoublePinyinScheme.SHOUDAO
+        assertEquals(emptyList<String>(), s.problems())
+        // 紫框：zh→V、ch→I、sh→E；零声母 12 组独立双键。
+        assertEquals(listOf("vi", "ii", "ei"), listOf("zhi", "chi", "shi").map { s.code(it) })
+        assertEquals(listOf("aa", "ai", "an", "ay", "ao", "ue", "ui", "en", "uf", "er", "oo", "ou"),
+            listOf("a", "ai", "an", "ang", "ao", "e", "ei", "en", "eng", "er", "o", "ou").map { s.code(it) })
+        // 口诀字所在的键：美尊红票样，娃（ua）向团；恳求来年，搜到风怪。
+        assertEquals(listOf("mm", "zz", "hh", "pp", "yy", "hw", "xx", "tt", "kk", "qq", "ll", "nn", "ss", "dd", "ff", "gg"),
+            listOf("mei", "zun", "hong", "piao", "yang", "hua", "xiang", "tuan", "ken", "qiu", "lai", "nian", "sou", "dao", "feng", "guai")
+                .map { s.code(it) })
+        // ue（jue）在 L，üe（lüe）在 B，ü 和 ui 在 V。
+        assertEquals(listOf("jl", "lb", "lv", "dv", "ju", "xh", "ex"),
+            listOf("jue", "lve", "lv", "dui", "ju", "xiong", "shuang").map { s.code(it) })
+        assertEquals(mapOf("dk" to listOf("dia", "den"), "lo" to listOf("luo", "lo")), s.collisions())
+        assertEquals("ex'pc", s.preview())
+    }
+
+    @Test fun shoudaoPreeditAndMixedEnglish() {
+        val s = DoublePinyinScheme.SHOUDAO
+        val rules = s.preeditFormat()
+        assertEquals("zhong guo", apply(rules, "vhgo"))
+        assertEquals("eng e ang ei er", apply(rules, "ufueayuier"))
+        assertEquals("lve jue", apply(rules, "lbjl"))
+        assertEquals("zhong sh", apply(rules, "vhe"))
+        val table = s.cnEnTable("#@/db_name\tcn_en_flypy.txt\nX光\tXgl\nB站\tbvj\n4S店\tsiSdm\n").lines()
+        assertEquals(listOf("#@/db_name\tcn_en_double_pinyin_shoudao.txt", "X光\tXgx", "B站\tbvj", "4S店\tsiSdn"), table.take(4))
+    }
+
     @Test fun algebraTurnsEverySyllableIntoItsCode() {
         for (scheme in DoublePinyinScheme.BUILTINS + custom) {
             val rules = scheme.algebra()

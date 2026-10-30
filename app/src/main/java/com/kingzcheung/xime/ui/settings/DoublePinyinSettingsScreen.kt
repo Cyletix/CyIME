@@ -34,7 +34,7 @@ import kotlinx.coroutines.withContext
 /** 韵母按键上的写法：v 写作 ü（lü、lüe），与常见双拼键位图一致。 */
 private fun finalLabel(final: String) = final.replace('v', 'ü')
 
-/** 双拼方案：内置的小鹤双拼可复制修改；自定义方案改键位后保存，按键排列和符号与中文26键相同。 */
+/** 双拼方案：内置的小鹤、首道可复制修改；自定义方案改键位后保存，按键排列和符号与中文26键相同。 */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DoublePinyinSettingsContent(onBack: () -> Unit) {
