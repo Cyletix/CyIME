@@ -77,7 +77,8 @@ object InputProfiles {
         InputScheme.PINYIN -> "pin'yin"
         InputScheme.DOUBLE_PINYIN -> when ((profile.engineProfile as? EngineProfile.Rime)?.schemaId) {
             "double_pinyin_flypy", "double_pinyin_flypy_14jian" -> "xn'he'ul'pb"
-            else -> "双拼编码"
+            else -> DoublePinyinSchemes.find((profile.engineProfile as? EngineProfile.Rime)?.schemaId.orEmpty())
+                ?.preview() ?: "双拼编码"
         }
         InputScheme.ROMAJI -> "romaji"
         InputScheme.KANA -> "かな"
@@ -127,7 +128,7 @@ object InputProfiles {
         val inputScheme = when {
             id == InputModes.ENGLISH -> InputScheme.DIRECT
             id in pinyinIds || CustomKeyboardLayouts.isCustom(id) -> InputScheme.PINYIN
-            id in doublePinyinIds -> InputScheme.DOUBLE_PINYIN
+            id in doublePinyinIds || DoublePinyinSchemes.isGenerated(id) -> InputScheme.DOUBLE_PINYIN
             id in wubiIds -> InputScheme.WUBI
             id in wubiPinyinIds -> InputScheme.WUBI_PINYIN
             id == "stroke" -> InputScheme.STROKE

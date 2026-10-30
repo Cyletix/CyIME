@@ -140,6 +140,7 @@ object RimeConfigHelper {
         com.kingzcheung.xime.model.CandidateModelAssets.installAvailable(context)
         com.kingzcheung.xime.model.CandidateModelAssets.dropSupersededDownloads(context)
         com.kingzcheung.xime.settings.ChineseSchemas.installOptionalLayoutSchemas(context, rimeDir)
+        com.kingzcheung.xime.settings.DoublePinyinSchemes.install(context, rimeDir)
         check(installing.delete()) { "Cannot finish bundled asset installation" }
         com.kingzcheung.xime.settings.CustomKeyboardLayouts.enableMeasuredCorrection(context)
         // F1: assets 会用内置 default.yaml 覆盖，这里把启用方案重新写回 schema_list

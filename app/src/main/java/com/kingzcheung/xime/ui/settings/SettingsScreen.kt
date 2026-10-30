@@ -97,8 +97,10 @@ fun SettingsScreen(
         composable(SettingsRoutes.HardwareKeyboard) { HardwareKeyboardSettingsContent { navController.popBackStack() } }
         composable("languages") {
             LanguageSettingsContent(onBack = { navController.popBackStack() },
-                onOpenSchemaResources = { navController.navigate(SettingsRoutes.Schema) })
+                onOpenSchemaResources = { navController.navigate(SettingsRoutes.Schema) },
+                onOpenDoublePinyin = { navController.navigate(SettingsRoutes.DoublePinyin) })
         }
+        composable(SettingsRoutes.DoublePinyin) { DoublePinyinSettingsContent { navController.popBackStack() } }
         composable(SettingsRoutes.Schema) {
             SchemaSettingsContent(
                 onBack = {
