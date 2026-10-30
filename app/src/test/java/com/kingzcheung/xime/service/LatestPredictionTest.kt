@@ -128,4 +128,76 @@ class LatestPredictionTest {
         assertEquals(listOf("first", "next99"), calls)
         assertEquals(listOf("next99"), output); assertEquals(1, maximum)
     }
+    // todo 139：上屏后联想请求要等一次 Main post 才发出，这段空档里的退格只取消联想、不删正文。
+    @Test fun deleteBeforeThePostedRequestSeesItAsPending() = runTest {
+        val output = mutableListOf<String>()
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { output += it })
+        val token = worker.reserve()
+        assertFalse(worker.isPending) // 工具栏照旧，只有退格看得到这次登记
+        assertTrue(worker.invalidate()) // 第一下退格：只取消联想
+        if (worker.revision == token) worker.submit("你好") // 迟到的 post 发现已作废
+        worker.release(token)
+        advanceTimeBy(300); runCurrent()
+        assertTrue(output.isEmpty())
+        assertFalse(worker.invalidate()) // 第二下退格删正文
+    }
+
+    @Test fun reservationWithoutSubmitIsReleased() = runTest {
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { })
+        val token = worker.reserve()
+        worker.release(token) // post 里没发请求（切了英文、不能联想的上下文）
+        assertFalse(worker.invalidate())
+    }
+
+    @Test fun submitTakesOverTheReservation() = runTest {
+        val output = mutableListOf<String>()
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { output += it })
+        val token = worker.reserve()
+        if (worker.revision == token) worker.submit("你好")
+        worker.release(token)
+        assertTrue(worker.isPending)
+        advanceTimeBy(300); runCurrent()
+        assertEquals(listOf("你好"), output)
+        assertFalse(worker.invalidate())
+    }
+
+    @Test fun releasingAnOldTokenKeepsANewerReservation() = runTest {
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { })
+        val first = worker.reserve()
+        worker.invalidate()
+        worker.reserve()
+        worker.release(first)
+        assertTrue(worker.invalidate())
+    }
+    // 屏幕退格按下就作废联想，松手那一下才删除：松手时仍要算“在等”，只取消联想。
+    @Test fun deletePressCancelStillCountsWhenTheDeleteRuns() = runTest {
+        val output = mutableListOf<String>()
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { output += it })
+        worker.submit("你好")
+        assertTrue(worker.invalidateAndHold())
+        assertFalse(worker.isPending)
+        advanceTimeBy(300); runCurrent()
+        assertTrue(output.isEmpty()) // 按住时不冒出联想
+        assertTrue(worker.invalidate()) // 松手：只取消联想
+        assertFalse(worker.invalidate()) // 下一下删正文
+    }
+
+    @Test fun heldDeleteCancelExpiresOnAnyOtherInvalidation() = runTest {
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { })
+        worker.submit("你好")
+        worker.invalidateAndHold() // 按下退格后滑走，没有删除
+        worker.invalidate() // 接着按了字母
+        assertFalse(worker.invalidate())
+        worker.submit("再见")
+        worker.invalidateAndHold()
+        worker.submit("新的上屏")
+        worker.invalidate()
+        assertFalse(worker.invalidate())
+    }
+
+    @Test fun deletePressWithNothingPendingHoldsNothing() = runTest {
+        val worker = LatestPrediction(backgroundScope, { listOf(it) }, { })
+        assertFalse(worker.invalidateAndHold())
+        assertFalse(worker.invalidate())
+    }
 }

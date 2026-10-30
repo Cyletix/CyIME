@@ -64,4 +64,22 @@ class ClipboardPastePredictionTest {
         verify(f.handler).post(any())
         verify(f.service).commitTextSilently("打字", false, false, CommitCaret.NONE)
     }
+    // todo 139：上屏到联想请求发出隔着一次 post，空档在 post 之前就登记；post 跑完归还。
+    @Test fun typedCommitReservesPredictionBeforeThePostAndReleasesItAfter() {
+        val f = Fixture(TextCommitResult.ACCEPTED_HOST)
+        whenever(f.prediction.reservePrediction()).thenReturn(7L)
+        f.service.commitTextAndPredict("打字", false)
+        val posted = argumentCaptor<Runnable>()
+        verify(f.prediction).reservePrediction()
+        verify(f.handler).post(posted.capture())
+        verify(f.prediction, never()).releasePrediction(any())
+        posted.firstValue.run()
+        verify(f.prediction).releasePrediction(7L)
+    }
+
+    @Test fun pasteNeverReservesAPrediction() {
+        val f = Fixture(TextCommitResult.ACCEPTED_HOST)
+        f.service.commitPastedText("剪贴板")
+        verify(f.prediction, never()).reservePrediction()
+    }
 }
